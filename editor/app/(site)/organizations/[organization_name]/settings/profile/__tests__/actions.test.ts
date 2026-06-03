@@ -1,8 +1,12 @@
 /**
  * Unit tests for `updateOrganizationProfile` — the org General settings server
- * action. The supabase clients and `next/cache` are mocked; these assert the
+ * action. The supabase client and `next/cache` are mocked; these assert the
  * pure decision logic: the membership gate, avatar validation, the
- * `org-{id}/avatar` path scheme + upsert upload, and the remove flow.
+ * `{id}/avatar` path scheme + upsert upload, and the remove flow.
+ *
+ * Note: the upload/remove go through the SAME user-authed `createClient()` as
+ * the row read/update — there is no `service_role` in this feature (RLS is the
+ * boundary), so the mock exposes only `createClient`.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,16 +19,9 @@ vi.mock("next/cache", () => ({
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn<(...args: never[]) => unknown>(),
-  service_role: {
-    workspace: {
-      storage: {
-        from: vi.fn<(...args: never[]) => unknown>(),
-      },
-    },
-  },
 }));
 
-import { createClient, service_role } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { updateOrganizationProfile } from "../actions";
 
@@ -33,12 +30,21 @@ const mockedCreateClient = vi.mocked(createClient);
 const ORG_NAME = "acme";
 const ORG_ID = 42;
 
-/** Build a user-authed client stub whose `.from()` chain captures the update. */
+/**
+ * Build a user-authed client stub. `.from("organization")` drives the
+ * membership gate + profile update; `.storage.from("avatars")` captures the
+ * upload/remove calls.
+ */
 function makeUserClient(opts: { member?: boolean } = {}) {
   const member = opts.member ?? true;
   const update = fn().mockReturnValue({
     eq: fn().mockResolvedValue({ error: null }),
   });
+  const upload = fn().mockResolvedValue({ error: null });
+  const remove = fn().mockResolvedValue({ error: null });
+  const storageFrom = vi
+    .fn<(bucket: string) => unknown>()
+    .mockReturnValue({ upload, remove });
 
   const client = {
     auth: {
@@ -48,7 +54,6 @@ function makeUserClient(opts: { member?: boolean } = {}) {
       if (table !== "organization")
         throw new Error(`unexpected table ${table}`);
       return {
-        // org lookup / membership gate
         select: fn().mockReturnValue({
           eq: fn().mockReturnValue({
             single: fn().mockResolvedValue(
@@ -58,22 +63,12 @@ function makeUserClient(opts: { member?: boolean } = {}) {
             ),
           }),
         }),
-        // profile update
         update,
       };
     }),
+    storage: { from: storageFrom },
   };
-  return { client, update };
-}
-
-/** Capture the storage upload call. */
-function stubUpload(result: { error: unknown } = { error: null }) {
-  const upload = fn().mockResolvedValue(result);
-  vi.mocked(service_role.workspace.storage.from).mockReturnValue({
-    upload,
-    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial storage stub
-  } as any);
-  return upload;
+  return { client, update, upload, remove, storageFrom };
 }
 
 function form(fields: Record<string, string | File>) {
@@ -105,10 +100,9 @@ describe("updateOrganizationProfile", () => {
   });
 
   it("updates text fields without touching avatar_path when no file/remove", async () => {
-    const { client, update } = makeUserClient();
+    const { client, update, upload, remove } = makeUserClient();
     // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
     mockedCreateClient.mockResolvedValue(client as any);
-    const upload = stubUpload();
 
     await updateOrganizationProfile(
       ORG_NAME,
@@ -121,6 +115,7 @@ describe("updateOrganizationProfile", () => {
     );
 
     expect(upload).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
     const payload = update.mock.calls[0][0];
     expect(payload).toMatchObject({
       display_name: "Acme Inc",
@@ -134,11 +129,10 @@ describe("updateOrganizationProfile", () => {
     );
   });
 
-  it("uploads to org-{id}/avatar (upsert) and writes avatar_path on valid image", async () => {
-    const { client, update } = makeUserClient();
+  it("uploads via the user-auth client to {id}/avatar (upsert) and writes avatar_path", async () => {
+    const { client, update, upload, storageFrom } = makeUserClient();
     // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
     mockedCreateClient.mockResolvedValue(client as any);
-    const upload = stubUpload();
 
     await updateOrganizationProfile(
       ORG_NAME,
@@ -149,20 +143,20 @@ describe("updateOrganizationProfile", () => {
       })
     );
 
-    expect(service_role.workspace.storage.from).toHaveBeenCalledWith("avatars");
+    // Goes through the user-authed client's storage, not service_role.
+    expect(storageFrom).toHaveBeenCalledWith("avatars");
     const [path, , options] = upload.mock.calls[0];
-    expect(path).toBe(`org-${ORG_ID}/avatar`);
+    expect(path).toBe(`${ORG_ID}/avatar`);
     expect(options).toMatchObject({ upsert: true, contentType: "image/png" });
     expect(update.mock.calls[0][0]).toMatchObject({
-      avatar_path: `org-${ORG_ID}/avatar`,
+      avatar_path: `${ORG_ID}/avatar`,
     });
   });
 
-  it("clears avatar_path on remove and does not upload", async () => {
-    const { client, update } = makeUserClient();
+  it("clears avatar_path on remove, deletes the object, and does not upload", async () => {
+    const { client, update, upload, remove } = makeUserClient();
     // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
     mockedCreateClient.mockResolvedValue(client as any);
-    const upload = stubUpload();
 
     await updateOrganizationProfile(
       ORG_NAME,
@@ -170,6 +164,7 @@ describe("updateOrganizationProfile", () => {
     );
 
     expect(upload).not.toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledWith([`${ORG_ID}/avatar`]);
     expect(update.mock.calls[0][0]).toMatchObject({ avatar_path: null });
   });
 
@@ -177,7 +172,6 @@ describe("updateOrganizationProfile", () => {
     const { client } = makeUserClient();
     // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
     mockedCreateClient.mockResolvedValue(client as any);
-    stubUpload();
 
     await expect(
       updateOrganizationProfile(
@@ -195,7 +189,6 @@ describe("updateOrganizationProfile", () => {
     const { client } = makeUserClient();
     // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
     mockedCreateClient.mockResolvedValue(client as any);
-    stubUpload();
 
     await expect(
       updateOrganizationProfile(
