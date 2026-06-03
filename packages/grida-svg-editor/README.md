@@ -740,25 +740,27 @@ Everything else is consumer-built against the editor's API. The two patterns:
 
 ```tsx
 function Toolbar() {
-  const mode = useEditorState((s) => s.mode);
-  const cmd = useCommands();
+  // Insertion is the `Tool` axis, not `Mode` — `Mode` is only
+  // "select" / "edit-content". Flip tools via `editor.set_tool(...)`.
+  const tool = useEditorState((s) => s.tool);
+  const editor = useSvgEditor();
   return (
     <>
       <ToolButton
-        active={mode === "select"}
-        onClick={() => cmd.set_mode("select")}
+        active={tool.type === "cursor"}
+        onClick={() => editor.set_tool({ type: "cursor" })}
       >
         ↖
       </ToolButton>
       <ToolButton
-        active={mode === "insert-rect"}
-        onClick={() => cmd.set_mode("insert-rect")}
+        active={tool.type === "insert" && tool.tag === "rect"}
+        onClick={() => editor.set_tool({ type: "insert", tag: "rect" })}
       >
         ▭
       </ToolButton>
       <ToolButton
-        active={mode === "insert-text"}
-        onClick={() => cmd.set_mode("insert-text")}
+        active={tool.type === "insert-text"}
+        onClick={() => editor.set_tool({ type: "insert-text" })}
       >
         T
       </ToolButton>

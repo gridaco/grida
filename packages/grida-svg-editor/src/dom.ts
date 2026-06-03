@@ -3151,10 +3151,13 @@ class DomSurface implements Surface {
     if (action.kind === "commit_insert" || action.kind === "discard_insert") {
       if (!insert) return;
       if (action.kind === "discard_insert") {
-        // Discard before cleanup so the final render rebuilds without the
-        // node; nothing is committed to history.
-        insert.session.discard();
+        // Clear the text-edit guard (cleanup) BEFORE discard: `render()`
+        // early-returns while a text-edit is active, so the rebuild that drops
+        // the node must come from discard()'s emit *after* the guard is
+        // cleared — otherwise the discarded node lingers in the DOM until the
+        // next unrelated render. Nothing is committed to history.
         this.cleanup_text_edit();
+        insert.session.discard();
       } else {
         // Cleanup renders the live `result`, then the bracket commits as a
         // single undo step.

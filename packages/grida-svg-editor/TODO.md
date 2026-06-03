@@ -31,12 +31,6 @@ alpha.10. Open items:
   / stroke / stroke-width / font on inserted nodes, promote them to
   `EditorStyle.insertion_*` fields (values, not slots; P2). Similarly
   for `DEFAULT_SIZE = 100` and the `CLICK_THRESHOLD_PX = 2` in `dom.ts`.
-- **Tunable defaults via `EditorStyle`.** `default_paint_attrs` (in
-  `src/core/insertions.ts`) returns `#D9D9D9` for rect/ellipse and
-  `#000000` 1px for line, hard-coded. If hosts ask for brand-default fill
-  / stroke / stroke-width on inserted shapes, promote them to
-  `EditorStyle.insertion_*` fields (values, not slots; P2). Similarly
-  for `DEFAULT_SIZE = 100` and the `CLICK_THRESHOLD_PX = 2` in `dom.ts`.
 - **Scope-respecting insertion.** v1 always inserts at root. Wire `parent`
   to `state.scope` in `start_insert_gesture` once "enter group → draw
   inside group" UX is requested. No API change needed.

@@ -4,7 +4,7 @@ title: Empty text is deleted on content-edit exit
 module: svg-editor
 area: text
 tags: [text, content-edit, history, undo]
-status: tested
+status: untested
 severity: medium
 date: 2026-06-03
 updated: 2026-06-03
