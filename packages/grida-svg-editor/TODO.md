@@ -8,14 +8,29 @@ calls, some need both. Listed by area; order is not priority.
 The `Tool` axis + `commands.insert` / `commands.insert_preview` shipped in
 alpha.10. Open items:
 
-- **Text tool (`T`).** Deferred. SVG `<text>` has no intrinsic size, so
-  drag-to-size doesn't apply naively (font-size scaling is a different
-  mental model). A usable text-insert UX must immediately mount the inline
-  content-editor on the new node (matching Figma's "click → caret appears")
-  rather than dropping literal "Text" placeholder characters. The wiring
-  exists (`editor.enter_content_edit(id)`); gesture, default attrs
-  (font-family, font-size, fill), and commit-vs-cancel semantics for an
-  empty text node all need design. Reserve `T`.
+- **Text tool (`T`).** _Shipped (click-only)._ Pointer-down places a
+  single-line `<text>` (`insertions.default_text_attrs`) and enters
+  content-edit immediately; create + first edit are bracketed in one
+  history step via `insert_text_preview`, and the empty-equals-delete rule
+  removes a node left empty on exit (fresh placement discards with no undo
+  entry; an existing node cleared empty is removed as one undoable step).
+  Design: [`docs/wg/feat-svg-editor/text-tool.md`](../../docs/wg/feat-svg-editor/text-tool.md).
+  Still open:
+  - **Tool-axis cleanup (F2).** `insert-text` was added as a sibling
+    `Tool` variant gated to `select` mode. The `Tool` union still conflates
+    select-mode tools (`cursor` / `insert` / `insert-text`) with
+    content-edit-only tools (`lasso` / `bend`) on one axis; splitting them
+    into honest mode-gated categories is deferred.
+  - **Wrapped / multi-line text.** Out of scope. A drag-to-define-box maps
+    to SVG 2 wrapped text (`inline-size` / `shape-inside`) — a separate
+    model with its own gesture; this tool only creates single-line text.
+- **Tunable defaults via `EditorStyle`.** `default_paint_attrs` (in
+  `src/core/insertions.ts`) returns `#D9D9D9` for rect/ellipse and
+  `#000000` 1px for line, hard-coded; `default_text_attrs` likewise
+  hard-codes 16px sans-serif black. If hosts ask for brand-default fill
+  / stroke / stroke-width / font on inserted nodes, promote them to
+  `EditorStyle.insertion_*` fields (values, not slots; P2). Similarly
+  for `DEFAULT_SIZE = 100` and the `CLICK_THRESHOLD_PX = 2` in `dom.ts`.
 - **Tunable defaults via `EditorStyle`.** `default_paint_attrs` (in
   `src/core/insertions.ts`) returns `#D9D9D9` for rect/ellipse and
   `#000000` 1px for line, hard-coded. If hosts ask for brand-default fill

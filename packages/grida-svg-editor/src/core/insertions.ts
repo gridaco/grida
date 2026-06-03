@@ -154,6 +154,32 @@ export namespace insertions {
     }
   }
 
+  /** v1 default font appearance for a freshly-placed `<text>`: 16px
+   *  sans-serif, black fill — visible and editable the instant it's
+   *  placed. Hard-coded for v1, exactly like the shape paint defaults
+   *  above; promote to `EditorStyle.insertion_*` only when a host asks
+   *  for brand defaults (see TODO.md "Tunable defaults via EditorStyle").
+   *
+   *  `<text>` is intentionally NOT an `InsertableTag` — its creation is a
+   *  click-only gesture, not drag-to-size — so it lives outside the
+   *  per-tag switches above rather than forcing a `size` it has no use
+   *  for. */
+  export const DEFAULT_TEXT_FONT_SIZE = 16;
+  export const DEFAULT_TEXT_FONT_FAMILY = "sans-serif";
+  export const DEFAULT_TEXT_FILL = "#000000";
+
+  /** Attrs for a click-to-place text insert: anchor at the click point
+   *  plus the default font appearance. `point` is in world space. */
+  export function default_text_attrs(point: Vec2): Record<string, string> {
+    return {
+      x: fmt(point.x),
+      y: fmt(point.y),
+      "font-size": String(DEFAULT_TEXT_FONT_SIZE),
+      "font-family": DEFAULT_TEXT_FONT_FAMILY,
+      fill: DEFAULT_TEXT_FILL,
+    };
+  }
+
   // ─── Per-tag drag math ───────────────────────────────────────────────
 
   function rect_attrs(

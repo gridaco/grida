@@ -89,7 +89,12 @@ export const DEFAULT_BINDINGS: readonly KeymapBinding[] = [
     args: "vertical_centers",
   },
 
-  // ─── hierarchy ────────────────────────────────────────────────────────────
+  // ─── content edit / hierarchy ─────────────────────────────────────────────
+  // Enter is overloaded; chain order matters. First try entering content
+  // edit on an editable (text/vector) node; `content.enter` returns false
+  // for everything else, so the chain falls through to hierarchy descent.
+  // This gives `Enter` parity with double-click.
+  { keybinding: kb(KeyCode.Enter), command: "content.enter" },
   { keybinding: kb(KeyCode.Enter), command: "hierarchy.enter" },
   { keybinding: kb(KeyCode.Enter, M.Shift), command: "hierarchy.exit" },
 
@@ -138,12 +143,12 @@ export const DEFAULT_BINDINGS: readonly KeymapBinding[] = [
     args: { dx: 0, dy: 10 },
   },
 
-  // ─── tools — V (cursor) / R (rect) / O (ellipse) / L (line) ─────────────
+  // ─── tools — V (cursor) / R (rect) / O (ellipse) / L (line) / T (text) ──
   // Bare letter keys. All default bindings are suppressed while a text
   // input is focused (the form-element focus guard in keymap/keymap.ts);
   // the dom.ts on_keydown early-return additionally suppresses them
-  // during inline SVG text edit. `T` is deliberately omitted — text
-  // insertion needs its own UX design pass (see TODO.md).
+  // during inline SVG text edit. `T` selects the click-only text tool
+  // (design: docs/wg/feat-svg-editor/text-tool.md).
   { keybinding: kb(KeyCode.KeyV), command: TOOL_SET, args: { type: "cursor" } },
   {
     keybinding: kb(KeyCode.KeyR),
@@ -159,6 +164,11 @@ export const DEFAULT_BINDINGS: readonly KeymapBinding[] = [
     keybinding: kb(KeyCode.KeyL),
     command: TOOL_SET,
     args: { type: "insert", tag: "line" },
+  },
+  {
+    keybinding: kb(KeyCode.KeyT),
+    command: TOOL_SET,
+    args: { type: "insert-text" },
   },
   // Q — vector lasso. The TOOL_SET handler gates on `mode === "edit-content"`,
   // so this fires only during path content-edit; outside that, the

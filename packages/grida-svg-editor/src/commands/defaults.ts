@@ -148,6 +148,15 @@ export function registerDefaultCommands(
     return editor.commands.align(args as AlignDirection);
   });
 
+  // ─── content edit ─────────────────────────────────────────────────────────
+  // Enter — enter content-edit (text edit / vector edit) on the single
+  // selected node. Mirrors the double-click → `enter_content_edit` intent
+  // path (dom.ts:commit_intent). `enter_content_edit()` self-guards on a
+  // single selection and returns false for non-editable nodes (or when no
+  // surface is attached to drive the edit), so the chained `hierarchy.enter`
+  // binding can preempt and descend into a container instead.
+  reg.register("content.enter", () => editor.enter_content_edit());
+
   // ─── hierarchy ────────────────────────────────────────────────────────────
   // Enter — select the first child of the selected node. Lets the user drill
   // into a group from the keyboard. Returns false when the selection isn't a
@@ -209,7 +218,7 @@ export function registerDefaultCommands(
     const required_mode: "select" | "edit-content" | null =
       next.type === "lasso" || next.type === "bend"
         ? "edit-content"
-        : next.type === "insert"
+        : next.type === "insert" || next.type === "insert-text"
           ? "select"
           : null; // cursor — any mode
     if (required_mode !== null && editor.state.mode !== required_mode)

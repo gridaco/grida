@@ -530,18 +530,23 @@ editor.tree(): {
 
 Returns a shallow snapshot. Cheap to call after a `version` bump.
 
-### Modes
+### Modes and tools
 
-Modes are the editor's internal state machine for "what does a click do." Consumers observe `state.mode`, flip it via commands, but cannot define new modes.
+"What does a click do" is governed by **two orthogonal axes**, both editor-internal — consumers observe them and flip them via commands, but cannot define new values for either.
+
+- **`Mode`** — what the editor is _doing_. Two values: `select` (normal interaction — pick / marquee / drag) and `edit-content` (inline text edit, or vector content edit on a path).
+- **`Tool`** — what pointer-down _means_ within the current mode. `cursor` (the default — select / marquee / drag), `insert` (a tag — pointer-down draws a new element of that tag, drag-to-size), `insert-text` (click-only — places a single-line `<text>` and enters content-edit immediately; `<text>` has no intrinsic size so it doesn't drag-to-size), and the content-edit-only `lasso` / `bend` (valid only while `mode === "edit-content"` on a path).
 
 ```ts
-editor.modes: ReadonlyArray<Mode>; // discoverable, frozen after construction
-// e.g. ["select", "insert-rect", "insert-ellipse", "insert-line", "insert-text", "edit-content"]
+editor.modes: ReadonlyArray<Mode>; // discoverable, frozen after construction — ["select", "edit-content"]
+editor.state.mode: Mode;
+editor.state.tool: Tool;
 
 editor.commands.set_mode(mode: Mode): void;
+editor.set_tool(tool: Tool): void; // also dispatchable as the `tool.set` command (keymap V/R/O/L/T)
 ```
 
-When a mode-driven gesture completes (rect drawn, text inserted), the editor returns to `select` automatically. Modifier keys can override this (Shift to stay in insert mode); that behavior is bundled, not customizable.
+When a tool-driven gesture completes (a shape is drawn, a text element placed), the tool reverts to `cursor` automatically. Modifier keys can override this (e.g. hold to stay in the insert tool); that behavior is bundled, not customizable.
 
 ### Commands
 
@@ -590,9 +595,11 @@ editor.commands.{
   group(): void;                      // wrap selection in a new <g>
   remove(): void;
 
-  // insertion
-  insert(tag: InsertableTag, attrs?: Readonly<Record<string, string>>): NodeId;
-  insert_preview(tag: InsertableTag, initial?: Readonly<Record<string, string>>): InsertPreviewSession;
+  // insertion — `tag` is an open string (so paste / RPC can create any element,
+  // e.g. "path"); only the closed `InsertableTag` set gets a pointer-driven
+  // draw gesture and default paint.
+  insert(tag: string, attrs?: Readonly<Record<string, string>>): NodeId;
+  insert_preview(tag: string, initial?: Readonly<Record<string, string>>): InsertPreviewSession;
 
   // content
   set_text(value: string): void;
@@ -853,9 +860,10 @@ If a consumer needs any of the above, the right answer is "this is the wrong too
 
 ## Status
 
-- `v0.0.0` — selection only, no mutation.
+- `v0.x` — selection, transform, insert (rect / ellipse / line), inline text
+  edit, and the click-to-place text tool. Experimental.
 
-The shape of the API, the mental model, the file-format guarantees, and the scope are all unsettled. Nothing here is stable. Do not depend on it from production code.
+The shape of the API, the mental model, the file-format guarantees, and the scope are all unsettled. Nothing here is stable — public types still in flux include the `Tool` union (a planned axis split, see `TODO.md` F2). Do not depend on it from production code.
 
 ## Contributing
 

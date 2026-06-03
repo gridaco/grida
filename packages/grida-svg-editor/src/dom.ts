@@ -73,6 +73,7 @@ import { resize_pipeline } from "./core/resize-pipeline";
 import type { RotatableVerdict } from "./core/rotate-pipeline";
 import { transform } from "./core/transform";
 import { insertions, type DragModifiers } from "./core/insertions";
+import { resolve_text_exit } from "./core/text-edit";
 import { paint } from "./core/paint";
 import { Gestures } from "./gestures/gestures";
 import { applyDefaultGestures } from "./gestures/defaults";
@@ -401,6 +402,16 @@ class DomSurface implements Surface {
   private text_edit: TextEditor | null = null;
   private text_edit_target: NodeId | null = null;
   private text_edit_original: string = "";
+
+  /** Open insertion bracket for the text tool — set while the inline
+   *  content-edit that follows a click-to-place is in flight. When set,
+   *  the text-edit exit finalizes through this session (commit = one undo
+   *  step; discard = no node) instead of the existing-node path. Null for
+   *  double-click edits of pre-existing text. */
+  private pending_text_insert: {
+    id: NodeId;
+    session: { commit(): void; discard(): void };
+  } | null = null;
 
   /** Active vector-edit session (null when not in vector content-edit mode).
    *  Mutually exclusive with `text_edit` — content-edit mode owns exactly
@@ -2073,6 +2084,23 @@ class DomSurface implements Surface {
       // the HUD process it (hover during tool mode is fine).
     }
 
+    // Text tool intercept — click-only (no drag-to-size; see
+    // types.ts `insert-text`). Primary pointer-down creates a single-line
+    // <text> at the world point with default appearance and immediately
+    // enters content-edit so the caret is live. Reverts to cursor.
+    // Create + first edit are bracketed in one history step that discards
+    // cleanly if the author types nothing (empty-equals-delete; design:
+    // docs/wg/feat-svg-editor/text-tool.md).
+    if (tool.type === "insert-text") {
+      if (kind === "pointer_down" && e.button === 0) {
+        const world = this.camera.screen_to_world({ x, y });
+        this.editor.set_tool({ type: "cursor" });
+        this.begin_text_insert(world);
+        return;
+      }
+      // Non-primary or non-down events fall through to the HUD.
+    }
+
     const button: PointerButton =
       e.button === 0 ? "primary" : e.button === 2 ? "secondary" : "middle";
 
@@ -2275,6 +2303,13 @@ class DomSurface implements Surface {
     // trying to draw a new shape.
     if (this.current_tool.type === "insert") {
       this.container.style.cursor = "crosshair";
+      return;
+    }
+    // Text tool — same reasoning as `insert` above: without this the cursor
+    // would flip to "move" / "resize-*" while hovering existing nodes,
+    // contradicting the "click to place text" intent. An I-beam signals it.
+    if (this.current_tool.type === "insert-text") {
+      this.container.style.cursor = "text";
       return;
     }
     // Delegate icon → CSS to the HUD's installed renderer. The
@@ -2980,6 +3015,34 @@ class DomSurface implements Surface {
     return false;
   }
 
+  // ─── Text creation (click-to-place tool) ───────────────────────────────────
+
+  /**
+   * Place a new single-line `<text>` at `world` and immediately enter
+   * content-edit on it. Creation + first edit are bracketed in one history
+   * preview (via `insert_text_preview`): committing with content is one
+   * undo step, exiting empty discards the node entirely (empty-equals-
+   * delete). The bracket is finalized in {@link enter_text_edit}'s
+   * commit/cancel callbacks via `this.pending_text_insert`.
+   *
+   * Default font appearance lives in `core/insertions.ts`
+   * (`default_text_attrs`), alongside the shape insertion defaults — not
+   * hard-coded here — so the per-element insert semantics stay in core (P3).
+   */
+  private begin_text_insert(world: Vec2): void {
+    if (this.text_edit || this.vector_edit) return;
+    const session = this.editor_internal().insert_text_preview(
+      insertions.default_text_attrs(world)
+    );
+    this.pending_text_insert = { id: session.id, session };
+    this.editor.enter_content_edit(session.id);
+    // If content-edit failed to mount, don't leak the empty node.
+    if (this.text_edit_target !== session.id) {
+      this.pending_text_insert = null;
+      session.discard();
+    }
+  }
+
   // ─── Content edit (text) ──────────────────────────────────────────────────
 
   private enter_text_edit(id: NodeId): boolean {
@@ -3008,19 +3071,6 @@ class DomSurface implements Surface {
       /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 
     let settled = false;
-    const cleanup_after_commit_or_cancel = () => {
-      // P4 — observers should see a consistent post-edit state. Do all
-      // observable mutations + surface syncs first; clear the
-      // text-edit handles last so anything that polls "is text-edit
-      // active?" still says yes until the rest of the world is settled.
-      this.editor.commands.set_mode("select");
-      this.render();
-      this.sync_surface_selection();
-      this.sync_cursor();
-      this.redraw();
-      this.text_edit = null;
-      this.text_edit_target = null;
-    };
 
     this.text_edit = createTextEditor({
       container: this.container,
@@ -3037,18 +3087,14 @@ class DomSurface implements Surface {
         onCommit: (final_text) => {
           if (settled) return;
           settled = true;
-          doc.doc.set_text(id, this.text_edit_original);
-          cleanup_after_commit_or_cancel();
-          if (final_text !== this.text_edit_original) {
-            this.editor.commands.set_text(final_text);
-          }
+          // Commit keeps what the author typed (`final_text`).
+          this.finalize_text_exit(id, final_text);
         },
         onCancel: () => {
           if (settled) return;
           settled = true;
-          doc.doc.set_text(id, this.text_edit_original);
-          cleanup_after_commit_or_cancel();
-          doc.emit();
+          // Cancel abandons edits — the result is the original text.
+          this.finalize_text_exit(id, this.text_edit_original);
         },
         onUndoFallthrough: () => {
           this.text_edit?.commit();
@@ -3061,6 +3107,86 @@ class DomSurface implements Surface {
       },
     });
     return true;
+  }
+
+  /**
+   * Exit inline text-edit back to select mode. P4 — observers should see a
+   * consistent post-edit state, so do all observable mutations + surface
+   * syncs first, then clear the text-edit handles last (so anything polling
+   * "is text-edit active?" still says yes until the world is settled).
+   */
+  private cleanup_text_edit(): void {
+    this.editor.commands.set_mode("select");
+    this.render();
+    this.sync_surface_selection();
+    this.sync_cursor();
+    this.redraw();
+    this.text_edit = null;
+    this.text_edit_target = null;
+  }
+
+  /**
+   * Realize the result of a text content-edit session and exit. `result`
+   * is the text that should remain — the typed text on commit, the original
+   * on cancel. Implements the empty-equals-delete rule (design:
+   * docs/wg/feat-svg-editor/text-tool.md): an empty result removes the node.
+   * (see test/svg-editor-text-empty-delete.md)
+   *
+   * The empty-equals-delete decision is pure and lives in
+   * {@link resolve_text_exit} (`core/text-edit.ts`) — tested headlessly.
+   * This method is the thin dispatcher that realizes each action against
+   * the surface + editor.
+   */
+  private finalize_text_exit(id: NodeId, result: string): void {
+    const internal = this.editor_internal();
+    const insert = this.pending_text_insert;
+    this.pending_text_insert = null;
+    const action = resolve_text_exit({
+      origin: insert && insert.id === id ? "fresh" : "existing",
+      result,
+      original: this.text_edit_original,
+    });
+
+    // Fresh-insert bracket: the live doc already holds `result`.
+    if (action.kind === "commit_insert" || action.kind === "discard_insert") {
+      if (!insert) return;
+      if (action.kind === "discard_insert") {
+        // Discard before cleanup so the final render rebuilds without the
+        // node; nothing is committed to history.
+        insert.session.discard();
+        this.cleanup_text_edit();
+      } else {
+        // Cleanup renders the live `result`, then the bracket commits as a
+        // single undo step.
+        this.cleanup_text_edit();
+        insert.session.commit();
+      }
+      return;
+    }
+
+    // Pre-existing node. Restore the original first so the delete/edit step
+    // below captures a clean revert baseline.
+    internal.doc.set_text(id, this.text_edit_original);
+    this.cleanup_text_edit();
+    switch (action.kind) {
+      case "remove":
+        this.editor.commands.select(id);
+        this.editor.commands.remove();
+        break;
+      case "set_text":
+        this.editor.commands.set_text(action.value);
+        break;
+      case "noop":
+        internal.emit();
+        break;
+      default: {
+        // Exhaustiveness guard — a new `TextExitAction` kind from the pure
+        // `resolve_text_exit` core must be handled here, not silently dropped
+        // by the shell (the core's tests can't catch a missing shell case).
+        const _exhaustive: never = action;
+        void _exhaustive;
+      }
+    }
   }
 
   // ─── Content edit (path) ─────────────────────────────────────────────────
