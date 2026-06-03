@@ -42,7 +42,7 @@ const tools = {
  * can gate + bill the call.
  */
 export type CanvasDesignAgentCallOptions = {
-  organizationId: number;
+  organization_id: number;
   feature?: string;
 };
 
@@ -60,6 +60,13 @@ export type CanvasDesignAgentCallOptions = {
  * @see https://vercel.com/docs/ai-gateway/capabilities/reasoning/openai
  * @see https://vercel.com/docs/ai-gateway/capabilities/reasoning/anthropic
  */
+// TODO(agent-convergence): bespoke `ToolLoopAgent`, intentionally NOT on the
+// `@grida/agent` core that powers `gridaAgent` + the Desktop sidecar. The core's
+// tool catalog is fixed (RFC anti-goal: no host-tool injection), and `canvas_use`
+// is host-specific executable tools — neither a capability backend (fs/todos/
+// command) nor a skill (instructional). Converging means adding a host-tool seam
+// to the core, so defer until the canvas copilot needs the core's
+// sessions/persistence (today it's stateless + playground-only).
 export const canvasDesignAgent = new ToolLoopAgent<
   CanvasDesignAgentCallOptions,
   typeof tools
@@ -72,7 +79,7 @@ export const canvasDesignAgent = new ToolLoopAgent<
     providerOptions: {
       ...settings.providerOptions,
       grida: {
-        organizationId: options.organizationId,
+        organization_id: options.organization_id,
         feature: options.feature ?? "canvas/agent/chat",
       },
       openai: {

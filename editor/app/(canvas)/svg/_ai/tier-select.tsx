@@ -10,8 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { models, type ModelTier } from "@/lib/ai/models";
 import { useSvgAgentTier } from "./provider";
-// IMPORTANT: pull from ./tiers (client-safe), not ./server-agent (server-only).
-import { SVG_AGENT_TIERS } from "./tiers";
+import { AGENT_TIERS } from "@grida/agent/tiers";
 
 // Compact one-line label per tier. Pricing is shown inside the dropdown,
 // not in the trigger, so the title bar stays narrow.
@@ -33,7 +32,7 @@ type Option = {
   outputUsd: number;
 };
 
-const OPTIONS: readonly Option[] = SVG_AGENT_TIERS.map((tier) => {
+const OPTIONS: readonly Option[] = AGENT_TIERS.map((tier) => {
   const spec = models[tier];
   return {
     tier,
@@ -51,7 +50,7 @@ const OPTIONS: readonly Option[] = SVG_AGENT_TIERS.map((tier) => {
  *
  * The server validates and falls back to its default for unknown values, so
  * the only invariant the UI must preserve is that `value` is one of
- * `SVG_AGENT_TIERS`.
+ * `AGENT_TIERS`.
  */
 export function TierSelect() {
   const { tier, setTier } = useSvgAgentTier();

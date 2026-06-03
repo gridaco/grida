@@ -1,5 +1,5 @@
 import type { SvgEditor } from "@grida/svg-editor";
-import type { AgentFs } from "@grida/agent-tools/fs";
+import type { AgentFs } from "@grida/agent/fs";
 import { formatSvg } from "./format-svg";
 
 /**
@@ -19,7 +19,7 @@ import { formatSvg } from "./format-svg";
  *   that this fires on every emission.
  *
  * Lives at the call site because pretty-printing is SVG-specific. The
- * generic `@grida/agent-tools/fs` knows nothing about element-per-line
+ * generic `@grida/agent/fs` knows nothing about element-per-line
  * formatting.
  */
 export function svgEditorBinding(editor: SvgEditor): AgentFs.LiveBinding {

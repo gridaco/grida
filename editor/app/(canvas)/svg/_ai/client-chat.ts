@@ -3,12 +3,12 @@ import {
   DefaultChatTransport,
   lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
-import { AgentFs } from "@grida/agent-tools/fs";
-import { AgentTodos } from "@grida/agent-tools/todos";
+import { AgentFs } from "@grida/agent/fs";
+import { AgentTodos } from "@grida/agent/todos";
 // Type-only import — erased at compile time, so this doesn't drag the server
 // module (which depends on `next/headers`) into the client bundle.
 import type { ModelTier } from "@/lib/ai/models";
-import type { SvgEditorAgentMessage } from "./server-agent";
+import type { AgentMessage } from "./server-agent";
 
 /**
  * @param fs        Filesystem tool resolver for `read_file` / `update_file`.
@@ -25,9 +25,9 @@ export function makeSvgEditorChat(
   todos: AgentTodos,
   getTier: () => ModelTier
 ) {
-  const chat = new Chat<SvgEditorAgentMessage>({
-    transport: new DefaultChatTransport<SvgEditorAgentMessage>({
-      api: "/private/ai/svg/chat",
+  const chat = new Chat<AgentMessage>({
+    transport: new DefaultChatTransport<AgentMessage>({
+      api: "/private/ai/design/chat",
       // `body` is a `Resolvable<object>` — a function form is read per request,
       // so a stale closure can't pin the tier to the value it had at chat
       // creation time.
@@ -36,9 +36,15 @@ export function makeSvgEditorChat(
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onToolCall: ({ toolCall }) => {
       // Try each fundamental resolver in order; first one to claim wins.
+      const agentToolCall = {
+        tool_name: toolCall.toolName,
+        tool_call_id: toolCall.toolCallId,
+        input: toolCall.input,
+        dynamic: toolCall.dynamic,
+      };
       const output =
-        AgentFs.resolveToolCall(fs, toolCall) ??
-        AgentTodos.resolveToolCall(todos, toolCall);
+        AgentFs.resolveToolCall(fs, agentToolCall) ??
+        AgentTodos.resolveToolCall(todos, agentToolCall);
       if (output === undefined) return;
       chat.addToolResult({
         tool: toolCall.toolName,

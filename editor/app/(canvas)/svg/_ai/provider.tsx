@@ -10,12 +10,11 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { AgentTodos } from "@grida/agent-tools/todos";
+import { AgentTodos } from "@grida/agent/todos";
 import type { ModelTier } from "@/lib/ai/models";
 import { useSvgDocStore } from "../_storage/context";
 import { makeSvgEditorChat, type SvgEditorChat } from "./client-chat";
-// IMPORTANT: pull from ./tiers (client-safe), not ./server-agent (server-only).
-import { SVG_AGENT_DEFAULT_TIER } from "./tiers";
+import { AGENT_DEFAULT_TIER } from "@grida/agent/tiers";
 
 type SvgAgentContextValue = {
   chat: SvgEditorChat;
@@ -39,8 +38,8 @@ export function AISvgChatProvider({ children }: { children: ReactNode }) {
   // the chat transport's `body` getter on every send, including auto-resends
   // after a tool result lands). Splitting them lets the chat instance stay
   // stable across tier changes — no re-mount, no in-flight stream torn down.
-  const [tier, setTierState] = useState<ModelTier>(SVG_AGENT_DEFAULT_TIER);
-  const tierRef = useRef<ModelTier>(SVG_AGENT_DEFAULT_TIER);
+  const [tier, setTierState] = useState<ModelTier>(AGENT_DEFAULT_TIER);
+  const tierRef = useRef<ModelTier>(AGENT_DEFAULT_TIER);
   const setTier = useCallback((next: ModelTier) => {
     tierRef.current = next;
     setTierState(next);

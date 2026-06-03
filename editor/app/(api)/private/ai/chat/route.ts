@@ -57,7 +57,10 @@ export async function POST(req: NextRequest) {
     return createAgentUIStreamResponse({
       agent: canvasDesignAgent,
       uiMessages: messages,
-      options: { organizationId, feature: "canvas/agent/chat" },
+      options: {
+        organization_id: organizationId,
+        feature: "canvas/agent/chat",
+      },
       sendReasoning: true,
       messageMetadata: ({ part }): AgentMessageMetadata | undefined => {
         if (part.type === "finish-step") {

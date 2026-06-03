@@ -5,12 +5,12 @@ import {
   type UIMessage,
 } from "ai";
 import {
-  svgEditorAgent,
-  SVG_AGENT_DEFAULT_TIER,
-  SVG_AGENT_TIERS,
+  gridaAgent,
+  AGENT_DEFAULT_TIER,
+  AGENT_TIERS,
 } from "@/app/(canvas)/svg/_ai/server-agent";
 import type { ModelTier } from "@/lib/ai/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createClientFromBearer } from "@/lib/supabase/server";
 import { modelSpecById } from "@/lib/ai/models";
 import { requireOrganizationId } from "@/lib/auth/organization";
 import { aiErrorResponse, orgErrorToAiError } from "@/lib/ai/error";
@@ -24,18 +24,32 @@ type AgentChatRequestBody = {
 
 // Server-side allowlist mirrors `/ai`'s chat action: never trust the
 // client to pick a tier outside the four exposed by the picker.
-const ALLOWED_TIERS = new Set<string>(SVG_AGENT_TIERS);
+const ALLOWED_TIERS = new Set<string>(AGENT_TIERS);
 function coerceTier(raw: unknown): ModelTier {
   return typeof raw === "string" && ALLOWED_TIERS.has(raw)
     ? (raw as ModelTier)
-    : SVG_AGENT_DEFAULT_TIER;
+    : AGENT_DEFAULT_TIER;
 }
 
 // GRIDA-SEC-003: auth + org always run; billing seam is carried by the
 // agent through `providerOptions.grida`.
+//
+// GRIDA-SEC-004: route accepts cookie auth (browser) OR `Authorization: Bearer`
+// (Grida Desktop AgentSidecar). The cookie path is unchanged for web
+// callers; the bearer path lets the agent sidecar call this endpoint without
+// presenting browser cookies. See editor/lib/supabase/server.ts
+// (`createClientFromBearer`).
+const BEARER_PREFIX = "Bearer ";
+
 export async function POST(req: NextRequest) {
   try {
-    const client = await createClient();
+    const authHeader = req.headers.get("authorization") ?? "";
+    const bearerToken = authHeader.startsWith(BEARER_PREFIX)
+      ? authHeader.slice(BEARER_PREFIX.length)
+      : null;
+    const client = bearerToken
+      ? createClientFromBearer(bearerToken)
+      : await createClient();
     const { data: userdata, error: authError } = await client.auth.getUser();
     if (authError || !userdata.user) {
       return aiErrorResponse({
@@ -62,9 +76,13 @@ export async function POST(req: NextRequest) {
     let lastStepUsage: LanguageModelUsage | undefined;
 
     return createAgentUIStreamResponse({
-      agent: svgEditorAgent,
+      agent: gridaAgent,
       uiMessages: messages,
-      options: { organizationId, feature: "canvas/svg/agent/chat", tier },
+      options: {
+        organization_id: organizationId,
+        feature: "canvas/svg/agent/chat",
+        tier,
+      },
       sendReasoning: true,
       messageMetadata: ({ part }): AgentMessageMetadata | undefined => {
         if (part.type === "finish-step") {
