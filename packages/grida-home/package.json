@@ -1,0 +1,46 @@
+{
+  "name": "@grida/home",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Grida's canonical per-user home directory contract — resolves WHERE Grida state lives (~/.grida, overridable via GRIDA_HOME). Path resolution only; no I/O. Not XDG.",
+  "keywords": [
+    "directory",
+    "grida",
+    "home",
+    "paths",
+    "userdata"
+  ],
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.1",
+    "typescript": "^6",
+    "vitest": "^4"
+  }
+}
