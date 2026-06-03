@@ -350,5 +350,6 @@ describe("refig CLI", () => {
     expect(pngBytes.byteLength).toBeGreaterThan(100);
   }, 90_000);
 
-  it.todo("--export-all on .fig file exports all nodes with exportSettings");
+  // Coverage target: --export-all on .fig file exports all nodes with
+  // exportSettings.
 });

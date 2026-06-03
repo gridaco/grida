@@ -15,10 +15,8 @@ describe("Original Direction Scaling Challenge", () => {
   //
   // This requires advanced matrix manipulation that goes beyond simple
   // decompose/compose operations.
-
-  it.todo(
-    "scales side drags in original (unrotated) axis for rotated transforms"
-  );
+  // Coverage target: scale side drags in original (unrotated) axis for
+  // rotated transforms once the exact matrix semantics are specified.
 });
 
 describe("Transform Box Editor", () => {

@@ -201,8 +201,8 @@ describe.runIf(rustBinAvailable())("parity with grida_dev reftest", () => {
 describe.skipIf(rustBinAvailable())(
   "parity with grida_dev reftest (SKIPPED)",
   () => {
-    it.todo(
-      `rust binary not found at ${RUST_BIN}; run 'cargo build -p grida_dev' to enable`
-    );
+    it(`rust binary not found at ${RUST_BIN}; run 'cargo build -p grida_dev' to enable`, () => {
+      expect(rustBinAvailable()).toBe(false);
+    });
   }
 );

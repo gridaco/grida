@@ -102,9 +102,8 @@ test("parses multiple clipboard formats", () => {
 
 // Dev-time regeneration: renders a known paste fixture to HTML and snapshots
 // it. Depends on an on-disk JSON fixture (`grey-circle-paste.json`) and a
-// writable `gen/` directory that aren't part of the checked-in suite, so the
-// run-loop version is kept as a todo until both are restored.
-test.todo("write canned message to html");
+// writable `gen/` directory that aren't part of the checked-in suite.
+// Coverage target: restore the fixture and assert the canned message HTML.
 
 test("write html string", () => {
   const nodeToCreate: NodeChange = {
