@@ -1,0 +1,54 @@
+import { isReasoningUIPart, isTextUIPart, isToolUIPart } from "ai";
+import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+
+/**
+ * One contiguous render unit walked out of a message's `parts`.
+ * Consecutive reasoning deltas merge into one block, and consecutive tool
+ * calls collapse into one group; part kinds the renderer doesn't handle
+ * (file / source / step markers) are dropped.
+ */
+export type RenderGroup =
+  | { type: "text"; key: string; text: string }
+  | { type: "reasoning"; key: string; text: string }
+  | { type: "tools"; key: string; entries: ToolCallEntry[] };
+
+export function groupMessageParts(message: ChatMessage): RenderGroup[] {
+  const groups: RenderGroup[] = [];
+
+  for (const [index, part] of message.parts.entries()) {
+    if (isTextUIPart(part)) {
+      groups.push({ type: "text", key: `text-${index}`, text: part.text });
+      continue;
+    }
+
+    if (isReasoningUIPart(part)) {
+      const last = groups[groups.length - 1];
+      if (last?.type === "reasoning") {
+        last.text += part.text;
+      } else {
+        groups.push({
+          type: "reasoning",
+          key: `reasoning-${index}`,
+          text: part.text,
+        });
+      }
+      continue;
+    }
+
+    if (!isToolUIPart(part)) continue;
+    const entry = part;
+
+    const last = groups[groups.length - 1];
+    if (last?.type === "tools") {
+      last.entries.push(entry);
+    } else {
+      groups.push({
+        type: "tools",
+        key: `tools-${index}`,
+        entries: [entry],
+      });
+    }
+  }
+
+  return groups;
+}

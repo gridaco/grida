@@ -1,0 +1,70 @@
+import { describe, expect, it } from "vitest";
+import { toolDisplay } from "./tool-display";
+import type { ToolCallEntry } from "@/lib/agent-chat";
+
+describe("toolDisplay", () => {
+  it("summarizes mixed tool chunks in stable product copy", () => {
+    expect(
+      toolDisplay.summarize([
+        tool("1", "edit_file", { path: "/src/a.ts" }),
+        tool("2", "read_file", { path: "/src/b.ts" }),
+        tool("3", "run_command", {
+          command: "pnpm",
+          args: ["typecheck"],
+          description: "Typecheck editor",
+        }),
+      ])
+    ).toBe("Edited 1 file, read 1 file, ran 1 command");
+  });
+
+  it("uses agent-provided command descriptions before argv", () => {
+    expect(
+      toolDisplay.describe(
+        tool("1", "run_command", {
+          command: "pnpm",
+          args: ["test"],
+          description: "Run agent sidecar tests",
+        })
+      )
+    ).toMatchObject({
+      action: "command",
+      title: "Ran command",
+      detail: "Run agent sidecar tests",
+    });
+  });
+
+  it("counts distinct files instead of repeated file tool calls", () => {
+    expect(
+      toolDisplay.summarize([
+        tool("1", "edit_file", { path: "/src/a.ts" }),
+        tool("2", "edit_file", { path: "/src/a.ts" }),
+        tool("3", "edit_file", { path: "/src/b.ts" }),
+      ])
+    ).toBe("Edited 2 files");
+  });
+
+  it("describes tool input streaming before final input or output", () => {
+    expect(
+      toolDisplay.describe({
+        type: "tool-read_file",
+        toolCallId: "1",
+        state: "input-streaming",
+        input: undefined,
+      } as ToolCallEntry)
+    ).toMatchObject({
+      action: "read",
+      title: "Reading file",
+      tone: "running",
+    });
+  });
+});
+
+function tool(id: string, toolName: string, input: unknown): ToolCallEntry {
+  return {
+    type: `tool-${toolName}`,
+    toolCallId: id,
+    input,
+    output: { ok: true },
+    state: "output-available",
+  } as ToolCallEntry;
+}
