@@ -1,0 +1,366 @@
+/**
+ * Workspace workbench — VSCode-like three-pane layout for a single
+ * opened workspace.
+ *
+ * Layout:
+ *
+ *   ┌─ TitleBar ────────────────────────────────────────────────┐
+ *   ├─ Agent Pane ────────┬─ Editor Pane ───────────┬─ File Tree Pane ┐
+ *   │ agent + workspace-  │  tab strip + per-file   │ files     │
+ *   │ scoped commands     │  viewers/editors        │ folders   │
+ *   └─────────────────────┴─────────────────────────┴───────────┘
+ *
+ * No secondary header strip — the TitleBar above carries the only
+ * cross-pane chrome (back/forward via Chromium history). The
+ * workspace name lives in the file tree pane's root row, which is already
+ * the right place for it.
+ *
+ * The workbench owns the small amount of cross-pane state: which tabs
+ * are open, which is active, and a refresh counter that the file tree pane
+ * reads when one pane mutates the filesystem (a save in the editor,
+ * an mkdir/cp/git-mv from the agent pane). Pure prop drilling — no
+ * context, no store — because nothing else needs to subscribe.
+ *
+ * The host (`page.tsx`) is responsible for resolving the workspace
+ * from the `?id=` query param; this component renders against an
+ * already-resolved `Workspace` so it never needs to deal with the
+ * empty-bridge / loading state.
+ */
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  FolderIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import {
+  TitleBar,
+  TITLEBAR_NO_DRAG_STYLE,
+} from "@/scaffolds/desktop/chrome/title-bar";
+import type { Workspace } from "@/lib/desktop/bridge";
+import {
+  confirmAndTrashEntry,
+  copyAbsolutePath,
+  copyRelativePath,
+  matchFileActionShortcut,
+  revealInFinder,
+} from "./workbench-file-actions";
+import { FileTreePane } from "./file-tree-pane";
+import { EditorPane } from "./editor-pane";
+import { WorkspaceOpenInMenu } from "./workspace-open-in-menu";
+import { AgentPane } from "./agent-pane";
+
+/**
+ * Pane sizing, matching the workstation-shell conventions:
+ *   - Default size as a percentage (scales with window width).
+ *   - Min (and optional max) as pixels (pane readability is a pixel concern).
+ *
+ * Side panes stay compact (15–25%); the editor pane fills the
+ * rest. The agent pane sits at ~25% because that's what the SVG
+ * workstation already established as a "comfortable chat width."
+ */
+const FILE_TREE_PANE_DEFAULT = "18%";
+const FILE_TREE_PANE_MIN = "180px";
+const FILE_TREE_PANE_MAX = "360px";
+const AGENT_PANE_DEFAULT = "25%";
+const AGENT_PANE_MIN = "280px";
+// No max: the agent pane grows as far as the user drags it (bounded only by
+// the other panes' mins). Only a min is enforced, for readability.
+// The editor pane fills the slack (defaultSize below), but needs its own min
+// so widening the now-uncapped chat can't crush it to zero width.
+const EDITOR_PANE_MIN = "360px";
+
+/**
+ * Whether a keyboard event originated inside an editable surface (text
+ * input, textarea, or contenteditable — which covers the agent chat box
+ * and the code editor's textarea). Used to keep the global ⌘⌫ trash
+ * shortcut from firing while the user is editing text, where ⌘⌫ means
+ * "delete to start of line."
+ *
+ * (see test/desktop-workbench-trash-shortcut-text-guard.md)
+ */
+function isEditableTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el || typeof el.tagName !== "string") return false;
+  return (
+    el.tagName === "INPUT" ||
+    el.tagName === "TEXTAREA" ||
+    el.isContentEditable === true
+  );
+}
+
+export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
+  // Tab state lives in the workbench so the file tree pane can highlight the
+  // active tab and the agent pane could later open files into tabs
+  // too. Order matters: `openTabs` is the visible left-to-right
+  // strip. `activeRelPath === null` means "no tabs open"; otherwise
+  // it's always one of `openTabs`.
+  const [openTabs, setOpenTabs] = useState<string[]>([]);
+  const [activeRelPath, setActiveRelPath] = useState<string | null>(null);
+  const [treeRefreshKey, setTreeRefreshKey] = useState(0);
+  // File tree pane visibility. VSCode convention: ⌘B / Ctrl+B
+  // toggles, and the TitleBar carries the persistent toggle button.
+  // Conditional render (not `display: none`) so the resizable-panel
+  // group redistributes space cleanly to the EditorPane when the file tree pane
+  // is hidden.
+  const [showTree, setShowTree] = useState(true);
+
+  // Recently-closed tabs for "reopen closed tab" (Cmd/Ctrl+Shift+T),
+  // most-recent last. A ref, not state — nothing renders from it, so
+  // keeping it off the render path avoids churn. Bounded so a long
+  // editing session can't grow it without limit.
+  const closedTabsRef = useRef<string[]>([]);
+  // Latest `openTabs`, mirrored so `reopenClosedTab` reads the live set
+  // without taking `openTabs` as a dep (which would rebuild the
+  // otherwise-stable callback on every tab change).
+  const openTabsRef = useRef(openTabs);
+  openTabsRef.current = openTabs;
+
+  const bumpTreeRefresh = useCallback(() => {
+    setTreeRefreshKey((k) => k + 1);
+  }, []);
+
+  const toggleTree = useCallback(() => {
+    setShowTree((v) => !v);
+  }, []);
+
+  // A trashed entry: drop the affected tab(s) — a file closes its own
+  // tab; a folder closes every open tab under it (its whole subtree).
+  // We activate the nearest surviving tab to the left of the one that
+  // was active (VSCode-like), and never record any of them for "reopen
+  // closed tab" — Cmd/Ctrl+Shift+T must not resurrect a deleted entry.
+  // Then bump the tree so the row disappears. Declared above the keydown
+  // effect that references it (its dep array is read at render).
+  const handleEntryTrashed = useCallback(
+    (relPath: string, isDirectory: boolean) => {
+      const affected = (tab: string) =>
+        isDirectory
+          ? tab === relPath || tab.startsWith(`${relPath}/`)
+          : tab === relPath;
+      setOpenTabs((prev) => {
+        if (!prev.some(affected)) return prev;
+        const next = prev.filter((t) => !affected(t));
+        setActiveRelPath((current) => {
+          if (current === null || !affected(current)) return current;
+          const activeIdx = prev.indexOf(current);
+          for (let i = activeIdx - 1; i >= 0; i--) {
+            if (!affected(prev[i])) return prev[i];
+          }
+          return next[0] ?? null;
+        });
+        return next;
+      });
+      bumpTreeRefresh();
+    },
+    [bumpTreeRefresh]
+  );
+
+  // ⌘B / Ctrl+B toggles the file tree pane. We intentionally don't
+  // scope this to a particular focused element — the shortcut is
+  // global within the workspace window, matching VSCode. Editable
+  // children that need ⌘B for their own action (rich-text bold, etc.)
+  // would have to consume the event before bubbling, but none of the
+  // current viewers do.
+  //
+  // The same listener also dispatches the three file actions
+  // (Reveal in Finder / Copy path / Copy relative path) against the
+  // active tab. They live up here rather than per-tab because the
+  // shortcuts are workspace-wide — they fire whether or not the user
+  // has clicked into the tab strip. If there's no active tab, the
+  // file-action shortcuts are no-ops (same UX as the context-menu
+  // entries being unavailable on an empty viewer).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const cmd = e.metaKey || e.ctrlKey;
+      if (cmd && !e.shiftKey && !e.altKey && (e.key === "b" || e.key === "B")) {
+        e.preventDefault();
+        toggleTree();
+        return;
+      }
+      const action = matchFileActionShortcut(e);
+      if (!action) return;
+      // ⌘⌫ must defer to text editing: when an input/textarea/editor is
+      // focused it means "delete to start of line." Bail BEFORE
+      // preventDefault so the focused field keeps its native behaviour.
+      if (action === "trash" && isEditableTarget(e.target)) return;
+      // The shortcuts collide with the browser's default Cmd+R (reload)
+      // and Cmd+Shift+C (devtools), so preventDefault unconditionally —
+      // even when there's no active tab — to keep the surface
+      // predictable. The shortcut "did nothing" rather than reloading
+      // the renderer.
+      e.preventDefault();
+      if (!activeRelPath) return;
+      switch (action) {
+        case "reveal":
+          void revealInFinder(workspace, activeRelPath);
+          return;
+        case "copy-path":
+          void copyAbsolutePath(workspace, activeRelPath);
+          return;
+        case "copy-relative-path":
+          void copyRelativePath(activeRelPath);
+          return;
+        case "trash":
+          // Confirms via a native dialog, then drops the tab + refreshes
+          // the tree. If the file tree has focus, it handles this chord
+          // first and stops propagation so folders can be targeted by the
+          // tree's focused-node selection. This window-level fallback targets
+          // the active editor tab only.
+          void confirmAndTrashEntry(workspace, activeRelPath, false).then(
+            (trashed) => {
+              if (trashed) handleEntryTrashed(activeRelPath, false);
+            }
+          );
+          return;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleTree, activeRelPath, workspace, handleEntryTrashed]);
+
+  const openFile = useCallback((relPath: string) => {
+    setOpenTabs((prev) => (prev.includes(relPath) ? prev : [...prev, relPath]));
+    setActiveRelPath(relPath);
+  }, []);
+
+  // Closing the active tab activates the neighbour to its left
+  // (VSCode behaviour) — falls back to the right neighbour if it
+  // was the first tab, or null if it was the only tab.
+  const closeTab = useCallback((relPath: string) => {
+    setOpenTabs((prev) => {
+      const idx = prev.indexOf(relPath);
+      if (idx < 0) return prev;
+      const next = prev.filter((_, i) => i !== idx);
+      setActiveRelPath((current) => {
+        if (current !== relPath) return current;
+        return next[idx - 1] ?? next[idx] ?? null;
+      });
+      return next;
+    });
+    // Record for "reopen closed tab". Pushed here, outside the updater
+    // above, so React's dev double-invoke of reducers can't double-push.
+    // Bounded to the last 25 closes.
+    const stack = closedTabsRef.current;
+    stack.push(relPath);
+    if (stack.length > 25) stack.shift();
+  }, []);
+
+  // Reopen the most-recently closed tab (Cmd/Ctrl+Shift+T). Skips entries
+  // that are already open again (closed, then reopened by hand) so the
+  // shortcut always brings back a genuinely-closed file rather than
+  // re-focusing a live one — matching VSCode.
+  const reopenClosedTab = useCallback(() => {
+    const stack = closedTabsRef.current;
+    while (stack.length > 0) {
+      const relPath = stack.pop();
+      if (relPath === undefined) return;
+      if (openTabsRef.current.includes(relPath)) continue;
+      openFile(relPath);
+      return;
+    }
+  }, [openFile]);
+
+  return (
+    <div className="flex h-screen w-screen flex-col bg-background">
+      {/* The TitleBar exposes back/forward (Chromium history) and
+          carries the workspace workbench's own chrome. Workspace-level
+          actions sit flush right so they don't compete with the
+          back/forward pair that NavButtons pins to the left. */}
+      <TitleBar>
+        <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <FolderIcon className="size-3.5 shrink-0 text-sky-500" />
+            <span className="truncate font-medium text-foreground">
+              {workspace.name}
+            </span>
+            <span className="truncate font-mono text-muted-foreground">
+              {workspace.root}
+            </span>
+          </div>
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <WorkspaceOpenInMenu workspace={workspace} />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            style={TITLEBAR_NO_DRAG_STYLE}
+            onClick={toggleTree}
+            aria-label={
+              showTree ? "Hide file tree pane" : "Show file tree pane"
+            }
+            aria-pressed={showTree}
+            title={
+              showTree ? "Hide file tree pane (⌘B)" : "Show file tree pane (⌘B)"
+            }
+          >
+            {showTree ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
+          </Button>
+        </div>
+      </TitleBar>
+
+      <div className="min-h-0 flex-1">
+        {/* Horizontal is the default orientation in
+            react-resizable-panels v4 — omit the prop.
+            Order: AgentPane | EditorPane | FileTreePane. Agent-first puts the
+            agent pane in the dominant left position; the file tree pane
+            sits on the right as a secondary navigator and is
+            conditionally rendered so the EditorPane absorbs its
+            space when hidden. */}
+        <ResizablePanelGroup>
+          <ResizablePanel
+            defaultSize={AGENT_PANE_DEFAULT}
+            minSize={AGENT_PANE_MIN}
+          >
+            <AgentPane
+              workspace={workspace}
+              activeRelPath={activeRelPath}
+              onMaybeMutated={bumpTreeRefresh}
+            />
+          </ResizablePanel>
+          <ResizableHandle />
+          <ResizablePanel defaultSize="57%" minSize={EDITOR_PANE_MIN}>
+            <EditorPane
+              workspace={workspace}
+              openTabs={openTabs}
+              activeRelPath={activeRelPath}
+              onSelectTab={setActiveRelPath}
+              onCloseTab={closeTab}
+              onReopenClosedTab={reopenClosedTab}
+              onSaved={bumpTreeRefresh}
+              onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
+            />
+          </ResizablePanel>
+          {showTree && (
+            <>
+              <ResizableHandle />
+              <ResizablePanel
+                defaultSize={FILE_TREE_PANE_DEFAULT}
+                minSize={FILE_TREE_PANE_MIN}
+                maxSize={FILE_TREE_PANE_MAX}
+                className="bg-muted/20"
+              >
+                <FileTreePane
+                  workspace={workspace}
+                  activeRelPath={activeRelPath}
+                  onOpenFile={(rp) => {
+                    if (rp) openFile(rp);
+                  }}
+                  refreshKey={treeRefreshKey}
+                  onEntryTrashed={handleEntryTrashed}
+                />
+              </ResizablePanel>
+            </>
+          )}
+        </ResizablePanelGroup>
+      </div>
+    </div>
+  );
+}

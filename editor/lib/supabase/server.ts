@@ -42,6 +42,34 @@ export async function createClient() {
   return __create_server_client<"public">("public");
 }
 
+/**
+ * GRIDA-SEC-004 — Desktop agent sidecar trust boundary.
+ *
+ * Build a Supabase client that authenticates via an `Authorization: Bearer`
+ * header instead of cookies. The token authenticates the **user**; the
+ * publishable key authenticates the **app**.
+ *
+ * Use when a route receives a request from a non-browser client (e.g. the
+ * Grida Desktop AgentSidecar) that holds an access token in `auth.json`
+ * and cannot present cookies. The cookie path (`createClient()`) is
+ * unchanged for browser callers.
+ *
+ * Route pattern:
+ *   const auth = req.headers.get("authorization");
+ *   const supabase = auth?.startsWith("Bearer ")
+ *     ? createClientFromBearer(auth.slice(7))
+ *     : await createClient();
+ */
+export function createClientFromBearer(token: string) {
+  return _createClient<Database, "public">(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    }
+  );
+}
+
 export async function createCIAMClient() {
   return __create_server_client<"grida_ciam_public">("grida_ciam_public");
 }
