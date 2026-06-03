@@ -1,0 +1,37 @@
+{
+  "name": "@grida/desktop-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Grida Desktop renderer bridge contract: protocol version, native capability DTOs, and window.grida shape.",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "prepack": "tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@grida/agent": "workspace:*"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.1",
+    "typescript": "^6",
+    "vitest": "^4"
+  }
+}
