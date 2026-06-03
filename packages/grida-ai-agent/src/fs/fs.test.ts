@@ -519,7 +519,7 @@ describe("AgentFs.hydrate", () => {
 describe("AgentFs — auto-flush (debounced)", () => {
   it("flushes pure-file writes to the backend after the debounce window", async () => {
     const backend = new AgentFs.MemoryBackend();
-    const fs = new AgentFs(backend, { flushDebounceMs: 10 });
+    const fs = new AgentFs(backend, { flush_debounce_ms: 10 });
     fs.write("/notes.md", { content: "hello", expected_version: null });
     expect(await backend.read("/notes.md")).toBeNull(); // not yet
     await tick(30);
@@ -529,7 +529,7 @@ describe("AgentFs — auto-flush (debounced)", () => {
 
   it("flushes external binding edits via subscribe", async () => {
     const backend = new AgentFs.MemoryBackend();
-    const fs = new AgentFs(backend, { flushDebounceMs: 10 });
+    const fs = new AgentFs(backend, { flush_debounce_ms: 10 });
     const b = makeBinding("<svg/>");
     fs.mount("/canvas.svg", b);
     b.externalEdit("<svg><rect/></svg>");
@@ -540,7 +540,7 @@ describe("AgentFs — auto-flush (debounced)", () => {
 
   it("dispose() cancels pending flushes", async () => {
     const backend = new AgentFs.MemoryBackend();
-    const fs = new AgentFs(backend, { flushDebounceMs: 50 });
+    const fs = new AgentFs(backend, { flush_debounce_ms: 50 });
     fs.write("/notes.md", { content: "hello", expected_version: null });
     fs.dispose();
     await tick(80);

@@ -1,4 +1,4 @@
-# `@grida/agent-tools/fs`
+# `@grida/agent/fs`
 
 A real-fs-shaped facade for AI agents to read, edit, write, and list
 files — either against live state (editors, doc models) or pure storage
@@ -164,17 +164,17 @@ Implementation: `findMatches()` in `internal/match.ts` (not part of the public s
 
 ## Backends
 
-| Backend                                    | Where it runs | Use                                              |
-| ------------------------------------------ | ------------- | ------------------------------------------------ |
-| `AgentFs.MemoryBackend`                    | anywhere      | Tests, SSR, fallback when no persistence         |
-| `OpfsBackend` (subpath `/backends/opfs`)   | browser only  | The `/svg` demo and future canvas surfaces       |
-| `NodeFsBackend` (subpath `/backends/node`) | Node          | Unit tests against a real tmp dir; future server |
+| Backend                                    | Where it runs | Use                                          |
+| ------------------------------------------ | ------------- | -------------------------------------------- |
+| `AgentFs.MemoryBackend`                    | anywhere      | Tests, SSR, fallback when no persistence     |
+| `OpfsBackend` (subpath `/backends/opfs`)   | browser only  | The `/svg` demo and future canvas surfaces   |
+| `NodeFsBackend` (subpath `/backends/node`) | Node          | Unit tests and agent host workspace bindings |
 
-All three implement `AgentFs.Backend`. `OpfsBackend` and `NodeFsBackend` live behind subpath imports so a bare `import "@grida/agent-tools/fs"` doesn't pull `window.navigator.storage` or `node:fs`.
+All three implement `AgentFs.Backend`. `OpfsBackend` and `NodeFsBackend` live behind subpath imports so a bare `import "@grida/agent/fs"` doesn't pull `window.navigator.storage` or `node:fs`.
 
 ```ts
-import { OpfsBackend } from "@grida/agent-tools/fs/backends/opfs"; // browser
-import { NodeFsBackend } from "@grida/agent-tools/fs/backends/node"; // server / tests
+import { OpfsBackend } from "@grida/agent/fs/backends/opfs"; // browser
+import { NodeFsBackend } from "@grida/agent/fs/backends/node"; // server / tests
 ```
 
 Backends are pure I/O — no caching, no debouncing, no version tracking.
@@ -203,7 +203,7 @@ Pure logic, runs in Node:
 Run from the repo root:
 
 ```sh
-pnpm --filter @grida/agent-tools test
+pnpm --filter @grida/agent test
 ```
 
 ## What this module deliberately is not

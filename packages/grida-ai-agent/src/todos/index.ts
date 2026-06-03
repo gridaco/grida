@@ -1,5 +1,5 @@
 /**
- * `@grida/agent-tools/todos` — fundamental planning tool. Mirrors Claude
+ * `@grida/agent/todos` — fundamental planning tool. Mirrors Claude
  * Code's `TodoWrite`: an in-memory, replace-all todo list the agent updates
  * as it works, rendered in the chat panel.
  *
@@ -14,7 +14,7 @@
  * Public surface is grouped under the `AgentTodos` class + a same-named
  * namespace:
  *
- *   import { AgentTodos } from "@grida/agent-tools/todos";
+ *   import { AgentTodos } from "@grida/agent/todos";
  *
  *   const todos = new AgentTodos();
  *   const list: ReadonlyArray<AgentTodos.Todo> = todos.snapshot();
@@ -89,7 +89,7 @@ export class AgentTodos {
 function normalize(t: AgentTodos.Todo): AgentTodos.Todo {
   return {
     content: t.content,
-    activeForm: t.activeForm,
+    active_form: t.active_form,
     status: t.status,
   };
 }
@@ -104,7 +104,7 @@ function shallowEqual(
     const y = b[i];
     if (
       x.content !== y.content ||
-      x.activeForm !== y.activeForm ||
+      x.active_form !== y.active_form ||
       x.status !== y.status
     ) {
       return false;
@@ -136,7 +136,7 @@ export namespace AgentTodos {
      * styles". Distinct from `content` because shells of words read
      * differently when paused vs. live.
      */
-    activeForm: string;
+    active_form: string;
     status: Status;
   };
 
@@ -168,7 +168,7 @@ export namespace AgentTodos {
       .describe(
         'Imperative form of the task. Example: "Run tests", "Add focus styles".'
       ),
-    activeForm: z
+    active_form: z
       .string()
       .min(1)
       .describe(
@@ -213,10 +213,10 @@ export namespace AgentTodos {
 
   export function resolveToolCall(
     store: AgentTodos,
-    toolCall: { toolName: string; input: unknown; dynamic?: boolean }
+    toolCall: { tool_name: string; input: unknown; dynamic?: boolean }
   ): unknown {
     if (toolCall.dynamic) return undefined;
-    if (toolCall.toolName !== TOOL_NAMES.todo_write) return undefined;
+    if (toolCall.tool_name !== TOOL_NAMES.todo_write) return undefined;
     const { todos } = toolCall.input as TodoWriteInput;
     const r = store.write(todos);
     return { ok: r.ok, count: r.count };

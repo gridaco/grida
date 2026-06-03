@@ -7,7 +7,7 @@ const t = (
   activeForm?: string
 ): AgentTodos.Todo => ({
   content,
-  activeForm: activeForm ?? content.replace(/^\w+/, (m) => `${m}ing`),
+  active_form: activeForm ?? content.replace(/^\w+/, (m) => `${m}ing`),
   status,
 });
 

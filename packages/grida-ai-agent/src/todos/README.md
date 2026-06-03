@@ -1,4 +1,4 @@
-# `@grida/agent-tools/todos`
+# `@grida/agent/todos`
 
 A tiny live store + AI-SDK tool for the agent's plan. Mirrors Claude
 Code's `TodoWrite`.
@@ -22,7 +22,7 @@ visible plan. The plan should be:
 - **Tiny** — three statuses, no metadata, no due-dates.
 
 If you want long-lived TODOs (across sessions, across users), write a
-markdown file with `@grida/agent-tools/fs` instead. That's the right tool for
+markdown file with `@grida/agent/fs` instead. That's the right tool for
 that job.
 
 ## API
@@ -103,7 +103,7 @@ If you've used Claude Code, you already know how this works.
 Pure logic, no React, no LLM:
 
 ```sh
-pnpm --filter @grida/agent-tools test
+pnpm --filter @grida/agent test
 ```
 
 ## What this module deliberately is not
@@ -111,5 +111,5 @@ pnpm --filter @grida/agent-tools test
 - **Persistent.** Sessions are short-lived; the plan is a function of
   the current turn. Use `agent-fs` for durable lists.
 - **A workflow engine.** No dependencies, no priorities, no due dates.
-- **A renderer.** The host owns the UI — subscribe to the store and
+- **A client.** The host owns the UI — subscribe to the store and
   render with `useSyncExternalStore`.

@@ -76,10 +76,10 @@ export class NodeFsBackend implements AgentFs.Backend {
 }
 
 async function walk(base: string, dir: string, out: string[]): Promise<void> {
-  let entries: { name: string; isDir: boolean }[];
+  let entries: { name: string; is_dir: boolean }[];
   try {
     const raw = await fs.readdir(dir, { withFileTypes: true });
-    entries = raw.map((e) => ({ name: e.name, isDir: e.isDirectory() }));
+    entries = raw.map((e) => ({ name: e.name, is_dir: e.isDirectory() }));
   } catch (err) {
     if (isNotFound(err)) return;
     throw err;
@@ -87,7 +87,7 @@ async function walk(base: string, dir: string, out: string[]): Promise<void> {
   const dirs: string[] = [];
   for (const ent of entries) {
     const full = path.join(dir, ent.name);
-    if (ent.isDir) {
+    if (ent.is_dir) {
       dirs.push(full);
     } else {
       const rel = path.relative(base, full);

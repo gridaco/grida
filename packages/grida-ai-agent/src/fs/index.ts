@@ -1,5 +1,5 @@
 /**
- * `@grida/agent-tools/fs` — a real-fs-shaped facade for AI agents to read,
+ * `@grida/agent/fs` — a real-fs-shaped facade for AI agents to read,
  * edit, and write files against either live state (an editor, a doc model)
  * or pure storage (notes, sketches, scratch).
  *
@@ -9,7 +9,7 @@
  * import one symbol and reach everything via member access — no flat
  * grab-bag of helpers.
  *
- *   import { AgentFs } from "@grida/agent-tools/fs";
+ *   import { AgentFs } from "@grida/agent/fs";
  *
  *   const fs = new AgentFs(new AgentFs.MemoryBackend());
  *   const binding: AgentFs.LiveBinding = ...;
@@ -26,7 +26,7 @@
  *   const output = AgentFs.resolveToolCall(fs, toolCall);
  *
  * Env-restricted backends (`./backends/opfs`, `./backends/node`) live
- * under their own subpaths so a bare `import "@grida/agent-tools/fs"`
+ * under their own subpaths so a bare `import "@grida/agent/fs"`
  * never pulls `navigator.storage` or `node:fs`. They implement
  * `AgentFs.Backend`.
  *
@@ -93,7 +93,7 @@ const PATH_DESCRIPTION =
  * pure-file map (which would be wrong — the binding would be ignored).
  */
 export class AgentFs {
-  private readonly flushDebounceMs: number;
+  private readonly flush_debounce_ms: number;
   private readonly bindings = new Map<string, AgentFs.LiveBinding>();
   private readonly binding_unsubs = new Map<string, () => void>();
   private readonly files = new Map<string, FileEntry>();
@@ -111,7 +111,7 @@ export class AgentFs {
     private readonly backend: AgentFs.Backend,
     opts: AgentFs.Options = {}
   ) {
-    this.flushDebounceMs = opts.flushDebounceMs ?? 500;
+    this.flush_debounce_ms = opts.flush_debounce_ms ?? 500;
   }
 
   // -------------------------------------------------------------------------
@@ -550,7 +550,7 @@ export class AgentFs {
     this.flush_timer = setTimeout(() => {
       this.flush_timer = null;
       void this.runFlush();
-    }, this.flushDebounceMs);
+    }, this.flush_debounce_ms);
   }
 
   private async runFlush(): Promise<void> {
@@ -704,7 +704,7 @@ export namespace AgentFs {
      * (binding emits, pure-file writes). Each change reschedules; the timer
      * fires when the writer goes idle. Default 500 ms.
      */
-    flushDebounceMs?: number;
+    flush_debounce_ms?: number;
   };
 
   // -------------------------------------------------------------------------
@@ -1042,10 +1042,10 @@ export namespace AgentFs {
 
   export function resolveToolCall(
     fs: AgentFs,
-    toolCall: { toolName: string; input: unknown; dynamic?: boolean }
+    toolCall: { tool_name: string; input: unknown; dynamic?: boolean }
   ): unknown {
     if (toolCall.dynamic) return undefined;
-    switch (toolCall.toolName) {
+    switch (toolCall.tool_name) {
       case TOOL_NAMES.read_file: {
         const { path } = toolCall.input as ReadFileInput;
         const r = fs.read(path);
@@ -1089,7 +1089,7 @@ export namespace AgentFs {
   // Default in-process backend.
   //
   // OPFS / Node backends live behind their own subpath imports so a bare
-  // `import "@grida/agent-tools/fs"` doesn't pull `navigator.storage` or
+  // `import "@grida/agent/fs"` doesn't pull `navigator.storage` or
   // `node:fs`.
   // -------------------------------------------------------------------------
 
