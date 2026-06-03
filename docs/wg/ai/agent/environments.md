@@ -32,7 +32,7 @@ sees only the capabilities the chosen environment exposes.
 | ----------------- | -------------------------------------------------- | --------------------------------------------- | --------------------- |
 | **Web**           | Inside a browser tab — the user's open page        | Browser's same-origin policy + CORS           | Transient (tab close) |
 | **Cloud sandbox** | Ephemeral container or micro-VM in a managed cloud | Container / VM isolation + outbound allowlist | Per-job lifetime      |
-| **Computer**      | The user's own machine (desktop daemon, IDE, CLI)  | OS-level (seatbelt / landlock / AppContainer) | Local-first, durable  |
+| **Computer**      | The user's own machine (desktop host, IDE, CLI)    | OS-level (seatbelt / landlock / AppContainer) | Local-first, durable  |
 
 Each environment is described below.
 
@@ -154,8 +154,8 @@ continue an interrupted session.
 
 ## Computer
 
-The agent runs on the user's own machine — as a long-lived daemon,
-an IDE plugin, a CLI invocation, or any local process.
+The agent runs on the user's own machine — as a long-lived AgentHost
+process, an IDE plugin, a CLI invocation, or any local process.
 
 **Capabilities offered.**
 
@@ -213,12 +213,12 @@ filesystem-resident database
 
 **Recommended discipline.**
 
-- Run one daemon process per user; let it own all session state and
+- Run one AgentHost process per user; let it own all session state and
   secrets.
 - Generate a per-launch credential for the host's IPC perimeter (HTTP
-  loopback / Unix socket / named pipe); do not expose the daemon to
+  loopback / Unix socket / named pipe); do not expose the agent host to
   the network.
-- Apply the OS sandbox to the daemon process itself, not only to the
+- Apply the OS sandbox to the AgentHost process itself, not only to the
   shell calls it spawns.
 
 ## How a host picks

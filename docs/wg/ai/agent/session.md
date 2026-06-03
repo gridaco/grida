@@ -1,6 +1,6 @@
 ---
 title: Session Lifecycle
-description: How a session is born, grows, survives interruption, is compacted, rewound, or branched, and how it switches models per turn. The loop semantics, the chunk stream, the abort path, the run-state machine, the permission-scope layering, and the session-status back-channel.
+description: How a session is born, grows, survives interruption, is compacted, rewound, or forked, and how it switches models per turn. The loop semantics, the chunk stream, the abort path, the run-state machine, the permission-scope layering, and the session-status back-channel.
 keywords:
   [
     agent-system,
@@ -9,7 +9,7 @@ keywords:
     tokens,
     compaction,
     rewind,
-    branching,
+    forking,
     model-switch,
     streaming,
     interruption,
@@ -187,23 +187,26 @@ flow restores both.
 
 ### Rewinding past a compaction
 
-A compaction creates a synthetic assistant message with a summary;
-the messages it summarized are soft-hidden. Rewinding past the
-compaction MUST un-hide them. The truncation pointer moves back
-over the summary AND the summarized turns. Implementations that
-hard-delete on compaction lose this property; they MUST NOT.
+A compaction does not hide the turns it summarized — they stay in the
+linear log, and the model boundary is read-time (`tail_start_id`). The
+summary marker sorts at the bottom (stamped at invocation time), so
+rewinding to any earlier message naturally hides the marker along with
+everything after the target. That **removes the boundary**, re-exposing
+the full pre-target history to the model — no special un-hide step is
+needed. Nothing is deleted, so an un-rewind restores it. Implementations
+that hard-delete on compaction lose this property; they MUST NOT.
 
-## Branching
+## Forking
 
-A **branch** is a new session whose `parent_id` points back to the
+A **fork** is a new session whose `parent_id` points back to the
 parent and whose `parent_message_id` points to the fork point. The
 new session starts with a copy of the parent's messages up to and
-including the fork point; new turns append only to the branch.
+including the fork point; new turns append only to the fork.
 
-### `branch` API
+### `fork` API
 
 ```ts
-branch({
+fork({
   parent_session_id: string,
   from_message_id: string,    // a chat_messages.id reachable from parent_session_id
   metadata?: object,          // merged into the new session's metadata_json
@@ -222,42 +225,50 @@ Behavior:
   copied from the parent's row.
 - The `metadata` blob is merged into the new session's
   `metadata_json`. `metadata.ephemeral = true` is the convention
-  for sidecar branches; see [`ux / sidecar`](./ux.md#sidecar-chat).
+  for sidecar forks; see [`ux / sidecar`](./ux.md#sidecar-chat).
+- The new session's title is **derived, not copied**: the parent's
+  title with a ` (copy)` suffix, so the duplicate is distinguishable
+  in the picker. If the parent is still untitled (`New Chat`), the
+  fork stays untitled so the auto-titler names it from its own
+  first turn. The title is only a _starting_ value — there is no
+  maintained link to the parent (lineage lives in `parent_id` /
+  `parent_message_id`). One source of truth: `session/title.ts`
+  (`session_title.forFork`).
 
-### Why a new session and not a fork of the same session
+### Why a new session and not a tree on one session
 
-- Each branch needs its own running stream, its own token rollup,
+- Each fork needs its own running stream, its own token rollup,
   its own model selection. A session is the natural unit.
-- Two branches MUST be inspectable side by side. Two rows are
+- Two forks MUST be inspectable side by side. Two rows are
   easier to render than one row with a tree shape.
-- The picker shows branches as siblings under the parent without
+- The picker shows forks as siblings under the parent without
   schema gymnastics — `SELECT * FROM chat_sessions WHERE parent_id
 = ?`.
 
-### What gets copied on branch
+### What gets copied on fork
 
 - Every message and part up to and including the fork point. The
   copies have new ids; their `data_json` is verbatim from the
   source.
 - The session row's settings (agent, model, workspace, metadata).
-- Token rollups for the copied turns. The branch starts with the
+- Token rollups for the copied turns. The fork starts with the
   same `total_tokens` the parent had at the fork point.
 
 ### What does NOT get copied
 
-- Side effects the parent took. Branching is a conversation fork,
-  not a workspace fork. If the host wants workspace-snapshot
-  branching, it layers it on the message metadata (same hook as
+- Side effects the parent took. A fork copies the conversation,
+  not the workspace. If the host wants a workspace-snapshot fork,
+  it layers it on the message metadata (same hook as
   side-effect rewind).
-- The parent's in-flight run, if any. A branch CANNOT fork a
+- The parent's in-flight run, if any. A fork CANNOT be taken off a
   running turn; the user MUST wait for the parent's turn to finish
   or abort.
 
-### Sidecar = ephemeral branch
+### Sidecar = ephemeral fork
 
 A sidecar chat (the "ask the model a side question without messing
-up the main thread") is exactly a branch — same wire, same shape —
-with one UX twist: the host marks the branch _ephemeral_, hiding it
+up the main thread") is exactly a fork — same wire, same shape —
+with one UX twist: the host marks the fork _ephemeral_, hiding it
 from the picker. The schema gains nothing; the host filters on a
 metadata flag. See [`ux / sidecar`](./ux.md#sidecar-chat).
 
@@ -290,15 +301,22 @@ re-evaluates against the new model's limit before the next turn.
 
 ### Auto vs manual
 
-- **Auto-compaction** is the default. For casual users, the system
-  fires compaction before the next overflow and replays seamlessly.
-  The user sees a one-line "summarized N earlier turns" affordance.
+- **Auto-compaction** is the default. The system fires it before the
+  next overflow and replays seamlessly. It keeps a **rolling verbatim
+  tail** of `N = tail_turns` (default 2) recent turns and summarizes
+  everything older — it fires mid-conversation, so it must keep recent
+  context intact.
 - **Manual compaction** lets the user fire it on demand (a slash
-  command, a button). Useful when the user knows the next turn will
-  be expensive and wants the conversation cheap to re-run.
+  command, a button). It is **not threshold-gated** — it fires
+  regardless of how full the context is — and it **summarizes everything
+  up to the invocation point** (no verbatim tail held back): the user
+  asked, so compact what's there. The model then continues from the
+  summary alone.
 
-Both produce the same artifact in the schema; only the trigger
-differs.
+Both produce the same artifact and place the marker the same way (see
+[What compaction produces](#what-compaction-produces)); the trigger and
+the verbatim-tail depth (auto keeps `N`, manual keeps none) are the only
+differences.
 
 ### What compaction produces
 
@@ -307,23 +325,27 @@ assistant message. The part's `data_json` carries:
 
 ```ts
 {
-  summary: string,         // Markdown body, sectioned (Goal / Progress / Decisions / Next Steps is a reasonable shape)
-  tail_start_id: string,   // chat_messages.id of the first message kept verbatim
-  auto: boolean,           // true for auto-compaction, false for user-fired
-  summary_tokens: int,     // token count of `summary`, for the next rollup
+  summary: string,            // Markdown body, sectioned (Goal / Progress / Decisions / Next Steps is a reasonable shape)
+  tail_start_id: string|null, // chat_messages.id of the first message kept verbatim; null when nothing is kept (manual)
+  auto: boolean,              // true for auto-compaction, false for user-fired
+  summary_tokens: int,        // token count of `summary`, for the next rollup
 }
 ```
 
-The model sees the summary plus every message from `tail_start_id`
-onward.
+The marker is **stamped at the moment of compaction**, so it sorts
+**last** in creation order — at the bottom of the transcript, where
+compaction was invoked.
 
-The summarized messages are **soft-hidden, not deleted**. Inspection,
-rewind, and "show what was summarized" all need them. The model's
-view skips them; the picker can expose them under "details".
+The summarized head is **not hidden or deleted** — the log stays linear
+and complete. What the _model_ sees is resolved at **read-time** from the
+latest marker's `tail_start_id`: the summary plus every message from
+`tail_start_id` onward (or just the summary, when `tail_start_id` is
+`null`). The user-facing transcript keeps the full history with the
+marker rendered inline as a divider; only the model view collapses.
 
 ### Tail preservation
 
-Compaction keeps the **N most recent turns** verbatim. Default
+**Auto** compaction keeps the **N most recent turns** verbatim. Default
 `N = 2` (one user message + one assistant response). The tail budget
 caps at ~25% of `usable`. If the tail at N=2 exceeds the budget, the
 implementor either:
@@ -334,6 +356,10 @@ implementor either:
 
 Default: "drop to N=1 and warn". "Split the last turn" is for agents
 that habitually run long tool chains.
+
+**Manual** compaction keeps **no verbatim tail** — it summarizes the
+whole conversation up to the invocation point (see
+[Auto vs manual](#auto-vs-manual)).
 
 ### Summarizer cost discipline
 
@@ -430,14 +456,14 @@ queryable from the messages.
 
 ### Compaction interacts with model switch
 
-| Scenario                                              | Behavior                                                                                                                                                            |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| New model has **larger** context than current usage   | No-op. Conversation proceeds.                                                                                                                                       |
-| New model has **smaller** context, but next turn fits | No-op. Conversation proceeds.                                                                                                                                       |
-| New model's context cannot fit the **current** rollup | **Force compaction before the turn proceeds.** The next user message blocks on the summarizer.                                                                      |
-| After compaction, history still does not fit          | The model swap fails. Surface to the user: "Switching to a model with a smaller context window would lose the conversation; consider branching with the new model." |
+| Scenario                                              | Behavior                                                                                                                                                          |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New model has **larger** context than current usage   | No-op. Conversation proceeds.                                                                                                                                     |
+| New model has **smaller** context, but next turn fits | No-op. Conversation proceeds.                                                                                                                                     |
+| New model's context cannot fit the **current** rollup | **Force compaction before the turn proceeds.** The next user message blocks on the summarizer.                                                                    |
+| After compaction, history still does not fit          | The model swap fails. Surface to the user: "Switching to a model with a smaller context window would lose the conversation; consider forking with the new model." |
 
-Branching is the escape hatch for the last case: a branch with the
+Forking is the escape hatch for the last case: a fork with the
 new model has only the parent's tail in scope (or the user manually
 picks the slice).
 
@@ -616,7 +642,9 @@ SessionStatus = {
 **Where it lives.**
 
 - **Authoritative source:** an in-memory map keyed by session id,
-  owned by the core, mutated by the run-state machine.
+  owned by the core, mutated by the run-state machine (the machine
+  itself — states, single-flight, and the drain — is specified in
+  [Turn Queue](./queue.md)).
 - **Subscription transport:** an event stream on the host's bus.
   The event payload is the `SessionStatus` shape.
 - **Read API:** `get_status(session_id) → SessionStatus` for
@@ -626,12 +654,18 @@ SessionStatus = {
 session reads as `idle` — correct, because no run is in flight after
 a restart.
 
-**One run per session at a time.** The state machine refuses a new
-run while `state != "idle"`. Hosts that want to surface "you have a
-turn already running" do so by checking status before submitting.
-`error` clears on the next submission attempt: the state machine
-transitions to `busy` for that run and follows the normal lifecycle
-from there.
+**One run per session at a time.** The state machine never runs two
+turns on one session in parallel. A turn-triggering message that
+arrives while `state != "idle"` is **queued, not rejected** — the
+core persists it and fires it when the session next goes idle, per
+the [Turn Queue](./queue.md) contract. A host MAY read status to
+surface "you have a turn already running," but it does not have to
+gate submission on it; the queue handles the busy case. `error` is
+not terminal — it clears on the next fired turn (a user retry, an
+edit-and-resend, or an explicit resume), at which point the machine
+transitions to `busy` and follows the normal lifecycle. A hard error
+pauses the queue drain rather than firing queued turns into a broken
+session; see [Turn Queue](./queue.md).
 
 **Retry visibility.** When the model call fails transiently (rate
 limit, provider 5xx) and the loop backs off, status transitions to
@@ -682,6 +716,9 @@ The default policy: save on every chunk. Detailed in
 - [Tools](./tools.md) — what the loop invokes.
 - [Subagents](./subagents.md) — the specialized compaction subagent
   this page references.
+- [Turn Queue](./queue.md) — the run-state machine that drives
+  `SessionStatus`, and how turn-triggering messages are queued and
+  drained.
 - [UX Patterns](./ux.md) — compositor, queued sends, sidecar,
   memory.
 - [Debugging](./debugging.md) — inspection format and DX checklist.

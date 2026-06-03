@@ -22,11 +22,13 @@ fundamentals as Grida ships them.
 
 ## Pages
 
-| Page                                                         | Covers                                                                                                                                                                 |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Fundamental Tools (Grida binding)](./tools-fundamentals.md) | How the locked-tool RFC ([`../agent/tools.md`](../agent/tools.md)) lands in Grida — virtual-fs adapter, in-canvas `bash`, host wiring.                                 |
-| [Canvas Tools](./tools-canvas.md)                            | The canvas-only tool surface: scene-graph search and selection, specialized inserts, canvas exec / lint / format, resource lookup. Requires an active editor instance. |
-| [Image Tools](./tools-image.md)                              | Image-generation tools: text-to-image and image-to-image, provider-agnostic abstraction, credit-aware operations, canvas-image-node integration.                       |
+| Page                                                                  | Covers                                                                                                                                                                 |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [**Architecture** (start here for implementation)](./architecture.md) | Grida's master implementation blueprint. Orchestrator god class (`AgentHost`), package map, host landings, sequencing, anti-goals.                                     |
+| [Fundamental Tools (Grida binding)](./tools-fundamentals.md)          | How the locked-tool RFC ([`../agent/tools.md`](../agent/tools.md)) lands in Grida — virtual-fs adapter, in-canvas `bash`, host wiring.                                 |
+| [Canvas Tools](./tools-canvas.md)                                     | The canvas-only tool surface: scene-graph search and selection, specialized inserts, canvas exec / lint / format, resource lookup. Requires an active editor instance. |
+| [Image Tools](./tools-image.md)                                       | Image-generation tools: text-to-image and image-to-image, provider-agnostic abstraction, credit-aware operations, canvas-image-node integration.                       |
+| [Built-in subagents](./agents-builtin.md)                             | Grida's specialized subagents (titler today; compactor + planner future). Concrete tier / model / sentinel / cost-discipline bindings of the RFC subagent pattern.     |
 
 ## See also
 

@@ -177,7 +177,7 @@ The contract stays honest about what is actually executed:
 - Expose timeout and truncation metadata so the model does not reason from incomplete or prematurely killed output as if it were complete.
 
 Security expectation: command execution must run under a real
-sandbox boundary. Grida's desktop binding wraps the daemon process
+sandbox boundary. Grida's desktop binding wraps the agent host process
 under the reference sandbox (`srt`); see
 [`../agent/srt.md`](../agent/srt.md).
 

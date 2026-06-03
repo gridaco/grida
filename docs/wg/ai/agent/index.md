@@ -16,7 +16,7 @@ keywords:
     sandbox,
     streaming,
     rewind,
-    branching,
+    forking,
     spec,
     guide,
     acp,
@@ -41,7 +41,7 @@ It answers one question: _what is an agent system that hosts a code
 agent, a design agent, or any other task-agnostic agent without
 rewriting the core?_
 
-The shape is host-agnostic: it holds for a desktop daemon, a cloud
+The shape is host-agnostic: it holds for a local AgentHost, a cloud
 sandbox runtime, a CLI, an IDE plugin, a hosted multi-tenant
 service. UX (window, panel, picker) is out of scope except where a
 UX requirement reaches back into the protocol.
@@ -101,7 +101,7 @@ A **normative guide**:
   AI-SDK-v6 chunk shape.
 - A UI framework. Window / tab / sidebar / picker decisions belong
   to the host. The guide touches UX only where UX requirements
-  bend the protocol (compositor format, sidecar branching, queued
+  bend the protocol (compositor format, sidecar forking, queued
   sends).
 - A billing engine. Usage rollups land on the session row so a
   billing layer can read them; pricing is not the agent system's
@@ -115,25 +115,26 @@ A **normative guide**:
 The guide is organized as a set of pages. Read [Foundations](./foundations.md)
 first; the rest can be read in any order.
 
-| Page                                           | Covers                                                                                                                                                                                                                                                           |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Foundations](./foundations.md)                | Bedrock: AI SDK v6 chunk shape, directory-rooted execution, the locked tool set summary, watchdog placement, web search, cross-cutting invariants.                                                                                                               |
-| [AI SDK (reference substrate)](./ai-sdk.md)    | Implementor's annex to AI SDK's own docs. The token-usage cache normalization rule, where the SDK's tool-loop helper fits, what the RFC adds on top of the substrate.                                                                                            |
-| [Runtime Environments](./environments.md)      | Web / cloud sandbox / computer. Which capabilities each environment exposes; how the locked tool set degrades; sandbox primitives.                                                                                                                               |
-| [Sandbox Runtime (srt)](./srt.md)              | srt as the reference implementation of the `computer` environment's sandbox primitive. Capability surface, platform support, what the protocol does and does not lock to.                                                                                        |
-| [Session Lifecycle](./session.md)              | Context tracking, rewinding, branching, compaction (auto + manual + failure), per-turn model switch, streaming, interruption, session status, permission scopes.                                                                                                 |
-| [Persistency](./persistency.md)                | Storage engine, the three-table schema, save policy, ID strategy, JSON discipline, event-log opt-in, schema evolution.                                                                                                                                           |
-| [Tools](./tools.md)                            | The locked fundamental set, the tool contract, capability requirements, result envelope, truncation, watchdog at the tool boundary, ACP `kind` mapping.                                                                                                          |
-| [MCP and Connectors](./mcp.md)                 | User-plugged MCP servers, lazy materialization, `tool_search` for bulk discovery, OAuth, dynamic refresh, the untrusted-by-default trust policy.                                                                                                                 |
-| [Skills and Project Instructions](./skills.md) | Two layers of knowledge: skills (lazy, advertise-then-load) and project instructions (eager, unconditional). Discovery sources, manifests, decision matrix.                                                                                                      |
-| [Binary file handling](./binary.md)            | Glossary / reference. Three resolution paths (provider-native multimodal, skill-per-format, shell-based conversion), the format matrix (pdf / zip / pptx / psd / fig / …), the scratch-space pattern for archive extraction.                                     |
-| [Subagents](./subagents.md)                    | The `task` tool, agent modes, blocking vs background, recursion, permission inheritance, inspectability, awareness, specialized subagents, opinionated patterns.                                                                                                 |
-| [Triggers](./triggers.md)                      | Non-human-originated turns. Schedule / external webhook / programmatic API / agent self-schedule / MCP-pushed event sources. Trigger envelope on `metadata_json.trigger`, queue semantics, interactive-vs-hosted execution, lifecycle bounds, auth and trust.    |
-| [Compositor](./compositor.md)                  | User intent representation. The multipart user-message shape, file refs vs attachments, inline commands, mentions, editor context (host-emitted selection / open / cursor / recent-action), attachment handling, and the user-view-vs-model-view lowering rules. |
-| [UX Patterns](./ux.md)                         | What rides on top of the compositor: queued sends, sidecar chat as ephemeral branch, memory as a built-on-top layer.                                                                                                                                             |
-| [Debugging](./debugging.md)                    | The canonical inspection format, export paths, what an inspection tool MUST expose, replay semantics, the DX checklist.                                                                                                                                          |
-| [ACP Integration](./acp.md)                    | The [Agent Client Protocol](https://agentclientprotocol.com/) as the default outward wire. Method mapping, capability matrix, where the protocol and the guide diverge.                                                                                          |
-| [FAQ](./faq.md)                                | Question-and-answer index over the guide. Doubles as an entry point and as a conformance test — if a Q cannot be answered from the RFC, the RFC owes a clarification.                                                                                            |
+| Page                                           | Covers                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Foundations](./foundations.md)                | Bedrock: AI SDK v6 chunk shape, directory-rooted execution, the locked tool set summary, watchdog placement, web search, cross-cutting invariants.                                                                                                                                   |
+| [AI SDK (reference substrate)](./ai-sdk.md)    | Implementor's annex to AI SDK's own docs. The token-usage cache normalization rule, where the SDK's tool-loop helper fits, what the RFC adds on top of the substrate.                                                                                                                |
+| [Runtime Environments](./environments.md)      | Web / cloud sandbox / computer. Which capabilities each environment exposes; how the locked tool set degrades; sandbox primitives.                                                                                                                                                   |
+| [Sandbox Runtime (srt)](./srt.md)              | srt as the reference implementation of the `computer` environment's sandbox primitive. Capability surface, platform support, what the protocol does and does not lock to.                                                                                                            |
+| [Session Lifecycle](./session.md)              | Context tracking, rewinding, forking, compaction (auto + manual + failure), per-turn model switch, streaming, interruption, session status, permission scopes.                                                                                                                       |
+| [Persistency](./persistency.md)                | Storage engine, the three-table schema, save policy, ID strategy, JSON discipline, event-log opt-in, schema evolution.                                                                                                                                                               |
+| [Turn Queue](./queue.md)                       | The single point where competing demands to start a turn on one session are serialized. Turn-ingestion model, `queued_at`, the run-state machine and its drain, drain discipline (serial vs coalescing), stop-with-a-queue semantics, queued-message operations (cancel / edit / reorder), the single-flight / FIFO / no-preemption invariants, drop rules, restart behavior, and the core-vs-surface boundary. |
+| [Tools](./tools.md)                            | The locked fundamental set, the tool contract, capability requirements, result envelope, truncation, watchdog at the tool boundary, ACP `kind` mapping.                                                                                                                              |
+| [MCP and Connectors](./mcp.md)                 | User-plugged MCP servers, lazy materialization, `tool_search` for bulk discovery, OAuth, dynamic refresh, the untrusted-by-default trust policy.                                                                                                                                     |
+| [Skills and Project Instructions](./skills.md) | Two layers of knowledge: skills (lazy, advertise-then-load) and project instructions (eager, unconditional). Discovery sources, manifests, decision matrix.                                                                                                                          |
+| [Binary file handling](./binary.md)            | Glossary / reference. Three resolution paths (provider-native multimodal, skill-per-format, shell-based conversion), the format matrix (pdf / zip / pptx / psd / fig / …), the scratch-space pattern for archive extraction.                                                         |
+| [Subagents](./subagents.md)                    | The `task` tool, agent modes, blocking vs background, recursion, permission inheritance, inspectability, awareness, specialized subagents, opinionated patterns.                                                                                                                     |
+| [Triggers](./triggers.md)                      | Non-human-originated turns. Schedule / external webhook / programmatic API / agent self-schedule / MCP-pushed event sources. Trigger envelope on `metadata_json.trigger`, queue semantics, interactive-vs-hosted execution, lifecycle bounds, auth and trust.                        |
+| [Compositor](./compositor.md)                  | User intent representation. The multipart user-message shape, file refs vs attachments, inline commands, mentions, editor context (host-emitted selection / open / cursor / recent-action), attachment handling, and the user-view-vs-model-view lowering rules.                     |
+| [UX Patterns](./ux.md)                         | What rides on top of the compositor: queued sends, sidecar chat as ephemeral fork, memory as a built-on-top layer.                                                                                                                                                                   |
+| [Debugging](./debugging.md)                    | The canonical inspection format, export paths, what an inspection tool MUST expose, replay semantics, the DX checklist.                                                                                                                                                              |
+| [ACP Integration](./acp.md)                    | The [Agent Client Protocol](https://agentclientprotocol.com/) as the default outward wire. Method mapping, capability matrix, where the protocol and the guide diverge.                                                                                                              |
+| [FAQ](./faq.md)                                | Question-and-answer index over the guide. Doubles as an entry point and as a conformance test — if a Q cannot be answered from the RFC, the RFC owes a clarification.                                                                                                                |
 
 ## Cross-cutting invariants
 
@@ -142,6 +143,7 @@ The following hold across every implementor:
 | Layer                 | Invariant                                                             | Policy                                                                  |
 | --------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Loop                  | One universal LLM loop drives any agent                               | Native vs AI SDK runtime path; cancel semantics                         |
+| Scheduling            | One turn per session; queued by `queued_at`, FIFO, no preemption      | Status transport; throttle / dedup caps; whether triggers are supported |
 | Agent                 | Agent-as-data: `{ manifest, tools, system_prompt }`                   | Where the manifest lives; how it is compiled                            |
 | Tools                 | Locked fundamental set; self-describing parameters                    | Which tools beyond the lock; how MCP is surfaced                        |
 | Session               | Three-table shape: `chat_sessions` / `chat_messages` / `chat_parts`   | DB engine (SQLite default; alternatives); event-log opt-in              |
