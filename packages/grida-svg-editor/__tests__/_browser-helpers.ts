@@ -195,8 +195,12 @@ export function committedWorldRect(editor: SvgEditor, id: string): WorldRect {
   if (!svg.getAttribute("height")) svg.setAttribute("height", "650");
   document.body.appendChild(svg);
   try {
-    const el = svg.querySelector<SVGGraphicsElement>(`[id="${id}"]`);
-    if (!el) throw new Error(`no element with id="${id}" in serialized svg`);
+    // `getElementById` over a selector: ids with CSS metacharacters would
+    // break an interpolated `[id="..."]` selector.
+    const el = svg.getElementById(id);
+    if (!(el instanceof SVGGraphicsElement)) {
+      throw new Error(`no element with id="${id}" in serialized svg`);
+    }
     return worldRectOf(el);
   } finally {
     svg.remove();

@@ -977,9 +977,13 @@ export class SvgDocument implements DocumentEvents {
    *     `xlink:href` serializes without `xmlns:xlink`. The fragment is the
    *     element's markup as authored, not a standalone parseable document.
    *
-   * Throws on an unknown id or a non-element node: the contract is "the
-   * markup for a selected element," selections are always elements, and a
-   * string return of `""` for a bad id would hide consumer bugs.
+   * Throws on an unknown id, a non-element node, or a node detached from
+   * the live tree: the contract is "the markup for a selected element,"
+   * selections are always live elements, and a string return of `""` for a
+   * bad id would hide consumer bugs. The detached case matters because
+   * `remove()` keeps the node in the id map for undo — a stale id from a
+   * removed node would otherwise serialize content no longer in the
+   * document, silently feeding a consumer deleted markup.
    */
   serialize_node(id: NodeId): string {
     const n = this.nodes.get(id);
@@ -989,6 +993,11 @@ export class SvgDocument implements DocumentEvents {
     if (n.kind !== "element") {
       throw new Error(
         `serialize_node: node ${JSON.stringify(id)} is a ${n.kind} node, not an element`
+      );
+    }
+    if (!this.contains(this.root, id)) {
+      throw new Error(
+        `serialize_node: node ${JSON.stringify(id)} is detached from the current document`
       );
     }
     return this.emit_node(n);

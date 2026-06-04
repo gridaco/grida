@@ -228,7 +228,8 @@ export namespace translate_pipeline {
      * snap).
      *
      * Rules per element kind:
-     *   - rect / text / tspan / image / use: `(x, y)`
+     *   - rect / text / image / use: `(x, y)`
+     *   - tspan: `null` (moved via relative `dx`/`dy`; no absolute anchor)
      *   - circle / ellipse: `(cx, cy)` (no radius subtracted —
      *     consistent anchor across all kinds, not a true bounds top-
      *     left)

@@ -267,7 +267,7 @@ export default function SvgEditorPackagePage() {
                     viewport is pre-selected.
                   </>
                 }
-                caption="Nested-svg geometry editing is out of scope for v1: getCTM stops at the nearest viewport, so chrome for a node across the inner-viewport boundary is the open question. See packages/grida-svg-editor/docs/geometry.md and the nested-svg notes in src/dom.ts."
+                caption="Translating a node inside an inner viewport now projects the delta into that viewport's frame, so it moves correctly. Still open: getCTM stops at the nearest viewport, so HUD chrome for a node spanning the inner-viewport boundary is unresolved. See packages/grida-svg-editor/docs/geometry.md and the nested-svg notes in src/dom.ts."
               >
                 <NestedSvgExample />
               </SpecCard>

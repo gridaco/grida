@@ -71,6 +71,16 @@ describe("SvgDocument.serialize_node", () => {
     );
   });
 
+  it("throws on a node detached from the live tree (removed but kept for undo)", () => {
+    // remove() keeps the node in the id map so undo can restore it. A stale
+    // id must fail fast rather than serialize content no longer in the doc.
+    const src = `<svg xmlns="http://www.w3.org/2000/svg"><rect id="r" width="10" height="10"/></svg>`;
+    const doc = new SvgDocument(src);
+    const rect = first_of_tag(doc, "rect");
+    doc.remove(rect);
+    expect(() => doc.serialize_node(rect)).toThrow(/detached/);
+  });
+
   it("throws on a non-element node", () => {
     const src = `<svg xmlns="http://www.w3.org/2000/svg"><text>hello</text></svg>`;
     const doc = new SvgDocument(src);
