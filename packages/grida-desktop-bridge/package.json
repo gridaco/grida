@@ -23,7 +23,6 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "prepack": "tsdown",
-    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
