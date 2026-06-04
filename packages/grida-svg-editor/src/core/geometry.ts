@@ -44,6 +44,21 @@ export interface GeometryProvider {
    * is hit. "Topmost" is defined by the renderer's z-order.
    */
   node_at_point(p: Vec2): NodeId | null;
+
+  /**
+   * Re-express a **world-space** delta vector in the frame a node's
+   * position attributes are written in — its parent user-space. For a
+   * node under a scaled/rotated `<g>` ancestor, or inside a nested
+   * `<svg>` viewport that scales its user space, the local frame differs
+   * from world by that linear transform; a translate must be written in
+   * the local frame so the on-screen motion matches the world delta
+   * (otherwise it moves `scale ×` too far).
+   *
+   * Optional: only DOM-backed providers (with a real layout engine) can
+   * derive the frame. Providers that omit it imply the flat-doc identity
+   * (world ≡ local), and callers fall back to the raw delta.
+   */
+  world_delta_to_local?(id: NodeId, delta: Vec2): Vec2;
 }
 
 export type GeometrySignals = {
@@ -110,6 +125,13 @@ export class MemoizedGeometryProvider implements GeometryProvider {
 
   node_at_point(p: Vec2): NodeId | null {
     return this.driver.node_at_point(p);
+  }
+
+  /** Pass-through. Frame projection depends on live layout, not on the
+   *  bounds cache, so there is nothing to memoize. Falls back to the raw
+   *  delta when the driver can't resolve a frame. */
+  world_delta_to_local(id: NodeId, delta: Vec2): Vec2 {
+    return this.driver.world_delta_to_local?.(id, delta) ?? delta;
   }
 
   /** Unsubscribe from both signals. Call on surface detach. */

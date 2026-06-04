@@ -798,6 +798,10 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       },
       emit,
       stages,
+      // Nested-viewport / transformed-ancestor correctness: write the delta
+      // in each mover's local frame. Identity for flat docs and DOM-less
+      // hosts (no provider, or a provider without a layout engine).
+      project: (id, d) => geometry_provider?.world_delta_to_local?.(id, d) ?? d,
     });
     apply();
     history.atomic(label, (tx) => {

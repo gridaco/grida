@@ -530,14 +530,30 @@ export namespace translate_pipeline {
     return { plan, guides };
   }
 
+  /** Projects a world-space delta into the frame the target element's
+   *  position attributes are written in (its parent user-space). Identity
+   *  for flat docs; non-trivial under a scaled/rotated `<g>` ancestor or a
+   *  nested `<svg>` viewport that scales its user space. Supplied by the
+   *  DOM layer (see `GeometryProvider.world_delta_to_local`); the pure
+   *  pipeline cannot derive it without a layout engine. */
+  export type DeltaProjector = (id: NodeId, delta: Vec2) => Vec2;
+
   /** Apply the plan: for each id, run `intent.apply` with the baseline
-   *  + world-space delta. Does NOT emit; caller wraps with history
+   *  + world-space delta. When `project` is given, the world delta is
+   *  re-expressed in each element's local frame first (nested-viewport /
+   *  transformed-ancestor correctness); absent, the raw world delta is
+   *  used (flat-doc fast path). Does NOT emit; caller wraps with history
    *  machinery and calls `emit()` after. */
-  export function apply(doc: SvgDocument, plan: TranslatePlan): void {
+  export function apply(
+    doc: SvgDocument,
+    plan: TranslatePlan,
+    project?: DeltaProjector
+  ): void {
     for (const id of plan.ids) {
       const baseline = plan.baselines.get(id);
       if (!baseline) continue;
-      intent.apply(doc, id, baseline, plan.delta.x, plan.delta.y);
+      const d = project ? project(id, plan.delta) : plan.delta;
+      intent.apply(doc, id, baseline, d.x, d.y);
     }
   }
 
@@ -563,6 +579,9 @@ export namespace translate_pipeline {
     options: TranslateOptions;
     emit: () => void;
     stages?: ReadonlyArray<TranslateStage>;
+    /** World→local delta projector (nested-viewport / transformed-ancestor
+     *  correctness). Omit for flat-doc callers. See {@link DeltaProjector}. */
+    project?: DeltaProjector;
   }): { plan: TranslatePlan; apply: () => void; revert: () => void } {
     const {
       doc,
@@ -571,6 +590,7 @@ export namespace translate_pipeline {
       options,
       emit,
       stages: stage_list = stages.RPC,
+      project,
     } = args;
     // Drop descendants whose ancestor is also in the gesture set —
     // otherwise both the parent's `transform` AND the child's own
@@ -593,7 +613,7 @@ export namespace translate_pipeline {
     return {
       plan,
       apply: () => {
-        apply(doc, plan);
+        apply(doc, plan, project);
         emit();
       },
       revert: () => {
