@@ -25,7 +25,13 @@ const isInsiders = process.argv.includes("--insiders");
 // See:
 // https://www.electronjs.org/docs/latest/tutorial/application-distribution#rebranding-with-downloaded-binaries
 // https://www.electronjs.org/docs/latest/api/dock#dockseticonimage-macos
-if (process.platform !== "darwin") {
+// Nothing to brand or restore without a local Electron bundle. Electron 42+
+// no longer auto-downloads it on install (the pre-42 `postinstall` hook is
+// gone), and electron-forge packages from the @electron/get cache — not
+// node_modules/electron/dist — so on a clean checkout (e.g. CI) there is no
+// branding to apply and none that could leak. Skip instead of crashing on a
+// missing source.
+if (process.platform !== "darwin" || !fs.existsSync(appBundle)) {
   process.exit(0);
 }
 
