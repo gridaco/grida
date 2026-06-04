@@ -65,6 +65,13 @@ preserving the author's source on round-trip.
   (byte-equal until the first re-typing edit), a single `<path>` target,
   and a cubic-Bézier conic representation, with the round-trip invariants
   that keep the conversion honest.
+- [`durable-node-identity.md`](./durable-node-identity.md) — the open
+  problem behind #775: `NodeId` is parse-ephemeral, so no reference
+  survives a `load()`, let alone an external rewrite of the file. Frames
+  the two distinct contracts (survives a re-parse vs. survives a
+  structural rewrite) and scopes the candidate identity schemes
+  (positional path, `id` attribute, semantic anchor) against them. The
+  `serialize_node` half of #775 shipped; this owns the reference half.
 
 ### Glossary
 

@@ -11,6 +11,7 @@ import {
   CSS,
   GROUP_TRANSFORM,
   LINE,
+  NESTED_SVG,
   PATH,
   SHAPES,
   SYMBOL_USE,
@@ -110,6 +111,21 @@ export function GroupTransformExample() {
       svg={GROUP_TRANSFORM}
       tool={{ type: "cursor" }}
       selectName="card"
+    />
+  );
+}
+
+/**
+ * Nested <svg>. A node *inside* the inner viewport is pre-selected, so the card
+ * lands on exactly the open case: chrome must cross the nested-viewport boundary
+ * (`getCTM` stops at the nearest viewport today).
+ */
+export function NestedSvgExample() {
+  return (
+    <SvgStage
+      svg={NESTED_SVG}
+      tool={{ type: "cursor" }}
+      selectName="inner-dot"
     />
   );
 }

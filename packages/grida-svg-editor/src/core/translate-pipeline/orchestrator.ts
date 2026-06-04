@@ -52,6 +52,10 @@ export type OrchestratorDeps = {
    *  Called per drive() so a runtime style flip (e.g. flipping
    *  snap_to_pixel_grid mid-drag) takes effect on the next frame. */
   options: () => TranslateOptions;
+  /** World→local delta projector (nested-viewport / transformed-ancestor
+   *  correctness). Omit for flat-doc / DOM-less hosts; absent ⇒ raw world
+   *  delta is written. See `translate_pipeline.DeltaProjector`. */
+  project_delta?: translate_pipeline.DeltaProjector;
 };
 
 const PROVIDER_ID = "svg-editor";
@@ -198,10 +202,11 @@ export class TranslateOrchestrator {
   ): void {
     const doc = this.deps.get_doc();
     const emit = this.deps.emit;
+    const project = this.deps.project_delta;
     session.preview.set({
       providerId: PROVIDER_ID,
       apply: () => {
-        translate_pipeline.apply(doc, plan);
+        translate_pipeline.apply(doc, plan, project);
         emit();
       },
       revert: () => {

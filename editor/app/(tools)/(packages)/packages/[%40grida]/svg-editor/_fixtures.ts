@@ -133,6 +133,31 @@ export const GROUP_TRANSFORM = `<svg xmlns="http://www.w3.org/2000/svg" viewBox=
   </g>
 </svg>`;
 
+// ─── Nested <svg> — a viewport within a viewport ─────────────────────────────
+// An inner <svg> with its own `x`/`y` origin and its own `viewBox` establishes
+// an independent user-space coordinate system (SVG 2 §7.2). The editor parses,
+// preserves, and renders it — but clean *geometry editing* across the nested
+// viewport boundary is out of scope for v1: `getCTM` stops at the nearest
+// viewport, so the selection chrome for a node inside the inner <svg> is the
+// open question this fixture is a harness for. See
+// `packages/grida-svg-editor/docs/geometry.md` and the nested-svg notes in
+// `src/dom.ts`. Here the inner viewport maps its own 0…120 user space into the
+// 240×170 region placed at (244, 70).
+export const NESTED_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 300" width="520" height="300">
+  <rect id="frame" x="0" y="0" width="520" height="300" fill="#f8fafc"/>
+  <text id="outer-label" x="24" y="34" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600" fill="#334155">outer viewport · user space 0…520</text>
+
+  <circle id="outer-dot" cx="78" cy="150" r="28" fill="#6366f1"/>
+  <rect id="outer-box" x="44" y="214" width="132" height="50" rx="8" fill="#22c55e"/>
+
+  <svg id="inner" x="244" y="70" width="240" height="170" viewBox="0 0 120 85">
+    <rect x="0" y="0" width="120" height="85" fill="#ffffff" stroke="#94a3b8"/>
+    <text x="6" y="13" font-family="ui-sans-serif, system-ui, sans-serif" font-size="7.5" fill="#64748b">inner viewport · own 0…120</text>
+    <circle id="inner-dot" cx="34" cy="48" r="22" fill="#f59e0b"/>
+    <rect id="inner-box" x="64" y="24" width="44" height="48" rx="6" fill="#ec4899"/>
+  </svg>
+</svg>`;
+
 // ─── Symbol & use — one source, many instances ───────────────────────────────
 // A <symbol> defines the geometry once; each <use> instantiates it. The `color`
 // attribute on each instance flows into `fill="currentColor"` inside the symbol,

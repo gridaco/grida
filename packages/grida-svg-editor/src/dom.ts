@@ -540,6 +540,11 @@ class DomSurface implements Surface {
       open_preview: (label) => this.editor_internal().history.preview(label),
       open_snap: (ids) => this.open_snap_session_for(ids),
       options: translate_options,
+      // Re-express the world delta in each mover's local frame so a child
+      // of a scaled `<g>` / nested `<svg>` viewport tracks the cursor 1:1
+      // (lazy: the geometry provider is wired later in this ctor).
+      project_delta: (id, d) =>
+        this._geometry_provider?.world_delta_to_local(id, d) ?? d,
     });
 
     // Resize funnel — same shape as translate, distinct lifecycle.
@@ -1625,14 +1630,24 @@ class DomSurface implements Surface {
     for (const id of ids) {
       for (const inner of snap_descent(doc, id)) agent_id_set.add(inner);
     }
+    // Snap rects come from the canonical world-space geometry provider
+    // (`bounds_of` → `getBBox` + `getCTM`). getCTM folds in ancestor
+    // `<g transform>`, so a child inside a translated group contributes its
+    // true world rect — not the group-local box that `getBBox` + own-
+    // `transform=` would yield. Mixing those frames produced spurious snaps
+    // (guides rendering near the canvas origin) for grouped children.
+    // `bounds_of` already applies the `<svg>` viewport special-case, so it is
+    // a strict superset of the old `bbox_world_for_snap`.
+    const bounds_of = (id: NodeId): Rect | null =>
+      this._geometry_provider?.bounds_of(id) ?? null;
     const agents: Rect[] = [];
     for (const id of agent_id_set) {
-      const r = this.bbox_world_for_snap(id);
+      const r = bounds_of(id);
       if (r) agents.push(r);
     }
     const neighbors: Rect[] = [];
     for (const id of neighbor_ids) {
-      const r = this.bbox_world_for_snap(id);
+      const r = bounds_of(id);
       if (r) neighbors.push(r);
     }
     return new SnapSession({ agents, neighbors });
@@ -4327,25 +4342,6 @@ class DomSurface implements Surface {
     return transform.project(local, transform_str);
   }
 
-  /** World-space rect for snap purposes. Differs from `bbox_world` for
-   *  `<svg>` viewport-establishing elements: `getBBox()` on an `<svg>`
-   *  reports the union of descendant geometry (SVG 2 §4.6.4), which —
-   *  when the dragged element is a descendant — silently turns the
-   *  dragged element's own pre-gesture position into a snap target via
-   *  the parent's edges. Use the viewport extent instead so the root
-   *  SVG's snap edges represent the canvas boundary, not "wherever the
-   *  children happen to be right now". */
-  private bbox_world_for_snap(id: NodeId): Rect | null {
-    if (this.tag_of(id) === "svg") {
-      const el = this.element_index.get(id);
-      if (el instanceof SVGSVGElement) {
-        const vp = svg_viewport_bounds(el);
-        if (vp) return vp;
-      }
-    }
-    return this.bbox_world(id);
-  }
-
   private editor_internal() {
     return this.editor._internal;
   }
@@ -4685,6 +4681,44 @@ class SvgGeometryDriver implements GeometryProvider {
 
   node_at_point(p: Vec2): NodeId | null {
     return this.accessors.pick_at_world(p, true);
+  }
+
+  /** World→local delta projection. The frame an element's position is
+   *  written in is its PARENT user-space: a `<rect>`'s `x`/`y` and the
+   *  leading `translate(...)` composed onto a `<g>`/transformed node are
+   *  both interpreted there. We take the parent element's frame (not the
+   *  element's own) so that translating a node whose OWN transform has a
+   *  scale/rotation is not double-counted.
+   *
+   *  Camera-free: `inv(root.getScreenCTM) ∘ parent.getScreenCTM` maps
+   *  parent user-space → root world-space, cancelling the shared CSS /
+   *  camera transform. Inverting its linear part turns a world delta into
+   *  the local delta. Identity (→ delta unchanged) for flat frames,
+   *  top-level nodes, and any degenerate / unavailable matrix. */
+  world_delta_to_local(id: NodeId, delta: Vec2): Vec2 {
+    const el = this.accessors.element_for(id);
+    const parent = el?.parentNode;
+    const root = this.accessors.root();
+    if (!(parent instanceof SVGGraphicsElement) || !root) return delta;
+    // Flat fast-path: a direct child of the root `<svg>` is already in world
+    // space (its parent frame IS world), so skip the getScreenCTM reflow.
+    // The common case for non-nested documents.
+    if (parent === root) return delta;
+    if (
+      typeof parent.getScreenCTM !== "function" ||
+      typeof root.getScreenCTM !== "function"
+    ) {
+      return delta;
+    }
+    const parent_ctm = parent.getScreenCTM();
+    const root_ctm = root.getScreenCTM();
+    if (!parent_ctm || !root_ctm) return delta;
+    // parent user-space → root world-space (camera/CSS cancelled).
+    const m = root_ctm.inverse().multiply(parent_ctm);
+    const det = m.a * m.d - m.c * m.b;
+    if (!Number.isFinite(det) || det === 0) return delta;
+    const [x, y] = project_delta_inverse_ctm(delta.x, delta.y, m);
+    return { x, y };
   }
 }
 
