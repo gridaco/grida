@@ -21,7 +21,12 @@ export type {
 export { VectorEditSession, sub_selection_equal } from "./session";
 export type { HoveredControl, SubSelectionSnapshot } from "./session";
 
-export { source_to_session_d, apply_session_d } from "./apply";
+export {
+  source_to_session_d,
+  apply_session_d,
+  vector_apply,
+  vector_revert,
+} from "./apply";
 
 export { marquee } from "./marquee";
 export type { SubpathSelectCandidates } from "./marquee";

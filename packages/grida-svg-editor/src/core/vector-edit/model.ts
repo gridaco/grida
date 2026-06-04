@@ -219,34 +219,59 @@ export class PathModel {
    *
    * - **path** — always `null` (no native fallback; the canonical form
    *   IS `<path d>`, so callers should just write `d` directly).
+   * - **line** — exactly two vertices joined by one straight segment
+   *   `0→1`. (Topology after a 2-point `vn.fromPolyline` and any sequence
+   *   of endpoint translates.)
    * - **polyline** — segments form the canonical open chain
    *   `0→1, 1→2, …, (n-2)→(n-1)`. (Topology after `vn.fromPolyline` and
    *   any sequence of vertex translates.)
    * - **polygon** — segments form the canonical closed chain
    *   `0→1, 1→2, …, (n-1)→0`. (Topology after `vn.fromPolygon` and any
    *   sequence of vertex translates.)
+   * - **rect / circle / ellipse** — always `null`. These geometry
+   *   primitives have no native writeback target; any vector gesture on
+   *   them re-types the element to `<path>` (see `vector_apply` /
+   *   `SvgDocument.retype_to_path`), so they never round-trip through here.
    *
    * Anything that changes segment topology (insert-vertex, delete-vertex,
-   * close/open shape) leaves the canonical chain and returns `null` here;
-   * the higher layer is responsible for routing those to tag-promotion
-   * (intra-Vertex or to-path).
+   * close/open shape) or introduces a curve leaves the canonical chain and
+   * returns `null` here; the caller re-types the element to `<path>`.
    */
   toNativeAttrs(
     source_tag: VectorEditSource["kind"]
-  ): Exclude<VectorEditSource, { kind: "path" }> | null {
-    if (source_tag === "path") return null;
+  ): Extract<
+    VectorEditSource,
+    { kind: "line" | "polyline" | "polygon" }
+  > | null {
+    if (
+      source_tag !== "line" &&
+      source_tag !== "polyline" &&
+      source_tag !== "polygon"
+    ) {
+      return null;
+    }
 
     const { vertices, segments } = this._network;
 
     // All-zero-tangent gate. Any non-zero tangent means the user has
     // promoted a straight segment to a curve — not expressible in
-    // <polyline>/<polygon> native attrs.
+    // <line>/<polyline>/<polygon> native attrs.
     for (const s of segments) {
       if (s.ta[0] !== 0 || s.ta[1] !== 0) return null;
       if (s.tb[0] !== 0 || s.tb[1] !== 0) return null;
     }
 
     const n = vertices.length;
+
+    if (source_tag === "line") {
+      // Exactly two vertices joined by one straight segment 0→1.
+      if (n !== 2 || segments.length !== 1) return null;
+      const s = segments[0];
+      if (s.a !== 0 || s.b !== 1) return null;
+      const [x1, y1] = vertices[0];
+      const [x2, y2] = vertices[1];
+      return { kind: "line", x1, y1, x2, y2 };
+    }
 
     if (source_tag === "polyline") {
       if (segments.length !== n - 1 || n < 2) return null;

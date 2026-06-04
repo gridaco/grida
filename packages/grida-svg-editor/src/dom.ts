@@ -88,9 +88,11 @@ import {
   marquee,
   sub_selection_equal,
   source_to_session_d,
-  apply_session_d,
+  vector_apply,
+  vector_revert,
   type SubSelectionSnapshot,
 } from "./core/vector-edit";
+import type { RetypeRecord } from "./core/document";
 import type {
   InsertableTag,
   InsertPreviewSession,
@@ -164,12 +166,6 @@ const IS_MODIFIER_KEY: Record<string, true> = {
  *  surface skips render() during the in-flight mount and doesn't yank the
  *  live `<text>` element out from under the about-to-mount text surface. */
 const TEXT_EDIT_PENDING = { __pending: true } as const;
-
-/** Per-frame `neighbours: []` for the `vector_of` HUD projection. Polyline
- *  and polygon sources never render tangent handles in v1 (curve edits would
- *  promote to `<path>`); using a frozen module-level array avoids allocating
- *  a fresh empty array per redraw frame. */
-const EMPTY_NEIGHBOURS: readonly number[] = Object.freeze([]);
 
 export type DomSurfaceOptions = {
   /** Mount the SVG inside this container. */
@@ -321,6 +317,11 @@ class DomSurface implements Surface {
     | {
         kind: "vector_vertex_translate";
         node_id: NodeId;
+        /** Promotion reversal token for a promotable-primitive source.
+         *  Holds the demote-to-primitive token once the first gesture
+         *  frame promotes the element to `<path>`; shared by reference
+         *  with the committed step's closures so undo demotes. */
+        promo: { token: RetypeRecord | null };
         indices: readonly number[];
         /** Snapshot of `d` at gesture start; used by `revert`. */
         initial_d: string;
@@ -341,6 +342,7 @@ class DomSurface implements Surface {
     | {
         kind: "vector_set_tangent";
         node_id: NodeId;
+        promo: { token: RetypeRecord | null };
         tangent: readonly [number, 0 | 1];
         initial_d: string;
         baseline_model: PathModel;
@@ -351,6 +353,7 @@ class DomSurface implements Surface {
     | {
         kind: "vector_bend_segment";
         node_id: NodeId;
+        promo: { token: RetypeRecord | null };
         segment: number;
         ca: number;
         /** Frozen segment state in path-LOCAL coords, captured at gesture
@@ -383,6 +386,7 @@ class DomSurface implements Surface {
          */
         kind: "vector_translate_selection";
         node_id: NodeId;
+        promo: { token: RetypeRecord | null };
         indices: readonly number[];
         tangent_refs: readonly (readonly [number, 0 | 1])[];
         initial_d: string;
@@ -3004,18 +3008,14 @@ class DomSurface implements Surface {
     if (tag === "text" || tag === "tspan") {
       return this.enter_text_edit(id);
     }
-    // Vector-edit: path / polyline / polygon. Eligibility is checked
-    // inside `enter_vector_edit` via `is_vector_edit_target`; the tag pre-
-    // filter here just avoids the extra predicate lookup on unrelated
-    // tags. `<line>` is intentionally NOT routed in v1: a line has no
-    // useful vertex-edit gestures that stay within the source tag
-    // (insert-vertex would promote to <polyline>, tangent would promote
-    // to <path>), and promotions are out of scope for v1. Updating this
-    // list without widening the doc-side predicate would silently route
-    // ineligible tags to a rejecting path; updating the predicate
-    // without widening this list would make those tags silently fall
-    // through to "no content edit".
-    if (tag === "path" || tag === "polyline" || tag === "polygon") {
+    // Vector-edit: the doc-side `is_vector_edit_target` predicate is the
+    // single authority over which tags are eligible (the native vector tags
+    // path / line / polyline / polygon, and the promotable primitives rect /
+    // circle / ellipse). Routing off it directly — rather than a hardcoded
+    // tag list — keeps this gate in lock-step with the predicate, so a future
+    // eligibility change lands in one place. (`<image>` / `<use>` stay
+    // ineligible there.)
+    if (this.editor_internal().doc.is_vector_edit_target(id) !== null) {
       return this.enter_vector_edit(id);
     }
     return false;
@@ -3418,20 +3418,15 @@ class DomSurface implements Surface {
       };
     });
     // Neighbouring vertices — those whose tangent handles should render.
-    //
-    // v1 carves out the vertex-chain sources (`<polyline>` / `<polygon>`):
-    // a tangent edit would force promotion to `<path>`, and promotions
-    // are out of scope. Hiding the affordance IS the contract — the
-    // gesture handlers (`handle_set_tangent_intent`,
-    // `handle_bend_segment`) also refuse at the door for these sources.
-    const neighbours: readonly number[] =
-      this.vector_edit.source.kind === "path"
-        ? model.neighbouringVertices({
-            vertices: this.vector_edit.selected_vertices,
-            segments: this.vector_edit.selected_segments,
-            tangents: this.vector_edit.selected_tangents,
-          })
-        : EMPTY_NEIGHBOURS;
+    // Shown for every vector source: dragging a tangent on a vertex tag
+    // (`line` / `polyline` / `polygon`) introduces a curve, which re-types
+    // the element to `<path>` (see `vector_apply`). The affordance is
+    // therefore always live.
+    const neighbours: readonly number[] = model.neighbouringVertices({
+      vertices: this.vector_edit.selected_vertices,
+      segments: this.vector_edit.selected_segments,
+      tangents: this.vector_edit.selected_tangents,
+    });
 
     return {
       vertices,
@@ -3509,9 +3504,81 @@ class DomSurface implements Surface {
   ): void {
     const cur = this.vector_edit;
     if (!cur || cur.node_id !== target_node_id) return;
-    if (d !== null) cur.mark_seen(d);
+    if (d !== null) {
+      cur.mark_seen(d);
+      // A geometry delta may have re-typed the node (promote on redo, demote
+      // on undo). `vector_apply` / `vector_revert` flip the *captured*
+      // session's source, but after exit + undo-exit the live session is a
+      // fresh object that the captured flip never touched — leaving it with
+      // `source.kind === "path"` while the document is back to a primitive,
+      // so the next gesture would write a stray `d`. Re-derive the live
+      // session's source from the now-current document tag, same as we
+      // already replay the watermark and selection here.
+      const live_source = this.editor_internal().doc.is_vector_edit_target(
+        cur.node_id
+      );
+      if (live_source) cur.sync_source(live_source);
+    }
     cur.restore_selection(selection);
     this.sync_selection_mirror();
+  }
+
+  /**
+   * Build the `{ apply, revert }` history step for a vector-edit geometry
+   * delta — the single chokepoint that routes the write through
+   * {@link vector_apply} / {@link vector_revert} so promote-to-path of a
+   * primitive source (rect / circle / ellipse) is handled in one place
+   * rather than per gesture.
+   *
+   * `promo` is the per-gesture token holder (shared by reference across an
+   * `active_preview`'s preview frames and its committed step) so the
+   * promotion that fires on the first frame is the one undo reverses —
+   * promotion + first edit collapse into a single undo step. On redo after
+   * an undo-demote, `apply` re-promotes and refreshes the token.
+   *
+   * `after_selection` / `before_selection` drive sub-selection replay;
+   * pass `null` (preview frames) to skip it.
+   */
+  private vector_geometry_step(
+    node_id: NodeId,
+    target_d: string,
+    baseline_d: string,
+    promo: { token: RetypeRecord | null },
+    after_selection: SubSelectionSnapshot | null,
+    before_selection: SubSelectionSnapshot | null
+  ): { providerId: string; apply: () => void; revert: () => void } {
+    const internal = this.editor_internal();
+    const doc = internal.doc;
+    const emit = internal.emit;
+    // Capture the session OBJECT (not its source value): `vector_apply`
+    // reads its live `source` and flips it primitive→path on promotion, so
+    // the closures must observe later mutations. A disposed session (exit +
+    // undo) makes these calls harmless no-ops; the document write keyed on
+    // `node_id` is the real effect.
+    const session = this.vector_edit;
+    return {
+      providerId: "svg-editor",
+      apply: () => {
+        if (session) {
+          const tok = vector_apply(doc, session, target_d);
+          if (tok) promo.token = tok;
+        }
+        if (after_selection)
+          this.replay_vector_session_state(node_id, target_d, after_selection);
+        emit();
+      },
+      revert: () => {
+        if (session) vector_revert(doc, session, baseline_d, promo.token);
+        promo.token = null;
+        if (before_selection)
+          this.replay_vector_session_state(
+            node_id,
+            baseline_d,
+            before_selection
+          );
+        emit();
+      },
+    };
   }
 
   /**
@@ -3633,13 +3700,7 @@ class DomSurface implements Surface {
     if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
       return;
     const internal = this.editor_internal();
-    const doc = internal.doc;
-    const emit = internal.emit;
     const node_id = intent.node_id;
-    // Capture source for the apply/revert closures — they fire later
-    // (undo, redo) when `this.vector_edit` may have been cleared.
-    const source = this.vector_edit.source;
-    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
 
     // Open / refresh the preview session.
     if (
@@ -3661,6 +3722,7 @@ class DomSurface implements Surface {
       this.active_preview = {
         kind: "vector_vertex_translate",
         node_id,
+        promo: { token: null },
         indices: [...intent.indices],
         initial_d,
         baseline_model,
@@ -3721,37 +3783,29 @@ class DomSurface implements Surface {
       // keep each gesture handler readable in isolation.
       const before_selection = this.active_preview.before_selection;
       const after_selection = this.vector_edit.snapshot_selection();
-      this.active_preview.session.set({
-        providerId: "svg-editor",
-        apply: () => {
-          commit(target_d);
-          this.replay_vector_session_state(node_id, target_d, after_selection);
-          emit();
-        },
-        revert: () => {
-          commit(baseline_d);
-          this.replay_vector_session_state(
-            node_id,
-            baseline_d,
-            before_selection
-          );
-          emit();
-        },
-      });
+      this.active_preview.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          this.active_preview.promo,
+          after_selection,
+          before_selection
+        )
+      );
       this.active_preview.session.commit();
       this.active_preview = null;
     } else {
-      this.active_preview.session.set({
-        providerId: "svg-editor",
-        apply: () => {
-          commit(target_d);
-          emit();
-        },
-        revert: () => {
-          commit(baseline_d);
-          emit();
-        },
-      });
+      this.active_preview.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          this.active_preview.promo,
+          null,
+          null
+        )
+      );
     }
   }
 
@@ -3788,11 +3842,7 @@ class DomSurface implements Surface {
     if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
       return;
     const internal = this.editor_internal();
-    const doc = internal.doc;
-    const emit = internal.emit;
     const node_id = intent.node_id;
-    const source = this.vector_edit.source;
-    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
 
     // Resolve the set of vertices and tangents to act on — reads the host's
     // authoritative sub-selection. Session doesn't cache the model
@@ -3855,6 +3905,7 @@ class DomSurface implements Surface {
       this.active_preview = {
         kind: "vector_translate_selection",
         node_id,
+        promo: { token: null },
         indices: [...indices],
         tangent_refs: [...tangent_refs],
         initial_d,
@@ -3921,37 +3972,29 @@ class DomSurface implements Surface {
     if (intent.phase === "commit") {
       const before_selection = this.active_preview.before_selection;
       const after_selection = this.vector_edit.snapshot_selection();
-      this.active_preview.session.set({
-        providerId: "svg-editor",
-        apply: () => {
-          commit(target_d);
-          this.replay_vector_session_state(node_id, target_d, after_selection);
-          emit();
-        },
-        revert: () => {
-          commit(baseline_d);
-          this.replay_vector_session_state(
-            node_id,
-            baseline_d,
-            before_selection
-          );
-          emit();
-        },
-      });
+      this.active_preview.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          this.active_preview.promo,
+          after_selection,
+          before_selection
+        )
+      );
       this.active_preview.session.commit();
       this.active_preview = null;
     } else {
-      this.active_preview.session.set({
-        providerId: "svg-editor",
-        apply: () => {
-          commit(target_d);
-          emit();
-        },
-        revert: () => {
-          commit(baseline_d);
-          emit();
-        },
-      });
+      this.active_preview.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          this.active_preview.promo,
+          null,
+          null
+        )
+      );
     }
   }
 
@@ -3985,21 +4028,12 @@ class DomSurface implements Surface {
   ): void {
     if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
       return;
-    // v1: tangent edits force a curve, which only `<path>` can carry as
-    // native attrs. For polyline/polygon sources `apply_session_d` would
-    // refuse silently (returns `false`) while `mark_seen` still advanced
-    // `last_seen_d`, leaving the external-mutation watcher permanently
-    // out of sync. Refuse the intent at the door instead — the HUD
-    // already hides tangent handles for these sources (`vector_of`), so
-    // a reachable invocation here can only come from a programmatic
-    // intent.
-    if (this.vector_edit.source.kind !== "path") return;
+    // Tangent edits introduce a curve. Any source accepts the gesture: a
+    // vertex tag (`line` / `polyline` / `polygon`) re-types to `<path>` on
+    // commit, the geometry primitives likewise, and `<path>` carries the
+    // curve directly (see `vector_geometry_step` → `vector_apply`).
     const internal = this.editor_internal();
-    const doc = internal.doc;
-    const emit = internal.emit;
     const node_id = intent.node_id;
-    const source = this.vector_edit.source;
-    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
 
     // Open / refresh the preview session.
     if (
@@ -4018,6 +4052,7 @@ class DomSurface implements Surface {
       this.active_preview = {
         kind: "vector_set_tangent",
         node_id,
+        promo: { token: null },
         tangent: [intent.tangent[0], intent.tangent[1]],
         initial_d,
         baseline_model,
@@ -4050,37 +4085,29 @@ class DomSurface implements Surface {
       // closure, then write the captured selection back.
       const before_selection = this.active_preview.before_selection;
       const after_selection = this.vector_edit.snapshot_selection();
-      this.active_preview.session.set({
-        providerId: "svg-editor",
-        apply: () => {
-          commit(target_d);
-          this.replay_vector_session_state(node_id, target_d, after_selection);
-          emit();
-        },
-        revert: () => {
-          commit(baseline_d);
-          this.replay_vector_session_state(
-            node_id,
-            baseline_d,
-            before_selection
-          );
-          emit();
-        },
-      });
+      this.active_preview.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          this.active_preview.promo,
+          after_selection,
+          before_selection
+        )
+      );
       this.active_preview.session.commit();
       this.active_preview = null;
     } else {
-      this.active_preview.session.set({
-        providerId: "svg-editor",
-        apply: () => {
-          commit(target_d);
-          emit();
-        },
-        revert: () => {
-          commit(baseline_d);
-          emit();
-        },
-      });
+      this.active_preview.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          this.active_preview.promo,
+          null,
+          null
+        )
+      );
     }
   }
 
@@ -4096,8 +4123,6 @@ class DomSurface implements Surface {
     if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
       return;
     const node_id = intent.node_id;
-    const source = this.vector_edit.source;
-    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
     const baseline_d = this.read_session_d();
     if (baseline_d === null) return;
     const baseline_model = PathModel.fromSvgPathD(baseline_d);
@@ -4108,8 +4133,6 @@ class DomSurface implements Surface {
     const target_d = next_model.toSvgPathD();
 
     const internal = this.editor_internal();
-    const doc = internal.doc;
-    const emit = internal.emit;
     // Split is a one-shot edit — we want it to be one undo entry. The
     // simplest way to compose this with the existing preview/commit
     // sessions used by other vector edits is `preview() + set() +
@@ -4126,20 +4149,19 @@ class DomSurface implements Surface {
       segments: Object.freeze([] as number[]),
       tangents: Object.freeze([] as ReadonlyArray<readonly [number, 0 | 1]>),
     });
+    // One-shot gesture → local promotion-token holder (no active_preview).
+    const promo: { token: RetypeRecord | null } = { token: null };
     const split_session = internal.history.preview("vector/split-segment");
-    split_session.set({
-      providerId: "svg-editor",
-      apply: () => {
-        commit(target_d);
-        this.replay_vector_session_state(node_id, target_d, after_selection);
-        emit();
-      },
-      revert: () => {
-        commit(baseline_d);
-        this.replay_vector_session_state(node_id, baseline_d, before_selection);
-        emit();
-      },
-    });
+    split_session.set(
+      this.vector_geometry_step(
+        node_id,
+        target_d,
+        baseline_d,
+        promo,
+        after_selection,
+        before_selection
+      )
+    );
     split_session.commit();
     this.redraw();
   }
@@ -4156,16 +4178,12 @@ class DomSurface implements Surface {
   private handle_bend_segment(intent: Intent & { kind: "bend_segment" }): void {
     if (!this.vector_edit || this.vector_edit.node_id !== intent.node_id)
       return;
-    // v1: bending a straight segment introduces tangents — only `<path>`
-    // can carry them as native attrs. See the same carve-out on
-    // `handle_set_tangent_intent` for the full rationale.
-    if (this.vector_edit.source.kind !== "path") return;
+    // Bending a straight segment introduces a curve. Any source accepts it:
+    // a vertex tag (`line` / `polyline` / `polygon`) re-types to `<path>` on
+    // commit, as do the geometry primitives; `<path>` carries it directly
+    // (see `vector_geometry_step` → `vector_apply`).
     const internal = this.editor_internal();
-    const doc = internal.doc;
-    const emit = internal.emit;
     const node_id = intent.node_id;
-    const source = this.vector_edit.source;
-    const commit = (d: string) => apply_session_d(doc, node_id, source, d);
 
     if (
       !this.active_preview ||
@@ -4188,6 +4206,7 @@ class DomSurface implements Surface {
       this.active_preview = {
         kind: "vector_bend_segment",
         node_id,
+        promo: { token: null },
         segment: intent.segment,
         ca: intent.ca,
         frozen: {
@@ -4221,37 +4240,29 @@ class DomSurface implements Surface {
     if (intent.phase === "commit") {
       const before_selection = this.active_preview.before_selection;
       const after_selection = this.vector_edit.snapshot_selection();
-      this.active_preview.session.set({
-        providerId: "svg-editor",
-        apply: () => {
-          commit(target_d);
-          this.replay_vector_session_state(node_id, target_d, after_selection);
-          emit();
-        },
-        revert: () => {
-          commit(baseline_d);
-          this.replay_vector_session_state(
-            node_id,
-            baseline_d,
-            before_selection
-          );
-          emit();
-        },
-      });
+      this.active_preview.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          this.active_preview.promo,
+          after_selection,
+          before_selection
+        )
+      );
       this.active_preview.session.commit();
       this.active_preview = null;
     } else {
-      this.active_preview.session.set({
-        providerId: "svg-editor",
-        apply: () => {
-          commit(target_d);
-          emit();
-        },
-        revert: () => {
-          commit(baseline_d);
-          emit();
-        },
-      });
+      this.active_preview.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          this.active_preview.promo,
+          null,
+          null
+        )
+      );
     }
   }
 

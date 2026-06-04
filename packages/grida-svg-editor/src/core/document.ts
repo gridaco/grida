@@ -40,11 +40,25 @@ import type { NodeId } from "../types";
  *   - All coordinates are in the element's own local space, exactly as
  *     authored. No `transform=` resolution, no parent CTM, no viewport
  *     remap.
- *   - `polyline` / `polygon` points are `[x, y]` tuples so the consumer
- *     can hand them straight to `vn.fromPolyline` / `vn.fromPolygon`.
+ *   - `line` carries its two endpoints; `polyline` / `polygon` points are
+ *     `[x, y]` tuples so the consumer can hand them straight to
+ *     `vn.fromPolyline` / `vn.fromPolygon`.
+ *   - `rect` / `circle` / `ellipse` carry their native geometry numbers.
+ *     These geometry primitives have no addressable interior vertices in
+ *     their native form, so editing one as vector geometry re-types the
+ *     element to `<path>` (see `retype_to_path`). The document holds the
+ *     native tag until that re-type is committed. Design:
+ *     `docs/wg/feat-svg-editor/promote-to-path.md`.
+ *
+ * Re-type vs. native writeback is decided per edit, not per tag: an edit
+ * that the source tag can still express (a straight vertex move on
+ * `line` / `polyline` / `polygon`) writes back natively; one it cannot (a
+ * curve, or a topology change that leaves the tag's canonical form)
+ * re-types the element to `<path>`.
  */
 export type VectorEditSource =
   | { kind: "path"; d: string }
+  | { kind: "line"; x1: number; y1: number; x2: number; y2: number }
   | {
       kind: "polyline";
       points: ReadonlyArray<readonly [number, number]>;
@@ -52,7 +66,69 @@ export type VectorEditSource =
   | {
       kind: "polygon";
       points: ReadonlyArray<readonly [number, number]>;
-    };
+    }
+  | {
+      kind: "rect";
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      /** Corner radii; `0` when the rect has square corners. */
+      rx: number;
+      ry: number;
+    }
+  | { kind: "circle"; cx: number; cy: number; r: number }
+  | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number };
+
+/** The native vector tags `retype_to_path` can re-type, keyed by tag → the
+ *  native geometry attributes it consumes (so no orphaned geometry attr
+ *  survives on the resulting `<path>`). Covers the geometry primitives
+ *  (rect / circle / ellipse — always re-typed) and the vertex tags (line /
+ *  polyline / polygon — re-typed only when an edit escapes their native
+ *  form). */
+const RETYPABLE_GEOMETRY_ATTRS: Readonly<Record<string, ReadonlySet<string>>> =
+  {
+    line: new Set(["x1", "y1", "x2", "y2"]),
+    polyline: new Set(["points"]),
+    polygon: new Set(["points"]),
+    rect: new Set(["x", "y", "width", "height", "rx", "ry"]),
+    circle: new Set(["cx", "cy", "r"]),
+    ellipse: new Set(["cx", "cy", "rx", "ry"]),
+  };
+
+/**
+ * Opaque reversal token returned by `retype_to_path`. Callers hold it and
+ * hand it back to `revert_retype` to restore the original primitive
+ * byte-for-byte; they do not inspect it. All trivia / attribute-token
+ * knowledge stays inside `SvgDocument`.
+ */
+export type RetypeRecord = {
+  readonly prev_local: string;
+  readonly prev_raw_tag: string;
+  /** Geometry attribute tokens removed on re-type, with their original
+   *  index in the element's `attrs` array. Ascending by index so they can
+   *  be spliced back in order. Typed as the document's internal attr token. */
+  readonly removed: ReadonlyArray<{ index: number; token: AttrToken }>;
+  /** True iff the re-type added a synthetic `fill="none"` (the `<line>`
+   *  fidelity guard — see `retype_to_path`). `revert_retype` removes it. */
+  readonly added_fill_none?: boolean;
+};
+
+/**
+ * Parse a single SVG length attribute as a plain user-unit number. Returns
+ * `null` for absent, non-finite, or unit/percentage values (`50%`, `5px`,
+ * `5em`) — those are an out-of-scope geometry gap, and refusing them here
+ * means the editor never offers a promotion it cannot perform faithfully.
+ */
+function parse_user_unit(raw: string | null): number | null {
+  if (raw === null) return null;
+  const s = raw.trim();
+  if (s === "") return null;
+  // Bare number only: optional sign, digits, optional fraction/exponent.
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
 
 export interface DocumentEvents {
   /** Fires after any structural mutation. */
@@ -466,31 +542,83 @@ export class SvgDocument implements DocumentEvents {
    * Returns a tag-discriminated snapshot of the authored geometry attrs
    * if this node is eligible for vector (vertex) editing — else `null`.
    *
-   * v1 eligibility:
+   * Eligibility:
    *   - `<path>`     — requires non-empty `d`.
+   *   - `<line>`     — requires two distinct finite user-unit endpoints.
    *   - `<polyline>` — requires `points` parseable to ≥ 2 vertices.
    *   - `<polygon>`  — same as polyline.
+   *   - `<rect>`     — requires finite user-unit `width`/`height` > 0.
+   *   - `<circle>`   — requires finite user-unit `r` > 0.
+   *   - `<ellipse>`  — requires finite user-unit `rx`/`ry` > 0.
    *
-   * Deliberately rejects `<line>` in v1: the only useful vertex-edit
-   * gestures on a `<line>` are (a) introducing a new vertex (which would
-   * have to promote it to `<polyline>`) and (b) bending it with a tangent
-   * (which would have to promote it to `<path>`). Both promotions are
-   * out of scope for v1, so opening a `<line>` in vector-edit mode would
-   * advertise capabilities that don't work.
+   * The vertex tags (`line` / `polyline` / `polygon`) write edits back to
+   * their native attributes while the geometry stays expressible there; an
+   * edit that escapes the native form (a curve, or a topology change that
+   * leaves the canonical chain) re-types the element to `<path>`. The
+   * geometry primitives (`rect` / `circle` / `ellipse`) have no native
+   * vector form, so any vector edit re-types them. In all cases the native
+   * tag is preserved byte-for-byte until the first re-typing edit commits
+   * (see `retype_to_path`). Design:
+   * `docs/wg/feat-svg-editor/promote-to-path.md`.
    *
-   * Also rejects `<rect>`, `<circle>`, `<ellipse>`, `<image>`, `<use>` —
-   * those would force the same promotion-to-`<path>` machinery (trivia
-   * transfer, cross-cutting attr carry, DOM-element swap, history-bracket
-   * changes) that v1 keeps out of scope.
+   * Geometry that is not a plain user-unit number (`%`, `px`, `em`, …) is
+   * an out-of-scope gap, so such an element returns `null` rather than
+   * advertising an edit the editor cannot perform faithfully.
+   *
+   * Rejects `<image>` / `<use>` (raster / reference bounding boxes, no
+   * editable outline).
    */
+  /**
+   * Parse an optional SVG geometry coordinate (`x`/`y`, `cx`/`cy`, the line
+   * endpoints). An **absent** attribute takes the SVG default (`0`); a
+   * **present** attribute that is not a plain user-unit number (`%`, `px`,
+   * `em`, …) is out of scope and yields `null` so the caller refuses the
+   * element — the same gate required attrs (width / radius) already apply.
+   *
+   * The absent-vs-present distinction is the point: a bare `?? 0` would
+   * silently coerce an authored `x1="5px"` to `0`, then the first native
+   * writeback would overwrite that authored value. Refusing keeps the
+   * editor from misrepresenting geometry it cannot read faithfully.
+   */
+  private optional_user_unit_coord(id: NodeId, name: string): number | null {
+    const raw = this.get_attr(id, name);
+    if (raw === null) return 0;
+    return parse_user_unit(raw);
+  }
+
   is_vector_edit_target(id: NodeId): VectorEditSource | null {
     const n = this.nodes.get(id);
     if (!n || n.kind !== "element") return null;
+    // A retypable native shape (line / polyline / polygon / rect / circle /
+    // ellipse) must not already carry an unprefixed `d`: re-typing appends
+    // one, and a pre-authored (malformed) `d` would collide into an invalid
+    // double-`d` `<path>`. A namespaced `foo:d` is a foreign attr that
+    // survives verbatim (re-type only touches unprefixed `d`), so it is not a
+    // collision and does not disqualify. `<path>` is exempt — `d` is its own
+    // geometry, and it is absent from RETYPABLE_GEOMETRY_ATTRS.
+    if (
+      RETYPABLE_GEOMETRY_ATTRS[n.local] &&
+      n.attrs.some((a) => a.prefix === null && a.ns === null && a.local === "d")
+    ) {
+      return null;
+    }
     switch (n.local) {
       case "path": {
         const d = this.get_attr(id, "d");
         if (d === null || d.trim().length === 0) return null;
         return { kind: "path", d };
+      }
+      case "line": {
+        const x1 = this.optional_user_unit_coord(id, "x1");
+        const y1 = this.optional_user_unit_coord(id, "y1");
+        const x2 = this.optional_user_unit_coord(id, "x2");
+        const y2 = this.optional_user_unit_coord(id, "y2");
+        // A present-but-unparseable endpoint (unit / percent) is out of scope.
+        if (x1 === null || y1 === null || x2 === null || y2 === null)
+          return null;
+        // Degenerate (zero-length) line has nothing to vector-edit.
+        if (x1 === x2 && y1 === y2) return null;
+        return { kind: "line", x1, y1, x2, y2 };
       }
       case "polyline":
       case "polygon": {
@@ -502,9 +630,187 @@ export class SvgDocument implements DocumentEvents {
           ? { kind: "polyline", points }
           : { kind: "polygon", points };
       }
+      case "rect": {
+        const x = this.optional_user_unit_coord(id, "x");
+        const y = this.optional_user_unit_coord(id, "y");
+        if (x === null || y === null) return null;
+        const width = parse_user_unit(this.get_attr(id, "width"));
+        const height = parse_user_unit(this.get_attr(id, "height"));
+        if (width === null || height === null) return null;
+        if (width <= 0 || height <= 0) return null;
+        // SVG corner-radii defaulting: a missing rx/ry mirrors the other;
+        // both missing → square corners. Negatives are treated as 0. A
+        // present-but-unparseable rx/ry (unit / percent) is out of scope.
+        const rx_attr = this.get_attr(id, "rx");
+        const ry_attr = this.get_attr(id, "ry");
+        const rx_parsed = rx_attr === null ? null : parse_user_unit(rx_attr);
+        const ry_parsed = ry_attr === null ? null : parse_user_unit(ry_attr);
+        if (rx_attr !== null && rx_parsed === null) return null;
+        if (ry_attr !== null && ry_parsed === null) return null;
+        let rx = rx_parsed ?? ry_parsed ?? 0;
+        let ry = ry_parsed ?? rx_parsed ?? 0;
+        rx = Math.max(0, Math.min(rx, width / 2));
+        ry = Math.max(0, Math.min(ry, height / 2));
+        return { kind: "rect", x, y, width, height, rx, ry };
+      }
+      case "circle": {
+        const cx = this.optional_user_unit_coord(id, "cx");
+        const cy = this.optional_user_unit_coord(id, "cy");
+        if (cx === null || cy === null) return null;
+        const r = parse_user_unit(this.get_attr(id, "r"));
+        if (r === null || r <= 0) return null;
+        return { kind: "circle", cx, cy, r };
+      }
+      case "ellipse": {
+        const cx = this.optional_user_unit_coord(id, "cx");
+        const cy = this.optional_user_unit_coord(id, "cy");
+        if (cx === null || cy === null) return null;
+        const rx = parse_user_unit(this.get_attr(id, "rx"));
+        const ry = parse_user_unit(this.get_attr(id, "ry"));
+        if (rx === null || ry === null) return null;
+        if (rx <= 0 || ry <= 0) return null;
+        return { kind: "ellipse", cx, cy, rx, ry };
+      }
       default:
         return null;
     }
+  }
+
+  /**
+   * Re-type a native vector element (`<line>` / `<polyline>` / `<polygon>` /
+   * `<rect>` / `<circle>` / `<ellipse>`) into a `<path>` in place, consuming
+   * its native geometry attributes and setting `d`. A structural mutation:
+   * this layer executes the re-type; it does not decide when one is
+   * warranted.
+   *
+   * Idempotent: returns `null` if `id` is not currently one of those tags
+   * (so it is safe to call repeatedly — once re-typed, e.g. already a
+   * `<path>`, further calls are no-ops). Otherwise mutates the node and
+   * returns an opaque {@link RetypeRecord} reversal token.
+   *
+   * Identity, children, `self_closing`, non-geometry attributes, and all
+   * source trivia are preserved unchanged — only the tag and the geometry
+   * attributes move. Pass the token to {@link revert_retype} to restore
+   * the original primitive byte-for-byte.
+   *
+   * (see test/svg-editor-vector-promote-to-path.md)
+   */
+  retype_to_path(id: NodeId, d: string): RetypeRecord | null {
+    const n = this.nodes.get(id);
+    if (!n || n.kind !== "element") return null;
+    const geom = RETYPABLE_GEOMETRY_ATTRS[n.local];
+    if (!geom) return null;
+
+    const prev_local = n.local;
+    const prev_raw_tag = n.raw_tag;
+
+    // Capture + remove the native geometry attrs (unprefixed only). Walk
+    // back-to-front so splices don't shift the indices we still need, then
+    // reverse to ascending order for faithful restoration.
+    const removed: { index: number; token: AttrToken }[] = [];
+    for (let i = n.attrs.length - 1; i >= 0; i--) {
+      const a = n.attrs[i];
+      // Unprefixed geometry attrs only — a prefixed `foo:cx` is not the
+      // shape's geometry and must survive verbatim.
+      if (a.prefix === null && a.ns === null && geom.has(a.local)) {
+        removed.push({ index: i, token: a });
+        n.attrs.splice(i, 1);
+      }
+    }
+    removed.reverse();
+
+    // Re-type. Keep any namespace prefix (e.g. `svg:circle` → `svg:path`).
+    n.local = "path";
+    n.raw_tag = n.prefix ? `${n.prefix}:path` : "path";
+
+    // Append the `d` attribute (mirrors set_attr's append shape).
+    n.attrs.push({
+      raw_name: "d",
+      prefix: null,
+      local: "d",
+      ns: null,
+      value: d,
+      pre: " ",
+      eq_trivia: "",
+      quote: '"',
+    });
+
+    // Fidelity guard for `<line>`: a line has no fill region, so its fill
+    // (default `black`, or any inherited/authored value) never paints. A
+    // `<path>` DOES fill — an open path closes implicitly for fill — so the
+    // re-typed element would suddenly show a fill the line never had. When
+    // the element declares no fill of its own (presentation attr or inline
+    // style), pin `fill="none"` so the path renders stroke-only like the
+    // line did. (An element that explicitly declares a fill keeps it — that
+    // authored value is respected as-is.)
+    let added_fill_none = false;
+    if (
+      prev_local === "line" &&
+      this.get_attr(id, "fill") === null &&
+      this.get_style(id, "fill") === null
+    ) {
+      n.attrs.push({
+        raw_name: "fill",
+        prefix: null,
+        local: "fill",
+        ns: null,
+        value: "none",
+        pre: " ",
+        eq_trivia: "",
+        quote: '"',
+      });
+      added_fill_none = true;
+    }
+
+    this._structure_version++;
+    this._geometry_version++;
+    this.emit();
+    return { prev_local, prev_raw_tag, removed, added_fill_none };
+  }
+
+  /**
+   * Reverse a {@link retype_to_path}: restore the original tag, remove the
+   * `d` attribute the promotion added, and splice the captured geometry
+   * attribute tokens back at their original positions (preserving their
+   * trivia, so a later `serialize()` is byte-equal to the pre-promotion
+   * source).
+   */
+  revert_retype(id: NodeId, token: RetypeRecord): void {
+    const n = this.nodes.get(id);
+    if (!n || n.kind !== "element") return;
+
+    // Remove the appended `d` (unprefixed). Only one exists — the re-type
+    // added it and the source tags carry none.
+    for (let i = n.attrs.length - 1; i >= 0; i--) {
+      const a = n.attrs[i];
+      if (a.prefix === null && a.ns === null && a.local === "d") {
+        n.attrs.splice(i, 1);
+        break;
+      }
+    }
+
+    // Remove the synthetic `fill="none"` if the re-type added one.
+    if (token.added_fill_none) {
+      for (let i = n.attrs.length - 1; i >= 0; i--) {
+        const a = n.attrs[i];
+        if (a.prefix === null && a.ns === null && a.local === "fill") {
+          n.attrs.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    n.local = token.prev_local;
+    n.raw_tag = token.prev_raw_tag;
+
+    // Re-insert removed tokens at ascending original indices.
+    for (const { index, token: t } of token.removed) {
+      n.attrs.splice(index, 0, t);
+    }
+
+    this._structure_version++;
+    this._geometry_version++;
+    this.emit();
   }
 
   // Structural-fact predicates — atomic yes/no queries about authored
