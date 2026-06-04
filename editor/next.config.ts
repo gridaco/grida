@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
   pageExtensions: ["js", "jsx", "mdx", "ts", "tsx"],
   experimental: {
     mdxRs: true,
+    serverActions: {
+      // Default server-action body limit is 1MB; the org avatar cap is 2MB, so
+      // a 2MB file + multipart overhead would be rejected before reaching the
+      // action. Raise the limit to comfortably fit the 2MB cap.
+      bodySizeLimit: "3mb",
+    },
   },
   // CI typechecks via .github/workflows/test.yml (pnpm typecheck). Skipping
   // the in-build TypeScript pass removes ~30s of redundant work from every

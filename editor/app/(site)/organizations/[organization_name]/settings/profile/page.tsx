@@ -61,6 +61,9 @@ export default async function OrganizationsSettingsProfilePage({
           <form
             id="profile"
             action={updateOrganizationProfile.bind(null, organization_name)}
+            // Required so the picked avatar `File` is encoded into the request
+            // and arrives as a `File` in the server action's `FormData`.
+            encType="multipart/form-data"
             className="py-4"
           >
             <FieldGroup className="gap-10">
