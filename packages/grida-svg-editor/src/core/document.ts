@@ -961,6 +961,39 @@ export class SvgDocument implements DocumentEvents {
     return out;
   }
 
+  /**
+   * Serialize a single element's subtree as an SVG **fragment**, using the
+   * same trivia-preserving rules as {@link serialize} (attribute order,
+   * quote style, whitespace, comments — emitted exactly as authored).
+   *
+   * This is NOT {@link serialize} scoped to a node — it is a deliberately
+   * weaker output (sdk-design D3, asymmetric outputs stay separate):
+   *
+   *   - `serialize()` emits the whole document and carries the P1
+   *     whole-document round-trip guarantee.
+   *   - `serialize_node()` emits a fragment and does NOT. Namespace
+   *     declarations that live on an ancestor (`xmlns:xlink` and friends,
+   *     normally on the root `<svg>`) are NOT inlined — a node using
+   *     `xlink:href` serializes without `xmlns:xlink`. The fragment is the
+   *     element's markup as authored, not a standalone parseable document.
+   *
+   * Throws on an unknown id or a non-element node: the contract is "the
+   * markup for a selected element," selections are always elements, and a
+   * string return of `""` for a bad id would hide consumer bugs.
+   */
+  serialize_node(id: NodeId): string {
+    const n = this.nodes.get(id);
+    if (!n) {
+      throw new Error(`serialize_node: unknown node id ${JSON.stringify(id)}`);
+    }
+    if (n.kind !== "element") {
+      throw new Error(
+        `serialize_node: node ${JSON.stringify(id)} is a ${n.kind} node, not an element`
+      );
+    }
+    return this.emit_node(n);
+  }
+
   private emit_node(n: AnyNode): string {
     switch (n.kind) {
       case "text":

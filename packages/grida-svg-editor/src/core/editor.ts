@@ -1864,6 +1864,21 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     // external control
     load,
     serialize,
+    /**
+     * Serialize a single element's subtree as an SVG **fragment**, using the
+     * same trivia-preserving rules as {@link serialize} — for handing "the
+     * markup of the element the user selected" to a downstream consumer
+     * (e.g. an AI agent) without re-serializing the whole document.
+     *
+     * Fragment, not document (see `SvgDocument.serialize_node`): it does NOT
+     * carry `serialize()`'s whole-document round-trip guarantee. Namespace
+     * declarations on an ancestor (`xmlns:xlink`, normally on the root
+     * `<svg>`) are NOT inlined — a node using `xlink:href` serializes without
+     * `xmlns:xlink`. Throws on an unknown id or a non-element node.
+     */
+    serialize_node(id: NodeId): string {
+      return doc.serialize_node(id);
+    },
     reset,
 
     // lifecycle

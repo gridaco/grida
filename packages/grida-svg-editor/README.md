@@ -249,8 +249,31 @@ editor.dispose(): void; // permanent teardown
 ```ts
 editor.load(svg: string): void; // replace the document (e.g. file-on-disk changed)
 editor.serialize(): string; // emit clean SVG — guaranteed round-trip per P1
+editor.serialize_node(id: NodeId): string; // emit ONE element's subtree — a fragment, see below
 editor.reset(): void; // back to last load() input, clears history
 ```
+
+`serialize_node(id)` exports the markup of a single element — the bridge from
+"what the user selected" (a `NodeId`) to "the SVG for that element," e.g. to
+hand a downstream consumer (an AI agent) the selected subtree without
+re-serializing the whole document. It reuses `serialize()`'s trivia-preserving
+rules (attribute order, quotes, whitespace, comments — emitted as authored).
+
+It is deliberately **weaker** than `serialize()`, and the two must not be
+conflated: `serialize()` emits the whole document and carries the P1
+round-trip guarantee; `serialize_node()` emits a **fragment** and does not.
+Namespace declarations that live on an ancestor (`xmlns:xlink` and friends,
+normally on the root `<svg>`) are **not** inlined into the fragment — a node
+using `xlink:href` serializes without `xmlns:xlink`. The fragment is the
+element's markup as authored, not a standalone parseable document. Throws on
+an unknown id or a non-element node (selections are always elements).
+
+> A stable reference to a node that survives a `load()` — and survives an
+> external rewrite of the file — is a separate, unsolved problem (`NodeId`
+> regenerates on each parse). Positional child-index paths address only the
+> deterministic-re-parse case, not structural edits; durable node identity is
+> under design — see
+> [durable node identity](https://grida.co/docs/wg/feat-svg-editor/durable-node-identity).
 
 ### Observation — state
 
