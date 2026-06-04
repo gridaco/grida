@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
@@ -17,13 +17,20 @@ export function OrganizationAvatarField({
   display_name,
 }: {
   current_avatar_url?: string | null;
-  display_name: string;
+  display_name?: string | null;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
 
   const shown = removed ? null : (preview ?? current_avatar_url ?? null);
+
+  // Revoke the object URL when it's replaced (deps change) or on unmount, so
+  // picking multiple files (or leaving the page) doesn't leak blob URLs.
+  useEffect(() => {
+    if (!preview) return;
+    return () => URL.revokeObjectURL(preview);
+  }, [preview]);
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
