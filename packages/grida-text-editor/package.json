@@ -1,6 +1,6 @@
 {
   "name": "@grida/text-editor",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Backend-agnostic text editor engine (experimental).",
   "license": "MIT",
   "author": "Grida",

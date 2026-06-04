@@ -1,6 +1,6 @@
 {
   "name": "@grida/cmath",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": false,
   "description": "unopinionated canvas math",
   "keywords": [
