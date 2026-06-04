@@ -14,10 +14,14 @@
 --   * Each policy is `drop ... if exists` first so this migration coexists with
 --     any same-named policy that may already be present on the prod bucket and
 --     is safe to (re)apply.
---   * The bucket is shared with non-org (e.g. user_profile, uuid-keyed) avatar
---     objects. The membership check is wrapped in a CASE so a non-numeric first
---     segment yields `false` instead of raising on the `::bigint` cast — those
---     objects fall through to whatever policy governs them, never to an error.
+--   * These are the ONLY write policies on the `avatars` bucket. The membership
+--     check is wrapped in a CASE so a non-numeric first segment yields `false`
+--     instead of raising on the `::bigint` cast. Because storage.objects is
+--     deny-by-default under RLS and no other write policy exists, a non-numeric
+--     (e.g. uuid-keyed) path is simply DENIED for insert/update/delete — it does
+--     not "fall through" to anything. Org avatar objects live at
+--     `{organization_id}/avatar`; only that numeric-prefixed shape is writable
+--     here today. Reads stay public (see the public-read policy below).
 
 insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
