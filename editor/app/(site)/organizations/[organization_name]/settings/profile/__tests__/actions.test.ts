@@ -77,8 +77,30 @@ function form(fields: Record<string, string | File>) {
   return fd;
 }
 
-function imageFile(type: string, bytes: number, name = "a.png") {
-  return new File([new Uint8Array(bytes)], name, { type });
+// Leading magic bytes the server action sniffs (it ignores `File.type`).
+const MAGIC: Record<string, number[]> = {
+  png: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  jpeg: [0xff, 0xd8, 0xff],
+  // "RIFF" + 4 size bytes + "WEBP"
+  webp: [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50],
+  // "GIF8" — a real format, but NOT one of the accepted types.
+  gif: [0x47, 0x49, 0x46, 0x38],
+};
+
+/**
+ * Build an image `File`. `magic` controls the real leading bytes (what the
+ * action sniffs); `type` is the client-declared MIME (which the action must
+ * NOT trust). Omit `magic` for a buffer of zero bytes (no valid signature).
+ */
+function imageFile(
+  type: string,
+  bytes: number,
+  name = "a.png",
+  magic?: number[]
+) {
+  const buf = new Uint8Array(bytes);
+  if (magic) buf.set(magic.slice(0, bytes), 0);
+  return new File([buf], name, { type });
 }
 
 beforeEach(() => {
@@ -139,7 +161,7 @@ describe("updateOrganizationProfile", () => {
       form({
         display_name: "Acme",
         email: "a@acme.com",
-        avatar: imageFile("image/png", 1024),
+        avatar: imageFile("image/png", 1024, "a.png", MAGIC.png),
       })
     );
 
@@ -151,6 +173,25 @@ describe("updateOrganizationProfile", () => {
     expect(update.mock.calls[0][0]).toMatchObject({
       avatar_path: `${ORG_ID}/avatar`,
     });
+  });
+
+  it("uses the sniffed type as contentType, ignoring a spoofed File.type", async () => {
+    const { client, upload } = makeUserClient();
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
+    mockedCreateClient.mockResolvedValue(client as any);
+
+    // Declared as PNG, but the real bytes are JPEG — sniffed type wins.
+    await updateOrganizationProfile(
+      ORG_NAME,
+      form({
+        display_name: "Acme",
+        email: "a@acme.com",
+        avatar: imageFile("image/png", 1024, "a.png", MAGIC.jpeg),
+      })
+    );
+
+    const [, , options] = upload.mock.calls[0];
+    expect(options).toMatchObject({ contentType: "image/jpeg" });
   });
 
   it("clears avatar_path on remove, deletes the object, and does not upload", async () => {
@@ -168,7 +209,26 @@ describe("updateOrganizationProfile", () => {
     expect(update.mock.calls[0][0]).toMatchObject({ avatar_path: null });
   });
 
-  it("rejects unsupported image types", async () => {
+  it("rejects a spoofed MIME — accepted File.type but disallowed magic bytes", async () => {
+    const { client, upload } = makeUserClient();
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
+    mockedCreateClient.mockResolvedValue(client as any);
+
+    // Claims to be a PNG, but the bytes are a real GIF (not an accepted type).
+    await expect(
+      updateOrganizationProfile(
+        ORG_NAME,
+        form({
+          display_name: "Acme",
+          email: "a@acme.com",
+          avatar: imageFile("image/png", 1024, "a.png", MAGIC.gif),
+        })
+      )
+    ).rejects.toThrow(/unsupported image type/);
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file whose bytes match no accepted image signature", async () => {
     const { client } = makeUserClient();
     // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
     mockedCreateClient.mockResolvedValue(client as any);
@@ -179,10 +239,33 @@ describe("updateOrganizationProfile", () => {
         form({
           display_name: "Acme",
           email: "a@acme.com",
-          avatar: imageFile("image/gif", 1024, "a.gif"),
+          // Zero-filled buffer: no magic match.
+          avatar: imageFile("image/png", 1024),
         })
       )
     ).rejects.toThrow(/unsupported image type/);
+  });
+
+  it("rejects when display_name is missing", async () => {
+    const { client, update } = makeUserClient();
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
+    mockedCreateClient.mockResolvedValue(client as any);
+
+    await expect(
+      updateOrganizationProfile(ORG_NAME, form({ email: "a@acme.com" }))
+    ).rejects.toThrow(/display name is required/);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects when email is missing", async () => {
+    const { client, update } = makeUserClient();
+    // oxlint-disable-next-line typescript-eslint/no-explicit-any -- partial client stub
+    mockedCreateClient.mockResolvedValue(client as any);
+
+    await expect(
+      updateOrganizationProfile(ORG_NAME, form({ display_name: "Acme" }))
+    ).rejects.toThrow(/email is required/);
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("rejects images larger than 2MB", async () => {
