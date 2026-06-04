@@ -56,6 +56,15 @@ preserving the author's source on round-trip.
   click-to-place rather than drag-to-size, and why an empty text
   element is treated as a deletion (the empty-equals-delete
   invariant, shared with existing-text editing).
+- [`promote-to-path.md`](./promote-to-path.md) — editing the non-path
+  shapes (`<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polyline>`,
+  `<polygon>`) as vector geometry. One rule, decided per edit: write back
+  to the native tag while it can express the result, promote to `<path>`
+  when it cannot (a curve, or topology that escapes the tag). Fills the
+  `promote` cell the Policy Class glossary leaves open: lazy timing
+  (byte-equal until the first re-typing edit), a single `<path>` target,
+  and a cubic-Bézier conic representation, with the round-trip invariants
+  that keep the conversion honest.
 
 ### Glossary
 

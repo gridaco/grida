@@ -209,14 +209,16 @@ describe("apply_session_d writes native attrs for vertex-chain sources", () => {
     expect(d.get_attr(id, "d")).toBeNull();
   });
 
-  it("polyline + tangent edit → returns false (v1 refuses, no promotion)", () => {
+  it("polyline + tangent edit → apply_session_d returns false (native writeback only; vector_apply re-types)", () => {
     const d = doc(
       `<svg xmlns="http://www.w3.org/2000/svg"><polyline points="0,0 10,0 10,10"/></svg>`
     );
     const id = id_of_first(d, "polyline");
     const source = d.is_vector_edit_target(id);
 
-    // A non-zero tangent makes the model un-expressible in <polyline>.
+    // A non-zero tangent makes the model un-expressible in <polyline>, so
+    // the native-writeback primitive refuses (returns false). The re-type to
+    // <path> is `vector_apply`'s job, layered on top of this false return.
     // setTangent takes a TangentRef `[vertex_idx, 0|1]` where 0 = ta on
     // the segment whose `a === vertex_idx` (i.e. the outgoing tangent
     // from this vertex). abs_pos is the new control-point world position.
@@ -264,8 +266,8 @@ describe("round-trip-if-no-change at the document level", () => {
     `<svg xmlns="http://www.w3.org/2000/svg"><polygon points="0,0 10,0 5,8"/></svg>`,
     // Preserved trivia: attribute order, mixed separators, comments.
     `<svg xmlns="http://www.w3.org/2000/svg"><!-- keep --><polyline class="a" points="0 0, 10 10"/></svg>`,
-    // <line> is not a vector-edit target in v1, but the byte-equal
-    // invariant still holds — the enter pass simply skips it.
+    // <line> is now a vector-edit target; the byte-equal invariant still
+    // holds because the enter pass (predicate + session-d) is non-mutating.
     `<svg xmlns="http://www.w3.org/2000/svg"><line x1="1" y1="2" x2="3" y2="4"/></svg>`,
   ]) {
     it(`byte-equal: ${fixture.slice(0, 60)}…`, () => {

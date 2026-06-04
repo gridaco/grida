@@ -105,9 +105,17 @@ export class VectorEditSession {
   readonly node_id: string;
   /** Source tag + authored attrs captured at session entry. Tells the
    *  apply.ts shim how to project a path-form `d` back to the document.
-   *  Stable across the session — the source tag itself does not change
-   *  in v1 (promotion is deferred). */
-  readonly source: VectorEditSource;
+   *
+   *  Flips **at most once**, primitive → `path`, when a promotable
+   *  primitive (rect / circle / ellipse) is promoted to `<path>` on its
+   *  first committed gesture (see `vector_apply`). The flip is what keeps
+   *  every downstream reader (overlay neighbours, tangent/bend gates, the
+   *  external-mutation reconciler) consistent after the element re-types.
+   *  `restore_source()` reverses it for gesture undo. */
+  private _source: VectorEditSource;
+  /** The pre-promotion source, retained so `restore_source` can reverse a
+   *  single primitive→path flip. `null` when not promoted. */
+  private _source_before_promotion: VectorEditSource | null;
 
   /** The in-session PathModel-form `d`. Gesture handlers parse from
    *  here and write back through `apply_session_d`; the writeback may
@@ -127,13 +135,40 @@ export class VectorEditSession {
 
   constructor(node_id: string, source: VectorEditSource, session_d: string) {
     this.node_id = node_id;
-    this.source = source;
+    this._source = source;
+    this._source_before_promotion = null;
     this._session_d = session_d;
     this._last_seen_d = session_d;
     this._selected_vertices = [];
     this._selected_segments = [];
     this._selected_tangents = [];
     this._hovered_control = null;
+  }
+
+  /** Source tag the session currently projects through. See `_source`. */
+  get source(): VectorEditSource {
+    return this._source;
+  }
+
+  /**
+   * Flip the source to `path` after the underlying element was promoted
+   * (rect / circle / ellipse → `<path>`). Idempotent: a second call while
+   * already promoted does nothing, so the pre-promotion source captured by
+   * the first flip is never clobbered.
+   */
+  promote_source_to_path(): void {
+    if (this._source_before_promotion !== null) return;
+    if (this._source.kind === "path") return;
+    this._source_before_promotion = this._source;
+    this._source = { kind: "path", d: this._session_d };
+  }
+
+  /** Reverse a {@link promote_source_to_path} (gesture undo). No-op if the
+   *  source was never promoted. */
+  restore_source(): void {
+    if (this._source_before_promotion === null) return;
+    this._source = this._source_before_promotion;
+    this._source_before_promotion = null;
   }
 
   /** The session's current PathModel-form `d`. Gesture handlers read
