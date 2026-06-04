@@ -415,7 +415,7 @@ export async function startPlanChangeConfirm(
 
 export type SubscribeCheckoutResult = {
   checkout_url: string | null;
-  session_id: string;
+  sessionId: string;
 };
 
 export async function startSubscribeCheckout(
@@ -511,7 +511,7 @@ export async function startSubscribeCheckout(
 
   return {
     checkout_url: session.url,
-    session_id: session.id,
+    sessionId: session.id,
   };
 }
 

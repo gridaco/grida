@@ -3,6 +3,16 @@
 @import "shadcn/tailwind.css";
 @plugin "@tailwindcss/typography";
 
+/*
+  Streamdown styles for AI Elements Response component
+  https://github.com/vercel/streamdown?tab=readme-ov-file#installation
+ */
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/cjk/dist/*.js";
+@source "../node_modules/@streamdown/code/dist/*.js";
+@source "../node_modules/@streamdown/math/dist/*.js";
+@source "../node_modules/@streamdown/mermaid/dist/*.js";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -124,6 +134,157 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.grida-ai-response-markdown p {
+  @apply my-2 leading-6;
+}
+
+.grida-ai-response-markdown [data-streamdown="heading-1"] {
+  @apply mt-4 mb-2 text-xl font-semibold;
+}
+
+.grida-ai-response-markdown [data-streamdown="heading-2"] {
+  @apply mt-4 mb-2 text-lg font-semibold text-muted-foreground;
+}
+
+.grida-ai-response-markdown [data-streamdown="heading-3"] {
+  @apply mt-3 mb-1.5 text-base font-semibold;
+}
+
+.grida-ai-response-markdown [data-streamdown="heading-4"] {
+  @apply mt-3 mb-1.5 text-base font-semibold;
+}
+
+.grida-ai-response-markdown [data-streamdown="heading-5"] {
+  @apply mt-3 mb-1 text-sm font-semibold;
+}
+
+.grida-ai-response-markdown [data-streamdown="heading-6"] {
+  @apply mt-3 mb-1 text-sm font-semibold text-muted-foreground;
+}
+
+.grida-ai-response-markdown [data-streamdown="unordered-list"],
+.grida-ai-response-markdown [data-streamdown="ordered-list"] {
+  @apply my-1 space-y-0 pl-3 leading-4;
+}
+
+.grida-ai-response-markdown [data-streamdown="list-item"] {
+  @apply my-0 pl-0 leading-4;
+}
+
+.grida-ai-response-markdown [data-streamdown="list-item"] > p {
+  @apply my-0 leading-4;
+}
+
+.grida-ai-response-markdown
+  [data-streamdown="list-item"]
+  > [data-streamdown="unordered-list"],
+.grida-ai-response-markdown
+  [data-streamdown="list-item"]
+  > [data-streamdown="ordered-list"] {
+  @apply mt-0.5 mb-0;
+}
+
+.grida-ai-response-markdown [data-streamdown="blockquote"] {
+  @apply my-3;
+}
+
+.grida-ai-response-markdown [data-streamdown="horizontal-rule"] {
+  @apply my-4;
+}
+
+.grida-ai-response-markdown [data-streamdown="inline-code"] {
+  @apply px-1 py-0.5 text-[0.93em];
+}
+
+.grida-ai-response-markdown [data-streamdown="code-block"],
+.grida-ai-response-markdown [data-streamdown="mermaid-block"],
+.grida-ai-response-markdown [data-streamdown="table-wrapper"] {
+  @apply my-3;
+}
+
+.grida-ai-response-markdown [data-streamdown="code-block"] {
+  @apply gap-0 rounded-md border-border/60 bg-transparent p-0;
+}
+
+.grida-ai-response-markdown [data-streamdown="code-block-header"] {
+  @apply h-7 px-2;
+}
+
+.grida-ai-response-markdown [data-streamdown="code-block-header"] span {
+  @apply ml-0 text-[11px];
+}
+
+.grida-ai-response-markdown [data-streamdown="code-block-body"] {
+  @apply rounded-none border-0 bg-transparent p-2 text-xs;
+}
+
+.grida-ai-response-markdown [data-streamdown="code-block-actions"] {
+  @apply border-0 bg-transparent px-1 py-0 shadow-none backdrop-blur-none;
+}
+
+.grida-ai-response-markdown [data-streamdown="code-block-copy-button"] {
+  @apply p-1;
+}
+
+.grida-ai-response-markdown [data-streamdown="table-wrapper"] {
+  @apply gap-1 rounded-none border-0 bg-transparent p-0;
+}
+
+.grida-ai-response-markdown
+  [data-streamdown="table-wrapper"]
+  > div:first-child {
+  @apply h-6 gap-0;
+}
+
+.grida-ai-response-markdown
+  [data-streamdown="table-wrapper"]
+  > div:first-child
+  button {
+  @apply rounded-sm p-1 opacity-60 hover:bg-muted hover:opacity-100;
+}
+
+.grida-ai-response-markdown
+  [data-streamdown="table-wrapper"]
+  > div:has(> [data-streamdown="table"]) {
+  @apply rounded-md border-border/60 bg-transparent;
+}
+
+.grida-ai-response-markdown [data-streamdown="table"] {
+  @apply text-xs;
+}
+
+.grida-ai-response-markdown [data-streamdown="table-header"] {
+  @apply bg-muted/40;
+}
+
+.grida-ai-response-markdown [data-streamdown="table-body"] {
+  @apply divide-border/60;
+}
+
+.grida-ai-response-markdown [data-streamdown="table-header-cell"] {
+  @apply px-2 py-1 text-xs leading-5;
+}
+
+.grida-ai-response-markdown [data-streamdown="table-cell"] {
+  @apply px-2 py-1 text-xs leading-5;
+}
+
+/* Line numbers for the Shiki code viewer (workspace file text tab).
+   Rides Shiki's per-line `<span class="line">` output: each line gets a
+   counter gutter via `::before`. `--ln-w` (set from the file's line
+   count) sizes the gutter so digits never clip and the code stays
+   aligned. The numbers are `select-none` so a copy excludes them. */
+.grida-code-lines code {
+  counter-reset: ln;
+}
+
+.grida-code-lines .line::before {
+  content: counter(ln);
+  counter-increment: ln;
+  width: var(--ln-w, 2.5rem);
+  @apply mr-4 inline-block select-none text-right opacity-40;
 }
 
 /* #region custom */

@@ -76,7 +76,7 @@ function RefigMarketing() {
             style={{ paddingBottom: "56.25%" }}
           >
             <iframe
-              src="https://player.vimeo.com/video/1165652748?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=0&muted=0&loop=0"
+              src="https://player.vimeo.com/video/1165652748?badge=0&autopause=0&player_id=0&appId=58479&autoplay=0&muted=0&loop=0"
               className="absolute top-0 left-0 h-full w-full border-0"
               title="refig (headless Figma renderer) demo"
               allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media"

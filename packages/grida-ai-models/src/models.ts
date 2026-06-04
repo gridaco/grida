@@ -161,6 +161,14 @@ export namespace models {
         outputLimit: 65_536,
         cost: { input: 1.5, output: 9, cacheRead: 0.15 },
       },
+      "google/gemini-3.1-pro-preview": {
+        id: "google/gemini-3.1-pro-preview",
+        label: "Gemini 3.1 Pro Preview",
+        multimodal: true,
+        contextWindow: 1_048_576,
+        outputLimit: 65_536,
+        cost: { input: 2, output: 12, cacheRead: 0.2 },
+      },
     } as const satisfies Record<string, ModelSpec>;
 
     /** Catalogued text-model id. The literal key set of {@link catalog}. */

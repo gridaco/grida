@@ -85,7 +85,8 @@ Pattern:
 2. The host sets `metadata_json.agent = "build"` on that message
    (per-turn agent override).
 3. It enters the **same queue** as any typed user message
-   (`queued_at` semantics apply if the session is busy).
+   (`queued_at` semantics apply if the session is busy — see
+   [`queue`](./queue.md)).
 4. The loop reads the override and runs `build` for that turn and
    onward.
 
@@ -177,25 +178,27 @@ See:
 
 **Yes — required by spec.** The RFC is explicit:
 
-> Rewinding past the compaction MUST un-hide them. The truncation
-> pointer moves back over the summary AND the summarized turns.
-> Implementations that hard-delete on compaction lose this property;
-> they MUST NOT.
+> A compaction does not hide the turns it summarized … rewinding to any
+> earlier message naturally hides the marker along with everything after
+> the target. That removes the boundary … Nothing is deleted …
+> Implementations that hard-delete on compaction lose this property; they
+> MUST NOT.
 
 How the persistency model makes it work:
 
-- Compaction **soft-hides** the summarized turns (sets `hidden_at`)
-  and writes a synthetic assistant message carrying the summary.
-- Rewind past the compaction clears `hidden_at` on messages between
-  the rewind target and the compaction (un-hide), and sets
-  `hidden_at` from the summary onward (hide-by-rewind).
+- Compaction does **not** hide the summarized turns — they stay in the
+  linear log, and the model boundary is read-time (`tail_start_id`). The
+  summary marker is stamped at invocation time, so it sorts last.
+- Rewinding to an earlier message hides everything after the target
+  (including the marker) via `hidden_at` — which removes the compaction
+  boundary and re-exposes the full pre-target history to the model.
 - Nothing is deleted. Inspection, un-rewind, audit stay possible.
 
-| Layer       | Guarantee                                                                                        |
-| ----------- | ------------------------------------------------------------------------------------------------ |
-| Persistency | Compacted messages stay in the DB with `hidden_at` set — they exist and are addressable.         |
-| Rewind      | The user MUST be able to rewind to any prior user message, including ones currently soft-hidden. |
-| Compaction  | An implementation that hard-deletes on compaction violates the spec.                             |
+| Layer       | Guarantee                                                                             |
+| ----------- | ------------------------------------------------------------------------------------- |
+| Persistency | Compacted messages stay in the DB (not hidden) — they exist and are addressable.      |
+| Rewind      | The user MUST be able to rewind to any prior user message, including summarized ones. |
+| Compaction  | An implementation that hard-deletes on compaction violates the spec.                  |
 
 The rewind picker SHOULD include compacted user messages as valid
 targets — filtering them out would silently break the MUST.
@@ -209,37 +212,38 @@ See:
 #### How is a compaction stored in the DB, and how does it support UIs that show a divider or the summary?
 
 One new synthetic assistant message + one new part — no special
-"compaction marker" beyond a reserved part type. Nothing else changes
-except `hidden_at` on the summarized rows.
+"compaction marker" beyond a reserved part type, and **nothing else
+changes**: the summarized rows are untouched (not hidden, not deleted).
 
 ```text
 chat_messages:
-  + INSERT one new row   → role="assistant", synthetic
-  ~ UPDATE summarized    → hidden_at = now()
+  + INSERT one new row   → role="assistant", synthetic, created_at = now()
+                           (stamped at invocation time → sorts LAST)
 
 chat_parts:
   + INSERT one new row on the synthetic message
     → type = "data-compaction"
     → data_json = {
-        summary: string,           // Markdown body
-        tail_start_id: string,     // first kept-verbatim message id
-        auto: boolean,             // auto vs manual trigger
-        summary_tokens: int,       // for the next rollup
+        summary: string,            // Markdown body
+        tail_start_id: string|null, // first kept-verbatim message id; null = nothing kept (manual)
+        auto: boolean,              // auto vs manual trigger
+        summary_tokens: int,        // for the next rollup
       }
 ```
 
 The model sees the `summary` text + every message from `tail_start_id`
-onward. Soft-hidden turns are invisible to the next call but still
-addressable for inspection and rewind.
+onward (or just the summary, when `tail_start_id` is `null`) — resolved
+at read-time. The summarized head stays visible and linear; only the
+model view skips it.
 
-| UI pattern                            | How it falls out of the schema                                                               |
-| ------------------------------------- | -------------------------------------------------------------------------------------------- |
-| **Marker / divider**                  | Render the `data-compaction` part as a divider. The `auto` flag drives phrasing.             |
-| **Show the compacted message**        | Render `data_json.summary` inline or behind a fold.                                          |
-| **Expand "details" (original turns)** | Query `chat_messages WHERE session_id = ? AND hidden_at IS NOT NULL AND id < tail_start_id`. |
+| UI pattern                     | How it falls out of the schema                                                                                                                              |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Marker / divider**           | Render the `data-compaction` part as a divider. The `auto` flag drives phrasing.                                                                            |
+| **Show the compacted message** | Render `data_json.summary` inline or behind a fold.                                                                                                         |
+| **Show the summarized turns**  | They're already in the transcript — the rows ordered before the marker (and `tail_start_id`); no separate query, the divider sits at the marker's position. |
 
-Auto vs manual produce the **same artifact**; only the trigger
-differs.
+Auto vs manual produce the **same artifact**; only the trigger and the
+verbatim-tail depth differ.
 
 See:
 [`session / what compaction produces`](./session.md#what-compaction-produces),
@@ -255,7 +259,7 @@ Four buckets, organized by who recovers and how:
 | ------------------ | ----------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------- |
 | Tool errors        | schema validation, watchdog `deny`, capability refusal, sandbox refusal, in-tool failure, aborted-by-parent | **Model decides next turn**        | `{ type: "error", error_text }` envelope          |
 | Transient provider | rate limit, provider 5xx, network blip                                                                      | **Loop auto-retries with backoff** | `SessionStatus.state = "retrying"` with `attempt` |
-| Spec-limit (hard)  | compaction overflow after fallbacks; model swap to too-small context; branch on busy                        | **User takes action**              | `SessionStatus.state = "error"`                   |
+| Spec-limit (hard)  | compaction overflow after fallbacks; model swap to too-small context; fork on busy                          | **User takes action**              | `SessionStatus.state = "error"`                   |
 | Loop abort         | user cancel; parent abort cascade                                                                           | Not an error — a signal            | Partial result / `"aborted by parent"` tool error |
 
 Normative rules from the RFC:
@@ -273,7 +277,7 @@ Normative rules from the RFC:
 terminal state. `error` clears on the next submission attempt — the
 state machine transitions to `busy` for that run and follows the
 normal lifecycle. Recovery for the underlying cause is user-driven
-(prune, branch, switch model).
+(prune, fork, switch model).
 
 See:
 [`session / session status`](./session.md#session-status) for the
@@ -311,6 +315,36 @@ See:
 [`subagents / what this guide does not specify`](./subagents.md#what-this-guide-does-not-specify),
 [`subagents / awareness`](./subagents.md#awareness) for the
 `caller: "agent"` framing.
+
+### Tools and filesystem
+
+#### When an agent edits a document the user has open, does the open view stay in sync?
+
+**Depends on who owns the filesystem — both modes are already
+specified.** The agent runtime owns `fs` by default, but a client MAY
+provide `fs/read_text_file` / `fs/write_text_file`, and the locked
+`read` / `write` / `edit` tools delegate to it when that capability is
+negotiated:
+
+- **Client-delegated fs** — the write round-trips _through_ the client,
+  so an open view updates by construction (the write _is_ a client
+  operation).
+- **Runtime-owned fs** — the agent writes to the runtime's filesystem;
+  the client sees the write as a `tool-output` chunk (carrying the path)
+  and refreshes as host UI, or re-reads. No server→client
+  "document-changed" event is owed — view-sync is UI, and the system
+  decides protocol while the host decides UI.
+
+The two common styles — a client owning the live document model vs. a
+host writing to disk and refreshing on reopen — are these two sanctioned
+modes, not a gap.
+
+See:
+[`acp / filesystem authority`](./acp.md#filesystem-authority),
+[`acp / capability matrix`](./acp.md#capability-matrix) for runtime-owned
+vs client-delegated `fs`;
+[`session / streaming and layering`](./session.md#streaming-and-layering)
+for tool-output reaching the client.
 
 ## See also
 

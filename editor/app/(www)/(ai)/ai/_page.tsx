@@ -2,6 +2,10 @@
 
 import React, { useCallback, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
+import { cjk } from "@streamdown/cjk";
+import { code } from "@streamdown/code";
+import { math } from "@streamdown/math";
+import { mermaid } from "@streamdown/mermaid";
 import { toast } from "sonner";
 import { Loader2Icon, RefreshCwIcon, SparklesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -52,6 +56,15 @@ type Props = {
   authed: boolean;
   context: AiPageContext | null;
 };
+
+const markdown = {
+  className: "grida-ai-response-markdown space-y-2 text-sm leading-6",
+  controls: {
+    code: { copy: true, download: false },
+    table: { copy: true, download: false, fullscreen: false },
+  },
+  plugins: { cjk, code, math, mermaid },
+} as const;
 
 // ---------------------------------------------------------------------------
 // Model picker — only the four tiered models (nano / mini / pro / max),
@@ -368,7 +381,22 @@ export default function Page({ authed, context }: Props) {
                           leaving the bubble empty until the response
                           lands. Our backend returns complete strings
                           per call, so static rendering is correct. */}
-                      <Response mode="static">{turn.content}</Response>
+                      <Response
+                        className={
+                          turn.role === "assistant"
+                            ? markdown.className
+                            : undefined
+                        }
+                        controls={
+                          turn.role === "assistant"
+                            ? markdown.controls
+                            : undefined
+                        }
+                        mode="static"
+                        plugins={markdown.plugins}
+                      >
+                        {turn.content}
+                      </Response>
                     </MessageContent>
                   </Message>
                 ))}

@@ -11,7 +11,7 @@ tags:
 
 # AI (WG)
 
-Two sibling layers live here:
+Three siblings live here:
 
 - **[`agent/`](./agent/index.md)** — the implementation-agnostic
   agent system RFC. RFC 2119 normative tone. No product-specific
@@ -20,13 +20,17 @@ Two sibling layers live here:
   [LSP](https://microsoft.github.io/language-server-protocol/): the
   contract a conforming implementation MUST honor.
 - **[`grida/`](./grida/index.md)** — Grida-specific bindings of the
-  RFC. The canvas-tool catalog, the image-generation surface, and
-  how Grida's host wires the locked-tool set. These docs describe
-  what Grida ships; they reference the RFC for the shapes.
+  RFC. The canvas-tool catalog, the image-generation surface, the
+  built-in subagents (titler / compactor / planner), and how Grida's
+  host wires the locked-tool set.
+- **[`grida/architecture.md`](./grida/architecture.md)** — Grida's
+  implementation blueprint. Names the orchestrator god class
+  (`AgentHost`), the package map, the host landings, the sequencing,
+  and the anti-goals. **Read this first if you're implementing.**
 
 ## Reading order
 
-If you're trying to understand the system end-to-end:
+If you're trying to **understand** the system end-to-end:
 
 1. Start at [`agent/index.md`](./agent/index.md) for vocabulary and
    the cross-cutting invariants.
@@ -40,6 +44,13 @@ If you're trying to understand the system end-to-end:
    skills, MCP, environments — from the `agent/` sidebar.
 5. Cross over to [`grida/`](./grida/index.md) for the bindings,
    the Grida-canvas tool surface, and the image-generation tools.
+
+If you're trying to **build** Grida's implementation:
+
+1. Start at [`grida/architecture.md`](./grida/architecture.md) for the
+   blueprint.
+2. Then steps 2–4 above.
+3. Then [`../desktop/`](../desktop/index.md) for the V1 host landing.
 
 ## Scope
 

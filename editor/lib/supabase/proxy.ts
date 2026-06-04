@@ -4,9 +4,12 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * @see https://supabase.com/docs/guides/auth/server-side/creating-a-client
  */
-export async function updateSession(request: NextRequest) {
+export async function updateSession(
+  request: NextRequest,
+  requestHeaders?: Headers
+) {
   let supabaseResponse = NextResponse.next({
-    request,
+    request: requestHeaders ? { headers: requestHeaders } : request,
   });
 
   // With Fluid compute, don't put this client in a global environment
@@ -24,7 +27,7 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value)
           );
           supabaseResponse = NextResponse.next({
-            request,
+            request: requestHeaders ? { headers: requestHeaders } : request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)

@@ -129,21 +129,21 @@ the model decides it needs to.
 
 ## Inline commands
 
-A command (`/search foo`, `/branch this chat`, `/compact now`) is
+A command (`/search foo`, `/fork this chat`, `/compact now`) is
 **not** a string the model parses out of prose. It is a part with a
 distinct type. The compositor MUST resolve commands at submission
 time into one of:
 
 | Outcome                                                            | When                                                                                                                 |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| A direct host action executed before the message reaches the model | Commands that compact, branch, archive — the model never sees them.                                                  |
+| A direct host action executed before the message reaches the model | Commands that compact, fork, archive — the model never sees them.                                                    |
 | A structured user-input part the model can act on                  | Commands that supply a query or a hint the model uses (e.g. `/search` becomes a `text` part + a search-intent flag). |
 | A pass-through `text` part with the original `/foo args` body      | Commands the host does not recognize. Forward-compatible.                                                            |
 
 The compositor knows the command catalog; the model does not need
 to. The catalog includes:
 
-- Built-in commands the host ships (`/branch`, `/compact`, `/archive`, `/rewind`).
+- Built-in commands the host ships (`/fork`, `/compact`, `/archive`, `/rewind`).
 - Project-config commands the user defines.
 - MCP-server-published commands (prompt templates).
 - Skill-bound commands (a skill MAY expose a slash trigger).
@@ -503,7 +503,7 @@ A conforming compositor MUST:
 
 ## See also
 
-- [UX Patterns](./ux.md) — queued sends, sidecar branches, memory,
+- [UX Patterns](./ux.md) — queued sends, sidecar forks, memory,
   the patterns that ride on top of the compositor.
 - [Skills](./skills.md) — how skill bodies actually enter context
   (not via mention strings).

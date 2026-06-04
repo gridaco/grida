@@ -115,6 +115,12 @@ const config: ForgeConfig = {
           // grida:// deep linking
           "x-scheme-handler/grida",
         ],
+        // GRIDA-SEC-004 — srt's Linux backend shells out to these.
+        // bubblewrap = namespace+seccomp sandbox; socat = unix-socket
+        // bridge for the HTTP/SOCKS5 proxies; ripgrep = mandatory
+        // deny-set search helper. Without them, srt initialize()
+        // throws and the supervisor refuses to boot.
+        requires: ["bubblewrap", "socat", "ripgrep"],
       },
     }),
     new MakerDeb({
@@ -126,6 +132,8 @@ const config: ForgeConfig = {
           // grida:// deep linking
           "x-scheme-handler/grida",
         ],
+        // GRIDA-SEC-004 — see MakerRpm comment above.
+        depends: ["bubblewrap", "socat", "ripgrep"],
       },
     }),
   ],
@@ -144,19 +152,34 @@ const config: ForgeConfig = {
           config: "vite.preload.config.ts",
           target: "preload",
         },
-      ],
-      renderer: [
         {
-          name: "main_window",
-          config: "vite.renderer.config.mjs",
+          // Agent sidecar. Runs in Electron-as-Node and constructs
+          // AgentHost. Forge emits `.vite/build/agent-sidecar.js`
+          // next to `main.js`. GRIDA-SEC-004.
+          entry: "src/agent-sidecar.ts",
+          config: "vite.agent-sidecar.config.ts",
+          target: "main",
         },
       ],
+      // URL-loaded model — main BrowserWindow `loadURL`s
+      // `${EDITOR_BASE_URL}/desktop/...` directly; no local renderer
+      // bundle is built. The preload (above) is the only renderer-side
+      // code we ship. GRIDA-SEC-004.
+      renderer: [],
     }),
     // Fuses are used to enable/disable various Electron functionality
     // at package time, before code signing the application
     new FusesPlugin({
       version: FuseVersion.V1,
-      [FuseV1Options.RunAsNode]: false,
+      // GRIDA-SEC-004 — must be `true` so the supervisor can
+      // `child_process.spawn(process.execPath, ..., { env: {
+      // ELECTRON_RUN_AS_NODE: '1' } })` to boot the agent sidecar
+      // inside an srt wrap. Residual risk: a local attacker who
+      // already controls the binary can pass the same env var to
+      // run arbitrary JS — but they already own the binary, so this
+      // is not a new vector. See
+      // `docs/wg/desktop/agent-sandbox-wrap.md` for the full rationale.
+      [FuseV1Options.RunAsNode]: true,
       [FuseV1Options.EnableCookieEncryption]: true,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,

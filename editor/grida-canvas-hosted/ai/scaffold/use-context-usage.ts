@@ -103,10 +103,6 @@ export function useContextUsage(messages: AgentUIMessage[]): ContextUsage {
           textTokens: cumOutput - cumReasoning,
           reasoningTokens: cumReasoning || undefined,
         },
-        // Deprecated fields — populated for compat with <ContextReasoningUsage>
-        // and <ContextCacheUsage> which still read them.
-        reasoningTokens: cumReasoning || undefined,
-        cachedInputTokens: cumCacheRead || undefined,
       } as LanguageModelUsage,
       modelId: latestModelId,
     };

@@ -125,5 +125,70 @@
         "no-restricted-imports": "off",
       },
     },
+    {
+      // Desktop renderer boundary — GRIDA-SEC-004.
+      //
+      // The `/desktop/*` route group runs inside Electron under a strict,
+      // per-request CSP (see `editor/proxy.ts`) and talks to the OS via
+      // the `window.grida` bridge (see `editor/lib/desktop/bridge.ts`).
+      // Anything outside that boundary either breaks the CSP (third-party
+      // image roundtrips, marketing/analytics SDKs), bypasses the bridge
+      // (direct Supabase, server actions), or pulls in the wrong "am I in
+      // the wrapper" surface (`editor/host/**` — that's the web side; the
+      // desktop bridge lives at `@/lib/desktop/`).
+      //
+      // We deny rather than allowlist here so legitimate UI primitives
+      // (`lucide-react`, `@/components/theme-provider`, in-tree fixtures)
+      // keep working without per-package upkeep. The denylist is what
+      // protects the boundary; the allowed-set lives in the doc above.
+      "files": ["app/desktop/**", "scaffolds/desktop/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "next/image",
+                "message": "next/image is blocked under /desktop/* — the strict CSP (GRIDA-SEC-004) forbids the third-party optimizer roundtrip. Use a plain <img> or an in-tree asset.",
+              },
+            ],
+            "patterns": [
+              {
+                "group": ["@/lib/billing", "@/lib/billing/**"],
+                "message": "Billing is server-only and lives outside the desktop bridge. Route through @/lib/desktop/bridge instead. GRIDA-SEC-004.",
+              },
+              {
+                "group": ["@/lib/ai", "@/lib/ai/**"],
+                "message": "AI server modules are not reachable from the desktop renderer. Route through @/lib/desktop/bridge instead. GRIDA-SEC-004.",
+              },
+              {
+                "group": ["@supabase/*", "@supabase/**"],
+                "message": "Do not import @supabase/* directly from /desktop/*. Go through @/lib/desktop/bridge — the renderer must not hold a Supabase client. GRIDA-SEC-004.",
+                "allowTypeImports": true,
+              },
+              {
+                "group": ["@/host", "@/host/**"],
+                "message": "@/host/* is the web-side 'am I in the wrapper' surface. The desktop bridge is @/lib/desktop/bridge. GRIDA-SEC-004.",
+              },
+              {
+                "group": [
+                  "@sentry/*",
+                  "@sentry/**",
+                  "posthog-js",
+                  "posthog-js/**",
+                  "@vercel/analytics",
+                  "@vercel/analytics/**",
+                  "mixpanel-browser",
+                  "mixpanel-browser/**",
+                  "@segment/analytics-next",
+                  "@segment/analytics-next/**",
+                ],
+                "message": "Third-party analytics/sentry/marketing SDKs are blocked under /desktop/* (CSP + telemetry boundary). GRIDA-SEC-004.",
+              },
+            ],
+          },
+        ],
+      },
+    },
   ],
 }

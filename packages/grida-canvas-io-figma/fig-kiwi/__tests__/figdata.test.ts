@@ -4,10 +4,8 @@ import { compileSchema } from "kiwi-schema";
 import schema from "../schema";
 import { Schema as CompiledSchema, NodeChange } from "../schema";
 
-// Dev-time one-shot: regenerate `fig.kiwi` from the TS schema. Kept as a todo
-// placeholder so the intent isn't lost; run manually via a dedicated script
-// rather than as part of the automated suite.
-test.todo("this just formats the schema");
+// Dev-time one-shot: regenerate `fig.kiwi` from the TS schema. Run manually
+// via a dedicated script rather than as part of the automated suite.
 
 test("able to parse figma kiwi", () => {
   const data = readFileSync(
@@ -70,11 +68,9 @@ test("able to write dummy files to a fig-kiwi archive", () => {
   expect(header).toEqual(encoder.header);
 });
 
-// Dev-time inspection script: logs sortPosition / parentIndex values from
-// CANVAS nodes across sample .fig fixtures. Has no assertions — converted to
-// a todo placeholder so it stops showing up as a disabled test while the
-// intent is preserved for future work.
-test.todo("inspect sortPosition values for CANVAS nodes");
+// Dev-time inspection target: log sortPosition / parentIndex values from
+// CANVAS nodes across sample .fig fixtures once there is an assertion-worthy
+// invariant to preserve.
 
 // test.skip("able to write a Message to an archive", () => {
 //   // @ts-ignore

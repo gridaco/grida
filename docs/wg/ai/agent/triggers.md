@@ -94,7 +94,7 @@ Why `role: "user"` and not a new role:
 
 - The loop is identical regardless of who originated the message.
   The model sees user input either way.
-- Persisting as `role: "user"` keeps the rewind / branch / queue /
+- Persisting as `role: "user"` keeps the rewind / fork / queue /
   compaction code paths the same.
 - A new role would bend the AI SDK chunk shape
   ([`foundations`](./foundations.md)) for no behavioral gain.
@@ -106,38 +106,34 @@ than `role`. The benefit is that everything else stays simple.
 ## Queue semantics
 
 A trigger fires while another turn may be in progress on the same
-session. The runtime MUST apply **the same queue-and-process-on-idle
-rule** as compositor-originated user messages
-([`ux / queued sends`](./ux.md#queued-sends)):
+session. A trigger message is a `user` message like any other, so it
+obeys the **single, shared [Turn Queue](./queue.md) contract**:
+persisted immediately, stamped `metadata_json.queued_at` while a turn
+runs, and fired earliest-first when the session goes idle. Compositor-
+and trigger-originated messages queue against the **same clock** — the
+user is not jumped by a webhook, the webhook is not jumped by the user
+— and no trigger preempts a running turn. The queue is core state; see
+[Turn Queue](./queue.md) for the full rule.
 
-1. The trigger message is persisted immediately with
-   `metadata_json.queued_at` set to the current epoch ms.
-2. The session's run-state machine refuses to start a new turn while
-   one is running.
-3. When the previous turn finishes (or aborts), the run-state
-   machine picks the **earliest by `queued_at`** unfired message,
-   clears `queued_at`, and fires the turn.
+What is trigger-specific is the **drop** rule: unlike a typed message,
+a trigger MAY be discarded before it ever enters the queue, under two
+host policies:
 
-Multiple queued triggers fire in order. Compositor-originated
-messages and trigger-originated messages queue against each other
-on `queued_at` — the user does not get jumped by a webhook, and the
-webhook does not get jumped by the user. Determinism over priority.
-
-A trigger MAY be **dropped** (not queued) under two conditions:
-
-- **Duplicate `delivery_id`** — the upstream redelivered an event
-  the runtime already has. Idempotency check.
+- **Duplicate `delivery_id`** — the upstream redelivered an event the
+  session already has. Idempotency check.
 - **Per-trigger throttle exceeded** — host policy caps how often a
-  given trigger can fire (e.g. webhook-source has an hourly cap).
+  given trigger can fire (e.g. a webhook source has an hourly cap).
   Excess events are dropped, not queued, to avoid backlog overload.
   This matches the
   [Claude Code Routines](https://code.claude.com/docs/en/routines)
   per-routine / per-account hourly cap behavior.
 
-Preemption (a trigger interrupts the running turn) is **not** in
-the protocol. A host that needs preemption layers it via
-`abort(session_id)` + retry — explicit, observable, never the
-default.
+A dropped trigger never enters the queue — the **trigger layer**
+applies these checks before it submits. The
+[Turn Queue](./queue.md) itself is source-agnostic and owns no drop
+policy; it serializes whatever a source hands it. Dropping is a
+property of the source (a human never dedupes or throttles
+themselves), not of the queue.
 
 ## Where the trigger runs
 
@@ -289,7 +285,7 @@ A conforming implementation that supports triggers MUST:
 - Persist every trigger-fired turn as a `user` message with
   `metadata_json.trigger` set.
 - Apply the same `queued_at` queue rule as the compositor; never
-  start parallel turns on the same session.
+  start parallel turns on the same session ([Turn Queue](./queue.md)).
 - Honor `delivery_id` for idempotency; drop duplicates.
 - Apply the watchdog to triggered turns and treat `ask` as `deny`
   when no human is present.
@@ -323,8 +319,10 @@ A conforming implementation that supports agent self-scheduling MUST:
 
 - [Compositor](./compositor.md) — the human-originated trigger
   source; the canonical home for user-message vocabulary.
-- [UX / queued sends](./ux.md#queued-sends) — the queue rule that
-  triggers share with compositor messages.
+- [Turn Queue](./queue.md) — the single queue contract triggers share
+  with compositor messages; this page adds only the drop rules.
+- [UX / queued sends](./ux.md#queued-sends) — the user-facing framing
+  of that shared queue.
 - [Subagents / blocking vs background](./subagents.md#blocking-vs-background) —
   the sibling primitive for non-foreground turns.
 - [Foundations / watchdog](./foundations.md#watchdog) — runs on

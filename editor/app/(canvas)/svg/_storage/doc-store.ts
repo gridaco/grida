@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
-import { AgentFs } from "@grida/agent-tools/fs";
-import { OpfsBackend } from "@grida/agent-tools/fs/backends/opfs";
+import { AgentFs } from "@grida/agent/fs";
+import { OpfsBackend } from "@grida/agent/fs/backends/opfs";
 import type { SvgEditor } from "@grida/svg-editor";
 import { svgEditorBinding } from "../_ai/binding-svg";
 import { svgToDataUri } from "./thumbnails";

@@ -2,6 +2,10 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
+import { cjk } from "@streamdown/cjk";
+import { code } from "@streamdown/code";
+import { math } from "@streamdown/math";
+import { mermaid } from "@streamdown/mermaid";
 import {
   isReasoningUIPart,
   isTextUIPart,
@@ -43,17 +47,26 @@ import { AgentInput } from "@/grida-canvas-hosted/ai/scaffold/components/agent-i
 import { useContextUsage } from "@/grida-canvas-hosted/ai/scaffold/use-context-usage";
 import type { AgentUIMessage } from "@/grida-canvas-hosted/ai/types";
 import { useSvgAgentChat } from "./provider";
-import type { SvgEditorAgentMessage } from "./server-agent";
+import type { AgentMessage } from "./server-agent";
 import { ToolCallItem } from "./tool-call-item";
 import { CreditChip } from "./credit-chip";
 import { SuggestedPrompts } from "./suggested-prompts";
 import { TierSelect } from "./tier-select";
 
-type SvgMessagePart = NonNullable<SvgEditorAgentMessage["parts"]>[number];
+type SvgMessagePart = NonNullable<AgentMessage["parts"]>[number];
 
 const WINDOW_WIDTH = 400;
 const WINDOW_HEIGHT = 600;
 const WINDOW_MARGIN = 24;
+
+const markdown = {
+  className: "grida-ai-response-markdown space-y-2 text-sm leading-6",
+  controls: {
+    code: { copy: true, download: false },
+    table: { copy: true, download: false, fullscreen: false },
+  },
+  plugins: { cjk, code, math, mermaid },
+} as const;
 
 export function AISvgChatPanel({
   boundaryRef,
@@ -73,7 +86,7 @@ export function AISvgChatPanel({
 
   // Token / cost / context-window aggregation across the conversation —
   // same hook the canvas chat uses. Powers the input's `ContextIndicator`.
-  // SvgEditorAgentMessage and AgentUIMessage share the AI-SDK UIMessage
+  // AgentMessage and AgentUIMessage share the AI-SDK UIMessage
   // shape (metadata is set by the route's `messageMetadata` callback).
   const contextUsage = useContextUsage(messages as unknown as AgentUIMessage[]);
 
@@ -228,13 +241,13 @@ export function AISvgChatPanel({
 const UserMessageView = memo(function UserMessageView({
   message,
 }: {
-  message: SvgEditorAgentMessage;
+  message: AgentMessage;
 }) {
   const text = useMemo(() => extractText(message.parts), [message.parts]);
   return (
     <Message from="user">
       <MessageContent>
-        <MessageResponse>{text}</MessageResponse>
+        <MessageResponse plugins={markdown.plugins}>{text}</MessageResponse>
       </MessageContent>
     </Message>
   );
@@ -244,14 +257,13 @@ const AssistantMessageView = memo(function AssistantMessageView({
   message,
   isStreaming,
 }: {
-  message: SvgEditorAgentMessage;
+  message: AgentMessage;
   isStreaming?: boolean;
 }) {
   const nodes = useMemo(
     () => renderParts(message.id, message.parts),
     [message.id, message.parts]
   );
-
   return (
     <Message from="assistant" className="w-full max-w-none">
       <div className="flex max-w-full flex-col gap-3">
@@ -269,7 +281,7 @@ const AssistantMessageView = memo(function AssistantMessageView({
 
 // ─── part rendering ──────────────────────────────────────────────────────
 
-function renderParts(messageId: string, parts: SvgEditorAgentMessage["parts"]) {
+function renderParts(messageId: string, parts: AgentMessage["parts"]) {
   const list = (parts ?? []) as ReadonlyArray<SvgMessagePart>;
   const out: React.ReactNode[] = [];
   list.forEach((part, idx) => {
@@ -296,7 +308,13 @@ function renderTextPart(key: string, part: TextUIPart): React.ReactNode | null {
   if (!text) return null;
   return (
     <MessageContent key={key} className="w-full rounded-none border-0 px-0">
-      <MessageResponse>{text}</MessageResponse>
+      <MessageResponse
+        className={markdown.className}
+        controls={markdown.controls}
+        plugins={markdown.plugins}
+      >
+        {text}
+      </MessageResponse>
     </MessageContent>
   );
 }
@@ -321,7 +339,7 @@ function renderReasoningPart(
   );
 }
 
-function extractText(parts: SvgEditorAgentMessage["parts"]): string {
+function extractText(parts: AgentMessage["parts"]): string {
   const list = (parts ?? []) as ReadonlyArray<
     UIMessagePart<Record<string, never>, Record<string, never>>
   >;

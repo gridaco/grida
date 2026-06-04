@@ -200,7 +200,7 @@ A conforming implementation MUST pass:
       call (the resume layer works).
 - [ ] A rewind-to-user-message + edit + resend works without losing
       the rewound history (soft-hidden, not deleted).
-- [ ] A branch from a message works and is queryable from the parent.
+- [ ] A fork from a message works and is queryable from the parent.
 - [ ] The watchdog is reachable from the host's config (the
       `tool.before` hook).
 - [ ] The session status (`busy` / `idle` / `retrying` / `error`) is

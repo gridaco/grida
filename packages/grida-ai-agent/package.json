@@ -1,0 +1,127 @@
+{
+  "name": "@grida/agent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Grida AI agent system: AgentHost HTTP perimeter, sessions, providers, workspaces, shell policy, the runtime-agnostic Grida agent, and storage-agnostic tool primitives. One package, gated by subpath exports.",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "bin": {
+    "grida-agent": "./dist/cli.bin.cjs"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server.d.mts",
+        "default": "./dist/server.mjs"
+      },
+      "require": {
+        "types": "./dist/server.d.cts",
+        "default": "./dist/server.cjs"
+      }
+    },
+    "./sandbox": {
+      "import": {
+        "types": "./dist/sandbox/index.d.mts",
+        "default": "./dist/sandbox/index.mjs"
+      },
+      "require": {
+        "types": "./dist/sandbox/index.d.cts",
+        "default": "./dist/sandbox/index.cjs"
+      }
+    },
+    "./transport": {
+      "import": {
+        "types": "./dist/transport.d.mts",
+        "default": "./dist/transport.mjs"
+      },
+      "require": {
+        "types": "./dist/transport.d.cts",
+        "default": "./dist/transport.cjs"
+      }
+    },
+    "./tiers": {
+      "import": {
+        "types": "./dist/tiers.d.mts",
+        "default": "./dist/tiers.mjs"
+      },
+      "require": {
+        "types": "./dist/tiers.d.ts",
+        "default": "./dist/tiers.js"
+      }
+    },
+    "./fs": {
+      "import": {
+        "types": "./dist/fs/index.d.mts",
+        "default": "./dist/fs/index.mjs"
+      },
+      "require": {
+        "types": "./dist/fs/index.d.ts",
+        "default": "./dist/fs/index.js"
+      }
+    },
+    "./fs/backends/opfs": {
+      "import": {
+        "types": "./dist/fs/backends/opfs.d.mts",
+        "default": "./dist/fs/backends/opfs.mjs"
+      },
+      "require": {
+        "types": "./dist/fs/backends/opfs.d.ts",
+        "default": "./dist/fs/backends/opfs.js"
+      }
+    },
+    "./todos": {
+      "import": {
+        "types": "./dist/todos/index.d.mts",
+        "default": "./dist/todos/index.mjs"
+      },
+      "require": {
+        "types": "./dist/todos/index.d.ts",
+        "default": "./dist/todos/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "cli": "node --import tsx src/cli.bin.ts",
+    "dev": "tsdown --watch",
+    "prepack": "tsdown",
+    "smoke:sessions:live": "node --import tsx src/session/smoke.live.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json && tsc --noEmit -p tsconfig.browser-backends.json"
+  },
+  "dependencies": {
+    "@ai-sdk/gateway": "3.0.66",
+    "@ai-sdk/openai-compatible": "2.0.47",
+    "@grida/ai-models": "workspace:*",
+    "@grida/home": "workspace:*",
+    "@hono/node-server": "^1.13.7",
+    "ai": "6.0.116",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.6.14",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.1",
+    "typescript": "^6",
+    "vitest": "^4"
+  }
+}

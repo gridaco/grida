@@ -6,20 +6,18 @@ import {
   getTransformBoxCorners,
 } from "../primitives/transform-box";
 
-describe("Original Direction Scaling Challenge", () => {
-  // NOTE: True original-direction scaling (scaling X/Y axes regardless of rotation)
-  // is a complex mathematical problem. The requirement is:
-  //
-  // "When dragging a side of a rotated shape, scale in the ORIGINAL direction
-  // (as if the rotation was not applied), not along the rotated axes."
-  //
-  // This requires advanced matrix manipulation that goes beyond simple
-  // decompose/compose operations.
-
-  it.todo(
-    "scales side drags in original (unrotated) axis for rotated transforms"
-  );
-});
+// Original Direction Scaling Challenge
+//
+// NOTE: True original-direction scaling (scaling X/Y axes regardless of rotation)
+// is a complex mathematical problem. The requirement is:
+//
+// "When dragging a side of a rotated shape, scale in the ORIGINAL direction
+// (as if the rotation was not applied), not along the rotated axes."
+//
+// This requires advanced matrix manipulation that goes beyond simple
+// decompose/compose operations.
+// Coverage target: scale side drags in original (unrotated) axis for
+// rotated transforms once the exact matrix semantics are specified.
 
 describe("Transform Box Editor", () => {
   const size: cmath.Vector2 = [200, 100];

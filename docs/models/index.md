@@ -62,6 +62,7 @@ Per 1M tokens.
 | GPT-5.5 (`openai/gpt-5.5`)                               | $5.00  | —           | $0.50      | $30.00  |
 | GPT-5.5 Pro (`openai/gpt-5.5-pro`)                       | $30.00 | —           | —          | $180.00 |
 | Gemini 3.5 Flash (`google/gemini-3.5-flash`)             | $1.50  | —           | $0.15      | $9.00   |
+| Gemini 3.1 Pro Preview (`google/gemini-3.1-pro-preview`) | $2.00  | —           | $0.20      | $12.00  |
 
 ## Image Generation Models
 

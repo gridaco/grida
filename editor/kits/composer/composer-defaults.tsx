@@ -110,17 +110,25 @@ export function ComposerTriggerMenu({
                     composer.selectTriggerItem(index);
                   }}
                 >
-                  <span className="min-w-0 flex items-baseline gap-2">
-                    <span className="font-mono text-muted-foreground">
+                  {/* Title takes priority. `shrink-0` keeps it at full width
+                      so the description — the only flexible sibling (`flex-1`)
+                      — is what yields and truncates when the row is tight.
+                      `max-w-full truncate` on the title only kicks in when the
+                      title alone is wider than the whole row. (A `shrink` ratio
+                      doesn't work here: flexbox distributes shrink by
+                      `shrink × content-width`, so a long description still
+                      forces the title to give up space.) */}
+                  <span className="flex w-full min-w-0 items-baseline gap-2">
+                    <span className="shrink-0 font-mono text-muted-foreground">
                       {trigger.kind === "command" ? "/" : "@"}
                     </span>
-                    <span className="truncate font-normal">
+                    <span className="max-w-full shrink-0 truncate font-normal">
                       {trigger.kind === "command"
                         ? (item as ComposerCommand).title
                         : (item as ComposerMention).label}
                     </span>
                     {description && (
-                      <span className="truncate text-muted-foreground text-xs">
+                      <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
                         {description}
                       </span>
                     )}

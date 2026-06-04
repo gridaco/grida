@@ -27,11 +27,24 @@
   outline: none;
 }
 
+/* Placeholder is taken out of flow (absolute) and pinned to a single
+ * ellipsized line. The older `float: left; height: 0` trick let a long
+ * placeholder wrap to a second line, which — inside the editor's
+ * `overflow-y-auto` min-height box — surfaced a scrollbar on an empty
+ * composer. Absolute + nowrap can't grow either scroll axis. */
+.composer-content [data-composer-editor] .is-editor-empty:first-child {
+  position: relative;
+}
+
 .composer-content [data-composer-editor] .is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  float: left;
-  height: 0;
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
   pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--muted-foreground);
 }
 

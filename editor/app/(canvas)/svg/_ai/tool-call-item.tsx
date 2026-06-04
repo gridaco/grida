@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/components/lib/utils/index";
 import { CodeBlock } from "@/components/ai-elements/code-block";
-import { AgentFs } from "@grida/agent-tools/fs";
+import { AgentFs } from "@grida/agent/fs";
 
 type Tone = "ok" | "warn" | "error";
 
