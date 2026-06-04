@@ -12,6 +12,8 @@ tags:
   - internal
   - svg
   - wg
+doc_tasks:
+  - enhance
 format: md
 ---
 
@@ -154,7 +156,7 @@ When a `<circle>` or `<ellipse>` is promoted, its outline is written as
 
 The control-handle length for a unit circle is the standard constant
 
-```
+```text
 k = (4/3) · tan(π/8) ≈ 0.5522847498
 ```
 

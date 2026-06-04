@@ -1,11 +1,12 @@
 // SvgDocument.is_vector_edit_target — eligibility gate for vector
-// (vertex) editing on <path> / <polyline> / <polygon> and the promotable
-// primitives <rect> / <circle> / <ellipse> (which re-type to <path> on the
-// first edit; see docs/wg/feat-svg-editor/promote-to-path.md).
+// (vertex) editing on the native vector tags <path> / <line> / <polyline> /
+// <polygon> and the promotable primitives <rect> / <circle> / <ellipse>
+// (which re-type to <path> on the first edit; see
+// docs/wg/feat-svg-editor/promote-to-path.md).
 //
 // Sibling test file to document-structural-predicates.test.ts; covers the
 // eligibility surface and the rejection of every non-eligible tag (so the
-// "line/image/use are deferred" stance is locked in code).
+// "image/use are deferred" stance is locked in code).
 
 import { describe, expect, it } from "vitest";
 import { SvgDocument } from "../src/core/document";

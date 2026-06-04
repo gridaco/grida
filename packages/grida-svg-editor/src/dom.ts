@@ -3003,11 +3003,11 @@ class DomSurface implements Surface {
       return this.enter_text_edit(id);
     }
     // Vector-edit: the doc-side `is_vector_edit_target` predicate is the
-    // single authority over which tags are eligible (path / polyline /
-    // polygon, and the promotable primitives rect / circle / ellipse).
-    // Routing off it directly — rather than a hardcoded tag list — keeps
-    // this gate in lock-step with the predicate, so a future eligibility
-    // change lands in one place. (`<line>` / `<image>` / `<use>` stay
+    // single authority over which tags are eligible (the native vector tags
+    // path / line / polyline / polygon, and the promotable primitives rect /
+    // circle / ellipse). Routing off it directly — rather than a hardcoded
+    // tag list — keeps this gate in lock-step with the predicate, so a future
+    // eligibility change lands in one place. (`<image>` / `<use>` stay
     // ineligible there.)
     if (this.editor_internal().doc.is_vector_edit_target(id) !== null) {
       return this.enter_vector_edit(id);
