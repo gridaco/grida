@@ -96,9 +96,10 @@ constraint. It grows along two tracks:
 
 **Track 1 — more fixtures + cards, as the package ships features.** Shipped
 fixtures (`_fixtures.ts`): every primitive shape, path (vector edit), line (the
-2-point exception), text + tspan, groups + transform, symbol + use (shared
-instances), and a CSS-cascade harness (fill _and_ geometry via a document
-`<style>` block). The backlog, roughly in package-maturity order:
+2-point exception), text + tspan, groups + transform, nested `<svg>` (a viewport
+within a viewport — preserved/rendered, geometry editing out of scope for v1),
+symbol + use (shared instances), and a CSS-cascade harness (fill _and_ geometry
+via a document `<style>` block). The backlog, roughly in package-maturity order:
 
 - Clean round-trip / minimal-diff (live `serialize()` next to the canvas — the
   package's headline guarantee; this is the highest-value card to add next).

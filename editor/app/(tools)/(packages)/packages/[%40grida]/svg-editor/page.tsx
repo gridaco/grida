@@ -4,6 +4,7 @@ import {
   CssExample,
   GroupTransformExample,
   LineExample,
+  NestedSvgExample,
   PathExample,
   ShapesExample,
   SymbolUseExample,
@@ -41,6 +42,7 @@ const SECTIONS: { id: string; label: string }[] = [
   { id: "line", label: "Line" },
   { id: "text", label: "Text & tspan" },
   { id: "groups", label: "Groups & transform" },
+  { id: "nested-svg", label: "Nested <svg>" },
   { id: "symbol-use", label: "Symbol & use" },
   { id: "css", label: "CSS cascade" },
 ];
@@ -250,6 +252,24 @@ export default function SvgEditorPackagePage() {
                 caption="Profiles intersect with structure here: 'no structural edits' would keep selection + transform but disable group / ungroup / reorder."
               >
                 <GroupTransformExample />
+              </SpecCard>
+
+              <SpecCard
+                id="nested-svg"
+                title="Nested <svg> — a viewport within a viewport"
+                description={
+                  <>
+                    An inner <code>&lt;svg&gt;</code> with its own{" "}
+                    <code>x</code>/<code>y</code> origin and its own{" "}
+                    <code>viewBox</code> establishes an independent user-space
+                    coordinate system (SVG 2 §7.2). The editor parses,
+                    preserves, and renders it; a node <em>inside</em> the inner
+                    viewport is pre-selected.
+                  </>
+                }
+                caption="Nested-svg geometry editing is out of scope for v1: getCTM stops at the nearest viewport, so chrome for a node across the inner-viewport boundary is the open question. See packages/grida-svg-editor/docs/geometry.md and the nested-svg notes in src/dom.ts."
+              >
+                <NestedSvgExample />
               </SpecCard>
 
               <SpecCard
