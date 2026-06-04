@@ -137,6 +137,16 @@ export type AgentRuntimeDeps = ResolveDeps & {
    */
   secrets_root?: string;
   /**
+   * GRIDA-SEC-004 — whether the `run_command` shell tool may be exposed to
+   * the model. Default (undefined/false) is FAIL-CLOSED: no shell tool. The
+   * host sets this true only when the process tree is confined by an OS
+   * sandbox (srt), or when it has deliberately opted into an unsandboxed
+   * shell (the CLI). Computed once at the HTTP-server boundary from
+   * `sandbox_enforced || allow_unsandboxed_shell`; the gate itself lives in
+   * `createWorkspaceAgentBindings`. No sandbox (or no opt-in) ⇒ no shell.
+   */
+  shell_execution_allowed?: boolean;
+  /**
    * Optional injected registry — the smoke + tests pre-populate entries.
    * Omit to let AgentRuntime allocate its own.
    */
@@ -507,13 +517,16 @@ export class AgentRuntime {
       workspace_registry: workspaceRegistry,
       sessions_store: sessionsStore,
       secrets_root: secretsRoot,
+      shell_execution_allowed: shellExecutionAllowed,
     } = this.deps;
     // Bindings deps for the run. Typed (not an inline literal) so the
-    // GRIDA-SEC-004 `secrets_root` threads through `runAgent`'s narrower
-    // `{ workspace_registry }` param into `createWorkspaceAgentBindings`.
+    // GRIDA-SEC-004 `secrets_root` + `shell_execution_allowed` thread through
+    // `runAgent`'s narrower `{ workspace_registry }` param into
+    // `createWorkspaceAgentBindings`.
     const runDeps = {
       workspace_registry: workspaceRegistry,
       secrets_root: secretsRoot,
+      shell_execution_allowed: shellExecutionAllowed,
     };
     // Pump: open the upstream model call, forward each SSE frame into the
     // registry. Doesn't block the caller; a client attaches as another

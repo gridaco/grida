@@ -76,6 +76,12 @@ if (!userDataPath) {
 }
 const requiredUserDataPath = userDataPath;
 const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
+// GRIDA-SEC-004 — the supervisor tells us whether it wrapped this spawn with
+// srt. Trusted: argv is set by the trusted main process, not the renderer.
+// Default-off is fail-closed — a missing/`0` flag means the shell tool stays
+// disabled, so a future supervisor bug that drops the flag can't silently
+// expose an unsandboxed shell.
+const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
 
 async function main() {
   const password = await readPasswordFromStdin();
@@ -92,6 +98,10 @@ async function main() {
       allowed_origins: [editorOrigin],
       allowed_referer_paths: ["/desktop"],
     },
+    // GRIDA-SEC-004 — fail-closed shell: `run_command` is exposed only when
+    // srt actually confines this process tree. On platforms srt can't wrap
+    // (Windows), this is false and the agent gets fs/todos/skills but no shell.
+    sandbox_enforced: sandboxEnforced,
   });
 
   try {

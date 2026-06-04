@@ -50,6 +50,22 @@ export type AgentHostOptions = {
   hostname?: string;
   /** Port to bind. Default `0` (OS picks a free ephemeral port). */
   port?: number;
+  /**
+   * GRIDA-SEC-004 — whether this host's process tree is confined by an OS
+   * sandbox (srt Seatbelt/bubblewrap). Default `false` (FAIL-CLOSED): with no
+   * sandbox and no explicit opt-in, the `run_command` shell tool is NOT
+   * exposed to the model. The desktop supervisor sets this true only when it
+   * actually wrapped the sidecar spawn.
+   */
+  sandbox_enforced?: boolean;
+  /**
+   * GRIDA-SEC-004 — deliberate escape hatch for hosts that run WITHOUT an OS
+   * sandbox (the `grida-agent` CLI, local dev). When true, `run_command` is
+   * exposed even though `sandbox_enforced` is false. Off by default; enabling
+   * it is an explicit, logged decision by the host author who accepts that the
+   * shell child has no kernel-level fs/network containment.
+   */
+  allow_unsandboxed_shell?: boolean;
 };
 
 export class AgentHost {

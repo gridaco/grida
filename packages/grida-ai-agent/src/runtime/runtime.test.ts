@@ -50,6 +50,27 @@ describe("agent workspace bindings", () => {
     });
   });
 
+  it("GRIDA-SEC-004: withholds the command capability unless shell execution is allowed (fail-closed)", async () => {
+    await fixture.write_workspace_file("canvas.svg", "<svg/>");
+
+    // Default (no shell_execution_allowed) — fs + todos, but NO command.
+    const denied = await createWorkspaceAgentBindings(
+      { workspace_root: fixture.workspace_root },
+      { workspace_registry: fixture.registry }
+    );
+    expect(denied).not.toBeNull();
+    expect(denied!.fs).toBeDefined();
+    expect(denied!.command).toBeUndefined();
+
+    // Explicit opt-in — command capability is wired.
+    const allowed = await createWorkspaceAgentBindings(
+      { workspace_root: fixture.workspace_root },
+      { workspace_registry: fixture.registry, shell_execution_allowed: true }
+    );
+    expect(allowed!.command).toBeDefined();
+    expect(allowed!.command!.default_workdir).toBe(fixture.workspace_root);
+  });
+
   symlinkIt(
     "does not hydrate files reached through outside-workspace symlinks",
     async () => {

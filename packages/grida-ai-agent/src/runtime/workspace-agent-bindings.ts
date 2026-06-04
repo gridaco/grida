@@ -28,11 +28,19 @@ export async function createWorkspaceAgentBindings(
      * runtime; absent on the no-bindings path. See `shell/runner.ts`.
      */
     secrets_root?: string;
+    /**
+     * GRIDA-SEC-004 — fail-closed shell gate. When falsy (the default), the
+     * `command` capability is NOT returned, so `run_command` never enters the
+     * tool registry and the model cannot run a shell. The host sets this true
+     * only when an OS sandbox confines the process tree (srt) or it has
+     * explicitly opted into an unsandboxed shell. "No containment ⇒ no shell."
+     */
+    shell_execution_allowed?: boolean;
   }
 ): Promise<{
   fs: AgentFs;
   todos: AgentTodos;
-  command: {
+  command?: {
     backend: ReturnType<typeof createAgentCommandBackend>;
     default_workdir: string;
   };
@@ -47,18 +55,19 @@ export async function createWorkspaceAgentBindings(
   const fs = new AgentFs(new WorkspaceAgentFsBackend(workspace));
   await fs.hydrate();
   const todos = new AgentTodos();
-  const commandBackend = createAgentCommandBackend(
-    deps.workspace_registry,
-    deps.secrets_root ? [deps.secrets_root] : []
-  );
-  return {
-    fs,
-    todos,
-    command: {
-      backend: commandBackend,
-      default_workdir: req.workspace_root,
-    },
-  };
+  // GRIDA-SEC-004 fail-closed: only wire shell execution when the host
+  // affirmed containment (or an explicit unsandboxed opt-in). Otherwise the
+  // workspace still gets fs + todos, but no `run_command`.
+  const command = deps.shell_execution_allowed
+    ? {
+        backend: createAgentCommandBackend(
+          deps.workspace_registry,
+          deps.secrets_root ? [deps.secrets_root] : []
+        ),
+        default_workdir: req.workspace_root,
+      }
+    : undefined;
+  return { fs, todos, command };
 }
 
 export class WorkspaceAgentFsBackend implements AgentFs.Backend {

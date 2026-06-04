@@ -191,17 +191,21 @@ class AgentSidecarSupervisor {
     const scriptPath = this.sidecarScriptPath();
     const password = crypto.randomBytes(32).toString("base64url");
 
-    const args = [
-      scriptPath,
-      `--user-data=${this.user_data_path}`,
-      `--editor-base-url=${EDITOR_BASE_URL}`,
-    ];
-
     // `wrap()` returns the sandbox-wrapped shell string. On
     // unsupported platforms, avoid shell quoting entirely and spawn
     // Electron-as-node with an argv array so Windows paths with spaces
     // work under cmd.exe.
     const supportedSandbox = isSupportedPlatform();
+
+    const args = [
+      scriptPath,
+      `--user-data=${this.user_data_path}`,
+      `--editor-base-url=${EDITOR_BASE_URL}`,
+      // GRIDA-SEC-004 — tell the sidecar whether srt wraps this spawn. Only
+      // then does it expose the `run_command` shell tool (fail-closed). On
+      // platforms srt can't wrap, this is "0" and the agent gets no shell.
+      `--sandbox-enforced=${supportedSandbox ? "1" : "0"}`,
+    ];
     let wrappedCmd: string | null = null;
     if (supportedSandbox) {
       // The shell command we want to run — Electron's own binary in

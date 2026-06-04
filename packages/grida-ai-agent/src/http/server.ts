@@ -41,6 +41,13 @@ export type ServerOptions = {
    * shutdown can drain runs deterministically before closing SQLite.
    */
   stream_registry?: StreamRegistry;
+  /**
+   * GRIDA-SEC-004 — OS sandbox confines the process tree (set by the host).
+   * Inputs to the single fail-closed shell decision computed in `buildServer`.
+   */
+  sandbox_enforced?: boolean;
+  /** GRIDA-SEC-004 — explicit unsandboxed-shell opt-in (CLI/dev). */
+  allow_unsandboxed_shell?: boolean;
 };
 
 /**
@@ -124,6 +131,19 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   // `opts.streamRegistry` is undefined for direct callers (the runtime
   // allocates its own); AgentHost injects a shared instance so its
   // stop() can drain in-flight runs before closing SQLite.
+  // GRIDA-SEC-004 — the single fail-closed shell decision. Shell execution is
+  // off unless the host confirmed an OS sandbox confines the tree, or it
+  // explicitly opted into an unsandboxed shell. Computed here (one auditable
+  // place) and threaded to the runtime → bindings → tool registry.
+  const shellExecutionAllowed =
+    opts.sandbox_enforced === true || opts.allow_unsandboxed_shell === true;
+  if (opts.allow_unsandboxed_shell === true && opts.sandbox_enforced !== true) {
+    console.warn(
+      "[agent-host] GRIDA-SEC-004: run_command exposed WITHOUT an OS sandbox " +
+        "(allow_unsandboxed_shell). The shell child has no kernel-level " +
+        "fs/network containment — only the in-process allowlist + arg checks."
+    );
+  }
   const runtime = new AgentRuntime({
     secrets: secretsStore,
     workspace_registry: workspaceRegistry,
@@ -134,6 +154,7 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     // agent's `run_command` cannot read it back into the transcript. NOT
     // added to the srt deny_read policy — the host itself reads auth.json.
     secrets_root: opts.user_data_path,
+    shell_execution_allowed: shellExecutionAllowed,
   });
   if (opts.capabilities.agent) registerAgentRoutes(app, runtime);
   if (opts.capabilities.sessions)

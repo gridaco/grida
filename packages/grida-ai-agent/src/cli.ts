@@ -225,6 +225,11 @@ async function createHost(config: CliConfig): Promise<AgentHost> {
       allowed_origins: [CLIENT_ORIGIN],
       allowed_referer_paths: [CLIENT_REFERER_PATH],
     },
+    // GRIDA-SEC-004 — the CLI runs WITHOUT an OS sandbox. It's a local,
+    // user-invoked dev/power tool (the operator is the user running it), so it
+    // deliberately opts into the shell rather than fail-closed. The desktop
+    // host, by contrast, only enables shell when srt actually wraps it.
+    allow_unsandboxed_shell: true,
   });
 }
 

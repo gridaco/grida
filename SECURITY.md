@@ -398,6 +398,19 @@ in-process secret-dir containment check (below). The OS-level outer sandbox
 fs/net sub-policy that would constrain each spawned child does not exist yet
 and is the deferred hardening.
 
+- **Fail-closed exposure (no sandbox ⇒ no shell).** The shell tool is not
+  registered at all unless the host affirms containment. The decision is
+  computed once at the HTTP-server boundary (`http/server.ts`) as
+  `sandbox_enforced || allow_unsandboxed_shell` and threaded to the tool
+  registry; the default is off. The desktop supervisor sets `sandbox_enforced`
+  true only when it actually wrapped the sidecar spawn with `srt`, so on
+  platforms `srt` cannot wrap (Windows today) the agent gets fs/todos/skills
+  but **no** `run_command`. The `grida-agent` CLI — a local, user-invoked tool
+  with no OS sandbox — sets the explicit `allow_unsandboxed_shell` opt-in
+  instead, which logs a warning. New privileged tools added later inherit the
+  same gate: a capability that needs containment is born behind this switch,
+  so the system's default posture is "no containment, no capability."
+
 - **Secret-dir containment (in-process).** The agent host's own secret dir —
   its `userData`, where BYOK `auth.json`, `workspaces.json`, `recent.json`,
   and the sessions db live — is deliberately **not** in the `srt`
