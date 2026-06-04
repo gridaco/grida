@@ -17,8 +17,16 @@ const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
 </svg>`;
 
 type Internal = {
-  doc: unknown;
+  doc: {
+    text_of: (id: string) => string;
+    set_text: (id: string, text: string) => void;
+    all_elements: () => string[];
+  };
   history: { preview: (label: string) => unknown };
+  insert_text_preview: (
+    initial: Readonly<Record<string, string>>,
+    opts?: { parent?: string }
+  ) => { id: string; commit: () => void; discard: () => void };
   emit: () => void;
   subscribe_translate_commit: (cb: () => void) => () => void;
   notify_translate_commit: () => void;
@@ -42,6 +50,7 @@ describe("editor._internal contract", () => {
         "doc",
         "emit",
         "history",
+        "insert_text_preview",
         "notify_translate_commit",
         "push_surface_hover",
         "set_computed_resolver",

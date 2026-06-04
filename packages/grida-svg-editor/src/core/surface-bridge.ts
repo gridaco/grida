@@ -30,6 +30,18 @@ export interface SurfaceBridge {
     preview(label: string): Preview;
   };
 
+  /** Text-creation bracket for the click-to-place text tool. Creates an
+   *  empty `<text>` with `initial` attrs under `opts.parent` (root by
+   *  default), selects it, and opens one history preview. The surface
+   *  mounts inline content-edit on the returned `id`, then calls
+   *  `commit()` (one undo step, content captured for redo) or `discard()`
+   *  (no node, no history entry — the empty-equals-delete rule for a
+   *  freshly-placed node). See `core/editor.ts`. */
+  insert_text_preview(
+    initial: Readonly<Record<string, string>>,
+    opts?: { parent?: NodeId }
+  ): { id: NodeId; commit(): void; discard(): void };
+
   /** surface → editor: bump the version counter and notify subscribers.
    *  Used inside preview-session apply/revert closures so a per-frame
    *  geometry write reaches `subscribe()` listeners. */

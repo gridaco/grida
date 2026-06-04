@@ -5,6 +5,7 @@ import {
   CircleIcon,
   CursorArrowIcon,
   SlashIcon,
+  TextIcon,
 } from "@radix-ui/react-icons";
 import * as React from "react";
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
@@ -53,6 +54,13 @@ const TOOLS: ReadonlyArray<ToolEntry> = [
     label: "Line",
     shortcut: "L",
   },
+  {
+    value: "text",
+    tool: { type: "insert-text" },
+    Icon: TextIcon,
+    label: "Text",
+    shortcut: "T",
+  },
 ];
 
 export function SvgToolbar({ className }: { className?: string }) {
@@ -61,7 +69,12 @@ export function SvgToolbar({ className }: { className?: string }) {
   // `lasso` and `bend` are path-edit-only and SvgToolbar is mounted in
   // select mode, so they're never actually visible while either is active
   // — fall back to cursor to keep this toolbar's active value defined.
-  const value = tool.type === "insert" ? tool.tag : "cursor";
+  const value =
+    tool.type === "insert"
+      ? tool.tag
+      : tool.type === "insert-text"
+        ? "text"
+        : "cursor";
 
   return (
     <ToolbarPosition className={className}>

@@ -505,7 +505,13 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
 
   function tools_equal(a: Tool, b: Tool): boolean {
     if (a.type !== b.type) return false;
-    if (a.type === "cursor" || a.type === "lasso" || a.type === "bend")
+    // Payload-free tool variants are equal once their types match.
+    if (
+      a.type === "cursor" ||
+      a.type === "lasso" ||
+      a.type === "bend" ||
+      a.type === "insert-text"
+    )
       return true;
     return b.type === "insert" && a.tag === b.tag;
   }
@@ -1451,6 +1457,67 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     };
   }
 
+  /**
+   * Text-creation bracket for the click-to-place text tool. Creates an
+   * empty `<text>` with `initial` attrs, opens a single history preview,
+   * and selects it — the DOM surface then mounts inline content-edit on
+   * it. The surface finalizes the returned session when content-edit
+   * exits:
+   *
+   *  - `commit()` — snapshots the live text content into the delta and
+   *    commits ONE undo step (create + text together). Redo replays both,
+   *    so a redone text insert keeps its content (a plain `insert_preview`
+   *    would lose it — text is not an attribute).
+   *  - `discard()` — rolls the creation back entirely: no node, no
+   *    committed history entry. This is the empty-equals-delete rule for a
+   *    freshly-placed node (design:
+   *    `docs/wg/feat-svg-editor/text-tool.md`).
+   *
+   * The node is inserted empty on open (so the caret has somewhere to
+   * live); live edits mutate its text in place, and `commit()` reads the
+   * final text back off the document.
+   */
+  function insert_text_preview(
+    initial: Readonly<Record<string, string>>,
+    opts?: { parent?: NodeId }
+  ): { id: NodeId; commit(): void; discard(): void } {
+    const parent = opts?.parent ?? doc.root;
+    const id = doc.create_element("text");
+    const previous_selection = selection;
+    const attrs = { ...initial };
+    // Read back at commit() so redo replays the final authored text.
+    let committed_text = "";
+    const apply = () => {
+      for (const name in attrs) doc.set_attr(id, name, attrs[name]);
+      if (doc.parent_of(id) === null) doc.insert(id, parent, null);
+      doc.set_text(id, committed_text);
+      set_selection([id]);
+    };
+    const revert = () => {
+      doc.remove(id);
+      set_selection(previous_selection);
+    };
+    const preview = history.preview("insert text");
+    let active = true;
+    // First apply: empty node, selected. Content-edit mutates the node's
+    // text in place from here (the node is already in the tree).
+    preview.set({ providerId: PROVIDER_ID, apply, revert });
+    return {
+      id,
+      commit() {
+        if (!active) return;
+        active = false;
+        committed_text = doc.text_of(id);
+        preview.commit();
+      },
+      discard() {
+        if (!active) return;
+        active = false;
+        preview.discard();
+      },
+    };
+  }
+
   /** Per-tag default paint attrs. Wrapped so callers don't need to depend
    *  on the InsertableTag type — `insert()` accepts arbitrary string tags
    *  (so `commands.insert("path", ...)` works for paste / RPC) but only
@@ -1811,6 +1878,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       history: {
         preview: (label: string) => history.preview(label),
       },
+      insert_text_preview,
       emit,
       subscribe_translate_commit(cb: () => void): () => void {
         translate_commit_listeners.add(cb);

@@ -1,5 +1,20 @@
 export const packages = [
   {
+    name: "@grida/svg-editor",
+    description:
+      "Headless, clean SVG editor. Open a file, edit it, save it — the diff is exactly the change you made. Round-trips by default, adds no proprietary noise, backend-agnostic. Experimental.",
+    demoPath: "/packages/@grida/svg-editor",
+    npm: true,
+    features: [
+      "Round-trips by default (byte-equal open + save)",
+      "Minimal-diff mutations, no proprietary noise",
+      "Headless core, DOM surface + React layer",
+      "Selection, transform, insert, inline text edit",
+      "Typed paint, properties, and defs/gradients",
+      "Core, not customizable — narrow public surface",
+    ],
+  },
+  {
     name: "@grida/refig",
     description:
       "Headless Figma renderer — render Figma documents to PNG, JPEG, WebP, PDF, or SVG in Node.js (no browser) or in the browser. Deterministic exports, offline rendering from .fig, CLI and library API.",

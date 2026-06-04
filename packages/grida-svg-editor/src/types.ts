@@ -15,12 +15,14 @@ export type Mode = "select" | "edit-content";
 // ─── Tool (orthogonal to Mode — what does pointer-down do in select mode?) ─
 
 /**
- * SVG element tags supported by the insertion subsystem. Closed set; adding
- * a new insertable tag requires a PR.
+ * SVG element tags inserted by the **drag-to-size** subsystem. Closed set;
+ * adding a new insertable tag requires a PR.
  *
- * `text` is deliberately out of v1: `<text>` has no intrinsic size and any
- * usable text-insert UX must immediately mount the inline content-editor on
- * the new node rather than dropping a placeholder. Reserved for a future PR.
+ * `text` is intentionally NOT here. It is creatable (the `insert-text`
+ * tool — see {@link Tool}), but via a **click-only** gesture, not
+ * drag-to-size: `<text>` has no intrinsic size, so there is nothing for a
+ * drag to set. Its creation path mounts the inline content-editor
+ * immediately. Design: `docs/wg/feat-svg-editor/text-tool.md`.
  */
 export type InsertableTag = "rect" | "ellipse" | "line";
 
@@ -38,6 +40,17 @@ export type InsertableTag = "rect" | "ellipse" | "line";
 export type Tool =
   | { type: "cursor" }
   | { type: "insert"; tag: InsertableTag }
+  /**
+   * Text creation tool. A select-mode tool like `insert`, but **click-only**
+   * rather than drag-to-size: pointer-down creates a single-line `<text>` at
+   * the click point with default appearance and immediately enters
+   * content-edit (caret active). `<text>` has no intrinsic size, so the
+   * drag-to-size model doesn't apply; a drag box would mean SVG 2 wrapped
+   * text, which is a separate (out-of-scope) model. Reverts to `cursor`
+   * after the node is placed. Design:
+   * `docs/wg/feat-svg-editor/text-tool.md`.
+   */
+  | { type: "insert-text" }
   /**
    * Vector content-edit lasso (Q). Empty-space drag draws a freeform
    * polygon that picks vertices + tangents inside it (segments are NOT

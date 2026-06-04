@@ -52,6 +52,10 @@ preserving the author's source on round-trip.
 - [`feedback-transform.md`](./feedback-transform.md) — internal
   critique of the current transform pipeline. Input to the IR
   redesign; cited from the intent matrix.
+- [`text-tool.md`](./text-tool.md) — why text creation is
+  click-to-place rather than drag-to-size, and why an empty text
+  element is treated as a deletion (the empty-equals-delete
+  invariant, shared with existing-text editing).
 
 ### Glossary
 
