@@ -66,7 +66,11 @@ jobs:
         # on launch. Build the closure from the repo root so the link:
         # targets have dist/ before packaging. --ignore-scripts skips native
         # postinstalls we don't need (these are pure tsdown packages, no wasm).
+        # `shell: bash` so the `\` line-continuations work on Windows too —
+        # the default Windows shell is PowerShell, where `\` is not a
+        # continuation and `--filter` parses as a unary operator.
         working-directory: ${{ github.workspace }}
+        shell: bash
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm turbo run build \
