@@ -3498,7 +3498,21 @@ class DomSurface implements Surface {
   ): void {
     const cur = this.vector_edit;
     if (!cur || cur.node_id !== target_node_id) return;
-    if (d !== null) cur.mark_seen(d);
+    if (d !== null) {
+      cur.mark_seen(d);
+      // A geometry delta may have re-typed the node (promote on redo, demote
+      // on undo). `vector_apply` / `vector_revert` flip the *captured*
+      // session's source, but after exit + undo-exit the live session is a
+      // fresh object that the captured flip never touched — leaving it with
+      // `source.kind === "path"` while the document is back to a primitive,
+      // so the next gesture would write a stray `d`. Re-derive the live
+      // session's source from the now-current document tag, same as we
+      // already replay the watermark and selection here.
+      const live_source = this.editor_internal().doc.is_vector_edit_target(
+        cur.node_id
+      );
+      if (live_source) cur.sync_source(live_source);
+    }
     cur.restore_selection(selection);
     this.sync_selection_mirror();
   }

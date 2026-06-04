@@ -171,6 +171,26 @@ export class VectorEditSession {
     this._source_before_promotion = null;
   }
 
+  /**
+   * Re-sync the source to the document's current tag, outright. Unlike
+   * {@link promote_source_to_path} / {@link restore_source} (which manage a
+   * single primitive→path flip within one gesture), this sets the source to
+   * an authoritative value derived from the live document and clears the
+   * promotion bookkeeping.
+   *
+   * The host calls this when an undo/redo re-types the node out from under a
+   * *different* live session object than the one that performed the original
+   * flip (exit + undo-exit creates a fresh session; the captured session's
+   * `restore_source` then no-ops). Without it the live session could keep
+   * `source.kind === "path"` while the node is back to a primitive, and the
+   * next gesture would write a stray `d` onto the native tag. Re-deriving
+   * from the document keeps the live session authoritative.
+   */
+  sync_source(source: VectorEditSource): void {
+    this._source = source;
+    this._source_before_promotion = null;
+  }
+
   /** The session's current PathModel-form `d`. Gesture handlers read
    *  this instead of `doc.get_attr(node_id, "d")` so they stay tag-
    *  oblivious (non-path sources have no `d` on the document). */

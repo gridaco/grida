@@ -568,6 +568,24 @@ export class SvgDocument implements DocumentEvents {
    * Rejects `<image>` / `<use>` (raster / reference bounding boxes, no
    * editable outline).
    */
+  /**
+   * Parse an optional SVG geometry coordinate (`x`/`y`, `cx`/`cy`, the line
+   * endpoints). An **absent** attribute takes the SVG default (`0`); a
+   * **present** attribute that is not a plain user-unit number (`%`, `px`,
+   * `em`, …) is out of scope and yields `null` so the caller refuses the
+   * element — the same gate required attrs (width / radius) already apply.
+   *
+   * The absent-vs-present distinction is the point: a bare `?? 0` would
+   * silently coerce an authored `x1="5px"` to `0`, then the first native
+   * writeback would overwrite that authored value. Refusing keeps the
+   * editor from misrepresenting geometry it cannot read faithfully.
+   */
+  private optional_user_unit_coord(id: NodeId, name: string): number | null {
+    const raw = this.get_attr(id, name);
+    if (raw === null) return 0;
+    return parse_user_unit(raw);
+  }
+
   is_vector_edit_target(id: NodeId): VectorEditSource | null {
     const n = this.nodes.get(id);
     if (!n || n.kind !== "element") return null;
@@ -591,10 +609,13 @@ export class SvgDocument implements DocumentEvents {
         return { kind: "path", d };
       }
       case "line": {
-        const x1 = parse_user_unit(this.get_attr(id, "x1")) ?? 0;
-        const y1 = parse_user_unit(this.get_attr(id, "y1")) ?? 0;
-        const x2 = parse_user_unit(this.get_attr(id, "x2")) ?? 0;
-        const y2 = parse_user_unit(this.get_attr(id, "y2")) ?? 0;
+        const x1 = this.optional_user_unit_coord(id, "x1");
+        const y1 = this.optional_user_unit_coord(id, "y1");
+        const x2 = this.optional_user_unit_coord(id, "x2");
+        const y2 = this.optional_user_unit_coord(id, "y2");
+        // A present-but-unparseable endpoint (unit / percent) is out of scope.
+        if (x1 === null || y1 === null || x2 === null || y2 === null)
+          return null;
         // Degenerate (zero-length) line has nothing to vector-edit.
         if (x1 === x2 && y1 === y2) return null;
         return { kind: "line", x1, y1, x2, y2 };
@@ -610,32 +631,40 @@ export class SvgDocument implements DocumentEvents {
           : { kind: "polygon", points };
       }
       case "rect": {
-        const x = parse_user_unit(this.get_attr(id, "x")) ?? 0;
-        const y = parse_user_unit(this.get_attr(id, "y")) ?? 0;
+        const x = this.optional_user_unit_coord(id, "x");
+        const y = this.optional_user_unit_coord(id, "y");
+        if (x === null || y === null) return null;
         const width = parse_user_unit(this.get_attr(id, "width"));
         const height = parse_user_unit(this.get_attr(id, "height"));
         if (width === null || height === null) return null;
         if (width <= 0 || height <= 0) return null;
         // SVG corner-radii defaulting: a missing rx/ry mirrors the other;
-        // both missing → square corners. Negatives are treated as 0.
-        const rx_raw = parse_user_unit(this.get_attr(id, "rx"));
-        const ry_raw = parse_user_unit(this.get_attr(id, "ry"));
-        let rx = rx_raw ?? ry_raw ?? 0;
-        let ry = ry_raw ?? rx_raw ?? 0;
+        // both missing → square corners. Negatives are treated as 0. A
+        // present-but-unparseable rx/ry (unit / percent) is out of scope.
+        const rx_attr = this.get_attr(id, "rx");
+        const ry_attr = this.get_attr(id, "ry");
+        const rx_parsed = rx_attr === null ? null : parse_user_unit(rx_attr);
+        const ry_parsed = ry_attr === null ? null : parse_user_unit(ry_attr);
+        if (rx_attr !== null && rx_parsed === null) return null;
+        if (ry_attr !== null && ry_parsed === null) return null;
+        let rx = rx_parsed ?? ry_parsed ?? 0;
+        let ry = ry_parsed ?? rx_parsed ?? 0;
         rx = Math.max(0, Math.min(rx, width / 2));
         ry = Math.max(0, Math.min(ry, height / 2));
         return { kind: "rect", x, y, width, height, rx, ry };
       }
       case "circle": {
-        const cx = parse_user_unit(this.get_attr(id, "cx")) ?? 0;
-        const cy = parse_user_unit(this.get_attr(id, "cy")) ?? 0;
+        const cx = this.optional_user_unit_coord(id, "cx");
+        const cy = this.optional_user_unit_coord(id, "cy");
+        if (cx === null || cy === null) return null;
         const r = parse_user_unit(this.get_attr(id, "r"));
         if (r === null || r <= 0) return null;
         return { kind: "circle", cx, cy, r };
       }
       case "ellipse": {
-        const cx = parse_user_unit(this.get_attr(id, "cx")) ?? 0;
-        const cy = parse_user_unit(this.get_attr(id, "cy")) ?? 0;
+        const cx = this.optional_user_unit_coord(id, "cx");
+        const cy = this.optional_user_unit_coord(id, "cy");
+        if (cx === null || cy === null) return null;
         const rx = parse_user_unit(this.get_attr(id, "rx"));
         const ry = parse_user_unit(this.get_attr(id, "ry"));
         if (rx === null || ry === null) return null;

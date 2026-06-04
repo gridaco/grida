@@ -128,6 +128,58 @@ describe("first vector edit promotes a primitive to <path>", () => {
     expect(d.serialize()).toBe(original);
     expect(session.source.kind).toBe("circle");
   });
+
+  // Regression: exit + undo-exit + undo-geometry. After a promote, the undo
+  // that demotes the document runs against the *captured* session, but the
+  // live session may be a fresh object (re-created when undo-exit re-enters
+  // edit mode while the node was still a <path>). Its `restore_source` is
+  // never called, so it keeps `source.kind === "path"` while the node is back
+  // to a primitive — and the next gesture would write a stray `d`. The host
+  // re-syncs the live session from the current document tag; `sync_source`
+  // is that primitive.
+  it("sync_source re-derives a stale live session's source after an undo-demote", () => {
+    const d = doc(
+      `<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="3"/></svg>`
+    );
+    const id = id_of_first(d, "circle");
+    const original = d.serialize();
+
+    // Gesture that promotes (the captured session that performed the flip).
+    const captured = session_for(d, id);
+    const baseline_d = captured.current_d;
+    const token = vector_apply(d, captured, "M8 5 C8 7 6 8 5 8 Z");
+    expect(d.tag_of(id)).toBe("path");
+
+    // exit + undo-exit re-enters edit mode while the node is a <path>, so the
+    // fresh live session reads a path source.
+    const live = session_for(d, id);
+    expect(live.source.kind).toBe("path");
+
+    // undo-geometry demotes the DOM via the captured session; the live one is
+    // untouched and now disagrees with the document.
+    vector_revert(d, captured, baseline_d, token);
+    expect(d.tag_of(id)).toBe("circle");
+    expect(live.source.kind).toBe("path"); // stale
+
+    // The host's replay step re-syncs the live session from the document.
+    const live_source = d.is_vector_edit_target(id);
+    expect(live_source).not.toBeNull();
+    live.sync_source(live_source!);
+    expect(live.source.kind).toBe("circle");
+
+    // And a subsequent curve gesture on the live session now re-promotes
+    // cleanly (native tag, single appended `d`) rather than writing a stray
+    // `d` onto the <circle>.
+    const reapply = vector_apply(d, live, "M9 5 C9 7 6 9 5 9 Z");
+    expect(reapply).not.toBeNull();
+    expect(d.tag_of(id)).toBe("path");
+    expect(d.serialize().match(/\bd="/g)?.length).toBe(1);
+
+    // Undo the re-promotion → byte-equal to the original circle.
+    vector_revert(d, live, baseline_d, reapply);
+    expect(d.tag_of(id)).toBe("circle");
+    expect(d.serialize()).toBe(original);
+  });
 });
 
 describe("vertex tags: native edits stay native, curves re-type to <path>", () => {

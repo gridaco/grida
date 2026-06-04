@@ -280,6 +280,50 @@ describe("SvgDocument.is_vector_edit_target — rejects", () => {
     expect(em.is_vector_edit_target(id_of_first(em, "ellipse"))).toBeNull();
   });
 
+  // The *optional* position coords (line x1/y1/x2/y2, rect x/y, circle /
+  // ellipse cx/cy) default to 0 when absent, but a present-but-unparseable
+  // value (unit / percent) must still disqualify — otherwise `?? 0` would
+  // silently coerce an authored `x1="5px"` to 0 and overwrite it on the
+  // first native writeback.
+  it("rejects shapes whose present optional coord is unit-bearing", () => {
+    for (const markup of [
+      `<line x1="5px" y1="0" x2="10" y2="0"/>`,
+      `<line x1="0" y1="0" x2="10" y2="5%"/>`,
+      `<rect x="2em" y="0" width="10" height="8"/>`,
+      `<rect x="0" y="3px" width="10" height="8"/>`,
+      `<circle cx="50%" cy="5" r="3"/>`,
+      `<ellipse cx="5" cy="2em" rx="3" ry="2"/>`,
+      `<rect x="0" y="0" width="10" height="8" rx="2px"/>`,
+    ]) {
+      const d = doc(`<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>`);
+      const tag = markup.slice(1, markup.indexOf(" "));
+      expect(d.is_vector_edit_target(id_of_first(d, tag))).toBeNull();
+    }
+  });
+
+  // Absent optional coords legitimately default to 0 — the shape stays
+  // eligible (this is the case the unit guard must NOT over-reject).
+  it("accepts shapes that omit optional coords (SVG-default 0)", () => {
+    const c = doc(
+      `<svg xmlns="http://www.w3.org/2000/svg"><circle r="3"/></svg>`
+    );
+    const cs = c.is_vector_edit_target(id_of_first(c, "circle"));
+    expect(cs).toEqual({ kind: "circle", cx: 0, cy: 0, r: 3 });
+
+    const r = doc(
+      `<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="8"/></svg>`
+    );
+    expect(r.is_vector_edit_target(id_of_first(r, "rect"))).toEqual({
+      kind: "rect",
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 8,
+      rx: 0,
+      ry: 0,
+    });
+  });
+
   it("rejects containers and non-geometric tags", () => {
     const d = doc(
       `<svg xmlns="http://www.w3.org/2000/svg"><g><text>hi</text></g></svg>`
