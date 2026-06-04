@@ -11,16 +11,24 @@ import type { WorkspaceRegistry } from "../workspaces";
 import {
   validateShellRequest,
   runShell,
+  type ProtectedReadRoots,
   type ShellRunError,
 } from "../shell/runner";
 
+/**
+ * @param protectedReadRoots Secret roots (the agent host's `userData`) the
+ *   shell child must not read through an arg (GRIDA-SEC-004). Threaded down
+ *   from the runtime; empty for the no-bindings/standalone path.
+ */
 export function createAgentCommandBackend(
-  registry: WorkspaceRegistry
+  registry: WorkspaceRegistry,
+  protectedReadRoots: ProtectedReadRoots = []
 ): RunCommandBackend {
   return async ({ command, args, workdir, timeout_ms: timeoutMs }) => {
     const validation = await validateShellRequest(
       { cmd: command, args, cwd: workdir, timeout_ms: timeoutMs },
-      registry
+      registry,
+      protectedReadRoots
     );
     if (!validation.ok) {
       return {
@@ -52,5 +60,10 @@ function describeError(err: ShellRunError): string {
       return `cwd is not a directory: ${err.cwd}`;
     case "cwd-resolve-failed":
       return `Couldn't resolve cwd ${err.cwd}: ${err.reason}`;
+    case "arg-in-protected-root":
+      // GRIDA-SEC-004: do NOT echo the resolved path — reflecting it back
+      // into the (renderer-visible) tool result would confirm the secret
+      // dir's location to a probing caller.
+      return `Argument rejected: resolves inside a protected directory.`;
   }
 }

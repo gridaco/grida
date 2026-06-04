@@ -26,7 +26,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 import * as schema from "./schema";
-import { BOOTSTRAP_SQL } from "./schema";
+import { BOOTSTRAP_SQL, SCHEMA_VERSION } from "./schema";
 
 export type SessionsSchema = typeof schema;
 export type SessionsDb = SqliteRemoteDatabase<SessionsSchema>;
@@ -47,6 +47,17 @@ export type OpenedSessionsDb = {
   sqlite: DatabaseSync;
   /** Schema bag for chainable drizzle queries (`db.select().from(schema.chatSessions)`). */
   schema: SessionsSchema;
+  /**
+   * Run a compound mutation in a single transaction. The drizzle
+   * sqlite-proxy adapter does NOT forward `db.transaction()`, so we drive
+   * `BEGIN` / `COMMIT` / `ROLLBACK` directly on the raw handle. The drizzle
+   * mutations awaited inside `fn` execute synchronously against this same
+   * connection (see {@link execProxy}), so the BEGIN-then-writes-then-COMMIT
+   * ordering holds. Keep `fn` SHORT — no long reads inside, to not hold the
+   * write lock. On throw, the transaction is rolled back and the error
+   * re-thrown so a crash mid-sequence leaves the log uncorrupted.
+   */
+  withTx: <T>(fn: () => Promise<T>) => Promise<T>;
   /** Close the underlying sqlite handle. */
   close: () => void;
 };
@@ -79,6 +90,27 @@ export function openSessionsDb(opts: OpenSessionsDbOptions): OpenedSessionsDb {
   // versioned migrations (see schema.ts).
   sqlite.exec(BOOTSTRAP_SQL);
 
+  // Version gate (`PRAGMA user_version`). A fresh/unstamped DB reads 0 — treat
+  // it as current and stamp to SCHEMA_VERSION. A DB stamped HIGHER than this
+  // binary supports is forward-incompatible: an older binary must not write a
+  // newer DB (it would miss columns and throw `no such column` mid-use), so we
+  // fail loud here. The future in-place ALTER-ladder goes between these two:
+  // when `version` is below SCHEMA_VERSION, step it up one version at a time
+  // (CREATE/ALTER per gap) before stamping. No bodies needed yet — no shipped
+  // DB to migrate from.
+  const version = readUserVersion(sqlite);
+  if (version > SCHEMA_VERSION) {
+    sqlite.close();
+    throw new Error(
+      `sessions.db is version ${version}, but this build supports up to ${SCHEMA_VERSION}. ` +
+        `Update Grida to open this database.`
+    );
+  }
+  if (version < SCHEMA_VERSION) {
+    // ── future ALTER-ladder goes here (step version up to SCHEMA_VERSION) ──
+    sqlite.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  }
+
   const db = drizzle(
     async (sql, params, method) => execProxy(sqlite, sql, params, method),
     { schema }
@@ -88,6 +120,21 @@ export function openSessionsDb(opts: OpenSessionsDbOptions): OpenedSessionsDb {
     db,
     sqlite,
     schema,
+    withTx: async (fn) => {
+      sqlite.exec("BEGIN");
+      try {
+        const result = await fn();
+        sqlite.exec("COMMIT");
+        return result;
+      } catch (err) {
+        try {
+          sqlite.exec("ROLLBACK");
+        } catch {
+          // transaction may already be aborted/rolled back
+        }
+        throw err;
+      }
+    },
     close: () => {
       try {
         sqlite.close();
@@ -96,6 +143,14 @@ export function openSessionsDb(opts: OpenSessionsDbOptions): OpenedSessionsDb {
       }
     },
   };
+}
+
+/** Read `PRAGMA user_version` off the raw handle (0 on a fresh/unstamped DB). */
+function readUserVersion(sqlite: DatabaseSync): number {
+  const row = sqlite.prepare("PRAGMA user_version").get() as
+    | { user_version?: number }
+    | undefined;
+  return row?.user_version ?? 0;
 }
 
 type ProxyMethod = "run" | "all" | "values" | "get";

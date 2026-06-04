@@ -389,6 +389,39 @@ load `https://grida.co` while dev loads `http://localhost:3000`;
 `shell.openExternal` after validation; `will-attach-webview` rejects;
 every main-process IPC handler validates `event.senderFrame.url`.
 
+**Agent shell execution (V1.x, pre-srt).** The `run_command` agent tool
+spawns child processes through `shell/runner.ts` with `shell: false` (no
+shell interpolation). Three gates apply: a hardcoded command allowlist
+(`permissions.ts`), a cwd-must-be-inside-an-opened-workspace check, and an
+in-process secret-dir containment check (below). The OS-level outer sandbox
+(`srt`, see the supervisor) confines the _whole_ sidecar; a per-command
+fs/net sub-policy that would constrain each spawned child does not exist yet
+and is the deferred hardening.
+
+- **Secret-dir containment (in-process).** The agent host's own secret dir —
+  its `userData`, where BYOK `auth.json`, `workspaces.json`, `recent.json`,
+  and the sessions db live — is deliberately **not** in the `srt`
+  `deny_read` policy, because the host process itself must read `auth.json`
+  for provider calls. Denying it at the kernel level would break host auth.
+  Instead the shell _child_ is kept out of it in-process: `validateShellRequest`
+  rejects any command arg that resolves (after realpath of the nearest
+  existing ancestor, mirroring the cwd discipline so a symlink can't bypass it)
+  inside that protected root. HOME secrets (`~/.ssh`, `~/.aws`, shell rc files)
+  remain denied for the entire tree by the `srt` policy, where the host has no
+  legitimate read. This ownership split is the responsibility-and-reconciliation
+  rule: `srt` owns HOME secrets, the in-process runner owns the host's own
+  `userData`.
+
+- **`git` is an accepted limitation.** `git` is on the allowlist because it is
+  the single most useful dev command, but it is a known
+  arbitrary-code-execution / arbitrary-file-read vector even with
+  `shell: false`: `git -c core.pager=…` / `-c core.sshCommand=…`,
+  `--upload-pack`, and `apply`/`clone` run attacker-chosen programs, and
+  `--git-dir`, `apply`, and a `.git/config` credential read reach arbitrary
+  files. This collapses the no-shell / allowlist guarantee. The risk is
+  accepted for V1.x pending the `srt` per-command sub-policy that can
+  constrain its fs/net reach at the kernel level.
+
 **No hosted auth in V1.** Desktop V1 ships no `/auth/*` route group, no
 PKCE handoff, no cloud session refresh, and no entitlement polling. Future
 hosted-provider work must re-register its callback and hosted-model files in

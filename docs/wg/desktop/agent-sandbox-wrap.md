@@ -48,6 +48,19 @@ The path/host variable shape (`{workspace}`, `{ad-hoc}`, `{userData}`)
 is locked by the RFC; see
 [agent/tools.md / capability requirements](../ai/agent/tools.md#capability-requirements).
 
+**`fs.read` deny scope — what the host's own `userData` is NOT.** The
+`fs.read` deny set covers HOME secrets (`~/.ssh`, `~/.aws`, shell rc files):
+the host has no legitimate read there, so the kernel-level deny is safe.
+It deliberately does **not** include the agent host's own `userData` (BYOK
+`auth.json`, `workspaces.json`, `recent.json`, sessions db). srt confines the
+whole sidecar including the host process, and the host process must read
+`auth.json` for provider calls — denying that root here would break host
+auth. The shell _child_ is instead kept out of `userData` in-process by the
+shell runner's per-arg check (`shell/runner.ts`), which rejects any command
+arg resolving inside it. So secret-read ownership is split: srt owns HOME
+secrets, the in-process runner owns the host's own `userData`. See
+[agent-security / Layer 4b](./agent-security.md).
+
 `allowLocalBinding: true` is a binary knob in srt — no port-scope filter
 exists upstream. The residual risk: the wrapped process can bind any
 loopback port and accept connections from any local user-mode process.

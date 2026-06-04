@@ -95,6 +95,45 @@ allowlisted host (e.g. the provider) for exfiltration. The RFC's
 [watchdog](../ai/agent/foundations.md#watchdog) is the answer to that —
 host-configured policy, not srt.
 
+## Layer 4b — Agent shell execution
+
+The `run_command` agent tool spawns child processes through the shell
+runner (`packages/grida-ai-agent/src/shell/runner.ts`) with `shell: false`,
+behind three gates: a hardcoded command allowlist (`permissions.ts`), a
+cwd-must-be-inside-an-opened-workspace check, and an in-process secret-dir
+containment check. (The full per-command fs/net sub-policy that would
+constrain each spawned child is deferred; today srt confines the whole
+sidecar, not each child.)
+
+**Secret-dir containment — the srt / in-process split.** There are two
+classes of secret on disk, owned by two different gates:
+
+- **HOME secrets** (`~/.ssh`, `~/.aws`, shell rc files) are denied for the
+  entire tree by the srt `deny_read` policy. The host has no legitimate read
+  there, so a kernel-level deny is safe.
+- **The agent host's own secret dir** — its `userData`, where BYOK
+  `auth.json`, `workspaces.json`, `recent.json`, and the sessions db live —
+  is **not** in srt `deny_read`. srt confines the whole sidecar including the
+  host process, and the host process must read `auth.json` for provider
+  calls. Denying it at the kernel level would break host auth. Instead the
+  shell _child_ is kept out of it in-process: `validateShellRequest` rejects
+  any command arg that resolves (after realpath of the nearest existing
+  ancestor, mirroring the cwd discipline so a symlink can't bypass it) inside
+  that protected root, threaded down from the runtime.
+
+This is the responsibility-and-reconciliation rule for secret reads: srt owns
+HOME secrets at the kernel; the in-process runner owns the host's own
+`userData`. Neither covers the other.
+
+**`git` is an accepted limitation.** `git` is allowlisted because it is the
+single most useful dev command, but even with `shell: false` it is an
+arbitrary-code-execution / arbitrary-file-read vector: `git -c core.pager=…`
+/ `-c core.sshCommand=…`, `--upload-pack`, and `apply`/`clone` run
+attacker-chosen programs, and `--git-dir`, `apply`, and a `.git/config`
+credential read reach arbitrary files. This collapses the no-shell /
+allowlist guarantee. The risk is accepted for V1.x pending the srt
+per-command sub-policy.
+
 ## Layer 5 — Secrets discipline
 
 - `auth.json` at chmod `0o600` ([agent-storage-layout](./agent-storage-layout.md)).

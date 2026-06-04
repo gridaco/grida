@@ -37,6 +37,15 @@ const ALLOWED_COMMANDS: ReadonlySet<string> = new Set([
   "find",
   "grep",
   "rg",
+  // KNOWN, ACCEPTED LIMITATION (V1.x, pre-srt): `git` is an
+  // arbitrary-code-execution and arbitrary-file-read vector even with
+  // `shell: false`. `git -c core.pager=…` / `-c core.sshCommand=…`,
+  // `--upload-pack`, and `apply`/`clone` run attacker-chosen programs;
+  // `--git-dir`, `apply`, and a `.git/config` credential read reach
+  // arbitrary files. This collapses the no-shell / allowlist guarantee.
+  // We keep `git` because it is the single most useful dev command and
+  // accept the risk for V1.x, pending the srt per-cmd sub-policy that can
+  // constrain its fs/net reach at the kernel level (see `policy.ts`).
   "git",
 ]);
 

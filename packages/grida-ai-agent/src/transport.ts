@@ -628,27 +628,35 @@ export namespace AgentTransport {
         if (done) break;
         if (!value || value.length === 0) continue;
         buffer += decoder.decode(value, { stream: true });
-        if (buffer.length > MAX_FRAME_BYTES) {
-          throw new Error(
-            `[grida-sse] frame exceeds ${MAX_FRAME_BYTES} bytes — upstream stalled`
-          );
-        }
         for (;;) {
           const sep = buffer.indexOf("\n\n");
           if (sep === -1) break;
           const frame = buffer.slice(0, sep);
           buffer = buffer.slice(sep + 2);
           let event = "message";
-          let data = "";
+          // Accumulate consecutive `data:` lines joined with "\n", mirroring
+          // the server's join (runtime/sse.ts). Overwriting on each line would
+          // silently drop all but the last line of a multi-line payload.
+          const dataLines: string[] = [];
           for (const line of frame.split("\n")) {
             if (line.length === 0 || line.startsWith(":")) continue;
             if (line.startsWith("event:")) {
-              event = line.slice("event:".length).trim();
+              // SSE field value: strip a single leading space after the colon.
+              event = line.slice("event:".length).replace(/^ /, "");
             } else if (line.startsWith("data:")) {
-              data = line.slice("data:".length).trim();
+              dataLines.push(line.slice("data:".length).replace(/^ /, ""));
             }
           }
+          const data = dataLines.join("\n");
           if (data.length > 0) onFrame(event, data);
+        }
+        // Cap only the UN-TERMINATED tail (what's left after the last "\n\n"),
+        // not the whole buffer — complete frames have already been drained, so
+        // a large legitimate replay burst on reconnect must not false-trip.
+        if (buffer.length > MAX_FRAME_BYTES) {
+          throw new Error(
+            `[grida-sse] frame exceeds ${MAX_FRAME_BYTES} bytes — upstream stalled`
+          );
         }
       }
     } catch (err) {

@@ -184,6 +184,83 @@ describe("validateShellRequest", () => {
   });
 });
 
+/* ────────────── protected-secret-root arg containment ──────────── */
+
+/**
+ * GRIDA-SEC-004 gate (3): the host's `userData` (BYOK `auth.json` etc.) is
+ * NOT in the srt deny_read policy — the host process reads it — so the shell
+ * runner must reject any command ARG that resolves inside it. The secrets
+ * root here is a tmp dir standing in for `userData`.
+ */
+describe("validateShellRequest — protected secret roots", () => {
+  let fixture: Awaited<ReturnType<typeof makeFixture>>;
+  let secretsRoot: string;
+  let authJsonAbs: string;
+  beforeEach(async () => {
+    fixture = await makeFixture();
+    // The fixture already creates a sibling `userdata` dir under the same
+    // base as the workspace; use it as the fake secrets root so a relative
+    // `../userdata/auth.json` from the workspace actually reaches it.
+    secretsRoot = await fs.realpath(
+      path.join(path.dirname(fixture.workspace_root), "userdata")
+    );
+    authJsonAbs = path.join(secretsRoot, "auth.json");
+    await fs.writeFile(authJsonAbs, '{"token":"secret"}');
+  });
+  afterEach(async () => {
+    await fixture.cleanup();
+  });
+
+  it("rejects an absolute arg inside the secrets root", async () => {
+    const result = await validateShellRequest(
+      { cmd: "cat", args: [authJsonAbs], cwd: fixture.workspace_root },
+      fixture.registry,
+      [secretsRoot]
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("arg-in-protected-root");
+    }
+  });
+
+  it("rejects a relative arg that climbs into the secrets root", async () => {
+    // `../userdata/auth.json` from the workspace resolves into the secret
+    // root — the prefix check must catch it after resolution.
+    const result = await validateShellRequest(
+      {
+        cmd: "cat",
+        args: ["../userdata/auth.json"],
+        cwd: fixture.workspace_root,
+      },
+      fixture.registry,
+      [secretsRoot]
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("arg-in-protected-root");
+    }
+  });
+
+  it("allows a normal in-workspace arg", async () => {
+    await fs.writeFile(path.join(fixture.workspace_root, "file.txt"), "ok");
+    const result = await validateShellRequest(
+      { cmd: "cat", args: ["./file.txt"], cwd: fixture.workspace_root },
+      fixture.registry,
+      [secretsRoot]
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("does not treat flags or plain text as paths", async () => {
+    const result = await validateShellRequest(
+      { cmd: "grep", args: ["-n", "needle"], cwd: fixture.workspace_root },
+      fixture.registry,
+      [secretsRoot]
+    );
+    expect(result.ok).toBe(true);
+  });
+});
+
 /* ─────────────────────────── runShell ──────────────────────────── */
 
 describe("runShell", () => {

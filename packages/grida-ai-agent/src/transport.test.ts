@@ -36,6 +36,72 @@ function sseStream(
   });
 }
 
+// Build a ReadableStream from pre-chunked byte slices, so a test can control
+// exactly how an SSE frame is split across `reader.read()` boundaries.
+function byteStream(...chunks: string[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const c of chunks) controller.enqueue(enc.encode(c));
+      controller.close();
+    },
+  });
+}
+
+describe("AgentTransport.readFrames", () => {
+  it("reassembles a multi-line `data:` frame, preserving the embedded newline", async () => {
+    const frames: Array<{ event: string; data: string }> = [];
+    await AgentTransport.readFrames(
+      byteStream("event: x\ndata: line one\ndata: line two\n\n"),
+      (event, data) => frames.push({ event, data })
+    );
+    expect(frames).toEqual([{ event: "x", data: "line one\nline two" }]);
+  });
+
+  it("reassembles a frame split across multiple reader.read() chunks", async () => {
+    const frames: Array<{ event: string; data: string }> = [];
+    await AgentTransport.readFrames(
+      byteStream("data: hel", "lo wor", "ld\n", "\ndata: next\n\n"),
+      (event, data) => frames.push({ event, data })
+    );
+    expect(frames).toEqual([
+      { event: "message", data: "hello world" },
+      { event: "message", data: "next" },
+    ]);
+  });
+
+  it("strips only a single leading space after the colon (preserves meaningful whitespace)", async () => {
+    const frames: Array<{ event: string; data: string }> = [];
+    await AgentTransport.readFrames(
+      byteStream("data:  two-leading-spaces\n\n"),
+      (event, data) => frames.push({ event, data })
+    );
+    expect(frames).toEqual([{ event: "message", data: " two-leading-spaces" }]);
+  });
+
+  it("caps the un-terminated tail, not buffered complete frames", async () => {
+    // A burst of many complete frames, each well under the per-frame limit,
+    // must NOT trip the cap even though their combined size exceeds it —
+    // the cap measures only the tail remaining after the last "\n\n".
+    const frame = `data: ${"x".repeat(4096)}\n\n`;
+    const burst = frame.repeat(512); // ~2 MiB total, > 1 MiB cap
+    const count = { n: 0 };
+    await expect(
+      AgentTransport.readFrames(byteStream(burst), () => {
+        count.n++;
+      })
+    ).resolves.toBeUndefined();
+    expect(count.n).toBe(512);
+  });
+
+  it("still trips the cap on a single un-terminated mega-frame", async () => {
+    const huge = `data: ${"x".repeat(1_100_000)}`; // no "\n\n" terminator
+    await expect(
+      AgentTransport.readFrames(byteStream(huge), () => {})
+    ).rejects.toThrow(/upstream stalled/);
+  });
+});
+
 describe("AgentTransport.Client", () => {
   it("owns the handshake route method and JSON parsing", async () => {
     const seen: Array<{ path: string; method: string }> = [];

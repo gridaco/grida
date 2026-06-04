@@ -17,7 +17,18 @@ import {
   real,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+
+/**
+ * Current schema version, stamped into the DB's `PRAGMA user_version`.
+ * `db.ts` gates on this at open time: an unstamped DB is treated as current
+ * and stamped; a DB stamped HIGHER than this is forward-incompatible and the
+ * open throws (an older binary must not silently write a newer DB). Bump this
+ * alongside an entry in the ALTER-ladder in `db.ts` whenever the schema
+ * changes in a way an in-place migration must handle.
+ */
+export const SCHEMA_VERSION = 1;
 
 export const chatSessions = sqliteTable(
   "chat_sessions",
@@ -102,7 +113,10 @@ export const chatParts = sqliteTable(
     updated_at: integer("updated_at").notNull(),
   },
   (t) => [
-    index("idx_chat_parts_message_index").on(t.message_id, t.index),
+    // UNIQUE so two racing writers can't INSERT duplicate rows for the same
+    // (message_id, index) — the upsert in `store.ts` relies on this constraint
+    // for its `ON CONFLICT(message_id, "index") DO UPDATE` index-keyed leg.
+    uniqueIndex("idx_chat_parts_message_index").on(t.message_id, t.index),
     index("idx_chat_parts_session").on(t.session_id),
     index("idx_chat_parts_tool_call").on(t.tool_call_id),
   ]
@@ -182,7 +196,7 @@ const BOOTSTRAP_INDEXES_SQL = `
   CREATE INDEX IF NOT EXISTS idx_chat_messages_hidden
     ON chat_messages(hidden_at);
 
-  CREATE INDEX IF NOT EXISTS idx_chat_parts_message_index
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_parts_message_index
     ON chat_parts(message_id, "index");
   CREATE INDEX IF NOT EXISTS idx_chat_parts_session
     ON chat_parts(session_id);

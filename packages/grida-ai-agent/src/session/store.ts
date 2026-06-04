@@ -674,23 +674,29 @@ export class SessionsStore {
 
     const now = Date.now();
     let hiddenCount = 0;
-    for (let i = 0; i < rows.length; i += 1) {
-      const r = rows[i];
-      if (i > targetIdx) {
-        if (r.hidden_at === null) {
-          hiddenCount += 1;
+    // Atomic: the per-row hide/un-hide stamps are one truncation. A crash
+    // mid-loop must not leave a partially-truncated view (some rows hidden,
+    // others not). The plan was computed from the read above; the derived
+    // rollup recompute stays outside the tx (keeps it short — see withTx).
+    await this.opened.withTx(async () => {
+      for (let i = 0; i < rows.length; i += 1) {
+        const r = rows[i];
+        if (i > targetIdx) {
+          if (r.hidden_at === null) {
+            hiddenCount += 1;
+            await this.db
+              .update(chatMessages)
+              .set({ hidden_at: now, updated_at: now })
+              .where(eq(chatMessages.id, r.id));
+          }
+        } else if (r.hidden_at !== null) {
           await this.db
             .update(chatMessages)
-            .set({ hidden_at: now, updated_at: now })
+            .set({ hidden_at: null, updated_at: now })
             .where(eq(chatMessages.id, r.id));
         }
-      } else if (r.hidden_at !== null) {
-        await this.db
-          .update(chatMessages)
-          .set({ hidden_at: null, updated_at: now })
-          .where(eq(chatMessages.id, r.id));
       }
-    }
+    });
     await this.recomputeRollups(sessionId);
     return {
       session_id: sessionId,
@@ -826,48 +832,58 @@ export class SessionsStore {
         .limit(1)
     )[0];
 
-    const forkRow = await this.create({
-      agent: parent.agent,
-      workspace_id: parent.workspace_id ?? undefined,
-      workspace_root: parentDb?.workspace_root ?? undefined,
-      // Fork title rule: docs/wg/ai/agent/session.md §Forking.
-      title: session_title.forFork(parent.title),
-      model: parent.model ?? undefined,
-      metadata: { ...parent.metadata, ...opts.metadata },
-      permissions: parent.permissions,
-      parent_id: parent.id,
-      parent_message_id: opts.from_message_id,
-    });
-
-    // Copy visible messages up to and including the fork point, in order.
+    // Read the source transcript before opening the tx (keeps the tx short —
+    // no long read while holding the write lock; see withTx).
     const source = await this.listVisibleMessages(opts.parent_session_id);
-    for (const msg of source) {
-      const newMsgId = newMessageId();
-      await this.db.insert(chatMessages).values({
-        id: newMsgId,
-        session_id: forkRow.id,
-        role: msg.role,
-        metadata_json: JSON.stringify(msg.metadata ?? {}),
-        hidden_at: null,
-        created_at: msg.created_at,
-        updated_at: msg.updated_at,
+
+    // Atomic: the new session row and its copied messages/parts are one unit.
+    // A crash mid-copy must not leave a fork session with a partial transcript
+    // (a session row whose history is truncated). The derived rollup recompute
+    // stays outside the tx.
+    const forkRow = await this.opened.withTx(async () => {
+      const created = await this.create({
+        agent: parent.agent,
+        workspace_id: parent.workspace_id ?? undefined,
+        workspace_root: parentDb?.workspace_root ?? undefined,
+        // Fork title rule: docs/wg/ai/agent/session.md §Forking.
+        title: session_title.forFork(parent.title),
+        model: parent.model ?? undefined,
+        metadata: { ...parent.metadata, ...opts.metadata },
+        permissions: parent.permissions,
+        parent_id: parent.id,
+        parent_message_id: opts.from_message_id,
       });
-      for (const part of msg.parts) {
-        await this.db.insert(chatParts).values({
-          id: newPartId(),
-          message_id: newMsgId,
-          session_id: forkRow.id,
-          index: part.index,
-          type: part.type,
-          data_json: JSON.stringify(part.data ?? null),
-          tool_call_id: part.tool_call_id ?? null,
-          tool_state: part.tool_state ?? null,
-          created_at: part.created_at,
-          updated_at: part.updated_at,
+
+      // Copy visible messages up to and including the fork point, in order.
+      for (const msg of source) {
+        const newMsgId = newMessageId();
+        await this.db.insert(chatMessages).values({
+          id: newMsgId,
+          session_id: created.id,
+          role: msg.role,
+          metadata_json: JSON.stringify(msg.metadata ?? {}),
+          hidden_at: null,
+          created_at: msg.created_at,
+          updated_at: msg.updated_at,
         });
+        for (const part of msg.parts) {
+          await this.db.insert(chatParts).values({
+            id: newPartId(),
+            message_id: newMsgId,
+            session_id: created.id,
+            index: part.index,
+            type: part.type,
+            data_json: JSON.stringify(part.data ?? null),
+            tool_call_id: part.tool_call_id ?? null,
+            tool_state: part.tool_state ?? null,
+            created_at: part.created_at,
+            updated_at: part.updated_at,
+          });
+        }
+        if (msg.id === opts.from_message_id) break;
       }
-      if (msg.id === opts.from_message_id) break;
-    }
+      return created;
+    });
 
     await this.recomputeRollups(forkRow.id);
     return (await this.get(forkRow.id))!;
@@ -895,40 +911,47 @@ export class SessionsStore {
   }): Promise<{ summary_message_id: string }> {
     const now = Date.now();
     const msgId = newMessageId();
-    await this.db.insert(chatMessages).values({
-      id: msgId,
-      session_id: opts.session_id,
-      role: "assistant",
-      // The synthetic summary's `usage.input` is the summary's token cost — what
-      // it adds to every future prompt — so the boundary-aware recomputeRollups
-      // reflects the freed context (the summarized head drops out of the count).
-      metadata_json: JSON.stringify({
-        compaction: true,
-        usage: { input: opts.summary_tokens },
-      }),
-      hidden_at: null,
-      created_at: now,
-      updated_at: now,
-    });
-    await this.db.insert(chatParts).values({
-      id: newPartId(),
-      message_id: msgId,
-      session_id: opts.session_id,
-      index: 0,
-      type: "data-compaction",
-      data_json: JSON.stringify({
+    // Atomic: the marker message and its `data-compaction` part are one unit. A
+    // crash between the two inserts would leave a compaction message with no
+    // compaction part — the boundary silently vanishes and the summarized head
+    // re-enters the model's context. The derived rollup recompute stays outside
+    // the tx (keeps it short — see withTx).
+    await this.opened.withTx(async () => {
+      await this.db.insert(chatMessages).values({
+        id: msgId,
+        session_id: opts.session_id,
+        role: "assistant",
+        // The synthetic summary's `usage.input` is the summary's token cost — what
+        // it adds to every future prompt — so the boundary-aware recomputeRollups
+        // reflects the freed context (the summarized head drops out of the count).
+        metadata_json: JSON.stringify({
+          compaction: true,
+          usage: { input: opts.summary_tokens },
+        }),
+        hidden_at: null,
+        created_at: now,
+        updated_at: now,
+      });
+      await this.db.insert(chatParts).values({
+        id: newPartId(),
+        message_id: msgId,
+        session_id: opts.session_id,
+        index: 0,
         type: "data-compaction",
-        data: {
-          summary: opts.summary,
-          tail_start_id: opts.tail_start_id,
-          auto: opts.auto,
-          summary_tokens: opts.summary_tokens,
-        },
-      }),
-      tool_call_id: null,
-      tool_state: null,
-      created_at: now,
-      updated_at: now,
+        data_json: JSON.stringify({
+          type: "data-compaction",
+          data: {
+            summary: opts.summary,
+            tail_start_id: opts.tail_start_id,
+            auto: opts.auto,
+            summary_tokens: opts.summary_tokens,
+          },
+        }),
+        tool_call_id: null,
+        tool_state: null,
+        created_at: now,
+        updated_at: now,
+      });
     });
     await this.recomputeRollups(opts.session_id);
     return { summary_message_id: msgId };
@@ -977,8 +1000,10 @@ export class SessionsStore {
   ): Promise<ChatPartRow> {
     const now = Date.now();
     const dataJson = JSON.stringify(input.data ?? null);
-    // Find an existing row by toolCallId first; fall back to (messageId, index).
-    let existing: typeof chatParts.$inferSelect | undefined;
+    // Tool parts are keyed by toolCallId (the row migrates across indexes as the
+    // AI SDK tool-state flow advances), so resolve that row first and update it
+    // in place. This leg is single-writer per toolCallId, so read-then-write is
+    // safe here; the index-keyed leg below is the one that races.
     if (input.tool_call_id) {
       const byTool = await this.db
         .select()
@@ -990,54 +1015,69 @@ export class SessionsStore {
           )
         )
         .limit(1);
-      existing = byTool[0];
-    }
-    if (!existing) {
-      const byIndex = await this.db
-        .select()
-        .from(chatParts)
-        .where(
-          and(
-            eq(chatParts.message_id, messageId),
-            eq(chatParts.index, input.index)
-          )
-        )
-        .limit(1);
-      existing = byIndex[0];
-    }
-
-    if (existing) {
-      const next = {
-        type: input.type,
-        data_json: dataJson,
-        tool_call_id: input.tool_call_id ?? existing.tool_call_id,
-        tool_state: input.tool_state ?? existing.tool_state,
-        index: input.index,
-        updated_at: now,
-      };
-      await this.db
-        .update(chatParts)
-        .set(next)
-        .where(eq(chatParts.id, existing.id));
-      return rowToPart({ ...existing, ...next });
+      const existing = byTool[0];
+      if (existing) {
+        const next = {
+          type: input.type,
+          data_json: dataJson,
+          tool_call_id: input.tool_call_id ?? existing.tool_call_id,
+          tool_state: input.tool_state ?? existing.tool_state,
+          index: input.index,
+          updated_at: now,
+        };
+        await this.db
+          .update(chatParts)
+          .set(next)
+          .where(eq(chatParts.id, existing.id));
+        return rowToPart({ ...existing, ...next });
+      }
     }
 
+    // Index-keyed leg: a single atomic `INSERT … ON CONFLICT(message_id,
+    // "index") DO UPDATE`. The old read-then-write let two racing writers both
+    // miss the SELECT and INSERT duplicate rows for the same (message_id,
+    // index) — the unique index (schema.ts) + this upsert collapse that to one
+    // row. COALESCE preserves the existing toolCallId/toolState when the caller
+    // omits them, matching the prior fall-back-to-existing behavior. Read the
+    // row back afterward to return its authoritative id/createdAt (the conflict
+    // path keeps the EXISTING row's, which the sqlite-proxy `run` doesn't echo).
     const session =
       input.session_id ?? (await this.messageSessionId(messageId));
-    const row = {
-      id: input.id ?? newPartId(),
-      message_id: messageId,
-      session_id: session,
-      index: input.index,
-      type: input.type,
-      data_json: dataJson,
-      tool_call_id: input.tool_call_id ?? null,
-      tool_state: input.tool_state ?? null,
-      created_at: now,
-      updated_at: now,
-    };
-    await this.db.insert(chatParts).values(row);
-    return rowToPart(row);
+    await this.db
+      .insert(chatParts)
+      .values({
+        id: input.id ?? newPartId(),
+        message_id: messageId,
+        session_id: session,
+        index: input.index,
+        type: input.type,
+        data_json: dataJson,
+        tool_call_id: input.tool_call_id ?? null,
+        tool_state: input.tool_state ?? null,
+        created_at: now,
+        updated_at: now,
+      })
+      .onConflictDoUpdate({
+        target: [chatParts.message_id, chatParts.index],
+        set: {
+          type: input.type,
+          data_json: dataJson,
+          tool_call_id: sql`coalesce(${input.tool_call_id ?? null}, ${chatParts.tool_call_id})`,
+          tool_state: sql`coalesce(${input.tool_state ?? null}, ${chatParts.tool_state})`,
+          updated_at: now,
+        },
+      });
+    const stored = await this.db
+      .select()
+      .from(chatParts)
+      .where(
+        and(
+          eq(chatParts.message_id, messageId),
+          eq(chatParts.index, input.index)
+        )
+      )
+      .limit(1);
+    return rowToPart(stored[0]);
   }
 
   private async messageSessionId(messageId: string): Promise<string> {

@@ -129,6 +129,11 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     workspace_registry: workspaceRegistry,
     sessions_store: sessionsStore,
     streams: opts.stream_registry,
+    // GRIDA-SEC-004: the host's own secret dir (auth.json, sessions.db,
+    // workspaces.json, recent.json). Threaded to the shell runner so the
+    // agent's `run_command` cannot read it back into the transcript. NOT
+    // added to the srt deny_read policy — the host itself reads auth.json.
+    secrets_root: opts.user_data_path,
   });
   if (opts.capabilities.agent) registerAgentRoutes(app, runtime);
   if (opts.capabilities.sessions)

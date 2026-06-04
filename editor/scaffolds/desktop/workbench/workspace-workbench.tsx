@@ -240,7 +240,10 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
       const next = prev.filter((_, i) => i !== idx);
       setActiveRelPath((current) => {
         if (current !== relPath) return current;
-        return next[idx - 1] ?? next[idx] ?? null;
+        // Compute the survivor from the pre-filter `prev` (left, then
+        // right, then null) so it doesn't rely on the post-filter index
+        // shift — matches `handleEntryTrashed` and the comment above.
+        return prev[idx - 1] ?? prev[idx + 1] ?? null;
       });
       return next;
     });

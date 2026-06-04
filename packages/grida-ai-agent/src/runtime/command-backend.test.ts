@@ -98,6 +98,25 @@ describe("Permissions", () => {
     }
   });
 
+  it("denies an arg that resolves inside the protected secret root (GRIDA-SEC-004)", async () => {
+    // The userData dir (BYOK auth.json) is the protected root threaded down
+    // from the runtime. Reading it through a command arg must surface as a
+    // structured tool result, not an execution.
+    const secretsRoot = await fs.realpath(path.join(baseDir, "userdata"));
+    await fs.writeFile(path.join(secretsRoot, "auth.json"), "{}");
+    const guarded = createAgentCommandBackend(registry, [secretsRoot]);
+    const result = await guarded({
+      command: "cat",
+      args: [path.join(secretsRoot, "auth.json")],
+      workdir: workspaceRoot,
+      description: "read the host's auth.json",
+    });
+    expect(isDeny(result)).toBe(true);
+    if (isDeny(result)) {
+      expect(result.code).toBe("arg-in-protected-root");
+    }
+  });
+
   // Phase B+ coverage target once the layered permission ruleset exists:
   // manifest deny is not overridable by session allow; most-specific
   // matching rule wins; headless evaluator treats ask as deny.

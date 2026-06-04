@@ -11,7 +11,7 @@
  * semantics, abort plumbing) that the demo doesn't need. For long-
  * running commands a streaming variant will land later.
  *
- * Two gates on every call:
+ * Three gates on every call:
  *
  *   1. `policy.ts` allowlist — cmd must be a known bare binary
  *      name. Args are not constrained here (see `policy.ts` for
@@ -19,6 +19,17 @@
  *   2. cwd must be `realpath`-resolvable AND contained by a
  *      currently-registered workspace. Without an opened workspace
  *      the call fails.
+ *   3. No arg may resolve to a path inside a protected-secret root
+ *      (the agent host's own `userData`, where BYOK `auth.json` and
+ *      the sessions db live). The srt outer policy can't deny that
+ *      root — the host process itself reads it for provider auth — so
+ *      this in-process arg check is what keeps `cat ${userData}/auth.json`
+ *      from leaking the key to the shell child. See `sandbox/policy.ts`.
+ *
+ * GRIDA-SEC-004: this is NOT general arg containment (deferred to the
+ * srt per-cmd sub-policy). It denies exactly the secret root, nothing
+ * more — so an arg's "is this a path?" guess only ever costs the secret
+ * dir, never a false rejection of normal in-workspace work.
  *
  * Timeout: 30s hard cap. Long-running processes are killed (SIGKILL
  * after a SIGTERM grace). The route returns `exitCode: null,
@@ -31,6 +42,7 @@
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
+import path from "node:path";
 import { isAllowedCommand } from "../permissions";
 import type { WorkspaceRegistry } from "../workspaces";
 
@@ -63,17 +75,31 @@ export type ShellRunError =
   | { code: "cmd-not-allowed"; cmd: string }
   | { code: "cwd-not-in-workspace"; cwd: string }
   | { code: "cwd-not-a-directory"; cwd: string }
-  | { code: "cwd-resolve-failed"; cwd: string; reason: string };
+  | { code: "cwd-resolve-failed"; cwd: string; reason: string }
+  | { code: "arg-in-protected-root"; arg: string };
 
 /**
- * Validates a shell-run request against the allowlist and the
- * workspace registry. Returns either `{ok, request}` with the
- * cwd-`realpath`'d request, or `{ok:false, error}` with a
+ * GRIDA-SEC-004 — secret roots the shell child must not read through an
+ * arg. Resolved against the agent host's `userData` and threaded down from
+ * the runtime ({@link createAgentCommandBackend}). Empty when no host
+ * supplied one (e.g. the standalone/no-bindings path).
+ */
+export type ProtectedReadRoots = readonly string[];
+
+/**
+ * Validates a shell-run request against the allowlist, the workspace
+ * registry, and the protected-secret roots. Returns either `{ok, request}`
+ * with the cwd-`realpath`'d request, or `{ok:false, error}` with a
  * structured error the route handler can return as 400/403.
+ *
+ * `protectedReadRoots` are absolute secret roots (the agent host's
+ * `userData`) the shell child must not read through any arg — see the
+ * module header's gate (3). Omit for the no-bindings path.
  */
 export async function validateShellRequest(
   req: ShellRunRequest,
-  registry: WorkspaceRegistry
+  registry: WorkspaceRegistry,
+  protectedReadRoots: ProtectedReadRoots = []
 ): Promise<
   { ok: true; request: ShellRunRequest } | { ok: false; error: ShellRunError }
 > {
@@ -119,6 +145,19 @@ export async function validateShellRequest(
       error: { code: "cwd-not-in-workspace", cwd: realCwd },
     };
   }
+  // Gate 3 — secret-root containment. Resolve every arg that looks like a
+  // path against the (realpath'd) cwd and reject the whole command if it
+  // lands inside a protected root. Realpathing the nearest existing
+  // ancestor mirrors the cwd discipline so a symlink can't bypass it.
+  if (protectedReadRoots.length > 0) {
+    const roots = await resolveProtectedRoots(protectedReadRoots);
+    for (const arg of req.args) {
+      const resolved = await resolveArgPath(arg, realCwd);
+      if (resolved !== null && roots.some((r) => containsPath(r, resolved))) {
+        return { ok: false, error: { code: "arg-in-protected-root", arg } };
+      }
+    }
+  }
   return {
     ok: true,
     request: {
@@ -128,6 +167,75 @@ export async function validateShellRequest(
       timeout_ms: req.timeout_ms,
     },
   };
+}
+
+/** `path.sep`-terminated prefix containment — same discipline as
+ *  {@link WorkspaceRegistry.containsPath}, so a sibling like
+ *  `${userData}-backup` never counts as inside `${userData}`. */
+function containsPath(root: string, candidate: string): boolean {
+  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
+  return candidate === root || candidate.startsWith(prefix);
+}
+
+/** Realpath each protected root so the comparison is symlink-stable.
+ *  A root that doesn't exist yet is kept as-is (still a valid prefix). */
+async function resolveProtectedRoots(
+  roots: ProtectedReadRoots
+): Promise<string[]> {
+  return await Promise.all(
+    roots.map(async (root) => {
+      try {
+        return await fs.realpath(root);
+      } catch {
+        return path.resolve(root);
+      }
+    })
+  );
+}
+
+/**
+ * Resolve an arg to an absolute path for the secret-root check, or `null`
+ * when it clearly isn't a path (a flag like `-n`, or plain text with no
+ * separators). Be conservative: anything with a separator, or an absolute
+ * path, is treated as a path — the check only ever denies the secret root,
+ * so a false "this is a path" guess is harmless. The nearest EXISTING
+ * ancestor is realpath'd (mirroring the cwd discipline) so a symlinked
+ * component can't smuggle the resolved target out of a protected root.
+ */
+async function resolveArgPath(
+  arg: string,
+  cwd: string
+): Promise<string | null> {
+  if (arg.length === 0) return null;
+  // Flags (`-n`, `--color`) are not paths.
+  if (arg.startsWith("-")) return null;
+  // Plain text with no path separators is not treated as a path.
+  if (!arg.includes("/") && !arg.includes("\\") && !path.isAbsolute(arg)) {
+    return null;
+  }
+  const abs = path.resolve(cwd, arg);
+  return await realpathNearest(abs);
+}
+
+/** Realpath `abs` if it exists; otherwise realpath the nearest existing
+ *  ancestor and re-join the missing tail, so a not-yet-created target
+ *  under a symlinked secret dir still resolves into the protected root. */
+async function realpathNearest(abs: string): Promise<string> {
+  let current = abs;
+  const tail: string[] = [];
+  // Walk up until an existing component is found (the filesystem root
+  // always exists, so this terminates).
+  while (true) {
+    try {
+      const real = await fs.realpath(current);
+      return tail.length ? path.join(real, ...tail.reverse()) : real;
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) return path.resolve(abs);
+      tail.push(path.basename(current));
+      current = parent;
+    }
+  }
 }
 
 /**

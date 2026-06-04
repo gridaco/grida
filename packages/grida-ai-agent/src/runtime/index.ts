@@ -127,6 +127,16 @@ export type AgentRuntimeDeps = ResolveDeps & {
   workspace_registry: WorkspaceRegistry;
   sessions_store: SessionsStore;
   /**
+   * GRIDA-SEC-004 — the agent host's own secret root (its `userData`, where
+   * BYOK `auth.json`, `workspaces.json`, `recent.json`, and the sessions db
+   * live). The host process reads it for provider auth, so it is NOT in the
+   * srt `deny_read` policy; the shell runner instead rejects any command arg
+   * that resolves inside it (see `shell/runner.ts`). The host wires this from
+   * its `user_data_path`. Omit to leave the shell child unconstrained on
+   * secret-arg reads (test/standalone).
+   */
+  secrets_root?: string;
+  /**
    * Optional injected registry — the smoke + tests pre-populate entries.
    * Omit to let AgentRuntime allocate its own.
    */
@@ -479,21 +489,32 @@ export class AgentRuntime {
     const entry = this.streams.create(sessionId);
 
     // Recorder consumer — attached BEFORE the pump so no frame is missed.
-    this.streams.attach(
-      sessionId,
-      createRecorderConsumer({
-        store: this.deps.sessions_store,
-        session_id: sessionId,
-        run_id: runId,
-      })
-    );
+    // We hold a handle to BOTH the consumer and its detach fn: the success
+    // path drives the recorder's terminal flush itself (so the assistant row
+    // is committed before usage is stamped — see below) and detaches it so
+    // `streams.finish` doesn't re-fire its `on_end`. The error/abort path
+    // leaves it attached, flushed by `streams.finish` as usual.
+    const recorder = createRecorderConsumer({
+      store: this.deps.sessions_store,
+      session_id: sessionId,
+      run_id: runId,
+    });
+    const detachRecorder = this.streams.attach(sessionId, recorder);
 
     const streams = this.streams;
     const runAgentFn = this.run_agent_fn;
     const {
       workspace_registry: workspaceRegistry,
       sessions_store: sessionsStore,
+      secrets_root: secretsRoot,
     } = this.deps;
+    // Bindings deps for the run. Typed (not an inline literal) so the
+    // GRIDA-SEC-004 `secrets_root` threads through `runAgent`'s narrower
+    // `{ workspace_registry }` param into `createWorkspaceAgentBindings`.
+    const runDeps = {
+      workspace_registry: workspaceRegistry,
+      secrets_root: secretsRoot,
+    };
     // Pump: open the upstream model call, forward each SSE frame into the
     // registry. Doesn't block the caller; a client attaches as another
     // consumer (HTTP) or reconnects later (a core drain has no live consumer).
@@ -545,10 +566,25 @@ export class AgentRuntime {
               });
             },
           },
-          { workspace_registry: workspaceRegistry }
+          // GRIDA-SEC-004 — `secrets_root` rides the bindings deps down to the
+          // shell runner's arg check. Built as a typed var (not a fresh
+          // literal) so it threads through `runAgent`'s narrower param to
+          // `createWorkspaceAgentBindings`, which reads it at runtime.
+          runDeps
         );
         console.log(`[agent-host-agent] run response opened runId=${runId}`);
         await pumpResponseIntoRegistry(response, streams, sessionId);
+        // Drain the recorder BEFORE stamping usage. The recorder creates the
+        // assistant row on a fire-and-forget write_chain fed by each pushed
+        // frame; `pumpResponseIntoRegistry` returning only means the frames
+        // were enqueued, not that the row was written. `setLatestAssistantUsage`
+        // addresses "the latest assistant row", so stamping before the write
+        // settles races onto the wrong row (or none). The recorder's terminal
+        // flush (its `on_end`) awaits its write_chain + finalizes, so awaiting
+        // it here makes the row exist deterministically. Detach so the later
+        // `streams.finish` won't re-fire `on_end` on it.
+        detachRecorder();
+        await recorder.on_end("finish");
         if (hasUsage(runUsage)) {
           await sessionsStore
             .setLatestAssistantUsage(sessionId, runUsage)

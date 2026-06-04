@@ -6,6 +6,20 @@
  * the broad read/write shape used by the OS sandbox. Host adapters own
  * concrete sandbox initialization, wrapping, process spawning, and host
  * facts such as `userData` and `home`.
+ *
+ * Secret-read ownership split (the srt policy here confines the WHOLE
+ * sidecar, host process included):
+ *
+ *   - HOME secrets (`~/.ssh`, `~/.aws`, shell rc files, …) are denied for
+ *     the entire tree via `deny_read` below — the host has no business
+ *     reading them, so a kernel-level deny is safe.
+ *   - The agent host's OWN secret dir (`userData`, where BYOK `auth.json`,
+ *     `workspaces.json`, `recent.json`, and the sessions db live) is NOT in
+ *     `deny_read`: the host process itself must read `auth.json` for
+ *     provider calls, and it must read/write the rest. Denying it here would
+ *     break host auth. Instead, the shell CHILD is kept out of it IN-PROCESS
+ *     by the runner's per-arg check (see `shell/runner.ts`, gate 3), which
+ *     rejects any command arg that resolves inside that root.
  */
 import path from "node:path";
 import type { ByokProviderId } from "../protocol/provider-ids";

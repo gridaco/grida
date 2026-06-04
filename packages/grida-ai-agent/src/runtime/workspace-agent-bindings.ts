@@ -20,7 +20,15 @@ export type WorkspaceAgentBindingRequest = {
 
 export async function createWorkspaceAgentBindings(
   req: WorkspaceAgentBindingRequest,
-  deps: { workspace_registry: WorkspaceRegistry }
+  deps: {
+    workspace_registry: WorkspaceRegistry;
+    /**
+     * Absolute secret root(s) (the agent host's `userData`) the shell child
+     * must not read through a command arg (GRIDA-SEC-004). Threaded from the
+     * runtime; absent on the no-bindings path. See `shell/runner.ts`.
+     */
+    secrets_root?: string;
+  }
 ): Promise<{
   fs: AgentFs;
   todos: AgentTodos;
@@ -39,7 +47,10 @@ export async function createWorkspaceAgentBindings(
   const fs = new AgentFs(new WorkspaceAgentFsBackend(workspace));
   await fs.hydrate();
   const todos = new AgentTodos();
-  const commandBackend = createAgentCommandBackend(deps.workspace_registry);
+  const commandBackend = createAgentCommandBackend(
+    deps.workspace_registry,
+    deps.secrets_root ? [deps.secrets_root] : []
+  );
   return {
     fs,
     todos,
