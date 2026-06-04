@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { builtinModules } from "module";
+import { gridaBundleGuard } from "./vite.guards";
 
 // https://vitejs.dev/config
 //
@@ -14,6 +15,9 @@ export default defineConfig({
       external: [...builtinModules, "@anthropic-ai/sandbox-runtime"],
     },
   },
+  // GRIDA-DESKTOP-BUILD-GUARD — fail the build if a @grida/* workspace
+  // package is left external instead of bundled. See desktop/vite.guards.ts.
+  plugins: [gridaBundleGuard()],
   define: {
     INSIDERS: process.env.INSIDERS === "1" ? 1 : 0,
   },

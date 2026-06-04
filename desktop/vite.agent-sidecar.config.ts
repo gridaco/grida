@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { builtinModules } from "module";
+import { gridaBundleGuard } from "./vite.guards";
 
 // Agent sidecar, built as a third Forge/Vite entry alongside the
 // Electron main process and preload. Runs in Electron-as-Node
@@ -35,6 +36,9 @@ export default defineConfig({
       ],
     },
   },
+  // GRIDA-DESKTOP-BUILD-GUARD — fail the build if a @grida/* workspace
+  // package is left external instead of bundled. See desktop/vite.guards.ts.
+  plugins: [gridaBundleGuard()],
   define: {
     EDITOR_BASE_URL: JSON.stringify(
       process.env.EDITOR_BASE_URL ?? "https://grida.co"

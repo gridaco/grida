@@ -56,6 +56,25 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build linked workspace packages
+        # The isolated ./desktop pnpm project `link:`s several @grida/*
+        # workspace packages whose dist/ is gitignored and is therefore
+        # absent on a clean checkout. The desktop Vite build resolves and
+        # bundles them from source-built dist/ — without this they can't be
+        # resolved and (per desktop/vite.guards.ts, GRIDA-DESKTOP-BUILD-GUARD)
+        # the build now hard-fails instead of shipping a binary that crashes
+        # on launch. Build the closure from the repo root so the link:
+        # targets have dist/ before packaging. --ignore-scripts skips native
+        # postinstalls we don't need (these are pure tsdown packages, no wasm).
+        working-directory: ${{ github.workspace }}
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm turbo run build \
+            --filter=@grida/desktop-bridge \
+            --filter=@grida/agent \
+            --filter=@grida/ai-models \
+            --filter=@grida/home
+
       - name: Import Apple signing certificate
         if: ${{ matrix.os.name == 'macos-apple-silicon' && env.HAS_SIGNING == 'true' }}
         uses: apple-actions/import-codesign-certs@v2
