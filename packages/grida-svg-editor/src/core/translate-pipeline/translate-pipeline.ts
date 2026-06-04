@@ -38,7 +38,21 @@ export type TranslateBaseline =
   | { type: "polygon"; points: string }
   | { type: "path"; d: string }
   | { type: "text"; x: number; y: number }
-  | { type: "tspan"; x: number; y: number }
+  // A `<tspan>` is positioned by text flow, not (necessarily) by `x`/`y`.
+  // Translating it via absolute `x`/`y` would teleport a flow-positioned span
+  // to the origin (absent attr read as 0). SVG `transform` does not apply to
+  // `<tspan>` either. So we move it with RELATIVE `dx`/`dy` offsets, composed
+  // on top of whatever positioning it already has. `d{x,y}` is the leading
+  // offset value (0 when absent); `d{x,y}_attr` is the original attribute
+  // string, retained so revert restores it exactly — including removal when
+  // the attribute was absent.
+  | {
+      type: "tspan";
+      dx: number;
+      dy: number;
+      dx_attr: string | null;
+      dy_attr: string | null;
+    }
   | { type: "image"; x: number; y: number }
   | { type: "use"; x: number; y: number }
   | { type: "unsupported" };
@@ -166,12 +180,19 @@ export namespace translate_pipeline {
           return { type: "path", d: doc.get_attr(id, "d") ?? "" };
         case "text":
           return { type: "text", x: num(doc, id, "x"), y: num(doc, id, "y") };
-        case "tspan":
+        case "tspan": {
+          // Move via relative `dx`/`dy`; capture the leading offset (whole-run
+          // shift) plus the original attribute string for faithful revert.
+          const dx_attr = doc.get_attr(id, "dx");
+          const dy_attr = doc.get_attr(id, "dy");
           return {
             type: "tspan",
-            x: num(doc, id, "x"),
-            y: num(doc, id, "y"),
+            dx: svg_parse.parse_number(dx_attr),
+            dy: svg_parse.parse_number(dy_attr),
+            dx_attr,
+            dy_attr,
           };
+        }
         case "image":
           return {
             type: "image",
@@ -221,10 +242,13 @@ export namespace translate_pipeline {
       switch (b.type) {
         case "rect":
         case "text":
-        case "tspan":
         case "image":
         case "use":
           return { x: b.x, y: b.y };
+        case "tspan":
+          // Moved by relative `dx`/`dy`, so there is no absolute document-
+          // space anchor to align to a lattice (pixel-grid / custom snap).
+          return null;
         case "circle":
         case "ellipse":
           return { x: b.cx, y: b.cy };
@@ -296,6 +320,25 @@ export namespace translate_pipeline {
       return `translate(${dx} ${dy}) ${existing}`;
     }
 
+    /** Rewrite the leading value of a `dx`/`dy` offset list to `value`,
+     *  preserving any per-glyph kerning tail (`compose("3 1 2", 9)` →
+     *  `"9 1 2"`). Empty separators are dropped, so a stray leading comma
+     *  doesn't lose the tail. With no original attribute (or a single
+     *  value), emit just `value`. The leading value shifts the whole run. */
+    function compose_leading_offset(
+      attr: string | null,
+      value: number
+    ): string {
+      if (attr === null) return String(value);
+      const tokens = attr
+        .trim()
+        .split(/[\s,]+/)
+        .filter((t) => t !== "");
+      if (tokens.length <= 1) return String(value);
+      tokens[0] = String(value);
+      return tokens.join(" ");
+    }
+
     function shift_path_d(d: string, dx: number, dy: number): string {
       if (dx === 0 && dy === 0) return d;
       try {
@@ -326,9 +369,22 @@ export namespace translate_pipeline {
         case "image":
         case "use":
         case "text":
-        case "tspan":
           doc.set_attr(id, "x", String(baseline.x + dx));
           doc.set_attr(id, "y", String(baseline.y + dy));
+          return;
+        case "tspan":
+          // Relative offsets — never absolute x/y (would teleport a
+          // flow-positioned span). Composed on top of the original offsets.
+          doc.set_attr(
+            id,
+            "dx",
+            compose_leading_offset(baseline.dx_attr, baseline.dx + dx)
+          );
+          doc.set_attr(
+            id,
+            "dy",
+            compose_leading_offset(baseline.dy_attr, baseline.dy + dy)
+          );
           return;
         case "circle":
         case "ellipse":
@@ -355,6 +411,24 @@ export namespace translate_pipeline {
         case "unsupported":
           return;
       }
+    }
+
+    /** Restore an element to its pre-translate state. For most kinds this is
+     *  `apply(..., 0, 0)` (baseline values, delta zero). `<tspan>` is special:
+     *  its `dx`/`dy` must be restored to the EXACT original attribute strings
+     *  — including removal when they were absent — so undo cannot leave a
+     *  fabricated `dx="0"` / `dy="0"` behind. */
+    export function revert(
+      doc: SvgDocument,
+      id: NodeId,
+      baseline: TranslateBaseline
+    ): void {
+      if (baseline.type === "tspan") {
+        doc.set_attr(id, "dx", baseline.dx_attr);
+        doc.set_attr(id, "dy", baseline.dy_attr);
+        return;
+      }
+      apply(doc, id, baseline, 0, 0);
     }
   }
 
@@ -473,7 +547,7 @@ export namespace translate_pipeline {
     for (const id of plan.ids) {
       const baseline = plan.baselines.get(id);
       if (!baseline) continue;
-      intent.apply(doc, id, baseline, 0, 0);
+      intent.revert(doc, id, baseline);
     }
   }
 

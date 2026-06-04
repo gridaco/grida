@@ -52,7 +52,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   apps/backgrounds:
     dependencies:
@@ -1070,7 +1070,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-ai-models:
     devDependencies:
@@ -1082,7 +1082,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-canvas-bitmap:
     dependencies:
@@ -1121,7 +1121,7 @@ importers:
         version: 19.2.5
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-canvas-io:
     dependencies:
@@ -1300,7 +1300,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-canvas-tailwind: {}
 
@@ -1353,7 +1353,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-fonts:
     devDependencies:
@@ -1377,7 +1377,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-home:
     devDependencies:
@@ -1389,7 +1389,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-keybinding:
     devDependencies:
@@ -1401,7 +1401,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-mixed-properties:
     dependencies:
@@ -1462,7 +1462,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-svg: {}
 
@@ -1493,6 +1493,15 @@ importers:
       '@types/react':
         specifier: 19.1.3
         version: 19.1.3
+      '@vitest/browser':
+        specifier: 4.0.18
+        version: 4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))(vitest@4.0.18)
+      '@vitest/browser-playwright':
+        specifier: ^4.0.18
+        version: 4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(playwright@1.58.2)(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))(vitest@4.0.18)
+      playwright:
+        specifier: ^1.58.2
+        version: 1.58.2
       react:
         specifier: 19.2.5
         version: 19.2.5
@@ -1504,7 +1513,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-text-editor:
     devDependencies:
@@ -1516,7 +1525,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/grida-tokens: {}
 
@@ -1541,7 +1550,7 @@ importers:
         version: 6.0.3
       vitest:
         specifier: ^4
-        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
   packages/lib/treearray: {}
 
@@ -7314,6 +7323,17 @@ packages:
     resolution: {integrity: sha512-JmxkOROPkjnMEdFGnnSKLo5BkFHgOkLe/N5KkWR02cA5bE+bmEkfAh7DJfrtVsPkqSPvwGH1TrMWWthJwoivPA==}
     peerDependencies:
       react: 19.2.5
+
+  '@vitest/browser-playwright@4.0.18':
+    resolution: {integrity: sha512-gfajTHVCiwpxRj1qh0Sh/5bbGLG4F/ZH/V9xvFVoFddpITfMta9YGow0W6ZpTTORv2vdJuz9TnrNSmjKvpOf4g==}
+    peerDependencies:
+      playwright: '*'
+      vitest: 4.0.18
+
+  '@vitest/browser@4.0.18':
+    resolution: {integrity: sha512-gVQqh7paBz3gC+ZdcCmNSWJMk70IUjDeVqi+5m5vYpEHsIwRgw3Y545jljtajhkekIpIp5Gg8oK7bctgY0E2Ng==}
+    peerDependencies:
+      vitest: 4.0.18
 
   '@vitest/expect@4.0.18':
     resolution: {integrity: sha512-8sCWUyckXXYvx4opfzVY03EOiYVxyNrHS5QxX3DAIi5dpJAAkyJezHCP77VMX4HKA2LDT/Jpfo8i2r5BE3GnQQ==}
@@ -13454,6 +13474,10 @@ packages:
     resolution: {integrity: sha512-94Bdh3cC2PKrbgSOUqTiGPWVZeSiXfKOVZNJniWoqrWrRkB1CJzBU3NEbiTsPcYy1lDsANA/THzS+9WBiy5nfQ==}
     engines: {node: '>= 10'}
 
+  sirv@3.0.2:
+    resolution: {integrity: sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g==}
+    engines: {node: '>=18'}
+
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
@@ -13934,6 +13958,10 @@ packages:
 
   tinyrainbow@3.0.3:
     resolution: {integrity: sha512-PSkbLUoxOFRzJYjjxHJt9xro7D+iilgMX/C9lawzVuYiIdcihh9DXmVibBe8lmcFrRi/VzlPjBxbN7rH24q8/Q==}
+    engines: {node: '>=14.0.0'}
+
+  tinyrainbow@3.1.0:
+    resolution: {integrity: sha512-Bf+ILmBgretUrdJxzXM0SgXLZ3XfiaUuOj/IKQHuTXip+05Xn+uyEYdVg0kYDipTBcLrCVyUzAPz7QmArb0mmw==}
     engines: {node: '>=14.0.0'}
 
   tippy.js@6.3.7:
@@ -21854,6 +21882,36 @@ snapshots:
       prop-types: 15.8.1
       react: 19.2.5
 
+  '@vitest/browser-playwright@4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(playwright@1.58.2)(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))(vitest@4.0.18)':
+    dependencies:
+      '@vitest/browser': 4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))(vitest@4.0.18)
+      '@vitest/mocker': 4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))
+      playwright: 1.58.2
+      tinyrainbow: 3.1.0
+      vitest: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+    transitivePeerDependencies:
+      - bufferutil
+      - msw
+      - utf-8-validate
+      - vite
+
+  '@vitest/browser@4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))(vitest@4.0.18)':
+    dependencies:
+      '@vitest/mocker': 4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))
+      '@vitest/utils': 4.0.18
+      magic-string: 0.30.21
+      pixelmatch: 7.1.0
+      pngjs: 7.0.0
+      sirv: 3.0.2
+      tinyrainbow: 3.0.3
+      vitest: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+      ws: 8.19.0
+    transitivePeerDependencies:
+      - bufferutil
+      - msw
+      - utf-8-validate
+      - vite
+
   '@vitest/expect@4.0.18':
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -21861,7 +21919,7 @@ snapshots:
       '@vitest/spy': 4.0.18
       '@vitest/utils': 4.0.18
       chai: 6.2.2
-      tinyrainbow: 3.0.3
+      tinyrainbow: 3.1.0
 
   '@vitest/mocker@4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))':
     dependencies:
@@ -21874,7 +21932,7 @@ snapshots:
 
   '@vitest/pretty-format@4.0.18':
     dependencies:
-      tinyrainbow: 3.0.3
+      tinyrainbow: 3.1.0
 
   '@vitest/runner@4.0.18':
     dependencies:
@@ -29136,6 +29194,12 @@ snapshots:
       mrmime: 2.0.0
       totalist: 3.0.1
 
+  sirv@3.0.2:
+    dependencies:
+      '@polka/url': 1.0.0-next.28
+      mrmime: 2.0.0
+      totalist: 3.0.1
+
   sisteransi@1.0.5: {}
 
   sitemap@7.1.2:
@@ -29634,6 +29698,8 @@ snapshots:
   tinyqueue@3.0.0: {}
 
   tinyrainbow@3.0.3: {}
+
+  tinyrainbow@3.1.0: {}
 
   tippy.js@6.3.7:
     dependencies:
@@ -30154,7 +30220,7 @@ snapshots:
       tsx: 4.21.0
       yaml: 2.7.0
 
-  vitest@4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0):
+  vitest@4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0):
     dependencies:
       '@vitest/expect': 4.0.18
       '@vitest/mocker': 4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))
@@ -30179,6 +30245,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
       '@types/node': 24.12.2
+      '@vitest/browser-playwright': 4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(playwright@1.58.2)(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))(vitest@4.0.18)
       jsdom: 20.0.3(canvas@2.11.2(encoding@0.1.13))
     transitivePeerDependencies:
       - jiti
