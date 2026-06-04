@@ -88,7 +88,7 @@ type RowState =
   | { kind: "removing" }
   | { kind: "error"; message: string; previous: "empty" | "configured" };
 
-function ByokRow({ providerId: providerId }: { providerId: ByokProviderId }) {
+function ByokRow({ providerId }: { providerId: ByokProviderId }) {
   const label = BYOK_PROVIDER_LABELS[providerId];
   const [state, setState] = useState<RowState>({ kind: "loading" });
   const [value, setValue] = useState("");

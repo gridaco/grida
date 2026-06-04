@@ -42,7 +42,7 @@ import {
 
 export function FileContextMenu({
   workspace,
-  relPath: relPath,
+  relPath,
   isDirectory = false,
   onTrashed,
   children,

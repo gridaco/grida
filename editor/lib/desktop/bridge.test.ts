@@ -49,7 +49,7 @@ describe("desktop bridge client contract", () => {
   });
 
   it("rejects empty keys before calling the bridge", async () => {
-    const set = vi.fn();
+    const set = vi.fn<DesktopBridge["secrets"]["set"]>();
     installBridge({
       grida: {
         protocol: DESKTOP_BRIDGE_PROTOCOL,
@@ -64,7 +64,9 @@ describe("desktop bridge client contract", () => {
   });
 
   it("confirms deletes through the destructive native dialog", async () => {
-    const confirm = vi.fn().mockResolvedValue(0);
+    const confirm = vi
+      .fn<DesktopBridge["dialog"]["confirm"]>()
+      .mockResolvedValue(0);
     installBridge({
       grida: {
         protocol: DESKTOP_BRIDGE_PROTOCOL,
@@ -78,8 +80,8 @@ describe("desktop bridge client contract", () => {
       detail:
         "The desktop app will stop using this key. You can add it back any time.",
       buttons: ["Remove", "Cancel"],
-      defaultId: 1,
-      cancelId: 1,
+      default_id: 1,
+      cancel_id: 1,
     });
   });
 

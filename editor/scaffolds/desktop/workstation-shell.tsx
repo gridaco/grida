@@ -77,7 +77,7 @@ const NO_DOCUMENT_MESSAGE =
  *   - track dirty by comparing the editor's `content_version` against
  *     the value at last save
  */
-export function WorkstationShell({ docId: docId }: { docId?: string }) {
+export function WorkstationShell({ docId }: { docId?: string }) {
   const bridge = useDesktopBridge();
   const [loadState, setLoadState] = useState<LoadState>({
     kind: "initializing",
@@ -155,9 +155,9 @@ function ShellSkeleton({ message }: { message: string }) {
  * provider, so the load-state branch above can't do it directly.
  */
 function ShellChrome({
-  docId: docId,
+  docId,
   filename,
-  displayPath: displayPath,
+  displayPath,
 }: {
   docId: string;
   filename: string;

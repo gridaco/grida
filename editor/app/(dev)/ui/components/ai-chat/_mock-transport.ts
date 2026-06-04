@@ -75,14 +75,7 @@ export type ToolCallSpec = {
 };
 
 export function toolCall(spec: ToolCallSpec): UIMessageChunk[] {
-  const {
-    toolCallId: toolCallId,
-    toolName: toolName,
-    input,
-    output,
-    errorText: errorText,
-    denied,
-  } = spec;
+  const { toolCallId, toolName, input, output, errorText, denied } = spec;
   const state = spec.state ?? "output-available";
 
   const chunks: UIMessageChunk[] = [

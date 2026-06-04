@@ -226,7 +226,7 @@ function TabStrip({
 
 function TabItem({
   workspace,
-  relPath: relPath,
+  relPath,
   active,
   dirty,
   icon,

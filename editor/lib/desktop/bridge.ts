@@ -277,7 +277,7 @@ export namespace secrets {
    * settings page never needs to import the raw bridge — keeping the
    * GRIDA-SEC-004 surface visible at the import sites.
    *
-   * Buttons are ordered `[remove, cancel]` so `defaultId: 1` (cancel)
+   * Buttons are ordered `[remove, cancel]` so `default_id: 1` (cancel)
    * matches platform convention for destructive prompts.
    */
   export async function confirmDeleteKey(

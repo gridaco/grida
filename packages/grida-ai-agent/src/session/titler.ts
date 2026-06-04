@@ -8,7 +8,7 @@
 
 import { generateText } from "ai";
 import type { ModelFactory } from "../agent";
-import { type SessionsStore } from "./store";
+import type { SessionsStore } from "./store";
 import { session_title } from "./title";
 
 const MAX_TITLE_LEN = 60;

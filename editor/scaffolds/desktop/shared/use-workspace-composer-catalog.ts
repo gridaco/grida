@@ -67,7 +67,7 @@ async function walkFiles(workspaceId: string): Promise<ComposerMention[]> {
     { relPath: "", depth: 0 },
   ];
   while (queue.length > 0 && out.length < MAX_FILES) {
-    const { relPath: relPath, depth } = queue.shift()!;
+    const { relPath, depth } = queue.shift()!;
     let entries;
     try {
       entries = await bridgeWorkspaces.readdir(workspaceId, relPath);

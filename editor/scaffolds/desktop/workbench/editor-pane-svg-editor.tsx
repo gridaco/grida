@@ -33,8 +33,8 @@ type LoadState =
   | { kind: "error"; message: string };
 
 export function EditorPaneSvgEditor({
-  workspaceId: workspaceId,
-  relPath: relPath,
+  workspaceId,
+  relPath,
   active,
   onDirtyChange,
   onSaved,
@@ -103,8 +103,8 @@ export function EditorPaneSvgEditor({
 /** Canvas + Cmd+S + dirty badge. Must live inside `SvgEditorProvider`
  * (the `useSvgEditor` / `useEditorState` hooks throw outside it). */
 function Surface({
-  workspaceId: workspaceId,
-  relPath: relPath,
+  workspaceId,
+  relPath,
   active,
   onDirtyChange,
   onSaved,
