@@ -78,7 +78,7 @@ These are silent footguns. Pinned, do not change without a plan:
 - **`appBundleId: "co.grida.desktop"`** in `forge.config.ts`. Changing it strands every installed user (Squirrel won't apply updates across bundle-id boundaries). Insiders use `co.grida.insiders` — separate track on purpose.
 - **Plain semver tags.** `update.electronjs.org` skips tags that don't pass `semver.valid()`. No `desktop-v…` or other prefixes.
 - **`hardenedRuntime: true`** in `osxSign.optionsForFile`. Required for notarization; required for the entitlements plist to apply.
-- **`onlyBuiltDependencies` in `pnpm-workspace.yaml`** (not `package.json`). pnpm 10 silently disables native module builds without it; in pnpm 10, when both files exist, only the workspace file's list is consulted. Removing it breaks the DMG maker (`Cannot find module '../build/Release/volume.node'`).
+- **`allowBuilds` in `pnpm-workspace.yaml`** (not `package.json`). pnpm 11 replaced the old `onlyBuiltDependencies` list with the `allowBuilds` map and ignores the `pnpm` field in `package.json` entirely. The native deps (`electron`, `electron-winstaller`, `fs-xattr`, `macos-alias`) must be set to `true` so their install scripts run; pnpm otherwise silently disables native module builds. Removing them breaks the DMG maker (`Cannot find module '../build/Release/volume.node'`).
 
 ---
 

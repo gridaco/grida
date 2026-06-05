@@ -1,7 +1,21 @@
 packages:
   - .
-onlyBuiltDependencies:
-  - electron
-  - electron-winstaller
-  - fs-xattr
-  - macos-alias
+# electron-forge requires a hoisted node_modules layout (forge.config.ts relies on
+# prod deps being real dirs at the top level). pnpm 11 no longer reads `node-linker`
+# from .npmrc — pnpm-specific settings must live here. Was: desktop/.npmrc.
+nodeLinker: hoisted
+# pnpm 11 replaced onlyBuiltDependencies with the allowBuilds map. These native
+# deps must run their install scripts (e.g. electron downloads its binary).
+# strictDepBuilds: false keeps all other (unlisted) build scripts as warnings,
+# matching the pnpm 10 onlyBuiltDependencies whitelist behavior.
+strictDepBuilds: false
+allowBuilds:
+  electron: true
+  electron-winstaller: true
+  fs-xattr: true
+  macos-alias: true
+overrides:
+  "@grida/agent": "link:../packages/grida-ai-agent"
+  "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge"
+  "@grida/ai-models": "link:../packages/grida-ai-models"
+  "@grida/home": "link:../packages/grida-home"
