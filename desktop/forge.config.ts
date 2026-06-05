@@ -11,6 +11,7 @@ import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import * as dotenv from "dotenv";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 
 // cli flags
@@ -58,6 +59,42 @@ const osxNotarize =
       }
     : undefined;
 
+// ───────────────────────────────────────────────────────────────────────────
+// GRIDA-DESKTOP-BUILD-GUARD — ship the runtime-external dependencies.
+//
+// The Vite plugin bundles main/preload/sidecar and, by default, sets
+// `packagerConfig.ignore` to drop everything except `.vite` — so NO
+// node_modules ships, and anything the bundles leave `external` crashes the app
+// on launch with "Cannot find module" (0.0.3: @grida/desktop-bridge; 0.0.4:
+// @anthropic-ai/sandbox-runtime). This is a known forge bug
+// (electron/forge#3738, #3917, #4045).
+//
+// Idiomatic fix: package.json `dependencies` are EXACTLY the modules left
+// `external` in vite.*.config.ts; everything bundled lives in devDependencies.
+// electron-packager's `prune` (default) then ships exactly the production
+// dependency closure — no hand-rolled walker. We only override `ignore` to undo
+// the Vite plugin's node_modules strip. scripts/verify-packaged-bundle.mjs (the
+// postPackage hook) fails the build if any external is still missing, so a
+// misclassified dependency can't ship.
+//
+// `@grida/*` are bundled (devDependencies, never external — enforced by
+// vite.guards.ts); keeping them out of `dependencies` also keeps their `link:`
+// symlinks out of the pruner's path.
+function packageIgnore(file: string): boolean {
+  if (!file) return false; // app root
+  if (file === "/package.json") return false;
+  if (file.startsWith("/.vite")) return false;
+  // `@grida/*` are bundled (devDependencies); their node_modules entries are
+  // `link:` symlinks to ../../packages that point out of the package and make
+  // asar fail ("links out of the package"). Exclude them explicitly.
+  if (file.startsWith("/node_modules/@grida")) return true;
+  // pnpm internals (.pnpm store, .bin shims, lockfile metadata) — not needed at
+  // runtime; the hoisted prod deps are real dirs at the top level.
+  if (file.startsWith("/node_modules/.")) return true;
+  if (file.startsWith("/node_modules")) return false; // pruner keeps only prod deps
+  return true; // src, tsconfig, configs — Vite already bundled what's needed
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     extraResource: [
@@ -66,7 +103,16 @@ const config: ForgeConfig = {
     ],
     name: productName,
     executableName: "desktop",
-    asar: true,
+    // Undo the Vite plugin's node_modules strip so the production deps
+    // (package.json `dependencies` = the vite externals) ship; `prune` then
+    // keeps just those. See GRIDA-DESKTOP-BUILD-GUARD above.
+    ignore: packageIgnore,
+    // @anthropic-ai/sandbox-runtime ships executable vendored binaries
+    // (vendor/seccomp/*/apply-seccomp) that cannot run from inside an asar —
+    // unpack it so they land on a real filesystem.
+    asar: {
+      unpack: "**/node_modules/@anthropic-ai/sandbox-runtime/**",
+    },
     appBundleId: appBundleId,
     icon: icon,
     osxSign,
@@ -84,7 +130,25 @@ const config: ForgeConfig = {
     appCategoryType: "public.app-category.developer-tools",
   },
   rebuildConfig: {},
-  hooks: {},
+  hooks: {
+    // GRIDA-DESKTOP-BUILD-GUARD — after packaging, verify every externalized
+    // require (and its full transitive closure) actually resolves in the
+    // packaged app. A missing dependency fails the build HERE instead of
+    // crashing on a user's machine with "Cannot find module". Runs on
+    // package / make / publish, locally and in CI.
+    postPackage: async (_forgeConfig, { outputPaths }) => {
+      const script = path.join(
+        __dirname,
+        "scripts",
+        "verify-packaged-bundle.mjs"
+      );
+      for (const outputPath of outputPaths) {
+        execFileSync(process.execPath, [script, outputPath], {
+          stdio: "inherit",
+        });
+      }
+    },
+  },
   makers: [
     new MakerSquirrel((arch) => {
       const version = process.env.npm_package_version;
