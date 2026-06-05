@@ -53,7 +53,7 @@ To promote a prerelease to stable: edit the GitHub Release in the UI and uncheck
 | Build + signing config        | [`desktop/forge.config.ts`](https://github.com/gridaco/grida/blob/main/desktop/forge.config.ts)                                       |
 | Hardened-runtime entitlements | [`desktop/build/entitlements.mac.plist`](https://github.com/gridaco/grida/blob/main/desktop/build/entitlements.mac.plist)             |
 | In-app updater wiring         | [`desktop/src/main.ts`](https://github.com/gridaco/grida/blob/main/desktop/src/main.ts) — `updateElectronApp({ notifyUser: true })`   |
-| pnpm native-module allowlist  | [`desktop/pnpm-workspace.yaml`](https://github.com/gridaco/grida/blob/main/desktop/pnpm-workspace.yaml) — `onlyBuiltDependencies`     |
+| pnpm native-module allowlist  | [`desktop/pnpm-workspace.yaml`](https://github.com/gridaco/grida/blob/main/desktop/pnpm-workspace.yaml) — `allowBuilds`               |
 | Apple secrets                 | `release` environment on `gridaco/grida` — `gh secret list --env release --repo gridaco/grida`                                        |
 
 Secrets (all 6 env-scoped, not repo-wide):
@@ -91,7 +91,7 @@ These are silent footguns. Pinned, do not change without a plan:
 3. No asset matching `<platform>-<arch>` (e.g. `darwin-arm64`) on the release. Check artifact filenames in forge `makers` config.
 
 **Workflow logs: `Cannot find module '../build/Release/volume.node'`**
-`onlyBuiltDependencies` is missing or in the wrong file. Must be in `desktop/pnpm-workspace.yaml`, not `desktop/package.json`. See [Hard constraints](#hard-constraints).
+The native dep is missing from `allowBuilds` (or set to `false`), or the config is in the wrong file. The `allowBuilds` map must be in `desktop/pnpm-workspace.yaml`, not `desktop/package.json` (pnpm 11 ignores the `pnpm` field in `package.json`). See [Hard constraints](#hard-constraints).
 
 **Workflow logs: `Error parsing workflow file ... HTTP 422` on `workflow_dispatch`.**
 A step `if:` references `${{ secrets.* }}` directly — not allowed. Map secrets to job-level `env:` booleans (`HAS_SIGNING: ${{ secrets.APPLE_CERTIFICATE_P12 != '' }}`) and gate on `env.HAS_SIGNING == 'true'`.
