@@ -1,0 +1,69 @@
+permissions:
+  contents: read
+
+name: Verify Desktop Package
+
+# Proves the desktop app PACKAGES correctly on every OS — i.e. the bundles'
+# externalized dependencies are actually shipped — without publishing. The
+# `electron-forge package` step runs the GRIDA-DESKTOP-BUILD-GUARD oracle
+# (desktop/scripts/verify-packaged-bundle.mjs, a postPackage hook) which fails
+# the build if the packaged app would crash on launch with "Cannot find module"
+# or ship packages outside the runtime closure. No signing/secrets required.
+on:
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "packages/grida-ai-agent/**"
+      - "packages/grida-ai-models/**"
+      - "packages/grida-desktop-bridge/**"
+      - "packages/grida-home/**"
+      - ".github/workflows/verify-desktop-package.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ./desktop
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build linked workspace packages
+        # The desktop bundles several @grida/* workspace packages whose dist/ is
+        # gitignored; build their closure from the repo root so the Vite build
+        # can resolve them. `shell: bash` so the `\` continuations work on the
+        # Windows runner (default shell is PowerShell). Mirrors the publish
+        # workflow's step.
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm turbo run build \
+            --filter=@grida/desktop-bridge \
+            --filter=@grida/agent \
+            --filter=@grida/ai-models \
+            --filter=@grida/home
+
+      - name: Package (runs the GRIDA-DESKTOP-BUILD-GUARD oracle)
+        # `electron-forge package` produces the unsigned .app/.exe + app.asar and
+        # runs the postPackage oracle. No makers, no publish, no secrets.
+        run: pnpm exec electron-forge package

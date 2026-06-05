@@ -20,28 +20,18 @@
     "publish:prerelease": "node scripts/prepare-dev-electron-branding.mjs && electron-forge publish",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:package": "node scripts/verify-packaged-bundle.mjs"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "3.0.66",
-    "@ai-sdk/openai-compatible": "2.0.47",
     "@anthropic-ai/sandbox-runtime": "^0.0.52",
-    "@grida/agent": "link:../packages/grida-ai-agent",
-    "@grida/ai-models": "link:../packages/grida-ai-models",
-    "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge",
-    "@grida/home": "link:../packages/grida-home",
     "@hono/node-server": "^1.13.7",
-    "ai": "6.0.116",
-    "clsx": "^2.1.1",
-    "electron-squirrel-startup": "^1.0.1",
     "hono": "^4.6.14",
-    "react": "19.2.5",
-    "react-dom": "19.2.5",
-    "tailwind-merge": "^3.5.0",
-    "undici": "^7.24.4",
-    "update-electron-app": "^3.2.0"
+    "undici": "^7.24.4"
   },
   "devDependencies": {
+    "@ai-sdk/gateway": "3.0.66",
+    "@ai-sdk/openai-compatible": "2.0.47",
     "@electron-forge/cli": "^7.11.1",
     "@electron-forge/maker-deb": "^7.11.1",
     "@electron-forge/maker-dmg": "^7.11.1",
@@ -54,16 +44,27 @@
     "@electron-forge/publisher-github": "^7.11.1",
     "@electron-forge/shared-types": "^7.11.1",
     "@electron/fuses": "^1.8.0",
+    "@grida/agent": "link:../packages/grida-ai-agent",
+    "@grida/ai-models": "link:../packages/grida-ai-models",
+    "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge",
+    "@grida/home": "link:../packages/grida-home",
     "@tailwindcss/vite": "^4.2.2",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.2",
+    "ai": "6.0.116",
+    "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
     "electron": "^42.2.0",
+    "electron-squirrel-startup": "^1.0.1",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
     "ts-node": "^10.0.0",
     "typescript": "^6",
+    "update-electron-app": "^3.2.0",
     "vite": "^8.0.13",
     "vitest": "^4"
   },
@@ -75,5 +76,6 @@
       "@grida/ai-models": "link:../packages/grida-ai-models",
       "@grida/home": "link:../packages/grida-home"
     }
-  }
+  },
+  "comment:dependencies": "Runtime deps that MUST ship on disk in the packaged app — i.e. the modules left `external` in vite.*.config.ts (everything else is bundled into .vite and belongs in devDependencies). electron-packager's prune ships exactly this set; scripts/verify-packaged-bundle.mjs enforces it. See GRIDA-DESKTOP-BUILD-GUARD in forge.config.ts."
 }
