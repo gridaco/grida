@@ -68,14 +68,6 @@
     "vite": "^8.0.13",
     "vitest": "^4"
   },
-  "packageManager": "pnpm@10.24.0",
-  "pnpm": {
-    "overrides": {
-      "@grida/agent": "link:../packages/grida-ai-agent",
-      "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge",
-      "@grida/ai-models": "link:../packages/grida-ai-models",
-      "@grida/home": "link:../packages/grida-home"
-    }
-  },
+  "packageManager": "pnpm@11.5.2",
   "comment:dependencies": "Runtime deps that MUST ship on disk in the packaged app — i.e. the modules left `external` in vite.*.config.ts (everything else is bundled into .vite and belongs in devDependencies). electron-packager's prune ships exactly this set; scripts/verify-packaged-bundle.mjs enforces it. See GRIDA-DESKTOP-BUILD-GUARD in forge.config.ts."
 }

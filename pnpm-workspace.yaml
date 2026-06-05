@@ -6,3 +6,33 @@ packages:
   - "packages/*"
   - "packages/lib/*"
   - "services/*"
+# pnpm 11 errors on un-approved dependency build scripts by default
+# (strictDepBuilds). pnpm 10 only warned and ran none of them for this workspace,
+# so we keep that behavior. strictDepBuilds: false avoids failing CI when a new
+# dependency ships a build script; the explicit allowBuilds entries below record
+# the reviewed decision (all skipped, as under pnpm 10). Flip one to `true` to opt in.
+strictDepBuilds: false
+allowBuilds:
+  "@sentry/cli": false
+  canvas: false
+  core-js: false
+  core-js-pure: false
+  esbuild: false
+  lefthook: false
+  msw: false
+  sharp: false
+  workerd: false
+overrides:
+  "@types/react": "19.1.3"
+  "@types/react-dom": "19.1.3"
+  tsx: "4.21.0"
+  typescript: "6.0.3"
+  axios: "1.16.1"
+  prosemirror-model: "1.23.0"
+  prosemirror-view: "1.36.0"
+  next: "16.2.6"
+  "@next/mdx": "16.2.6"
+  "@next/third-parties": "16.2.6"
+  openai: "6.18.0"
+  react: "19.2.5"
+  react-dom: "19.2.5"
