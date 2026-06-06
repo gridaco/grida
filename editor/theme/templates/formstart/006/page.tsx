@@ -40,7 +40,7 @@ function Consumer() {
     <ScreenRoot>
       <ScreenMobileFrame>
         <Header>
-          <LeviLogo className="fill-[#C41230]" />
+          <LeviLogo className="text-[#C41230]" />
         </Header>
         <ScreenGrid columns={8} rows={16}>
           <ScreenGridPosition col={1} row={11}>

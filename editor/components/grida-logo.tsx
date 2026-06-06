@@ -1,4 +1,5 @@
 import { GridaLogo as GridaLogoIcon } from "@grida/react-icons/logos";
+import { cn } from "@app/ui/lib/utils";
 
 /**
  * Editor adapter for the theme-free package logo. The package icon fills with
@@ -13,9 +14,6 @@ export const GridaLogo = ({
   size?: number;
 }) => {
   return (
-    <GridaLogoIcon
-      size={size}
-      className={["fill-foreground", className].filter(Boolean).join(" ")}
-    />
+    <GridaLogoIcon size={size} className={cn("fill-foreground", className)} />
   );
 };

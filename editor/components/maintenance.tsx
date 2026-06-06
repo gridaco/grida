@@ -52,7 +52,11 @@ export default function Maintenance() {
         <Link href="https://instagram.com/grida.co" target="_blank">
           <InstagramLogoIcon className="size-4" />
         </Link>
-        <Link href="https://grida.co/join-slack" target="_blank">
+        <Link
+          href="https://grida.co/join-slack"
+          target="_blank"
+          aria-label="Join Grida on Slack"
+        >
           <SlackLogo className="size-4" />
         </Link>
         <Link href="https://github.com/gridaco" target="_blank">

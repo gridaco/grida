@@ -4,9 +4,8 @@
  */
 export default function PauseFilledRoundedIcon({
   className,
-}: {
-  className?: string;
-}) {
+  ...props
+}: React.ComponentProps<"svg">) {
   return (
     <svg
       height={24}
@@ -15,6 +14,7 @@ export default function PauseFilledRoundedIcon({
       viewBox="0 0 47.607 47.607"
       fill="currentColor"
       className={className}
+      {...props}
     >
       <g>
         <path d="M17.991,40.976c0,3.662-2.969,6.631-6.631,6.631l0,0c-3.662,0-6.631-2.969-6.631-6.631V6.631C4.729,2.969,7.698,0,11.36,0l0,0c3.662,0,6.631,2.969,6.631,6.631V40.976z" />

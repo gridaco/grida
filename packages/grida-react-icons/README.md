@@ -222,7 +222,7 @@ conform yet, and is being reconciled:
 
 ## Layout
 
-```
+```text
 index.ts     root → core editor / graphics-design icons   import "@grida/react-icons"
 logos.ts     →  src/logos                                  import "@grida/react-icons/logos"
 src/

@@ -336,7 +336,7 @@ export default function UIIconsPage() {
 
       <Section
         title="Paint"
-        description="Paint & gradient-type swatches — shape only (currentColor; the editor wraps them to add the border, theme, and active state). Sweep approximates the SVG-less conic with a 24-wedge stepped pie. Shown here raw (foreground), as the package ships them."
+        description="Paint & gradient-type swatches — shape only (currentColor; the editor wraps them to add the border, theme, and active state). Sweep approximates the SVG-less conic with a 24-wedge stepped pie. Shown here in the muted tone (the package ships them as agnostic currentColor shapes)."
       >
         <IconGrid entries={PAINT} />
       </Section>
