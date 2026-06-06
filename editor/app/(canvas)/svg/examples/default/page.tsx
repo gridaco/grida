@@ -3,15 +3,18 @@
 import { useState, useSyncExternalStore } from "react";
 import { SvgEditorCanvas, useEditorLoad } from "@grida/svg-editor/react";
 import type { DomSurfaceHandle } from "@grida/svg-editor/dom";
-import { SvgShell } from "./_components/svg-shell";
-import { SvgToolbar } from "./_components/svg-toolbar";
-import { PathToolbar, PathToolbarPosition } from "./_components/path-toolbar";
-import { DocsNav } from "./_components/docs-nav";
-import SAMPLE_SVG from "./_fixtures/simple";
-import { SvgRouteShell, useSvgDocStore } from "./_storage";
-import { useSvgAgentHydrated } from "./_ai/provider";
+import { SvgShell } from "../../_components/svg-shell";
+import { SvgToolbar } from "../../_components/svg-toolbar";
+import {
+  PathToolbar,
+  PathToolbarPosition,
+} from "../../_components/path-toolbar";
+import { DocsNav } from "../../_components/docs-nav";
+import SAMPLE_SVG from "../../_fixtures/artwork";
+import { SvgRouteShell, useSvgDocStore } from "../../_storage";
+import { useSvgAgentHydrated } from "../../_ai/provider";
 
-const OPFS_BASE = ["grida-svg-demo", "v2", "default"] as const;
+const OPFS_BASE = ["grida-svg-demo", "v3", "default"] as const;
 
 export default function SvgEditorDevPage() {
   return (

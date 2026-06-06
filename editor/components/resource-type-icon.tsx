@@ -30,6 +30,8 @@ import {
   LockKeyholeIcon,
   BookUserIcon,
   GlobeIcon,
+  PaletteIcon,
+  BoxSelectIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "./logos";
 
@@ -69,6 +71,8 @@ export type ResourceTypeIconName =
   | "v0_form"
   | "v0_site"
   | "v0_canvas"
+  | "palette"
+  | "vector-square"
   | "v0_schema"
   | "v0_campaign_referral"
   | "slides";
@@ -132,6 +136,10 @@ export function ResourceTypeIcon({
       return <AppWindowIcon {...props} />;
     case "v0_canvas":
       return <PenToolIcon {...props} />;
+    case "palette":
+      return <PaletteIcon {...props} />;
+    case "vector-square":
+      return <BoxSelectIcon {...props} />;
     case "slides":
       return <PresentationIcon {...props} />;
     case "form-x-supabase":

@@ -94,7 +94,7 @@ export function SvgMenuContent({
           Examples
         </DropdownMenuSubTrigger>
         <DropdownMenuSubContent className="min-w-40">
-          <Link href="/svg">
+          <Link href="/svg/examples/default">
             <DropdownMenuItem className="text-xs">
               <OpenInNewWindowIcon className="size-3.5" />
               Free-form
