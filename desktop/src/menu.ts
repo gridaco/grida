@@ -45,9 +45,16 @@ async function open_folder_picker_and_register(app: App): Promise<void> {
   const agentSidecar = getAgentSidecarInfo();
   if (!agentSidecar) return; // pre-ready / between restarts
   const focused = BrowserWindow.getFocusedWindow() ?? undefined;
+  // `createDirectory` surfaces the macOS "New Folder" button so users can
+  // scaffold a fresh workspace folder from within the picker. macOS-only;
+  // safely ignored on Windows/Linux.
   const result = focused
-    ? await dialog.showOpenDialog(focused, { properties: ["openDirectory"] })
-    : await dialog.showOpenDialog({ properties: ["openDirectory"] });
+    ? await dialog.showOpenDialog(focused, {
+        properties: ["openDirectory", "createDirectory"],
+      })
+    : await dialog.showOpenDialog({
+        properties: ["openDirectory", "createDirectory"],
+      });
   if (result.canceled || result.filePaths.length === 0) return;
   let workspaceId: string;
   try {
