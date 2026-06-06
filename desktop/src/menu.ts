@@ -46,8 +46,12 @@ async function open_folder_picker_and_register(app: App): Promise<void> {
   if (!agentSidecar) return; // pre-ready / between restarts
   const focused = BrowserWindow.getFocusedWindow() ?? undefined;
   const result = focused
-    ? await dialog.showOpenDialog(focused, { properties: ["openDirectory"] })
-    : await dialog.showOpenDialog({ properties: ["openDirectory"] });
+    ? await dialog.showOpenDialog(focused, {
+        properties: ["openDirectory", "createDirectory"],
+      })
+    : await dialog.showOpenDialog({
+        properties: ["openDirectory", "createDirectory"],
+      });
   if (result.canceled || result.filePaths.length === 0) return;
   let workspaceId: string;
   try {

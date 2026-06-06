@@ -69,7 +69,9 @@ export type FileFilter = { name: string; extensions: string[] };
 export type OpenDialogOptions = {
   default_path?: string;
   filters?: FileFilter[];
-  properties?: Array<"openFile" | "openDirectory" | "multiSelections">;
+  properties?: Array<
+    "openFile" | "openDirectory" | "multiSelections" | "createDirectory"
+  >;
 };
 
 export type SaveDialogOptions = {

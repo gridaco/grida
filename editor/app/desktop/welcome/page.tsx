@@ -115,7 +115,9 @@ export default function DesktopWelcomePage() {
     try {
       setBusy(true);
       setError(null);
-      const paths = await bridge.dialog.open({ properties: ["openDirectory"] });
+      const paths = await bridge.dialog.open({
+        properties: ["openDirectory", "createDirectory"],
+      });
       if (!paths || paths.length === 0) return;
       const ws = await workspacesNs.openFolder(paths[0]);
       await refreshWorkspaces();
