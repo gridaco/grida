@@ -28,6 +28,7 @@
 
 import { createAgentUIStreamResponse } from "ai";
 import { createAgent, type AgentMessage, type SkillId } from "../agent";
+import type { MessageUsage } from "../session/rows";
 import type { AgentModelId } from "../protocol/run";
 import { AGENT_DEFAULT_TIER, type ModelTier } from "../tiers";
 import type { ResolvedProvider } from "../providers";
@@ -101,6 +102,37 @@ export type AgentStepUsage = {
 };
 
 /**
+ * The camelCase shape the AI SDK actually hands `onStepFinish`
+ * (`LanguageModelUsage`, projected to the fields we persist). Declared
+ * locally so the snake_case→camelCase mapping in {@link runAgent} is
+ * type-checked rather than asserted — the original `as AgentStepUsage`
+ * cast type-checked but never matched the runtime keys.
+ */
+type SdkStepUsage = {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  cachedInputTokens?: number;
+};
+
+/**
+ * Project the SDK's camelCase usage onto the snake_case {@link MessageUsage}
+ * we persist + stream, applying the same cache-normalization as the
+ * recorder's `accumulateUsage`: the SDK's `inputTokens` already INCLUDES
+ * cache reads, so subtract them so `input` + `cache_read` don't double-count.
+ */
+function toMessageUsage(u: SdkStepUsage): MessageUsage {
+  const cacheRead = u.cachedInputTokens ?? 0;
+  return {
+    input: Math.max(0, (u.inputTokens ?? 0) - cacheRead),
+    output: u.outputTokens ?? 0,
+    reasoning: u.reasoningTokens ?? 0,
+    cache_read: cacheRead,
+  };
+}
+
+/**
  * Run the agent locally and return the standard AI SDK UI-message SSE
  * response. When `req.workspaceRoot` is set, the agent gets fs +
  * command bindings and resolves tool calls in-process.
@@ -143,11 +175,35 @@ export async function runAgent(
       transaction_id: req.run_id,
     },
     abortSignal: req.signal,
+    // Stream the turn's usage as message metadata so the LIVE assistant
+    // message the renderer holds carries it — the context meter reads
+    // `metadata.usage` off `useChat` messages, and nothing rehydrates from
+    // the DB after a normal turn. Mirrors the canvas route; shape matches
+    // what `setLatestAssistantUsage` writes to the row so live and
+    // post-reload agree.
+    messageMetadata: ({ part }) =>
+      part.type === "finish"
+        ? { usage: toMessageUsage(part.totalUsage) }
+        : undefined,
     onStepFinish: req.on_step_usage
       ? (step) => {
           try {
-            const u = (step as { usage?: AgentStepUsage }).usage;
-            if (u) req.on_step_usage!(u);
+            // The AI SDK reports `step.usage` in **camelCase**
+            // (`LanguageModelUsage`: `inputTokens`, `outputTokens`, …);
+            // our persistence projection is snake_case. Map explicitly —
+            // a bare `as AgentStepUsage` cast compiles but reads
+            // `undefined` for every field at runtime, silently zeroing all
+            // recorded usage (no rollups, no cost, no context meter).
+            const u = (step as { usage?: SdkStepUsage }).usage;
+            if (u) {
+              req.on_step_usage!({
+                input_tokens: u.inputTokens,
+                output_tokens: u.outputTokens,
+                total_tokens: u.totalTokens,
+                reasoning_tokens: u.reasoningTokens,
+                cached_input_tokens: u.cachedInputTokens,
+              });
+            }
           } catch {
             // never break the stream on a usage hook bug
           }
