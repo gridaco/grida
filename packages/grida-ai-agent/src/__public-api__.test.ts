@@ -100,14 +100,14 @@ describe("@grida/agent public API", () => {
     });
 
     it("exposes BYOK provider identity, wire vocab, tiers, and session-row types", () => {
-      expect(BYOK_PROVIDER_IDS).toEqual(["openrouter", "ai-gateway"]);
+      expect(BYOK_PROVIDER_IDS).toEqual(["openrouter", "vercel"]);
       expect(BYOK_PROVIDER_METADATA.map((provider) => provider.label)).toEqual([
         "OpenRouter",
-        "AI Gateway",
+        "Vercel",
       ]);
-      const byok: ByokProviderId = "ai-gateway";
+      const byok: ByokProviderId = "vercel";
       const metadata: ByokProviderMetadata = BYOK_PROVIDER_METADATA[0];
-      expect(byok).toBe("ai-gateway");
+      expect(byok).toBe("vercel");
       expect(metadata.id).toBe("openrouter");
 
       // Tier constants.

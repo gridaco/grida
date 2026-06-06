@@ -12,7 +12,7 @@
  *
  * Allowed provider ids — a closed set:
  *   - `openrouter`
- *   - `ai-gateway`
+ *   - `vercel`
  *
  * Any other id is rejected with a 400 so a typo doesn't silently create a
  * never-used auth.json entry.

@@ -122,7 +122,7 @@ There is intentionally no `/secrets/get`, no `/auth/*`, and no
 V1 provider resolution is BYOK-only:
 
 1. `openrouter`
-2. `ai-gateway`
+2. `vercel`
 3. unavailable (`provider_down`)
 
 `AgentRunOptions.providerId` accepts only `ByokProviderId`. The package root
@@ -215,8 +215,8 @@ describe("handshake", () => {
 });
 
 describe("provider resolution", () => {
-  it("prefers OpenRouter BYOK over AI Gateway BYOK");
-  it("falls back to AI Gateway BYOK");
+  it("prefers OpenRouter BYOK over Vercel BYOK");
+  it("falls back to Vercel BYOK");
   it("throws provider_down when no BYOK key is present");
   it("validates explicit BYOK provider ids");
 });

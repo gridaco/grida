@@ -1,7 +1,7 @@
 import models, { TIER_MODEL_IDS } from "..";
 
 describe("models.image.findImageModelCard", () => {
-  it("resolves a full gateway id", () => {
+  it("resolves a full vercel id", () => {
     const card = models.image.findImageModelCard("bfl/flux-pro-1.1");
     expect(card?.id).toBe("bfl/flux-pro-1.1");
     expect(card?.label).toBe("Flux Pro 1.1");
@@ -9,7 +9,7 @@ describe("models.image.findImageModelCard", () => {
 
   it("resolves the deprecated ProviderModel wrapper", () => {
     const card = models.image.findImageModelCard({
-      provider: "gateway",
+      provider: "vercel",
       modelId: "bfl/flux-2-pro",
     });
     expect(card?.id).toBe("bfl/flux-2-pro");

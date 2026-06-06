@@ -40,7 +40,7 @@ export type AgentHostSandboxPolicy = {
 
 const BYOK_PROVIDER_NETWORK_HOSTS = {
   openrouter: ["openrouter.ai"],
-  "ai-gateway": ["ai-gateway.vercel.sh", "*.vercel-ai.com"],
+  vercel: ["ai-gateway.vercel.sh", "*.vercel-ai.com"],
 } as const satisfies Record<ByokProviderId, readonly string[]>;
 
 const ALWAYS_ALLOWED_HOSTS: readonly string[] = Object.values(

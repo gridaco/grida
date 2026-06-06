@@ -101,7 +101,7 @@ export const gateway = createGateway({
 // active only when a key env var is a non-empty string after trim
 // (whitespace-only secrets fall back to the billed path).
 //
-// Implementations (precedence: OpenRouter first, then AI Gateway). A
+// Implementations (precedence: OpenRouter first, then Vercel). A
 // third BYOK key is a new branch here — no registry.
 // ---------------------------------------------------------------------------
 function resolveByokProvider() {

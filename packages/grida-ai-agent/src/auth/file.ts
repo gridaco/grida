@@ -11,8 +11,8 @@
  *
  *   ```json
  *   {
- *     "openrouter":  { "type": "api", "key": "sk-or-..." },
- *     "ai-gateway":  { "type": "api", "key": "..." }
+ *     "openrouter": { "type": "api", "key": "sk-or-..." },
+ *     "vercel":     { "type": "api", "key": "..." }
  *   }
  *   ```
  *
@@ -97,7 +97,7 @@ export class AuthStore {
    * Serializes `set` / `remove` so two concurrent mutations can't
    * lose-update each other. Both ops follow read-modify-write on a
    * shared file; without this chain a parallel set('openrouter', …)
-   * and set('ai-gateway', …) would both `readAll` the same starting
+   * and set('vercel', …) would both `readAll` the same starting
    * state, both `writeAll`, and the second `rename` wins — silently
    * dropping the first key. The `.catch(() => undefined)` on the
    * chain swallows rejection so a single failed write doesn't strand
