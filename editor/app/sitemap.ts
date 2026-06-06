@@ -65,6 +65,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
+      url: "https://grida.co/svg",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: "https://grida.co/sdk",
       changeFrequency: "monthly",
       priority: 0.5,

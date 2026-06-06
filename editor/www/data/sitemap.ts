@@ -28,6 +28,10 @@ export namespace sitemap {
     forms_ai: "/forms/ai",
     canvas: "/canvas",
     slides: "/canvas/slides",
+    svg: "/svg",
+    svg_editor: "/svg/examples/default",
+    svg_editor_docs: "/packages/@grida/svg-editor",
+    npm_svg_editor: "https://www.npmjs.com/package/@grida/svg-editor",
     west: "/west",
     cookies: "/cookies-policy",
     signin: "/sign-in",
@@ -44,6 +48,7 @@ export namespace sitemap {
     corssh: "https://cors.sh",
     blog: "/blog",
     fonts: "https://fonts.grida.co",
+    icons: "https://icons.grida.co",
     changelog: "https://x.com/univ___erse",
   };
 
@@ -98,7 +103,7 @@ export namespace sitemap {
       description: "Get user responses, Launch MVP",
     } satisfies Item,
     canvas: {
-      icon: "v0_canvas",
+      icon: "palette",
       title: "Canvas",
       href: links.canvas,
       description: "Design Components and Websites",
@@ -108,6 +113,12 @@ export namespace sitemap {
       title: "Slides",
       href: "/slides",
       description: "Presentations on a real canvas",
+    } satisfies Item,
+    svg: {
+      icon: "vector-square",
+      title: "SVG",
+      href: links.svg,
+      description: "The clean SVG editor & SDK",
     } satisfies Item,
     library: {
       icon: "folder",
@@ -119,6 +130,11 @@ export namespace sitemap {
       title: "Fonts",
       href: links.fonts,
       description: "Open fonts for commercial use",
+    } satisfies Item,
+    icons: {
+      title: "Icons",
+      href: links.icons,
+      description: "Open source icons & API",
     } satisfies Item,
     tools: {
       title: "Tools",

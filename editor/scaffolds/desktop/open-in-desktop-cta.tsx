@@ -13,12 +13,12 @@ import { Button } from "@app/ui/components/button";
  */
 export function OpenInDesktopCta({
   surface = "this page",
-  tryWebHref = "/svg",
+  tryWebHref = "/svg/examples/default",
   downloadHref = "/downloads",
 }: {
   /** Human-readable name of the desktop-only surface (e.g. "the SVG workstation"). */
   surface?: string;
-  /** Optional href for "Try the web demo" — defaults to the public `/svg` route. */
+  /** Optional href for "Try the web demo" — defaults to the public `/svg/examples/default` editor demo. */
   tryWebHref?: string | null;
   /** Where the "Download Grida Desktop" button points. */
   downloadHref?: string;

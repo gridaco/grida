@@ -29,7 +29,7 @@ const GITHUB_URL =
 
 // Related demos — the full-editor seams and the sibling package page.
 const RELATED: { href: string; label: string }[] = [
-  { href: "/svg", label: "Full editor" },
+  { href: "/svg/examples/default", label: "Full editor" },
   { href: "/svg/examples/slides", label: "Slides example" },
   { href: "/packages/@grida/hud", label: "@grida/hud" },
 ];
@@ -72,7 +72,10 @@ export default function SvgEditorPackagePage() {
                 it, and the diff is exactly the change you made. The demo below
                 is the whole editor; the cards under it isolate one feature
                 each. For the editor wired into a full product, see the{" "}
-                <Link href="/svg" className="underline underline-offset-4">
+                <Link
+                  href="/svg/examples/default"
+                  className="underline underline-offset-4"
+                >
                   editor seam demo
                 </Link>
                 .

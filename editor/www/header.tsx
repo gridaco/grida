@@ -38,6 +38,7 @@ type Item = {
 const features: Item[] = [
   sitemap.items.canvas,
   sitemap.items.slides,
+  sitemap.items.svg,
   sitemap.items.forms,
   sitemap.items.database,
   // sitemap.items.west,
@@ -46,6 +47,7 @@ const features: Item[] = [
 const resources: Item[] = [
   sitemap.items.library,
   sitemap.items.fonts,
+  sitemap.items.icons,
   sitemap.items.tools,
   sitemap.items.downloads,
   sitemap.items.brand,
