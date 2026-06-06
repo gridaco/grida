@@ -11,8 +11,8 @@ export const BYOK_PROVIDER_METADATA = [
     label: "OpenRouter",
   },
   {
-    id: "ai-gateway",
-    label: "AI Gateway",
+    id: "vercel",
+    label: "Vercel",
   },
 ] as const;
 

@@ -32,7 +32,7 @@ export function makeOpenRouterFactory(apiKey: string): ModelFactory {
   return (tier, modelId) => provider(modelId ?? MODEL_BY_TIER[tier]);
 }
 
-export function makeAiGatewayFactory(apiKey: string): ModelFactory {
+export function makeVercelFactory(apiKey: string): ModelFactory {
   const provider = createGateway({ apiKey });
   return (tier, modelId) => provider(modelId ?? MODEL_BY_TIER[tier]);
 }

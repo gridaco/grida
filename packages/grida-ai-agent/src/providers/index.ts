@@ -8,7 +8,7 @@
  * the factory, so it's cheap on the hot path and easy to test.
  *
  * This is the providers layer, not a generic model-provider router. V1 is
- * BYOK-only: OpenRouter takes precedence over AI Gateway, and a missing
+ * BYOK-only: OpenRouter takes precedence over Vercel, and a missing
  * key throws `ProviderUnavailableError`.
  */
 
@@ -20,7 +20,7 @@ import {
   BYOK_PROVIDER_METADATA,
   type ByokProviderId,
 } from "../protocol/provider-ids";
-import { makeAiGatewayFactory, makeOpenRouterFactory } from "./byok";
+import { makeOpenRouterFactory, makeVercelFactory } from "./byok";
 
 /** Canonical tier->catalog-model map. One table, sourced from @grida/ai-models. */
 export const MODEL_BY_TIER: Record<ModelTier, TierModelId> = TIER_MODEL_IDS;
@@ -98,11 +98,11 @@ function makeResolvedProvider(
         kind: "byok",
         model_factory: makeOpenRouterFactory(key.trim()),
       };
-    case "ai-gateway":
+    case "vercel":
       return {
         provider_id: providerId,
         kind: "byok",
-        model_factory: makeAiGatewayFactory(key.trim()),
+        model_factory: makeVercelFactory(key.trim()),
       };
   }
   const _exhaustive: never = providerId;

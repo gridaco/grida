@@ -15,11 +15,11 @@ function deps(keys: Record<string, string | null> = {}) {
 }
 
 describe("resolveProvider", () => {
-  it("prefers OpenRouter over AI Gateway when both BYOK keys exist", async () => {
+  it("prefers OpenRouter over Vercel when both BYOK keys exist", async () => {
     const provider = await resolveProvider(
       deps({
         openrouter: " sk-or ",
-        "ai-gateway": "ai-gateway-key",
+        vercel: "vercel-key",
       })
     );
 
@@ -28,12 +28,10 @@ describe("resolveProvider", () => {
     expect(provider.model_factory).toBeTypeOf("function");
   });
 
-  it("falls back to AI Gateway when OpenRouter is absent", async () => {
-    const provider = await resolveProvider(
-      deps({ "ai-gateway": "ai-gateway-key" })
-    );
+  it("falls back to Vercel when OpenRouter is absent", async () => {
+    const provider = await resolveProvider(deps({ vercel: "vercel-key" }));
 
-    expect(provider.provider_id).toBe("ai-gateway");
+    expect(provider.provider_id).toBe("vercel");
     expect(provider.kind).toBe("byok");
   });
 
@@ -46,9 +44,9 @@ describe("resolveProvider", () => {
   it("throws when an explicit BYOK provider has no key", async () => {
     await expect(
       resolveProvider(deps({ openrouter: "sk-or" }), {
-        explicit: "ai-gateway",
+        explicit: "vercel",
       })
-    ).rejects.toMatchObject({ provider_id: "ai-gateway" });
+    ).rejects.toMatchObject({ provider_id: "vercel" });
   });
 
   it("BYOK factory honors an explicit modelId over the tier model", async () => {

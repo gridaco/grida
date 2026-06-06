@@ -2,7 +2,7 @@
  * GRIDA-SEC-004 — BYOK secret store.
  *
  * Thin façade over `AuthStore` for the `ApiKeyEntry`-shaped records
- * (`openrouter`, `ai-gateway`). The agent host's `/secrets/*` HTTP routes
+ * (`openrouter`, `vercel`). The agent host's `/secrets/*` HTTP routes
  * call this; the BYOK provider path in `runtime.ts`
  * calls this internally to pull the key when constructing the
  * @ai-sdk client.

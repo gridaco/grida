@@ -26,7 +26,7 @@ BYOK_OPENROUTER_API_KEY=sk-or-v1-...      # https://openrouter.ai/keys
 
 - Bypasses **billing only — never auth.** Still sign in (`insider@grida.co` / `password`); a resolvable org is still required (an unauthenticated request still 401s).
 - **Text/chat only** — BYOK swaps the AI-SDK provider, so only the text path is unbilled. Image/audio go through Replicate (`withTransaction`) and **still gate + bill even under BYOK** — those features need the full billing setup. (OpenRouter also exposes no image/audio models.) Catalog model IDs are unchanged; use IDs your provider accepts (edit `editor/lib/ai/models.ts` locally if one 404s).
-- Precedence if both are set: OpenRouter, then AI Gateway. Fail-closed — an empty/unset (or whitespace-only) key falls back to the billed path.
+- Precedence if both are set: OpenRouter, then Vercel. Fail-closed — an empty/unset (or whitespace-only) key falls back to the billed path.
 - **Never set `BYOK_*` on a hosted or preview deploy.** It disables billing **and** the org-id sanity gate for every org. Contributor / self-host / local only. See [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md) (`GRIDA-SEC-003`, BYOK carve-out).
 
 Working on billing itself? Ignore BYOK and continue with the full setup below.

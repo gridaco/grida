@@ -19,7 +19,7 @@
  * modules — keeping the full `namespace models` declaration in a
  * single source file is the workaround.
  *
- * `provider: "gateway"` and `provider: "replicate"` on the cards are
+ * `provider: "vercel"` and `provider: "replicate"` on the cards are
  * data labels only — see the README for the full contract.
  *
  * @module
@@ -31,11 +31,11 @@ export namespace models {
   // ── Shared discriminators ─────────────────────────────────────────
 
   /**
-   * Routing label for hosted-provider calls. `"gateway"` indicates
-   * the model is served via a hosted AI gateway (e.g. Vercel AI
-   * Gateway); the label is data, not an SDK directive.
+   * Routing label for hosted-provider calls. `"vercel"` indicates
+   * the model is served via the Vercel AI Gateway; the label is
+   * data, not an SDK directive.
    */
-  export type Provider = "gateway";
+  export type Provider = "vercel";
 
   /**
    * Model vendor (the organization that produced the weights).
@@ -226,7 +226,7 @@ export namespace models {
      * a `provider` field on its own.
      */
     export type ProviderModel = {
-      provider: "gateway";
+      provider: "vercel";
       modelId: ImageModelId;
     };
 
@@ -461,7 +461,7 @@ export namespace models {
         short_description:
           "State-of-the-art image generation and editing with flexible resolutions",
         vendor: "openai",
-        provider: "gateway",
+        provider: "vercel",
         speed_label: "medium",
         speed_max: "1m",
         styles: null,
@@ -514,7 +514,7 @@ export namespace models {
         short_description:
           "Previous-generation image model. Superseded by GPT Image 2.",
         vendor: "openai",
-        provider: "gateway",
+        provider: "vercel",
         speed_label: "medium",
         speed_max: "1m",
         styles: null,
@@ -561,7 +561,7 @@ export namespace models {
         deprecated: false,
         short_description: "Cost-efficient image generation model",
         vendor: "openai",
-        provider: "gateway",
+        provider: "vercel",
         speed_label: "slow",
         speed_max: "1m",
         styles: null,
@@ -613,7 +613,7 @@ export namespace models {
         short_description:
           "Fast, efficient multimodal model with native image generation",
         vendor: "google",
-        provider: "gateway",
+        provider: "vercel",
         speed_label: "fast",
         speed_max: "15s",
         styles: null,
@@ -636,7 +636,7 @@ export namespace models {
         short_description:
           "High-quality multimodal model with native image generation",
         vendor: "google",
-        provider: "gateway",
+        provider: "vercel",
         speed_label: "medium",
         speed_max: "30s",
         styles: null,
@@ -662,7 +662,7 @@ export namespace models {
         short_description:
           "Latest Flux model with best-in-class image quality and prompt adherence",
         vendor: "black-forest-labs",
-        provider: "gateway",
+        provider: "vercel",
         speed_label: "medium",
         speed_max: "30s",
         styles: null,
@@ -683,7 +683,7 @@ export namespace models {
         short_description:
           "Highest quality Flux model for context-aware image generation and editing",
         vendor: "black-forest-labs",
-        provider: "gateway",
+        provider: "vercel",
         speed_label: "slow",
         speed_max: "30s",
         styles: null,
@@ -703,7 +703,7 @@ export namespace models {
         deprecated: false,
         short_description: "Fast context-aware image generation and editing",
         vendor: "black-forest-labs",
-        provider: "gateway",
+        provider: "vercel",
         speed_label: "medium",
         speed_max: "20s",
         styles: null,
@@ -724,7 +724,7 @@ export namespace models {
         short_description:
           "Faster, better FLUX Pro. Text-to-image model with excellent image quality and output diversity.",
         vendor: "black-forest-labs",
-        provider: "gateway",
+        provider: "vercel",
         speed_label: "slow",
         speed_max: "30s",
         styles: null,
