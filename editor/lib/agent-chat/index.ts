@@ -47,3 +47,13 @@ export {
   useCoreTurnSync,
   type CoreRunState,
 } from "./use-session-status";
+export {
+  computeContextUsage,
+  estimateContextBreakdown,
+  estimateTokens,
+  lastAssistantUsage,
+  usageTokenTotal,
+  type ContextBreakdown,
+  type ContextUsage,
+  type MessageUsage,
+} from "./context-usage";

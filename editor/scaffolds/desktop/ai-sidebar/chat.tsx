@@ -59,6 +59,7 @@ import {
   DesktopModelPicker,
   useModelPickerState,
 } from "../shared/model-picker";
+import { DesktopContextMeter } from "../shared/context-meter";
 import {
   AgentComposerInput,
   type ComposerCommandAction,
@@ -219,6 +220,12 @@ export function AISidebarChat({ className }: { className?: string }) {
     current_id: chatSession.current_id,
     sessions: chatSession.sessions,
   });
+
+  // The active session row carries the rolled-up cost the context meter
+  // surfaces alongside the (real) window %.
+  const activeSession = chatSession.sessions.find(
+    (s) => s.id === chatSession.current_id
+  );
 
   // Pull a fresh sessions list every time a turn finishes. The agent sidecar
   // writes the auto-generated title + final usage counters AFTER the
@@ -419,7 +426,14 @@ export function AISidebarChat({ className }: { className?: string }) {
           onStop={stop}
           placeholder="Ask the assistant to edit the SVG…"
           toolbar={
-            <DesktopModelPicker value={modelId} onValueChange={setModelId} />
+            <>
+              <DesktopModelPicker value={modelId} onValueChange={setModelId} />
+              <DesktopContextMeter
+                messages={messages}
+                modelId={modelId}
+                costUsd={activeSession?.cost_usd}
+              />
+            </>
           }
         />
       </div>

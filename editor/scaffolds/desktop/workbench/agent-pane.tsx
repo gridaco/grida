@@ -67,6 +67,7 @@ import {
   DesktopModelPicker,
   useModelPickerState,
 } from "../shared/model-picker";
+import { DesktopContextMeter } from "../shared/context-meter";
 import {
   AgentComposerInput,
   type ComposerCommandAction,
@@ -273,6 +274,12 @@ function AgentPaneContent({
     current_id: chatSession.current_id,
     sessions: chatSession.sessions,
   });
+
+  // The active session row carries the rolled-up cost the context meter
+  // surfaces alongside the (real) window %.
+  const activeSession = chatSession.sessions.find(
+    (s) => s.id === chatSession.current_id
+  );
 
   // On every turn end: refresh the sessions list (the sidecar writes the title
   // + usage after the last frame) AND bump `onMaybeMutated` (the agent may have
@@ -482,7 +489,14 @@ function AgentPaneContent({
           isStreaming={isStreaming}
           onStop={stop}
           toolbar={
-            <DesktopModelPicker value={modelId} onValueChange={setModelId} />
+            <>
+              <DesktopModelPicker value={modelId} onValueChange={setModelId} />
+              <DesktopContextMeter
+                messages={messages}
+                modelId={modelId}
+                costUsd={activeSession?.cost_usd}
+              />
+            </>
           }
         />
       </div>
