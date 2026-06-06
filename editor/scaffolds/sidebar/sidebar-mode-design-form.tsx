@@ -15,7 +15,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { FormFieldBlockMenuItems } from "../blocks-editor/blocks/field-block";
 import {
   SidebarMenu,
@@ -25,7 +25,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { SidebarMenuGroup } from "./sidebar-menu-group";
 
 export function ModeDesignForm() {

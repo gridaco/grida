@@ -14,15 +14,15 @@ import {
 import { useMultiplayerStore, MultiplayerProvider } from "./store";
 import { useMockDemoManager } from "./mock-demo-manager";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+} from "@app/ui/components/card";
+import { Badge } from "@app/ui/components/badge";
 
 function MultiplayerDemoContent() {
   const [messages, setMessages] = useState<string[]>([]);

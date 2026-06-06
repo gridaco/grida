@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { CaretDownIcon, CaretRightIcon } from "@radix-ui/react-icons";

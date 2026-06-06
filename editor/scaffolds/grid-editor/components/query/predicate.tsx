@@ -1,19 +1,19 @@
 "use client";
 
 import React, { useCallback, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { TagInput, type Tag as TagInputTag } from "@/components/tag";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { Button } from "@/components/ui-editor/button";
 import {
   Select,
@@ -24,7 +24,7 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Data } from "@/lib/data";
 import { XPostgrestQuery } from "@/lib/supabase-postgrest/builder";

@@ -5,7 +5,7 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-} from "@/components/ui/carousel";
+} from "@app/ui/components/carousel";
 import Autoplay from "embla-carousel-autoplay";
 import {
   CalendarBoxIcon,
@@ -15,13 +15,13 @@ import {
   Timer,
 } from "@/theme/templates/kit/components";
 import { useCampaignMeta } from "@/theme/templates/kit/campaign";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@app/ui/components/button";
+import { Badge } from "@app/ui/components/badge";
 import { motion } from "motion/react";
 import _messages from "./messages.json";
 import { Features } from "@/grida-forms-hosted/features/scheduling";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useCTAContext } from "../../kit/contexts/cta.context";
 import { FileIO } from "@/lib/file";
 import type grida from "@grida/schema";

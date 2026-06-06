@@ -1,7 +1,7 @@
 "use client";
 
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Field, FieldDescription, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 import { Gift } from "lucide-react";
 import { Platform } from "@/lib/platform";
 

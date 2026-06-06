@@ -65,7 +65,7 @@ import {
   ContextMenuItem,
   ContextMenuShortcut,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+} from "@app/ui/components/context-menu";
 import { PixelGrid } from "@grida/pixel-grid/react";
 import { Rule } from "./ui/rule";
 import { WorkbenchColors } from "../ui-config";
@@ -107,7 +107,7 @@ import {
 import { PaddingOverlay } from "./ui/surface-padding-overlay";
 import { AspectRatioGuide } from "./ui/aspect-ratio-guide";
 import cmath from "@grida/cmath";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useWasmSurface } from "./hooks/use-wasm-surface";
 
 const DRAG_THRESHOLD = 2;

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 import { TitleBar } from "./title-bar";
 
 /**

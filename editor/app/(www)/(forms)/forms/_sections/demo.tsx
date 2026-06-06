@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
+import { Card } from "@app/ui/components/card";
 import Playground from "@/scaffolds/playground-forms";
 import dynamic from "next/dynamic";
 import { motion } from "motion/react";

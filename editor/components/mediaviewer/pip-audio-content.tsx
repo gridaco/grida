@@ -1,8 +1,8 @@
 "use client";
 
 import { MediaObject } from "@/components/mediaviewer";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from "@app/ui/components/button";
+import { Card } from "@app/ui/components/card";
 import { SlashIcon } from "@radix-ui/react-icons";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import {

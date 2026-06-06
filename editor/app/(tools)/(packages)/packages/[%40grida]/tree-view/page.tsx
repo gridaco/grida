@@ -32,7 +32,7 @@ import {
 import { ComponentDemo } from "@/app/(dev)/ui/components/component-demo";
 import { RegistryExample } from "@/components/registry-example";
 import { NpmLogoIcon } from "@/components/logos/npm";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
 import { Resources } from "@/resources";
 import Footer from "@/www/footer";

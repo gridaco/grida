@@ -1,6 +1,6 @@
 import { SectionHeader, SectionHeaderBadge } from "@/www/ui/section";
 import { Section } from "@/www/ui/section";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { FigmaIcon, FileCode2Icon } from "lucide-react";
 import { BentoCard, BentoCardContent, BentoGrid } from "@/www/ui/bento-grid";
 

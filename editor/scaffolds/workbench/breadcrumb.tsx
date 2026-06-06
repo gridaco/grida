@@ -8,7 +8,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@app/ui/components/breadcrumb";
 import { useEditorState } from "../editor";
 import { usePathname } from "next/navigation";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";

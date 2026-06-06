@@ -1,4 +1,4 @@
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import { WorkbenchUI } from "@/components/workbench";
 import { BoltIcon } from "lucide-react";
 import {
@@ -10,10 +10,10 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { InputIcon, LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { tokens } from "@grida/tokens";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import PropertyTypeIcon from "@/components/property-type-icon";
 import { PropertyAccessExpressionControl } from "./props-property-access-expression";
 import { useSchema } from "../schema";

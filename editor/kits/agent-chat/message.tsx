@@ -1,7 +1,7 @@
 /**
  * `@/kits/agent-chat` renderer — one chat turn (user or assistant),
  * render-only and props-driven. Built on the repo's
- * `@/components/ai-elements/*` primitives so every agent chat surface
+ * `@app/ui/ai-elements/*` primitives so every agent chat surface
  * (desktop sidebar, workspace pane, demo) shares one look:
  *
  *   - `Message` / `MessageContent` / `MessageResponse` — role-aware
@@ -47,15 +47,15 @@ import {
   MessageActions,
   MessageContent,
   MessageResponse,
-} from "@/components/ai-elements/message";
+} from "@app/ui/ai-elements/message";
 import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
-import { Shimmer } from "@/components/ai-elements/shimmer";
-import { ToolInput, ToolOutput } from "@/components/ai-elements/tool";
-import { Task, TaskContent, TaskTrigger } from "@/components/ai-elements/task";
+} from "@app/ui/ai-elements/reasoning";
+import { Shimmer } from "@app/ui/ai-elements/shimmer";
+import { ToolInput, ToolOutput } from "@app/ui/ai-elements/tool";
+import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
 // Message/tool types stay in the shared `@/lib/agent-chat` seam (the
 // bridge transport + session helpers use them too); `toolDisplay` is
 // this renderer's own label/summary formatting, colocated in the kit.
@@ -220,7 +220,7 @@ export function ChatMessageView({
  * Copy a message's text to the clipboard. Self-contained — copy is a
  * pure, always-safe action, so it owns its transient "copied" state here
  * and is never gated by `disabled`. Mirrors `CodeBlockCopyButton` in
- * `@/components/ai-elements/code-block`.
+ * `@app/ui/ai-elements/code-block`.
  */
 function CopyMessageAction({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);

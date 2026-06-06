@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { sitemap } from "@/www/data/sitemap";
 import Header from "@/www/header";
 import Footer from "@/www/footer";

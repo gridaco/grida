@@ -1,11 +1,11 @@
 import React from "react";
-import { Button } from "../ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   TagInputProps,
   TagInputStyleClassesProps,
   type Tag as TagType,
 } from "./tag-input";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 import { cva } from "class-variance-authority";
 

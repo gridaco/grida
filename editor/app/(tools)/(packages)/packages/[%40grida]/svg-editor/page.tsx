@@ -12,9 +12,9 @@ import {
 } from "./_examples";
 import { FeaturedDemo } from "./_featured";
 import { NpmLogoIcon } from "@/components/logos/npm";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useScrollSpy } from "@/hooks/use-scroll-spy";
 import Footer from "@/www/footer";
 import Header from "@/www/header";

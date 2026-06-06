@@ -2,23 +2,23 @@
 
 import { useState } from "react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
+} from "@app/ui/components/card";
+import { Field, FieldGroup, FieldLabel } from "@app/ui/components/field";
+import { Textarea } from "@app/ui/components/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { Download, Upload } from "lucide-react";
 
 import { getCountries } from "libphonenumber-js";

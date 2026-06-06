@@ -7,7 +7,7 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart";
+} from "@app/ui/components/chart";
 import type { CurveType } from "recharts/types/shape/Curve";
 
 interface TimeSeriesChartData {

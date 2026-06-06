@@ -12,12 +12,12 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Spinner } from "@/components/ui/spinner";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/card";
+import { Button } from "@app/ui/components/button";
+import { Badge } from "@app/ui/components/badge";
+import { Spinner } from "@app/ui/components/spinner";
+import { Skeleton } from "@app/ui/components/skeleton";
+import { Input } from "@app/ui/components/input";
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import {
   Empty,
   EmptyContent,
@@ -34,7 +34,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@app/ui/components/empty";
 import { Mail, PlusIcon, StarIcon } from "lucide-react";
 import type { Database } from "@app/database";
 

@@ -3,7 +3,7 @@
 import React from "react";
 import { EmailChallengePreview } from "@/components/formfield/email-challenge";
 import { ComponentDemo } from "../component-demo";
-import { Label } from "@/components/ui/label";
+import { Label } from "@app/ui/components/label";
 
 export default function EmailChallengePage() {
   return (

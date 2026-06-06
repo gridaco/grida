@@ -13,7 +13,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { useDrag } from "@use-gesture/react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export type ErrorBoundaryFallbackProps = {
   error: unknown;

@@ -1,5 +1,5 @@
 import React from "react";
-import { SidebarMenuButton } from "@/components/ui/sidebar";
+import { SidebarMenuButton } from "@app/ui/components/sidebar";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 

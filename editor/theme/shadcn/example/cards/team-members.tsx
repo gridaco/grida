@@ -2,15 +2,15 @@
 
 import { ChevronDown } from "lucide-react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@app/ui/components/avatar";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import {
   Command,
   CommandEmpty,
@@ -18,12 +18,12 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 
 export function CardsTeamMembers() {
   return (

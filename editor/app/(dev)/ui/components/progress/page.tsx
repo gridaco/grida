@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Progress } from "@/components/ui/progress";
+import { Progress } from "@app/ui/components/progress";
 import { Progress as EditorProgress } from "@/components/ui-editor/progress";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { ComponentDemo } from "../component-demo";
 
 export default function ProgressPage() {

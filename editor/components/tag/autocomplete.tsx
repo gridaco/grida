@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 // import { Command, CommandList, CommandItem, CommandGroup, CommandEmpty } from '../ui/command';
 import { TagInputStyleClassesProps, type Tag as TagType } from "./tag-input";
-import { cn } from "@/components/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { Button } from "../ui/button";
+import { cn } from "@app/ui/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@app/ui/components/popover";
+import { Button } from "@app/ui/components/button";
 
 type AutocompleteProps = {
   tags: TagType[];

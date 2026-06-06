@@ -27,7 +27,7 @@ import {
   ContextMenuSeparator,
   ContextMenuShortcut,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+} from "@app/ui/components/context-menu";
 import type { Workspace } from "@/lib/desktop/bridge";
 import {
   confirmAndTrashEntry,

@@ -1,6 +1,6 @@
 import { createWestReferralClient } from "@/lib/supabase/server";
 import { CampaignProvider } from "./store";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@app/ui/components/sidebar";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { CampaignSidebar } from "./campaign-sidebar";

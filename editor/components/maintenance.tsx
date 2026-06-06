@@ -6,7 +6,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "./ui/card";
+} from "@app/ui/components/card";
 import {
   GitHubLogoIcon,
   InstagramLogoIcon,

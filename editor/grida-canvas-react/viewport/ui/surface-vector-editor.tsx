@@ -6,7 +6,7 @@ import {
 } from "@/grida-canvas-react/provider";
 import cmath from "@grida/cmath";
 import { useGesture } from "@use-gesture/react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { Point } from "./point";
 import assert from "assert";
 import useVectorContentEditMode, {

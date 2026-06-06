@@ -16,30 +16,30 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@app/ui/components/empty";
 import { FolderIcon, GridIcon, ListIcon, UploadIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@app/ui/components/button";
+import { Alert, AlertDescription, AlertTitle } from "@app/ui/components/alert";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/context-menu";
+import { cn } from "@app/ui/lib/utils";
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@app/ui/components/breadcrumb";
 import { editorlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -67,15 +67,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 import { StandaloneMediaView } from "@/components/mediaviewer";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Spinner } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
+import { Spinner } from "@app/ui/components/spinner";
+import { Badge } from "@app/ui/components/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+} from "@app/ui/components/collapsible";
 import { fmt_bytes } from "@/utils/fmt";
 import StorageEditorProvider, {
   reducer,

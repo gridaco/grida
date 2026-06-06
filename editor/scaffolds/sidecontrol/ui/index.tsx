@@ -1,5 +1,5 @@
 import React from "react";
-import { Label } from "@/components/ui/label";
+import { Label } from "@app/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -9,14 +9,14 @@ import {
   SelectValue,
 } from "@/components/ui-editor/select";
 import { Combobox as ComboboxPrimitive } from "@base-ui/react";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@app/ui/components/separator";
+import { Textarea } from "@app/ui/components/textarea";
 import { WorkbenchUI } from "@/components/workbench";
 import { Button } from "@/components/ui-editor/button";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "../controls/utils/toggle-group";
 import type { TMixed } from "../controls/utils/types";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
 import grida from "@grida/schema";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 

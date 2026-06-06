@@ -3,13 +3,13 @@
 import * as React from "react";
 import { useSyncExternalStore } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { cn } from "@/components/lib/utils";
-import { Button } from "@/components/ui/button";
+import { cn } from "@app/ui/lib/utils";
+import { Button } from "@app/ui/components/button";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from "@/components/ui/resizable";
+} from "@app/ui/components/resizable";
 import { HierarchyPanel } from "./hierarchy-panel";
 import { useSvgDocStore } from "../_storage/context";
 

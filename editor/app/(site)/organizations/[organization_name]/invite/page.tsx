@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
+import { Field, FieldLabel } from "@app/ui/components/field";
 import { GridaLogo } from "@/components/grida-logo";
 import {
   Breadcrumb,
@@ -8,7 +8,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@app/ui/components/breadcrumb";
 import Link from "next/link";
 
 type Params = { organization_name: string };

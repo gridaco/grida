@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { Editor } from "@tiptap/react";
-import type { toggleVariants } from "@/components/ui/toggle";
+import type { toggleVariants } from "@app/ui/components/toggle";
 import type { VariantProps } from "class-variance-authority";
 import { CaretDownIcon, CheckIcon } from "@radix-ui/react-icons";
 import { ToolbarButton } from "../toolbar-button";
@@ -8,13 +8,13 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-} from "@/components/ui/popover";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+} from "@app/ui/components/popover";
+import { ToggleGroup, ToggleGroupItem } from "@app/ui/components/toggle-group";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { useTheme } from "../../hooks/use-theme";
 
 interface ColorItem {

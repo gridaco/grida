@@ -16,7 +16,7 @@ import {
 } from "@/grida-canvas-react";
 import { Zoom } from "@/scaffolds/sidecontrol/sidecontrol-node-selection";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { Platform } from "@/lib/platform";
 import { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";

@@ -1,6 +1,6 @@
 import * as React from "react";
-import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/components/lib/utils";
+import { Spinner } from "@app/ui/components/spinner";
+import { cn } from "@app/ui/lib/utils";
 
 export const ImageOverlay = React.memo(() => {
   return (

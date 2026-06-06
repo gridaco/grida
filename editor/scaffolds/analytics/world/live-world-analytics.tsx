@@ -7,7 +7,7 @@ import { MapProvider, useMap } from "react-map-gl";
 import { useDarkMode } from "usehooks-ts";
 import { useWindowSize } from "@uidotdev/usehooks";
 import { Source, Layer } from "react-map-gl";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@app/ui/components/card";
 import TimeSeriesChart from "@/scaffolds/analytics/charts/timeseries";
 import { format } from "date-fns";
 import { useUxInitialTransform, useUxMapFocus } from "./use-ux-map-focus";

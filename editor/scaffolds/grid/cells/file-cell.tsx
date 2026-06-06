@@ -11,14 +11,14 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button, buttonVariants } from "@/components/ui/button";
+} from "@app/ui/components/popover";
+import { Button, buttonVariants } from "@app/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +28,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@app/ui/components/alert-dialog";
 import type {
   CellIdentifier,
   DataGridCellFileRefsResolver,
@@ -39,17 +39,17 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import React, { useState } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@app/ui/components/scroll-area";
 import { MediaPicker } from "@/scaffolds/mediapicker";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { toast } from "sonner";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@app/ui/components/dialog";
 import { SignedUploadUrlData } from "@/types/private/api";
 import { SupabaseStorageExtensions } from "@/lib/supabase/storage-ext";
-import { Spinner } from "@/components/ui/spinner";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@app/ui/components/spinner";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { useFileRefs } from "../providers";
 
 export function FileLoadingCell() {

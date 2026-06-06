@@ -1,6 +1,6 @@
 import React from "react";
-import { cn } from "@/components/lib/utils";
-import { Skeleton } from "../ui/skeleton";
+import { cn } from "@app/ui/lib/utils";
+import { Skeleton } from "@app/ui/components/skeleton";
 
 export function InputSkeleton({
   className,

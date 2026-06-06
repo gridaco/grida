@@ -1,9 +1,9 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@app/ui/components/badge";
+import { Button } from "@app/ui/components/button";
+import { Card } from "@app/ui/components/card";
+import { Textarea } from "@app/ui/components/textarea";
 import { forms_ai_shortcuts } from "@/scaffolds/playground-forms/k";
 import { ArrowTopRightIcon } from "@radix-ui/react-icons";
 import { useMemo, useRef, useState } from "react";

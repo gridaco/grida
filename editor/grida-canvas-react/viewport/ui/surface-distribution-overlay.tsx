@@ -12,7 +12,7 @@ import { ObjectsDistributionAnalysis } from "./distribution";
 import cmath from "@grida/cmath";
 import { useSurfaceGesture } from "../hooks/use-surface-gesture";
 import { SVGPatternDiagonalStripe } from "./svg-fill-patterns";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export function GapOverlay({
   onGapGestureStart,

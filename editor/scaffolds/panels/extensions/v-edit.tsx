@@ -7,10 +7,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { tokens } from "@grida/tokens";
 import { binary_operator_labels } from "@grida/tokens/k";
-import { Label } from "@/components/ui/label";
+import { Label } from "@app/ui/components/label";
 import { ExpressionEditor } from "@/scaffolds/expression-editor";
 
 type Identifier = string;

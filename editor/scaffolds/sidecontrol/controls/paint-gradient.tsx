@@ -3,7 +3,7 @@ import type cg from "@grida/cg";
 import { RGBA32FColorControl } from "./color";
 import { MinusIcon, PlusIcon } from "@radix-ui/react-icons";
 import { GradientStopsSlider } from "@/grida-canvas-react-gradient/gradient-stops-slider";
-import { Label } from "@/components/ui/label";
+import { Label } from "@app/ui/components/label";
 import { Button } from "@/components/ui-editor/button";
 import { PropertyRows, PropertyRow } from "../ui";
 import InputPropertyPercentage from "../ui/percentage";

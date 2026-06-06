@@ -18,10 +18,10 @@ import {
   ScreenGridArea,
 } from "@/theme/templates/kit/components";
 import data from "./messages.json";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { motion } from "motion/react";
 import { KakaoTalkLogo } from "@/components/logos";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarImage } from "@app/ui/components/avatar";
 import { ArrowRightIcon, GlobeIcon } from "@radix-ui/react-icons";
 import {
   Drawer,
@@ -32,7 +32,7 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer";
+} from "@app/ui/components/drawer";
 import { PhoneIcon } from "lucide-react";
 import Link from "next/link";
 import type grida from "@grida/schema";

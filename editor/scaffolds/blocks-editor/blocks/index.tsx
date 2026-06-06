@@ -12,7 +12,7 @@ import { VideoBlock } from "./video-block";
 import { DividerBlock } from "./divider-block";
 import { HeaderBlock } from "./header-block";
 import { PdfBlock } from "./pdf-block";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export function BlocksCanvas({
   children,

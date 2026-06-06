@@ -9,7 +9,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 
 interface ContinueWithAuthProps {
   next?: string;

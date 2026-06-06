@@ -2,7 +2,7 @@
 
 import React from "react";
 import Map, { ViewState } from "react-map-gl";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 

@@ -10,9 +10,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/alert-dialog";
+import { Input } from "@app/ui/components/input";
+import { Button } from "@app/ui/components/button";
 
 export function DeleteFormSection() {
   const [state] = useEditorState();

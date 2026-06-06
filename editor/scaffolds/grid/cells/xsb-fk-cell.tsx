@@ -4,11 +4,11 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import React, { useCallback, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Button } from "@app/ui/components/button";
+import { Badge } from "@app/ui/components/badge";
+import { Input } from "@app/ui/components/input";
 import { Data } from "@/lib/data";
 import { LinkIcon } from "lucide-react";
 import { XSBSearchTableSheet } from "@/scaffolds/x-supabase/xsb-search-table-sheet";

@@ -1,16 +1,16 @@
 "use client";
 import React, { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { Button as FancyButton } from "@/www/ui/button";
 import { motion } from "motion/react";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card } from "@app/ui/components/card";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
 import { sitemap } from "@/www/data/sitemap";
 import { ArrowRight } from "lucide-react";
 import { Section, SectionHeader } from "@/www/ui/section";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import { Marquee } from "@/www/ui/marquee";
 import { ArrowRightIcon, CalendarIcon } from "@radix-ui/react-icons";
 import { BentoGrid, BentoCard, BentoCardContent } from "@/www/ui/bento-grid";
@@ -19,7 +19,7 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
+} from "@app/ui/components/accordion";
 import Image from "next/image";
 import Footer from "@/www/footer";
 import { wwwprint } from "./data";

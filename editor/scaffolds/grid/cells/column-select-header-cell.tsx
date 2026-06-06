@@ -1,5 +1,5 @@
 import React, { InputHTMLAttributes } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@app/ui/components/checkbox";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 
 type SharedInputProps = Pick<

@@ -3,11 +3,11 @@ import { Button } from "@/components/ui-editor/button";
 import { toast } from "sonner";
 import React from "react";
 import { io } from "@grida/io";
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import InputPropertyNumber from "../ui/number";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
-import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@app/ui/lib/utils";
+import { Spinner } from "@app/ui/components/spinner";
 import {
   Select,
   SelectContent,
@@ -37,8 +37,8 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+} from "@app/ui/components/popover";
+import { Field, FieldGroup, FieldLabel } from "@app/ui/components/field";
 
 /**
  * Available scale presets for auto-assignment when adding new export configs

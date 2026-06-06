@@ -13,8 +13,8 @@ import {
   WrenchIcon,
   XIcon,
 } from "lucide-react";
-import { cn } from "@/components/lib/utils/index";
-import { CodeBlock } from "@/components/ai-elements/code-block";
+import { cn } from "@app/ui/lib/utils";
+import { CodeBlock } from "@app/ui/ai-elements/code-block";
 import { AgentFs } from "@grida/agent/fs";
 
 type Tone = "ok" | "warn" | "error";

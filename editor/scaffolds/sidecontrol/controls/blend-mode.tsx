@@ -9,7 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { Button } from "@/components/ui-editor/button";
 import { usePropertyPreview } from "@/grida-canvas-react/hooks/use-property-change";
 

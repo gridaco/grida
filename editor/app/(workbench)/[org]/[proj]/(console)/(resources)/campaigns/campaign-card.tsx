@@ -1,7 +1,7 @@
 "use client";
 import { Clock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@app/ui/components/badge";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardAction,
@@ -10,7 +10,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import { Platform } from "@/lib/platform";
 
 export function CampaignCard({

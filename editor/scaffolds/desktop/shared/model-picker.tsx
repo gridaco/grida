@@ -18,7 +18,7 @@ import {
   PromptInputSelectItem,
   PromptInputSelectTrigger,
   PromptInputSelectValue,
-} from "@/components/ai-elements/prompt-input";
+} from "@app/ui/ai-elements/prompt-input";
 // Pull the catalog from the framework-free `@grida/ai-models` package,
 // NOT the editor's `@/lib/ai/models` seam — that seam constructs server
 // providers (live keys) and is lint-blocked from the desktop renderer

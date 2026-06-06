@@ -14,7 +14,7 @@ import {
   useState,
 } from "react";
 import { FileIcon, XIcon } from "lucide-react";
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import { EditorPaneTab } from "./editor-pane-tab";
 import { FileContextMenu } from "./workbench-file-context-menu";

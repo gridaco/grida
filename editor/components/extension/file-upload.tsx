@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   Dispatch,
   SetStateAction,
@@ -19,7 +19,7 @@ import {
   DropzoneOptions,
 } from "react-dropzone";
 import { Cross2Icon } from "@radix-ui/react-icons";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@app/ui/components/button";
 
 type DirectionOptions = "rtl" | "ltr" | undefined;
 

@@ -17,8 +17,8 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+} from "@app/ui/components/chart";
+import { ToggleGroup, ToggleGroupItem } from "@app/ui/components/toggle-group";
 import produce from "immer";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { CHART_PALETTES, DataChartPalette, STANDARD_PALETTES } from "./colors";
@@ -32,7 +32,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import {
   DropdownMenu,
@@ -43,13 +43,13 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { Chart } from "@/lib/chart";
 import { ChartPartialDataAlert, useChartDataStat } from "./warn-partial-data";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card } from "@/components/ui/card";
+import { Button } from "@app/ui/components/button";
+import { Label } from "@app/ui/components/label";
+import { Skeleton } from "@app/ui/components/skeleton";
+import { Card } from "@app/ui/components/card";
 
 /// TODO:
 // type switch

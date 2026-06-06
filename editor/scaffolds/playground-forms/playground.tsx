@@ -6,11 +6,11 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { Editor as MonacoEditor, useMonaco } from "@monaco-editor/react";
 import { useEffect, useRef, useState } from "react";
 import { GridaLogo } from "@/components/grida-logo";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   CaretSortIcon,
   Link2Icon,
@@ -24,7 +24,12 @@ import { forms_examples } from "./k";
 import { generate } from "./actions";
 import { readStreamableValue } from "@ai-sdk/rsc";
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import PlaygroundPreview from "./preview";
 import { ThemePalette } from "../theme-editor/palette-editor";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
@@ -35,12 +40,12 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import { Console } from "console-feed";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { Hightlight } from "@/components/prism/highlight";
 import { BanIcon } from "lucide-react";
-import { Label } from "@/components/ui/label";
+import { Label } from "@app/ui/components/label";
 import { FlatPostgREST } from "@/lib/supabase-postgrest/flat";
 import { FormAgentState } from "@/grida-forms/formstate";
 import { Env } from "@/env";

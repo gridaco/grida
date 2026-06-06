@@ -24,7 +24,7 @@ import {
   useEditorState,
   useSvgEditor,
 } from "@grida/svg-editor/react";
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 
 type LoadState =

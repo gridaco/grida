@@ -1,5 +1,5 @@
 import React from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import type cmath from "@grida/cmath";
 import { cursors } from "@/components/cursor/cursor-data";
 import { Point } from "./point";

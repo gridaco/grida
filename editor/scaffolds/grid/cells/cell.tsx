@@ -1,6 +1,6 @@
 "use clint";
 import React from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export interface DataGridCellRootProps {
   selected?: boolean;

@@ -15,8 +15,8 @@ import { fetchPhotoTopics, fetchPhotosAction } from "./lib-photos-actions";
 import { SearchInput } from "./components/search-input";
 import { Pill, PillsList } from "./components/pills";
 import { LoadingIndicator } from "./components/loading-indicator";
-import { Spinner } from "@/components/ui/spinner";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@app/ui/components/spinner";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { UnsplashLogoIcon } from "@/components/logos/unsplash";
 import { useVirtualizer } from "@tanstack/react-virtual";
 

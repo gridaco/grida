@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { GridaLogo } from "@/components/grida-logo";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { Section } from "@/www/ui/section";
 import Hero from "./_sections/hero";
 import Demo from "./_sections/demo";

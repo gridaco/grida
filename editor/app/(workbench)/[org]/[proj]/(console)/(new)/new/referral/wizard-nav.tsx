@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 
 interface WizardNavProps {
   currentStep: number;

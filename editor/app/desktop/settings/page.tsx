@@ -2,17 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
+import { Label } from "@app/ui/components/label";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@app/ui/components/card";
+import { Skeleton } from "@app/ui/components/skeleton";
 import {
   BYOK_PROVIDER_LABELS,
   DesktopBridgeMissingError,

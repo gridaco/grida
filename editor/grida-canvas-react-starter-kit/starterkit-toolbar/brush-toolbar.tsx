@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useCallback } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useBrushState, useCurrentEditor } from "@/grida-canvas-react";
 import {
   DotsHorizontalIcon,
@@ -19,12 +19,12 @@ import {
   PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Slider } from "@/components/ui/slider";
+} from "@app/ui/components/popover";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { Slider } from "@app/ui/components/slider";
 import cmath from "@grida/cmath";
 import kolor from "@grida/color";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@app/ui/components/dialog";
 import { useEyeDropper } from "@/scaffolds/sidecontrol/controls/utils/eyedropper";
 import { toast } from "sonner";
 

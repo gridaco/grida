@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { Apple } from "@/components/logos/apple";
 import { Windows } from "@/components/logos/windows";
 import { Linux } from "@/components/logos/linux";

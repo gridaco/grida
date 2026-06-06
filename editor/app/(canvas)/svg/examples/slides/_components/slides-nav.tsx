@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
+import { Button } from "@app/ui/components/button";
+import { ButtonGroup } from "@app/ui/components/button-group";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from "@/components/ui/resizable";
+} from "@app/ui/components/resizable";
 import { HierarchyPanel } from "../../../_components/hierarchy-panel";
 import { SlideListFocusScope, SlideRow } from "./slide-row";
 import { TemplatePicker } from "./template-picker";

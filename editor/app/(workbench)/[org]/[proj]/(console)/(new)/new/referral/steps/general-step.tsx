@@ -1,8 +1,8 @@
 "use client";
 
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Field, FieldDescription, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
+import { Textarea } from "@app/ui/components/textarea";
 import { Platform } from "@/lib/platform";
 import { Smile } from "lucide-react";
 

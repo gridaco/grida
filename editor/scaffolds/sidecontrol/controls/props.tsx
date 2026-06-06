@@ -8,7 +8,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 
 export function PropsControl({
   properties,

@@ -8,13 +8,13 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/breadcrumb";
+import { Button } from "@app/ui/components/button";
+import { Field, FieldDescription, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 import { useDebounce } from "@uidotdev/usehooks";
 import Link from "next/link";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 
 const checkname = async (name: string) => {
   const res = await fetch("/private/accounts/organizations/check-name", {

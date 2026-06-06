@@ -18,8 +18,8 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+} from "@app/ui/components/select";
+import { Switch } from "@app/ui/components/switch";
 import { useEditorState } from "@/scaffolds/editor";
 import { SupabaseLogo } from "@/components/logos";
 

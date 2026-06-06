@@ -1,6 +1,6 @@
 import React from "react";
 import { useSingleSelection } from "../surface-hooks";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { FLOATING_BAR_Z_INDEX } from "../../ui-config";
 
 interface BarProps {

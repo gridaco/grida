@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui-editor/dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import artwork from "../../../../../../../../../public/images/abstract-database-illustration.png";
 import {
   Empty,
@@ -19,7 +19,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@app/ui/components/empty";
 
 export default function WelcomeNewPage() {
   const welcome = useDialogState();

@@ -7,7 +7,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import { useCurrentEditor } from "@/grida-canvas-react";
 
 type ArtboardData = {

@@ -8,7 +8,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
+} from "@app/ui/components/sheet";
 import { XSBReferenceTableGrid } from "@/scaffolds/grid/xsb-reference-grid";
 import { GridaXSupabase } from "@/types";
 import { PlusIcon } from "@radix-ui/react-icons";
@@ -37,7 +37,7 @@ import {
 } from "@/scaffolds/data-query";
 import { Data } from "@/lib/data";
 import { toast } from "sonner";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@app/ui/components/scroll-area";
 import { XSBTextSearchInput } from "@/scaffolds/grid-editor/components/query/xsb/xsb-text-search";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { useXSBTableSearch } from "@/scaffolds/x-supabase";

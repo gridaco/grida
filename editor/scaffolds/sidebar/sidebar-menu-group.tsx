@@ -6,13 +6,13 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuSub,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { ChevronRight, File, Folder } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import type { MenuItem } from "../editor/menu";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 

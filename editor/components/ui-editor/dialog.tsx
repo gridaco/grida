@@ -13,9 +13,9 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 
 function DialogContent({
   className,

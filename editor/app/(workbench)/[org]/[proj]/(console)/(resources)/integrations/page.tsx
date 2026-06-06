@@ -1,7 +1,12 @@
 "use client";
 import React, { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
+import { Button } from "@app/ui/components/button";
 import { FileText, ExternalLink } from "lucide-react";
 import { IntegrationsSearch } from "./integrations-serach";
 import { Integration, integrations } from "./data";

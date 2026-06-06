@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -7,9 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/dialog";
+import { Field, FieldGroup, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 
 export function PresetSave({ disabled }: { disabled?: boolean }) {
   return (

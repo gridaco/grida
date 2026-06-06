@@ -1,4 +1,4 @@
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@app/ui/components/sidebar";
 import { ConsoleResourcesSidebar } from "./console-resources-sidebar";
 
 type Params = { org: string; proj: string };

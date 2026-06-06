@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { PanelPropertyField } from "@/components/panels/side-panel";
 import { MixIcon } from "@radix-ui/react-icons";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
 import { TProperties, TSchema } from "@/lib/spock";
 import { useFormFields } from "@/scaffolds/editor";

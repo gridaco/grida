@@ -11,8 +11,8 @@ import {
   CornersIcon,
 } from "@radix-ui/react-icons";
 import grida from "@grida/schema";
-import { Toggle } from "@/components/ui/toggle";
-import { cn } from "@/components/lib/utils";
+import { Toggle } from "@app/ui/components/toggle";
+import { cn } from "@app/ui/lib/utils";
 import { usePropertyPreview } from "@/grida-canvas-react/hooks/use-property-change";
 
 /**

@@ -21,10 +21,10 @@ import {
   EnvelopeClosedIcon,
 } from "@radix-ui/react-icons";
 import { PhoneIcon, TagIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@app/ui/components/button";
+import { Badge } from "@app/ui/components/badge";
+import { Checkbox } from "@app/ui/components/checkbox";
+import { Spinner } from "@app/ui/components/spinner";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 import { DGCustomerRow } from "../types";
 import { EmptyRowsRenderer } from "../grid-empty-state";
@@ -51,7 +51,7 @@ import {
   DataQueryOrderbyMenuTriggerButton,
 } from "@/scaffolds/grid-editor/components";
 import { TableQueryChips } from "@/scaffolds/grid-editor/components/query/query-chips";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@app/ui/components/scroll-area";
 import {
   fetchCustomers,
   fetchCustomerIds,

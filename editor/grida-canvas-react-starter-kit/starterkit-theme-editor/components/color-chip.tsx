@@ -2,8 +2,8 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/popover";
+import { cn } from "@app/ui/lib/utils";
 import { pickers } from "@/components/color-picker";
 import kolor from "@grida/color";
 

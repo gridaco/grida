@@ -2,12 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import { useFilePicker } from "use-file-picker";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Spinner } from "@/components/ui/spinner";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@app/ui/components/tabs";
+import { Dialog, DialogContent, DialogHeader } from "@app/ui/components/dialog";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { Spinner } from "@app/ui/components/spinner";
 import { useGridaFormsPublicUpload } from "@/scaffolds/asset";
 import { FileIO } from "@/lib/file";
 

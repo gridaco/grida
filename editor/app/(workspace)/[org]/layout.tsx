@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { EditorHelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { EditorCommandK } from "@/scaffolds/globals/editor-cmdk";
 import WorkspaceSidebar from "@/scaffolds/workspace/sidebar";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@app/ui/components/sidebar";
 import Header from "./header";
 
 type Params = { org: string };

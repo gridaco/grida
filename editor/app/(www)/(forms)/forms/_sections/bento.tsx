@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import Image from "next/image";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 import bentomainbg from "@/app/(www)/(forms)/_sections/bento-bg.png";
 

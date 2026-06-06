@@ -15,7 +15,7 @@ import type {
   PaymentFieldData,
 } from "@/grida-forms-hosted/types";
 import dynamic from "next/dynamic";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { request_toss_payments_checkout_session } from "@/grida-forms-hosted/integrations/payments/tosspayments/api";
 import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/api";
 import {
@@ -39,7 +39,7 @@ import {
   ClientFileUploadFieldRenderBlock,
   ClientRenderBlock,
 } from "@/grida-forms/lib";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   FormAgentProvider,
   useFormAgentState,
@@ -52,7 +52,7 @@ import { MediaLoadPluginProvider } from "./mediaload";
 import { FormAgentMessagingInterfaceProvider } from "./interface";
 import { FormAgentMessagingInterface } from "./emit";
 import { useValue } from "@/lib/spock";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { PhoneFieldDefaultCountryProvider } from "@/components/formfield/phone-field";
 import type { FormAgentGeo } from "@/grida-forms/formstate/core/geo";
 import resources from "@/i18n";

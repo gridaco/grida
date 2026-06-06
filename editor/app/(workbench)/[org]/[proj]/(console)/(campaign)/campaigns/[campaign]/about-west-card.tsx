@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from "@app/ui/components/button";
+import { Card } from "@app/ui/components/card";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { ShineBorder } from "@/www/ui/shine-border";
 import { CrossCircledIcon } from "@radix-ui/react-icons";

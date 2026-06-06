@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { ArrowUpIcon, ImageUpIcon } from "lucide-react";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { useFilePicker } from "use-file-picker";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import TextareaAutoResize from "react-textarea-autosize";
 import { toast } from "sonner";
 

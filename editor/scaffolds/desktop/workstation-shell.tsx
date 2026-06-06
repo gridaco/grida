@@ -8,12 +8,12 @@ import {
   useEditorState,
   useSvgEditor,
 } from "@grida/svg-editor/react";
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from "@/components/ui/resizable";
+} from "@app/ui/components/resizable";
 import {
   getDesktopBridge,
   useDesktopBridge,

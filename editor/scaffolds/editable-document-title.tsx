@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import { createBrowserClient } from "@/lib/supabase/client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";

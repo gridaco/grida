@@ -19,9 +19,9 @@ import {
 } from "@/grida-canvas-react/use-slide-editor";
 import { useSlideKeybindings } from "@/grida-canvas-react/viewport/slide-hotkeys";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@app/ui/components/tooltip";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { PlaygroundToolbar } from "@/grida-canvas-hosted/playground/uxhost-toolbar";
 import { ToolbarPosition } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import { StarterKitOrgIdProvider } from "@/grida-canvas-react-starter-kit/starterkit-host/org-id-provider";
@@ -31,7 +31,7 @@ import {
   SidebarHeader,
   SidebarGroupLabel,
   SidebarProvider,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { PlayIcon } from "lucide-react";
 import { PreviewProvider } from "@/grida-canvas-react-starter-kit/starterkit-preview";
@@ -41,13 +41,13 @@ import { GridaLogo } from "@/components/grida-logo";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { WindowGlobalCurrentEditorProvider } from "@/grida-canvas-react/devtools/global-api-host";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
-} from "@/components/ui/resizable";
+} from "@app/ui/components/resizable";
 import {
   createInitialSlidesDocument,
   type SlideEditorMode,

@@ -6,7 +6,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
   InputGroupTextarea,
-} from "@/components/ui/input-group";
+} from "@app/ui/components/input-group";
 
 export type FieldState = "disabled" | "off" | "on";
 

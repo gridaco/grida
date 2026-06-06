@@ -19,7 +19,7 @@ import React, {
   useRef,
 } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 
 type Api = {
   fire: (options?: ConfettiOptions) => void;

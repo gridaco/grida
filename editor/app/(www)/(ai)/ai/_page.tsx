@@ -8,29 +8,29 @@ import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import { toast } from "sonner";
 import { Loader2Icon, RefreshCwIcon, SparklesIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+} from "@app/ui/components/select";
+import { Badge } from "@app/ui/components/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import {
   Conversation,
   ConversationContent,
   ConversationEmptyState,
   ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { Message, MessageContent } from "@/components/ai-elements/message";
-import { Response } from "@/components/ai-elements/response";
+} from "@app/ui/ai-elements/conversation";
+import { Message, MessageContent } from "@app/ui/ai-elements/message";
+import { Response } from "@app/ui/ai-elements/response";
 import {
   PromptInput,
   PromptInputBody,
@@ -39,9 +39,9 @@ import {
   PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
-} from "@/components/ai-elements/prompt-input";
+} from "@app/ui/ai-elements/prompt-input";
 import models, { type ModelTier } from "@grida/ai-models";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { resolveAiError } from "@/lib/ai/error";
 import { AiCredits, useAiCredits } from "@/lib/ai/credits";
 import { AI_GATE_FLOOR_CENTS, fmtUsd } from "@/lib/billing/fees";

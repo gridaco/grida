@@ -23,7 +23,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@app/ui/components/table";
 
 import { DataTablePagination } from "./data-table-pagination";
 

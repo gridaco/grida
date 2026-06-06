@@ -1,14 +1,14 @@
 import { Metadata } from "next";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/card";
+import { Field, FieldGroup, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 import { GridaLogo } from "@/components/grida-logo";
 import Link from "next/link";
 

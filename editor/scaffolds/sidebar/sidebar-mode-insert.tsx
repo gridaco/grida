@@ -9,9 +9,9 @@ import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from "@/components/ui/hover-card";
+} from "@app/ui/components/hover-card";
 import FormField from "@/components/formfield/form-field";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { blocklabels } from "@/k/supported_block_types";
 import { BlockTypeIcon } from "@/components/form-block-type-icon";
 import type { FormBlockType, FormInputType } from "@/grida-forms-hosted/types";
@@ -23,7 +23,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import useInsertFormBlockMenu from "@/scaffolds/blocks-editor/use-insert-form-block";
 
 export function ModeInsertBlocks() {

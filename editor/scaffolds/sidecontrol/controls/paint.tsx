@@ -1,5 +1,5 @@
 import { WorkbenchUI } from "@/components/workbench";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
 import { GradientControl } from "./paint-gradient";
 import { ImagePaintControl } from "./paint-image";
 import { BlendModeDropdown } from "./blend-mode";
@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui-editor/popover";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   LinearGradientPaintIcon,
   RadialGradientPaintIcon,
@@ -28,7 +28,7 @@ import { useSchema } from "../schema";
 import { factory, tokens } from "@grida/tokens";
 import { useComputed } from "@/grida-canvas-react-renderer-dom/nodes/use-computed";
 import { useNumberInput } from "@grida/number-input/react";
-import { Separator } from "@/components/ui/separator";
+import { Separator } from "@app/ui/components/separator";
 import grida from "@grida/schema";
 import cg from "@grida/cg";
 import cmath from "@grida/cmath";

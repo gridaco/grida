@@ -1,10 +1,10 @@
 "use client";
 import React from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { InstagramIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 
 export function Section({
   className,

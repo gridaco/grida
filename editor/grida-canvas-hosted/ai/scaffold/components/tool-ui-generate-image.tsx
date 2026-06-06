@@ -2,7 +2,7 @@
 
 import { CheckIcon, ImageIcon } from "lucide-react";
 
-import { Shimmer } from "@/components/ai-elements/shimmer";
+import { Shimmer } from "@app/ui/ai-elements/shimmer";
 import {
   deriveToolState,
   type ToolUIProps,

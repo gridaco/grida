@@ -33,7 +33,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@app/ui/components/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -41,17 +41,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/components/lib/utils/index";
+} from "@app/ui/components/dropdown-menu";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
+import { cn } from "@app/ui/lib/utils";
 import type { UseChatSessionResult } from "@/lib/agent-chat";
 
 /** A single recent-session row, as surfaced by `useChatSession()`. */

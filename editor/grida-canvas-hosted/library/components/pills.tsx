@@ -2,8 +2,8 @@
 
 import React from "react";
 import Image from "next/image";
-import { cn } from "@/components/lib/utils";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { cn } from "@app/ui/lib/utils";
+import { ScrollArea, ScrollBar } from "@app/ui/components/scroll-area";
 
 export type PillProps = {
   label: string;

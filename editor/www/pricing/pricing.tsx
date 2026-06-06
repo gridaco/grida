@@ -7,7 +7,7 @@ import {
   save_plans,
 } from "@/lib/billing/marketing-plans";
 import PricingComparisonTable from "./pricing-comparison-table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
 import Link from "next/link";
 
 export function Pricing() {

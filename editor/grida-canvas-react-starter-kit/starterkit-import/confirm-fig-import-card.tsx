@@ -1,5 +1,5 @@
 import React from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { LayersIcon, BoxIcon } from "lucide-react";
 import type { FigFileImportResult } from "./use-fig-file-import";
 

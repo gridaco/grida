@@ -25,7 +25,7 @@ import {
   useTool,
 } from "@grida/svg-editor/react";
 import type { Tool } from "@grida/svg-editor";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   CircleIcon,
   MinusIcon,

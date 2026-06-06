@@ -1,9 +1,14 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@app/ui/components/input";
+import { Textarea } from "@app/ui/components/textarea";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@app/ui/components/card";
 import Link from "next/link";
 import { usePropsEditor } from "@/scaffolds/props-editor";
 import { CMSImageField, CMSRichText } from "@/components/formfield-cms";
@@ -12,17 +17,22 @@ import { useProject } from "@/scaffolds/workspace";
 import { useCampaign } from "../../store";
 import { Platform } from "@/lib/platform";
 import { documentpreviewlink } from "@/lib/internal/url";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import type { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@app/ui/components/field";
 import type { WWWTemplateEditorInstance } from "@/scaffolds/platform/www";
 import assert from "assert";
 import { toast } from "sonner";
 import { CampaignTemplateDuo001Viewer } from "./template-duo-001-viewer";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@app/ui/components/scroll-area";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@app/ui/components/checkbox";
 import { EnterpriseCampaignThemeTab } from "./theme-tab";
 
 export function EnterpriseWestReferralDuo001Editor({

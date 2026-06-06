@@ -12,7 +12,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import {
   GiftIcon,

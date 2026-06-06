@@ -11,8 +11,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/dialog";
+import { Button } from "@app/ui/components/button";
 import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";
 

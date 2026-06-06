@@ -1,5 +1,5 @@
 import { Table2 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import {
   Empty,
   EmptyContent,
@@ -7,7 +7,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@app/ui/components/empty";
 
 export function EmptyRowsRenderer({
   loading,

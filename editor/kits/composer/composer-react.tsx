@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
   createContext,

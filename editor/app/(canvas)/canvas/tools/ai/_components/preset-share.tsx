@@ -1,13 +1,13 @@
 import { Copy } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Button } from "@app/ui/components/button";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 
 export function PresetShare({ disabled }: { disabled?: boolean }) {
   return (

@@ -5,7 +5,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuShortcut,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { DataFormat } from "..";
 
 export function DateTimeZoneRadioGroup({

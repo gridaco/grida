@@ -1,14 +1,14 @@
 import React, { useMemo } from "react";
-import * as CardPrimitives from "@/components/ui/card";
+import * as CardPrimitives from "@app/ui/components/card";
 import type { DGResponseRow } from "../grid";
 import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { Data } from "@/lib/data";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { LineContent } from "./line";
 import { MediaRenderer } from "./media";
 

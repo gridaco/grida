@@ -5,7 +5,7 @@ import {
   type RGBUnit,
 } from "@grida/number-input/react";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 type HexValueInputProps = Omit<
   React.InputHTMLAttributes<HTMLInputElement>,

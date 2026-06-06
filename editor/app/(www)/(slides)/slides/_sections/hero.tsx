@@ -3,7 +3,7 @@
 import React from "react";
 import { motion } from "motion/react";
 import { Button as FancyButton } from "@/www/ui/button";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { ArrowRight } from "lucide-react";
 import { sitemap } from "@/www/data/sitemap";
 import Link from "next/link";

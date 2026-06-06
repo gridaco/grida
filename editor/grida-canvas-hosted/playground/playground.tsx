@@ -39,8 +39,8 @@ import { PlusIcon, Cross1Icon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/dropdown-menu";
+import { Button } from "@app/ui/components/button";
 import {
   FloatingWindowHost,
   FloatingWindowBounds,
@@ -56,11 +56,11 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarProvider,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { v4 } from "uuid";
 import { HelpFab } from "@/scaffolds/globals/editor-help-fab";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { PlaygroundToolbar } from "./uxhost-toolbar";
 import {
   Tabs,
@@ -76,8 +76,8 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Kbd, KbdGroup } from "@/components/ui/kbd";
+} from "@app/ui/components/tooltip";
+import { Kbd, KbdGroup } from "@app/ui/components/kbd";
 import ErrorBoundary from "./error-boundary";
 import { uikbdk, M, KeyCode } from "@grida/keybinding";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
@@ -91,7 +91,7 @@ import {
   PreviewProvider,
 } from "@/grida-canvas-react-starter-kit/starterkit-preview";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
 import { editor } from "@/grida-canvas";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";

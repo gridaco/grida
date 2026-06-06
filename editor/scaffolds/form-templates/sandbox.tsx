@@ -1,8 +1,8 @@
 "use client";
 import React from "react";
 import { ErrorBoundary, FallbackProps } from "react-error-boundary";
-import { cn } from "@/components/lib/utils";
-import { Button } from "@/components/ui/button";
+import { cn } from "@app/ui/lib/utils";
+import { Button } from "@app/ui/components/button";
 
 export function SandboxWrapper({
   children,

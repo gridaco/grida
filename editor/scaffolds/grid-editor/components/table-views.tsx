@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
 import { useDatagridTable } from "@/scaffolds/editor";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 

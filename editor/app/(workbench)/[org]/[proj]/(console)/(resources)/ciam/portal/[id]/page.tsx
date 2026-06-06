@@ -7,12 +7,12 @@ import { createBrowserCIAMClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Spinner } from "@/components/ui/spinner";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
+import { Switch } from "@app/ui/components/switch";
+import { Badge } from "@app/ui/components/badge";
+import { Spinner } from "@app/ui/components/spinner";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { EmailTemplateAuthoringKit } from "@/kits/email-template-authoring";
 import {
   EmailFrame,
@@ -35,11 +35,16 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
-} from "@/components/ui/field";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@app/ui/components/field";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import { Safari, SafariToolbar } from "@/components/frames/safari";
 import { PortalLoginView } from "@/theme/templates/portal-login/202602-default/portal-login-view";
-import { Separator } from "@/components/ui/separator";
+import { Separator } from "@app/ui/components/separator";
 import type { ReactNode } from "react";
 import type {
   Database,

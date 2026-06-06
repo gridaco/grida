@@ -8,18 +8,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
+} from "@app/ui/components/table";
+import { Card, CardContent } from "@app/ui/components/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+} from "@app/ui/components/select";
+import { Badge } from "@app/ui/components/badge";
+import { Button } from "@app/ui/components/button";
+import { Progress } from "@app/ui/components/progress";
 import {
   ChevronDown,
   ChevronRight,
@@ -35,8 +35,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+} from "@app/ui/components/dropdown-menu";
+import { Avatar, AvatarFallback } from "@app/ui/components/avatar";
 import { Platform } from "@/lib/platform";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";

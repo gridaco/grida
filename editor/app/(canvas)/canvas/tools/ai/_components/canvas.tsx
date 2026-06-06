@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import type { DeepPartial } from "ai";
 import type { PortableNode } from "../schema";
 

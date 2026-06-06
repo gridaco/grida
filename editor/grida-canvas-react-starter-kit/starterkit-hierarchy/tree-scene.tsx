@@ -36,8 +36,8 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/context-menu";
+import { cn } from "@app/ui/lib/utils";
 import { NameInput } from "./tree-item-name-input";
 import { EditorTreeSource } from "./tree-source";
 import grida from "@grida/schema";

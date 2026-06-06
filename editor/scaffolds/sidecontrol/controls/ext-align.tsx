@@ -1,10 +1,10 @@
-import { ButtonGroup } from "@/components/ui/button-group";
+import { ButtonGroup } from "@app/ui/components/button-group";
 import { buttonVariants } from "@/components/ui-editor/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import {
   AlignTopIcon,
   AlignRightIcon,
@@ -16,7 +16,7 @@ import {
   SpaceEvenlyVerticallyIcon,
 } from "@radix-ui/react-icons";
 import React from "react";
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 
 export function AlignControl({
   disabled,

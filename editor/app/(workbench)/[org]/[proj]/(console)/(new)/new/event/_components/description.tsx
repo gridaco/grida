@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
 import { useState } from "react";
 

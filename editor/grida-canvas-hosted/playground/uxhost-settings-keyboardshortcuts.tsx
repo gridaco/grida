@@ -1,26 +1,26 @@
 import React, { useState, useMemo } from "react";
-import { Label } from "@/components/ui/label";
+import { Label } from "@app/ui/components/label";
 import {
   InputGroup,
   InputGroupInput,
   InputGroupAddon,
-} from "@/components/ui/input-group";
+} from "@app/ui/components/input-group";
 import {
   keycodeToPlatformUILabel,
   keybindingsToKeyCodes,
   getKeyboardOS,
   type Keybindings,
 } from "@grida/keybinding";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@app/ui/components/scroll-area";
 import { actions } from "./uxhost-actions";
-import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { Kbd, KbdGroup } from "@app/ui/components/kbd";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { SearchIcon } from "lucide-react";
 
 interface KeyboardShortcutRowProps {

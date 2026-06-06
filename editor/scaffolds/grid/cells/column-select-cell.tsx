@@ -3,8 +3,8 @@ import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-} from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
+} from "@app/ui/components/tooltip";
+import { Checkbox } from "@app/ui/components/checkbox";
 import { EnterFullScreenIcon } from "@radix-ui/react-icons";
 import type { CheckedState } from "@radix-ui/react-checkbox";
 

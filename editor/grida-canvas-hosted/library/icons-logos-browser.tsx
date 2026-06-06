@@ -12,12 +12,12 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { SearchInput } from "./components/search-input";
 import { Pill } from "./components/pills";
 import { LoadingIndicator } from "./components/loading-indicator";
 import { useDebounce } from "@uidotdev/usehooks";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { SlashIcon } from "@radix-ui/react-icons";
 import {
   IconsBrowserItem,

@@ -1,5 +1,5 @@
 "use client";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { MaxDialog } from "./_components/max";
 import { DescriptionDialog } from "./_components/description";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
@@ -19,8 +19,8 @@ import {
   StickyNoteIcon,
   TicketIcon,
 } from "lucide-react";
-import { cn } from "@/components/lib/utils";
-import { Label } from "@/components/ui/label";
+import { cn } from "@app/ui/lib/utils";
+import { Label } from "@app/ui/components/label";
 import Image from "next/image";
 import { CaretSortIcon } from "@radix-ui/react-icons";
 import { ScheduleDialog } from "./_components/schedule";

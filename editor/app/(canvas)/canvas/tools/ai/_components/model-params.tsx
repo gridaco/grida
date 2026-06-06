@@ -1,9 +1,9 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { MaxTokensSelector } from "./maxtokens-selector";
 import { TemperatureSelector } from "./temperature-selector";
 import { TopPSelector } from "./top-p-selector";

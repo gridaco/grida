@@ -1,4 +1,4 @@
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
 import Link from "next/link";
 import { getLocale } from "@/i18n/server";
 import { notFound, redirect } from "next/navigation";

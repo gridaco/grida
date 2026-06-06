@@ -6,7 +6,7 @@ import {
   FetchNodeResult,
   ImportFromFigmaApiDialog,
 } from "@/grida-canvas-react-starter-kit/starterkit-import";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { FigmaLogoIcon } from "@radix-ui/react-icons";
 import { GridaLogo } from "@/components/grida-logo";
 import { ThemedMonacoEditor } from "@/components/monaco";

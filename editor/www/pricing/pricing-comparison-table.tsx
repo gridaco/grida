@@ -8,7 +8,7 @@ import {
   PricingTableRowDesktop,
   PricingTableRowMobile,
 } from "./pricing-table-row";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import Link from "next/link";
 import {
   CloudUploadIcon,

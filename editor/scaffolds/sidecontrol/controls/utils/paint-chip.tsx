@@ -1,6 +1,6 @@
 import { css } from "@/grida-canvas-utils/css";
 import { TransparencyGridIcon, ImageIcon } from "@radix-ui/react-icons";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { ImageView } from "@/grida-canvas-react";
 import { ComponentProps } from "react";
 import type cg from "@grida/cg";

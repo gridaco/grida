@@ -4,9 +4,9 @@ import React, { useState } from "react";
 import type { FormFieldInit } from "@/grida-forms-hosted/types";
 import { LightningBoltIcon, MagicWandIcon } from "@radix-ui/react-icons";
 import { draftid } from "@/utils/id";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@app/ui/components/textarea";
+import { Button } from "@app/ui/components/button";
+import { Spinner } from "@app/ui/components/spinner";
 import { generateFormFieldSchema } from "@/lib/ai/actions/forms-schema";
 
 export function FormFieldAssistant({

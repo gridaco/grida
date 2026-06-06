@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Folder,
   File,
@@ -14,7 +14,7 @@ import {
   MoreHorizontal,
   Check,
 } from "lucide-react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 type FileNode = {
   type: "file";

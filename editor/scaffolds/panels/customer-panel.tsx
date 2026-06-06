@@ -7,18 +7,18 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+} from "@app/ui/components/sheet";
+import { Label } from "@app/ui/components/label";
+import { Input } from "@app/ui/components/input";
+import { Avatar, AvatarFallback } from "@app/ui/components/avatar";
 import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
 import { fmt_local_index } from "@/utils/fmt";
 import { Link2Icon } from "@radix-ui/react-icons";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { provisional } from "@/services/customer/utils";
 import type { Platform } from "@/lib/platform";
 import useSWR from "swr";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export function CustomerEditPanel({
   customer_id,

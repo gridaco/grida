@@ -4,7 +4,7 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-} from "@/components/ui/carousel";
+} from "@app/ui/components/carousel";
 import Autoplay from "embla-carousel-autoplay";
 import {
   ScreenDecorations,
@@ -14,7 +14,7 @@ import {
   ScreenRoot,
   TickerTape,
 } from "@/theme/templates/kit/components";
-import { Card } from "@/components/ui/card";
+import { Card } from "@app/ui/components/card";
 import Image from "next/image";
 import type grida from "@grida/schema";
 

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Progress } from "@/components/ui-editor/progress";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export type LoadingIndicatorProps = {
   loading?: boolean;

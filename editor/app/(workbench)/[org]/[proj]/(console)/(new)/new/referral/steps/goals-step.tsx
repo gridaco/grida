@@ -1,18 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Input } from "@app/ui/components/input";
+import { Textarea } from "@app/ui/components/textarea";
+import { Button } from "@app/ui/components/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+} from "@app/ui/components/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
+import { Field, FieldGroup, FieldLabel } from "@app/ui/components/field";
 import {
   Plus,
   Target,

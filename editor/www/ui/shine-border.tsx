@@ -3,7 +3,7 @@
 // https://magicui.design/docs/components/shine-border
 import * as React from "react";
 
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 interface ShineBorderProps extends React.HTMLAttributes<HTMLDivElement> {
   /**

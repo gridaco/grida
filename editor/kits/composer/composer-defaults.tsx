@@ -1,12 +1,12 @@
 "use client";
 
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 import {
   Command,
   CommandGroup,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 import { ImageIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import { type ReactNode, useEffect, useRef } from "react";

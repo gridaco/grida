@@ -14,8 +14,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+} from "@app/ui/components/card";
+import { Badge } from "@app/ui/components/badge";
 import {
   Table,
   TableBody,
@@ -23,8 +23,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
+} from "@app/ui/components/table";
+import { Separator } from "@app/ui/components/separator";
 import type { ai as AITypes } from "@/lib/ai/ai";
 import Header from "@/www/header";
 import Footer from "@/www/footer";

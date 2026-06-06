@@ -28,7 +28,7 @@ import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
 import useDisableSwipeBack from "@/grida-canvas-react/viewport/hooks/use-disable-browser-swipe-back";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,7 @@ import {
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
-import { Card } from "@/components/ui/card";
+import { Card } from "@app/ui/components/card";
 import { PenToolIcon } from "lucide-react";
 import { editor } from "@/grida-canvas";
 import { useEditor } from "@/grida-canvas-react";

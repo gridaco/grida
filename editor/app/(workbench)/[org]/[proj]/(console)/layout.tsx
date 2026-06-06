@@ -1,10 +1,10 @@
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@app/ui/components/sonner";
 import { EditorHelpFab } from "@/scaffolds/globals/editor-help-fab";
 import { Inter } from "next/font/google";
 import { ProjectLoaded, ProjectTagsProvider } from "@/scaffolds/workspace";
 import { Metadata } from "next";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@app/ui/components/tooltip";
 
 const inter = Inter({ subsets: ["latin"] });
 

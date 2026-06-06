@@ -8,9 +8,9 @@ import type {
 import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import { useFileRefs } from "../grid/providers";
 import { FileRefsStateRenderer } from "../grid/cells";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { useMediaViewer } from "@/components/mediaviewer";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { PlayFilledIcon } from "@/components/icons";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 

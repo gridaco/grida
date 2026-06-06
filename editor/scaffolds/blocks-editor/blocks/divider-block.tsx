@@ -10,7 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockAction,
@@ -20,7 +20,7 @@ import {
   useDeleteBlock,
   MoveBlockMenuItems,
 } from "./base-block";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 
 export function DividerBlock({ id }: EditorFlatFormBlock) {
   const [focused, setFocus] = useBlockFocus(id);

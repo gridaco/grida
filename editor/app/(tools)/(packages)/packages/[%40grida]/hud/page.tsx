@@ -27,9 +27,9 @@ import {
 } from "@/app/(dev)/ui/components/hud/_showcase";
 import { LiveEditorSection } from "@/app/(dev)/ui/components/hud/_live-section";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { NpmLogoIcon } from "@/components/logos/npm";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { useScrollSpy } from "@/hooks/use-scroll-spy";
 import Footer from "@/www/footer";
 import Header from "@/www/header";

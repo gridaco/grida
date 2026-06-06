@@ -1,6 +1,6 @@
 import { packages } from "./data";
 import { NpmLogoIcon } from "@/components/logos/npm";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { BoxIcon } from "lucide-react";
 import Header from "@/www/header";
 import Footer from "@/www/footer";

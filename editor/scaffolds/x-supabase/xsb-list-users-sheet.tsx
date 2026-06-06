@@ -7,7 +7,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
+} from "@app/ui/components/sheet";
 import { XSBAuthUsersGrid } from "@/scaffolds/grid/wellknown/xsb-auth.users-grid";
 import { GridaXSupabase } from "@/types";
 import React, { useEffect, useMemo, useState } from "react";

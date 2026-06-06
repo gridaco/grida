@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import Prompt from "./prompt";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { PageBackground } from "@/theme/bg/background";
 import Header from "@/www/header";
 import Link from "next/link";

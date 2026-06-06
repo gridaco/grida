@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import * as Figma from "figma-api";
-import { Input } from "@/components/ui/input";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@app/ui/components/input";
+import { Field, FieldDescription, FieldLabel } from "@app/ui/components/field";
 import {
   Dialog,
   DialogClose,
@@ -10,8 +10,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/dialog";
+import { Button } from "@app/ui/components/button";
 import { FigmaLogoIcon } from "@radix-ui/react-icons";
 import { toast } from "sonner";
 

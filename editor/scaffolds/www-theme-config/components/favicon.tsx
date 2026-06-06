@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@app/ui/components/button";
+import { Separator } from "@app/ui/components/separator";
 
 interface FaviconSectionProps {
   favicon: { src: string; srcDark?: string | undefined } | null;

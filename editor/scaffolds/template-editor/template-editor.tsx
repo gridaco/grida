@@ -9,22 +9,27 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+} from "@app/ui/components/select";
+import { Button } from "@app/ui/components/button";
+import { Label } from "@app/ui/components/label";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import { CaretLeftIcon, ReloadIcon } from "@radix-ui/react-icons";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import {
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
-} from "@/components/ui/hover-card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@app/ui/components/hover-card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import { useMockedContext } from "@/scaffolds/template-editor/mock";
 import { TemplateTextEditor } from "@/scaffolds/template-editor/text-editor";
 import { ContextVariablesTable } from "@/scaffolds/template-editor/about-variable-table";
@@ -39,7 +44,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@app/ui/components/alert-dialog";
 import {
   ending_page_template_config,
   ending_page_templates,

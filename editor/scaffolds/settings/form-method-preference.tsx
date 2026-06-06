@@ -13,13 +13,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/select";
+import { Button } from "@app/ui/components/button";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
 import type { FormMethod } from "@/grida-forms-hosted/types";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { useEditorState } from "../editor";
 
 export function FormMethodPreference() {

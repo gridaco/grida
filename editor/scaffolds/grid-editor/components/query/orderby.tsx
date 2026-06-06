@@ -6,19 +6,19 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/dropdown-menu";
+import { Button } from "@app/ui/components/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { PopoverClose } from "@radix-ui/react-popover";
 import { WorkbenchUI } from "@/components/workbench";
 import { ArrowDownIcon, ArrowDownUpIcon, ArrowUpIcon } from "lucide-react";

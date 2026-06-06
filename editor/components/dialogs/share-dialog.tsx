@@ -3,10 +3,15 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { Copy, Mail, MessageSquareText, MoreHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { Drawer, DrawerTitle, DrawerContent } from "@/components/ui/drawer";
+import { Button } from "@app/ui/components/button";
+import { Separator } from "@app/ui/components/separator";
+import {
+  Item,
+  ItemContent,
+  ItemMedia,
+  ItemTitle,
+} from "@app/ui/components/item";
+import { Drawer, DrawerTitle, DrawerContent } from "@app/ui/components/drawer";
 
 export type WebSharePayload = {
   title?: string;

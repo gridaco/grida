@@ -5,7 +5,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@app/ui/components/table";
 import { TemplateVariables } from "@/lib/templating";
 import { z } from "zod/v3";
 

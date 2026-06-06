@@ -6,7 +6,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { SearchInput } from "./components/search-input";
 import { useDebounce } from "@uidotdev/usehooks";
 import { ButtonIcon } from "@radix-ui/react-icons";

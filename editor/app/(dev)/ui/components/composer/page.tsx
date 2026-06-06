@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { ArrowUpIcon, PlusIcon } from "lucide-react";
 import {
   type DragEvent,

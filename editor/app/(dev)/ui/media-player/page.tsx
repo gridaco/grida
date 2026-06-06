@@ -2,7 +2,7 @@
 
 import { MediaObject } from "@/components/mediaviewer";
 import { ContentAudio } from "@/components/mediaviewer/pip-audio-content";
-import { Card } from "@/components/ui/card";
+import { Card } from "@app/ui/components/card";
 import React from "react";
 
 export default function MediaPlayerDevPage() {

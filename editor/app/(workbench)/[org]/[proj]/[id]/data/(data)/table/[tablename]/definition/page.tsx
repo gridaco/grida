@@ -8,7 +8,7 @@ import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import { Data } from "@/lib/data";
 import { DefinitionFlow } from "@/scaffolds/data-definition/flow";
 import { ReactFlowProvider } from "@xyflow/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import "@xyflow/react/dist/style.css";

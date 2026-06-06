@@ -32,25 +32,25 @@ import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
+} from "@app/ui/ai-elements/reasoning";
 import {
   Message,
   MessageResponse,
   MessageAction,
   MessageActions,
   MessageContent,
-} from "@/components/ai-elements/message";
+} from "@app/ui/ai-elements/message";
 import {
   Tool,
   ToolContent,
   ToolHeader,
   ToolInput,
   ToolOutput,
-} from "@/components/ai-elements/tool";
+} from "@app/ui/ai-elements/tool";
 import { canvas_use } from "@/grida-canvas-hosted/ai/tools/canvas-use";
 import { CopyIcon } from "lucide-react";
-import { cn } from "@/components/lib/utils";
-import { Shimmer } from "@/components/ai-elements/shimmer";
+import { cn } from "@app/ui/lib/utils";
+import { Shimmer } from "@app/ui/ai-elements/shimmer";
 import { SvgToolUI } from "./tool-ui-svg";
 import { TreeToolUI } from "./tool-ui-tree";
 import { ArtboardSizesToolUI } from "./tool-ui-artboard-sizes";

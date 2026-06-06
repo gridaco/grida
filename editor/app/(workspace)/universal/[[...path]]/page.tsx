@@ -14,7 +14,7 @@ import {
   ItemGroup,
   ItemMedia,
   ItemTitle,
-} from "@/components/ui/item";
+} from "@app/ui/components/item";
 import { ArrowRight, Folder, FileText } from "lucide-react";
 
 type Params = {

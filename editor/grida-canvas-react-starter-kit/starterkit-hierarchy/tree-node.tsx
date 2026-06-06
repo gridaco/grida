@@ -54,7 +54,7 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
-} from "@/components/ui/context-menu";
+} from "@app/ui/components/context-menu";
 import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import grida from "@grida/schema";
 import { EditorTreeSource } from "./tree-source";

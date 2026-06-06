@@ -13,8 +13,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+} from "@app/ui/components/table";
+import { Badge } from "@app/ui/components/badge";
 import {
   LightningBoltIcon,
   QuestionMarkCircledIcon,
@@ -23,14 +23,14 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import MessageAppFrame from "@/components/frames/message-app-frame";
 import { bird_sms_fees } from "@/k/sms_fees";
 import {
@@ -42,12 +42,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui-editor/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Spinner } from "@/components/ui/spinner";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
+import { Textarea } from "@app/ui/components/textarea";
+import { Switch } from "@app/ui/components/switch";
+import { Spinner } from "@app/ui/components/spinner";
+import { Separator } from "@app/ui/components/separator";
 import { MessageCircleIcon } from "lucide-react";
 import { useEditorState } from "@/scaffolds/editor";
 import {
@@ -57,7 +57,7 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
-} from "@/components/ui/field";
+} from "@app/ui/components/field";
 import { PrivateEditorApi } from "@/lib/private";
 import { EmailTemplateAuthoringKit } from "@/kits/email-template-authoring";
 import {

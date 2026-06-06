@@ -1,4 +1,4 @@
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import React from "react";
 import { WorkbenchUI } from "@/components/workbench";
 

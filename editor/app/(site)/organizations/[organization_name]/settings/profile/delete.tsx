@@ -10,10 +10,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/alert-dialog";
+import { Button } from "@app/ui/components/button";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 
 export function DeleteOrganizationConfirm({
   org,

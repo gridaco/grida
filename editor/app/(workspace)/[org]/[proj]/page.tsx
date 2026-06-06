@@ -12,9 +12,9 @@ import { CreateNewDocumentButton } from "@/scaffolds/workspace/create-new-docume
 import { ProjectStats } from "@/scaffolds/analytics/stats";
 import { PoweredByGridaFooter } from "@/grida-forms-hosted/e/powered-by-brand-footer";
 import { useWorkspace } from "@/scaffolds/workspace";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { DocumentsGrid } from "@/app/(workspace)/[org]/_components/documents-grid";
 import { SettingsIcon } from "lucide-react";
 import Head from "next/head";

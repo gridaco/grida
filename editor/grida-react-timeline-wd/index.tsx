@@ -1,6 +1,6 @@
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import * as React from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 type TimelineProps = React.ComponentPropsWithoutRef<
   typeof SliderPrimitive.Root

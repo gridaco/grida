@@ -5,7 +5,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import type { Metadata } from "next";
 import "../globals.css";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@app/ui/components/tooltip";
 
 const inter = Inter({ subsets: ["latin"] });
 

@@ -1,20 +1,20 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import {
   Field,
   FieldDescription,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field";
+} from "@app/ui/components/field";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@app/ui/components/select";
+import { Textarea } from "@app/ui/components/textarea";
 import { DotsVerticalIcon } from "@radix-ui/react-icons";
 
 export type SiteGeneral = {

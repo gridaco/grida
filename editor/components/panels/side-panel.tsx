@@ -4,9 +4,9 @@ import {
   HoverCard,
   HoverCardTrigger,
   HoverCardContent,
-} from "@/components/ui/hover-card";
+} from "@app/ui/components/hover-card";
 import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export function SidePanel({
   children,

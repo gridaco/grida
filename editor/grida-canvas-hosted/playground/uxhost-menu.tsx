@@ -45,7 +45,7 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { saveAs } from "file-saver";
 import { v4 } from "uuid";

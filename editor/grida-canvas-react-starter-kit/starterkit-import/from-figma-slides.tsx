@@ -7,10 +7,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+} from "@app/ui/components/dialog";
+import { Button } from "@app/ui/components/button";
+import { Progress } from "@app/ui/components/progress";
+import { Alert, AlertTitle, AlertDescription } from "@app/ui/components/alert";
 import { FigmaLogoIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { FileIcon, CheckCircle2Icon } from "lucide-react";
 import { FileDropzone } from "./file-dropzone";

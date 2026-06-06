@@ -1,8 +1,8 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Badge } from "@app/ui/components/badge";
+import { Button } from "@app/ui/components/button";
+import { Field, FieldLabel } from "@app/ui/components/field";
 import {
   Dialog,
   DialogContent,
@@ -10,20 +10,20 @@ import {
   DialogFooter,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/dialog";
+import { Input } from "@app/ui/components/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { editorlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
 import { generated_form_store_name } from "@/services/utils/generated-form-store-name";

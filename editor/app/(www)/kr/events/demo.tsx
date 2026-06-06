@@ -4,9 +4,14 @@ import Image from "next/image";
 import React from "react";
 import * as k from "./data";
 import { GridaLogo } from "@/components/grida-logo";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import bentomainbg from "../../../../public/affiliate/poc/images/bento-fullsize-video-card-background.png";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export function Demo() {
   return (

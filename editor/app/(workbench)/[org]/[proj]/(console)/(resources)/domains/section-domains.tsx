@@ -4,13 +4,13 @@ import React, { useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
 import { toast } from "sonner";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Spinner } from "@/components/ui/spinner";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
+import { Badge } from "@app/ui/components/badge";
+import { Field, FieldDescription, FieldLabel } from "@app/ui/components/field";
+import { Spinner } from "@app/ui/components/spinner";
+import { Switch } from "@app/ui/components/switch";
+import { Label } from "@app/ui/components/label";
 import {
   Dialog,
   DialogClose,
@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,8 +28,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/components/lib/utils/index";
+} from "@app/ui/components/dropdown-menu";
+import { cn } from "@app/ui/lib/utils";
 import {
   DotsHorizontalIcon,
   Pencil2Icon,

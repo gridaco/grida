@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Field, FieldLabel } from "@/components/ui/field";
+} from "@app/ui/components/dialog";
+import { Input } from "@app/ui/components/input";
+import { Field, FieldLabel } from "@app/ui/components/field";
 
 interface CapacityDialogProps {
   defaultCapacity?: number;

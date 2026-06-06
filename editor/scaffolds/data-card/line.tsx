@@ -1,7 +1,7 @@
 import React from "react";
 import type { Data } from "@/lib/data";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@app/ui/components/badge";
+import { Checkbox } from "@app/ui/components/checkbox";
 
 export function LineContent({
   value,

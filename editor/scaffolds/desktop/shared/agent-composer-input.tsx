@@ -18,8 +18,8 @@
 
 import { useMemo, type ReactNode } from "react";
 import { ArrowUpIcon, SquareIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils/index";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import {
   ComposerContent,
   ComposerProvider,

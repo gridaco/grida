@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Card } from "@/components/ui/card";
-import { cn } from "@/components/lib/utils";
+import { Card } from "@app/ui/components/card";
+import { cn } from "@app/ui/lib/utils";
 import { useDrag } from "@use-gesture/react";
 import { useMeasure, useThrottle } from "@uidotdev/usehooks";
 

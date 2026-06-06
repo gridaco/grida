@@ -9,18 +9,18 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
+} from "@app/ui/components/navigation-menu";
 import { GridaLogo } from "@/components/grida-logo";
 import { GitHubLogoIcon, HamburgerMenuIcon } from "@radix-ui/react-icons";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Drawer,
   DrawerContent,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer";
+} from "@app/ui/components/drawer";
 import { sitemap } from "./data/sitemap";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   ResourceTypeIcon,
   ResourceTypeIconName,

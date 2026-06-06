@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@app/ui/components/tooltip";
 import { Content } from "@tiptap/react";
 import { MinimalTiptapEditor } from "@/kits/minimal-tiptap";
 

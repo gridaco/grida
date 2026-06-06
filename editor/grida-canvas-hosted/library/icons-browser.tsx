@@ -12,14 +12,14 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { Button } from "@/components/ui-editor/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import {
   Command,
   CommandEmpty,
@@ -27,13 +27,13 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 import { CaretDownIcon, DotIcon } from "@radix-ui/react-icons";
 import { CheckIcon } from "lucide-react";
 import { SearchInput } from "./components/search-input";
 import { Pill, PillsList } from "./components/pills";
 import { LoadingIndicator } from "./components/loading-indicator";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   ANY_VARIANT,
   IconVendor,

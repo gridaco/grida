@@ -16,7 +16,7 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef } from "react";
 
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 
 export type Frame = number[][];
 type MatrixMode = "default" | "vu";

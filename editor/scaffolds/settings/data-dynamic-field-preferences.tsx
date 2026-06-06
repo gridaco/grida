@@ -14,13 +14,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import type { FormResponseUnknownFieldHandlingStrategyType } from "@/grida-forms-hosted/types";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { useEditorState } from "../editor";
 
 export function UnknownFieldPreferences() {

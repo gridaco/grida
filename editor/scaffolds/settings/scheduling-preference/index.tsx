@@ -14,14 +14,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+} from "@app/ui/components/table";
+import { Button } from "@app/ui/components/button";
+import { Switch } from "@app/ui/components/switch";
+import { Label } from "@app/ui/components/label";
 import { useTimestampTZ } from "@/hooks/use-timestamptz";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { toZonedTime, format as tzFormat, fromZonedTime } from "date-fns-tz";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { PrivateEditorApi } from "@/lib/private";
 import { CalendarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { DatePicker, TZPicker, TimePicker } from "./pickers";

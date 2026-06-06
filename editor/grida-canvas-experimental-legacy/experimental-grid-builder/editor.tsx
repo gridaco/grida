@@ -13,7 +13,7 @@ import { useGesture } from "@use-gesture/react";
 import { nanoid } from "nanoid";
 import { DndContext, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { cvt_delta_by_resize_handle_origin, resize } from "./transform-resize";
 import { motion } from "motion/react";
 import useMergedRef from "@/hooks/use-merged-ref";

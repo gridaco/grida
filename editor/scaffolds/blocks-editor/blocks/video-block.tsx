@@ -10,8 +10,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/dropdown-menu";
+import { Button } from "@app/ui/components/button";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockAction,

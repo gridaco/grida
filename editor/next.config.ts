@@ -16,6 +16,8 @@ const withMDX = createMDX({
 
 const nextConfig: NextConfig = {
   pageExtensions: ["js", "jsx", "mdx", "ts", "tsx"],
+  // @app/ui is a workspace package shipping raw TSX; Next must transpile it.
+  transpilePackages: ["@app/ui"],
   experimental: {
     mdxRs: true,
   },

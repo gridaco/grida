@@ -4,9 +4,9 @@ import type React from "react";
 
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import { SearchIcon, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 
 export function IntegrationsSearch() {
   const router = useRouter();

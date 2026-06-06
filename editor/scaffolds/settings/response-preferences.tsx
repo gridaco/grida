@@ -8,22 +8,22 @@ import {
   PreferenceBoxHeader,
   PreferenceDescription,
 } from "@/components/preferences";
-import { cn } from "@/components/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { cn } from "@app/ui/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { Switch } from "@app/ui/components/switch";
+import { Label } from "@app/ui/components/label";
+import { Input } from "@app/ui/components/input";
 import Link from "next/link";
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from "@/components/ui/hover-card";
+} from "@app/ui/components/hover-card";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { PrivateEditorApi } from "@/lib/private";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { editorlink } from "@/host/url";
 import { useEditorState } from "../editor";
 

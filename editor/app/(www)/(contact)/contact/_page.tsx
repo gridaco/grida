@@ -5,14 +5,14 @@ import Header from "@/www/header";
 import FooterWithCTA from "@/www/footer-with-cta";
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import { Calendar } from "lucide-react";
 import { SlackLogoIcon } from "@/components/logos";
 import { EnvelopeClosedIcon } from "@radix-ui/react-icons";

@@ -9,16 +9,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@app/ui/components/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+} from "@app/ui/components/dropdown-menu";
+import { Button } from "@app/ui/components/button";
+import { Switch } from "@app/ui/components/switch";
+import { Badge } from "@app/ui/components/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +28,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@app/ui/components/alert-dialog";
 import { usePolicyStore } from "./store";
 import { toast } from "sonner";
 import Link from "next/link";

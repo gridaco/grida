@@ -3,7 +3,7 @@
 import { useCallback, useState, type KeyboardEvent } from "react";
 import type { Content } from "@tiptap/react";
 import { MinimalTiptapEditor, toTiptapContent } from "@/kits/minimal-tiptap";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Dialog,
   DialogClose,

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@app/ui/components/sonner";
 import { cookies } from "next/headers";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@app/ui/components/tooltip";
 import { getPlatform } from "@/host/platform";
 import PlatformProvider from "@/host/platform-provider";
 import "../editor.css";

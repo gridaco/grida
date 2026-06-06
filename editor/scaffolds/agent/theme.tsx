@@ -5,7 +5,7 @@ import palettes from "@/theme/palettes";
 import useVariablesCSS from "@/theme/hooks/use-variables-css";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
 import { PageBackground } from "@/theme/bg/background";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useTheme } from "next-themes";
 import { CustomCSSProvider } from "@/scaffolds/css/css-provider";
 import type { NextFont } from "next/dist/compiled/@next/font/dist/types";

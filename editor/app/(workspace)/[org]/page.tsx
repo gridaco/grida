@@ -21,10 +21,10 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/empty";
+import { Button } from "@app/ui/components/button";
 import { useWorkspace } from "@/scaffolds/workspace";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { DocumentsGrid } from "./_components/documents-grid";
 
 export default function OrganizationDashboardPage(props: {

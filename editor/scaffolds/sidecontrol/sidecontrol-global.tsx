@@ -8,7 +8,7 @@ import {
   SidebarSectionHeaderItem,
   SidebarSectionHeaderLabel,
 } from "@/components/sidebar";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup, ToggleGroupItem } from "@app/ui/components/toggle-group";
 import {
   Select,
   SelectContent,
@@ -17,7 +17,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { Ag } from "@/components/design/ag";
 import { fonts } from "@/theme/font-family";
 import { useEditorState } from "../editor";
@@ -29,7 +29,7 @@ import type {
 import * as _variants from "@/theme/palettes";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
 import { sections } from "@/theme/section";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   DesktopIcon,
   GearIcon,
@@ -47,14 +47,19 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { customcss_starter_template } from "@/theme/customcss/k";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/components/lib/utils";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@app/ui/components/label";
+import { cn } from "@app/ui/lib/utils";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import {
   PreferenceBody,
   PreferenceBox,
@@ -65,7 +70,7 @@ import {
   language_label_map,
   supported_form_page_languages,
 } from "@/k/supported_languages";
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@app/ui/components/switch";
 import { PoweredByGridaWaterMark } from "@/components/powered-by-branding";
 import { BrowseStartPageTemplatesDialog } from "../form-templates/startpage-templates-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
@@ -81,7 +86,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@app/ui/components/alert-dialog";
 import { useCurrentEditor } from "@/grida-canvas-react";
 
 const { default: all, ...variants } = _variants;

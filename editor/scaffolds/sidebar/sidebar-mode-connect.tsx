@@ -16,7 +16,7 @@ import {
   SupabaseLogo,
   TossLogo,
 } from "@/components/logos";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -24,7 +24,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenu,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { editorlink } from "@/host/url";
 import { SidebarMenuLinkButton } from "./sidebar-menu-link-button";
 import { SalesforceLogo } from "@/components/logos/salesforce";

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { TreeItem, TreeItemLabel } from "@/components/ui-editor/tree";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   MaskIndicatorVariant,
   NodeMaskRole,

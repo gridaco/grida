@@ -11,7 +11,7 @@ import {
   SectorHeader,
   SectorHeading,
 } from "@/components/preferences";
-import { Field, FieldGroup, FieldTitle } from "@/components/ui/field";
+import { Field, FieldGroup, FieldTitle } from "@app/ui/components/field";
 import { useEditorState } from "@/scaffolds/editor";
 import { AboutThisForm } from "@/scaffolds/settings/about-this-form";
 import React from "react";

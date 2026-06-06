@@ -8,14 +8,14 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/popover";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { supported_field_types, annotations } from "@/k/supported_field_types";
 import type { FormInputType } from "@/grida-forms-hosted/types";

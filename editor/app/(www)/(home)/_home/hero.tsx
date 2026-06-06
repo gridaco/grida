@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { Button as FancyButton } from "@/www/ui/button";
 import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";

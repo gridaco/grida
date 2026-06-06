@@ -16,7 +16,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@app/ui/components/breadcrumb";
 import {
   Sidebar,
   SidebarContent,
@@ -26,13 +26,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from "@/components/ui/sidebar";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+} from "@app/ui/components/sidebar";
+import { Tabs, TabsContent } from "@app/ui/components/tabs";
 import { SchemedColorToken, defaultThemeColors } from "@/theme/shadcn/colors";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { CardsDemo } from "@/theme/shadcn/example/cards";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Checkbox } from "@app/ui/components/checkbox";
+import { ToggleGroup, ToggleGroupItem } from "@app/ui/components/toggle-group";
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
 import {
   SectionHeader,
@@ -40,7 +40,7 @@ import {
   SectionHeaderTitle,
 } from "./components/section-header";
 import colors, { ColorPalette } from "@/theme/tailwindcolors";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { useTheme } from "next-themes";
 import { ThemeEditorProvider, ThemeEditorState, useThemeEditor } from "./state";
 import { ColorPickerChip } from "./components/color-chip";

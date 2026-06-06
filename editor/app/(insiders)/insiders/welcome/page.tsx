@@ -1,12 +1,12 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import { CalendarDays, Users, Zap } from "lucide-react";
 import Link from "next/link";
 import { HomeIcon } from "@radix-ui/react-icons";

@@ -20,12 +20,12 @@ import {
 } from "@/grida-canvas-react";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import { useEditorHotKeys } from "@/grida-canvas-react/viewport/hotkeys";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@app/ui/components/tooltip";
 import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dropzone";
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import Toolbar, {
   ToolbarPosition,
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
@@ -34,7 +34,7 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarProvider,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { useEditor } from "@/grida-canvas-react";
 
 export default function MinimalCanvasDemo() {

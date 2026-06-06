@@ -17,7 +17,7 @@ import {
   MessageAction,
   MessageContent,
   MessageResponse,
-} from "@/components/ai-elements/message";
+} from "@app/ui/ai-elements/message";
 import { queuedMessageText } from "@/lib/agent-chat";
 import type { ChatMessageWithParts } from "@/lib/desktop/bridge";
 

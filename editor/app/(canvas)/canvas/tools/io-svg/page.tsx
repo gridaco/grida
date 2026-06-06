@@ -16,8 +16,13 @@ import {
 } from "@/grida-canvas-react";
 
 import { useFilePicker } from "use-file-picker";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@app/ui/components/button";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import { useHotkeys } from "react-hotkeys-hook";
 import { editor } from "@/grida-canvas";
 import { io } from "@grida/io";

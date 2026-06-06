@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui-editor/dialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Cross2Icon,
   EnterFullScreenIcon,
@@ -25,8 +25,8 @@ import { useHotkeys } from "react-hotkeys-hook";
 import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 import Resizable from "./resizable";
 import ErrorBoundary from "@/grida-canvas-hosted/playground/error-boundary";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/components/lib/utils";
+import { Input } from "@app/ui/components/input";
+import { cn } from "@app/ui/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
 import { dq } from "@/grida-canvas/query";
 

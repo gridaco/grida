@@ -13,8 +13,8 @@ import {
 import type { Tool } from "@grida/svg-editor";
 
 import { ToolGroupItem } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 
 type ToolEntry = {
   value: string;

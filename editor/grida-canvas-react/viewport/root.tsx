@@ -3,7 +3,7 @@
 import React from "react";
 import { domapi } from "@/grida-canvas/backends/dom";
 import { ViewportSurfaceContext } from "./context";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export function ViewportRoot({
   className,

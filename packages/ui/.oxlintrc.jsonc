@@ -1,0 +1,11 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.jsonc"],
+  "ignorePatterns": [
+    // shadcn / registry UI (vendored — no control over code). Mirrors the
+    // editor's prior `components/ui/**` + `components/ai-elements/**` ignores
+    // from before these were promoted into @app/ui.
+    "src/components/**",
+    "src/ai-elements/**",
+  ],
+}

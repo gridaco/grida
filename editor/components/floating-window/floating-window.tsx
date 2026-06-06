@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   FloatingWindowHost as PrimitiveHost,
   FloatingWindowBounds as PrimitiveBounds,

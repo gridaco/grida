@@ -7,8 +7,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from "@app/ui/components/dropdown-menu";
+import { ScrollArea } from "@app/ui/components/scroll-area";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { CheckIcon, PlusIcon } from "@radix-ui/react-icons";
 import Link from "next/link";

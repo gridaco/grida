@@ -8,7 +8,7 @@ import {
   ChevronUpIcon,
 } from "@radix-ui/react-icons";
 
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 
 function Select({
   ...props

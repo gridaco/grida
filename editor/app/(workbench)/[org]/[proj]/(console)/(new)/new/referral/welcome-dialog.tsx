@@ -6,7 +6,7 @@ import {
   AlertDialogCancel,
   AlertDialogTitle,
   AlertDialogDescription,
-} from "@/components/ui/alert-dialog";
+} from "@app/ui/components/alert-dialog";
 import Image from "next/image";
 
 export default function WelcomeDialog(

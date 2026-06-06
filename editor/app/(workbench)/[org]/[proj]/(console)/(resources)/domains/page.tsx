@@ -5,7 +5,7 @@ import { createBrowserWWWClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { useCallback, useMemo } from "react";
 import useSWR, { mutate } from "swr";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import {
   DEFAULT_PLATFORM_APEX_DOMAIN,
   platformSiteHostnameForTenant,

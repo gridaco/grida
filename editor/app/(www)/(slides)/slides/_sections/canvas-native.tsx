@@ -3,7 +3,7 @@
 import React from "react";
 import { motion } from "motion/react";
 import { SectionHeader, SectionHeaderBadge } from "@/www/ui/section";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 const features = [
   {

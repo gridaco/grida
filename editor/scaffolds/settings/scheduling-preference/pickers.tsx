@@ -1,11 +1,11 @@
 import { format } from "date-fns";
-import { cn } from "@/components/lib/utils";
-import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@app/ui/lib/utils";
+import { Calendar } from "@app/ui/components/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { CalendarIcon } from "@radix-ui/react-icons";
 import timezones from "timezones-list";
 import {
@@ -14,9 +14,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/select";
+import { Input } from "@app/ui/components/input";
+import { Button } from "@app/ui/components/button";
 
 export function TZPicker({
   defaultValue,

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { CheckIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardContent,
@@ -12,9 +12,9 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@app/ui/components/card";
+import { Badge } from "@app/ui/components/badge";
+import { Skeleton } from "@app/ui/components/skeleton";
 import {
   getBillingSummary,
   startSubscribeCheckout,

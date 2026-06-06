@@ -14,7 +14,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockAction,
@@ -34,7 +34,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import {
   Dialog,
   DialogClose,
@@ -42,9 +42,9 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/dialog";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import { editorlink } from "@/host/url";
 import { SYSTEM_GF_KEY_STARTS_WITH } from "@/k/system";
 

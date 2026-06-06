@@ -7,8 +7,8 @@ import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
-} from "@/components/ui/collapsible";
-import { Badge } from "@/components/ui/badge";
+} from "@app/ui/components/collapsible";
+import { Badge } from "@app/ui/components/badge";
 
 export function ErrorInvalidSchema({
   data,

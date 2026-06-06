@@ -4,12 +4,17 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { Check } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/components/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { Field, FieldGroup, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
+import { Textarea } from "@app/ui/components/textarea";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@app/ui/components/card";
+import { cn } from "@app/ui/lib/utils";
 import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";
 import { ArrowRightIcon } from "@radix-ui/react-icons";

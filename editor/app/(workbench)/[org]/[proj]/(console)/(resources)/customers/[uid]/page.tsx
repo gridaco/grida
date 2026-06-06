@@ -8,7 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import {
   Table,
   TableBody,
@@ -16,11 +16,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@app/ui/components/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import { FormCustomerDetail } from "@/app/(api)/private/editor/customers/[uid]/route";
 import useSWR, { mutate } from "swr";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { ClockIcon, Link2Icon } from "@radix-ui/react-icons";
 import {
   ArrowLeft,
@@ -32,10 +37,10 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { Button, buttonVariants } from "@app/ui/components/button";
+import { ButtonGroup } from "@app/ui/components/button-group";
+import { Badge } from "@app/ui/components/badge";
+import { Textarea } from "@app/ui/components/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,7 +49,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@app/ui/components/alert-dialog";
 import {
   createBrowserClient,
   createBrowserCIAMClient,
@@ -64,26 +69,26 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TagInput } from "@/components/tag";
 import { useProject } from "@/scaffolds/workspace";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { Checkbox } from "@app/ui/components/checkbox";
+import { Label } from "@app/ui/components/label";
 import { useTags } from "@/scaffolds/workspace";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 type Params = {
   uid: string;

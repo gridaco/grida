@@ -9,22 +9,22 @@ import {
   CardTitle,
   CardContent,
   CardDescription,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/select";
+import { Input } from "@app/ui/components/input";
+import { Button } from "@app/ui/components/button";
 import Link from "next/link";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { editorlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { Checkbox } from "@app/ui/components/checkbox";
+import { Label } from "@app/ui/components/label";
 import { Authentication } from "@/lib/auth";
 
 export default function FormAuthPage() {

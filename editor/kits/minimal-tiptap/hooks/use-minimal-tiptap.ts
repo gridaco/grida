@@ -20,7 +20,7 @@ import {
   FileHandler,
 } from "../extensions";
 import type { UploadReturnType } from "../extensions/image/image";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { getOutput, randomId } from "../utils";
 import { useThrottle } from "../hooks/use-throttle";
 import { toast } from "sonner";

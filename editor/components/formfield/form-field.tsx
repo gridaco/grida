@@ -17,27 +17,27 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { SignatureCanvas } from "./signature-canvas";
 import { StripePaymentFormFieldPreview } from "./form-field-preview-payment-stripe";
 import { TossPaymentsPaymentFormFieldPreview } from "./form-field-preview-payment-tosspayments";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { ClockIcon, PlusIcon } from "@radix-ui/react-icons";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@app/ui/components/checkbox";
 import useSafeSelectValue from "./use-safe-select-value";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider"; // TODO: this causes hydration error
-import { Toggle } from "@/components/ui/toggle";
+import { Switch } from "@app/ui/components/switch";
+import { Slider } from "@app/ui/components/slider"; // TODO: this causes hydration error
+import { Toggle } from "@app/ui/components/toggle";
 import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui-forms/toggle-group";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@app/ui/components/radio-group";
+import { Textarea } from "@app/ui/components/textarea";
+import { Input } from "@app/ui/components/input";
+import { Button } from "@app/ui/components/button";
+import { Card, CardContent, CardHeader } from "@app/ui/components/card";
+import { Label } from "@app/ui/components/label";
 import {
   FileUploadField,
   getMaxUploadSize,

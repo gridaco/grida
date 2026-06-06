@@ -8,7 +8,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 
 /**
  * Wraps an intercepted route's body in a shadcn Dialog. Closing the dialog

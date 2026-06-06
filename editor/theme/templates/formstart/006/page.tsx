@@ -12,8 +12,8 @@ import {
   LinearBoxScaleDecoration,
   Header,
 } from "@/theme/templates/kit/components";
-import { cn } from "@/components/lib/utils";
-import { Button } from "@/components/ui/button";
+import { cn } from "@app/ui/lib/utils";
+import { Button } from "@app/ui/components/button";
 import { motion } from "motion/react";
 import { useData } from "../../kit/contexts/data.context";
 import { useTranslation } from "react-i18next";

@@ -9,7 +9,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 
 type PaletteKey = keyof typeof palettes;
 
