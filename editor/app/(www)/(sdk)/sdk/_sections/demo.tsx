@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { Card } from "@app/ui/components/card";
 import { Button } from "@app/ui/components/button";
 import { ShineBorder } from "@/www/ui/shine-border";
-import { PlayFilledIcon } from "@/components/icons";
+import { PlayFilledIcon } from "@grida/react-icons";
 
 export default function SectionMainDemo() {
   const [isLocked, setIsLocked] = useState(true);

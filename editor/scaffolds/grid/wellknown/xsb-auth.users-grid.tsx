@@ -21,7 +21,7 @@ import Highlight from "@/components/highlight";
 import { CellRoot } from "../cells";
 import { GridaXSupabase } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@app/ui/components/avatar";
-import { Apple, Google, KakaoTalkLogo } from "@/components/logos";
+import { AppleLogo, GoogleLogo, KakaoTalkLogo } from "@grida/react-icons/logos";
 import { cn } from "@app/ui/lib/utils";
 import {
   StandaloneDataGridStateProvider,
@@ -280,9 +280,9 @@ function AuthProviderIcon({
     case "email":
       return <EnvelopeClosedIcon className={className} />;
     case "apple":
-      return <Apple className={className} />;
+      return <AppleLogo className={className} />;
     case "google":
-      return <Google className={className} />;
+      return <GoogleLogo className={className} />;
     case "github":
       return <GitHubLogoIcon className={className} />;
     case "kakao":

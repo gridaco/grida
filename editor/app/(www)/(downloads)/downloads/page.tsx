@@ -3,9 +3,7 @@ import Image from "next/image";
 import Footer from "@/www/footer";
 import Header from "@/www/header";
 import { Button } from "@app/ui/components/button";
-import { Apple } from "@/components/logos/apple";
-import { Windows } from "@/components/logos/windows";
-import { Linux } from "@/components/logos/linux";
+import { AppleLogo, WindowsLogo, LinuxLogo } from "@grida/react-icons/logos";
 import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";
 import type { Metadata } from "next";
@@ -99,29 +97,29 @@ function DownloadButtons({ links }: { links: downloads.DownloadLinks }) {
       {/* macOS Apple Silicon */}
       <Link href={links.mac_dmg_arm64} download>
         <Button size="lg" variant="outline">
-          <Apple className="size-4" /> Download for macOS (Apple Silicon)
+          <AppleLogo className="size-4" /> Download for macOS (Apple Silicon)
         </Button>
       </Link>
 
       {/* Windows x64 */}
       <Link href={links.windows_exe_x64} download>
         <Button size="lg" variant="outline">
-          <Windows className="size-4" /> Download for Windows (x64)
+          <WindowsLogo className="size-4" /> Download for Windows (x64)
         </Button>
       </Link>
 
       {/* Windows Debian */}
       <Link href={links.linux_deb_x64} download>
         <Button size="lg" variant="outline">
-          <Linux className="size-4" /> Download for Linux (Debian / Ubuntu)
+          <LinuxLogo className="size-4" /> Download for Linux (Debian / Ubuntu)
         </Button>
       </Link>
 
       {/* Windows Red Hat */}
       <Link href={links.linux_rpm_x64} download>
         <Button size="lg" variant="outline">
-          <Linux className="size-4" /> Download for Linux (Red Hat / Fedora /
-          SUSE)
+          <LinuxLogo className="size-4" /> Download for Linux (Red Hat / Fedora
+          / SUSE)
         </Button>
       </Link>
     </div>

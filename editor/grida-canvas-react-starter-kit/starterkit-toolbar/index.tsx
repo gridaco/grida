@@ -21,7 +21,7 @@ import {
   PenToolIcon,
   TriangleIcon,
 } from "lucide-react";
-import { UpscaleIcon } from "../starterkit-icons/upscale";
+import { UpscaleIcon } from "@grida/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,

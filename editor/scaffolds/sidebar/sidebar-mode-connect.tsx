@@ -11,11 +11,12 @@ import {
 } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import {
-  PostgreSQL,
-  StripeLogo1,
+  PostgreSQLLogo,
+  StripeBadgeLogo,
   SupabaseLogo,
   TossLogo,
-} from "@/components/logos";
+  SalesforceLogo,
+} from "@grida/react-icons/logos";
 import { Badge } from "@app/ui/components/badge";
 import {
   SidebarGroup,
@@ -27,7 +28,6 @@ import {
 } from "@app/ui/components/sidebar";
 import { editorlink } from "@/host/url";
 import { SidebarMenuLinkButton } from "./sidebar-menu-link-button";
-import { SalesforceLogo } from "@/components/logos/salesforce";
 
 export function ModeConnect() {
   const [state] = useEditorState();
@@ -143,7 +143,7 @@ function DoctypeForms() {
             <SidebarMenuItem>
               {/* <Link href={`connect/pg/stripe`}> */}
               <SidebarMenuButton disabled size="sm">
-                <StripeLogo1 className="size-4" />
+                <StripeBadgeLogo className="size-4" />
                 Stripe
                 <Badge variant="outline" className="ms-auto">
                   soon
@@ -260,7 +260,7 @@ function SectionXDatabase() {
           </SidebarMenuLinkButton>
           <SidebarMenuItem>
             <SidebarMenuButton disabled size="sm">
-              <PostgreSQL className="size-4" />
+              <PostgreSQLLogo className="size-4" />
               PostgreSQL
               <Badge variant="outline" className="ms-auto">
                 soon
@@ -373,7 +373,7 @@ function DoctypeSite() {
             <SidebarMenuItem>
               {/* <Link href={`connect/pg/stripe`}> */}
               <SidebarMenuButton disabled size="sm">
-                <StripeLogo1 className="size-4" />
+                <StripeBadgeLogo className="size-4" />
                 Stripe
                 <Badge variant="outline" className="ms-auto">
                   soon

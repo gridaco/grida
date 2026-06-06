@@ -1,4 +1,4 @@
-import { GridaLogo } from "../starterkit-icons";
+import { GridaLogo } from "@/components/grida-logo";
 import {
   motion,
   AnimatePresence,

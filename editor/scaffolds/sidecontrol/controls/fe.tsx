@@ -30,7 +30,7 @@ import {
   FeLayerBlurIcon,
   FeBackdropBlurIcon,
   FeGlassIcon,
-} from "./icons/fe-icons";
+} from "@grida/react-icons";
 import { BlendModeDropdown } from "./blend-mode";
 
 /**

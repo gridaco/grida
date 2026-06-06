@@ -12,7 +12,7 @@ import {
   InstagramLogoIcon,
   TwitterLogoIcon,
 } from "@radix-ui/react-icons";
-import { SlackLogoIcon } from "@/components/logos/slack";
+import { SlackLogo } from "@grida/react-icons/logos";
 
 export default function Maintenance() {
   return (
@@ -52,8 +52,12 @@ export default function Maintenance() {
         <Link href="https://instagram.com/grida.co" target="_blank">
           <InstagramLogoIcon className="size-4" />
         </Link>
-        <Link href="https://grida.co/join-slack" target="_blank">
-          <SlackLogoIcon className="size-4" />
+        <Link
+          href="https://grida.co/join-slack"
+          target="_blank"
+          aria-label="Join Grida on Slack"
+        >
+          <SlackLogo className="size-4" />
         </Link>
         <Link href="https://github.com/gridaco" target="_blank">
           <GitHubLogoIcon className="size-4" />

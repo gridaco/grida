@@ -2,7 +2,7 @@
 
 import React, { useRef } from "react";
 import Link from "next/link";
-import { NpmLogoIcon } from "@/components/logos/npm";
+import { NpmLogo } from "@grida/react-icons/logos";
 import {
   StandaloneDocumentEditor,
   ViewportRoot,
@@ -62,7 +62,7 @@ function RefigMarketing() {
             rel="noopener noreferrer"
             className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
           >
-            <NpmLogoIcon className="size-4" />
+            <NpmLogo className="size-4" />
             npm
           </a>
         </div>

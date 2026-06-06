@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@app/ui/components/select";
 import { Switch } from "@app/ui/components/switch";
-import { SupabaseLogo } from "@/components/logos";
+import { SupabaseLogo } from "@grida/react-icons/logos";
 import { Spinner } from "@app/ui/components/spinner";
 import { PrivateEditorApi } from "@/lib/private";
 import { ContextVariablesTable } from "@/scaffolds/template-editor/about-variable-table";

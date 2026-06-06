@@ -17,7 +17,7 @@ import { Pill, PillsList } from "./components/pills";
 import { LoadingIndicator } from "./components/loading-indicator";
 import { Spinner } from "@app/ui/components/spinner";
 import { Skeleton } from "@app/ui/components/skeleton";
-import { UnsplashLogoIcon } from "@/components/logos/unsplash";
+import { UnsplashLogo } from "@grida/react-icons/logos";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 export type PhotosBrowserProps = {
@@ -645,7 +645,7 @@ function PhotosFooterAttribution() {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-foreground/70 hover:text-foreground transition-colors"
         >
-          <UnsplashLogoIcon className="size-4" />
+          <UnsplashLogo className="size-4" />
           <span>Unsplash</span>
         </a>
         <span>❤️</span>

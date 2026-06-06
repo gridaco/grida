@@ -1,5 +1,5 @@
 import { packages } from "./data";
-import { NpmLogoIcon } from "@/components/logos/npm";
+import { NpmLogo } from "@grida/react-icons/logos";
 import { Button } from "@app/ui/components/button";
 import { BoxIcon } from "lucide-react";
 import Header from "@/www/header";
@@ -69,7 +69,7 @@ export default function PackagePage() {
                       target="_blank"
                     >
                       <Button variant="outline">
-                        <NpmLogoIcon className="size-10" />
+                        <NpmLogo className="size-10" />
                       </Button>
                     </Link>
                   )}

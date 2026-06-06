@@ -10,7 +10,7 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
-import { SupabaseLogo } from "@/components/logos";
+import { SupabaseLogo } from "@grida/react-icons/logos";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import {
   DropdownMenu,

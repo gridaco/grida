@@ -5,7 +5,11 @@ import React from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { BirdLogo, KakaoTalkLogo, WhatsAppLogo } from "@/components/logos";
+import {
+  BirdLogo,
+  KakaoTalkLogo,
+  WhatsAppLogo,
+} from "@grida/react-icons/logos";
 import {
   Table,
   TableBody,

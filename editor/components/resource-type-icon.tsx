@@ -31,7 +31,7 @@ import {
   BookUserIcon,
   GlobeIcon,
 } from "lucide-react";
-import { SupabaseLogo } from "./logos";
+import { SupabaseLogo } from "@grida/react-icons/logos";
 
 export type ResourceTypeIconName =
   | "auth"

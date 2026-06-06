@@ -33,7 +33,7 @@ import {
   TableIcon,
 } from "@radix-ui/react-icons";
 import { toast } from "sonner";
-import { SupabaseLogo } from "@/components/logos";
+import { SupabaseLogo } from "@grida/react-icons/logos";
 import Link from "next/link";
 import {
   Select,

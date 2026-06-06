@@ -18,7 +18,7 @@ import { motion } from "motion/react";
 import { useData } from "../../kit/contexts/data.context";
 import { useTranslation } from "react-i18next";
 import _messages from "./messages.json";
-import { LeviLogo } from "@/components/logos/levi";
+import { LeviLogo } from "@grida/react-icons/logos";
 import type grida from "@grida/schema";
 
 const userprops =
@@ -40,7 +40,7 @@ function Consumer() {
     <ScreenRoot>
       <ScreenMobileFrame>
         <Header>
-          <LeviLogo className="fill-[#C41230]" />
+          <LeviLogo className="text-[#C41230]" />
         </Header>
         <ScreenGrid columns={8} rows={16}>
           <ScreenGridPosition col={1} row={11}>

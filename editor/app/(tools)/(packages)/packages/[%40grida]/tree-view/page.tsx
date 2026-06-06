@@ -31,7 +31,7 @@ import {
 } from "@/app/(dev)/ui/components/tree-view/_recipes";
 import { ComponentDemo } from "@/app/(dev)/ui/components/component-demo";
 import { RegistryExample } from "@/components/registry-example";
-import { NpmLogoIcon } from "@/components/logos/npm";
+import { NpmLogo } from "@grida/react-icons/logos";
 import { Button } from "@app/ui/components/button";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
 import { Resources } from "@/resources";
@@ -74,7 +74,7 @@ export default function TreeViewLandingPage() {
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link href={NPM_URL} target="_blank" rel="noopener noreferrer">
               <Button size="lg" variant="outline">
-                <NpmLogoIcon className="size-8 mr-1" />
+                <NpmLogo className="size-8 mr-1" />
                 npm
               </Button>
             </Link>
@@ -118,7 +118,7 @@ export default function TreeViewLandingPage() {
             </div>
             <Link href={NPM_URL} target="_blank" rel="noopener noreferrer">
               <Button variant="outline" size="sm">
-                <NpmLogoIcon className="size-6 mr-1" />
+                <NpmLogo className="size-6 mr-1" />
                 View on npm
                 <ArrowRightIcon className="size-3.5 ml-1.5" />
               </Button>

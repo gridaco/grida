@@ -21,7 +21,7 @@ import {
 } from "@app/ui/components/select";
 import { Switch } from "@app/ui/components/switch";
 import { useEditorState } from "@/scaffolds/editor";
-import { SupabaseLogo } from "@/components/logos";
+import { SupabaseLogo } from "@grida/react-icons/logos";
 
 export function SupabaseFKReferenceSettings({
   readonly,

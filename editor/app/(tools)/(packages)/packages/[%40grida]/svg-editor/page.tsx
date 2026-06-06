@@ -11,7 +11,7 @@ import {
   TextExample,
 } from "./_examples";
 import { FeaturedDemo } from "./_featured";
-import { NpmLogoIcon } from "@/components/logos/npm";
+import { NpmLogo } from "@grida/react-icons/logos";
 import { Button } from "@app/ui/components/button";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
 import { cn } from "@app/ui/lib/utils";
@@ -80,7 +80,7 @@ export default function SvgEditorPackagePage() {
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={NPM_URL} target="_blank" rel="noopener noreferrer">
                   <Button size="lg" variant="outline">
-                    <NpmLogoIcon className="size-8 mr-1" />
+                    <NpmLogo className="size-8 mr-1" />
                     npm
                   </Button>
                 </Link>

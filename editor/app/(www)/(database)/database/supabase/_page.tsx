@@ -11,7 +11,7 @@ import Header from "@/www/header";
 import FooterWithCTA from "@/www/footer-with-cta";
 import Image from "next/image";
 import Link from "next/link";
-import { SupabaseLogo } from "@/components/logos";
+import { SupabaseLogo } from "@grida/react-icons/logos";
 
 export default function GridaDatabaseSupabasePage() {
   return (

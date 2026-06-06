@@ -11,7 +11,7 @@ import { FileRefsStateRenderer } from "../grid/cells";
 import { Skeleton } from "@app/ui/components/skeleton";
 import { useMediaViewer } from "@/components/mediaviewer";
 import { Button } from "@app/ui/components/button";
-import { PlayFilledIcon } from "@/components/icons";
+import { PlayFilledIcon } from "@grida/react-icons";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 
 type TRowData = Pick<DGResponseRow, "__gf_id" | "raw" | "fields">;

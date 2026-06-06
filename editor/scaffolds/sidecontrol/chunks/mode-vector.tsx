@@ -14,10 +14,10 @@ import type { editor } from "@/grida-canvas";
 import { useA11yArrow } from "@/grida-canvas-react/provider";
 import { encodeTranslateVectorCommand } from "@/grida-canvas/reducers/methods";
 import {
-  MirroringAll,
-  MirroringAngle,
-  MirroringNone,
-} from "@/grida-canvas-react-starter-kit/starterkit-icons/tangent-mirroring-mode";
+  MirroringAllIcon,
+  MirroringAngleIcon,
+  MirroringNoneIcon,
+} from "@grida/react-icons";
 import { computeMixed } from "./compute-mixed";
 import { SectionFills } from "./section-fills";
 
@@ -132,17 +132,17 @@ function SectionGeometry({ node_id }: { node_id: string }) {
             enum={[
               {
                 value: "none",
-                icon: <MirroringNone className="size-5" />,
+                icon: <MirroringNoneIcon className="size-5" />,
                 title: "No mirroring",
               },
               {
                 value: "all",
-                icon: <MirroringAll className="size-5" />,
+                icon: <MirroringAllIcon className="size-5" />,
                 title: "Perfect mirroring",
               },
               {
                 value: "angle",
-                icon: <MirroringAngle className="size-5" />,
+                icon: <MirroringAngleIcon className="size-5" />,
                 title: "Only angle is mirrored, length can vary",
               },
             ]}

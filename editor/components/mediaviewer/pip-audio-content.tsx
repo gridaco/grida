@@ -11,7 +11,7 @@ import {
   ChevronLastIcon,
 } from "lucide-react";
 import React, { useMemo } from "react";
-import { PauseFilledIcon, PlayFilledIcon } from "@/components/icons";
+import { PauseFilledRoundedIcon, PlayFilledIcon } from "@grida/react-icons";
 import AudioMediaSessionProvider, {
   useMediaSession,
 } from "@/components/mediaplayer";
@@ -42,7 +42,7 @@ export function ContentAudio({
             <PlayerTrigger
               renderer={(playing) =>
                 playing ? (
-                  <PauseFilledIcon className="size-4" />
+                  <PauseFilledRoundedIcon className="size-4" />
                 ) : (
                   <PlayFilledIcon className="size-4" />
                 )
