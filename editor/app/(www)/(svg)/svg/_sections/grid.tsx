@@ -33,7 +33,11 @@ export function GridDivider() {
   return <div aria-hidden className="h-px w-full bg-border" />;
 }
 
-/** A padded grid row. Pass `bleed` to opt out of horizontal padding. */
+/**
+ * A padded grid row. Pass `bleed` to opt out of *all* padding — for sections
+ * that manage their own (e.g. a full-bleed bento whose header carries the
+ * vertical rhythm); adding row padding there would double it up.
+ */
 export function GridRow({
   children,
   className,

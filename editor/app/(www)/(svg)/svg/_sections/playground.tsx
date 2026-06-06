@@ -116,7 +116,7 @@ function PlaygroundTile({
           className="absolute inset-0 z-10 flex items-end justify-center pb-4"
           aria-label={`Edit ${label}.svg`}
         >
-          <span className="rounded-full border bg-background/80 px-2.5 py-1 text-[10px] text-muted-foreground opacity-0 backdrop-blur transition group-hover:opacity-100">
+          <span className="rounded-full border bg-background/80 px-2.5 py-1 text-[10px] text-muted-foreground opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100">
             Click to edit
           </span>
         </button>
