@@ -28,7 +28,7 @@ import {
 import { LiveEditorSection } from "@/app/(dev)/ui/components/hud/_live-section";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
 import { cn } from "@app/ui/lib/utils";
-import { NpmLogoIcon } from "@/components/logos/npm";
+import { NpmLogo } from "@grida/react-icons/logos";
 import { Button } from "@app/ui/components/button";
 import { useScrollSpy } from "@/hooks/use-scroll-spy";
 import Footer from "@/www/footer";
@@ -179,7 +179,7 @@ export default function HudSpecPage() {
                     rel="noopener noreferrer"
                   >
                     <Button size="sm" variant="outline">
-                      <NpmLogoIcon className="mr-1 size-6" />
+                      <NpmLogo className="mr-1 size-6" />
                       npm
                     </Button>
                   </Link>

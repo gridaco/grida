@@ -2,9 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { Button } from "@app/ui/components/button";
-import { Apple } from "@/components/logos/apple";
-import { Windows } from "@/components/logos/windows";
-import { Linux } from "@/components/logos/linux";
+import { AppleLogo, WindowsLogo, LinuxLogo } from "@grida/react-icons/logos";
 import { DownloadIcon } from "@radix-ui/react-icons";
 
 type OS = "mac" | "windows" | "linux";
@@ -18,11 +16,11 @@ const oslabel: Record<OS, string> = {
 function OSIcon({ os, className }: { os: OS; className?: string }) {
   switch (os) {
     case "mac":
-      return <Apple className={className} />;
+      return <AppleLogo className={className} />;
     case "windows":
-      return <Windows className={className} />;
+      return <WindowsLogo className={className} />;
     case "linux":
-      return <Linux className={className} />;
+      return <LinuxLogo className={className} />;
   }
 }
 

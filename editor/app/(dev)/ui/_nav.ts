@@ -3,6 +3,10 @@ export type NavGroup = { label: string; items: NavItem[] };
 
 export const uiNavGroups: NavGroup[] = [
   {
+    label: "Foundations",
+    items: [{ name: "Icons", href: "/ui/icons" }],
+  },
+  {
     label: "Components",
     items: [
       { name: "AI Chat", href: "/ui/components/ai-chat" },

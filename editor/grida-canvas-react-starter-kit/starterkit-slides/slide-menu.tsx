@@ -42,7 +42,7 @@ import { io } from "@grida/io";
 import { useFilePicker } from "use-file-picker";
 import { toast } from "sonner";
 import { ImageIcon, FileDown } from "lucide-react";
-import { SlackLogoIcon } from "@/components/logos";
+import { SlackLogo } from "@grida/react-icons/logos";
 import { distro } from "@/grida-canvas-hosted/distro";
 
 // Shared menu sections — reused from the playground menu
@@ -315,7 +315,7 @@ export function SlideMenuContent() {
         </Link>
         <Link href={sitemap.links.slack} target="_blank">
           <DropdownMenuItem className="text-xs">
-            <SlackLogoIcon className="size-3.5" />
+            <SlackLogo className="size-3.5" />
             Slack Community
           </DropdownMenuItem>
         </Link>

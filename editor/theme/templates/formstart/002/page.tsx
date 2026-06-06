@@ -20,7 +20,7 @@ import {
 import data from "./messages.json";
 import { Button } from "@app/ui/components/button";
 import { motion } from "motion/react";
-import { KakaoTalkLogo } from "@/components/logos";
+import { KakaoTalkLogo } from "@grida/react-icons/logos";
 import { Avatar, AvatarImage } from "@app/ui/components/avatar";
 import { ArrowRightIcon, GlobeIcon } from "@radix-ui/react-icons";
 import {
@@ -36,7 +36,7 @@ import {
 import { PhoneIcon } from "lucide-react";
 import Link from "next/link";
 import type grida from "@grida/schema";
-import { ACME } from "@/components/logos/acme";
+import { ACMELogo } from "@grida/react-icons/logos";
 
 const userprops =
   {} satisfies grida.program.document.template.TemplateDocumentDefinition["properties"];
@@ -48,7 +48,7 @@ export default function _002() {
         <Header>
           <HeaderLogo>
             {/* <PolestarTypeLogo className="w-20" /> */}
-            <ACME />
+            <ACMELogo />
           </HeaderLogo>
         </Header>
         <ScreenGrid columns={8} rows={16}>

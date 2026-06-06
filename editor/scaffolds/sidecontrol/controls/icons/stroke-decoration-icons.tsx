@@ -19,8 +19,12 @@
  */
 
 import React from "react";
-import { cn } from "@app/ui/lib/utils";
 import type cg from "@grida/cg";
+
+/** Dependency-free className join (replaces the editor-internal `cn`). */
+function cls(...classes: (string | false | null | undefined)[]) {
+  return classes.filter(Boolean).join(" ");
+}
 
 // ── Fixed-size icon constants ────────────────────────────────────────────────
 
@@ -38,10 +42,14 @@ const DEPTH = 14;
 const svgProps = {
   viewBox: VB,
   preserveAspectRatio: "xMidYMid meet" as const,
+  // Default 16px footprint baked as attributes (was the `size-4` class) so a
+  // caller's `size-*` className still overrides it via CSS — no tailwind-merge.
+  width: 16,
+  height: 16,
   "aria-hidden": true,
 };
 
-const iconSlotClass = "size-4 shrink-0";
+const iconSlotClass = "shrink-0";
 
 function LineSegment({ toJoin = false }: { toJoin?: boolean }) {
   const x2 = toJoin ? LINE_X2_JOIN : LINE_X2;
@@ -66,7 +74,7 @@ export function StrokeDecorationNoneIcon({
   className?: string;
 }) {
   return (
-    <svg {...svgProps} className={cn(iconSlotClass, className)} fill="none">
+    <svg {...svgProps} className={cls(iconSlotClass, className)} fill="none">
       <line
         x1={LINE_X1}
         y1={LINE_Y}
@@ -92,7 +100,7 @@ export function StrokeDecorationArrowLinesIcon({
   const C = { x: baseX, y: LINE_Y + halfH };
   const D = { x: baseX, y: LINE_Y };
   return (
-    <svg {...svgProps} className={cn(iconSlotClass, className)} fill="none">
+    <svg {...svgProps} className={cls(iconSlotClass, className)} fill="none">
       <LineSegment />
       <path
         d={`M${A.x} ${A.y} L${B.x} ${B.y} L${C.x} ${C.y} L${B.x} ${B.y} L${D.x} ${D.y}`}
@@ -117,7 +125,7 @@ export function StrokeDecorationTriangleFilledIcon({
   return (
     <svg
       {...svgProps}
-      className={cn(iconSlotClass, className)}
+      className={cls(iconSlotClass, className)}
       fill="currentColor"
     >
       <LineSegment toJoin />
@@ -138,7 +146,7 @@ export function StrokeDecorationCircleFilledIcon({
   return (
     <svg
       {...svgProps}
-      className={cn(iconSlotClass, className)}
+      className={cls(iconSlotClass, className)}
       fill="currentColor"
     >
       <LineSegment toJoin />
@@ -159,7 +167,7 @@ export function StrokeDecorationSquareFilledIcon({
   return (
     <svg
       {...svgProps}
-      className={cn(iconSlotClass, className)}
+      className={cls(iconSlotClass, className)}
       fill="currentColor"
     >
       <LineSegment toJoin />
@@ -181,7 +189,7 @@ export function StrokeDecorationDiamondFilledIcon({
   return (
     <svg
       {...svgProps}
-      className={cn(iconSlotClass, className)}
+      className={cls(iconSlotClass, className)}
       fill="currentColor"
     >
       <LineSegment toJoin />
@@ -203,7 +211,7 @@ export function StrokeDecorationVerticalBarFilledIcon({
   const top = LINE_Y - h / 2;
   const bottom = LINE_Y + h / 2;
   return (
-    <svg {...svgProps} className={cn(iconSlotClass, className)} fill="none">
+    <svg {...svgProps} className={cls(iconSlotClass, className)} fill="none">
       <LineSegment />
       <path
         d={`M${LINE_X2} ${LINE_Y} L${left} ${LINE_Y} L${left} ${top} L24 ${top} L24 ${bottom} L${left} ${bottom} L${left} ${LINE_Y}`}
@@ -376,7 +384,7 @@ export function StrokeDecorationIcon({
   if (!icon) return null;
   return (
     <span
-      className={cn(
+      className={cls(
         "inline-flex items-center justify-center",
         variant === "start" && "scale-x-[-1]",
         className
@@ -413,7 +421,7 @@ export function StrokeDecorationIconResponsive({
 
   return (
     <span
-      className={cn(
+      className={cls(
         "flex h-4 w-full min-w-0 items-center",
         variant === "start" && "scale-x-[-1]",
         className

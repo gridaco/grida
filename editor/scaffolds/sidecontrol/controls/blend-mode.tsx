@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import { TMixed } from "./utils/types";
 import { enumEq, enumLabel, EnumItem, enumValue } from "../ui";
-import { BlendModeIcon } from "@/grida-canvas-react-starter-kit/starterkit-icons";
+import { BlendModeIcon } from "./icons/blend-mode-icon";
 import type cg from "@grida/cg";
 import {
   DropdownMenu,

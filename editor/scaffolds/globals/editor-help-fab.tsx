@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@app/ui/components/dropdown-menu";
-import { SlackLogoIcon } from "@/components/logos";
+import { SlackLogo } from "@grida/react-icons/logos";
 import { sendGAEvent } from "@next/third-parties/google";
 import { useWorkspace } from "../workspace";
 import { sitemap } from "@/www/data/sitemap";
@@ -115,7 +115,7 @@ export function HelpFab({
                 <br />
                 Have questions? DM me on{" "}
                 <Link href={sitemap.links.slack} target="_blank">
-                  <SlackLogoIcon className="inline align-middle w-3.5 h-3.5 me-1" />
+                  <SlackLogo className="inline align-middle w-3.5 h-3.5 me-1" />
                   Slack
                 </Link>{" "}
                 or email me at{" "}
@@ -135,7 +135,7 @@ export function HelpFab({
           </Link> */}
           <Link href={sitemap.links.slack} target="_blank">
             <DropdownMenuItem>
-              <SlackLogoIcon className="size-4" />
+              <SlackLogo className="size-4" />
               Chat with us
             </DropdownMenuItem>
           </Link>

@@ -28,10 +28,12 @@ import { Separator } from "@app/ui/components/separator";
 import type { ai as AITypes } from "@/lib/ai/ai";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
-import { BlackForestLabsLogo } from "@/components/logos/blackforestlabs";
-import { OpenAILogo } from "@/components/logos/openai";
-import { AnthropicLogo } from "@/components/logos/anthropic";
-import { Google as GoogleLogo } from "@/components/logos/google";
+import {
+  BlackForestLabsLogo,
+  OpenAILogo,
+  AnthropicLogo,
+  GoogleLogo,
+} from "@grida/react-icons/logos";
 
 export const metadata: Metadata = {
   title: "AI Models",

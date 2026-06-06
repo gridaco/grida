@@ -70,7 +70,7 @@ import {
 import { io } from "@grida/io";
 import { useFilePicker } from "use-file-picker";
 import { ImageIcon } from "lucide-react";
-import { SlackLogoIcon } from "@/components/logos";
+import { SlackLogo } from "@grida/react-icons/logos";
 import { distro } from "../distro";
 import { keyboardShortcutText } from "./uxhost-shortcut-renderer";
 
@@ -322,7 +322,7 @@ export function PlaygroundMenuContent({
         </Link>
         <Link href={sitemap.links.slack} target="_blank">
           <DropdownMenuItem className="text-xs">
-            <SlackLogoIcon className="size-3.5" />
+            <SlackLogo className="size-3.5" />
             Slack Community
           </DropdownMenuItem>
         </Link>

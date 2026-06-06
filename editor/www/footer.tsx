@@ -6,7 +6,7 @@ import {
   FooterContent,
 } from "@/www/ui/footer";
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import { XLogoIcon, SlackLogoIcon } from "@/components/logos";
+import { XLogo, SlackLogo } from "@grida/react-icons/logos";
 import Link from "next/link";
 import { sitemap } from "./data/sitemap";
 
@@ -37,14 +37,14 @@ export default function Footer() {
                     className="text-muted-foreground"
                   >
                     <span className="sr-only">X (Twitter)</span>
-                    <XLogoIcon className="size-5" />
+                    <XLogo className="size-5" />
                   </Link>
                   <Link
                     href={sitemap.links.slack}
                     className="text-muted-foreground"
                   >
                     <span className="sr-only">Slack Community</span>
-                    <SlackLogoIcon className="size-5" />
+                    <SlackLogo className="size-5" />
                   </Link>
                 </div>
               </FooterColumn>

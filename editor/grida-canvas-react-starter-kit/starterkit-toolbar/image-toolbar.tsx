@@ -18,7 +18,7 @@ import type grida from "@grida/schema";
 import type { editor } from "@/grida-canvas";
 import { editor as editorUtils } from "@/grida-canvas/editor.i";
 import { ImageUpscale } from "lucide-react";
-import { RemoveBackgroundIcon } from "../starterkit-icons/remove-background";
+import { RemoveBackgroundIcon } from "@grida/react-icons";
 import { upscaleImage, removeBackgroundImage } from "@/lib/ai/actions/image";
 import type { Editor } from "@/grida-canvas/editor";
 import { useStarterKitOrgId } from "../starterkit-host/org-id-provider";

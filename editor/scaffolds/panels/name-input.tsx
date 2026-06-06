@@ -11,7 +11,7 @@ import {
 } from "@app/ui/components/command";
 import { useState } from "react";
 import { useDatagridTable } from "../editor";
-import { SupabaseLogo } from "@/components/logos";
+import { SupabaseLogo } from "@grida/react-icons/logos";
 import {
   SYSTEM_GF_CUSTOMER_UUID_KEY,
   SYSTEM_GF_CUSTOMER_EMAIL_KEY,

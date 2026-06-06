@@ -1,0 +1,50 @@
+{
+  "name": "@grida/react-icons",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Hand-authored SVG icon components for Grida",
+  "keywords": [
+    "grida",
+    "icons",
+    "logos",
+    "react",
+    "svg"
+  ],
+  "homepage": "https://grida.co",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": "https://github.com/gridaco/grida",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./logos": {
+      "types": "./dist/logos.d.ts",
+      "import": "./dist/logos.mjs",
+      "require": "./dist/logos.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "prepack": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "react": "^19.0.0",
+    "tsdown": "^0.22.1",
+    "typescript": "^6"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}

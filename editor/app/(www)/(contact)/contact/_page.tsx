@@ -14,7 +14,7 @@ import {
   CardContent,
 } from "@app/ui/components/card";
 import { Calendar } from "lucide-react";
-import { SlackLogoIcon } from "@/components/logos";
+import { SlackLogo } from "@grida/react-icons/logos";
 import { EnvelopeClosedIcon } from "@radix-ui/react-icons";
 import Head from "next/head";
 
@@ -58,7 +58,7 @@ function Contact() {
                   target="_blank"
                   className="hover:underline"
                 >
-                  <SlackLogoIcon className="inline align-middle w-3.5 h-3.5 me-1" />
+                  <SlackLogo className="inline align-middle w-3.5 h-3.5 me-1" />
                   Slack
                 </Link>{" "}
                 or email me at{" "}
@@ -77,7 +77,7 @@ function Contact() {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
-            <SlackLogoIcon className="size-8 mb-4" />
+            <SlackLogo className="size-8 mb-4" />
             <CardTitle>Join Slack</CardTitle>
             <CardDescription>Connect with our community</CardDescription>
           </CardHeader>
