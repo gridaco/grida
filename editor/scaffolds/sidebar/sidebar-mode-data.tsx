@@ -23,7 +23,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -33,7 +33,7 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import {
   Dialog,
   DialogClose,
@@ -42,11 +42,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/dialog";
+import { Field, FieldGroup, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
+import { Label } from "@app/ui/components/label";
+import { Button } from "@app/ui/components/button";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useForm, Controller } from "react-hook-form";
 import { toast } from "sonner";
@@ -55,8 +55,8 @@ import { useRouter } from "next/navigation";
 import { renderMenuGroup } from "./render";
 import Link from "next/link";
 import { editorlink } from "@/host/url";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@app/ui/components/scroll-area";
+import { Checkbox } from "@app/ui/components/checkbox";
 import { TypeSelect } from "@/components/formfield-type-select";
 import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import {
@@ -65,18 +65,18 @@ import {
 } from "@/components/dialogs/delete-confirmation-dialog";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";
 import type { FormInputType } from "@/grida-forms-hosted/types";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { xsb_table_conn_init } from "../editor/init";
 import {
   SidebarGroupAction,
   SidebarGroupLabel,
   SidebarMenuAction,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { SidebarMenuLinkButton } from "./sidebar-menu-link-button";
 import { GDocTableID, TableMenuItemData } from "../editor/state";
 

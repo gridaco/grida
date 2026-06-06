@@ -1,4 +1,4 @@
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import { WorkbenchUI } from "@/components/workbench";
 
 export function AspectRatioControl({

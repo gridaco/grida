@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { ReloadIcon } from "@radix-ui/react-icons";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 
 export function GridRefreshButton({
   refreshing,

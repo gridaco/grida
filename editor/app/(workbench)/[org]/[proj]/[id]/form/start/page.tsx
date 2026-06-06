@@ -7,10 +7,10 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet-without-overlay";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@app/ui/components/sheet-without-overlay";
+import { Field, FieldGroup, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
+import { Label } from "@app/ui/components/label";
 import {
   Table,
   TableBody,
@@ -18,18 +18,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@app/ui/components/table";
 import { useEditorState } from "@/scaffolds/editor";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@app/ui/components/scroll-area";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { useDocumentAssetUpload } from "@/scaffolds/asset";
 import type { FileIO } from "@/lib/file";
@@ -47,15 +47,15 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import {
   ViewportRoot,
   EditorSurface,
   useRootTemplateInstanceNode,
 } from "@/grida-canvas-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 import { ErrorInvalidSchema } from "@/components/error";
 

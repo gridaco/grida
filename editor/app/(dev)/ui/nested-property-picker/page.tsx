@@ -3,7 +3,7 @@
 import NestedDropdownMenu, {
   NestedMenuItemProps,
 } from "@/components/extension/nested-dropdown-menu";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { accessSchema, TProperty, TSchema } from "@/lib/spock";
 import PropertyAccessDropdownMenu from "@/scaffolds/sidecontrol/controls/context/variable";
 

@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import { ArrowLeft, ChevronDown, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { SLIDE_TEMPLATES, type SlideTemplate } from "./templates";
 
 /**

@@ -1,5 +1,5 @@
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/components/lib/utils";
+import { Skeleton } from "@app/ui/components/skeleton";
+import { cn } from "@app/ui/lib/utils";
 
 export function NumberSkeleton() {
   return (

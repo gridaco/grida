@@ -20,9 +20,9 @@ import { KeyIcon, PhoneIcon } from "lucide-react";
 import Highlight from "@/components/highlight";
 import { CellRoot } from "../cells";
 import { GridaXSupabase } from "@/types";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@app/ui/components/avatar";
 import { Apple, Google, KakaoTalkLogo } from "@/components/logos";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   StandaloneDataGridStateProvider,
   useDataGridState,

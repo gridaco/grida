@@ -1,12 +1,12 @@
 "use client";
 
 import { PreviewButton } from "@/components/preview-button";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { useEditorState } from "@/scaffolds/editor";
 import { SitePlayAction } from "./play-actions-site";
 

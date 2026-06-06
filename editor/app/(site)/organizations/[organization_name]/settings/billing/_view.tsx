@@ -11,7 +11,7 @@ import {
   FileTextIcon,
   InfoIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardContent,
@@ -19,18 +19,18 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@app/ui/components/card";
+import { Badge } from "@app/ui/components/badge";
+import { Skeleton } from "@app/ui/components/skeleton";
+import { Separator } from "@app/ui/components/separator";
+import { Switch } from "@app/ui/components/switch";
+import { Input } from "@app/ui/components/input";
+import { Label } from "@app/ui/components/label";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import {
   Table,
   TableBody,
@@ -46,7 +46,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@app/ui/components/table";
 import { format } from "date-fns";
 import {
   getBillingSummary,

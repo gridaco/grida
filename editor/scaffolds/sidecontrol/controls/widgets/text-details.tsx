@@ -1,13 +1,18 @@
 import React, { useState } from "react";
 import kolor from "@grida/color";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@app/ui/components/tabs";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import { Slider } from "../utils/slider";
-import { Separator } from "@/components/ui/separator";
+import { Separator } from "@app/ui/components/separator";
 import { PropertyLine, PropertyLineLabel, PropertyEnumToggle } from "../../ui";
 import InputPropertyNumber from "../../ui/number";
 import { RGBA32FColorControl } from "../color";
@@ -32,8 +37,8 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
+} from "@app/ui/components/tooltip";
+import { Checkbox } from "@app/ui/components/checkbox";
 import {
   Preview,
   type BasicPreview,

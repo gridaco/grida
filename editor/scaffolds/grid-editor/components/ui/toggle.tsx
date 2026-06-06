@@ -1,11 +1,11 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/tooltip";
+import { cn } from "@app/ui/lib/utils";
 import { IconButtonDotBadge } from "./dotbadge";
 import { ArrowDownUpIcon, ListFilterIcon } from "lucide-react";
 

@@ -1,16 +1,16 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@app/ui/components/badge";
+import { Label } from "@app/ui/components/label";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { RadioGroup, RadioGroupItem } from "@app/ui/components/radio-group";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import {
   Gift,
   Users,

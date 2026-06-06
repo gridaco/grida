@@ -6,8 +6,8 @@ import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Image from "next/image";
 import React, { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from "@app/ui/components/button";
+import { Card } from "@app/ui/components/card";
 import { CheckIcon } from "lucide-react";
 
 export default function CiPage() {

@@ -6,7 +6,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { ModeDesign } from "./sidebar-mode-design";
 import { ModeData } from "./sidebar-mode-data";
 import { ModeConnect } from "./sidebar-mode-connect";
@@ -14,7 +14,12 @@ import { ModeProject } from "./sidebar-mode-project";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { GridaLogo } from "@/components/grida-logo";
 import { EditableDocumentTitle } from "@/scaffolds/editable-document-title";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import { CaretLeftIcon, SlashIcon } from "@radix-ui/react-icons";
 import { DatabaseIcon, HammerIcon, PlugIcon } from "lucide-react";
 import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
@@ -25,7 +30,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 
 export function EditorSidebar() {
   const [state, dispatch] = useEditorState();

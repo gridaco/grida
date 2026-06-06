@@ -4,9 +4,9 @@ import { createBrowserFormsClient } from "@/lib/supabase/client";
 import { useEditorState } from "@/scaffolds/editor";
 import React, { useCallback } from "react";
 import { toast } from "sonner";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { ArrowUpIcon, ArrowDownIcon } from "@radix-ui/react-icons";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@app/ui/components/dropdown-menu";
 
 export function useDeleteBlock() {
   const [, dispatch] = useEditorState();

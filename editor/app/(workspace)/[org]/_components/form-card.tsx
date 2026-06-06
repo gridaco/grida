@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { Labels } from "@/k/labels";
 import { LockOpen1Icon } from "@radix-ui/react-icons";
 import type { GDocument, GDocumentType } from "@/types";

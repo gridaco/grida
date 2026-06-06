@@ -1,6 +1,6 @@
 import Image from "next/image";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@app/ui/components/card";
+import { Badge } from "@app/ui/components/badge";
 import { wwwprint } from "../../data";
 
 export default function MaterialsPage() {

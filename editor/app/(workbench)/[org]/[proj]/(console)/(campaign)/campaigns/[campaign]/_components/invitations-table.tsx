@@ -3,8 +3,8 @@
 import React from "react";
 import { ColumnDef, CellContext } from "@tanstack/react-table";
 import { MoreHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@app/ui/components/button";
+import { Checkbox } from "@app/ui/components/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,12 +12,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { useCampaign } from "../store";
 import { useProject } from "@/scaffolds/workspace";
@@ -29,8 +29,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
+} from "@app/ui/components/dialog";
+import { Progress } from "@app/ui/components/progress";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { useExportCSV } from "@/scaffolds/platform/data/use-export-csv";
 import { DownloadIcon } from "lucide-react";

@@ -6,13 +6,13 @@ import {
   DevtoolsDialog,
   FormPageDeveloperErrorDialog,
 } from "@/grida-forms-hosted/e/dev";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { useFingerprint } from "@/components/fingerprint";
 import { formlink } from "@/host/url";
 import { GridaFormsFormView, type FormViewTranslation } from "./formview";
 import type { FormPageBackgroundSchema } from "@/grida-forms-hosted/types";
 import { PageBackground } from "@/theme/bg/background";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@app/ui/components/tooltip";
 import { useRequestFormSession, useFormSession } from "./load";
 import { Env } from "@/env";
 import { AgentPagesFlow } from "@/grida-forms/formstate/core/flow";

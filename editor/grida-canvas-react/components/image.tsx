@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useCurrentEditor } from "@/grida-canvas-react/use-editor";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 type ImageState = "loading" | "empty" | "loaded";
 

@@ -117,7 +117,7 @@ grida.co and \[tenant\].grida.site domains are connected.
     - `sitemap.ts` contains the sitemap.xml generator. this contains the sitemap for the public pages, usually under `(www)` directory.
   - `/www` contains the landing page specific components.
   - `/components` contains the generally reusable components.
-  - `/components/ui` contains the shadcn ui components.
+  - the shadcn ui primitives + ai-elements live in the `@app/ui` package (`packages/ui`), imported as `@app/ui/components/*` and `@app/ui/ai-elements/*` (promoted out of `/editor/components`).
   - `/scaffolds` contains the feature-specific larger components / pages / editors.
   - `/lib` contains the core, strictly designed modules with non-opinionated, reusable, and stable modules. - all of them must be worthy to be promoted to `<root>/packages` directory.
   - `/grida-*` aims to isolate the modules to a domain-specific scope. once reasonably well-defined, they will be promoted to `<root>/packages` directory.

@@ -29,12 +29,12 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import {
   toolmode_to_toolbar_value,
   toolbar_value_to_cursormode,
@@ -46,7 +46,7 @@ import {
   useEditorFlagsState,
   useToolState,
 } from "@/grida-canvas-react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
 
 export function ToolGroupItem({

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import type cmath from "@grida/cmath";
 
 export interface LassoProps extends Omit<

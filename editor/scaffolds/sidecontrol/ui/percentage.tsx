@@ -1,6 +1,6 @@
 import React from "react";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/components/lib/utils";
+import { Input } from "@app/ui/components/input";
+import { cn } from "@app/ui/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
 import type { TMixed } from "../controls/utils/types";
 import type { editor } from "@/grida-canvas";

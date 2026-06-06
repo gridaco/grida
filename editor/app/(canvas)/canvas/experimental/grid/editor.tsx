@@ -17,14 +17,14 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { block_from_preset } from "./blocks/data";
 import { Provider, useBuilderState } from "./core";
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea } from "@app/ui/components/textarea";
 import { nanoid } from "nanoid";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Label } from "@app/ui/components/label";
+import { Input } from "@app/ui/components/input";
+import { Button } from "@app/ui/components/button";
 import { MediaPicker } from "@/scaffolds/mediapicker";
 import {
   Select,
@@ -32,8 +32,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+} from "@app/ui/components/select";
+import { ToggleGroup, ToggleGroupItem } from "@app/ui/components/toggle-group";
 import {
   TextAlignBottomIcon,
   TextAlignMiddleIcon,

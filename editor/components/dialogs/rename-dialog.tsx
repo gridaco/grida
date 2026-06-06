@@ -3,7 +3,7 @@
 import type React from "react";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Dialog,
   DialogClose,
@@ -12,15 +12,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import {
   Field,
   FieldError,
   FieldDescription,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 
 // Update the interface to allow for Promise<boolean> return type
 interface RenameDialogProps {

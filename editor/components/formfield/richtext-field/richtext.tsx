@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Content } from "@tiptap/react";
 import { MinimalTiptapEditor, toTiptapContent } from "@/kits/minimal-tiptap";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import type { FileResolverFn, FileUploaderFn } from "../file-upload-field";
 import { RichTextStagedFileUtils } from "@/services/form";
 

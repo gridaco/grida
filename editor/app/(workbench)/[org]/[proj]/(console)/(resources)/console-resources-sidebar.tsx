@@ -11,7 +11,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { DarwinSidebarHeaderDragArea } from "@/host/desktop";
 import { ArrowLeftIcon } from "@radix-ui/react-icons";

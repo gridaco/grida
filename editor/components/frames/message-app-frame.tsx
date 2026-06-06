@@ -1,9 +1,9 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { AvatarFallback, Avatar } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
+import { Button } from "@app/ui/components/button";
+import { AvatarFallback, Avatar } from "@app/ui/components/avatar";
+import { Input } from "@app/ui/components/input";
 import { ArrowUpIcon, ChevronLeft } from "lucide-react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export default function MessageAppFrame({
   sender,

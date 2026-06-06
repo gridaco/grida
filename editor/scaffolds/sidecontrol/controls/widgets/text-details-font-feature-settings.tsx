@@ -5,9 +5,9 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import type cg from "@grida/cg";
-import { Label } from "@/components/ui/label";
+import { Label } from "@app/ui/components/label";
 import { editor } from "@/grida-canvas";
 
 // Number-related OpenType features

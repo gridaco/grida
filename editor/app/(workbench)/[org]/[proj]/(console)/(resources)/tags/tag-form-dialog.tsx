@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import {
   Form,
   FormControl,
@@ -20,10 +20,10 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+} from "@app/ui/components/form";
+import { Input } from "@app/ui/components/input";
+import { Button } from "@app/ui/components/button";
+import { Textarea } from "@app/ui/components/textarea";
 import { useTags } from "@/scaffolds/workspace";
 import type { Platform } from "@/lib/platform";
 import { toast } from "sonner";

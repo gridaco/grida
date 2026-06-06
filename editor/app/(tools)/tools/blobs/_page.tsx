@@ -2,10 +2,10 @@
 
 import React, { useMemo, useState } from "react";
 import { blob } from "@grida/cmath/_blob";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Button } from "@app/ui/components/button";
+import { Slider } from "@app/ui/components/slider";
+import { Card } from "@app/ui/components/card";
+import { Label } from "@app/ui/components/label";
 import { DownloadIcon, RefreshCwIcon } from "lucide-react";
 
 /**

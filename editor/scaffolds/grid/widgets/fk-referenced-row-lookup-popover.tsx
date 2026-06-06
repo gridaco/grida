@@ -4,22 +4,22 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import XSBReferencedRowLookupProvider, {
   useReferenced,
 } from "@/scaffolds/data-xsb-referenced-row-lookup";
 import { Data } from "@/lib/data";
 import { useSchemaName } from "@/scaffolds/data-query";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { useEditorState } from "@/scaffolds/editor";
 import { DataCard } from "@/scaffolds/data-card/card";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import { CodeIcon } from "@radix-ui/react-icons";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { analyze } from "@/scaffolds/data-card/analyze";
 import assert from "assert";
 import { SupabasePostgRESTOpenApi } from "@/lib/supabase-postgrest";

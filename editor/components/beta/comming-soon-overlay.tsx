@@ -1,5 +1,5 @@
 import React from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 

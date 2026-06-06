@@ -1,5 +1,5 @@
 import React from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { TransparencyGridIcon } from "@radix-ui/react-icons";
 
 export default function StopMarker({

@@ -2,8 +2,8 @@
 
 import { addDays } from "date-fns";
 
-import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent } from "@/components/ui/card";
+import { Calendar } from "@app/ui/components/calendar";
+import { Card, CardContent } from "@app/ui/components/card";
 
 const start = new Date(2023, 5, 5);
 

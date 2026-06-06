@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { AuthPolicyList } from "./auth-policy-list";
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";

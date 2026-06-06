@@ -1,5 +1,5 @@
 import { TemplateComponents } from "@/grida-canvas-react-renderer-dom/template-builder";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Dialog,
   DialogClose,
@@ -9,8 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui-editor/dialog";
 import React, { useEffect } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/components/lib/utils";
+import { ScrollArea } from "@app/ui/components/scroll-area";
+import { cn } from "@app/ui/lib/utils";
 import {
   DataProvider,
   ProgramDataContextHost,

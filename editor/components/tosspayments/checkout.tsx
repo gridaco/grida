@@ -14,7 +14,7 @@ import {
   ANONYMOUS,
   PaymentWidgetInstance,
 } from "@tosspayments/payment-widget-sdk";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { TossPaymentsCheckoutSessionResponseData } from "@/types/integrations/api";
 
 interface TossPaymentsCheckoutSessionContext extends TossPaymentsCheckoutSessionResponseData {

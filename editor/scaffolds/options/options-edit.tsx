@@ -10,8 +10,8 @@ import {
   PlusIcon,
   TrashIcon,
 } from "@radix-ui/react-icons";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/components/lib/utils";
+import { Switch } from "@app/ui/components/switch";
+import { cn } from "@app/ui/lib/utils";
 import {
   arrayMove,
   SortableContext,
@@ -29,10 +29,10 @@ import {
 } from "@dnd-kit/core";
 import { fmt_snake_case_to_human_text } from "@/utils/fmt";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { AdminMediaPicker } from "../mediapicker";
 import type { Optgroup, Option } from "@/grida-forms-hosted/types";
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import {
   Dialog,
   DialogClose,
@@ -41,13 +41,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+} from "@app/ui/components/dialog";
+import { Textarea } from "@app/ui/components/textarea";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { produce, type Draft } from "immer";
 import { draftid } from "@/utils/id";
 import { FolderIcon } from "lucide-react";

@@ -10,19 +10,19 @@ import {
   createBrowserClient,
   createBrowserCIAMClient,
 } from "@/lib/supabase/client";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   ButtonGroup,
   ButtonGroupSeparator,
-} from "@/components/ui/button-group";
+} from "@app/ui/components/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { ChevronDownIcon, UploadIcon } from "@radix-ui/react-icons";
 import { useProject } from "@/scaffolds/workspace";
 import { useDialogState } from "@/components/hooks/use-dialog-state";

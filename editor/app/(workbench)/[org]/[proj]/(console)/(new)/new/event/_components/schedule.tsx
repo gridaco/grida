@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@app/ui/components/dialog";
 import React from "react";
 
 export function ScheduleDialog({

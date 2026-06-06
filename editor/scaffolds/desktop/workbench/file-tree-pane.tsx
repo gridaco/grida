@@ -31,8 +31,8 @@ import {
   type AsyncTreeSourceHandle,
 } from "@grida/tree-view/async";
 import { TreeProvider, useTree, useTreeSnapshot } from "@grida/tree-view/react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/components/lib/utils/index";
+import { ScrollArea } from "@app/ui/components/scroll-area";
+import { cn } from "@app/ui/lib/utils";
 import {
   workspaces as workspacesNs,
   type Workspace,

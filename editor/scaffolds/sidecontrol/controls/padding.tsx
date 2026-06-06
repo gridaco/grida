@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import InputPropertyNumber from "../ui/number";
 import { WorkbenchUI } from "@/components/workbench";
 import { AllSidesIcon } from "@radix-ui/react-icons";
-import { Toggle } from "@/components/ui/toggle";
-import { cn } from "@/components/lib/utils";
+import { Toggle } from "@app/ui/components/toggle";
+import { cn } from "@app/ui/lib/utils";
 import grida from "@grida/schema";
 import type { TMixed } from "./utils/types";
 

@@ -9,8 +9,13 @@ import React, {
 } from "react";
 import { GridaLogo } from "@/components/grida-logo";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@app/ui/components/button";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useFilePicker } from "use-file-picker";
 import Link from "next/link";

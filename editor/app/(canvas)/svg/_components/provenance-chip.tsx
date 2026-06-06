@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 
 const CARRIER_SHORT: Record<string, string> = {
   presentation_attribute: "attr",

@@ -4,7 +4,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import {
   ArrowRight,
   FormInput,

@@ -15,11 +15,16 @@ import {
   prettyPrintSchema,
 } from "@grida/io-figma/fig-kiwi";
 import type { GUID, NodeChange } from "@grida/io-figma/fig-kiwi/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { cn } from "@/components/lib/utils";
-import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@app/ui/components/card";
+import { Input } from "@app/ui/components/input";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { cn } from "@app/ui/lib/utils";
+import { Button } from "@app/ui/components/button";
 import { NodeTypeIcon } from "./node-type-icon";
 import { ThemedMonacoEditor } from "@/components/monaco";
 

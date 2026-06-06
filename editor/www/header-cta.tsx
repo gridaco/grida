@@ -2,7 +2,7 @@
 
 import React from "react";
 import { sitemap } from "./data/sitemap";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import useSession from "@/lib/supabase/use-session";
 import Link from "next/link";
 

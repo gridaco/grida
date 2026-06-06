@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { ShineBorder } from "@/www/ui/shine-border";
 import { useStopwatch } from "react-timer-hook";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export function GenerationImageFrame({
   image,

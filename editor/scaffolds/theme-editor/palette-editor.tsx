@@ -3,14 +3,14 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { HslColorPicker } from "react-colorful";
 import { MoonIcon, SunIcon } from "@radix-ui/react-icons";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@app/ui/components/toggle-group";
+import { Card, CardContent, CardHeader } from "@app/ui/components/card";
+import { Input } from "@app/ui/components/input";
 import { z } from "zod/v3";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import type { Theme } from "@/theme/palettes/types";
 import palettes from "@/theme/palettes";
 

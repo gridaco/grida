@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Label } from "@/components/ui/label";
+import { Label } from "@app/ui/components/label";
 import {
   Dialog,
   DialogClose,
@@ -8,8 +8,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/dialog";
+import { Button } from "@app/ui/components/button";
 import { toast } from "sonner";
 import { io } from "@grida/io";
 import { FileDropzone } from "./file-dropzone";

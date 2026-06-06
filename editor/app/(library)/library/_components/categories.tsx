@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { listCategories } from "../actions";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@app/ui/components/badge";
+import { Skeleton } from "@app/ui/components/skeleton";
 import type { Library } from "@/lib/library";
 import Link from "next/link";
 

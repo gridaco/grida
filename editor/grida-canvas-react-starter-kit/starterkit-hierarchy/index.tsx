@@ -8,12 +8,12 @@ import {
   SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import {
   ResizablePanelGroup,
   ResizablePanel,
   ResizableHandle,
-} from "@/components/ui/resizable";
+} from "@app/ui/components/resizable";
 import { ScenesList } from "./tree-scene";
 import { IsolationNodeHierarchyList } from "./tree-node";
 

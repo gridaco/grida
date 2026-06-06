@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Play } from "lucide-react";
 import { useSvgEditor } from "@grida/svg-editor/react";
 import { keynote, type KeynoteSurfaceHandle } from "@grida/svg-editor/presets";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { SvgShell } from "../../_components/svg-shell";
 import { SvgToolbar } from "../../_components/svg-toolbar";
 import {

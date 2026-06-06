@@ -30,7 +30,7 @@ import {
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { WorkspaceWorkbench } from "@/scaffolds/desktop/workbench/workspace-workbench";
 
 export default function DesktopWorkspacePage() {

@@ -10,7 +10,7 @@ import {
   CommandList,
   CommandSeparator,
   CommandShortcut,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 import {
   GearIcon,
   ImageIcon,
@@ -19,7 +19,7 @@ import {
   MagicWandIcon,
 } from "@radix-ui/react-icons";
 import { useHotkeys } from "react-hotkeys-hook";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
 /**

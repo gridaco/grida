@@ -1,4 +1,4 @@
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useTableDefinition } from "../data-query";
 import assert from "assert";
 import type { DGResponseRow } from "../grid";

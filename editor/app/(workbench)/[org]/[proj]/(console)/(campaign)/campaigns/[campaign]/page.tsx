@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import Overview from "./_components/overview";
 import { useCampaign } from "./store";
 

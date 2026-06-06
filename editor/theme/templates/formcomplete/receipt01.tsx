@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@app/ui/components/card";
 import i18next from "i18next";
 import { TemplateVariables } from "@/lib/templating";
 import { getPropTypes, getRenderedTexts } from "@/lib/templating/template";

@@ -5,12 +5,12 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+} from "@app/ui/components/card";
+import { Button } from "@app/ui/components/button";
+import { Progress } from "@app/ui/components/progress";
 import { Platform } from "@/lib/platform";
 import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import {
   getCampaignScheduleMessage,
   isCampaignInSchedule,

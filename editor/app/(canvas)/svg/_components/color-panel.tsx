@@ -9,8 +9,8 @@ import type {
   PaintPreviewSession,
   PaintValue,
 } from "@grida/svg-editor";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import { ProvenanceChip } from "./provenance-chip";
 
 type Channel = "fill" | "stroke";

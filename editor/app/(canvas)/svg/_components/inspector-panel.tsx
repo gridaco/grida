@@ -18,10 +18,10 @@ import cmath from "@grida/cmath";
 import { PaintRow } from "./color-panel";
 import { ProvenanceChip } from "./provenance-chip";
 import { AlignControl } from "@/scaffolds/sidecontrol/controls/ext-align";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@app/ui/components/button";
+import { Separator } from "@app/ui/components/separator";
+import { Input } from "@app/ui/components/input";
+import { Label } from "@app/ui/components/label";
 
 // Per-leaf subscriptions. `editor.node_paint` / `node_properties` /
 // `defs.gradients.list()` are reference-stable across no-op emits, so

@@ -3,25 +3,25 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import cmath from "@grida/cmath";
 import vn from "@grida/vn";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { Button } from "@app/ui/components/button";
+import { Checkbox } from "@app/ui/components/checkbox";
+import { Label } from "@app/ui/components/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
-import { Textarea } from "@/components/ui/textarea";
+} from "@app/ui/components/select";
+import { Separator } from "@app/ui/components/separator";
+import { Slider } from "@app/ui/components/slider";
+import { Textarea } from "@app/ui/components/textarea";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { CopyIcon, RotateCcwIcon } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────

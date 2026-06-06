@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import kolor from "@grida/color";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import {
@@ -22,13 +22,13 @@ import {
 } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
 import { ColorPicker32FWithOptions } from "@/scaffolds/sidecontrol/controls/color-picker";
-import { Toggle, toggleVariants } from "@/components/ui/toggle";
+import { Toggle, toggleVariants } from "@app/ui/components/toggle";
 import { PaintBucketIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import {
   useContentEditModeMinimalState,
   useToolState,

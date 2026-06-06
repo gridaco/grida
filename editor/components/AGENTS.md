@@ -14,30 +14,46 @@ If you find yourself adding heavy state machines, feature workflows, or global/e
 
 - **No route coupling**: do not import from specific Next.js route segments under `app/` (e.g. `app/(workbench)/...`).
 - **Avoid global state coupling**: prefer props and local state; do not require editor/workbench global stores just to render.
-- **Composable styling**: prefer `className` + merge helper (e.g. `cn(...)`) and avoid “closed” styling that can’t be overridden.
+- **Composable styling**: prefer `className` + the merge helper `cn(...)` (imported from `@app/ui/lib/utils`) and avoid “closed” styling that can’t be overridden.
 - **Small surface area**: keep components narrowly-scoped; split when a component becomes a mini-feature.
 - **No new directories by default**: do not create new folders under `components/` unless explicitly required. This tree is intentionally curated by project maintainers, and everything here should remain broadly reusable.
 
+## Base primitives live in `@app/ui` (not here)
+
+The shadcn **base primitive set** and the **AI elements** were promoted out of this
+directory into the `@app/ui` workspace package (`packages/ui`). Import them — do not
+re-add them here:
+
+- Primitives: `@app/ui/components/*` (e.g. `@app/ui/components/button`)
+- AI elements: `@app/ui/ai-elements/*`
+- `cn` helper: `@app/ui/lib/utils`
+- Shared theme/tokens: `@app/ui/globals.css` (owned by the package)
+
+To add or update a base primitive, run `shadcn` against the **package** (`packages/ui`
+has its own `components.json`), not the editor. See `packages/ui` for details.
+
 ## Directory map (highlighted)
 
-| directory                 | role                                                                               | opinionation | notes                                                                                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `components/ui/`          | **Base primitives** (Shadcn-style) used across the app.                            | low          | Treated as our “default primitive set”. Prefer using **as-is** (avoid local forks/overrides unless necessary).                         |
-| `components/ui-editor/`   | Editor-leaning primitives (generally more condensed/special) for editor-ish UI/UX. | medium       | A parallel set to `ui/` when the editor needs different density/interaction defaults.                                                  |
-| `components/ui-forms/`    | Forms-specific UI primitives.                                                      | medium       | Opinionated toward predictable forms behavior/UX.                                                                                      |
-| `components/ui2/`         | Preview-only UI primitives for the visual builder.                                 | medium       | Dedicated to preview constraints; e.g. relative-position overlays/dialog mechanics.                                                    |
-| `components/ai-elements/` | AI UI primitives imported from a Shadcn registry-style source.                     | medium       | Keep the public surface small and override-friendly; treat similarly to registry components (avoid deep local redesign unless needed). |
+The directories below are what remains **in `editor/components`** — editor-local
+primitive sets that build _on top of_ `@app/ui`:
+
+| directory               | role                                                                               | opinionation | notes                                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------- |
+| `components/ui-editor/` | Editor-leaning primitives (generally more condensed/special) for editor-ish UI/UX. | medium       | A parallel set to `@app/ui` when the editor needs different density/interaction defaults. |
+| `components/ui-forms/`  | Forms-specific UI primitives.                                                      | medium       | Opinionated toward predictable forms behavior/UX.                                         |
+| `components/ui2/`       | Preview-only UI primitives for the visual builder.                                 | medium       | Dedicated to preview constraints; e.g. relative-position overlays/dialog mechanics.       |
 
 ## How to choose where a component goes
 
-| if your component is…                                                      | put it in…              |
-| -------------------------------------------------------------------------- | ----------------------- |
-| a basic primitive (button, input, popover, dialog, etc.)                   | `components/ui/`        |
-| a primitive but optimized for editor density / special editor interactions | `components/ui-editor/` |
-| a primitive meant for forms-specific UX                                    | `components/ui-forms/`  |
-| a primitive that must work inside preview/embedded rendering constraints   | `components/ui2/`       |
-| a higher-level widget with internal state but used broadly                 | `kits/`                 |
-| bound to global editor/workbench state, or a feature assembly              | `scaffolds/`            |
+| if your component is…                                                      | put it in…                                 |
+| -------------------------------------------------------------------------- | ------------------------------------------ |
+| a basic primitive (button, input, popover, dialog, etc.)                   | `@app/ui` (`shadcn add` → `packages/ui`)   |
+| an AI / chat registry primitive                                            | `@app/ui/ai-elements` (add to the package) |
+| a primitive but optimized for editor density / special editor interactions | `components/ui-editor/`                    |
+| a primitive meant for forms-specific UX                                    | `components/ui-forms/`                     |
+| a primitive that must work inside preview/embedded rendering constraints   | `components/ui2/`                          |
+| a higher-level widget with internal state but used broadly                 | `kits/`                                    |
+| bound to global editor/workbench state, or a feature assembly              | `scaffolds/`                               |
 
 ## Authoring guidelines
 

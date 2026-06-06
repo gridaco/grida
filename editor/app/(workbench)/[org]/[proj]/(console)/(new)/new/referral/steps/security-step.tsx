@@ -1,9 +1,9 @@
 "use client";
 
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Label } from "@app/ui/components/label";
+import { Switch } from "@app/ui/components/switch";
 import { Shield, User, Users, ChevronRight } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@app/ui/components/avatar";
 import { Platform } from "@/lib/platform";
 
 interface SecurityStepProps {

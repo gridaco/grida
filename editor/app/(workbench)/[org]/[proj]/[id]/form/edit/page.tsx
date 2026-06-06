@@ -5,7 +5,7 @@ import { FormEditorAgentThemeProvider } from "@/scaffolds/agent-form-builder/the
 import { useEditorState } from "@/scaffolds/editor";
 import { SideControl } from "@/scaffolds/sidecontrol";
 import BlocksEditor from "@/scaffolds/blocks-editor";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { CurrentPage } from "@/scaffolds/editor/utils/current-page";
 
 export default function EditFormPage() {

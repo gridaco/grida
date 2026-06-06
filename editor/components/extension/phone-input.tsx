@@ -7,7 +7,7 @@ import { CheckIcon, ChevronsUpDown } from "lucide-react";
 import * as RPNInput from "react-phone-number-input";
 import flags from "react-phone-number-input/flags";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Command,
   CommandEmpty,
@@ -15,15 +15,15 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/command";
+import { Input } from "@app/ui/components/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/popover";
+import { ScrollArea } from "@app/ui/components/scroll-area";
+import { cn } from "@app/ui/lib/utils";
 
 type PhoneInputProps = Omit<
   React.ComponentProps<"input">,

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import { wwwprint } from "../../data";
 
 export default function TemplatesPage() {

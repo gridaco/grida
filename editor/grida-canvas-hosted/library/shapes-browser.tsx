@@ -12,7 +12,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { SearchInput } from "./components/search-input";
 import { LoadingIndicator } from "./components/loading-indicator";
 import { useDebounce } from "@uidotdev/usehooks";

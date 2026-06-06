@@ -15,13 +15,13 @@ import {
 } from "./ui";
 import { Button } from "@/components/ui-editor/button";
 import { CubeIcon, GearIcon, PlusIcon, TrashIcon } from "@radix-ui/react-icons";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@app/ui/components/checkbox";
 import { UserDataControl } from "./controls/x-userdata";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import { useCurrentEditor, useEditorState } from "@/grida-canvas-react";
 import grida from "@grida/schema";
 import { RGBA32FColorControl } from "./controls/color";
@@ -29,7 +29,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { useCurrentSceneState } from "@/grida-canvas-react/provider";
 
 function SceneBackgroundPropertyLine() {

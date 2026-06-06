@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { useTransformState } from "../../provider";
 import cmath from "@grida/cmath";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useSurfaceGesture } from "../hooks/use-surface-gesture";
 import { SVGPatternDiagonalStripe } from "./svg-fill-patterns";
 import { useCurrentEditor, useEditorState } from "../../use-editor";

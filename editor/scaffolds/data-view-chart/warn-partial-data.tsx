@@ -1,6 +1,6 @@
 "use client";
 import { useCallback } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@app/ui/components/alert";
 import { useDatagridTableSpace, useEditorState } from "../editor";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui-editor/button";

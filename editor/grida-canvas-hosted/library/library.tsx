@@ -10,7 +10,7 @@ import { WidgetsBrowser } from "./widgets-browser";
 import { LogosBrowser } from "./icons-logos-browser";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { toast } from "sonner";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import cg from "@grida/cg";
 import cmath from "@grida/cmath";
 import { datatransfer } from "@/grida-canvas/data-transfer";

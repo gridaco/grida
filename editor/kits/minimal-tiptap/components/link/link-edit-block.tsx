@@ -1,9 +1,9 @@
 import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/components/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { Label } from "@app/ui/components/label";
+import { Switch } from "@app/ui/components/switch";
+import { Input } from "@app/ui/components/input";
+import { cn } from "@app/ui/lib/utils";
 
 export interface LinkEditorProps extends React.ComponentProps<"div"> {
   defaultUrl?: string;

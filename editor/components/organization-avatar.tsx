@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { cn } from "@/components/lib/utils";
+import { Avatar, AvatarFallback } from "@app/ui/components/avatar";
+import { cn } from "@app/ui/lib/utils";
 import Image from "next/image";
 
 export function OrganizationAvatar({

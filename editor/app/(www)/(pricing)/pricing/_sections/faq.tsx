@@ -5,7 +5,7 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
+} from "@app/ui/components/accordion";
 
 const faqs: { question: string; answer: React.ReactNode }[] = [
   {

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Progress as ProgressPrimitive } from "radix-ui";
 
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 
 function Progress({
   className,

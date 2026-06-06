@@ -12,7 +12,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import {
   Select,
   SelectContent,
@@ -21,7 +21,7 @@ import {
   SelectValue,
   SelectGroup,
   SelectLabel,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { useImageModelConfig } from "@/lib/ai/hooks";
 import { generateAiImage } from "@/lib/ai/actions/image-generate";
 import { useAiCredits } from "@/lib/ai/credits";
@@ -48,15 +48,15 @@ import { EditorSurfaceDropzone } from "@/grida-canvas-react/viewport/surface-dro
 import { EditorSurfaceContextMenu } from "@/grida-canvas-react/viewport/surface-context-menu";
 import { EditorSurfaceClipboardSyncProvider } from "@/grida-canvas-react/viewport/surface";
 import { WorkbenchUI } from "@/components/workbench";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { ToolbarPosition } from "@/grida-canvas-react-starter-kit/starterkit-toolbar";
 import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import ai from "@/lib/ai";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import {
   useContinueWithAuth,
   AuthProvider,

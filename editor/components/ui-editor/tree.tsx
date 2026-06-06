@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 
 /**
  * Presentational tree primitives. Library-agnostic by design: the row

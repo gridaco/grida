@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@app/ui/components/button";
 import {
   CalendarIcon,
   EnvelopeClosedIcon,
@@ -14,7 +14,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { SlackLogoIcon } from "@/components/logos";
 import { sendGAEvent } from "@next/third-parties/google";
 import { useWorkspace } from "../workspace";
@@ -22,7 +22,7 @@ import { sitemap } from "@/www/data/sitemap";
 import Link from "next/link";
 import Head from "next/head";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import type { VariantProps } from "class-variance-authority";
 
 function useGAAuthenticatedUserIDTelemetry() {

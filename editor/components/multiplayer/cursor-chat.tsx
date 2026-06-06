@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { cva } from "class-variance-authority";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import ContentEditable, {
   type ContentEditableEvent,
 } from "@/components/primitives/contenteditable";

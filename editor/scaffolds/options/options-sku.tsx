@@ -9,12 +9,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@app/ui/components/table";
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from "@/components/ui/hover-card";
+} from "@app/ui/components/hover-card";
 import { QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 import type { InventoryStock, MutableInventoryStock } from "@/types/inventory";
 import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";

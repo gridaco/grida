@@ -4,7 +4,7 @@
  * Talks to `AgentSidecar` via an AI SDK `ChatTransport` over the desktop
  * bridge, and resolves fs tool calls locally against the live
  * `SvgEditor` via {@link useAgentFsBinding}.
- * Presentation is built on the repo's `@/components/ai-elements/*`
+ * Presentation is built on the repo's `@app/ui/ai-elements/*`
  * primitives so the panel matches the web `/svg` route's shape.
  *
  * GRIDA-SEC-004 — error / finish chunks are surfaced via the `error`
@@ -28,8 +28,8 @@ import {
   ConversationContent,
   ConversationEmptyState,
   ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { cn } from "@/components/lib/utils/index";
+} from "@app/ui/ai-elements/conversation";
+import { cn } from "@app/ui/lib/utils";
 import type { ComposerCatalog } from "@/kits/composer";
 import {
   AGENT_SESSION_AGENT,

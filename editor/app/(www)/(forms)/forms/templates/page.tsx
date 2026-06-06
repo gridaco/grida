@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@app/ui/components/card";
 import { fetchTemplates } from "./actions";
 import { formlink } from "@/host/url";
 import { Env } from "@/env";

@@ -8,10 +8,10 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+} from "@app/ui/components/context-menu";
 import { useSelectionState, useEditorFlagsState } from "../provider";
 import { toast } from "sonner";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   useContextMenuActions,
   ContextMenuAction,

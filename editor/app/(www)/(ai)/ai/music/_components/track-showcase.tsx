@@ -8,7 +8,7 @@ import {
   PauseIcon,
   PlayIcon,
 } from "lucide-react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export type ShowcaseTrack = {
   id: string;

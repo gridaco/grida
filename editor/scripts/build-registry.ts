@@ -94,7 +94,7 @@ function extractDescription(source: string): string | undefined {
  * Parse `import` lines to derive npm + shadcn-registry dependencies.
  *
  * - Bare specifiers (e.g. `lucide-react`, `@grida/tree-view`) → `dependencies`.
- * - `@/components/ui/<name>` → `registryDependencies` (existing shadcn block).
+ * - `@app/ui/components/<name>` → `registryDependencies` (existing shadcn block).
  * - `@/lib/utils`, `@/...`, `.`, `..` → ignored (already provided by any
  *   shadcn-configured app via `components.json` aliases).
  */
@@ -109,8 +109,8 @@ function extractDeps(source: string): {
   while ((m = re.exec(source))) {
     const spec = m[1];
     if (!spec) continue;
-    if (spec.startsWith("@/components/ui/")) {
-      regDeps.add(spec.slice("@/components/ui/".length).split("/")[0]!);
+    if (spec.startsWith("@app/ui/components/")) {
+      regDeps.add(spec.slice("@app/ui/components/".length).split("/")[0]!);
       continue;
     }
     if (spec.startsWith("@/") || spec.startsWith(".")) continue;

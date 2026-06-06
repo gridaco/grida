@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui-editor/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import { WorkbenchUI } from "@/components/workbench";
 import { IDataQueryPaginationConsumer } from "@/scaffolds/data-query";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";

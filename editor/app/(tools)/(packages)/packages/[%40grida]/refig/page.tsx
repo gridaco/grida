@@ -9,10 +9,10 @@ import {
   EditorSurface,
 } from "@/grida-canvas-react";
 import { GridaLogo } from "@/components/grida-logo";
-import { Button } from "@/components/ui/button";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@app/ui/components/button";
+import { TooltipProvider } from "@app/ui/components/tooltip";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   useRefigEditor,
   validateExt,

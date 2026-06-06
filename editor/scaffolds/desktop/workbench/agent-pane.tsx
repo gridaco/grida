@@ -36,8 +36,8 @@ import {
   Conversation,
   ConversationContent,
   ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { cn } from "@/components/lib/utils/index";
+} from "@app/ui/ai-elements/conversation";
+import { cn } from "@app/ui/lib/utils";
 import {
   AGENT_SESSION_AGENT,
   sessions as bridgeSessions,

@@ -8,10 +8,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
+} from "@app/ui/components/alert-dialog";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
+import { Spinner } from "@app/ui/components/spinner";
 
 export function DeleteConfirmationAlertDialog<ID = string>({
   title,

@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Chat, useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Select,
   SelectContent,
@@ -19,7 +19,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { ComponentDemo } from "../component-demo";
 import { DemoChatShell } from "./_chat-shell";
 import { createMockTransport } from "./_mock-transport";

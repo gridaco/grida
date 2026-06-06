@@ -1,16 +1,16 @@
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { buttonVariants } from "@/components/ui-editor/button";
 import {
   ButtonGroup,
   ButtonGroupSeparator,
-} from "@/components/ui/button-group";
+} from "@app/ui/components/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import cg from "@grida/cg";
 import { CaretDownIcon } from "@radix-ui/react-icons";
 import {

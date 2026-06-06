@@ -1,14 +1,14 @@
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { ToolIcon } from ".";
 import { useCurrentEditor, useToolState } from "@/grida-canvas-react";
-import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@app/ui/components/button";
+import { ToggleGroup, ToggleGroupItem } from "@app/ui/components/toggle-group";
 import { RadiusIcon, SplineIcon, SplinePointerIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
 import { uikbdk, M } from "@grida/keybinding";
 

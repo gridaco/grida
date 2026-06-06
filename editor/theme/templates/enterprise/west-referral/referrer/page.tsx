@@ -6,8 +6,8 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/card";
+import { Button } from "@app/ui/components/button";
 import {
   ScreenMobileFrame,
   ScreenRoot,
@@ -18,9 +18,9 @@ import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { ShineBorder } from "@/www/ui/shine-border";
 import NumberFlow from "@number-flow/react";
 import { motion } from "motion/react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { Check } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@app/ui/components/avatar";
 import { mutate } from "swr";
 import { TicketCheckIcon } from "lucide-react";
 import { template } from "@/utils/template";

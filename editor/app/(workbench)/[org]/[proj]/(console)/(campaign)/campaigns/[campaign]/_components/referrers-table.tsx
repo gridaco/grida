@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { ColumnDef, CellContext } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@app/ui/components/button";
+import { Checkbox } from "@app/ui/components/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,12 +11,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { DataTable } from "@/components/data-table/data-table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { CustomerPickerDialog } from "@/scaffolds/platform/customer/customer-picker-dialog";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { MoreHorizontal } from "lucide-react";
@@ -34,8 +34,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
+} from "@app/ui/components/dialog";
+import { Progress } from "@app/ui/components/progress";
 
 type ReferrerWithCustomer = Platform.WEST.Referral.Referrer & {
   customer: Platform.WEST.Referral.Customer;

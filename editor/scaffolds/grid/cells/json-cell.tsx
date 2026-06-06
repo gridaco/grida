@@ -4,14 +4,14 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import React, { useCallback, useEffect, useState } from "react";
 import { BlockKeys } from "./block-keys";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { JSONValue } from "@/types";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@app/ui/components/button";
+import { Badge } from "@app/ui/components/badge";
 import { toast } from "sonner";
 
 // expand

@@ -1,11 +1,15 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@app/ui/components/popover";
 import { TagInputStyleClassesProps, type Tag as TagType } from "./tag-input";
 import { TagList, TagListProps } from "./tag-list";
-import { Button } from "../ui/button";
-import { cn } from "@/components/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 
 type TagPopoverProps = {
   children: React.ReactNode;

@@ -44,7 +44,7 @@ import {
   CreateNewAttributeProvider,
 } from "./columns";
 import { unwrapFeildValue } from "@/grida-forms/lib/unwrap";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { toast } from "sonner";
 import { FormValue } from "@/services/form";
@@ -55,12 +55,12 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import Highlight from "@/components/highlight";
 import { FieldSupports } from "@/k/supported_field_types";
 import { format } from "date-fns";
 import { EmptyRowsRenderer } from "./grid-empty-state";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   StandaloneDataGridStateProvider,
   useCellRootProps,
@@ -71,8 +71,8 @@ import {
 } from "./providers";
 import { useMediaViewer } from "@/components/mediaviewer";
 import { useSchemaName, useTableDefinition } from "../data-query";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@app/ui/components/checkbox";
+import { Badge } from "@app/ui/components/badge";
 import { ReferencedRowLookupPopover } from "./widgets/fk-referenced-row-lookup-popover";
 import "./grid.css";
 

@@ -1,9 +1,14 @@
 "use client";
 
 import React from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
+import { Button } from "@app/ui/components/button";
+import { Checkbox } from "@app/ui/components/checkbox";
 import {
   CaretDownIcon,
   CaretUpIcon,
@@ -18,7 +23,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { __UNSAFE_CONSOLE } from "@/grida-canvas-react/devtools/__unsafe-console";

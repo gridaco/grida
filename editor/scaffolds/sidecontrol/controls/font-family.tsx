@@ -6,7 +6,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -15,12 +15,12 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { WorkbenchUI } from "@/components/workbench";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useGridaFontsSearch } from "@/hooks/use-grida-fonts-search";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import grida from "@grida/schema";
 import type { GoogleWebFontListItem } from "@grida/fonts/google";
 import * as google from "@grida/fonts/google";

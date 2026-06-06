@@ -3,23 +3,23 @@
 import * as React from "react";
 import Link from "next/link";
 import { UserCheck2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Button } from "@app/ui/components/button";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@/components/ui/input-otp";
+} from "@app/ui/components/input-otp";
 import { template } from "@/utils/template";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { toast } from "sonner";
 
 type Step = "email" | "otp" | "done";

@@ -6,7 +6,7 @@ import { Platform } from "@/lib/platform";
 import { notFound } from "next/navigation";
 import ReferrerPage from "./_components/referrer";
 import InvitationPage from "./_components/invitation";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { useCampaignAgent } from "../../store";
 import { useLayout } from "@/scaffolds/tenant";
 import { TemplateData } from "@/theme/templates/enterprise/west-referral/templates";

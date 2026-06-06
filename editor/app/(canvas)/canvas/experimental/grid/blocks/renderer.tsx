@@ -12,8 +12,8 @@ import type {
   GridaFormsTimerBlock,
   GridaFormsGalleryBlock,
 } from "./types";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import * as CSS from "./css";
 
 const ReactPlayer = dynamic(() => import("react-player/lazy"), { ssr: false });

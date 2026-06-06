@@ -10,15 +10,15 @@ import {
   HammerIcon,
   TerminalIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
+import { Button } from "@app/ui/components/button";
+import { ButtonGroup } from "@app/ui/components/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import {
   hostApps,
   type HostAppId,

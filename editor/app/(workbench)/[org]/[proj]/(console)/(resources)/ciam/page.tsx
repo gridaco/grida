@@ -4,7 +4,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import { previewlink } from "@/lib/internal/url";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 

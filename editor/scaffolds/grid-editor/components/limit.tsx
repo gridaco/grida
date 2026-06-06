@@ -4,7 +4,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { WorkbenchUI } from "@/components/workbench";
 
 const default_limit_options = [10, 100, 500, 1000] as const;

@@ -10,11 +10,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@app/ui/components/alert-dialog";
 import type { Platform } from "@/lib/platform";
 import { useTags } from "@/scaffolds/workspace";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 
 interface DeleteTagDialogProps {
   tag: Platform.Tag.TagWithUsageCount;

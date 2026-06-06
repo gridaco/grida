@@ -5,7 +5,7 @@ import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from "@/components/ui/input-group";
+} from "@app/ui/components/input-group";
 import { Search as SearchIcon } from "lucide-react";
 
 export type SearchInputProps = {

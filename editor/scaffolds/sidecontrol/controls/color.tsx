@@ -5,13 +5,13 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/popover";
+import { cn } from "@app/ui/lib/utils";
 import { ColorPicker32FWithOptions } from "./color-picker";
 import RGBHexInput from "./utils/hex";
 import { useNumberInput } from "@grida/number-input/react";
-import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
-import { Separator } from "@/components/ui/separator";
+import { InputGroup, InputGroupAddon } from "@app/ui/components/input-group";
+import { Separator } from "@app/ui/components/separator";
 import kolor from "@grida/color";
 
 function InlineOpacityControl({

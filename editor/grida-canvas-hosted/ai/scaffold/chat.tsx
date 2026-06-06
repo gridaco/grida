@@ -9,8 +9,8 @@ import {
   ConversationContent,
   ConversationEmptyState,
   ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/ai-elements/conversation";
+import { cn } from "@app/ui/lib/utils";
 import { useCurrentAgentChat } from "./chat-provider";
 import { useContextUsage } from "./use-context-usage";
 import type { AgentUIMessage } from "../types";

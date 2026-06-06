@@ -3,9 +3,9 @@
 import * as React from "react";
 import type { WebSharePayload } from "@/components/dialogs/share-dialog";
 import { ShareDrawerDialog } from "@/components/dialogs/share-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Spinner } from "@/components/ui/spinner";
-import { Button } from "@/components/ui/button";
+import { Checkbox } from "@app/ui/components/checkbox";
+import { Spinner } from "@app/ui/components/spinner";
+import { Button } from "@app/ui/components/button";
 import {
   Drawer,
   DrawerTitle,

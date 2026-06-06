@@ -8,13 +8,13 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/card";
+import { Badge } from "@app/ui/components/badge";
+import { Button } from "@app/ui/components/button";
 import { CheckCircle2, ExternalLink } from "lucide-react";
 import { Integration } from "./data";
 import Link from "next/link";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@app/ui/components/avatar";
 
 interface IntegrationCardProps {
   integration: Integration;

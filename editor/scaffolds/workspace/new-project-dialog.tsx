@@ -1,7 +1,7 @@
 "use client";
 
-import { Spinner } from "@/components/ui/spinner";
-import { Button } from "@/components/ui/button";
+import { Spinner } from "@app/ui/components/spinner";
+import { Button } from "@app/ui/components/button";
 import {
   Dialog,
   DialogTrigger,
@@ -11,9 +11,9 @@ import {
   DialogClose,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/dialog";
+import { Field, FieldDescription, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 import { useDebounce } from "@uidotdev/usehooks";
 import React, { useEffect, useState } from "react";
 

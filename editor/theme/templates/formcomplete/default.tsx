@@ -5,8 +5,8 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/card";
+import { Button } from "@app/ui/components/button";
 import { CheckIcon } from "@radix-ui/react-icons";
 import { TemplateVariables } from "@/lib/templating";
 import { getPropTypes, getRenderedTexts } from "@/lib/templating/template";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { sitemap } from "@/www/data/sitemap";
 import { Button as FancyButton } from "@/www/ui/button";
 import { ArrowRight } from "lucide-react";

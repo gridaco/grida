@@ -2,7 +2,7 @@
 
 import React from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Command,
   CommandEmpty,
@@ -10,7 +10,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 import {
   Dialog,
   DialogContent,
@@ -18,12 +18,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui-editor/dialog";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { BlockTypeIcon } from "@/components/form-block-type-icon";
 import { FormFieldTypeIcon } from "@/components/form-field-type-icon";
 import { blocklabels } from "@/k/supported_block_types";
@@ -36,7 +36,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { PopoverContentProps } from "@radix-ui/react-popover";
 

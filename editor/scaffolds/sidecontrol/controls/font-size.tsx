@@ -1,6 +1,6 @@
 import { PropertyEnumV2, EnumItem } from "../ui";
 import InputPropertyNumber from "../ui/number";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import type { editor } from "@/grida-canvas";
 import type { TMixed } from "./utils/types";
 import { usePropertyPreview } from "@/grida-canvas-react/hooks/use-property-change";

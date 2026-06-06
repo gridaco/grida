@@ -3,19 +3,19 @@
 import type React from "react";
 
 import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@/components/ui/input-otp";
+} from "@app/ui/components/input-otp";
 
 import { toast } from "sonner";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 
 type Step = "email" | "otp";
 

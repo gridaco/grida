@@ -9,7 +9,7 @@ import {
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from "@/components/ui/input-group";
+} from "@app/ui/components/input-group";
 
 export function CopyToClipboardInput({ value }: { value: string }) {
   const inputId = React.useId();

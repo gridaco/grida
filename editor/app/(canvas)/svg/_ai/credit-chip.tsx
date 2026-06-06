@@ -1,13 +1,13 @@
 "use client";
 
 import { useAiCredits } from "@/lib/ai/credits";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/components/lib/utils/index";
+import { Badge } from "@app/ui/components/badge";
+import { cn } from "@app/ui/lib/utils";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { AI_GATE_FLOOR_CENTS, fmtUsd } from "@/lib/billing/fees";
 
 /**

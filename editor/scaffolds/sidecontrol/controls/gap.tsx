@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import InputPropertyNumber from "../ui/number";
 import { WorkbenchUI } from "@/components/workbench";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   Select,
   SelectContent,

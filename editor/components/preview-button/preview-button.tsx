@@ -7,9 +7,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ButtonGroup } from "@/components/ui/button-group";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/dropdown-menu";
+import { ButtonGroup } from "@app/ui/components/button-group";
+import { Button } from "@app/ui/components/button";
 import { editorlink, formlink } from "@/host/url";
 import { useEditorState } from "@/scaffolds/editor";
 import Link from "next/link";

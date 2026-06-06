@@ -1,11 +1,11 @@
 import React from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import grida from "@grida/schema";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import type cmath from "@grida/cmath";
 type TMixed<T> = typeof grida.mixed | T;
 

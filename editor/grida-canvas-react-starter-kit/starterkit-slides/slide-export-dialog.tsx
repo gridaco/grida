@@ -8,17 +8,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/select";
+import { RadioGroup, RadioGroupItem } from "@app/ui/components/radio-group";
+import { Label } from "@app/ui/components/label";
+import { Button } from "@app/ui/components/button";
 import {
   useSlideEditorMode,
   useSlides,

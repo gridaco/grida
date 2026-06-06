@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Dialog,
   DialogClose,
@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui-editor/dialog";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { toast } from "sonner";
 import { wellkown } from "@/utils/mimetype";
 import { useStorageEditor } from "../core";
@@ -18,18 +18,18 @@ import {
   FieldDescription,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
+} from "@app/ui/components/field";
+import { Label } from "@app/ui/components/label";
 import { Cross2Icon, Link2Icon } from "@radix-ui/react-icons";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@app/ui/components/toggle-group";
+import { Input } from "@app/ui/components/input";
 import { BookIcon } from "lucide-react";
 import { FilePicker } from "@/components/picker";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { vfs } from "@/lib/vfs";
 import { useDebounce } from "@uidotdev/usehooks";
 

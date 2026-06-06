@@ -6,8 +6,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+} from "@app/ui/components/select";
+import { Badge } from "@app/ui/components/badge";
 import { models, type ModelTier } from "@/lib/ai/models";
 import { useSvgAgentTier } from "./provider";
 import { AGENT_TIERS } from "@grida/agent/tiers";

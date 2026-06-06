@@ -1,8 +1,8 @@
 "use client";
 import React, { useState } from "react";
 import { motion } from "motion/react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "@app/ui/components/card";
+import { Button } from "@app/ui/components/button";
 import { ShineBorder } from "@/www/ui/shine-border";
 import { PlayFilledIcon } from "@/components/icons";
 

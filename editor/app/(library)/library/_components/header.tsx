@@ -2,7 +2,7 @@
 
 import React, { Suspense } from "react";
 import { GridaLogo } from "@/components/grida-logo";
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 

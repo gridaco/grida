@@ -9,18 +9,18 @@ import {
   PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
-} from "@/components/ai-elements/prompt-input";
+} from "@app/ui/ai-elements/prompt-input";
 import {
   Context,
   ContextContent,
   ContextContentBody,
   ContextContentHeader,
   ContextTrigger,
-} from "@/components/ai-elements/context";
+} from "@app/ui/ai-elements/context";
 import type { ChatStatus, LanguageModelUsage } from "ai";
 import { ArrowUpIcon, XIcon } from "lucide-react";
-import { InputGroupButton } from "@/components/ui/input-group";
-import { Spinner } from "@/components/ui/spinner";
+import { InputGroupButton } from "@app/ui/components/input-group";
+import { Spinner } from "@app/ui/components/spinner";
 
 export type ContextUsageData = {
   usedTokens: number;

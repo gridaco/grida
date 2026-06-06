@@ -5,7 +5,7 @@ import {
   iconByValue,
   StrokeDecorationIconResponsive,
 } from "./icons/stroke-decoration-icons";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 const DECORATION_OPTIONS: { label: string; value: cg.StrokeMarkerPreset }[] = [
   { label: "None", value: "none" },

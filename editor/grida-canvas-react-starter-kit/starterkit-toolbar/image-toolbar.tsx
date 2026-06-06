@@ -8,9 +8,9 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { toast } from "sonner";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { type AiErrorResponse, resolveAiError } from "@/lib/ai/error";
 import { dq } from "@/grida-canvas/query";
 import cg from "@grida/cg";

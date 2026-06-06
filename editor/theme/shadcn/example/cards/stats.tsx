@@ -2,8 +2,13 @@
 
 import { Bar, BarChart, Line, LineChart } from "recharts";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartConfig, ChartContainer } from "@/components/ui/chart";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@app/ui/components/card";
+import { ChartConfig, ChartContainer } from "@app/ui/components/chart";
 
 const data = [
   {

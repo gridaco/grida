@@ -1,16 +1,16 @@
 "use client";
 
 import React, { useCallback, useMemo, useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/select";
+import { Badge } from "@app/ui/components/badge";
+import { cn } from "@app/ui/lib/utils";
 import {
   AuthProvider,
   useContinueWithAuth,
@@ -30,7 +30,7 @@ import {
   PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
-} from "@/components/ai-elements/prompt-input";
+} from "@app/ui/ai-elements/prompt-input";
 import { generateAudio } from "@/lib/ai/actions/audio";
 import { useAiCredits } from "@/lib/ai/credits";
 import ai from "@/lib/ai";

@@ -8,15 +8,15 @@ import {
   CardHeader,
   CardTitle,
   CardFooter,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/card";
+import { Button } from "@app/ui/components/button";
 import { createBrowserWWWClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
 import { useCallback, useMemo } from "react";
 import useSWR, { mutate } from "swr";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { useForm, useWatch } from "react-hook-form";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { FaviconEditor } from "@/scaffolds/www-theme-config/components/favicon";
 import type { PostgrestError } from "@supabase/supabase-js";
 import {

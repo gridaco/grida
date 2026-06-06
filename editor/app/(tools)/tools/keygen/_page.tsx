@@ -1,19 +1,19 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+} from "@app/ui/components/card";
+import { Textarea } from "@app/ui/components/textarea";
+import { Input } from "@app/ui/components/input";
+import { Label } from "@app/ui/components/label";
+import { Switch } from "@app/ui/components/switch";
+import { Badge } from "@app/ui/components/badge";
 import { CopyIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { generateKeypairAction } from "./actions";

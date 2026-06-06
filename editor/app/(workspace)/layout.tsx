@@ -1,12 +1,12 @@
 import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { ThemeProvider } from "@/components/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@app/ui/components/sonner";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { cookies } from "next/headers";
 import { getPlatform } from "@/host/platform";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import PlatformProvider from "@/host/platform-provider";
 import "../editor.css";
 

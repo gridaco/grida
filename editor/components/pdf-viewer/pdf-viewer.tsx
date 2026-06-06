@@ -4,8 +4,8 @@ import React, { useState } from "react";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
 import { Document, Page } from "react-pdf";
 import { pdfjs } from "react-pdf";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@app/ui/components/button";
+import { Spinner } from "@app/ui/components/spinner";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 

@@ -1,6 +1,6 @@
 import * as React from "react";
-import { cn } from "@/components/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@app/ui/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@app/ui/components/avatar";
 
 /* ─── Root ─── */
 

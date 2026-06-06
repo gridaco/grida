@@ -10,13 +10,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/scaffolds/workspace";
 import Link from "next/link";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@app/ui/components/badge";
+import { Button } from "@app/ui/components/button";
 import { editorlink } from "@/host/url";
 import {
   Dialog,
@@ -26,18 +26,23 @@ import {
   DialogFooter,
   DialogHeader,
   DialogDescription,
-} from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/dialog";
+import { Field, FieldDescription, FieldLabel } from "@app/ui/components/field";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
+import { Input } from "@app/ui/components/input";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import {
   NewDocumentRequest,
   NewDocumentResponse,
 } from "@/app/(api)/private/editor/new/route";
 import { toast } from "sonner";
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@app/ui/components/switch";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 

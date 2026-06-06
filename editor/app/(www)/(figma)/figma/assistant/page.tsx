@@ -2,8 +2,8 @@ import Header from "@/www/header";
 import Footer from "@/www/footer";
 import React from "react";
 import { Github } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@app/ui/components/button";
+import { Card, CardContent } from "@app/ui/components/card";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 

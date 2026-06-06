@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { CheckIcon } from "@radix-ui/react-icons";
 import { ShineBorder } from "@/www/ui/shine-border";
 

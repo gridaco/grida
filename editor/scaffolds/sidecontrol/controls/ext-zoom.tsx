@@ -12,11 +12,11 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { WorkbenchUI } from "@/components/workbench";
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import { useTransformState } from "@/grida-canvas-react/provider";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   useCurrentEditor,
   useEditorState,

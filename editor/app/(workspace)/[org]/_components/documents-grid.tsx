@@ -15,7 +15,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+} from "@app/ui/components/context-menu";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { RenameDialog } from "@/components/dialogs/rename-dialog";
 import {
@@ -28,7 +28,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@app/ui/components/empty";
 import { TrashIcon } from "@radix-ui/react-icons";
 import { createBrowserClient } from "@/lib/supabase/client";
 

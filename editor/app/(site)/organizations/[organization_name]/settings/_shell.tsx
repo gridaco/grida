@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarSeparator,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 
 type SettingsCategory = { href: string; label: string };
 

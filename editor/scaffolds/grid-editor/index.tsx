@@ -10,7 +10,7 @@ import {
   AlertDialogDescription,
   AlertDialogCancel,
   AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+} from "@app/ui/components/alert-dialog";
 import { toast } from "sonner";
 import { useDatagridTable, useEditorState } from "../editor";
 import Link from "next/link";
@@ -20,9 +20,9 @@ import {
   DownloadIcon,
   PieChartIcon,
 } from "@radix-ui/react-icons";
-import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
+import { Badge } from "@app/ui/components/badge";
+import { Button, buttonVariants } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import {
   TableViews,
   GridQueryLimitSelect,
@@ -45,7 +45,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { Columns3Icon, Rows3Icon } from "lucide-react";
 import {
   useDatabaseTableId,
@@ -68,7 +68,7 @@ import DataGalleryView from "../data-view-gallery";
 import DataChartview from "../data-view-chart";
 import DataListView from "../data-view-list";
 import { useMultiplayer } from "@/scaffolds/editor/multiplayer";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@app/ui/components/scroll-area";
 import {
   DataPlatformProvider,
   SchemaNameProvider,

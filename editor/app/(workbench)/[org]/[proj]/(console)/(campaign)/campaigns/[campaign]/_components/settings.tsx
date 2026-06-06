@@ -8,8 +8,8 @@ import { z } from "zod/v3";
 import { CalendarIcon, InfoIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useCampaign } from "../store";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Button } from "@app/ui/components/button";
+import { Label } from "@app/ui/components/label";
 import {
   Card,
   CardContent,
@@ -17,7 +17,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import {
   Form,
   FormControl,
@@ -26,30 +26,30 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/form";
+import { Input } from "@app/ui/components/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+} from "@app/ui/components/select";
+import { Switch } from "@app/ui/components/switch";
+import { Textarea } from "@app/ui/components/textarea";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { Separator } from "@/components/ui/separator";
+} from "@app/ui/components/popover";
+import { Calendar } from "@app/ui/components/calendar";
+import { Separator } from "@app/ui/components/separator";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import {
   Field,
   FieldDescription,
@@ -59,20 +59,20 @@ import {
   FieldSeparator,
   FieldSet,
   FieldLegend,
-} from "@/components/ui/field";
+} from "@app/ui/components/field";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import { toast } from "sonner";
 import {
   createBrowserFormsClient,
   createBrowserWestReferralClient,
 } from "@/lib/supabase/client";
 import { Platform } from "@/lib/platform";
-import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Spinner } from "@app/ui/components/spinner";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 import { DeleteConfirmationAlertDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { useProject, useTags } from "@/scaffolds/workspace";

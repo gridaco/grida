@@ -24,7 +24,7 @@ import {
   InsertCommandPopover,
 } from "./insert-menu";
 import { FormAgentProvider, initdummy } from "@/grida-forms/formstate";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { PopoverTrigger } from "@radix-ui/react-popover";
 

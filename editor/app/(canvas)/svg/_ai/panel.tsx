@@ -20,7 +20,7 @@ import {
   SparklesIcon,
   XCircleIcon,
 } from "lucide-react";
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 import {
   FloatingWindowBody,
   FloatingWindowRoot,
@@ -31,18 +31,18 @@ import {
   ConversationContent,
   ConversationEmptyState,
   ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
+} from "@app/ui/ai-elements/conversation";
 import {
   Message,
   MessageContent,
   MessageResponse,
-} from "@/components/ai-elements/message";
+} from "@app/ui/ai-elements/message";
 import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
-import { Shimmer } from "@/components/ai-elements/shimmer";
+} from "@app/ui/ai-elements/reasoning";
+import { Shimmer } from "@app/ui/ai-elements/shimmer";
 import { AgentInput } from "@/grida-canvas-hosted/ai/scaffold/components/agent-input";
 import { useContextUsage } from "@/grida-canvas-hosted/ai/scaffold/use-context-usage";
 import type { AgentUIMessage } from "@/grida-canvas-hosted/ai/types";

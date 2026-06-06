@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import cmath from "@grida/cmath";
 import { useMeasure } from "@uidotdev/usehooks";
 import { useGesture } from "@use-gesture/react";

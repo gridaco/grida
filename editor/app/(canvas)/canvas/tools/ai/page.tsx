@@ -1,26 +1,26 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@app/ui/components/separator";
+import { Textarea } from "@app/ui/components/textarea";
 import { ModelSelector } from "./_components/model-selector";
 import { PresetSave } from "./_components/preset-save";
 import { PresetSelector } from "./_components/preset-selector";
 import { PresetShare } from "./_components/preset-share";
 import { presets } from "./_data/presets";
 import { ModelParams } from "./_components/model-params";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldLabel } from "@app/ui/components/field";
 import { MinimalChatBox } from "@/components/chat";
 import { readStreamableValue } from "@ai-sdk/rsc";
 import { Canvas } from "./_components/canvas";
 import { generate, type UserAttachment } from "./generate";
 import type { DeepPartial } from "ai";
 import type { StreamingResponse } from "./schema";
-import { Toggle } from "@/components/ui/toggle";
+import { Toggle } from "@app/ui/components/toggle";
 import { CodeIcon } from "@radix-ui/react-icons";
 import { ThemedMonacoEditor } from "@/components/monaco";
 import { useDummyPublicUpload } from "@/scaffolds/platform/storage";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { GridaLogo } from "@/components/grida-logo";
 
 const systemmsg = (system: string, template?: string, context?: string) => {

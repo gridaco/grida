@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import { Input } from "@app/ui/components/input";
+import { Label } from "@app/ui/components/label";
+import { Button } from "@app/ui/components/button";
+import { Switch } from "@app/ui/components/switch";
 import { Plus, Trash2, Users } from "lucide-react";
 import { Platform } from "@/lib/platform";
 

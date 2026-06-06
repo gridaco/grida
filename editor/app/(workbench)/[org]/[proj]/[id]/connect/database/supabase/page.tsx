@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@app/ui/components/button";
 import {
   Card,
   CardContent,
@@ -8,19 +8,19 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@app/ui/components/card";
+import { Input } from "@app/ui/components/input";
+import { Label } from "@app/ui/components/label";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import {
   CodeIcon,
   EyeNoneIcon,
@@ -41,10 +41,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { SupabasePostgRESTOpenApi, ping } from "@/lib/supabase-postgrest";
 import { GridaXSupabase } from "@/types";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import assert from "assert";
 import {
   AlertDialog,
@@ -56,8 +56,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Spinner } from "@/components/ui/spinner";
+} from "@app/ui/components/alert-dialog";
+import { Spinner } from "@app/ui/components/spinner";
 import { PrivateEditorApi } from "@/lib/private";
 import {
   Dialog,
@@ -67,13 +67,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldLabel } from "@/components/ui/field";
+} from "@app/ui/components/dialog";
+import { Field, FieldLabel } from "@app/ui/components/field";
 import { XSBTableInfo } from "@/scaffolds/x-supabase/xsb-table-info";
 import { useEditorState } from "@/scaffolds/editor";
 import { XSupabasePrivateApiTypes } from "@/types/private/api";
 import { Sector, SectorHeader, SectorHeading } from "@/components/preferences";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 
 type SchemaDefinitions = {

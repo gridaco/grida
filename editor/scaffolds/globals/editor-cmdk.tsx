@@ -8,7 +8,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 
 export function EditorCommandK() {
   const [open, setOpen] = React.useState(false);

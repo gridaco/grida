@@ -1,8 +1,8 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { Input } from "@app/ui/components/input";
+import { Button } from "@app/ui/components/button";
+import { Progress } from "@app/ui/components/progress";
 import {
   Empty,
   EmptyContent,
@@ -10,7 +10,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@app/ui/components/empty";
 import {
   DragEvent,
   ClipboardEvent,
@@ -29,7 +29,7 @@ import { toast } from "sonner";
 import { UploadIcon, ClipboardIcon } from "lucide-react";
 import { FigmaLogoIcon } from "@radix-ui/react-icons";
 import Header from "@/www/header";
-import { Kbd } from "@/components/ui/kbd";
+import { Kbd } from "@app/ui/components/kbd";
 
 type ParsedData = ParsedFigmaArchive | ParsedFigmaHTML | null;
 

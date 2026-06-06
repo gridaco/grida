@@ -2,7 +2,7 @@
 
 import React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { PresetID, blockpresets } from "./blocks/data";
 
 export function InsertPanel({

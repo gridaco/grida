@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { cn } from "@/components/lib/utils";
-import { Button } from "@/components/ui/button";
+import { cn } from "@app/ui/lib/utils";
+import { Button } from "@app/ui/components/button";
 
 interface SocialPreviewSectionProps {
   ogImage: string | null;

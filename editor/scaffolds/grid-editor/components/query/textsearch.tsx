@@ -6,7 +6,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { useDebounceCallback } from "usehooks-ts";
 
 export function DataQueryTextSearch({

@@ -1,4 +1,4 @@
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import cmath from "@grida/cmath";
 import React, { useMemo } from "react";
 

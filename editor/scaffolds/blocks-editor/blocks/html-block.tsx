@@ -7,7 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { EditorFlatFormBlock } from "@/scaffolds/editor/state";
 import {
   BlockAction,
@@ -18,7 +18,7 @@ import {
   MoveBlockMenuItems,
 } from "./base-block";
 import { useEditorState } from "@/scaffolds/editor";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { ThemedMonacoEditor } from "@/components/monaco";
 
 export function HtmlBlock({ id, body_html }: EditorFlatFormBlock) {

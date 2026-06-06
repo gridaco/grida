@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { Editor as MonacoEditor } from "@monaco-editor/react";
 import assert from "assert";

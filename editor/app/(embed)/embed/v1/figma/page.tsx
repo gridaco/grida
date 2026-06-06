@@ -7,7 +7,7 @@ import {
   ViewportRoot,
   EditorSurface,
 } from "@/grida-canvas-react";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@app/ui/components/tooltip";
 import { FontFamilyListProvider } from "@/scaffolds/sidecontrol/controls/font-family";
 import {
   useRefigEditor,

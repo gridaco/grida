@@ -3,7 +3,7 @@
 import React from "react";
 import { Selection, Zoom } from "./sidecontrol-node-selection";
 import { DocumentProperties } from "./sidecontrol-document-properties";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   constraints,
   ThemeEditor,
@@ -13,7 +13,7 @@ import { Portal as PortalPrimitive } from "radix-ui";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import { PreviewButton } from "@/grida-canvas-react-starter-kit/starterkit-preview";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { WorkbenchUI } from "@/components/workbench";
 import kolor from "@grida/color";
 

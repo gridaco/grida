@@ -1,13 +1,13 @@
 "use client";
 
 import { LayoutGridIcon } from "lucide-react";
-import { Shimmer } from "@/components/ai-elements/shimmer";
+import { Shimmer } from "@app/ui/ai-elements/shimmer";
 import {
   Task,
   TaskContent,
   TaskItem,
   TaskTrigger,
-} from "@/components/ai-elements/task";
+} from "@app/ui/ai-elements/task";
 import { deriveToolState, type ToolUIOutputProps } from "./tool-ui-shared";
 
 /** Artboard sizes output is a record of category → array of size entries. */

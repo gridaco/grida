@@ -1,9 +1,9 @@
 "use client";
 
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
+import { Textarea } from "@app/ui/components/textarea";
+import { Button } from "@app/ui/components/button";
 import {
   Table,
   TableBody,
@@ -11,7 +11,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@app/ui/components/table";
 import {
   Card,
   CardContent,
@@ -19,7 +19,7 @@ import {
   CardHeader,
   CardTitle,
   CardFooter,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import {
   ArrowDownIcon,
   PlusCircledIcon,
@@ -33,7 +33,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+} from "@app/ui/components/breadcrumb";
 import { AdjustStockCountButton } from "@/scaffolds/options/adjust-stock-button";
 
 function Header() {

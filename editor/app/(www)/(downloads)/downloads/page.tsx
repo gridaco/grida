@@ -2,7 +2,7 @@ import React from "react";
 import Image from "next/image";
 import Footer from "@/www/footer";
 import Header from "@/www/header";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { Apple } from "@/components/logos/apple";
 import { Windows } from "@/components/logos/windows";
 import { Linux } from "@/components/logos/linux";

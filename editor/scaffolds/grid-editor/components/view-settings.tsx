@@ -11,15 +11,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { CodeIcon, CommitIcon, GearIcon } from "@radix-ui/react-icons";
 import { format as formatTZ } from "date-fns-tz";
 import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { editorlink } from "@/host/url";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { PaletteIcon } from "lucide-react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ToggleGroup, ToggleGroupItem } from "@app/ui/components/toggle-group";
 import { ResourceTypeIcon } from "@/components/resource-type-icon";
 import { DataViewType } from "@/scaffolds/editor/state";
 import { DateFormatRadioGroup } from "@/scaffolds/data-format/ui/date-format";

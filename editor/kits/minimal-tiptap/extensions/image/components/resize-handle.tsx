@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 interface ResizeProps extends React.ComponentProps<"div"> {
   isResizing?: boolean;

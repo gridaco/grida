@@ -10,8 +10,8 @@ import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
-import { Button } from "@/components/ui/button";
-import { Response } from "@/components/ai-elements/response";
+import { Button } from "@app/ui/components/button";
+import { Response } from "@app/ui/ai-elements/response";
 import { MARKDOWN_SAMPLE } from "./_sample";
 
 const VARIANTS = [

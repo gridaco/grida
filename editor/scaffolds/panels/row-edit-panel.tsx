@@ -22,7 +22,7 @@ import type {
 } from "@/grida-forms-hosted/types";
 import { fmt_local_index } from "@/utils/fmt";
 import { ThemedMonacoEditor } from "@/components/monaco";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Table,
   TableBody,
@@ -30,13 +30,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@app/ui/components/table";
 import { UAParser } from "ua-parser-js";
 import { AvatarIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { useEditorState } from "../editor";
 import { TVirtualRow } from "../editor/state";
-import { Toggle } from "@/components/ui/toggle";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Toggle } from "@app/ui/components/toggle";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { FormView } from "@/grida-forms-hosted/e";
 import {
   useFormSession,

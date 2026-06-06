@@ -4,8 +4,8 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+} from "@app/ui/components/tooltip";
+import { Avatar, AvatarFallback, AvatarImage } from "@app/ui/components/avatar";
 
 export function PlayerAvatar({
   selected,

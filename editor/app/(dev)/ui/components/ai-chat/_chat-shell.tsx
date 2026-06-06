@@ -10,8 +10,8 @@ import {
   Conversation,
   ConversationContent,
   ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/ai-elements/conversation";
+import { cn } from "@app/ui/lib/utils";
 import {
   ChatMessageView,
   CompactingIndicator,

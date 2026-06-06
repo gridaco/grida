@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Dialog,
   DialogClose,
@@ -10,11 +10,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
+} from "@app/ui/components/dialog";
+import { Input } from "@app/ui/components/input";
+import { Spinner } from "@app/ui/components/spinner";
 import { PhoneInput } from "@/components/extension/phone-input";
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea } from "@app/ui/components/textarea";
 import { TagInput } from "@/components/tag";
 import {
   Field,
@@ -23,7 +23,7 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
-} from "@/components/ui/field";
+} from "@app/ui/components/field";
 
 export interface CustomerContactsEditDialogDTO {
   name: string | null;

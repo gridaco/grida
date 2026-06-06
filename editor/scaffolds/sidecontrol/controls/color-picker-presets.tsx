@@ -6,13 +6,13 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+} from "@app/ui/components/tooltip";
+import { ScrollArea, ScrollBar } from "@app/ui/components/scroll-area";
 import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui-editor/native-select";
-import { Separator } from "@/components/ui/separator";
+import { Separator } from "@app/ui/components/separator";
 
 /**
  * the visual correct order as displayed from https://tailwindcss.com/docs/colors

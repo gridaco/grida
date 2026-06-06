@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { MapPin, Phone, Mail } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@app/ui/components/button";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
+import { Textarea } from "@app/ui/components/textarea";
+import { Card, CardContent } from "@app/ui/components/card";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({

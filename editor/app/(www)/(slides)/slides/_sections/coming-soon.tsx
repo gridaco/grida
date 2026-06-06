@@ -3,8 +3,8 @@
 import React from "react";
 import { motion } from "motion/react";
 import { SectionHeader, SectionHeaderBadge } from "@/www/ui/section";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/components/lib/utils";
+import { Badge } from "@app/ui/components/badge";
+import { cn } from "@app/ui/lib/utils";
 import { TerminalIcon, ServerIcon, UsersIcon, CodeIcon } from "lucide-react";
 
 const items = [

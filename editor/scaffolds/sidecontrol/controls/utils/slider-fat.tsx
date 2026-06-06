@@ -32,7 +32,7 @@
 
 import * as React from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useSliderValue } from "@grida/number-input/react";
 
 interface PropertySliderProps {

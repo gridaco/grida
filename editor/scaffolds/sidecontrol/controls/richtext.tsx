@@ -8,8 +8,8 @@ import {
   SheetDescription,
   SheetFooter,
   SheetClose,
-} from "@/components/ui/sheet";
-import { SheetContent } from "@/components/ui/sheet-without-overlay";
+} from "@app/ui/components/sheet";
+import { SheetContent } from "@app/ui/components/sheet-without-overlay";
 import { Pencil2Icon } from "@radix-ui/react-icons";
 
 export function RichTextControl({

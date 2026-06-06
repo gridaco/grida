@@ -10,7 +10,7 @@ import {
   PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
-} from "@/components/ai-elements/prompt-input";
+} from "@app/ui/ai-elements/prompt-input";
 
 const PLAYGROUND_HREF = "/ai/music/playground";
 

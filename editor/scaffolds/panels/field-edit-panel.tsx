@@ -32,8 +32,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/select";
+import { Button } from "@app/ui/components/button";
 import {
   FieldSupports,
   supported_field_autocomplete_types,
@@ -52,7 +52,7 @@ import {
   useOptionsEdit,
 } from "../options/options-edit";
 import { OptionsStockEdit } from "../options/options-sku";
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@app/ui/components/switch";
 import { FormFieldUpsert } from "@/types/private/api";
 import { useDatagridTable, useEditorState } from "@/scaffolds/editor";
 import { useRouter } from "next/navigation";
@@ -61,7 +61,7 @@ import { useInventory, useInventoryState } from "../options/use-inventory";
 import Link from "next/link";
 import { NameInput } from "./name-input";
 import { LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { DummyFormAgentStateProvider } from "@/grida-forms/formstate";
 import { SupabaseFKReferenceSettings } from "./extensions/field-x-sb-reference-fk-settings";
 import { SupabaseStorageSettings } from "./extensions/field-x-sb-storage-settings";

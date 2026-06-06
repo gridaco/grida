@@ -21,7 +21,7 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { useDialogState } from "@/components/hooks/use-dialog-state";
 import { SlideExportDialog } from "./slide-export-dialog";
 import { saveAs } from "file-saver";

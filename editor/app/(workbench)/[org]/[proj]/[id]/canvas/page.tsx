@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import {
   EditorSurface,
   StandaloneSceneContent,

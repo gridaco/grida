@@ -10,7 +10,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   SidebarHeader,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { SlashIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 

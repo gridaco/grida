@@ -8,7 +8,7 @@ import {
   animate,
 } from "motion/react";
 import { Progress as ProgressPrimitive } from "radix-ui";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useEffect, useState, useRef } from "react";
 
 // Using motion's built-in easing functions

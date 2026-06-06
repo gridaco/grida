@@ -5,8 +5,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/card";
+import { Button } from "@app/ui/components/button";
 import { FORM_CLOSED_WHILE_RESPONDING } from "@/k/error";
 import Link from "next/link";
 import i18next from "i18next";

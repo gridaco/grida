@@ -6,8 +6,8 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button, buttonVariants } from "@/components/ui/button";
+} from "@app/ui/components/alert-dialog";
+import { Button, buttonVariants } from "@app/ui/components/button";
 import { txt_n_plural } from "@/utils/plural";
 import { TrashIcon } from "@radix-ui/react-icons";
 

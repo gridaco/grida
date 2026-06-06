@@ -7,15 +7,15 @@ import {
   CardHeader,
   CardTitle,
   CardFooter,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/card";
+import { Button } from "@app/ui/components/button";
 import {
   Drawer,
   DrawerContent,
   DrawerFooter,
   DrawerTitle,
-} from "@/components/ui/drawer";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from "@app/ui/components/drawer";
+import { ScrollArea } from "@app/ui/components/scroll-area";
 import { FormView } from "@/grida-forms-hosted/e";
 import {
   ScreenMobileFrame,
@@ -33,7 +33,7 @@ import {
   useFormSession,
   useRequestFormSession,
 } from "@/grida-forms-hosted/e/load";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@app/ui/components/skeleton";
 import { submitFormToDefaultEndpoint } from "@/grida-forms-hosted/internal-sdk/submit";
 
 /** Form submit error codes returned by POST /v1/submit/:id (when Accept: application/json). */

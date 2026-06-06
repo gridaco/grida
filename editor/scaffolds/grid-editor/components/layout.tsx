@@ -1,5 +1,5 @@
 "use clinet";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import React from "react";
 
 export function Root({ children }: React.PropsWithChildren) {

@@ -1,12 +1,12 @@
 "use client";
 
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
 import { Link2Icon } from "@radix-ui/react-icons";
 import { Data } from "@/lib/data";
 import { XSBSearchTableSheet, XSBListUsersSheet } from "@/scaffolds/x-supabase";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { SearchIcon } from "lucide-react";
 
 type SQLForeignKeyValue = string | number | undefined;

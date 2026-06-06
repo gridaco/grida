@@ -9,9 +9,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import { TriangleAlertIcon, CodeIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 
 type ErrorViewProps = {
   code: string;

@@ -2,15 +2,15 @@
 
 import React from "react";
 import { UserCheck2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Button } from "@app/ui/components/button";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@/components/ui/input-otp";
-import { Spinner } from "@/components/ui/spinner";
+} from "@app/ui/components/input-otp";
+import { Spinner } from "@app/ui/components/spinner";
 import { template } from "@/utils/template";
 import type { PortalPresetLoginPage } from "@app/database";
 

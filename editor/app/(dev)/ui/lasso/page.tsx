@@ -5,8 +5,8 @@ import { Lasso } from "@/grida-canvas-react/viewport/ui/lasso/lasso";
 import { useLasso } from "@/grida-canvas-react/viewport/ui/lasso/use-lasso";
 import { useThrottle } from "@uidotdev/usehooks";
 import cmath from "@grida/cmath";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import { TransparencyGrid } from "@grida/transparency-grid/react";
 
 export default function LassoDemoPage() {

@@ -74,7 +74,7 @@ import {
   useToolState,
 } from "@/grida-canvas-react/provider";
 import { Checkbox } from "@/components/ui-editor/checkbox";
-import { Toggle } from "@/components/ui/toggle";
+import { Toggle } from "@app/ui/components/toggle";
 import { AlignControl as _AlignControl } from "./controls/ext-align";
 import { Button } from "@/components/ui-editor/button";
 import { ZoomControl } from "./controls/ext-zoom";
@@ -84,13 +84,13 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { PropertyAccessExpressionControl } from "./controls/props-property-access-expression";
 import { TextDetails } from "./controls/widgets/text-details";
 import { FeControl } from "./controls/fe";

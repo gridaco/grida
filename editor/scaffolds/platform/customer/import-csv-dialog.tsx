@@ -10,20 +10,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/dialog";
+import { Button } from "@app/ui/components/button";
 import { Progress } from "@/components/ui-editor/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@app/ui/components/alert";
 import { Upload, File } from "lucide-react";
 import { SimpleCSVTable } from "@/components/table/simple-csv-table";
 import { Download, AlertCircle, CheckCircle2 } from "lucide-react";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@app/ui/components/checkbox";
 import { useProject } from "@/scaffolds/workspace";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@app/ui/components/tabs";
 import { Platform } from "@/lib/platform";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldLabel } from "@app/ui/components/field";
 
 type ImportStep = "upload" | "preview" | "importing" | "complete" | "error";
 

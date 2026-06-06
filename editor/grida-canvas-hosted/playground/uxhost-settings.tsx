@@ -4,8 +4,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
+} from "@app/ui/components/dialog";
+import { Switch } from "@app/ui/components/switch";
 import { useCurrentEditor } from "@/grida-canvas-react";
 import {
   Field,
@@ -14,8 +14,8 @@ import {
   FieldGroup,
   FieldLabel,
   FieldSeparator,
-} from "@/components/ui/field";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/field";
+import { Button } from "@app/ui/components/button";
 import {
   OpenInNewWindowIcon,
   GearIcon,
@@ -34,7 +34,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import { KeyboardIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import {
@@ -43,7 +43,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 
 const menuItems = [
   {

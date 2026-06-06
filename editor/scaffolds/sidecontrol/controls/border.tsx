@@ -1,17 +1,17 @@
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import { WorkbenchUI } from "@/components/workbench";
 import grida from "@grida/schema";
 import kolor from "@grida/color";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { RGBA32FChip } from "./utils/paint-chip";
 import { RGBA32FColorControl } from "./color";
 import { PropertyEnum, PropertyLine, PropertyLineLabel } from "../ui";
-import { Label } from "@/components/ui/label";
+import { Label } from "@app/ui/components/label";
 import { Cross2Icon } from "@radix-ui/react-icons";
 
 export function BorderControl({

@@ -4,16 +4,16 @@ import { Megaphone } from "lucide-react";
 import { CampaignCard } from "./campaign-card";
 import { createBrowserWestReferralClient } from "@/lib/supabase/client";
 import { useProject } from "@/scaffolds/workspace";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { Platform } from "@/lib/platform";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@app/ui/components/empty";
 import useSWR from "swr";
 
 export default function CampaignsPage() {

@@ -7,9 +7,9 @@ import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
-} from "@/components/ui/hover-card";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
+} from "@app/ui/components/hover-card";
+import { Label } from "@app/ui/components/label";
+import { Slider } from "@app/ui/components/slider";
 
 interface TemperatureSelectorProps {
   defaultValue: SliderProps["defaultValue"];

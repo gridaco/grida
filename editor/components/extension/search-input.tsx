@@ -1,10 +1,10 @@
 "use client";
 import { SearchIcon } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { buttonVariants } from "@/components/ui/button";
+import { Input } from "@app/ui/components/input";
+import { buttonVariants } from "@app/ui/components/button";
 import { useRef, useState } from "react";
 import { motion } from "motion/react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export function SearchInput({
   className,

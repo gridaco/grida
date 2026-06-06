@@ -3,7 +3,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import Link from "next/link";

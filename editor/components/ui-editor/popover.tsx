@@ -4,7 +4,7 @@ import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import type { PopoverContentProps } from "@radix-ui/react-popover";
 
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 
 const popover_content_on_pointer_down_outside: PopoverContentProps["onPointerDownOutside"] =
   (e) => {

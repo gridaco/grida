@@ -7,8 +7,8 @@ import {
   PreferenceBoxFooter,
   PreferenceBoxHeader,
 } from "@/components/preferences";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@app/ui/components/button";
+import { Textarea } from "@app/ui/components/textarea";
 
 export function TrustedOriginPreferences() {
   return (

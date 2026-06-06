@@ -18,8 +18,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/select";
+import { Button } from "@app/ui/components/button";
 import { MixIcon } from "@radix-ui/react-icons";
 import {
   Dialog,
@@ -44,11 +44,11 @@ import {
   ending_page_template_config,
   ending_page_templates,
 } from "@/k/templates";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Switch } from "@app/ui/components/switch";
+import { Label } from "@app/ui/components/label";
 import { useEditorState } from "@/scaffolds/editor";
 import { useForm, Controller, useWatch } from "react-hook-form";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 
 export function EndingPagePreferences() {
   const [state] = useEditorState();

@@ -5,7 +5,7 @@ import { Inconsolata, Inter, Lora } from "next/font/google";
 import type { FormDocument } from "@/grida-forms-hosted/types";
 import { ThemeProvider } from "@/components/theme-provider";
 import { stringfyThemeVariables } from "@/theme/palettes/utils";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@app/ui/components/sonner";
 import { CustomCSS } from "@/theme/customcss";
 import { FormAgentGlobalWindowMessagingInterface } from "@/grida-forms-hosted/e/interface";
 import { FingerprintProvider } from "@/components/fingerprint";

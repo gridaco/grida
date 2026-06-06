@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Download, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 
 /**
  * Rendered by the desktop route layout when the page is loaded outside

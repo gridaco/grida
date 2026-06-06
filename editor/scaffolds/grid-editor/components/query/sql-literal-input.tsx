@@ -7,7 +7,7 @@ import {
   ValueIcon,
   ValueNoneIcon,
 } from "@radix-ui/react-icons";
-import { Input } from "@/components/ui/input";
+import { Input } from "@app/ui/components/input";
 import { WorkbenchUI } from "@/components/workbench";
 import {
   Select,
@@ -15,7 +15,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import type { SQLLiteralInputValue } from "./types";
 import type { Data } from "@/lib/data";

@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { usePlatform } from "@/host/platform-provider";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import * as k from "./k";
 
 export function DesktopDragArea({

@@ -29,8 +29,8 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/context-menu";
+import { cn } from "@app/ui/lib/utils";
 import { useSlideThumbnail } from "./use-slide-thumbnail";
 import { useBackendState } from "@/grida-canvas-react/provider";
 import {

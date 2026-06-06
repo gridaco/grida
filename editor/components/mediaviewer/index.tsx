@@ -13,10 +13,15 @@ import {
   DownloadIcon,
   ExitFullScreenIcon,
 } from "@radix-ui/react-icons";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
-import { Menubar } from "@/components/ui/menubar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@app/ui/components/button";
+import { Spinner } from "@app/ui/components/spinner";
+import { Menubar } from "@app/ui/components/menubar";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@app/ui/components/card";
 import { FileTypeIcon } from "@/components/form-field-type-icon";
 import { PictureInPicture } from "@/components/pip";
 import { ContentAudio } from "./pip-audio-content";

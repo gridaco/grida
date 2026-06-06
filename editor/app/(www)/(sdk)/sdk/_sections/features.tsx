@@ -2,7 +2,7 @@
 import React from "react";
 import { motion } from "motion/react";
 import { SectionHeader, SectionHeaderBadge } from "@/www/ui/section";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { sitemap } from "@/www/data/sitemap";
 import { BentoGrid, BentoCard, BentoCardContent } from "@/www/ui/bento-grid";
 import Link from "next/link";

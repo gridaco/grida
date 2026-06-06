@@ -36,7 +36,7 @@ import { SvgEditorCanvas, SvgEditorProvider } from "@grida/svg-editor/react";
 import { cursors as hud_cursors } from "@grida/hud/cursors";
 import cmath from "@grida/cmath";
 import { measure } from "@grida/cmath/_measurement";
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@app/ui/components/switch";
 import {
   HUDStage,
   type HUDExtraBuilder,

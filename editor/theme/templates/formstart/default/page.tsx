@@ -1,5 +1,5 @@
 import { GridaLogo } from "@/components/grida-logo";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import Image from "next/image";
 import React from "react";
 import { CalendarBoxIcon, LocationBoxIcon } from "../../kit/components/icons";

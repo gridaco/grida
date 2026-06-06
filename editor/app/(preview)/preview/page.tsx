@@ -2,7 +2,7 @@
 
 import { ThemeProvider } from "@/components/theme-provider";
 import dynamic from "next/dynamic";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import React from "react";
 
 const PlaygroundPreviewSlave = dynamic(

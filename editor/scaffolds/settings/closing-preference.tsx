@@ -7,13 +7,13 @@ import {
   PreferenceBoxFooter,
   PreferenceBoxHeader,
 } from "@/components/preferences";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Button } from "@app/ui/components/button";
+import { Switch } from "@app/ui/components/switch";
+import { Label } from "@app/ui/components/label";
 import { PrivateEditorApi } from "@/lib/private";
 import { toast } from "sonner";
 import { useForm, Controller } from "react-hook-form";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import { useEditorState } from "@/scaffolds/editor";
 
 export function ClosingFormPreferences() {

@@ -5,12 +5,12 @@ import Image from "next/image";
 import { motion } from "motion/react";
 import { ArrowRight, Upload, Check } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Button } from "@app/ui/components/button";
+import { Field, FieldLabel } from "@app/ui/components/field";
+import { Input } from "@app/ui/components/input";
+import { Textarea } from "@app/ui/components/textarea";
+import { Label } from "@app/ui/components/label";
+import { RadioGroup, RadioGroupItem } from "@app/ui/components/radio-group";
 import Link from "next/link";
 import { sitemap } from "@/www/data/sitemap";
 

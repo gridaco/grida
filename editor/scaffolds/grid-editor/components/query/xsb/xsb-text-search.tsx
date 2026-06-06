@@ -9,22 +9,22 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { CaretDownIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { SearchIcon } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@app/ui/components/button";
 import Link from "next/link";
 import assert from "assert";
 import { PostgresTypeTools } from "@/lib/x-supabase/typemap";
 import { EditorSymbols } from "@/scaffolds/editor/symbols";
 import { useExpandableInput } from "@/components/extension/search-input";
 import { motion } from "motion/react";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { useTableDefinition } from "@/scaffolds/data-query";
 
 export function XSBTextSearchInput({

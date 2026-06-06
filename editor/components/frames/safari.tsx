@@ -1,4 +1,4 @@
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { LockClosedIcon } from "@radix-ui/react-icons";
 import React, { SVGProps } from "react";
 

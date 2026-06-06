@@ -8,22 +8,22 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@app/ui/components/card";
 import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
+} from "@app/ui/components/chart";
+import { DateRangePicker } from "@app/ui/components/date-range-picker";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { Analytics } from "@/lib/analytics";
 import useSWR from "swr";
 import { useCampaign } from "../store";
@@ -33,7 +33,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@app/ui/components/empty";
 import { Activity, Loader2 } from "lucide-react";
 
 interface DateRange {

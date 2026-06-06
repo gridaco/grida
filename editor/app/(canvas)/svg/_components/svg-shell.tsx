@@ -11,8 +11,8 @@ import {
   useSvgEditor,
 } from "@grida/svg-editor/react";
 import type { SvgEditor } from "@grida/svg-editor";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@app/ui/components/badge";
+import { Button } from "@app/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -20,8 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/dropdown-menu";
+import { Input } from "@app/ui/components/input";
 import { GridaLogo } from "@/components/grida-logo";
 import { HierarchyPanel } from "./hierarchy-panel";
 import { InspectorPanel } from "./inspector-panel";

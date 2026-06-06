@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuPortal,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import type { FormInputType } from "@/grida-forms-hosted/types";
 import {
   AvatarIcon,
@@ -26,7 +26,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 
 export const ColumnHeaderCell = React.forwardRef(function ColumnHeaderCell(
   {

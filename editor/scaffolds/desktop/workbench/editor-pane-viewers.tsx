@@ -25,7 +25,7 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { AlertCircleIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { type BundledLanguage, codeToHtml } from "shiki";
-import { cn } from "@/components/lib/utils/index";
+import { cn } from "@app/ui/lib/utils";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 
 /* ─────────────────────── shared load helpers ──────────────────── */

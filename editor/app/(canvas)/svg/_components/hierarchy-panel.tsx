@@ -8,7 +8,7 @@ import type { Row } from "@grida/tree-view";
 import { useSvgTreeController, type SvgNodeMeta } from "./use-svg-tree";
 import { useSurfaceHover } from "./use-surface-hover";
 import { tagInfo } from "./node-type-map";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 const INDENT_PX = 14;
 

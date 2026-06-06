@@ -8,15 +8,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/table";
+import { Button } from "@app/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
+} from "@app/ui/components/dropdown-menu";
+import { Badge } from "@app/ui/components/badge";
 import { EditTagDialog } from "./edit-tag-dialog";
 import { DeleteTagDialog } from "./delete-tag-dialog";
 import { MoreHorizontal, Pencil, Tag, Trash2 } from "lucide-react";
@@ -27,7 +27,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
+} from "@app/ui/components/empty";
 import type { Platform } from "@/lib/platform";
 
 function getContrastColor(hexColor: string) {

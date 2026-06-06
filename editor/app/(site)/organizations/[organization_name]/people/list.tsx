@@ -7,16 +7,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@app/ui/components/avatar";
+import { Button } from "@app/ui/components/button";
 import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@app/ui/components/dropdown-menu";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { Organization } from "@/types";
 import { toast } from "sonner";

@@ -8,10 +8,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@app/ui/components/dialog";
 import { ArrowLeftIcon, ArrowRightIcon } from "@radix-ui/react-icons";
 import { motion } from "motion/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { useStep } from "usehooks-ts";
 import { FormStartPage } from "@/theme/templates/formstart";
 import { SandboxWrapper } from "./sandbox";

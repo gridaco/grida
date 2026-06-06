@@ -28,7 +28,7 @@ import {
   SettingsIcon,
   XIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Command,
   CommandEmpty,
@@ -36,12 +36,12 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@app/ui/components/popover";
 import {
   getDesktopBridge,
   workspaces as workspacesNs,

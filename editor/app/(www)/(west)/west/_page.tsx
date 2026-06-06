@@ -7,7 +7,7 @@ import { ArrowRight, GiftIcon, Link2, Percent } from "lucide-react";
 import { sitemap } from "@/www/data/sitemap";
 import { GridaLogo } from "@/components/grida-logo";
 import { Button as FancyButton } from "@/www/ui/button";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import FooterWithCTA from "@/www/footer-with-cta";
 import Header from "@/www/header";
 import Image from "next/image";
@@ -19,8 +19,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { cn } from "@/components/lib/utils";
+} from "@app/ui/components/card";
+import { cn } from "@app/ui/lib/utils";
 import CustomDomainDemo from "./custom-domain-demo";
 import { ChartLineIcon } from "lucide-react";
 import Hello from "./hello";

@@ -4,8 +4,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "@app/ui/components/card";
+import { Button } from "@app/ui/components/button";
 import Link from "next/link";
 import i18next from "i18next";
 import { ssr_page_init_i18n } from "@/i18n/ssr";

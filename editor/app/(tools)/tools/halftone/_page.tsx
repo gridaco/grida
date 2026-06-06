@@ -1,18 +1,18 @@
 "use client";
 
 import React, { useEffect, useId, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/select";
+import { Slider } from "@app/ui/components/slider";
+import { Separator } from "@app/ui/components/separator";
+import { Badge } from "@app/ui/components/badge";
+import { Input } from "@app/ui/components/input";
 import { ColorPicker32F } from "@/scaffolds/sidecontrol/controls/color-picker";
 import { DownloadIcon, ImageIcon, UploadIcon } from "lucide-react";
 import kolor from "@grida/color";

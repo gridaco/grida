@@ -3,21 +3,21 @@
 import * as React from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { CheckIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
 import { Env } from "@/env";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from "@/components/ui/input-group";
+} from "@app/ui/components/input-group";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@/components/ui/input-otp";
+} from "@app/ui/components/input-otp";
 
 export type EmailChallengeI18n = {
   verify: string;

@@ -8,7 +8,7 @@ import {
 } from "masonic";
 import type { Library } from "@/lib/library";
 import { getBlurDataURLFromColor } from "@/utils/placeholder";
-import { Button } from "@/components/ui/button";
+import { Button } from "@app/ui/components/button";
 import { DownloadIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import Link from "next/link";
@@ -17,10 +17,10 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import dynamic from "next/dynamic";
 import { motion } from "motion/react";
-import { Spinner } from "@/components/ui/spinner";
+import { Spinner } from "@app/ui/components/spinner";
 
 const Masonry: ComponentType<MasonryProps<ObjectDetail>> = dynamic(
   () => import("masonic").then((mod) => mod.Masonry),

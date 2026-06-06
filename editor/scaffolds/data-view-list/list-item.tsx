@@ -3,11 +3,11 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@app/ui/components/tooltip";
 import { Data } from "@/lib/data";
 import type { DGResponseRow } from "../grid";
 import { LineContent } from "../data-card/line";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import type { FormFieldDefinition } from "@/grida-forms-hosted/types";
 import { MediaRenderer } from "../data-card/media";
 

@@ -8,7 +8,7 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command";
+} from "@app/ui/components/command";
 import { useState } from "react";
 import { useDatagridTable } from "../editor";
 import { SupabaseLogo } from "@/components/logos";
@@ -18,13 +18,13 @@ import {
   SYSTEM_GF_CUSTOMER_PHONE_KEY,
   SYSTEM_GF_CUSTOMER_NAME_KEY,
 } from "@/k/system";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/popover";
+import { Input } from "@app/ui/components/input";
 import { GridaXSupabase } from "@/types";
 
 const CommandInput = React.forwardRef<

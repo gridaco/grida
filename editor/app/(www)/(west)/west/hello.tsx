@@ -1,7 +1,7 @@
 import React from "react";
 import { GiftIcon } from "lucide-react";
 import { ScratchToReveal } from "@/www/ui/scratch-to-reveal";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { GridaLogo } from "@/components/grida-logo";
 import ScratchAnimation from "@/www/ui/scratch-animation";
 

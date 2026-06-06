@@ -1,8 +1,8 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@app/ui/components/badge";
+import { Button } from "@app/ui/components/button";
+import { Card, CardContent, CardHeader } from "@app/ui/components/card";
 import {
   Dialog,
   DialogClose,
@@ -12,22 +12,22 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+} from "@app/ui/components/dialog";
+import { Input } from "@app/ui/components/input";
 import {
   Field,
   FieldDescription,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field";
+} from "@app/ui/components/field";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
+} from "@app/ui/components/select";
+import { Slider } from "@app/ui/components/slider";
 import {
   Table,
   TableBody,
@@ -35,7 +35,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@app/ui/components/table";
 import { Env } from "@/env";
 import { formerrorlink, formlink } from "@/host/url";
 import {

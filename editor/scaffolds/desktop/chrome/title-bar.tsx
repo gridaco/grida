@@ -3,8 +3,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/components/lib/utils/index";
+import { Button } from "@app/ui/components/button";
+import { cn } from "@app/ui/lib/utils";
 import { app, nav } from "@/lib/desktop/bridge";
 import { useNavigationState } from "@/lib/desktop/bridge-react";
 

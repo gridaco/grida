@@ -2,7 +2,7 @@ import cmath from "@grida/cmath";
 // import { color_connection_line } from "../theme";
 // import { get_direction } from "./math";
 import { NetworkArrow } from "./network-arrow";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 
 export function BezierCurvedLine({
   id,

@@ -1,11 +1,13 @@
 "use client";
 
+import { CodeBlock, CodeBlockCopyButton } from "@app/ui/ai-elements/code-block";
+import { cn } from "@app/ui/lib/utils";
 import {
-  CodeBlock,
-  CodeBlockCopyButton,
-} from "@/components/ai-elements/code-block";
-import { cn } from "@/components/lib/utils";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@app/ui/components/tabs";
 import { registry } from "@/registry/__index__";
 import * as React from "react";
 import type { BundledLanguage } from "shiki";

@@ -2,7 +2,7 @@
 
 import type React from "react";
 import Link from "next/link";
-import { cn } from "@/components/lib/utils";
+import { cn } from "@app/ui/lib/utils";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import {
   Field,
@@ -11,7 +11,7 @@ import {
   FieldGroup,
   FieldLabel,
   FieldSeparator,
-} from "@/components/ui/field";
+} from "@app/ui/components/field";
 import {
   Select,
   SelectContent,
@@ -20,14 +20,14 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@app/ui/components/select";
 import { PaletteColorChip } from "@/components/design/palette-color-chip";
 import { NavbarLogoEditor } from "@/scaffolds/www-theme-config/components/navbar-logo";
 import type palettes from "@/theme/palettes";
 import * as _palettes from "@/theme/palettes";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Slider } from "@/components/ui/slider";
+import { Input } from "@app/ui/components/input";
+import { Checkbox } from "@app/ui/components/checkbox";
+import { Slider } from "@app/ui/components/slider";
 
 type ProjectLinkTarget = {
   organization_name: string;

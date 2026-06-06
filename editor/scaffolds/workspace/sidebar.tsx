@@ -4,7 +4,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+} from "@app/ui/components/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,7 @@ import {
   SidebarMenuSubItem,
   SidebarMenuBadge,
   SidebarGroupAction,
-} from "@/components/ui/sidebar";
+} from "@app/ui/components/sidebar";
 import {
   Home,
   Settings2,
@@ -37,8 +37,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Progress } from "@/components/ui/progress";
+} from "@app/ui/components/dropdown-menu";
+import { Progress } from "@app/ui/components/progress";
 import { useWorkspace, WorkspaceState } from "@/scaffolds/workspace";
 import {
   DotsHorizontalIcon,
@@ -55,7 +55,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { usePathname, useRouter } from "next/navigation";
 import { sitemap } from "@/www/data/sitemap";
 import { DarwinSidebarHeaderDragArea } from "../../host/desktop";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@app/ui/components/badge";
 import { Labels } from "@/k/labels";
 import { Button } from "@/components/ui-editor/button";
 import { ShineBorder } from "@/www/ui/shine-border";
