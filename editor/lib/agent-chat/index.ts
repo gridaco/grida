@@ -57,3 +57,14 @@ export {
   type ContextUsage,
   type MessageUsage,
 } from "./context-usage";
+export {
+  IMAGE_ATTACHMENT_POLICY,
+  isSupportedImageType,
+  planResize,
+  decodedBytes,
+  toFileUiParts,
+  encodeImageFile,
+  type ImageAttachmentPolicy,
+  type EncodedImageAttachment,
+} from "./image-attachment";
+export { buildAgentSend, type AgentSendBody } from "./build-agent-send";

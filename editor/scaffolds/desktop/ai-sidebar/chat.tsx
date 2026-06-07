@@ -31,11 +31,13 @@ import {
 } from "@app/ui/ai-elements/conversation";
 import { cn } from "@app/ui/lib/utils";
 import type { ComposerCatalog } from "@/kits/composer";
+import _models from "@grida/ai-models";
 import {
   AGENT_SESSION_AGENT,
   sessions as bridgeSessions,
 } from "@/lib/desktop/bridge";
 import {
+  buildAgentSend,
   desktopAgentTransport,
   isSessionBusy,
   useChatSession,
@@ -221,6 +223,13 @@ export function AISidebarChat({ className }: { className?: string }) {
     sessions: chatSession.sessions,
   });
 
+  // Whether the active model accepts image input — memoized so the catalog
+  // lookup doesn't re-scan on every render (only when the model changes).
+  const multimodal = useMemo(
+    () => _models.text.modelSpecById(modelId)?.multimodal ?? false,
+    [modelId]
+  );
+
   // The active session row carries the rolled-up cost the context meter
   // surfaces alongside the (real) window %.
   const activeSession = chatSession.sessions.find(
@@ -248,16 +257,11 @@ export function AISidebarChat({ className }: { className?: string }) {
   } = useTurnQueueController({
     sessionId: chatSession.current_id,
     busy,
-    send: (text) =>
-      sendMessage(
-        { text },
-        {
-          body: {
-            session_id: chatSession.current_id ?? undefined,
-            model_id: modelId,
-          },
-        }
-      ),
+    send: buildAgentSend({
+      sendMessage,
+      sessionId: chatSession.current_id,
+      modelId,
+    }),
   });
 
   // React to the CORE drain (RFC `queue`): when the core fires a queued turn (a
@@ -425,6 +429,7 @@ export function AISidebarChat({ className }: { className?: string }) {
           isStreaming={isStreaming}
           onStop={stop}
           placeholder="Ask the assistant to edit the SVG…"
+          multimodal={multimodal}
           toolbar={
             <>
               <DesktopModelPicker value={modelId} onValueChange={setModelId} />

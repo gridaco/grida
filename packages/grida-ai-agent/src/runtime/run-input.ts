@@ -219,9 +219,39 @@ function normalizeWireParts(raw: unknown[]): AgentRunMessagePart[] | null {
     const obj = part as Record<string, unknown>;
     if (typeof obj.type !== "string" || obj.type.length === 0) return null;
     if (obj.type === "text" && typeof obj.text !== "string") return null;
+    // Reject oversized inline (data:) image attachments BEFORE they are
+    // persisted or sent upstream. Defense-in-depth against a buggy/abusive
+    // client; the renderer downscales to a smaller target, so a normal send
+    // never trips this. Hosted-URL attachments are not size-checked here.
+    if (
+      obj.type === "file" &&
+      typeof obj.url === "string" &&
+      obj.url.startsWith("data:") &&
+      dataUrlDecodedBytes(obj.url) > MAX_INLINE_FILE_BYTES
+    ) {
+      return null;
+    }
     out.push({ ...obj, type: obj.type });
   }
   return out;
+}
+
+/**
+ * Hard ceiling on a single inline image attachment, measured on decoded bytes.
+ * Set above the renderer's downscale target (~5 MB) so legitimate sends never
+ * trip it — this is the abuse/footgun backstop, enforced before persistence.
+ */
+const MAX_INLINE_FILE_BYTES = 8 * 1024 * 1024;
+
+/** Decoded byte size of a base64 `data:` URL payload (≈ len*3/4 − padding). */
+function dataUrlDecodedBytes(dataUrl: string): number {
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0) return 0;
+  const b64 = dataUrl.slice(comma + 1);
+  const len = b64.length;
+  if (len === 0) return 0;
+  const padding = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((len * 3) / 4) - padding);
 }
 
 function coerceSkills(raw: unknown): SkillId[] | undefined {

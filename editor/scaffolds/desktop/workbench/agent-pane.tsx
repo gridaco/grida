@@ -47,7 +47,9 @@ import {
   welcome_handoff,
   type WelcomeHandoff,
 } from "@/lib/desktop/welcome-handoff";
+import _models from "@grida/ai-models";
 import {
+  buildAgentSend,
   desktopAgentTransport,
   isSessionBusy,
   useChatSession,
@@ -283,6 +285,13 @@ function AgentPaneContent({
     initial: handoff?.model_id,
   });
 
+  // Whether the active model accepts image input — memoized so the catalog
+  // lookup doesn't re-scan on every render (only when the model changes).
+  const multimodal = useMemo(
+    () => _models.text.modelSpecById(modelId)?.multimodal ?? false,
+    [modelId]
+  );
+
   // The active session row carries the rolled-up cost the context meter
   // surfaces alongside the (real) window %.
   const activeSession = chatSession.sessions.find(
@@ -319,17 +328,12 @@ function AgentPaneContent({
   } = useTurnQueueController({
     sessionId: chatSession.current_id,
     busy,
-    send: (text) =>
-      sendMessage(
-        { text },
-        {
-          body: {
-            session_id: chatSession.current_id ?? undefined,
-            skills: skillsForActiveTab(activeRelPath),
-            model_id: modelId,
-          },
-        }
-      ),
+    send: buildAgentSend({
+      sendMessage,
+      sessionId: chatSession.current_id,
+      modelId,
+      skills: skillsForActiveTab(activeRelPath),
+    }),
   });
 
   // React to the CORE drain (RFC `queue`): when the core fires a queued turn (a
@@ -496,6 +500,7 @@ function AgentPaneContent({
           onSubmit={onSubmit}
           isStreaming={isStreaming}
           onStop={stop}
+          multimodal={multimodal}
           toolbar={
             <>
               <DesktopModelPicker value={modelId} onValueChange={setModelId} />

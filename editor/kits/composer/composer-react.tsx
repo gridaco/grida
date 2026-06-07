@@ -162,6 +162,7 @@ export function ComposerContent({
   triggerMenuId,
   autofocus,
   onSubmitRequest,
+  onImageFiles,
   ...props
 }: Omit<HTMLAttributes<HTMLDivElement>, "onSubmit"> & {
   placeholder?: string;
@@ -169,6 +170,14 @@ export function ComposerContent({
   editorClassName?: string;
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
+  /**
+   * Forward `image/*` files pasted or dropped onto the editor. The kit stays
+   * policy-agnostic: it only hands over the raw `File[]`; the consumer decides
+   * what counts (e.g. excludes SVG), how to encode, and whether to attach. When
+   * provided AND image files are present, the gesture is consumed (text/HTML
+   * paste with no image files always falls through to the editor unchanged).
+   */
+  onImageFiles?: (files: File[]) => void;
 }) {
   const {
     core,
@@ -178,6 +187,10 @@ export function ComposerContent({
   } = useComposerInternals();
   const resolvedTriggerMenuId = triggerMenuId ?? defaultTriggerMenuId;
   const editorRef = useRef<Editor | null>(null);
+  // The editor is created once; read the latest callback through a ref so a
+  // re-rendered consumer's handler is always the one invoked.
+  const onImageFilesRef = useRef(onImageFiles);
+  onImageFilesRef.current = onImageFiles;
   const extensions = useMemo(
     () => ComposerTiptap.extensions({ placeholder }),
     [placeholder]
@@ -204,6 +217,22 @@ export function ComposerContent({
             onSubmitRequest?.();
           },
         });
+      },
+      handlePaste(_view, event) {
+        const handler = onImageFilesRef.current;
+        if (!handler) return false;
+        const files = imageFilesFromTransfer(event.clipboardData);
+        if (files.length === 0) return false;
+        handler(files);
+        return true;
+      },
+      handleDrop(_view, event) {
+        const handler = onImageFilesRef.current;
+        if (!handler) return false;
+        const files = imageFilesFromTransfer(event.dataTransfer);
+        if (files.length === 0) return false;
+        handler(files);
+        return true;
       },
     },
     onCreate({ editor }) {
@@ -251,6 +280,17 @@ export function ComposerContent({
       <EditorContent editor={editor} />
     </div>
   );
+}
+
+/** Pull `image/*` files out of a paste/drop `DataTransfer`. Both clipboard
+ * pastes (screenshots) and file drops surface them on `.files`. */
+function imageFilesFromTransfer(data: DataTransfer | null): File[] {
+  if (!data) return [];
+  const out: File[] = [];
+  for (const file of Array.from(data.files ?? [])) {
+    if (file.type.startsWith("image/")) out.push(file);
+  }
+  return out;
 }
 
 function toViewSnapshot(snapshot: ComposerSnapshot): ComposerViewSnapshot {
