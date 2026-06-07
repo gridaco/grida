@@ -14,13 +14,20 @@ import { KeyCode, M, kb } from "@grida/keybinding";
 import { TOOL_SET } from "../commands/defaults";
 import type { Keymap, KeymapBinding } from "./keymap";
 
-// Arrow-key nudge should fire regardless of Alt/Cmd/Ctrl — Alt-hold powers
-// the measurement HUD, and the user expects to keep nudging while it's on.
-// Only Shift carries meaning (1px vs 10px); the rest are "don't care".
+// Arrow-key nudge (move). Shift carries meaning (1px vs 10px). Ctrl is ALSO
+// meaningful and must be RELEASED for move: `Ctrl+Alt+Arrow` is reserved for
+// nudge-resize below, so move must not also fire on that chord. Alt stays
+// don't-care — Alt-hold powers the measurement HUD and the user expects to
+// keep nudging (moving) while it's on. Meta is don't-care.
 //
-// Expressed as a `meaningful` mask: only Shift is meaningful, so Ctrl/Alt/Meta
-// are don't-care. `kb()` expands to the 2^3 = 8 power-set internally.
-const NUDGE_MEANINGFUL = M.Shift;
+// Expressed as a `meaningful` mask: Shift|Ctrl are meaningful, Alt/Meta are
+// don't-care. `kb()` expands the don't-care bits to a power-set internally.
+const NUDGE_MEANINGFUL = M.Shift | M.Ctrl;
+
+// Nudge-resize chord (Ctrl+Alt+Arrow). Shift|Ctrl|Alt are all meaningful;
+// Meta is don't-care. Literal Ctrl (not CtrlCmd) — the chord is `Ctrl+⌥` on
+// both macOS and Windows/Linux.
+const RESIZE_MEANINGFUL = M.Shift | M.Ctrl | M.Alt;
 
 export const DEFAULT_BINDINGS: readonly KeymapBinding[] = [
   // ─── history ──────────────────────────────────────────────────────────────
@@ -99,9 +106,9 @@ export const DEFAULT_BINDINGS: readonly KeymapBinding[] = [
   { keybinding: kb(KeyCode.Enter, M.Shift), command: "hierarchy.exit" },
 
   // ─── nudge — Arrow (1px) and Shift+Arrow (10px) ──────────────────────────
-  // Only Shift is meaningful; Alt/Cmd/Ctrl are don't-care. Alt-hold is
-  // the measurement-HUD trigger and must not block movement; Cmd/Ctrl
-  // are free for future "snap-override" semantics without rebinding here.
+  // Meaningful = Shift|Ctrl (see NUDGE_MEANINGFUL). Move fires only with Ctrl
+  // RELEASED — Ctrl+Alt+Arrow is the nudge-resize chord below. Alt stays
+  // don't-care so Alt-hold (measurement HUD) keeps moving the selection.
   {
     keybinding: kb(KeyCode.LeftArrow, 0, NUDGE_MEANINGFUL),
     command: "transform.nudge",
@@ -141,6 +148,71 @@ export const DEFAULT_BINDINGS: readonly KeymapBinding[] = [
     keybinding: kb(KeyCode.DownArrow, M.Shift, NUDGE_MEANINGFUL),
     command: "transform.nudge",
     args: { dx: 0, dy: 10 },
+  },
+
+  // ─── nudge-resize — Ctrl+Alt+Arrow (1px) and +Shift (10px) ───────────────
+  // Grow/shrink each selected element by the delta around its OWN NW corner —
+  // per-element, NOT a union/group resize (members keep their positions
+  // relative to one another). Right/Left = width, Down/Up = height. The
+  // all-or-nothing gate lives in `editor.commands.resize_by`; on refusal (the
+  // selection includes a non-resizable / transformed member) the chord is a
+  // no-op — the move-nudge mask forbids Ctrl, so nothing else catches it.
+  // That same mask is why move and resize never both fire on this chord.
+  {
+    keybinding: kb(KeyCode.RightArrow, M.Ctrl | M.Alt, RESIZE_MEANINGFUL),
+    command: "selection.nudge_resize",
+    args: { dw: 1, dh: 0 },
+  },
+  {
+    keybinding: kb(KeyCode.LeftArrow, M.Ctrl | M.Alt, RESIZE_MEANINGFUL),
+    command: "selection.nudge_resize",
+    args: { dw: -1, dh: 0 },
+  },
+  {
+    keybinding: kb(KeyCode.DownArrow, M.Ctrl | M.Alt, RESIZE_MEANINGFUL),
+    command: "selection.nudge_resize",
+    args: { dw: 0, dh: 1 },
+  },
+  {
+    keybinding: kb(KeyCode.UpArrow, M.Ctrl | M.Alt, RESIZE_MEANINGFUL),
+    command: "selection.nudge_resize",
+    args: { dw: 0, dh: -1 },
+  },
+  {
+    keybinding: kb(
+      KeyCode.RightArrow,
+      M.Ctrl | M.Alt | M.Shift,
+      RESIZE_MEANINGFUL
+    ),
+    command: "selection.nudge_resize",
+    args: { dw: 10, dh: 0 },
+  },
+  {
+    keybinding: kb(
+      KeyCode.LeftArrow,
+      M.Ctrl | M.Alt | M.Shift,
+      RESIZE_MEANINGFUL
+    ),
+    command: "selection.nudge_resize",
+    args: { dw: -10, dh: 0 },
+  },
+  {
+    keybinding: kb(
+      KeyCode.DownArrow,
+      M.Ctrl | M.Alt | M.Shift,
+      RESIZE_MEANINGFUL
+    ),
+    command: "selection.nudge_resize",
+    args: { dw: 0, dh: 10 },
+  },
+  {
+    keybinding: kb(
+      KeyCode.UpArrow,
+      M.Ctrl | M.Alt | M.Shift,
+      RESIZE_MEANINGFUL
+    ),
+    command: "selection.nudge_resize",
+    args: { dw: 0, dh: -10 },
   },
 
   // ─── tools — V (cursor) / R (rect) / O (ellipse) / L (line) / T (text) ──

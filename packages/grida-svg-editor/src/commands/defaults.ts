@@ -95,6 +95,20 @@ export function registerDefaultCommands(
     return editor.commands.resize_to(target);
   });
 
+  // Ctrl+Alt+Arrow — grow/shrink each selected element by the delta around its
+  // own NW corner (per-element; see `editor.commands.resize_by` — NOT a
+  // union/group resize). `args` is `{dw, dh}` (±1 / ±10 with Shift). The
+  // all-or-nothing resizability gate lives in `resize_by`; this handler only
+  // guards mode + non-empty selection and returns false when the verb refuses
+  // (selection includes a `<g>` or a transformed member) — the chord is then
+  // a no-op.
+  reg.register("selection.nudge_resize", (args) => {
+    if (editor.state.mode !== "select") return false;
+    if (editor.state.selection.length === 0) return false;
+    const { dw, dh } = args as { dw: number; dh: number };
+    return editor.commands.resize_by({ dw, dh });
+  });
+
   // Rotate the selection by `args.angle` radians. Pivot defaults to the
   // union-bbox center; pass `args.pivot = {x, y}` to override. Returns
   // false if `is_rotatable` refuses any selected member (composite

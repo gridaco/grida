@@ -195,13 +195,40 @@ export type Commands = {
    * member.
    *
    * The default selection is `state.selection`. Pass `opts.ids` to
-   * override. Members whose tag is not resizable
-   * (e.g. `<g>`) are skipped silently; the gesture is a no-op when no
-   * resizable member remains. Returns `true` when a history step was
-   * pushed.
+   * override. Members that are not resizable are skipped silently: this
+   * means both an unresizable tag (e.g. `<g>`) AND a resizable tag carrying
+   * a non-trivial transform (rotate-without-pivot, matrix, scale, skew),
+   * which can't be resized in local space without breaking round-trip — the
+   * same `is_resizable_node` gate the resize HUD applies. The gesture is a
+   * no-op when no resizable member remains. Returns `true` when a history
+   * step was pushed. `opts.label` overrides the atomic history label
+   * (default `"resize-to"`).
    */
   resize_to(
     target: { x: number; y: number; width: number; height: number },
+    opts?: { ids?: ReadonlyArray<NodeId>; label?: string }
+  ): boolean;
+  /**
+   * Resize the selection by a delta — PER-ELEMENT: each selected member
+   * grows/shrinks around its OWN NW corner, so members keep their positions
+   * relative to one another (NOT a union/group resize — contrast
+   * {@link resize_to}, which scales the whole selection around the shared
+   * union origin and so translates off-origin members). `delta.dw` /
+   * `delta.dh` are applied additively to each member (clamped to >= 0). The
+   * core verb behind keyboard nudge-resize.
+   *
+   * ALL-OR-NOTHING gate: refuses (returns `false`, no history step) unless
+   * EVERY member passes `is_resizable_node` — the same tag + transform-class
+   * check the resize HUD uses, applied wholesale (a mixed selection is
+   * refused, not partially resized — matches a HUD handle-drag, which is
+   * rejected when any member is unsafe). Also refuses on empty selection or
+   * when no geometry provider (DOM surface) is attached.
+   *
+   * Per-tag constraints (circle uniform, text edge no-op) apply per member.
+   * The default selection is `state.selection`; pass `opts.ids` to override.
+   */
+  resize_by(
+    delta: { dw: number; dh: number },
     opts?: { ids?: ReadonlyArray<NodeId> }
   ): boolean;
   /**
@@ -822,17 +849,156 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     }
   }
 
+  // ─── resize: shared path (resize_to / resize_by go through these) ──────────
+  //
+  // `resize_to` (group / set-bbox) and `resize_by` (per-element nudge) are the
+  // same operation — "for each member apply (sx, sy, origin), optionally a
+  // group translate, in one atomic history step" — differing only in (a) the
+  // gate refusal mode and (b) how each member's (sx, sy, origin) is derived.
+  // Those two pieces are extracted so the callers stay tiny and can't drift.
+
+  type ResizeMember = {
+    id: NodeId;
+    rz: ResizeBaseline;
+    transform_pre: string | null;
+    bbox: { x: number; y: number; width: number; height: number };
+  };
+
+  /**
+   * Gate + capture for a resize gesture. Returns the resizable members (with
+   * captured baseline / pre-transform / bbox), or `null` if the gesture can't
+   * run: no geometry provider, empty selection, or — in `all_or_nothing` mode
+   * — any member fails the gate.
+   *
+   * `mode`:
+   *  - `"skip"`           — drop members failing the `is_resizable_node` gate
+   *    (tag + transform class) or lacking a bbox; resize the rest. Used by the
+   *    inspector `resize_to` (set-bbox) path.
+   *  - `"all_or_nothing"` — refuse the WHOLE gesture (return `null`) if ANY
+   *    member fails. Used by keyboard `resize_by` (nudge), matching the resize
+   *    HUD, whose handle-drag is rejected when any member is unsafe.
+   */
+  function collect_resize_members(
+    ids: ReadonlyArray<NodeId>,
+    mode: "skip" | "all_or_nothing"
+  ): ResizeMember[] | null {
+    if (ids.length === 0) return null;
+    if (!geometry_provider) return null;
+    const members: ResizeMember[] = [];
+    for (const id of ids) {
+      // Gate on `is_resizable_node` (tag AND transform class), not the
+      // tag-only `is_resizable`: scaling local attrs around a world-space
+      // origin is only correct when world ≡ local; a non-trivial transform
+      // (rotate-without-pivot, matrix, scale, skew) breaks that and would
+      // resize it incorrectly / violate P1. Mirrors the HUD resize gate. Admitted:
+      // identity, leading-translate, `rotate(θ cx cy)` with explicit pivot.
+      if (!resize_pipeline.intent.is_resizable_node(doc, id)) {
+        if (mode === "all_or_nothing") return null;
+        continue;
+      }
+      const bbox = geometry_provider.bounds_of(id);
+      if (!bbox) {
+        if (mode === "all_or_nothing") return null;
+        continue;
+      }
+      members.push({
+        id,
+        rz: resize_pipeline.intent.capture_baseline(doc, id, bbox),
+        transform_pre: doc.get_attr(id, "transform"),
+        bbox,
+      });
+    }
+    return members.length === 0 ? null : members;
+  }
+
+  /**
+   * Apply a resize to each member, optionally followed by a uniform group
+   * translate, as ONE atomic history step. `op` resolves each member's scale
+   * factors + scale origin; `group_translate` is the post-scale envelope shift
+   * (group resize only — `null` for per-element). Callers guarantee `members`
+   * is non-empty. Returns `true` when a history step was pushed; `false` when
+   * the gesture is geometrically identity (no member scales and no group
+   * translate) so undo isn't polluted with an empty step. NOTE: a per-tag
+   * constraint that collapses a non-1 factor to identity *inside* the handler
+   * (e.g. `<circle>` uniform `min` on a single-axis nudge) is not detected
+   * here — the op-level factor is still ≠ 1, so that case still pushes a step.
+   */
+  function commit_resize(
+    members: ResizeMember[],
+    op: (m: ResizeMember) => {
+      sx: number;
+      sy: number;
+      origin: { x: number; y: number };
+    },
+    group_translate: { dx: number; dy: number } | null,
+    label: string
+  ): boolean {
+    const ops = members.map((m) => ({ m, ...op(m) }));
+    // Identity gesture → no history step (avoids empty undo entries, e.g.
+    // nudging the zero-extent axis of a degenerate shape).
+    const scales = ops.some(({ sx, sy }) => sx !== 1 || sy !== 1);
+    const translates =
+      !!group_translate &&
+      (group_translate.dx !== 0 || group_translate.dy !== 0);
+    if (!scales && !translates) return false;
+    const apply = () => {
+      for (const { m, sx, sy, origin } of ops) {
+        resize_pipeline.intent.apply(doc, m.id, m.rz, sx, sy, origin);
+      }
+      if (
+        group_translate &&
+        (group_translate.dx !== 0 || group_translate.dy !== 0)
+      ) {
+        // Re-capture translate baselines after scale wrote new attrs —
+        // otherwise apply_translate would offset the pre-scale values and
+        // double-account or back-step.
+        for (const m of members) {
+          const tx_after = translate_pipeline.intent.capture_baseline(
+            doc,
+            m.id
+          );
+          translate_pipeline.intent.apply(
+            doc,
+            m.id,
+            tx_after,
+            group_translate.dx,
+            group_translate.dy
+          );
+        }
+      }
+      emit();
+    };
+    const revert = () => {
+      for (const { m, origin } of ops) {
+        // apply_resize at sx=sy=1 writes attrs back to baseline regardless of
+        // origin; transform is restored directly (apply_translate.viaTransform
+        // may have rewritten it during apply; apply_resize never touches it).
+        resize_pipeline.intent.apply(doc, m.id, m.rz, 1, 1, origin);
+        doc.set_attr(m.id, "transform", m.transform_pre);
+      }
+      emit();
+    };
+    apply();
+    history.atomic(label, (tx) => {
+      tx.push({ providerId: PROVIDER_ID, apply, revert });
+    });
+    return true;
+  }
+
   /**
    * One-shot multi-member resize to an explicit target rect. Mirrors a
    * drag-resize gesture in mechanics — capture per-member baselines,
    * scale around the union's NW corner, translate the result so the
    * union NW lands at the requested position — but as a single
-   * atomic step rather than a preview session.
+   * atomic step rather than a preview session. This is the GROUP path:
+   * the whole selection is treated as one envelope.
    *
    * The function does its own geometry lookup via the
    * `geometry_provider` registered by the DOM surface. When no surface
-   * is attached, the call is a no-op (returns `false`). Members whose
-   * tag is not resizable are silently filtered.
+   * is attached, the call is a no-op (returns `false`). Members that fail
+   * the `is_resizable_node` gate — an unresizable tag (e.g. `<g>`) OR a
+   * non-trivially-transformed element — are silently skipped (see
+   * `collect_resize_members`).
    *
    * Revert restores the captured `transform` attribute and all
    * geometry attrs the apply step wrote — so a `<rect>` with an
@@ -841,80 +1007,69 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
    */
   function resize_to(
     target: { x: number; y: number; width: number; height: number },
-    opts?: { ids?: ReadonlyArray<NodeId> }
+    opts?: { ids?: ReadonlyArray<NodeId>; label?: string }
   ): boolean {
-    const ids = opts?.ids ?? selection;
-    if (ids.length === 0) return false;
-    if (!geometry_provider) return false;
-
-    type Member = {
-      id: NodeId;
-      rz: ResizeBaseline;
-      tx_pre: TranslateBaseline;
-      transform_pre: string | null;
-      bbox: { x: number; y: number; width: number; height: number };
-    };
-    const members: Member[] = [];
-    for (const id of ids) {
-      if (!resize_pipeline.intent.is_resizable(doc.tag_of(id))) continue;
-      const bbox = geometry_provider.bounds_of(id);
-      if (!bbox) continue;
-      members.push({
-        id,
-        rz: resize_pipeline.intent.capture_baseline(doc, id, bbox),
-        tx_pre: translate_pipeline.intent.capture_baseline(doc, id),
-        transform_pre: doc.get_attr(id, "transform"),
-        bbox,
-      });
-    }
-    if (members.length === 0) return false;
+    const members = collect_resize_members(opts?.ids ?? selection, "skip");
+    if (!members) return false;
 
     const union = cmath.rect.union(members.map((m) => m.bbox));
     const sx = union.width === 0 ? 1 : target.width / union.width;
     const sy = union.height === 0 ? 1 : target.height / union.height;
-    // Origin = union NW: scale keeps NW fixed; we follow with an explicit
-    // translate so NW lands at target NW. Decoupling scale-anchor from
-    // target-anchor sidesteps the `(1 - sx) === 0` degenerate case in the
-    // single-step origin formula.
+    // Origin = union NW: scale keeps the union NW fixed; an explicit group
+    // translate then lands it at target NW. Every member shares this one
+    // (sx, sy, origin) — the whole selection scales as one envelope, so
+    // off-origin members move relative to the union (group semantics).
     const origin = { x: union.x, y: union.y };
-    const dx = target.x - union.x;
-    const dy = target.y - union.y;
+    return commit_resize(
+      members,
+      () => ({ sx, sy, origin }),
+      { dx: target.x - union.x, dy: target.y - union.y },
+      opts?.label ?? "resize-to"
+    );
+  }
 
-    const apply = () => {
-      for (const m of members) {
-        resize_pipeline.intent.apply(doc, m.id, m.rz, sx, sy, origin);
-      }
-      if (dx !== 0 || dy !== 0) {
-        // Re-capture translate baselines after scale wrote new attrs —
-        // otherwise `apply_translate` would offset the pre-scale values
-        // and double-account or back-step.
-        for (const m of members) {
-          const tx_after = translate_pipeline.intent.capture_baseline(
-            doc,
-            m.id
-          );
-          translate_pipeline.intent.apply(doc, m.id, tx_after, dx, dy);
-        }
-      }
-      emit();
-    };
-    const revert = () => {
-      for (const m of members) {
-        // apply_resize at sx=sy=1 writes attrs as `origin + (a - origin) * 1
-        // = a` for every per-tag arm — restores resize baseline exactly.
-        resize_pipeline.intent.apply(doc, m.id, m.rz, 1, 1, origin);
-        // Restore `transform` directly — `apply_translate.viaTransform`
-        // may have rewritten it during apply; `apply_resize` never
-        // touches it.
-        doc.set_attr(m.id, "transform", m.transform_pre);
-      }
-      emit();
-    };
-    apply();
-    history.atomic("resize-to", (tx) => {
-      tx.push({ providerId: PROVIDER_ID, apply, revert });
-    });
-    return true;
+  /**
+   * Resize by a `{dw, dh}` delta — the core verb behind keyboard nudge-resize
+   * (`Ctrl+Alt+Arrow`). This is the PER-ELEMENT path: each selected member
+   * grows/shrinks by the delta around ITS OWN NW corner, so members keep their
+   * positions relative to one another. This deliberately differs from
+   * {@link resize_to} (the group/envelope path): a HUD group-resize scales the
+   * whole selection around the shared union origin, translating off-origin
+   * members — correct for a drag handle, wrong for a keyboard nudge, whose UX
+   * is "apply the delta to each".
+   *
+   * ALL-OR-NOTHING gate (`collect_resize_members("all_or_nothing")`): refuses
+   * (returns `false`, no history step) on empty selection, no geometry
+   * provider, or any member failing the `is_resizable_node` gate — matching
+   * the resize HUD rather than `resize_to`'s per-member skip.
+   */
+  function resize_by(
+    delta: { dw: number; dh: number },
+    opts?: { ids?: ReadonlyArray<NodeId> }
+  ): boolean {
+    const members = collect_resize_members(
+      opts?.ids ?? selection,
+      "all_or_nothing"
+    );
+    if (!members) return false;
+    // Each member around its OWN NW (origin = member bbox NW), its OWN factor
+    // from its OWN bbox + delta. No group translate → members do not move
+    // relative to one another. The factor `(size + d)/size` makes the resize
+    // additive (size·factor = size + d), so each member grows by exactly
+    // `dw` / `dh`; the guard handles a degenerate zero-size axis, the clamp
+    // keeps it non-negative.
+    const axis = (size: number, d: number) =>
+      size === 0 ? 1 : Math.max(0, size + d) / size;
+    return commit_resize(
+      members,
+      (m) => ({
+        sx: axis(m.bbox.width, delta.dw),
+        sy: axis(m.bbox.height, delta.dh),
+        origin: { x: m.bbox.x, y: m.bbox.y },
+      }),
+      null,
+      "nudge-resize"
+    );
   }
 
   /** Shared helper: compute a default rotation pivot from the live
@@ -1641,6 +1796,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     translate,
     nudge,
     resize_to,
+    resize_by,
     rotate,
     rotate_to,
     flatten_transform,

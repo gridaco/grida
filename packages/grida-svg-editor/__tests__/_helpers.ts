@@ -7,7 +7,8 @@ import type {
   SvgEditorInternal,
 } from "../src/core/editor";
 import type { SvgDocument } from "../src/core/document";
-import type { Rect } from "../src/types";
+import type { GeometryProvider } from "../src/core/geometry";
+import type { NodeId, Rect } from "../src/types";
 
 /**
  * Test-only factory that returns the wide `SvgEditorInternal` type so
@@ -45,4 +46,69 @@ export function first_rect(
     }
   }
   throw new Error("no <rect> in document");
+}
+
+/**
+ * Install a headless `GeometryProvider` that derives bbox from the doc's own
+ * attrs — covers `<rect>` / `<image>` / `<use>` / `<circle>` / `<ellipse>`.
+ * Required by any command that needs world bounds (`resize_to`, `resize_by`,
+ * `rotate`, `align`). Returns `null` for other tags (e.g. `<g>`).
+ */
+export function install_geometry(
+  editor: ReturnType<typeof createSvgEditor>
+): void {
+  const internal = editor as SvgEditorInternal;
+  const doc = editor.document;
+  const num = (id: NodeId, name: string, fallback = 0): number => {
+    const raw = doc.get_attr(id, name);
+    if (raw == null) return fallback;
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const driver: GeometryProvider = {
+    bounds_of(id: NodeId): Rect | null {
+      const tag = doc.tag_of(id);
+      switch (tag) {
+        case "rect":
+        case "image":
+        case "use":
+          return {
+            x: num(id, "x"),
+            y: num(id, "y"),
+            width: num(id, "width"),
+            height: num(id, "height"),
+          };
+        case "circle": {
+          const cx = num(id, "cx");
+          const cy = num(id, "cy");
+          const r = num(id, "r");
+          return { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r };
+        }
+        case "ellipse": {
+          const cx = num(id, "cx");
+          const cy = num(id, "cy");
+          const rx = num(id, "rx");
+          const ry = num(id, "ry");
+          return { x: cx - rx, y: cy - ry, width: 2 * rx, height: 2 * ry };
+        }
+        default:
+          return null;
+      }
+    },
+    bounds_of_many(ids) {
+      const out = new Map<NodeId, Rect>();
+      for (const id of ids) {
+        const r = this.bounds_of(id);
+        if (r) out.set(id, r);
+      }
+      return out;
+    },
+    nodes_in_rect() {
+      return [];
+    },
+    node_at_point() {
+      return null;
+    },
+  };
+  internal._internal.set_geometry(driver);
 }
