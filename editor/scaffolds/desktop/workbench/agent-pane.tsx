@@ -43,7 +43,10 @@ import {
   sessions as bridgeSessions,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import { welcome_handoff } from "@/lib/desktop/welcome-handoff";
+import {
+  welcome_handoff,
+  type WelcomeHandoff,
+} from "@/lib/desktop/welcome-handoff";
 import {
   desktopAgentTransport,
   isSessionBusy,
@@ -136,12 +139,15 @@ function AgentPaneContent({
 }: AgentPaneContentProps) {
   // Prompt handed off from the welcome composer. Peeked once (cached in a
   // ref so it stays stable after we clear it) to decide a fresh-session
-  // start; consumed + sent in the auto-send effect below.
-  const handoffRef = useRef<string | null | undefined>(undefined);
+  // start; consumed + sent in the auto-send effect below. Carries the
+  // composer's model pick so the first turn runs on it (see the model
+  // state seed below).
+  const handoffRef = useRef<WelcomeHandoff | null | undefined>(undefined);
   if (handoffRef.current === undefined) {
     handoffRef.current = welcome_handoff.peek(workspace.id);
   }
-  const handoffPrompt = handoffRef.current;
+  const handoff = handoffRef.current;
+  const handoffPrompt = handoff?.prompt ?? null;
 
   // Composer catalog: `@` file references + `/` skill commands.
   const catalog = useWorkspaceComposerCatalog(workspace.id);
@@ -268,11 +274,13 @@ function AgentPaneContent({
     setMessages(chatSession.initial_messages);
   }, [chatSession.initial_messages, setMessages]);
 
-  // Flat model selection (ignores tiers). Seeds from the active
-  // session's stored model and rides each send as `body.modelId`.
+  // Flat model selection (ignores tiers). Seeds from the welcome
+  // composer's pick on a handed-off fresh session, otherwise from the
+  // active session's stored model, and rides each send as `body.modelId`.
   const { model_id: modelId, setModelId } = useModelPickerState({
     current_id: chatSession.current_id,
     sessions: chatSession.sessions,
+    initial: handoff?.model_id,
   });
 
   // The active session row carries the rolled-up cost the context meter

@@ -67,20 +67,27 @@ export function DesktopModelPicker({
 
 /**
  * Model selection state for a chat panel. Defaults to
- * {@link DEFAULT_MODEL_ID} and re-seeds from a session's stored model
- * whenever the active session id changes — so opening a past chat shows
- * the model it ran with, while a background session-list refresh never
- * clobbers a pick the user just made (the seed fires once per id, not
- * per `sessions` change).
+ * {@link DEFAULT_MODEL_ID} (or `initial`, when a caller seeds one — e.g.
+ * the welcome handoff carrying the home composer's pick) and re-seeds
+ * from a session's stored model whenever the active session id changes —
+ * so opening a past chat shows the model it ran with, while a background
+ * session-list refresh never clobbers a pick the user just made (the seed
+ * fires once per id, not per `sessions` change).
  */
 export function useModelPickerState({
   current_id: currentId,
   sessions,
+  initial,
 }: {
   current_id: string | null;
   sessions: ChatSessionRow[];
+  /** Initial selection, applied only on first mount. Falls back to
+   * {@link DEFAULT_MODEL_ID} when absent or not a known catalog id. */
+  initial?: string;
 }): { model_id: string; setModelId: (id: string) => void } {
-  const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
+  const [modelId, setModelId] = useState<string>(
+    isCatalogId(initial) ? initial : DEFAULT_MODEL_ID
+  );
   // The session id we last seeded from. Re-seed only when the active id
   // changes — `undefined` means "never seeded" so the first run fires.
   const seededFor = useRef<string | null | undefined>(undefined);

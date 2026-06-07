@@ -53,6 +53,10 @@ import {
   TITLEBAR_NO_DRAG_STYLE,
 } from "@/scaffolds/desktop/chrome/title-bar";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
+import {
+  DesktopModelPicker,
+  useModelPickerState,
+} from "@/scaffolds/desktop/shared/model-picker";
 import { useWorkspaceComposerCatalog } from "@/scaffolds/desktop/shared/use-workspace-composer-catalog";
 import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 
@@ -106,6 +110,15 @@ export default function DesktopWelcomePage() {
   // empty id and yields an empty catalog.
   const catalog = useWorkspaceComposerCatalog(selectedId ?? "");
 
+  // Model selection for the composer. No sessions here (the welcome page
+  // never loads a chat), so this just holds the user's pick at the
+  // default; it rides the handoff so the workspace chat's first turn runs
+  // on the chosen model rather than the fallback tier.
+  const { model_id: modelId, setModelId } = useModelPickerState({
+    current_id: null,
+    sessions: [],
+  });
+
   const onOpen = useCallback(async () => {
     const bridge = getDesktopBridge();
     if (!bridge) {
@@ -148,11 +161,12 @@ export default function DesktopWelcomePage() {
       const t = text.trim();
       if (!t || !selectedId) return;
       // Stash for the workspace chat to pick up + auto-send as a fresh
-      // session, then become the workspace window.
-      welcome_handoff.set(selectedId, t);
+      // session, then become the workspace window. The model rides along
+      // so the picker's choice survives the navigation.
+      welcome_handoff.set(selectedId, { prompt: t, model_id: modelId });
       router.push(`/desktop/workspace?id=${encodeURIComponent(selectedId)}`);
     },
-    [selectedId, router]
+    [selectedId, modelId, router]
   );
 
   const selected = workspaces.find((w) => w.id === selectedId) ?? null;
@@ -252,6 +266,12 @@ export default function DesktopWelcomePage() {
                 selected
                   ? `Ask Grida to design something in ${selected.name}…`
                   : "Open a folder to start designing…"
+              }
+              toolbar={
+                <DesktopModelPicker
+                  value={modelId}
+                  onValueChange={setModelId}
+                />
               }
             />
           </div>
