@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { getKeyboardOS } from "@grida/keybinding";
 import { createSvgEditor } from "../src/index";
-import { createSvgEditorWithInternals } from "./_helpers";
+import { createSvgEditorWithInternals, install_geometry } from "./_helpers";
 
 // "Mod" is Meta on Mac, Ctrl elsewhere — match the keymap's platform
 // resolution so these tests pass under both local macOS and Linux CI.
@@ -53,6 +53,17 @@ function findByElementId(
   const found = [...editor.tree().nodes.values()].find((n) => n.name === id);
   if (!found) throw new Error(`no node with element id "${id}"`);
   return found.id;
+}
+
+/** Read a numeric geometry attr (defaulting to 0) — shared by the
+ *  transform.nudge and nudge-resize keymap suites. */
+function rectAttr(
+  editor: ReturnType<typeof createSvgEditor>,
+  id: string,
+  name: "x" | "y" | "width" | "height"
+): number {
+  const v = editor.document.get_attr(id, name);
+  return v === null ? 0 : parseFloat(v);
 }
 
 describe("default keymap — hierarchy.enter / hierarchy.exit", () => {
@@ -104,15 +115,6 @@ describe("default keymap — hierarchy.enter / hierarchy.exit", () => {
 });
 
 describe("default keymap — transform.nudge (arrows / shift+arrows)", () => {
-  function rectAttr(
-    editor: ReturnType<typeof createSvgEditor>,
-    id: string,
-    name: "x" | "y"
-  ): number {
-    const v = editor.document.get_attr(id, name);
-    return v === null ? 0 : parseFloat(v);
-  }
-
   it("ArrowRight nudges +1 in x", () => {
     const editor = createSvgEditorWithInternals({ svg: NESTED });
     const a = findByElementId(editor, "a");
@@ -287,5 +289,83 @@ describe("default keymap — claim vs consume (preventDefault contract)", () => 
     // KeyY without modifier — no binding exists.
     const e = mkEvent({ code: "KeyY" });
     expect(editor.keymap.claims(e)).toBe(false);
+  });
+});
+
+describe("default keymap — nudge-resize (Ctrl+Alt+Arrow)", () => {
+  // rect "a" in NESTED: x=10 y=20 width=30 height=40.
+  it("Ctrl+Alt+ArrowRight grows width and consumes it (resize, not move — x unchanged)", () => {
+    const editor = createSvgEditorWithInternals({ svg: NESTED });
+    install_geometry(editor);
+    const a = findByElementId(editor, "a");
+    editor.commands.select(a);
+    const x0 = rectAttr(editor, a, "x");
+    const w0 = rectAttr(editor, a, "width");
+    expect(
+      editor.keymap.dispatch(
+        mkEvent({ code: "ArrowRight", ctrlKey: true, altKey: true })
+      )
+    ).toBe(true);
+    // resize_to is factor-based → sub-epsilon float drift on non-integer
+    // factors (30 * 31/30 ≈ 31). toBeCloseTo, not toBe.
+    expect(rectAttr(editor, a, "width")).toBeCloseTo(w0 + 1, 6);
+    expect(rectAttr(editor, a, "x")).toBe(x0); // NOT moved — this is resize, not nudge
+  });
+
+  it("Ctrl+Alt+ArrowDown grows height", () => {
+    const editor = createSvgEditorWithInternals({ svg: NESTED });
+    install_geometry(editor);
+    const a = findByElementId(editor, "a");
+    editor.commands.select(a);
+    const h0 = rectAttr(editor, a, "height");
+    expect(
+      editor.keymap.dispatch(
+        mkEvent({ code: "ArrowDown", ctrlKey: true, altKey: true })
+      )
+    ).toBe(true);
+    expect(rectAttr(editor, a, "height")).toBeCloseTo(h0 + 1, 6);
+  });
+
+  it("Ctrl+Alt+Shift+ArrowRight grows width by 10", () => {
+    const editor = createSvgEditorWithInternals({ svg: NESTED });
+    install_geometry(editor);
+    const a = findByElementId(editor, "a");
+    editor.commands.select(a);
+    const w0 = rectAttr(editor, a, "width");
+    expect(
+      editor.keymap.dispatch(
+        mkEvent({
+          code: "ArrowRight",
+          ctrlKey: true,
+          altKey: true,
+          shiftKey: true,
+        })
+      )
+    ).toBe(true);
+    expect(rectAttr(editor, a, "width")).toBeCloseTo(w0 + 10, 6);
+  });
+
+  it("Alt+ArrowRight still moves (x+1, width unchanged) — measurement-HUD nudge preserved", () => {
+    const editor = createSvgEditorWithInternals({ svg: NESTED });
+    install_geometry(editor);
+    const a = findByElementId(editor, "a");
+    editor.commands.select(a);
+    const x0 = rectAttr(editor, a, "x");
+    const w0 = rectAttr(editor, a, "width");
+    expect(
+      editor.keymap.dispatch(mkEvent({ code: "ArrowRight", altKey: true }))
+    ).toBe(true);
+    expect(rectAttr(editor, a, "x")).toBe(x0 + 1); // moved
+    expect(rectAttr(editor, a, "width")).toBe(w0); // not resized
+  });
+
+  it("Ctrl+Alt+Arrow returns false with empty selection", () => {
+    const editor = createSvgEditorWithInternals({ svg: NESTED });
+    install_geometry(editor);
+    expect(
+      editor.keymap.dispatch(
+        mkEvent({ code: "ArrowRight", ctrlKey: true, altKey: true })
+      )
+    ).toBe(false);
   });
 });

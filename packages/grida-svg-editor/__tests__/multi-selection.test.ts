@@ -6,74 +6,10 @@
 import { describe, expect, it } from "vitest";
 import cmath from "@grida/cmath";
 import { createSvgEditor } from "../src/index";
-import type { SvgEditorInternal } from "../src/core/editor";
 import { SvgDocument } from "../src/core/document";
-import type { GeometryProvider } from "../src/core/geometry";
 import type { NodeId, Rect } from "../src/types";
 import { resize_pipeline, type ResizePlan } from "../src/core/resize-pipeline";
-
-// ─── Geometry stub ──────────────────────────────────────────────────────────
-//
-// `commands.resize_to` requires a surface-attached geometry provider.
-// For headless tests we install one that derives bbox from the doc's
-// own attrs — covers <rect>, <circle>, <ellipse> for the cases below.
-
-function install_geometry(editor: ReturnType<typeof createSvgEditor>): void {
-  const internal = editor as SvgEditorInternal;
-  const doc = editor.document;
-  const num = (id: NodeId, name: string, fallback = 0): number => {
-    const raw = doc.get_attr(id, name);
-    if (raw == null) return fallback;
-    const n = parseFloat(raw);
-    return Number.isFinite(n) ? n : fallback;
-  };
-  const driver: GeometryProvider = {
-    bounds_of(id: NodeId): Rect | null {
-      const tag = doc.tag_of(id);
-      switch (tag) {
-        case "rect":
-        case "image":
-        case "use":
-          return {
-            x: num(id, "x"),
-            y: num(id, "y"),
-            width: num(id, "width"),
-            height: num(id, "height"),
-          };
-        case "circle": {
-          const cx = num(id, "cx");
-          const cy = num(id, "cy");
-          const r = num(id, "r");
-          return { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r };
-        }
-        case "ellipse": {
-          const cx = num(id, "cx");
-          const cy = num(id, "cy");
-          const rx = num(id, "rx");
-          const ry = num(id, "ry");
-          return { x: cx - rx, y: cy - ry, width: 2 * rx, height: 2 * ry };
-        }
-        default:
-          return null;
-      }
-    },
-    bounds_of_many(ids) {
-      const out = new Map<NodeId, Rect>();
-      for (const id of ids) {
-        const r = this.bounds_of(id);
-        if (r) out.set(id, r);
-      }
-      return out;
-    },
-    nodes_in_rect() {
-      return [];
-    },
-    node_at_point() {
-      return null;
-    },
-  };
-  internal._internal.set_geometry(driver);
-}
+import { first_rect, install_geometry } from "./_helpers";
 
 // ─── Phase A: SelectionGroup builder (parity sanity) ─────────────────────────
 //
@@ -420,6 +356,272 @@ describe("commands.resize_to — multi member", () => {
     expect(editor.document.get_attr(b, "x")).toBe("70");
     expect(editor.document.get_attr(b, "y")).toBe("60");
     expect(editor.document.get_attr(b, "width")).toBe("10");
+  });
+});
+
+// ─── commands.resize_to — transform-safety gate (is_resizable_node) ──────────
+//
+// resize_to scales LOCAL attrs around a WORLD-space origin, which is only
+// correct when world ≡ local. A member with a non-trivial transform (rotate
+// without explicit pivot, matrix, scale, skew) must be skipped — gating on the
+// tag-only `is_resizable` used to let such members through and mis-resize them.
+// The gate is now `is_resizable_node`, matching the HUD resize path.
+
+describe("commands.resize_to — transform-safety gate", () => {
+  it("skips a member with an unsafe transform (rotate without explicit pivot) and resizes the rest", () => {
+    const editor = createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect x="0" y="0" width="10" height="10"/><rect x="20" y="0" width="10" height="10" transform="rotate(30)"/></svg>`,
+    });
+    install_geometry(editor);
+    const [plain, rotated] = editor.document
+      .all_elements()
+      .filter((id) => editor.document.tag_of(id) === "rect");
+    editor.commands.select([plain, rotated]);
+    // Only `plain` is a member → union = (0,0,10,10). Target doubles width.
+    const ok = editor.commands.resize_to({ x: 0, y: 0, width: 20, height: 10 });
+    expect(ok).toBe(true);
+    // plain resized:
+    expect(editor.document.get_attr(plain, "width")).toBe("20");
+    // rotated untouched (skipped):
+    expect(editor.document.get_attr(rotated, "x")).toBe("20");
+    expect(editor.document.get_attr(rotated, "width")).toBe("10");
+    expect(editor.document.get_attr(rotated, "transform")).toBe("rotate(30)");
+  });
+
+  it("is a no-op (false) when the only member has an unsafe transform", () => {
+    const editor = createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect x="0" y="0" width="10" height="10" transform="rotate(30)"/></svg>`,
+    });
+    install_geometry(editor);
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    const ok = editor.commands.resize_to({
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    });
+    expect(ok).toBe(false);
+    expect(editor.document.get_attr(r, "width")).toBe("10");
+    expect(editor.document.get_attr(r, "transform")).toBe("rotate(30)");
+  });
+
+  it("still resizes a member with a leading translate", () => {
+    const editor = createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect x="0" y="0" width="10" height="10" transform="translate(5 5)"/></svg>`,
+    });
+    install_geometry(editor);
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    const ok = editor.commands.resize_to({ x: 0, y: 0, width: 20, height: 10 });
+    expect(ok).toBe(true);
+    expect(editor.document.get_attr(r, "width")).toBe("20");
+    // leading translate preserved (apply_resize never touches transform):
+    expect(editor.document.get_attr(r, "transform")).toBe("translate(5 5)");
+  });
+});
+
+// ─── commands.resize_by — keyboard nudge-resize core verb ────────────────────
+//
+// Grows/shrinks the selection's union bbox by a {dw, dh} delta, NW corner
+// fixed. Sugar over resize_to with an ALL-OR-NOTHING is_resizable_node gate
+// (matches the HUD: a mixed/unsafe selection is refused, not partially
+// resized — the distinction from resize_to's per-member skip).
+
+describe("commands.resize_by", () => {
+  const mkRect = () =>
+    createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect x="10" y="10" width="50" height="20"/></svg>`,
+    });
+
+  it("grows width with the NW corner fixed (+dw)", () => {
+    const editor = mkRect();
+    install_geometry(editor);
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    expect(editor.commands.resize_by({ dw: 30, dh: 0 })).toBe(true);
+    expect(editor.document.get_attr(r, "x")).toBe("10");
+    expect(editor.document.get_attr(r, "y")).toBe("10");
+    expect(editor.document.get_attr(r, "width")).toBe("80");
+    expect(editor.document.get_attr(r, "height")).toBe("20");
+  });
+
+  it("shrinks width with the NW corner fixed (-dw)", () => {
+    const editor = mkRect();
+    install_geometry(editor);
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    expect(editor.commands.resize_by({ dw: -20, dh: 0 })).toBe(true);
+    expect(editor.document.get_attr(r, "x")).toBe("10");
+    expect(editor.document.get_attr(r, "width")).toBe("30");
+  });
+
+  it("grows height with the NW corner fixed (+dh)", () => {
+    const editor = mkRect();
+    install_geometry(editor);
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    expect(editor.commands.resize_by({ dw: 0, dh: 10 })).toBe(true);
+    expect(editor.document.get_attr(r, "y")).toBe("10");
+    expect(editor.document.get_attr(r, "height")).toBe("30");
+    expect(editor.document.get_attr(r, "width")).toBe("50");
+  });
+
+  it("shrinks height with the NW corner fixed (-dh)", () => {
+    const editor = mkRect();
+    install_geometry(editor);
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    expect(editor.commands.resize_by({ dw: 0, dh: -5 })).toBe(true);
+    expect(editor.document.get_attr(r, "height")).toBe("15");
+  });
+
+  it("grows each member in place (multi) — members do not move relative to one another", () => {
+    const editor = createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect x="0" y="0" width="10" height="10"/><rect x="20" y="0" width="10" height="10"/></svg>`,
+    });
+    install_geometry(editor);
+    const [a, b] = editor.document
+      .all_elements()
+      .filter((id) => editor.document.tag_of(id) === "rect");
+    editor.commands.select([a, b]);
+    // PER-ELEMENT: each rect grows by +30 around its OWN NW. Neither member is
+    // translated — b keeps its x=20 (contrast: resize_to would push it to 40).
+    expect(editor.commands.resize_by({ dw: 30, dh: 0 })).toBe(true);
+    expect(editor.document.get_attr(a, "x")).toBe("0");
+    expect(editor.document.get_attr(a, "width")).toBe("40");
+    expect(editor.document.get_attr(b, "x")).toBe("20"); // NOT translated
+    expect(editor.document.get_attr(b, "width")).toBe("40");
+  });
+
+  it("refuses the whole gesture (false, no mutation) when selection includes a <g>", () => {
+    const editor = createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect x="0" y="0" width="10" height="10"/><g><rect x="50" y="50" width="10" height="10"/></g></svg>`,
+    });
+    install_geometry(editor);
+    const r = editor.document
+      .all_elements()
+      .find((id) => editor.document.tag_of(id) === "rect")!;
+    const g = editor.document
+      .all_elements()
+      .find((id) => editor.document.tag_of(id) === "g")!;
+    editor.commands.select([r, g]);
+    expect(editor.commands.resize_by({ dw: 30, dh: 0 })).toBe(false);
+    // resizable member is NOT partially resized — all-or-nothing.
+    expect(editor.document.get_attr(r, "width")).toBe("10");
+  });
+
+  it("refuses the whole gesture when a member has an unsafe transform (all-or-nothing, unlike resize_to)", () => {
+    const editor = createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect x="0" y="0" width="10" height="10"/><rect x="20" y="0" width="10" height="10" transform="rotate(30)"/></svg>`,
+    });
+    install_geometry(editor);
+    const [plain, rotated] = editor.document
+      .all_elements()
+      .filter((id) => editor.document.tag_of(id) === "rect");
+    editor.commands.select([plain, rotated]);
+    expect(editor.commands.resize_by({ dw: 30, dh: 0 })).toBe(false);
+    expect(editor.document.get_attr(plain, "width")).toBe("10");
+    expect(editor.document.get_attr(rotated, "width")).toBe("10");
+  });
+
+  it("is a no-op (false) when no geometry provider is attached (headless)", () => {
+    const editor = mkRect();
+    // Do NOT install geometry.
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    expect(editor.commands.resize_by({ dw: 30, dh: 0 })).toBe(false);
+    expect(editor.document.get_attr(r, "width")).toBe("50");
+  });
+
+  it("shrinking past zero stays non-negative (floors at the resize minimum)", () => {
+    const editor = mkRect();
+    install_geometry(editor);
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    // resize_by clamps the target width to 0; the per-tag resize handler then
+    // floors the written width at its 0.001 minimum so the shape never
+    // collapses or flips negative. The contract is "never negative / NaN".
+    expect(editor.commands.resize_by({ dw: -1000, dh: 0 })).toBe(true);
+    const w = parseFloat(editor.document.get_attr(r, "width")!);
+    expect(Number.isFinite(w)).toBe(true);
+    expect(w).toBeGreaterThanOrEqual(0);
+    expect(w).toBeLessThan(1);
+  });
+
+  it("is a no-op (false, no history step) on a geometrically identity gesture", () => {
+    const editor = createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect x="0" y="0" width="10" height="0"/></svg>`,
+    });
+    install_geometry(editor);
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    // height is 0 → the height nudge can't scale a zero-extent axis (factor 1)
+    // and width is untouched → identity gesture → no history step pushed.
+    expect(editor.commands.resize_by({ dw: 0, dh: 5 })).toBe(false);
+    expect(editor.state.can_undo).toBe(false);
+  });
+
+  it("pushes one undo step", () => {
+    const editor = mkRect();
+    install_geometry(editor);
+    const r = first_rect(editor);
+    editor.commands.select(r);
+    editor.commands.resize_by({ dw: 30, dh: 0 });
+    expect(editor.document.get_attr(r, "width")).toBe("80");
+    expect(editor.state.can_undo).toBe(true);
+    editor.commands.undo();
+    expect(editor.document.get_attr(r, "width")).toBe("50");
+    expect(editor.document.get_attr(r, "x")).toBe("10");
+  });
+});
+
+// ─── resize semantics — GROUP (resize_to) vs PER-ELEMENT (resize_by) ─────────
+//
+// The two verbs share one path (collect_resize_members + commit_resize) but
+// parameterize it to OPPOSITE multi-member semantics. These two tests pin the
+// divergence on identical input so the contract is explicit:
+//
+//   fixture: two 10×10 rects, a@(0,0) and b@(20,0); union = (0,0,30,10).
+//   widen so the union/each grows +30 in width.
+//
+//   • resize_to (group / HUD handle-drag): scale the whole selection around the
+//     union NW → the off-origin member b TRANSLATES (x 20 → 40) and scales.
+//   • resize_by (per-element / keyboard nudge): grow each member around its OWN
+//     NW → b stays at x=20, just grows. Nobody moves relative to anyone.
+
+describe("resize semantics — group (resize_to) vs per-element (resize_by)", () => {
+  const TWO_RECTS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect x="0" y="0" width="10" height="10"/><rect x="20" y="0" width="10" height="10"/></svg>`;
+  const select_two = (editor: ReturnType<typeof createSvgEditor>) => {
+    install_geometry(editor);
+    const [a, b] = editor.document
+      .all_elements()
+      .filter((id) => editor.document.tag_of(id) === "rect");
+    editor.commands.select([a, b]);
+    return { a, b };
+  };
+
+  it("resize_to (GROUP) scales the union — the off-origin member translates", () => {
+    const editor = createSvgEditor({ svg: TWO_RECTS });
+    const { a, b } = select_two(editor);
+    // union (0,0,30,10) → target (0,0,60,10): sx=2 around union NW (0,0).
+    expect(
+      editor.commands.resize_to({ x: 0, y: 0, width: 60, height: 10 })
+    ).toBe(true);
+    expect(editor.document.get_attr(a, "x")).toBe("0");
+    expect(editor.document.get_attr(a, "width")).toBe("20");
+    expect(editor.document.get_attr(b, "x")).toBe("40"); // TRANSLATED (20 → 40)
+    expect(editor.document.get_attr(b, "width")).toBe("20");
+  });
+
+  it("resize_by (PER-ELEMENT) grows each member in place — nobody translates", () => {
+    const editor = createSvgEditor({ svg: TWO_RECTS });
+    const { a, b } = select_two(editor);
+    expect(editor.commands.resize_by({ dw: 30, dh: 0 })).toBe(true);
+    expect(editor.document.get_attr(a, "x")).toBe("0");
+    expect(editor.document.get_attr(a, "width")).toBe("40");
+    expect(editor.document.get_attr(b, "x")).toBe("20"); // NOT translated
+    expect(editor.document.get_attr(b, "width")).toBe("40");
   });
 });
 
