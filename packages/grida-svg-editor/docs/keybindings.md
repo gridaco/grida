@@ -75,15 +75,15 @@ source of truth for what svg-editor ships out of the box.
 
 ## Transformation
 
-| Action                    | macOS            | Windows/Linux    | Status | Command                      | Notes                                                                       |
-| ------------------------- | ---------------- | ---------------- | ------ | ---------------------------- | --------------------------------------------------------------------------- |
-| Nudge                     | `Arrow Keys`     | `Arrow Keys`     | [x]    | `transform.nudge`            | 1 doc-unit per press; `args: { dx, dy }`                                    |
-| Nudge (large)             | `⇧ + Arrow Keys` | `⇧ + Arrow Keys` | [x]    | `transform.nudge`            | 10 doc-units per press                                                      |
-| Nudge resize (right/up/…) | `Ctrl + ⌥ + …`   | `Ctrl + Alt + …` | [x]    | `selection.nudge_resize`     | NW-fixed; ±1 / ±10 with Shift; refused on non-resizable/transformed members |
-| Move to front             | `]`              | `]`              | [x]    | `reorder` (`bring_to_front`) | shipped                                                                     |
-| Move to back              | `[`              | `[`              | [x]    | `reorder` (`send_to_back`)   | shipped                                                                     |
-| Move forward              | `⌘ + ]`          | `Ctrl + ]`       | [x]    | `reorder` (`bring_forward`)  | shipped                                                                     |
-| Move backward             | `⌘ + [`          | `Ctrl + [`       | [x]    | `reorder` (`send_backward`)  | shipped                                                                     |
+| Action                    | macOS            | Windows/Linux    | Status | Command                      | Notes                                                                                                  |
+| ------------------------- | ---------------- | ---------------- | ------ | ---------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Nudge                     | `Arrow Keys`     | `Arrow Keys`     | [x]    | `transform.nudge`            | 1 doc-unit per press; `args: { dx, dy }`                                                               |
+| Nudge (large)             | `⇧ + Arrow Keys` | `⇧ + Arrow Keys` | [x]    | `transform.nudge`            | 10 doc-units per press                                                                                 |
+| Nudge resize (right/up/…) | `⌃ + ⌥ + …`      | `Ctrl + Alt + …` | [x]    | `selection.nudge_resize`     | per-element, each around its own NW; ±1 / ±10 with Shift; refused on non-resizable/transformed members |
+| Move to front             | `]`              | `]`              | [x]    | `reorder` (`bring_to_front`) | shipped                                                                                                |
+| Move to back              | `[`              | `[`              | [x]    | `reorder` (`send_to_back`)   | shipped                                                                                                |
+| Move forward              | `⌘ + ]`          | `Ctrl + ]`       | [x]    | `reorder` (`bring_forward`)  | shipped                                                                                                |
+| Move backward             | `⌘ + [`          | `Ctrl + [`       | [x]    | `reorder` (`send_backward`)  | shipped                                                                                                |
 
 ## Alignment & Distribution
 

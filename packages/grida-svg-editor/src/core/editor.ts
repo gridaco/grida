@@ -209,9 +209,13 @@ export type Commands = {
     opts?: { ids?: ReadonlyArray<NodeId>; label?: string }
   ): boolean;
   /**
-   * Resize the selection's union bbox by a delta, keeping the union NW
-   * corner fixed. `delta.dw` / `delta.dh` add to the union width / height
-   * (each clamped to >= 0). Sugar over {@link resize_to}.
+   * Resize the selection by a delta — PER-ELEMENT: each selected member
+   * grows/shrinks around its OWN NW corner, so members keep their positions
+   * relative to one another (NOT a union/group resize — contrast
+   * {@link resize_to}, which scales the whole selection around the shared
+   * union origin and so translates off-origin members). `delta.dw` /
+   * `delta.dh` are applied additively to each member (clamped to >= 0). The
+   * core verb behind keyboard nudge-resize.
    *
    * ALL-OR-NOTHING gate: refuses (returns `false`, no history step) unless
    * EVERY member passes `is_resizable_node` — the same tag + transform-class
@@ -220,9 +224,8 @@ export type Commands = {
    * rejected when any member is unsafe). Also refuses on empty selection or
    * when no geometry provider (DOM surface) is attached.
    *
-   * Per-tag constraints (circle uniform, text edge no-op) run inside
-   * `resize_to`. The default selection is `state.selection`; pass `opts.ids`
-   * to override.
+   * Per-tag constraints (circle uniform, text edge no-op) apply per member.
+   * The default selection is `state.selection`; pass `opts.ids` to override.
    */
   resize_by(
     delta: { dw: number; dh: number },
@@ -887,7 +890,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       // tag-only `is_resizable`: scaling local attrs around a world-space
       // origin is only correct when world ≡ local; a non-trivial transform
       // (rotate-without-pivot, matrix, scale, skew) breaks that and would
-      // mis-resize / violate P1. Mirrors the HUD resize gate. Admitted:
+      // resize it incorrectly / violate P1. Mirrors the HUD resize gate. Admitted:
       // identity, leading-translate, `rotate(θ cx cy)` with explicit pivot.
       if (!resize_pipeline.intent.is_resizable_node(doc, id)) {
         if (mode === "all_or_nothing") return null;

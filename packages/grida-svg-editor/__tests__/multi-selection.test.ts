@@ -364,7 +364,7 @@ describe("commands.resize_to — multi member", () => {
 // resize_to scales LOCAL attrs around a WORLD-space origin, which is only
 // correct when world ≡ local. A member with a non-trivial transform (rotate
 // without explicit pivot, matrix, scale, skew) must be skipped — gating on the
-// tag-only `is_resizable` used to let such members through and mis-resize them.
+// tag-only `is_resizable` used to let such members through and resize them incorrectly.
 // The gate is now `is_resizable_node`, matching the HUD resize path.
 
 describe("commands.resize_to — transform-safety gate", () => {
