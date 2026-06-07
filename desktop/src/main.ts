@@ -1,7 +1,6 @@
 import { app, shell, BrowserWindow, Menu, dialog } from "electron";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
-import path from "node:path";
 import create_menu from "./menu";
 import { open_welcome_window, open_document_window } from "./window";
 import { EDITOR_BASE_URL } from "./env";
@@ -20,17 +19,20 @@ import { registerIpcHandlers } from "./main/ipc-handlers";
 import { agentSidecarClient } from "./main/agent-sidecar-client";
 import { routeDeepLink } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
+import { open_handoff } from "./main/open-handoff";
 
-// GRIDA-SEC-004 — single-instance lock is the FIRST statement.
-// If another instance already holds it, this process exits immediately
-// so the running instance can pick up any deep links or file-open
-// arguments (`open-file` on macOS, argv on Win/Linux) through its
-// `second-instance` handler.
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  app.quit();
-  process.exit(0);
-}
+// GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
+// handler, NOT here at module top. It must run AFTER `open-file` has fired:
+// when we are not the *default* handler for an opened type (`.svg` is
+// `LSHandlerRank: Alternate` in Info.plist; `.grida` is `Owner`), macOS
+// launches a SECOND instance for the file and delivers `open-file` there —
+// the running instance never sees it (electron/electron#14029). That
+// secondary must forward the captured path to the primary via
+// `requestSingleInstanceLock(additionalData)`, which is only possible once
+// the path is known. `open-file` is delivered before `ready` for a
+// launch-triggered open, so `ready` is the earliest point we can both decide
+// primaryhood AND carry the forward. See `open-handoff.ts` + the lock call
+// in the `ready` handler below.
 
 // Squirrel-startup is a no-op on macOS/Linux; on Windows it exits the
 // process during the install/uninstall handshake.
@@ -60,8 +62,6 @@ app.commandLine.appendSwitch("disable-async-dns");
 app.commandLine.appendSwitch("js-flags", "--expose-gc");
 // #endregion chrome flags
 
-updateElectronApp({ notifyUser: true });
-
 app.setName(RUNTIME_APP_NAME);
 app.setAsDefaultProtocolClient("grida");
 
@@ -88,11 +88,6 @@ let deepLinkDrainTimer: NodeJS.Timeout | null = null;
 // of spawning a duplicate. (The agent server returns the same docId for the
 // same normalized path; see `@grida/agent`'s file registry.)
 const documentWindows = new Map<string, BrowserWindow>();
-
-function isSupportedFile(filePath: string): boolean {
-  const ext = path.extname(filePath).toLowerCase();
-  return ext === ".svg" || ext === ".grida";
-}
 
 /**
  * Attaches the dirty-close prompt to a document window.
@@ -142,7 +137,15 @@ async function openDocumentWindowForPath(filePath: string) {
   try {
     docId = await agentSidecarClient.registerPath(filePath);
   } catch (err) {
+    // Surface, don't silently drop — a dropped open with no feedback is
+    // exactly what made the "open while running" bug hard to diagnose.
     console.error("[grida] /files/register failed:", err);
+    dialog.showErrorBox(
+      "Couldn't open file",
+      `Grida couldn't open this file.\n\n${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
     return;
   }
 
@@ -178,7 +181,7 @@ async function openDocumentWindowForPath(filePath: string) {
 }
 
 function handleFilePath(filePath: string) {
-  if (!isSupportedFile(filePath)) {
+  if (!open_handoff.isSupportedFile(filePath)) {
     console.warn("[grida] unsupported file type:", filePath);
     return;
   }
@@ -231,27 +234,29 @@ app.on("open-file", (event, filePath) => {
 });
 
 // Also pick up file args from the first-instance command line (Win/Linux).
-for (const arg of process.argv.slice(1)) {
-  if (arg.startsWith("grida://")) pendingDeepLinks.push(arg);
-  if (isSupportedFile(arg)) pendingFiles.push(arg);
+// macOS delivers the opened document via `open-file` (above), not argv.
+for (const open of open_handoff.fromArgv(process.argv)) {
+  if (open.kind === "url") pendingDeepLinks.push(open.url);
+  else pendingFiles.push(open.path);
 }
 
-app.on("second-instance", (_event, commandLine) => {
+app.on("second-instance", (_event, argv, _workingDirectory, additionalData) => {
   // Focus an existing window so the user knows we routed the request.
   const existing = BrowserWindow.getAllWindows()[0];
   if (existing) {
     if (existing.isMinimized()) existing.restore();
     existing.focus();
   }
-  // Last argv element is typically the deep link or file path.
-  const last = commandLine[commandLine.length - 1];
-  if (!last) return;
-  if (last.startsWith("grida://")) {
-    handleDeepLink(last);
-    return;
-  }
-  if (isSupportedFile(last)) {
-    handleFilePath(last);
+  // Prefer the forwarded `additionalData` — the secondary's captured opens.
+  // This is the ONLY reliable channel on macOS, where the opened document
+  // never appears in the second instance's argv (it arrives as an `open-file`
+  // Apple Event the secondary collects, then forwards from its `ready`).
+  // Fall back to parsing argv for the Win/Linux command-line case.
+  const forwarded = open_handoff.decode(additionalData);
+  const opens = forwarded.length > 0 ? forwarded : open_handoff.fromArgv(argv);
+  for (const open of opens) {
+    if (open.kind === "url") handleDeepLink(open.url);
+    else handleFilePath(open.path);
   }
 });
 
@@ -267,6 +272,27 @@ app.on("open-url", (event, url) => {
 let agentSidecarInfo: AgentSidecarInfo | null = null;
 
 app.on("ready", async () => {
+  // GRIDA-SEC-004 — single-instance enforcement (deferred from module top;
+  // see the comment near the imports). By `ready`, any launch-triggered
+  // `open-file`/`open-url` has populated the pending queues, so a SECONDARY
+  // instance forwards them to the primary via `additionalData` and quits here
+  // — before starting a second sidecar or opening any window. The primary's
+  // `second-instance` handler routes the forward.
+  const isPrimary = app.requestSingleInstanceLock(
+    open_handoff.encode([
+      ...pendingFiles.map((path) => ({ kind: "file", path }) as const),
+      ...pendingDeepLinks.map((url) => ({ kind: "url", url }) as const),
+    ])
+  );
+  if (!isPrimary) {
+    app.quit();
+    return;
+  }
+
+  // Primary-only: auto-update checks should never run in a secondary that is
+  // about to quit.
+  updateElectronApp({ notifyUser: true });
+
   if (USE_DEV_INSIDERS_BRANDING && process.platform === "darwin") {
     app.dock?.setIcon(create_runtime_app_icon());
   }
