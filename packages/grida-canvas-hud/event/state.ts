@@ -76,6 +76,10 @@ interface PendingPointerDown {
 interface TapCandidate {
   /** DOWN point in document-space — the point the tap resolves against. */
   anchor_doc: Vector2;
+  /** DOWN point in screen-space — used to drop the candidate when the press
+   *  drags past the threshold. This is the ONLY drag-cancel path for
+   *  secondary / middle presses, which never create a `pending`. */
+  anchor_screen: Vector2;
   /** Which button pressed. Middle never reaches here. */
   button: Exclude<PointerButton, "middle">;
   /** Topmost host pick at the down point, captured at press time. */
@@ -500,6 +504,19 @@ export class SurfaceState {
     const response = emptyResponse();
     const point_doc = screenToDoc(this.transform, sx, sy);
 
+    // A press that drags past the threshold is no longer a tap — drop the
+    // candidate regardless of button. The `pending` promotion path below
+    // resolves the primary button's gesture, but secondary / middle presses
+    // never create a `pending`, so this is the only place a right-button drag
+    // is caught. Threshold is screen-space px, matching the gesture path.
+    if (this.tap_candidate) {
+      const tdx = sx - this.tap_candidate.anchor_screen[0];
+      const tdy = sy - this.tap_candidate.anchor_screen[1];
+      if (tdx * tdx + tdy * tdy >= DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+        this.tap_candidate = null;
+      }
+    }
+
     // 1. Pending pointer-down → translate / marquee / promote-override
     //    promotion when threshold crossed
     if (this.pending && this.gesture.kind === "idle") {
@@ -510,10 +527,9 @@ export class SurfaceState {
       if (dx * dx + dy * dy >= DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
         const promote = this.pending.promote_to;
         // Cancel deferred selection — drag preserves multi-selection.
+        // (The tap candidate was already dropped by the button-agnostic
+        // drag-cancel at the top of this handler.)
         this.pending.deferred = undefined;
-        // The press became a drag — it is no longer a tap. Drop the
-        // candidate so pointer-up emits no tap.
-        this.tap_candidate = null;
         if (promote) {
           // Explicit promote (e.g. segment-strip → bend_segment or
           // translate_vector_selection per drag mode).
@@ -1169,6 +1185,7 @@ export class SurfaceState {
       tap_hit = deps.pick(point_doc);
       this.tap_candidate = {
         anchor_doc: point_doc,
+        anchor_screen: screen,
         button,
         hit: tap_hit,
         mods: { ...this.modifiers },

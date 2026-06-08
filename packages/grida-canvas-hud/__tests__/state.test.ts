@@ -609,6 +609,20 @@ describe("SurfaceState tap outcome", () => {
     expect(taps).toEqual([]);
   });
 
+  // UX spec: a SECONDARY (right-button) drag past the threshold also emits NO
+  // tap. Regression guard: a secondary press never creates a `pending`, so the
+  // primary gesture-promotion path cannot drop its tap candidate — the
+  // candidate must be dropped by the button-agnostic drag-cancel in
+  // `onPointerMove`. Without it, a right-button drag mis-fires as a context
+  // click at the down point (a tap-driven tool would treat a drag as a click).
+  it("secondary drag past threshold emits NO tap", () => {
+    down(50, 50, "secondary");
+    move(60, 60); // 14px > 3px threshold
+    move(80, 70);
+    up(80, 70, "secondary");
+    expect(taps).toEqual([]);
+  });
+
   // UX spec: a secondary click taps AND leaves selection untouched. A
   // right-click-driven tool (context action) needs the same "click landed at
   // P over N" fact, but the secondary button must never mutate selection —
