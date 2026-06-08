@@ -10,6 +10,37 @@ export type Vec2 = { x: number; y: number };
 
 export type Rect = { x: number; y: number; width: number; height: number };
 
+/**
+ * Observe-only outcome of a discrete pointer **tap** on the canvas: the user
+ * pressed and released within the drag threshold, without dragging. Delivered
+ * through {@link SvgEditor.subscribe_pick} — a transient event, never part of
+ * `EditorState` (it would be stale on the next snapshot).
+ *
+ * A pick is deliberately **separate from selection**. Selection answers "what
+ * do commands target"; a pick answers "what did the user just click, and
+ * where". A primary tap on a node both selects it and emits a pick; a tap on
+ * empty canvas emits a pick with `node_id: null` (distinguishable from "nothing
+ * is selected"); a secondary (right-button) tap emits a pick and does NOT
+ * change selection. This is what a click-driven host tool (annotation, context
+ * menu, custom selection) needs and selection alone cannot express.
+ *
+ * Observe-only: a pick reports a click that already happened. It cannot
+ * prevent or replace the editor's own selection handling.
+ *
+ * @unstable Shape is provisional until ≥2 consumers exercise it. Fields may
+ * change without a semver bump until then.
+ */
+export type PickEvent = {
+  /** Document-space point the tap resolved against (the pointer-DOWN point). */
+  point: Vec2;
+  /** Topmost node under `point`, or `null` for empty canvas / background. */
+  node_id: NodeId | null;
+  /** Which button produced the tap. `"middle"` is pan and never taps. */
+  button: "primary" | "secondary";
+  /** Modifier snapshot at press time. */
+  mods: { shift: boolean; alt: boolean; meta: boolean; ctrl: boolean };
+};
+
 export type Mode = "select" | "edit-content";
 
 // ─── Tool (orthogonal to Mode — what does pointer-down do in select mode?) ─
