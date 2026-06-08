@@ -86,4 +86,10 @@ describe("models.text.displayLabel", () => {
     expect(spec.short_label).toBeUndefined();
     expect(models.text.displayLabel(spec)).toBe(spec.label);
   });
+
+  it("drops the 'Preview' suffix for the Gemini 3.1 Pro preview", () => {
+    const spec = models.text.catalog["google/gemini-3.1-pro-preview"];
+    expect(spec.label).toBe("Gemini 3.1 Pro Preview");
+    expect(models.text.displayLabel(spec)).toBe("Gemini 3.1 Pro");
+  });
 });

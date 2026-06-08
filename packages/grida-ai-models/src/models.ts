@@ -173,6 +173,7 @@ export namespace models {
       "google/gemini-3.1-pro-preview": {
         id: "google/gemini-3.1-pro-preview",
         label: "Gemini 3.1 Pro Preview",
+        short_label: "Gemini 3.1 Pro",
         multimodal: true,
         contextWindow: 1_048_576,
         outputLimit: 65_536,
