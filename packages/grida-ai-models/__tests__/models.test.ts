@@ -73,3 +73,17 @@ describe("models.text.byTier", () => {
     }
   });
 });
+
+describe("models.text.displayLabel", () => {
+  it("returns the curated short name when present", () => {
+    const spec = models.text.catalog["anthropic/claude-opus-4.8"];
+    expect(spec.short_label).toBe("Opus 4.8");
+    expect(models.text.displayLabel(spec)).toBe("Opus 4.8");
+  });
+
+  it("falls back to the full label when short_label is unset", () => {
+    const spec = models.text.catalog["openai/gpt-5.4-nano"];
+    expect(spec.short_label).toBeUndefined();
+    expect(models.text.displayLabel(spec)).toBe(spec.label);
+  });
+});

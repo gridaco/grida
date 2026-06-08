@@ -57,7 +57,7 @@ export function DesktopModelPicker({
       <PromptInputSelectContent>
         {MODEL_OPTIONS.map((m) => (
           <PromptInputSelectItem key={m.id} value={m.id} className="text-xs">
-            {m.label}
+            {_models.text.displayLabel(m)}
           </PromptInputSelectItem>
         ))}
       </PromptInputSelectContent>
