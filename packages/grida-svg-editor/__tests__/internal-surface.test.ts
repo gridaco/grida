@@ -33,6 +33,7 @@ type Internal = {
   set_content_edit_driver: (fn: unknown) => void;
   set_surface_hover_override_driver: (fn: unknown) => void;
   push_surface_hover: (id: unknown) => void;
+  push_pick: (e: unknown) => void;
   set_computed_resolver: (fn: unknown) => void;
   set_geometry: (p: unknown) => void;
 };
@@ -52,6 +53,7 @@ describe("editor._internal contract", () => {
         "history",
         "insert_text_preview",
         "notify_translate_commit",
+        "push_pick",
         "push_surface_hover",
         "set_computed_resolver",
         "set_content_edit_driver",

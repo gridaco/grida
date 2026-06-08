@@ -20,6 +20,7 @@ import type {
   NodeId,
   Paint,
   PaintPreviewSession,
+  PickEvent,
   PreviewSession,
   Providers,
   Tool,
@@ -418,6 +419,34 @@ export function useHoverOverride(): (id: NodeId | null) => void {
       lastSetRef.current = id;
       editor.set_surface_hover_override(id);
     },
+    [editor]
+  );
+}
+
+// ─── Pick (tap) observation ────────────────────────────────────────────────
+
+/**
+ * Observe pick (tap) outcomes — a discrete click on the canvas, reporting the
+ * document-space `point`, the `node_id` under it (`null` for empty canvas),
+ * the `button`, and `mods`. The handler fires once per tap, after the editor's
+ * own selection handling. Observe-only: it cannot prevent or alter selection.
+ *
+ * This is the React edge-wire over `editor.subscribe_pick`. The handler is
+ * kept in a ref so re-subscription is never triggered by handler identity —
+ * pass an inline closure freely. Pick is editor-scoped (it survives surface
+ * detach), so this is a hook, not a `SvgEditorCanvas` prop.
+ *
+ * Typical use: a comment / annotation tool anchors a popover at `e.point` and
+ * scopes its action to `e.node_id` (or to the whole document when `null`).
+ *
+ * @unstable See {@link PickEvent}.
+ */
+export function useEditorPick(handler: (e: PickEvent) => void): void {
+  const editor = useSvgEditor();
+  const handler_ref = useRef(handler);
+  handler_ref.current = handler;
+  useEffect(
+    () => editor.subscribe_pick((e) => handler_ref.current(e)),
     [editor]
   );
 }

@@ -27,6 +27,7 @@ import {
   type PointerButton,
   type SelectionShape,
   type SelectionGroup,
+  type TapOutcome,
 } from "@grida/hud";
 import { cursors as hud_cursors } from "@grida/hud/cursors";
 import { measure, type Measurement } from "@grida/cmath/_measurement";
@@ -628,6 +629,7 @@ class DomSurface implements Surface {
       shapeOf: (id) => this.shape_of(id),
       vectorOf: (id) => this.vector_of(id),
       onIntent: (i) => this.commit_intent(i),
+      onTap: (t) => this.handle_tap(t),
       style: {
         chromeColor: editor.style.chrome_color,
         // v1 ships rotation: the chrome builder draws a rotation knob
@@ -2408,6 +2410,26 @@ class DomSurface implements Surface {
     // host owns preventDefault because only it sees the DOM event.
     if (this.editor.keymap.claims(e)) e.preventDefault();
     this.editor.keymap.dispatch(e);
+  }
+
+  // ─── Pick (tap) handler ───────────────────────────────────────────────────
+
+  /**
+   * Re-express a HUD tap as an editor {@link PickEvent} and fan it out on the
+   * editor's pick channel. The HUD already resolved everything that matters —
+   * the pointer-down point, the hit node, and click-vs-drag — so this is a
+   * pure translation (HUD `[x, y]` tuple → editor `{ x, y }` doc-space point)
+   * with NO re-hit-testing. Taking the hit from the HUD (not a fresh
+   * `node_at_point`) guarantees the pick and the selection it accompanies can
+   * never disagree. Observe-only: this mutates no editor state.
+   */
+  private handle_tap(tap: TapOutcome): void {
+    this.editor._internal.push_pick({
+      point: { x: tap.point[0], y: tap.point[1] },
+      node_id: tap.hit,
+      button: tap.button,
+      mods: tap.mods,
+    });
   }
 
   // ─── Intent handler ──────────────────────────────────────────────────────

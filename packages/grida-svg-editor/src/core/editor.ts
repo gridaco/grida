@@ -42,6 +42,7 @@ import type {
   Paint,
   PaintPreviewSession,
   PaintValue,
+  PickEvent,
   PreviewSession,
   Providers,
   ReorderDirection,
@@ -1740,6 +1741,16 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     notify_surface_hover();
   }
 
+  // Pick channel — a transient "the user tapped here, on this node" event.
+  // Like surface-hover, kept out of EditorState (a pick is an edge, not steady
+  // state) and off the `version` stream so it never triggers snapshot
+  // re-renders. The surface pushes a fully-resolved PickEvent; the editor only
+  // fans it out. Observe-only: emitting a pick never mutates editor state.
+  const pick_listeners = new Set<(e: PickEvent) => void>();
+  function notify_pick(e: PickEvent) {
+    for (const cb of pick_listeners) cb(e);
+  }
+
   function enter_content_edit(target?: NodeId): boolean {
     const id = target ?? (selection.length === 1 ? selection[0] : null);
     if (!id) return false;
@@ -1863,6 +1874,15 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   function dispose() {
     detach();
     listeners.clear();
+    // Release every transient observation-channel subscriber too. `detach()`
+    // already stops the surface from pushing to them, so they're inert by
+    // here; clearing drops any closures a disposed-but-still-referenced editor
+    // would otherwise retain. Clearing all of them (not just one) keeps the
+    // disposal contract uniform across the subscribe channels.
+    surface_hover_listeners.clear();
+    geometry_listeners.clear();
+    translate_commit_listeners.clear();
+    pick_listeners.clear();
   }
 
   function set_style(partial: Partial<EditorStyle>) {
@@ -1988,6 +2008,23 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     },
 
     /**
+     * Subscribe to pick (tap) outcomes — a discrete click on the canvas,
+     * reporting the document-space point and the node under it (`null` for
+     * empty canvas), plus the button and modifier snapshot. Fires once per
+     * tap, after the editor's own selection handling. Observe-only: a pick
+     * cannot alter selection, and the channel does NOT bump `state.version`.
+     * See {@link PickEvent}.
+     *
+     * @unstable
+     */
+    subscribe_pick(cb: (e: PickEvent) => void): Unsubscribe {
+      pick_listeners.add(cb);
+      return () => {
+        pick_listeners.delete(cb);
+      };
+    },
+
+    /**
      * Subscribe to bounds-affecting changes. Fires when any document
      * mutation advances `state.geometry_version` — drag, resize, text
      * edit, structural insert/remove. Skips presentation-only writes
@@ -2073,6 +2110,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       },
       push_surface_hover(id: NodeId | null) {
         _set_current_surface_hover(id);
+      },
+      push_pick(e: PickEvent) {
+        notify_pick(e);
       },
       set_computed_resolver(fn: DomComputedResolver | null) {
         computed_resolver = fn;

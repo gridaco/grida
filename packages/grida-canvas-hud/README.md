@@ -266,7 +266,10 @@ const surface = new Surface(canvasElement, {
   // required wiring
   pick:    (point_doc) => editor.hitTest(point_doc),      // (point) => NodeId | null
   shapeOf: (id)        => editor.shapeOf(id),             // (id)    => SelectionShape | null
-  onIntent:  (intent)    => editor.commitIntent(intent),  // surface → host
+  onIntent:  (intent)    => editor.commitIntent(intent),  // surface → host (commit)
+
+  // optional wiring
+  onTap:   (tap)         => tool.anchorAt(tap),           // surface → host (observe; see "Tap outcome")
 
   // optional config
   style: { chromeColor: "#2563eb", handleSize: 8 },
@@ -462,6 +465,62 @@ This package's implementation:
   per named scenario.
 
 Skim the spec before changing the classifier or its dispatch.
+
+## Tap outcome
+
+A **tap** is the surface's observe-only report that a discrete press+release
+landed at a document-space point over a particular node (or empty canvas),
+WITHOUT becoming a drag. It is delivered through the optional `onTap` wiring
+callback — a sibling of `pick` / `shapeOf` / `onIntent`, deliberately NOT an
+`Intent`:
+
+- An `Intent` is an **actionable change the host commits** (the surface never
+  mutates the document; the host wraps `preview`/`commit`). A tap is a **fact
+  to observe** — there is nothing to commit. Folding it into `onIntent` would
+  contradict that union's documented meaning.
+- A tap must be able to fire **without changing selection** — most importantly
+  the secondary button, which produces a tap and nothing else. Keeping it off
+  the selection-bearing intents preserves "Not a selection store" (Anti-goals).
+
+```ts
+import { type TapOutcome } from "@grida/hud";
+
+const surface = new Surface(canvas, {
+  pick,
+  shapeOf,
+  onIntent,
+  onTap: (tap: TapOutcome) => {
+    // tap.point  — document-space DOWN point the tap resolved against
+    // tap.button — "primary" | "secondary"  (never "middle")
+    // tap.hit    — topmost pick at point, or null for empty canvas
+    // tap.mods   — modifier snapshot at press time
+  },
+});
+```
+
+**Firing rules (the contract a consumer reads from the exports):**
+
+- Fires on the press+release of `primary` and `secondary` buttons when the
+  pointer never crosses the drag threshold (`DRAG_THRESHOLD_PX = 3`).
+- `point` is the **pointer-down** point, never the up point. For a tap on an
+  already-selected node — where the selection commits on pointer-**up** via the
+  deferred drag-candidate path — the down and up points differ by up to the
+  threshold; the surface reports the down point because that is what the tap
+  resolved against and the only one it still holds at release.
+- A drag past the threshold emits **no** tap (it became a gesture). A press
+  that opens a handle gesture (resize / rotate / corner-radius / …) emits no
+  tap either — it is a handle interaction, not a content tap.
+- `middle` never taps — it is reserved for pan.
+- A secondary tap never mutates selection; the tap is its only outcome.
+
+`hit` is carried (host-`pick`-resolved at down time), not host-re-derived — the
+host observes the SAME node the surface resolved the tap against, consistent
+with `select` carrying resolved ids.
+
+> **`@unstable`.** `TapOutcome` is marked `@unstable` per the promotion bar
+> ("two consumers shape the contract"): it ships against one consumer today.
+> Fields may change without a semver bump until a second consumer exercises it.
+> There is no reader in this package; it is a contract-first producer surface.
 
 ## Coordinate model
 
@@ -872,6 +931,9 @@ Non-exhaustive index — open the test files for the full surface.
 | Dblclick on vertex / tangent / segment-strip WHILE in content-edit → handler runs (no exit) | `decision.test.ts`                             |
 | Marquee starts from empty-space pointer-down                                                | `state.test.ts`                                |
 | Drag past threshold cancels a deferred select (drag-vs-click discriminator)                 | `state.test.ts`                                |
+| Tap (press+release, no drag) reports the DOWN point — incl. the deferred commit-on-up path  | `state.test.ts`                                |
+| Tap fires for primary + secondary, never middle (pan); drag past threshold emits no tap     | `state.test.ts`                                |
+| Secondary tap changes no selection; empty-canvas tap carries `hit: null`                    | `state.test.ts`                                |
 | Tangent knob renders as a 45°-rotated square ("diamond"), smaller than vertex               | `classes/vector-path/surface-extended.test.ts` |
 | Vertex knob renders as a circle, selected fills with chrome color                           | `classes/vector-path/surface-extended.test.ts` |
 | Selected tangent line is thicker than idle                                                  | `classes/vector-path/surface-extended.test.ts` |
@@ -890,7 +952,7 @@ Non-exhaustive index — open the test files for the full surface.
 | `handles.test.ts`                              | 8 resize + 4 rotate positions; screen-space hit-test; visibility threshold                                                                                                                                                                     |
 | `click-tracker.test.ts`                        | single vs double within window; position threshold; multi-button isolation                                                                                                                                                                     |
 | `gesture.test.ts`                              | legal transitions (idle↔translate/resize/marquee/cancel; deferred selection)                                                                                                                                                                   |
-| `state.test.ts`                                | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates, exit-edit                                                                                                                                   |
+| `state.test.ts`                                | dispatch sequences: click selects, drag-empty marquees, drag-handle resizes, drag-node translates, exit-edit; observe-only tap outcome (down-point fidelity, primary/secondary, middle excluded, drag emits none, empty-canvas null hit)       |
 | `intent.test.ts`                               | intent stream + `phase` correctness across a full drag (preview·N → commit)                                                                                                                                                                    |
 | `decision.test.ts`                             | one test per named scenario in the selection-intent classifier, including ExitEdit gating                                                                                                                                                      |
 | `chrome.test.ts`                               | given state + bounds, assert resulting `HUDDraw` shape — primitive counts and coords                                                                                                                                                           |

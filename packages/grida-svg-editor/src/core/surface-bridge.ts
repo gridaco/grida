@@ -13,7 +13,7 @@
 //     a fact or open a history bracket.
 
 import type { Preview } from "@grida/history";
-import type { NodeId, Unsubscribe } from "../types";
+import type { NodeId, PickEvent, Unsubscribe } from "../types";
 import type { DomComputedResolver } from "./editor";
 import type { GeometryProvider } from "./geometry";
 import type { SvgDocument } from "./document";
@@ -73,6 +73,13 @@ export interface SurfaceBridge {
    *  `editor.subscribe_surface_hover()` listeners; does NOT bump
    *  `state.version`. */
   push_surface_hover(id: NodeId | null): void;
+
+  /** surface → editor: publish a discrete tap (press + release within the
+   *  drag threshold). Goes to `editor.subscribe_pick()` listeners; does NOT
+   *  bump `state.version`. The surface resolves the document-space point and
+   *  the hit node; the editor only fans the event out. Observe-only — never
+   *  mutates selection or any other editor state. */
+  push_pick(e: PickEvent): void;
 
   /** editor → surface: register the cascade resolver. The DOM surface
    *  implements this with `getComputedStyle()`; headless surfaces may

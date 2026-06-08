@@ -304,6 +304,25 @@ editor.subscribe_with_selector<T>(
 
 `state` is a frozen snapshot. Consumers never destructure into internals; if a view they need isn't here or in the purpose-built views below, that's an API gap.
 
+### Observation — pick (tap)
+
+A **pick** is a discrete tap on the canvas — a press and release within the drag threshold, no drag. It is observe-only and deliberately **separate from selection**: selection answers "what do commands target," a pick answers "what did the user just click, and where." A primary tap on a node both selects it _and_ emits a pick; a tap on empty canvas emits a pick with `node_id: null` (distinguishable from "nothing is selected," which selection alone cannot express); a secondary (right-button) tap emits a pick and does **not** change selection. This is the seam a click-driven host tool needs — a comment / annotation tool anchors UI at `point` and scopes its action to `node_id`, or to the whole document when `null`.
+
+```ts
+type PickEvent = {
+  point: Vec2; // document-space — the pointer-DOWN point the tap resolved against
+  node_id: NodeId | null; // topmost node under point; null = empty canvas
+  button: "primary" | "secondary"; // middle is pan, never taps
+  mods: { shift: boolean; alt: boolean; meta: boolean; ctrl: boolean };
+};
+
+editor.subscribe_pick(fn: (e: PickEvent) => void): Unsubscribe;
+```
+
+The point is document-space and always the pointer-**down** point — so it stays correct even for a tap on an already-selected node (whose selection commits on pointer-up). The channel does **not** bump `state.version`. In React, wire it with `useEditorPick(handler)`.
+
+> **Status:** `@unstable` — shipped against one consumer; the shape is open until a second click-driven tool exercises it (P6).
+
 ### Observation — properties
 
 This section is about **property semantics on a single node**, following the CSS / SVG spec. Multi-selection ("mixed values") is a separate concern; see the [Multi-selection](#multi-selection-mixed-values) section below. The two are kept apart on purpose: property semantics is defined by the spec; mixed semantics is an aggregation layer the editor adds because it supports multi-select.
@@ -880,6 +899,7 @@ What this editor will never be. Each one is a defensive perimeter for the princi
 - **Not customizable in HUD layout.** Style spec only — no overlay slots, no handle replacement, no custom chrome components.
 - **Not a private IR.** SVG is the source of truth. The editor does not maintain an alternative on-disk format, and the bytes are not projected from any in-memory canonical store. (The internal typed element IR described under [Paradigm § Element IR (internal)](#element-ir-internal) is a typed view over the parsed AST, not a store the file is derived from — the AST and the file are the source of truth, and the IR is rebuilt from them on each load.)
 - **Not a serializer playground.** Round-trip rules are fixed (P1). No "compact mode," no "Prettier mode," no consumer-supplied formatter.
+- **Not an input-interception hook.** The pick/tap observation (`subscribe_pick`) reports a click that already happened; it cannot prevent, delay, or replace the editor's own selection and gesture handling. A host that needs to intercept input owns the container and splices its own layer in (the DOM escape hatch) — it does not get a veto through the observation surface.
 
 If a consumer needs any of the above, the right answer is "this is the wrong tool." Saying yes to any one is the path that turned the Grida main editor into a 6,800-line god-class.
 

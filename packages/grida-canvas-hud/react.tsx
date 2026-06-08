@@ -39,9 +39,11 @@ export function useHUDSurface(
   const pickRef = React.useRef(options.pick);
   const shapeOfRef = React.useRef(options.shapeOf);
   const onIntentRef = React.useRef(options.onIntent);
+  const onTapRef = React.useRef(options.onTap);
   pickRef.current = options.pick;
   shapeOfRef.current = options.shapeOf;
   onIntentRef.current = options.onIntent;
+  onTapRef.current = options.onTap;
 
   React.useLayoutEffect(() => {
     if (!canvasRef.current) return;
@@ -49,6 +51,9 @@ export function useHUDSurface(
       pick: (p) => pickRef.current(p),
       shapeOf: (id) => shapeOfRef.current(id),
       onIntent: (i) => onIntentRef.current(i),
+      // Forward taps through a stable ref so the host can pass a fresh
+      // closure each render. `undefined` if the host never wired `onTap`.
+      onTap: (t) => onTapRef.current?.(t),
       style: options.style,
       readonly: options.readonly,
       color: options.color,
