@@ -30,6 +30,7 @@ import {
   cursorToCss,
 } from "../event/cursor";
 import type { Intent, IntentHandler } from "../event/intent";
+import type { TapHandler, TapOutcome } from "../event/tap";
 import type { Transform } from "../event/transform";
 import type { SelectionShape, SelectionGroup } from "../event/shape";
 import { type HUDStyle, DEFAULT_STYLE, mergeStyle } from "./style";
@@ -87,6 +88,22 @@ export interface SurfaceOptions {
   vectorOf?: (id: NodeId) => VectorOverlay | null;
   /** Surface emits intents the host commits. */
   onIntent: IntentHandler;
+  /**
+   * Optional observe-only tap sink. Fires once per discrete tap (press +
+   * release within the drag threshold) for the primary and secondary
+   * buttons — never the middle button (pan), never a drag. The outcome
+   * carries the document-space DOWN point, the button, the topmost host
+   * pick at that point (or `null` for empty canvas), and the modifier
+   * snapshot.
+   *
+   * Distinct from `onIntent` by design: a tap is a fact to observe, not a
+   * change to commit, and it must be able to fire WITHOUT mutating
+   * selection (most importantly for the secondary button). Hosts that don't
+   * run a tap-driven tool omit it and pay nothing.
+   *
+   * @unstable — see {@link TapOutcome}.
+   */
+  onTap?: TapHandler;
   /** Initial style (partial; merged with defaults). */
   style?: Partial<HUDStyle>;
   /** Initial readonly flag. Default `false`. */
@@ -496,6 +513,7 @@ export class Surface {
       pick: this.opts.pick,
       shapeOf: this.opts.shapeOf,
       emitIntent: this.opts.onIntent,
+      emitTap: this.opts.onTap,
     });
   }
 
@@ -935,6 +953,7 @@ function selectionRectFromShape(
 
 export type { SurfaceResponse, SurfaceEvent, PointerButton, Modifiers };
 export type { Intent, IntentHandler };
+export type { TapHandler, TapOutcome };
 export type { HUDStyle };
 export type { SelectionShape, SelectionGroup };
 

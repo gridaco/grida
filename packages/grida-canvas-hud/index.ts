@@ -99,6 +99,7 @@ export type { SurfaceEvent, Modifiers, PointerButton } from "./event/event";
 export { NO_MODS } from "./event/event";
 export type { SurfaceGesture } from "./event/gesture";
 export type { Intent, IntentPhase, SelectMode } from "./event/intent";
+export type { TapOutcome, TapHandler } from "./event/tap";
 export type {
   CursorIcon,
   CursorRenderer,

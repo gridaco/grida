@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import cmath from "@grida/cmath";
 import { SurfaceState, type StateDeps } from "../event/state";
 import type { Intent } from "../event/intent";
+import type { TapOutcome } from "../event/tap";
 import type { NodeId, Rect } from "../event/gesture";
 import { NO_MODS } from "../event/event";
 
@@ -22,8 +23,13 @@ function pointInRect(p: [number, number], r: Rect): boolean {
   );
 }
 
-function makeDeps(): { deps: StateDeps; intents: Intent[] } {
+function makeDeps(): {
+  deps: StateDeps;
+  intents: Intent[];
+  taps: TapOutcome[];
+} {
   const intents: Intent[] = [];
+  const taps: TapOutcome[] = [];
   const deps: StateDeps = {
     pick: (p) => {
       for (const [id, r] of Object.entries(SCENE)) {
@@ -36,8 +42,9 @@ function makeDeps(): { deps: StateDeps; intents: Intent[] } {
       return r ? { kind: "rect", rect: r } : null;
     },
     emitIntent: (i) => intents.push(i),
+    emitTap: (t) => taps.push(t),
   };
-  return { deps, intents };
+  return { deps, intents, taps };
 }
 
 function makeState(selection: NodeId[] = []): SurfaceState {
@@ -519,6 +526,126 @@ describe("SurfaceState dispatch", () => {
     if (typeof state.cursor === "string" || state.cursor.kind !== "rotate")
       return;
     expect(state.cursor.baseAngle).toBeCloseTo((3 * Math.PI) / 4, 9);
+  });
+});
+
+// ── Tap outcome (observe-only press+release) ─────────────────────────────────
+//
+// A tap is the surface's report that a discrete press+release landed at a
+// document-space point over a particular node (or empty canvas), WITHOUT it
+// being a drag. It is observe-only — delivered through `emitTap`, never the
+// intent stream — so a host can anchor a tap-driven tool to the click point
+// and scope it to the hit without the surface mutating selection. Only the
+// surface owns the press/release stream, the camera, and the click-vs-drag
+// discrimination, so only the surface can report this fact.
+describe("SurfaceState tap outcome", () => {
+  let state: SurfaceState;
+  let deps: StateDeps;
+  let intents: Intent[];
+  let taps: TapOutcome[];
+
+  beforeEach(() => {
+    state = makeState();
+    const m = makeDeps();
+    deps = m.deps;
+    intents = m.intents;
+    taps = m.taps;
+  });
+
+  type Btn = "primary" | "secondary" | "middle";
+  const down = (x: number, y: number, button: Btn = "primary") =>
+    state.dispatch({ kind: "pointer_down", x, y, button, mods: NO_MODS }, deps);
+  const up = (x: number, y: number, button: Btn = "primary") =>
+    state.dispatch({ kind: "pointer_up", x, y, button, mods: NO_MODS }, deps);
+  const move = (x: number, y: number) =>
+    state.dispatch({ kind: "pointer_move", x, y, mods: NO_MODS }, deps);
+
+  // UX spec: a primary click-no-drag on a node taps with the down point and
+  // the node hit. This is the base case the whole contract exists for — a
+  // tap-driven tool wants "a click landed at P; the topmost hit was N." The
+  // surface resolves the hit via the host's own `pick`, so the host observes
+  // the same node the surface saw.
+  it("primary click-no-drag on a node taps with the down point and hit id", () => {
+    down(50, 50);
+    up(50, 50);
+    expect(taps).toEqual([
+      { point: [50, 50], button: "primary", hit: "a", mods: NO_MODS },
+    ]);
+  });
+
+  // UX spec: a tap on an ALREADY-SELECTED node — which commits selection on
+  // pointer-UP via the deferred drag-candidate path — still reports the
+  // pointer-DOWN point, not the up point. This is the test that justifies the
+  // whole contract living in the surface: the down and up points differ by up
+  // to the drag threshold, and only the surface still holds the down point at
+  // commit time. A host watching pointer-up would anchor its UI to the wrong
+  // place by a few pixels every time.
+  it("tap on already-selected node (deferred, commits on up) reports the DOWN point, not the up point", () => {
+    state.setSelection(["a"]);
+    down(50, 50);
+    // Sub-threshold wobble between down and up (2px < 3px threshold): the
+    // selection still commits on up (it's a click, not a drag), and the tap
+    // must report the DOWN point (50,50), not the up point (52,51).
+    move(52, 51);
+    up(52, 51);
+    // The deferred select still fired (it was a click) …
+    expect(intents).toEqual([{ kind: "select", ids: ["a"], mode: "replace" }]);
+    // … and the tap reports the DOWN point.
+    expect(taps).toEqual([
+      { point: [50, 50], button: "primary", hit: "a", mods: NO_MODS },
+    ]);
+  });
+
+  // UX spec: a primary drag past the threshold is a gesture, not a tap — it
+  // emits NO tap. The whole point of the drag-vs-click discriminator is that
+  // dragging expresses a different intent (translate / marquee); a tap-driven
+  // tool must not fire mid-drag or on drag-release.
+  it("primary drag past threshold emits NO tap", () => {
+    state.setSelection(["a"]);
+    down(50, 50);
+    move(60, 60); // 14px > 3px threshold → promotes to translate gesture
+    move(80, 70);
+    up(80, 70);
+    expect(taps).toEqual([]);
+  });
+
+  // UX spec: a secondary click taps AND leaves selection untouched. A
+  // right-click-driven tool (context action) needs the same "click landed at
+  // P over N" fact, but the secondary button must never mutate selection —
+  // the surface is not a selection store, and a context click changing the
+  // selection out from under the user is the classic right-click bug. The tap
+  // is the ONLY thing a secondary click produces.
+  it("secondary click taps AND emits no select (selection unchanged)", () => {
+    state.setSelection(["a"]);
+    down(200, 50, "secondary"); // over node "b", which is NOT selected
+    up(200, 50, "secondary");
+    expect(intents).toEqual([]); // selection untouched
+    expect(taps).toEqual([
+      { point: [200, 50], button: "secondary", hit: "b", mods: NO_MODS },
+    ]);
+  });
+
+  // UX spec: the middle button is pan, not a click — it produces NO tap. The
+  // requested outcome is button-agnostic across primary/secondary, but the
+  // middle button is reserved for panning the viewport; firing a tap there
+  // would mis-report a pan-start as a click.
+  it("middle-button press emits NO tap", () => {
+    down(50, 50, "middle");
+    up(50, 50, "middle");
+    expect(taps).toEqual([]);
+  });
+
+  // UX spec: an empty-canvas click taps with `hit: null`. The host's
+  // tap-driven tool must be able to distinguish "clicked node N" from
+  // "clicked empty canvas" — which it can't do from `deselect_all` alone (a
+  // selection that happened to become empty is indistinguishable from an
+  // empty-canvas click). The tap carries the point AND the null hit.
+  it("empty-canvas click taps with hit: null", () => {
+    down(500, 500); // no node there
+    up(500, 500);
+    expect(taps).toEqual([
+      { point: [500, 500], button: "primary", hit: null, mods: NO_MODS },
+    ]);
   });
 });
 

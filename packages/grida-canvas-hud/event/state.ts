@@ -29,6 +29,7 @@ import {
 import { type SelectionShape, type SelectionGroup, shapeBounds } from "./shape";
 import { type CursorIcon, cursorEquals } from "./cursor";
 import type { Intent, IntentHandler, IntentPhase } from "./intent";
+import type { TapHandler } from "./tap";
 import { ClickTracker } from "./click-tracker";
 import { HitRegions } from "./hit-regions";
 import {
@@ -66,6 +67,24 @@ interface PendingPointerDown {
 }
 
 /**
+ * Down-point snapshot for an in-flight tap. Captured at pointer-down for
+ * primary / secondary; consumed at pointer-up iff the pointer never crossed
+ * the drag threshold. Distinct from `PendingPointerDown` because a tap is
+ * button-agnostic and selection-independent — the secondary button records
+ * a candidate without ever opening a `pending`.
+ */
+interface TapCandidate {
+  /** DOWN point in document-space — the point the tap resolves against. */
+  anchor_doc: Vector2;
+  /** Which button pressed. Middle never reaches here. */
+  button: Exclude<PointerButton, "middle">;
+  /** Topmost host pick at the down point, captured at press time. */
+  hit: NodeId | null;
+  /** Modifier snapshot at press time. */
+  mods: Modifiers;
+}
+
+/**
  * Provider callbacks the host wires into the surface at construction.
  *
  * Two verbs, deliberately distinct:
@@ -85,6 +104,13 @@ export interface StateDeps {
   pick: (point_doc: Vector2) => NodeId | null;
   shapeOf: (id: NodeId) => SelectionShape | null;
   emitIntent: IntentHandler;
+  /**
+   * Optional observe-only tap sink. Called once per discrete tap (press +
+   * release within the drag threshold) for primary and secondary buttons.
+   * Distinct from `emitIntent` — a tap is a fact to observe, not a change
+   * to commit. Omitted by hosts that don't run a tap-driven tool.
+   */
+  emitTap?: TapHandler;
 }
 
 /**
@@ -188,6 +214,15 @@ export class SurfaceState {
   private hit_regions = new HitRegions();
   private click_tracker = new ClickTracker();
   private pending: PendingPointerDown | null = null;
+  /**
+   * Live tap candidate, captured at pointer-down for primary / secondary
+   * buttons (never middle). Holds the DOWN-point data the tap will report
+   * if the pointer releases without crossing the drag threshold. Cleared
+   * the moment the press promotes to a drag/gesture — so a drag emits no
+   * tap. Independent of `pending` (which exists only for the primary
+   * selection flow); the secondary button has no `pending` but still taps.
+   */
+  private tap_candidate: TapCandidate | null = null;
   /**
    * Vector-edit selection mirror. Set by the host via `setVectorSelection`
    * when entering content-edit on a path. Non-null = surface should render
@@ -476,6 +511,9 @@ export class SurfaceState {
         const promote = this.pending.promote_to;
         // Cancel deferred selection — drag preserves multi-selection.
         this.pending.deferred = undefined;
+        // The press became a drag — it is no longer a tap. Drop the
+        // candidate so pointer-up emits no tap.
+        this.tap_candidate = null;
         if (promote) {
           // Explicit promote (e.g. segment-strip → bend_segment or
           // translate_vector_selection per drag mode).
@@ -1115,17 +1153,40 @@ export class SurfaceState {
     deps: StateDeps
   ): SurfaceResponse {
     const response = emptyResponse();
-    if (button !== "primary") return response;
 
     const point_doc = screenToDoc(this.transform, sx, sy);
     const screen: Vector2 = [sx, sy];
+
+    // Tap candidate — captured at down for primary AND secondary (never
+    // middle, which is pan). The candidate freezes the DOWN point + pick so
+    // a tap reports the press point even when the primary selection commits
+    // on pointer-up (deferred path). Cleared on drag-promotion in
+    // `onPointerMove`; consumed in `onPointerUp` iff no drag happened. The
+    // pick used here is the SAME pick the primary flow resolves selection
+    // against below — one `pick` per down, no host disagreement.
+    let tap_hit: NodeId | null = null;
+    if (button !== "middle") {
+      tap_hit = deps.pick(point_doc);
+      this.tap_candidate = {
+        anchor_doc: point_doc,
+        button,
+        hit: tap_hit,
+        mods: { ...this.modifiers },
+      };
+    }
+
+    // Secondary / middle never run the selection-intent flow: secondary must
+    // not mutate selection (the tap is its only outcome), middle is pan.
+    if (button !== "primary") return response;
 
     // Gather inputs and ask the decision module what to do. ALL UX-level
     // branching lives in `event/decision.ts` — keep this handler purely
     // mechanical so the table in `docs/intent-decision-tree.md` stays the
     // single source of truth.
     const ui_action = this.hit_regions.hitTest(screen);
-    const hovered_id = deps.pick(point_doc);
+    // Reuse the pick already resolved for the tap candidate — primary always
+    // captured one above, so this is never a second `pick` call.
+    const hovered_id = tap_hit;
     const click_count = this.click_tracker.register(sx, sy);
 
     // Corner-radius handle intercept — its own affordance family,
@@ -1643,6 +1704,26 @@ export class SurfaceState {
     deps: StateDeps
   ): SurfaceResponse {
     const response = emptyResponse();
+
+    // Tap resolution — button-agnostic, BEFORE the primary-only gate below.
+    // A tap fires iff a candidate from this press survived to release (the
+    // pointer never crossed the drag threshold — `onPointerMove` clears the
+    // candidate on promotion) AND no gesture is active (an eager handle
+    // press opened a gesture at down, which is a handle interaction, not a
+    // content tap). The candidate carries the DOWN point + the down-time
+    // pick, so the deferred (commit-on-up) primary path still reports the
+    // press point, not this release point.
+    const tap = this.tap_candidate;
+    this.tap_candidate = null;
+    if (tap && tap.button === button && this.gesture.kind === "idle") {
+      deps.emitTap?.({
+        point: tap.anchor_doc,
+        button: tap.button,
+        hit: tap.hit,
+        mods: tap.mods,
+      });
+    }
+
     if (button !== "primary") return response;
 
     // Apply deferred intent on click (no drag occurred).
@@ -1984,6 +2065,9 @@ export class SurfaceState {
   private onBlur(deps: StateDeps): SurfaceResponse {
     const response = emptyResponse();
     this.pending = null;
+    // A press interrupted by blur never releases on the surface — drop the
+    // candidate so no tap fires when focus returns.
+    this.tap_candidate = null;
     if (this.gesture.kind !== "idle") {
       deps.emitIntent({ kind: "cancel_gesture" });
       this.gesture = IDLE;
