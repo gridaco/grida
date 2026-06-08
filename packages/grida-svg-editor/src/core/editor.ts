@@ -1874,6 +1874,15 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   function dispose() {
     detach();
     listeners.clear();
+    // Release every transient observation-channel subscriber too. `detach()`
+    // already stops the surface from pushing to them, so they're inert by
+    // here; clearing drops any closures a disposed-but-still-referenced editor
+    // would otherwise retain. Clearing all of them (not just one) keeps the
+    // disposal contract uniform across the subscribe channels.
+    surface_hover_listeners.clear();
+    geometry_listeners.clear();
+    translate_commit_listeners.clear();
+    pick_listeners.clear();
   }
 
   function set_style(partial: Partial<EditorStyle>) {
