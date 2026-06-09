@@ -54,6 +54,7 @@ import {
   ChatMessageView,
   CompactingIndicator,
   ForkedNotice,
+  PendingTurnIndicator,
   type ChatMessageActions,
 } from "@/kits/agent-chat";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
@@ -378,6 +379,13 @@ export function AISidebarChat({ className }: { className?: string }) {
 
   const isEmpty = messages.length === 0;
 
+  // Pre-first-token "Thinking" indicator: a turn is streaming through this
+  // client, but the AI-SDK reducer hasn't created the assistant message yet (it
+  // does so on the first content chunk), so the per-bubble shimmer has nothing
+  // to mount on. Bridge that dead-air window with a tail indicator until an
+  // assistant turn begins.
+  const pendingTurn = isStreaming && messages.at(-1)?.role !== "assistant";
+
   return (
     <div className={cn("flex h-full flex-col bg-background", className)}>
       <ChatSessionPicker
@@ -399,6 +407,7 @@ export function AISidebarChat({ className }: { className?: string }) {
           ) : (
             settledList
           )}
+          {pendingTurn && <PendingTurnIndicator />}
           {compacting && <CompactingIndicator />}
         </ConversationContent>
         <ConversationScrollButton />

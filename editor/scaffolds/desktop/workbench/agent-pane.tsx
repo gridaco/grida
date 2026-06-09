@@ -66,6 +66,7 @@ import {
   ChatMessageView,
   CompactingIndicator,
   ForkedNotice,
+  PendingTurnIndicator,
   type ChatMessageActions,
 } from "@/kits/agent-chat";
 import { QueuedMessages } from "../shared/queued-messages";
@@ -516,6 +517,13 @@ function AgentPaneContent({
     [messages, isStreaming, messageActions]
   );
 
+  // Pre-first-token "Thinking" indicator: a turn is streaming through this
+  // client, but the AI-SDK reducer hasn't created the assistant message yet (it
+  // does so on the first content chunk), so the per-bubble shimmer has nothing
+  // to mount on. Bridge that dead-air window with a tail indicator until an
+  // assistant turn begins.
+  const pendingTurn = isStreaming && messages.at(-1)?.role !== "assistant";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ChatSessionPicker
@@ -531,6 +539,7 @@ function AgentPaneContent({
               user needs to begin. No "Ask the workspace agent" hero,
               no example prompts; the surface stays quiet until used. */}
           {settledList}
+          {pendingTurn && <PendingTurnIndicator />}
           {compacting && <CompactingIndicator />}
         </ConversationContent>
         <ConversationScrollButton />

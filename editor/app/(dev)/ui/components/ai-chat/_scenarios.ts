@@ -31,6 +31,13 @@ export type Scenario = {
    * message in `initialMessages`.
    */
   compacting?: boolean;
+  /**
+   * Render the pre-first-token "Thinking" indicator at the transcript tail —
+   * the dead-air window between a send and the first streamed chunk. A static
+   * state (like {@link compacting}) so the shimmer + elapsed timer animate
+   * continuously and are tunable, without timing a live stream.
+   */
+  pending?: boolean;
 };
 
 const MARKDOWN = `## Plan
@@ -112,6 +119,21 @@ export const SCENARIOS: Scenario[] = [
   },
 
   // --- G. Lifecycle (compaction) ---
+  {
+    id: "lifecycle-pending",
+    label: "Awaiting first token (Thinking)",
+    group: "Lifecycle",
+    // The dead-air window after a send, before the first chunk. The user
+    // message is settled; the assistant turn hasn't begun, so the tail shows
+    // the "Thinking" shimmer (its elapsed timer reveals after a few seconds).
+    pending: true,
+    initial_messages: [
+      userMsg(
+        "Refactor the logo into its own component and tighten the viewBox."
+      ),
+    ],
+    chunks: [],
+  },
   {
     id: "lifecycle-compacting",
     label: "Compacting (in progress)",

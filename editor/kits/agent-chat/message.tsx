@@ -478,6 +478,42 @@ export function CompactingIndicator() {
 }
 
 /**
+ * Pre-first-token indicator — the dead-air window between a send and the first
+ * streamed chunk. The AI-SDK reducer doesn't create the assistant message until
+ * the first content chunk arrives, so the per-turn "Thinking" shimmer that lives
+ * inside the assistant bubble ({@link ChatMessageView}) has nothing to mount on
+ * yet. A surface renders this at the transcript tail while a turn is in flight
+ * and no assistant turn has begun (`isStreaming && last message is not the
+ * assistant`); it's framed as an assistant turn so it sits exactly where the
+ * real response will, then is replaced by it the moment the first chunk lands.
+ *
+ * Mirrors {@link CompactingIndicator}: the elapsed counter stays hidden for the
+ * first few seconds — a fast first token never grows a timer — and only a wait
+ * long enough to feel slow surfaces it, so a slow time-to-first-token reads as
+ * progress rather than a hang. The timer is a sibling of the `Shimmer`, not its
+ * child: `Shimmer` recreates its motion element whenever its string child
+ * changes, so feeding it the ticking label would restart the shimmer each second.
+ */
+export function PendingTurnIndicator() {
+  const elapsed = useElapsedSeconds();
+  return (
+    <Message from="assistant" className="w-full max-w-none">
+      <MessageContent className="w-full max-w-full">
+        <span className="flex items-center gap-1.5 text-xs">
+          <Shimmer as="span">Thinking</Shimmer>
+          {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="tabular-nums">{formatElapsed(elapsed)}</span>
+            </>
+          )}
+        </span>
+      </MessageContent>
+    </Message>
+  );
+}
+
+/**
  * Transient confirmation that a fork happened (RFC `session / fork`). Forking
  * switches to a copy that looks identical to the source, so without this the
  * action reads as a no-op. A surface renders it while
