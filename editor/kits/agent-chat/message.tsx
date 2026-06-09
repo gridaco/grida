@@ -19,8 +19,15 @@
 
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
+import { cn } from "@app/ui/lib/utils";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
@@ -139,27 +146,32 @@ export function ChatMessageView({
     return (
       <Message from="user">
         <MessageContent>
-          {images.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {images.map((image, index) => (
-                // Index key: a sent user message's attachments are immutable and
-                // never reorder, so the index is stable — and it avoids putting a
-                // multi-MB data-URL into the key (which React keeps + compares).
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={index}
-                  src={image.url}
-                  alt={image.filename ?? ""}
-                  loading="lazy"
-                  decoding="async"
-                  className="max-h-48 max-w-full rounded-md border object-contain"
-                />
-              ))}
-            </div>
-          )}
-          {text.length > 0 && (
-            <MessageResponse plugins={markdown.plugins}>{text}</MessageResponse>
-          )}
+          <CollapsibleBubbleBody>
+            {images.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {images.map((image, index) => (
+                  // Index key: a sent user message's attachments are immutable
+                  // and never reorder, so the index is stable — and it avoids
+                  // putting a multi-MB data-URL into the key (which React keeps
+                  // + compares).
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={index}
+                    src={image.url}
+                    alt={image.filename ?? ""}
+                    loading="lazy"
+                    decoding="async"
+                    className="max-h-48 max-w-full rounded-md border object-contain"
+                  />
+                ))}
+              </div>
+            )}
+            {text.length > 0 && (
+              <MessageResponse plugins={markdown.plugins}>
+                {text}
+              </MessageResponse>
+            )}
+          </CollapsibleBubbleBody>
         </MessageContent>
         {/* Subtle until hover so the transcript stays clean; right-aligned
             to sit under the user bubble. Copy is always available (a pure
@@ -251,6 +263,97 @@ export function ChatMessageView({
 }
 
 /**
+ * Height (px) a user bubble is clamped to before the "Show more" affordance
+ * kicks in. Roughly ten lines at the bubble's `leading-6` — tall enough that
+ * an ordinary message never collapses, short enough that a pasted wall of text
+ * doesn't push the rest of the transcript off-screen.
+ */
+const BUBBLE_COLLAPSE_THRESHOLD_PX = 240;
+
+// Layout-effect that degrades to a no-op on the server. The transcript is
+// client-state-driven (messages arrive after mount), so this effectively only
+// runs in the browser — but the demo seeds `initial_messages` through SSR, and
+// a bare `useLayoutEffect` warns there. Measuring before paint (vs `useEffect`)
+// avoids a flash where a long bubble renders full-height then snaps closed.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/**
+ * Wraps a user bubble's body and, when it exceeds
+ * {@link BUBBLE_COLLAPSE_THRESHOLD_PX}, clamps it to that height behind a
+ * fade-to-bubble gradient with a "Show more" / "Show less" toggle. The
+ * affordance only appears when the content actually overflows — short messages
+ * render untouched, with no measurement cost beyond a single observed element.
+ *
+ * The fade fills to `secondary` to match the bubble's own `bg-secondary`, so it
+ * reads as the text dissolving into the bubble rather than a separate band. It
+ * is `pointer-events-none` so text selection underneath still works.
+ */
+function CollapsibleBubbleBody({ children }: { children: ReactNode }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useIsomorphicLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const measure = () =>
+      setOverflowing(el.scrollHeight > BUBBLE_COLLAPSE_THRESHOLD_PX);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    // Re-measure on reflow — a late-loading image or a window resize can flip
+    // a bubble across the threshold after the first paint.
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const collapsed = overflowing && !expanded;
+
+  return (
+    <div className="flex flex-col gap-1">
+      {/* Measured directly: `scrollHeight` reports the full content height
+          even while the box is clamped, so the fade host and the measured
+          element are one and the same — no separate inner wrapper needed. */}
+      <div
+        ref={contentRef}
+        className={cn(
+          "relative flex flex-col gap-2",
+          collapsed && "overflow-hidden"
+        )}
+        style={
+          collapsed ? { maxHeight: BUBBLE_COLLAPSE_THRESHOLD_PX } : undefined
+        }
+      >
+        {children}
+        {collapsed && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-secondary"
+          />
+        )}
+      </div>
+      {overflowing && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+          className="flex w-fit items-center gap-1 text-xs font-medium text-foreground/60 transition-colors hover:text-foreground"
+        >
+          {expanded ? "Show less" : "Show more"}
+          <ChevronDownIcon
+            className={cn(
+              "size-3 transition-transform",
+              expanded && "rotate-180"
+            )}
+          />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * Copy a message's text to the clipboard. Self-contained — copy is a
  * pure, always-safe action, so it owns its transient "copied" state here
  * and is never gated by `disabled`. Mirrors `CodeBlockCopyButton` in
@@ -334,43 +437,73 @@ function formatElapsed(totalSeconds: number): string {
 }
 
 /**
+ * How long an in-flight indicator runs bare before the elapsed-time counter
+ * appears, in milliseconds. Below this only the shimmering label shows; at or
+ * past it the "· {time}" counter is revealed.
+ */
+const ELAPSED_REVEAL_AFTER_MS = 3000;
+
+/**
+ * A shimmering label trailed by a live elapsed-time counter — the shared body
+ * of the transcript's in-flight indicators ({@link CompactingIndicator},
+ * {@link PendingTurnIndicator}) so they tick identically.
+ *
+ * The counter stays hidden for the first {@link ELAPSED_REVEAL_AFTER_MS}: a fast
+ * operation settles before a timer grows, and only a wait long enough to feel
+ * slow surfaces the elapsed time as reassurance.
+ *
+ * The counter is a sibling of the `Shimmer`, not its child: `Shimmer` requires a
+ * string child and recreates its motion element whenever that child changes, so
+ * feeding it the ticking label would restart the shimmer every second.
+ */
+function ShimmerWithElapsed({ label }: { label: string }) {
+  const elapsed = useElapsedSeconds();
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+      <Shimmer as="span">{label}</Shimmer>
+      {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
+        <>
+          <span aria-hidden>·</span>
+          <span className="tabular-nums">{formatElapsed(elapsed)}</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/**
  * In-flight compaction (RFC `session / compaction`). A divider whose centered
  * label shimmers while the summarizer runs, trailed by a live elapsed-time
  * counter so a slow summarize reads as progress, not a hang. The host renders
  * this at the tail of the conversation while a manual `/compact` is awaiting;
  * once the summary message hydrates it is replaced by the settled
  * {@link CompactionNotice}.
- *
- * The timer is a sibling of the shimmer, not inside it: `Shimmer` requires a
- * string child and recreates its motion element whenever that child changes,
- * so feeding it the ticking label would restart the shimmer every second.
- *
- * The counter stays hidden for the first few seconds: a fast compaction never
- * grows a timer (the indicator settles before it appears), and only a wait long
- * enough to feel slow surfaces the elapsed time as reassurance.
  */
-
-/**
- * How long the indicator runs bare before the elapsed-time counter appears,
- * in milliseconds. Below this, only the "Compacting conversation" shimmer
- * shows; at or past it the "· {time}" counter is revealed.
- */
-const ELAPSED_REVEAL_AFTER_MS = 3000;
-
 export function CompactingIndicator() {
-  const elapsed = useElapsedSeconds();
   return (
     <CompactionDivider>
-      <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
-        <Shimmer as="span">Compacting conversation</Shimmer>
-        {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
-          <>
-            <span aria-hidden>·</span>
-            <span className="tabular-nums">{formatElapsed(elapsed)}</span>
-          </>
-        )}
-      </span>
+      <ShimmerWithElapsed label="Compacting conversation" />
     </CompactionDivider>
+  );
+}
+
+/**
+ * Pre-first-token indicator — the dead-air window between a send and the first
+ * streamed chunk. The AI-SDK reducer doesn't create the assistant message until
+ * the first content chunk arrives, so the per-turn "Thinking" shimmer that lives
+ * inside the assistant bubble ({@link ChatMessageView}) has nothing to mount on
+ * yet. A surface renders this at the transcript tail while a turn is in flight
+ * and no assistant turn has begun (`isStreaming && last message is not the
+ * assistant`); it's framed as an assistant turn so it sits exactly where the
+ * real response will, then is replaced by it the moment the first chunk lands.
+ */
+export function PendingTurnIndicator() {
+  return (
+    <Message from="assistant" className="w-full max-w-none">
+      <MessageContent className="w-full max-w-full">
+        <ShimmerWithElapsed label="Thinking" />
+      </MessageContent>
+    </Message>
   );
 }
 

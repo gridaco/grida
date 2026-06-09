@@ -57,6 +57,7 @@ import {
   useChatSession,
   useCoreTurnSync,
   useRefreshOnStreamEnd,
+  useResumeInFlight,
   useSessionFork,
   useSessionStatus,
   useTurnQueueController,
@@ -66,6 +67,7 @@ import {
   ChatMessageView,
   CompactingIndicator,
   ForkedNotice,
+  PendingTurnIndicator,
   type ChatMessageActions,
 } from "@/kits/agent-chat";
 import { QueuedMessages } from "../shared/queued-messages";
@@ -216,11 +218,15 @@ function AgentPaneContent({
   useEffect(() => {
     chatRef.current = chat;
   }, [chat]);
-  // `resume: true` — AI SDK v6 built-in. On mount the SDK calls our
-  // transport's `reconnectToStream({chatId})`; the transport returns
-  // null on 404 (no in-flight run) → clean no-op; on success the
-  // agent sidecar replays from its chunk log and live-tails until finish.
-  // See `bridge-transport.ts` + `agent/stream-registry.ts`.
+  // Reconnect to an in-flight run on remount/refresh via `useResumeInFlight`
+  // (NOT the SDK's `resume: true`). `resume: true` resumes once on mount,
+  // against the placeholder chat that has no session id yet — the id is
+  // restored async from localStorage, so the rebuilt chat that carries it
+  // never resumes and a refresh silently shows a stale DB snapshot. The hook
+  // resumes once per chat instance that has a real session id, never over a
+  // turn this client is streaming itself. Transport returns null on the agent
+  // sidecar's 404 → clean no-op; on success it replays the chunk log and
+  // live-tails. See `bridge-transport.ts` + `agent/stream-registry.ts`.
   const {
     messages,
     status,
@@ -230,16 +236,23 @@ function AgentPaneContent({
     clearError,
     setMessages,
     resumeStream,
-  } = useChat({
-    chat,
-    resume: true,
-  });
+  } = useChat({ chat });
   // `isStreaming` = a turn is actively streaming THROUGH THIS CLIENT. Used
   // where that is the honest concept: the typing indicator, the Stop/Send
   // button, and "did I start this turn?" (vs. the core). It is the AI-SDK
   // client's optimistic per-request status — NOT the authoritative session
   // state.
   const isStreaming = status === "submitted" || status === "streaming";
+
+  // Reconnect to the session's in-flight run after a remount/refresh. Keyed on
+  // the chat instance + session id so the resume tracks the chat the async
+  // localStorage restore rebuilds — the gap `resume: true` left open.
+  useResumeInFlight({
+    chat,
+    sessionId: chatSession.current_id,
+    isStreaming,
+    resumeStream,
+  });
 
   // Manual compaction (RFC `session / compaction`) runs as a separate op that
   // does NOT move `useChat` status. Declared here so the single `busy` signal
@@ -516,6 +529,13 @@ function AgentPaneContent({
     [messages, isStreaming, messageActions]
   );
 
+  // Pre-first-token "Thinking" indicator: a turn is streaming through this
+  // client, but the AI-SDK reducer hasn't created the assistant message yet (it
+  // does so on the first content chunk), so the per-bubble shimmer has nothing
+  // to mount on. Bridge that dead-air window with a tail indicator until an
+  // assistant turn begins.
+  const pendingTurn = isStreaming && messages.at(-1)?.role !== "assistant";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ChatSessionPicker
@@ -531,6 +551,7 @@ function AgentPaneContent({
               user needs to begin. No "Ask the workspace agent" hero,
               no example prompts; the surface stays quiet until used. */}
           {settledList}
+          {pendingTurn && <PendingTurnIndicator />}
           {compacting && <CompactingIndicator />}
         </ConversationContent>
         <ConversationScrollButton />

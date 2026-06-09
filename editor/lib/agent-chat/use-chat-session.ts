@@ -23,10 +23,12 @@
  * `grida.lastChatSession.<agent>[.<workspaceId>]`. On mount the hook
  * reads that key, validates the session still exists on the agent sidecar
  * (and discards stale ids cleanly), and sets `currentId`. Streaming
- * continuity is then automatic: the chat panel's
- * `useChat({chat, resume: true})` calls `transport.reconnectToStream`
- * on mount; the agent sidecar serves replay + live tail if the run is still
- * in flight, or 404s into a clean no-op. The DB is the snapshot;
+ * continuity is then automatic: the chat panel's `useResumeInFlight`
+ * calls `transport.reconnectToStream` once the rebuilt chat carries the
+ * restored session id; the agent sidecar serves replay + live tail if the
+ * run is still in flight, or 404s into a clean no-op. (The SDK's own
+ * `resume: true` can't do this — it fires once on mount, before the async
+ * restore resolves the id.) The DB is the snapshot;
  * localStorage is the "what was I last looking at" — pure UX state, by
  * design not in SQL.
  */

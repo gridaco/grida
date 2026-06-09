@@ -31,6 +31,13 @@ export type Scenario = {
    * message in `initialMessages`.
    */
   compacting?: boolean;
+  /**
+   * Render the pre-first-token "Thinking" indicator at the transcript tail —
+   * the dead-air window between a send and the first streamed chunk. A static
+   * state (like {@link compacting}) so the shimmer + elapsed timer animate
+   * continuously and are tunable, without timing a live stream.
+   */
+  pending?: boolean;
 };
 
 const MARKDOWN = `## Plan
@@ -54,6 +61,20 @@ const LONG_CONTENT = Array.from(
   (_, i) =>
     `  <rect x="${i}" y="${i}" width="10" height="10" fill="#${i}${i}f" />`
 ).join("\n");
+
+// A pasted-spec wall of text — overflows the user bubble's collapse threshold
+// so the "Show more" affordance (clamp + fade-to-bubble gradient) appears.
+const LONG_USER_MESSAGE = [
+  "Here's the full spec for the logo refactor — please read all of it before you start.",
+  "",
+  "1. Extract the inline SVG in `src/header.tsx` into its own `<Logo>` component under `src/logo.tsx`. It should take an optional `size` prop (default 24) and forward `className` so callers can recolor it.",
+  "2. Tighten the artboard: the current `viewBox` is `0 0 48 48` with a lot of dead margin. Crop it to `0 0 24 24` and re-center the glyph.",
+  "3. Normalize the palette down to three tokens — `teal`, `coral`, and `ink` — and move them into `tokens.css`. Every hard-coded hex in the markup should reference a token instead.",
+  "4. Add a subtle drop shadow, but only on the light theme; the dark theme should stay flat.",
+  "5. Wire the new `<Logo>` into the header and the footer, and delete the two inline copies.",
+  "",
+  "Once that's done, run the typecheck and the snapshot tests, and show me the before/after of the header. Thanks!",
+].join("\n");
 
 export const SCENARIOS: Scenario[] = [
   // --- D. Composition (default) ---
@@ -98,6 +119,21 @@ export const SCENARIOS: Scenario[] = [
   },
 
   // --- G. Lifecycle (compaction) ---
+  {
+    id: "lifecycle-pending",
+    label: "Awaiting first token (Thinking)",
+    group: "Lifecycle",
+    // The dead-air window after a send, before the first chunk. The user
+    // message is settled; the assistant turn hasn't begun, so the tail shows
+    // the "Thinking" shimmer (its elapsed timer reveals after a few seconds).
+    pending: true,
+    initial_messages: [
+      userMsg(
+        "Refactor the logo into its own component and tighten the viewBox."
+      ),
+    ],
+    chunks: [],
+  },
   {
     id: "lifecycle-compacting",
     label: "Compacting (in progress)",
@@ -396,6 +432,19 @@ export const SCENARIOS: Scenario[] = [
     label: "Markdown-rich text",
     group: "Markdown",
     chunks: text("t1", MARKDOWN),
+  },
+  {
+    id: "long-user-message",
+    label: "Long user message (collapsible)",
+    group: "Markdown",
+    // The pasted spec overflows the user bubble's collapse threshold, so it
+    // renders clamped behind a fade with a "Show more" toggle; the streamed
+    // reply confirms the assistant turn still flows normally below it.
+    initial_messages: [userMsg(LONG_USER_MESSAGE)],
+    chunks: text(
+      "t1",
+      "Got it — I'll start by extracting `<Logo>` into `src/logo.tsx`, then tighten the viewBox to `0 0 24 24`."
+    ),
   },
   {
     id: "overflow-json",

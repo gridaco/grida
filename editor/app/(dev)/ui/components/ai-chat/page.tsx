@@ -83,6 +83,9 @@ export default function AiChatDemoPage() {
   // scenario — the shimmer animates continuously so it's tunable; the settled
   // summary is a separate scenario carrying a `data-compaction` message.
   const compacting = scenario.compacting === true;
+  // Pre-first-token "Thinking" indicator. Static per scenario like `compacting`
+  // so the shimmer + elapsed timer animate without timing a live stream.
+  const pending = scenario.pending === true;
 
   return (
     <div className="container mx-auto max-w-screen-xl py-10">
@@ -158,6 +161,7 @@ export default function AiChatDemoPage() {
             messages={messages}
             isStreaming={isStreaming}
             compacting={compacting}
+            pending={pending}
             error={error}
             onDismissError={clearError}
             actions={{

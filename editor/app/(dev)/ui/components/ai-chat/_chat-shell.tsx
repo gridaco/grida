@@ -15,6 +15,7 @@ import { cn } from "@app/ui/lib/utils";
 import {
   ChatMessageView,
   CompactingIndicator,
+  PendingTurnIndicator,
   type ChatMessage,
   type ChatMessageActions,
 } from "@/kits/agent-chat";
@@ -23,6 +24,7 @@ export function DemoChatShell({
   messages,
   isStreaming,
   compacting,
+  pending,
   error,
   onDismissError,
   className,
@@ -32,12 +34,18 @@ export function DemoChatShell({
   isStreaming: boolean;
   /** Show the in-flight compaction shimmer at the transcript tail. */
   compacting?: boolean;
+  /** Force the pre-first-token "Thinking" indicator (static showcase). */
+  pending?: boolean;
   error?: Error;
   onDismissError: () => void;
   className?: string;
   /** Per-turn rewind/branch affordances under user bubbles (demo). */
   actions?: ChatMessageActions;
 }) {
+  // Mirrors the desktop surfaces: a turn is streaming but no assistant turn has
+  // begun. The `pending` prop forces it for the static showcase scenario.
+  const pendingTurn =
+    pending || (isStreaming && messages.at(-1)?.role !== "assistant");
   return (
     <div
       data-testid="demo-ai-chat-shell"
@@ -56,6 +64,7 @@ export function DemoChatShell({
               actions={m.role === "user" ? actions : undefined}
             />
           ))}
+          {pendingTurn && <PendingTurnIndicator />}
           {compacting && <CompactingIndicator />}
         </ConversationContent>
         <ConversationScrollButton />
