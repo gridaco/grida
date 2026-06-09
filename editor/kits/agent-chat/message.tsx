@@ -437,42 +437,52 @@ function formatElapsed(totalSeconds: number): string {
 }
 
 /**
+ * How long an in-flight indicator runs bare before the elapsed-time counter
+ * appears, in milliseconds. Below this only the shimmering label shows; at or
+ * past it the "· {time}" counter is revealed.
+ */
+const ELAPSED_REVEAL_AFTER_MS = 3000;
+
+/**
+ * A shimmering label trailed by a live elapsed-time counter — the shared body
+ * of the transcript's in-flight indicators ({@link CompactingIndicator},
+ * {@link PendingTurnIndicator}) so they tick identically.
+ *
+ * The counter stays hidden for the first {@link ELAPSED_REVEAL_AFTER_MS}: a fast
+ * operation settles before a timer grows, and only a wait long enough to feel
+ * slow surfaces the elapsed time as reassurance.
+ *
+ * The counter is a sibling of the `Shimmer`, not its child: `Shimmer` requires a
+ * string child and recreates its motion element whenever that child changes, so
+ * feeding it the ticking label would restart the shimmer every second.
+ */
+function ShimmerWithElapsed({ label }: { label: string }) {
+  const elapsed = useElapsedSeconds();
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+      <Shimmer as="span">{label}</Shimmer>
+      {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
+        <>
+          <span aria-hidden>·</span>
+          <span className="tabular-nums">{formatElapsed(elapsed)}</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/**
  * In-flight compaction (RFC `session / compaction`). A divider whose centered
  * label shimmers while the summarizer runs, trailed by a live elapsed-time
  * counter so a slow summarize reads as progress, not a hang. The host renders
  * this at the tail of the conversation while a manual `/compact` is awaiting;
  * once the summary message hydrates it is replaced by the settled
  * {@link CompactionNotice}.
- *
- * The timer is a sibling of the shimmer, not inside it: `Shimmer` requires a
- * string child and recreates its motion element whenever that child changes,
- * so feeding it the ticking label would restart the shimmer every second.
- *
- * The counter stays hidden for the first few seconds: a fast compaction never
- * grows a timer (the indicator settles before it appears), and only a wait long
- * enough to feel slow surfaces the elapsed time as reassurance.
  */
-
-/**
- * How long the indicator runs bare before the elapsed-time counter appears,
- * in milliseconds. Below this, only the "Compacting conversation" shimmer
- * shows; at or past it the "· {time}" counter is revealed.
- */
-const ELAPSED_REVEAL_AFTER_MS = 3000;
-
 export function CompactingIndicator() {
-  const elapsed = useElapsedSeconds();
   return (
     <CompactionDivider>
-      <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
-        <Shimmer as="span">Compacting conversation</Shimmer>
-        {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
-          <>
-            <span aria-hidden>·</span>
-            <span className="tabular-nums">{formatElapsed(elapsed)}</span>
-          </>
-        )}
-      </span>
+      <ShimmerWithElapsed label="Compacting conversation" />
     </CompactionDivider>
   );
 }
@@ -486,28 +496,12 @@ export function CompactingIndicator() {
  * and no assistant turn has begun (`isStreaming && last message is not the
  * assistant`); it's framed as an assistant turn so it sits exactly where the
  * real response will, then is replaced by it the moment the first chunk lands.
- *
- * Mirrors {@link CompactingIndicator}: the elapsed counter stays hidden for the
- * first few seconds — a fast first token never grows a timer — and only a wait
- * long enough to feel slow surfaces it, so a slow time-to-first-token reads as
- * progress rather than a hang. The timer is a sibling of the `Shimmer`, not its
- * child: `Shimmer` recreates its motion element whenever its string child
- * changes, so feeding it the ticking label would restart the shimmer each second.
  */
 export function PendingTurnIndicator() {
-  const elapsed = useElapsedSeconds();
   return (
     <Message from="assistant" className="w-full max-w-none">
       <MessageContent className="w-full max-w-full">
-        <span className="flex items-center gap-1.5 text-xs">
-          <Shimmer as="span">Thinking</Shimmer>
-          {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
-            <>
-              <span aria-hidden>·</span>
-              <span className="tabular-nums">{formatElapsed(elapsed)}</span>
-            </>
-          )}
-        </span>
+        <ShimmerWithElapsed label="Thinking" />
       </MessageContent>
     </Message>
   );
