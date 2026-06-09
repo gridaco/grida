@@ -16,11 +16,20 @@
  * agent can resolve them even when the chip text alone is ambiguous.
  */
 
-import { useMemo, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { ArrowUpIcon, SquareIcon } from "lucide-react";
+import type { FileUIPart } from "ai";
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import {
+  ComposerAttachmentCards,
   ComposerContent,
   ComposerProvider,
   ComposerTriggerMenu,
@@ -28,6 +37,7 @@ import {
   type ComposerCatalog,
   type ComposerMessage,
 } from "@/kits/composer";
+import { encodeImageFile, toFileUiParts } from "@/lib/agent-chat";
 
 /**
  * A `/`-command that runs an action (e.g. `/compact`) instead of being
@@ -46,12 +56,30 @@ export type AgentComposerInputProps = {
   /** Action `/`-commands (e.g. `/compact`). Merged into the menu, ahead
    *  of the catalog's own commands, and intercepted on submit. */
   commandActions?: ComposerCommandAction[];
-  /** Receives the lowered prompt text. Empty submissions are filtered. */
-  onSubmit: (text: string) => void | Promise<void>;
+  /**
+   * Receives the lowered prompt text plus any inlined image attachments as
+   * AI-SDK `file` parts (perceive-only). Empty submissions (no text AND no
+   * files) are filtered.
+   */
+  onSubmit: (text: string, files?: FileUIPart[]) => void | Promise<void>;
   isStreaming: boolean;
+  /**
+   * The session's combined busy signal (streaming OR maintenance like
+   * compaction OR core-busy), as used by the turn-queue controller to decide
+   * whether a submit enqueues. Text can ride the queue, but the queue is
+   * text-only — so image submits are blocked whenever `busy`, not just while
+   * THIS client streams. Defaults to `isStreaming` when omitted.
+   */
+  busy?: boolean;
   onStop: () => void;
   placeholder?: string;
   autofocus?: boolean;
+  /**
+   * Whether the active model accepts image input. When false, pasted/dropped
+   * images are rejected at ingest (with a notice) and stripped at submit.
+   * Defaults to `true`.
+   */
+  multimodal?: boolean;
   /** Left-aligned footer content (e.g. the model picker). */
   toolbar?: ReactNode;
   className?: string;
@@ -87,13 +115,20 @@ function AgentComposerInner({
   commandActions,
   onSubmit,
   isStreaming,
+  busy,
   onStop,
   placeholder = "Ask anything…",
   autofocus,
+  multimodal = true,
   toolbar,
   className,
 }: Omit<AgentComposerInputProps, "catalog">) {
+  // The image-block gate must match the queue controller's enqueue decision,
+  // which keys off the combined busy signal — not just this client's stream.
+  // Fall back to `isStreaming` if the host doesn't pass `busy`.
+  const isBusy = busy ?? isStreaming;
   const composer = useComposer();
+  const { addAttachment } = composer;
 
   const actionById = useMemo(() => {
     const map = new Map<string, ComposerCommandAction>();
@@ -101,11 +136,86 @@ function AgentComposerInner({
     return map;
   }, [commandActions]);
 
+  // In-flight image encoding. Tracked through a ref (read synchronously by
+  // `submit`, which races the async `onImageFiles`) and mirrored to state (to
+  // disable the send button). A counter, not a boolean, so concurrent pastes
+  // don't clear the flag while another encode is still running.
+  const encodingCountRef = useRef(0);
+  const [isEncodingImages, setIsEncodingImages] = useState(false);
+
+  // Minimal, neutral inline feedback for the two cases that would otherwise do
+  // nothing visible: a non-vision model, or attempting to queue images.
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notify = useCallback((msg: string | null) => {
+    setNotice(msg);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    if (msg) noticeTimer.current = setTimeout(() => setNotice(null), 4000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    },
+    []
+  );
+
+  // Paste / drop image files → inline as perceive-only attachments. The model
+  // sees pixels, not a path; downscale/cap + SVG/non-image rejection live in
+  // `encodeImageFile`.
+  const onImageFiles = useCallback(
+    async (files: File[]) => {
+      if (!multimodal) {
+        notify("This model can't read images.");
+        return;
+      }
+      // Mark encode in-flight BEFORE the first await so a paste-then-Enter
+      // can't slip a text-only submit past the attachments (see `submit`).
+      encodingCountRef.current += 1;
+      setIsEncodingImages(true);
+      try {
+        // Encode concurrently — each file is independent, so a multi-image paste
+        // shouldn't serialize on the slowest one. Drop the ones that failed or
+        // were rejected (encodeImageFile returns null).
+        const encoded = (
+          await Promise.all(files.map((file) => encodeImageFile(file)))
+        ).filter((item) => item !== null);
+        for (const item of encoded) {
+          addAttachment({
+            name: item.name,
+            mime: item.mime,
+            size: item.size,
+            url: item.url,
+          });
+        }
+        // Feedback: clear the gate notice once an image lands; if every file
+        // failed to encode (corrupt, or unsupported like SVG), say so rather
+        // than silently swallowing the paste.
+        if (encoded.length > 0) {
+          notify(null);
+        } else {
+          notify(
+            "Couldn't add the image — it may be corrupted or unsupported."
+          );
+        }
+      } finally {
+        encodingCountRef.current -= 1;
+        if (encodingCountRef.current === 0) setIsEncodingImages(false);
+      }
+    },
+    [multimodal, addAttachment, notify]
+  );
+
   const submit = () => {
-    // No `isStreaming` early-return: submitting WHILE a turn streams is how a
-    // message gets queued (RFC `queue`). The host's `onSubmit` decides
-    // send-vs-enqueue; the round button stays Stop (abort) while streaming, so
-    // Enter is the queue affordance.
+    // Hold a submit while image encoding is still in flight — otherwise a
+    // paste-then-Enter races the async `onImageFiles` and sends text-only,
+    // dropping the attachment. Keep the editor content so the user can retry.
+    if (encodingCountRef.current > 0) {
+      notify("Still adding the image — one moment…");
+      return;
+    }
+    // No blanket `isStreaming` early-return: submitting WHILE a turn streams is
+    // how a TEXT message gets queued (RFC `queue`). Images are the exception —
+    // the turn queue persists text only, so image sends need an idle session.
     const message = composer.submit({ submitted_at: Date.now() });
     if (!message) return;
     // Intercept action commands (`/compact`, …) — run them instead of
@@ -120,9 +230,35 @@ function AgentComposerInner({
       return;
     }
     const text = lowerPrompt(message);
-    if (!text.trim()) return;
+    // Image attachments the user added; stripped when the model can't see them
+    // (e.g. switched to a non-multimodal model after attaching).
+    const images = toFileUiParts(message.parts);
+    const files = multimodal ? images : [];
+    // `files` empties while `images` doesn't only when the model can't read
+    // them — track it so neither the only-images nor the text+images path drops
+    // attachments silently.
+    const droppedImages = images.length > 0 && files.length === 0;
+    if (!text.trim() && files.length === 0) {
+      if (droppedImages) notify("This model can't read images.");
+      return;
+    }
+    // Images can't ride the text-only queue: block on the combined busy signal
+    // (streaming OR compaction OR core-busy) — the queue controller would
+    // enqueue text only and silently drop the attachment. Don't clear, so the
+    // user keeps their attachments until the session is idle.
+    if (isBusy && files.length > 0) {
+      notify(
+        "Can't add images while the session is busy — wait until it's idle."
+      );
+      return;
+    }
     composer.clear();
-    void onSubmit(text);
+    // Text still sends; if images were stripped (non-vision model) say so rather
+    // than dropping them silently. Otherwise clear any stale notice.
+    notify(
+      droppedImages ? "Images weren't sent — this model can't read them." : null
+    );
+    void onSubmit(text, files.length > 0 ? files : undefined);
   };
 
   return (
@@ -136,10 +272,15 @@ function AgentComposerInner({
       <ComposerContent
         autofocus={autofocus}
         onSubmitRequest={submit}
+        onImageFiles={onImageFiles}
         placeholder={placeholder}
         className="px-3 pt-2"
         editorClassName="min-h-9 max-h-48 overflow-y-auto text-sm"
       />
+      <ComposerAttachmentCards className="px-3 pb-1" />
+      {notice && (
+        <p className="px-3 pb-1 text-xs text-muted-foreground">{notice}</p>
+      )}
       <div className="flex items-center gap-1 px-2 pb-2 pt-1">
         {toolbar}
         <div className="ml-auto">
@@ -159,6 +300,7 @@ function AgentComposerInner({
               size="icon-sm"
               className="rounded-full"
               onClick={submit}
+              disabled={isEncodingImages}
               aria-label="Send"
             >
               <ArrowUpIcon className="size-4" />

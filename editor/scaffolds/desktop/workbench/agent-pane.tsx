@@ -43,8 +43,13 @@ import {
   sessions as bridgeSessions,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import { welcome_handoff } from "@/lib/desktop/welcome-handoff";
 import {
+  welcome_handoff,
+  type WelcomeHandoff,
+} from "@/lib/desktop/welcome-handoff";
+import _models from "@grida/ai-models";
+import {
+  buildAgentSend,
   desktopAgentTransport,
   isSessionBusy,
   useChatSession,
@@ -67,6 +72,7 @@ import {
   DesktopModelPicker,
   useModelPickerState,
 } from "../shared/model-picker";
+import { DesktopContextMeter } from "../shared/context-meter";
 import {
   AgentComposerInput,
   type ComposerCommandAction,
@@ -135,12 +141,15 @@ function AgentPaneContent({
 }: AgentPaneContentProps) {
   // Prompt handed off from the welcome composer. Peeked once (cached in a
   // ref so it stays stable after we clear it) to decide a fresh-session
-  // start; consumed + sent in the auto-send effect below.
-  const handoffRef = useRef<string | null | undefined>(undefined);
+  // start; consumed + sent in the auto-send effect below. Carries the
+  // composer's model pick so the first turn runs on it (see the model
+  // state seed below).
+  const handoffRef = useRef<WelcomeHandoff | null | undefined>(undefined);
   if (handoffRef.current === undefined) {
     handoffRef.current = welcome_handoff.peek(workspace.id);
   }
-  const handoffPrompt = handoffRef.current;
+  const handoff = handoffRef.current;
+  const handoffPrompt = handoff?.prompt ?? null;
 
   // Composer catalog: `@` file references + `/` skill commands.
   const catalog = useWorkspaceComposerCatalog(workspace.id);
@@ -267,12 +276,27 @@ function AgentPaneContent({
     setMessages(chatSession.initial_messages);
   }, [chatSession.initial_messages, setMessages]);
 
-  // Flat model selection (ignores tiers). Seeds from the active
-  // session's stored model and rides each send as `body.modelId`.
+  // Flat model selection (ignores tiers). Seeds from the welcome
+  // composer's pick on a handed-off fresh session, otherwise from the
+  // active session's stored model, and rides each send as `body.modelId`.
   const { model_id: modelId, setModelId } = useModelPickerState({
     current_id: chatSession.current_id,
     sessions: chatSession.sessions,
+    initial: handoff?.model_id,
   });
+
+  // Whether the active model accepts image input — memoized so the catalog
+  // lookup doesn't re-scan on every render (only when the model changes).
+  const multimodal = useMemo(
+    () => _models.text.modelSpecById(modelId)?.multimodal ?? false,
+    [modelId]
+  );
+
+  // The active session row carries the rolled-up cost the context meter
+  // surfaces alongside the (real) window %.
+  const activeSession = chatSession.sessions.find(
+    (s) => s.id === chatSession.current_id
+  );
 
   // On every turn end: refresh the sessions list (the sidecar writes the title
   // + usage after the last frame) AND bump `onMaybeMutated` (the agent may have
@@ -304,17 +328,12 @@ function AgentPaneContent({
   } = useTurnQueueController({
     sessionId: chatSession.current_id,
     busy,
-    send: (text) =>
-      sendMessage(
-        { text },
-        {
-          body: {
-            session_id: chatSession.current_id ?? undefined,
-            skills: skillsForActiveTab(activeRelPath),
-            model_id: modelId,
-          },
-        }
-      ),
+    send: buildAgentSend({
+      sendMessage,
+      sessionId: chatSession.current_id,
+      modelId,
+      skills: skillsForActiveTab(activeRelPath),
+    }),
   });
 
   // React to the CORE drain (RFC `queue`): when the core fires a queued turn (a
@@ -480,9 +499,18 @@ function AgentPaneContent({
           commandActions={commandActions}
           onSubmit={onSubmit}
           isStreaming={isStreaming}
+          busy={busy}
           onStop={stop}
+          multimodal={multimodal}
           toolbar={
-            <DesktopModelPicker value={modelId} onValueChange={setModelId} />
+            <>
+              <DesktopModelPicker value={modelId} onValueChange={setModelId} />
+              <DesktopContextMeter
+                messages={messages}
+                modelId={modelId}
+                costUsd={activeSession?.cost_usd}
+              />
+            </>
           }
         />
       </div>

@@ -20,7 +20,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { isTextUIPart } from "ai";
+import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
@@ -122,10 +122,37 @@ export function ChatMessageView({
       .filter(isTextUIPart)
       .map((part) => part.text)
       .join("");
+    // Inline image attachments the user pasted/dropped (perceive-only `file`
+    // parts). Rendered as thumbnails in the bubble so the sent message mirrors
+    // what the model received.
+    const images = message.parts.filter(
+      (part): part is FileUIPart =>
+        isFileUIPart(part) && part.mediaType.startsWith("image/")
+    );
     return (
       <Message from="user">
         <MessageContent>
-          <MessageResponse plugins={markdown.plugins}>{text}</MessageResponse>
+          {images.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {images.map((image, index) => (
+                // Index key: a sent user message's attachments are immutable and
+                // never reorder, so the index is stable — and it avoids putting a
+                // multi-MB data-URL into the key (which React keeps + compares).
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={index}
+                  src={image.url}
+                  alt={image.filename ?? ""}
+                  loading="lazy"
+                  decoding="async"
+                  className="max-h-48 max-w-full rounded-md border object-contain"
+                />
+              ))}
+            </div>
+          )}
+          {text.length > 0 && (
+            <MessageResponse plugins={markdown.plugins}>{text}</MessageResponse>
+          )}
         </MessageContent>
         {/* Subtle until hover so the transcript stays clean; right-aligned
             to sit under the user bubble. Copy is always available (a pure

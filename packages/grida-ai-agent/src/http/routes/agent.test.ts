@@ -399,3 +399,174 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     expect((textPart!.data as { text: string }).text).toBe("partial");
   });
 });
+
+describe("HTTP wire — inline image attachments (perceive-only)", () => {
+  let baseDir: string;
+  let sessionsStore: SessionsStore;
+  let streamRegistry: StreamRegistry;
+  let runtime: AgentRuntime;
+  let app: Hono;
+  // What each model run actually received (the rebuilt model view). The run
+  // loop runs for real; only the upstream model call is captured + faked.
+  let capturedRuns: Array<{ messages: unknown[] }>;
+
+  // A tiny inline image — never decoded in this path (no real model); it only
+  // needs to survive persist → listVisibleMessages → lowerParts → runAgent.
+  const PNG_DATA_URL = "data:image/png;base64,iVBORw0KGgo=";
+
+  const capturingRunAgent = async (
+    _provider: unknown,
+    req: { messages: unknown[] }
+  ): Promise<Response> => {
+    capturedRuns.push({ messages: req.messages });
+    return new Response(
+      'data: {"type":"text-start","id":"t0"}\n\n' +
+        'data: {"type":"text-delta","id":"t0","delta":"ok"}\n\n' +
+        'data: {"type":"text-end","id":"t0"}\n\n' +
+        "data: [DONE]\n\n",
+      { headers: { "content-type": "text/event-stream" } }
+    );
+  };
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-agent-image-"));
+    const auth = new AuthStore(baseDir);
+    const secrets = new SecretsStore(auth);
+    await secrets.set("openrouter", "sk-test");
+    const db = openSessionsDb({ user_data_path: baseDir });
+    sessionsStore = new SessionsStore(db);
+    const workspaceRegistry = new WorkspaceRegistry(baseDir);
+    streamRegistry = new StreamRegistry();
+    capturedRuns = [];
+    app = new Hono();
+    runtime = new AgentRuntime({
+      secrets,
+      workspace_registry: workspaceRegistry,
+      sessions_store: sessionsStore,
+      streams: streamRegistry,
+      run_agent: capturingRunAgent as never,
+      drain_cooldown_ms: 20,
+    });
+    registerAgentRoutes(app, runtime);
+  });
+
+  afterEach(async () => {
+    runtime.dispose();
+    sessionsStore.close();
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  function fileParts(messages: unknown[]): Array<Record<string, unknown>> {
+    const out: Array<Record<string, unknown>> = [];
+    for (const m of messages as Array<{ parts?: unknown[] }>) {
+      for (const p of m.parts ?? []) {
+        const part = p as { type?: string };
+        if (part.type === "file") out.push(part as Record<string, unknown>);
+      }
+    }
+    return out;
+  }
+
+  it("forwards an inline image file part to the model on the turn it is sent", async () => {
+    const res = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [
+          {
+            id: "u1",
+            role: "user",
+            parts: [
+              { type: "text", text: "what is in this image?" },
+              {
+                type: "file",
+                mediaType: "image/png",
+                url: PNG_DATA_URL,
+                filename: "shot.png",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const sessionId = sessionIdFromSse(await res.text());
+    expect(sessionId).toBeTruthy();
+
+    // The model received the image — proves persist → listVisibleMessages →
+    // lowerParts → runAgent carries the file part through.
+    expect(capturedRuns.length).toBeGreaterThan(0);
+    expect(fileParts(capturedRuns[0].messages)).toContainEqual(
+      expect.objectContaining({
+        type: "file",
+        url: PNG_DATA_URL,
+        mediaType: "image/png",
+      })
+    );
+
+    // Settle the recorder's async write chain before teardown closes the DB.
+    await vi.waitFor(async () => {
+      const msgs = await sessionsStore.listMessages(sessionId);
+      expect(msgs.some((m) => m.role === "assistant")).toBe(true);
+    });
+  });
+
+  it("re-delivers the image on a later text-only turn (DB-rebuild durability)", async () => {
+    // Turn 1 — send the image.
+    const r1 = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [
+          {
+            id: "u1",
+            role: "user",
+            parts: [
+              { type: "text", text: "remember this image" },
+              {
+                type: "file",
+                mediaType: "image/png",
+                url: PNG_DATA_URL,
+                filename: "shot.png",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(r1.status).toBe(200);
+    const sessionId = sessionIdFromSse(await r1.text());
+    expect(sessionId).toBeTruthy();
+
+    // Let turn 1 fully end so the second run doesn't race a 409 (a `create`
+    // replaces an ended entry but throws while one is still "running").
+    await vi.waitFor(() => {
+      const entry = streamRegistry.get(sessionId);
+      expect(entry === undefined || entry.status === "ended").toBe(true);
+    });
+
+    // Turn 2 — a NEW text-only message, NOT resending the image. The DB still
+    // holds it, so the rebuilt model view must still carry the file part.
+    const r2 = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        session_id: sessionId,
+        messages: [
+          {
+            id: "u2",
+            role: "user",
+            parts: [{ type: "text", text: "what did it say?" }],
+          },
+        ],
+      }),
+    });
+    expect(r2.status).toBe(200);
+    await r2.text();
+
+    await vi.waitFor(() => {
+      expect(capturedRuns.length).toBeGreaterThanOrEqual(2);
+    });
+    const lastTurn = capturedRuns[capturedRuns.length - 1];
+    expect(fileParts(lastTurn.messages)).toContainEqual(
+      expect.objectContaining({ type: "file", url: PNG_DATA_URL })
+    );
+  });
+});

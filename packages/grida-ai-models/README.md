@@ -58,13 +58,19 @@ resolved `Record<ModelTier, ModelSpec>`.
 Each `ModelSpec` contains:
 
 - `id`
-- `label`
+- `label` — full human-readable name (e.g. `"Claude Opus 4.8"`)
+- `short_label` — optional, manually-curated compact name for space-constrained
+  UI (e.g. `"Opus 4.8"`); falls back to `label` when unset
 - `multimodal`
 - `contextWindow`
 - `outputLimit`
 - `cost`
 
 Token costs are stored as USD per 1 million tokens.
+
+For UI that needs the compact name, call `models.text.displayLabel(spec)` — it
+returns `short_label` when present and `label` otherwise, so call sites never
+repeat the fallback.
 
 ## Media Models
 

@@ -9,7 +9,7 @@ import {
   createAgentHostFixture,
   type AgentHostFixture,
 } from "../test/agent-host-fixture";
-import { runAgent } from "./run-agent";
+import { runAgent, type AgentStepUsage } from "./run-agent";
 import {
   createWorkspaceAgentBindings,
   WorkspaceAgentFsBackend,
@@ -182,5 +182,75 @@ describe("agent workspace bindings", () => {
 
     expect(response.status).toBe(200);
     expect(modelFactory).toHaveBeenCalled();
+  });
+
+  it("forwards camelCase SDK step usage to on_step_usage as snake_case (regression: usage was silently zeroed)", async () => {
+    await fixture.write_workspace_file("canvas.svg", "<svg/>");
+    const modelFactory = vi.fn(
+      () =>
+        new MockLanguageModelV3({
+          provider: "openrouter",
+          modelId: "openai/gpt-5.4-nano",
+          doStream: {
+            stream: simulateReadableStream({
+              chunks: [
+                { type: "stream-start", warnings: [] },
+                { type: "text-start", id: "t" },
+                { type: "text-delta", id: "t", delta: "ok" },
+                { type: "text-end", id: "t" },
+                {
+                  type: "finish",
+                  finishReason: { unified: "stop", raw: "stop" },
+                  usage: {
+                    inputTokens: {
+                      total: 7,
+                      noCache: 7,
+                      cacheRead: undefined,
+                      cacheWrite: undefined,
+                    },
+                    outputTokens: { total: 3, text: 3, reasoning: undefined },
+                  },
+                },
+              ],
+            }),
+          },
+        })
+    );
+
+    const usages: AgentStepUsage[] = [];
+    const response = await runAgent(
+      {
+        provider_id: "openrouter",
+        kind: "byok",
+        model_factory: modelFactory,
+      },
+      {
+        messages: [
+          { id: "m", role: "user", parts: [{ type: "text", text: "hi" }] },
+        ] as never,
+        tier: AGENT_DEFAULT_TIER,
+        signal: new AbortController().signal,
+        workspace_root: fixture.workspace_root,
+        on_step_usage: (u) => usages.push(u),
+      },
+      { workspace_registry: fixture.registry }
+    );
+
+    // Drain the SSE stream so the step completes, onStepFinish fires, and the
+    // finish message-metadata is emitted.
+    const body = await response.text();
+
+    // 1) on_step_usage hook receives snake_case values (DB rollup path).
+    expect(usages.length).toBeGreaterThan(0);
+    const last = usages.at(-1)!;
+    // Pre-fix, the bare cast left these undefined (camelCase keys never read).
+    expect(last.input_tokens).toBe(7);
+    expect(last.output_tokens).toBe(3);
+
+    // 2) The stream carries usage as message metadata (live context-meter
+    //    path) — `input` is cache-normalized: 7 input − 0 cache_read = 7.
+    expect(body).toContain('"usage"');
+    expect(body).toMatch(/"input":7/);
+    expect(body).toMatch(/"output":3/);
   });
 });

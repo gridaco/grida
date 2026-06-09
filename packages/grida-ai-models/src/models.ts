@@ -76,8 +76,14 @@ export namespace models {
     export interface ModelSpec {
       /** Provider-namespaced model id (`creator/model-name`). */
       id: string;
-      /** Human-readable label. */
+      /** Human-readable label (full name, e.g. "Claude Opus 4.8"). */
       label: string;
+      /**
+       * Optional compact name for space-constrained UI (e.g. "Opus 4.8").
+       * Manually curated — not derived. Falls back to {@link label} when
+       * unset; use {@link displayLabel} to resolve.
+       */
+      short_label?: string;
       /** Whether the model accepts image/file inputs. */
       multimodal: boolean;
       /** Maximum context window in tokens (input + output combined). */
@@ -129,6 +135,7 @@ export namespace models {
       "anthropic/claude-sonnet-4.6": {
         id: "anthropic/claude-sonnet-4.6",
         label: "Claude Sonnet 4.6",
+        short_label: "Sonnet 4.6",
         multimodal: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
@@ -137,6 +144,7 @@ export namespace models {
       "anthropic/claude-opus-4.8": {
         id: "anthropic/claude-opus-4.8",
         label: "Claude Opus 4.8",
+        short_label: "Opus 4.8",
         multimodal: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
@@ -145,6 +153,7 @@ export namespace models {
       "anthropic/claude-opus-4.7": {
         id: "anthropic/claude-opus-4.7",
         label: "Claude Opus 4.7",
+        short_label: "Opus 4.7",
         multimodal: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
@@ -164,6 +173,7 @@ export namespace models {
       "google/gemini-3.1-pro-preview": {
         id: "google/gemini-3.1-pro-preview",
         label: "Gemini 3.1 Pro Preview",
+        short_label: "Gemini 3.1 Pro",
         multimodal: true,
         contextWindow: 1_048_576,
         outputLimit: 65_536,
@@ -215,6 +225,15 @@ export namespace models {
         }
       }
       return undefined;
+    }
+
+    /**
+     * The label to show in UI: the curated short name ({@link ModelSpec.short_label})
+     * if present, otherwise the full {@link ModelSpec.label}. Centralizes the
+     * fallback so call sites never repeat `spec.short_label ?? spec.label`.
+     */
+    export function displayLabel(spec: ModelSpec): string {
+      return spec.short_label ?? spec.label;
     }
   }
 

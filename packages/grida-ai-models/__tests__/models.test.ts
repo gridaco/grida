@@ -73,3 +73,23 @@ describe("models.text.byTier", () => {
     }
   });
 });
+
+describe("models.text.displayLabel", () => {
+  it("returns the curated short name when present", () => {
+    const spec = models.text.catalog["anthropic/claude-opus-4.8"];
+    expect(spec.short_label).toBe("Opus 4.8");
+    expect(models.text.displayLabel(spec)).toBe("Opus 4.8");
+  });
+
+  it("falls back to the full label when short_label is unset", () => {
+    const spec = models.text.catalog["openai/gpt-5.4-nano"];
+    expect(spec.short_label).toBeUndefined();
+    expect(models.text.displayLabel(spec)).toBe(spec.label);
+  });
+
+  it("drops the 'Preview' suffix for the Gemini 3.1 Pro preview", () => {
+    const spec = models.text.catalog["google/gemini-3.1-pro-preview"];
+    expect(spec.label).toBe("Gemini 3.1 Pro Preview");
+    expect(models.text.displayLabel(spec)).toBe("Gemini 3.1 Pro");
+  });
+});

@@ -109,12 +109,12 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json && tsc --noEmit -p tsconfig.browser-backends.json"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "3.0.66",
-    "@ai-sdk/openai-compatible": "2.0.47",
+    "@ai-sdk/gateway": "3.0.125",
+    "@ai-sdk/openai-compatible": "2.0.48",
     "@grida/ai-models": "workspace:*",
     "@grida/home": "workspace:*",
     "@hono/node-server": "^1.13.7",
-    "ai": "6.0.116",
+    "ai": "6.0.197",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.6.14",
     "zod": "^4"

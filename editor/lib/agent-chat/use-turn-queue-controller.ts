@@ -18,6 +18,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import type { FileUIPart } from "ai";
 import { decideSubmit } from "./turn-queue";
 import { useQueuedMessages } from "./use-queued-messages";
 import type { ChatMessageWithParts } from "@/lib/desktop/bridge";
@@ -34,9 +35,10 @@ export type UseTurnQueueControllerArgs = {
   /**
    * Start a brand-new turn NOW (the session is idle). The surface owns the
    * request body (model, skills, session id). Called by {@link submit} when
-   * the session is not busy.
+   * the session is not busy. `files` carries inline image attachments
+   * (perceive-only) on the immediate-send path only.
    */
-  send: (text: string) => void | Promise<void>;
+  send: (text: string, files?: FileUIPart[]) => void | Promise<void>;
 };
 
 export type UseTurnQueueControllerResult = {
@@ -47,8 +49,10 @@ export type UseTurnQueueControllerResult = {
   /** Local-only tray removal — used to PROMOTE a row the core just fired into
    *  the transcript (atomic move, no server delete). */
   drop: (messageId: string) => void;
-  /** The composer's submit handler: enqueue while busy, else send now. */
-  submit: (text: string) => Promise<void>;
+  /** The composer's submit handler: enqueue while busy, else send now.
+   *  `files` (inline images) only flow on the send-now path — the queue is
+   *  text-only, and the composer blocks image submits while busy. */
+  submit: (text: string, files?: FileUIPart[]) => Promise<void>;
   /** Re-read the queue from the core (reconcile the mirror after a drain). */
   refetch: () => Promise<void>;
 };
@@ -68,18 +72,23 @@ export function useTurnQueueController(
   const sendRef = useRef(args.send);
   sendRef.current = args.send;
 
-  const submit = useCallback(async (text: string) => {
+  const submit = useCallback(async (text: string, files?: FileUIPart[]) => {
     const t = text.trim();
-    if (!t) return;
+    const hasFiles = !!files && files.length > 0;
+    if (!t && !hasFiles) return;
     const sid = sessionIdRef.current;
     if (decideSubmit({ busy: busyRef.current }) === "enqueue") {
       // Queue behind the busy session. A null session can't be mid-turn (the
       // first turn is never in flight), so there is nothing to queue against —
-      // drop it rather than enqueue into the void.
-      if (sid) await enqueueRef.current(sid, t);
+      // drop it rather than enqueue into the void. The queue is text-only;
+      // image submits are blocked at the composer while busy, so `files` never
+      // reaches this branch. Require non-empty `t` too: a files-only submit
+      // would otherwise queue an empty turn (the early `!t && !hasFiles` guard
+      // lets `!t && hasFiles` through).
+      if (sid && t) await enqueueRef.current(sid, t);
       return;
     }
-    await sendRef.current(t);
+    await sendRef.current(t, files);
   }, []);
 
   return {

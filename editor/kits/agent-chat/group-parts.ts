@@ -6,6 +6,13 @@ import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
  * Consecutive reasoning deltas merge into one block, and consecutive tool
  * calls collapse into one group; part kinds the renderer doesn't handle
  * (file / source / step markers) are dropped.
+ *
+ * Note on `file` parts: user-message images render inline via a dedicated
+ * branch in `message.tsx` (perceive-only attachments), NOT through this
+ * grouping. Assistant `file` parts are intentionally dropped here — the agent
+ * produces none in the current scope. If assistant-emitted files ever need
+ * rendering, promote `file` to a first-class `RenderGroup` rather than adding
+ * another ad-hoc branch.
  */
 export type RenderGroup =
   | { type: "text"; key: string; text: string }

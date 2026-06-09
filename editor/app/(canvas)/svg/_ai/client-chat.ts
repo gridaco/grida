@@ -45,12 +45,19 @@ export function makeSvgEditorChat(
       const output =
         AgentFs.resolveToolCall(fs, agentToolCall) ??
         AgentTodos.resolveToolCall(todos, agentToolCall);
-      if (output === undefined) return;
+      // Unclaimed (no resolver returned a result) — not ours to answer. `== null`
+      // covers both undefined (no resolver matched) and null (a resolver's
+      // "miss"); the SDK's output type rejects null anyway.
+      if (output == null) return;
+      // The fs/todos resolvers dispatch on the tool name at runtime and return
+      // that tool's output shape. `addToolResult` is statically keyed per tool
+      // (`TOOL extends keyof tools`); bridge the dynamic resolver to it with one
+      // cast rather than threading per-tool output unions through it.
       chat.addToolResult({
         tool: toolCall.toolName,
         toolCallId: toolCall.toolCallId,
         output,
-      });
+      } as Parameters<typeof chat.addToolResult>[0]);
     },
   });
 
