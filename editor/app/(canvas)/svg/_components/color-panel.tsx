@@ -108,8 +108,19 @@ export function PaintRow({
   const isSolid = shape.kind === "solid";
   const pickerHex = isSolid ? shape.hex : "#000000";
 
+  // A discrete paint choice — a preset swatch, "none", or a committed hex —
+  // is an absolute, atomic write. Discard any in-flight picker-drag preview
+  // first: otherwise the popover's close-time `preview.commit()` would replay
+  // the stale dragged value *after* this write, splitting undo history (the
+  // discrete choice wouldn't be the final state, and undo could revert past
+  // it). `discard()` is a no-op when no drag session is open.
+  const commitPaint = (paint: Paint) => {
+    preview.discard();
+    onSetPaint(paint);
+  };
+
   const setSolidHex = (hex: string) =>
-    onSetPaint({ kind: "color", value: { kind: "rgb", value: hex } });
+    commitPaint({ kind: "color", value: { kind: "rgb", value: hex } });
 
   // hex input — controlled, validated on commit. Read-only for non-solid.
   const inputValue =
@@ -174,7 +185,7 @@ export function PaintRow({
           </div>
           <button
             type="button"
-            onClick={() => onSetPaint({ kind: "none" })}
+            onClick={() => commitPaint({ kind: "none" })}
             className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1 text-xs hover:bg-muted/50 cursor-pointer"
           >
             <NoneSwatch className="size-3.5" />
