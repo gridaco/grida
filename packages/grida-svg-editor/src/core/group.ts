@@ -223,8 +223,13 @@ export namespace group {
     // visual / cascade / reference state we refuse to flatten.
     let has_id = false;
     for (const a of doc.attributes_of(id)) {
+      // Reject any namespaced own-attribute: the allowlist names the
+      // un-namespaced structural attrs (`transform` / `id` / `data-grida-id`).
+      // A namespaced attribute whose local name happens to match (e.g.
+      // `x:transform`) is unknown state we won't flatten.
+      if (a.ns !== null) return null;
       if (!UNGROUP_OWN_ATTR_ALLOWLIST.has(a.name)) return null;
-      if (a.name === "id" && a.ns === null) has_id = true;
+      if (a.name === "id") has_id = true;
     }
 
     // <use> reference check. `find_by_tag` cheaply enumerates every

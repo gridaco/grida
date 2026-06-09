@@ -421,7 +421,7 @@ Current implementation notes:
   `reorder` (`]` / `[` / `Cmd+]` / `Cmd+[`, direction via `args`).
 - Missing (per `docs/keybindings.md` `[~]` and `[-]`): `selection.duplicate`
   (Cmd+D), `clipboard.cut` / `copy` / `paste`, distribute
-  (`Alt+Ctrl+H`/`V`), ungroup (Cmd+Shift+G), `paint.remove_fill` /
+  (`Alt+Ctrl+H`/`V`), `paint.remove_fill` /
   `remove_stroke` / `swap` / `set_opacity`, visibility / lock toggles,
   viewport keys (zoom is in `gestures/defaults.ts` instead — see below),
   no tool-letter shortcuts (`V`/`R`/`O`/…) because the editor has no
@@ -526,8 +526,8 @@ state.
 The grouping spec below is implemented as of `selection.group` + `Cmd+G`.
 The accept/reject decision tree (cross-parent, non-contiguous, constrained
 parents, valid `<g>`-child predicate) and the round-trip / whitespace
-caveats are documented in [`docs/grouping.md`](docs/grouping.md). Ungrouping is
-still open — see the §Ungrouping section below.
+caveats are documented in [`docs/grouping.md`](docs/grouping.md). Ungrouping has
+shipped — see the §Ungrouping section below.
 
 Use the real SVG `<g>` element as the grouping primitive.
 

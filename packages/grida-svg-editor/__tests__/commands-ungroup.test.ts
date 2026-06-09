@@ -168,6 +168,16 @@ describe("commands.ungroup — refuses out-of-scope structure", () => {
     expect(editor.serialize()).toBe(original);
   });
 
+  it("refuses a group referenced by <use xlink:href> (legacy namespace)", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100"><g id="grp"><rect x="0" y="0" width="10" height="10"/></g><use xlink:href="#grp"/></svg>`;
+    const editor = createSvgEditor({ svg });
+    const group = first_by_tag(editor, "g");
+    editor.commands.select(group);
+    const original = editor.serialize();
+    expect(editor.commands.ungroup()).toBe(false);
+    expect(editor.serialize()).toBe(original);
+  });
+
   it("refuses a group with a direct animation child", () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="2s"/><rect x="0" y="0" width="10" height="10"/></g></svg>`;
     const editor = createSvgEditor({ svg });

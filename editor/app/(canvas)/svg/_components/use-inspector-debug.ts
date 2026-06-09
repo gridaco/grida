@@ -19,7 +19,13 @@ let hydrated = false;
 function hydrate(): void {
   if (hydrated || typeof window === "undefined") return;
   hydrated = true;
-  value = window.localStorage.getItem(STORAGE_KEY) === "true";
+  // `localStorage` access throws in storage-restricted contexts (private
+  // mode, sandboxed iframes, disabled cookies) — fall back to the default.
+  try {
+    value = window.localStorage.getItem(STORAGE_KEY) === "true";
+  } catch {
+    value = false;
+  }
 }
 
 function subscribe(cb: () => void): () => void {
@@ -33,10 +39,18 @@ function getSnapshot(): boolean {
 }
 
 export function setInspectorDebug(next: boolean): void {
+  // Hydrate first so the equality check compares against persisted state,
+  // not the pre-hydration default (else a `set(false)` before any read
+  // no-ops against a stale `value` and never persists).
+  hydrate();
   if (next === value) return;
   value = next;
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(STORAGE_KEY, String(next));
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(next));
+    } catch {
+      // Persistence unavailable; keep in-memory behavior.
+    }
   }
   listeners.forEach((cb) => cb());
 }
