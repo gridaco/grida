@@ -21,7 +21,11 @@
  * flags, handled per-command below.
  */
 
-/** Pure inspectors: no flag turns these into a write/exec under `shell: false`. */
+/**
+ * Pure inspectors: no flag turns these into a write/exec under `shell: false`.
+ * `rg` is deliberately NOT here — it has a process-spawning flag (`--pre`) and is
+ * flag-filtered below, the same way `find` and `git` are.
+ */
 const READ_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "ls",
   "pwd",
@@ -31,7 +35,6 @@ const READ_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "tail",
   "wc",
   "grep",
-  "rg",
 ]);
 
 /** `find` is read-only UNLESS it spawns a process or deletes/writes. */
@@ -46,6 +49,25 @@ const FIND_MUTATING_FLAGS: ReadonlySet<string> = new Set([
   "-fprintf",
   "-fls",
 ]);
+
+/**
+ * `rg` (ripgrep) is read-only UNLESS it spawns a process. `--pre=CMD` runs CMD on
+ * EVERY searched file (arbitrary code execution — ripgrep's own help warns it
+ * spawns a process per file), and `--hostname-bin=CMD` runs CMD to resolve the
+ * hostname. Both take a value, so guard the bare (`--pre value`) and `=`-joined
+ * (`--pre=value`) forms. `--pre-glob` is harmless on its own and is intentionally
+ * not matched here (it only narrows which files an already-present `--pre` runs on).
+ */
+const RG_EXEC_FLAGS: ReadonlySet<string> = new Set(["--pre", "--hostname-bin"]);
+
+function rgArgsAreReadOnly(args: readonly string[]): boolean {
+  return !args.some(
+    (a) =>
+      RG_EXEC_FLAGS.has(a) ||
+      a.startsWith("--pre=") ||
+      a.startsWith("--hostname-bin=")
+  );
+}
 
 /**
  * `git` subcommands that touch neither the working tree nor a remote.
@@ -107,6 +129,10 @@ export function isReadOnlyCommand(
 
   if (cmd === "find") {
     return !args.some((a) => FIND_MUTATING_FLAGS.has(a));
+  }
+
+  if (cmd === "rg") {
+    return rgArgsAreReadOnly(args);
   }
 
   if (cmd === "git") {

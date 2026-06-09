@@ -20,7 +20,6 @@ describe("isReadOnlyCommand", () => {
       "tail",
       "wc",
       "grep",
-      "rg",
     ]) {
       expect(isReadOnlyCommand(cmd, [])).toBe(true);
     }
@@ -61,6 +60,29 @@ describe("isReadOnlyCommand", () => {
     expect(isReadOnlyCommand("find", [".", "-delete"])).toBe(false);
     expect(isReadOnlyCommand("find", [".", "-execdir", "sh", "-c", "x"])).toBe(
       false
+    );
+  });
+
+  it("treats rg as read-only only without process-spawning flags (--pre/--hostname-bin)", () => {
+    expect(isReadOnlyCommand("rg", ["pattern", "."])).toBe(true);
+    expect(isReadOnlyCommand("rg", [])).toBe(true);
+    expect(isReadOnlyCommand("rg", ["--glob", "*.ts", "pattern"])).toBe(true);
+    // --pre runs a command on every searched file → arbitrary exec.
+    expect(isReadOnlyCommand("rg", ["--pre", "evil.sh", "pattern", "."])).toBe(
+      false
+    );
+    expect(isReadOnlyCommand("rg", ["--pre=evil.sh", "pattern", "."])).toBe(
+      false
+    );
+    expect(
+      isReadOnlyCommand("rg", ["--hostname-bin", "evil.sh", "pattern"])
+    ).toBe(false);
+    expect(isReadOnlyCommand("rg", ["--hostname-bin=evil.sh", "pattern"])).toBe(
+      false
+    );
+    // --pre-glob alone (no --pre) is harmless and must NOT be falsely flagged.
+    expect(isReadOnlyCommand("rg", ["--pre-glob", "*.pdf", "pattern"])).toBe(
+      true
     );
   });
 

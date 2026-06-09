@@ -422,7 +422,12 @@ request therefore cannot inject a tool call, approve something never asked, or
 rewrite assistant history — it can only supply the boolean the host is already
 waiting on. The recorder persists the `approval-requested` state and the
 model-view rebuild (`message-view.ts`) lowers `approval-responded`/`output-denied`
-parts so the SDK resumes (runs) or skips (denies) the call.
+parts so the SDK resumes (runs) or skips (denies) the call. Symmetrically, a send
+that does **not** answer the pending approval cannot run _ahead_ of it: the run
+handler (`runtime/index.ts`) refuses to start a new turn while an approval is
+unanswered (HTTP 409 `approval-pending`) — the same fail-closed invariant the
+queue drain enforces (`session-scheduler.ts` `has_pending_approval`). So neither a
+forged answer nor a typed-ahead follow-up can bypass or orphan the block.
 
 Three structural checks hold regardless of mode: the
 cwd-must-be-inside-an-opened-workspace check, the in-process secret-arg

@@ -439,12 +439,13 @@ export class AgentRuntime {
       approval_answer: approvalAnswer,
     } = req;
 
-    await persistIncomingTail(this.deps.sessions_store, sessionId, messages);
     // Supervised-approval resume (RFC `permission modes`, Phase 2): if this
     // re-submit carries an Allow/Deny (the explicit `approval_answer` body
-    // field), apply it to the persisted part BEFORE the model view is rebuilt —
-    // otherwise the rebuild would still see `approval-requested` and the run
-    // would not resume.
+    // field), apply it to the persisted part BEFORE anything else — the
+    // pending-approval guard below must see the cleared state, and the model
+    // view rebuilt in `startTurn` must no longer see `approval-requested` or the
+    // run would not resume. `applyApprovalAnswer` flips a part persisted by the
+    // PRIOR turn, so it does not depend on the incoming tail being persisted yet.
     if (approvalAnswer) {
       await applyApprovalAnswer(
         this.deps.sessions_store,
@@ -452,6 +453,30 @@ export class AgentRuntime {
         approvalAnswer
       );
     }
+
+    // Fail closed on an unanswered supervised approval — the SAME invariant the
+    // scheduler's drain enforces (`session-scheduler.ts` `has_pending_approval`):
+    // never start a NEW turn while an approval is pending. `buildModelMessages`
+    // drops the unanswered `approval-requested` part, so a turn started here would
+    // orphan the blocked command and run the next message ahead of it. A valid
+    // `approval_answer` above clears the block; a missing / forged / stale one
+    // leaves it pending. The client normally queues sends while an approval is
+    // pending (it never POSTs here), so this is the server-authoritative guard for
+    // a direct or forged send. We bail BEFORE persisting the incoming tail so a
+    // typed-ahead follow-up isn't recorded against a refused turn.
+    if (await this.deps.sessions_store.hasPendingApproval(sessionId)) {
+      return Response.json(
+        {
+          error:
+            "a supervised approval is pending; resolve it before starting a new turn",
+          code: "approval-pending",
+          session_id: sessionId,
+        },
+        { status: 409 }
+      );
+    }
+
+    await persistIncomingTail(this.deps.sessions_store, sessionId, messages);
 
     // Fire-and-forget title generation; writes title only if still the
     // default sentinel, so a user rename always wins. Failures swallowed.
