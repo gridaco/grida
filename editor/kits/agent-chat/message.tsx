@@ -19,8 +19,15 @@
 
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
+import { cn } from "@app/ui/lib/utils";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
@@ -139,27 +146,32 @@ export function ChatMessageView({
     return (
       <Message from="user">
         <MessageContent>
-          {images.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {images.map((image, index) => (
-                // Index key: a sent user message's attachments are immutable and
-                // never reorder, so the index is stable — and it avoids putting a
-                // multi-MB data-URL into the key (which React keeps + compares).
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={index}
-                  src={image.url}
-                  alt={image.filename ?? ""}
-                  loading="lazy"
-                  decoding="async"
-                  className="max-h-48 max-w-full rounded-md border object-contain"
-                />
-              ))}
-            </div>
-          )}
-          {text.length > 0 && (
-            <MessageResponse plugins={markdown.plugins}>{text}</MessageResponse>
-          )}
+          <CollapsibleBubbleBody>
+            {images.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {images.map((image, index) => (
+                  // Index key: a sent user message's attachments are immutable
+                  // and never reorder, so the index is stable — and it avoids
+                  // putting a multi-MB data-URL into the key (which React keeps
+                  // + compares).
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={index}
+                    src={image.url}
+                    alt={image.filename ?? ""}
+                    loading="lazy"
+                    decoding="async"
+                    className="max-h-48 max-w-full rounded-md border object-contain"
+                  />
+                ))}
+              </div>
+            )}
+            {text.length > 0 && (
+              <MessageResponse plugins={markdown.plugins}>
+                {text}
+              </MessageResponse>
+            )}
+          </CollapsibleBubbleBody>
         </MessageContent>
         {/* Subtle until hover so the transcript stays clean; right-aligned
             to sit under the user bubble. Copy is always available (a pure
@@ -247,6 +259,97 @@ export function ChatMessageView({
         </MessageActions>
       )}
     </Message>
+  );
+}
+
+/**
+ * Height (px) a user bubble is clamped to before the "Show more" affordance
+ * kicks in. Roughly ten lines at the bubble's `leading-6` — tall enough that
+ * an ordinary message never collapses, short enough that a pasted wall of text
+ * doesn't push the rest of the transcript off-screen.
+ */
+const BUBBLE_COLLAPSE_THRESHOLD_PX = 240;
+
+// Layout-effect that degrades to a no-op on the server. The transcript is
+// client-state-driven (messages arrive after mount), so this effectively only
+// runs in the browser — but the demo seeds `initial_messages` through SSR, and
+// a bare `useLayoutEffect` warns there. Measuring before paint (vs `useEffect`)
+// avoids a flash where a long bubble renders full-height then snaps closed.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/**
+ * Wraps a user bubble's body and, when it exceeds
+ * {@link BUBBLE_COLLAPSE_THRESHOLD_PX}, clamps it to that height behind a
+ * fade-to-bubble gradient with a "Show more" / "Show less" toggle. The
+ * affordance only appears when the content actually overflows — short messages
+ * render untouched, with no measurement cost beyond a single observed element.
+ *
+ * The fade fills to `secondary` to match the bubble's own `bg-secondary`, so it
+ * reads as the text dissolving into the bubble rather than a separate band. It
+ * is `pointer-events-none` so text selection underneath still works.
+ */
+function CollapsibleBubbleBody({ children }: { children: ReactNode }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useIsomorphicLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const measure = () =>
+      setOverflowing(el.scrollHeight > BUBBLE_COLLAPSE_THRESHOLD_PX);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    // Re-measure on reflow — a late-loading image or a window resize can flip
+    // a bubble across the threshold after the first paint.
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const collapsed = overflowing && !expanded;
+
+  return (
+    <div className="flex flex-col gap-1">
+      {/* Measured directly: `scrollHeight` reports the full content height
+          even while the box is clamped, so the fade host and the measured
+          element are one and the same — no separate inner wrapper needed. */}
+      <div
+        ref={contentRef}
+        className={cn(
+          "relative flex flex-col gap-2",
+          collapsed && "overflow-hidden"
+        )}
+        style={
+          collapsed ? { maxHeight: BUBBLE_COLLAPSE_THRESHOLD_PX } : undefined
+        }
+      >
+        {children}
+        {collapsed && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-secondary"
+          />
+        )}
+      </div>
+      {overflowing && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+          className="flex w-fit items-center gap-1 text-xs font-medium text-foreground/60 transition-colors hover:text-foreground"
+        >
+          {expanded ? "Show less" : "Show more"}
+          <ChevronDownIcon
+            className={cn(
+              "size-3 transition-transform",
+              expanded && "rotate-180"
+            )}
+          />
+        </button>
+      )}
+    </div>
   );
 }
 
