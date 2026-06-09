@@ -59,6 +59,66 @@ describe("models.image catalogue invariants", () => {
   });
 });
 
+describe("models.video catalogue invariants", () => {
+  it("every dict key resolves to a defined card", () => {
+    for (const id of Object.keys(models.video.models)) {
+      expect(models.video.models[id]).toBeDefined();
+    }
+  });
+
+  it("every card has at least one provider binding", () => {
+    for (const card of Object.values(models.video.models)) {
+      if (!card) continue;
+      expect(Object.keys(card.providers).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("each binding's provider field matches its key", () => {
+    for (const card of Object.values(models.video.models)) {
+      if (!card) continue;
+      for (const [key, b] of Object.entries(card.providers)) {
+        if (!b) continue;
+        expect(b.provider).toBe(key);
+      }
+    }
+  });
+
+  it("every binding prices the model's default (resolution, audio mode)", () => {
+    // Provider-selection is deferred, so the contract is route-agnostic: any
+    // provider the runtime later picks must be able to serve the default
+    // config. Every binding therefore prices `default.resolution` at the
+    // default audio mode.
+    for (const card of Object.values(models.video.models)) {
+      if (!card) continue;
+      const mode = card.default.audio ? "audio" : "silent";
+      for (const b of Object.values(card.providers)) {
+        if (!b) continue;
+        expect(
+          b.pricing.usd_per_second[card.default.resolution]?.[mode]
+        ).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("binding() resolves a present provider and nulls an absent one", () => {
+    const veo = models.video.models["google/veo-3.1"]!;
+    // fal keys the capability into the id — this is the image-to-video endpoint.
+    expect(models.video.binding(veo, "fal")?.id).toBe(
+      "fal-ai/veo3.1/image-to-video"
+    );
+    expect(models.video.binding(veo, "vercel")?.id).toBe(
+      "google/veo-3.1-generate-001"
+    );
+    // OpenRouter has no verified per-second meter yet → no binding.
+    expect(models.video.binding(veo, "openrouter")).toBeNull();
+
+    const grok = models.video.models["xai/grok-imagine-video-1.5"]!;
+    expect(models.video.binding(grok, "fal")?.id).toBe(
+      "xai/grok-imagine-video/v1.5/image-to-video"
+    );
+  });
+});
+
 describe("models.text.byTier", () => {
   it("exposes a spec for every tier", () => {
     expect(models.text.byTier.nano).toBeDefined();
