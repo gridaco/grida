@@ -619,8 +619,15 @@ liveDescribe("LIVE — permission modes (shell)", () => {
             `      final text: ${JSON.stringify(ae.finalText.slice(0, 160))}\n` +
             `══════════ end "${task}" ══════════\n`
         );
+        // The deterministic regression this probe pins: in BOTH postures the
+        // command actually executes — `auto` runs it directly, `accept-edits`
+        // runs it on resume after the Allow. `continuation` (whether the model
+        // then replies) is the model/task-dependent variable under
+        // investigation, so it stays in the console report above rather than a
+        // hard assertion that would flake a live run.
+        expect(auto.ran).toBe(true);
+        expect(ae.ran).toBe(true);
       }
-      expect(true).toBe(true);
     },
     TIMEOUT_MS * 4
   );

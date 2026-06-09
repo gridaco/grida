@@ -1165,6 +1165,11 @@ export class SessionsStore {
         ...(answer.reason ? { reason: answer.reason } : {}),
       },
     };
+    // Single-writer: re-assert `approval-requested` in the UPDATE itself, not
+    // only in the read above. A single conditional SQLite UPDATE is atomic, so
+    // if two answers race past the read, only the first flips the row — the
+    // second matches 0 rows and cannot overwrite the first decision. (No
+    // transaction needed: the conditional write IS the serialization point.)
     await this.db
       .update(chatParts)
       .set({
@@ -1172,7 +1177,12 @@ export class SessionsStore {
         tool_state: "approval-responded",
         updated_at: Date.now(),
       })
-      .where(eq(chatParts.id, existing.id));
+      .where(
+        and(
+          eq(chatParts.id, existing.id),
+          eq(chatParts.tool_state, "approval-requested")
+        )
+      );
     return true;
   }
 
