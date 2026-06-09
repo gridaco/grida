@@ -1,5 +1,5 @@
 ---
-title: ACP Provider: Codex
+title: "ACP Provider: Codex"
 description: Provider profile for consuming Codex from an external agent system. Defines what Codex provides, how a host should adapt it into an ACP-consuming runtime, and the boundaries around tools, sessions, filesystem authority, and image generation.
 keywords:
   [
