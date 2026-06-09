@@ -9,11 +9,38 @@
  * goes red instead of a user's session log silently corrupting.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { openSessionsDb, type OpenedSessionsDb } from "./db";
 import { SCHEMA_VERSION } from "./schema";
+
+/** A pre-`mode` (v1) `chat_sessions` table — the v2 schema MINUS `mode`. */
+const V1_CHAT_SESSIONS_DDL = `
+  CREATE TABLE chat_sessions (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT 'New Chat',
+    agent TEXT NOT NULL,
+    workspace_id TEXT,
+    workspace_root TEXT,
+    model_json TEXT,
+    parent_id TEXT,
+    parent_message_id TEXT,
+    permissions_json TEXT NOT NULL DEFAULT '[]',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read INTEGER NOT NULL DEFAULT 0,
+    cache_write INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    archived_at INTEGER
+  );
+`;
 
 function userVersion(db: OpenedSessionsDb): number {
   const row = db.sqlite.prepare("PRAGMA user_version").get() as {
@@ -47,6 +74,41 @@ describe("openSessionsDb — user_version gate", () => {
     const db = openSessionsDb({ user_data_path: dir });
     try {
       expect(userVersion(db)).toBe(SCHEMA_VERSION);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("migrates a pre-`mode` (v1) DB by adding the column (the column-add trap)", () => {
+    // Build a v1-shaped DB on disk: chat_sessions WITHOUT `mode`, a real row,
+    // stamped user_version=1. `CREATE TABLE IF NOT EXISTS` in the bootstrap is a
+    // NO-OP on an existing table — it does NOT add the column — so only the
+    // ALTER-ladder can. This pins that the ladder runs.
+    const filePath = path.join(dir, "sessions.db");
+    const raw = new DatabaseSync(filePath);
+    raw.exec(V1_CHAT_SESSIONS_DDL);
+    raw.exec(
+      `INSERT INTO chat_sessions (id, title, agent, created_at, updated_at) ` +
+        `VALUES ('s1', 't', 'grida', 0, 0)`
+    );
+    raw.exec("PRAGMA user_version = 1");
+    raw.close();
+
+    const db = openSessionsDb({ user_data_path: dir });
+    try {
+      // The ladder ran and the gate re-stamped to current.
+      expect(userVersion(db)).toBe(SCHEMA_VERSION);
+      // The legacy row reads with a null mode — no `no such column`.
+      const row = db.sqlite
+        .prepare("SELECT mode FROM chat_sessions WHERE id = 's1'")
+        .get();
+      expect(row).toEqual({ mode: null });
+      // And the column is writable.
+      db.sqlite.exec("UPDATE chat_sessions SET mode = 'auto' WHERE id = 's1'");
+      const updated = db.sqlite
+        .prepare("SELECT mode FROM chat_sessions WHERE id = 's1'")
+        .get();
+      expect(updated).toEqual({ mode: "auto" });
     } finally {
       db.close();
     }

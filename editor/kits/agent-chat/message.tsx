@@ -56,6 +56,13 @@ import {
 import { Shimmer } from "@app/ui/ai-elements/shimmer";
 import { ToolInput, ToolOutput } from "@app/ui/ai-elements/tool";
 import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
+import {
+  Confirmation,
+  ConfirmationAccepted,
+  ConfirmationRejected,
+  ConfirmationRequest,
+  ConfirmationTitle,
+} from "@app/ui/ai-elements/confirmation";
 // Message/tool types stay in the shared `@/lib/agent-chat` seam (the
 // bridge transport + session helpers use them too); `toolDisplay` is
 // this renderer's own label/summary formatting, colocated in the kit.
@@ -433,6 +440,22 @@ function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
   );
 }
 
+/** The approval object present on a tool part once it's awaiting or carries an
+ *  Allow/Deny answer. `undefined` for ordinary (non-supervised) tool calls.
+ *  Return type is inferred so the discriminated `ToolUIPartApproval` union the
+ *  `Confirmation` prop expects is preserved (a widened `approved?: boolean`
+ *  annotation would break it). */
+function approvalOf(entry: ToolCallEntry) {
+  if (
+    entry.state === "approval-requested" ||
+    entry.state === "approval-responded" ||
+    entry.state === "output-denied"
+  ) {
+    return entry.approval;
+  }
+  return undefined;
+}
+
 function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   const description = toolDisplay.describe(entry);
   const title = description.detail
@@ -440,15 +463,38 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
     : description.title;
   const hasInput = entry.input !== undefined;
   const hasOutput = entry.output !== undefined || Boolean(entry.errorText);
+  // The Allow/Deny ACTION lives in the session-global approval bar above the
+  // composer (instantly visible). Here we only echo the status passively so the
+  // transcript shows which call is awaiting / was approved / was denied.
+  const approval = approvalOf(entry);
 
   return (
     <Task defaultOpen={false} className="w-full">
       <TaskTrigger title={title}>
         {triggerRow(iconForAction(description.action), title)}
       </TaskTrigger>
-      {(hasInput || hasOutput) && (
+      {(hasInput || hasOutput || approval) && (
         <TaskContent>
           {hasInput && <ToolInput input={entry.input} />}
+          {approval && (
+            <Confirmation
+              approval={approval}
+              state={entry.state}
+              className="mt-2"
+            >
+              <ConfirmationRequest>
+                <ConfirmationTitle>
+                  Awaiting your approval (see the prompt above the composer).
+                </ConfirmationTitle>
+              </ConfirmationRequest>
+              <ConfirmationAccepted>
+                <ConfirmationTitle>Approved.</ConfirmationTitle>
+              </ConfirmationAccepted>
+              <ConfirmationRejected>
+                <ConfirmationTitle>Denied — not run.</ConfirmationTitle>
+              </ConfirmationRejected>
+            </Confirmation>
+          )}
           <ToolOutput output={entry.output} errorText={entry.errorText} />
         </TaskContent>
       )}

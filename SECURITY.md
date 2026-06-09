@@ -389,14 +389,60 @@ load `https://grida.co` while dev loads `http://localhost:3000`;
 `shell.openExternal` after validation; `will-attach-webview` rejects;
 every main-process IPC handler validates `event.senderFrame.url`.
 
-**Agent shell execution (V1.x, pre-srt).** The `run_command` agent tool
-spawns child processes through `shell/runner.ts` with `shell: false` (no
-shell interpolation). Three gates apply: a hardcoded command allowlist
-(`permissions.ts`), a cwd-must-be-inside-an-opened-workspace check, and an
-in-process secret-dir containment check (below). The OS-level outer sandbox
-(`srt`, see the supervisor) confines the _whole_ sidecar; a per-command
-fs/net sub-policy that would constrain each spawned child does not exist yet
-and is the deferred hardening.
+**Agent shell execution.** The `run_command` agent tool spawns child
+processes through `shell/runner.ts` with `shell: false` (no shell
+interpolation). There is **no command allowlist** — the OS sandbox (`srt`,
+see the supervisor) is the structural boundary, and a per-session
+**permission mode** governs the surface (`protocol/mode.ts`):
+
+- `accept-edits` (default): only read-only/inspection commands auto-run
+  (`permissions.ts` `isReadOnlyCommand`); a mutating/executing command **pauses
+  for a supervised Allow/Deny approval** before it runs. The gate is the AI
+  SDK's native `needsApproval` on the tool (`tools/run-command.ts`), wired from
+  the session mode at `workspace-agent-bindings.ts` (`needs_approval =
+!isReadOnlyCommand` in `accept-edits`, absent in `auto`). The gate is the
+  tool's, NOT the backend's: by the time the command backend's `execute` runs,
+  the call is already cleared (auto, or user-approved), so the backend cannot
+  re-gate on mode without refusing an approved command.
+- `auto`: every command runs; the OS sandbox is the sole guard. The semantic
+  safety classifier that would judge intent is **deferred** — `auto` is an
+  opt-in, informed-consent posture.
+
+**Supervised-approval answer boundary.** The approval pause/resume crosses the
+trust boundary, so the answer is server-validated. The host owns message state
+(it rebuilds the model view from the DB each turn), so the answer does NOT ride a
+client-mutated assistant message — it travels as an explicit `approval_answer`
+field on the run-request body (`{tool_call_id, approval_id, approved}`), exactly
+like `mode`/`model_id`. `parseRunBody` shape-gates it (`coerceApprovalAnswer`;
+malformed ⇒ no resume, never a 400), then `applyApprovalAnswer`
+(`runtime/run-input.ts`) routes it through `store.answerApproval`, which flips a
+persisted part to `approval-responded` **only if** it is currently
+`approval-requested` with a matching approval id and session. A forged client
+request therefore cannot inject a tool call, approve something never asked, or
+rewrite assistant history — it can only supply the boolean the host is already
+waiting on. The recorder persists the `approval-requested` state and the
+model-view rebuild (`message-view.ts`) lowers `approval-responded`/`output-denied`
+parts so the SDK resumes (runs) or skips (denies) the call. Symmetrically, a send
+that does **not** answer the pending approval cannot run _ahead_ of it: the run
+handler (`runtime/index.ts`) refuses to start a new turn while an approval is
+unanswered (HTTP 409 `approval-pending`) — the same fail-closed invariant the
+queue drain enforces (`session-scheduler.ts` `has_pending_approval`). So neither a
+forged answer nor a typed-ahead follow-up can bypass or orphan the block.
+
+Three structural checks hold regardless of mode: the
+cwd-must-be-inside-an-opened-workspace check, the in-process secret-arg
+containment check (below), and a no-clobber protected-path guard on the
+fs-edit tools (`fs/scope.ts`: `.git`, rc/env files, lockfiles, agent config).
+The OS-level outer sandbox confines the _whole_ sidecar; a per-command fs/net
+sub-policy that would constrain each spawned child (the kernel-level finish of
+the secret-dir guard below) does not exist yet and is the deferred hardening.
+
+- **Network (allow-only, enumerated).** `srt` denies all outbound except a
+  host-set domain allowlist and **forbids `*` / broad patterns by design** —
+  its structural sandbox is also its network sandbox, so there is no "open
+  network." The allowlist (`sandbox/policy.ts`) is the BYOK provider hosts plus
+  a curated dev-network set (package registries, git hosts) so the agent can
+  install deps and fetch code.
 
 - **Fail-closed exposure (no sandbox ⇒ no shell).** The shell tool is not
   registered at all unless the host affirms containment. The decision is
@@ -423,17 +469,20 @@ and is the deferred hardening.
   remain denied for the entire tree by the `srt` policy, where the host has no
   legitimate read. This ownership split is the responsibility-and-reconciliation
   rule: `srt` owns HOME secrets, the in-process runner owns the host's own
-  `userData`.
+  `userData`. **Caveat (`auto`):** the in-process arg check only inspects
+  top-level argv, so an interpreter or shell (`bash -c`, `python3 -c`) reachable
+  in `auto` can read `userData` by a computed path. Closing that for the shell
+  _child_ needs the kernel-level per-call `deny_read` (the deferred per-command
+  sub-policy); until then the network allowlist + the key being the user's own
+  provider credential bound the exfil. The fs-edit tools (`read_file`) remain
+  workspace-scoped and never serve `userData`.
 
-- **`git` is an accepted limitation.** `git` is on the allowlist because it is
-  the single most useful dev command, but it is a known
-  arbitrary-code-execution / arbitrary-file-read vector even with
-  `shell: false`: `git -c core.pager=…` / `-c core.sshCommand=…`,
-  `--upload-pack`, and `apply`/`clone` run attacker-chosen programs, and
-  `--git-dir`, `apply`, and a `.git/config` credential read reach arbitrary
-  files. This collapses the no-shell / allowlist guarantee. The risk is
-  accepted for V1.x pending the `srt` per-command sub-policy that can
-  constrain its fs/net reach at the kernel level.
+- **`auto` is informed-consent.** `auto` removes command-identity gating; the
+  sandbox still bounds the blast radius (writes confined to writable roots, the
+  enumerated network), but it does not judge _intent_ — an injected or confused
+  agent can read broadly and run anything within those bounds. Restoring intent
+  judgment is the classifier/watchdog layer, named and deferred. `auto` is
+  opt-in; the default `accept-edits` keeps a read-only-only shell.
 
 **No hosted auth in V1.** Desktop V1 ships no `/auth/*` route group, no
 PKCE handoff, no cloud session refresh, and no entitlement polling. Future
@@ -453,8 +502,11 @@ Today:
 - [packages/grida-ai-agent/src/providers/index.ts](packages/grida-ai-agent/src/providers/index.ts) — BYOK-only provider resolver; never exposes credentials to the renderer.
 - [packages/grida-ai-agent/src/runtime/index.ts](packages/grida-ai-agent/src/runtime/index.ts) — agent run orchestration; owns run / stream / abort behavior.
 - [packages/grida-ai-agent/src/runtime/stream-registry.ts](packages/grida-ai-agent/src/runtime/stream-registry.ts) — in-flight run replay/abort registry.
-- [packages/grida-ai-agent/src/runtime/command-backend.ts](packages/grida-ai-agent/src/runtime/command-backend.ts) — agent `run_command` adapter through shell policy.
-- [packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts](packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts) — opened workspace to agent fs/todos/command bindings.
+- [packages/grida-ai-agent/src/runtime/command-backend.ts](packages/grida-ai-agent/src/runtime/command-backend.ts) — agent `run_command` adapter through shell policy (structural gates only; the supervised mode gate is the tool's `needsApproval`).
+- [packages/grida-ai-agent/src/tools/run-command.ts](packages/grida-ai-agent/src/tools/run-command.ts) — the supervised-approval gate itself: the AI SDK `needsApproval` predicate that pauses a mutating command before `execute` in `accept-edits` (absent in `auto`). The decision lives on the tool, not the backend.
+- [packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts](packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts) — opened workspace to agent fs/todos/command bindings; wires the `accept-edits` supervised-approval predicate.
+- [packages/grida-ai-agent/src/runtime/run-input.ts](packages/grida-ai-agent/src/runtime/run-input.ts) — wire-message normalization + `coerceApprovalAnswer`/`applyApprovalAnswer` (shape-gates the explicit `approval_answer` body field and routes it to `store.answerApproval`).
+- [packages/grida-ai-agent/src/session/store.ts](packages/grida-ai-agent/src/session/store.ts) — sessions store; `answerApproval` is the server-authoritative supervised-approval gate (answers only a real pending approval, never forges a call).
 - [packages/grida-ai-agent/src/workspaces.ts](packages/grida-ai-agent/src/workspaces.ts) — opened workspace registry and root canonicalization.
 - [packages/grida-ai-agent/src/workspaces/fs.ts](packages/grida-ai-agent/src/workspaces/fs.ts) — guarded workspace file operations.
 - `desktop/src/preload.ts` — path-scoped `contextBridge`; password fetched through guarded IPC and held in closure.

@@ -67,6 +67,11 @@ export type ToolsetCapabilities = {
      * for verifying the workdir is inside the workspace — this is just
      * the default. */
     default_workdir: string;
+    /** Supervised-approval gate (RFC `permission modes`, Phase 2). Passed
+     * straight to `createRunCommandTool` → the tool's `needsApproval`. The
+     * host computes it from the session mode + `isReadOnlyCommand`; absent in
+     * `auto` (every command auto-runs). */
+    needs_approval?: (input: { command: string; args: string[] }) => boolean;
   };
   /** Inject the discovered skill index. When provided, the locked `skill`
    * tool joins the registry, letting the model load any advertised skill

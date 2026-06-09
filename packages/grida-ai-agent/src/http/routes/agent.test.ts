@@ -243,6 +243,81 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     expect(body.code).toBe("run_in_flight");
   });
 
+  it("POST /agent/run is refused 409 approval-pending while a supervised approval is unanswered (RFC `permission modes`)", async () => {
+    // A session whose last assistant turn left an unanswered approval-requested
+    // tool part — the exact state the scheduler's drain refuses to run over
+    // (`session-scheduler.ts` `has_pending_approval`). The HTTP path must refuse
+    // too, or `buildModelMessages` drops the unanswered part and the next message
+    // runs ahead of the blocked command (orphaning the approval).
+    const created = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });
+    const asst = await sessionsStore.appendMessage(created.id, {
+      role: "assistant",
+    });
+    await sessionsStore.upsertPart(asst.id, {
+      index: 0,
+      type: "tool-run_command",
+      data: {
+        type: "tool-run_command",
+        state: "approval-requested",
+        approval: { id: "ap1" },
+      },
+      tool_call_id: "tc1",
+      tool_state: "approval-requested",
+    });
+    expect(await sessionsStore.hasPendingApproval(created.id)).toBe(true);
+
+    // A normal send carrying NO valid approval_answer is refused, not run.
+    const blocked = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ id: "u2", role: "user", content: "do something else" }],
+        session_id: created.id,
+      }),
+    });
+    expect(blocked.status).toBe(409);
+    expect(((await blocked.json()) as { code?: string }).code).toBe(
+      "approval-pending"
+    );
+    // No turn started; the typed-ahead follow-up was NOT persisted; the approval
+    // is still pending and actionable (not orphaned).
+    expect(streamRegistry.get(created.id)).toBeUndefined();
+    expect(await sessionsStore.getMessage("u2")).toBeNull();
+    expect(await sessionsStore.hasPendingApproval(created.id)).toBe(true);
+
+    // Carrying the Allow clears the block → the run proceeds.
+    const resumed = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ id: "u2", role: "user", content: "do something else" }],
+        session_id: created.id,
+        approval_answer: {
+          tool_call_id: "tc1",
+          approval_id: "ap1",
+          approved: true,
+        },
+      }),
+    });
+    expect(resumed.status).toBe(200);
+    await resumed.text();
+    expect(await sessionsStore.hasPendingApproval(created.id)).toBe(false);
+
+    // Settle the recorder's async write chain before teardown closes the DB:
+    // wait for the resumed turn's streamed assistant text ("hi") to land.
+    await vi.waitFor(async () => {
+      const msgs = await sessionsStore.listMessages(created.id);
+      const hasHi = msgs.some(
+        (m) =>
+          m.role === "assistant" &&
+          m.parts.some(
+            (p) =>
+              (p.data as { type?: string }).type === "text" &&
+              (p.data as { text?: string }).text === "hi"
+          )
+      );
+      expect(hasHi).toBe(true);
+    });
+  });
+
   it("the CORE drains a queue on a clean idle edge — serial, FIFO, no client re-send (RFC `queue`)", async () => {
     // Two pending messages, with NO client re-send: the scheduler fires them.
     const created = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });

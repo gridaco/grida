@@ -7,8 +7,11 @@
  */
 
 import { AgentFs } from "../fs";
+import { isProtectedWrite } from "../fs/scope";
+import { isReadOnlyCommand } from "../permissions";
 import { AgentTodos } from "../todos";
 import type { SkillId } from "../agent";
+import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
 import { createAgentCommandBackend } from "./command-backend";
 import { workspaceFs } from "../workspaces/fs";
 import type { Workspace, WorkspaceRegistry } from "../workspaces";
@@ -16,6 +19,9 @@ import type { Workspace, WorkspaceRegistry } from "../workspaces";
 export type WorkspaceAgentBindingRequest = {
   workspace_root?: string;
   skills?: readonly SkillId[];
+  /** Permission/supervision posture; drives the shell gate in the command
+   *  backend (RFC `permission modes`). Defaults to `accept-edits`. */
+  mode?: AgentMode;
 };
 
 export async function createWorkspaceAgentBindings(
@@ -43,6 +49,7 @@ export async function createWorkspaceAgentBindings(
   command?: {
     backend: ReturnType<typeof createAgentCommandBackend>;
     default_workdir: string;
+    needs_approval?: (input: { command: string; args: string[] }) => boolean;
   };
 } | null> {
   if (!req.workspace_root) return null;
@@ -52,19 +59,38 @@ export async function createWorkspaceAgentBindings(
   if (!workspace) {
     throw new Error(`workspace not found for root: ${req.workspace_root}`);
   }
-  const fs = new AgentFs(new WorkspaceAgentFsBackend(workspace));
+  // GRIDA-SEC-004 — the workspace-bound agent fs refuses no-clobber writes
+  // (`.git`, lockfiles, rc files, …). The standalone/client-resolved fs gets no
+  // guard, so its behavior is unchanged.
+  const fs = new AgentFs(new WorkspaceAgentFsBackend(workspace), {
+    write_guard: isProtectedWrite,
+  });
   await fs.hydrate();
   const todos = new AgentTodos();
   // GRIDA-SEC-004 fail-closed: only wire shell execution when the host
   // affirmed containment (or an explicit unsandboxed opt-in). Otherwise the
   // workspace still gets fs + todos, but no `run_command`.
+  const mode = req.mode ?? AGENT_DEFAULT_MODE;
   const command = deps.shell_execution_allowed
     ? {
         backend: createAgentCommandBackend(
           deps.workspace_registry,
-          deps.secrets_root ? [deps.secrets_root] : []
+          deps.secrets_root ? [deps.secrets_root] : [],
+          // Flush the agent fs's pending writes before a command runs, so a
+          // script the agent just wrote via write_file is on disk when the
+          // shell reads it (closes the debounced-write vs immediate-read race).
+          () => fs.flush()
         ),
         default_workdir: req.workspace_root,
+        // Supervised gate (RFC `permission modes`, Phase 2). In `accept-edits`
+        // a non-read-only command pauses for Allow/Deny (the tool's
+        // `needsApproval`); a read-only inspection command still auto-runs. In
+        // `auto` the predicate is absent — every command runs without asking.
+        needs_approval:
+          mode === "accept-edits"
+            ? ({ command, args }: { command: string; args: string[] }) =>
+                !isReadOnlyCommand(command, args)
+            : undefined,
       }
     : undefined;
   return { fs, todos, command };
@@ -83,7 +109,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     try {
       const result = await workspaceFs.readFile(
         this.workspace,
-        logicalPathToRel(path)
+        this.toRel(path)
       );
       return result.content;
     } catch (err) {
@@ -98,16 +124,12 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   }
 
   async write(path: string, content: string): Promise<void> {
-    await workspaceFs.writeFile(
-      this.workspace,
-      logicalPathToRel(path),
-      content
-    );
+    await workspaceFs.writeFile(this.workspace, this.toRel(path), content);
   }
 
   async delete(path: string): Promise<void> {
     try {
-      await workspaceFs.deleteFile(this.workspace, logicalPathToRel(path));
+      await workspaceFs.deleteFile(this.workspace, this.toRel(path));
     } catch (err) {
       // Deleting something that isn't a deletable file (missing, or a
       // directory) is a no-op for the backend contract; policy violations
@@ -115,6 +137,28 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       if (isNotFound(err) || isWorkspaceFsCode(err, "not-a-file")) return;
       throw err;
     }
+  }
+
+  /**
+   * Map an agent-fs path to a workspace-relative path. The agent mixes two
+   * path spaces: the fs tools' logical "/"-rooted form (where "/" is the
+   * workspace root, e.g. `/chart.svg`) AND — once it can see the shell's cwd —
+   * the REAL absolute path inside the workspace (`<root>/chart.svg`). Both must
+   * resolve to the same file, or a `write_file(<abs>)` followed by a shell
+   * `python3 chart.py` reads from a different place than it was written (the
+   * file would otherwise land under a doubled `<root>/<root>/…` path). The
+   * downstream `workspaceFs` containment check still rejects anything that
+   * escapes the root.
+   */
+  private toRel(p: string): string {
+    if (!p.startsWith("/")) {
+      throw new Error(`agent-fs path must start with "/": ${p}`);
+    }
+    const root = this.workspace.root;
+    if (p === root) return "";
+    if (p.startsWith(root + "/")) return p.slice(root.length + 1);
+    // Logical "/"-rooted path, relative to the workspace root.
+    return p.slice(1);
   }
 
   private async walk(relPath: string, out: string[]): Promise<void> {
@@ -131,13 +175,6 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       })
     );
   }
-}
-
-function logicalPathToRel(path: string): string {
-  if (!path.startsWith("/")) {
-    throw new Error(`agent-fs path must start with "/": ${path}`);
-  }
-  return path.slice(1);
 }
 
 function isNotFound(err: unknown): boolean {

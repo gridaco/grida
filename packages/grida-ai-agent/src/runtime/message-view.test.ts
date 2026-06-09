@@ -212,6 +212,45 @@ describe("buildModelMessages", () => {
     expect((out[1].parts[0] as { toolCallId: string }).toolCallId).toBe("tc1");
   });
 
+  it("keeps an answered approval (approval-responded), drops an un-answered request", () => {
+    // RFC `permission modes` (Phase 2). On resume the client re-submits the
+    // approved tool part as `approval-responded`; it MUST survive so the SDK
+    // lowers the approval pair and RUNS the call ("click Allow → it runs"). A
+    // still-pending `approval-requested` part is dropped like an incomplete
+    // call (a tool-call with no result and no answer trips MissingToolResults).
+    const out = buildModelMessages([
+      msg("m1", "user", [part("text", { type: "text", text: "run it" })]),
+      msg("m2", "assistant", [
+        part(
+          "tool-run_command",
+          {
+            type: "tool-run_command",
+            tool_call_id: "tc_ok",
+            state: "approval-responded",
+            input: { command: "python3", args: ["x.py"] },
+            approval: { id: "ap1", approved: true },
+          },
+          { tool_call_id: "tc_ok", tool_state: "approval-responded" }
+        ),
+        part(
+          "tool-run_command",
+          {
+            type: "tool-run_command",
+            tool_call_id: "tc_pending",
+            state: "approval-requested",
+            input: { command: "rm", args: ["-rf", "x"] },
+            approval: { id: "ap2" },
+          },
+          { tool_call_id: "tc_pending", tool_state: "approval-requested" }
+        ),
+      ]),
+    ]);
+    expect(out[1].parts.length).toBe(1);
+    const kept = out[1].parts[0] as { toolCallId: string; state: string };
+    expect(kept.toolCallId).toBe("tc_ok");
+    expect(kept.state).toBe("approval-responded");
+  });
+
   it("re-feeds a completed tool call with its input intact (passes validateUIMessages)", async () => {
     // The production failure (`ses_e826…`) was validateUIMessages throwing
     // `Type validation failed for messages[1].parts[0].input`. A complete tool

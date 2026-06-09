@@ -1,32 +1,32 @@
 /**
- * GRIDA-SEC-004 — shell runner allowlist (pre-srt; demo-grade).
+ * GRIDA-SEC-004 — read-only command categorization (the `accept-edits` gate).
  *
- * V1.x ships a hardcoded allowlist of "safe-ish" dev commands. This
- * is the demo-grade gate that lets us prove the end-to-end shell
- * shape (open folder → run command → see output) without depending
- * on the full manifest + srt sub-policy machinery the approved plan
- * calls for.
+ * This replaces the pre-srt hardcoded command allowlist. The allowlist used to
+ * be *the* boundary; it no longer is — the OS sandbox (srt) is the structural
+ * boundary (write-confinement + process-tree containment; see
+ * `sandbox/policy.ts` and `shell/runner.ts`). This predicate answers ONE
+ * question, only for the supervised mode (`accept-edits`): does this command
+ * merely inspect, or could it mutate / execute arbitrary code?
  *
- * Known limitations until srt lands:
+ *   - read-only ⇒ auto-runs without prompting.
+ *   - not read-only ⇒ surfaces an approval (or the user switches to `auto`).
  *
- *   - There is no per-cmd fs/net sub-policy enforcement — the child
- *     inherits the agent host's full OS reach. srt is what makes the
- *     sub-policy enforceable at the kernel level.
+ * It is NOT a security boundary: `auto` runs anything, contained by the sandbox.
+ * So it fails SAFE — anything it can't positively classify as read-only is
+ * treated as mutating (returns `false`), which over-restricts (a prompt) rather
+ * than over-permits. A gap in this list costs an extra approval, never a breach.
  *
- * The cwd-must-be-inside-an-opened-workspace check (in `runner.ts`)
- * is the second gate. Without an opened workspace, no shell call
- * runs — opening a folder is the user's explicit grant.
+ * Commands run with `shell: false` (`shell/runner.ts`), so redirection, pipes,
+ * and glob expansion are inert — the only mutation vectors are a command's own
+ * flags, handled per-command below.
  */
 
 /**
- * Commands the demo accepts. Curated for "useful for showing the
- * shape works" — `ls`/`pwd`/`echo`/`cat` for the basics, `rg`/`git`
- * for "things you'd actually want." Shells, language runtimes, and
- * package managers are intentionally absent because this surface is
- * agent-callable; `bash -c`, `node -e`, and `pnpm run` collapse the
- * allowlist to arbitrary code execution.
+ * Pure inspectors: no flag turns these into a write/exec under `shell: false`.
+ * `rg` is deliberately NOT here — it has a process-spawning flag (`--pre`) and is
+ * flag-filtered below, the same way `find` and `git` are.
  */
-const ALLOWED_COMMANDS: ReadonlySet<string> = new Set([
+const READ_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "ls",
   "pwd",
   "echo",
@@ -34,30 +34,113 @@ const ALLOWED_COMMANDS: ReadonlySet<string> = new Set([
   "head",
   "tail",
   "wc",
-  "find",
   "grep",
-  "rg",
-  // KNOWN, ACCEPTED LIMITATION (V1.x, pre-srt): `git` is an
-  // arbitrary-code-execution and arbitrary-file-read vector even with
-  // `shell: false`. `git -c core.pager=…` / `-c core.sshCommand=…`,
-  // `--upload-pack`, and `apply`/`clone` run attacker-chosen programs;
-  // `--git-dir`, `apply`, and a `.git/config` credential read reach
-  // arbitrary files. This collapses the no-shell / allowlist guarantee.
-  // We keep `git` because it is the single most useful dev command and
-  // accept the risk for V1.x, pending the srt per-cmd sub-policy that can
-  // constrain its fs/net reach at the kernel level (see `policy.ts`).
-  "git",
 ]);
 
-export function isAllowedCommand(cmd: string): boolean {
-  // Reject absolute paths or paths with separators — `cmd` must be a
-  // bare binary name so the OS PATH resolution picks the host's copy
-  // (and so the allowlist check actually means something).
-  if (cmd.length === 0) return false;
-  if (cmd.includes("/") || cmd.includes("\\")) return false;
-  return ALLOWED_COMMANDS.has(cmd);
+/** `find` is read-only UNLESS it spawns a process or deletes/writes. */
+const FIND_MUTATING_FLAGS: ReadonlySet<string> = new Set([
+  "-exec",
+  "-execdir",
+  "-ok",
+  "-okdir",
+  "-delete",
+  "-fprint",
+  "-fprint0",
+  "-fprintf",
+  "-fls",
+]);
+
+/**
+ * `rg` (ripgrep) is read-only UNLESS it spawns a process. `--pre=CMD` runs CMD on
+ * EVERY searched file (arbitrary code execution — ripgrep's own help warns it
+ * spawns a process per file), and `--hostname-bin=CMD` runs CMD to resolve the
+ * hostname. Both take a value, so guard the bare (`--pre value`) and `=`-joined
+ * (`--pre=value`) forms. `--pre-glob` is harmless on its own and is intentionally
+ * not matched here (it only narrows which files an already-present `--pre` runs on).
+ */
+const RG_EXEC_FLAGS: ReadonlySet<string> = new Set(["--pre", "--hostname-bin"]);
+
+function rgArgsAreReadOnly(args: readonly string[]): boolean {
+  return !args.some(
+    (a) =>
+      RG_EXEC_FLAGS.has(a) ||
+      a.startsWith("--pre=") ||
+      a.startsWith("--hostname-bin=")
+  );
 }
 
-export function listAllowedCommands(): readonly string[] {
-  return [...ALLOWED_COMMANDS].sort();
+/**
+ * `git` subcommands that touch neither the working tree nor a remote.
+ *
+ * Known limitation (accepted, not a breach): inspection subcommands that render
+ * content — `diff`, `show`, `log -p`, `blame` — honor repo-resident config a
+ * command-line flag scan can't see (`[diff] external`, a `*.textconv`/`diff`
+ * driver in `.gitattributes`). On a repo with a hostile such config, an
+ * auto-run `git diff` could exec that program WITHOUT an approval prompt. This
+ * costs a missed prompt, never containment: the OS sandbox still confines the
+ * spawned program, and this module is not a security boundary (see the header).
+ * The fs-edit tools also can't write these config files (`fs/scope.ts`), so the
+ * agent can't plant the config itself — only a pre-existing/cloned repo can.
+ */
+const GIT_READ_ONLY_SUBCOMMANDS: ReadonlySet<string> = new Set([
+  "status",
+  "log",
+  "diff",
+  "show",
+  "ls-files",
+  "rev-parse",
+  "blame",
+]);
+
+/**
+ * `git` global flags that turn ANY invocation into arbitrary code execution or
+ * arbitrary file read even with a read-only subcommand (`-c core.pager=…` /
+ * `-c core.sshCommand=…`, `--upload-pack`, `--git-dir`, `--exec-path`). Their
+ * presence makes the call not-read-only regardless of subcommand.
+ */
+function gitGlobalFlagsAreSafe(args: readonly string[]): boolean {
+  const unsafe = [
+    "-c",
+    "--exec-path",
+    "--git-dir",
+    "--upload-pack",
+    "--receive-pack",
+  ];
+  return !args.some((a) =>
+    unsafe.some((u) => a === u || a.startsWith(`${u}=`))
+  );
+}
+
+/**
+ * Whether `cmd` (with its argv) is a read-only/inspection command — the
+ * `accept-edits` auto-run set. Bare binary name only (a path defeats the point);
+ * unknown ⇒ not read-only.
+ */
+export function isReadOnlyCommand(
+  cmd: string,
+  args: readonly string[] = []
+): boolean {
+  if (cmd.length === 0) return false;
+  // Must be a bare name so OS PATH resolution picks the host's copy and the
+  // categorization actually means something.
+  if (cmd.includes("/") || cmd.includes("\\")) return false;
+
+  if (READ_ONLY_COMMANDS.has(cmd)) return true;
+
+  if (cmd === "find") {
+    return !args.some((a) => FIND_MUTATING_FLAGS.has(a));
+  }
+
+  if (cmd === "rg") {
+    return rgArgsAreReadOnly(args);
+  }
+
+  if (cmd === "git") {
+    if (!gitGlobalFlagsAreSafe(args)) return false;
+    // The first non-flag token is the subcommand.
+    const sub = args.find((a) => !a.startsWith("-"));
+    return sub !== undefined && GIT_READ_ONLY_SUBCOMMANDS.has(sub);
+  }
+
+  return false;
 }

@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — shell runner (pre-srt; demo-grade).
+ * GRIDA-SEC-004 — shell runner.
  *
  * Spawns a child process via `child_process.spawn` (no shell
  * interpolation — args are passed verbatim, so quoting attacks via
@@ -11,22 +11,27 @@
  * semantics, abort plumbing) that the demo doesn't need. For long-
  * running commands a streaming variant will land later.
  *
- * Three gates on every call:
+ * Command *identity* is NOT gated here. The pre-srt hardcoded allowlist is
+ * gone — the OS sandbox (srt) is the structural boundary, and the supervised
+ * mode's read-only-vs-mutating gate lives upstream in the command backend
+ * (`runtime/command-backend.ts`, via `permissions.ts`). What remains here are
+ * the two STRUCTURAL gates that hold in every mode:
  *
- *   1. `policy.ts` allowlist — cmd must be a known bare binary
- *      name. Args are not constrained here (see `policy.ts` for
- *      the "bash escape hatch" caveat).
- *   2. cwd must be `realpath`-resolvable AND contained by a
+ *   1. cwd must be `realpath`-resolvable AND contained by a
  *      currently-registered workspace. Without an opened workspace
  *      the call fails.
- *   3. No arg may resolve to a path inside a protected-secret root
+ *   2. No arg may resolve to a path inside a protected-secret root
  *      (the agent host's own `userData`, where BYOK `auth.json` and
  *      the sessions db live). The srt outer policy can't deny that
  *      root — the host process itself reads it for provider auth — so
- *      this in-process arg check is what keeps `cat ${userData}/auth.json`
+ *      this in-process arg check keeps `cat ${userData}/auth.json`
  *      from leaking the key to the shell child. See `sandbox/policy.ts`.
+ *      (A kernel-level per-call deny is the planned hardening; until then
+ *      this is the load-bearing guard for the host's own key — though an
+ *      interpreter in `auto` can read by a computed path, which is why the
+ *      per-call sub-policy is the real fix.)
  *
- * GRIDA-SEC-004: this is NOT general arg containment (deferred to the
+ * GRIDA-SEC-004: gate 2 is NOT general arg containment (deferred to the
  * srt per-cmd sub-policy). It denies exactly the secret root, nothing
  * more — so an arg's "is this a path?" guess only ever costs the secret
  * dir, never a false rejection of normal in-workspace work.
@@ -43,7 +48,6 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { isAllowedCommand } from "../permissions";
 import type { WorkspaceRegistry } from "../workspaces";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -72,7 +76,6 @@ export type ShellRunResult = {
 };
 
 export type ShellRunError =
-  | { code: "cmd-not-allowed"; cmd: string }
   | { code: "cwd-not-in-workspace"; cwd: string }
   | { code: "cwd-not-a-directory"; cwd: string }
   | { code: "cwd-resolve-failed"; cwd: string; reason: string }
@@ -87,14 +90,15 @@ export type ShellRunError =
 export type ProtectedReadRoots = readonly string[];
 
 /**
- * Validates a shell-run request against the allowlist, the workspace
- * registry, and the protected-secret roots. Returns either `{ok, request}`
- * with the cwd-`realpath`'d request, or `{ok:false, error}` with a
- * structured error the route handler can return as 400/403.
+ * Validates a shell-run request against the workspace registry and the
+ * protected-secret roots (the two structural gates; command identity is gated
+ * upstream by mode — see the module header). Returns either `{ok, request}`
+ * with the cwd-`realpath`'d request, or `{ok:false, error}` with a structured
+ * error the route handler can return as 400/403.
  *
  * `protectedReadRoots` are absolute secret roots (the agent host's
  * `userData`) the shell child must not read through any arg — see the
- * module header's gate (3). Omit for the no-bindings path.
+ * module header's gate (2). Omit for the no-bindings path.
  */
 export async function validateShellRequest(
   req: ShellRunRequest,
@@ -103,9 +107,6 @@ export async function validateShellRequest(
 ): Promise<
   { ok: true; request: ShellRunRequest } | { ok: false; error: ShellRunError }
 > {
-  if (!isAllowedCommand(req.cmd)) {
-    return { ok: false, error: { code: "cmd-not-allowed", cmd: req.cmd } };
-  }
   let realCwd: string;
   try {
     realCwd = await fs.realpath(req.cwd);

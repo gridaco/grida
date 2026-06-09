@@ -28,8 +28,10 @@
 
 import { createAgentUIStreamResponse } from "ai";
 import { createAgent, type AgentMessage, type SkillId } from "../agent";
+import { newMessageId } from "../session/ids";
 import type { MessageUsage } from "../session/rows";
 import type { AgentModelId } from "../protocol/run";
+import type { AgentMode } from "../protocol/mode";
 import { AGENT_DEFAULT_TIER, type ModelTier } from "../tiers";
 import type { ResolvedProvider } from "../providers";
 import type { WorkspaceRegistry } from "../workspaces";
@@ -67,6 +69,12 @@ export type AgentRunRequest = {
   workspace_root?: string;
   /** Built-in prompt blocks (e.g. `'svg'`). Ignored when `workspaceRoot` is absent. */
   skills?: readonly SkillId[];
+  /**
+   * Permission/supervision posture (RFC `permission modes`). Drives the shell
+   * gate in the command backend; ignored when `workspaceRoot` is absent (no
+   * command binding). Defaults to `accept-edits` downstream when omitted.
+   */
+  mode?: AgentMode;
   /**
    * Discovered RFC skills (names + descriptions advertised; bodies loaded
    * via the `skill` tool). Session-static — the runtime discovers once and
@@ -166,6 +174,14 @@ export async function runAgent(
   return await createAgentUIStreamResponse({
     agent,
     uiMessages: req.messages,
+    // Advertise a stable assistant message id on every turn's stream. On a fresh
+    // turn this mints a new id; on a supervised-approval RESUME the SDK reuses
+    // the last assistant message's id from the rebuilt history (it continues
+    // that message). The recorder persists under this same id, so the
+    // client-rendered message and the DB row share one id — the resume merges in
+    // place instead of forking a duplicate turn. Uses the store's id format so
+    // ids are uniform across server-minted and stream-advertised messages.
+    generateMessageId: newMessageId,
     // `prepareCall` in the package reads `options.tier` / `options.modelId`
     // and rebuilds the model per turn.
     options: {

@@ -3,7 +3,16 @@
  *
  * Bridges the agent's `run_command` tool to the agent-host shell
  * policy. This file is the whole command execution adapter: validate
- * command + workdir first, then run through the host shell runner.
+ * workdir + secret-arg, then run through the host shell runner.
+ *
+ * The supervised mode gate (RFC `permission modes`) is NOT here — it lives in
+ * the tool's `needsApproval` (`createRunCommandTool`), wired from the session
+ * mode at `workspace-agent-bindings.ts`. By the time this backend's `execute`
+ * runs, the SDK has already cleared the call: `auto` (never asked) or the user
+ * pressed Allow. Re-gating on mode here would refuse an *approved* command,
+ * since `execute` can't see the approval. This backend keeps only the
+ * structural GRIDA-SEC-004 gates (cwd-in-workspace, secret-arg) — those hold
+ * in every mode.
  */
 
 import type { RunCommandBackend } from "../agent";
@@ -19,12 +28,20 @@ import {
  * @param protectedReadRoots Secret roots (the agent host's `userData`) the
  *   shell child must not read through an arg (GRIDA-SEC-004). Threaded down
  *   from the runtime; empty for the no-bindings/standalone path.
+ * @param beforeRun Optional hook awaited just before a command spawns — used to
+ *   flush the agent fs's pending (debounced) writes to disk, so a command that
+ *   reads the workspace sees files the agent just wrote via the fs tools.
  */
 export function createAgentCommandBackend(
   registry: WorkspaceRegistry,
-  protectedReadRoots: ProtectedReadRoots = []
+  protectedReadRoots: ProtectedReadRoots = [],
+  beforeRun?: () => Promise<void>
 ): RunCommandBackend {
   return async ({ command, args, workdir, timeout_ms: timeoutMs }) => {
+    // Make the agent's just-written files visible on disk before the command
+    // reads them (the fs tools flush on a debounce; a command bypasses the fs
+    // and reads the backing store directly).
+    if (beforeRun) await beforeRun();
     const validation = await validateShellRequest(
       { cmd: command, args, cwd: workdir, timeout_ms: timeoutMs },
       registry,
@@ -52,8 +69,6 @@ export function createAgentCommandBackend(
 
 function describeError(err: ShellRunError): string {
   switch (err.code) {
-    case "cmd-not-allowed":
-      return `Command not in allowlist: ${err.cmd}`;
     case "cwd-not-in-workspace":
       return `cwd is not inside an opened workspace: ${err.cwd}`;
     case "cwd-not-a-directory":

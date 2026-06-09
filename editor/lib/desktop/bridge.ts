@@ -15,10 +15,13 @@
 import { useSyncExternalStore } from "react";
 import {
   AGENT_SKILL_IDS,
+  AGENT_MODES,
+  asAgentMode,
   BYOK_PROVIDER_IDS,
   BYOK_PROVIDER_METADATA,
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
+  type AgentMode,
   type AgentUIMessageChunk,
   type AgentRunOptions,
   type ByokProviderId,
@@ -49,10 +52,13 @@ import {
 
 export {
   AGENT_SKILL_IDS,
+  AGENT_MODES,
+  asAgentMode,
   BYOK_PROVIDER_IDS,
   BYOK_PROVIDER_METADATA,
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
+  type AgentMode,
   type AgentUIMessageChunk,
   type AgentRunOptions,
   type ByokProviderId,

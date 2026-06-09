@@ -107,11 +107,14 @@ export class AgentFs {
   private hydrate_promise: Promise<void> | null = null;
   private readonly watchers = new Set<AgentFs.Listener>();
 
+  private readonly write_guard?: (path: string) => boolean;
+
   constructor(
     private readonly backend: AgentFs.Backend,
     opts: AgentFs.Options = {}
   ) {
     this.flush_debounce_ms = opts.flush_debounce_ms ?? 500;
+    this.write_guard = opts.write_guard;
   }
 
   // -------------------------------------------------------------------------
@@ -327,6 +330,13 @@ export class AgentFs {
    */
   write(path: string, args: AgentFs.WriteArgs): AgentFs.WriteResult {
     const { content, expected_version } = args;
+    if (this.write_guard?.(path)) {
+      return {
+        ok: false,
+        reason: "protected",
+        message: `${path} is a protected path and can't be written by an edit tool. Use the shell (e.g. git, the package manager) if you need to change it.`,
+      };
+    }
     if (expected_version !== null) {
       const entry = this.lookup(path);
       if (entry === null) {
@@ -360,6 +370,13 @@ export class AgentFs {
   edit(path: string, args: AgentFs.EditArgs): AgentFs.EditResult {
     const { old_string, new_string, replace_all, expected_version } = args;
 
+    if (this.write_guard?.(path)) {
+      return {
+        ok: false,
+        reason: "protected",
+        message: `${path} is a protected path and can't be edited by an edit tool. Use the shell if you need to change it.`,
+      };
+    }
     const entry = this.lookup(path);
     if (entry === null) {
       return {
@@ -553,6 +570,22 @@ export class AgentFs {
     }, this.flush_debounce_ms);
   }
 
+  /**
+   * Force any pending debounced writes to the backend NOW and await them.
+   * Establishes a happens-before edge for a reader that bypasses this fs and
+   * goes straight to the backing store — notably a shell command (`run_command`)
+   * that reads the workspace from disk and must see the files the agent just
+   * wrote, which would otherwise still be sitting in the debounce window.
+   * Idempotent and a no-op when nothing is dirty.
+   */
+  async flush(): Promise<void> {
+    if (this.flush_timer) {
+      clearTimeout(this.flush_timer);
+      this.flush_timer = null;
+    }
+    await this.runFlush();
+  }
+
   private async runFlush(): Promise<void> {
     const targets = [...this.flush_queue];
     this.flush_queue.clear();
@@ -705,6 +738,13 @@ export namespace AgentFs {
      * fires when the writer goes idle. Default 500 ms.
      */
     flush_debounce_ms?: number;
+    /**
+     * GRIDA-SEC-004 — no-clobber guard (`fs/scope.ts` `isProtectedWrite`).
+     * When provided, `write`/`edit` to a path it rejects fail with
+     * `reason: "protected"`. Injected only on the workspace-bound agent path;
+     * omitted on the standalone/client-resolved fs, which keeps its behavior.
+     */
+    write_guard?: (path: string) => boolean;
   };
 
   // -------------------------------------------------------------------------
@@ -719,6 +759,9 @@ export namespace AgentFs {
     "stale",
     "parse_error",
     "not_found",
+    // GRIDA-SEC-004 — no-clobber path (see `fs/scope.ts`); only emitted when a
+    // host injects a `write_guard` (the workspace-bound agent path).
+    "protected",
   ] as const;
   export type WriteFailureReason = (typeof WRITE_FAILURE_REASONS)[number];
 
@@ -729,6 +772,8 @@ export namespace AgentFs {
     "ambiguous",
     "parse_error",
     "no_op",
+    // GRIDA-SEC-004 — no-clobber path (see `fs/scope.ts`).
+    "protected",
   ] as const;
   export type EditFailureReason = (typeof EDIT_FAILURE_REASONS)[number];
 

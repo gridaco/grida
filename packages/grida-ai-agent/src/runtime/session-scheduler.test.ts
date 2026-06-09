@@ -51,8 +51,13 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** A scheduler wired to the real store with an overridable `drain`. */
-function makeScheduler(drain?: SessionSchedulerDeps["drain"]): {
+/** A scheduler wired to the real store with an overridable `drain`. The
+ *  `has_pending_approval` gate defaults to "never blocked" so the existing
+ *  drain tests are unaffected; the approval-pause test passes a real flag. */
+function makeScheduler(
+  drain?: SessionSchedulerDeps["drain"],
+  hasPendingApproval?: SessionSchedulerDeps["has_pending_approval"]
+): {
   scheduler: SessionScheduler;
   calls: string[];
 } {
@@ -66,6 +71,7 @@ function makeScheduler(drain?: SessionSchedulerDeps["drain"]): {
     list_queued: (sid) => store.listQueuedMessages(sid),
     dequeue: (id) => store.dequeueMessage(id),
     drain: drain ?? defaultDrain,
+    has_pending_approval: hasPendingApproval ?? (async () => false),
     drain_cooldown_ms: COOLDOWN,
   });
   live.push(scheduler);
@@ -151,6 +157,42 @@ describe("SessionScheduler drain", () => {
     ]); // still queued
   });
 
+  it("a pending approval pauses the drain — the queued head waits until answered", async () => {
+    // A turn blocked awaiting the user's Allow/Deny is NOT a completed turn
+    // (RFC queue § drain-pause). An approval-request finishes the run cleanly,
+    // so the session reads idle through the pause — but the queued message must
+    // NOT fire until the approval resolves. Without the fire-gate's
+    // has_pending_approval check, the cooldown drain would fire `q1` during the
+    // wait (the reported B1 bug): drop that check and this assertion fails.
+    let pendingApproval = true;
+    const { scheduler, calls } = makeScheduler(
+      undefined,
+      async () => pendingApproval
+    );
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
+
+    // Turn 1 pauses for approval: clean finish → idle, but an approval pends.
+    scheduler.onCreate(s.id);
+    scheduler.onFinish(s.id, "finish");
+    expect(scheduler.getStatus(s.id).state).toBe("idle");
+
+    await delay(COOLDOWN + 20);
+    expect(calls).toEqual([]); // did NOT fire during the approval pause
+    expect((await store.listQueuedMessages(s.id)).map((m) => m.id)).toEqual([
+      "q1",
+    ]); // still queued
+
+    // User answers; the resume turn runs and reaches a true finish.
+    pendingApproval = false;
+    scheduler.onCreate(s.id);
+    scheduler.onFinish(s.id, "finish");
+
+    await delay(COOLDOWN + 20);
+    expect(calls).toEqual([s.id]); // now the queued head drains, exactly once
+    expect(await store.listQueuedMessages(s.id)).toHaveLength(0);
+  });
+
   it("drains a multi-item queue serially, one turn each, FIFO", async () => {
     const order: string[] = [];
     let scheduler!: SessionScheduler;
@@ -165,6 +207,7 @@ describe("SessionScheduler drain", () => {
       list_queued: (sid) => store.listQueuedMessages(sid),
       dequeue: (id) => store.dequeueMessage(id),
       drain,
+      has_pending_approval: async () => false,
       drain_cooldown_ms: COOLDOWN,
     });
     live.push(scheduler);
@@ -202,6 +245,7 @@ describe("SessionScheduler drain", () => {
       list_queued: (sid) => store.listQueuedMessages(sid),
       dequeue: (id) => store.dequeueMessage(id),
       drain,
+      has_pending_approval: async () => false,
       drain_cooldown_ms: COOLDOWN,
     });
     live.push(scheduler);

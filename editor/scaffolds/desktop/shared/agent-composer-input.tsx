@@ -282,8 +282,14 @@ function AgentComposerInner({
         <p className="px-3 pb-1 text-xs text-muted-foreground">{notice}</p>
       )}
       <div className="flex items-center gap-1 px-2 pb-2 pt-1">
-        {toolbar}
-        <div className="ml-auto">
+        {/* The toolbar (pickers + context meter) rides a shrinkable,
+            clipping track; the submit button sits outside it as shrink-0,
+            so as the composer narrows the pickers truncate first and the
+            most-important submit control is never culled. */}
+        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
+          {toolbar}
+        </div>
+        <div className="shrink-0">
           {isStreaming ? (
             <Button
               type="button"

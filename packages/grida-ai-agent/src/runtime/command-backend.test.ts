@@ -2,22 +2,22 @@
 /**
  * Contract pins — Permissions (GRIDA-SEC-004).
  *
- * Maps to docs/wg/ai/grida/architecture.md §Test pins → describe("Permissions").
+ * The command backend applies the STRUCTURAL gates (cwd-in-workspace +
+ * secret-arg containment), then runs through the host shell runner. Every
+ * refusal surfaces as a structured `{ ok: false, code, message }` tool result.
+ * The gates pinned here:
  *
- * What exists today (V1.x, pre-srt): a single shell allowlist
- * (`shell/policy.ts`) plus a cwd-must-be-inside-an-opened-workspace
- * gate (`shell/runner.ts`). The agent reaches both through
- * `createAgentCommandBackend`, which surfaces a denial as a structured
- * `{ ok: false, code, message }` tool result — the model sees the
- * refusal as a tool output, never an execution. THAT is the behavior
- * the refactor must preserve, so it is pinned here.
+ *   - cwd must be inside an opened workspace (every mode).
+ *   - no arg may resolve inside the protected secret root (every mode).
  *
- * The architecture doc's full layered ruleset (manifest > session >
- * project precedence, most-specific-rule-wins, headless ask=deny) is
- * the Phase B+ target and does not exist yet — tracked as `it.todo`
- * below so the contract surface is visible without faking a green test
- * for unbuilt behavior. (The allowlist + validate gates themselves are
- * additionally unit-pinned in `shell/runner.test.ts`.)
+ * The supervised mode gate (RFC `permission modes`) is NOT in the backend —
+ * it's the tool's `needsApproval`, wired from the session mode at
+ * `workspace-agent-bindings.ts` and pinned in
+ * `workspace-agent-bindings.test.ts`. By the time the backend's `execute` runs,
+ * the call is already cleared (auto, or user-approved), so the backend runs
+ * whatever it's handed — it can't re-gate on mode without refusing an approved
+ * command. The read-only-vs-mutating categorization that drives `needsApproval`
+ * is unit-pinned in `permissions.test.ts`.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
@@ -54,17 +54,20 @@ describe("Permissions", () => {
     await fs.rm(baseDir, { recursive: true, force: true });
   });
 
-  it("denies a non-allowlisted command as a structured tool result (not execution)", async () => {
+  it("runs a mutating command — the backend does not gate on mode", async () => {
+    // The mode/approval gate is the tool's `needsApproval`, not the backend.
+    // Whatever reaches the backend's `execute` is already cleared (auto, or
+    // user-approved), so a mutating `mkdir` runs (harmless: a subdir of the
+    // temp workspace). Re-gating here would refuse an approved command.
     const result = await backend({
-      command: "rm",
-      args: ["-rf", "/"],
+      command: "mkdir",
+      args: ["sub"],
       workdir: workspaceRoot,
-      description: "attempt a denied command",
+      description: "create a directory",
     });
-    expect(isDeny(result)).toBe(true);
-    if (isDeny(result)) {
-      expect(result.code).toBe("cmd-not-allowed");
-      expect(result.message).toMatch(/allowlist/i);
+    expect(isDeny(result)).toBe(false);
+    if (!isDeny(result)) {
+      expect(result.exit_code).toBe(0);
     }
   });
 
@@ -83,7 +86,7 @@ describe("Permissions", () => {
     }
   });
 
-  it("allows an allowlisted command inside an opened workspace", async () => {
+  it("runs a command inside an opened workspace", async () => {
     const result = await backend({
       command: "echo",
       args: ["grida-ok"],

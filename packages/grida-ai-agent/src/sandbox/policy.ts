@@ -43,9 +43,54 @@ const BYOK_PROVIDER_NETWORK_HOSTS = {
   vercel: ["ai-gateway.vercel.sh", "*.vercel-ai.com"],
 } as const satisfies Record<ByokProviderId, readonly string[]>;
 
-const ALWAYS_ALLOWED_HOSTS: readonly string[] = Object.values(
-  BYOK_PROVIDER_NETWORK_HOSTS
-).flat();
+/**
+ * Broad dev-network allowlist (RFC `permission modes` / network).
+ *
+ * srt's network model is allow-only and deliberately FORBIDS `*` / overly-broad
+ * patterns ("not allowed for security reasons"), so "open network" is
+ * enumerated, not unrestricted — srt's structural sandbox is also its network
+ * sandbox and cannot be told "allow everything." This is a denylist's mirror: a
+ * maintained allowlist of the package/registry + VCS hosts the agent needs for
+ * real work (install deps, fetch code, clone). It is intentionally a starter
+ * set across the major ecosystems and is meant to grow; a host not listed here
+ * is unreachable (the agent surfaces a network failure, not a silent hang).
+ *
+ * Apex AND `*.` are both listed where needed: srt's `*.host` matches
+ * subdomains only, not the bare apex.
+ */
+const DEV_NETWORK_HOSTS: readonly string[] = [
+  // npm / Node / Yarn
+  "registry.npmjs.org",
+  "*.npmjs.org",
+  "registry.yarnpkg.com",
+  // PyPI / Python
+  "pypi.org",
+  "files.pythonhosted.org",
+  "*.pythonhosted.org",
+  // crates / Rust
+  "crates.io",
+  "static.crates.io",
+  "index.crates.io",
+  // Go modules
+  "proxy.golang.org",
+  "sum.golang.org",
+  // Deno / JSR
+  "deno.land",
+  "*.deno.land",
+  "jsr.io",
+  // VCS hosting + raw source
+  "github.com",
+  "*.github.com",
+  "*.githubusercontent.com",
+  "gitlab.com",
+  "*.gitlab.com",
+  "bitbucket.org",
+];
+
+const ALWAYS_ALLOWED_HOSTS: readonly string[] = [
+  ...Object.values(BYOK_PROVIDER_NETWORK_HOSTS).flat(),
+  ...DEV_NETWORK_HOSTS,
+];
 
 function homeProtectedPaths(home: string): string[] {
   return [

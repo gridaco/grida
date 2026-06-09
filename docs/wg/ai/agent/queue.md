@@ -163,6 +163,21 @@ _transient_ failure is different: the turn is still the running turn
 (`retrying`), so the queue is not drained mid-retry; it drains only
 once the turn reaches a clean `idle`.
 
+**A blocked turn pauses the drain.** A turn that pauses **awaiting a
+user decision** — a supervised-approval Allow/Deny, or any other
+human-in-the-loop block on the current turn — is **not a completed
+turn**, even though it may end the run's stream and read as `idle`.
+Firing the next queued turn into that gap would run it _before_ the
+user resolves the block, reordering the user's own intent. So a
+pending block pauses the drain exactly like a hard error: queued
+messages keep their `queued_at` and wait. The drain resumes once the
+user resolves the block and the turn continues to a **true finish**.
+`idle` alone is therefore not a sufficient drainability test — the
+drain fires only when the session is genuinely ready for a _new_ turn,
+which a blocked turn is not. The block state is authoritative session
+state (a persisted pending approval), so every consumer — a second
+window, a hosted runner, the CLI — honors the pause identically.
+
 ### Stopping with a queue
 
 A user **abort** ([`session / interruption`](./session.md#interruption))
