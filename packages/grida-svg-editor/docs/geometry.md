@@ -66,15 +66,23 @@ the driver room to batch.
 
 ## Version-bump discipline
 
-| Counter             | Bumps on                                                                     |
-| ------------------- | ---------------------------------------------------------------------------- |
-| `structure_version` | tree shape changes, `id` writes, `set_text`                                  |
-| `geometry_version`  | tree shape changes, `set_text`, and writes to attributes in `GEOMETRY_ATTRS` |
-| `doc_version`       | every mutation (including presentation writes)                               |
+| Counter             | Bumps on                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| `structure_version` | tree shape changes, `id` writes, `set_text`                                                         |
+| `geometry_version`  | tree shape changes, `set_text`, writes to attributes in `GEOMETRY_ATTRS`, and DOM font-load settle† |
+| `doc_version`       | every mutation (including presentation writes)                                                      |
 
 `GEOMETRY_ATTRS` is the closed set of attribute names whose writes can
 shift bounds — `x`, `y`, `width`, `d`, `transform`, `font-size`, etc.
 See [`src/core/document.ts`](../src/core/document.ts) for the full list.
+
+† The **one** `geometry_version` bump with no attribute write: a DOM
+font-load settle (`document.fonts` `loadingdone`). The DOM surface drives
+it through `editor._internal.bump_geometry()` →
+`SvgDocument.bump_geometry()`, which advances `geometry_version` only — it
+does **not** bump `structure_version` / `doc_version`, mark the doc dirty,
+or touch undo (a reflow is not an edit). See §Limitations "Text bbox
+depends on font".
 
 The `MemoizedGeometryProvider` subscribes to both `structure_version`
 and `geometry_version` and clears its cache on either. It does **not**
@@ -98,6 +106,25 @@ frame are O(1).
 The cache is keyed on `NodeId`, not on DOM element references —
 elements are replaced every tick, but ids persist.
 
+## Show/hide uses `visibility`, not `display`
+
+Layer show/hide writes `visibility="hidden"`, never `display:none`.
+`display:none` removes the element from the render tree, which nulls
+out `getBBox`/`getScreenCTM` and makes `elementFromPoint` miss it — so
+hidden nodes would become un-pickable and un-transformable, and snap
+geometry against them would break. `visibility:hidden` keeps the node
+in the tree (invisible but still laid out and query-able), so those
+DOM queries keep working.
+
+Known limitation (accepted, to revisit): `visibility` inherits, so a
+hidden group is not airtight — a descendant with `visibility:visible`
+escapes it, and "show" on a node that only _inherits_ its hidden state
+writes `null` and is a no-op until that escaping case is handled.
+`display:none` would be airtight but is disqualified above. The toggle
+lives in the editor inspector (`VisibilityToggle`); the snap filter
+(`core/snap/neighborhood.ts`) already gates on both `display="none"`
+and `visibility="hidden"`.
+
 ## Limitations (v1)
 
 These are documented as known-broken rather than fixed in v1:
@@ -112,8 +139,21 @@ These are documented as known-broken rather than fixed in v1:
 height` frame, not the inner HTML's actual layout. Bounds reflect
   the frame; visible HTML content overflow is not queryable.
 - **Text bbox depends on font.** `<text>` and `<tspan>` bboxes shift
-  when a font finishes loading. Snap on text bounds will jitter until
-  fonts settle. There's no font-load-await today.
+  when a web font finishes loading AFTER its `font-family` / `font-size`
+  was already written — a reflow the IR cannot see, so nothing in the
+  document bumps `geometry_version`. The **DOM surface** closes this for
+  the common case: it listens to the container's `document.fonts`
+  `loadingdone` event (and an initial `fonts.ready`) and advances the
+  geometry channel via `editor._internal.bump_geometry()`, clearing the
+  bounds cache so snap / HUD chrome / the size meter re-read at the
+  settled glyph metrics. Honest caveats: (1) the bump is **coarse** — one
+  settle clears the **whole** cache, not just the reflowed text runs
+  (consistent with the pessimistic-invalidation stance below); (2) it is
+  **DOM-surface only** — non-DOM geometry providers, and fonts loaded
+  outside `document.fonts` (a `FontFace` added to a different set, or a
+  raw `@font-face` the document never observes), are NOT auto-observed. A
+  public `invalidate_geometry()` for those cases is **deferred**, not
+  shipped.
 - **Pessimistic invalidation.** Same-value attribute writes still
   bump `geometry_version`. The cache treats every bump as "clear
   everything." Subtree-targeted invalidation is a follow-up when

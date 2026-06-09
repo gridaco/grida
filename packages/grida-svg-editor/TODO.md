@@ -452,7 +452,9 @@ Current implementation notes:
 Background research / terms to separate before choosing a policy:
 
 - **Visibility.** A locked element may still render normally. Locking is not the
-  same as `display="none"`, `visibility="hidden"`, or opacity changes.
+  same as `display="none"`, `visibility="hidden"`, or opacity changes. (Layer
+  show/hide itself uses `visibility`, not `display` — see `docs/geometry.md`
+  "Show/hide uses `visibility`, not `display`".)
 - **Pickability / hit-testing.** SVG already has `pointer-events`, including
   `pointer-events="none"`, which affects browser hit-testing and DOM APIs such
   as `elementFromPoint` / `elementsFromPoint`. This is a pointer-targeting
@@ -622,14 +624,22 @@ Cases to study before choosing policy:
   depend on object bounding boxes, current user space, or inherited context.
   Ungrouping can change the coordinate context.
 
-Open questions:
+Open questions (answers below reflect the shipped clean-structural subset):
 
-- Does `Cmd+Shift+G` only allow plain structural groups?
+- Does `Cmd+Shift+G` only allow plain structural groups? **Yes** — own
+  attributes must be a subset of `{ transform, id, data-grida-id }`.
 - Do we reject ungrouping when the group has non-trivial visual state?
-- Do we distinguish "ungroup" from a more destructive "flatten group" command?
+  **Yes** — refused (no-op, no history), not silently mishandled.
+- Do we distinguish "ungroup" from a more destructive "flatten group"
+  command? **Not yet** — only `ungroup` ships; a destructive
+  "flatten group" (per-child opacity / filter / cascade preservation) is
+  still deferred.
 - How much visual preservation do we attempt for transforms and inherited
-  presentation attributes?
-- How much CSS cascade preservation do we attempt?
+  presentation attributes? **Transforms only** — the group `transform` is
+  baked into each child (op-list prepend). Inherited presentation
+  attributes are not preserved; a group carrying them is refused instead.
+- How much CSS cascade preservation do we attempt? **None** — a group with
+  `class` / `style` is refused rather than flattened.
 
 Current implementation notes (grouping):
 
@@ -655,21 +665,41 @@ Current implementation notes (grouping):
 
 Current implementation notes (ungrouping):
 
-- Not implemented. No `commands.ungroup`, no `core/group.ts:plan_ungroup`,
-  no keymap binding for Cmd+Shift+G (`docs/keybindings.md` lists it `[-]`).
-- No transform-baking helper exists. `compose_leading_translate`
-  (`core/intents.ts`) only composes a _translate_ into an existing
-  `transform` string; there is no general matrix-compose / bake utility
-  for arbitrary `translate/rotate/scale/matrix(…)` sequences.
-- No inherited-presentation copy helper exists. `attributes_of(id)` and
-  `get_all_styles(id)` (`document.ts`) expose own-attrs / own-style only;
-  a real "preserve appearance" ungroup would need to read computed values
-  (via the DOM-attached `getComputedStyle` path) and decide which to
-  push down — there is no such routine today.
-- Entry points to add: `core/group.ts:plan_ungroup` (read-only policy
-  decision tree mirroring `docs/grouping.md` §Ungrouping), a transform-bake
-  helper alongside `compose_leading_translate`, and a guarded handler in
-  `commands/defaults.ts` that calls into `editor.ts`.
+- **Ships for the safe clean-structural subset.** `commands.ungroup({ id? })`
+  (`editor.ts`) is gated by the read-only policy `core/group.ts:plan_ungroup`
+  and bound to **Cmd/Ctrl+Shift+G** (`selection.ungroup` in
+  `keymap/defaults.ts` + `commands/defaults.ts`). One atomic history step;
+  undo restores the group, its children, and their transforms byte-equal.
+- **Accepted:** a `<g>` that is a plain structural wrapper — own attributes
+  are a subset of `{ transform, id, data-grida-id }` — with **at least one**
+  element child, NOT inside `<defs>`, NOT referenced by any `<use>`
+  (`href` / `xlink:href === "#<id>"`, enumerated via `find_by_tag`), and
+  with no direct SMIL animation child (`animate` / `animateTransform` /
+  `animateMotion` / `set`). When the group carries a `transform`, every
+  child's own `transform` must be parseable.
+- **Refused (no mutation, no history) — the rendering-semantics-changing
+  cases from the research above:** any group `opacity` / `filter` /
+  `clip-path` / `mask` / `class` / `style` / inherited presentation attr
+  (`fill`, `stroke`, `font-*`, …); a `<g>` referenced by `<use>`; a `<g>`
+  inside `<defs>`; an animation-bearing `<g>`; an empty `<g>`; a `<g>` whose
+  (or whose child's) transform doesn't parse; and any non-single-`<g>`
+  selection. These are honest refusals — the package does NOT attempt the
+  per-child opacity / filter / cascade preservation those cases would need.
+- **Transform bake:** when the group has a `transform`, it is baked into each
+  child by PREPENDING the group's parsed ops to the child's parsed ops and
+  re-emitting clean tokens (`transform.parse` / `transform.emit` in
+  `core/transform.ts`) — e.g. group `translate(10 20)` + child `rotate(5)`
+  → child `translate(10 20) rotate(5 0 0)`. This is an op-list compose, NOT
+  a `matrix(...)` collapse: SVG applies transform lists left-to-right, so the
+  group's ops must lead the child's to preserve visual order, and keeping
+  clean tokens stays human-readable and round-trips through the parser
+  without trig drift.
+- **Still not attempted (deferred):** inherited-presentation push-down,
+  group-`opacity` flattening, group-`filter` / `clip-path` / `mask`
+  per-child equivalence, CSS-cascade preservation, and a distinct
+  destructive "flatten group" command. A real "preserve appearance" ungroup
+  of a stateful group would need computed-value reads (the DOM-attached
+  `getComputedStyle` path) — out of scope for the clean-structural subset.
 
 ### 11. Camera fit breaks when root SVG uses percentage / responsive sizing
 

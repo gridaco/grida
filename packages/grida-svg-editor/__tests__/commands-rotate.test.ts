@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createSvgEditor } from "../src/index";
+import { install_geometry } from "./_helpers";
 
 const DEG = Math.PI / 180;
 
@@ -75,6 +76,113 @@ describe("commands.rotate_to", () => {
     // rotate_to(90°) should land at rotate(90 ...) regardless of starting rotation.
     editor.commands.rotate_to(90 * DEG, { ids: [id], pivot: { x: 5, y: 5 } });
     expect(editor.document.get_attr(id, "transform")).toBe("rotate(90 5 5)");
+  });
+});
+
+describe("commands.transform", () => {
+  it("flips a rect horizontally in place about the bbox center (default pivot)", () => {
+    // 10×10 rect at origin → bbox center (5, 5). Flip-x about center is
+    // matrix(-1 0 0 1 10 0): x' = 10 - x maps the rect onto itself.
+    const { editor, id } = with_rect();
+    install_geometry(editor);
+    expect(editor.commands.transform([-1, 0, 0, 1, 0, 0], { ids: [id] })).toBe(
+      true
+    );
+    expect(editor.document.get_attr(id, "transform")).toBe(
+      "matrix(-1 0 0 1 10 0)"
+    );
+  });
+
+  it("flips a rect vertically in place about the bbox center (default pivot)", () => {
+    const { editor, id } = with_rect();
+    install_geometry(editor);
+    expect(editor.commands.transform([1, 0, 0, -1, 0, 0], { ids: [id] })).toBe(
+      true
+    );
+    expect(editor.document.get_attr(id, "transform")).toBe(
+      "matrix(1 0 0 -1 0 10)"
+    );
+  });
+
+  it("flips back on a second flip — the leading matrix folds to identity and the attribute is removed", () => {
+    // E² = identity for any pivot, so the same flip applied twice composes the
+    // leading matrix back to identity, which `apply_affine` drops — the rect
+    // round-trips to its original (no transform). The flip buttons toggle
+    // freely; `transform` uses `is_transformable`, NOT rotate's matrix-
+    // refusing gate.
+    const { editor, id } = with_rect();
+    install_geometry(editor);
+    expect(editor.commands.transform([-1, 0, 0, 1, 0, 0], { ids: [id] })).toBe(
+      true
+    );
+    expect(editor.document.get_attr(id, "transform")).toBe(
+      "matrix(-1 0 0 1 10 0)"
+    );
+    expect(editor.commands.transform([-1, 0, 0, 1, 0, 0], { ids: [id] })).toBe(
+      true
+    );
+    expect(editor.document.get_attr(id, "transform")).toBeNull();
+  });
+
+  it("refuses (returns false, no-op) with no geometry provider attached", () => {
+    const { editor, id } = with_rect();
+    // No install_geometry → default pivot can't be computed.
+    expect(editor.commands.transform([-1, 0, 0, 1, 0, 0], { ids: [id] })).toBe(
+      false
+    );
+    expect(editor.document.get_attr(id, "transform")).toBeNull();
+  });
+
+  it("composes onto an existing matrix transform, folding into a single leading matrix", () => {
+    // Unlike rotate, `transform` accepts a member that already has a matrix/
+    // scale/skew transform — it folds the new affine into ONE leading matrix
+    // rather than stacking a second token.
+    const { editor, id } = with_rect('transform="matrix(1 0 0 1 5 5)"');
+    install_geometry(editor);
+    expect(editor.commands.transform([-1, 0, 0, 1, 0, 0], { ids: [id] })).toBe(
+      true
+    );
+    const t = editor.document.get_attr(id, "transform")!;
+    // Exactly one matrix token — folded, not `matrix(...) matrix(...)`.
+    expect(t).toMatch(/^matrix\([^)]*\)$/);
+  });
+
+  it("still refuses a genuine conflict — <text rotate=…> (gate keeps non-matrix refusals)", () => {
+    // `is_transformable` drops ONLY rotate's matrix refusal; the genuine
+    // conflicts remain gated.
+    const editor = createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg"><text x="0" y="0" rotate="30 60 90">hi</text></svg>`,
+    });
+    install_geometry(editor);
+    const id = [...editor.tree().nodes.values()].find(
+      (n) => n.tag === "text"
+    )!.id;
+    expect(editor.commands.transform([-1, 0, 0, 1, 0, 0], { ids: [id] })).toBe(
+      false
+    );
+  });
+
+  it("preserves an existing rotate token, folding the flip as a leading matrix", () => {
+    const { editor, id } = with_rect('transform="rotate(30 5 5)"');
+    install_geometry(editor);
+    expect(
+      editor.commands.transform([-1, 0, 0, 1, 0, 0], {
+        ids: [id],
+        pivot: { x: 5, y: 5 },
+      })
+    ).toBe(true);
+    const t = editor.document.get_attr(id, "transform")!;
+    expect(t).toMatch(/^matrix\(/);
+    expect(t).toContain("rotate(30 5 5)");
+  });
+
+  it("is one atomic history step (undo restores the original)", () => {
+    const { editor, id } = with_rect();
+    install_geometry(editor);
+    editor.commands.transform([-1, 0, 0, 1, 0, 0], { ids: [id] });
+    expect(editor.state.can_undo).toBe(true);
+    editor.commands.undo();
+    expect(editor.document.get_attr(id, "transform")).toBeNull();
   });
 });
 

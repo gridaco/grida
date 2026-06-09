@@ -100,12 +100,12 @@ source of truth for what svg-editor ships out of the box.
 
 ## Grouping & Layout
 
-| Action               | macOS       | Windows/Linux    | Status | Command           | Notes                    |
-| -------------------- | ----------- | ---------------- | ------ | ----------------- | ------------------------ |
-| Group                | `⌘ + G`     | `Ctrl + G`       | [x]    | `selection.group` | wraps selection in `<g>` |
-| Ungroup              | `⌘ + ⇧ + G` | `Ctrl + ⇧ + G`   | [-]    | —                 | no ungroup command       |
-| Group with Container | `⌘ + ⌥ + G` | `Ctrl + Alt + G` | [-]    | —                 | no container model       |
-| Auto-layout          | `⇧ + A`     | `⇧ + A`          | [-]    | —                 | no AL model              |
+| Action               | macOS       | Windows/Linux    | Status | Command             | Notes                                                                                                                                                                                                                                                                                                     |
+| -------------------- | ----------- | ---------------- | ------ | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Group                | `⌘ + G`     | `Ctrl + G`       | [x]    | `selection.group`   | wraps selection in `<g>`                                                                                                                                                                                                                                                                                  |
+| Ungroup              | `⌘ + ⇧ + G` | `Ctrl + ⇧ + G`   | [x]    | `selection.ungroup` | dissolves a plain structural `<g>` (clean-structural subset only — refuses groups with `opacity` / `filter` / `clip-path` / `mask` / `class` / `style` / `fill`, `<defs>` / `<use>`-referenced / animation-bearing groups; bakes the group transform into children); see `grouping.md` §Ungrouping policy |
+| Group with Container | `⌘ + ⌥ + G` | `Ctrl + Alt + G` | [-]    | —                   | no container model                                                                                                                                                                                                                                                                                        |
+| Auto-layout          | `⇧ + A`     | `⇧ + A`          | [-]    | —                   | no AL model                                                                                                                                                                                                                                                                                               |
 
 ## Text Formatting
 

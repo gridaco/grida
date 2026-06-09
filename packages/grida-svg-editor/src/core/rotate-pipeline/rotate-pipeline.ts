@@ -201,6 +201,44 @@ export namespace rotate_pipeline {
       return { kind: "yes" };
     }
 
+    /**
+     * Decide whether a general affine `transform` compose is safe.
+     *
+     * Distinct from {@link is_rotatable} by design (sdk-design D3 — paired
+     * gates that satisfy different constraints stay separate). `transform`
+     * folds a *leading matrix* onto whatever transform the element already
+     * has, so — unlike rotate, which must recompose into a clean
+     * `rotate(θ cx cy)` — it does NOT refuse a `matrix` / `scale` / `skew`
+     * ("mixed") transform. It still refuses the genuine conflicts that would
+     * make a static `transform=` write fail to take effect or fight a
+     * time-varying source: an unparseable string, a shadowing inline CSS
+     * `transform`, an `<animateTransform>` child, or per-glyph `<text rotate>`.
+     */
+    export function is_transformable(
+      doc: SvgDocument,
+      id: NodeId
+    ): RotatableVerdict {
+      const own_transform = doc.get_attr(id, "transform");
+      const ops = transform.parse(own_transform);
+      // Unparseable transform string — nothing safe to compose onto.
+      if (ops === null) {
+        return { kind: "refuse", reason: "non-trivial-transform" };
+      }
+      // NB: unlike `is_rotatable`, a "mixed"/matrix classification is allowed
+      // — `transform.apply_affine` folds the affine into a single leading
+      // matrix, which round-trips cleanly regardless of the prior transform.
+      if (doc.has_glyph_rotate(id)) {
+        return { kind: "refuse", reason: "text-with-glyph-rotate" };
+      }
+      if (doc.has_inline_css_transform(id)) {
+        return { kind: "refuse", reason: "css-property-transform" };
+      }
+      if (doc.has_animate_transform_child(id)) {
+        return { kind: "refuse", reason: "animated-transform" };
+      }
+      return { kind: "yes" };
+    }
+
     function find_op<K extends TransformOp["type"]>(
       ops: ReadonlyArray<TransformOp>,
       type: K

@@ -627,6 +627,8 @@ editor.commands.{
   resize_to(target: { width: number; height: number; anchor?: ResizeAnchor }): void;
   rotate(args: { angle: number; pivot?: { x: number; y: number } }): void;
   rotate_to(args: { angle: number; pivot?: { x: number; y: number } }): void;
+  // `matrix` is SVG `matrix(a b c d e f)` order (the `Matrix2D` tuple).
+  transform(matrix: Matrix2D, opts?: { ids?: NodeId[]; pivot?: { x: number; y: number } }): boolean;
   flatten_transform(): void;          // bake `transform=` into native attrs where possible
 
   // alignment (operates on selection of ≥2 nodes against their union bbox)
@@ -635,6 +637,9 @@ editor.commands.{
   // structure
   reorder(direction: "bring_forward" | "send_backward" | "bring_to_front" | "send_to_back"): void;
   group(): void;                      // wrap selection in a new <g>
+  ungroup(opts?: { id?: NodeId }): boolean; // dissolve a plain structural <g>
+                                      // (clean-structural subset only; refuses
+                                      // groups with visual state — see TODO §10)
   remove(): void;
 
   // insertion — `tag` is an open string (so paste / RPC can create any element,
@@ -661,6 +666,8 @@ editor.commands.{
 ```
 
 All commands operate on `state.selection` unless they take an explicit target. Commands that can't apply (e.g. `set_text` with no text node selected) are no-ops, not errors.
+
+`transform` composes a general 2×3 affine onto the selection **relative** and **in world space about a pivot** (default: the selection union-bbox center) — `E = T(pivot) · matrix · T(-pivot)` — so a bare `[-1, 0, 0, 1, 0, 0]` is an in-place horizontal flip and `[1, 0, 0, -1, 0, 0]` a vertical one. The editor owns the round-trip: `E` is folded onto each member's transform list as a **single leading `matrix` op** (existing `rotate`/`translate` tokens are preserved after it; repeated applies collapse into one matrix; a net-identity leading matrix is dropped). It refuses (returns `false`, no history) on empty selection, no attached surface, or any member that isn't rotatable (matrix / scale / skew / `<text rotate>` / CSS-property / animated transforms — same gate as `rotate`; Flatten Transform is the recovery path). Flat-doc only: nested transformed ancestors are out of scope.
 
 (Naming convention for the API surface is `snake_case` to match the SVG / CSS property naming the editor already echoes — `set_property("stroke-width", …)` reads cleanly next to `set_paint("fill", …)`. JavaScript identifiers use `snake_case`; user-facing strings that mirror SVG attribute names stay `kebab-case` exactly as the spec writes them.)
 

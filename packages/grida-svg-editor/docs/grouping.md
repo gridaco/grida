@@ -5,7 +5,10 @@ decision tree below is the contract. Default stance: **when unclear,
 reject** — surface a no-op rather than silently produce invalid SVG or
 unexpected paint-order changes.
 
-Ungrouping is not implemented. See `TODO.md` §10 for the open research.
+`Cmd+Shift+G` ungroups a plain structural `<g>` — the **safe
+clean-structural subset** only. See [Ungrouping policy](#ungrouping-policy)
+below and `TODO.md` §10 for the full research on why ungrouping is not the
+inverse of grouping.
 
 ## Element sets
 
@@ -91,10 +94,57 @@ For v1 this is documented and accepted.
 After a successful group: the new `<g>` is the sole selection. Undo
 restores the original selection.
 
+## Ungrouping policy
+
+`Cmd+Shift+G` (`commands.ungroup`) dissolves the selected `<g>`, hoisting
+its children into the group's parent at the group's z-position, in
+document order. The new selection is the former children. One atomic
+history step — undo restores the group, its children, and their
+transforms byte-equal.
+
+Ungrouping is **not** the inverse of grouping when the group carries
+visual / cascade / reference state, so the gate
+(`core/group.ts:plan_ungroup`) accepts only the safe clean-structural
+subset. It **accepts** a `<g>` when ALL hold:
+
+- The target is a single `<g>` (not the document root).
+- The group is NOT inside `<defs>` (any ancestor `<defs>` → refuse).
+- The group has **at least one** element child.
+- The group's own attributes are a subset of
+  `{ transform, id, data-grida-id }`.
+- The group's `id` (if any) is NOT referenced by any `<use>`
+  (`href` / `xlink:href === "#<id>"`).
+- No direct child is an SVG animation element (`animate` /
+  `animateTransform` / `animateMotion` / `set`).
+- If the group has a `transform`, every child's own `transform` parses.
+
+It **refuses** (no-op, no history) any group carrying visual state —
+`opacity`, `filter`, `clip-path`, `mask`, `class`, `style`, or an
+inherited presentation attribute (`fill`, `stroke`, `font-*`, …) — along
+with `<defs>` groups, `<use>`-referenced groups, animation-bearing
+groups, empty groups, and unbakeable transforms. These cases would
+change rendering semantics; the package refuses them rather than
+silently mishandle them. A destructive "flatten group" command that
+attempts per-child opacity / filter / cascade preservation is a separate
+deferred item (`TODO.md` §10).
+
+### Transform bake
+
+When the group has a `transform`, it is baked into each child by
+**prepending** the group's parsed ops to the child's parsed ops and
+re-emitting clean tokens — e.g. group `translate(10 20)` + child
+`rotate(5)` → child `translate(10 20) rotate(5 0 0)`. A child with no
+transform inherits the group's transform verbatim. This is an op-list
+compose, **not** a `matrix(...)` collapse: SVG applies transform lists
+left-to-right, so the group's ops must lead the child's to preserve
+visual order, and clean tokens stay human-readable and round-trip
+through the parser without trig drift.
+
 ## What this is not
 
-- Not a flatten / ungroup operation. See `TODO.md` §10 for why
-  ungrouping is fundamentally different.
+- Not a destructive flatten. `ungroup` handles only the clean-structural
+  subset; the per-child opacity / filter / cascade-preservation
+  "flatten group" remains deferred (`TODO.md` §10).
 - Not an LCA computation. Cross-parent selections are rejected, not
   lifted to a common ancestor.
 - Not a multi-node transform tool. The HUD's multi-group chrome is a
