@@ -499,6 +499,7 @@ function AgentPaneContent({
           commandActions={commandActions}
           onSubmit={onSubmit}
           isStreaming={isStreaming}
+          busy={busy}
           onStop={stop}
           multimodal={multimodal}
           toolbar={

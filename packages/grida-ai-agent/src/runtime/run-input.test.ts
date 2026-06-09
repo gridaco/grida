@@ -214,4 +214,54 @@ describe("parseRunBody", () => {
     expect(parsed).toBeInstanceOf(Response);
     expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
   });
+
+  it("rejects an oversized inline image with a case-variant DATA: scheme", async () => {
+    // The size guard detects `data:` case-insensitively — a `DATA:` scheme must
+    // not slip the backstop.
+    const b64 = "A".repeat(Math.ceil((9 * 1024 * 1024 * 4) / 3));
+    const parsed = await parseRunBody(
+      {
+        messages: [
+          {
+            role: "user",
+            parts: [
+              {
+                type: "file",
+                mediaType: "image/png",
+                url: `DATA:image/png;base64,${b64}`,
+              },
+            ],
+          },
+        ],
+      },
+      deps as never
+    );
+    expect(parsed).toBeInstanceOf(Response);
+    expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
+  });
+
+  it("rejects a malformed inline data: URL (no comma) instead of treating it as 0 bytes", async () => {
+    // Fail closed: a comma-less data: URL has indeterminate size. The old guard
+    // measured it as 0 bytes and let a multi-MB payload through.
+    const huge = "A".repeat(9 * 1024 * 1024);
+    const parsed = await parseRunBody(
+      {
+        messages: [
+          {
+            role: "user",
+            parts: [
+              {
+                type: "file",
+                mediaType: "image/png",
+                url: `data:image/png;base64${huge}`,
+              },
+            ],
+          },
+        ],
+      },
+      deps as never
+    );
+    expect(parsed).toBeInstanceOf(Response);
+    expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
+  });
 });

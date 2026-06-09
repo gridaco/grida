@@ -63,6 +63,14 @@ export type AgentComposerInputProps = {
    */
   onSubmit: (text: string, files?: FileUIPart[]) => void | Promise<void>;
   isStreaming: boolean;
+  /**
+   * The session's combined busy signal (streaming OR maintenance like
+   * compaction OR core-busy), as used by the turn-queue controller to decide
+   * whether a submit enqueues. Text can ride the queue, but the queue is
+   * text-only — so image submits are blocked whenever `busy`, not just while
+   * THIS client streams. Defaults to `isStreaming` when omitted.
+   */
+  busy?: boolean;
   onStop: () => void;
   placeholder?: string;
   autofocus?: boolean;
@@ -107,6 +115,7 @@ function AgentComposerInner({
   commandActions,
   onSubmit,
   isStreaming,
+  busy,
   onStop,
   placeholder = "Ask anything…",
   autofocus,
@@ -114,6 +123,10 @@ function AgentComposerInner({
   toolbar,
   className,
 }: Omit<AgentComposerInputProps, "catalog">) {
+  // The image-block gate must match the queue controller's enqueue decision,
+  // which keys off the combined busy signal — not just this client's stream.
+  // Fall back to `isStreaming` if the host doesn't pass `busy`.
+  const isBusy = busy ?? isStreaming;
   const composer = useComposer();
   const { addAttachment } = composer;
 
@@ -122,6 +135,13 @@ function AgentComposerInner({
     for (const a of commandActions ?? []) map.set(a.id, a);
     return map;
   }, [commandActions]);
+
+  // In-flight image encoding. Tracked through a ref (read synchronously by
+  // `submit`, which races the async `onImageFiles`) and mirrored to state (to
+  // disable the send button). A counter, not a boolean, so concurrent pastes
+  // don't clear the flag while another encode is still running.
+  const encodingCountRef = useRef(0);
+  const [isEncodingImages, setIsEncodingImages] = useState(false);
 
   // Minimal, neutral inline feedback for the two cases that would otherwise do
   // nothing visible: a non-vision model, or attempting to queue images.
@@ -148,33 +168,51 @@ function AgentComposerInner({
         notify("This model can't read images.");
         return;
       }
-      // Encode concurrently — each file is independent, so a multi-image paste
-      // shouldn't serialize on the slowest one. Drop the ones that failed or
-      // were rejected (encodeImageFile returns null).
-      const encoded = (
-        await Promise.all(files.map((file) => encodeImageFile(file)))
-      ).filter((item) => item !== null);
-      for (const item of encoded) {
-        addAttachment({
-          name: item.name,
-          mime: item.mime,
-          size: item.size,
-          url: item.url,
-        });
-      }
-      // Feedback: clear the gate notice once an image lands; if every file
-      // failed to encode (corrupt, or unsupported like SVG), say so rather than
-      // silently swallowing the paste.
-      if (encoded.length > 0) {
-        notify(null);
-      } else {
-        notify("Couldn't add the image — it may be corrupted or unsupported.");
+      // Mark encode in-flight BEFORE the first await so a paste-then-Enter
+      // can't slip a text-only submit past the attachments (see `submit`).
+      encodingCountRef.current += 1;
+      setIsEncodingImages(true);
+      try {
+        // Encode concurrently — each file is independent, so a multi-image paste
+        // shouldn't serialize on the slowest one. Drop the ones that failed or
+        // were rejected (encodeImageFile returns null).
+        const encoded = (
+          await Promise.all(files.map((file) => encodeImageFile(file)))
+        ).filter((item) => item !== null);
+        for (const item of encoded) {
+          addAttachment({
+            name: item.name,
+            mime: item.mime,
+            size: item.size,
+            url: item.url,
+          });
+        }
+        // Feedback: clear the gate notice once an image lands; if every file
+        // failed to encode (corrupt, or unsupported like SVG), say so rather
+        // than silently swallowing the paste.
+        if (encoded.length > 0) {
+          notify(null);
+        } else {
+          notify(
+            "Couldn't add the image — it may be corrupted or unsupported."
+          );
+        }
+      } finally {
+        encodingCountRef.current -= 1;
+        if (encodingCountRef.current === 0) setIsEncodingImages(false);
       }
     },
     [multimodal, addAttachment, notify]
   );
 
   const submit = () => {
+    // Hold a submit while image encoding is still in flight — otherwise a
+    // paste-then-Enter races the async `onImageFiles` and sends text-only,
+    // dropping the attachment. Keep the editor content so the user can retry.
+    if (encodingCountRef.current > 0) {
+      notify("Still adding the image — one moment…");
+      return;
+    }
     // No blanket `isStreaming` early-return: submitting WHILE a turn streams is
     // how a TEXT message gets queued (RFC `queue`). Images are the exception —
     // the turn queue persists text only, so image sends need an idle session.
@@ -204,10 +242,14 @@ function AgentComposerInner({
       if (droppedImages) notify("This model can't read images.");
       return;
     }
-    // Images can't ride the text-only queue: block while busy (don't clear, so
-    // the user keeps their attachments) until the session is idle.
-    if (isStreaming && files.length > 0) {
-      notify("Can't queue images — wait for the current turn.");
+    // Images can't ride the text-only queue: block on the combined busy signal
+    // (streaming OR compaction OR core-busy) — the queue controller would
+    // enqueue text only and silently drop the attachment. Don't clear, so the
+    // user keeps their attachments until the session is idle.
+    if (isBusy && files.length > 0) {
+      notify(
+        "Can't add images while the session is busy — wait until it's idle."
+      );
       return;
     }
     composer.clear();
@@ -258,6 +300,7 @@ function AgentComposerInner({
               size="icon-sm"
               className="rounded-full"
               onClick={submit}
+              disabled={isEncodingImages}
               aria-label="Send"
             >
               <ArrowUpIcon className="size-4" />

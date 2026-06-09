@@ -143,6 +143,8 @@ export function ChatMessageView({
                   key={index}
                   src={image.url}
                   alt={image.filename ?? ""}
+                  loading="lazy"
+                  decoding="async"
                   className="max-h-48 max-w-full rounded-md border object-contain"
                 />
               ))}

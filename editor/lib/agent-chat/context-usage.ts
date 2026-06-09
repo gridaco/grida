@@ -213,7 +213,10 @@ export function computeContextUsage(
   const usage = lastAssistantUsage(messages);
   const usedTokens = usage ? usageTokenTotal(usage) : 0;
   const maxTokens = contextWindow ?? 0;
-  const percent = maxTokens > 0 ? usedTokens / maxTokens : 0;
+  // Clamp to the documented [0, 1] contract — a turn can report usage above the
+  // catalog window (provider drift, an over-budget request), and an unbounded
+  // ratio would mis-scale the ring math downstream.
+  const percent = maxTokens > 0 ? Math.min(1, usedTokens / maxTokens) : 0;
   const breakdown = estimateContextBreakdown(messages, usedTokens);
   return { usedTokens, maxTokens, percent, breakdown, usage };
 }

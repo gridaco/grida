@@ -136,4 +136,19 @@ describe("computeContextUsage", () => {
       ).usedTokens
     ).toBe(0);
   });
+
+  it("clamps percent to 1 when usage exceeds the window", () => {
+    // A turn can report usage above the catalog window (provider drift / an
+    // over-budget request); percent must honor its [0, 1] contract.
+    const over = [
+      {
+        role: "assistant",
+        parts: [{ type: "text", text: "y" }],
+        metadata: { usage: { input: 900, output: 400 } },
+      },
+    ];
+    const u = computeContextUsage(over, 1000);
+    expect(u.usedTokens).toBe(1300);
+    expect(u.percent).toBe(1);
+  });
 });

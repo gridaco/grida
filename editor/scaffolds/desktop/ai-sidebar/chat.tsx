@@ -427,6 +427,7 @@ export function AISidebarChat({ className }: { className?: string }) {
           commandActions={commandActions}
           onSubmit={onSubmit}
           isStreaming={isStreaming}
+          busy={busy}
           onStop={stop}
           placeholder="Ask the assistant to edit the SVG…"
           multimodal={multimodal}

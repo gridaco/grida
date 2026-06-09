@@ -82,8 +82,10 @@ export function useTurnQueueController(
       // first turn is never in flight), so there is nothing to queue against —
       // drop it rather than enqueue into the void. The queue is text-only;
       // image submits are blocked at the composer while busy, so `files` never
-      // reaches this branch.
-      if (sid) await enqueueRef.current(sid, t);
+      // reaches this branch. Require non-empty `t` too: a files-only submit
+      // would otherwise queue an empty turn (the early `!t && !hasFiles` guard
+      // lets `!t && hasFiles` through).
+      if (sid && t) await enqueueRef.current(sid, t);
       return;
     }
     await sendRef.current(t, files);
