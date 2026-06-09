@@ -19,6 +19,8 @@ and lookup helpers.
   pricing
 - Image generation model cards: labels, vendors, speed hints, supported sizes,
   size constraints, defaults, and pricing
+- Video generation model cards: canonical (provider-agnostic) models, each with
+  per-provider bindings carrying that provider's call id and pricing
 - Audio generation model cards
 - Image tool model cards, such as background removal and upscaling
 - Shared discriminator types for providers, vendors, speed labels, and pricing
@@ -78,6 +80,7 @@ Media model data lives under the `models` namespace:
 
 - `models.image`
 - `models.audio`
+- `models.video`
 - `models.image_tools`
 
 Image cards can describe both preset sizes and continuous size constraints.
@@ -92,6 +95,14 @@ Image pricing is a discriminated union:
 
 Audio models currently use flat per-run pricing. Image tools use flat
 per-invocation pricing.
+
+Video is different: the provider ecosystem is fragmented, so a video card is
+**canonical** (provider-agnostic `vendor/model` id + intrinsic specs) and holds a
+`providers` record of bindings — one per serving provider (`vercel` / `fal` /
+`openrouter`), each with its own call `id` and `per_second` pricing (nested
+`resolution → audio-mode → USD/s`). Cards catalogue the image-to-video route only.
+No default provider is encoded; resolve a route with
+`models.video.binding(card, provider)`.
 
 ## Lookups
 
@@ -109,7 +120,7 @@ per-invocation pricing.
 
 ## Updating The Catalog
 
-To add or update a text model (or any image / audio / image-tool model),
+To add or update a text model (or any image / audio / video / image-tool model),
 edit `src/models.ts`. That file is the central catalogue and also the
 type source — `models.text.CatalogId` is derived from the text-model table.
 

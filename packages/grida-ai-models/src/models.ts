@@ -7,6 +7,7 @@
  * - `models.text.*`        — text-model spec table, tier→spec map, lookup
  * - `models.image.*`       — image-generation catalogue
  * - `models.audio.*`       — audio-generation catalogue
+ * - `models.video.*`       — video-generation catalogue
  * - `models.image_tools.*` — non-generator image tools (background removal, upscale)
  * - `models.Provider`, `models.Vendor` — shared discriminator labels
  *
@@ -19,8 +20,9 @@
  * modules — keeping the full `namespace models` declaration in a
  * single source file is the workaround.
  *
- * `provider: "vercel"` and `provider: "replicate"` on the cards are
- * data labels only — see the README for the full contract.
+ * Routing labels on the cards — `Provider` (text/image), `audio.AudioProvider`,
+ * and video's per-binding `video.VideoProvider` — are data labels only; see the
+ * README for the full contract.
  *
  * @module
  */
@@ -47,7 +49,9 @@ export namespace models {
     | "recraft-ai"
     | "black-forest-labs"
     | "google"
-    | "stability-ai";
+    | "stability-ai"
+    | "bytedance"
+    | "xai";
 
   // ── models.text ───────────────────────────────────────────────────
   //
@@ -890,6 +894,328 @@ export namespace models {
     } as const;
 
     export const audio_model_ids = Object.keys(models) as AudioModelId[];
+  }
+
+  // ── models.video ──────────────────────────────────────────────────
+
+  /**
+   * Video-generation model catalogue.
+   *
+   * The video provider ecosystem is **fragmented**: the same model is served
+   * by several providers (Vercel AI Gateway, fal.ai, OpenRouter), each with a
+   * *different id, a different meter, and different availability*. So unlike
+   * `models.image`/`models.audio` — which bind one card to one provider — a
+   * video card is **canonical** (provider-agnostic id + intrinsic specs) and
+   * holds a {@link VideoProviderBinding} per provider that serves it, keyed by
+   * provider in {@link VideoModelCard.providers}. The default-provider choice
+   * is **deliberately not encoded here** — bindings carry no preference order;
+   * selection is a runtime concern. Look up a route with {@link binding}.
+   *
+   * The cards catalogue the **image-to-video** route (a still → clip) — the
+   * canvas-relevant mode and the only one some models (e.g. Grok) offer. Other
+   * capabilities (text-to-video, editing) aren't modelled until used; on fal
+   * they are distinct endpoint ids, so adding one is a new binding id, not a flag.
+   *
+   * **Pricing.** Video bills by output **duration**, and the rate varies by
+   * both resolution and whether audio is generated, so `per_second` is keyed
+   * `resolution → audio-mode → USD/s` (see {@link PerSecondPricing}). Values
+   * are the real provider rate; update if a provider changes its meter.
+   */
+  export namespace video {
+    /**
+     * A provider that can serve a video model. Distinct from the top-level
+     * {@link models.Provider} because video routes through more than the
+     * Vercel gateway. Each provider uses its own id format and meter.
+     */
+    export type VideoProvider = "vercel" | "fal" | "openrouter";
+
+    /**
+     * **Canonical**, provider-agnostic model id in `vendor/model` form
+     * (e.g. `google/veo-3.1`). This is *our* key, not any one provider's id —
+     * the provider-specific call id lives on each {@link VideoProviderBinding}.
+     * Open union (`string & {}`) keeps unrecognized ids assignable.
+     */
+    export type VideoModelId =
+      | "google/veo-3.1"
+      | "bytedance/seedance-2.0"
+      | "xai/grok-imagine-video-1.5"
+      | (string & {});
+
+    /** Resolution label (e.g. `"720p"`, `"1080p"`, `"4k"`). Pricing-map + UI key. */
+    export type ResolutionLabel = string;
+
+    /**
+     * Whether a clip is generated with synchronized audio. A real pricing axis:
+     * fal meters `silent` at roughly half of `audio`; Vercel sells `audio` only;
+     * Seedance bundles audio into its single rate.
+     */
+    export type AudioMode = "audio" | "silent";
+
+    // ── Pricing ─────────────────────────────────────────────────────
+
+    /**
+     * Per-second pricing, nested `resolution → audio-mode → USD/s`. Lives on a
+     * {@link VideoProviderBinding} — meters differ across providers.
+     *
+     * A binding lists only the `(resolution, mode)` combinations its provider
+     * actually serves and meters, so the keys double as that provider's
+     * resolution/audio support: Vercel's Veo card omits `"4k"` and `silent`
+     * because the gateway sells neither; fal lists both. Each value is the real
+     * USD-per-output-second rate for that exact config.
+     */
+    export type PerSecondPricing = {
+      type: "per_second";
+      /** USD/s, by resolution then audio mode. */
+      usd_per_second: Record<
+        ResolutionLabel,
+        Partial<Record<AudioMode, number>>
+      >;
+    };
+
+    export type VideoModelPricing = PerSecondPricing;
+
+    /**
+     * How one provider serves a canonical model: the id you actually call on
+     * that provider, plus that provider's own meter. The unit of
+     * provider-selection. Keyed by {@link VideoProvider} in
+     * {@link VideoModelCard.providers}, so `provider` here must equal that key.
+     */
+    export type VideoProviderBinding = {
+      provider: VideoProvider;
+      /**
+       * Provider-specific call id for the image-to-video route. Format varies —
+       * `google/veo-3.1-generate-001` (Vercel), `fal-ai/veo3.1/image-to-video`
+       * (fal, where the capability is keyed into the endpoint id).
+       */
+      id: string;
+      /** Real upstream pricing for **this** provider — meters differ across providers. */
+      pricing: VideoModelPricing;
+      /**
+       * Coarse provider cost per invocation in USD — this binding's rate at the
+       * model's default `(resolution, audio)` × default duration. For budget
+       * estimation; not for display.
+       */
+      avg_cost_usd: number;
+      /** Per-binding deprecation (a provider may retire a route independently). */
+      deprecated?: boolean;
+      /** Provider's page for this binding; UI falls back to {@link VideoModelCard.url}. */
+      url?: string;
+    };
+
+    export type VideoModelCard = {
+      /** Canonical, provider-agnostic id. */
+      id: VideoModelId;
+      label: string;
+      deprecated: boolean;
+      short_description: string;
+      vendor: Vendor;
+      /** Supported aspect ratios. */
+      aspect_ratios: image.AspectRatioString[];
+      /** Inclusive output-duration bounds, in seconds. */
+      min_duration: number;
+      max_duration: number;
+      /** Whether the model can produce synchronized audio (capability; per-mode pricing lives on each binding). */
+      audio: boolean;
+      speed_label: image.SpeedLabel;
+      /** Default generation request. Every binding must price `(resolution, audio)`. */
+      default: {
+        resolution: ResolutionLabel;
+        aspect_ratio: image.AspectRatioString;
+        duration: number;
+        audio: boolean;
+      };
+      /** Original vendor's model card page (not a serving gateway). */
+      url: string;
+      /**
+       * Providers that serve this model, keyed by provider. **No implied
+       * preference** — default-provider selection is deferred to the runtime.
+       * Non-empty; keying makes providers unique by construction.
+       */
+      providers: Partial<Record<VideoProvider, VideoProviderBinding>>;
+    };
+
+    export const models: Partial<Record<VideoModelId, VideoModelCard>> = {
+      // -----------------------------------------------------------------
+      // Google — Veo 3.1
+      // -----------------------------------------------------------------
+      "google/veo-3.1": {
+        id: "google/veo-3.1",
+        label: "Veo 3.1",
+        deprecated: false,
+        short_description:
+          "Google's flagship video model — strong prompt adherence with native, synchronized audio.",
+        vendor: "google",
+        aspect_ratios: ["16:9", "9:16"],
+        min_duration: 4,
+        max_duration: 8,
+        audio: true,
+        speed_label: "slow",
+        default: {
+          resolution: "1080p",
+          aspect_ratio: "16:9",
+          duration: 8,
+          audio: true,
+        },
+        url: "https://deepmind.google/models/veo/",
+        providers: {
+          // Vercel AI Gateway — gateway.video(id), image-to-video. Audio-on
+          // only, ≤1080p, flat $0.40/s.
+          // https://vercel.com/ai-gateway/models/veo-3.1-generate-001
+          vercel: {
+            provider: "vercel",
+            id: "google/veo-3.1-generate-001",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.4 },
+                "1080p": { audio: 0.4 },
+              },
+            },
+            avg_cost_usd: 3.2, // 1080p audio × 8s default
+            url: "https://vercel.com/ai-gateway/models/veo-3.1-generate-001",
+          },
+          // fal.ai — image-to-video endpoint (capability is keyed into the id;
+          // t2v is a separate `fal-ai/veo3.1` endpoint, not catalogued). Meters
+          // audio/silent and adds 4K. Audio-on matches Vercel ($0.40/s @
+          // 720p/1080p); silent ~half; 4K $0.40 silent / $0.60 audio.
+          // https://fal.ai/models/fal-ai/veo3.1/image-to-video
+          fal: {
+            provider: "fal",
+            id: "fal-ai/veo3.1/image-to-video",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.4, silent: 0.2 },
+                "1080p": { audio: 0.4, silent: 0.2 },
+                "4k": { audio: 0.6, silent: 0.4 },
+              },
+            },
+            avg_cost_usd: 3.2, // 1080p audio × 8s default
+            url: "https://fal.ai/models/fal-ai/veo3.1/image-to-video",
+          },
+          // OpenRouter also serves it as `google/veo-3.1`, but its API surfaces
+          // only token pricing ($0/MTok) for video — no usable per-second
+          // meter confirmed. Add a binding once a real rate is verified.
+        },
+      },
+      // -----------------------------------------------------------------
+      // ByteDance — Seedance 2.0
+      // -----------------------------------------------------------------
+      "bytedance/seedance-2.0": {
+        id: "bytedance/seedance-2.0",
+        label: "Seedance 2.0",
+        deprecated: false,
+        short_description:
+          "ByteDance's state-of-the-art video model — top-tier image-to-video with reference and editing modes.",
+        vendor: "bytedance",
+        aspect_ratios: ["16:9", "9:16", "1:1"],
+        min_duration: 5,
+        max_duration: 15,
+        audio: true,
+        speed_label: "slow",
+        default: {
+          resolution: "720p",
+          aspect_ratio: "16:9",
+          duration: 5,
+          audio: true,
+        },
+        url: "https://seed.bytedance.com/en/seedance2_0",
+        providers: {
+          // Vercel AI Gateway — image-to-video. Per-second by resolution; audio
+          // bundled into the rate (no separate silent meter). 1080p exists but
+          // its per-second rate is unconfirmed; a `bytedance/seedance-2.0-fast`
+          // route also exists (~20% cheaper).
+          // https://vercel.com/changelog/seedance-2.0-video-now-available-on-ai-gateway
+          vercel: {
+            provider: "vercel",
+            id: "bytedance/seedance-2.0",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "480p": { audio: 0.092 },
+                "720p": { audio: 0.199 },
+              },
+            },
+            avg_cost_usd: 1.0, // 720p audio × 5s default (≈ $0.995)
+          },
+          // Also served by fal.ai and Replicate — add those bindings once
+          // their per-second rates are verified.
+        },
+      },
+      // -----------------------------------------------------------------
+      // xAI — Grok Imagine Video 1.5
+      // -----------------------------------------------------------------
+      // Image-to-video only (no t2v, per xAI docs); native lip-synced audio
+      // bundled into the rate. Per-second by resolution, identical on Vercel
+      // (no markup) and fal: $0.08/s @480p, $0.14/s @720p. Both also bill
+      // ~$0.01 per input image — an input surcharge not captured by the
+      // per_second (output) meter.
+      "xai/grok-imagine-video-1.5": {
+        id: "xai/grok-imagine-video-1.5",
+        label: "Grok Imagine Video 1.5",
+        deprecated: false,
+        short_description:
+          "xAI's image-to-video model — animates a still into cinematic video with native, lip-synced audio.",
+        vendor: "xai",
+        aspect_ratios: ["16:9", "9:16"],
+        min_duration: 5,
+        max_duration: 15,
+        audio: true,
+        speed_label: "fast",
+        default: {
+          resolution: "720p",
+          aspect_ratio: "16:9",
+          duration: 5,
+          audio: true,
+        },
+        url: "https://docs.x.ai/developers/models/grok-imagine-video-1.5-preview",
+        providers: {
+          // Vercel AI Gateway — image-to-video; mirrors xAI's list price (no markup).
+          // https://vercel.com/changelog/grok-imagine-video-1-5-on-ai-gateway
+          vercel: {
+            provider: "vercel",
+            id: "xai/grok-imagine-video-1.5-preview",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "480p": { audio: 0.08 },
+                "720p": { audio: 0.14 },
+              },
+            },
+            avg_cost_usd: 0.7, // 720p audio × 5s default
+            url: "https://vercel.com/ai-gateway/models/grok-imagine-video",
+          },
+          // fal.ai — image-to-video endpoint; same per-second rate.
+          // https://fal.ai/models/xai/grok-imagine-video/v1.5/image-to-video
+          fal: {
+            provider: "fal",
+            id: "xai/grok-imagine-video/v1.5/image-to-video",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "480p": { audio: 0.08 },
+                "720p": { audio: 0.14 },
+              },
+            },
+            avg_cost_usd: 0.7, // 720p audio × 5s default
+            url: "https://fal.ai/models/xai/grok-imagine-video/v1.5/image-to-video",
+          },
+        },
+      },
+    } as const;
+
+    export const video_model_ids = Object.keys(models) as VideoModelId[];
+
+    /**
+     * The binding for a specific provider, or `null` if that provider does
+     * not serve this model.
+     */
+    export function binding(
+      card: VideoModelCard,
+      provider: VideoProvider
+    ): VideoProviderBinding | null {
+      return card.providers[provider] ?? null;
+    }
   }
 
   // ── models.image_tools ────────────────────────────────────────────
