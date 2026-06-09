@@ -15,8 +15,19 @@
  * `child_process` directly — it asks the caller for a function that
  * takes `{command, args, workdir}` and returns process output.
  * That keeps the package runtime-neutral and lets the agent host reuse
- * its existing allowlist + cwd-containment checks (see
- * `@grida/agent`'s `validateShellRequest`).
+ * its structural shell gates — cwd-in-workspace + secret-arg containment
+ * (see `@grida/agent`'s `validateShellRequest`). There is no command
+ * allowlist; the OS sandbox is the structural boundary.
+ *
+ * GRIDA-SEC-004 — this tool owns the supervised-approval gate. The
+ * `needsApproval` predicate below is what PAUSES a mutating command for an
+ * Allow/Deny in `accept-edits` (and is absent in `auto`). The gate lives on
+ * the tool, NOT the backend: by the time the backend's `execute` runs, the
+ * call is already cleared (auto, or user-approved), so the backend cannot
+ * re-gate on mode. The mode→predicate wiring is at
+ * `workspace-agent-bindings.ts`; the read-only classification is
+ * `permissions.ts` `isReadOnlyCommand`; the server-authoritative answer is
+ * `store.answerApproval`. See SECURITY.md.
  */
 
 import { tool } from "ai";
@@ -49,7 +60,7 @@ export type RunCommandResult = {
 export type RunCommandFailure = {
   ok: false;
   /** Caller-chosen reason. The agent host uses things like
-   * `"cmd-not-allowed"`, `"cwd-not-in-workspace"`. Stays as a string
+   * `"cwd-not-in-workspace"`, `"arg-in-protected-root"`. Stays as a string
    * so adding new categories doesn't require a wire change. */
   code: string;
   message: string;
@@ -74,6 +85,17 @@ export function createRunCommandTool(opts: {
   backend: RunCommandBackend;
   default_workdir: string;
   policy_description?: string;
+  /**
+   * Supervised-approval gate (RFC `permission modes`, Phase 2). When this
+   * returns true for a given call, the AI SDK emits a `tool-approval-request`
+   * and PAUSES — `execute` does not run until the user approves (Allow). In
+   * `accept-edits` the host wires this to "true unless the command is
+   * read-only"; in `auto` it's absent (every command auto-runs). The decision
+   * lives here, NOT in the backend, because the backend's `execute` can't tell
+   * an approved call from an un-approved one — by the time `execute` runs, the
+   * SDK has already cleared the call (auto, or user-approved).
+   */
+  needs_approval?: (input: { command: string; args: string[] }) => boolean;
 }) {
   const policy =
     opts.policy_description ??
@@ -132,6 +154,15 @@ export function createRunCommandTool(opts: {
         message: z.string(),
       }),
     ]),
+    // Supervised approval (Phase 2): pausing happens BEFORE `execute`. When the
+    // host supplies no predicate (e.g. `auto`), the call never pauses.
+    needsApproval: opts.needs_approval
+      ? (input) =>
+          opts.needs_approval!({
+            command: input.command,
+            args: input.args ?? [],
+          })
+      : false,
     execute: async ({
       command,
       args,

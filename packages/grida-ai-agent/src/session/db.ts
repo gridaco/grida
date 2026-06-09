@@ -107,7 +107,7 @@ export function openSessionsDb(opts: OpenSessionsDbOptions): OpenedSessionsDb {
     );
   }
   if (version < SCHEMA_VERSION) {
-    // ── future ALTER-ladder goes here (step version up to SCHEMA_VERSION) ──
+    migrateSchema(sqlite, version);
     sqlite.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   }
 
@@ -151,6 +151,42 @@ function readUserVersion(sqlite: DatabaseSync): number {
     | { user_version?: number }
     | undefined;
   return row?.user_version ?? 0;
+}
+
+/**
+ * The in-place ALTER-ladder: step a DB stamped at `fromVersion` up to
+ * {@link SCHEMA_VERSION}, one version at a time. Runs AFTER the idempotent
+ * `BOOTSTRAP_SQL` pass, so a *fresh* DB already has the current columns —
+ * every step must therefore be additive and tolerant of "already there"
+ * ({@link addColumnIfMissing} guards on `PRAGMA table_info`). `CREATE TABLE
+ * IF NOT EXISTS` does NOT add a column to an existing table, so a new column
+ * on an existing DB only arrives through a step here.
+ */
+function migrateSchema(sqlite: DatabaseSync, fromVersion: number): void {
+  // v1 → v2: `chat_sessions.mode` (permission/supervision posture).
+  if (fromVersion < 2) {
+    addColumnIfMissing(sqlite, "chat_sessions", "mode", "TEXT");
+  }
+}
+
+/**
+ * Add a column iff it isn't already present. The presence check (vs a bare
+ * `ALTER TABLE … ADD COLUMN`) is what makes the ladder safe to run on a fresh
+ * DB that already has the column from `BOOTSTRAP_SQL` — a bare ALTER there
+ * throws `duplicate column name`. Table/column names are internal constants,
+ * not user input, so the string interpolation is safe.
+ */
+function addColumnIfMissing(
+  sqlite: DatabaseSync,
+  table: string,
+  column: string,
+  decl: string
+): void {
+  const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+    name?: string;
+  }>;
+  if (cols.some((c) => c.name === column)) return;
+  sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
 }
 
 type ProxyMethod = "run" | "all" | "values" | "get";

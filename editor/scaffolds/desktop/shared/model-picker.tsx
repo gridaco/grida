@@ -49,7 +49,7 @@ export function DesktopModelPicker({
     <PromptInputSelect value={value} onValueChange={onValueChange}>
       <PromptInputSelectTrigger
         size="sm"
-        className="text-xs"
+        className="min-w-0 gap-1 px-2 text-xs [&>svg]:transition-colors hover:[&>svg]:text-foreground aria-expanded:[&>svg]:text-foreground [&_[data-slot=select-value]]:block [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate"
         aria-label="Model"
       >
         <PromptInputSelectValue placeholder="Model" />

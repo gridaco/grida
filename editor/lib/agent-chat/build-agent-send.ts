@@ -10,11 +10,14 @@
  */
 
 import type { FileUIPart } from "ai";
+import type { AgentMode } from "@grida/agent";
 
 /** The body the desktop agent routes read off each send. */
 export type AgentSendBody = {
   session_id?: string;
   model_id: string;
+  /** Permission/supervision posture for the turn (RFC `permission modes`). */
+  mode?: AgentMode;
   /** Per-send skill subset (workspace tab); omitted on tab-less surfaces. */
   skills?: string[];
 };
@@ -29,14 +32,16 @@ export function buildAgentSend(opts: {
   sendMessage: SendMessageFn;
   sessionId: string | null;
   modelId: string;
+  mode?: AgentMode;
   skills?: string[];
 }): (text: string, files?: FileUIPart[]) => void {
-  const { sendMessage, sessionId, modelId, skills } = opts;
+  const { sendMessage, sessionId, modelId, mode, skills } = opts;
   return (text, files) => {
     const body: AgentSendBody = {
       session_id: sessionId ?? undefined,
       model_id: modelId,
     };
+    if (mode) body.mode = mode;
     if (skills) body.skills = skills;
     void sendMessage(files && files.length > 0 ? { text, files } : { text }, {
       body,

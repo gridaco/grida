@@ -3,6 +3,7 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import {
   AGENT_SKILL_IDS,
+  asAgentMode,
   AGENT_TIERS,
   BYOK_PROVIDER_IDS,
   ai,
@@ -57,6 +58,14 @@ export namespace desktopAgentTransport {
         return streamFromBridge({
           ...defaults,
           ...body,
+          // A body-less send (the AI SDK's approval/tool auto-resubmit calls
+          // `makeRequest` with no body) would otherwise fall back to the
+          // creation-time `defaults.session_id`, which is stale `undefined` for
+          // a chat started fresh (the Chat isn't rebuilt when it adopts its
+          // server id mid-stream). Pin it to the live id we learned on send so
+          // a resume always targets the right session instead of forking a new
+          // one. The explicit per-send `body.session_id` still wins.
+          session_id: body.session_id ?? liveSessionId ?? defaults.session_id,
           onSessionId: trackSessionId,
           messages: options.messages,
           abortSignal: options.abortSignal,
@@ -96,8 +105,21 @@ function streamFromBridge(
         settled = true;
         controller.error(err);
       };
-      const abort = () => {
+      // The ONE sanctioned run-termination path. `abortRun` is the only caller
+      // of `ai.abortAgentRun` in this module, and it is reached solely through
+      // `opts.abortSignal` — raised by an explicit user Stop (useChat().stop()
+      // → AbortController.abort()). A stream teardown (the `cancel()` method
+      // below) is a DETACH, not an abort: per
+      // docs/wg/ai/agent/session.md#abort-vs-tcp-close the run keeps going and
+      // the client re-attaches via `reconnectToStream`. NEVER call `abortRun`
+      // from a teardown path — doing so re-opens the "cut-off after detach"
+      // class (a renderer killing a server-authoritative run as a side effect
+      // of having stopped reading it).
+      const abortRun = () => {
         if (sessionId) void ai.abortAgentRun(sessionId);
+      };
+      const abort = () => {
+        abortRun();
         close();
       };
 
@@ -118,6 +140,8 @@ function streamFromBridge(
             workspace_id: opts.workspace_id,
             skills: opts.skills,
             session_id: opts.session_id,
+            mode: opts.mode,
+            approval_answer: opts.approval_answer,
           },
           (chunk: AgentUIMessageChunk) => {
             if (!settled) controller.enqueue(chunk);
@@ -145,7 +169,13 @@ function streamFromBridge(
     },
 
     cancel() {
-      if (sessionId) void ai.abortAgentRun(sessionId);
+      // Detach, not abort (docs/wg/ai/agent/session.md#abort-vs-tcp-close). The
+      // consumer stopped reading — unmount, stream-replace, reconnect swap, or a
+      // downstream reducer error — which is NOT an explicit user Stop. Per the
+      // RFC the run keeps going (the recorder stays attached host-side) and the
+      // client re-attaches via `reconnectToStream`. Deliberately does NOT call
+      // `abortRun`. Keep `settled` so no further chunk is enqueued onto the dead
+      // controller.
       settled = true;
     },
   });
@@ -213,6 +243,32 @@ function readBodyOptions(body: unknown): DesktopAgentTransportOptions {
   if (typeof obj.feature === "string") out.feature = obj.feature;
   if (typeof obj.workspace_id === "string") out.workspace_id = obj.workspace_id;
   if (typeof obj.session_id === "string") out.session_id = obj.session_id;
+  // Same canonical narrower the server uses in `parseRunBody` — don't hand-roll
+  // a second copy of the mode-validation logic.
+  const mode = asAgentMode(obj.mode);
+  if (mode) out.mode = mode;
+  // Supervised-approval answer (RFC `permission modes`, Phase 2). Relayed as a
+  // first-class body field — the sidecar re-validates it against the persisted
+  // pending approval, so this is a shape gate only, not the authority.
+  if (
+    obj.approval_answer &&
+    typeof obj.approval_answer === "object" &&
+    !Array.isArray(obj.approval_answer)
+  ) {
+    const a = obj.approval_answer as Record<string, unknown>;
+    if (
+      typeof a.tool_call_id === "string" &&
+      typeof a.approval_id === "string" &&
+      typeof a.approved === "boolean"
+    ) {
+      out.approval_answer = {
+        tool_call_id: a.tool_call_id,
+        approval_id: a.approval_id,
+        approved: a.approved,
+        ...(typeof a.reason === "string" ? { reason: a.reason } : {}),
+      };
+    }
+  }
   if (Array.isArray(obj.skills)) {
     out.skills = obj.skills.filter(
       (item): item is NonNullable<AgentRunOptions["skills"]>[number] =>

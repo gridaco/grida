@@ -6,6 +6,7 @@
 import type { models, ModelTier } from "@grida/ai-models";
 import type { ByokProviderId } from "./provider-ids";
 import type { SkillId } from "./skills";
+import type { AgentMode } from "./mode";
 
 export const AGENT_SESSION_AGENT = "grida" as const;
 
@@ -36,6 +37,23 @@ export type AgentRunMessage = {
   parts?: readonly AgentRunMessagePart[];
 };
 
+/**
+ * A user's Allow/Deny on a paused supervised approval (RFC `permission modes`,
+ * Phase 2). It rides the resume run-request body as a FIRST-CLASS field — not
+ * smuggled inside a mutated assistant message — exactly like `mode`/`model_id`.
+ * The server is the single source of truth for message state, so the answer
+ * never needs to be SDK-part-shaped on the wire: the host validates it against
+ * the persisted pending approval (`store.answerApproval`) before rebuilding the
+ * model view. A forged answer (unknown call, wrong id, already-answered) is a
+ * silent no-op.
+ */
+export type ApprovalAnswer = {
+  tool_call_id: string;
+  approval_id: string;
+  approved: boolean;
+  reason?: string;
+};
+
 export type AgentRunOptions = {
   messages: readonly AgentRunMessage[];
   tier?: ModelTier;
@@ -50,6 +68,19 @@ export type AgentRunOptions = {
   feature?: string;
   workspace_id?: string;
   skills?: readonly SkillId[];
+  /**
+   * Permission/supervision posture for this turn (RFC `permission modes`).
+   * Omitted ⇒ the host defaults to `accept-edits`. Persisted on the session so
+   * a later queued-turn drain reuses the user's last-chosen mode.
+   */
+  mode?: AgentMode;
+  /**
+   * Resume answer for a paused supervised approval (RFC `permission modes`,
+   * Phase 2). Present ONLY on the turn that answers an Allow/Deny; the host
+   * applies it (`store.answerApproval`) before rebuilding the model view, then
+   * the SDK resumes (Allow) or skips (Deny) the call. See {@link ApprovalAnswer}.
+   */
+  approval_answer?: ApprovalAnswer;
   /**
    * Optional persistent session id. When omitted, the agent host creates a
    * new chat session row and returns the id via the transport response.

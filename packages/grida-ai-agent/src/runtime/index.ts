@@ -18,6 +18,7 @@
 
 import crypto from "node:crypto";
 import { AGENT_SESSION_AGENT } from "../protocol/run";
+import { AGENT_DEFAULT_MODE } from "../protocol/mode";
 import type { ByokProviderId } from "../protocol/provider-ids";
 import {
   resolveProvider,
@@ -48,6 +49,7 @@ import {
 import { SessionScheduler } from "./session-scheduler";
 import { AGENT_DEFAULT_TIER } from "../tiers";
 import {
+  applyApprovalAnswer,
   extractFirstUserText,
   parseRunBody,
   persistIncomingTail,
@@ -107,6 +109,11 @@ async function resolveOrCreateSession(
         model_id: req.model_id,
       });
     }
+    // Persist a mode change so a later queued-turn drain (no client request)
+    // reuses the user's last-chosen posture.
+    if (existing.mode !== req.mode) {
+      await store.updateMode(existing.id, req.mode);
+    }
     return existing.id;
   }
   const created = await store.create({
@@ -118,6 +125,7 @@ async function resolveOrCreateSession(
       tier: req.tier,
       model_id: req.model_id,
     },
+    mode: req.mode,
   });
   return created.id;
 }
@@ -201,6 +209,7 @@ type StartTurnOptions = {
   feature?: RunRequest["feature"];
   workspace_root?: string;
   skills?: RunRequest["skills"];
+  mode: RunRequest["mode"];
 };
 
 export class AgentRuntime {
@@ -238,6 +247,8 @@ export class AgentRuntime {
       dequeue: (messageId) =>
         this.deps.sessions_store.dequeueMessage(messageId),
       drain: (sessionId) => this.drainTurn(sessionId),
+      has_pending_approval: (sessionId) =>
+        this.deps.sessions_store.hasPendingApproval(sessionId),
       drain_cooldown_ms: deps.drain_cooldown_ms,
     });
     this.streams.observe({
@@ -280,6 +291,9 @@ export class AgentRuntime {
       model_id: session.model?.model_id,
       workspace_root: workspaceRoot,
       skills: undefined,
+      // Queued-turn posture comes from the persisted session, not a client
+      // request (there is none here). Legacy rows (null mode) fall to default.
+      mode: session.mode ?? AGENT_DEFAULT_MODE,
     });
   }
 
@@ -421,9 +435,23 @@ export class AgentRuntime {
       feature,
       workspace_root: workspaceRoot,
       skills,
+      mode,
+      approval_answer: approvalAnswer,
     } = req;
 
     await persistIncomingTail(this.deps.sessions_store, sessionId, messages);
+    // Supervised-approval resume (RFC `permission modes`, Phase 2): if this
+    // re-submit carries an Allow/Deny (the explicit `approval_answer` body
+    // field), apply it to the persisted part BEFORE the model view is rebuilt —
+    // otherwise the rebuild would still see `approval-requested` and the run
+    // would not resume.
+    if (approvalAnswer) {
+      await applyApprovalAnswer(
+        this.deps.sessions_store,
+        sessionId,
+        approvalAnswer
+      );
+    }
 
     // Fire-and-forget title generation; writes title only if still the
     // default sentinel, so a user rename always wins. Failures swallowed.
@@ -456,6 +484,7 @@ export class AgentRuntime {
         feature,
         workspace_root: workspaceRoot,
         skills,
+        mode,
       });
     } catch (err) {
       if (err instanceof RunInFlightError) {
@@ -491,6 +520,7 @@ export class AgentRuntime {
       feature,
       workspace_root: workspaceRoot,
       skills,
+      mode,
     } = opts;
 
     // Reserve the registry entry; its `modelAbort.signal` (not the request
@@ -567,6 +597,7 @@ export class AgentRuntime {
             signal: entry.model_abort.signal,
             workspace_root: workspaceRoot,
             skills,
+            mode,
             skill_index: ctx.skill_index,
             skill_cache: ctx.skill_cache,
             project_instructions: ctx.project_instructions,

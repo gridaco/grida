@@ -38,6 +38,7 @@ import {
   ConversationScrollButton,
 } from "@app/ui/ai-elements/conversation";
 import { cn } from "@app/ui/lib/utils";
+import { Button } from "@app/ui/components/button";
 import {
   AGENT_SESSION_AGENT,
   sessions as bridgeSessions,
@@ -50,6 +51,7 @@ import {
 import _models from "@grida/ai-models";
 import {
   buildAgentSend,
+  buildApprovalResumeBody,
   desktopAgentTransport,
   isSessionBusy,
   useChatSession,
@@ -72,6 +74,7 @@ import {
   DesktopModelPicker,
   useModelPickerState,
 } from "../shared/model-picker";
+import { DesktopModePicker, useModePickerState } from "../shared/mode-picker";
 import { DesktopContextMeter } from "../shared/context-meter";
 import {
   AgentComposerInput,
@@ -162,13 +165,20 @@ function AgentPaneContent({
     force_new: handoffPrompt != null,
   });
 
-  // `chatRef` exposes the chat instance to the transport's
-  // `onResumeStart` hook, which can't close over `chat` since that
-  // variable doesn't exist yet at closure-construction time.
+  // `chatRef` mirrors the live `Chat` for the transport's `onResumeStart` hook,
+  // which can't close over `chat` (that variable doesn't exist when the closure
+  // is built). It is synced from the PASSIVE EFFECT below — NEVER assigned
+  // inside `useMemo`. The factory must be pure: under React StrictMode it is
+  // double-invoked, so a `chatRef.current = instance` side-effect there leaves
+  // the ref pointing at the DISCARDED instance while `useChat` keeps the other.
+  // The approval send (and onResumeStart) would then act on an EMPTY chat — no
+  // assistant turn, so the resume's tool-output has no part to merge into
+  // ("No tool invocation found"), the run never renders, and the approval bar
+  // never clears until a hard refresh re-hydrates from the DB.
   const chatRef = useRef<Chat<UIMessage> | null>(null);
   const chat = useMemo(
-    () => {
-      const instance = new Chat<UIMessage>({
+    () =>
+      new Chat<UIMessage>({
         id: chatSession.current_id ?? undefined,
         messages: chatSession.initial_messages,
         transport: desktopAgentTransport.create({
@@ -189,10 +199,7 @@ function AgentPaneContent({
             }
           },
         }),
-      });
-      chatRef.current = instance;
-      return instance;
-    },
+      }),
     // Rebuild ONLY on a real session switch / new chat (or workspace change)
     // — signalled by `initialMessages` changing (hydration). `currentId` is
     // intentionally NOT a dep: when the live fresh chat adopts its server id
@@ -203,6 +210,12 @@ function AgentPaneContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [workspace.id, chatSession.initial_messages]
   );
+  // Sync the ref to the ACTUAL `chat` React committed (StrictMode-safe — the
+  // memo factory is pure, so the ref assignment lives here in a post-commit
+  // effect that always sees the kept instance, never a discarded double).
+  useEffect(() => {
+    chatRef.current = chat;
+  }, [chat]);
   // `resume: true` — AI SDK v6 built-in. On mount the SDK calls our
   // transport's `reconnectToStream({chatId})`; the transport returns
   // null on 404 (no in-flight run) → clean no-op; on success the
@@ -285,6 +298,13 @@ function AgentPaneContent({
     initial: handoff?.model_id,
   });
 
+  // Permission/supervision posture (RFC `permission modes`). Seeds from the
+  // active session's stored mode; rides each send as `body.mode`.
+  const { mode, setMode } = useModePickerState({
+    current_id: chatSession.current_id,
+    sessions: chatSession.sessions,
+  });
+
   // Whether the active model accepts image input — memoized so the catalog
   // lookup doesn't re-scan on every render (only when the model changes).
   const multimodal = useMemo(
@@ -332,6 +352,7 @@ function AgentPaneContent({
       sendMessage,
       sessionId: chatSession.current_id,
       modelId,
+      mode,
       skills: skillsForActiveTab(activeRelPath),
     }),
   });
@@ -443,6 +464,45 @@ function AgentPaneContent({
     [onCompact, onForkCommand]
   );
 
+  // Answer a pending tool approval (RFC `permission modes`, Phase 2). The
+  // Allow/Deny rides the run-request body as an explicit `approval_answer` field
+  // — exactly how `mode`/`model_id` travel. The sidecar owns message state (it
+  // rebuilds the model view from the DB each turn), validates the answer against
+  // the persisted pending approval, and resumes; because the resume stream
+  // re-advertises the original assistant message id, the AI-SDK reducer merges
+  // the resume into that message in place. So the desktop is a THIN sender — no
+  // message mutation, no DB reconcile, no SDK client-state approval helpers. The
+  // body shape is pinned headless in `approval-resume.test.ts`.
+  const onApprove = useCallback(
+    (pending: PendingApproval, approved: boolean) => {
+      // Send through `chat` directly (the instance `useChat` renders), NOT
+      // `chatRef.current` — the ref is a post-commit mirror, while `chat` is the
+      // live populated instance holding `[user, A]`. Resuming through the right
+      // instance is what lets the AI-SDK reducer merge the resume's tool-output
+      // into the existing `run_command` part instead of failing to find it.
+      return chat.sendMessage(undefined, {
+        body: buildApprovalResumeBody({
+          session_id: chatSession.current_id ?? undefined,
+          model_id: modelId,
+          mode,
+          tool_call_id: pending.toolCallId,
+          approval_id: pending.approvalId,
+          approved,
+        }),
+      });
+    },
+    [chat, chatSession.current_id, modelId, mode]
+  );
+
+  // A pending supervised approval (the model called a mutating command in
+  // Accept Edits and the sidecar paused it). Surfaced as a session-global bar
+  // above the composer so the Allow/Deny is instantly visible — not buried in a
+  // collapsed tool row. Read off the last assistant turn's tool parts.
+  const pendingApproval = useMemo(
+    () => findPendingApproval(messages),
+    [messages]
+  );
+
   const settledList = useMemo(
     () =>
       messages.map((m, index) => (
@@ -493,6 +553,13 @@ function AgentPaneContent({
 
       <QueuedMessages queued={queued} onCancel={cancelQueued} />
 
+      {/* Hidden while the session is busy: clicking Allow/Deny starts the
+          resume turn (busy → true), so the bar vanishes on click — instant
+          feedback, no optimistic message mutation needed. */}
+      {pendingApproval && !busy && (
+        <AgentApprovalBar pending={pendingApproval} onApprove={onApprove} />
+      )}
+
       <div className="shrink-0 border-t p-3">
         <AgentComposerInput
           catalog={catalog}
@@ -504,6 +571,7 @@ function AgentPaneContent({
           multimodal={multimodal}
           toolbar={
             <>
+              <DesktopModePicker value={mode} onValueChange={setMode} />
               <DesktopModelPicker value={modelId} onValueChange={setModelId} />
               <DesktopContextMeter
                 messages={messages}
@@ -513,6 +581,111 @@ function AgentPaneContent({
             </>
           }
         />
+      </div>
+    </div>
+  );
+}
+
+/** A supervised command awaiting the user's Allow/Deny (RFC `permission
+ *  modes`, Phase 2). `approvalId` is the tool part's `approval.id`;
+ *  `toolCallId` identifies the paused call — both ride the answer back so the
+ *  sidecar can match it to the persisted pending approval. */
+type PendingApproval = {
+  approvalId: string;
+  toolCallId: string;
+  /** Human label for the command, e.g. `python3 quadtree.py`. */
+  label: string;
+  description?: string;
+};
+
+/**
+ * Find a pending supervised approval on the LAST assistant turn. The sidecar
+ * pauses a mutating command in Accept Edits and emits an `approval-requested`
+ * tool part; this surfaces it for the session-global bar. Tolerant of both the
+ * live (camelCase `toolCallId`) and hydrated (snake `tool_call_id`) part shapes
+ * — it only reads `state`/`approval`/`input`, which agree in both.
+ */
+function findPendingApproval(messages: UIMessage[]): PendingApproval | null {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "assistant") return null;
+  for (const part of last.parts) {
+    const p = part as {
+      type?: string;
+      state?: string;
+      toolCallId?: string;
+      tool_call_id?: string;
+      approval?: { id?: string };
+      input?: { command?: string; args?: string[]; description?: string };
+    };
+    const toolCallId = p.toolCallId ?? p.tool_call_id;
+    if (
+      typeof p.type !== "string" ||
+      (!p.type.startsWith("tool-") && p.type !== "dynamic-tool") ||
+      p.state !== "approval-requested" ||
+      !p.approval?.id ||
+      !toolCallId
+    ) {
+      continue;
+    }
+    const input = p.input ?? {};
+    const label = input.command
+      ? `${input.command} ${(input.args ?? []).join(" ")}`.trim()
+      : p.type.replace(/^tool-/, "");
+    return {
+      approvalId: p.approval.id,
+      toolCallId,
+      label,
+      description: input.description,
+    };
+  }
+  return null;
+}
+
+/**
+ * Session-global supervised-approval prompt, rendered above the composer so the
+ * Allow/Deny is instantly visible (not buried in a collapsed tool row).
+ */
+function AgentApprovalBar({
+  pending,
+  onApprove,
+}: {
+  pending: PendingApproval;
+  onApprove: (
+    pending: PendingApproval,
+    approved: boolean
+  ) => void | Promise<void>;
+}) {
+  return (
+    <div className="shrink-0 border-t bg-muted/30 px-3 py-2.5">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">
+            {pending.description
+              ? pending.description
+              : "This command mutates files or executes code."}{" "}
+            Allow it to run?
+          </p>
+          <code className="mt-1 block truncate font-mono text-xs text-foreground/80">
+            $ {pending.label}
+          </code>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void onApprove(pending, false)}
+          >
+            Deny
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => void onApprove(pending, true)}
+          >
+            Allow
+          </Button>
+        </div>
       </div>
     </div>
   );

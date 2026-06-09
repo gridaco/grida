@@ -17,6 +17,7 @@
 import { and, asc, desc, eq, gt, isNull, like, lt, or, sql } from "drizzle-orm";
 import type { OpenedSessionsDb } from "./db";
 import { chatMessages, chatParts, chatSessions } from "./schema";
+import { asAgentMode, type AgentMode } from "../protocol/mode";
 import { newMessageId, newPartId, newSessionId } from "./ids";
 import { session_title } from "./title";
 import { compactionBoundary } from "./boundary";
@@ -99,6 +100,7 @@ export class SessionsStore {
       workspace_id: input.workspace_id ?? null,
       workspace_root: input.workspace_root ?? null,
       model_json: input.model ? JSON.stringify(input.model) : null,
+      mode: input.mode ?? null,
       parent_id: input.parent_id ?? null,
       parent_message_id: input.parent_message_id ?? null,
       permissions_json: JSON.stringify(input.permissions ?? []),
@@ -241,6 +243,18 @@ export class SessionsStore {
       .where(eq(chatSessions.id, id));
   }
 
+  /** Persist the session's permission mode (RFC `permission modes`). The
+   *  runtime calls this when an incoming run carries a mode that differs from
+   *  the stored one, so a later queued-turn drain (which has no client request)
+   *  rebuilds the turn with the user's last-chosen mode. */
+  async updateMode(id: string, mode: AgentMode): Promise<void> {
+    const now = Date.now();
+    await this.db
+      .update(chatSessions)
+      .set({ mode, updated_at: now })
+      .where(eq(chatSessions.id, id));
+  }
+
   /**
    * Accumulate token usage deltas into the session row. Each `finish-step`
    * chunk during a stream calls this once with that step's incremental
@@ -368,6 +382,24 @@ export class SessionsStore {
       .where(eq(chatMessages.id, id))
       .limit(1);
     return rows[0] ? rowToMessage(rows[0]) : null;
+  }
+
+  /**
+   * The next free part index for a message — its highest existing `index` + 1,
+   * or 0 when it has no parts yet. The recorder uses this when it RESUMES an
+   * assistant message across the supervised-approval pause (the stream
+   * re-advertises the original message id, so the resume turn appends to the
+   * SAME message): new continuation parts must land AFTER the parts written in
+   * the pausing turn, never overwrite index 0.
+   */
+  async nextPartIndex(messageId: string): Promise<number> {
+    const rows = await this.db
+      .select({ index: chatParts.index })
+      .from(chatParts)
+      .where(eq(chatParts.message_id, messageId))
+      .orderBy(desc(chatParts.index))
+      .limit(1);
+    return rows[0] ? rows[0].index + 1 : 0;
   }
 
   /**
@@ -848,6 +880,7 @@ export class SessionsStore {
         // Fork title rule: docs/wg/ai/agent/session.md §Forking.
         title: session_title.forFork(parent.title),
         model: parent.model ?? undefined,
+        mode: parent.mode ?? undefined,
         metadata: { ...parent.metadata, ...opts.metadata },
         permissions: parent.permissions,
         parent_id: parent.id,
@@ -1080,6 +1113,134 @@ export class SessionsStore {
     return rowToPart(stored[0]);
   }
 
+  /**
+   * GRIDA-SEC-004 — answer a PENDING tool approval (RFC `permission modes`,
+   * Phase 2). The renderer may only ANSWER an approval the server actually
+   * asked. This flips a persisted tool part to `approval-responded` ONLY when
+   * it is currently `approval-requested` AND its stamped approval id matches the
+   * answer — never creating a part, never touching input/output/tool_call_id.
+   * A non-pending, unknown, or id-mismatched answer is a silent no-op. That
+   * keeps the server authoritative: a forged client message cannot inject a
+   * tool call, approve something that was never asked, or rewrite assistant
+   * history — it can only supply the boolean the server is waiting on.
+   * Returns true iff a pending approval was answered.
+   */
+  async answerApproval(
+    sessionId: string,
+    answer: {
+      tool_call_id: string;
+      approval_id: string;
+      approved: boolean;
+      reason?: string;
+    }
+  ): Promise<boolean> {
+    const rows = await this.db
+      .select()
+      .from(chatParts)
+      .where(
+        and(
+          eq(chatParts.session_id, sessionId),
+          eq(chatParts.tool_call_id, answer.tool_call_id),
+          eq(chatParts.tool_state, "approval-requested")
+        )
+      )
+      .limit(1);
+    const existing = rows[0];
+    if (!existing) return false;
+    let data: Record<string, unknown> | null;
+    try {
+      data = JSON.parse(existing.data_json) as Record<string, unknown>;
+    } catch {
+      return false;
+    }
+    const approval = data?.approval as { id?: unknown } | undefined;
+    // The answer must carry the exact approval id the server issued.
+    if (!approval || approval.id !== answer.approval_id) return false;
+    const nextData = {
+      ...data,
+      state: "approval-responded",
+      approval: {
+        id: answer.approval_id,
+        approved: answer.approved,
+        ...(answer.reason ? { reason: answer.reason } : {}),
+      },
+    };
+    await this.db
+      .update(chatParts)
+      .set({
+        data_json: JSON.stringify(nextData),
+        tool_state: "approval-responded",
+        updated_at: Date.now(),
+      })
+      .where(eq(chatParts.id, existing.id));
+    return true;
+  }
+
+  /**
+   * GRIDA-SEC-004 — does this session have an UNANSWERED supervised approval?
+   * True iff a persisted tool part is still `approval-requested` (RFC
+   * `permission modes`, Phase 2). A turn blocked awaiting the user's Allow/Deny
+   * is NOT a completed turn: the queue drain consults this to stay paused until
+   * the user resolves it (RFC `queue` § drain-pause — the same class as a hard
+   * error pausing the drain). Read-only existence check against the
+   * authoritative persisted state (restart-durable); reads no input / output /
+   * tool args / message content.
+   */
+  async hasPendingApproval(sessionId: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: chatParts.id })
+      .from(chatParts)
+      .where(
+        and(
+          eq(chatParts.session_id, sessionId),
+          eq(chatParts.tool_state, "approval-requested")
+        )
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  /**
+   * Find the FIRST persisted part for a tool call in a session (by `created_at`)
+   * — the original tool-call part. Used by the recorder to resolve a tool whose
+   * input/output land on DIFFERENT turns: a command approved in `accept-edits`
+   * is CALLED in the pausing turn but EXECUTED on the later resume turn (a fresh
+   * recorder that never saw the input). Without this, the result is persisted as
+   * a nameless `tool` part on the resume message instead of completing the
+   * original `tool-run_command` part — and the model-view rebuild drops it,
+   * re-asking forever. Returns the part's slot + decoded data, or null.
+   */
+  async findToolPart(
+    sessionId: string,
+    toolCallId: string
+  ): Promise<{
+    message_id: string;
+    index: number;
+    type: string;
+    data: unknown;
+  } | null> {
+    const rows = await this.db
+      .select()
+      .from(chatParts)
+      .where(
+        and(
+          eq(chatParts.session_id, sessionId),
+          eq(chatParts.tool_call_id, toolCallId)
+        )
+      )
+      .orderBy(chatParts.created_at)
+      .limit(1);
+    const r = rows[0];
+    if (!r) return null;
+    let data: unknown = null;
+    try {
+      data = JSON.parse(r.data_json);
+    } catch {
+      data = null;
+    }
+    return { message_id: r.message_id, index: r.index, type: r.type, data };
+  }
+
   private async messageSessionId(messageId: string): Promise<string> {
     const rows = await this.db
       .select({ session_id: chatMessages.session_id })
@@ -1122,6 +1283,7 @@ type ChatSessionDbRow = {
   workspace_id: string | null;
   workspace_root: string | null;
   model_json: string | null;
+  mode: string | null;
   parent_id: string | null;
   parent_message_id: string | null;
   permissions_json: string;
@@ -1145,6 +1307,7 @@ function rowToSession(row: ChatSessionDbRow): ChatSessionRow {
     agent: row.agent,
     workspace_id: row.workspace_id,
     model: parseJsonOr(row.model_json, null) as ChatModel | null,
+    mode: asAgentMode(row.mode) ?? null,
     parent_id: row.parent_id ?? null,
     parent_message_id: row.parent_message_id ?? null,
     permissions: parseJsonOr(

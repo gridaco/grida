@@ -8,8 +8,17 @@
 
 import crypto from "node:crypto";
 import { models } from "@grida/ai-models";
-import type { AgentModelId, AgentRunMessagePart } from "../protocol/run";
+import type {
+  AgentModelId,
+  AgentRunMessagePart,
+  ApprovalAnswer,
+} from "../protocol/run";
 import { AGENT_SKILL_IDS, type SkillId } from "../protocol/skills";
+import {
+  AGENT_DEFAULT_MODE,
+  asAgentMode,
+  type AgentMode,
+} from "../protocol/mode";
 import { AGENT_DEFAULT_TIER, AGENT_TIERS, type ModelTier } from "../tiers";
 import {
   BYOK_PROVIDER_IDS,
@@ -40,6 +49,10 @@ export type RunRequest = {
   workspace_id?: string;
   workspace_root?: string;
   skills?: SkillId[];
+  /** Permission/supervision posture; defaults to `accept-edits` when absent. */
+  mode: AgentMode;
+  /** Resume answer for a paused supervised approval; absent on a normal turn. */
+  approval_answer?: ApprovalAnswer;
   session_id?: string;
 };
 
@@ -59,6 +72,8 @@ export async function parseRunBody(
     feature?: unknown;
     workspace_id?: unknown;
     skills?: unknown;
+    mode?: unknown;
+    approval_answer?: unknown;
     session_id?: unknown;
   };
   const messages = normalizeWireMessages(b.messages);
@@ -129,6 +144,14 @@ export async function parseRunBody(
     workspace_id: workspaceId,
     workspace_root: workspaceRoot,
     skills: coerceSkills(b.skills),
+    // Unknown/absent mode coerces to the conservative default. An invalid
+    // string is treated as absent rather than rejected — the supervision
+    // posture should fail safe, not 400 the whole turn.
+    mode: asAgentMode(b.mode) ?? AGENT_DEFAULT_MODE,
+    // A malformed approval answer is treated as absent (no resume), never a
+    // 400 — and `store.answerApproval` re-validates it against the persisted
+    // pending approval regardless, so a forged answer is a no-op.
+    approval_answer: coerceApprovalAnswer(b.approval_answer),
     session_id:
       typeof b.session_id === "string" && b.session_id.length > 0
         ? b.session_id
@@ -176,6 +199,49 @@ export async function persistIncomingTail(
       await store.upsertPart(m.id, { index: i, type: part.type, data: part });
     }
   }
+}
+
+/**
+ * GRIDA-SEC-004 — apply a supervised-approval answer (RFC `permission modes`,
+ * Phase 2). On resume the client sends the Allow/Deny as an explicit
+ * `approval_answer` body field (parsed by {@link coerceApprovalAnswer}), NOT as
+ * a mutated assistant message — the server owns message state, so the answer
+ * never has to be SDK-part-shaped on the wire. This routes it through
+ * `store.answerApproval`, which flips the persisted part to `approval-responded`
+ * ONLY if it was a real pending approval with a matching id + session. A forged
+ * answer (unknown call, wrong id, already answered) is a silent no-op: the
+ * client can only answer what the server already asked.
+ */
+export async function applyApprovalAnswer(
+  store: SessionsStore,
+  sessionId: string,
+  answer: ApprovalAnswer
+): Promise<void> {
+  // Pass the answer straight through — `ApprovalAnswer` IS the `answerApproval`
+  // param shape. A field-by-field rebuild here would silently drop any field
+  // later added to `ApprovalAnswer`; relaying the object keeps the two in lock-step.
+  await store.answerApproval(sessionId, answer);
+}
+
+/** Narrow an untrusted body value to an {@link ApprovalAnswer}, or `undefined`
+ *  (malformed ⇒ no resume). Shape-only — `store.answerApproval` is the
+ *  authority on whether the answer matches a real pending approval. */
+function coerceApprovalAnswer(raw: unknown): ApprovalAnswer | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const a = raw as Record<string, unknown>;
+  if (
+    typeof a.tool_call_id !== "string" ||
+    typeof a.approval_id !== "string" ||
+    typeof a.approved !== "boolean"
+  ) {
+    return undefined;
+  }
+  return {
+    tool_call_id: a.tool_call_id,
+    approval_id: a.approval_id,
+    approved: a.approved,
+    reason: typeof a.reason === "string" ? a.reason : undefined,
+  };
 }
 
 function normalizeWireMessages(raw: unknown): NormalizedMessage[] | null {

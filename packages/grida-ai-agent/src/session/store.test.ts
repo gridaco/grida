@@ -138,6 +138,20 @@ describe("SessionsStore CRUD", () => {
     expect(await store.get(created.id)).toBeNull();
   });
 
+  it("round-trips the permission mode (create + updateMode)", async () => {
+    const created = await store.create({ agent: "grida", mode: "auto" });
+    expect(created.mode).toBe("auto");
+    expect((await store.get(created.id))?.mode).toBe("auto");
+
+    await store.updateMode(created.id, "accept-edits");
+    expect((await store.get(created.id))?.mode).toBe("accept-edits");
+
+    // A session created without a mode reads back null (default applied upstream).
+    const bare = await store.create({ agent: "grida" });
+    expect(bare.mode).toBeNull();
+    expect((await store.get(bare.id))?.mode).toBeNull();
+  });
+
   it("rename throws when session is missing", async () => {
     await expect(store.rename("ses_missing", "X")).rejects.toBeInstanceOf(
       SessionNotFoundError
@@ -309,6 +323,34 @@ describe("SessionsStore messages + parts", () => {
     expect(b.tool_state).toBe("output-available");
     const messages = await store.listMessages(s.id);
     expect(messages[0].parts.length).toBe(1);
+  });
+
+  it("hasPendingApproval reflects an unanswered supervised approval", async () => {
+    const s = await store.create({ agent: "grida" });
+    expect(await store.hasPendingApproval(s.id)).toBe(false); // none yet
+
+    const m = await store.appendMessage(s.id, { role: "assistant" });
+    await store.upsertPart(m.id, {
+      index: 0,
+      type: "tool-run_command",
+      data: {
+        type: "tool-run_command",
+        state: "approval-requested",
+        approval: { id: "ap1" },
+      },
+      tool_call_id: "tc1",
+      tool_state: "approval-requested",
+    });
+    expect(await store.hasPendingApproval(s.id)).toBe(true);
+
+    // Answering it flips the part to approval-responded → no longer pending.
+    const ok = await store.answerApproval(s.id, {
+      tool_call_id: "tc1",
+      approval_id: "ap1",
+      approved: true,
+    });
+    expect(ok).toBe(true);
+    expect(await store.hasPendingApproval(s.id)).toBe(false);
   });
 
   it("updateUsage adds to counters; setUsage replaces", async () => {
@@ -854,6 +896,112 @@ describe("SessionsStore queue", () => {
     // Scoped to its own session, it deletes.
     await store.deleteMessage(b.id, "q-b");
     expect(await store.getMessage("q-b")).toBeNull();
+  });
+});
+
+describe("answerApproval — supervised approval boundary (GRIDA-SEC-004)", () => {
+  // Seed a pending approval: an assistant tool part stamped
+  // `approval-requested` with approval id `ap_1` for tool call `tc_1`.
+  async function seedPendingApproval(): Promise<string> {
+    const s = await store.create({ agent: "grida" });
+    const m = await store.appendMessage(s.id, { role: "assistant" });
+    await store.upsertPart(m.id, {
+      index: 0,
+      type: "tool-run_command",
+      data: {
+        type: "tool-run_command",
+        tool_call_id: "tc_1",
+        tool_name: "run_command",
+        state: "approval-requested",
+        approval: { id: "ap_1" },
+        input: { command: "python3", args: ["x.py"] },
+      },
+      tool_call_id: "tc_1",
+      tool_state: "approval-requested",
+      session_id: s.id,
+    });
+    return s.id;
+  }
+
+  function readPart(toolCallId: string): {
+    tool_state: string;
+    data_json: string;
+  } {
+    return opened.sqlite
+      .prepare(
+        "SELECT tool_state, data_json FROM chat_parts WHERE tool_call_id = ?"
+      )
+      .get(toolCallId) as { tool_state: string; data_json: string };
+  }
+
+  it("answers a pending approval (state → approval-responded, approved stamped)", async () => {
+    const sid = await seedPendingApproval();
+    const ok = await store.answerApproval(sid, {
+      tool_call_id: "tc_1",
+      approval_id: "ap_1",
+      approved: true,
+    });
+    expect(ok).toBe(true);
+    const part = readPart("tc_1");
+    expect(part.tool_state).toBe("approval-responded");
+    const data = JSON.parse(part.data_json);
+    expect(data.state).toBe("approval-responded");
+    expect(data.approval).toMatchObject({ id: "ap_1", approved: true });
+    // The original input is preserved — the answer never rewrites the call.
+    expect(data.input).toEqual({ command: "python3", args: ["x.py"] });
+  });
+
+  it("ignores an answer for an unknown tool call (no forged execution)", async () => {
+    const sid = await seedPendingApproval();
+    const ok = await store.answerApproval(sid, {
+      tool_call_id: "tc_FORGED",
+      approval_id: "ap_1",
+      approved: true,
+    });
+    expect(ok).toBe(false);
+    expect(readPart("tc_1").tool_state).toBe("approval-requested");
+  });
+
+  it("ignores an answer whose approval id does not match", async () => {
+    const sid = await seedPendingApproval();
+    const ok = await store.answerApproval(sid, {
+      tool_call_id: "tc_1",
+      approval_id: "ap_FORGED",
+      approved: true,
+    });
+    expect(ok).toBe(false);
+    expect(readPart("tc_1").tool_state).toBe("approval-requested");
+  });
+
+  it("does not re-answer an already-answered approval (no double decision)", async () => {
+    const sid = await seedPendingApproval();
+    await store.answerApproval(sid, {
+      tool_call_id: "tc_1",
+      approval_id: "ap_1",
+      approved: true,
+    });
+    // A second, contradicting answer must not mutate the already-answered part.
+    const ok = await store.answerApproval(sid, {
+      tool_call_id: "tc_1",
+      approval_id: "ap_1",
+      approved: false,
+    });
+    expect(ok).toBe(false);
+    expect(JSON.parse(readPart("tc_1").data_json).approval.approved).toBe(true);
+  });
+
+  it("is scoped to the session (cannot answer another session's approval)", async () => {
+    // The pending approval lives in the seeded session; `other` is a different
+    // session attempting to answer it.
+    await seedPendingApproval();
+    const other = await store.create({ agent: "grida" });
+    const ok = await store.answerApproval(other.id, {
+      tool_call_id: "tc_1",
+      approval_id: "ap_1",
+      approved: true,
+    });
+    expect(ok).toBe(false);
+    expect(readPart("tc_1").tool_state).toBe("approval-requested");
   });
 });
 

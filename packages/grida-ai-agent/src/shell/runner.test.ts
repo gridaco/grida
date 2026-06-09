@@ -8,15 +8,15 @@
  * was never a *test*: no expected outputs, no pass/fail, nothing
  * runnable from CI. The genuine contract lives here.
  *
- * Three layers, increasing scope:
+ * Two layers, increasing scope:
  *
- *   1. `isAllowedCommand` / `listAllowedCommands` — pure unit. Pure
- *      string matching against the allowlist set; no IO.
- *   2. `validateShellRequest` — touches real fs (`realpath`, `stat`)
+ *   1. `validateShellRequest` — touches real fs (`realpath`, `stat`)
  *      and a real `WorkspaceRegistry` pointed at a temp userData
- *      dir. Covers the gates the agent server route runs before spawning:
- *      cmd-allowlist, cwd-resolve, cwd-is-directory, cwd-in-workspace.
- *   3. `runShell` — actually spawns child processes via
+ *      dir. Covers the structural gates the agent server route runs before
+ *      spawning: cwd-resolve, cwd-is-directory, cwd-in-workspace, and the
+ *      secret-arg containment check. (Command identity is gated upstream by
+ *      mode — see `permissions.test.ts`.)
+ *   2. `runShell` — actually spawns child processes via
  *      `child_process.spawn`. Uses `echo`, `pwd`, `ls`, `sleep` from
  *      the host PATH; the runner uses `shell: false` so these
  *      resolve to the standalone binaries (`/bin/echo` etc.), which
@@ -33,49 +33,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { isAllowedCommand, listAllowedCommands } from "../permissions";
 import { runShell, validateShellRequest } from "./runner";
 import { WorkspaceRegistry } from "../workspaces";
-
-/* ───────────────────────────── policy ──────────────────────────── */
-
-describe("isAllowedCommand", () => {
-  it("accepts known allowlisted binaries", () => {
-    for (const cmd of ["ls", "pwd", "echo", "cat", "git", "rg"]) {
-      expect(isAllowedCommand(cmd)).toBe(true);
-    }
-  });
-
-  it("rejects unknown commands and the empty string", () => {
-    expect(isAllowedCommand("rm")).toBe(false);
-    expect(isAllowedCommand("curl")).toBe(false);
-    expect(isAllowedCommand("")).toBe(false);
-  });
-
-  it("rejects shells, runtimes, and package managers", () => {
-    for (const cmd of ["bash", "sh", "node", "pnpm", "npm", "yarn"]) {
-      expect(isAllowedCommand(cmd)).toBe(false);
-    }
-  });
-
-  it("rejects path-shaped inputs even when the basename is allowlisted", () => {
-    // The allowlist would defeat its own purpose if `/bin/ls` or
-    // `..\ls` passed just because the trailing segment matches.
-    expect(isAllowedCommand("/bin/ls")).toBe(false);
-    expect(isAllowedCommand("./ls")).toBe(false);
-    expect(isAllowedCommand("..\\ls")).toBe(false);
-  });
-});
-
-describe("listAllowedCommands", () => {
-  it("returns a sorted, non-empty list including the demo essentials", () => {
-    const list = listAllowedCommands();
-    expect(list.length).toBeGreaterThan(0);
-    expect([...list]).toEqual([...list].sort());
-    expect(list).toContain("echo");
-    expect(list).toContain("pwd");
-  });
-});
 
 /* ────────────────────── validate + runShell scaffold ───────────── */
 
@@ -127,17 +86,6 @@ describe("validateShellRequest", () => {
     if (result.ok) {
       expect(result.request.cmd).toBe("echo");
       expect(result.request.cwd).toBe(fixture.workspace_root);
-    }
-  });
-
-  it("rejects non-allowlisted commands", async () => {
-    const result = await validateShellRequest(
-      { cmd: "rm", args: [], cwd: fixture.workspace_root },
-      fixture.registry
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.code).toBe("cmd-not-allowed");
     }
   });
 

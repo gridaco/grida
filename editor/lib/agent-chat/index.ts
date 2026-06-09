@@ -14,6 +14,11 @@
 
 export type { ChatMessage, ToolCallEntry } from "./types";
 export {
+  buildApprovalResumeBody,
+  type ApprovalResumeBody,
+  type ApprovalResumeArgs,
+} from "./approval-resume";
+export {
   desktopAgentTransport,
   type DesktopAgentTransportOptions,
 } from "./bridge-transport";

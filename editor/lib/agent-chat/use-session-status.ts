@@ -91,14 +91,50 @@ export type UseCoreTurnSyncArgs = {
   refetchQueue: () => void;
 };
 
+/** What a `coreState` edge means for the surface (pure — the hook is a wire). */
+export type CoreTurnSyncAction =
+  | { type: "ignore" }
+  | { type: "drain"; fired: ChatMessageWithParts };
+
 /**
- * On a **busy** edge that THIS client did not start (`!isStreaming` → the core
- * fired a queued turn, not us), promote the fired message — the FIFO head of
- * the tray, which matches the core's drain order — into the transcript by its
- * OWN id (so a later hydrate can't duplicate it), drop it from the tray in the
- * same tick, then attach to the core's stream. A turn this client started is
- * skipped (it has its own optimistic message + stream), as is the mount frame
- * (`resume: true` covers an already-in-flight run).
+ * Decide whether a `coreState` transition is a CORE queue-drain this client
+ * must attach to. A drain ALWAYS promotes the tray's FIFO head — so the
+ * presence of a queued head is what distinguishes a real drain from a bare
+ * `busy` edge. Ignored cases:
+ *
+ *   - no transition / first frame / non-`busy` target,
+ *   - the mount frame (`prevState === null`) — `resume: true` covers an
+ *     already-in-flight run,
+ *   - `isStreaming` — a turn THIS client started,
+ *   - **no queued head** — the decisive guard. A bare `busy` edge with nothing
+ *     to promote is NOT a drain; the likeliest cause is the client's OWN
+ *     approval-resume send racing the busy edge faster than `isStreaming`
+ *     commits. Attaching there reconnects a SECOND stream over the live send
+ *     and runs `onResumeStart`, which drops the assistant holding the approved
+ *     tool's part — the resume's `tool-output` then has no part to attach to,
+ *     the reducer throws "No tool invocation found", the stream tears down, and
+ *     `cancel()` aborts the run: the supervised-approval cut-off.
+ */
+export function coreTurnSyncAction(input: {
+  coreState: CoreRunState | null;
+  prevState: CoreRunState | null;
+  isStreaming: boolean;
+  queuedHead: ChatMessageWithParts | undefined;
+}): CoreTurnSyncAction {
+  const { coreState, prevState, isStreaming, queuedHead } = input;
+  if (coreState === null || coreState === prevState) return { type: "ignore" };
+  if (prevState === null) return { type: "ignore" };
+  if (coreState !== "busy") return { type: "ignore" };
+  if (isStreaming) return { type: "ignore" };
+  if (!queuedHead) return { type: "ignore" };
+  return { type: "drain", fired: queuedHead };
+}
+
+/**
+ * On a real core queue-drain (see {@link coreTurnSyncAction}), promote the
+ * fired message — the FIFO head of the tray — into the transcript by its OWN id
+ * (so a later hydrate can't duplicate it), drop it from the tray in the same
+ * tick, then attach to the core's stream and reconcile the tray.
  *
  * Keyed on `coreState` alone; everything else is read through a ref so an
  * unrelated re-render never re-fires an edge.
@@ -112,25 +148,24 @@ export function useCoreTurnSync(args: UseCoreTurnSyncArgs): void {
   useEffect(() => {
     const prev = prevRef.current;
     prevRef.current = coreState;
-    if (coreState === null || coreState === prev) return;
-    // Skip the mount frame — `resume: true` already covers an in-flight run.
-    if (prev === null) return;
-    if (coreState !== "busy") return;
     const a = ref.current;
-    if (a.isStreaming) return; // a turn THIS client started — not a drain
+    const action = coreTurnSyncAction({
+      coreState,
+      prevState: prev,
+      isStreaming: a.isStreaming,
+      queuedHead: a.queued[0],
+    });
+    if (action.type === "ignore") return;
 
-    const fired = a.queued[0];
-    if (fired) {
-      a.setMessages((messages) => [
-        ...messages,
-        {
-          id: fired.id,
-          role: "user",
-          parts: [{ type: "text", text: queuedMessageText(fired) }],
-        } as UIMessage,
-      ]);
-      a.dropQueued(fired.id);
-    }
+    a.setMessages((messages) => [
+      ...messages,
+      {
+        id: action.fired.id,
+        role: "user",
+        parts: [{ type: "text", text: queuedMessageText(action.fired) }],
+      } as UIMessage,
+    ]);
+    a.dropQueued(action.fired.id);
     a.resumeStream();
     a.refetchQueue();
   }, [coreState]);

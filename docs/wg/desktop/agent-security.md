@@ -81,10 +81,11 @@ catches the worst filesystem/network blast radius if layer 1 fails.
 ## Layer 4 — OS-level outer sandbox
 
 `AgentHost` runs inside `srt` ([agent-sandbox-wrap](./agent-sandbox-wrap.md)) with the
-package-owned outer-wrap intent: network limited to BYOK provider hosts from
-the package metadata, secret-path read/write denies, and host-supplied write
-roots for the sidecar's persisted state and platform temp paths. Loopback
-binding is allowed so the HTTP server can bind
+package-owned outer-wrap intent: network limited to an **enumerated allowlist**
+(BYOK provider hosts + a curated dev-network set — package registries, git
+hosts; `srt` forbids `*` / open patterns), secret-path read/write denies, and
+host-supplied write roots for the sidecar's persisted state and platform temp
+paths. Loopback binding is allowed so the HTTP server can bind
 `127.0.0.1:<random>`.
 
 **What this catches.** A compromised agent server that wants to read
@@ -98,12 +99,27 @@ host-configured policy, not srt.
 ## Layer 4b — Agent shell execution
 
 The `run_command` agent tool spawns child processes through the shell
-runner (`packages/grida-ai-agent/src/shell/runner.ts`) with `shell: false`,
-behind three gates: a hardcoded command allowlist (`permissions.ts`), a
-cwd-must-be-inside-an-opened-workspace check, and an in-process secret-dir
-containment check. (The full per-command fs/net sub-policy that would
-constrain each spawned child is deferred; today srt confines the whole
-sidecar, not each child.)
+runner (`packages/grida-ai-agent/src/shell/runner.ts`) with `shell: false`.
+There is **no command allowlist** — a per-session **permission mode**
+(`protocol/mode.ts`) governs the surface: `accept-edits` (default — read-only
+inspection commands auto-run; a mutating/executing command **pauses for a
+supervised Allow/Deny prompt** and runs only on approval) or `auto` (every
+command runs; the OS sandbox is the guard, the semantic classifier deferred).
+The supervised gate is the AI SDK's native `needsApproval` on the tool
+(`tools/run-command.ts`), wired from the mode at `workspace-agent-bindings.ts` —
+not the command backend, which only runs an already-cleared call. The
+approval _answer_ is server-validated: the renderer's Allow/Deny rides an
+explicit `approval_answer` body field (the host owns message state, so the answer
+is not smuggled in a client-mutated message) and `store.answerApproval` (via
+`run-input.ts` `applyApprovalAnswer`) flips a part to `approval-responded` only
+when it was a real pending approval, so the renderer can answer but never forge a
+call. Two
+structural gates hold in every mode: the cwd-must-be-inside-an-opened-workspace
+check and the in-process secret-arg containment check (below); the fs-edit tools
+additionally refuse no-clobber paths (`fs/scope.ts`). The OS sandbox confines the
+whole sidecar; the full per-command fs/net sub-policy that would constrain each
+spawned child (the kernel-level finish of the secret-dir guard) is deferred — see
+[agent-sandbox-wrap / inner sub-policy](./agent-sandbox-wrap.md#inner-sub-policy--per-call-shellrun).
 
 **Secret-dir containment — the srt / in-process split.** There are two
 classes of secret on disk, owned by two different gates:
@@ -123,16 +139,19 @@ classes of secret on disk, owned by two different gates:
 
 This is the responsibility-and-reconciliation rule for secret reads: srt owns
 HOME secrets at the kernel; the in-process runner owns the host's own
-`userData`. Neither covers the other.
+`userData`. **Caveat (`auto`):** the in-process arg check only inspects
+top-level argv, so an interpreter/shell reachable in `auto` (`bash -c`,
+`python3 -c`) can read `userData` by a computed path. Closing that for the
+shell child needs the kernel-level per-call `deny_read` (the deferred
+sub-policy); meanwhile the enumerated network + the key being the user's own
+provider credential bound the exfil.
 
-**`git` is an accepted limitation.** `git` is allowlisted because it is the
-single most useful dev command, but even with `shell: false` it is an
-arbitrary-code-execution / arbitrary-file-read vector: `git -c core.pager=…`
-/ `-c core.sshCommand=…`, `--upload-pack`, and `apply`/`clone` run
-attacker-chosen programs, and `--git-dir`, `apply`, and a `.git/config`
-credential read reach arbitrary files. This collapses the no-shell /
-allowlist guarantee. The risk is accepted for V1.x pending the srt
-per-command sub-policy.
+**`auto` is informed-consent, not a guarantee.** `auto` removes
+command-identity gating; the sandbox still bounds the blast radius (writable
+roots, the enumerated network) but does not judge intent — an injected or
+confused agent can read broadly and run anything within those bounds. Intent
+judgment is the [watchdog](../ai/agent/foundations.md#watchdog) layer, deferred.
+`auto` is opt-in; the default `accept-edits` keeps a read-only-only shell.
 
 ## Layer 5 — Secrets discipline
 

@@ -23,6 +23,12 @@ export {
 } from "./protocol/run";
 export { AGENT_SKILL_IDS, type SkillId } from "./protocol/skills";
 export {
+  AGENT_MODES,
+  AGENT_DEFAULT_MODE,
+  asAgentMode,
+  type AgentMode,
+} from "./protocol/mode";
+export {
   GRIDA_STATUS_SSE_EVENT,
   type SessionRunState,
   type SessionStatus,

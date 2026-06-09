@@ -145,7 +145,27 @@ function lowerParts(parts: ChatMessageWithParts["parts"]): unknown[] {
     }
     if (type.startsWith("tool-") || type === "dynamic-tool") {
       const state = (data.state as string | undefined) ?? p.tool_state ?? "";
-      if (state !== "output-available" && state !== "output-error") continue;
+      // Lowerable tool states (RFC `permission modes` — Phase 2 adds the two
+      // approval-answered states):
+      //   - output-available / output-error → tool-call + tool-result pair.
+      //   - approval-responded → tool-call + approval-request + a tool-role
+      //     approval-response; `convertToModelMessages` lowers it and the SDK's
+      //     approval collector then RUNS the approved call (the resume) or
+      //     skips a denied one. This is what makes "click Allow → it runs" work
+      //     across the rebuild-from-DB boundary.
+      //   - output-denied → the denied call + its denied approval pair.
+      // An un-answered `approval-requested` part is dropped like an incomplete
+      // call: a tool-call with neither result nor approval-response would trip
+      // `MissingToolResultsError`. The resume turn re-persists it as
+      // `approval-responded` BEFORE this rebuild runs (see `applyApprovalAnswer`).
+      if (
+        state !== "output-available" &&
+        state !== "output-error" &&
+        state !== "approval-responded" &&
+        state !== "output-denied"
+      ) {
+        continue;
+      }
       // A completed tool part lowers to a tool-call (input) + tool-result
       // (output) pair; `convertToModelMessages` rejects a missing/non-object
       // input ("Type validation failed for …parts[N].input"). Drop the whole

@@ -609,6 +609,14 @@ A renderer that closes its TCP connection has **not** aborted; it
 has **detached**. The model call keeps going; the recorder keeps
 writing. Only an explicit abort (its own endpoint) cancels.
 
+"TCP close" here is shorthand for **any transport-level stream
+teardown** — a TCP FIN, a WebSocket close, an IPC channel drop, or a
+consumer cancelling the chunk stream it was reading. None of these is
+an abort. A transport that wires stream teardown to the abort endpoint
+collapses the two and silently re-introduces this loss: the run dies
+because the client stopped reading it, not because the user asked it
+to stop.
+
 The cost of distinguishing the two is one endpoint. The cost of
 collapsing them is a user who refreshed mid-stream and lost every
 already-spent token.

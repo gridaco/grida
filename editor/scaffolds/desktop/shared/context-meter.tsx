@@ -119,7 +119,7 @@ export function DesktopContextMeter({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="size-7 text-muted-foreground"
+                className="size-7 shrink-0 text-muted-foreground"
                 aria-label={`Context: ${pct} used`}
               >
                 <Ring ratio={ratio} />

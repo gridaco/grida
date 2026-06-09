@@ -151,6 +151,7 @@ describe("@grida/agent public API", () => {
         agent: "grida",
         workspace_id: null,
         model: null,
+        mode: null,
         parent_id: null,
         parent_message_id: null,
         permissions: [],

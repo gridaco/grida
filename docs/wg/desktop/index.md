@@ -32,13 +32,13 @@ For the user-facing app and the security boundary:
 
 ## Pages
 
-| Page                                              | Covers                                                                                                                     |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| [Process model](./process-model.md)               | Electron main / `AgentSidecar` / renderer — the three-process boundary, the supervisor, the HTTP perimeter, the god class. |
-| [Renderer bridge](./renderer-bridge.md)           | URL-loaded renderer doctrine — `loadURL("grida.co/desktop/*")`, path-scoped `window.grida`, `DesktopBridgeGate`.           |
-| [Agent security](./agent-security.md)             | Desktop binding of `GRIDA-SEC-004`: bridge path scope, HTTP perimeter, sandbox, and secrets discipline.                    |
-| [Agent sandbox wrap](./agent-sandbox-wrap.md)     | How desktop adapts package sandbox intent to `srt` and supervises the wrapped AgentSidecar.                                |
-| [Agent storage layout](./agent-storage-layout.md) | Desktop `${userData}` files and SQLite session storage.                                                                    |
+| Page                                              | Covers                                                                                                                                                                |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Process model](./process-model.md)               | Electron main / `AgentSidecar` / renderer — the three-process boundary, the supervisor, the HTTP perimeter, the god class.                                            |
+| [Renderer bridge](./renderer-bridge.md)           | URL-loaded renderer doctrine — `loadURL("grida.co/desktop/*")`, path-scoped `window.grida`, `DesktopBridgeGate`.                                                      |
+| [Agent security](./agent-security.md)             | Desktop binding of `GRIDA-SEC-004`: bridge path scope, HTTP perimeter, sandbox, and secrets discipline.                                                               |
+| [Agent sandbox wrap](./agent-sandbox-wrap.md)     | How desktop adapts package sandbox intent to `srt`, the shell permission model (`auto`/`off`/`ask`) and per-call sub-policy, and supervises the wrapped AgentSidecar. |
+| [Agent storage layout](./agent-storage-layout.md) | Desktop `${userData}` files and SQLite session storage.                                                                                                               |
 
 ## God class
 

@@ -264,4 +264,54 @@ describe("parseRunBody", () => {
     expect(parsed).toBeInstanceOf(Response);
     expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
   });
+
+  // Supervised-approval answer (RFC `permission modes`, Phase 2). The Allow/Deny
+  // rides the body as `approval_answer`; parseRunBody shape-gates it (the store
+  // is the authority on whether it matches a real pending approval).
+  it("parses a well-formed approval_answer", async () => {
+    const parsed = await parseRunBody(
+      {
+        messages: [{ role: "user", parts: [{ type: "text", text: "ok" }] }],
+        approval_answer: {
+          tool_call_id: "tc1",
+          approval_id: "ap1",
+          approved: true,
+          reason: "looks safe",
+        },
+      },
+      deps as never
+    );
+    expect(parsed).not.toBeInstanceOf(Response);
+    if (parsed instanceof Response) return;
+    expect(parsed.approval_answer).toEqual({
+      tool_call_id: "tc1",
+      approval_id: "ap1",
+      approved: true,
+      reason: "looks safe",
+    });
+  });
+
+  it("drops a malformed approval_answer (missing `approved`) without 400ing the turn", async () => {
+    const parsed = await parseRunBody(
+      {
+        messages: [{ role: "user", parts: [{ type: "text", text: "ok" }] }],
+        // `approved` missing — fail safe to "no resume", not a rejected request.
+        approval_answer: { tool_call_id: "tc1", approval_id: "ap1" },
+      },
+      deps as never
+    );
+    expect(parsed).not.toBeInstanceOf(Response);
+    if (parsed instanceof Response) return;
+    expect(parsed.approval_answer).toBeUndefined();
+  });
+
+  it("leaves approval_answer undefined when absent", async () => {
+    const parsed = await parseRunBody(
+      { messages: [{ role: "user", parts: [{ type: "text", text: "ok" }] }] },
+      deps as never
+    );
+    expect(parsed).not.toBeInstanceOf(Response);
+    if (parsed instanceof Response) return;
+    expect(parsed.approval_answer).toBeUndefined();
+  });
 });

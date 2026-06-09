@@ -1,10 +1,15 @@
 /* eslint-disable vitest/require-mock-type-parameters */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UIMessageChunk } from "ai";
 import { desktopAgentTransport } from "./bridge-transport";
 import { ai } from "@/lib/desktop/bridge";
 
-vi.mock("@/lib/desktop/bridge", () => ({
+// Spread the real module so the runtime vocab constants the transport reads
+// (`AGENT_MODES`, `AGENT_TIERS`, …) stay defined — stub ONLY the bridge `ai`
+// surface. A whole-module stub left `AGENT_MODES` undefined, which the mode
+// passthrough below depends on.
+vi.mock("@/lib/desktop/bridge", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/desktop/bridge")>()),
   ai: {
     startAgentRun: vi.fn(),
     abortAgentRun: vi.fn(),
@@ -128,6 +133,98 @@ describe("desktopAgentTransport", () => {
     );
   });
 
+  // Regression: the permission mode (RFC `permission modes`) chosen in the
+  // composer rides each send as `body.mode`. It MUST reach `startAgentRun` —
+  // a prior bug dropped it in both `readBodyOptions` and the `startAgentRun`
+  // field list, so every run defaulted to `accept-edits` server-side no matter
+  // what the picker showed (the picker was cosmetic; `python3` stayed gated).
+  it("forwards the per-turn permission `mode` to startAgentRun", async () => {
+    vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_test",
+      done: Promise.resolve(),
+    }));
+
+    const stream = await desktopAgentTransport.create().sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+      body: { mode: "auto" },
+    });
+    await stream.cancel();
+
+    expect(ai.startAgentRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mode: "auto" }),
+      expect.any(Function)
+    );
+  });
+
+  // Supervised-approval answer (RFC `permission modes`, Phase 2). The Allow/Deny
+  // rides the body as an explicit `approval_answer` field — exactly like `mode`.
+  // It MUST reach `startAgentRun` whole, or the resume can't be matched to the
+  // pending approval and the command never runs.
+  it("forwards the `approval_answer` body field to startAgentRun", async () => {
+    vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_test",
+      done: Promise.resolve(),
+    }));
+
+    const answer = {
+      tool_call_id: "tc1",
+      approval_id: "ap1",
+      approved: true,
+    };
+    const stream = await desktopAgentTransport.create().sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+      body: { approval_answer: answer },
+    });
+    await stream.cancel();
+
+    expect(ai.startAgentRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ approval_answer: answer }),
+      expect.any(Function)
+    );
+  });
+
+  // A malformed `approval_answer` (missing `approved`) is dropped at the body
+  // gate, not forwarded — the sidecar re-validates regardless, but the transport
+  // shouldn't relay junk.
+  it("drops a malformed `approval_answer` (shape gate)", async () => {
+    vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_test",
+      done: Promise.resolve(),
+    }));
+
+    const stream = await desktopAgentTransport.create().sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+      body: { approval_answer: { tool_call_id: "tc1", approval_id: "ap1" } },
+    });
+    await stream.cancel();
+
+    expect(ai.startAgentRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ approval_answer: undefined }),
+      expect.any(Function)
+    );
+  });
+
   // Regression: a core-initiated turn (a queue drain) is rendered by
   // `resumeStream()`, which the AI SDK calls as `reconnectToStream({ chatId })`
   // with the AI-SDK chat id. For a FRESH chat that id is client-generated and
@@ -168,5 +265,226 @@ describe("desktopAgentTransport", () => {
       0,
       expect.any(Function)
     );
+  });
+
+  // Regression (dead Allow button): the AI SDK's approval/tool auto-resubmit
+  // calls the transport with NO body. It must still target the session the
+  // prior send resolved — otherwise the sidecar forks a fresh session and the
+  // resume (the approval answer) is lost, so the command never runs.
+  it("a body-less resubmit reuses the live session id from the prior send", async () => {
+    vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_live",
+      done: Promise.resolve(),
+    }));
+
+    const transport = desktopAgentTransport.create({ workspace_id: "w" });
+
+    // First send: the fresh chat adopts its server id.
+    const s1 = await transport.sendMessages({
+      trigger: "submit-message",
+      chatId: "c",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+      body: { model_id: "x" },
+    });
+    const r1 = s1.getReader();
+    while (!(await r1.read()).done) {
+      /* drain so start() tracks the session id */
+    }
+
+    // Second send is BODY-LESS (the auto-resubmit) — must carry ses_live, not
+    // fall back to the (undefined) creation-time default.
+    const s2 = await transport.sendMessages({
+      trigger: "submit-message",
+      chatId: "c",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+    });
+    await s2.cancel();
+
+    expect(ai.startAgentRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ session_id: "ses_live" }),
+      expect.any(Function)
+    );
+  });
+});
+
+// The control-channel contract (RFC `session lifecycle`):
+// docs/wg/ai/agent/session.md#abort-vs-tcp-close — a stream teardown is a
+// DETACH, not an abort. `ai.abortAgentRun` (the run-termination control action)
+// may be reached ONLY through the explicit user-Stop channel (the request
+// `abortSignal`), NEVER through the ReadableStream `cancel()` a consumer fires
+// on unmount / stream-replace / reconnect swap / reducer error. These five
+// cases pin the whole class. Case 1 is the direct regression lock: it FAILS the
+// moment a detach (`cancel()`) is wired to abort — the original "cut-off after
+// detach" bug. The rest fix the contract's other edges: Stop still aborts (2),
+// an explicit Stop followed by teardown stays single (3, because `abort()`
+// closes the stream so the SDK's later `cancel()` never fires — guarding a
+// future decouple of close-from-abort), no-session teardown is a no-op (4), and
+// the resume path is immune too (5). No jsdom, no network — the same mock-bridge
+// harness as above.
+describe("detach ≠ abort (session.md#abort-vs-tcp-close)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // A run that has started (session id resolved) but never finishes — `done`
+  // stays pending so the stream is genuinely mid-flight when we tear it down.
+  // `ready` resolves once the bridge has captured `onChunk`; `emit` pushes a
+  // chunk so start() runs past the session-id tracking line.
+  function mockPendingRun(sessionId: string) {
+    let emit!: (chunk: UIMessageChunk) => void;
+    let markReady!: () => void;
+    const ready = new Promise<void>((r) => (markReady = r));
+    vi.mocked(ai.startAgentRun).mockImplementation(async (_opts, onChunk) => {
+      emit = onChunk;
+      markReady();
+      return {
+        streamId: "local-1",
+        sessionId,
+        done: new Promise<void>(() => {}),
+      };
+    });
+    return { ready, emit: (chunk: UIMessageChunk) => emit(chunk) };
+  }
+
+  it("cancel() on a mid-run stream does NOT abort the run (detach, not abort)", async () => {
+    const run = mockPendingRun("ses_live");
+    const stream = await desktopAgentTransport.create().sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+    });
+    await run.ready;
+    const reader = stream.getReader();
+    // Read one chunk so start() has run past the session-id tracking line.
+    run.emit({ type: "text-start", id: "t" });
+    await reader.read();
+
+    await reader.cancel();
+
+    expect(ai.abortAgentRun).not.toHaveBeenCalled();
+  });
+
+  it("explicit Stop (abortSignal) DOES abort the run exactly once", async () => {
+    const run = mockPendingRun("ses_live");
+    const controller = new AbortController();
+    const stream = await desktopAgentTransport.create().sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: controller.signal,
+    });
+    await run.ready;
+    const reader = stream.getReader();
+    run.emit({ type: "text-start", id: "t" });
+    await reader.read(); // start() is now past session-id tracking
+
+    controller.abort();
+    await Promise.resolve();
+
+    expect(ai.abortAgentRun).toHaveBeenCalledTimes(1);
+    expect(ai.abortAgentRun).toHaveBeenCalledWith("ses_live");
+  });
+
+  it("Stop then cancel aborts exactly once (no double-abort)", async () => {
+    const run = mockPendingRun("ses_live");
+    const controller = new AbortController();
+    const stream = await desktopAgentTransport.create().sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: controller.signal,
+    });
+    await run.ready;
+    const reader = stream.getReader();
+    run.emit({ type: "text-start", id: "t" });
+    await reader.read();
+
+    controller.abort(); // explicit Stop → abort (1)
+    await reader.cancel(); // teardown → must NOT add a second abort
+    await Promise.resolve();
+
+    expect(ai.abortAgentRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancel() before the session id resolves is a clean no-op", async () => {
+    // startAgentRun never resolves → no session id is ever tracked.
+    vi.mocked(ai.startAgentRun).mockImplementation(
+      () =>
+        new Promise<{
+          streamId: string;
+          sessionId: string;
+          done: Promise<void>;
+        }>(() => {})
+    );
+    const stream = await desktopAgentTransport.create().sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+    });
+
+    await expect(stream.cancel()).resolves.toBeUndefined();
+    expect(ai.abortAgentRun).not.toHaveBeenCalled();
+  });
+
+  it("a reconnect/resume stream teardown does NOT abort the run", async () => {
+    vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_server",
+      done: Promise.resolve(),
+    }));
+    // A live in-flight run to reconnect to; `done` stays pending so the resume
+    // stream is open when we tear it down.
+    vi.mocked(ai.reconnectAgentRun).mockImplementation(async () => ({
+      streamId: "local-2",
+      sessionId: "ses_server",
+      done: new Promise<void>(() => {}),
+    }));
+
+    const transport = desktopAgentTransport.create();
+    // First send establishes the live server session id.
+    const s1 = await transport.sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-client",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+    });
+    const r1 = s1.getReader();
+    while (!(await r1.read()).done) {
+      /* drain so start() tracks the session id */
+    }
+
+    const resume = await transport.reconnectToStream!({
+      chatId: "chat-client",
+    });
+    expect(resume).not.toBeNull();
+    await resume!.cancel();
+
+    expect(ai.abortAgentRun).not.toHaveBeenCalled();
   });
 });

@@ -10,6 +10,7 @@
 
 import type { ByokProviderId } from "../protocol/provider-ids";
 import type { AgentModelId } from "../protocol/run";
+import type { AgentMode } from "../protocol/mode";
 import type { ModelTier } from "../tiers";
 
 export type ChatModel = {
@@ -40,6 +41,9 @@ export type ChatSessionRow = {
   agent: string;
   workspace_id: string | null;
   model: ChatModel | null;
+  /** Permission/supervision posture (RFC `permission modes`). Null on legacy
+   *  rows predating the column — readers default to {@link AGENT_DEFAULT_MODE}. */
+  mode: AgentMode | null;
   /** Parent session id when this session is a fork; null for roots. */
   parent_id: string | null;
   /** The forked-from user message id in the parent; null for roots. */
@@ -122,6 +126,7 @@ export type CreateSessionOptions = {
   workspace_id?: string;
   title?: string;
   model?: ChatModel;
+  mode?: AgentMode;
   metadata?: Record<string, unknown>;
 };
 

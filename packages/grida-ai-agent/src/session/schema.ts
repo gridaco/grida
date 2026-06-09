@@ -28,7 +28,7 @@ import {
  * alongside an entry in the ALTER-ladder in `db.ts` whenever the schema
  * changes in a way an in-place migration must handle.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const chatSessions = sqliteTable(
   "chat_sessions",
@@ -39,6 +39,10 @@ export const chatSessions = sqliteTable(
     workspace_id: text("workspace_id"),
     workspace_root: text("workspace_root"),
     model_json: text("model_json"),
+    // Permission/supervision posture (RFC `permission modes`). Nullable; null
+    // on legacy rows predating the column (added in SCHEMA_VERSION 2 — see the
+    // ALTER-ladder in `db.ts`). Readers default null → `accept-edits`.
+    mode: text("mode"),
     // Fork lineage (RFC `session / fork`). `parent_id` points at
     // the source session; `parent_message_id` at the forked-from message.
     // Null for root sessions.
@@ -140,6 +144,7 @@ const BOOTSTRAP_TABLES_SQL = `
     workspace_id TEXT,
     workspace_root TEXT,
     model_json TEXT,
+    mode TEXT,
     parent_id TEXT,
     parent_message_id TEXT,
     permissions_json TEXT NOT NULL DEFAULT '[]',
