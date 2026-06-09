@@ -53,6 +53,12 @@ export {
   type CoreRunState,
 } from "./use-session-status";
 export {
+  useResumeInFlight,
+  decideResumeInFlight,
+  type ResumeInFlightDecision,
+  type UseResumeInFlightArgs,
+} from "./use-resume-in-flight";
+export {
   computeContextUsage,
   estimateContextBreakdown,
   estimateTokens,

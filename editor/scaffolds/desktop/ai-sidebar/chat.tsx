@@ -43,6 +43,7 @@ import {
   useChatSession,
   useCoreTurnSync,
   useRefreshOnStreamEnd,
+  useResumeInFlight,
   useSessionFork,
   useSessionStatus,
   useTurnQueueController,
@@ -141,14 +142,16 @@ export function AISidebarChat({ className }: { className?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fs, chatSession.initial_messages]);
 
-  // `resume: true` is the AI SDK v6 built-in for "on mount, ask the
-  // transport to reconnect to any in-flight run for this chat id."
-  // Same behavior as a manual `useEffect(() => chat.resumeStream(), …)`,
-  // just less code. Our transport returns null on the agent sidecar's 404 →
-  // clean no-op; on success the agent sidecar replays from its in-memory
-  // chunk log and live-tails until finish. See `bridge-transport.ts`
-  // for the renderer side and `agent/stream-registry.ts` for the
-  // agent sidecar's chunk log + multiplex.
+  // Reconnect to an in-flight run on remount/refresh via `useResumeInFlight`
+  // (NOT the SDK's `resume: true`). `resume: true` fires `resumeStream()`
+  // exactly once on mount, against the placeholder chat that has no session
+  // id yet — the id is restored async from localStorage, so the rebuilt chat
+  // that DOES carry it never resumes, and the refresh silently shows a stale
+  // DB snapshot. The hook resumes once per chat instance that has a real
+  // session id, and never over a turn this client is streaming itself. Our
+  // transport returns null on the agent sidecar's 404 → clean no-op; on
+  // success the agent sidecar replays from its in-memory chunk log and
+  // live-tails until finish. See `bridge-transport.ts` + `agent/stream-registry.ts`.
   const {
     messages,
     status,
@@ -158,16 +161,23 @@ export function AISidebarChat({ className }: { className?: string }) {
     clearError,
     setMessages,
     resumeStream,
-  } = useChat({
-    chat,
-    resume: true,
-  });
+  } = useChat({ chat });
   // `isStreaming` = a turn is actively streaming THROUGH THIS CLIENT. Used
   // where that is the honest concept: the typing indicator, the Stop/Send
   // button, and "did I start this turn?" (vs. the core). It is the AI-SDK
   // client's optimistic per-request status — NOT the authoritative session
   // state.
   const isStreaming = status === "submitted" || status === "streaming";
+
+  // Reconnect to the session's in-flight run after a remount/refresh. Keyed on
+  // the chat instance + session id so the resume tracks the chat the async
+  // localStorage restore rebuilds — the gap `resume: true` left open.
+  useResumeInFlight({
+    chat,
+    sessionId: chatSession.current_id,
+    isStreaming,
+    resumeStream,
+  });
 
   // Manual compaction (RFC `session / compaction`) runs as a separate op that
   // does NOT move `useChat` status. Declared here so the single `busy` signal

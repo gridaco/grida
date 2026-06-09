@@ -103,8 +103,8 @@ export type CoreTurnSyncAction =
  * `busy` edge. Ignored cases:
  *
  *   - no transition / first frame / non-`busy` target,
- *   - the mount frame (`prevState === null`) — `resume: true` covers an
- *     already-in-flight run,
+ *   - the mount frame (`prevState === null`) — `useResumeInFlight` covers an
+ *     already-in-flight run on remount/refresh,
  *   - `isStreaming` — a turn THIS client started,
  *   - **no queued head** — the decisive guard. A bare `busy` edge with nothing
  *     to promote is NOT a drain; the likeliest cause is the client's OWN
