@@ -32,6 +32,7 @@ export type {
   InsertPreviewSession,
   InvalidComputedValue,
   LinearGradientDefinition,
+  Matrix2D,
   Mode,
   NodeId,
   Paint,

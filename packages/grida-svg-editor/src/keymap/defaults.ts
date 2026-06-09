@@ -43,6 +43,10 @@ export const DEFAULT_BINDINGS: readonly KeymapBinding[] = [
   { keybinding: kb(KeyCode.Backspace), command: "selection.remove" },
   { keybinding: kb(KeyCode.Delete), command: "selection.remove" },
   { keybinding: kb(KeyCode.KeyG, M.CtrlCmd), command: "selection.group" },
+  {
+    keybinding: kb(KeyCode.KeyG, M.CtrlCmd | M.Shift),
+    command: "selection.ungroup",
+  },
   { keybinding: kb(KeyCode.KeyA, M.CtrlCmd), command: "selection.all" },
 
   // ─── tree navigation ─────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ import type { Row } from "@grida/tree-view";
 import { useSvgTreeController, type SvgNodeMeta } from "./use-svg-tree";
 import { useSurfaceHover } from "./use-surface-hover";
 import { tagInfo } from "./node-type-map";
+import { SvgTreeRowContextMenu } from "./context-menu";
 import { cn } from "@app/ui/lib/utils";
 
 const INDENT_PX = 14;
@@ -122,49 +123,51 @@ function HierarchyRow({
   const isExpanded = row.isExpanded;
 
   return (
-    <div
-      ref={(el) => {
-        if (el) rowRefs.current.set(row.id, el);
-        else rowRefs.current.delete(row.id);
-      }}
-      onClick={(e) => onClick(row.id, e)}
-      onMouseEnter={() => onHover(row.id)}
-      onMouseLeave={() => onHover(null)}
-      className={cn(
-        "flex items-center gap-1.5 h-[22px] pr-1.5 rounded-sm cursor-pointer",
-        selected
-          ? "bg-accent text-accent-foreground"
-          : hovered
-            ? "bg-muted"
-            : "hover:bg-muted/60"
-      )}
-      style={{ paddingLeft: 4 + row.depth * INDENT_PX }}
-      title={label}
-    >
-      <span
-        onClick={(e) => {
-          if (!isFolder) return;
-          e.stopPropagation();
-          controller.toggle(row.id);
+    <SvgTreeRowContextMenu id={row.id}>
+      <div
+        ref={(el) => {
+          if (el) rowRefs.current.set(row.id, el);
+          else rowRefs.current.delete(row.id);
         }}
+        onClick={(e) => onClick(row.id, e)}
+        onMouseEnter={() => onHover(row.id)}
+        onMouseLeave={() => onHover(null)}
         className={cn(
-          "w-3.5 shrink-0 inline-flex items-center justify-center text-muted-foreground",
-          isFolder ? "cursor-pointer" : "cursor-default"
+          "flex items-center gap-1.5 h-[22px] pr-1.5 rounded-sm cursor-pointer",
+          selected
+            ? "bg-accent text-accent-foreground"
+            : hovered
+              ? "bg-muted"
+              : "hover:bg-muted/60"
         )}
+        style={{ paddingLeft: 4 + row.depth * INDENT_PX }}
+        title={label}
       >
-        {isFolder ? (isExpanded ? "▾" : "▸") : ""}
-      </span>
-      <Icon
-        size={13}
-        strokeWidth={1.75}
-        className={cn(
-          "shrink-0",
-          selected ? "text-accent-foreground" : "text-muted-foreground"
-        )}
-      />
-      <span className="overflow-hidden text-ellipsis whitespace-nowrap">
-        {label}
-      </span>
-    </div>
+        <span
+          onClick={(e) => {
+            if (!isFolder) return;
+            e.stopPropagation();
+            controller.toggle(row.id);
+          }}
+          className={cn(
+            "w-3.5 shrink-0 inline-flex items-center justify-center text-muted-foreground",
+            isFolder ? "cursor-pointer" : "cursor-default"
+          )}
+        >
+          {isFolder ? (isExpanded ? "▾" : "▸") : ""}
+        </span>
+        <Icon
+          size={13}
+          strokeWidth={1.75}
+          className={cn(
+            "shrink-0",
+            selected ? "text-accent-foreground" : "text-muted-foreground"
+          )}
+        />
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+          {label}
+        </span>
+      </div>
+    </SvgTreeRowContextMenu>
   );
 }

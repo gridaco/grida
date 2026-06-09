@@ -37,6 +37,7 @@ import type {
   GradientDefinition,
   InsertPreviewSession,
   InvalidComputedValue,
+  Matrix2D,
   Mode,
   NodeId,
   Paint,
@@ -265,6 +266,39 @@ export type Commands = {
     }
   ): boolean;
   /**
+   * Compose an arbitrary 2×3 affine onto the selection, **relative** and
+   * applied in **world space about a pivot**. `matrix` is in SVG
+   * `matrix(a b c d e f)` order (see {@link Matrix2D}).
+   *
+   * Semantics: the effective affine written to each member is
+   * `E = T(pivot) · matrix · T(-pivot)`, so the bare flip tuples become
+   * in-place flips about the pivot. Pivot defaults to the selection
+   * union-bbox center (via the attached surface's `geometry_provider`);
+   * pass `opts.pivot` to override.
+   *
+   * Round-trip: `E` is folded onto each member's transform list as a
+   * single LEADING `matrix` op — existing `rotate`/`translate` tokens are
+   * preserved after it, repeated applies collapse into one matrix, and a
+   * net-identity leading matrix is dropped (so flip-then-flip restores
+   * the original). One atomic history step labelled `"transform"`.
+   *
+   * Refusal (returns `false`, no-op, no history): empty selection, no
+   * `geometry_provider`, or any member failing `is_rotatable` (the same
+   * non-trivial-transform / `<text rotate>` / CSS-property / animated
+   * gate `rotate` uses). All-or-nothing — no partial writes.
+   *
+   * Flat-doc limitation: only each element's OWN transform is folded;
+   * the pivot is treated as world ≡ parent space. Nested transformed
+   * ancestors (`<g transform=…>`) are out of scope.
+   */
+  transform(
+    matrix: Matrix2D,
+    opts?: {
+      ids?: ReadonlyArray<NodeId>;
+      pivot?: { x: number; y: number };
+    }
+  ): boolean;
+  /**
    * Collapse each selected member's `transform=` to a single `matrix(...)`
    * token, baking accumulated translates / rotates / scales / skews into
    * the equivalent affine. After flatten, the element's transform list
@@ -298,6 +332,28 @@ export type Commands = {
    * rejected the call.
    */
   group(): boolean;
+  /**
+   * Dissolve the selected `<g>` (or `opts.id`), hoisting its children
+   * into the group's parent at the group's z-position. Returns `true`
+   * when a history step was pushed (children hoisted, group removed, the
+   * former children selected); `false` when the call was refused.
+   *
+   * Only the **safe clean-structural subset** is accepted (see
+   * `core/group.ts:plan_ungroup` and `../docs/grouping.md` §Ungrouping).
+   * Refused — with NO mutation and NO history entry — when: the target
+   * is not a single `<g>`; the group is inside `<defs>`; the group has
+   * no element children; the group carries any own attribute beyond
+   * `{ transform, id, data-grida-id }` (i.e. any visual / cascade state
+   * such as `opacity` / `class` / `style` / `filter` / `clip-path` /
+   * `mask` / `fill`); the group's `id` is referenced by a `<use>`; a
+   * direct child is an SMIL animation element; or — when the group has a
+   * `transform` — any child's own transform is unparseable.
+   *
+   * When the group has a `transform`, it is BAKED into each child by
+   * prepending the group's parsed ops to the child's (clean token
+   * compose, not a matrix collapse), so paint output round-trips.
+   */
+  ungroup(opts?: { id?: NodeId }): boolean;
   /**
    * Atomic one-shot insertion. Creates a new element of the given SVG
    * tag with the supplied attributes (merged on top of the package's
@@ -431,16 +487,27 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   const notify_translate_commit = () => {
     for (const cb of translate_commit_listeners) cb();
   };
+  /**
+   * Fan out the geometry channel iff the doc's `geometry_version` has
+   * moved since we last fired. Shared by the `doc.on_change` handler
+   * (mutation-driven bumps) and the surface-driven `bump_geometry` seam
+   * (font-load reflow). Idempotent against a stale version — never
+   * double-fires for the same value.
+   */
+  function fire_geometry_listeners_if_advanced() {
+    if (doc.geometry_version !== last_emitted_geometry_version) {
+      last_emitted_geometry_version = doc.geometry_version;
+      for (const cb of geometry_listeners) cb();
+    }
+  }
+
   doc.on_change(() => {
     // Every doc mutation bumps doc_version; load()/serialize() snapshots it
     // as the baseline for `dirty`.
     doc_version++;
     // Fire the geometry channel only when the doc's geometry_version
     // advanced — pure presentation writes don't reach the geometry cache.
-    if (doc.geometry_version !== last_emitted_geometry_version) {
-      last_emitted_geometry_version = doc.geometry_version;
-      for (const cb of geometry_listeners) cb();
-    }
+    fire_geometry_listeners_if_advanced();
   });
 
   function subscribe(fn: (state: EditorState) => void): Unsubscribe {
@@ -1182,6 +1249,89 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     return true;
   }
 
+  /**
+   * Relative affine compose about a pivot. See the `Commands.transform`
+   * doc for the full contract. This function owns ONLY the pivot/effective-
+   * matrix computation (which needs `geometry_provider`); the parse→fold→
+   * emit round-trip is delegated per-member to the pure
+   * `transform.apply_affine` helper.
+   */
+  function apply_transform(
+    matrix: Matrix2D,
+    opts?: {
+      ids?: ReadonlyArray<NodeId>;
+      pivot?: { x: number; y: number };
+    }
+  ): boolean {
+    const ids = opts?.ids ?? selection;
+    if (ids.length === 0) return false;
+    if (!geometry_provider) return false;
+
+    // All-or-nothing transformability gate. Distinct from `rotate`'s gate
+    // (`is_transformable`, not `is_rotatable`): `transform` folds a leading
+    // matrix onto whatever transform the element already has, so it does NOT
+    // refuse a matrix/scale/skew transform — that's what makes flip-then-flip
+    // toggle. It still refuses the genuine conflicts (unparseable transform,
+    // inline CSS `transform`, `<animateTransform>` child, `<text rotate>`).
+    // Any refusal aborts the whole command with no IR mutation, no history.
+    for (const id of ids) {
+      if (rotate_pipeline.intent.is_transformable(doc, id).kind === "refuse") {
+        return false;
+      }
+    }
+
+    const pivot = opts?.pivot ?? default_rotate_pivot(ids);
+
+    // The host's request as a 2×3 affine. SVG `matrix(a b c d e f)` maps to
+    // `cmath.Transform = [[a, c, e], [b, d, f]]`.
+    const [a, b, c, d, e, f] = matrix;
+    const requested: cmath.Transform = [
+      [a, c, e],
+      [b, d, f],
+    ];
+    // Re-center the affine about `pivot`: `E = T(pivot) · matrix · T(-pivot)`.
+    const t_pivot: cmath.Transform = [
+      [1, 0, pivot.x],
+      [0, 1, pivot.y],
+    ];
+    const t_neg_pivot: cmath.Transform = [
+      [1, 0, -pivot.x],
+      [0, 1, -pivot.y],
+    ];
+    const effective = cmath.transform.multiply(
+      cmath.transform.multiply(t_pivot, requested),
+      t_neg_pivot
+    );
+
+    // Capture each member's pre-value, then fold `effective` onto its
+    // leading matrix via the pure helper. The helper returns `null` to
+    // signal "remove the attribute" (net identity, no other ops).
+    type Member = { id: NodeId; transform_pre: string | null };
+    const members: Member[] = ids.map((id) => ({
+      id,
+      transform_pre: doc.get_attr(id, "transform"),
+    }));
+    const apply = () => {
+      for (const m of members) {
+        doc.set_attr(
+          m.id,
+          "transform",
+          transform.apply_affine(m.transform_pre, effective)
+        );
+      }
+      emit();
+    };
+    const revert = () => {
+      for (const m of members) doc.set_attr(m.id, "transform", m.transform_pre);
+      emit();
+    };
+    apply();
+    history.atomic("transform", (tx) => {
+      tx.push({ providerId: PROVIDER_ID, apply, revert });
+    });
+    return true;
+  }
+
   function flatten_transform(opts?: { ids?: ReadonlyArray<NodeId> }): boolean {
     const ids = opts?.ids ?? selection;
     if (ids.length === 0) return false;
@@ -1488,6 +1638,98 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     };
     apply();
     history.atomic("group", (tx) => {
+      tx.push({ providerId: PROVIDER_ID, apply, revert });
+    });
+    return true;
+  }
+
+  function ungroup(opts?: { id?: NodeId }): boolean {
+    // Target resolution. With an explicit `opts.id`, that's the target.
+    // Without one, operate on the single selected node (refuse a 0- or
+    // multi-selection — ungroup is a single-group action).
+    let target: NodeId;
+    if (opts?.id !== undefined) {
+      target = opts.id;
+    } else {
+      if (selection.length !== 1) return false;
+      target = selection[0];
+    }
+
+    const plan = group_policy.plan_ungroup(doc, target);
+    if (!plan) return false;
+
+    const group_id = plan.group_id;
+
+    // Capture for revert (BEFORE any mutation):
+    //   - the group's slot among its parent's element-children, so revert
+    //     re-inserts it exactly where it was (paint order round-trips).
+    //   - each child's original `transform=` value, so baking is undoable
+    //     byte-equal even for children that started with no transform.
+    const group_next_sibling = doc.next_element_sibling_of(group_id);
+    const original_child_transforms = new Map<NodeId, string | null>();
+    for (const child of plan.children) {
+      original_child_transforms.set(child, doc.get_attr(child, "transform"));
+    }
+
+    // Bake the group transform into each child by PREPENDING the group's
+    // parsed ops to the child's parsed ops, then re-emitting clean tokens.
+    // We compose op LISTS (`translate(...) rotate(...)`), NOT a collapsed
+    // `matrix(...)`: SVG applies a transform list left-to-right, so the
+    // group's transform must lead the child's to preserve the same visual
+    // order. Keeping clean tokens (rather than collapsing to a matrix)
+    // means the result stays human-readable and round-trips through the
+    // transform parser without trig drift. When the group has no
+    // transform, children are untouched.
+    const group_ops =
+      plan.group_transform === null
+        ? []
+        : (transform.parse(plan.group_transform) ?? []);
+
+    const original_selection = selection;
+    const apply = () => {
+      if (group_ops.length > 0) {
+        for (const child of plan.children) {
+          const child_ops =
+            transform.parse(doc.get_attr(child, "transform")) ?? [];
+          const next = transform.emit([...group_ops, ...child_ops]);
+          doc.set_attr(child, "transform", next === "" ? null : next);
+        }
+      }
+      // Hoist each child into the parent at the group's z-position, in
+      // document order: insert before the still-present group so the
+      // children land in order at the group's slot. Then remove the
+      // (now-empty) group.
+      for (const child of plan.children) {
+        doc.insert(child, plan.parent, group_id);
+      }
+      doc.remove(group_id);
+      set_selection(plan.children);
+    };
+    const revert = () => {
+      // Re-insert the group at its captured slot, then move children back
+      // into it in document order. The children currently sit immediately
+      // before the group's slot in the parent (where apply hoisted them);
+      // re-inserting the group ahead of them and then moving each child
+      // into the group (append) restores the exact element-tree shape.
+      doc.insert(group_id, plan.parent, group_next_sibling);
+      for (const child of plan.children) {
+        doc.insert(child, group_id, null);
+      }
+      // Restore each child's original transform (reverse the bake). A
+      // child that had no transform gets the attribute removed again.
+      if (group_ops.length > 0) {
+        for (const child of plan.children) {
+          doc.set_attr(
+            child,
+            "transform",
+            original_child_transforms.get(child) ?? null
+          );
+        }
+      }
+      set_selection(original_selection);
+    };
+    apply();
+    history.atomic("ungroup", (tx) => {
       tx.push({ providerId: PROVIDER_ID, apply, revert });
     });
     return true;
@@ -1810,11 +2052,13 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     resize_by,
     rotate,
     rotate_to,
+    transform: apply_transform,
     flatten_transform,
     align,
     reorder,
     remove,
     group,
+    ungroup,
     insert,
     insert_preview,
     set_text,
@@ -2119,6 +2363,16 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       },
       set_geometry(p: GeometryProvider | null) {
         geometry_provider = p;
+      },
+      bump_geometry() {
+        // A surface-observed reflow the IR can't see (web font settled
+        // after the font-* write). Advance ONLY the geometry channel:
+        // `doc.bump_geometry()` advances `geometry_version` without
+        // emitting, so `doc_version` / `structure_version` / dirty / undo
+        // stay put (a reflow is not an edit); then fan out the geometry
+        // listeners so the MemoizedGeometryProvider cache clears.
+        doc.bump_geometry();
+        fire_geometry_listeners_if_advanced();
       },
     } satisfies SurfaceBridge,
 

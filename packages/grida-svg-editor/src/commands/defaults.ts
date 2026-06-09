@@ -77,6 +77,18 @@ export function registerDefaultCommands(
     return editor.commands.group();
   });
 
+  // Cmd+Shift+G — dissolve the selected <g>, hoisting its children into
+  // the parent. Returns false when `ungroup` refuses (not a single <g>,
+  // inside <defs>, no children, carries visual state, <use>-referenced,
+  // animation-bearing, unbakeable transform) so the keymap chain can
+  // keep going. Guarded on a single selection + `select` mode — the same
+  // shape as `selection.group`.
+  reg.register("selection.ungroup", () => {
+    if (editor.state.mode !== "select") return false;
+    if (editor.state.selection.length !== 1) return false;
+    return editor.commands.ungroup();
+  });
+
   // Inspector entry point — set the union bbox of the current selection
   // to an explicit rect. `args` is the target `{x, y, width, height}`.
   // Refuses outside select-mode (text-edit would route the call into a

@@ -9,6 +9,7 @@ import {
   ResetIcon,
 } from "@radix-ui/react-icons";
 import {
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -18,6 +19,7 @@ import {
   DropdownMenuSubTrigger,
 } from "@app/ui/components/dropdown-menu";
 import { sitemap } from "@/www/data/sitemap";
+import { toggleInspectorDebug, useInspectorDebug } from "./use-inspector-debug";
 
 /**
  * Minimal dropdown content for the SVG demo pages.
@@ -44,6 +46,7 @@ export function SvgMenuContent({
   onUndo: () => void;
   onRedo: () => void;
 }) {
+  const debug = useInspectorDebug();
   return (
     <DropdownMenuContent align="start" className="min-w-52">
       <DropdownMenuSub>
@@ -108,6 +111,17 @@ export function SvgMenuContent({
           </Link>
         </DropdownMenuSubContent>
       </DropdownMenuSub>
+      <DropdownMenuSeparator />
+      <DropdownMenuCheckboxItem
+        checked={debug}
+        onSelect={(e) => {
+          e.preventDefault();
+          toggleInspectorDebug();
+        }}
+        className="text-xs"
+      >
+        Debug mode
+      </DropdownMenuCheckboxItem>
       <DropdownMenuSeparator />
       <Link href={sitemap.links.github} target="_blank">
         <DropdownMenuItem className="text-xs">

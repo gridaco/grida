@@ -47,6 +47,17 @@ export interface SurfaceBridge {
    *  geometry write reaches `subscribe()` listeners. */
   emit(): void;
 
+  /** surface → editor: advance the geometry channel for a surface-observed
+   *  reflow the IR cannot see — a `<text>` / `<tspan>` whose bbox shifted
+   *  because a web font finished loading AFTER the `font-family` /
+   *  `font-size` write. Advances `geometry_version` by exactly 1 and fires
+   *  `subscribe_geometry` listeners (clearing the `MemoizedGeometryProvider`
+   *  cache) WITHOUT marking the doc dirty, advancing `structure_version` /
+   *  `doc_version`, or touching undo — a reflow is not an edit. The DOM
+   *  surface drives this from a `document.fonts` `loadingdone` listener;
+   *  see `src/dom.ts` and ../../docs/geometry.md §Limitations. */
+  bump_geometry(): void;
+
   /** editor → surface: subscribe to translate-commit outcomes (drag
    *  commit, `commands.nudge`, `commands.translate`). Distinct from the
    *  raw geometry-listener firehose; the nudge-dwell watcher uses this. */

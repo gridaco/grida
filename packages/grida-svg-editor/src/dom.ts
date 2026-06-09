@@ -168,6 +168,54 @@ const IS_MODIFIER_KEY: Record<string, true> = {
  *  live `<text>` element out from under the about-to-mount text surface. */
 const TEXT_EDIT_PENDING = { __pending: true } as const;
 
+/**
+ * Wire a web-font settle source to the editor's geometry channel.
+ *
+ * The DOM surface re-serializes the `<svg>` on every editor tick, but a
+ * `<text>` / `<tspan>` bbox can change with NO attribute write: a web font
+ * finishing load AFTER its `font-family` / `font-size` was already written.
+ * The IR never sees that reflow, so nothing bumps `geometry_version` and
+ * every bounds-keyed consumer (snap, HUD chrome, size meter) stays stuck at
+ * the fallback-face metrics until the next real edit.
+ *
+ * Listens for `loadingdone` on `source` (a `FontFaceSet`, or any injected
+ * `EventTarget` in tests) and calls `bump` once per settle. COARSE on
+ * purpose: one bump clears the WHOLE bounds cache, not just text nodes —
+ * consistent with the package's pessimistic-invalidation stance, and far
+ * cheaper than scoping the bump to the (possibly many) reflowed runs.
+ *
+ * Also bumps once when `source.ready` resolves (when present): fonts that
+ * settled before attach — a cache hit, or `font-display` resolving the same
+ * tick the surface mounts — never re-fire `loadingdone`, so a document
+ * mounted post-settle still needs one bump to re-read at the real metrics.
+ *
+ * Returns a teardown that removes the listener and neutralizes the pending
+ * `ready` bump (leak guard) — call it on surface detach.
+ *
+ * Factored out of the surface so it can be unit-tested with a fake
+ * `EventTarget` in the node-only test env (jsdom's `FontFaceSet` is
+ * incomplete); never a real font / network.
+ */
+export function install_font_load_geometry_bump(
+  source: EventTarget | null,
+  bump: () => void
+): () => void {
+  if (!source) return () => {};
+  const on_fonts_settled = () => bump();
+  source.addEventListener("loadingdone", on_fonts_settled);
+  let alive = true;
+  const ready = (source as EventTarget & { ready?: Promise<unknown> }).ready;
+  if (ready && typeof ready.then === "function") {
+    void ready.then(() => {
+      if (alive) bump();
+    });
+  }
+  return () => {
+    alive = false;
+    source.removeEventListener("loadingdone", on_fonts_settled);
+  };
+}
+
 export type DomSurfaceOptions = {
   /** Mount the SVG inside this container. */
   container: HTMLElement;
@@ -189,6 +237,19 @@ export type DomSurfaceOptions = {
    * when `fit: true`.
    */
   initial_camera?: cmath.Transform;
+  /**
+   * Font-load settle source — the `EventTarget` whose `loadingdone` event
+   * signals "web fonts finished loading, text may have reflowed." Defaults
+   * to `container.ownerDocument.fonts` (the live `FontFaceSet`). The
+   * surface installs a `loadingdone` listener that advances the editor's
+   * geometry channel so text bounds re-read at the settled glyph metrics
+   * (see ../docs/geometry.md §Limitations "Text bbox depends on font").
+   *
+   * Injectable as a DOM seam: jsdom's `FontFaceSet` is incomplete, so
+   * tests pass a plain `EventTarget` stub and `dispatchEvent(new Event(
+   * "loadingdone"))` to simulate a settle without a real font / network.
+   */
+  font_load_source?: EventTarget;
 };
 
 /**
@@ -840,6 +901,27 @@ class DomSurface implements Surface {
       win.addEventListener("resize", fn);
       this.teardown.push(() => win.removeEventListener("resize", fn));
     }
+
+    // Web-font settle → geometry bump. A `<text>` / `<tspan>` bbox can
+    // shift when a font finishes loading AFTER its `font-family` /
+    // `font-size` write was already serialized — a reflow the IR never
+    // sees, so nothing bumps `geometry_version` and `bounds_of` / snap /
+    // HUD chrome stay stuck at the fallback-face metrics. We listen to the
+    // document's `FontFaceSet` and ask the editor to advance the geometry
+    // channel once per settle. The source is injectable
+    // (`options.font_load_source`) because jsdom's FontFaceSet is
+    // incomplete; tests pass a plain EventTarget stub. See
+    // `install_font_load_geometry_bump` and ../docs/geometry.md
+    // §Limitations "Text bbox depends on font".
+    const font_source: EventTarget | null =
+      options.font_load_source ??
+      (container.ownerDocument.fonts as EventTarget | undefined) ??
+      null;
+    const detach_font_listener = install_font_load_geometry_bump(
+      font_source,
+      () => editor._internal.bump_geometry()
+    );
+    this.teardown.push(detach_font_listener);
 
     this.wire_events();
 

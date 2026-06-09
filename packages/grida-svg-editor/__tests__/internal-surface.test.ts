@@ -28,6 +28,7 @@ type Internal = {
     opts?: { parent?: string }
   ) => { id: string; commit: () => void; discard: () => void };
   emit: () => void;
+  bump_geometry: () => void;
   subscribe_translate_commit: (cb: () => void) => () => void;
   notify_translate_commit: () => void;
   set_content_edit_driver: (fn: unknown) => void;
@@ -50,6 +51,7 @@ describe("editor._internal contract", () => {
       [
         "doc",
         "emit",
+        "bump_geometry",
         "history",
         "insert_text_preview",
         "notify_translate_commit",

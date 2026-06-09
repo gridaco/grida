@@ -11,6 +11,31 @@ export type Vec2 = { x: number; y: number };
 export type Rect = { x: number; y: number; width: number; height: number };
 
 /**
+ * A 2×3 affine transform in SVG `matrix(a b c d e f)` order — the same
+ * six-number tuple the SVG `transform="matrix(...)"` function takes.
+ *
+ * Applied to a point `(x, y)`:
+ *   x' = a·x + c·y + e
+ *   y' = b·x + d·y + f
+ *
+ * This is the wire shape `commands.transform` accepts. Examples:
+ *   - `[-1, 0, 0, 1, 0, 0]` — horizontal flip (mirror x about the origin)
+ *   - `[1, 0, 0, -1, 0, 0]` — vertical flip (mirror y about the origin)
+ *   - `[1, 0, 0, 1, 0, 0]`  — identity (no-op)
+ *
+ * `commands.transform` re-centers this about a pivot, so the bare flip
+ * tuples become in-place flips about the selection center.
+ */
+export type Matrix2D = readonly [
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+  f: number,
+];
+
+/**
  * Observe-only outcome of a discrete pointer **tap** on the canvas: the user
  * pressed and released within the drag threshold, without dragging. Delivered
  * through {@link SvgEditor.subscribe_pick} — a transient event, never part of

@@ -367,4 +367,115 @@ export namespace transform {
     );
     return emit(rewritten);
   }
+
+  // ---------------------------------------------------------------------
+  // apply_affine — fold a world-space affine onto the leading matrix
+  // ---------------------------------------------------------------------
+  //
+  // The editor owns transform-string round-tripping: a host can ask for
+  // "compose this affine onto the element" but can NEVER hand us a raw
+  // `transform=` string to write. `apply_affine` is the single pure
+  // chokepoint that turns a `cmath.Transform` (the host's request,
+  // already pivoted into world space by the command) into the new
+  // attribute value.
+  //
+  // Fold policy: the `effective` affine is folded into a SINGLE LEADING
+  // `matrix` op.
+  //   - If `ops[0]` is already a `matrix`, it is replaced by
+  //     `effective · existing_leading_matrix` (so repeated applies
+  //     collapse into one matrix — no token pile-up).
+  //   - Otherwise a `matrix` op built from `effective` is PREPENDED,
+  //     preserving every existing token (`rotate(θ cx cy)`, `translate`,
+  //     …) after it.
+  //   - If the resulting leading matrix is the identity (within EPSILON),
+  //     it is DROPPED. This is what makes flip-then-flip restore: the
+  //     net leading matrix collapses to identity and disappears.
+  //
+  // Identity-removal contract: when the fold yields an identity leading
+  // matrix AND there are no other ops left, the element has no transform
+  // at all — return `null` so the caller REMOVES the attribute (rather
+  // than writing `transform=""`). With other tokens present, the leading
+  // matrix is simply omitted and the remaining tokens are emitted.
+  //
+  // Flat-doc limitation (see the `project` note above): only the
+  // element's OWN transform is folded. `effective` is assumed to already
+  // be expressed in the element's parent space; for the package's
+  // flat-doc target (no nested transformed ancestors) parent space ≡
+  // world space, so the command can pivot in world space and pass the
+  // result straight through. Nested `<g transform=…>` ancestors are out
+  // of scope.
+
+  /** Epsilon for the identity-leading-matrix drop. Trig/compose noise on
+   *  a flip-then-flip round-trip lands well inside 1e-9; authored SVG
+   *  coordinates rarely carry more than 4 significant decimals, so this
+   *  never collapses a meaningful matrix. */
+  const IDENTITY_EPSILON = 1e-9;
+
+  /** A `cmath.Transform` (`[[a,c,e],[b,d,f]]`) as a `matrix` op
+   *  (`matrix(a b c d e f)` argument order). */
+  function transform_to_matrix_op(
+    m: cmath.Transform
+  ): Extract<TransformOp, { type: "matrix" }> {
+    return {
+      type: "matrix",
+      a: m[0][0],
+      b: m[1][0],
+      c: m[0][1],
+      d: m[1][1],
+      e: m[0][2],
+      f: m[1][2],
+    };
+  }
+
+  function is_identity_matrix(m: cmath.Transform): boolean {
+    const id = cmath.transform.identity;
+    return (
+      Math.abs(m[0][0] - id[0][0]) <= IDENTITY_EPSILON &&
+      Math.abs(m[0][1] - id[0][1]) <= IDENTITY_EPSILON &&
+      Math.abs(m[0][2] - id[0][2]) <= IDENTITY_EPSILON &&
+      Math.abs(m[1][0] - id[1][0]) <= IDENTITY_EPSILON &&
+      Math.abs(m[1][1] - id[1][1]) <= IDENTITY_EPSILON &&
+      Math.abs(m[1][2] - id[1][2]) <= IDENTITY_EPSILON
+    );
+  }
+
+  /**
+   * Fold a world-space `effective` affine onto `transform_str`'s leading
+   * matrix and emit the new attribute value.
+   *
+   * Returns the new `transform=` string, or `null` to signal "remove the
+   * attribute" (the net is identity AND no other ops remain).
+   *
+   * Returns `transform_str` UNCHANGED when it does not parse (refuse-and-
+   * surface is the caller's job via `is_rotatable`; this pure helper does
+   * not invent a transform on an unparseable input).
+   *
+   *   apply_affine(null, identity)               => null
+   *   apply_affine("rotate(30 10 10)", flipX)    => "matrix(...) rotate(30 10 10)"
+   *   apply_affine("matrix(2 0 0 2 0 0)", flipX) => "matrix(-2 0 0 2 0 0)"
+   */
+  export function apply_affine(
+    transform_str: string | null,
+    effective: cmath.Transform
+  ): string | null {
+    const ops = parse(transform_str);
+    // Unparseable: leave verbatim. The command gate (`is_rotatable`)
+    // refuses these before reaching here; this is a defensive identity.
+    if (ops === null) return transform_str;
+
+    // Compute the new leading matrix: `effective · existing_leading`.
+    const has_leading_matrix = ops.length > 0 && ops[0].type === "matrix";
+    const existing_leading: cmath.Transform = has_leading_matrix
+      ? op_matrix(ops[0])
+      : cmath.transform.identity;
+    const rest = has_leading_matrix ? ops.slice(1) : ops;
+    const folded = cmath.transform.multiply(effective, existing_leading);
+
+    if (is_identity_matrix(folded)) {
+      // Drop the leading matrix entirely.
+      if (rest.length === 0) return null; // remove the attribute
+      return emit(rest);
+    }
+    return emit([transform_to_matrix_op(folded), ...rest]);
+  }
 }

@@ -274,6 +274,27 @@ export class SvgDocument implements DocumentEvents {
     return this._geometry_version;
   }
 
+  /**
+   * Advance `_geometry_version` by exactly 1 WITHOUT touching the tree,
+   * any attribute, `structure_version`, or the `on_change` listeners.
+   *
+   * The one geometry mutation with no attribute write: a `<text>` /
+   * `<tspan>` reflow the IR cannot see — a web font finishing load AFTER
+   * the `font-family` / `font-size` write was already serialized. The DOM
+   * surface observes the reflow (`document.fonts` `loadingdone`) and asks
+   * the geometry channel to advance so the bounds cache re-reads the
+   * settled glyph metrics. See ../../docs/geometry.md §Limitations.
+   *
+   * Deliberately does NOT call `emit()`: this is not a document edit, so
+   * it must not bump `doc_version` / mark the doc dirty / touch undo
+   * (the editor's `on_change` handler does all three). The editor's
+   * `_internal.bump_geometry` advances `geometry_version` here and fans
+   * out the geometry listeners itself.
+   */
+  bump_geometry(): void {
+    this._geometry_version++;
+  }
+
   private emit() {
     for (const fn of this.listeners) fn();
   }
