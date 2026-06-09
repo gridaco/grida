@@ -26,6 +26,7 @@ import { GridaLogo } from "@/components/grida-logo";
 import { HierarchyPanel } from "./hierarchy-panel";
 import { InspectorPanel } from "./inspector-panel";
 import { SvgMenuContent } from "./svg-menu";
+import { SvgCanvasContextMenu } from "./context-menu";
 
 /** Zoom step matches the editor's keyboard handler — see
  *  `gestures/defaults.ts#ZOOM_STEP`. */
@@ -175,7 +176,9 @@ export function SvgShell({
       </aside>
 
       {/* ─── Center: canvas ─────────────────────────────────────── */}
-      <main className="flex-1 relative bg-muted overflow-hidden">{canvas}</main>
+      <main className="flex-1 relative bg-muted overflow-hidden">
+        <SvgCanvasContextMenu>{canvas}</SvgCanvasContextMenu>
+      </main>
 
       {/* ─── Right sidebar: inspector ───────────────────────────── */}
       <aside className="w-64 border-l flex flex-col">
@@ -190,7 +193,7 @@ export function SvgShell({
           onFit={handleFit}
           onReset={handleReset}
         />
-        <div className="flex-1 overflow-auto p-3">
+        <div className="flex-1 overflow-auto py-2">
           <InspectorPanel />
         </div>
       </aside>
