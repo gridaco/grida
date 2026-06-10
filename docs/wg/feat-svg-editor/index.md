@@ -65,6 +65,15 @@ preserving the author's source on round-trip.
   (byte-equal until the first re-typing edit), a single `<path>` target,
   and a cubic-Bézier conic representation, with the round-trip invariants
   that keep the conversion honest.
+- [`clipboard.md`](./clipboard.md) — FRD for copy/cut/paste. The
+  payload is a standalone SVG document, not a private format. Names two
+  extraction operations (standalone payload vs in-document clone) and
+  the five kinds of context a lifted subtree leaves behind (references
+  and namespaces carried; transforms, cascade, and viewport verbatim by
+  argument), with the same-document closure-duplication cost stated
+  rather than hidden. Also: command/history semantics, in-place
+  appended placement, transport ownership and the engine floor for
+  native clipboard events, and the paste-is-load trust model.
 - [`durable-node-identity.md`](./durable-node-identity.md) — the open
   problem behind #775: `NodeId` is parse-ephemeral, so no reference
   survives a `load()`, let alone an external rewrite of the file. Frames
