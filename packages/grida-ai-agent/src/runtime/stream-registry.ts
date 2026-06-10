@@ -38,10 +38,13 @@ export type StreamRegistryOptions = {
 };
 
 /**
- * Lifecycle observer — the two clean edges a run-state machine
- * ({@link SessionScheduler}) needs: a turn started (`create`) and a turn
- * ended (`finish`, including the abort path which funnels through `finish`).
- * Settable post-construction so it works for an injected registry too.
+ * Lifecycle observer — the two clean edges the registry's lifecycle exposes:
+ * a turn started (`create`) and a turn ended (`finish`, including the abort
+ * path which funnels through `finish`). Attachable post-construction so it
+ * works for an injected registry too. The seam is MULTI-subscriber (RFC
+ * `events` §semantics): the run-state machine ({@link SessionScheduler}) and
+ * the lifecycle event bus both observe it, and attaching one never displaces
+ * another.
  */
 export type StreamLifecycleObserver = {
   on_create?: (sessionId: string) => void;
@@ -52,34 +55,44 @@ export class StreamRegistry {
   private readonly entries = new Map<string, StreamEntry>();
   private readonly grace_ms: number;
   private consumer_seq = 0;
-  private observer: StreamLifecycleObserver | null = null;
+  private readonly observers = new Set<StreamLifecycleObserver>();
 
   constructor(opts: StreamRegistryOptions = {}) {
     this.grace_ms = opts.finish_grace_ms ?? 60_000;
   }
 
   /**
-   * Attach the lifecycle observer (the run-state machine). Settable here so it
-   * works whether the registry was constructed here or injected. Observer
-   * callbacks are invoked guarded — a throwing observer never breaks the
-   * registry's core duty of decoupling model lifetime from consumers.
+   * Attach a lifecycle observer. Attachable here (not the constructor) so it
+   * works whether the registry was constructed locally or injected.
+   * Multi-subscriber: each call ADDS an observer (never overwrites) and
+   * returns its detach fn. Observer callbacks are invoked guarded and
+   * independently — a throwing observer never breaks the registry's core
+   * duty of decoupling model lifetime from consumers, nor delivery to the
+   * other observers.
    */
-  observe(observer: StreamLifecycleObserver): void {
-    this.observer = observer;
+  observe(observer: StreamLifecycleObserver): () => void {
+    this.observers.add(observer);
+    return () => {
+      this.observers.delete(observer);
+    };
   }
 
-  private notifyObserver(fn: () => void): void {
-    try {
-      fn();
-    } catch (err) {
+  private notifyObservers(
+    fn: (observer: StreamLifecycleObserver) => void
+  ): void {
+    for (const observer of this.observers) {
       try {
-        console.warn(
-          `[stream-registry] observer error: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
-      } catch {
-        /* never let logging break the registry */
+        fn(observer);
+      } catch (err) {
+        try {
+          console.warn(
+            `[stream-registry] observer error: ${
+              err instanceof Error ? err.message : String(err)
+            }`
+          );
+        } catch {
+          /* never let logging break the registry */
+        }
       }
     }
   }
@@ -99,7 +112,7 @@ export class StreamRegistry {
     };
     this.entries.set(sessionId, entry);
     // Busy edge — AFTER the entry is in the map (throws above never notify).
-    this.notifyObserver(() => this.observer?.on_create?.(sessionId));
+    this.notifyObservers((o) => o.on_create?.(sessionId));
     return entry;
   }
 
@@ -135,7 +148,7 @@ export class StreamRegistry {
     // Idle/error edge — AFTER the entry is marked ended + consumers notified,
     // so an observer that triggers a drain sees a consistent ended entry. The
     // drain it schedules runs on a fresh task, never re-entrantly here.
-    this.notifyObserver(() => this.observer?.on_finish?.(sessionId, reason));
+    this.notifyObservers((o) => o.on_finish?.(sessionId, reason));
   }
 
   /** Explicit cancel: abort the upstream signal then `finish("abort")`. */

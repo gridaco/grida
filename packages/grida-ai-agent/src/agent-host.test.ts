@@ -190,4 +190,39 @@ describe("HTTP wire — perimeter (auth/referer/origin)", () => {
       VALID_ORIGIN
     );
   });
+
+  it("GET /events is auth-guarded, and the auth_token query carriage does NOT extend to it", async () => {
+    // The lifecycle event stream (RFC `events.md`) reveals session ids and
+    // activity timing — perimeter rules apply unchanged. And the SSE
+    // `auth_token` query exception stays exactly the two routes SECURITY.md
+    // names (`/agent/stream/:id`, `/sessions/:id/status`): every /events
+    // consumer attaches via fetch with headers, so the carriage is not
+    // widened (GRIDA-SEC-004, fail closed).
+    const bare = await fetch(`${base}/events`, {
+      headers: { referer: VALID_REFERER, origin: VALID_ORIGIN },
+    });
+    expect(bare.status).toBe(401);
+
+    const queryToken = await fetch(
+      `${base}/events?auth_token=${AgentTransport.buildAuthToken(PASSWORD)}`,
+      { headers: { referer: VALID_REFERER, origin: VALID_ORIGIN } }
+    );
+    expect(queryToken.status).toBe(401);
+
+    // Header-authed attach succeeds and is an SSE stream.
+    const controller = new AbortController();
+    const authed = await fetch(`${base}/events`, {
+      headers: {
+        authorization: AgentTransport.buildBasicAuthHeader(PASSWORD),
+        referer: VALID_REFERER,
+        origin: VALID_ORIGIN,
+        accept: "text/event-stream",
+      },
+      signal: controller.signal,
+    });
+    expect(authed.status).toBe(200);
+    expect(authed.headers.get("content-type")).toContain("text/event-stream");
+    controller.abort();
+    await authed.body?.cancel().catch(() => undefined);
+  });
 });

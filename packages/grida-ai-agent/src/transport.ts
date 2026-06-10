@@ -12,6 +12,10 @@ import {
   GRIDA_STATUS_SSE_EVENT,
   type SessionStatus,
 } from "./protocol/session-status";
+import {
+  GRIDA_EVENTS_SSE_EVENT,
+  type AgentLifecycleEvent,
+} from "./protocol/events";
 import type { AgentServerHandshakeResponse } from "./protocol/handshake";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type {
@@ -506,6 +510,40 @@ export namespace AgentTransport {
             onStatus(JSON.parse(data) as SessionStatus);
           } catch {
             /* malformed status frame — ignore */
+          }
+        });
+        return { done };
+      },
+    } as const;
+
+    readonly events = {
+      /**
+       * Subscribe to the host-wide lifecycle event stream (`GET /events`,
+       * RFC `events.md`): every session's `turn-started` / `turn-finished` /
+       * `approval-requested` on one long-lived SSE. Volatile — no initial
+       * frame, no replay; a late joiner sees only future events. The
+       * returned `done` settles when the subscription ends (the caller
+       * aborts via `init.signal`, or the socket drops).
+       */
+      subscribe: async (
+        onEvent: (event: AgentLifecycleEvent) => void,
+        init: { signal?: AbortSignal } = {}
+      ): Promise<{ done: Promise<void> }> => {
+        const route = "/events";
+        const res = await this.fetch(route, {
+          method: "GET",
+          headers: { accept: "text/event-stream" },
+          signal: init.signal,
+        });
+        if (!res.ok || !res.body) {
+          throw await httpErrorFromResponse(res, route);
+        }
+        const done = readFrames(res.body, (event, data) => {
+          if (event !== GRIDA_EVENTS_SSE_EVENT) return;
+          try {
+            onEvent(JSON.parse(data) as AgentLifecycleEvent);
+          } catch {
+            /* malformed event frame — ignore */
           }
         });
         return { done };
