@@ -30,7 +30,7 @@
 
 import type { NodeId } from "../types";
 import type { SvgDocument } from "./document";
-import { SVG_NS, XLINK_NS, XMLNS_NS } from "./document";
+import { SVG_NS, WELL_KNOWN_NS_PREFIXES, XMLNS_NS } from "./document";
 
 export namespace clipboard {
   /**
@@ -80,12 +80,6 @@ export namespace clipboard {
    */
   const URL_REF_RE = /url\(\s*["']?#([^"')\s]+)["']?\s*\)/g;
 
-  /** Prefixes resolvable without a source declaration — the same
-   *  well-known table the paste-side hoist uses. */
-  const WELL_KNOWN_PREFIXES: ReadonlyMap<string, string> = new Map([
-    ["xlink", XLINK_NS],
-  ]);
-
   /**
    * Extract a standalone SVG document from the selection.
    *
@@ -107,7 +101,11 @@ export namespace clipboard {
     doc: SvgDocument,
     selection: ReadonlyArray<NodeId>
   ): string | null {
-    const roots = normalize_selection(doc, selection);
+    // One doc-order comparator per extraction (each build walks the whole
+    // node tree); collect_reference_closure keeps its own — it is an
+    // independently exported test entry point.
+    const order = by_document_order(doc);
+    const roots = normalize_selection(doc, selection, order);
     if (roots.length === 0) return null;
 
     const closure = collect_reference_closure(doc, roots);
@@ -119,7 +117,7 @@ export namespace clipboard {
     // declaration wins — the FRD is silent on conflicting prefix URIs
     // across members; first-in-document-order is deterministic and honest.
     const shell_ns = new Map<string, string>();
-    for (const member of [...closure, ...roots].sort(by_document_order(doc))) {
+    for (const member of [...closure, ...roots].sort(order)) {
       for (const prefix of doc.undeclared_ns_prefixes(member)) {
         if (shell_ns.has(prefix)) continue;
         const uri = resolve_prefix(doc, member, prefix);
@@ -204,12 +202,13 @@ export namespace clipboard {
 
   function normalize_selection(
     doc: SvgDocument,
-    selection: ReadonlyArray<NodeId>
+    selection: ReadonlyArray<NodeId>,
+    order: (a: NodeId, b: NodeId) => number
   ): NodeId[] {
     const live = [...new Set(selection)].filter(
       (id) => doc.is_element(id) && doc.contains(doc.root, id)
     );
-    return doc.prune_nested_nodes(live).sort(by_document_order(doc));
+    return doc.prune_nested_nodes(live).sort(order);
   }
 
   function by_document_order(
@@ -237,8 +236,15 @@ export namespace clipboard {
    *  carrier list. */
   function refs_of(doc: SvgDocument, id: NodeId): string[] {
     const out: string[] = [];
+    // One parse of the inline style per element (`get_style` re-parses the
+    // whole attribute per property); first declaration wins, matching
+    // `get_style`'s semantics.
+    const styles = new Map<string, string>();
+    for (const { property, value } of doc.get_all_styles(id)) {
+      if (!styles.has(property)) styles.set(property, value);
+    }
     for (const prop of URL_REF_PROPS) {
-      for (const value of [doc.get_attr(id, prop), doc.get_style(id, prop)]) {
+      for (const value of [doc.get_attr(id, prop), styles.get(prop)]) {
         if (!value) continue;
         for (const m of value.matchAll(URL_REF_RE)) out.push(m[1]);
       }
@@ -271,6 +277,6 @@ export namespace clipboard {
       if (uri !== null) return uri;
       cur = doc.parent_of(cur);
     }
-    return WELL_KNOWN_PREFIXES.get(prefix) ?? null;
+    return WELL_KNOWN_NS_PREFIXES.get(prefix) ?? null;
   }
 }

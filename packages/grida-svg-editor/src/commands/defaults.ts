@@ -199,12 +199,18 @@ export function registerDefaultCommands(
   });
 
   // Paste acquisition is the invoking channel's job (FRD §Command
-  // semantics); for this programmatic channel that means the provider
-  // when configured (async read, fire-and-forget — the refusal
-  // observability of the async leg is inherently weaker), else the
-  // editor's internal buffer (sync, honest chain semantics).
-  reg.register("clipboard.paste", () => {
+  // semantics). Precedence here mirrors the FRD read rule: explicitly
+  // delivered text first (`args.text` — an RPC/host caller that already
+  // holds the markup), else the provider when configured (async read,
+  // fire-and-forget — the refusal observability of the async leg is
+  // inherently weaker), else the editor's internal buffer (sync, honest
+  // chain semantics).
+  reg.register("clipboard.paste", (args) => {
     if (editor.state.mode !== "select") return false;
+    const text = (args as { text?: string } | undefined)?.text;
+    if (typeof text === "string") {
+      return editor.commands.paste(text).length > 0;
+    }
     const provider = editor.providers.clipboard;
     if (provider) {
       void provider

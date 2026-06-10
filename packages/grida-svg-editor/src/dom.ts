@@ -553,6 +553,7 @@ class DomSurface implements Surface {
     this.container = options.container;
     const container = this.container;
     this.fit_on_attach = options.fit === true;
+    this.clipboard_enabled = options.clipboard !== false;
     this.attention = create_attention_tracker(container);
     this.teardown.push(() => this.attention.dispose());
     // The container is exclusively owned by the surface — interactive
@@ -594,7 +595,8 @@ class DomSurface implements Surface {
     // copy/cut event target from focus fire at all over a selectionless
     // canvas (the pre-2025 WebKit floor; FRD §Transport). The focus ring
     // is suppressed — the HUD's selection chrome is the focus signal here.
-    this.clipboard_enabled = options.clipboard !== false;
+    // Unconditional: focus management is a general canvas mitigation, not
+    // gated by `clipboard_enabled`.
     container.tabIndex = -1;
     container.style.outline = "none";
 

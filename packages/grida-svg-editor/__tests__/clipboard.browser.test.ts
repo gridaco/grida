@@ -9,7 +9,11 @@
 // is the manual TC (test/svg-editor-clipboard.md).
 
 import { afterEach, describe, expect, it } from "vitest";
-import { attachSurface, type AttachedSurface } from "./_browser-helpers";
+import {
+  attachSurface,
+  nodeIdByName,
+  type AttachedSurface,
+} from "./_browser-helpers";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const DOC = `<svg xmlns="${SVG_NS}" viewBox="0 0 100 100"><rect id="base" x="0" y="0" width="10" height="10"/></svg>`;
@@ -33,13 +37,9 @@ afterEach(() => {
 });
 
 function select_rect(s: AttachedSurface) {
-  for (const [node_id, n] of s.editor.tree().nodes) {
-    if (n.tag === "rect") {
-      s.editor.commands.select(node_id);
-      return node_id;
-    }
-  }
-  throw new Error("no rect");
+  const id = nodeIdByName(s.editor, "base");
+  s.editor.commands.select(id);
+  return id;
 }
 
 function dispatch_clipboard(

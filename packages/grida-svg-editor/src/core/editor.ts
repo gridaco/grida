@@ -17,7 +17,7 @@ import { applyDefaultBindings } from "../keymap/defaults";
 import cmath from "@grida/cmath";
 import { create_defs } from "./defs";
 import { clipboard as clipboard_codec } from "./clipboard";
-import { SvgDocument, XLINK_NS, XMLNS_NS } from "./document";
+import { SvgDocument, WELL_KNOWN_NS_PREFIXES, XMLNS_NS } from "./document";
 import type { GeometryProvider } from "./geometry";
 import type { SurfaceBridge } from "./surface-bridge";
 import { group as group_policy } from "./group";
@@ -1979,7 +1979,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     // strict XML consumers reject wholesale. Hoist the declarations we
     // can resolve: `xlink` (well-known URI) and anything the discarded
     // `<svg>` shell declared. Their writes ride the same atomic step.
-    const known_uri = new Map<string, string>([["xlink", XLINK_NS]]);
+    const known_uri = new Map(WELL_KNOWN_NS_PREFIXES);
     for (const d of xmlns) known_uri.set(d.prefix, d.uri);
     const hoist: Array<{ prefix: string; uri: string }> = [];
     const considered = new Set<string>();

@@ -273,6 +273,20 @@ describe("clipboard.* registry handlers", () => {
     expect(editor.serialize()).toContain(`<circle r="3"/>`);
   });
 
+  it("paste handler prefers explicitly delivered args.text over the provider", async () => {
+    const { provider } = fake_provider({ read: `<rect width="9"/>` });
+    const editor = createSvgEditor({
+      svg: WITH_RECT,
+      providers: { clipboard: provider },
+    });
+    expect(
+      editor.commands.invoke("clipboard.paste", { text: `<circle r="7"/>` })
+    ).toBe(true);
+    expect(editor.serialize()).toContain(`<circle r="7"/>`);
+    await tick();
+    expect(provider.read).not.toHaveBeenCalled();
+  });
+
   it("paste handler falls back to the buffer with honest chain semantics", () => {
     const editor = createSvgEditor({ svg: WITH_RECT });
     // Empty buffer → false (chain may keep going).
