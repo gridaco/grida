@@ -646,6 +646,15 @@ editor.commands.{
   // e.g. "path"); only the closed `InsertableTag` set gets a pointer-driven
   // draw gesture and default paint.
   insert(tag: string, attrs?: Readonly<Record<string, string>>): NodeId;
+  // markup-shaped sibling of `insert` — one or more sibling elements, or a
+  // full `<svg>` doc (the shell is discarded; its children are the content).
+  // Subtrees adopted verbatim; ONE history step; returns root ids in
+  // document order. Authored ids are NEVER rewritten (dedup is Tidy's job);
+  // undeclared `xlink:` / shell-declared prefixes are hoisted onto the root
+  // in the same step. Position is authored content: wrap the fragment in
+  // `<g transform="translate(x y)">` to land it at a point — same single
+  // undo step, no placement opt.
+  insert_fragment(svg: string, opts?: { parent?: NodeId; index?: number; select?: boolean }): NodeId[];
   insert_preview(tag: string, initial?: Readonly<Record<string, string>>): InsertPreviewSession;
 
   // content

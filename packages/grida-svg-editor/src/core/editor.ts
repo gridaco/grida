@@ -16,7 +16,7 @@ import { Keymap } from "../keymap/keymap";
 import { applyDefaultBindings } from "../keymap/defaults";
 import cmath from "@grida/cmath";
 import { create_defs } from "./defs";
-import { SvgDocument } from "./document";
+import { SvgDocument, XLINK_NS, XMLNS_NS } from "./document";
 import type { GeometryProvider } from "./geometry";
 import type { SurfaceBridge } from "./surface-bridge";
 import { group as group_policy } from "./group";
@@ -370,6 +370,62 @@ export type Commands = {
     attrs: Readonly<Record<string, string>>,
     opts?: { parent?: NodeId; index?: number; select?: boolean }
   ): NodeId;
+  /**
+   * Atomic insertion of a pre-authored SVG **fragment** — one or more
+   * sibling elements as markup (`"<g …><path …/></g>"`), or a full
+   * `<svg>` document whose element children are taken as the content
+   * (the `<svg>` shell — viewBox, width/height, prolog, doctype — is
+   * discarded; an `<svg>` that is one of several top-level elements is
+   * content and inserted as-is). The element subtrees are adopted
+   * verbatim — every byte of trivia inside each element survives
+   * (attribute order, quote styles, whitespace, comments) — inserted
+   * contiguously in source order at `opts.parent` / `opts.index`, and
+   * selected. ONE history step regardless of fragment size; a single
+   * `undo()` restores the exact pre-insert serialization. Returns the
+   * inserted top-level ids in document order.
+   *
+   * This is the markup-shaped sibling of {@link insert} — the primitive
+   * paste and asset-stamping flows compose. Use `insert` for a tag +
+   * attrs; use `insert_fragment` for markup.
+   *
+   * **Position is authored content.** There is deliberately no placement
+   * opt: to land a fragment at a document-space point, author the
+   * position into the markup before inserting — wrap it in
+   * `<g transform="translate(x y)">…</g>` or set the elements' own
+   * geometry attrs. Placement then round-trips as ordinary markup and
+   * the whole drop is the same single undo step.
+   *
+   * **`id` collisions:** authored `id=""` attributes are inserted
+   * verbatim, NEVER rewritten — silent id renaming is proprietary noise
+   * (P1; README "What clean means" §3). When a fragment id collides
+   * with an existing one, reference resolution (`url(#…)`, `href`)
+   * follows the document-order rules of the host renderer; resolving
+   * the duplication is the explicit Tidy command's job, not insertion's.
+   *
+   * **Namespaces:** when the fragment uses a prefix the document root
+   * doesn't declare, the declaration is hoisted onto the root as part
+   * of the same history step — `xlink` (well-known URI) and any prefix
+   * the discarded `<svg>` shell declared. A prefix whose URI is not
+   * discoverable is left as authored (the input was equally unbound as
+   * a standalone document). An authored root declaration always wins —
+   * never rebound.
+   *
+   * **Refusals:** an input with no top-level elements (empty /
+   * whitespace / comments-only) returns `[]` with NO history step.
+   * Throws on malformed markup (parser errors propagate), on a
+   * non-string input, and on an `opts.parent` that isn't a live element
+   * of the current document — a silent no-op there would hide consumer
+   * bugs (same stance as `serialize_node`).
+   *
+   * `opts.parent` defaults to root; `opts.index` (position in the
+   * parent's element-children list; the whole fragment lands
+   * contiguously at it) defaults to append; `opts.select` defaults to
+   * `true`.
+   */
+  insert_fragment(
+    svg: string,
+    opts?: { parent?: NodeId; index?: number; select?: boolean }
+  ): NodeId[];
   /**
    * Preview-bracketed insertion for drag-to-size gestures. Creates and
    * inserts the node immediately (so HUD selection chrome renders);
@@ -1744,6 +1800,20 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
    * win. `opts.parent` defaults to root; `opts.index` (insert-before
    * sibling index) defaults to append; `opts.select` defaults to `true`.
    */
+  /**
+   * Resolve an optional `index` (position in `parent`'s element-children
+   * list to insert AT — anything at or after it shifts; out-of-range or
+   * `undefined` appends) to an insert-before anchor. Shared by `insert`,
+   * `insert_fragment`, and `insert_preview`.
+   */
+  function resolve_insert_before(
+    parent: NodeId,
+    index: number | undefined
+  ): NodeId | null {
+    if (index === undefined) return null;
+    return doc.element_children_of(parent)[index] ?? null;
+  }
+
   function insert(
     tag: string,
     attrs: Readonly<Record<string, string>>,
@@ -1751,14 +1821,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   ): NodeId {
     const parent = opts?.parent ?? doc.root;
     const select_after = opts?.select !== false;
-    // Resolve insert-before from the optional `index`. `index` is the
-    // position in the parent's element-children list to insert AT —
-    // anything at or after that index gets shifted. `undefined` appends.
-    let insert_before: NodeId | null = null;
-    if (opts?.index !== undefined) {
-      const siblings = doc.element_children_of(parent);
-      insert_before = siblings[opts.index] ?? null;
-    }
+    const insert_before = resolve_insert_before(parent, opts?.index);
     const id = doc.create_element(tag);
     const merged_attrs: Record<string, string> = {
       ...default_paint_attrs_for(tag),
@@ -1783,6 +1846,76 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   /**
+   * Atomic fragment insertion — contract in {@link Commands.insert_fragment}.
+   * Parses + adopts via `doc.create_fragment` (subtrees registered but
+   * detached, like `create_element` — history.redo finds them via
+   * closure), computes the namespace hoist plan, then brackets inserts +
+   * hoisted declarations + selection in ONE history step.
+   */
+  function insert_fragment(
+    svg: string,
+    opts?: { parent?: NodeId; index?: number; select?: boolean }
+  ): NodeId[] {
+    const parent = opts?.parent ?? doc.root;
+    if (!doc.is_element(parent) || !doc.contains(doc.root, parent)) {
+      throw new Error(
+        `insert_fragment: parent ${JSON.stringify(parent)} is not an element in the current document`
+      );
+    }
+    const select_after = opts?.select !== false;
+    const { roots, xmlns } = doc.create_fragment(svg);
+    if (roots.length === 0) return [];
+
+    // Namespace fidelity guard (same spirit as `retype_to_path`'s
+    // synthetic `fill="none"`). A fragment is not a standalone document —
+    // it may use prefixes whose declarations lived on a discarded
+    // ancestor. Inserting such content into a document whose root doesn't
+    // declare the prefix would serialize a namespace-ill-formed file that
+    // strict XML consumers reject wholesale. Hoist the declarations we
+    // can resolve: `xlink` (well-known URI) and anything the discarded
+    // `<svg>` shell declared. Their writes ride the same atomic step.
+    const known_uri = new Map<string, string>([["xlink", XLINK_NS]]);
+    for (const d of xmlns) known_uri.set(d.prefix, d.uri);
+    const hoist: Array<{ prefix: string; uri: string }> = [];
+    const considered = new Set<string>();
+    for (const id of roots) {
+      for (const prefix of doc.undeclared_ns_prefixes(id)) {
+        if (considered.has(prefix)) continue;
+        considered.add(prefix);
+        // An authored declaration on the root wins — never rebind.
+        if (doc.get_attr(doc.root, prefix, XMLNS_NS) !== null) continue;
+        const uri = known_uri.get(prefix);
+        // No discoverable URI → left as authored; the input was equally
+        // unbound as a standalone document.
+        if (uri === undefined) continue;
+        hoist.push({ prefix, uri });
+      }
+    }
+
+    const insert_before = resolve_insert_before(parent, opts?.index);
+    const previous_selection = selection;
+    const apply = () => {
+      for (const { prefix, uri } of hoist) doc.declare_xmlns(prefix, uri);
+      // Each root is inserted before the same anchor, in source order —
+      // the whole fragment lands contiguously, order preserved.
+      for (const id of roots) doc.insert(id, parent, insert_before);
+      if (select_after) set_selection(roots);
+    };
+    const revert = () => {
+      for (let i = roots.length - 1; i >= 0; i--) doc.remove(roots[i]);
+      for (const { prefix } of hoist) {
+        doc.set_attr(doc.root, prefix, null, XMLNS_NS);
+      }
+      if (select_after) set_selection(previous_selection);
+    };
+    apply();
+    history.atomic("insert fragment", (tx) => {
+      tx.push({ providerId: PROVIDER_ID, apply, revert });
+    });
+    return roots;
+  }
+
+  /**
    * Preview-bracketed insertion. Used by the pointer-driven drag gesture
    * in the DOM surface. Per-frame attr writes call `update(attrs)`; one
    * undo step on `commit()`; clean rollback on `discard()`.
@@ -1797,11 +1930,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     opts?: { parent?: NodeId; index?: number }
   ): InsertPreviewSession {
     const parent = opts?.parent ?? doc.root;
-    let insert_before: NodeId | null = null;
-    if (opts?.index !== undefined) {
-      const siblings = doc.element_children_of(parent);
-      insert_before = siblings[opts.index] ?? null;
-    }
+    const insert_before = resolve_insert_before(parent, opts?.index);
     const id = doc.create_element(tag);
     const previous_selection = selection;
 
@@ -2060,6 +2189,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     group,
     ungroup,
     insert,
+    insert_fragment,
     insert_preview,
     set_text,
     load_svg,

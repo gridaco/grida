@@ -19,6 +19,7 @@ import {
   type ParseResult,
   type PiNode,
   type TextNode,
+  SVG_NS,
   XLINK_NS,
   XMLNS_NS,
   XML_NS,
@@ -476,7 +477,8 @@ export class SvgDocument implements DocumentEvents {
       }
     }
     if (value !== null) {
-      const prefix = ns === XLINK_NS ? "xlink" : null;
+      const prefix =
+        ns === XLINK_NS ? "xlink" : ns === XMLNS_NS ? "xmlns" : null;
       n.attrs.push({
         raw_name: prefix ? `${prefix}:${name}` : name,
         prefix,
@@ -950,7 +952,7 @@ export class SvgDocument implements DocumentEvents {
     local: string,
     opts?: { prefix?: string | null; ns?: string | null }
   ): NodeId {
-    const id = `e${Math.random().toString(36).slice(2, 10)}`;
+    const id = this.fresh_node_id();
     const prefix = opts?.prefix ?? null;
     const ns = opts?.ns ?? null;
     const node: ElementNode = {
@@ -970,6 +972,181 @@ export class SvgDocument implements DocumentEvents {
     };
     this.nodes.set(id, node);
     return id;
+  }
+
+  /** Fresh internal NodeId, guaranteed unique within this document's node
+   *  map. Shared by `create_element` and fragment adoption — collisions
+   *  matter for the latter because the parser assigns sequential per-parse
+   *  ids that a second parse would repeat. */
+  private fresh_node_id(): NodeId {
+    let id: NodeId;
+    do {
+      id = `e${Math.random().toString(36).slice(2, 10)}`;
+    } while (this.nodes.has(id));
+    return id;
+  }
+
+  // ─── Fragment ingestion ──────────────────────────────────────────────────
+
+  /**
+   * Parse an SVG **fragment** string and adopt its element subtrees into
+   * this document's node store — registered like {@link create_element}
+   * but NOT inserted into the tree (no version bump, no emit). Callers
+   * attach the returned roots via {@link insert}; the editor's
+   * `commands.insert_fragment` is the history-bracketed consumer.
+   *
+   * Input shapes:
+   *   - A **bare fragment** — one or more sibling elements
+   *     (`<path …/><path …/>`, or a single `<g>…</g>`). The top-level
+   *     elements become the returned roots, in source order.
+   *   - A **full SVG document** — when the input's only top-level element
+   *     is an `<svg>`, that element is treated as a document SHELL, not
+   *     content: its element children become the roots and the shell
+   *     itself (viewBox, width/height, prolog, doctype) is discarded. Its
+   *     `xmlns:*` prefix declarations are harvested into `xmlns` so the
+   *     caller can re-declare prefixes the adopted content still uses.
+   *     An `<svg>` that appears as one of SEVERAL top-level elements (or
+   *     anywhere below the top level) is content, adopted as-is.
+   *
+   * Top-level non-element nodes (whitespace between roots, comments, PIs,
+   * doctype) are dropped — adoption takes elements, and the host
+   * document's own trivia stays untouched. WITHIN each adopted subtree
+   * every byte of source trivia survives verbatim (attribute order, quote
+   * styles, whitespace, comments), so the inserted markup serializes back
+   * exactly as authored — same rules as the initial parse.
+   *
+   * Authored `id=""` attributes are adopted verbatim — never rewritten,
+   * even when they collide with ids already in the document. Silent id
+   * renaming is exactly the proprietary noise this editor refuses (README
+   * "What clean means" §3); deduplication belongs to the explicit Tidy
+   * command. Internal NodeIds ARE freshly assigned (see
+   * {@link fresh_node_id}) so adopted nodes never collide in the id map.
+   *
+   * Throws `TypeError` on a non-string input and `Error` on markup the
+   * parser rejects (unclosed / mismatched tags, malformed attributes). An
+   * input with no top-level elements (empty string, whitespace, comments
+   * only) returns `{ roots: [], xmlns: [] }`.
+   */
+  create_fragment(markup: string): {
+    roots: NodeId[];
+    xmlns: ReadonlyArray<{ prefix: string; uri: string }>;
+  } {
+    if (typeof markup !== "string") {
+      throw new TypeError(
+        `create_fragment(markup) requires a string source, got ${markup === null ? "null" : typeof markup}`
+      );
+    }
+    // Wrap so multi-root fragments parse uniformly (the parser wants one
+    // root). The wrapper carries the two namespaces this package treats as
+    // well-known, so `xlink:`-prefixed attrs in a bare fragment resolve
+    // their `ns` the same way a host-document parse would. The wrapper is
+    // never adopted — only its children are.
+    const wrapped = `<svg xmlns="${SVG_NS}" xmlns:xlink="${XLINK_NS}">${markup}</svg>`;
+    const parsed = parse_svg(wrapped);
+    const wrapper = parsed.nodes.get(parsed.root) as ElementNode;
+    const element_children = (n: ElementNode): ElementNode[] =>
+      n.children
+        .map((c) => parsed.nodes.get(c))
+        .filter((cn): cn is ElementNode => cn?.kind === "element");
+
+    let content = element_children(wrapper);
+    const xmlns: { prefix: string; uri: string }[] = [];
+    if (content.length === 1 && content[0].local === "svg") {
+      // Full-document input: the lone `<svg>` is a shell. Harvest its
+      // prefix declarations (NOT the default `xmlns=` — the host
+      // document's default namespace governs the adopted content).
+      const shell = content[0];
+      for (const a of shell.attrs) {
+        if (a.prefix === "xmlns") {
+          xmlns.push({ prefix: a.local, uri: a.value });
+        }
+      }
+      content = element_children(shell);
+    }
+
+    const roots: NodeId[] = [];
+    for (const node of content) {
+      roots.push(this.adopt_parsed_subtree(node, parsed.nodes, null));
+    }
+    return { roots, xmlns };
+  }
+
+  /**
+   * Register `node` and its whole subtree (from a foreign parse) into this
+   * document's node map under fresh NodeIds. The parser assigns sequential
+   * per-parse ids (`n0`, `n1`, …), so adopting without a remap would
+   * collide with this document's own nodes. Children links are rewritten;
+   * the subtree root arrives detached (`parent: null`), like
+   * `create_element`. Mutates the parsed nodes in place — a parse result
+   * is single-use.
+   */
+  private adopt_parsed_subtree(
+    node: AnyNode,
+    source: ReadonlyMap<NodeId, AnyNode>,
+    parent: NodeId | null
+  ): NodeId {
+    const id = this.fresh_node_id();
+    node.id = id;
+    node.parent = parent;
+    this.nodes.set(id, node);
+    if (node.kind === "element") {
+      const parsed_children = node.children;
+      node.children = [];
+      for (const c of parsed_children) {
+        const child = source.get(c);
+        if (!child) continue;
+        node.children.push(this.adopt_parsed_subtree(child, source, id));
+      }
+    }
+    return id;
+  }
+
+  /**
+   * Namespace prefixes USED within `id`'s subtree (element tags and
+   * attribute names) that are not DECLARED within the subtree itself —
+   * i.e. prefixes the subtree borrows from ancestor scope. `xml` and
+   * `xmlns` are excluded (bound by the XML spec, never declared).
+   * Declaration scoping is honored per use-site: a prefix declared on the
+   * using element or any of its ancestors up to (and including) the
+   * subtree root counts as declared.
+   *
+   * Structural fact only — the caller decides what an unbound prefix
+   * means (e.g. `commands.insert_fragment` hoists a resolvable
+   * declaration onto the document root).
+   */
+  undeclared_ns_prefixes(id: NodeId): ReadonlySet<string> {
+    const out = new Set<string>();
+    const walk = (nid: NodeId, declared: ReadonlySet<string>) => {
+      const n = this.nodes.get(nid);
+      if (!n || n.kind !== "element") return;
+      const scope = new Set(declared);
+      for (const a of n.attrs) {
+        if (a.prefix === "xmlns") scope.add(a.local);
+      }
+      const need = (p: string | null) => {
+        if (p === null || p === "xml" || p === "xmlns") return;
+        if (!scope.has(p)) out.add(p);
+      };
+      need(n.prefix);
+      for (const a of n.attrs) {
+        if (a.prefix !== "xmlns") need(a.prefix);
+      }
+      for (const c of n.children) walk(c, scope);
+    };
+    walk(id, new Set());
+    return out;
+  }
+
+  /**
+   * Declare a namespace prefix on the ROOT element: appends
+   * `xmlns:<prefix>="<uri>"` when the root doesn't already declare that
+   * prefix. An authored declaration always wins — this never rebinds.
+   * Policy wrapper over {@link set_attr} in the `XMLNS_NS` space; removal
+   * works through `set_attr(root, prefix, null, XMLNS_NS)` as usual.
+   */
+  declare_xmlns(prefix: string, uri: string): void {
+    if (this.get_attr(this.root, prefix, XMLNS_NS) !== null) return;
+    this.set_attr(this.root, prefix, uri, XMLNS_NS);
   }
 
   // ─── Serialization ───────────────────────────────────────────────────────
