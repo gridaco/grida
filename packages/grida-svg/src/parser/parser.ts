@@ -8,6 +8,21 @@
 // This is *not* a conforming XML parser. It is good enough to round-trip the
 // kind of SVG humans and tooling actually write. Where it fails the test
 // suite, the failure should be visible and small.
+//
+// Known, deliberate fidelity tolerances (each trades spec conformance
+// against byte fidelity; see also the `AttrToken.value` doc):
+//   - Entity spellings normalize on re-emit (`&#x72;` → the literal char;
+//     unknown named entities like `&nbsp;` re-emit as `&amp;nbsp;`).
+//   - Bare `&` / `<` inside attribute values are accepted (invalid XML)
+//     and re-emit escaped (`&amp;` / `&lt;`).
+//   - Line ends are NOT normalized (XML 1.0 §2.11 would fold `\r\n` to
+//     `\n`); kept verbatim on purpose for byte-exact round-trip.
+//
+// Strictness is load-bearing downstream: the SVG editor's rendering-
+// hardening design (docs/wg/feat-svg-editor/rendering-hardening.md, R4)
+// relies on this parser THROWING on input it cannot tokenize. Loosening
+// toward error-recovery is a contract change for that consumer, not a
+// local implementation detail.
 
 /**
  * Opaque-by-convention identifier for a node in a parsed SVG tree.
@@ -27,12 +42,19 @@ export type AttrToken = {
   local: string;
   /** Resolved namespace URI, or null if unprefixed and no default ns. */
   ns: string | null;
-  /** Raw attribute value string (entity-decoded). */
+  /** Attribute value, entity-decoded. Known fidelity tolerance: entity
+   *  SPELLINGS do not survive — `&#x72;ed` decodes to `red` and re-encodes
+   *  canonically. Not always meaning-preserving for conforming consumers:
+   *  whitespace references (`&#10;`) re-emit as raw control characters
+   *  (which XML attribute-value normalization folds to spaces), and
+   *  unrecognized named entities (`&nbsp;`) re-emit ampersand-escaped. */
   value: string;
   /** Trivia before the attribute name (whitespace, usually `" "`). */
   pre: string;
-  /** Trivia between `=` and the value (usually empty). */
+  /** Trivia between the attribute name and `=` (usually empty). */
   eq_trivia: string;
+  /** Trivia between `=` and the opening quote (usually empty). */
+  eq_trailing: string;
   /** Quote character (`"` or `'`). */
   quote: '"' | "'";
 };
@@ -383,31 +405,30 @@ function parse_attrs(
     const name_start = i;
     while (i < n && !/[\s=/>]/.test(src[i])) i++;
     const raw_name = src.slice(name_start, i);
-    // Skip whitespace before '='.
-    let eq_trivia = "";
-    while (i < n && /\s/.test(src[i])) {
-      eq_trivia += src[i];
-      i++;
+    if (raw_name === "") {
+      // A zero-length match means the next char is `=` (e.g. `<rect ="x"/>`
+      // or a missing inter-attribute separator like `a="1"="2"`). Nameless
+      // tokens would enter the model and collide with local-keyed lookups.
+      throw new Error("expected attribute name at " + i);
     }
+    // Capture whitespace before '=' (round-trips via eq_trivia).
+    const eq_start = i;
+    while (i < n && /\s/.test(src[i])) i++;
+    const eq_trivia = src.slice(eq_start, i);
+    if (i >= n) throw new Error("unterminated start tag");
     if (src[i] !== "=") {
-      // Boolean attr without value (rare in SVG) — treat as empty.
-      const [prefix, local] = split_qname(raw_name);
-      attrs.push({
-        raw_name,
-        prefix,
-        local,
-        ns: null,
-        value: "",
-        pre,
-        eq_trivia,
-        quote: '"',
-      });
-      pre = "";
-      continue;
+      // Valueless ("boolean") attributes are not well-formed XML. The old
+      // treat-as-empty tolerance was accept-then-corrupt: the token had no
+      // value-presence flag, so serialization fabricated `=""` and fused
+      // the trailing separator into the next attribute. Strict beats
+      // corrupt — refuse at the door like every other malformed shape.
+      throw new Error("expected '=' after attribute name at " + i);
     }
     i++; // consume '='
-    // Skip whitespace after '='.
+    // Capture whitespace after '=' (round-trips via eq_trailing).
+    const tw_start = i;
     while (i < n && /\s/.test(src[i])) i++;
+    const eq_trailing = src.slice(tw_start, i);
     const quote = src[i];
     if (quote !== '"' && quote !== "'") {
       throw new Error("expected attribute quote at " + i);
@@ -427,6 +448,7 @@ function parse_attrs(
       value: decode_entities(raw_value),
       pre,
       eq_trivia,
+      eq_trailing,
       quote: quote as '"' | "'",
     });
     pre = "";
@@ -442,15 +464,38 @@ const NAMED_ENTITIES: Record<string, string> = {
   apos: "'",
 };
 
+function decode_code_point(cp: number): string {
+  // XML 1.0 §4.1: a character reference must denote a character matching
+  // the §2.2 Char production — TAB/LF/CR, then the BMP minus surrogates
+  // and FFFE/FFFF, then the supplementary planes. NUL and other C0
+  // controls are NOT legal XML even as references; decoding them would
+  // re-emit raw control bytes no conforming parser accepts. Validating
+  // here also keeps the parser's controlled Error shape (fromCodePoint
+  // would escape a raw RangeError and silently mint lone surrogates).
+  const legal =
+    cp === 0x9 ||
+    cp === 0xa ||
+    cp === 0xd ||
+    (cp >= 0x20 && cp <= 0xd7ff) ||
+    (cp >= 0xe000 && cp <= 0xfffd) ||
+    (cp >= 0x10000 && cp <= 0x10ffff);
+  if (!legal) {
+    throw new Error("invalid character reference: " + cp);
+  }
+  return String.fromCodePoint(cp);
+}
+
 function decode_entities(s: string): string {
+  // Note: the regex matches only lowercase `#x` — uppercase `&#X..;` is
+  // not a valid XML CharRef and passes through as literal text.
   return s.replace(
     /&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z][a-zA-Z0-9]*);/g,
     (_, ent) => {
-      if (ent.startsWith("#x") || ent.startsWith("#X")) {
-        return String.fromCodePoint(parseInt(ent.slice(2), 16));
+      if (ent.startsWith("#x")) {
+        return decode_code_point(parseInt(ent.slice(2), 16));
       }
       if (ent.startsWith("#")) {
-        return String.fromCodePoint(parseInt(ent.slice(1), 10));
+        return decode_code_point(parseInt(ent.slice(1), 10));
       }
       return NAMED_ENTITIES[ent] ?? `&${ent};`;
     }

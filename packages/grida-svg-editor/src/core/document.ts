@@ -182,6 +182,16 @@ export const GEOMETRY_ATTRS: ReadonlySet<string> = new Set([
 /** `transform:` CSS property at the start of a declaration list or after `;`. */
 const CSS_TRANSFORM_PROPERTY = /(?:^|;)\s*transform\s*:/i;
 
+/** Trivia shape for editor-synthesized attribute tokens — parser-authored
+ *  tokens carry their source trivia verbatim; tokens the editor appends get
+ *  this one canonical shape (` name="value"`). */
+const SYNTH_ATTR_TRIVIA = {
+  pre: " ",
+  eq_trivia: "",
+  eq_trailing: "",
+  quote: '"',
+} as const;
+
 export class SvgDocument implements DocumentEvents {
   private nodes: Map<NodeId, AnyNode>;
   private prolog: AnyNode[];
@@ -502,9 +512,7 @@ export class SvgDocument implements DocumentEvents {
         local: name,
         ns,
         value,
-        pre: " ",
-        eq_trivia: "",
-        quote: '"',
+        ...SYNTH_ATTR_TRIVIA,
       });
       if (structural) this._structure_version++;
       if (geometry) this._geometry_version++;
@@ -770,9 +778,7 @@ export class SvgDocument implements DocumentEvents {
       local: "d",
       ns: null,
       value: d,
-      pre: " ",
-      eq_trivia: "",
-      quote: '"',
+      ...SYNTH_ATTR_TRIVIA,
     });
 
     // Fidelity guard for `<line>`: a line has no fill region, so its fill
@@ -795,9 +801,7 @@ export class SvgDocument implements DocumentEvents {
         local: "fill",
         ns: null,
         value: "none",
-        pre: " ",
-        eq_trivia: "",
-        quote: '"',
+        ...SYNTH_ATTR_TRIVIA,
       });
       added_fill_none = true;
     }
@@ -1252,7 +1256,7 @@ export class SvgDocument implements DocumentEvents {
   }
 
   private emit_attr(a: AttrToken): string {
-    return `${a.pre}${a.raw_name}${a.eq_trivia}=${a.quote}${encode_attr_value(
+    return `${a.pre}${a.raw_name}${a.eq_trivia}=${a.eq_trailing}${a.quote}${encode_attr_value(
       a.value,
       a.quote
     )}${a.quote}`;
