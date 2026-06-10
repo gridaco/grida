@@ -643,6 +643,10 @@ class DomSurface implements Surface {
       // (lazy: the geometry provider is wired later in this ctor).
       project_delta: (id, d) =>
         this._geometry_provider?.world_delta_to_local(id, d) ?? d,
+      // Clone toggle retargets the gesture between origins and clones;
+      // the selection (and with it the HUD chrome, via subscribe) must
+      // follow the movers.
+      set_selection: (ids) => this.editor.commands.select([...ids]),
     });
 
     // Resize funnel — same shape as translate, distinct lifecycle.
@@ -2225,8 +2229,10 @@ class DomSurface implements Surface {
     const response = this.hud.dispatch({ kind: "modifiers", mods: next });
     // Re-run the current preview frame so an in-flight translate reflects
     // the new modifier state without waiting for the next pointer-move.
+    // Translate listens to Shift (axis lock) AND Alt (clone toggle —
+    // enter/exit must land on the flip, not the next pointer move).
     if (
-      prev.shift !== next.shift &&
+      (prev.shift !== next.shift || prev.alt !== next.alt) &&
       this.translate_orchestrator.has_active_session()
     ) {
       this.translate_orchestrator.redrive_modifiers(
@@ -2797,9 +2803,14 @@ class DomSurface implements Surface {
    *  Pull-at-consume: HUD is the canonical store (see `sync_modifiers`),
    *  read live so mid-drag Shift press/release reflects on the next pass. */
   private current_translate_modifiers(): TranslateModifiers {
+    const mods = this.hud.modifiers();
     return {
-      axis_lock: this.hud.modifiers().shift ? "by_dominance" : "off",
+      axis_lock: mods.shift ? "by_dominance" : "off",
       force_disable_snap: false,
+      // Alt-drag translate-with-clone. Alt's measurement-overlay role is
+      // orthogonal (hover-time, no gesture in flight) — same coexistence
+      // as Figma's.
+      clone: mods.alt,
     };
   }
 

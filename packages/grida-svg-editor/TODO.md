@@ -304,11 +304,13 @@ What shipped:
 
 Still open (deferred by the FRD, tracked here):
 
-- **Subtree clone** — the closure-free in-document extraction operation
-  that duplicate (`⌘D`, §5 alt-drag clone) consumes. A different
-  contract from payload extraction (carrying the closure in-document
-  would deposit duplicate defs); needs its own spec pass. Tracked:
-  [#817](https://github.com/gridaco/grida/issues/817).
+- ~~**Subtree clone**~~ — **shipped** ([#817](https://github.com/gridaco/grida/issues/817)):
+  `core/subtree.ts:clone_plan` (no closure, no shell, ids verbatim,
+  next-sibling placement), consumed by `commands.duplicate` (⌘D) and
+  the §5 alt-drag clone. Spec:
+  [`docs/wg/feat-svg-editor/subtree-clone.md`](../../docs/wg/feat-svg-editor/subtree-clone.md).
+  Selection normalization is now shared with payload extraction via
+  `subtree.normalize_roots`.
 - **Paste placement enhancements** — paste-at-pointer, collision
   offset, scoped paste (each must confront wrapper-vs-rewrite noise).
 - **Materializing extraction variants** — ancestor-transform bake and
@@ -322,34 +324,41 @@ Still open (deferred by the FRD, tracked here):
   obligation; the `innerHTML` mount executes `on*` attrs for loaded
   AND pasted content alike. Separate, security-reviewed work item.
 
-### 5. Alt-drag (translate with clone)
+### 5. Alt-drag (translate with clone) — SHIPPED
 
-Tracked: [#817](https://github.com/gridaco/grida/issues/817).
+Shipped ([#817](https://github.com/gridaco/grida/issues/817)). Spec:
+[`docs/wg/feat-svg-editor/subtree-clone.md`](../../docs/wg/feat-svg-editor/subtree-clone.md).
 
 Hold Alt during a translate gesture to clone the selected nodes and move
-the clone. Interaction with history (one undo step for clone + move?),
-group semantics, defs duplication — note the clipboard FRD's verdict:
-this consumes the **subtree-clone** operation (no defs closure), not
-the clipboard's payload extraction.
+the clone (the origin stays at rest). Consumes the **subtree-clone**
+operation (no defs closure) per the clipboard FRD's verdict — not the
+clipboard's payload extraction.
 
-Current implementation notes:
+Implementation notes:
 
-- Alt is tracked but only as a master signal for the measurement overlay
-  (`dom.ts:compute_measurement_extra`, gated on `mods.alt`). The `Intent`
-  payloads (`translate`, `resize`, …) do not carry modifier state, so the
-  host has no signal at the intent-handling layer.
-- The `translate` intent is committed in one shot by `dom.ts:handle_translate`
-  — it mutates baselines in place and has no branch for "duplicate then
-  translate the duplicate."
-- No clone / duplicate primitive exists. `commands.group()` is the only
-  authoring command that creates new IR elements (`doc.create_element("g")`
-  - `doc.insert`). There is no subtree-clone helper in `core/document.ts`.
-- A `selection.duplicate` command id is referenced only in `docs/keybindings.md`
-  (`[~]` not implemented); not registered in `commands/defaults.ts`.
-- Entry points to add: extend `Intent` (in `@grida/hud`) to carry modifiers
-  or add an explicit `clone: boolean` on `translate`; clone helper alongside
-  `group.ts`; bracket the clone + first-frame translate in a single
-  `history.preview("alt-drag duplicate")` session so undo collapses them.
+- `TranslateModifiers.clone` (optional, default off — nudge/RPC paths
+  untouched) is mapped from `hud.modifiers().alt` by
+  `dom.ts:current_translate_modifiers` (pull-at-consume, live per
+  frame); `sync_modifiers` re-drives the translate orchestrator on an
+  Alt flip between pointer moves. No `Intent` change in `@grida/hud`
+  was needed — the original "extend Intent to carry modifiers" entry
+  point predated the pull-at-consume modifier plumbing.
+- The clone state machine lives in
+  `core/translate-pipeline/orchestrator.ts:reconcile_clone` (lazy clone
+  on first modifier-held frame; mid-drag toggle; snap + selection
+  retarget; commit-time composite delta = one undo step; Escape =
+  byte-exact restore). See `core/translate-pipeline/README.md` §Clone
+  toggle for the lifecycle contract and the absolute-revert invariant
+  it depends on.
+- `selection.duplicate` (⌘D) is registered in `commands/defaults.ts` +
+  `keymap/defaults.ts`; `commands.duplicate()` is the public API.
+- Alt's measurement-overlay role coexists (hover-time vs gesture-time).
+- Tests: `__tests__/subtree-clone.test.ts`,
+  `__tests__/commands-duplicate.test.ts`,
+  `__tests__/translate-pipeline/clone-drag.test.ts`; manual TC
+  `test/svg-editor-duplicate.md`.
+- Still open (spec §Out of scope): repeating-offset duplicate (the main
+  editor's `active_duplication` pattern); clone-to-different-parent.
 
 ### 6. Snap to geometry
 

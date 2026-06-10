@@ -56,6 +56,32 @@ Future UX-intent verbs (`commands.align_left`, `commands.distribute_*`)
 add their own named list (or share `STAGES_NUDGE`). They do NOT route
 through `commands.translate`.
 
+## Clone toggle (Alt-drag translate-with-clone)
+
+`TranslateModifiers.clone` is NOT a stage and never reaches one — it is
+consumed by `TranslateOrchestrator.reconcile_clone` before each pass
+(spec: `docs/wg/feat-svg-editor/subtree-clone.md`). Lifecycle:
+
+- **Enter** (modifier on, not yet cloned — lazily, on the first such
+  frame): origins revert to baseline, `subtree.clone_plan` clones are
+  inserted next to their origins, and the session's ids / baselines /
+  snap session / editor selection retarget to the clones (key-swap:
+  a verbatim clone at rest has its origin's baseline). The CLONE moves;
+  the origin stays.
+- **Exit** (modifier off while cloned): clones are removed, everything
+  retargets back to the at-open `origins` capture, the origins resume
+  following the cursor. Re-press = fresh enter with new clones.
+- **Commit while cloned**: the final preview delta is a COMPOSITE
+  (insert clones + translate + select clones / un-translate + remove
+  clones + select origins) so the committed step is one undo unit.
+  Per-frame deltas stay translate-only; structural mutations happen at
+  toggle edges, outside the preview.
+
+Invariant both edges and the composite depend on: `translate_pipeline`'s
+`revert` writes ABSOLUTE baseline values (incl. tspan's exact-attr
+restore), so double-revert is a no-op. A relative-write baseline kind
+would break the clone toggle.
+
 ## Adding a stage
 
 1. Write a pure `TranslateStage` in `stages.ts`.
