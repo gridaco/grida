@@ -115,7 +115,7 @@ export namespace sitemap {
       description: "Presentations on a real canvas",
     } satisfies Item,
     svg: {
-      icon: "vector-square",
+      icon: "shapes",
       title: "SVG",
       href: links.svg,
       description: "The clean SVG editor & SDK",

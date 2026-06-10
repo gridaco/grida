@@ -31,7 +31,7 @@ import {
   BookUserIcon,
   GlobeIcon,
   PaletteIcon,
-  BoxSelectIcon,
+  ShapesIcon,
 } from "lucide-react";
 import { SupabaseLogo } from "@grida/react-icons/logos";
 
@@ -72,7 +72,7 @@ export type ResourceTypeIconName =
   | "v0_site"
   | "v0_canvas"
   | "palette"
-  | "vector-square"
+  | "shapes"
   | "v0_schema"
   | "v0_campaign_referral"
   | "slides";
@@ -138,8 +138,8 @@ export function ResourceTypeIcon({
       return <PenToolIcon {...props} />;
     case "palette":
       return <PaletteIcon {...props} />;
-    case "vector-square":
-      return <BoxSelectIcon {...props} />;
+    case "shapes":
+      return <ShapesIcon {...props} />;
     case "slides":
       return <PresentationIcon {...props} />;
     case "form-x-supabase":
