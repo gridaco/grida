@@ -65,10 +65,10 @@ misses one row is not a hardening scheme.
   confusion. This is the documented bypass mechanism against
   DOMPurify (below).
 
-Sources: <https://portswigger.net/web-security/cross-site-scripting/cheat-sheet>,
-<https://portswigger.net/research/svg-animate-xss-vector>,
-<https://www.w3.org/wiki/SVG_Security>,
-<https://pentesterlab.com/glossary/svg-xss>.
+Sources: https://portswigger.net/web-security/cross-site-scripting/cheat-sheet,
+https://portswigger.net/research/svg-animate-xss-vector,
+https://www.w3.org/wiki/SVG_Security,
+https://pentesterlab.com/glossary/svg-xss.
 
 ## Strategy I — allowlist sanitization at the markup layer
 
@@ -97,10 +97,10 @@ Sources: <https://portswigger.net/web-security/cross-site-scripting/cheat-sheet>
   support), but the guarantee is operational, not structural — it
   requires staying current with releases.
 
-Sources: <https://github.com/cure53/DOMPurify>,
-<https://www.sentinelone.com/vulnerability-database/cve-2020-26870/>,
-<https://www.wiz.io/vulnerability-database/cve/cve-2024-45801>,
-<https://flatt.tech/research/posts/bypassing-dompurify-with-good-old-xml/>.
+Sources: https://github.com/cure53/DOMPurify,
+https://www.sentinelone.com/vulnerability-database/cve-2020-26870/,
+https://www.wiz.io/vulnerability-database/cve/cve-2024-45801,
+https://flatt.tech/research/posts/bypassing-dompurify-with-good-old-xml/.
 
 ### tldraw's sanitizer
 
@@ -130,8 +130,8 @@ Sources: <https://github.com/cure53/DOMPurify>,
   sanitizer was required; the image-context guarantee (Strategy II)
   was not available to a surface that needs the markup live.
 
-Sources: <https://github.com/tldraw/tldraw/issues/7876>,
-<https://github.com/tldraw/tldraw/pull/7896>.
+Sources: https://github.com/tldraw/tldraw/issues/7876,
+https://github.com/tldraw/tldraw/pull/7896.
 
 ## Strategy II — image-context isolation (secure static mode)
 
@@ -157,10 +157,10 @@ Sources: <https://github.com/tldraw/tldraw/issues/7876>,
   full document context and executes normally (MDN, "SVG as an
   image").
 
-Sources: <https://svgwg.org/specs/integration/>,
-<https://developer.mozilla.org/en-US/docs/Web/SVG/Guides/SVG_as_an_image>,
-<https://www.w3.org/wiki/SVG_Security>,
-<https://bugzilla.mozilla.org/show_bug.cgi?id=628747>.
+Sources: https://svgwg.org/specs/integration/,
+https://developer.mozilla.org/en-US/docs/Web/SVG/Guides/SVG_as_an_image,
+https://www.w3.org/wiki/SVG_Security,
+https://bugzilla.mozilla.org/show_bug.cgi?id=628747.
 
 ## Strategy III — frame isolation (iframe sandbox)
 
@@ -182,7 +182,7 @@ Sources: <https://svgwg.org/specs/integration/>,
   `postMessage` bridge; an in-place editing model does not survive
   the boundary.
 
-Source: <https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe>.
+Source: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe.
 
 ## Strategy IV — parse into a native model
 
@@ -206,10 +206,10 @@ Source: <https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/if
   unsupported features are gone, which rules the strategy out
   wherever byte-exact round-trip of the source is a requirement.
 
-Sources: <https://www.figma.com/plugin-docs/api/VectorNode/>,
-<https://help.figma.com/hc/en-us/articles/360040450213-Vector-networks>,
-<https://help.penpot.app/technical-guide/developer/data-model/>,
-<https://deepwiki.com/excalidraw/excalidraw/6.3-file-and-image-management>.
+Sources: https://www.figma.com/plugin-docs/api/VectorNode/,
+https://help.figma.com/hc/en-us/articles/360040450213-Vector-networks,
+https://help.penpot.app/technical-guide/developer/data-model/,
+https://deepwiki.com/excalidraw/excalidraw/6.3-file-and-image-management.
 
 ## What a host CSP adds
 
@@ -230,9 +230,9 @@ Sources: <https://www.figma.com/plugin-docs/api/VectorNode/>,
   a library cannot guarantee it, and a host that needs
   `'unsafe-inline'` for unrelated reasons silently loses the layer.
 
-Sources: <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/script-src>,
-<https://content-security-policy.com/script-src/>,
-<https://github.com/w3c/webappsec-csp/issues/13>.
+Sources: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/script-src,
+https://content-security-policy.com/script-src/,
+https://github.com/w3c/webappsec-csp/issues/13.
 
 ## Comparison
 
