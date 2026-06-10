@@ -27,19 +27,27 @@ export namespace fragment {
   const SVG_OPEN_RE = /<svg(?:\s[^>]*)?>/i;
   const VIEWBOX_RE =
     /viewBox\s*=\s*["']\s*([-\d.eE+]+)[\s,]+([-\d.eE+]+)[\s,]+([-\d.eE+]+)[\s,]+([-\d.eE+]+)\s*["']/;
+  const XMLNS_DECL_RE = /xmlns:[A-Za-z_][\w.-]*\s*=\s*(?:"[^"]*"|'[^']*')/g;
 
   /**
    * Split a standalone SVG document into its inner markup (bytes between
-   * the root `<svg …>` open tag and the last `</svg>`) and its declared
-   * viewBox. A string with no `<svg>` shell is already a bare fragment —
-   * returned as-is with `viewbox: null`.
+   * the root `<svg …>` open tag and the last `</svg>`), its declared
+   * viewBox, and the shell's prefixed `xmlns:*` declarations (verbatim
+   * `name="value"` tokens). The content may use those prefixes — the
+   * declarations must survive the shell's removal or the result is
+   * namespace-invalid (`<path inkscape:label=…/>` with no
+   * `xmlns:inkscape` in scope). The default `xmlns=` is deliberately NOT
+   * collected: the host document's default namespace governs adopted
+   * content. A string with no `<svg>` shell is already a bare fragment —
+   * returned as-is with `viewbox: null` and no declarations.
    */
   export function strip_shell(svg: string): {
     inner: string;
     viewbox: ViewBox | null;
+    xmlns: readonly string[];
   } {
     const open = SVG_OPEN_RE.exec(svg);
-    if (!open) return { inner: svg, viewbox: null };
+    if (!open) return { inner: svg, viewbox: null, xmlns: [] };
 
     const start = open.index + open[0].length;
     const end = svg.lastIndexOf("</svg");
@@ -55,7 +63,7 @@ export namespace fragment {
         }
       : null;
 
-    return { inner, viewbox };
+    return { inner, viewbox, xmlns: open[0].match(XMLNS_DECL_RE) ?? [] };
   }
 
   /**
@@ -63,14 +71,21 @@ export namespace fragment {
    * intrinsic box (its viewBox) is centered on `at`. Without a viewBox the
    * fragment's local origin lands on `at` — best effort for content whose
    * box isn't knowable pre-insert.
+   *
+   * Shell `xmlns:*` declarations ride on the wrapper `<g>` — namespaces,
+   * like position, are authored content here: once the shell is gone,
+   * `insert_fragment` has no way to recover a prefix's URI, so prefixed
+   * content (`inkscape:label`, `sodipodi:*`, …) would serialize
+   * namespace-invalid.
    */
   export function position(svg: string, at: { x: number; y: number }): string {
-    const { inner, viewbox } = strip_shell(svg);
+    const { inner, viewbox, xmlns } = strip_shell(svg);
     const cx = viewbox ? viewbox.min_x + viewbox.width / 2 : 0;
     const cy = viewbox ? viewbox.min_y + viewbox.height / 2 : 0;
     const tx = fmt(at.x - cx);
     const ty = fmt(at.y - cy);
-    return `<g transform="translate(${tx} ${ty})">${inner}</g>`;
+    const decls = xmlns.length > 0 ? ` ${xmlns.join(" ")}` : "";
+    return `<g${decls} transform="translate(${tx} ${ty})">${inner}</g>`;
   }
 
   /** Trim float noise so the authored transform stays readable. */

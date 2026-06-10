@@ -22,7 +22,24 @@ describe("fragment.strip_shell", () => {
     expect(fragment.strip_shell(bare)).toEqual({
       inner: bare,
       viewbox: null,
+      xmlns: [],
     });
+  });
+
+  it("collects the shell's prefixed xmlns declarations verbatim", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:xlink='http://www.w3.org/1999/xlink' viewBox="0 0 24 24"><path inkscape:label="x"/></svg>`;
+    const { xmlns } = fragment.strip_shell(svg);
+    expect(xmlns).toEqual([
+      `xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"`,
+      `xmlns:xlink='http://www.w3.org/1999/xlink'`,
+    ]);
+  });
+
+  it("does not collect the default xmlns declaration", () => {
+    const { xmlns } = fragment.strip_shell(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect/></svg>`
+    );
+    expect(xmlns).toEqual([]);
   });
 
   it("handles prolog/doctype before the root element", () => {
@@ -59,6 +76,13 @@ describe("fragment.position", () => {
   it("lands the local origin on the point when no viewBox is declared", () => {
     expect(fragment.position(`<circle r="3"/>`, { x: 7.125, y: -3 })).toBe(
       `<g transform="translate(7.13 -3)"><circle r="3"/></g>`
+    );
+  });
+
+  it("carries shell xmlns:* declarations onto the wrapper — prefixed content stays namespace-valid", () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" viewBox="0 0 24 24"><path inkscape:label="x" d="M0 0h24v24H0z"/></svg>`;
+    expect(fragment.position(svg, { x: 100, y: 50 })).toBe(
+      `<g xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" transform="translate(88 38)"><path inkscape:label="x" d="M0 0h24v24H0z"/></g>`
     );
   });
 });
