@@ -131,6 +131,16 @@ async function handleEvent(event: AgentLifecycleEvent): Promise<void> {
     body: decision.body,
   });
   notification.on("click", () => attendSession(event.session_id, session));
+  // macOS rejects notifications silently when the app's identity isn't
+  // authorized (UNErrorDomain 1 — e.g. ad-hoc-signed dev builds, or the
+  // user disabled the app in Notification Center). Without this listener
+  // the whole pipeline looks healthy while nothing ever appears.
+  notification.on("failed", (_event, error) => {
+    console.warn(`[agent-notifications] OS rejected notification: ${error}`);
+  });
+  notification.on("show", () => {
+    console.log(`[agent-notifications] shown: ${decision.title}`);
+  });
   notification.show();
 }
 
