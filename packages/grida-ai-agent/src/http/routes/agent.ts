@@ -7,6 +7,10 @@
  *                                    `grida-session` event carrying the sessionId.
  *   - `GET  /agent/stream/:id`     → reconnect (replay-from-0 + live tail).
  *   - `POST /agent/abort`          body: { sessionId }
+ *   - `GET  /events`               → host-wide lifecycle event SSE (RFC
+ *                                    `events.md`): every session's
+ *                                    turn-started / turn-finished /
+ *                                    approval-requested, one subscription.
  *
  * All parsing, validation, provider resolution, session persistence, the
  * registry/recorder wiring, and the SSE plumbing live in `runtime.ts`.
@@ -29,4 +33,10 @@ export function registerAgentRoutes(app: Hono, runtime: AgentRuntime): void {
   app.post("/agent/abort", async (c) =>
     runtime.abort(await c.req.json().catch(() => ({})))
   );
+
+  // Read-only, observe-only, auth like every other route (header-carried
+  // Basic Auth — deliberately NOT on the `auth_token` query-carriage list:
+  // every current consumer attaches via fetch with headers, so the
+  // EventSource exception isn't widened to this route. GRIDA-SEC-004.)
+  app.get("/events", (c) => runtime.eventsStream(c.req.raw.signal));
 }

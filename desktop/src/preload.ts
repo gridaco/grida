@@ -120,6 +120,18 @@ ipcRenderer.on(IPC_CHANNELS.WORKSPACE_COMMAND, (_event, command: unknown) => {
   );
 });
 
+// Main → renderer "bring this session into view" push (RFC `events`
+// §click-to-attend): a notification click focused this window; the agent
+// pane selects the named session. Same re-dispatch pattern as
+// WORKSPACE_COMMAND — only the structured-clone payload crosses, never the
+// Electron event object (GRIDA-SEC-004).
+ipcRenderer.on(IPC_CHANNELS.AGENT_FOCUS_SESSION, (_event, payload: unknown) => {
+  if (!isDesktopPath(location.pathname)) return;
+  window.dispatchEvent(
+    new CustomEvent(IPC_CHANNELS.AGENT_FOCUS_SESSION, { detail: payload })
+  );
+});
+
 function installDesktopNavigationGuard(): void {
   const assertAllowed = (url: string | URL | null | undefined) => {
     if (url === null || url === undefined) return;

@@ -30,6 +30,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Chat, useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import {
@@ -48,6 +49,7 @@ import {
   welcome_handoff,
   type WelcomeHandoff,
 } from "@/lib/desktop/welcome-handoff";
+import { useDesktopAgentFocusSession } from "@/lib/desktop/agent-focus-session";
 import _models from "@grida/ai-models";
 import {
   buildAgentSend,
@@ -166,6 +168,47 @@ function AgentPaneContent({
     workspaceId: workspace.id,
     force_new: handoffPrompt != null,
   });
+
+  // Click-to-attend (RFC `events.md` §click-to-attend): a notification
+  // click focused this window and names the session to bring into view.
+  // Two arrival paths, one handler:
+  //   - live window — the AGENT_FOCUS_SESSION push the preload re-dispatches;
+  //   - fresh window — the `session` URL param (a window opened by the click
+  //     has no listener at load time, so the id rides the URL instead).
+  // Guard: select only a session that belongs to THIS workspace. Main routes
+  // the click by the session's workspace binding, so a mismatch is a routing
+  // bug upstream — fail safe by ignoring it, never re-bind a foreign session
+  // to this workspace's fs scope. `select` is ref-held: `chatSession` is a
+  // fresh object every render, and the subscription must not re-wire on it.
+  const selectSessionRef = useRef(chatSession.select);
+  selectSessionRef.current = chatSession.select;
+  const focusSession = useCallback(
+    (sessionId: string) => {
+      void (async () => {
+        try {
+          const row = await bridgeSessions.get(sessionId);
+          if (!row || row.workspace_id !== workspace.id) return;
+          selectSessionRef.current(sessionId);
+        } catch {
+          // Unknown/unreachable session — ignore; the window focus alone
+          // already brought the user to the right workspace.
+        }
+      })();
+    },
+    [workspace.id]
+  );
+  useDesktopAgentFocusSession(focusSession);
+  // The URL-param path, consumed once. No need to wait for the session-list
+  // load: an explicit deep-link select wins over the async last-session
+  // restore by design (the restore only fills a still-null selection).
+  const params = useSearchParams();
+  const focusParam = params.get("session");
+  const consumedFocusParamRef = useRef(false);
+  useEffect(() => {
+    if (!focusParam || consumedFocusParamRef.current) return;
+    consumedFocusParamRef.current = true;
+    focusSession(focusParam);
+  }, [focusParam, focusSession]);
 
   // `chatRef` mirrors the live `Chat` for the transport's `onResumeStart` hook,
   // which can't close over `chat` (that variable doesn't exist when the closure

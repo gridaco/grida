@@ -33,6 +33,14 @@ export {
   type SessionRunState,
   type SessionStatus,
 } from "./protocol/session-status";
+export {
+  GRIDA_EVENTS_SSE_EVENT,
+  type AgentApprovalRequestedEvent,
+  type AgentLifecycleEvent,
+  type AgentTurnEndReason,
+  type AgentTurnFinishedEvent,
+  type AgentTurnStartedEvent,
+} from "./protocol/events";
 export type { AgentUIMessageChunk } from "./protocol/wire";
 export type {
   FileRegisterResult,

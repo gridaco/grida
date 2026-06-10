@@ -51,9 +51,12 @@ export type SessionSchedulerDeps = {
    * Throws if a run is already in flight (single-flight) — the scheduler
    * swallows that and waits for the next idle edge. The selected row is
    * already dequeued (visible), so the turn's model view includes it as the
-   * latest user message; the drain takes no message argument.
+   * latest user message; `messageId` names that fired row — the
+   * fired-message identity the turn-lifecycle wire must carry (RFC
+   * `turn-authority`), threaded so the core can EMIT it rather than discard
+   * it. It does not select what runs (the dequeue already did).
    */
-  drain: (sessionId: string) => Promise<void>;
+  drain: (sessionId: string, messageId: string) => Promise<void>;
   /**
    * Is this session's current turn BLOCKED awaiting a user decision (an
    * unanswered supervised approval)? A blocked turn is NOT a completed turn:
@@ -203,7 +206,7 @@ export class SessionScheduler {
       }
       if (this.getStatus(sessionId).state !== "idle") return;
       try {
-        await this.deps.drain(sessionId);
+        await this.deps.drain(sessionId, head.id);
       } catch {
         // RunInFlightError (lost a single-flight race) or a provider-down at
         // drain time: the next clean idle edge re-checks the queue. We do NOT

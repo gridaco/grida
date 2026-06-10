@@ -11,13 +11,22 @@
 
 import { BrowserWindow } from "electron";
 
-export function focusWindowByUrl(needle: string): BrowserWindow | null {
+/** The lookup half of {@link focusWindowByUrl} — find without focusing.
+ *  Used where the caller needs the window's state first (e.g. the
+ *  notification focus gate suppresses when the target IS focused). */
+export function findWindowByUrl(needle: string): BrowserWindow | null {
   for (const w of BrowserWindow.getAllWindows()) {
     if (w.isDestroyed()) continue;
     if (!w.webContents.getURL().includes(needle)) continue;
-    if (w.isMinimized()) w.restore();
-    w.focus();
     return w;
   }
   return null;
+}
+
+export function focusWindowByUrl(needle: string): BrowserWindow | null {
+  const w = findWindowByUrl(needle);
+  if (!w) return null;
+  if (w.isMinimized()) w.restore();
+  w.focus();
+  return w;
 }

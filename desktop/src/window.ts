@@ -336,14 +336,23 @@ export function open_workspace_window({
   app,
   base_url: baseUrl,
   workspace_id: workspaceId,
+  session_id: sessionId,
 }: {
   app: App;
   base_url: string;
   workspace_id: string;
+  /**
+   * Optional agent session to bring into view on first load (RFC `events`
+   * §click-to-attend — a notification click whose workspace window was
+   * closed). Carried on the URL (not IPC) because a fresh renderer has no
+   * listener yet; the agent pane reads the param once on mount.
+   */
+  session_id?: string;
 }) {
+  const session = sessionId ? `&session=${encodeURIComponent(sessionId)}` : "";
   return create_main_window({
     base_url: baseUrl,
-    urlPath: `/desktop/workspace?id=${encodeURIComponent(workspaceId)}`,
+    urlPath: `/desktop/workspace?id=${encodeURIComponent(workspaceId)}${session}`,
     additionalArguments: buildDesktopArguments({ app }),
   });
 }

@@ -159,6 +159,22 @@ export async function parseRunBody(
   };
 }
 
+/**
+ * The id of the user message a direct `/agent/run` fires — the LAST
+ * user-role message of the incoming array (the AI SDK client resends the
+ * full history each turn; the tail is the new message). This is the
+ * fired-message identity the `turn-started` lifecycle event carries (RFC
+ * `turn-authority`). `undefined` when the array holds no user message.
+ */
+export function extractLastUserMessageId(
+  msgs: NormalizedMessage[]
+): string | undefined {
+  for (let i = msgs.length - 1; i >= 0; i -= 1) {
+    if (msgs[i].role === "user") return msgs[i].id;
+  }
+  return undefined;
+}
+
 export function extractFirstUserText(msgs: NormalizedMessage[]): string {
   for (const m of msgs) {
     if (m.role !== "user") continue;

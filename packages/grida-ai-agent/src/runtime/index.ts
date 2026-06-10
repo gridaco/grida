@@ -45,12 +45,16 @@ import {
   RunInFlightError,
   StreamRegistry,
   type StreamEntry,
+  type StreamEndReason,
 } from "./stream-registry";
 import { SessionScheduler } from "./session-scheduler";
+import { AgentEventBus } from "./events";
+import { buildEventsConsumerResponse } from "./events-sse";
 import { AGENT_DEFAULT_TIER } from "../tiers";
 import {
   applyApprovalAnswer,
   extractFirstUserText,
+  extractLastUserMessageId,
   parseRunBody,
   persistIncomingTail,
   type RunRequest,
@@ -210,6 +214,14 @@ type StartTurnOptions = {
   workspace_root?: string;
   skills?: RunRequest["skills"];
   mode: RunRequest["mode"];
+  /**
+   * The user message this turn fires — the fired-message identity the
+   * turn-lifecycle wire carries (RFC `turn-authority`; emitted on the
+   * `turn-started` event). A queue drain names the dequeued row; an HTTP
+   * run names the incoming tail's user message; an approval-answer resume
+   * fires no new user message and leaves this absent.
+   */
+  fired_message_id?: string;
 };
 
 export class AgentRuntime {
@@ -222,9 +234,33 @@ export class AgentRuntime {
    * reads it ({@link SessionScheduler.subscribe}).
    */
   readonly scheduler: SessionScheduler;
+  /**
+   * The lifecycle event bus (RFC `events`): `turn-started` /
+   * `turn-finished` / `approval-requested`, multi-subscriber, volatile,
+   * observe-only. In-process consumers subscribe here; the host-wide SSE
+   * route projects it ({@link eventsStream}).
+   */
+  readonly events = new AgentEventBus();
   private readonly run_agent_fn: typeof runAgent;
   /** Session-static agent context, discovered once per session id. */
   private readonly session_contexts = new Map<string, SessionContext>();
+  /**
+   * Fired-message id of the single in-flight turn per session (single-flight
+   * makes one slot enough). Written at reserve, captured + cleared at the
+   * finish edge so the `turn-finished` event names the turn it closes.
+   */
+  private readonly fired_messages = new Map<string, string | undefined>();
+  /**
+   * Per-session emission chain — preserves the RFC `events` per-session
+   * causal order. The finished-emission awaits a store read (the
+   * pending-approval check), and a new turn can start during that await;
+   * without the chain its `turn-started` could overtake the prior turn's
+   * `turn-finished` on the bus.
+   */
+  private readonly session_event_chains = new Map<string, Promise<void>>();
+  /** Registry-observer detach fns, called in {@link dispose} — the registry
+   *  can be injected and outlive this runtime. */
+  private readonly detach_observers: Array<() => void> = [];
   private readonly compaction_enabled: boolean;
   private readonly compaction_config: CompactionConfig;
   private readonly compaction_summarize?: compactor.Summarize;
@@ -246,15 +282,103 @@ export class AgentRuntime {
         this.deps.sessions_store.listQueuedMessages(sessionId),
       dequeue: (messageId) =>
         this.deps.sessions_store.dequeueMessage(messageId),
-      drain: (sessionId) => this.drainTurn(sessionId),
+      drain: (sessionId, messageId) => this.drainTurn(sessionId, messageId),
       has_pending_approval: (sessionId) =>
         this.deps.sessions_store.hasPendingApproval(sessionId),
       drain_cooldown_ms: deps.drain_cooldown_ms,
     });
-    this.streams.observe({
-      on_create: (sessionId) => this.scheduler.onCreate(sessionId),
-      on_finish: (sessionId, reason) =>
-        this.scheduler.onFinish(sessionId, reason),
+    // Both observers are detached in dispose(): the registry can be
+    // INJECTED (deps.streams) and so outlive this runtime — without the
+    // detach, a disposed runtime's scheduler would keep receiving edges.
+    this.detach_observers.push(
+      this.streams.observe({
+        on_create: (sessionId) => this.scheduler.onCreate(sessionId),
+        on_finish: (sessionId, reason) =>
+          this.scheduler.onFinish(sessionId, reason),
+      })
+    );
+    // Second registry observer — the lifecycle event bus (RFC `events`).
+    // Attachable alongside the scheduler because `observe` is
+    // multi-subscriber; the finish edge is the single chokepoint every end
+    // path funnels through (pump finish/error, explicit abort).
+    this.detach_observers.push(
+      this.streams.observe({
+        on_finish: (sessionId, reason) => {
+          // Capture the fired identity AT the edge — a subsequent turn's
+          // reserve may rewrite the slot before the ordered task runs.
+          const messageId = this.fired_messages.get(sessionId);
+          this.fired_messages.delete(sessionId);
+          this.emitTurnFinished(sessionId, reason, messageId);
+        },
+      })
+    );
+  }
+
+  /**
+   * Emit a turn's end on the lifecycle bus: `approval-requested` first when
+   * the turn ended blocked on an unanswered supervised approval (read from
+   * the AUTHORITATIVE persisted approval state — the same fact the drain
+   * fire-gate consults), then `turn-finished`. Ordered per session via
+   * {@link emitOrdered}.
+   */
+  private emitTurnFinished(
+    sessionId: string,
+    reason: StreamEndReason,
+    messageId: string | undefined
+  ): void {
+    this.emitOrdered(sessionId, async () => {
+      let pending = false;
+      // Only a cleanly-settled run can be approval-blocked: the approval
+      // request itself ends the run with "finish" (RFC `queue` §drain-pause).
+      if (reason === "finish") {
+        try {
+          pending =
+            await this.deps.sessions_store.hasPendingApproval(sessionId);
+        } catch {
+          // Unknowable → report a plain finish. The durable approval state
+          // is still authoritative for the drain; only this event's flavor
+          // degrades.
+        }
+      }
+      const at = Date.now();
+      if (pending) {
+        this.events.emit({
+          type: "approval-requested",
+          session_id: sessionId,
+          at,
+        });
+      }
+      this.events.emit({
+        type: "turn-finished",
+        session_id: sessionId,
+        message_id: messageId,
+        reason,
+        pending_approval: pending,
+        at,
+      });
+    });
+  }
+
+  /**
+   * Run `task` after every previously-enqueued emission task for this
+   * session — the RFC `events` per-session causal order. Tasks never
+   * reject the chain (failures are swallowed); the chain entry is dropped
+   * once its tail settles so the map doesn't grow with dead sessions.
+   */
+  private emitOrdered(
+    sessionId: string,
+    task: () => void | Promise<void>
+  ): void {
+    const prev = this.session_event_chains.get(sessionId) ?? Promise.resolve();
+    const next = prev.then(task).then(
+      () => undefined,
+      () => undefined
+    );
+    this.session_event_chains.set(sessionId, next);
+    void next.then(() => {
+      if (this.session_event_chains.get(sessionId) === next) {
+        this.session_event_chains.delete(sessionId);
+      }
     });
   }
 
@@ -265,11 +389,13 @@ export class AgentRuntime {
    * already in the model view; this just rebuilds the turn context from the
    * PERSISTED session — provider/model from `session.model`, workspace root
    * from the row — and starts the turn. No client request, no per-send skills
-   * (a renderer concern with no analogue here). Throws {@link RunInFlightError}
-   * if a run is already in flight (the scheduler swallows it and retries on the
-   * next idle edge).
+   * (a renderer concern with no analogue here). `messageId` is the dequeued
+   * row the scheduler fired — carried through to the `turn-started` event
+   * (RFC `turn-authority`), never used to select what runs. Throws
+   * {@link RunInFlightError} if a run is already in flight (the scheduler
+   * swallows it and retries on the next idle edge).
    */
-  private async drainTurn(sessionId: string): Promise<void> {
+  private async drainTurn(sessionId: string, messageId: string): Promise<void> {
     const session = await this.deps.sessions_store.get(sessionId);
     if (!session) return;
     // Resolve the provider from the persisted model. A provider-down here
@@ -294,6 +420,7 @@ export class AgentRuntime {
       // Queued-turn posture comes from the persisted session, not a client
       // request (there is none here). Legacy rows (null mode) fall to default.
       mode: session.mode ?? AGENT_DEFAULT_MODE,
+      fired_message_id: messageId,
     });
   }
 
@@ -510,6 +637,13 @@ export class AgentRuntime {
         workspace_root: workspaceRoot,
         skills,
         mode,
+        // The fired message of a direct run is the incoming tail's user
+        // message (the client resends history; the tail is the new one). An
+        // approval-answer resume continues the PRIOR turn's tool call — it
+        // fires no new user message (RFC `turn-authority`).
+        fired_message_id: approvalAnswer
+          ? undefined
+          : extractLastUserMessageId(messages),
       });
     } catch (err) {
       if (err instanceof RunInFlightError) {
@@ -552,6 +686,21 @@ export class AgentRuntime {
     // signal) drives the model call so a disconnect can resume. Throws
     // RunInFlightError to the caller if a run is already in flight.
     const entry = this.streams.create(sessionId);
+
+    // Lifecycle event (RFC `events`): the turn is reserved — announce it,
+    // naming the fired message (RFC `turn-authority`). Stash the id for the
+    // finish edge (single-flight ⇒ one slot per session suffices). Emitted
+    // via the ordered chain so it can never overtake a prior turn's
+    // still-resolving `turn-finished`.
+    this.fired_messages.set(sessionId, opts.fired_message_id);
+    this.emitOrdered(sessionId, () => {
+      this.events.emit({
+        type: "turn-started",
+        session_id: sessionId,
+        message_id: opts.fired_message_id,
+        at: Date.now(),
+      });
+    });
 
     // Recorder consumer — attached BEFORE the pump so no frame is missed.
     // We hold a handle to BOTH the consumer and its detach fn: the success
@@ -715,6 +864,18 @@ export class AgentRuntime {
       sessionId,
       requestSignal
     );
+  }
+
+  /**
+   * `GET /events` — subscribe to the host-wide lifecycle event stream (RFC
+   * `events.md` §projection over the host wire): every session's
+   * `turn-started` / `turn-finished` / `approval-requested`, one
+   * subscription. Long-lived SSE; volatile by spec — no initial frame, no
+   * replay (a late joiner sees only future events; current state lives in
+   * the authoritative stores).
+   */
+  eventsStream(requestSignal: AbortSignal): Response {
+    return buildEventsConsumerResponse(this.events, requestSignal);
   }
 
   /**
@@ -922,15 +1083,22 @@ export class AgentRuntime {
 
   /** Drain in-flight runs (abort upstream) + clear the registry. */
   dispose(): void {
+    // Detach from the registry FIRST — it can be injected (deps.streams)
+    // and outlive this runtime; a disposed runtime must not keep observing.
+    for (const detach of this.detach_observers.splice(0)) detach();
     this.streams.clear();
     this.scheduler.dispose();
+    this.events.dispose();
     this.session_contexts.clear();
+    this.fired_messages.clear();
+    this.session_event_chains.clear();
   }
 
   /** Drop a session's cached static context (call when a session is deleted). */
   forgetSession(sessionId: string): void {
     this.session_contexts.delete(sessionId);
     this.scheduler.forget(sessionId);
+    this.fired_messages.delete(sessionId);
   }
 }
 

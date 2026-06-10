@@ -306,4 +306,62 @@ describe("StreamRegistry / lifecycle observer", () => {
     expect(c.frames).toEqual(["f1"]);
     expect(c.ended).toEqual(["finish"]);
   });
+
+  // RFC `events` §semantics — the seam admits N observers. The historical
+  // failure mode was a single-observer slot that silently overwrote: the
+  // scheduler attached, and a second consumer (the lifecycle event bus)
+  // could not attach without displacing it.
+  it("is multi-subscriber: a second observe() never displaces the first", () => {
+    const r = new StreamRegistry();
+    const first: string[] = [];
+    const second: string[] = [];
+    r.observe({
+      on_create: (sid) => first.push(`create:${sid}`),
+      on_finish: (sid, reason) => first.push(`finish:${sid}:${reason}`),
+    });
+    r.observe({
+      on_finish: (sid, reason) => second.push(`finish:${sid}:${reason}`),
+    });
+
+    r.create("ses_a");
+    r.finish("ses_a", "finish");
+    expect(first).toEqual(["create:ses_a", "finish:ses_a:finish"]);
+    expect(second).toEqual(["finish:ses_a:finish"]);
+  });
+
+  it("a throwing observer never breaks delivery to its siblings", () => {
+    const r = new StreamRegistry();
+    const seen: string[] = [];
+    r.observe({
+      on_create: () => {
+        throw new Error("boom");
+      },
+      on_finish: () => {
+        throw new Error("boom");
+      },
+    });
+    r.observe({
+      on_create: (sid) => seen.push(`create:${sid}`),
+      on_finish: (sid, reason) => seen.push(`finish:${sid}:${reason}`),
+    });
+    r.create("ses_a");
+    r.finish("ses_a", "finish");
+    expect(seen).toEqual(["create:ses_a", "finish:ses_a:finish"]);
+  });
+
+  it("observe() returns a detach fn that removes only that observer", () => {
+    const r = new StreamRegistry();
+    const kept: string[] = [];
+    const dropped: string[] = [];
+    const detach = r.observe({ on_create: (sid) => dropped.push(sid) });
+    r.observe({ on_create: (sid) => kept.push(sid) });
+
+    r.create("ses_a");
+    detach();
+    r.finish("ses_a", "finish");
+    r.create("ses_b");
+
+    expect(dropped).toEqual(["ses_a"]);
+    expect(kept).toEqual(["ses_a", "ses_b"]);
+  });
 });
