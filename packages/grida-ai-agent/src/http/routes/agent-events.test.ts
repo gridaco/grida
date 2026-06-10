@@ -35,6 +35,7 @@ import type { AgentLifecycleEvent } from "../../protocol/events";
 import { AgentRuntime } from "../../runtime";
 import { StreamRegistry } from "../../runtime/stream-registry";
 import type { runAgent } from "../../runtime/run-agent";
+import { sessionIdFromSse } from "../../testing/sse";
 import { registerAgentRoutes } from "./agent";
 
 const sseResponse = (frames: string[]): Response =>
@@ -52,23 +53,6 @@ const finishingRunAgent: typeof runAgent = async () =>
     '{"type":"text-delta","id":"t0","delta":"hi"}',
     '{"type":"text-end","id":"t0"}',
   ]);
-
-function sessionIdFromSse(body: string): string {
-  for (const frame of body.split("\n\n")) {
-    if (!frame.startsWith("event: grida-session")) continue;
-    const dataLine = frame.split("\n").find((l) => l.startsWith("data:"));
-    if (!dataLine) continue;
-    try {
-      const parsed = JSON.parse(dataLine.slice("data:".length).trim()) as {
-        session_id?: string;
-      };
-      return parsed.session_id ?? "";
-    } catch {
-      return "";
-    }
-  }
-  return "";
-}
 
 /** Tail a `GET /events` SSE body into a growing array of parsed events. */
 function tailEvents(res: Response): {

@@ -23,6 +23,7 @@
  */
 
 import fs from "node:fs/promises";
+import { sessionIdFromSse } from "../testing/sse";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
@@ -106,23 +107,6 @@ function assistantTextFromSse(body: string): string {
     }
   }
   return text;
-}
-
-function sessionIdFromSse(body: string): string {
-  for (const frame of body.split("\n\n")) {
-    if (!frame.startsWith("event: grida-session")) continue;
-    const dataLine = frame.split("\n").find((l) => l.startsWith("data:"));
-    if (!dataLine) continue;
-    try {
-      const parsed = JSON.parse(dataLine.slice("data:".length).trim()) as {
-        session_id?: string;
-      };
-      return parsed.session_id ?? "";
-    } catch {
-      return "";
-    }
-  }
-  return "";
 }
 
 type Host = {

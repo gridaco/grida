@@ -25,6 +25,7 @@ import { createRecorderConsumer } from "../../session/recorder";
 import { AGENT_SESSION_AGENT } from "../../protocol/run";
 import { AgentRuntime } from "../../runtime";
 import { StreamRegistry } from "../../runtime/stream-registry";
+import { sessionIdFromSse } from "../../testing/sse";
 import { registerAgentRoutes } from "./agent";
 
 // Inject a deterministic fake model-run fn: the run loop + registry +
@@ -39,25 +40,6 @@ const fakeRunAgent = async (): Promise<Response> =>
       "data: [DONE]\n\n",
     { headers: { "content-type": "text/event-stream" } }
   );
-
-// Session continuity rides the in-band `grida-session` SSE frame (the sole
-// channel — no response header). Pull the id out of a drained SSE body.
-function sessionIdFromSse(body: string): string {
-  for (const frame of body.split("\n\n")) {
-    if (!frame.startsWith("event: grida-session")) continue;
-    const dataLine = frame.split("\n").find((l) => l.startsWith("data:"));
-    if (!dataLine) continue;
-    try {
-      const parsed = JSON.parse(dataLine.slice("data:".length).trim()) as {
-        session_id?: string;
-      };
-      return parsed.session_id ?? "";
-    } catch {
-      return "";
-    }
-  }
-  return "";
-}
 
 describe("HTTP wire — agent routes (run/stream/abort)", () => {
   let baseDir: string;
