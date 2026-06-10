@@ -7,10 +7,11 @@
 <div align="center">
   <h1>Grida</h1>
   <p>
-    <strong>Grida is an open-source canvas editor & rendering engine (Rust + Skia + WASM) — plus Database/CMS and Forms.</strong>
+    <strong>Grida is an open-source canvas editor & rendering engine (Rust + Skia + WASM) — plus an SVG editor, Database/CMS and Forms.</strong>
   </p>
   <p>
     <a href="https://grida.co/canvas">Canvas demo</a> •
+    <a href="https://grida.co/svg">SVG editor</a> •
     <a href="https://grida.co/docs/packages/@grida/refig">Refig</a> •
     <a href="https://grida.co/downloads">Downloads</a> •
     <a href="https://grida.co">Website</a> •
@@ -43,6 +44,7 @@ If Grida is useful, consider starring this repo — it helps a lot.
 ## Demo
 
 - **Canvas (Skia/WASM)**: [grida.co/canvas](https://grida.co/canvas)
+- **SVG editor**: [grida.co/svg](https://grida.co/svg)
 
 ---
 
@@ -59,10 +61,14 @@ Core engine is written in Rust (Skia) and is exposed to web/Node via `@grida/can
 - [x] Infinite canvas + fast pan/zoom
 - [x] `.grida` document format (FlatBuffers)
 - [x] Render backends: DOM + Skia/WASM (WebGL2 + raster)
-- [x] Import: Figma (`@grida/io-figma`)
-- [x] SVG tooling (`@grida/io-svg`) (subset)
+- [x] Import: Figma (`@grida/io-figma`), SVG
+- [x] SVG tooling (`@grida/svg`)
+- [x] Canvas-native rich text editing
+- [x] History — time-bucketed undo/redo with preview
+- [x] Markdown & HTML/CSS embeds (in-house Chromium-aligned renderer)
+- [x] Multi-page PDF export
 - [x] Bitmap editor (TP)
-- [x] SVG editor (TP)
+- [x] SVG editor — see [SVG](#svg)
 - [x] Vector network model (paths, holes, compound shapes)
 - [x] Headless rendering: `@grida/refig` (Node + browser)
 - [ ] Component / instance model
@@ -115,6 +121,21 @@ main();
 ```
 
 Docs: [@grida/refig](https://grida.co/docs/packages/@grida/refig)
+
+---
+
+<br/>
+<br/>
+
+## SVG
+
+**The clean SVG editor.** Open an SVG, change one thing, save — and the diff shows exactly that. Nothing else moves. A round-trip-faithful editor and headless SDK, built for the era when people and AI edit the same files — AI chat built in.
+
+- **Try it**: [grida.co/svg](https://grida.co/svg)
+- **SDK**: [`@grida/svg-editor`](https://www.npmjs.com/package/@grida/svg-editor) — headless core + React bindings (alpha), backed by [`@grida/svg`](https://www.npmjs.com/package/@grida/svg) for path data and trivia-preserving parsing
+- **The file is the source of truth** — byte-equal round trip when nothing changed; the editor leaves no fingerprints of its own
+
+On the rendering side, Grida Canvas ships an in-house SVG renderer — **Rust + Skia → WASM**, a Chromium-shaped pipeline within the same in-tree engine that renders HTML/CSS (Stylo + Taffy + Skia), validated against Chromium-rendered oracles (resvg-test-suite corpus, WPT-style harness).
 
 ---
 
@@ -180,7 +201,7 @@ Docs: [@grida/refig](https://grida.co/docs/packages/@grida/refig)
 
 ## Quickstart (monorepo)
 
-**Requirements:** Node.js **24+**, pnpm **10+**
+**Requirements:** Node.js **24+**, pnpm **11+**
 
 ```bash
 pnpm install
@@ -204,11 +225,28 @@ pnpm test
 
 ## Packages
 
-Selected packages you can use independently:
+Published packages you can use independently:
 
-- **`@grida/refig`**: headless Figma renderer (Node + browser) + CLI
-- **`@grida/canvas-wasm`**: Skia renderer via WASM (WebGL + headless raster)
-- **`@grida/ruler`**, **`@grida/pixel-grid`**, **`@grida/transparency-grid`**: infinite-canvas UI primitives
+| Package                                                                                | Description                                                                                             | Demo                                                                                                 |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [`@grida/canvas-wasm`](https://www.npmjs.com/package/@grida/canvas-wasm)               | Grida Canvas rendering engine (Rust + Skia) as WASM — WebGL2 in the browser, headless raster in Node.js |                                                                                                      |
+| [`@grida/refig`](https://www.npmjs.com/package/@grida/refig)                           | Headless Figma renderer — render `.fig` / REST JSON to PNG/JPEG/WebP/PDF/SVG, with CLI                  | [demo](https://grida.co/packages/@grida/refig) · [docs](https://grida.co/docs/packages/@grida/refig) |
+| [`@grida/svg-editor`](https://www.npmjs.com/package/@grida/svg-editor)                 | Headless, round-trip-faithful SVG editor SDK with React bindings (alpha)                                | [demo](https://grida.co/packages/@grida/svg-editor)                                                  |
+| [`@grida/svg`](https://www.npmjs.com/package/@grida/svg)                               | SVG tooling — path data, attribute parsing, trivia-preserving round-trip parser                         |                                                                                                      |
+| [`@grida/hud`](https://www.npmjs.com/package/@grida/hud)                               | Canvas-based heads-up display (overlays, handles) for editor viewports                                  | [demo](https://grida.co/packages/@grida/hud)                                                         |
+| [`@grida/tree-view`](https://www.npmjs.com/package/@grida/tree-view)                   | Headless, agnostic tree-view controller (layer panels)                                                  | [demo](https://grida.co/packages/@grida/tree-view)                                                   |
+| [`@grida/text-editor`](https://www.npmjs.com/package/@grida/text-editor)               | Backend-agnostic text editor engine (experimental)                                                      |                                                                                                      |
+| [`@grida/history`](https://www.npmjs.com/package/@grida/history)                       | Dependency-free transaction & undo/redo engine                                                          |                                                                                                      |
+| [`@grida/keybinding`](https://www.npmjs.com/package/@grida/keybinding)                 | Declarative keybinding primitives — modifiers, platform resolution, event matching                      |                                                                                                      |
+| [`@grida/cmath`](https://www.npmjs.com/package/@grida/cmath)                           | Unopinionated canvas math — vectors, rects, transforms, snapping                                        |                                                                                                      |
+| [`@grida/vn`](https://www.npmjs.com/package/@grida/vn)                                 | Vector network model (paths, holes, compound shapes)                                                    |                                                                                                      |
+| [`@grida/color`](https://www.npmjs.com/package/@grida/color)                           | Core graphics color library                                                                             |                                                                                                      |
+| [`@grida/ruler`](https://www.npmjs.com/package/@grida/ruler)                           | Zero-dependency canvas ruler for infinite canvas                                                        | [demo](https://grida.co/packages/@grida/ruler)                                                       |
+| [`@grida/pixel-grid`](https://www.npmjs.com/package/@grida/pixel-grid)                 | Pixel-perfect grid component for infinite canvas                                                        | [demo](https://grida.co/packages/@grida/pixel-grid)                                                  |
+| [`@grida/transparency-grid`](https://www.npmjs.com/package/@grida/transparency-grid)   | Transparency (checkerboard) grid for infinite canvas                                                    | [demo](https://grida.co/packages/@grida/transparency-grid)                                           |
+| [`@grida/tailwindcss-colors`](https://www.npmjs.com/package/@grida/tailwindcss-colors) | Tailwind CSS color data (RGBA/HEX/OKLCH) for programmatic use                                           |                                                                                                      |
+
+Interactive demos: [grida.co/packages](https://grida.co/packages)
 
 ---
 
