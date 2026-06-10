@@ -1,7 +1,8 @@
 import { SectionHeader, SectionHeaderBadge } from "@/www/ui/section";
 import { Section } from "@/www/ui/section";
 import { Badge } from "@app/ui/components/badge";
-import { FigmaIcon, FileCode2Icon } from "lucide-react";
+import { FileCode2Icon } from "lucide-react";
+import { FigmaLogoIcon } from "@radix-ui/react-icons";
 import { BentoCard, BentoCardContent, BentoGrid } from "@/www/ui/bento-grid";
 
 export default function Import() {
@@ -21,7 +22,7 @@ export default function Import() {
         >
           <BentoCardContent
             name="Figma Slides"
-            Icon={FigmaIcon}
+            Icon={FigmaLogoIcon}
             description="Drop your .deck file and continue with editable layers and slide objects on the same canvas."
             className="group-hover:-translate-y-0"
           />

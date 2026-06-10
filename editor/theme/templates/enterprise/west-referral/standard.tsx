@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { cn } from "@app/ui/lib/utils";
-import { InstagramIcon } from "lucide-react";
+import { InstagramLogoIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import Link from "next/link";
 import { Skeleton } from "@app/ui/components/skeleton";
@@ -201,7 +201,7 @@ export function FooterTemplate({
           </div>
         )}
         <div className="text-muted-foreground">
-          {instagram && <InstagramIcon className="size-4" />}
+          {instagram && <InstagramLogoIcon className="size-4" />}
         </div>
       </div>
       <div className="text-sm text-muted-foreground flex gap-2">

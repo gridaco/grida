@@ -4,7 +4,7 @@ import Image from "next/image";
 import React from "react";
 import { CalendarBoxIcon, LocationBoxIcon } from "../../kit/components/icons";
 import { TwitterLogoIcon } from "@radix-ui/react-icons";
-import { YoutubeIcon } from "lucide-react";
+import { YouTubeLogo } from "@grida/react-icons/logos";
 import grida from "@grida/schema";
 
 interface Props {
@@ -131,7 +131,7 @@ function Footer() {
     <footer className="container max-w-4xl mx-auto border-t px-4 py-8 text-muted-foreground">
       <aside className="flex gap-2">
         <TwitterLogoIcon className="size-4" />
-        <YoutubeIcon className="size-4" />
+        <YouTubeLogo className="size-4" />
       </aside>
     </footer>
   );

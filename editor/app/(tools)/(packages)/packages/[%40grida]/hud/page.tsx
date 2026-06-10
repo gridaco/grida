@@ -33,7 +33,8 @@ import { Button } from "@app/ui/components/button";
 import { useScrollSpy } from "@/hooks/use-scroll-spy";
 import Footer from "@/www/footer";
 import Header from "@/www/header";
-import { ArrowRightIcon, GithubIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
+import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -189,7 +190,7 @@ export default function HudSpecPage() {
                     rel="noopener noreferrer"
                   >
                     <Button size="sm" variant="outline">
-                      <GithubIcon className="mr-1.5 size-3.5" />
+                      <GitHubLogoIcon className="mr-1.5 size-3.5" />
                       source
                     </Button>
                   </Link>

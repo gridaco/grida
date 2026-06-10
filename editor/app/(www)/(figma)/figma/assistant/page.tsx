@@ -1,7 +1,7 @@
 import Header from "@/www/header";
 import Footer from "@/www/footer";
 import React from "react";
-import { Github } from "lucide-react";
+import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import { Button } from "@app/ui/components/button";
 import { Card, CardContent } from "@app/ui/components/card";
 import { ArrowRight } from "lucide-react";
@@ -63,7 +63,7 @@ function Hero() {
             rel="noopener noreferrer"
             className="flex items-center text-white gap-2"
           >
-            <Github className="size-5" />
+            <GitHubLogoIcon className="size-5" />
             <span>600 Stars</span>
           </a>
 
