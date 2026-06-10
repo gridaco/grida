@@ -70,12 +70,12 @@ server) stops being the only way to observe the system.
 A daemon that wants to be discoverable MUST publish a registration
 record in the state directory containing at least:
 
-| Field     | Meaning                                                                                                                        |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `id`      | A random per-launch claim token. The ownership fact: a daemon owns the registration iff the record's `id` is the one it wrote. |
-| `version` | The implementation version, informational. NOT the compatibility gate — see [Probe](#probe-and-protocol-gate).                 |
-| `url`     | The loopback base URL the daemon listens on.                                                                                   |
-| `pid`     | The daemon's OS process id. For diagnostics and last-resort termination; never for liveness.                                   |
+| Field     | Meaning                                                                                                                                                                                                                                                                                                                 |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`      | A random per-launch claim token. The ownership fact: a daemon owns the registration iff the record's `id` is the one it wrote.                                                                                                                                                                                          |
+| `version` | The implementation version, informational. NOT the compatibility gate — see [Probe](#probe-and-protocol-gate).                                                                                                                                                                                                          |
+| `url`     | The loopback base URL the daemon listens on. Readers MUST reject any other host: accept exactly `127.0.0.1`, `localhost`, or IPv6 `::1` — deliberately narrower than the full `127.0.0.0/8` range, since implementations only ever bind the canonical address and a tampered record gains nothing from the wider range. |
+| `pid`     | The daemon's OS process id. For diagnostics and last-resort termination; never for liveness.                                                                                                                                                                                                                            |
 
 ### Atomic publish
 

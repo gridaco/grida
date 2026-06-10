@@ -255,9 +255,17 @@ export function createWebDaemonBridge(
         const subscriptionId = crypto.randomUUID();
         const controller = new AbortController();
         statusSubs.set(subscriptionId, controller);
-        const { done } = await client.sessions.subscribe_status(id, onStatus, {
-          signal: controller.signal,
-        });
+        let done: Promise<void>;
+        try {
+          ({ done } = await client.sessions.subscribe_status(id, onStatus, {
+            signal: controller.signal,
+          }));
+        } catch (err) {
+          // A failed attach returns no subscription_id, so the caller can
+          // never unsubscribe — drop the registry entry here instead.
+          statusSubs.delete(subscriptionId);
+          throw err;
+        }
         return {
           subscription_id: subscriptionId,
           done: done.finally(() => {

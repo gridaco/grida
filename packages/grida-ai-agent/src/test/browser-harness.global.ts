@@ -58,17 +58,27 @@ export default async function setup(project: TestProject) {
       allowed_referer_paths: ["/"],
     },
   });
-  await harness.start();
-  await foreign.start();
-
-  project.provide("agent_url", AgentTransport.baseUrl(harness.port));
-  project.provide("agent_password", password);
-  project.provide("agent_foreign_url", AgentTransport.baseUrl(foreign.port));
-
-  return async () => {
+  const cleanup = async () => {
     await harness.stop();
     await foreign.stop();
     await fs.rm(harnessDir, { recursive: true, force: true });
     await fs.rm(foreignDir, { recursive: true, force: true });
   };
+
+  // Partial startup (e.g. the second host failing to bind) must not
+  // leak the first host or the temp dirs — `stop()` and rm are no-ops
+  // for resources that never came up.
+  try {
+    await harness.start();
+    await foreign.start();
+
+    project.provide("agent_url", AgentTransport.baseUrl(harness.port));
+    project.provide("agent_password", password);
+    project.provide("agent_foreign_url", AgentTransport.baseUrl(foreign.port));
+  } catch (err) {
+    await cleanup().catch(() => {});
+    throw err;
+  }
+
+  return cleanup;
 }
