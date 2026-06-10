@@ -77,6 +77,18 @@ export function registerDefaultCommands(
     return editor.commands.group();
   });
 
+  // Cmd+D — duplicate the selection in place via subtree clone (no defs
+  // closure, ids verbatim; see docs/wg/feat-svg-editor/subtree-clone.md).
+  // Returns false when the plan is empty (nothing cloneable) so the
+  // keymap chain can keep going. Same select-mode guard as
+  // `selection.group` — a programmatic invoke during text-edit must not
+  // mutate structure.
+  reg.register("selection.duplicate", () => {
+    if (editor.state.mode !== "select") return false;
+    if (editor.state.selection.length === 0) return false;
+    return editor.commands.duplicate().length > 0;
+  });
+
   // Cmd+Shift+G — dissolve the selected <g>, hoisting its children into
   // the parent. Returns false when `ungroup` refuses (not a single <g>,
   // inside <defs>, no children, carries visual state, <use>-referenced,

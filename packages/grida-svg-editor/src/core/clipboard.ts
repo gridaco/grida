@@ -24,14 +24,16 @@
  *
  * This module is the **payload extraction** operation only. The sibling
  * operation the FRD names — in-document subtree CLONE (duplicate /
- * clone-drag), which must NOT carry the closure — is a different contract
- * and does not live here.
+ * clone-drag), which must NOT carry the closure — lives in `./subtree`.
+ * The two share exactly selection normalization (`subtree.normalize_roots`)
+ * and verbatim subtree serialization (`doc.serialize_node`).
  */
 
 import { encode_attr_value } from "@grida/svg/parser";
 import type { NodeId } from "../types";
 import type { SvgDocument } from "./document";
 import { SVG_NS, WELL_KNOWN_NS_PREFIXES, XMLNS_NS } from "./document";
+import { subtree } from "./subtree";
 
 export namespace clipboard {
   /**
@@ -109,8 +111,8 @@ export namespace clipboard {
     // One doc-order comparator per extraction (each build walks the whole
     // node tree); collect_reference_closure keeps its own — it is an
     // independently exported test entry point.
-    const order = by_document_order(doc);
-    const roots = normalize_selection(doc, selection, order);
+    const order = subtree.by_document_order(doc);
+    const roots = subtree.normalize_roots(doc, selection, order);
     if (roots.length === 0) return null;
 
     const closure = collect_reference_closure(doc, roots);
@@ -203,30 +205,12 @@ export namespace clipboard {
 
     // Subtree-aware dedup (a collected gradient inside a collected
     // pattern would otherwise serialize twice), then document order.
-    return doc.prune_nested_nodes([...collected]).sort(by_document_order(doc));
+    return doc
+      .prune_nested_nodes([...collected])
+      .sort(subtree.by_document_order(doc));
   }
 
   // ─── Internals ─────────────────────────────────────────────────────────
-
-  function normalize_selection(
-    doc: SvgDocument,
-    selection: ReadonlyArray<NodeId>,
-    order: (a: NodeId, b: NodeId) => number
-  ): NodeId[] {
-    const live = [...new Set(selection)].filter(
-      (id) => doc.is_element(id) && doc.contains(doc.root, id)
-    );
-    return doc.prune_nested_nodes(live).sort(order);
-  }
-
-  function by_document_order(
-    doc: SvgDocument
-  ): (a: NodeId, b: NodeId) => number {
-    const index = new Map<NodeId, number>();
-    let i = 0;
-    for (const id of doc.all_nodes()) index.set(id, i++);
-    return (a, b) => (index.get(a) ?? 0) - (index.get(b) ?? 0);
-  }
 
   /** Preorder element walk of `root`'s subtree, root included. */
   function elements_of_subtree(doc: SvgDocument, root: NodeId): NodeId[] {

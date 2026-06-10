@@ -10,7 +10,11 @@ export {
   type StageEmission,
   type PipelineResult,
 } from "./translate-pipeline";
-export { TranslateOrchestrator, type OrchestratorDeps } from "./orchestrator";
+export {
+  TranslateOrchestrator,
+  type OrchestratorDeps,
+  type GestureModifiers,
+} from "./orchestrator";
 export {
   NudgeDwellWatcher,
   type NudgeDwellWatcherDeps,

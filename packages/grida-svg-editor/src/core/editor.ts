@@ -17,6 +17,7 @@ import { applyDefaultBindings } from "../keymap/defaults";
 import cmath from "@grida/cmath";
 import { create_defs } from "./defs";
 import { clipboard as clipboard_codec } from "./clipboard";
+import { subtree } from "./subtree";
 import { SvgDocument, WELL_KNOWN_NS_PREFIXES, XMLNS_NS } from "./document";
 import type { GeometryProvider } from "./geometry";
 import type { SurfaceBridge } from "./surface-bridge";
@@ -382,6 +383,28 @@ export type Commands = {
    * return `[]`.
    */
   paste(text?: string): NodeId[];
+  /**
+   * Duplicate the selection in place — the **subtree-clone** operation
+   * (the clipboard FRD's second extraction operation; design note:
+   * `docs/wg/feat-svg-editor/subtree-clone.md`). Each normalized
+   * selection root is cloned verbatim (byte-equal subtree markup — and
+   * therefore NO defs closure, NO namespace shell: the destination is
+   * the source document) and inserted as its origin's next sibling, so
+   * the clone paints directly above its origin. Selection moves to the
+   * clones. ONE history step; a single `undo()` removes the clones and
+   * restores the prior selection.
+   *
+   * Authored `id=""` attributes are cloned verbatim, NEVER rewritten —
+   * the document gains colliding ids that resolve first-in-document-order
+   * (so a clone's internal self-reference resolves to the ORIGINAL);
+   * dedup is the explicit Tidy command's job.
+   *
+   * Refusal (no mutation, no history): an empty selection, or one that
+   * normalizes to nothing cloneable (document root, nested `<svg>`,
+   * stale / non-element ids) → `[]`. Returns the clone ids in document
+   * order otherwise.
+   */
+  duplicate(): NodeId[];
   /**
    * Wrap the current selection in a new plain `<g>`. Returns `true` if
    * the wrap was performed (a history step was pushed and the new group
@@ -1716,12 +1739,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     // reinserts bottom-to-top so each captured `next_element_sibling`
     // anchor is still present in the parent when its predecessor
     // re-attaches above it.
-    const doc_order = doc.all_elements();
-    const index_of = new Map<NodeId, number>();
-    for (let i = 0; i < doc_order.length; i++) index_of.set(doc_order[i], i);
-    const targets = [...filtered].sort(
-      (a, b) => (index_of.get(a) ?? 0) - (index_of.get(b) ?? 0)
-    );
+    const targets = [...filtered].sort(subtree.by_document_order(doc));
 
     type Capture = {
       id: NodeId;
@@ -2086,6 +2104,31 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   /**
+   * Duplicate-in-place over `subtree.clone_plan` — see the `Commands`
+   * doc. Same atomic shape as `insert_fragment_impl`: closures own the
+   * insert/remove pair so redo re-inserts the same NodeIds.
+   */
+  function duplicate(): NodeId[] {
+    const plan = subtree.clone_plan(doc, selection);
+    if (plan.length === 0) return [];
+    const clones = plan.map((p) => p.clone);
+    const previous_selection = selection;
+    const apply = () => {
+      subtree.insert_plan(doc, plan);
+      set_selection(clones);
+    };
+    const revert = () => {
+      subtree.remove_plan(doc, plan);
+      set_selection(previous_selection);
+    };
+    apply();
+    history.atomic("duplicate", (tx) => {
+      tx.push({ providerId: PROVIDER_ID, apply, revert });
+    });
+    return clones;
+  }
+
+  /**
    * Preview-bracketed insertion. Used by the pointer-driven drag gesture
    * in the DOM surface. Per-frame attr writes call `update(attrs)`; one
    * undo step on `commit()`; clean rollback on `discard()`.
@@ -2359,6 +2402,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     copy,
     cut,
     paste,
+    duplicate,
     group,
     ungroup,
     insert,

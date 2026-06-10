@@ -661,6 +661,16 @@ editor.commands.{
   cut(): string | null;               // one undoable step; buffer secured before delete
   paste(text?: string): NodeId[];     // inserted roots (selected); [] = refusal
 
+  // duplicate — the clipboard FRD's SECOND extraction operation
+  // (subtree clone): in-document, so NO defs closure and NO xmlns
+  // shell are carried; subtrees and authored ids clone verbatim
+  // (colliding ids resolve first-in-document-order; Tidy dedups).
+  // Each clone lands as its origin's next sibling (paints above it);
+  // selection moves to the clones; ONE history step. Alt-drag
+  // translate-with-clone consumes the same operation. Contract:
+  // https://grida.co/docs/wg/feat-svg-editor/subtree-clone
+  duplicate(): NodeId[];              // clone ids (selected); [] = refusal
+
   // insertion — `tag` is an open string (so paste / RPC can create any element,
   // e.g. "path"); only the closed `InsertableTag` set gets a pointer-driven
   // draw gesture and default paint.

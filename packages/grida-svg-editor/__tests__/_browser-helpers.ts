@@ -87,12 +87,20 @@ export function clientCenter(el: Element): { x: number; y: number } {
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 }
 
-function pointer(
+/** Dispatch one synthetic pointer event. Exported for tests that need a
+ *  custom sequence (e.g. modifier keydowns between moves) — plain drags
+ *  should use {@link dragByClient}. Pass `init` for modifier state: a
+ *  REAL pointer event carries held modifiers natively, and the surface
+ *  mirrors them into the HUD's modifier store, so a synthetic move
+ *  during a held-Alt drag must say `{ altKey: true }` or it releases
+ *  the key as far as the editor can tell. */
+export function pointer(
   target: EventTarget,
   type: string,
   x: number,
   y: number,
-  buttons: number
+  buttons: number,
+  init?: PointerEventInit
 ): void {
   const ev = new PointerEvent(type, {
     pointerId: 1,
@@ -105,6 +113,7 @@ function pointer(
     bubbles: true,
     cancelable: true,
     composed: true,
+    ...init,
   });
   target.dispatchEvent(ev);
 }

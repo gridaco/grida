@@ -108,9 +108,10 @@ one name. This document names both and specifies the first:
   document. Carries **no** closure and no shell: the destination is the
   source, every reference still resolves, and carrying definitions
   would deposit duplicates. This is what duplicate and clone-drag
-  gestures consume. Out of scope here; to be specified with those
-  gestures. The two operations share selection normalization and
-  verbatim subtree serialization — nothing else.
+  gestures consume. Out of scope here; specified with those gestures in
+  [`subtree-clone.md`](./subtree-clone.md). The two operations share
+  selection normalization and verbatim subtree serialization — nothing
+  else.
 
 Copy cannot know its destination, so it always performs payload
 extraction. The consequence — a payload pasted back into its own source
@@ -604,7 +605,9 @@ Adjacent work this design deliberately enables but does not include: the
 **subtree-clone operation** and its consumers — duplicate and clone-drag
 gestures (§ Two extraction operations; they must not pay the closure
 cost, which is why they are a different operation, not a clipboard
-client); ingestion of peer tools' proprietary clipboard formats; pasting
+client — since specified and shipped, see
+[`subtree-clone.md`](./subtree-clone.md)); ingestion of peer tools'
+proprietary clipboard formats; pasting
 non-SVG content (plain text as a new text element, raster images);
 additional system-clipboard representations beyond plain text; the
 materializing variants of extraction policies 3 and 4; the

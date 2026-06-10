@@ -47,6 +47,7 @@ export const DEFAULT_BINDINGS: readonly KeymapBinding[] = [
     keybinding: kb(KeyCode.KeyG, M.CtrlCmd | M.Shift),
     command: "selection.ungroup",
   },
+  { keybinding: kb(KeyCode.KeyD, M.CtrlCmd), command: "selection.duplicate" },
   { keybinding: kb(KeyCode.KeyA, M.CtrlCmd), command: "selection.all" },
 
   // ─── tree navigation ─────────────────────────────────────────────────────
