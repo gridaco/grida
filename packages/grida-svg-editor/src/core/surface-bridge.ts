@@ -53,7 +53,7 @@ export interface SurfaceBridge {
    *  `font-size` write. Advances `geometry_version` by exactly 1 and fires
    *  `subscribe_geometry` listeners (clearing the `MemoizedGeometryProvider`
    *  cache) WITHOUT marking the doc dirty, advancing `structure_version` /
-   *  `doc_version`, or touching undo — a reflow is not an edit. The DOM
+   *  `revision`, or touching undo — a reflow is not an edit. The DOM
    *  surface drives this from a `document.fonts` `loadingdone` listener;
    *  see `src/dom.ts` and ../../docs/geometry.md §Limitations. */
   bump_geometry(): void;

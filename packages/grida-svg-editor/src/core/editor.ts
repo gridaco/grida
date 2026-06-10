@@ -49,6 +49,7 @@ import type {
   ReorderDirection,
   Tool,
   Unsubscribe,
+  Vec2,
 } from "../types";
 import { DEFAULT_STYLE, TOOL_CURSOR } from "../types";
 import { array_shallow_equal } from "../util/equal";
@@ -481,10 +482,11 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   let mode: Mode = "select";
   let tool: Tool = TOOL_CURSOR;
   let version = 0;
-  /** Document-edit counter — only bumps on actual mutations, not selection. */
-  let doc_version = 0;
-  /** doc_version at the last load()/serialize(); compared to derive `dirty`. */
-  let baseline_doc_version = 0;
+  /** `doc.revision` at the last load()/reset(); compared to derive `dirty`.
+   *  The doc's own total mutation counter is the single edit-version
+   *  source — `content_version`, `dirty`, and the typed-read memo caches
+   *  all derive from it (no editor-side shadow counter to drift). */
+  let baseline_revision = doc.revision;
   /**
    * Bumps once per `editor.load(svg)` call. The constructor's initial parse
    * does NOT count — it's the "factory" state. Hosts subscribe via
@@ -513,11 +515,11 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       scope,
       mode,
       tool,
-      dirty: doc_version !== baseline_doc_version,
+      dirty: doc.revision !== baseline_revision,
       can_undo: history.stack.canUndo,
       can_redo: history.stack.canRedo,
       version,
-      content_version: doc_version,
+      content_version: doc.revision,
       structure_version: doc.structure_version,
       geometry_version: doc.geometry_version,
       load_version,
@@ -558,11 +560,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   doc.on_change(() => {
-    // Every doc mutation bumps doc_version; load()/serialize() snapshots it
-    // as the baseline for `dirty`.
-    doc_version++;
     // Fire the geometry channel only when the doc's geometry_version
     // advanced — pure presentation writes don't reach the geometry cache.
+    // (Edit counting lives on the doc itself: `doc.revision`.)
     fire_geometry_listeners_if_advanced();
   });
 
@@ -676,7 +676,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   // ─── Properties API ──────────────────────────────────────────────────────
   //
   // `node_paint` and `node_properties` return reference-stable snapshots:
-  // repeated reads at the same `doc_version` are O(1) cache hits; reads
+  // repeated reads at the same `doc.revision` are O(1) cache hits; reads
   // across mutations rebuild and structurally diff against the last
   // snapshot, returning the prior reference when the underlying values
   // didn't change.
@@ -686,15 +686,15 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
 
   const paint_cache = new Map<
     string,
-    { doc_version: number; value: PaintValue }
+    { revision: number; value: PaintValue }
   >();
   const property_cache = new Map<
     string,
-    { doc_version: number; value: ReadProperty }
+    { revision: number; value: ReadProperty }
   >();
   const properties_cache = new Map<
     string,
-    { doc_version: number; value: PropertyMap }
+    { revision: number; value: PropertyMap }
   >();
 
   // Tree snapshot cache — invalidated by `structure_version` only.
@@ -762,13 +762,13 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   function node_property_cached(id: NodeId, name: string): ReadProperty {
     const key = `${id} ${name}`;
     const cached = property_cache.get(key);
-    if (cached && cached.doc_version === doc_version) return cached.value;
+    if (cached && cached.revision === doc.revision) return cached.value;
     const next = properties.read(doc, id, name);
     if (cached && properties.value_equals(cached.value, next)) {
-      cached.doc_version = doc_version;
+      cached.revision = doc.revision;
       return cached.value;
     }
-    property_cache.set(key, { doc_version, value: next });
+    property_cache.set(key, { revision: doc.revision, value: next });
     return next;
   }
 
@@ -778,7 +778,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   ): PropertyMap {
     const key = `${id} ${names.join("")}`;
     const cached = properties_cache.get(key);
-    if (cached && cached.doc_version === doc_version) return cached.value;
+    if (cached && cached.revision === doc.revision) return cached.value;
     // Build via the per-(id,name) cache so the inner values are reference
     // stable too, not just the outer object.
     const next: { [name: string]: ReadProperty } = {};
@@ -789,18 +789,18 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       if (cached && cached.value[name] !== v) changed = true;
     }
     if (cached && !changed) {
-      cached.doc_version = doc_version;
+      cached.revision = doc.revision;
       return cached.value;
     }
     const frozen = Object.freeze(next) as PropertyMap;
-    properties_cache.set(key, { doc_version, value: frozen });
+    properties_cache.set(key, { revision: doc.revision, value: frozen });
     return frozen;
   }
 
   function node_paint(id: NodeId, channel: "fill" | "stroke"): PaintValue {
     const key = `${id} ${channel}`;
     const cached = paint_cache.get(key);
-    if (cached && cached.doc_version === doc_version) return cached.value;
+    if (cached && cached.revision === doc.revision) return cached.value;
     const { declared, provenance } = properties.resolve_declared(
       doc,
       id,
@@ -809,10 +809,10 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     const computed = paint.parse(declared);
     const next: PaintValue = { declared, computed, provenance };
     if (cached && paint.value_equals(cached.value, next)) {
-      cached.doc_version = doc_version;
+      cached.revision = doc.revision;
       return cached.value;
     }
-    paint_cache.set(key, { doc_version, value: next });
+    paint_cache.set(key, { revision: doc.revision, value: next });
     return next;
   }
 
@@ -927,6 +927,15 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     return { gradient_id };
   }
 
+  /** World→local delta projection shared by every one-shot translate
+   *  writer (translate / nudge via `prepare_rpc`, align). Re-expresses a
+   *  world-space delta in the frame the target's position attributes are
+   *  written in — nested-viewport / transformed-ancestor correctness.
+   *  Identity for flat docs and DOM-less hosts (no provider, or a
+   *  provider without a layout engine). */
+  const project_world_delta: translate_pipeline.DeltaProjector = (id, d) =>
+    geometry_provider?.world_delta_to_local?.(id, d) ?? d;
+
   /** Shared one-shot translate runner. `stages` selects semantics — see
    *  `core/translate-pipeline/README.md`'s "Stage lists per entry point". */
   function do_translate_oneshot(
@@ -949,10 +958,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       },
       emit,
       stages,
-      // Nested-viewport / transformed-ancestor correctness: write the delta
-      // in each mover's local frame. Identity for flat docs and DOM-less
-      // hosts (no provider, or a provider without a layout engine).
-      project: (id, d) => geometry_provider?.world_delta_to_local?.(id, d) ?? d,
+      project: project_world_delta,
     });
     apply();
     history.atomic(label, (tx) => {
@@ -1445,7 +1451,10 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
    * center of a reference rect. Same mechanics as `resize_to`: per-member
    * translate baselines (so `<g>`, transformed, and natively-attributed
    * nodes all write the cleanest in-place representation), one atomic
-   * history step.
+   * history step. Deltas are computed in world space and re-expressed in
+   * each member's local frame before writing (`world_delta_to_local`),
+   * so members under scaled/rotated ancestors land exactly and a repeat
+   * invocation is a no-op.
    *
    * Reference rect is selection-size dependent:
    *   - multi-selection: union of member bboxes
@@ -1495,8 +1504,18 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
 
     // `compute_align_deltas` omits zero-deltas — every entry in `deltas`
     // is a member that actually moves. No need to filter again.
-    const deltas = compute_align_deltas(members, target, direction);
-    if (deltas.size === 0) return false;
+    const world_deltas = compute_align_deltas(members, target, direction);
+    if (world_deltas.size === 0) return false;
+
+    // Deltas are world-space but `intent.apply` writes own-frame attrs —
+    // unprojected, a scaled/rotated ancestor turns every delta into an
+    // over/undershoot and repeated aligns oscillate instead of settling.
+    // Projected eagerly, not inside the closures, so redo replays the
+    // exact deltas even after the surface detaches.
+    const deltas = new Map<NodeId, Vec2>();
+    for (const [id, d] of world_deltas) {
+      deltas.set(id, project_world_delta(id, d));
+    }
 
     const apply = () => {
       for (const m of members) {
@@ -2143,7 +2162,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     mode = "select";
     tool = TOOL_CURSOR;
     history.clear();
-    baseline_doc_version = doc_version;
+    baseline_revision = doc.revision;
     load_version++;
     emit();
   }
@@ -2219,7 +2238,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     scope = null;
     mode = "select";
     tool = TOOL_CURSOR;
-    baseline_doc_version = doc_version;
+    baseline_revision = doc.revision;
     emit();
   }
 
@@ -2498,7 +2517,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
         // A surface-observed reflow the IR can't see (web font settled
         // after the font-* write). Advance ONLY the geometry channel:
         // `doc.bump_geometry()` advances `geometry_version` without
-        // emitting, so `doc_version` / `structure_version` / dirty / undo
+        // emitting, so `doc.revision` / `structure_version` / dirty / undo
         // stay put (a reflow is not an edit); then fan out the geometry
         // listeners so the MemoizedGeometryProvider cache clears.
         doc.bump_geometry();
