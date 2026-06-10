@@ -4,7 +4,7 @@ title: Copy/cut/paste round-trips through the OS clipboard as plain SVG markup
 module: svg-editor
 area: clipboard
 tags: [clipboard, copy, paste, cut, interop, history, undo]
-status: untested
+status: verified
 severity: high
 date: 2026-06-10
 updated: 2026-06-10
@@ -75,6 +75,10 @@ events; the OS clipboard and real keystrokes are only exercised here):
 
 ## Notes
 
+- 2026-06-10: manually verified on the v1 implementation —
+  cross-window copy-paste (two editor windows) and repeated multi-paste
+  both work as specified. Translate-with-clone (Alt+drag) is a separate
+  deferred feature (TODO §5), not part of this TC.
 - Spec: `docs/wg/feat-svg-editor/clipboard.md`. Same-document paste of
   a defs-referencing shape intentionally duplicates the `<defs>` block
   (documented cost; Tidy is the planned recovery) — not a bug.

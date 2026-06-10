@@ -307,7 +307,8 @@ Still open (deferred by the FRD, tracked here):
 - **Subtree clone** — the closure-free in-document extraction operation
   that duplicate (`⌘D`, §5 alt-drag clone) consumes. A different
   contract from payload extraction (carrying the closure in-document
-  would deposit duplicate defs); needs its own spec pass.
+  would deposit duplicate defs); needs its own spec pass. Tracked:
+  [#817](https://github.com/gridaco/grida/issues/817).
 - **Paste placement enhancements** — paste-at-pointer, collision
   offset, scoped paste (each must confront wrapper-vs-rewrite noise).
 - **Materializing extraction variants** — ancestor-transform bake and
@@ -323,9 +324,13 @@ Still open (deferred by the FRD, tracked here):
 
 ### 5. Alt-drag (translate with clone)
 
+Tracked: [#817](https://github.com/gridaco/grida/issues/817).
+
 Hold Alt during a translate gesture to clone the selected nodes and move
 the clone. Interaction with history (one undo step for clone + move?),
-group semantics, defs duplication.
+group semantics, defs duplication — note the clipboard FRD's verdict:
+this consumes the **subtree-clone** operation (no defs closure), not
+the clipboard's payload extraction.
 
 Current implementation notes:
 

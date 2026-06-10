@@ -19,10 +19,13 @@ format: md
 
 # Clipboard — copy, cut, paste
 
-**Status:** Draft — pre-implementation. Revised after pedantic review
-(three independent passes: logical probes, bedrock verification, design
-probes); the review's blocking findings are folded in below as explicit
-policy rather than left implicit.
+**Status:** Implemented — the TypeScript SVG editor SDK ships this
+contract (commands, payload codec, native-event transport, provider
+seam). Revised after pedantic review (three independent passes: logical
+probes, bedrock verification, design probes) before implementation; the
+review's blocking findings are folded in below as explicit policy
+rather than left implicit. The named deferrals (§ Out of scope) remain
+open.
 
 This document specifies clipboard support for the SVG editor: what a
 copied selection becomes, what pasting accepts, how the payload moves
