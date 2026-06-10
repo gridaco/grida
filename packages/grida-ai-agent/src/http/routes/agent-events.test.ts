@@ -46,8 +46,10 @@ const sseResponse = (frames: string[]): Response =>
     }
   );
 
-/** Default fake model run: one text chunk, then DONE. */
-const finishingRunAgent: typeof runAgent = async () =>
+/** Default fake model run: one text chunk, then DONE. Fakes declare the
+ * full 3-param `runAgent` arity (unused ones underscored) so the harness's
+ * 3-arg forwarding call is arity-consistent. */
+const finishingRunAgent: typeof runAgent = async (_provider, _opts, _deps) =>
   sseResponse([
     '{"type":"text-start","id":"t0"}',
     '{"type":"text-delta","id":"t0","delta":"hi"}',
@@ -174,7 +176,7 @@ describe("HTTP wire — lifecycle events (GET /events)", () => {
   it("a turn that ends BLOCKED on a supervised approval emits approval-requested before its turn-finished (pending_approval: true)", async () => {
     // The SDK pauses a gated tool call by emitting `tool-approval-request`
     // and ending the run cleanly; the recorder persists the pending state.
-    currentRunAgent = async () =>
+    currentRunAgent = async (_provider, _opts, _deps) =>
       sseResponse([
         '{"type":"tool-input-start","toolCallId":"call1","toolName":"run_command"}',
         '{"type":"tool-input-available","toolCallId":"call1","toolName":"run_command","input":{"command":"rm","args":["-rf"]}}',
@@ -215,7 +217,7 @@ describe("HTTP wire — lifecycle events (GET /events)", () => {
 
   it("an explicit abort emits turn-finished with reason 'abort'", async () => {
     // Hanging fake: the stream stays open until the model abort signal trips.
-    currentRunAgent = async (_provider, opts) =>
+    currentRunAgent = async (_provider, opts, _deps) =>
       new Response(
         new ReadableStream<Uint8Array>({
           start(controller) {
@@ -265,7 +267,7 @@ describe("HTTP wire — lifecycle events (GET /events)", () => {
   });
 
   it("an upstream failure emits turn-finished with reason 'error'", async () => {
-    currentRunAgent = async () => {
+    currentRunAgent = async (_provider, _opts, _deps) => {
       throw new Error("upstream down");
     };
     const tail = tailEvents(await app.request("/events", { method: "GET" }));
