@@ -79,8 +79,10 @@ function isExternalSpecifier(id) {
 function extractExternals(jsFile) {
   const code = fs.readFileSync(jsFile, "utf8");
   const found = new Set();
-  // matches require("x"), require('x'), require(`x`)
-  const re = /require\(\s*[`"']([^`"']+)[`"']\s*\)/g;
+  // matches require("x") and dynamic import("x") — Rollup keeps external
+  // dynamic imports as `import(...)` even in CJS output (dynamicImportInCjs),
+  // so lazily-loaded externals like node-pty never appear as require().
+  const re = /(?:require|import)\(\s*[`"']([^`"']+)[`"']\s*\)/g;
   let m;
   while ((m = re.exec(code))) {
     if (isExternalSpecifier(m[1])) found.add(m[1]);

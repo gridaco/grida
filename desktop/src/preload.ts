@@ -33,6 +33,8 @@ import {
   type NavigationState,
   type OpenDialogOptions,
   type SaveDialogOptions,
+  type TerminalCreateOptions,
+  type TerminalHandlers,
 } from "./bridge/contract";
 
 const DESKTOP_PATH_ROOT = "/desktop";
@@ -131,6 +133,31 @@ ipcRenderer.on(IPC_CHANNELS.AGENT_FOCUS_SESSION, (_event, payload: unknown) => {
     new CustomEvent(IPC_CHANNELS.AGENT_FOCUS_SESSION, { detail: payload })
   );
 });
+
+/**
+ * Per-terminal handler fanout for the PTY host's push channels. The
+ * preload mints each terminal id and registers its handlers here
+ * BEFORE invoking TERMINAL_CREATE, so the shell's first output frame
+ * (emitted as soon as the PTY spawns) can never race the subscription.
+ * Same payload-only discipline as the other `ipcRenderer.on` fanouts —
+ * the Electron event object never crosses the contextBridge
+ * (GRIDA-SEC-004).
+ */
+const terminalHandlers = new Map<string, TerminalHandlers>();
+ipcRenderer.on(
+  IPC_CHANNELS.TERMINAL_DATA,
+  (_event, payload: { id: string; data: string }) => {
+    terminalHandlers.get(payload.id)?.on_data(payload.data);
+  }
+);
+ipcRenderer.on(
+  IPC_CHANNELS.TERMINAL_EXIT,
+  (_event, payload: { id: string; exit_code: number }) => {
+    const handlers = terminalHandlers.get(payload.id);
+    terminalHandlers.delete(payload.id);
+    handlers?.on_exit({ exit_code: payload.exit_code });
+  }
+);
 
 function installDesktopNavigationGuard(): void {
   const assertAllowed = (url: string | URL | null | undefined) => {
@@ -258,6 +285,9 @@ const bridge: DesktopBridge = {
       // and File -> path resolution. Command execution is agent-host-internal
       // for V1, not a public renderer bridge capability.
       shell: true,
+      // Human-interactive terminal pane (GRIDA-SEC-004) — distinct from
+      // `shell` above and from the agent's sandboxed `run_command`.
+      terminal: true,
     },
   },
 
@@ -356,6 +386,36 @@ const bridge: DesktopBridge = {
         workspace_id: workspaceId,
         rel_path: relPath,
       }) as Promise<void>,
+  },
+
+  terminal: {
+    create: async (opts: TerminalCreateOptions, handlers: TerminalHandlers) => {
+      // Caller-mints-id (cf. sessions.enqueue): registering the handlers
+      // under a preload-minted id before the invoke means no PTY output
+      // frame can be emitted before the subscription exists.
+      const id = crypto.randomUUID();
+      terminalHandlers.set(id, handlers);
+      try {
+        await ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_CREATE, {
+          id,
+          workspace_id: opts.workspace_id,
+          cols: opts.cols,
+          rows: opts.rows,
+        });
+      } catch (err) {
+        terminalHandlers.delete(id);
+        throw err;
+      }
+      return { id };
+    },
+    write: (id: string, data: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_WRITE, { id, data }),
+    resize: (id: string, cols: number, rows: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_RESIZE, { id, cols, rows }),
+    kill: async (id: string) => {
+      terminalHandlers.delete(id);
+      await ipcRenderer.invoke(IPC_CHANNELS.TERMINAL_KILL, id);
+    },
   },
 
   host_apps: {

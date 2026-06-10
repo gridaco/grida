@@ -46,6 +46,24 @@ export function matchWorkspaceWorkbenchKeybinding(
   return null;
 }
 
+/**
+ * Terminal pane toggle — ctrl+` on every platform (the literal Control
+ * key, not CtrlCmd; ⌘` is macOS's own window-cycling chord), matching
+ * VSCode. Exported standalone (not a `WORKSPACE_WORKBENCH_COMMANDS`
+ * entry) because it's matched in two places: the workbench's window
+ * keydown handler, and the terminal pane's xterm key handler — xterm
+ * swallows keydown by default, so the pane must recognize the chord and
+ * let it bubble back out to the workbench.
+ */
+export const TERMINAL_TOGGLE_KEYBINDING: Keybinding = kb(
+  KeyCode.Backquote,
+  M.Ctrl
+);
+
+export function isTerminalToggleEvent(event: KeyboardEvent): boolean {
+  return match(event, TERMINAL_TOGGLE_KEYBINDING);
+}
+
 const WORKSPACE_WORKBENCH_COMMAND_SET = new Set<string>(
   WORKSPACE_WORKBENCH_COMMANDS
 );

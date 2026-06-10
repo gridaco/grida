@@ -27,6 +27,12 @@ import {
   resolvePreferredHostApps,
   type HostAppId,
 } from "./host-apps";
+import {
+  createTerminal,
+  killTerminal,
+  resizeTerminal,
+  writeTerminal,
+} from "./terminal-host";
 import { trashWorkspaceEntry } from "./workspace-files";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
@@ -243,6 +249,45 @@ export function registerIpcHandlers() {
       await trashWorkspaceEntry(workspace, opts.rel_path);
     }
   );
+
+  // GRIDA-SEC-004: human-interactive terminal. The PTY spawn cwd is the
+  // workspace root resolved from the sidecar registry — the renderer
+  // only ever names a workspace id, never a raw path. The PTY host
+  // additionally binds each terminal to its creating WebContents (see
+  // terminal-host.ts), so these guarded channels are the only way in.
+  guarded(
+    IPC_CHANNELS.TERMINAL_CREATE,
+    async (
+      event,
+      opts: { id: string; workspace_id: string; cols: number; rows: number }
+    ) => {
+      const workspace = await findWorkspaceOrThrow(opts.workspace_id);
+      await createTerminal(event.sender, {
+        id: opts.id,
+        cwd: workspace.root,
+        cols: opts.cols,
+        rows: opts.rows,
+      });
+    }
+  );
+
+  guarded(
+    IPC_CHANNELS.TERMINAL_WRITE,
+    (event, opts: { id: string; data: string }) => {
+      writeTerminal(event.sender, opts.id, opts.data);
+    }
+  );
+
+  guarded(
+    IPC_CHANNELS.TERMINAL_RESIZE,
+    (event, opts: { id: string; cols: number; rows: number }) => {
+      resizeTerminal(event.sender, opts.id, opts.cols, opts.rows);
+    }
+  );
+
+  guarded(IPC_CHANNELS.TERMINAL_KILL, (event, id: string) => {
+    killTerminal(event.sender, id);
+  });
 }
 
 async function findWorkspaceOrThrow(workspaceId: string) {

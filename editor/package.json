@@ -121,6 +121,8 @@
     "@visx/tooltip": "^3.3.0",
     "@visx/visx": "^3.11.0",
     "@visx/xychart": "^3.11.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "@xyflow/react": "^12.10.0",
     "ai": "6.0.197",
     "ajv": "^8.20.0",

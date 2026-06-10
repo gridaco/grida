@@ -135,7 +135,13 @@ export function createWebDaemonBridge(
     protocol: DESKTOP_BRIDGE_PROTOCOL,
     app: { version: "web-daemon-dev", platform: "web" },
     caps: {
-      native: { host_apps: false, window: false, dialog: false, shell: false },
+      native: {
+        host_apps: false,
+        window: false,
+        dialog: false,
+        shell: false,
+        terminal: false,
+      },
     },
     handshake: () => client.handshake(),
 
@@ -195,6 +201,14 @@ export function createWebDaemonBridge(
       write_file: (workspaceId, relPath, content) =>
         client.workspaces.write_file(workspaceId, relPath, content),
       trash_entry: () => unavailable("workspaces.trash_entry"),
+    },
+    terminal: {
+      // PTY host is an Electron-main capability; the web daemon bridge
+      // reports `caps.native.terminal: false` and the UI hides the pane.
+      create: () => unavailable("terminal.create"),
+      write: () => unavailable("terminal.write"),
+      resize: () => unavailable("terminal.resize"),
+      kill: () => unavailable("terminal.kill"),
     },
     host_apps: {
       resolve_preferred: async () => [],

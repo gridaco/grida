@@ -37,6 +37,12 @@ export type DesktopNativeCapabilities = {
   window: boolean;
   dialog: boolean;
   shell: boolean;
+  /**
+   * Human-interactive terminal (PTY) pane. Added after protocol 1
+   * shipped — renderers must treat a missing/falsy value as "old
+   * desktop binary, no terminal" and hide the surface.
+   */
+  terminal: boolean;
 };
 
 export type DesktopCapabilities = {
@@ -101,6 +107,21 @@ export type DesktopHostAppInfo = {
   label: string;
   installed: boolean;
   supports: Array<"workspace">;
+};
+
+export type TerminalCreateOptions = {
+  /** Workspace whose root becomes the shell's cwd. Resolved host-side
+   * from the sidecar registry — the renderer never passes a raw path. */
+  workspace_id: string;
+  cols: number;
+  rows: number;
+};
+
+export type TerminalHandlers = {
+  /** Raw PTY output frames, in order. */
+  on_data: (data: string) => void;
+  /** Fires once when the shell process exits; no more frames after. */
+  on_exit: (info: { exit_code: number }) => void;
 };
 
 export type DesktopBridge = {
@@ -171,6 +192,26 @@ export type DesktopBridge = {
      * user first.
      */
     trash_entry: (workspaceId: string, relPath: string) => Promise<void>;
+  };
+  /**
+   * GRIDA-SEC-004 — human-interactive terminal. A real, unsandboxed
+   * login PTY on the user's own machine (VSCode trust model: the human
+   * is allowed to run anything as themselves). This is deliberately
+   * NOT the agent's shell — the agent's `run_command` stays confined
+   * behind the srt sandbox and is never wired to this surface.
+   *
+   * `create` registers `handlers` before the PTY spawns, so no output
+   * frame is lost. The shell's cwd is the workspace root; the user may
+   * `cd` freely once open. Killed on window close — no reattach (v1).
+   */
+  terminal: {
+    create: (
+      opts: TerminalCreateOptions,
+      handlers: TerminalHandlers
+    ) => Promise<{ id: string }>;
+    write: (id: string, data: string) => Promise<void>;
+    resize: (id: string, cols: number, rows: number) => Promise<void>;
+    kill: (id: string) => Promise<void>;
   };
   host_apps: {
     resolve_preferred: (opts: {

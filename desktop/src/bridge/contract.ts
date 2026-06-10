@@ -17,6 +17,8 @@ export type {
   OpenDialogOptions,
   RecentEntry,
   SaveDialogOptions,
+  TerminalCreateOptions,
+  TerminalHandlers,
   Workspace,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
@@ -43,6 +45,13 @@ export const IPC_CHANNELS = {
   SHELL_SHOW_ITEM_IN_FOLDER: "grida:shell:show-item-in-folder",
   HOST_APPS_RESOLVE_PREFERRED: "grida:host-apps:resolve-preferred",
   HOST_APPS_OPEN_WORKSPACE: "grida:host-apps:open-workspace",
+  TERMINAL_CREATE: "grida:terminal:create",
+  TERMINAL_WRITE: "grida:terminal:write",
+  TERMINAL_RESIZE: "grida:terminal:resize",
+  TERMINAL_KILL: "grida:terminal:kill",
+  // main → renderer push channels (no invoke response)
+  TERMINAL_DATA: "grida:terminal:data",
+  TERMINAL_EXIT: "grida:terminal:exit",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

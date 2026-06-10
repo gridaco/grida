@@ -711,6 +711,67 @@ export namespace workspaces {
   }
 }
 
+/* ─────────────────────── terminal namespace ─────────────────── */
+
+/**
+ * GRIDA-SEC-004 — human-interactive terminal (PTY) pane. A real,
+ * unsandboxed shell running as the user (VSCode trust model) — NOT the
+ * agent's sandboxed `run_command`. The renderer only ever names a
+ * workspace id; the desktop main process resolves the cwd and owns the
+ * PTY. This namespace is the only surface in the editor tree that
+ * touches `bridge.terminal`.
+ *
+ * The capability is additive on protocol 1 — older desktop binaries
+ * don't have it, so UI must gate on {@link isSupported}.
+ */
+export namespace terminal {
+  export function isSupported(): boolean {
+    return getDesktopBridge()?.caps.native.terminal === true;
+  }
+
+  /**
+   * Spawn a login-shell PTY rooted at the workspace root. Handlers are
+   * registered before the shell spawns, so the first output frame is
+   * never lost. Resolves with the terminal id used by the siblings.
+   */
+  export async function create(
+    opts: { workspaceId: string; cols: number; rows: number },
+    handlers: {
+      onData: (data: string) => void;
+      onExit: (info: { exitCode: number }) => void;
+    }
+  ): Promise<{ id: string }> {
+    return await bridgeOrThrow().terminal.create(
+      {
+        workspace_id: opts.workspaceId,
+        cols: opts.cols,
+        rows: opts.rows,
+      },
+      {
+        on_data: handlers.onData,
+        on_exit: (info) => handlers.onExit({ exitCode: info.exit_code }),
+      }
+    );
+  }
+
+  export async function write(id: string, data: string): Promise<void> {
+    await bridgeOrThrow().terminal.write(id, data);
+  }
+
+  export async function resize(
+    id: string,
+    cols: number,
+    rows: number
+  ): Promise<void> {
+    await bridgeOrThrow().terminal.resize(id, cols, rows);
+  }
+
+  /** Kill the shell process. Idempotent from the renderer's view. */
+  export async function kill(id: string): Promise<void> {
+    await bridgeOrThrow().terminal.kill(id);
+  }
+}
+
 /* ─────────────────────── hostApps namespace ─────────────────── */
 
 /**
