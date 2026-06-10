@@ -14,6 +14,7 @@ import {
   SidebarMenuItem,
 } from "@app/ui/components/sidebar";
 import { uiNavGroups } from "./_nav";
+import { GridaLogo } from "@/components/grida-logo";
 
 export function UISidebar() {
   const pathname = usePathname();
@@ -23,8 +24,9 @@ export function UISidebar() {
       <SidebarHeader className="border-b">
         <Link
           href="/ui"
-          className="px-2 py-1.5 text-sm font-semibold tracking-tight"
+          className="flex items-center gap-2 px-2 py-1.5 text-sm font-semibold tracking-tight"
         >
+          <GridaLogo className="size-4" />
           UI Components
         </Link>
       </SidebarHeader>

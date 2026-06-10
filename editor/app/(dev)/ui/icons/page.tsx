@@ -1,54 +1,11 @@
 import type { Metadata } from "next";
 import React from "react";
 
-// Logos (incl. the Grida brand mark) — the explicit /logos subpath.
-import {
-  GridaLogo,
-  AppleLogo,
-  BirdLogo,
-  GoogleLogo,
-  KakaoTalkLogo,
-  SupabaseLogo,
-  WhatsAppLogo,
-  StripeBadgeLogo,
-  StripeWordmarkLogo,
-  TossLogo,
-  PostgreSQLLogo,
-  WindowsLogo,
-  SlackLogo,
-  XLogo,
-  AnthropicLogo,
-  OpenAILogo,
-  LinuxLogo,
-  NpmLogo,
-  UnsplashLogo,
-  SalesforceLogo,
-  BlackForestLabsLogo,
-  ACMELogo,
-  LeviLogo,
-} from "@grida/react-icons/logos";
-
-// Core editor / graphics-design glyphs — the package root.
-import {
-  PlayFilledIcon,
-  PauseFilledRoundedIcon,
-  FeNoiseIcon,
-  FeBackdropBlurIcon,
-  FeLayerBlurIcon,
-  FeGlassIcon,
-  SolidPaintIcon,
-  LinearGradientPaintIcon,
-  RadialGradientPaintIcon,
-  SweepGradientPaintIcon,
-  DiamondGradientPaintIcon,
-  ImagePaintIcon,
-  BlendModeIcon,
-  RemoveBackgroundIcon,
-  UpscaleIcon,
-  MirroringAllIcon,
-  MirroringAngleIcon,
-  MirroringNoneIcon,
-} from "@grida/react-icons";
+// The whole package surface, enumerated as namespaces so this page can never
+// drift from what the package actually ships — a new export renders here
+// without touching this file.
+import * as icons from "@grida/react-icons";
+import * as logos from "@grida/react-icons/logos";
 
 // Not yet promoted — still editor-internal (couples @grida/cg + flex composites).
 import {
@@ -79,71 +36,75 @@ type IconEntry = {
   Comp: React.ComponentType<{ className?: string }>;
 };
 
-// ── Promoted to @grida/react-icons/logos (source paths dropped) ──────────────
+type IconNamespace = Record<string, IconEntry["Comp"]>;
 
-const BRAND: IconEntry[] = [{ name: "GridaLogo", Comp: GridaLogo }];
+const ICONS_NS = icons as unknown as IconNamespace;
+const LOGOS_NS = logos as unknown as IconNamespace;
 
-const LOGOS: IconEntry[] = [
-  { name: "AppleLogo", Comp: AppleLogo },
-  { name: "BirdLogo", Comp: BirdLogo },
-  { name: "GoogleLogo", Comp: GoogleLogo },
-  { name: "KakaoTalkLogo", Comp: KakaoTalkLogo },
-  { name: "SupabaseLogo", Comp: SupabaseLogo },
-  { name: "WhatsAppLogo", Comp: WhatsAppLogo },
-  { name: "StripeBadgeLogo", Comp: StripeBadgeLogo },
-  { name: "StripeWordmarkLogo", Comp: StripeWordmarkLogo },
-  { name: "TossLogo", Comp: TossLogo },
-  { name: "PostgreSQLLogo", Comp: PostgreSQLLogo },
-  { name: "WindowsLogo", Comp: WindowsLogo },
-  { name: "SlackLogo", Comp: SlackLogo },
-  { name: "XLogo", Comp: XLogo },
-  { name: "AnthropicLogo", Comp: AnthropicLogo },
-  { name: "OpenAILogo", Comp: OpenAILogo },
-  { name: "LinuxLogo", Comp: LinuxLogo },
-  { name: "NpmLogo", Comp: NpmLogo },
-  { name: "UnsplashLogo", Comp: UnsplashLogo },
-  { name: "SalesforceLogo", Comp: SalesforceLogo },
-  { name: "BlackForestLabsLogo", Comp: BlackForestLabsLogo },
-  { name: "ACMELogo", Comp: ACMELogo },
-  { name: "LeviLogo", Comp: LeviLogo },
-];
+// `default` guards against CJS-interop namespace quirks.
+const exportedNames = (ns: IconNamespace) =>
+  Object.keys(ns)
+    .filter((n) => n !== "default")
+    .sort();
+
+const entriesOf = (ns: IconNamespace, names: readonly string[]): IconEntry[] =>
+  names.map((name) => ({ name, Comp: ns[name] }));
+
+// ── Promoted to @grida/react-icons/logos — enumerated from the package, so a
+//    newly added logo shows up here automatically ─────────────────────────────
+
+const BRAND: IconEntry[] = entriesOf(LOGOS_NS, ["GridaLogo"]);
+
+const LOGOS: IconEntry[] = entriesOf(
+  LOGOS_NS,
+  exportedNames(LOGOS_NS).filter((n) => n !== "GridaLogo")
+);
 
 // ── Promoted to @grida/react-icons root — grouped by SEMANTIC role, not by the
-//    editor directory the source happened to live in ──────────────────────────
+//    editor directory the source happened to live in. Group membership is
+//    typechecked against the package; anything not grouped falls through to
+//    the automatic "Ungrouped" section below ──────────────────────────────────
 
-const MEDIA: IconEntry[] = [
-  { name: "PlayFilledIcon", Comp: PlayFilledIcon },
-  { name: "PauseFilledRoundedIcon", Comp: PauseFilledRoundedIcon },
-];
+const group = (names: readonly (keyof typeof icons)[]): IconEntry[] =>
+  entriesOf(ICONS_NS, names);
 
-const FILTER_FX: IconEntry[] = [
-  { name: "FeNoiseIcon", Comp: FeNoiseIcon },
-  { name: "FeBackdropBlurIcon", Comp: FeBackdropBlurIcon },
-  { name: "FeLayerBlurIcon", Comp: FeLayerBlurIcon },
-  { name: "FeGlassIcon", Comp: FeGlassIcon },
-];
+const MEDIA = group(["PlayFilledIcon", "PauseFilledRoundedIcon"]);
 
-const PAINT: IconEntry[] = [
-  { name: "SolidPaintIcon", Comp: SolidPaintIcon },
-  { name: "LinearGradientPaintIcon", Comp: LinearGradientPaintIcon },
-  { name: "RadialGradientPaintIcon", Comp: RadialGradientPaintIcon },
-  { name: "SweepGradientPaintIcon", Comp: SweepGradientPaintIcon },
-  { name: "DiamondGradientPaintIcon", Comp: DiamondGradientPaintIcon },
-  { name: "ImagePaintIcon", Comp: ImagePaintIcon },
-];
+const FILTER_FX = group([
+  "FeNoiseIcon",
+  "FeBackdropBlurIcon",
+  "FeLayerBlurIcon",
+  "FeGlassIcon",
+]);
 
-const BLEND: IconEntry[] = [{ name: "BlendModeIcon", Comp: BlendModeIcon }];
+const PAINT = group([
+  "SolidPaintIcon",
+  "LinearGradientPaintIcon",
+  "RadialGradientPaintIcon",
+  "SweepGradientPaintIcon",
+  "DiamondGradientPaintIcon",
+  "ImagePaintIcon",
+]);
 
-const IMAGE: IconEntry[] = [
-  { name: "RemoveBackgroundIcon", Comp: RemoveBackgroundIcon },
-  { name: "UpscaleIcon", Comp: UpscaleIcon },
-];
+const BLEND = group(["BlendModeIcon"]);
 
-const VECTOR: IconEntry[] = [
-  { name: "MirroringAllIcon", Comp: MirroringAllIcon },
-  { name: "MirroringAngleIcon", Comp: MirroringAngleIcon },
-  { name: "MirroringNoneIcon", Comp: MirroringNoneIcon },
-];
+const IMAGE = group(["RemoveBackgroundIcon", "UpscaleIcon"]);
+
+const VECTOR = group([
+  "MirroringAllIcon",
+  "MirroringAngleIcon",
+  "MirroringNoneIcon",
+]);
+
+// Root exports not placed in a semantic group above — rendered automatically
+// so nothing the package ships is missing from this page.
+const GROUPED = new Set(
+  [MEDIA, FILTER_FX, PAINT, BLEND, IMAGE, VECTOR].flat().map((e) => e.name)
+);
+const UNGROUPED: IconEntry[] = entriesOf(
+  ICONS_NS,
+  exportedNames(ICONS_NS).filter((n) => !GROUPED.has(n))
+);
 
 // ── Not yet promoted — editor-internal ───────────────────────────────────────
 
@@ -188,14 +149,7 @@ const STROKE_DECORATION: IconEntry[] = [
 ];
 
 const PROMOTED_COUNT =
-  BRAND.length +
-  LOGOS.length +
-  MEDIA.length +
-  FILTER_FX.length +
-  PAINT.length +
-  BLEND.length +
-  IMAGE.length +
-  VECTOR.length;
+  exportedNames(ICONS_NS).length + exportedNames(LOGOS_NS).length;
 
 function IconCell({
   name,
@@ -296,6 +250,29 @@ export default function UIIconsPage() {
         </p>
       </div>
 
+      <div className="rounded-md border p-4 text-sm">
+        <p className="font-medium">
+          Are you looking for{" "}
+          <a
+            href="https://icons.grida.co"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-4"
+          >
+            icons.grida.co
+          </a>
+          ?
+        </p>
+        <p className="mt-1 leading-relaxed text-muted-foreground">
+          Grida Icons is our aggregated catalog of popular open-source icon sets
+          (Lucide, Heroicons, Phosphor, Octicons, Radix UI, SVGL) with a free
+          search API — that&apos;s a separate project. This page documents{" "}
+          <code className="font-mono">@grida/react-icons</code>: the
+          hand-authored React components for Grida&apos;s own editor-domain
+          glyphs and brand logos.
+        </p>
+      </div>
+
       <hr />
 
       <Section
@@ -367,6 +344,19 @@ export default function UIIconsPage() {
       >
         <IconGrid entries={VECTOR} />
       </Section>
+
+      {UNGROUPED.length > 0 ? (
+        <>
+          <hr />
+
+          <Section
+            title="Ungrouped"
+            description="Root exports not yet placed in a semantic group above — enumerated from the package automatically, so nothing it ships is missing from this page."
+          >
+            <IconGrid entries={UNGROUPED} />
+          </Section>
+        </>
+      ) : null}
 
       <hr />
 
