@@ -21,3 +21,4 @@ export { default as UnsplashLogo } from "./unsplash";
 export { default as WhatsAppLogo } from "./whatsapp";
 export { default as WindowsLogo } from "./windows";
 export { default as XLogo } from "./x";
+export { default as YouTubeLogo } from "./youtube";

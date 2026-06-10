@@ -37,7 +37,8 @@ import { CopyToClipboardInput } from "@/components/copy-to-clipboard-input";
 import { Resources } from "@/resources";
 import Footer from "@/www/footer";
 import Header from "@/www/header";
-import { ArrowRightIcon, GithubIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
+import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
 import Link from "next/link";
 import type * as React from "react";
@@ -80,7 +81,7 @@ export default function TreeViewLandingPage() {
             </Link>
             <Link href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
               <Button size="lg" variant="outline">
-                <GithubIcon className="size-4 mr-2" />
+                <GitHubLogoIcon className="size-4 mr-2" />
                 GitHub
               </Button>
             </Link>

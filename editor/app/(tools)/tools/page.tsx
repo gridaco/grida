@@ -11,11 +11,11 @@ import {
   BoxIcon,
   CodeIcon,
   EraserIcon,
-  FigmaIcon,
   FrameIcon,
   ImageIcon,
   KeyRoundIcon,
 } from "lucide-react";
+import { FigmaLogoIcon } from "@radix-ui/react-icons";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -86,7 +86,7 @@ const categories: { name: string; tools: Tool[] }[] = [
         title: ".fig Inspector",
         description: "Parse and inspect Figma .fig files and clipboard data",
         link: "/tools/fig",
-        icon: FigmaIcon,
+        icon: FigmaLogoIcon,
       },
       {
         title: "E.164 Phone Number Tool",

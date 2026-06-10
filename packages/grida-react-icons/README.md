@@ -1,5 +1,10 @@
 # @grida/react-icons
 
+> **Live:** [grida.co/ui/icons](https://grida.co/ui/icons) — every icon in
+> the package, rendered. _Looking for the open-source icon search & API
+> ([icons.grida.co](https://icons.grida.co))? That's a separate project —
+> [gridaco/icons](https://github.com/gridaco/icons)._
+
 Icons for building **expert editors and graphics-design tools** — the
 genuine missing pieces that general icon sets don't ship: paint &
 gradient types, blend modes, stroke endpoints/markers, vector-editing

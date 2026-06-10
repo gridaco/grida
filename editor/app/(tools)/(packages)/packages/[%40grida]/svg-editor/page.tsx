@@ -19,7 +19,8 @@ import { cn } from "@app/ui/lib/utils";
 import { useScrollSpy } from "@/hooks/use-scroll-spy";
 import Footer from "@/www/footer";
 import Header from "@/www/header";
-import { ArrowRightIcon, GithubIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
+import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useMemo } from "react";
 import type * as React from "react";
@@ -95,7 +96,7 @@ export default function SvgEditorPackagePage() {
                   rel="noopener noreferrer"
                 >
                   <Button size="lg" variant="outline">
-                    <GithubIcon className="size-4 mr-2" />
+                    <GitHubLogoIcon className="size-4 mr-2" />
                     GitHub
                   </Button>
                 </Link>

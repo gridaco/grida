@@ -158,7 +158,7 @@
     "jose": "^6.1.3",
     "libphonenumber-js": "^1.12.6",
     "lowlight": "^3.3.0",
-    "lucide-react": "^0.511.0",
+    "lucide-react": "^1.17.0",
     "mapbox-gl": "^3.4.0",
     "masonic": "^4.1.0",
     "mdn-data": "^2.8.0",
