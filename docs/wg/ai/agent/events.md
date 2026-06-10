@@ -208,6 +208,19 @@ sessions differently, normative for the desktop shell.
 
 ### When to notify
 
+This table is the policy's normative core, and it is exactly the kind
+of small matrix that drifts silently — a new end reason lands in the
+vocabulary and the consumer maps it to stale copy nobody decided on.
+A host MUST therefore hold the table with two mechanical guards: the
+mapping is **exhaustive** over the event vocabulary (growing the
+vocabulary must fail the consumer's build until a row is decided, not
+fall through to an old row), and an event or reason the consumer's
+version does not know is **silent** (version skew between an agent
+server and an older shell must never produce a wrong notification).
+A host SHOULD additionally pin the table row-for-row with a contract
+test in its own tree, so the doc and the behavior can be diffed by
+eye.
+
 | Event                                          | Notify?                                                                                                   |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `approval-requested`                           | Yes — highest value; the agent is stalled on the user.                                                    |
@@ -246,6 +259,40 @@ select that session. The resolution key is the session's workspace
 binding; an unbound session falls back to the host's default
 surface. A notification that cannot deep-link still MUST focus the
 application.
+
+## The seam under a foreign backend
+
+The channel is deliberately the seam between **turn execution** and
+**attention surfaces** — and that seam must hold when the thing
+executing the turn is no longer the built-in runtime. A host that
+adopts an external agent runtime as a session backend (for example,
+one consumed over the [Agent Client Protocol](./acp.md)) takes on a
+normative obligation:
+
+- **The adapter owns emission.** Whatever component translates the
+  foreign runtime's lifecycle into the host's sessions MUST also
+  project it onto this vocabulary: the foreign turn's terminal
+  outcome (however that runtime names its stop reasons) maps to
+  `turn-finished` with the honest `reason`; the foreign runtime's
+  permission/approval request maps to `approval-requested` and the
+  blocked-finish semantics (`pending_approval`); a user cancel maps
+  to `abort`.
+- **Consumers stay backend-blind.** A notification consumer — or any
+  other subscriber — MUST NOT need to know which backend ran the
+  turn. If adopting a backend requires touching a consumer, the
+  adapter has leaked; the fix belongs in the adapter.
+- **Conformance is observable.** A backend adapter conforms when the
+  [invariants below](#invariants) hold over its sessions exactly as
+  they hold over the built-in runtime's: every turn emits
+  started/finished, blocked turns ring the doorbell before their
+  finish, and the events ride the same host-wide stream.
+
+Stated once because the alternative is silent: nothing in a backend
+integration _forces_ events to flow — sessions would still run,
+transcripts would still render, and the first sign of the missing
+emission would be a user quietly never notified. Treat "the events
+still arise" as part of the definition of done for any new backend,
+verified the same way the built-in runtime is.
 
 ## Not a hooks system
 

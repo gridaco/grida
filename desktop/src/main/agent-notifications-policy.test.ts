@@ -1,10 +1,17 @@
 /**
  * Contract pins for the desktop notification policy (RFC
  * `docs/wg/ai/agent/events.md` §the first consumer): which lifecycle
- * events notify, the silent cases, and the focus gate. Pure — no
- * electron; the wiring (SSE loop, window resolution, Notification,
- * click routing) lives in `agent-notifications.ts` and is exercised
- * through the running app.
+ * events notify, the silent cases, and the focus gate. The `decide`
+ * suite below mirrors the RFC's §when-to-notify table ROW FOR ROW — if
+ * a row changes in one place and not the other, the spec has drifted;
+ * fix the drift, not the test. Exhaustiveness over the event vocabulary
+ * is enforced at COMPILE time in the policy itself (`silentOnUnknown`),
+ * so these pins own the row semantics and the skew fallback, not the
+ * enumeration.
+ *
+ * Pure — no electron; the wiring (SSE loop, window resolution,
+ * Notification, click routing) lives in `agent-notifications.ts` and is
+ * exercised through the running app.
  */
 import { describe, expect, it } from "vitest";
 import type { AgentLifecycleEvent } from "@grida/agent";
@@ -87,6 +94,29 @@ describe("agent_notifications.decide — when to notify (RFC events §when-to-no
     expect(
       agent_notifications.decide(finished(), { ...SESSION, title: "  " })?.title
     ).toBe(FALLBACK_TITLE);
+  });
+
+  // Version skew (a newer agent server under an older shell — possible once
+  // external backends/daemons emit onto this channel): values this build's
+  // vocabulary doesn't know MUST stay silent, never map to a wrong
+  // notification. In-repo vocabulary growth is caught at compile time
+  // instead (the policy's exhaustive switches).
+  it("is silent on an end reason this build does not know (skew fail-quiet)", () => {
+    expect(
+      agent_notifications.decide(
+        finished({ reason: "timeout" as never }),
+        SESSION
+      )
+    ).toBeNull();
+  });
+
+  it("is silent on an event type this build does not know (skew fail-quiet)", () => {
+    expect(
+      agent_notifications.decide(
+        { type: "turn-retrying", session_id: "ses1", at: 1 } as never,
+        SESSION
+      )
+    ).toBeNull();
   });
 });
 

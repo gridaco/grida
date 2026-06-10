@@ -43,10 +43,19 @@ export namespace agent_notifications {
   };
 
   /**
-   * Which events become a notification, and the copy (RFC `events`
-   * §when-to-notify). Returns null for the silent cases: turn-started
-   * (not an attention moment), abort (the user did it themselves), and
-   * a blocked finish (the approval-requested event already covers it).
+   * Which events become a notification, and the copy — this function IS
+   * the RFC `events` §when-to-notify table; if they disagree, one of them
+   * drifted. Returns null for the silent cases: turn-started (not an
+   * attention moment), abort (the user did it themselves), and a blocked
+   * finish (the approval-requested event already covers it).
+   *
+   * Drift discipline: both switches are EXHAUSTIVE over the protocol
+   * unions, so growing the event vocabulary (a new event type, a new end
+   * reason — e.g. a future external-backend adapter surfacing a stop
+   * reason of its own) fails the desktop build here until this table
+   * decides notify-or-silent for it. At runtime an unknown value (version
+   * skew: a newer agent server under an older shell) falls through to
+   * SILENT — never to a wrong notification.
    */
   export function decide(
     event: AgentLifecycleEvent,
@@ -57,14 +66,35 @@ export namespace agent_notifications {
       case "approval-requested":
         return { title, body: "Waiting for your approval" };
       case "turn-finished": {
-        if (event.reason === "abort") return null;
         if (event.pending_approval) return null;
-        if (event.reason === "error") return { title, body: "Run failed" };
-        return { title, body: "Turn completed" };
+        switch (event.reason) {
+          case "finish":
+            return { title, body: "Turn completed" };
+          case "error":
+            return { title, body: "Run failed" };
+          case "abort":
+            return null;
+          default:
+            return silentOnUnknown(event.reason);
+        }
       }
-      default:
+      case "turn-started":
         return null;
+      default:
+        return silentOnUnknown(event);
     }
+  }
+
+  /**
+   * The exhaustiveness alarm + the skew fallback in one place: `value` is
+   * `never` when the switch covers the whole protocol union (so a union
+   * growth is a COMPILE error at the call site), and the runtime return is
+   * null (an event this build doesn't know stays silent, RFC `events`
+   * §when-to-notify).
+   */
+  function silentOnUnknown(value: never): null;
+  function silentOnUnknown(): null {
+    return null;
   }
 
   /**
