@@ -31,7 +31,10 @@ export type AttachedSurface = {
  * This is the gesture path's real entry point: the surface installs pointer
  * handlers, so {@link dragByClient} drives the actual translate/snap pipeline.
  */
-export function attachSurface(svgText: string): AttachedSurface {
+export function attachSurface(
+  svgText: string,
+  opts?: { clipboard?: boolean }
+): AttachedSurface {
   const container = document.createElement("div");
   // Pin to the top-left of the viewport with a concrete size so client
   // coordinates equal world coordinates under the identity camera.
@@ -52,6 +55,7 @@ export function attachSurface(svgText: string): AttachedSurface {
     container,
     gestures: true,
     fit: false,
+    clipboard: opts?.clipboard,
   });
 
   const elementByName = (name: string): SVGGraphicsElement => {

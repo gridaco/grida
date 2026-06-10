@@ -8,6 +8,7 @@ import {
   useCanUndo,
   useCommands,
   useEditorSerialize,
+  useEditorState,
   useSvgEditor,
 } from "@grida/svg-editor/react";
 import type { SvgEditor } from "@grida/svg-editor";
@@ -88,6 +89,7 @@ export function SvgShell({
   const editor = useSvgEditor();
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
+  const hasSelection = useEditorState((s) => s.selection.length > 0);
   const cmd = useCommands();
   const serialize = useEditorSerialize();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,11 +151,20 @@ export function SvgShell({
             <SvgMenuContent
               canUndo={canUndo}
               canRedo={canRedo}
+              canCopy={hasSelection}
               onOpenFile={() => fileInputRef.current?.click()}
               onSaveFile={saveSvg}
               onReset={onReset}
               onUndo={() => cmd.undo()}
               onRedo={() => cmd.redo()}
+              // Menu items route through the command REGISTRY (not the
+              // bare commands) — this is the provider/RPC acquisition
+              // path the keystroke flow never exercises: copy/cut write
+              // navigator.clipboard via the route's ClipboardProvider,
+              // paste reads it (see route-shell.tsx).
+              onCopy={() => cmd.invoke("clipboard.copy")}
+              onCut={() => cmd.invoke("clipboard.cut")}
+              onPaste={() => cmd.invoke("clipboard.paste")}
             />
           </DropdownMenu>
           <span className="font-bold text-xs">{title}</span>

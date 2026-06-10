@@ -642,6 +642,25 @@ editor.commands.{
                                       // groups with visual state — see TODO §10)
   remove(): void;
 
+  // clipboard — the payload is a STANDALONE SVG DOCUMENT, not a private
+  // format (the file is the IR, so the clipboard is the file format).
+  // Copy carries the outbound url(#…)/href reference closure in one
+  // <defs> block and declares borrowed xmlns prefixes on the payload
+  // shell; ancestor transforms / inherited presentation / viewport are
+  // deliberately NOT carried (verbatim policy). Cut = copy + remove as
+  // ONE history step labeled "cut"; undo restores the document and the
+  // clipboard keeps the payload (cut → undo → paste = move). Paste is
+  // synchronous over delivered text (`text ?? internal buffer`) and has
+  // a gesture-grade refusal table: non-parseable environment input is a
+  // no-op `[]`, never a throw (insert_fragment keeps strict semantics).
+  // System-clipboard wiring is the DOM surface's native ClipboardEvent
+  // transport (text/plain = the markup itself) plus the optional
+  // ClipboardProvider seam. Full contract:
+  // https://grida.co/docs/wg/feat-svg-editor/clipboard
+  copy(): string | null;              // payload | null on empty selection; no history
+  cut(): string | null;               // one undoable step; buffer secured before delete
+  paste(text?: string): NodeId[];     // inserted roots (selected); [] = refusal
+
   // insertion — `tag` is an open string (so paste / RPC can create any element,
   // e.g. "path"); only the closed `InsertableTag` set gets a pointer-driven
   // draw gesture and default paint.

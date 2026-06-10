@@ -47,6 +47,18 @@ export interface AttentionTracker {
    * Pure read; no DOM mutation. Cheap enough to call once per keydown.
    */
   is_attended(): boolean;
+  /**
+   * `true` iff focus is inside `container`'s subtree — the focus arm of
+   * {@link is_attended} alone, WITHOUT the pointer-over arm.
+   *
+   * Exists for the native clipboard gate (`dom.ts`): pointer-over is a
+   * sufficient signal to claim a keystroke (worst case: a stolen scroll)
+   * but NOT a copy/cut/paste gesture (worst case: destroying what the
+   * user believed they copied, or routing a paste meant for a host text
+   * field into the document). See docs/wg/feat-svg-editor/clipboard.md
+   * §Transport "Gating the native events".
+   */
+  is_focus_within(): boolean;
   /** Detach the internal pointer-tracking listeners. */
   dispose(): void;
 }
@@ -72,20 +84,22 @@ export function create_attention_tracker(
   container.addEventListener("pointerenter", on_enter);
   container.addEventListener("pointerleave", on_leave);
 
-  const is_attended = (): boolean => {
+  const is_focus_within = (): boolean => {
     const owner = container.ownerDocument;
-    if (!owner) return pointer_over;
+    if (!owner) return false;
     const active = owner.activeElement;
     // Focus inside the surface's subtree counts. `contains(self)` is true,
     // so this also covers "the container itself is focused" (e.g. tabindex).
-    if (active && active !== owner.body && container.contains(active)) {
-      return true;
-    }
-    return pointer_over;
+    return !!active && active !== owner.body && container.contains(active);
+  };
+
+  const is_attended = (): boolean => {
+    return is_focus_within() || pointer_over;
   };
 
   return {
     is_attended,
+    is_focus_within,
     dispose: () => {
       container.removeEventListener("pointerenter", on_enter);
       container.removeEventListener("pointerleave", on_leave);

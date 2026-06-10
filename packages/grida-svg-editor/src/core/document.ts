@@ -1278,4 +1278,15 @@ function parse_inline_style(
   return out;
 }
 
-export { XLINK_NS, XML_NS, XMLNS_NS };
+/**
+ * Namespace prefixes resolvable without a source declaration. ONE table,
+ * shared by the paste-side hoist (`insert_fragment`'s xmlns plan) and the
+ * copy-side shell repair (clipboard payload extraction) — the two sides
+ * form a round-trip and must agree: a prefix only one side knows would
+ * produce payloads the other can't honor.
+ */
+export const WELL_KNOWN_NS_PREFIXES: ReadonlyMap<string, string> = new Map([
+  ["xlink", XLINK_NS],
+]);
+
+export { SVG_NS, XLINK_NS, XML_NS, XMLNS_NS };
