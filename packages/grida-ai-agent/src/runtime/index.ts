@@ -258,6 +258,9 @@ export class AgentRuntime {
    * `turn-finished` on the bus.
    */
   private readonly session_event_chains = new Map<string, Promise<void>>();
+  /** Registry-observer detach fns, called in {@link dispose} — the registry
+   *  can be injected and outlive this runtime. */
+  private readonly detach_observers: Array<() => void> = [];
   private readonly compaction_enabled: boolean;
   private readonly compaction_config: CompactionConfig;
   private readonly compaction_summarize?: compactor.Summarize;
@@ -284,24 +287,31 @@ export class AgentRuntime {
         this.deps.sessions_store.hasPendingApproval(sessionId),
       drain_cooldown_ms: deps.drain_cooldown_ms,
     });
-    this.streams.observe({
-      on_create: (sessionId) => this.scheduler.onCreate(sessionId),
-      on_finish: (sessionId, reason) =>
-        this.scheduler.onFinish(sessionId, reason),
-    });
+    // Both observers are detached in dispose(): the registry can be
+    // INJECTED (deps.streams) and so outlive this runtime — without the
+    // detach, a disposed runtime's scheduler would keep receiving edges.
+    this.detach_observers.push(
+      this.streams.observe({
+        on_create: (sessionId) => this.scheduler.onCreate(sessionId),
+        on_finish: (sessionId, reason) =>
+          this.scheduler.onFinish(sessionId, reason),
+      })
+    );
     // Second registry observer — the lifecycle event bus (RFC `events`).
     // Attachable alongside the scheduler because `observe` is
     // multi-subscriber; the finish edge is the single chokepoint every end
     // path funnels through (pump finish/error, explicit abort).
-    this.streams.observe({
-      on_finish: (sessionId, reason) => {
-        // Capture the fired identity AT the edge — a subsequent turn's
-        // reserve may rewrite the slot before the ordered task runs.
-        const messageId = this.fired_messages.get(sessionId);
-        this.fired_messages.delete(sessionId);
-        this.emitTurnFinished(sessionId, reason, messageId);
-      },
-    });
+    this.detach_observers.push(
+      this.streams.observe({
+        on_finish: (sessionId, reason) => {
+          // Capture the fired identity AT the edge — a subsequent turn's
+          // reserve may rewrite the slot before the ordered task runs.
+          const messageId = this.fired_messages.get(sessionId);
+          this.fired_messages.delete(sessionId);
+          this.emitTurnFinished(sessionId, reason, messageId);
+        },
+      })
+    );
   }
 
   /**
@@ -1073,6 +1083,9 @@ export class AgentRuntime {
 
   /** Drain in-flight runs (abort upstream) + clear the registry. */
   dispose(): void {
+    // Detach from the registry FIRST — it can be injected (deps.streams)
+    // and outlive this runtime; a disposed runtime must not keep observing.
+    for (const detach of this.detach_observers.splice(0)) detach();
     this.streams.clear();
     this.scheduler.dispose();
     this.events.dispose();
