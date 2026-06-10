@@ -204,6 +204,8 @@ export class SvgDocument implements DocumentEvents {
    * stays the same and React skips the re-render of the whole tree.
    */
   private _structure_version = 0;
+  /** Total listener-visible mutation count. See the `revision` getter. */
+  private _revision = 0;
   /** Bumps on writes that can shift world-space bounds (`GEOMETRY_ATTRS`,
    *  `set_text`, `insert`, `remove`). Cache key for `GeometryProvider`;
    *  see ../../docs/geometry.md. */
@@ -270,6 +272,21 @@ export class SvgDocument implements DocumentEvents {
     return this._structure_version;
   }
 
+  /**
+   * Total mutation counter — advances on EVERY listener-visible mutation
+   * (attribute, style, text, topology, load/reset), unlike the selective
+   * `structure_version` / `geometry_version` channels. The single
+   * edit-version source: anything derived from this document — the
+   * editor's `content_version` / `dirty`, memoized reads, a rendered
+   * projection — answers "am I current?" by comparing values, with no
+   * event-ordering dependence. Advances BEFORE listeners fire, so a
+   * read issued from inside a change listener already sees the new
+   * value.
+   */
+  get revision(): number {
+    return this._revision;
+  }
+
   /** See `_geometry_version` for what this counter signals. */
   get geometry_version(): number {
     return this._geometry_version;
@@ -287,16 +304,16 @@ export class SvgDocument implements DocumentEvents {
    * settled glyph metrics. See ../../docs/geometry.md §Limitations.
    *
    * Deliberately does NOT call `emit()`: this is not a document edit, so
-   * it must not bump `doc_version` / mark the doc dirty / touch undo
-   * (the editor's `on_change` handler does all three). The editor's
-   * `_internal.bump_geometry` advances `geometry_version` here and fans
-   * out the geometry listeners itself.
+   * `revision` must not advance — no dirty flag, no undo, no render
+   * flush. The editor's `_internal.bump_geometry` advances
+   * `geometry_version` here and fans out the geometry listeners itself.
    */
   bump_geometry(): void {
     this._geometry_version++;
   }
 
   private emit() {
+    this._revision++;
     for (const fn of this.listeners) fn();
   }
 

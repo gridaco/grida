@@ -19,6 +19,19 @@ import type { NodeId, Rect, Unsubscribe, Vec2 } from "../types";
  * will query dozens of nodes per pointermove. The driver wraps SVG
  * `getBBox` + `getCTM`; the memoizer caches per-`NodeId` to survive
  * the surface re-rendering the SVG tree every editor tick.
+ *
+ * **Freshness contract.** Every read MUST reflect the CURRENT document
+ * — including when issued synchronously from inside a doc-change
+ * listener (`subscribe_geometry` fires mid-mutation, before any
+ * render). An implementation backed by a lazily-synced projection
+ * (e.g. a rendered DOM tree) must flush that projection before
+ * reading; compare `SvgDocument.revision` against the projection's
+ * last-rendered revision. Returning the previous document's geometry
+ * is not a transient glitch: the `MemoizedGeometryProvider` wrapper
+ * caches whatever the driver returns, so one stale read poisons every
+ * later consumer until the next invalidation (align/resize then plan
+ * against one-mutation-old bounds and oscillate — see
+ * `__tests__/geometry-stale-read.browser.test.ts`).
  */
 export interface GeometryProvider {
   /**

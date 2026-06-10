@@ -46,6 +46,7 @@ interface GeometryProvider {
   bounds_of_many(ids: ReadonlyArray<NodeId>): Map<NodeId, Rect>;
   nodes_in_rect(rect: Rect): NodeId[];
   node_at_point(p: Vec2): NodeId | null;
+  world_delta_to_local?(id: NodeId, delta: Vec2): Vec2;
 }
 ```
 
@@ -70,7 +71,12 @@ the driver room to batch.
 | ------------------- | --------------------------------------------------------------------------------------------------- |
 | `structure_version` | tree shape changes, `id` writes, `set_text`                                                         |
 | `geometry_version`  | tree shape changes, `set_text`, writes to attributes in `GEOMETRY_ATTRS`, and DOM font-load settle† |
-| `doc_version`       | every mutation (including presentation writes)                                                      |
+| `revision`          | every mutation (including presentation writes)                                                      |
+
+All three live on `SvgDocument`. `revision` is the total order —
+surfaced as `EditorState.content_version`, it derives `dirty`, keys the
+typed-read memo caches, and gates the DOM surface's render flush (see
+§Flush-on-read below).
 
 `GEOMETRY_ATTRS` is the closed set of attribute names whose writes can
 shift bounds — `x`, `y`, `width`, `d`, `transform`, `font-size`, etc.
@@ -80,31 +86,55 @@ See [`src/core/document.ts`](../src/core/document.ts) for the full list.
 font-load settle (`document.fonts` `loadingdone`). The DOM surface drives
 it through `editor._internal.bump_geometry()` →
 `SvgDocument.bump_geometry()`, which advances `geometry_version` only — it
-does **not** bump `structure_version` / `doc_version`, mark the doc dirty,
+does **not** bump `structure_version` / `revision`, mark the doc dirty,
 or touch undo (a reflow is not an edit). See §Limitations "Text bbox
 depends on font".
 
 The `MemoizedGeometryProvider` subscribes to both `structure_version`
 and `geometry_version` and clears its cache on either. It does **not**
-subscribe to `doc_version` — a fill-color change does not invalidate
+subscribe to `revision` — a fill-color change does not invalidate
 bounds.
 
 ## Why caching is load-bearing
 
-The DOM surface re-renders the entire `<svg>` root on every editor
-tick (it calls `editor.serialize()` and `replaceWith`s the result).
-That means every editor tick replaces the DOM elements that
-`getBBox`/`getCTM` would read from.
+The DOM surface re-renders the entire `<svg>` root whenever the doc
+changed (it calls `editor.serialize()` and `replaceWith`s the result;
+the rebuild is gated on `revision`, so emits that carry no doc change
+— selection, tool — skip it). Every re-render replaces the DOM
+elements that `getBBox`/`getCTM` would read from.
 
-For idle editing this is fine — `render()` only fires on doc mutation.
-But during a drag, snap queries 50+ candidate node bounds per
-pointermove against a freshly-mounted tree, and without caching each
-call forces a synchronous layout flush. The memoizer makes the first
-read of a frame pay the layout cost; subsequent reads in the same
-frame are O(1).
+For idle editing this is fine — the rebuild only happens on doc
+mutation. But during a drag, snap queries 50+ candidate node bounds
+per pointermove against a freshly-mounted tree, and without caching
+each call forces a synchronous layout flush. The memoizer makes the
+first read of a frame pay the layout cost; subsequent reads in the
+same frame are O(1).
 
 The cache is keyed on `NodeId`, not on DOM element references —
-elements are replaced every tick, but ids persist.
+elements are replaced on every re-render, but ids persist.
+
+## Flush-on-read — reads never observe a stale render
+
+Doc listeners (`subscribe_geometry`, `editor.subscribe`) fire
+synchronously inside the mutation — before the surface's render
+listener has projected the new attrs into the live DOM. A geometry
+read issued from such a listener (a React `useSyncExternalStore`
+bounds hook, say) would otherwise read the PREVIOUS document's
+layout — and because the memoizer caches whatever the driver
+returns, that one stale read poisons every later consumer until the
+next invalidation: repeated `align` re-applies the previous delta
+and the selection oscillates instead of settling.
+
+So the driver flushes before every live-DOM read: each
+`SvgGeometryDriver` method (and the `getComputedStyle`-backed
+computed resolver) first calls the surface's `flush_dom()`, which
+re-renders iff `revision` is ahead of the last-rendered revision.
+Same model as CSS layout — reading `offsetWidth` flushes pending
+layout; reading `bounds_of` flushes the pending render. The contract
+is stated on the `GeometryProvider` interface (any future driver
+backed by a lazily-synced projection must honor it); the regression
+suite is
+[`geometry-stale-read.browser.test.ts`](../__tests__/geometry-stale-read.browser.test.ts).
 
 ## Show/hide uses `visibility`, not `display`
 

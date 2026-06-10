@@ -310,6 +310,14 @@ class DomSurface implements Surface {
   private hud: HUDSurface;
   private teardown: Array<() => void> = [];
   private element_index = new Map<NodeId, SVGElement>();
+  /** `doc.revision` at the last completed `render()`. `-1` = never
+   *  rendered. Compared against the live revision by `flush_dom()` to
+   *  decide whether the rendered tree is a current projection of the IR —
+   *  pull-based on purpose: an event-driven dirty flag would depend on
+   *  listener registration order (the editor's own `doc.on_change` handler
+   *  fans out geometry listeners BEFORE any surface subscription would
+   *  run, and those listeners can re-enter reads). */
+  private rendered_doc_revision = -1;
   /** Last pointer position in container-local CSS px. Tracked separately from
    *  HUD hover so the measurement HUD can run its own hit-test that allows
    *  the `<svg>` root (which `hit_test` excludes for selection purposes).
@@ -803,7 +811,10 @@ class DomSurface implements Surface {
       this.hud.setVectorBendMode(
         this.current_tool.type === "bend" ? "always" : "auto"
       );
-      this.render();
+      // Revision-gated: a no-op when a flush-on-read (geometry driver /
+      // computed resolver) already projected this mutation, or when the
+      // emit carried no doc change (selection, tool, mode).
+      this.flush_dom();
       this.sync_surface_selection();
       // Sync pixel grid enabled state BEFORE sync_canvas_size — that call
       // re-paints the HUD internally and must see the latest flag. Cheap
@@ -935,13 +946,19 @@ class DomSurface implements Surface {
     // matching, `var()`, and inheritance — the cases the headless cascade
     // engine doesn't cover at v1.
     internal.set_computed_resolver({
+      // `flush_dom()` first: like the geometry driver, these read the live
+      // DOM as a proxy for document state, and a query from inside a doc-
+      // change listener would otherwise resolve against the pre-mutation
+      // cascade. See the staleness contract on `flush_dom`.
       computed_property: (id, name) => {
+        this.flush_dom();
         const el = this.element_index.get(id);
         if (!el) return null;
         const value = getComputedStyle(el).getPropertyValue(name);
         return value === "" ? null : value;
       },
       computed_paint: (id, channel) => {
+        this.flush_dom();
         const el = this.element_index.get(id);
         if (!el) return null;
         const computed = getComputedStyle(el).getPropertyValue(channel);
@@ -961,6 +978,7 @@ class DomSurface implements Surface {
       camera: () => this.camera,
       container: () => this.container,
       pick_at_world: (p, allow_root) => this._pick_node_at_world(p, allow_root),
+      flush: () => this.flush_dom(),
     });
     const geometry = new MemoizedGeometryProvider(driver, {
       subscribe_structure: (cb) =>
@@ -1221,10 +1239,34 @@ class DomSurface implements Surface {
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
+  /**
+   * Bring the live DOM up to date with the doc IR iff it is stale.
+   *
+   * Staleness contract: anything that reads the LIVE DOM as a proxy for
+   * document state — the geometry driver (`getBBox` / `getCTM`), the
+   * computed-style resolver — MUST call this first. Doc listeners (the
+   * geometry channel, editor `subscribe`) fire synchronously inside the
+   * mutation, BEFORE the surface's render listener has projected the new
+   * attrs into the DOM; a read in that window returns the PREVIOUS
+   * geometry, and through `MemoizedGeometryProvider` it would be cached as
+   * if current — every later consumer (align, resize_to, snap) then plans
+   * against one-mutation-stale bounds. Same model as CSS layout: reading
+   * `offsetWidth` flushes pending layout; reading `bounds_of` flushes the
+   * pending render.
+   */
+  private flush_dom(): void {
+    if (this.rendered_doc_revision === this.editor._internal.doc.revision) {
+      return;
+    }
+    this.render();
+  }
+
   private render() {
     // During an active text-edit session the text element and its caret /
     // selection rect overlays are managed live by `SvgTextSurface`. Replacing
     // the SVG would yank them out. Skip the re-render until commit/cancel.
+    // (`rendered_doc_revision` is deliberately NOT stamped on this early
+    // return — the next `flush_dom()` after the session ends re-renders.)
     if (this.text_edit) return;
     const owner_doc = this.container.ownerDocument;
     const doc = this.editor._internal.doc;
@@ -1269,6 +1311,7 @@ class DomSurface implements Surface {
       }
     };
     tag_walk(new_svg);
+    this.rendered_doc_revision = doc.revision;
   }
 
   private sync_canvas_size() {
@@ -4700,12 +4743,23 @@ type GeometryAccessors = {
    *  fallback through one shared implementation. `allow_root` mirrors
    *  the surface-internal `pick_at` flag — see comment there. */
   pick_at_world(p: Vec2, allow_root: boolean): NodeId | null;
+  /** Re-render the live DOM from the doc IR iff it has unprojected
+   *  mutations (`DomSurface.flush_dom`). The driver calls this before
+   *  every live-DOM read so a query issued inside a doc-change listener —
+   *  i.e. after the IR mutated but before the surface's render listener
+   *  ran — cannot observe (and, via the memoizer, cache) the previous
+   *  document's layout. */
+  flush(): void;
 };
 
 class SvgGeometryDriver implements GeometryProvider {
   constructor(private readonly accessors: GeometryAccessors) {}
 
   bounds_of(id: NodeId): Rect | null {
+    // Before `element_for`: a pending render also replaces the element
+    // index, so resolving the element against a stale tree would hand
+    // back a detached node.
+    this.accessors.flush();
     const el = this.accessors.element_for(id);
     if (!el) return null;
 
@@ -4770,6 +4824,7 @@ class SvgGeometryDriver implements GeometryProvider {
   }
 
   nodes_in_rect(rect: Rect): NodeId[] {
+    this.accessors.flush();
     const root = this.accessors.root();
     if (!root) return [];
     const hits: NodeId[] = [];
@@ -4784,6 +4839,7 @@ class SvgGeometryDriver implements GeometryProvider {
   }
 
   node_at_point(p: Vec2): NodeId | null {
+    this.accessors.flush();
     return this.accessors.pick_at_world(p, true);
   }
 
@@ -4800,6 +4856,7 @@ class SvgGeometryDriver implements GeometryProvider {
    *  the local delta. Identity (→ delta unchanged) for flat frames,
    *  top-level nodes, and any degenerate / unavailable matrix. */
   world_delta_to_local(id: NodeId, delta: Vec2): Vec2 {
+    this.accessors.flush();
     const el = this.accessors.element_for(id);
     const parent = el?.parentNode;
     const root = this.accessors.root();
