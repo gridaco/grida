@@ -85,6 +85,18 @@ describe("clipboard.extract_payload / reference closure", () => {
     );
   });
 
+  it("carries targets from DUPLICATE inline declarations — the CSS winner included", () => {
+    // Last declaration wins in CSS; scanning only one declaration would
+    // risk carrying the loser and dropping the resource that renders.
+    const doc = new SvgDocument(
+      `<svg xmlns="${SVG_NS}"><defs><linearGradient id="old"/><linearGradient id="new"/></defs>` +
+        `<rect style="fill: url(#old); fill: url(#new)"/></svg>`
+    );
+    const payload = clipboard.extract_payload(doc, [el(doc, "rect")])!;
+    expect(payload).toContain(`id="new"`);
+    expect(payload).toContain(`id="old"`);
+  });
+
   it("carries an inline-style url(#…) target", () => {
     const doc = new SvgDocument(
       `<svg xmlns="${SVG_NS}"><defs><linearGradient id="g1"/></defs><rect style="fill: url(#g1)"/></svg>`
@@ -286,6 +298,22 @@ describe("clipboard.extract_payload / namespaces", () => {
     expect(payload).toBe(
       `<svg xmlns="${SVG_NS}" xmlns:xlink="${XLINK_NS}"><use xlink:href="#nope"/></svg>`
     );
+  });
+
+  it("escapes special characters in a resolved namespace URI on the shell", () => {
+    // The resolved URI is the PARSED value (entities decoded) — the shell
+    // must re-escape it like any serialized attribute, or a quote-bearing
+    // URI breaks the payload's well-formedness.
+    const doc = new SvgDocument(
+      `<svg xmlns="${SVG_NS}" xmlns:weird="urn:&quot;x&amp;y">` +
+        `<g><rect weird:flag="1"/></g></svg>`
+    );
+    const payload = clipboard.extract_payload(doc, [el(doc, "rect")])!;
+    expect(payload).toContain(`xmlns:weird="urn:&quot;x&amp;y"`);
+    // Round-trip: the payload parses, and from the payload root the
+    // shell's declaration covers every prefix the content uses.
+    const reparsed = new SvgDocument(payload);
+    expect(reparsed.undeclared_ns_prefixes(reparsed.root).size).toBe(0);
   });
 
   it("leaves an unknown undeclared prefix unbound — the source was equally unbound", () => {

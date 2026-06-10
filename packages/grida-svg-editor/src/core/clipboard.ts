@@ -28,6 +28,7 @@
  * and does not live here.
  */
 
+import { encode_attr_value } from "@grida/svg/parser";
 import type { NodeId } from "../types";
 import type { SvgDocument } from "./document";
 import { SVG_NS, WELL_KNOWN_NS_PREFIXES, XMLNS_NS } from "./document";
@@ -54,6 +55,10 @@ export namespace clipboard {
     "marker-end",
     "marker",
   ] as const;
+
+  /** Set view of {@link URL_REF_PROPS} for membership tests over parsed
+   *  style declarations. */
+  const URL_REF_PROP_SET: ReadonlySet<string> = new Set(URL_REF_PROPS);
 
   /**
    * Elements whose `href` / `xlink:href` is a same-document resource
@@ -129,7 +134,10 @@ export namespace clipboard {
 
     let shell = `<svg xmlns="${SVG_NS}"`;
     for (const [prefix, uri] of shell_ns) {
-      shell += ` xmlns:${prefix}="${uri}"`;
+      // `uri` is the PARSED value (entities decoded) — re-escape it the
+      // same way the serializer escapes any attribute, or a URI carrying
+      // a literal quote would break the shell's well-formedness.
+      shell += ` xmlns:${prefix}="${encode_attr_value(uri, '"')}"`;
     }
     shell += ">";
 
@@ -236,18 +244,20 @@ export namespace clipboard {
    *  carrier list. */
   function refs_of(doc: SvgDocument, id: NodeId): string[] {
     const out: string[] = [];
-    // One parse of the inline style per element (`get_style` re-parses the
-    // whole attribute per property); first declaration wins, matching
-    // `get_style`'s semantics.
-    const styles = new Map<string, string>();
-    for (const { property, value } of doc.get_all_styles(id)) {
-      if (!styles.has(property)) styles.set(property, value);
-    }
     for (const prop of URL_REF_PROPS) {
-      for (const value of [doc.get_attr(id, prop), styles.get(prop)]) {
-        if (!value) continue;
-        for (const m of value.matchAll(URL_REF_RE)) out.push(m[1]);
-      }
+      const value = doc.get_attr(id, prop);
+      if (!value) continue;
+      for (const m of value.matchAll(URL_REF_RE)) out.push(m[1]);
+    }
+    // EVERY inline declaration is scanned (one parse per element —
+    // `get_style` would re-parse the attribute per property). Duplicate
+    // declarations of one property are legal; the LAST wins in CSS, so
+    // picking any single one risks dropping the reference that actually
+    // renders. Carrying every declared reference is faithful: the winner
+    // comes along, and a carried loser is harmless extra defs.
+    for (const { property, value } of doc.get_all_styles(id)) {
+      if (!URL_REF_PROP_SET.has(property)) continue;
+      for (const m of value.matchAll(URL_REF_RE)) out.push(m[1]);
     }
     if (HREF_TAGS.has(doc.tag_of(id))) {
       // ns=null matches any namespace — covers `href` and `xlink:href`.
