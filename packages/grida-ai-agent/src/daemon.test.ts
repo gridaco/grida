@@ -125,6 +125,30 @@ describe("Daemon unpublish + ownership", () => {
     expect(await Daemon.unpublish(stateDir, REG.id)).toBe(false);
   });
 
+  it("unpublish leaves no claim-file debris on either path", async () => {
+    // The atomic rename-claim must be invisible afterwards: record gone
+    // when owned, record intact when not — and no `.unpublish` temp
+    // left behind either way.
+    await Daemon.publish(stateDir, REG);
+    await Daemon.unpublish(stateDir, REG.id);
+    expect(await fs.readdir(stateDir)).toEqual([]);
+
+    const successor = { ...REG, id: "claim-2" };
+    await Daemon.publish(stateDir, successor);
+    await Daemon.unpublish(stateDir, REG.id);
+    expect(await fs.readdir(stateDir)).toEqual(["daemon.json"]);
+  });
+
+  it("restores (never deletes) a malformed record it does not own", async () => {
+    // Malformed content is not ours to delete: unpublish must put the
+    // bytes back exactly as found.
+    const file = Daemon.paths(stateDir).registration;
+    await fs.mkdir(stateDir, { recursive: true });
+    await fs.writeFile(file, "not json");
+    expect(await Daemon.unpublish(stateDir, REG.id)).toBe(false);
+    expect(await fs.readFile(file, "utf8")).toBe("not json");
+  });
+
   it("checkOwnership distinguishes owned / replaced / missing", async () => {
     expect(await Daemon.checkOwnership(stateDir, REG.id)).toBe("missing");
     await Daemon.publish(stateDir, REG);

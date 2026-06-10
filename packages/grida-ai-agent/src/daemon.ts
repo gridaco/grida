@@ -147,20 +147,50 @@ export namespace Daemon {
 
   /**
    * Remove the registration iff `id` still owns it. Returns whether the
-   * record was removed. Never blind-deletes a successor's record.
+   * record was removed. Never deletes a successor's record.
+   *
+   * A read-then-rm here would be a TOCTOU hole: a successor can publish
+   * between the read and the rm, and the rm would destroy the new
+   * record (whose owner's next ownership tick would then see `missing`
+   * and stand down). Instead the CURRENT record is atomically claimed
+   * via rename, inspected, and either discarded (ours) or renamed back
+   * untouched (anyone else's — including malformed content, which is
+   * not ours to delete either). The claim window shows a concurrent
+   * reader a missing record for microseconds; the convergence ticks
+   * run on a 10s interval, so that blip is harmless.
    */
   export async function unpublish(
     state_dir: string,
     id: string
   ): Promise<boolean> {
-    const current = await read(state_dir);
-    if (!current || current.id !== id) return false;
+    const file = paths(state_dir).registration;
+    const claim = `${file}.${id}.unpublish`;
     try {
-      await fs.rm(paths(state_dir).registration);
-      return true;
+      await fs.rename(file, claim);
     } catch {
-      return false;
+      return false; // nothing registered
     }
+    let owned = false;
+    try {
+      const parsed = JSON.parse(await fs.readFile(claim, "utf8")) as {
+        id?: unknown;
+      };
+      owned = parsed?.id === id;
+    } catch {
+      owned = false;
+    }
+    if (owned) {
+      await fs.rm(claim, { force: true });
+      return true;
+    }
+    try {
+      await fs.rename(claim, file);
+    } catch {
+      // Restore failed (e.g. the dir vanished) — the claim file is
+      // ignored by `read`, so leaving it is strictly less destructive
+      // than deleting a record that is not ours.
+    }
+    return false;
   }
 
   export type OwnershipStatus = "owned" | "replaced" | "missing";
