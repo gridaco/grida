@@ -102,7 +102,16 @@ const config: ForgeConfig = {
       "mac/dotgrida.icns",
     ],
     name: productName,
-    executableName: "desktop",
+    // @electron/packager couples CFBundleDisplayName to `executableName`
+    // (mac.ts updatePlist), so a fixed "desktop" here makes macOS attribute
+    // the app — Dock, Notification Center banners, the notification
+    // permission prompt — as "desktop" instead of the product name. On
+    // macOS, omit it so executable + display name follow `name`; nothing
+    // references Contents/MacOS/<binary> by literal path (the sidecar
+    // respawns via process.execPath), and Squirrel.Mac replaces the whole
+    // bundle on update. Windows/Linux keep "desktop": the exe name is
+    // load-bearing for Squirrel shortcuts/updates and package paths.
+    executableName: process.platform === "darwin" ? undefined : "desktop",
     // Undo the Vite plugin's node_modules strip so the production deps
     // (package.json `dependencies` = the vite externals) ship; `prune` then
     // keeps just those. See GRIDA-DESKTOP-BUILD-GUARD above.
