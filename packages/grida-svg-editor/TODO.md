@@ -278,6 +278,16 @@ reference handling, paste position, multi-document support.
 
 Current implementation notes:
 
+- **Insertion-side primitive shipped.** `commands.insert_fragment(svg, opts)`
+  is the markup-shaped atomic insert that paste composes: parses a bare
+  fragment or a full `<svg>` doc (shell discarded, children taken), adopts
+  subtrees verbatim (authored `id`s NEVER rewritten — dedup stays Tidy's
+  job), hoists resolvable undeclared `xmlns:*` prefixes onto the root, ONE
+  history step, roots returned in document order. Backed by
+  `SvgDocument.create_fragment` / `undeclared_ns_prefixes` /
+  `declare_xmlns` (`core/document.ts`). Remaining paste work is the list
+  below — clipboard wiring, copy-side defs dependency walking, command ids
+  and keymap bindings.
 - Not implemented. No `clipboard.copy` / `clipboard.cut` / `clipboard.paste`
   command id is registered (`commands/defaults.ts`) and no keymap binding
   exists for them (`keymap/defaults.ts`).

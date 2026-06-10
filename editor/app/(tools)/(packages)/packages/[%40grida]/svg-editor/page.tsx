@@ -3,6 +3,7 @@
 import {
   CssExample,
   GroupTransformExample,
+  InsertFragmentExample,
   LineExample,
   NestedSvgExample,
   PathExample,
@@ -45,6 +46,7 @@ const SECTIONS: { id: string; label: string }[] = [
   { id: "nested-svg", label: "Nested <svg>" },
   { id: "symbol-use", label: "Symbol & use" },
   { id: "css", label: "CSS cascade" },
+  { id: "insert-fragment", label: "Fragment insertion" },
 ];
 
 export default function SvgEditorPackagePage() {
@@ -308,6 +310,26 @@ export default function SvgEditorPackagePage() {
                 caption="Not yet decided: how the editor cooperates with the cascade. This card is the surface for choosing the behavior, not a finished feature."
               >
                 <CssExample />
+              </SpecCard>
+
+              <SpecCard
+                id="insert-fragment"
+                title="Fragment insertion — insert_fragment"
+                description={
+                  <>
+                    <code>commands.insert_fragment(svg)</code> inserts a
+                    pre-authored subtree — a vendor icon, a clipboard payload —
+                    as <strong>one</strong> history step. Click a chip to
+                    insert; drag it onto the stage to insert at the drop point.
+                    Position is authored content: the drop point becomes a{" "}
+                    <code>&lt;g transform&gt;</code> wrapper in the markup, so
+                    placement round-trips and a single undo removes the whole
+                    insert.
+                  </>
+                }
+                caption="The insertion-side primitive paste will compose. No placement opt by design — the caller authors position into the fragment."
+              >
+                <InsertFragmentExample />
               </SpecCard>
             </div>
           </section>

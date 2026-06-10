@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
-import { SvgEditorCanvas, useEditorLoad } from "@grida/svg-editor/react";
+import { useCallback, useState, useSyncExternalStore } from "react";
+import {
+  SvgEditorCanvas,
+  useCommands,
+  useEditorLoad,
+} from "@grida/svg-editor/react";
 import type { DomSurfaceHandle } from "@grida/svg-editor/dom";
+import { toast } from "sonner";
+import { datatransfer } from "@/grida-canvas/data-transfer";
 import { SvgShell } from "../../_components/svg-shell";
 import { SvgToolbar } from "../../_components/svg-toolbar";
 import {
@@ -10,6 +16,8 @@ import {
   PathToolbarPosition,
 } from "../../_components/path-toolbar";
 import { DocsNav } from "../../_components/docs-nav";
+import { SvgLibraryWindow } from "../../_components/library-window";
+import { fragment } from "../../_components/fragment";
 import SAMPLE_SVG from "../../_fixtures/artwork";
 import { SvgRouteShell, useSvgDocStore } from "../../_storage";
 import { useSvgAgentHydrated } from "../../_ai/provider";
@@ -27,10 +35,11 @@ export default function SvgEditorDevPage() {
 function SvgEditorDevPageBody() {
   const store = useSvgDocStore();
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [dragging, setDragging] = useState<"file" | "library" | null>(null);
   const [sourceName, setSourceName] = useState<string | null>(null);
   const [handle, setHandle] = useState<DomSurfaceHandle | null>(null);
   const load = useEditorLoad();
+  const cmd = useCommands();
   const docs = useSyncExternalStore(
     store.subscribe,
     store.getDocs,
@@ -62,18 +71,68 @@ function SvgEditorDevPageBody() {
     reader.readAsText(file);
   };
 
+  // Fetch a library asset and insert it as ONE history step. With a target
+  // point, the position is authored into the markup — see
+  // `fragment.position`. Shared by click-to-insert and drop-at-point.
+  const insertFromSrc = useCallback(
+    (src: string, at: { x: number; y: number } | null) => {
+      const task = fetch(src, { cache: "no-store" })
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to fetch icon");
+          return res.text();
+        })
+        .then((svg) => {
+          cmd.insert_fragment(at ? fragment.position(svg, at) : svg);
+        });
+      toast.promise(task, {
+        loading: "Loading icon...",
+        success: "Icon inserted",
+        error: "Failed to insert icon",
+      });
+    },
+    [cmd]
+  );
+
+  // Library click-to-insert: land the icon at the viewport center.
+  const insertSrcAtViewportCenter = useCallback(
+    (src: string) => insertFromSrc(src, handle?.camera.center ?? null),
+    [insertFromSrc, handle]
+  );
+
+  const dragKind = (dt: DataTransfer | null): "file" | "library" | null => {
+    if (dt?.types?.includes(datatransfer.key)) return "library";
+    if (dt?.types?.includes("Files")) return "file";
+    return null;
+  };
+
   const onDragOver = (e: React.DragEvent) => {
-    if (!e.dataTransfer?.types?.includes("Files")) return;
+    const kind = dragKind(e.dataTransfer);
+    if (!kind) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
-    if (!dragging) setDragging(true);
+    if (dragging !== kind) setDragging(kind);
   };
   const onDragLeave = (e: React.DragEvent) => {
-    if (e.currentTarget === e.target) setDragging(false);
+    if (e.currentTarget === e.target) setDragging(null);
   };
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setDragging(false);
+    setDragging(null);
+    const known = e.dataTransfer?.getData(datatransfer.key);
+    if (known) {
+      const data = datatransfer.decode(known);
+      if (data.type !== "svg") return;
+      // Drop point → world space, so the icon lands centered under the
+      // pointer. Same screen-space convention as the surface's gestures.
+      const cr = e.currentTarget.getBoundingClientRect();
+      const at =
+        handle?.camera.screen_to_world({
+          x: e.clientX - cr.left,
+          y: e.clientY - cr.top,
+        }) ?? null;
+      insertFromSrc(data.src, at);
+      return;
+    }
     const file = e.dataTransfer?.files?.[0];
     if (file) loadSvgFile(file);
   };
@@ -98,7 +157,7 @@ function SvgEditorDevPageBody() {
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           className="absolute inset-0 bg-[radial-gradient(circle,theme(colors.border)_1px,transparent_1px)] [background-size:20px_20px] data-[dragging=true]:outline-2 data-[dragging=true]:outline-dashed data-[dragging=true]:outline-primary data-[dragging=true]:-outline-offset-2"
-          data-dragging={dragging}
+          data-dragging={dragging !== null}
         >
           <SvgEditorCanvas
             fit
@@ -112,10 +171,15 @@ function SvgEditorDevPageBody() {
           </PathToolbarPosition>
           {dragging && (
             <div className="absolute inset-0 flex items-center justify-center bg-primary/5 text-primary text-sm font-semibold pointer-events-none">
-              Drop SVG to load
+              {dragging === "file" ? "Drop SVG to load" : "Drop to insert"}
             </div>
           )}
         </div>
+      }
+      canvasOverlay={
+        // Sibling of the drop target on purpose — dropping an icon back
+        // onto the Library window must not insert it into the canvas.
+        <SvgLibraryWindow onInsertSrc={insertSrcAtViewportCenter} />
       }
     />
   );
