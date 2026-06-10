@@ -368,6 +368,29 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    to the sidecar over stdin and serves it to preload only through guarded IPC;
    it is never placed on argv, env, disk, or `window.grida`.
 
+   **Daemon mode (#798).** When the agent server runs as a registered local
+   daemon (`grida-agent serve --register`; WG spec
+   [docs/wg/ai/agent/daemon.md](docs/wg/ai/agent/daemon.md)), the per-spawn
+   password gives way to a **persistent** credential stored owner-only
+   (0600) at `<state-dir>/daemon.credential`, alongside the `daemon.json`
+   registration record (also 0600, atomic temp+rename write;
+   `Daemon.read` refuses non-loopback URLs so a tampered record cannot
+   redirect a credential-bearing client off-machine —
+   [packages/grida-ai-agent/src/daemon.ts](packages/grida-ai-agent/src/daemon.ts)).
+   Liveness probing is the **authenticated** `/handshake`; there is
+   deliberately no unauthenticated health route for local malware to
+   port-scan against. Two carriages, one credential: the
+   `Authorization: Basic` header everywhere, plus an `auth_token` query
+   parameter accepted ONLY on GET event-stream routes
+   (`/agent/stream/:id`, `/sessions/:id/status`) for header-less
+   `EventSource` attach (`http/auth.ts`, allowlisted in `http/server.ts`).
+   A present header always wins — a wrong header never falls back to the
+   token — and the token is never accepted on mutating routes, so a URL
+   leak (proxy logs, history) can at worst read stream frames for the
+   leaked session id; it cannot mutate state, run the agent, or touch
+   secrets. CORS/Referer layers still apply unchanged to token-authed
+   requests.
+
 4. **Defense-in-depth `Referer` check** — the agent server rejects any request
    whose `Referer` path is not under the host-declared desktop route root. Catches a same-origin
    XSS that somehow bypasses preload scoping (e.g. a future SPA-nav
@@ -500,6 +523,7 @@ Today:
 - [editor/lib/supabase/server.ts](editor/lib/supabase/server.ts) — `createClientFromBearer` (bearer-auth shim for existing private editor routes that allow Desktop-originated calls without browser cookies).
 - [editor/app/(api)/private/ai/design/chat/route.ts](<editor/app/(api)/private/ai/design/chat/route.ts>) — legacy SVG/web whole-agent route; accepts bearer auth for existing Desktop SVG callers during migration.
 - [packages/grida-ai-agent/src/providers/index.ts](packages/grida-ai-agent/src/providers/index.ts) — BYOK-only provider resolver; never exposes credentials to the renderer.
+- [packages/grida-ai-agent/src/daemon.ts](packages/grida-ai-agent/src/daemon.ts) — daemon discovery contract: owner-only atomic registration + persistent credential, loopback-only records, authenticated probe.
 - [packages/grida-ai-agent/src/runtime/index.ts](packages/grida-ai-agent/src/runtime/index.ts) — agent run orchestration; owns run / stream / abort behavior.
 - [packages/grida-ai-agent/src/runtime/stream-registry.ts](packages/grida-ai-agent/src/runtime/stream-registry.ts) — in-flight run replay/abort registry.
 - [packages/grida-ai-agent/src/runtime/command-backend.ts](packages/grida-ai-agent/src/runtime/command-backend.ts) — agent `run_command` adapter through shell policy (structural gates only; the supervised mode gate is the tool's `needsApproval`).

@@ -10,7 +10,13 @@ const SCOPES = [
 ];
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx"]);
-const ALLOWED_WINDOW_GRIDA = new Set(["lib/desktop/bridge.ts"]);
+// bridge.ts is the READ funnel; web-daemon-dev-boot.tsx is an INSTALLER
+// (the dev-only web sibling of the Electron preload — it assigns
+// `window.grida`, never reads through it).
+const ALLOWED_WINDOW_GRIDA = new Set([
+  "lib/desktop/bridge.ts",
+  "scaffolds/desktop/web-daemon-dev-boot.tsx",
+]);
 
 function files(dir: string): string[] {
   const out: string[] = [];

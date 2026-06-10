@@ -37,6 +37,7 @@ export default defineConfig([
       "src/server.ts",
       "src/sandbox/index.ts",
       "src/transport.ts",
+      "src/acp/index.ts",
       "src/cli.ts",
       "src/cli.bin.ts",
     ],

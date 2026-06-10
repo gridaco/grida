@@ -240,3 +240,6 @@ CLAUDE.local.md
 
 # Local-only tracking docs
 /TODO.md
+
+# vitest browser-mode failure screenshots
+__screenshots__/

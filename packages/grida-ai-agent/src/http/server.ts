@@ -98,7 +98,17 @@ export function buildServer(opts: ServerOptions): BuiltServer {
 
   // 3. Basic Auth — runs after CORS + referer clear. Preflights are handled
   //    by `corsMiddleware` upstream and never reach this guard.
-  const basicAuthGuard = makeBasicAuthGuard(opts.password);
+  // GRIDA-SEC-004 — the ONLY routes where the credential may ride the
+  // `auth_token` query parameter (header-less EventSource attach; WG daemon
+  // spec §auth-model). GET event-stream routes exclusively — keep in sync
+  // with the SSE routes registered in routes/agent.ts and routes/sessions.ts.
+  const sseQueryTokenPaths = [
+    /^\/agent\/stream\/[^/]+$/,
+    /^\/sessions\/[^/]+\/status$/,
+  ];
+  const basicAuthGuard = makeBasicAuthGuard(opts.password, {
+    query_token_paths: sseQueryTokenPaths,
+  });
   app.use("*", basicAuthGuard);
 
   // Per-launch state lives at the agent-server scope (registry is in-memory

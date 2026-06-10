@@ -9,12 +9,15 @@
  * calls, exercised from the canonical CLI surface, end to end over HTTP — no
  * Electron shell.
  */
+import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { Daemon } from "./daemon";
+import { AGENT_SERVER_PROTOCOL } from "./protocol/handshake";
 import { AuthStore } from "./auth/file";
 import { SecretsStore } from "./secrets";
 import { WorkspaceRegistry } from "./workspaces";
@@ -30,7 +33,10 @@ import {
   compactCommand,
   messagesCommand,
   parseRunArgs,
+  parseServeArgs,
   rewindCommand,
+  statusCommand,
+  stopCommand,
   type CliWriter,
 } from "./cli";
 
@@ -171,6 +177,147 @@ describe("CLI — session lifecycle commands (real client → HTTP → runtime)"
     // …and the compaction divider is the last line (the invocation point).
     expect(printed[printed.length - 1]).toContain("compacted");
   });
+});
+
+describe("CLI — parseServeArgs", () => {
+  it("defaults to an unregistered serve with no extra origins", () => {
+    expect(parseServeArgs([])).toEqual({
+      register: false,
+      allow_origins: [],
+      allow_referer_paths: [],
+    });
+  });
+
+  it("parses --register and repeatable allowlist flags", () => {
+    const flags = parseServeArgs([
+      "--register",
+      "--allow-origin",
+      "http://localhost:3000",
+      "--allow-referer-path",
+      "/",
+    ]);
+    expect(flags.register).toBe(true);
+    expect(flags.allow_origins).toEqual(["http://localhost:3000"]);
+    expect(flags.allow_referer_paths).toEqual(["/"]);
+  });
+
+  it("rejects a flag without a value and unknown options", () => {
+    expect(() => parseServeArgs(["--allow-origin"])).toThrow(
+      /requires a value/
+    );
+    expect(() => parseServeArgs(["--bogus"])).toThrow(/unknown serve option/);
+  });
+});
+
+describe("CLI — daemon status / stop on stale or missing registrations", () => {
+  let stateDir: string;
+  let lines: string[];
+  let out: CliWriter;
+
+  beforeEach(async () => {
+    stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-cli-daemon-"));
+    lines = [];
+    out = { write: (s) => lines.push(s) };
+  });
+
+  afterEach(async () => {
+    await fs.rm(stateDir, { recursive: true, force: true });
+  });
+
+  it("status reports no daemon when nothing is registered", async () => {
+    await statusCommand(out, stateDir);
+    expect(lines.join("")).toContain("no daemon registered");
+  });
+
+  it("status reports a stale registration as unreachable", async () => {
+    await Daemon.publish(
+      stateDir,
+      Daemon.mintRegistration({
+        version: "0.0.0",
+        // A port nothing listens on: probe must fail, not hang.
+        url: "http://127.0.0.1:1",
+        pid: 999999,
+      })
+    );
+    await Daemon.readOrCreateCredential(stateDir);
+    await statusCommand(out, stateDir);
+    expect(lines.join("")).toContain("unreachable");
+  });
+
+  it("stop removes a stale registration without signaling the pid", async () => {
+    const registration = Daemon.mintRegistration({
+      version: "0.0.0",
+      url: "http://127.0.0.1:1",
+      pid: 999999,
+    });
+    await Daemon.publish(stateDir, registration);
+    await Daemon.readOrCreateCredential(stateDir);
+    await stopCommand(out, stateDir);
+    expect(lines.join("")).toContain("stale");
+    expect(await Daemon.read(stateDir)).toBeNull();
+  });
+});
+
+describe("CLI — serve --register daemon process (real spawn)", () => {
+  let stateDir: string;
+  let child: ChildProcess | null = null;
+
+  beforeEach(async () => {
+    stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-cli-spawn-"));
+  });
+
+  afterEach(async () => {
+    if (child && child.exitCode === null && !child.killed) {
+      child.kill("SIGKILL");
+    }
+    child = null;
+    await fs.rm(stateDir, { recursive: true, force: true });
+  });
+
+  it(
+    "publishes on start, serves a probing client, unpublishes on SIGTERM",
+    { timeout: 40_000 },
+    async () => {
+      const stderr: string[] = [];
+      child = spawn(
+        process.execPath,
+        ["--import", "tsx", "src/cli.bin.ts", "serve", "--register"],
+        {
+          cwd: path.resolve(__dirname, ".."),
+          env: { ...process.env, GRIDA_AGENT_USER_DATA: stateDir },
+          stdio: ["ignore", "ignore", "pipe"],
+        }
+      );
+      child.stderr!.on("data", (chunk: Buffer) =>
+        stderr.push(chunk.toString())
+      );
+      const exited = new Promise<void>((resolve) => {
+        child!.once("exit", () => resolve());
+      });
+
+      // Connect-or-spawn's poll half, against the real process: the
+      // registration appears, the authenticated probe passes.
+      let connection: Daemon.Connection | null = null;
+      for (let i = 0; i < 150 && !connection; i += 1) {
+        await new Promise((r) => setTimeout(r, 200));
+        connection = await Daemon.connect(stateDir);
+      }
+      if (!connection) {
+        throw new Error(`daemon never published; stderr:\n${stderr.join("")}`);
+      }
+      expect(connection.handshake.protocol).toBe(AGENT_SERVER_PROTOCOL);
+      expect(connection!.registration.pid).toBe(child.pid);
+
+      // A second client resolves the SAME daemon (reuse, not respawn).
+      const again = await Daemon.connect(stateDir);
+      expect(again!.registration.id).toBe(connection!.registration.id);
+
+      // Graceful shutdown unpublishes the owned registration.
+      child.kill("SIGTERM");
+      await exited;
+      expect(await Daemon.read(stateDir)).toBeNull();
+    }
+  );
 });
 
 describe("CLI — parseRunArgs", () => {

@@ -5,7 +5,8 @@
       "name": "editor",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "editor", "dev"],
-      "port": 3000
+      "port": 3000,
+      "autoPort": true
     },
     {
       "name": "docs",

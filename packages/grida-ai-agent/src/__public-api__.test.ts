@@ -56,9 +56,19 @@ import {
 } from ".";
 import {
   AgentHost,
+  Daemon,
   type AgentHostHttpAccess,
   type AgentHostOptions,
 } from "./server";
+import {
+  AcpAgentAdapter,
+  promptText,
+  runAcpStdio,
+  toolKind,
+  translateChunk,
+  type AcpCoreClient,
+  type AcpUpdateSink,
+} from "./acp";
 import {
   buildAgentHostSandboxPolicy,
   hostFromUrl,
@@ -199,6 +209,47 @@ describe("@grida/agent public API", () => {
         true
       );
     });
+
+    it("exposes the Daemon discovery contract (WG daemon.md, #798)", () => {
+      expect(Daemon.REGISTRATION_FILENAME).toBe("daemon.json");
+      expect(Daemon.CREDENTIAL_FILENAME).toBe("daemon.credential");
+      expect(Daemon.LOCAL_CLIENT_ORIGIN).toBe("http://127.0.0.1");
+      const p: Daemon.Paths = Daemon.paths("/tmp/state");
+      expect(p.registration.endsWith("daemon.json")).toBe(true);
+      const reg: Daemon.Registration = Daemon.mintRegistration({
+        version: "0.0.0",
+        url: "http://127.0.0.1:1",
+        pid: 1,
+      });
+      expect(reg.id.length).toBeGreaterThan(0);
+      expect(typeof Daemon.publish).toBe("function");
+      expect(typeof Daemon.read).toBe("function");
+      expect(typeof Daemon.unpublish).toBe("function");
+      expect(typeof Daemon.checkOwnership).toBe("function");
+      expect(typeof Daemon.readCredential).toBe("function");
+      expect(typeof Daemon.readOrCreateCredential).toBe("function");
+      expect(typeof Daemon.probe).toBe("function");
+      expect(typeof Daemon.connect).toBe("function");
+      expect(typeof Daemon.connectOrSpawn).toBe("function");
+    });
+  });
+
+  describe("acp subpath", () => {
+    it("exposes the ACP adapter surface (acp.md)", () => {
+      const sink: AcpUpdateSink = { sessionUpdate: async () => {} };
+      const client = {} as AcpCoreClient;
+      expectTypeOf(AcpAgentAdapter).toBeConstructibleWith(sink, { client });
+      expect(typeof runAcpStdio).toBe("function");
+      expect(toolKind("read_file")).toBe("read");
+      expect(promptText([{ type: "text", text: "x" }])).toBe("x");
+      expect(
+        translateChunk({
+          type: "text-delta",
+          id: "t",
+          delta: "x",
+        } as Parameters<typeof translateChunk>[0])
+      ).toMatchObject({ sessionUpdate: "agent_message_chunk" });
+    });
   });
 
   describe("transport subpath", () => {
@@ -208,6 +259,8 @@ describe("@grida/agent public API", () => {
       expect(AgentTransport.buildBasicAuthHeader("pw")).toBe(
         "Basic YWdlbnQ6cHc="
       );
+      // The auth_token SSE query value is the SAME credential payload.
+      expect(AgentTransport.buildAuthToken("pw")).toBe("YWdlbnQ6cHc=");
       const fetcher: AgentTransport.Fetcher = AgentTransport.makeFetcher({
         port: 49152,
         password: "pw",
