@@ -106,8 +106,14 @@ moves a **clone** instead of the selection:
   entry: one undo removes the clone and the movement together; redo
   restores both. Cancelling the gesture (Escape) while cloned restores
   the document byte-exact, with no history entry.
-- A zero-movement clone commit (press Alt, release without moving) is a
-  duplicate-in-place — same outcome as ⌘D, via the gesture.
+- A cloned commit with zero **net** movement — drag past the threshold,
+  return to the start, release with the modifier held — is a
+  duplicate-in-place: same outcome as ⌘D, via the gesture. (A
+  press-and-release that never crosses the drag threshold is a tap, not
+  a gesture: no translate session opens and no clone is created.)
+- If nothing in the selection is cloneable (per the refusals below),
+  the modifier is inert: no clone is created and the gesture keeps
+  moving the origins.
 - The committed entry keeps the gesture's history label ("move") — the
   label is fixed when the gesture opens, before the modifier is known.
 - Alt's measurement-overlay role (Alt + hover) is orthogonal and
@@ -119,17 +125,26 @@ moves a **clone** instead of the selection:
 Refusal is per-member and silent (normalized away), never a thrown
 error — cloning is a gesture-grade operation:
 
-| Member                                  | Verdict                                                                                                                               |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Empty selection / normalizes to nothing | No-op — no mutation, no history                                                                                                       |
-| The document root                       | Skipped — no sibling slot exists                                                                                                      |
-| A nested `<svg>` element                | Skipped — a lone serialized `<svg>` is indistinguishable from a document shell on re-ingestion; refusing beats silently unwrapping it |
-| Stale / detached / non-element ids      | Normalized away                                                                                                                       |
-| A descendant of another selected member | Subsumed by its ancestor (normalization)                                                                                              |
+| Member                                  | Verdict                                                                                                                                            |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Empty selection / normalizes to nothing | No-op — no mutation, no history                                                                                                                    |
+| The document root                       | Skipped — no sibling slot exists                                                                                                                   |
+| A nested `<svg>` element                | Skipped — to the current ingestion API a lone serialized `<svg>` is indistinguishable from a document shell; refusing beats silently unwrapping it |
+| Stale / detached / non-element ids      | Normalized away                                                                                                                                    |
+| A descendant of another selected member | Subsumed by its ancestor (normalization)                                                                                                           |
 
 ## Out of scope
 
 Repeating-offset duplicate (the main editor's `active_duplication`
-pattern); clone-to-different-parent (the gesture is flat — clones are
-siblings of their origins, hierarchy changes during a cloned drag are
-not modeled); any defs deduplication on clone (Tidy's job).
+pattern — tracked as
+[gridaco/grida#825](https://github.com/gridaco/grida/issues/825));
+clone-to-different-parent (the gesture is flat — clones are siblings of
+their origins, hierarchy changes during a cloned drag are not modeled);
+any defs deduplication on clone (Tidy's job).
+
+The nested-`<svg>` refusal above is an artifact of cloning via the
+serialize → re-ingest round-trip, not domain truth. The intended
+endpoint is a native document-level subtree copy (no string round-trip,
+no shell question), which would retire that refusal row; the verbatim,
+no-closure, placement, and id semantics of this note are unaffected by
+that change of mechanism.

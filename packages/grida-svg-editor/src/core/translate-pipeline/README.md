@@ -58,8 +58,13 @@ through `commands.translate`.
 
 ## Clone toggle (Alt-drag translate-with-clone)
 
-`TranslateModifiers.clone` is NOT a stage and never reaches one — it is
-consumed by `TranslateOrchestrator.reconcile_clone` before each pass
+The clone signal rides `GestureModifiers` — an orchestrator-owned
+extension of `TranslateModifiers` declared in `orchestrator.ts`, NOT a
+pipeline modifier: `run_pass` narrows the context back to
+`TranslateModifiers`, so a stage cannot even reference `.clone`
+statically and `pipeline.ts` still transfers verbatim under the
+extractability boundary above. It is consumed by
+`TranslateOrchestrator.reconcile_clone` before each pass
 (spec: `docs/wg/feat-svg-editor/subtree-clone.md`). Lifecycle:
 
 - **Enter** (modifier on, not yet cloned — lazily, on the first such

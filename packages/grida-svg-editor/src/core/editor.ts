@@ -1739,12 +1739,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     // reinserts bottom-to-top so each captured `next_element_sibling`
     // anchor is still present in the parent when its predecessor
     // re-attaches above it.
-    const doc_order = doc.all_elements();
-    const index_of = new Map<NodeId, number>();
-    for (let i = 0; i < doc_order.length; i++) index_of.set(doc_order[i], i);
-    const targets = [...filtered].sort(
-      (a, b) => (index_of.get(a) ?? 0) - (index_of.get(b) ?? 0)
-    );
+    const targets = [...filtered].sort(subtree.by_document_order(doc));
 
     type Capture = {
       id: NodeId;
@@ -2119,11 +2114,11 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     const clones = plan.map((p) => p.clone);
     const previous_selection = selection;
     const apply = () => {
-      for (const p of plan) doc.insert(p.clone, p.parent, p.before);
+      subtree.insert_plan(doc, plan);
       set_selection(clones);
     };
     const revert = () => {
-      for (let i = plan.length - 1; i >= 0; i--) doc.remove(plan[i].clone);
+      subtree.remove_plan(doc, plan);
       set_selection(previous_selection);
     };
     apply();

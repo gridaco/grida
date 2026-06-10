@@ -355,7 +355,9 @@ Implementation notes:
 - Alt's measurement-overlay role coexists (hover-time vs gesture-time).
 - Tests: `__tests__/subtree-clone.test.ts`,
   `__tests__/commands-duplicate.test.ts`,
-  `__tests__/translate-pipeline/clone-drag.test.ts`; manual TC
+  `__tests__/translate-pipeline/clone-drag.test.ts`,
+  `__tests__/clone-drag.browser.test.ts` (pins the dom.ts wiring —
+  alt→clone mapping, redrive-on-flip, selection retarget); manual TC
   `test/svg-editor-duplicate.md`.
 - Still open (spec §Out of scope): repeating-offset duplicate (the main
   editor's `active_duplication` pattern); clone-to-different-parent.

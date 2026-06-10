@@ -19,10 +19,10 @@ function find_by_element_id(doc: SvgDocument, id: string): NodeId {
   throw new Error(`no element with id "${id}"`);
 }
 
-/** Insert every plan entry — the consumer side of "plan, don't insert". */
-function insert_plan(doc: SvgDocument, plan: subtree.SubtreeClonePlan): void {
-  for (const p of plan) doc.insert(p.clone, p.parent, p.before);
-}
+/** The consumer side of "plan, don't insert" — the namespace's own
+ *  attach helper, used the way `commands.duplicate` and the clone-drag
+ *  session use it. */
+const insert_plan = subtree.insert_plan;
 
 describe("subtree.clone_plan — verbatim clone", () => {
   it("clone subtree serializes byte-equal to its origin (trivia preserved)", () => {
@@ -139,6 +139,29 @@ describe("subtree.clone_plan — normalization (shared with payload extraction)"
     const a = find_by_element_id(doc, "a");
     const plan = subtree.clone_plan(doc, ["nope", a]);
     expect(plan.map((p) => p.origin)).toEqual([a]);
+  });
+});
+
+describe("subtree.insert_plan / remove_plan", () => {
+  it("insert → remove round-trips the document byte-equal", () => {
+    const doc = new SvgDocument(
+      `<svg ${SVG_NS}><rect id="a" x="1"/><rect id="b" x="2"/></svg>`
+    );
+    const baseline = doc.serialize();
+    const a = find_by_element_id(doc, "a");
+    const b = find_by_element_id(doc, "b");
+    const plan = subtree.clone_plan(doc, [a, b]);
+    subtree.insert_plan(doc, plan);
+    expect(doc.serialize()).not.toBe(baseline);
+    subtree.remove_plan(doc, plan);
+    expect(doc.serialize()).toBe(baseline);
+    // Removed clones stay in the id map — a later insert_plan restores
+    // them (the history-redo contract).
+    subtree.insert_plan(doc, plan);
+    const ids = doc
+      .element_children_of(doc.root)
+      .map((id) => doc.get_attr(id, "id"));
+    expect(ids).toEqual(["a", "a", "b", "b"]);
   });
 });
 

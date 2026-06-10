@@ -58,7 +58,7 @@ import {
   NudgeDwellWatcher,
   TranslateOrchestrator,
   type TranslateOptions,
-  type TranslateModifiers,
+  type GestureModifiers,
 } from "./core/translate-pipeline";
 import {
   ResizeOrchestrator,
@@ -646,7 +646,7 @@ class DomSurface implements Surface {
       // Clone toggle retargets the gesture between origins and clones;
       // the selection (and with it the HUD chrome, via subscribe) must
       // follow the movers.
-      set_selection: (ids) => this.editor.commands.select([...ids]),
+      set_selection: (ids) => this.editor.commands.select(ids),
     });
 
     // Resize funnel — same shape as translate, distinct lifecycle.
@@ -2799,10 +2799,10 @@ class DomSurface implements Surface {
     if (intent.phase === "commit") this.request_redraw();
   }
 
-  /** Snapshot of HUD modifier state mapped to pipeline `TranslateModifiers`.
+  /** Snapshot of HUD modifier state mapped to the orchestrator's `GestureModifiers`.
    *  Pull-at-consume: HUD is the canonical store (see `sync_modifiers`),
    *  read live so mid-drag Shift press/release reflects on the next pass. */
-  private current_translate_modifiers(): TranslateModifiers {
+  private current_translate_modifiers(): GestureModifiers {
     const mods = this.hud.modifiers();
     return {
       axis_lock: mods.shift ? "by_dominance" : "off",

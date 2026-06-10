@@ -1,17 +1,21 @@
 /**
- * Subtree clone — selection → sibling subtrees within the SAME document.
+ * The selection → subtree algebra the two extraction operations share,
+ * plus the clone-specific member (`clone_plan`).
  *
- * The second of the two extraction operations the clipboard FRD names
+ * The clipboard FRD
  * ([docs/wg/feat-svg-editor/clipboard.md](../../../../docs/wg/feat-svg-editor/clipboard.md)
- * §Two extraction operations; design note:
+ * §Two extraction operations) names two operations over a normalized
+ * selection: **payload extraction** (copy — `core/clipboard.ts`) and
+ * **subtree clone** (duplicate / clone-drag — this module; design note:
  * [docs/wg/feat-svg-editor/subtree-clone.md](../../../../docs/wg/feat-svg-editor/subtree-clone.md)).
- * Unlike copy's payload extraction, a clone carries **no reference closure
- * and no namespace shell**: the destination is the source document, every
- * `url(#…)` / `href` reference still resolves against it, and carrying
- * definitions would deposit duplicate defs on every duplicate. The two
- * operations share exactly two things — selection normalization
+ * They share exactly two things — selection normalization
  * ({@link subtree.normalize_roots}) and verbatim subtree serialization
  * (`SvgDocument.serialize_node`) — and nothing else.
+ *
+ * Unlike copy's payload, a clone carries **no reference closure and no
+ * namespace shell**: the destination is the source document, every
+ * `url(#…)` / `href` reference still resolves against it, and carrying
+ * definitions would deposit duplicate defs on every duplicate.
  *
  * Consumers: `commands.duplicate` (⌘D) and the translate orchestrator's
  * Alt-drag clone session (gridaco/grida#817).
@@ -54,12 +58,17 @@ export namespace subtree {
   export function normalize_roots(
     doc: SvgDocument,
     selection: ReadonlyArray<NodeId>,
-    order: (a: NodeId, b: NodeId) => number = by_document_order(doc)
+    order?: (a: NodeId, b: NodeId) => number
   ): NodeId[] {
     const live = [...new Set(selection)].filter(
       (id) => doc.is_element(id) && doc.contains(doc.root, id)
     );
-    return doc.prune_nested_nodes(live).sort(order);
+    const roots = doc.prune_nested_nodes(live);
+    // Build the comparator only when a sort can actually run — the
+    // dominant callers (⌘D, Alt-drag) pass single-node selections, and
+    // by_document_order walks the whole tree.
+    if (roots.length > 1) roots.sort(order ?? by_document_order(doc));
+    return roots;
   }
 
   /** One origin → clone pairing with the clone's placement, captured at
@@ -125,5 +134,29 @@ export namespace subtree {
       });
     }
     return out;
+  }
+
+  /**
+   * Attach every plan clone at its captured anchor. Anchors predate the
+   * plan (captured before any insertion), so no entry anchors on another
+   * entry's clone — each insert is independent and the interleaved
+   * `A, A′, B, B′` order falls out of the per-origin anchors.
+   *
+   * Idempotent: `doc.insert` detaches-then-splices, so re-attaching an
+   * already-live clone repositions it to the same slot. History redo
+   * closures rely on this.
+   */
+  export function insert_plan(doc: SvgDocument, plan: SubtreeClonePlan): void {
+    for (const p of plan) doc.insert(p.clone, p.parent, p.before);
+  }
+
+  /**
+   * Detach every plan clone. Order-independent for the same reason
+   * {@link insert_plan} is: anchors are never plan clones. Removed nodes
+   * stay in the document's id map (standard removed-node policy), so a
+   * later {@link insert_plan} over the same plan restores them.
+   */
+  export function remove_plan(doc: SvgDocument, plan: SubtreeClonePlan): void {
+    for (const p of plan) doc.remove(p.clone);
   }
 }

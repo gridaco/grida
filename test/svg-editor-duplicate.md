@@ -13,6 +13,7 @@ covered_by:
   - packages/grida-svg-editor/__tests__/subtree-clone.test.ts
   - packages/grida-svg-editor/__tests__/commands-duplicate.test.ts
   - packages/grida-svg-editor/__tests__/translate-pipeline/clone-drag.test.ts
+  - packages/grida-svg-editor/__tests__/clone-drag.browser.test.ts
 ---
 
 ## Behavior
@@ -68,7 +69,9 @@ here.
 
 ## Notes
 
-Shipped with gridaco/grida#817. Zero-movement Alt-tap during a drag
-that then commits is a duplicate-in-place (same outcome as ⌘D). The
+Shipped with gridaco/grida#817. A cloned drag committed with zero NET
+movement (drag out and back, release with Alt held) is a
+duplicate-in-place (same outcome as ⌘D); a press-release that never
+crosses the drag threshold is a tap — no gesture, no clone. The
 committed history label remains "move" (label is fixed at gesture
 open) — accepted in the spec.

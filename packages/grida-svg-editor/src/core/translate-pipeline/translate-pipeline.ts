@@ -73,11 +73,6 @@ export type TranslateModifiers = {
   /** Hard override — skip the snap stage regardless of session /
    *  options. Used by RPC and align / distribute commands. */
   force_disable_snap: boolean;
-  /** Alt-drag translate-with-clone (gridaco/grida#817). Consumed ONLY by
-   *  the orchestrator's session reconciliation (clone/unclone at toggle
-   *  edges); pipeline stages never read it — stage purity holds. Absent
-   *  = off, so nudge / RPC / dwell constructors stay untouched. */
-  clone?: boolean;
 };
 
 export type TranslateOptions = {

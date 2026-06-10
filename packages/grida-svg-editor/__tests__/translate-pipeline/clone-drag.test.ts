@@ -201,7 +201,46 @@ describe("clone-drag — commit", () => {
     expect(editor.document.get_attr(clone, "y")).toBe("14");
   });
 
-  it("zero-movement alt commit = duplicate-in-place, one undo step", () => {
+  it("nothing cloneable: the modifier is inert and the gesture keeps moving the origins", () => {
+    // A nested <svg> is a per-member refusal (see subtree-clone.md
+    // §Refusals) — a selection of only-uncloneable members must NOT
+    // abort the gesture or throw; it simply never enters the cloned
+    // state.
+    const editor = createSvgEditor({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><svg id="inner" x="5"><rect width="10" height="10"/></svg></svg>`,
+    });
+    const internal = (editor as unknown as { _internal: Internal })._internal;
+    const selection_calls: NodeId[][] = [];
+    const orch = new TranslateOrchestrator({
+      get_doc: () => internal.doc,
+      emit: () => internal.emit(),
+      open_preview: (label) => internal.history.preview(label) as never,
+      open_snap: () => null,
+      options: () => ({
+        pixel_grid_quantum: null,
+        snap_enabled: false,
+        snap_threshold_px: 6,
+      }),
+      set_selection: (ids) => selection_calls.push([...ids]),
+    });
+    const inner = [...editor.tree().nodes.entries()].find(
+      ([, n]) => n.name === "inner"
+    )![0];
+    const baseline = editor.serialize();
+
+    orch.drive({ ids: [inner], movement: [5, 0] }, MODS.on, {
+      phase: "preview",
+      policy: "engine",
+      snap: false,
+    });
+    expect(editor.serialize().match(/<svg/g)).toHaveLength(2); // no clone
+    expect(selection_calls).toHaveLength(0); // never retargeted
+
+    orch.cancel();
+    expect(editor.serialize()).toBe(baseline);
+  });
+
+  it("zero NET movement cloned commit = duplicate-in-place, one undo step", () => {
     const { editor, drive } = harness();
     const baseline = editor.serialize();
     const a = first_rect(editor);
