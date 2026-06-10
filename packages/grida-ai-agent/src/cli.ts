@@ -9,7 +9,10 @@
  * an Electron shell (see `cli.test.ts`).
  *
  * Commands:
- *   serve                                        start the HTTP server; print PORT
+ *   serve [--register] [--allow-origin <o>]      start the HTTP server; print PORT
+ *   start                                        connect-or-spawn the daemon; print URL
+ *   status                                       probe the registered daemon
+ *   stop                                         stop the registered daemon
  *   run [--session <id>] "message"               one turn; echoes the session id
  *   sessions                                     list sessions
  *   messages <sessionId>                         print the linear transcript
@@ -22,19 +25,34 @@
  * calls. Behavior is owned by the runtime; this layer only parses args,
  * invokes the client, and prints the result.
  *
+ * Daemon model (WG spec docs/wg/ai/agent/daemon.md, issue #798):
+ * `serve --register` publishes a discovery record + persistent credential so
+ * any local-process client can attach. Client commands reuse a registered,
+ * healthy daemon (shared sessions) and only fall back to a throwaway embedded
+ * host when none is running.
+ *
  * This module is import-safe: it never runs `main()` on import. The executable
  * shim is `cli.bin.ts`, so tests can import the command handlers directly.
  */
 import crypto from "node:crypto";
+import { spawn } from "node:child_process";
 import { home } from "@grida/home";
+import { Daemon } from "./daemon";
 import { AgentTransport } from "./transport";
 import type { AgentHost } from "./agent-host";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { ChatMessageWithParts, ChatSessionRow } from "./session/rows";
 
-const CLIENT_ORIGIN = "http://127.0.0.1";
-const CLIENT_REFERER_PATH = "/cli";
+const CLIENT_ORIGIN = Daemon.LOCAL_CLIENT_ORIGIN;
+const CLIENT_REFERER_PATH = Daemon.LOCAL_CLIENT_REFERER_PATH;
 const REFERER = `${CLIENT_ORIGIN}${CLIENT_REFERER_PATH}`;
+
+/**
+ * Informational only — compatibility is gated on the wire protocol the
+ * handshake reports (`AGENT_SERVER_PROTOCOL`), never on this string.
+ * Matches the (private) package version.
+ */
+const CLI_VERSION = "0.0.0";
 
 /** Minimal output sink the command handlers write to: `process.stdout` in
  *  `main`, an array-backed fake in tests. */
@@ -50,7 +68,19 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const out: CliWriter = { write: (s) => void process.stdout.write(s) };
   switch (command) {
     case "serve":
-      await serveCommand();
+      await serveCommand(argv.slice(1));
+      return;
+    case "start":
+      await startCommand(out, readConfig().user_data_path);
+      return;
+    case "status":
+      await statusCommand(out, readConfig().user_data_path);
+      return;
+    case "stop":
+      await stopCommand(out, readConfig().user_data_path);
+      return;
+    case "acp":
+      await acpCommand();
       return;
     case "run":
       await withClient((c) => runCommand(c, argv.slice(1), out));
@@ -80,33 +110,204 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 }
 
-async function serveCommand(): Promise<void> {
+export type ServeFlags = {
+  register: boolean;
+  allow_origins: string[];
+  allow_referer_paths: string[];
+};
+
+/** Parse `serve`'s options. Exported for unit testing. */
+export function parseServeArgs(args: string[]): ServeFlags {
+  const flags: ServeFlags = {
+    register: false,
+    allow_origins: [],
+    allow_referer_paths: [],
+  };
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--register") {
+      flags.register = true;
+    } else if (arg === "--allow-origin" || arg === "--allow-referer-path") {
+      const value = args[i + 1];
+      if (!value || value.startsWith("-")) {
+        throw new Error(`${arg} requires a value`);
+      }
+      if (arg === "--allow-origin") flags.allow_origins.push(value);
+      else flags.allow_referer_paths.push(value);
+      i += 1;
+    } else {
+      throw new Error(`unknown serve option: ${arg}`);
+    }
+  }
+  return flags;
+}
+
+async function serveCommand(args: string[]): Promise<void> {
+  const flags = parseServeArgs(args);
   const config = readConfig();
-  const host = await createHost(config);
+  if (flags.register) {
+    // Daemon model: a REGISTERED server must outlive any one client, so the
+    // per-launch password gives way to the persistent on-disk credential
+    // every local-process client can read (WG spec §auth-model).
+    config.password = await Daemon.readOrCreateCredential(
+      config.user_data_path
+    );
+  }
+  const host = await createHost(config, flags);
   await host.start();
   process.stdout.write(`PORT=${host.port}\n`);
   process.stderr.write(
     `grida-agent listening on ${AgentTransport.baseUrl(host.port)}\n`
   );
   process.stderr.write(`PASSWORD=${config.password}\n`);
-  await waitForShutdown(host);
+  let registration: Daemon.Registration | null = null;
+  if (flags.register) {
+    registration = Daemon.mintRegistration({
+      version: CLI_VERSION,
+      url: AgentTransport.baseUrl(host.port),
+      pid: process.pid,
+    });
+    await Daemon.publish(config.user_data_path, registration);
+    process.stderr.write(
+      `REGISTERED ${Daemon.paths(config.user_data_path).registration}\n`
+    );
+  }
+  await waitForShutdown(
+    host,
+    registration
+      ? { state_dir: config.user_data_path, registration }
+      : undefined
+  );
 }
 
 /**
- * Spin a throwaway `AgentHost`, hand a connected client to `fn`, then stop the
- * host. Every non-`serve` command runs through here so the host lifecycle is
- * owned in exactly one place.
+ * Connect-or-spawn the daemon (WG spec §connect-or-spawn): reuse a healthy
+ * registered daemon, or spawn `serve --register` detached and wait for it
+ * to publish. Prints the connection facts.
  */
+export async function startCommand(
+  out: CliWriter,
+  stateDir: string,
+  spawnDaemon: () => void = spawnDetachedDaemon
+): Promise<void> {
+  const connection = await Daemon.connectOrSpawn(stateDir, {
+    spawn: spawnDaemon,
+  });
+  out.write(`URL=${connection.url}\n`);
+  out.write(`PID=${connection.registration.pid}\n`);
+}
+
+/** Probe the registered daemon and print one status line. */
+export async function statusCommand(
+  out: CliWriter,
+  stateDir: string
+): Promise<void> {
+  const registration = await Daemon.read(stateDir);
+  if (!registration) {
+    out.write("no daemon registered\n");
+    return;
+  }
+  const credential = await Daemon.readCredential(stateDir);
+  const result = credential
+    ? await Daemon.probe(registration, credential)
+    : ({ ok: false, reason: "unauthorized" } as const);
+  if (result.ok) {
+    out.write(
+      `daemon ${registration.url} pid=${registration.pid} ` +
+        `protocol=${result.handshake.protocol} healthy\n`
+    );
+  } else {
+    out.write(
+      `daemon ${registration.url} pid=${registration.pid} ` +
+        `unreachable (${result.reason})\n`
+    );
+  }
+}
+
+/**
+ * Stop the registered daemon. The recorded pid is signaled only after an
+ * authenticated probe proved the record describes a live daemon holding our
+ * credential (WG spec §stale-records); a stale record is just removed.
+ */
+export async function stopCommand(
+  out: CliWriter,
+  stateDir: string
+): Promise<void> {
+  const registration = await Daemon.read(stateDir);
+  if (!registration) {
+    out.write("no daemon registered\n");
+    return;
+  }
+  const credential = await Daemon.readCredential(stateDir);
+  const probed = credential
+    ? await Daemon.probe(registration, credential)
+    : null;
+  if (probed?.ok) {
+    try {
+      process.kill(registration.pid, "SIGTERM");
+    } catch {
+      // already gone
+    }
+    await waitForPidExit(registration.pid);
+    out.write(`stopped pid=${registration.pid}\n`);
+  } else {
+    out.write(
+      `registration stale (${probed ? probed.reason : "no credential"}) — removing\n`
+    );
+  }
+  // The daemon unpublishes itself on SIGTERM; this covers the stale path
+  // and the race where it died before its own cleanup. Owned-only delete.
+  await Daemon.unpublish(stateDir, registration.id);
+}
+
+/**
+ * Run as an ACP agent over stdio (docs/wg/ai/agent/acp.md): the editor
+ * launches `grida-agent acp` and drives it via JSON-RPC. The core is
+ * reached like any other client — a registered daemon when healthy,
+ * otherwise an in-process host that lives for this stdio connection.
+ * Either way the same session store backs the conversation.
+ */
+async function acpCommand(): Promise<void> {
+  const { runAcpStdio } = await import("./acp");
+  const { client, host } = await resolveClient();
+  try {
+    await runAcpStdio({ client, version: CLI_VERSION }).closed;
+  } finally {
+    await host?.stop();
+  }
+}
+
+/**
+ * Resolve a client against the best available host: a registered, healthy
+ * daemon when one exists (shared sessions — issue #798), else a throwaway
+ * embedded `AgentHost`. When `host` is non-null the caller owns its
+ * lifecycle and must `stop()` it.
+ */
+async function resolveClient(): Promise<{
+  client: AgentTransport.Client;
+  host: AgentHost | null;
+}> {
+  const config = readConfig();
+  const daemon = await Daemon.connect(config.user_data_path);
+  if (daemon) {
+    return { client: createClient(daemon.url, daemon.credential), host: null };
+  }
+  const host = await createHost(config);
+  await host.start();
+  return {
+    client: createClient(AgentTransport.baseUrl(host.port), config.password),
+    host,
+  };
+}
+
 async function withClient(
   fn: (client: AgentTransport.Client) => Promise<void>
 ): Promise<void> {
-  const config = readConfig();
-  const host = await createHost(config);
-  await host.start();
+  const { client, host } = await resolveClient();
   try {
-    await fn(createClient(host.port, config.password));
+    await fn(client);
   } finally {
-    await host.stop();
+    await host?.stop();
   }
 }
 
@@ -216,14 +417,22 @@ export function parseRunArgs(args: string[]): {
   return { session_id: sessionId, message: rest.join(" ").trim() };
 }
 
-async function createHost(config: CliConfig): Promise<AgentHost> {
+async function createHost(
+  config: CliConfig,
+  flags?: Pick<ServeFlags, "allow_origins" | "allow_referer_paths">
+): Promise<AgentHost> {
   const { AgentHost } = await import("./server");
   return new AgentHost({
     password: config.password,
     user_data_path: config.user_data_path,
     http_access: {
-      allowed_origins: [CLIENT_ORIGIN],
-      allowed_referer_paths: [CLIENT_REFERER_PATH],
+      // The canonical local-client origin is always admitted; additional
+      // origins (e.g. a dev web client) are an explicit serve-time opt-in.
+      allowed_origins: [CLIENT_ORIGIN, ...(flags?.allow_origins ?? [])],
+      allowed_referer_paths: [
+        CLIENT_REFERER_PATH,
+        ...(flags?.allow_referer_paths ?? []),
+      ],
     },
     // GRIDA-SEC-004 — the CLI runs WITHOUT an OS sandbox. It's a local,
     // user-invoked dev/power tool (the operator is the user running it), so it
@@ -233,13 +442,45 @@ async function createHost(config: CliConfig): Promise<AgentHost> {
   });
 }
 
-function createClient(port: number, password: string): AgentTransport.Client {
+function createClient(
+  baseUrl: string,
+  password: string
+): AgentTransport.Client {
   return new AgentTransport.Client({
-    base_url: AgentTransport.baseUrl(port),
+    base_url: baseUrl,
     password,
     origin: CLIENT_ORIGIN,
     referer: REFERER,
   });
+}
+
+/**
+ * Re-invoke this same CLI entry as a detached daemon
+ * (`node [execArgv] <entry> serve --register`). `execArgv` carries dev
+ * loader flags (`--import tsx`) so the spawn works both from the built bin
+ * and the dev `pnpm cli` path. The child outlives this process.
+ */
+function spawnDetachedDaemon(): void {
+  const entry = process.argv[1];
+  if (!entry) {
+    throw new Error("[grida-agent] cannot resolve CLI entrypoint for spawn");
+  }
+  spawn(process.execPath, [...process.execArgv, entry, "serve", "--register"], {
+    detached: true,
+    stdio: "ignore",
+  }).unref();
+}
+
+/** Poll `kill(pid, 0)` until the process is gone, attempt-bounded. */
+async function waitForPidExit(pid: number): Promise<void> {
+  for (let i = 0; i < 100; i += 1) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return; // ESRCH — gone
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
 }
 
 function readConfig(): CliConfig {
@@ -250,14 +491,43 @@ function readConfig(): CliConfig {
   return { password, user_data_path: userDataPath };
 }
 
-async function waitForShutdown(host: AgentHost): Promise<void> {
+async function waitForShutdown(
+  host: AgentHost,
+  daemon?: { state_dir: string; registration: Daemon.Registration }
+): Promise<void> {
   await new Promise<void>((resolve) => {
-    const stop = (signal: NodeJS.Signals) => {
-      process.stderr.write(`grida-agent shutdown (${signal})\n`);
-      void host.stop().finally(resolve);
+    let tick: NodeJS.Timeout | null = null;
+    let settled = false;
+    const finish = (label: string, unpublish: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (tick) clearInterval(tick);
+      process.stderr.write(`grida-agent shutdown (${label})\n`);
+      const cleanup =
+        daemon && unpublish
+          ? Daemon.unpublish(daemon.state_dir, daemon.registration.id).catch(
+              () => false
+            )
+          : Promise.resolve(false);
+      void cleanup.then(() => void host.stop().finally(resolve));
     };
+    const stop = (signal: NodeJS.Signals) => finish(signal, true);
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
+    if (daemon) {
+      // Ownership re-assertion (WG spec §convergence): last writer wins —
+      // when the registration is no longer ours (a newer daemon published,
+      // or an operator removed the record), stand down instead of fighting.
+      tick = setInterval(() => {
+        void Daemon.checkOwnership(
+          daemon.state_dir,
+          daemon.registration.id
+        ).then((status) => {
+          if (status !== "owned") finish(`registration ${status}`, false);
+        });
+      }, Daemon.OWNERSHIP_INTERVAL_MS);
+      tick.unref();
+    }
   });
 }
 
@@ -318,7 +588,11 @@ function printHelp(out: CliWriter): void {
   out.write(`grida-agent
 
 Usage:
-  grida-agent serve
+  grida-agent serve [--register] [--allow-origin <origin>] [--allow-referer-path <path>]
+  grida-agent start
+  grida-agent status
+  grida-agent stop
+  grida-agent acp
   grida-agent run [--session <id>] "message"
   grida-agent sessions
   grida-agent messages <sessionId>

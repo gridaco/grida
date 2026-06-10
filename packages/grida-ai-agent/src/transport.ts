@@ -58,6 +58,16 @@ export namespace AgentTransport {
     return `Basic ${base64(`${USERNAME}:${password}`)}`;
   }
 
+  /**
+   * GRIDA-SEC-004 — the `auth_token` query value for header-less
+   * event-stream attaches (native `EventSource`). The SAME base64 payload
+   * the Basic header carries; the server accepts it on GET SSE routes
+   * only. URL-encode when interpolating into a query string.
+   */
+  export function buildAuthToken(password: string): string {
+    return base64(`${USERNAME}:${password}`);
+  }
+
   export function baseUrl(port: number): string {
     return `http://127.0.0.1:${port}`;
   }
@@ -141,6 +151,15 @@ export namespace AgentTransport {
   export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>;
 
   /**
+   * Browser clients only (Node fetch ignores this): pages served with
+   * `Referrer-Policy: no-referrer` (e.g. `/desktop/*`, GRIDA-SEC-004)
+   * would otherwise strip the Referer the server's guard requires. One
+   * policy for every transport fetch path — `makeFetcher` and
+   * `Client.fetch` must never diverge here.
+   */
+  const REFERRER_POLICY: RequestInit["referrerPolicy"] = "unsafe-url";
+
+  /**
    * Host-adapter fetch factory. Holds the host-supplied password in closure
    * so the caller can expose only a narrowed bridge/client surface.
    */
@@ -167,7 +186,7 @@ export namespace AgentTransport {
         ...init,
         headers,
         credentials: "omit",
-        referrerPolicy: "unsafe-url",
+        referrerPolicy: REFERRER_POLICY,
       });
     };
   }
@@ -219,20 +238,27 @@ export namespace AgentTransport {
     private readonly fetch_impl: typeof fetch;
 
     constructor(opts: ClientOptions) {
+      // The default MUST be receiver-bound: storing the global `fetch` on a
+      // property and calling `this.fetch_impl(...)` would invoke it with the
+      // Client as `this`, which a real browser rejects ("Illegal invocation").
+      // Node's fetch tolerates any receiver, so only browser clients see it —
+      // pinned by the browser-engine harness (perimeter.browser.test.ts).
+      const boundFetch: typeof fetch = (input, init) =>
+        globalThis.fetch(input, init);
       if ("fetcher" in opts) {
         this.custom_fetcher = opts.fetcher ?? null;
         this.base = "";
         this.authorization = null;
         this.origin = undefined;
         this.referer = undefined;
-        this.fetch_impl = fetch;
+        this.fetch_impl = boundFetch;
       } else {
         this.custom_fetcher = null;
         this.base = opts.base_url.replace(/\/$/, "");
         this.authorization = buildBasicAuthHeader(opts.password);
         this.origin = opts.origin;
         this.referer = opts.referer;
-        this.fetch_impl = opts.fetch ?? fetch;
+        this.fetch_impl = opts.fetch ?? boundFetch;
       }
     }
 
@@ -246,6 +272,7 @@ export namespace AgentTransport {
         ...init,
         headers,
         credentials: "omit",
+        referrerPolicy: REFERRER_POLICY,
       });
     }
 

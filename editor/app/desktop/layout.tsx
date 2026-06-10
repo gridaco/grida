@@ -5,6 +5,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@app/ui/components/tooltip";
 import { DesktopBridgeGate } from "@/scaffolds/desktop/desktop-bridge-gate";
+import { WebDaemonDevBoot } from "@/scaffolds/desktop/web-daemon-dev-boot";
 import "../editor.css";
 
 /**
@@ -57,7 +58,12 @@ export default async function DesktopRootLayout({
       >
         <ThemeProvider nonce={nonce}>
           <TooltipProvider>
-            <DesktopBridgeGate>{children}</DesktopBridgeGate>
+            {/* Dev-only: lets these prod pages run in a plain browser
+                against a local agent daemon; a pass-through in
+                production builds (see web-daemon-dev-boot.tsx). */}
+            <WebDaemonDevBoot>
+              <DesktopBridgeGate>{children}</DesktopBridgeGate>
+            </WebDaemonDevBoot>
           </TooltipProvider>
         </ThemeProvider>
       </body>

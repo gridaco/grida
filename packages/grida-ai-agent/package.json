@@ -57,6 +57,16 @@
         "default": "./dist/transport.cjs"
       }
     },
+    "./acp": {
+      "import": {
+        "types": "./dist/acp/index.d.mts",
+        "default": "./dist/acp/index.mjs"
+      },
+      "require": {
+        "types": "./dist/acp/index.d.cts",
+        "default": "./dist/acp/index.cjs"
+      }
+    },
     "./tiers": {
       "import": {
         "types": "./dist/tiers.d.mts",
@@ -105,10 +115,12 @@
     "prepack": "tsdown",
     "smoke:sessions:live": "node --import tsx src/session/smoke.live.ts",
     "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json && tsc --noEmit -p tsconfig.browser-backends.json"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "0.25.0",
     "@ai-sdk/gateway": "3.0.125",
     "@ai-sdk/openai-compatible": "2.0.48",
     "@grida/ai-models": "workspace:*",
@@ -120,6 +132,8 @@
     "zod": "^4"
   },
   "devDependencies": {
+    "@vitest/browser-playwright": "4.0.18",
+    "playwright": "^1.58.2",
     "tsdown": "^0.22.1",
     "typescript": "^6",
     "vitest": "^4"

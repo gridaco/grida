@@ -329,6 +329,8 @@ agent. The guide fills them in.
 ## See also
 
 - [Agent Client Protocol — official site](https://agentclientprotocol.com/)
+- [Local Daemon](./daemon.md) — the discoverable local server the
+  ACP adapter attaches to as a local-process client.
 - [Foundations](./foundations.md) — the AI SDK v6 chunk shape ACP
   wraps.
 - [Session Lifecycle](./session.md) — what `session/new` / `load`
