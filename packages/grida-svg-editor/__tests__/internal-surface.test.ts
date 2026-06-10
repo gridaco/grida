@@ -22,7 +22,11 @@ type Internal = {
     set_text: (id: string, text: string) => void;
     all_elements: () => string[];
   };
-  history: { preview: (label: string) => unknown };
+  history: {
+    preview: (label: string) => unknown;
+    undo_label: () => string | null;
+  };
+  clipboard: { copy: () => string | null; cut: () => string | null };
   insert_text_preview: (
     initial: Readonly<Record<string, string>>,
     opts?: { parent?: string }
@@ -49,6 +53,7 @@ describe("editor._internal contract", () => {
     const internal = internalOf(editor);
     expect(Object.keys(internal).sort()).toEqual(
       [
+        "clipboard",
         "doc",
         "emit",
         "bump_geometry",
@@ -65,6 +70,9 @@ describe("editor._internal contract", () => {
       ].sort()
     );
     expect(typeof internal.history.preview).toBe("function");
+    expect(typeof internal.history.undo_label).toBe("function");
+    expect(typeof internal.clipboard.copy).toBe("function");
+    expect(typeof internal.clipboard.cut).toBe("function");
     expect(typeof internal.emit).toBe("function");
     expect(typeof internal.subscribe_translate_commit).toBe("function");
     expect(typeof internal.notify_translate_commit).toBe("function");

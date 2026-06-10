@@ -104,6 +104,7 @@ import type {
 } from "./types";
 import { TOOL_CURSOR } from "./types";
 import { array_shallow_equal } from "./util/equal";
+import { is_text_input_focused } from "./util/dom";
 
 // Re-exports of surface-scoped types that don't belong on the headless
 // entry. Anything DOM-coupled (Camera, Gestures, MemoizedGeometryProvider,
@@ -226,6 +227,18 @@ export type DomSurfaceOptions = {
    */
   gestures?: boolean;
   /**
+   * Wire native ClipboardEvent transport — `copy` / `cut` / `paste`
+   * listeners on the owner document, gated by the clipboard attention
+   * discipline. Default `true`. Pass `false` to route ALL clipboard
+   * traffic through the `ClipboardProvider` seam instead (the
+   * configuration under which a host's paste-time screening governs
+   * every path) — see docs/wg/feat-svg-editor/clipboard.md §Transport
+   * "Host control over the native path". Focus management (the container
+   * focusing on pointerdown) stays either way — it is a general canvas
+   * mitigation, not a clipboard feature.
+   */
+  clipboard?: boolean;
+  /**
    * Auto-fit the document into the viewport on initial attach. Default
    * `false`. Mirrors Excalidraw's `initialData.scrollToContent`.
    * Subsequent `editor.load()` calls do NOT re-fit — call
@@ -344,6 +357,9 @@ class DomSurface implements Surface {
   readonly gestures: Gestures;
   /** One-shot: cleared after the post-mount RAF honors `options.fit`. */
   private fit_on_attach: boolean;
+  /** Native ClipboardEvent transport wired (`options.clipboard !== false`).
+   *  See `DomSurfaceOptions.clipboard`. */
+  private readonly clipboard_enabled: boolean;
   /** Container element (cached from options). */
   private readonly container: HTMLElement;
   /** Pointer/focus-attention tracker — gates the doc/window-level keydown
@@ -571,6 +587,16 @@ class DomSurface implements Surface {
     (
       container.style as CSSStyleDeclaration & { webkitUserSelect?: string }
     ).webkitUserSelect = "none";
+    // Programmatically focusable, not tab-reachable. The surface focuses
+    // the container on pointerdown so (a) native clipboard events target
+    // the canvas (and the clipboard gate's focus-within arm can claim
+    // them — see `claims_clipboard`), and (b) engines that derive the
+    // copy/cut event target from focus fire at all over a selectionless
+    // canvas (the pre-2025 WebKit floor; FRD §Transport). The focus ring
+    // is suppressed — the HUD's selection chrome is the focus signal here.
+    this.clipboard_enabled = options.clipboard !== false;
+    container.tabIndex = -1;
+    container.style.outline = "none";
 
     // Derive pipeline options from current style. Shared by the
     // orchestrator (drag gestures) and the nudge-dwell watcher (after-
@@ -2091,6 +2117,82 @@ class DomSurface implements Surface {
 
     // Prevent context menu inside container (we don't have right-click UI yet).
     on(this.container, "contextmenu", (e: MouseEvent) => e.preventDefault());
+
+    // Native clipboard transport — the primary channel (the keystroke is
+    // the permission; no prompts in any engine). Wired on `owner_doc` for
+    // symmetry with keydown; gated per-event by `claims_clipboard`. See
+    // docs/wg/feat-svg-editor/clipboard.md §Transport.
+    if (this.clipboard_enabled) {
+      on(owner_doc, "copy", (e: ClipboardEvent) =>
+        this.on_copy_or_cut(e, "copy")
+      );
+      on(owner_doc, "cut", (e: ClipboardEvent) =>
+        this.on_copy_or_cut(e, "cut")
+      );
+      on(owner_doc, "paste", (e: ClipboardEvent) => this.on_paste(e));
+    }
+  }
+
+  /**
+   * Gate for claiming a native clipboard gesture. Deliberately STRICTER
+   * than the keyboard attention gate: focus-based only — pointer-over is
+   * a sufficient signal for a keystroke (worst case: a stolen scroll) but
+   * not for clipboard (worst case: destroying what the user believed they
+   * copied, or routing a paste meant for a host text field into the
+   * document). A user with text selected in a sibling panel and the
+   * pointer idly over the canvas must get their text copy.
+   */
+  private claims_clipboard(kind: "copy" | "cut" | "paste"): boolean {
+    // The inline text session owns the clipboard while active.
+    if (this.text_edit) return false;
+    // Structural mutation under an open content-edit session is the same
+    // hazard the `clipboard.*` registry handlers gate (vector edit).
+    if (this.editor.state.mode !== "select") return false;
+    if (!this.attention.is_focus_within()) return false;
+    // A focused host text input always wins, for paste especially.
+    if (is_text_input_focused()) return false;
+    if (kind !== "paste") {
+      // A non-collapsed host text selection is the natural target of a
+      // copy/cut gesture — never claim over it.
+      const sel = this.container.ownerDocument.getSelection();
+      if (sel && !sel.isCollapsed) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Act-then-claim: an empty selection returns without `preventDefault()`,
+   * leaving the browser default (and the OS clipboard) untouched. The
+   * buffer-only `_internal.clipboard` variants are used here — the event's
+   * DataTransfer is this gesture's ONE external channel (the public
+   * commands would additionally write the provider; one gesture, one
+   * external write — FRD §Transport).
+   */
+  private on_copy_or_cut(e: ClipboardEvent, kind: "copy" | "cut"): void {
+    if (!this.claims_clipboard(kind)) return;
+    // No DataTransfer = no usable event channel — leave the gesture
+    // unclaimed rather than half-execute (a cut would delete without
+    // delivering anywhere external).
+    if (!e.clipboardData) return;
+    const internal = this.editor_internal();
+    const payload =
+      kind === "copy" ? internal.clipboard.copy() : internal.clipboard.cut();
+    if (payload === null) return;
+    e.clipboardData.setData("text/plain", payload);
+    e.preventDefault();
+  }
+
+  /**
+   * Claim-then-act (mirrors the keydown claim doctrine: swallow when the
+   * gesture is aimed at the editor, not just when a handler consumed):
+   * a refused paste — junk text — still claims; the suppressed default is
+   * a no-op on a div anyway.
+   */
+  private on_paste(e: ClipboardEvent): void {
+    if (!this.claims_clipboard("paste")) return;
+    e.preventDefault();
+    const text = e.clipboardData?.getData("text/plain");
+    if (text) this.editor.commands.paste(text);
   }
 
   /**
@@ -2180,6 +2282,13 @@ class DomSurface implements Surface {
         this.text_edit.pointerUp();
       }
       return;
+    }
+    // Take focus on press (text-edit case returned above — stealing focus
+    // there would blur the hidden input and force a deferred commit).
+    // Focus-within is what arms the clipboard gate and what makes engines
+    // that target copy/cut at the focused element fire over the canvas.
+    if (kind === "pointer_down") {
+      this.container.focus({ preventScroll: true });
     }
 
     const cr = this.container.getBoundingClientRect();

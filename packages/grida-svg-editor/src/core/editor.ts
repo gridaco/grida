@@ -16,6 +16,7 @@ import { Keymap } from "../keymap/keymap";
 import { applyDefaultBindings } from "../keymap/defaults";
 import cmath from "@grida/cmath";
 import { create_defs } from "./defs";
+import { clipboard as clipboard_codec } from "./clipboard";
 import { SvgDocument, XLINK_NS, XMLNS_NS } from "./document";
 import type { GeometryProvider } from "./geometry";
 import type { SurfaceBridge } from "./surface-bridge";
@@ -326,6 +327,61 @@ export type Commands = {
   // structure
   reorder(direction: ReorderDirection): void;
   remove(): void;
+  // clipboard — contract: docs/wg/feat-svg-editor/clipboard.md
+  /**
+   * Copy the selection as a **standalone SVG document** (the payload is
+   * the file format — no private envelope). The payload carries the
+   * outbound `url(#…)` / `href` reference closure in one `<defs>` block
+   * and declares every namespace prefix the fragment borrows from
+   * ancestor scope; ancestor transforms, inherited presentation, and the
+   * viewport are deliberately NOT carried (verbatim policy — see the FRD).
+   *
+   * Pure read: no document mutation, no history entry. The payload is
+   * always written to the editor's internal clipboard buffer (the
+   * transport floor — cannot fail) and, when a `ClipboardProvider` is
+   * configured, delivered to it best-effort (a failed provider write is
+   * dev-warned, never a copy failure).
+   *
+   * Returns the payload string, or `null` on empty / non-live selection
+   * (a no-op, not an error — copy has no refusal path).
+   */
+  copy(): string | null;
+  /**
+   * Copy, then delete the selection — ONE history step labeled `"cut"`
+   * with {@link remove}'s exact capture/revert semantics. The payload is
+   * secured in the internal buffer BEFORE the deletion commits, so a
+   * failed external write never strands the user with deleted content
+   * and no copy. The clipboard write is not part of the history step:
+   * undo restores the document and leaves the buffer holding the payload
+   * (cut → undo → paste works as a move idiom).
+   *
+   * Returns the payload string, or `null` on empty selection (no
+   * mutation, no history).
+   */
+  cut(): string | null;
+  /**
+   * Paste SVG markup — `text` when given, else the internal clipboard
+   * buffer. Synchronous over delivered text: acquisition from a native
+   * clipboard event or an async provider read is the invoking channel's
+   * job and completes before this command runs.
+   *
+   * Accepts anything {@link insert_fragment} parses (bare fragment or
+   * full document — the editor's own payloads are an ordinary case, not
+   * a privileged one) and inserts it with the same atomic semantics:
+   * one history step, subtrees adopted verbatim, ids never rewritten,
+   * namespace declarations hoisted, appended at the document top level,
+   * inserted roots selected.
+   *
+   * **Gesture-grade refusal table** (deliberately weaker than
+   * `insert_fragment`'s): paste's input is environment-supplied — prose,
+   * URLs, and JSON are what clipboards hold most of the day — so
+   * non-parseable input is a **no-op refusal** (`[]`, no mutation, no
+   * history), never a thrown error. A non-string argument still throws
+   * `TypeError` (caller bug — no acquisition channel produces one).
+   * Empty selection→buffer misses (`undefined` text, empty buffer) also
+   * return `[]`.
+   */
+  paste(text?: string): NodeId[];
   /**
    * Wrap the current selection in a new plain `<g>`. Returns `true` if
    * the wrap was performed (a history step was pushed and the new group
@@ -496,6 +552,13 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   let load_version = 0;
   let style: EditorStyle = { ...DEFAULT_STYLE, ...opts.style };
   const providers = opts.providers ?? {};
+  /**
+   * In-memory clipboard buffer — the transport floor (FRD R1: the buffer
+   * write cannot fail; external channels are best-effort on top). NOT part
+   * of `EditorState` and NOT history-managed: it survives `load()` /
+   * `reset()` / undo, like the OS clipboard it mirrors.
+   */
+  let clipboard_buffer: string | null = null;
   const listeners = new Set<(state: EditorState) => void>();
   let attached_surface: Surface | null = null;
   /**
@@ -1625,6 +1688,16 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   function remove() {
+    remove_selection("remove");
+  }
+
+  /**
+   * Shared deletion body for `remove` and `cut` — identical
+   * capture/revert semantics, differing only in the history label
+   * (`verb`), so undo attribution names the gesture that caused the
+   * deletion.
+   */
+  function remove_selection(verb: string) {
     if (selection.length === 0) return;
 
     // Compact selection to subtree roots first — `doc.remove` detaches
@@ -1675,7 +1748,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     };
     apply();
     history.atomic(
-      captures.length === 1 ? "remove" : `remove ${captures.length}`,
+      captures.length === 1 ? verb : `${verb} ${captures.length}`,
       (tx) => {
         tx.push({ providerId: PROVIDER_ID, apply, revert });
       }
@@ -1875,6 +1948,19 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     svg: string,
     opts?: { parent?: NodeId; index?: number; select?: boolean }
   ): NodeId[] {
+    return insert_fragment_impl(svg, opts, "insert fragment");
+  }
+
+  /**
+   * Label-bearing body shared by `insert_fragment` and `paste` — same
+   * atomic insertion, differing only in history attribution (undo for a
+   * paste gesture should read "paste", not "insert fragment").
+   */
+  function insert_fragment_impl(
+    svg: string,
+    opts: { parent?: NodeId; index?: number; select?: boolean } | undefined,
+    label: string
+  ): NodeId[] {
     const parent = opts?.parent ?? doc.root;
     if (!doc.is_element(parent) || !doc.contains(doc.root, parent)) {
       throw new Error(
@@ -1928,10 +2014,75 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       if (select_after) set_selection(previous_selection);
     };
     apply();
-    history.atomic("insert fragment", (tx) => {
+    history.atomic(label, (tx) => {
       tx.push({ providerId: PROVIDER_ID, apply, revert });
     });
     return roots;
+  }
+
+  // ─── Clipboard ───────────────────────────────────────────────────────────
+  // Contract: docs/wg/feat-svg-editor/clipboard.md. Payload assembly is
+  // core/clipboard.ts (pure); these commands own the buffer + transport
+  // write-through. `deliver_external` implements the one-external-channel
+  // rule: the public commands deliver to the provider; the surface's
+  // native-event path calls `_internal.clipboard.*` (deliver=false) and
+  // writes the event's DataTransfer instead — one gesture, one external
+  // write.
+
+  function copy_impl(deliver_external: boolean): string | null {
+    const payload = clipboard_codec.extract_payload(doc, selection);
+    if (payload === null) return null;
+    clipboard_buffer = payload;
+    if (deliver_external && providers.clipboard) {
+      void providers.clipboard.write(payload).catch((err) => {
+        // Best-effort external delivery (FRD R1): the buffer is the
+        // success floor; a failed provider write is reportable, never a
+        // copy failure.
+        console.warn("[svg-editor] clipboard provider write failed:", err);
+      });
+    }
+    return payload;
+  }
+
+  function copy(): string | null {
+    return copy_impl(true);
+  }
+
+  function cut_impl(deliver_external: boolean): string | null {
+    // Extract BEFORE removing — `serialize_node` throws on detached
+    // nodes, and the FRD requires the payload secured in the buffer
+    // before the deletion commits.
+    const payload = copy_impl(deliver_external);
+    if (payload === null) return null;
+    remove_selection("cut");
+    return payload;
+  }
+
+  function cut(): string | null {
+    return cut_impl(true);
+  }
+
+  function paste(text?: string): NodeId[] {
+    if (text !== undefined && typeof text !== "string") {
+      throw new TypeError(
+        `paste(text) requires a string when provided, got ${text === null ? "null" : typeof text}`
+      );
+    }
+    const source = text ?? clipboard_buffer;
+    if (source === null) return [];
+    try {
+      return insert_fragment_impl(source, undefined, "paste");
+    } catch (err) {
+      if (err instanceof TypeError) throw err;
+      // Gesture-grade refusal (FRD §Command semantics): paste's input is
+      // environment-supplied — prose, URLs, JSON are what clipboards hold
+      // most of the day — so non-parseable input is a no-op, never a
+      // throw. Mutation-safe to catch here: `create_fragment` parses the
+      // whole input before adopting anything, so a parse error precedes
+      // any document-visible change. `insert_fragment` (whose caller
+      // authored its input) keeps strict error semantics.
+      return [];
+    }
   }
 
   /**
@@ -2205,6 +2356,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     align,
     reorder,
     remove,
+    copy,
+    cut,
+    paste,
     group,
     ungroup,
     insert,
@@ -2482,6 +2636,11 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       doc,
       history: {
         preview: (label: string) => history.preview(label),
+        undo_label: () => history.stack.undoLabel,
+      },
+      clipboard: {
+        copy: () => copy_impl(false),
+        cut: () => cut_impl(false),
       },
       insert_text_preview,
       emit,

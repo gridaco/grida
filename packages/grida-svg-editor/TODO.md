@@ -273,41 +273,53 @@ Open:
 
 ### 4. Copy / paste
 
-Document-internal copy of selected elements. Clipboard format, defs
-reference handling, paste position, multi-document support.
+**Shipped.** Spec: [`docs/wg/feat-svg-editor/clipboard.md`](../../docs/wg/feat-svg-editor/clipboard.md)
+(FRD — payload = standalone SVG document; extraction policies for the
+five context kinds; command/refusal semantics; transport ownership;
+trust model).
 
-Current implementation notes:
+What shipped:
 
-- **Insertion-side primitive shipped.** `commands.insert_fragment(svg, opts)`
-  is the markup-shaped atomic insert that paste composes: parses a bare
-  fragment or a full `<svg>` doc (shell discarded, children taken), adopts
-  subtrees verbatim (authored `id`s NEVER rewritten — dedup stays Tidy's
-  job), hoists resolvable undeclared `xmlns:*` prefixes onto the root, ONE
-  history step, roots returned in document order. Backed by
-  `SvgDocument.create_fragment` / `undeclared_ns_prefixes` /
-  `declare_xmlns` (`core/document.ts`). Remaining paste work is the list
-  below — clipboard wiring, copy-side defs dependency walking, command ids
-  and keymap bindings.
-- Not implemented. No `clipboard.copy` / `clipboard.cut` / `clipboard.paste`
-  command id is registered (`commands/defaults.ts`) and no keymap binding
-  exists for them (`keymap/defaults.ts`).
-- A `ClipboardProvider` interface is declared in `types.ts` with
-  `read(): Promise<string | null>` / `write(text: string): Promise<void>`
-  and surfaced via `Providers.clipboard` on `CreateSvgEditorOptions.providers`,
-  but no editor code reads `providers.clipboard` today — it's just a
-  reserved slot.
-- No ID-regeneration helper exists. `parser.ts:fresh_id` generates IDs at
-  parse time only; `doc.create_element` (used by `selection.group`) makes
-  a new `data-grida-id`, not a new SVG `id` attribute.
-- No `<defs>` dependency walker. `defs` registry in `core/defs.ts` only
-  tracks gradients (`upsert`); no traversal of `url(#…)` / `href` refs in
-  a copied subtree.
-- `docs/keybindings.md` lists Cut/Copy/Paste/Duplicate as `[~]` "command doesn't
-  exist yet" and pins the clipboard model as TBD.
-- Entry points to add: a new `commands/clipboard.ts` (or extend
-  `commands/defaults.ts`), bindings in `keymap/defaults.ts`, and a
-  subtree-clone helper in `core/document.ts` (no equivalent exists today
-  beyond `create_element` + per-attr copy).
+- **Core codec** — `core/clipboard.ts:extract_payload` (selection →
+  standalone document: normalization, closed-carrier-list reference
+  closure with cycle guard + forest exclusion, xmlns shell with
+  well-known repair, deterministic, headless).
+- **Commands** — `commands.copy()` / `cut()` / `paste(text?)` on the
+  public surface; internal buffer as the transport floor; provider
+  write-through; cut as one history step labeled `"cut"`; paste's
+  gesture-grade refusal table (junk environment input → `[]`, never a
+  throw).
+- **Registry ids** — `clipboard.copy` / `cut` / `paste` registered
+  (`commands/defaults.ts`), `select`-mode gated; deliberately NO keymap
+  rows (native ClipboardEvents are the binding — a keymap claim would
+  `preventDefault` the keystroke and suppress the event's generation).
+- **DOM surface transport** — `copy`/`cut`/`paste` listeners on the
+  owner document behind a focus-only clipboard gate
+  (`claims_clipboard`, stricter than keyboard attention); container
+  focus management (`tabIndex = -1`, focus on pointerdown); the
+  `DomSurfaceOptions.clipboard: false` native-transport opt-out.
+- Tests: `__tests__/clipboard-extract.test.ts`,
+  `clipboard-commands.test.ts`, `clipboard.browser.test.ts`; manual TC
+  `test/svg-editor-clipboard.md`.
+
+Still open (deferred by the FRD, tracked here):
+
+- **Subtree clone** — the closure-free in-document extraction operation
+  that duplicate (`⌘D`, §5 alt-drag clone) consumes. A different
+  contract from payload extraction (carrying the closure in-document
+  would deposit duplicate defs); needs its own spec pass.
+- **Paste placement enhancements** — paste-at-pointer, collision
+  offset, scoped paste (each must confront wrapper-vs-rewrite noise).
+- **Materializing extraction variants** — ancestor-transform bake and
+  inherited-presentation capture (provenance-driven).
+- **Non-walked carriers** — `<style>` element rules (blocked on the
+  cascade engine's stylesheet matching), SMIL timing/value refs,
+  `cursor`, SVG 2 text-layout properties.
+- **Peer-format ingestion** (e.g. Figma's binary clipboard) and
+  non-SVG paste (plain text → `<text>`, raster images).
+- **Rendering-surface hardening** — the FRD trust-model's tracking
+  obligation; the `innerHTML` mount executes `on*` attrs for loaded
+  AND pasted content alike. Separate, security-reviewed work item.
 
 ### 5. Alt-drag (translate with clone)
 

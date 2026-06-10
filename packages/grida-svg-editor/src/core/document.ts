@@ -1278,4 +1278,4 @@ function parse_inline_style(
   return out;
 }
 
-export { XLINK_NS, XML_NS, XMLNS_NS };
+export { SVG_NS, XLINK_NS, XML_NS, XMLNS_NS };

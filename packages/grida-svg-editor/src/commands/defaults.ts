@@ -174,6 +174,52 @@ export function registerDefaultCommands(
     return editor.commands.align(args as AlignDirection);
   });
 
+  // ─── clipboard ────────────────────────────────────────────────────────────
+  // Contract: docs/wg/feat-svg-editor/clipboard.md. No keymap rows bind
+  // these — Cmd+C/X/V reach the editor as native ClipboardEvents wired by
+  // the DOM surface (a keymap claim would preventDefault the keystroke and
+  // suppress the native event's generation). These ids exist for menu /
+  // RPC / palette hosts.
+  //
+  // All three gate on `select` mode — one step beyond the FRD's named
+  // text-edit inertness: cut/paste during vector content-edit would mutate
+  // structure under an open edit session (same hazard `selection.group`
+  // guards). Copy is a pure read but gates too, for symmetry.
+
+  reg.register("clipboard.copy", () => {
+    if (editor.state.mode !== "select") return false;
+    if (editor.state.selection.length === 0) return false;
+    return editor.commands.copy() !== null;
+  });
+
+  reg.register("clipboard.cut", () => {
+    if (editor.state.mode !== "select") return false;
+    if (editor.state.selection.length === 0) return false;
+    return editor.commands.cut() !== null;
+  });
+
+  // Paste acquisition is the invoking channel's job (FRD §Command
+  // semantics); for this programmatic channel that means the provider
+  // when configured (async read, fire-and-forget — the refusal
+  // observability of the async leg is inherently weaker), else the
+  // editor's internal buffer (sync, honest chain semantics).
+  reg.register("clipboard.paste", () => {
+    if (editor.state.mode !== "select") return false;
+    const provider = editor.providers.clipboard;
+    if (provider) {
+      void provider
+        .read()
+        .then((text) => {
+          if (text) editor.commands.paste(text);
+        })
+        .catch((err) => {
+          console.warn("[svg-editor] clipboard provider read failed:", err);
+        });
+      return true;
+    }
+    return editor.commands.paste().length > 0;
+  });
+
   // ─── content edit ─────────────────────────────────────────────────────────
   // Enter — enter content-edit (text edit / vector edit) on the single
   // selected node. Mirrors the double-click → `enter_content_edit` intent

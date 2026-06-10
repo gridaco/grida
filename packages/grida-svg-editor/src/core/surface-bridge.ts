@@ -25,9 +25,24 @@ export interface SurfaceBridge {
   readonly doc: SvgDocument;
 
   /** History bracket factory. Surfaces open one per gesture and
-   *  `set / commit / discard` it across frames. */
+   *  `set / commit / discard` it across frames. `undo_label` reads the
+   *  label of the step `undo()` would revert — gesture attribution
+   *  (e.g. asserting a cut recorded as "cut", not "remove"). */
   readonly history: {
     preview(label: string): Preview;
+    undo_label(): string | null;
+  };
+
+  /** surface → editor: buffer-only clipboard operations for the native
+   *  ClipboardEvent path. Same semantics as `commands.copy` / `commands.cut`
+   *  EXCEPT no provider delivery — the surface writes the event's
+   *  DataTransfer instead, honoring the one-external-channel rule
+   *  (docs/wg/feat-svg-editor/clipboard.md §Transport: one gesture, one
+   *  external write). Paste has no row here — the surface hands the
+   *  event's text to the public `commands.paste(text)`. */
+  readonly clipboard: {
+    copy(): string | null;
+    cut(): string | null;
   };
 
   /** Text-creation bracket for the click-to-place text tool. Creates an

@@ -101,6 +101,12 @@ export type SvgEditorCanvasProps = {
    * `DomSurfaceOptions.fit`.
    */
   fit?: boolean;
+  /**
+   * Wire native ClipboardEvent transport (copy/cut/paste). Default `true`.
+   * Pass `false` to route all clipboard traffic through the
+   * `ClipboardProvider` seam. See `DomSurfaceOptions.clipboard`.
+   */
+  clipboard?: boolean;
   /** Initial camera transform. Default identity. */
   initial_camera?: cmath.Transform;
   /**
@@ -125,6 +131,7 @@ export function SvgEditorCanvas({
   style,
   gestures,
   fit,
+  clipboard,
   initial_camera,
   onAttach,
 }: SvgEditorCanvasProps) {
@@ -143,6 +150,7 @@ export function SvgEditorCanvas({
       container,
       gestures,
       fit,
+      clipboard,
       initial_camera: initial_camera_ref.current,
     });
     on_attach_ref.current?.(handle);
@@ -150,7 +158,7 @@ export function SvgEditorCanvas({
       on_attach_ref.current?.(null);
       handle.detach();
     };
-  }, [editor, gestures, fit]);
+  }, [editor, gestures, fit, clipboard]);
   return <div ref={ref} className={className} style={style} />;
 }
 

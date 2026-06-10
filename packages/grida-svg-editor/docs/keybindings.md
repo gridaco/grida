@@ -60,18 +60,18 @@ source of truth for what svg-editor ships out of the box.
 
 ## Editing
 
-| Action      | macOS                   | Windows/Linux               | Status | Command               | Notes                                      |
-| ----------- | ----------------------- | --------------------------- | ------ | --------------------- | ------------------------------------------ |
-| Undo        | `⌘ + Z`                 | `Ctrl + Z`                  | [x]    | `history.undo`        | shipped                                    |
-| Redo        | `⌘ + ⇧ + Z`             | `Ctrl + ⇧ + Z`              | [x]    | `history.redo`        | shipped                                    |
-| Redo (alt)  | `⌘ + Y`                 | `Ctrl + Y`                  | [x]    | `history.redo`        | shipped (alias)                            |
-| Cut         | `⌘ + X`                 | `Ctrl + X`                  | [~]    | `clipboard.cut`       | clipboard model TBD                        |
-| Copy        | `⌘ + C`                 | `Ctrl + C`                  | [~]    | `clipboard.copy`      | clipboard model TBD                        |
-| Copy as PNG | `⌘ + ⇧ + C`             | `Ctrl + ⇧ + C`              | [-]    | —                     | host-owned (rasterizer)                    |
-| Paste       | `⌘ + V`                 | `Ctrl + V`                  | [~]    | `clipboard.paste`     | clipboard model TBD                        |
-| Duplicate   | `⌘ + D`                 | `Ctrl + D`                  | [~]    | `selection.duplicate` | command doesn't exist yet                  |
-| Delete      | `Delete` or `Backspace` | `Delete` or `Backspace`     | [x]    | `selection.remove`    | shipped; future routing inside the handler |
-| Flatten     | `⌘ + E` or `⌥ + ⇧ + F`  | `Ctrl + E` or `Alt + ⇧ + F` | [-]    | —                     | no flatten command yet                     |
+| Action      | macOS                   | Windows/Linux               | Status | Command               | Notes                                                                                                                                                                                                                                          |
+| ----------- | ----------------------- | --------------------------- | ------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Undo        | `⌘ + Z`                 | `Ctrl + Z`                  | [x]    | `history.undo`        | shipped                                                                                                                                                                                                                                        |
+| Redo        | `⌘ + ⇧ + Z`             | `Ctrl + ⇧ + Z`              | [x]    | `history.redo`        | shipped                                                                                                                                                                                                                                        |
+| Redo (alt)  | `⌘ + Y`                 | `Ctrl + Y`                  | [x]    | `history.redo`        | shipped (alias)                                                                                                                                                                                                                                |
+| Cut         | `⌘ + X`                 | `Ctrl + X`                  | [x]    | `clipboard.cut`       | shipped — via native clipboard events, deliberately NO keymap row (a keymap claim would `preventDefault` the keystroke and suppress the native event); command id serves menu/RPC hosts. See `docs/wg/feat-svg-editor/clipboard.md` §Transport |
+| Copy        | `⌘ + C`                 | `Ctrl + C`                  | [x]    | `clipboard.copy`      | shipped — same native-event routing as Cut                                                                                                                                                                                                     |
+| Copy as PNG | `⌘ + ⇧ + C`             | `Ctrl + ⇧ + C`              | [-]    | —                     | host-owned (rasterizer)                                                                                                                                                                                                                        |
+| Paste       | `⌘ + V`                 | `Ctrl + V`                  | [x]    | `clipboard.paste`     | shipped — same native-event routing; command id reads the provider (else internal buffer)                                                                                                                                                      |
+| Duplicate   | `⌘ + D`                 | `Ctrl + D`                  | [~]    | `selection.duplicate` | command doesn't exist yet                                                                                                                                                                                                                      |
+| Delete      | `Delete` or `Backspace` | `Delete` or `Backspace`     | [x]    | `selection.remove`    | shipped; future routing inside the handler                                                                                                                                                                                                     |
+| Flatten     | `⌘ + E` or `⌥ + ⇧ + F`  | `Ctrl + E` or `Alt + ⇧ + F` | [-]    | —                     | no flatten command yet                                                                                                                                                                                                                         |
 
 ## Transformation
 
