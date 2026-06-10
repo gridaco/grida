@@ -33,6 +33,7 @@ export const IPC_CHANNELS = {
   WINDOW_NAVIGATION_FORWARD: "grida:window:navigation:forward",
   WINDOW_NAVIGATION_CHANGED: "grida:window:navigation:changed",
   AGENT_SERVER_INFO: "grida:agent:server-info",
+  AGENT_FOCUS_SESSION: "grida:agent:focus-session",
   WORKSPACE_COMMAND: "grida:workspace:command",
   WORKSPACE_TRASH_ENTRY: "grida:workspace:trash-entry",
   DIALOG_CONFIRM: "grida:dialog:confirm",

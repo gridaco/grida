@@ -17,6 +17,7 @@ import {
 } from "./main/agent-sidecar-supervisor";
 import { registerIpcHandlers } from "./main/ipc-handlers";
 import { agentSidecarClient } from "./main/agent-sidecar-client";
+import { startAgentNotifications } from "./main/agent-notifications";
 import { routeDeepLink } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
 import { open_handoff } from "./main/open-handoff";
@@ -306,6 +307,10 @@ app.on("ready", async () => {
     console.log(
       `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
     );
+    // Desktop notifications on turn-finish / pending-approval (RFC
+    // `events.md` §the first consumer). Main-owned so a turn with no
+    // renderer attached (queue drain, closed window) still notifies.
+    startAgentNotifications();
   } catch (err) {
     console.error("[grida] agent sidecar failed to start:", err);
     dialog.showErrorBox(
