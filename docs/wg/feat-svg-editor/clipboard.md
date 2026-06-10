@@ -558,14 +558,11 @@ document markup in a privileged interpreter (mounting it into a live web
 page, where event-handler attributes and embedded foreign content can
 execute) has that exposure for _loaded_ documents already; paste changes
 the likelihood of hostile input — a keystroke now suffices where a file
-open was required — not the mechanism. **No rendering-surface hardening
-specification exists today; this paragraph is the tracking obligation.**
-Before clipboard ships in a surface that interprets markup in a
-privileged context, that surface's hardening posture must be specified
-and reviewed — inert rendering of execution-bearing constructs is a
-_projection_ choice, compatible with document fidelity (the model keeps
-the bytes; the surface declines to execute them), and is the expected
-shape of that work. A host that wants paste-time screening applies it on
+open was required — not the mechanism. **That surface's hardening
+posture is specified in
+[`rendering-hardening.md`](./rendering-hardening.md); the obligation
+remains open until that specification is reviewed and the surface
+enforces it.** A host that wants paste-time screening applies it on
 its side of the provider seam — made meaningful for _all_ paths by the
 native-transport opt-out (§ Transport) — where mutating text in transit
 is an explicit host choice rather than a silent editor behavior.

@@ -56,6 +56,20 @@ describe("round-trip fidelity (P1)", () => {
     expect(roundtrip(src)).toBe(src);
   });
 
+  it("preserves whitespace around an attribute's `=`", () => {
+    // Trivia on both sides of `=` must survive: before-`=` rides the attr
+    // token's eq_trivia, after-`=` rides eq_trailing.
+    const src = `<svg xmlns="http://www.w3.org/2000/svg"><rect fill = "red" width ="10" height= "10"/></svg>`;
+    expect(roundtrip(src)).toBe(src);
+  });
+
+  it("preserves multi-space and newline trivia after `=`", () => {
+    const a = `<svg xmlns="http://www.w3.org/2000/svg"><rect fill =  'red'/></svg>`;
+    const b = `<svg xmlns="http://www.w3.org/2000/svg"><rect fill =\n"red"/></svg>`;
+    expect(roundtrip(a)).toBe(a);
+    expect(roundtrip(b)).toBe(b);
+  });
+
   it("preserves the byte-position of edited attributes (one diff per change)", () => {
     const src = `<svg xmlns="http://www.w3.org/2000/svg"><rect x="10" y="20" width="100" height="50" fill="red"/></svg>`;
     const editor = createSvgEditor({ svg: src });
