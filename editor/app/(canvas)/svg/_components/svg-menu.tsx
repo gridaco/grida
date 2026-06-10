@@ -32,19 +32,28 @@ import { toggleInspectorDebug, useInspectorDebug } from "./use-inspector-debug";
 export function SvgMenuContent({
   canUndo,
   canRedo,
+  canCopy,
   onOpenFile,
   onSaveFile,
   onReset,
   onUndo,
   onRedo,
+  onCopy,
+  onCut,
+  onPaste,
 }: {
   canUndo: boolean;
   canRedo: boolean;
+  /** Selection non-empty — gates Cut / Copy (Paste reads the clipboard). */
+  canCopy: boolean;
   onOpenFile: () => void;
   onSaveFile: () => void;
   onReset: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onCopy: () => void;
+  onCut: () => void;
+  onPaste: () => void;
 }) {
   const debug = useInspectorDebug();
   return (
@@ -89,6 +98,27 @@ export function SvgMenuContent({
           >
             Redo
             <DropdownMenuShortcut>⇧⌘Z</DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={onCut}
+            disabled={!canCopy}
+            className="text-xs"
+          >
+            Cut
+            <DropdownMenuShortcut>⌘X</DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={onCopy}
+            disabled={!canCopy}
+            className="text-xs"
+          >
+            Copy
+            <DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onPaste} className="text-xs">
+            Paste
+            <DropdownMenuShortcut>⌘V</DropdownMenuShortcut>
           </DropdownMenuItem>
         </DropdownMenuSubContent>
       </DropdownMenuSub>

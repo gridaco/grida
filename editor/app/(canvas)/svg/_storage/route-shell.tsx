@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore, type PropsWithChildren } from "react";
 import { SvgEditorProvider } from "@grida/svg-editor/react";
+import type { Providers } from "@grida/svg-editor";
 import {
   FloatingWindowBounds,
   FloatingWindowHost,
@@ -48,6 +49,21 @@ export function SvgRouteShell({
   );
 }
 
+/**
+ * `navigator.clipboard`-backed ClipboardProvider — the host-owned
+ * transport seam (P2) for menu / RPC-invoked clipboard commands
+ * (`clipboard.copy` / `cut` / `paste` via the command registry). The
+ * keystroke path never touches this: ⌘C/⌘X/⌘V reach the editor as native
+ * ClipboardEvents wired by the DOM surface. A denied read resolves to
+ * `null` (the command treats it as an empty clipboard, not an error).
+ */
+const demo_providers: Providers = {
+  clipboard: {
+    write: (text) => navigator.clipboard.writeText(text),
+    read: () => navigator.clipboard.readText().catch(() => null),
+  },
+};
+
 function ActiveDocMount({ children }: PropsWithChildren) {
   const store = useSvgDocStore();
   const activeId = useSyncExternalStore(
@@ -58,7 +74,11 @@ function ActiveDocMount({ children }: PropsWithChildren) {
   const initialSvg = store.getActiveSvg();
 
   return (
-    <SvgEditorProvider key={activeId ?? "__pending__"} initialSvg={initialSvg}>
+    <SvgEditorProvider
+      key={activeId ?? "__pending__"}
+      initialSvg={initialSvg}
+      providers={demo_providers}
+    >
       <EditorBindingEffect />
       {children}
     </SvgEditorProvider>
