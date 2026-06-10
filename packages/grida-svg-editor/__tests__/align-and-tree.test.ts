@@ -232,9 +232,11 @@ function op_mat(op: TransformOp): Mat {
         [1, 0, 0, 1, -op.cx, -op.cy]
       );
     }
-    default:
-      // skewX / skewY unused by these fixtures.
-      return MAT_IDENT;
+    case "skewX":
+    case "skewY":
+      // Unused by these fixtures — fail fast rather than silently model
+      // wrong geometry with an identity fallback.
+      throw new Error(`op_mat: unsupported transform op "${op.type}"`);
   }
 }
 
