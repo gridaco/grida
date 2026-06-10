@@ -22,7 +22,7 @@ contract (`commands.duplicate` / `selection.duplicate` (⌘D), and the
 Alt-drag translate-with-clone gesture). Tracked as
 [gridaco/grida#817](https://github.com/gridaco/grida/issues/817);
 deferred from clipboard v1 by
-[the clipboard FRD](https://grida.co/docs/wg/feat-svg-editor/clipboard)
+[the clipboard FRD](./clipboard.md)
 §Two extraction operations / §Out of scope.
 
 ## Definition

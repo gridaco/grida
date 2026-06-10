@@ -456,9 +456,10 @@ Current implementation notes:
   `selection.align` (Alt+A/D/W/S/H/V via `args: AlignDirection`),
   `hierarchy.enter` (Enter), `hierarchy.exit` (Shift+Enter),
   `transform.nudge` (Arrow / Shift+Arrow, 1px / 10px via `args: { dx, dy }`),
-  `reorder` (`]` / `[` / `Cmd+]` / `Cmd+[`, direction via `args`).
-- Missing (per `docs/keybindings.md` `[~]` and `[-]`): `selection.duplicate`
-  (Cmd+D), `clipboard.cut` / `copy` / `paste`, distribute
+  `reorder` (`]` / `[` / `Cmd+]` / `Cmd+[`, direction via `args`),
+  `selection.duplicate` (Cmd+D — see §5).
+- Missing (per `docs/keybindings.md` `[~]` and `[-]`):
+  `clipboard.cut` / `copy` / `paste`, distribute
   (`Alt+Ctrl+H`/`V`), `paint.remove_fill` /
   `remove_stroke` / `swap` / `set_opacity`, visibility / lock toggles,
   viewport keys (zoom is in `gestures/defaults.ts` instead — see below),

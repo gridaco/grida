@@ -106,6 +106,11 @@ describe("selection.duplicate — registry + keymap", () => {
         return prevented;
       },
     } as unknown as KeyboardEvent;
+    // `dispatch` is deliberately browser-agnostic (it never calls
+    // preventDefault itself); the dom surface suppresses the browser's
+    // Cmd+D bookmark default via `claims()`. Pin that the row is
+    // advertised so the host-side preventDefault actually fires.
+    expect(editor.keymap.claims(event)).toBe(true);
     expect(editor.keymap.dispatch(event)).toBe(true);
     expect(editor.serialize().match(/<rect/g)).toHaveLength(2);
   });
