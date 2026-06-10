@@ -81,6 +81,16 @@ preserving the author's source on round-trip.
   structural rewrite) and scopes the candidate identity schemes
   (positional path, `id` attribute, semantic anchor) against them. The
   `serialize_node` half of #775 shipped; this owns the reference half.
+- [`rendering-hardening.md`](./rendering-hardening.md) — specification
+  for rendering untrusted documents inertly. Hardening is a
+  _projection_ choice at the rendering surface — the model keeps the
+  bytes verbatim; the surface declines to execute them. Names the
+  execution-vector inventory, the editing obligations that rule out
+  structural isolation (image context, sandboxed frame) for the
+  editing surface, the inert-projection requirements, and the named
+  costs. Carries the clipboard FRD's trust-model tracking obligation —
+  open until the spec is reviewed and a surface enforces it. Proposed —
+  under review; no surface implements it yet.
 
 ### Glossary
 
@@ -112,6 +122,12 @@ package-internal docs. Those have moved to their canonical homes:
   [`research/usvg-tree-notes.md`](../research/usvg-tree-notes.md):
   what resvg's `usvg` IR normalises away and what an editor IR must
   refuse.
+- **Security research** —
+  [`research/untrusted-svg-rendering.md`](../research/untrusted-svg-rendering.md):
+  how the web platform and peer editors render untrusted SVG inertly
+  (script-vector inventory, sanitizers, secure static image mode,
+  sandboxed frames, CSP semantics). Input to
+  [`rendering-hardening.md`](./rendering-hardening.md).
 
 Additional pointers — the `@grida/svg-editor` package itself, the
 `/svg` demo wiring, the AI agent binding, package-internal
