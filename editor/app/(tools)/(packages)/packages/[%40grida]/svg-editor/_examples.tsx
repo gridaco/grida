@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   SvgEditorCanvas,
   SvgEditorProvider,
+  useCommands,
   useSvgEditor,
 } from "@grida/svg-editor/react";
 import type { Tool } from "@grida/svg-editor";
+import type { DomSurfaceHandle } from "@grida/svg-editor/dom";
 import {
   CSS,
   GROUP_TRANSFORM,
+  INSERT_FRAGMENT,
+  INSERT_FRAGMENT_ICONS,
   LINE,
   NESTED_SVG,
   PATH,
@@ -140,4 +144,113 @@ export function SymbolUseExample() {
 /** CSS-driven fill + transform via a document <style> block. */
 export function CssExample() {
   return <SvgStage svg={CSS} tool={{ type: "cursor" }} selectName="pill" />;
+}
+
+// ─── Fragment insertion — `commands.insert_fragment` ────────────────────────
+
+/** Drag payload type for the demo's icon chips — scoped to this card. */
+const FRAGMENT_MIME = "application/x-grida-svg-fragment-demo";
+
+/**
+ * The minimal `insert_fragment` consumer: click a chip to insert its icon,
+ * or drag it onto the stage to insert at the drop point. Both paths are a
+ * single `insert_fragment` call — position is authored content, so the
+ * drop point becomes a `<g transform="translate(…)">` wrapper around the
+ * fragment, and the whole insert is ONE undo step.
+ */
+export function InsertFragmentExample() {
+  return (
+    <SvgEditorProvider initialSvg={INSERT_FRAGMENT}>
+      <InsertFragmentBody />
+    </SvgEditorProvider>
+  );
+}
+
+function InsertFragmentBody() {
+  const cmd = useCommands();
+  const [handle, setHandle] = useState<DomSurfaceHandle | null>(null);
+  // Cascade repeated center-inserts so stamps don't hide each other.
+  const stamps = useRef(0);
+
+  const insert_at = (
+    icon: (typeof INSERT_FRAGMENT_ICONS)[number],
+    at: { x: number; y: number }
+  ) => {
+    // The whole recipe: author the position around the fragment, insert
+    // once. Rounded — the transform round-trips into the saved file.
+    const tx = Math.round((at.x - icon.size / 2) * 100) / 100;
+    const ty = Math.round((at.y - icon.size / 2) * 100) / 100;
+    cmd.insert_fragment(
+      `<g transform="translate(${tx} ${ty})">${icon.svg}</g>`
+    );
+  };
+
+  const insert_at_stage_center = (
+    icon: (typeof INSERT_FRAGMENT_ICONS)[number]
+  ) => {
+    const n = stamps.current++;
+    insert_at(icon, { x: 280 + (n % 5) * 28 - 56, y: 160 });
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes(FRAGMENT_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+  const onDrop = (e: React.DragEvent) => {
+    const key = e.dataTransfer.getData(FRAGMENT_MIME);
+    const icon = INSERT_FRAGMENT_ICONS.find((i) => i.name === key);
+    if (!icon || !handle) return;
+    e.preventDefault();
+    // Drop point (container-local px) → world space via the camera.
+    const cr = e.currentTarget.getBoundingClientRect();
+    const at = handle.camera.screen_to_world({
+      x: e.clientX - cr.left,
+      y: e.clientY - cr.top,
+    });
+    insert_at(icon, at);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        {INSERT_FRAGMENT_ICONS.map((icon) => (
+          <button
+            key={icon.name}
+            type="button"
+            draggable
+            onClick={() => insert_at_stage_center(icon)}
+            onDragStart={(e) => {
+              e.dataTransfer.setData(FRAGMENT_MIME, icon.name);
+              e.dataTransfer.effectAllowed = "copy";
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted cursor-grab active:cursor-grabbing"
+            title={`Insert ${icon.name} — click, or drag onto the stage`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="size-4"
+              aria-hidden
+              dangerouslySetInnerHTML={{ __html: icon.svg }}
+            />
+            {icon.name}
+          </button>
+        ))}
+        <span className="text-xs text-muted-foreground">
+          click to insert · drag to place
+        </span>
+      </div>
+      <div
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        className="relative aspect-video w-full overflow-hidden rounded-lg border bg-[radial-gradient(circle,theme(colors.border)_1px,transparent_1px)] [background-size:20px_20px]"
+      >
+        <SvgEditorCanvas
+          fit
+          onAttach={setHandle}
+          className="absolute inset-0 h-full w-full"
+        />
+      </div>
+    </div>
+  );
 }

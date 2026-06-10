@@ -196,3 +196,39 @@ export const CSS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 240
   <circle class="ghost" cx="380" cy="130" r="64"/>
   <text class="brand" x="280" y="220" font-family="ui-monospace, monospace" font-size="18">fill + transform via style</text>
 </svg>`;
+
+// ─── Fragment insertion — `commands.insert_fragment` ────────────────────────
+// A mostly-empty pasteboard with one authored landmark, so an inserted icon is
+// obviously NEW content and its placement relative to existing markup is
+// legible. Paired with the icon fragments below: click inserts, drag inserts
+// at the drop point — both as ONE history step.
+export const INSERT_FRAGMENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 320" width="560" height="320">
+  <rect id="pasteboard" width="560" height="320" fill="#f8fafc"/>
+  <text id="hint" x="280" y="296" text-anchor="middle" font-family="ui-monospace, monospace" font-size="12" fill="#94a3b8">click an icon to insert — or drag it here</text>
+</svg>`;
+
+// Icon *fragments* — multi-element subtrees with no <svg> shell, the shape a
+// vendor icon or clipboard payload arrives in. 24×24 box each; the demo
+// authors the drop position around them (see the card in `_examples.tsx`).
+export const INSERT_FRAGMENT_ICONS: ReadonlyArray<{
+  name: string;
+  /** Intrinsic box — fragments carry no viewBox; the consumer knows it. */
+  size: number;
+  svg: string;
+}> = [
+  {
+    name: "star",
+    size: 24,
+    svg: `<g fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></g>`,
+  },
+  {
+    name: "heart",
+    size: 24,
+    svg: `<g fill="none" stroke="#ec4899" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></g>`,
+  },
+  {
+    name: "bolt",
+    size: 24,
+    svg: `<g fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></g>`,
+  },
+];

@@ -57,6 +57,7 @@ export function SvgShell({
   onCameraReset,
   sidebarContent,
   inspectorActions,
+  canvasOverlay,
 }: {
   title: string;
   badge?: string;
@@ -77,6 +78,12 @@ export function SvgShell({
   sidebarContent?: React.ReactNode;
   /** Optional trailing actions in the Inspector header (e.g. Play). */
   inspectorActions?: React.ReactNode;
+  /**
+   * Floating chrome over the canvas area (e.g. a Library window), rendered
+   * as a SIBLING of `canvas` — outside its drop target and context-menu
+   * wrapper, so interactions on the overlay don't leak into the canvas.
+   */
+  canvasOverlay?: React.ReactNode;
 }) {
   const editor = useSvgEditor();
   const canUndo = useCanUndo();
@@ -178,6 +185,7 @@ export function SvgShell({
       {/* ─── Center: canvas ─────────────────────────────────────── */}
       <main className="flex-1 relative bg-muted overflow-hidden">
         <SvgCanvasContextMenu>{canvas}</SvgCanvasContextMenu>
+        {canvasOverlay}
       </main>
 
       {/* ─── Right sidebar: inspector ───────────────────────────── */}
