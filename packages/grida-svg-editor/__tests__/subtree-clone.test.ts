@@ -248,9 +248,15 @@ describe("subtree.repeat_delta — the repeating-offset witness (#825)", () => {
 
   it("one unmeasurable member (detached, no provider, measureless tag) → null", () => {
     const record = { origins: ["a"], clones: ["a1"] };
+    // origin unmeasurable, clone measurable
     expect(
       subtree.repeat_delta(record, ["a1"], bounds({ a1: r(40, 10) }))
     ).toBe(null);
+    // origin measurable, clone unmeasurable
+    expect(subtree.repeat_delta(record, ["a1"], bounds({ a: r(10, 10) }))).toBe(
+      null
+    );
+    // neither measurable
     expect(subtree.repeat_delta(record, ["a1"], () => null)).toBe(null);
   });
 
