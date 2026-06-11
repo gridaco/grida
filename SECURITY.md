@@ -507,6 +507,27 @@ the secret-dir guard below) does not exist yet and is the deferred hardening.
   judgment is the classifier/watchdog layer, named and deferred. `auto` is
   opt-in; the default `accept-edits` keeps a read-only-only shell.
 
+**Human terminal (deliberate contrast to the agent shell).** The
+workbench's Terminal pane (`bridge.terminal.*`) is a real, **unsandboxed**
+login PTY — arbitrary code execution by design, accepted under the same
+trust model as VSCode's integrated terminal: the human runs commands as
+themselves, on their own machine, with their own privileges (no
+escalation). It is deliberately NOT wrapped in `srt` and deliberately NOT
+part of the agent's tool surface — the agent's `run_command` stays
+confined behind the sandbox gates above, and no code path hands the agent
+a handle to a human terminal. What makes the surface acceptable is that
+only the legitimate desktop renderer can reach it: the four terminal IPC
+channels are registered through the same sender-frame `guarded()` wrapper
+as every other native capability (editor origin + `/desktop/*` path), the
+preload exposes them only on desktop routes, and the PTY host
+(`desktop/src/main/terminal-host.ts`) additionally (a) resolves the spawn
+cwd from a workspace **id** through the sidecar registry — the renderer
+never passes a raw path, (b) binds each terminal to the WebContents that
+created it so one window cannot drive another window's shell, (c) caps
+PTYs per window, and (d) kills every PTY on window close and app quit.
+A contract test (`desktop/src/main/terminal-host.test.ts`) fails if a
+terminal channel is ever registered outside `guarded()`.
+
 **No hosted auth in V1.** Desktop V1 ships no `/auth/*` route group, no
 PKCE handoff, no cloud session refresh, and no entitlement polling. Future
 hosted-provider work must re-register its callback and hosted-model files in
@@ -556,6 +577,8 @@ Today:
 - [editor/lib/desktop/bridge.ts](editor/lib/desktop/bridge.ts) — typed client of `window.grida` + SSR-safe presence detector (`useDesktopBridge`).
 - [desktop/src/main/host-apps.ts](desktop/src/main/host-apps.ts) — private desktop UX registry for “Open in…” app detection/opening.
 - [desktop/src/main/workspace-files.ts](desktop/src/main/workspace-files.ts) — move-to-trash for a workspace entry (file or folder); re-validates that `relPath` resolves inside the workspace root, and isn't the root itself, before `shell.trashItem`.
+- [desktop/src/main/terminal-host.ts](desktop/src/main/terminal-host.ts) — human-terminal PTY host: workspace-id-resolved cwd, per-WebContents terminal ownership, per-window PTY cap, kill-on-close; the unsandboxed-by-design surface described under "Human terminal" above.
+- [editor/scaffolds/desktop/workbench/terminal-pane.tsx](editor/scaffolds/desktop/workbench/terminal-pane.tsx) — xterm.js view over the `terminal` bridge namespace; renderer side of the human terminal.
 - `desktop/src/main.ts` — Electron main entry; acquires the single-instance lock (deferred to `ready` so a secondary instance can forward a macOS `open-file` path via `additionalData` before quitting — before any sidecar/window/IPC is created, preserving the one-sidecar invariant); routes `open-file`/`open-url`/`second-instance` opens.
 - [desktop/src/main/open-handoff.ts](desktop/src/main/open-handoff.ts) — pure codec for the secondary→primary "open" forward; tolerant `decode` so a foreign or legacy `second-instance` payload is never mistaken for an open.
 

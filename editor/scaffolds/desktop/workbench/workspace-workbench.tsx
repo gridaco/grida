@@ -33,7 +33,9 @@ import {
   FolderIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
+  SquareTerminalIcon,
 } from "lucide-react";
+import { usePanelRef } from "react-resizable-panels";
 import { Button } from "@app/ui/components/button";
 import {
   ResizableHandle,
@@ -44,7 +46,10 @@ import {
   TitleBar,
   TITLEBAR_NO_DRAG_STYLE,
 } from "@/scaffolds/desktop/chrome/title-bar";
-import type { Workspace } from "@/lib/desktop/bridge";
+import {
+  terminal as bridgeTerminal,
+  type Workspace,
+} from "@/lib/desktop/bridge";
 import {
   confirmAndTrashEntry,
   copyAbsolutePath,
@@ -52,10 +57,12 @@ import {
   matchFileActionShortcut,
   revealInFinder,
 } from "./workbench-file-actions";
+import { isTerminalToggleEvent } from "./workspace-workbench-keybindings";
 import { FileTreePane } from "./file-tree-pane";
 import { EditorPane } from "./editor-pane";
 import { WorkspaceOpenInMenu } from "./workspace-open-in-menu";
 import { AgentPane } from "./agent-pane";
+import { TerminalPane } from "./terminal-pane";
 
 /**
  * Pane sizing, matching the workstation-shell conventions:
@@ -76,6 +83,11 @@ const AGENT_PANE_MIN = "280px";
 // The editor pane fills the slack (defaultSize below), but needs its own min
 // so widening the now-uncapped chat can't crush it to zero width.
 const EDITOR_PANE_MIN = "360px";
+// Bottom terminal panel (VSCode-style). Collapsible: dragging it under
+// its min snaps it closed, and ctrl+` collapse/expand keeps the shell
+// process alive (the panel content stays mounted at zero height).
+const TERMINAL_PANE_DEFAULT = "30%";
+const TERMINAL_PANE_MIN = "120px";
 
 /**
  * Whether a keyboard event originated inside an editable surface (text
@@ -111,6 +123,36 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   // group redistributes space cleanly to the EditorPane when the file tree pane
   // is hidden.
   const [showTree, setShowTree] = useState(true);
+
+  // Terminal pane (ctrl+` / TitleBar toggle), VSCode-style. Two facts:
+  // `terminalSpawned` — the bottom panel (and its PTY) exists; flips on
+  // first open and back off when the shell exits. `terminalOpen` —
+  // panel is expanded; derived from the panel's onResize so dragging
+  // the handle and the imperative collapse/expand stay in sync without
+  // a second source of truth. Collapse keeps the pane mounted (and the
+  // shell alive); only unmount kills the PTY.
+  // Hidden entirely against older desktop binaries whose bridge
+  // predates `terminal` (additive capability on protocol 1).
+  const supportsTerminal = bridgeTerminal.isSupported();
+  const [terminalSpawned, setTerminalSpawned] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const terminalPanelRef = usePanelRef();
+
+  const toggleTerminal = useCallback(() => {
+    if (!terminalSpawned) {
+      setTerminalSpawned(true); // mounts expanded at its default size
+      return;
+    }
+    const panel = terminalPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) panel.expand();
+    else panel.collapse();
+  }, [terminalSpawned, terminalPanelRef]);
+
+  const handleTerminalSessionEnded = useCallback(() => {
+    setTerminalSpawned(false);
+    setTerminalOpen(false);
+  }, []);
 
   // Recently-closed tabs for "reopen closed tab" (Cmd/Ctrl+Shift+T),
   // most-recent last. A ref, not state — nothing renders from it, so
@@ -178,6 +220,16 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   // entries being unavailable on an empty viewer).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // ctrl+` toggles the terminal pane (VSCode). The terminal pane's
+      // xterm key handler deliberately lets this chord bubble up here,
+      // so the toggle works even while the shell has focus. Key-repeat
+      // is swallowed (preventDefault, no toggle): one press = one state
+      // change, and held-chord repeats must not leak into the shell.
+      if (supportsTerminal && isTerminalToggleEvent(e)) {
+        e.preventDefault();
+        if (!e.repeat) toggleTerminal();
+        return;
+      }
       const cmd = e.metaKey || e.ctrlKey;
       if (cmd && !e.shiftKey && !e.altKey && (e.key === "b" || e.key === "B")) {
         e.preventDefault();
@@ -223,7 +275,14 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggleTree, activeRelPath, workspace, handleEntryTrashed]);
+  }, [
+    toggleTree,
+    activeRelPath,
+    workspace,
+    handleEntryTrashed,
+    supportsTerminal,
+    toggleTerminal,
+  ]);
 
   const openFile = useCallback((relPath: string) => {
     setOpenTabs((prev) => (prev.includes(relPath) ? prev : [...prev, relPath]));
@@ -290,6 +349,26 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <WorkspaceOpenInMenu workspace={workspace} />
+          {supportsTerminal && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              style={TITLEBAR_NO_DRAG_STYLE}
+              onClick={toggleTerminal}
+              aria-label={
+                terminalOpen ? "Hide terminal pane" : "Show terminal pane"
+              }
+              aria-pressed={terminalOpen}
+              title={
+                terminalOpen
+                  ? "Hide terminal pane (⌃`)"
+                  : "Show terminal pane (⌃`)"
+              }
+            >
+              <SquareTerminalIcon />
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
@@ -310,54 +389,79 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
       </TitleBar>
 
       <div className="min-h-0 flex-1">
-        {/* Horizontal is the default orientation in
-            react-resizable-panels v4 — omit the prop.
-            Order: AgentPane | EditorPane | FileTreePane. Agent-first puts the
-            agent pane in the dominant left position; the file tree pane
-            sits on the right as a secondary navigator and is
-            conditionally rendered so the EditorPane absorbs its
-            space when hidden. */}
-        <ResizablePanelGroup>
-          <ResizablePanel
-            defaultSize={AGENT_PANE_DEFAULT}
-            minSize={AGENT_PANE_MIN}
-          >
-            <AgentPane
-              workspace={workspace}
-              activeRelPath={activeRelPath}
-              onMaybeMutated={bumpTreeRefresh}
-            />
+        {/* Vertical split: the three workbench panes on top, the
+            terminal panel at the bottom (VSCode-style). The bottom pair
+            mounts on first ctrl+` and stays mounted while collapsed so
+            the shell survives toggling; shell exit unmounts it. */}
+        <ResizablePanelGroup orientation="vertical">
+          <ResizablePanel>
+            {/* Horizontal is the default orientation in
+                react-resizable-panels v4 — omit the prop.
+                Order: AgentPane | EditorPane | FileTreePane. Agent-first puts the
+                agent pane in the dominant left position; the file tree pane
+                sits on the right as a secondary navigator and is
+                conditionally rendered so the EditorPane absorbs its
+                space when hidden. */}
+            <ResizablePanelGroup>
+              <ResizablePanel
+                defaultSize={AGENT_PANE_DEFAULT}
+                minSize={AGENT_PANE_MIN}
+              >
+                <AgentPane
+                  workspace={workspace}
+                  activeRelPath={activeRelPath}
+                  onMaybeMutated={bumpTreeRefresh}
+                />
+              </ResizablePanel>
+              <ResizableHandle />
+              <ResizablePanel defaultSize="57%" minSize={EDITOR_PANE_MIN}>
+                <EditorPane
+                  workspace={workspace}
+                  openTabs={openTabs}
+                  activeRelPath={activeRelPath}
+                  onSelectTab={setActiveRelPath}
+                  onCloseTab={closeTab}
+                  onReopenClosedTab={reopenClosedTab}
+                  onSaved={bumpTreeRefresh}
+                  onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
+                />
+              </ResizablePanel>
+              {showTree && (
+                <>
+                  <ResizableHandle />
+                  <ResizablePanel
+                    defaultSize={FILE_TREE_PANE_DEFAULT}
+                    minSize={FILE_TREE_PANE_MIN}
+                    maxSize={FILE_TREE_PANE_MAX}
+                    className="bg-muted/20"
+                  >
+                    <FileTreePane
+                      workspace={workspace}
+                      activeRelPath={activeRelPath}
+                      onOpenFile={(rp) => {
+                        if (rp) openFile(rp);
+                      }}
+                      refreshKey={treeRefreshKey}
+                      onEntryTrashed={handleEntryTrashed}
+                    />
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
           </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel defaultSize="57%" minSize={EDITOR_PANE_MIN}>
-            <EditorPane
-              workspace={workspace}
-              openTabs={openTabs}
-              activeRelPath={activeRelPath}
-              onSelectTab={setActiveRelPath}
-              onCloseTab={closeTab}
-              onReopenClosedTab={reopenClosedTab}
-              onSaved={bumpTreeRefresh}
-              onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
-            />
-          </ResizablePanel>
-          {showTree && (
+          {terminalSpawned && (
             <>
               <ResizableHandle />
               <ResizablePanel
-                defaultSize={FILE_TREE_PANE_DEFAULT}
-                minSize={FILE_TREE_PANE_MIN}
-                maxSize={FILE_TREE_PANE_MAX}
-                className="bg-muted/20"
+                panelRef={terminalPanelRef}
+                collapsible
+                defaultSize={TERMINAL_PANE_DEFAULT}
+                minSize={TERMINAL_PANE_MIN}
+                onResize={(size) => setTerminalOpen(size.inPixels > 0)}
               >
-                <FileTreePane
+                <TerminalPane
                   workspace={workspace}
-                  activeRelPath={activeRelPath}
-                  onOpenFile={(rp) => {
-                    if (rp) openFile(rp);
-                  }}
-                  refreshKey={treeRefreshKey}
-                  onEntryTrashed={handleEntryTrashed}
+                  onSessionEnded={handleTerminalSessionEnded}
                 />
               </ResizablePanel>
             </>

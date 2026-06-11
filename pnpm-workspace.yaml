@@ -20,6 +20,11 @@ allowBuilds:
   esbuild: false
   lefthook: false
   msw: false
+  # node-pty ships prebuilt N-API binaries (prebuilds/<platform>-<arch>/)
+  # that its runtime loader falls back to, so the install script is safe
+  # to skip on darwin/win32. Linux has no prebuilds — packaging relies on
+  # electron-forge's native-module rebuild, not this install script.
+  node-pty: false
   sharp: false
   workerd: false
 overrides:

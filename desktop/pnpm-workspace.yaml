@@ -9,12 +9,29 @@ nodeLinker: hoisted
 # strictDepBuilds: false keeps all other (unlisted) build scripts as warnings,
 # matching the pnpm 10 onlyBuiltDependencies whitelist behavior.
 strictDepBuilds: false
+# pnpm 11 blocks git/tarball-resolved subdependencies by default. The electron
+# tooling we already ship pins one: @electron/rebuild -> @electron/node-gyp is
+# a git-hosted dependency (upstream's choice, commit-pinned in our lockfile).
+# Any re-resolution of the graph (e.g. adding a dependency) would fail on it,
+# so the block is disabled here — reviewed: the only exotic subdep in the
+# lockfile is that commit-pinned @electron/node-gyp.
+blockExoticSubdeps: false
 allowBuilds:
   electron: true
   electron-winstaller: true
   fs-xattr: true
   macos-alias: true
+  # Skipped: node-pty ships prebuilt N-API binaries its loader falls back
+  # to (prebuilds/<platform>-<arch>/), so the node-gyp install script is
+  # unnecessary on darwin/win32; Linux packaging goes through forge's
+  # native-module rebuild instead.
+  node-pty: false
 overrides:
+  # @electron/rebuild pins an old node-abi that throws "Could not detect abi"
+  # for current Electron releases. Only the Linux packaging path actually
+  # rebuilds (see forge.config.ts rebuildConfig), but the lookup must succeed
+  # there. Keep this current when bumping Electron majors.
+  node-abi: "^4.31.0"
   "@grida/agent": "link:../packages/grida-ai-agent"
   "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge"
   "@grida/ai-models": "link:../packages/grida-ai-models"

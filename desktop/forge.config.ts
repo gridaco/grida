@@ -12,6 +12,7 @@ import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 import * as dotenv from "dotenv";
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 
 // cli flags
@@ -118,9 +119,11 @@ const config: ForgeConfig = {
     ignore: packageIgnore,
     // @anthropic-ai/sandbox-runtime ships executable vendored binaries
     // (vendor/seccomp/*/apply-seccomp) that cannot run from inside an asar —
-    // unpack it so they land on a real filesystem.
+    // unpack it so they land on a real filesystem. node-pty likewise: its
+    // native `pty.node` addon and `spawn-helper` executable cannot load/run
+    // from inside an asar.
     asar: {
-      unpack: "**/node_modules/@anthropic-ai/sandbox-runtime/**",
+      unpack: "**/node_modules/{@anthropic-ai/sandbox-runtime,node-pty}/**",
     },
     appBundleId: appBundleId,
     icon: icon,
@@ -138,8 +141,38 @@ const config: ForgeConfig = {
     extendInfo: "./Info.plist",
     appCategoryType: "public.app-category.developer-tools",
   },
-  rebuildConfig: {},
+  // node-pty is the only native dependency. Upstream ships N-API prebuilt
+  // binaries for darwin/win32 (its loader falls back to prebuilds/<platform>-
+  // <arch>), so rebuilding there is pure waste — and would force every dev
+  // machine to carry a C++ toolchain. Linux has no upstream prebuilds, so it
+  // is the one platform where @electron/rebuild must compile from source
+  // (requires the distro toolchain; GitHub's ubuntu runners ship it).
+  // node-abi is overridden in pnpm-workspace.yaml so the rebuild recognizes
+  // current Electron versions.
+  rebuildConfig: {
+    ignoreModules: process.platform === "linux" ? [] : ["node-pty"],
+  },
   hooks: {
+    // node-pty's npm tarball ships the darwin prebuilt `spawn-helper`
+    // with mode 0644 (no exec bit) and never chmods it, so PTY spawn
+    // fails with `posix_spawnp failed`. Fix the bit BEFORE asar packing:
+    // the installed app can be mounted read-only (macOS app
+    // translocation), so a runtime chmod can't be the only fix. asar
+    // preserves the mode into app.asar.unpacked. The dev tree is handled
+    // at runtime by terminal-host.ts `ensureSpawnHelperExecutable`.
+    packageAfterPrune: async (_forgeConfig, buildPath) => {
+      const prebuilds = path.join(
+        buildPath,
+        "node_modules",
+        "node-pty",
+        "prebuilds"
+      );
+      if (!fs.existsSync(prebuilds)) return;
+      for (const dir of fs.readdirSync(prebuilds)) {
+        const helper = path.join(prebuilds, dir, "spawn-helper");
+        if (fs.existsSync(helper)) fs.chmodSync(helper, 0o755);
+      }
+    },
     // GRIDA-DESKTOP-BUILD-GUARD — after packaging, verify every externalized
     // require (and its full transitive closure) actually resolves in the
     // packaged app. A missing dependency fails the build HERE instead of

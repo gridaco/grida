@@ -9,10 +9,17 @@ import { gridaBundleGuard } from "./vite.guards";
 // `bubblewrap`) and references vendored helpers via filesystem
 // paths relative to its own install root. Bundling those paths
 // into `.vite/build/main.js` breaks resolution at runtime.
+// `node-pty` is externalised for the same reason: it loads a native
+// `.node` addon (and `spawn-helper`) via paths relative to its
+// install root.
 export default defineConfig({
   build: {
     rollupOptions: {
-      external: [...builtinModules, "@anthropic-ai/sandbox-runtime"],
+      external: [
+        ...builtinModules,
+        "@anthropic-ai/sandbox-runtime",
+        "node-pty",
+      ],
     },
   },
   // GRIDA-DESKTOP-BUILD-GUARD — fail the build if a @grida/* workspace
