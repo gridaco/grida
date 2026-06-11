@@ -164,9 +164,11 @@ fires only when all of:
 - world bounds are readable for **every** member of both sets (no
   geometry provider, a detached member, or a measureless element
   refuses);
-- the two union bboxes agree in size within a float-noise tolerance —
-  a resized or structurally edited copy is no longer a translate of
-  its origin;
+- **every copy is rigid against its own origin** (the record pairs
+  them): same size, displaced by the same delta as the union, within a
+  float-noise tolerance. The check is per member, not per envelope — a
+  resized or rearranged inner copy is no longer a translate even when
+  the envelope-defining copies keep the union bbox intact;
 - the measured delta is non-zero.
 
 Measuring instead of storing is what makes the feature honest about

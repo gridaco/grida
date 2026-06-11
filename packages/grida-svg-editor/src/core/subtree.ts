@@ -171,17 +171,23 @@ export namespace subtree {
    * `duplicate()`. Editor-session state — never observable, never in
    * history. Staleness is caught at use by {@link repeat_delta}, not by
    * per-mutation bookkeeping.
+   *
+   * The arrays are INDEX-PAIRED: `clones[i]` is the clone of
+   * `origins[i]` (both producers derive them from the same
+   * {@link SubtreeClonePlan}). {@link repeat_delta}'s per-member
+   * rigidity check depends on that pairing.
    */
   export type DuplicationRecord = {
     origins: ReadonlyArray<NodeId>;
     clones: ReadonlyArray<NodeId>;
   };
 
-  /** Union-bbox dimension tolerance for the rigid-translate witness in
-   *  {@link repeat_delta}. Generous against float noise from re-encoded
-   *  path data / `getBBox`, far below anything a user would call a
-   *  resize. */
-  const REPEAT_DIMS_EPSILON = 0.01;
+  /** Per-member rigidity tolerance for the rigid-translate witness in
+   *  {@link repeat_delta} — position drift from the shared delta, and
+   *  size drift from the origin. Generous against float noise from
+   *  re-encoded path data / `getBBox`, far below anything a user would
+   *  call a move or a resize. */
+  const REPEAT_RIGID_EPSILON = 0.01;
 
   /**
    * The repeating-offset delta (gridaco/grida#825): given the previous
@@ -197,9 +203,12 @@ export namespace subtree {
    *   - `bounds_of` answers for EVERY member of both sets (a detached
    *     member, a measureless tag, or a missing geometry provider all
    *     refuse);
-   *   - the two union bboxes agree in size within
-   *     {@link REPEAT_DIMS_EPSILON} — a resized or structurally edited
-   *     copy is no longer a translate of its origin;
+   *   - EVERY clone is rigid against its own origin (the record's
+   *     arrays are index-paired): same size, displaced by the same
+   *     delta as the union, within {@link REPEAT_RIGID_EPSILON}. The
+   *     check is per member, not per envelope — a rearranged or
+   *     resized inner copy is no longer a translate even when the
+   *     envelope-defining copies keep the union bbox intact;
    *   - the union top-left delta is non-zero (a copy that never moved
    *     repeats nothing).
    *
@@ -214,7 +223,8 @@ export namespace subtree {
     bounds_of: (id: NodeId) => Rect | null
   ): Vec2 | null {
     if (record === null) return null;
-    if (record.origins.length === 0 || record.clones.length === 0) return null;
+    if (record.origins.length === 0) return null;
+    if (record.origins.length !== record.clones.length) return null;
     if (!array_shallow_equal(record.clones, targets)) return null;
     const origin_bounds = collect_bounds(record.origins, bounds_of);
     if (origin_bounds === null) return null;
@@ -222,14 +232,20 @@ export namespace subtree {
     if (clone_bounds === null) return null;
     const a = cmath.rect.union(origin_bounds);
     const b = cmath.rect.union(clone_bounds);
-    if (
-      Math.abs(a.width - b.width) > REPEAT_DIMS_EPSILON ||
-      Math.abs(a.height - b.height) > REPEAT_DIMS_EPSILON
-    ) {
-      return null;
-    }
     const dx = b.x - a.x;
     const dy = b.y - a.y;
+    for (let i = 0; i < origin_bounds.length; i++) {
+      const o = origin_bounds[i];
+      const c = clone_bounds[i];
+      if (
+        Math.abs(c.x - o.x - dx) > REPEAT_RIGID_EPSILON ||
+        Math.abs(c.y - o.y - dy) > REPEAT_RIGID_EPSILON ||
+        Math.abs(c.width - o.width) > REPEAT_RIGID_EPSILON ||
+        Math.abs(c.height - o.height) > REPEAT_RIGID_EPSILON
+      ) {
+        return null;
+      }
+    }
     if (dx === 0 && dy === 0) return null;
     return { x: dx, y: dy };
   }

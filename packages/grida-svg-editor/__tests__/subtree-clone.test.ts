@@ -254,13 +254,45 @@ describe("subtree.repeat_delta — the repeating-offset witness (#825)", () => {
     expect(subtree.repeat_delta(record, ["a1"], () => null)).toBe(null);
   });
 
-  it("union dims drift (a resized copy) → null", () => {
+  it("a resized copy → null", () => {
     const record = { origins: ["a"], clones: ["a1"] };
     expect(
       subtree.repeat_delta(
         record,
         ["a1"],
         bounds({ a: r(10, 10, 20, 20), a1: r(40, 10, 30, 20) })
+      )
+    ).toBe(null);
+  });
+
+  it("rigidity is per member, not per envelope — an inner copy moved while the union survives → null", () => {
+    // a and c define the union corners; b is interior. Every clone of
+    // a/c shifts by (5, 5) so the union shifts rigidly — but b's clone
+    // wandered. An envelope-only check would pass; the witness must not.
+    const record = { origins: ["a", "b", "c"], clones: ["a1", "b1", "c1"] };
+    expect(
+      subtree.repeat_delta(
+        record,
+        ["a1", "b1", "c1"],
+        bounds({
+          a: r(0, 0, 10, 10),
+          b: r(20, 20, 10, 10),
+          c: r(50, 50, 10, 10),
+          a1: r(5, 5, 10, 10),
+          b1: r(30, 40, 10, 10), // not (25, 25) — non-rigid inner move
+          c1: r(55, 55, 10, 10),
+        })
+      )
+    ).toBe(null);
+  });
+
+  it("a malformed record (unpaired arrays) → null", () => {
+    const record = { origins: ["a", "b"], clones: ["a1"] };
+    expect(
+      subtree.repeat_delta(
+        record,
+        ["a1"],
+        bounds({ a: r(0, 0), b: r(50, 0), a1: r(5, 0) })
       )
     ).toBe(null);
   });

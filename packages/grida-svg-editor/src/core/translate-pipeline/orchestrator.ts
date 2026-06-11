@@ -171,9 +171,12 @@ export class TranslateOrchestrator {
         // Seed the repeating-duplicate memory (#825) — a cloned drag is
         // a duplication; ⌘D right after repeats its offset. Zero-net-
         // movement commits seed too: the delta they witness is (0,0),
-        // which the consumer treats as duplicate-in-place.
+        // which the consumer treats as duplicate-in-place. Origins come
+        // from the PLAN, not `session.ids`: the record's arrays are
+        // index-paired, and the plan is normalized (document order,
+        // refusals dropped) while the at-open ids are neither.
         this.deps.on_clone_commit?.({
-          origins: session.ids,
+          origins: cloned.plan.map((p) => p.origin),
           clones: cloned.ids,
         });
       }

@@ -324,4 +324,25 @@ describe("clone-drag — seeds the repeating-duplicate record (#825)", () => {
     const [copy] = editor.commands.duplicate();
     expect(rect_x(editor, copy)).toBe("10");
   });
+
+  it("multi-member, gesture ids out of document order: the seeded record pairs origin↔clone correctly", () => {
+    // The record's arrays are index-paired and must come from the
+    // normalized clone PLAN — session.ids is in gesture (selection)
+    // order. Drive [b, a] reversed; the per-member rigidity witness
+    // only passes if the seed paired a↔a′ and b↔b′, not a↔b′.
+    const { editor, drive } = harness();
+    install_geometry(editor);
+    const doc = editor.document;
+    const ids = [...editor.tree().nodes.keys()].filter(
+      (id) => doc.get_attr(id, "id") === "a" || doc.get_attr(id, "id") === "b"
+    );
+    const [a, b] = ids;
+    drive([b, a], [30, 0], MODS.on);
+    drive([b, a], [30, 0], MODS.on, "commit");
+
+    const next = editor.commands.duplicate();
+    expect(next).toHaveLength(2);
+    expect(rect_x(editor, next[0])).toBe("70"); // 10 + 30 + 30
+    expect(rect_x(editor, next[1])).toBe("160"); // 100 + 30 + 30
+  });
 });
