@@ -1,6 +1,6 @@
 ---
 title: "Subtree clone — duplicate and clone-drag"
-description: "Design note for the SVG editor's in-document subtree-clone operation: the second of the clipboard FRD's two extraction operations. Specifies the no-closure/no-shell verdict, verbatim-id collision semantics, placement and paint order, who moves during a clone-drag, the mid-drag modifier toggle, and the one-undo-step history bracket."
+description: "Design note for the SVG editor's in-document subtree-clone operation: the second of the clipboard FRD's two extraction operations. Specifies the no-closure/no-shell verdict, verbatim-id collision semantics, placement and paint order, who moves during a clone-drag, the mid-drag modifier toggle, the one-undo-step history bracket, and the repeating-offset duplicate (⌘D remembers the translate delta)."
 keywords:
   - svg
   - svg-editor
@@ -23,7 +23,9 @@ Alt-drag translate-with-clone gesture). Tracked as
 [gridaco/grida#817](https://github.com/gridaco/grida/issues/817);
 deferred from clipboard v1 by
 [the clipboard FRD](./clipboard.md)
-§Two extraction operations / §Out of scope.
+§Two extraction operations / §Out of scope. The repeating-offset
+behavior (§Repeating offset below) shipped as the follow-up
+[gridaco/grida#825](https://github.com/gridaco/grida/issues/825).
 
 ## Definition
 
@@ -83,8 +85,9 @@ untouched — the diff is exactly the clones, nothing reflows.
 
 Duplicates the selection **in place** and moves the selection to the
 clones. One history step: a single undo removes the clones and restores
-the prior selection. Repeating-offset duplication (duplicate → move →
-duplicate repeats the offset) is deliberately out of scope for v1.
+the prior selection. When the previous duplication's copies were
+translated and are duplicated again, the next copies repeat that
+offset — see §Repeating offset.
 
 ### Clone-drag (Alt + translate)
 
@@ -120,6 +123,73 @@ moves a **clone** instead of the selection:
   coexists: measurement reads the held modifier outside a gesture;
   clone-drag reads it during one.
 
+## Repeating offset
+
+The Figma-style repeating duplicate
+([gridaco/grida#825](https://github.com/gridaco/grida/issues/825);
+concept source: the main editor's `active_duplication` pattern):
+duplicate, move the copy, duplicate again — the next copy lands at the
+same relative offset from the previous one.
+
+The editor keeps a **duplication record** — the `{ origins, clones }`
+pair of the last committed duplication. It is editor-session memory,
+on the same footing as the clipboard buffer: never observable, never
+part of history. Two events arm it, both user-initiated commits:
+
+- a duplicate command (⌘D) — every duplicate re-arms the record with
+  its own origins/clones, which is what makes repeats chain (⌘D, move,
+  ⌘D, ⌘D, ⌘D marches copies at a constant stride);
+- a **cloned** translate commit (Alt-drag) — a clone-drag is a
+  duplication, so ⌘D immediately after repeats the drag offset (the
+  Figma convention, stated here rather than implied). A cancelled
+  cloned drag arms nothing; a zero-net-movement cloned commit arms a
+  record whose witnessed delta is zero, which repeats nothing.
+
+History replay never arms it: undo/redo of a duplicate re-runs the
+committed closures but does not touch the record, because the record
+is the memory of what the **user** last did, not of what the document
+last contained.
+
+### The witness, not a stored delta
+
+The record does not store the offset. At the next duplicate, the
+offset is **measured**: if the record still witnesses "duplicate, then
+rigidly translate the copies", the delta between the union bbox of
+`origins` and of `clones` is applied to the fresh clones. The repeat
+fires only when all of:
+
+- the duplicate's normalized targets are exactly the record's clones,
+  in the same (document) order — the user is duplicating the previous
+  copies and nothing else;
+- world bounds are readable for **every** member of both sets (no
+  geometry provider, a detached member, or a measureless element
+  refuses);
+- the two union bboxes agree in size within a float-noise tolerance —
+  a resized or structurally edited copy is no longer a translate of
+  its origin;
+- the measured delta is non-zero.
+
+Measuring instead of storing is what makes the feature honest about
+_any_ movement: drag, nudge, arrow keys, inspector edits, and align
+all repeat, because the witness reads where the copies actually are,
+not which command moved them.
+
+### Degradation, invalidation, history
+
+Every failed precondition **degrades to the plain duplicate-in-place
+above** — gesture-grade, never a thrown error. (The main editor
+asserts on a stale record; this contract deliberately does not — ⌘D
+must never crash because the document changed under the record.)
+
+Staleness is caught at use by the witness — there is no per-mutation
+bookkeeping watching the recorded ids. The only eager invalidation is
+`load()` / `reset()`, where every node id dies wholesale.
+
+The offset rides the translate pipeline (baseline + apply, with the
+world→local projection every one-shot translate uses) **inside the
+same single history step as the clone insertion**: one undo removes
+copy and offset together; redo restores both.
+
 ## Refusals
 
 Refusal is per-member and silent (normalized away), never a thrown
@@ -135,10 +205,7 @@ error — cloning is a gesture-grade operation:
 
 ## Out of scope
 
-Repeating-offset duplicate (the main editor's `active_duplication`
-pattern — tracked as
-[gridaco/grida#825](https://github.com/gridaco/grida/issues/825));
-clone-to-different-parent (the gesture is flat — clones are siblings of
+Clone-to-different-parent (the gesture is flat — clones are siblings of
 their origins, hierarchy changes during a cloned drag are not modeled);
 any defs deduplication on clone (Tidy's job).
 

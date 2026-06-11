@@ -187,3 +187,92 @@ describe("subtree.clone_plan — refusals", () => {
     expect(plan.map((p) => p.origin)).toEqual([a]);
   });
 });
+
+// The repeating-offset witness (gridaco/grida#825; spec: subtree-clone.md
+// §Repeating offset). Pure: stub bounds tables, no editor. `null` always
+// means "no repeat — duplicate in place"; nothing in this matrix throws.
+describe("subtree.repeat_delta — the repeating-offset witness (#825)", () => {
+  const r = (x: number, y: number, w = 20, h = 20) => ({
+    x,
+    y,
+    width: w,
+    height: h,
+  });
+  const bounds =
+    (table: Record<string, ReturnType<typeof r>>) => (id: NodeId) =>
+      table[id] ?? null;
+
+  it("a rigid translate of the previous clones yields the exact delta", () => {
+    const record = { origins: ["a"], clones: ["a1"] };
+    const delta = subtree.repeat_delta(
+      record,
+      ["a1"],
+      bounds({ a: r(10, 10), a1: r(40, 15) })
+    );
+    expect(delta).toEqual({ x: 30, y: 5 });
+  });
+
+  it("multi-member: the delta is the UNION bbox offset", () => {
+    const record = { origins: ["a", "b"], clones: ["a1", "b1"] };
+    const delta = subtree.repeat_delta(
+      record,
+      ["a1", "b1"],
+      bounds({ a: r(0, 0), b: r(50, 50), a1: r(5, 7), b1: r(55, 57) })
+    );
+    expect(delta).toEqual({ x: 5, y: 7 });
+  });
+
+  it("no record → null", () => {
+    expect(subtree.repeat_delta(null, ["a"], bounds({ a: r(0, 0) }))).toBe(
+      null
+    );
+  });
+
+  it("targets must BE the previous clones, in the same order", () => {
+    const table = bounds({ a: r(10, 10), a1: r(40, 10), b1: r(70, 10) });
+    const record = { origins: ["a"], clones: ["a1"] };
+    // different node
+    expect(subtree.repeat_delta(record, ["b1"], table)).toBe(null);
+    // count mismatch
+    expect(subtree.repeat_delta(record, ["a1", "b1"], table)).toBe(null);
+    // reorder of a multi-member record
+    const multi = { origins: ["a", "b"], clones: ["a1", "b1"] };
+    expect(
+      subtree.repeat_delta(
+        multi,
+        ["b1", "a1"],
+        bounds({ a: r(0, 0), b: r(50, 0), a1: r(5, 0), b1: r(55, 0) })
+      )
+    ).toBe(null);
+  });
+
+  it("one unmeasurable member (detached, no provider, measureless tag) → null", () => {
+    const record = { origins: ["a"], clones: ["a1"] };
+    expect(
+      subtree.repeat_delta(record, ["a1"], bounds({ a1: r(40, 10) }))
+    ).toBe(null);
+    expect(subtree.repeat_delta(record, ["a1"], () => null)).toBe(null);
+  });
+
+  it("union dims drift (a resized copy) → null", () => {
+    const record = { origins: ["a"], clones: ["a1"] };
+    expect(
+      subtree.repeat_delta(
+        record,
+        ["a1"],
+        bounds({ a: r(10, 10, 20, 20), a1: r(40, 10, 30, 20) })
+      )
+    ).toBe(null);
+  });
+
+  it("zero delta (the copy never moved) → null", () => {
+    const record = { origins: ["a"], clones: ["a1"] };
+    expect(
+      subtree.repeat_delta(
+        record,
+        ["a1"],
+        bounds({ a: r(10, 10), a1: r(10, 10) })
+      )
+    ).toBe(null);
+  });
+});

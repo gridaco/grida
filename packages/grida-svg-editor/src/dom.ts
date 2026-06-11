@@ -647,6 +647,10 @@ class DomSurface implements Surface {
       // the selection (and with it the HUD chrome, via subscribe) must
       // follow the movers.
       set_selection: (ids) => this.editor.commands.select(ids),
+      // A cloned commit arms the repeating-duplicate record so a
+      // follow-up ⌘D repeats the drag offset (gridaco/grida#825).
+      on_clone_commit: (record) =>
+        this.editor_internal().seed_duplication(record),
     });
 
     // Resize funnel — same shape as translate, distinct lifecycle.

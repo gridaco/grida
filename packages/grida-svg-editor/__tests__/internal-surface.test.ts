@@ -35,6 +35,7 @@ type Internal = {
   bump_geometry: () => void;
   subscribe_translate_commit: (cb: () => void) => () => void;
   notify_translate_commit: () => void;
+  seed_duplication: (record: unknown) => void;
   set_content_edit_driver: (fn: unknown) => void;
   set_surface_hover_override_driver: (fn: unknown) => void;
   push_surface_hover: (id: unknown) => void;
@@ -62,6 +63,7 @@ describe("editor._internal contract", () => {
         "notify_translate_commit",
         "push_pick",
         "push_surface_hover",
+        "seed_duplication",
         "set_computed_resolver",
         "set_content_edit_driver",
         "set_geometry",
