@@ -303,13 +303,22 @@ describe("subtree.repeat_delta — the repeating-offset witness (#825)", () => {
     ).toBe(null);
   });
 
-  it("zero delta (the copy never moved) → null", () => {
+  it("zero delta (the copy never moved) → null, including sub-tolerance float noise", () => {
     const record = { origins: ["a"], clones: ["a1"] };
     expect(
       subtree.repeat_delta(
         record,
         ["a1"],
         bounds({ a: r(10, 10), a1: r(10, 10) })
+      )
+    ).toBe(null);
+    // A noise-sized net delta is not a move — repeating it would write
+    // noise-sized attribute deltas onto an otherwise byte-equal clone.
+    expect(
+      subtree.repeat_delta(
+        record,
+        ["a1"],
+        bounds({ a: r(10, 10), a1: r(10.000001, 9.999999) })
       )
     ).toBe(null);
   });

@@ -209,8 +209,10 @@ export namespace subtree {
    *     check is per member, not per envelope — a rearranged or
    *     resized inner copy is no longer a translate even when the
    *     envelope-defining copies keep the union bbox intact;
-   *   - the union top-left delta is non-zero (a copy that never moved
-   *     repeats nothing).
+   *   - the union top-left delta exceeds the same tolerance (a copy
+   *     that never moved — or drifted by float noise only — repeats
+   *     nothing; the in-place duplicate stays byte-equal instead of
+   *     inheriting noise-sized attribute writes).
    *
    * Pure and gesture-grade: reads only through `bounds_of`, never
    * throws — every failed precondition degrades to `null` (the main
@@ -246,7 +248,15 @@ export namespace subtree {
         return null;
       }
     }
-    if (dx === 0 && dy === 0) return null;
+    // Same tolerance as the rigidity check: a sub-epsilon net delta is
+    // float noise, not a move — degrade to the byte-equal in-place
+    // duplicate rather than fabricate noise-sized attribute writes.
+    if (
+      Math.abs(dx) <= REPEAT_RIGID_EPSILON &&
+      Math.abs(dy) <= REPEAT_RIGID_EPSILON
+    ) {
+      return null;
+    }
     return { x: dx, y: dy };
   }
 

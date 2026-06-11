@@ -169,7 +169,10 @@ fires only when all of:
   float-noise tolerance. The check is per member, not per envelope — a
   resized or rearranged inner copy is no longer a translate even when
   the envelope-defining copies keep the union bbox intact;
-- the measured delta is non-zero.
+- the measured delta exceeds the same tolerance — a copy that never
+  moved, or drifted by float noise only, repeats nothing (the in-place
+  duplicate stays byte-equal instead of inheriting noise-sized
+  attribute writes).
 
 Measuring instead of storing is what makes the feature honest about
 _any_ movement: drag, nudge, arrow keys, inspector edits, and align
