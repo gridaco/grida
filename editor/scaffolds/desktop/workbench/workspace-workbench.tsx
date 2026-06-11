@@ -222,10 +222,12 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
     function onKey(e: KeyboardEvent) {
       // ctrl+` toggles the terminal pane (VSCode). The terminal pane's
       // xterm key handler deliberately lets this chord bubble up here,
-      // so the toggle works even while the shell has focus.
+      // so the toggle works even while the shell has focus. Key-repeat
+      // is swallowed (preventDefault, no toggle): one press = one state
+      // change, and held-chord repeats must not leak into the shell.
       if (supportsTerminal && isTerminalToggleEvent(e)) {
         e.preventDefault();
-        toggleTerminal();
+        if (!e.repeat) toggleTerminal();
         return;
       }
       const cmd = e.metaKey || e.ctrlKey;

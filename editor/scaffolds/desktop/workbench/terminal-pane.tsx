@@ -167,8 +167,14 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
 
       const fitAndResize = () => {
         // A collapsed panel measures 0×0; fitting then would clamp the
-        // grid to garbage. Skip — the observer re-fires on expand.
-        if (el.clientWidth === 0 || el.clientHeight === 0) return;
+        // grid to garbage. Skip — the observer re-fires on expand. Also
+        // drop focus: a hidden terminal must not keep swallowing
+        // keystrokes into an invisible shell (covers both the ctrl+`
+        // toggle and a drag-to-collapse).
+        if (el.clientWidth === 0 || el.clientHeight === 0) {
+          term.blur();
+          return;
+        }
         fit.fit();
         if (termId) void bridgeTerminal.resize(termId, term.cols, term.rows);
       };

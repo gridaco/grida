@@ -36,9 +36,118 @@ const TERMINAL_ID_RE = /^[0-9a-zA-Z-]{1,64}$/;
  * one shell per workbench window; 8 leaves headroom for future tabs. */
 const MAX_TERMINALS_PER_WEBCONTENTS = 8;
 
-type TerminalRecord = { pty: IPty; wc: WebContents };
+/**
+ * Bookkeeping for live AND in-flight terminals, with a reservation
+ * protocol that closes the TOCTOU between validation and the async
+ * native load + spawn: `reserve()` claims the id and counts against
+ * the per-owner cap synchronously BEFORE the first `await`, so
+ * concurrent `terminal.create` calls cannot pass the duplicate/cap
+ * checks together. `commit()` binds the spawned PTY only if the
+ * reservation is still live — a kill or window close that lands
+ * mid-spawn makes it return false and the caller destroys the fresh
+ * PTY instead of resurrecting the record. `releaseExited()` compares
+ * the PTY identity so a stale exit can never tear down a session that
+ * reused the id.
+ *
+ * Generic over owner/PTY so the protocol is unit-testable without
+ * Electron or node-pty (terminal-host.test.ts).
+ */
+export class TerminalRegistry<TOwner extends object, TPty> {
+  private readonly records = new Map<
+    string,
+    { owner: TOwner; pty: TPty | null }
+  >();
 
-const terminals = new Map<string, TerminalRecord>();
+  constructor(private readonly maxPerOwner: number) {}
+
+  /** Claim `id` for `owner` before any async work. Throws on an
+   * invalid or already-claimed id, or when the owner is at cap
+   * (pending reservations count — that's the point). */
+  reserve(id: unknown, owner: TOwner): void {
+    if (!isValidTerminalId(id)) {
+      throw new Error("invalid terminal id");
+    }
+    if (this.records.has(id)) {
+      throw new Error(`terminal already exists: ${id}`);
+    }
+    let owned = 0;
+    for (const record of this.records.values()) {
+      if (record.owner === owner) owned += 1;
+    }
+    if (owned >= this.maxPerOwner) {
+      throw new Error("too many terminals for this window");
+    }
+    this.records.set(id, { owner, pty: null });
+  }
+
+  /** Bind the spawned PTY to its reservation. Returns false when the
+   * reservation is gone (killed / window closed during spawn) — the
+   * caller must destroy `pty` itself. */
+  commit(id: string, owner: TOwner, pty: TPty): boolean {
+    const record = this.records.get(id);
+    if (!record || record.owner !== owner || record.pty !== null) return false;
+    record.pty = pty;
+    return true;
+  }
+
+  /** The owner's live terminal, or throw. Pending reservations and
+   * other owners' terminals are equally "not found" — one window can
+   * never address another window's shell. */
+  get(id: unknown, owner: TOwner): TPty {
+    const record = isValidTerminalId(id) ? this.records.get(id) : undefined;
+    if (!record || record.owner !== owner || record.pty === null) {
+      throw new Error("terminal not found");
+    }
+    return record.pty;
+  }
+
+  /** Remove the record for a kill. Missing id → null (idempotent — the
+   * renderer's unmount cleanup races the host's own exit cleanup);
+   * foreign owner → throw; pending reservation → removed, null (the
+   * in-flight create's `commit` then fails and destroys the PTY). */
+  take(id: unknown, owner: TOwner): TPty | null {
+    const record = isValidTerminalId(id) ? this.records.get(id) : undefined;
+    if (!record) return null;
+    if (record.owner !== owner) throw new Error("terminal not found");
+    this.records.delete(id as string);
+    return record.pty;
+  }
+
+  /** Exit-path removal: only if `pty` is still the record's PTY, so a
+   * stale exit can't delete a record whose id was since recycled. */
+  releaseExited(id: string, pty: TPty): boolean {
+    const record = this.records.get(id);
+    if (!record || record.pty !== pty) return false;
+    this.records.delete(id);
+    return true;
+  }
+
+  /** Remove every record of `owner` (window closed); returns the live
+   * PTYs to kill. Pending creates notice via failed `commit`. */
+  takeAllFor(owner: TOwner): TPty[] {
+    const live: TPty[] = [];
+    for (const [id, record] of this.records) {
+      if (record.owner !== owner) continue;
+      this.records.delete(id);
+      if (record.pty !== null) live.push(record.pty);
+    }
+    return live;
+  }
+
+  /** Remove everything (app quit); returns the live PTYs to kill. */
+  drainAll(): TPty[] {
+    const live: TPty[] = [];
+    for (const record of this.records.values()) {
+      if (record.pty !== null) live.push(record.pty);
+    }
+    this.records.clear();
+    return live;
+  }
+}
+
+const terminals = new TerminalRegistry<WebContents, IPty>(
+  MAX_TERMINALS_PER_WEBCONTENTS
+);
 /** WebContents ids that already have a kill-on-destroy hook. */
 const hookedWebContents = new Set<number>();
 
@@ -130,35 +239,34 @@ export async function createTerminal(
   opts: { id: string; cwd: string; cols: number; rows: number }
 ): Promise<void> {
   const { id } = opts;
-  if (!isValidTerminalId(id)) {
-    throw new Error("invalid terminal id");
-  }
-  if (terminals.has(id)) {
-    throw new Error(`terminal already exists: ${id}`);
-  }
-  let owned = 0;
-  for (const record of terminals.values()) {
-    if (record.wc === wc) owned += 1;
-  }
-  if (owned >= MAX_TERMINALS_PER_WEBCONTENTS) {
-    throw new Error("too many terminals for this window");
+  // Synchronous reservation BEFORE the await below — see TerminalRegistry.
+  terminals.reserve(id, wc);
+
+  let proc: IPty;
+  try {
+    const pty = await loadPty();
+    const shell = resolveDefaultShell(process.platform, process.env);
+    proc = pty.spawn(shell.command, shell.args, {
+      name: "xterm-256color",
+      cwd: opts.cwd,
+      cols: clampGridSize(opts.cols, 80),
+      rows: clampGridSize(opts.rows, 24),
+      env: {
+        ...(process.env as Record<string, string>),
+        TERM: "xterm-256color",
+        COLORTERM: "truecolor",
+      },
+    });
+  } catch (err) {
+    terminals.take(id, wc); // free the reservation
+    throw err;
   }
 
-  const pty = await loadPty();
-  const shell = resolveDefaultShell(process.platform, process.env);
-  const proc = pty.spawn(shell.command, shell.args, {
-    name: "xterm-256color",
-    cwd: opts.cwd,
-    cols: clampGridSize(opts.cols, 80),
-    rows: clampGridSize(opts.rows, 24),
-    env: {
-      ...(process.env as Record<string, string>),
-      TERM: "xterm-256color",
-      COLORTERM: "truecolor",
-    },
-  });
-
-  terminals.set(id, { pty: proc, wc });
+  if (!terminals.commit(id, wc, proc)) {
+    // Killed (or window closed) while the spawn was in flight.
+    proc.kill();
+    return;
+  }
 
   proc.onData((data) => {
     if (!wc.isDestroyed()) {
@@ -166,8 +274,9 @@ export async function createTerminal(
     }
   });
   proc.onExit(({ exitCode }) => {
-    terminals.delete(id);
-    if (!wc.isDestroyed()) {
+    // Identity-checked: a kill already removed the record, and an id
+    // recycled after this PTY's death must not be torn down by it.
+    if (terminals.releaseExited(id, proc) && !wc.isDestroyed()) {
       wc.send(IPC_CHANNELS.TERMINAL_EXIT, { id, exit_code: exitCode });
     }
   });
@@ -179,29 +288,16 @@ export async function createTerminal(
     hookedWebContents.add(wc.id);
     wc.once("destroyed", () => {
       hookedWebContents.delete(wc.id);
-      for (const [id, record] of terminals) {
-        if (record.wc === wc) {
-          terminals.delete(id);
-          record.pty.kill();
-        }
+      for (const pty of terminals.takeAllFor(wc)) {
+        pty.kill();
       }
     });
   }
 }
 
-/** Look up a terminal, enforcing that `wc` is the WebContents that
- * created it — one window cannot drive another window's shell. */
-function ownedTerminal(wc: WebContents, id: unknown): TerminalRecord {
-  const record = isValidTerminalId(id) ? terminals.get(id) : undefined;
-  if (!record || record.wc !== wc) {
-    throw new Error("terminal not found");
-  }
-  return record;
-}
-
 export function writeTerminal(wc: WebContents, id: unknown, data: unknown) {
   if (typeof data !== "string") throw new Error("invalid terminal data");
-  ownedTerminal(wc, id).pty.write(data);
+  terminals.get(id, wc).write(data);
 }
 
 export function resizeTerminal(
@@ -210,10 +306,9 @@ export function resizeTerminal(
   cols: unknown,
   rows: unknown
 ) {
-  ownedTerminal(wc, id).pty.resize(
-    clampGridSize(cols, 80),
-    clampGridSize(rows, 24)
-  );
+  terminals
+    .get(id, wc)
+    .resize(clampGridSize(cols, 80), clampGridSize(rows, 24));
 }
 
 /**
@@ -223,17 +318,11 @@ export function resizeTerminal(
  * A live terminal still requires ownership, like write/resize.
  */
 export function killTerminal(wc: WebContents, id: unknown) {
-  if (!isValidTerminalId(id)) return;
-  const record = terminals.get(id);
-  if (!record) return;
-  if (record.wc !== wc) throw new Error("terminal not found");
-  terminals.delete(id);
-  record.pty.kill();
+  terminals.take(id, wc)?.kill();
 }
 
 export function disposeAllTerminals() {
-  for (const record of terminals.values()) {
-    record.pty.kill();
+  for (const pty of terminals.drainAll()) {
+    pty.kill();
   }
-  terminals.clear();
 }

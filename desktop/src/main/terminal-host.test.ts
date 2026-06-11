@@ -4,6 +4,7 @@ import {
   clampGridSize,
   isValidTerminalId,
   resolveDefaultShell,
+  TerminalRegistry,
 } from "./terminal-host";
 
 describe("resolveDefaultShell", () => {
@@ -61,6 +62,73 @@ describe("isValidTerminalId", () => {
     expect(isValidTerminalId("a".repeat(65))).toBe(false);
     expect(isValidTerminalId("../etc/passwd")).toBe(false);
     expect(isValidTerminalId(42)).toBe(false);
+  });
+});
+
+/**
+ * The reservation protocol — regression coverage for the TOCTOU where
+ * concurrent `terminal.create` calls passed the duplicate/cap checks
+ * together before any of them reached the async spawn, and for
+ * exit-vs-recycled-id teardown.
+ */
+describe("TerminalRegistry", () => {
+  const owner = { id: 1 };
+  const other = { id: 2 };
+
+  it("a pending reservation already claims the id (concurrent create race)", () => {
+    const reg = new TerminalRegistry<object, string>(8);
+    reg.reserve("a", owner);
+    // second create for the same id arrives before the first spawn lands
+    expect(() => reg.reserve("a", owner)).toThrow(/already exists/);
+  });
+
+  it("pending reservations count against the per-owner cap", () => {
+    const reg = new TerminalRegistry<object, string>(2);
+    reg.reserve("a", owner);
+    reg.reserve("b", owner); // neither committed yet
+    expect(() => reg.reserve("c", owner)).toThrow(/too many terminals/);
+    // a different window is unaffected
+    reg.reserve("c", other);
+  });
+
+  it("commit fails after a mid-spawn kill, so the caller destroys the PTY", () => {
+    const reg = new TerminalRegistry<object, string>(8);
+    reg.reserve("a", owner);
+    expect(reg.take("a", owner)).toBeNull(); // kill during spawn: nothing live yet
+    expect(reg.commit("a", owner, "pty-1")).toBe(false);
+    expect(() => reg.get("a", owner)).toThrow(/not found/);
+  });
+
+  it("commit fails after a mid-spawn window close (takeAllFor)", () => {
+    const reg = new TerminalRegistry<object, string>(8);
+    reg.reserve("a", owner);
+    reg.reserve("b", owner);
+    expect(reg.commit("b", owner, "pty-b")).toBe(true);
+    expect(reg.takeAllFor(owner)).toEqual(["pty-b"]); // only live PTYs returned
+    expect(reg.commit("a", owner, "pty-a")).toBe(false);
+  });
+
+  it("a stale exit cannot tear down a recycled id", () => {
+    const reg = new TerminalRegistry<object, string>(8);
+    reg.reserve("a", owner);
+    reg.commit("a", owner, "pty-1");
+    reg.take("a", owner); // killed
+    reg.reserve("a", owner); // id recycled by a fresh create
+    reg.commit("a", owner, "pty-2");
+    expect(reg.releaseExited("a", "pty-1")).toBe(false); // old PTY's exit: no-op
+    expect(reg.get("a", owner)).toBe("pty-2");
+    expect(reg.releaseExited("a", "pty-2")).toBe(true);
+  });
+
+  it("ownership: another window can neither get nor take, and pending is not gettable", () => {
+    const reg = new TerminalRegistry<object, string>(8);
+    reg.reserve("a", owner);
+    expect(() => reg.get("a", owner)).toThrow(/not found/); // pending
+    reg.commit("a", owner, "pty-1");
+    expect(() => reg.get("a", other)).toThrow(/not found/);
+    expect(() => reg.take("a", other)).toThrow(/not found/);
+    expect(reg.take("bogus", owner)).toBeNull(); // idempotent kill
+    expect(reg.take("a", owner)).toBe("pty-1");
   });
 });
 
