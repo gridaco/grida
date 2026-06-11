@@ -16,7 +16,8 @@ import { createSvgEditor } from "../../src/index";
 import { TranslateOrchestrator } from "../../src/core/translate-pipeline/orchestrator";
 import type { SvgDocument } from "../../src/core/document";
 import type { NodeId } from "../../src/types";
-import { first_rect } from "../_helpers";
+import type { subtree } from "../../src/core/subtree";
+import { first_rect, install_geometry } from "../_helpers";
 
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect id="a" x="10" y="10" width="20" height="20"/><rect id="b" x="100" y="100" width="20" height="20"/></svg>`;
 
@@ -24,6 +25,7 @@ type Internal = {
   doc: SvgDocument;
   history: { preview: (label: string) => unknown };
   emit: () => void;
+  seed_duplication: (record: subtree.DuplicationRecord) => void;
 };
 
 const MODS = {
@@ -53,6 +55,9 @@ function harness(opts?: { snap?: boolean }) {
       selection_calls.push([...ids]);
       editor.commands.select([...ids]);
     },
+    // Mirrors the dom.ts wiring: a cloned commit arms the editor's
+    // repeating-duplicate record (#825).
+    on_clone_commit: (record) => internal.seed_duplication(record),
   });
   const snap = opts?.snap ?? false;
   const drive = (
@@ -287,5 +292,57 @@ describe("clone-drag — commit", () => {
     expect(rect_x(editor, ids[1])).toBe("100");
     expect(rect_x(editor, clones[0])).toBe("15");
     expect(rect_x(editor, clones[1])).toBe("105");
+  });
+});
+
+// Alt-drag seeds the repeating-duplicate record (gridaco/grida#825;
+// spec: subtree-clone.md §Repeating offset): a CLONED commit is a
+// duplication, so ⌘D right after repeats the drag offset — the Figma
+// convention. Cancel never seeds.
+describe("clone-drag — seeds the repeating-duplicate record (#825)", () => {
+  it("⌘D after an alt-drag commit repeats the drag offset", () => {
+    const { editor, drive } = harness();
+    install_geometry(editor);
+    const a = first_rect(editor);
+    drive([a], [30, 0], MODS.on);
+    drive([a], [30, 0], MODS.on, "commit");
+    const committed = editor.state.selection;
+    expect(committed).toHaveLength(1);
+    expect(rect_x(editor, committed[0])).toBe("40");
+
+    const [next] = editor.commands.duplicate();
+    expect(rect_x(editor, next)).toBe("70");
+  });
+
+  it("a cancelled cloned drag seeds nothing — the next ⌘D clones in place", () => {
+    const { editor, orch, drive } = harness();
+    install_geometry(editor);
+    const a = first_rect(editor);
+    drive([a], [30, 0], MODS.on);
+    orch.cancel();
+    editor.commands.select([a]);
+    const [copy] = editor.commands.duplicate();
+    expect(rect_x(editor, copy)).toBe("10");
+  });
+
+  it("multi-member, gesture ids out of document order: the seeded record pairs origin↔clone correctly", () => {
+    // The record's arrays are index-paired and must come from the
+    // normalized clone PLAN — session.ids is in gesture (selection)
+    // order. Drive [b, a] reversed; the per-member rigidity witness
+    // only passes if the seed paired a↔a′ and b↔b′, not a↔b′.
+    const { editor, drive } = harness();
+    install_geometry(editor);
+    const doc = editor.document;
+    const ids = [...editor.tree().nodes.keys()].filter(
+      (id) => doc.get_attr(id, "id") === "a" || doc.get_attr(id, "id") === "b"
+    );
+    const [a, b] = ids;
+    drive([b, a], [30, 0], MODS.on);
+    drive([b, a], [30, 0], MODS.on, "commit");
+
+    const next = editor.commands.duplicate();
+    expect(next).toHaveLength(2);
+    expect(rect_x(editor, next[0])).toBe("70"); // 10 + 30 + 30
+    expect(rect_x(editor, next[1])).toBe("160"); // 100 + 30 + 30
   });
 });

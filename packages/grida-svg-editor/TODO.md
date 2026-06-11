@@ -359,8 +359,13 @@ Implementation notes:
   `__tests__/clone-drag.browser.test.ts` (pins the dom.ts wiring —
   alt→clone mapping, redrive-on-flip, selection retarget); manual TC
   `test/svg-editor-duplicate.md`.
-- Still open (spec §Out of scope): repeating-offset duplicate (the main
-  editor's `active_duplication` pattern); clone-to-different-parent.
+- Repeating-offset duplicate shipped (gridaco/grida#825, spec
+  §Repeating offset): `commands.duplicate` measures the previous
+  duplication's translate delta via `subtree.repeat_delta` and applies
+  it to the fresh clones in the same atomic step; a cloned drag commit
+  seeds the record (`OrchestratorDeps.on_clone_commit` →
+  `_internal.seed_duplication`).
+- Still open (spec §Out of scope): clone-to-different-parent.
 
 ### 6. Snap to geometry
 

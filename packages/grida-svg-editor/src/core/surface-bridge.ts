@@ -17,6 +17,7 @@ import type { NodeId, PickEvent, Unsubscribe } from "../types";
 import type { DomComputedResolver } from "./editor";
 import type { GeometryProvider } from "./geometry";
 import type { SvgDocument } from "./document";
+import type { subtree } from "./subtree";
 
 export interface SurfaceBridge {
   /** Low-level IR. Mutating directly bypasses history; surfaces read
@@ -81,6 +82,13 @@ export interface SurfaceBridge {
   /** surface → editor: publish a translate commit. Called by the
    *  translate orchestrator after a drag settles. */
   notify_translate_commit(): void;
+
+  /** surface → editor: arm the repeating-duplicate record after a CLONED
+   *  translate commit (gridaco/grida#825), so a follow-up `duplicate()`
+   *  (⌘D) repeats the drag offset — the Figma alt-drag-then-⌘D
+   *  convention. Commit-time only, never preview or cancel; spec:
+   *  docs/wg/feat-svg-editor/subtree-clone.md §Repeating offset. */
+  seed_duplication(record: subtree.DuplicationRecord): void;
 
   /** editor → surface: register the driver that mounts inline content
    *  editing (text-edit, vector-edit) on a target node. The editor calls

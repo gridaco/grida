@@ -667,7 +667,11 @@ editor.commands.{
   // (colliding ids resolve first-in-document-order; Tidy dedups).
   // Each clone lands as its origin's next sibling (paints above it);
   // selection moves to the clones; ONE history step. Alt-drag
-  // translate-with-clone consumes the same operation. Contract:
+  // translate-with-clone consumes the same operation. Repeating
+  // offset: duplicate → move the copy → duplicate repeats the
+  // translate delta (an Alt-drag clone commit arms the same memory);
+  // still one undo step, degrades to in-place when the preconditions
+  // don't hold. Contract:
   // https://grida.co/docs/wg/feat-svg-editor/subtree-clone
   duplicate(): NodeId[];              // clone ids (selected); [] = refusal
 

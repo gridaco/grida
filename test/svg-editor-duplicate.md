@@ -1,9 +1,19 @@
 ---
 id: TC-SVGEDITOR-DUPLICATE-001
-title: Alt-drag clones and moves the clone; ⌘D duplicates in place; both are one undo step
+title: Alt-drag clones and moves the clone; ⌘D duplicates and repeats the previous offset; both are one undo step
 module: svg-editor
 area: duplicate
-tags: [duplicate, clone, alt-drag, modifier, history, undo, selection]
+tags:
+  [
+    duplicate,
+    clone,
+    alt-drag,
+    modifier,
+    history,
+    undo,
+    selection,
+    repeating-offset,
+  ]
 status: untested
 severity: high
 date: 2026-06-11
@@ -22,6 +32,9 @@ Duplicate and Alt-drag both consume the **subtree-clone** operation
 (spec: `docs/wg/feat-svg-editor/subtree-clone.md`): the clone is a
 verbatim copy — no defs are duplicated, authored ids are repeated as-is
 — inserted directly after its origin, so it paints right on top of it.
+⌘D also carries the **repeating offset** (spec §Repeating offset):
+duplicate → move the copy → ⌘D again lands the next copy at the same
+relative offset, and an Alt-drag clone commit arms the same memory.
 
 Alt-drag follows the Figma convention: **the clone moves, the origin
 stays**. The toggle is live — the clone appears the moment Alt is
@@ -66,11 +79,27 @@ here.
 8. **Measurement coexistence**: with nothing dragging, hover with Alt
    held. Expected: the measurement overlay still works; no clone is
    created outside a drag.
+9. **Repeating offset (⌘D remembers the move)**: select a shape, press
+   ⌘D, drag the copy somewhere, press ⌘D again. Expected: the third
+   copy lands at the same relative offset from the second as the
+   second sits from the first. Keep pressing ⌘D: copies march at a
+   constant stride. ONE ⌘Z per copy removes that copy AND its offset
+   together. Moving the copy with arrow keys / nudge instead of a drag
+   repeats the same way (the offset is measured, not tied to a
+   gesture).
+10. **Alt-drag seeds the repeat**: Alt-drag a shape to clone-and-move
+    it, release, then press ⌘D. Expected: the next copy repeats the
+    drag offset (Figma convention).
+11. **Repeat degrades, never breaks**: after ⌘D + move, resize the
+    copy, then ⌘D. Expected: plain duplicate-in-place (the chain is
+    broken by the resize), no error. Same when re-selecting a
+    different node between duplicates.
 
 ## Notes
 
-Shipped with gridaco/grida#817. A cloned drag committed with zero NET
-movement (drag out and back, release with Alt held) is a
+Shipped with gridaco/grida#817; the repeating offset (steps 9–11) with
+gridaco/grida#825 (spec §Repeating offset). A cloned drag committed
+with zero NET movement (drag out and back, release with Alt held) is a
 duplicate-in-place (same outcome as ⌘D); a press-release that never
 crosses the drag threshold is a tap — no gesture, no clone. The
 committed history label remains "move" (label is fixed at gesture

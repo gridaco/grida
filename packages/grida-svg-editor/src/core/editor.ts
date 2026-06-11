@@ -25,6 +25,7 @@ import { group as group_policy } from "./group";
 import {
   translate_pipeline,
   type TranslateBaseline,
+  type TranslatePlan,
   type TranslateStage,
 } from "./translate-pipeline";
 import { rotate_pipeline } from "./rotate-pipeline";
@@ -399,6 +400,17 @@ export type Commands = {
    * (so a clone's internal self-reference resolves to the ORIGINAL);
    * dedup is the explicit Tidy command's job.
    *
+   * **Repeating offset** (gridaco/grida#825, spec §Repeating offset):
+   * duplicate, move the copy, duplicate again — the next copy lands at
+   * the same relative offset from the previous one (Figma's repeating
+   * duplicate; an Alt-drag clone commit arms the same memory, so ⌘D
+   * after a clone-drag repeats the drag offset). Still ONE history
+   * step: a single `undo()` removes copy + offset together. Requires an
+   * attached geometry provider; when the repeat's preconditions don't
+   * hold (selection isn't the previous clones, a copy was resized,
+   * nothing moved, no geometry) the command degrades to the plain
+   * in-place duplicate above — never an error.
+   *
    * Refusal (no mutation, no history): an empty selection, or one that
    * normalizes to nothing cloneable (document root, nested `<svg>`,
    * stale / non-element ids) → `[]`. Returns the clone ids in document
@@ -582,6 +594,16 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
    * `reset()` / undo, like the OS clipboard it mirrors.
    */
   let clipboard_buffer: string | null = null;
+  /**
+   * The last committed duplication — read by the NEXT `duplicate()` to
+   * repeat the user's translate delta (gridaco/grida#825; spec
+   * §Repeating offset). Session state like `clipboard_buffer`: not in
+   * `EditorState`, not history-managed (undo/redo replay never re-arms
+   * it — only a user-initiated ⌘D or cloned-drag commit does). Staleness
+   * is caught at use by `subtree.repeat_delta`; the only eager clears are
+   * `load()` / `reset()`, where every NodeId dies wholesale.
+   */
+  let active_duplication: subtree.DuplicationRecord | null = null;
   const listeners = new Set<(state: EditorState) => void>();
   let attached_surface: Surface | null = null;
   /**
@@ -2104,20 +2126,52 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   /**
-   * Duplicate-in-place over `subtree.clone_plan` — see the `Commands`
-   * doc. Same atomic shape as `insert_fragment_impl`: closures own the
+   * Duplicate over `subtree.clone_plan` — see the `Commands` doc. Same
+   * atomic shape as `insert_fragment_impl`: closures own the
    * insert/remove pair so redo re-inserts the same NodeIds.
+   *
+   * Repeating offset (gridaco/grida#825, spec §Repeating offset): when
+   * the targets are exactly the previous duplication's clones and
+   * geometry witnesses a rigid translate between that record's origins
+   * and clones, the fresh clones land displaced by the same delta. The
+   * offset rides the translate pipeline INSIDE the same atomic step —
+   * one undo removes copy + offset together. Clone baselines are
+   * key-swapped from the origins (a clone is a verbatim copy at rest —
+   * the orchestrator's `enter_clone` trick), so nothing reads the
+   * detached clones. Any failed precondition degrades to plain
+   * duplicate-in-place; never an error.
    */
   function duplicate(): NodeId[] {
     const plan = subtree.clone_plan(doc, selection);
     if (plan.length === 0) return [];
     const clones = plan.map((p) => p.clone);
+    const origins = plan.map((p) => p.origin);
     const previous_selection = selection;
+    // Measured BEFORE any mutation: both bbox reads (previous origins,
+    // previous clones) must see the document as the user left it.
+    const delta = subtree.repeat_delta(active_duplication, origins, (id) =>
+      geometry_provider ? geometry_provider.bounds_of(id) : null
+    );
+    let offset_plan: TranslatePlan | null = null;
+    if (delta) {
+      const baselines = new Map<NodeId, TranslateBaseline>();
+      for (const p of plan) {
+        baselines.set(
+          p.clone,
+          translate_pipeline.intent.capture_baseline(doc, p.origin)
+        );
+      }
+      offset_plan = { ids: clones, baselines, delta };
+    }
     const apply = () => {
       subtree.insert_plan(doc, plan);
+      if (offset_plan) {
+        translate_pipeline.apply(doc, offset_plan, project_world_delta);
+      }
       set_selection(clones);
     };
     const revert = () => {
+      if (offset_plan) translate_pipeline.revert(doc, offset_plan);
       subtree.remove_plan(doc, plan);
       set_selection(previous_selection);
     };
@@ -2125,6 +2179,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     history.atomic("duplicate", (tx) => {
       tx.push({ providerId: PROVIDER_ID, apply, revert });
     });
+    // Arm the record AFTER the commit, OUTSIDE the closures — history
+    // replay must not re-arm a stale record.
+    active_duplication = { origins, clones };
     return clones;
   }
 
@@ -2356,6 +2413,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     mode = "select";
     tool = TOOL_CURSOR;
     history.clear();
+    active_duplication = null;
     baseline_revision = doc.revision;
     load_version++;
     emit();
@@ -2436,6 +2494,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     scope = null;
     mode = "select";
     tool = TOOL_CURSOR;
+    active_duplication = null;
     baseline_revision = doc.revision;
     emit();
   }
@@ -2695,6 +2754,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
         };
       },
       notify_translate_commit,
+      seed_duplication(record: subtree.DuplicationRecord) {
+        active_duplication = record;
+      },
       set_content_edit_driver(fn: ((target: NodeId) => boolean) | null) {
         content_edit_driver = fn;
       },

@@ -28,7 +28,9 @@
  * the explicit Tidy command's job.
  */
 
-import type { NodeId } from "../types";
+import cmath from "@grida/cmath";
+import type { NodeId, Rect, Vec2 } from "../types";
+import { array_shallow_equal } from "../util/equal";
 import type { SvgDocument } from "./document";
 
 export namespace subtree {
@@ -158,5 +160,119 @@ export namespace subtree {
    */
   export function remove_plan(doc: SvgDocument, plan: SubtreeClonePlan): void {
     for (const p of plan) doc.remove(p.clone);
+  }
+
+  /**
+   * The last committed duplication — the memory the repeating-offset
+   * behavior reads (gridaco/grida#825; spec:
+   * [docs/wg/feat-svg-editor/subtree-clone.md](../../../../docs/wg/feat-svg-editor/subtree-clone.md)
+   * §Repeating offset). Armed by `commands.duplicate` and by a cloned
+   * translate commit (Alt-drag); consumed and re-armed by the next
+   * `duplicate()`. Editor-session state — never observable, never in
+   * history. Staleness is caught at use by {@link repeat_delta}, not by
+   * per-mutation bookkeeping.
+   *
+   * The arrays are INDEX-PAIRED: `clones[i]` is the clone of
+   * `origins[i]` (both producers derive them from the same
+   * {@link SubtreeClonePlan}). {@link repeat_delta}'s per-member
+   * rigidity check depends on that pairing.
+   */
+  export type DuplicationRecord = {
+    origins: ReadonlyArray<NodeId>;
+    clones: ReadonlyArray<NodeId>;
+  };
+
+  /** Per-member rigidity tolerance for the rigid-translate witness in
+   *  {@link repeat_delta} — position drift from the shared delta, and
+   *  size drift from the origin. Generous against float noise from
+   *  re-encoded path data / `getBBox`, far below anything a user would
+   *  call a move or a resize. */
+  const REPEAT_RIGID_EPSILON = 0.01;
+
+  /**
+   * The repeating-offset delta (gridaco/grida#825): given the previous
+   * duplication's record and the CURRENT duplicate's normalized origins,
+   * return the world-space offset the fresh clones should repeat, or
+   * `null` for "no repeat — duplicate in place".
+   *
+   * The repeat fires only when the record still witnesses
+   * "duplicate, then rigidly translate the copies":
+   *   - `targets` is exactly `record.clones`, in the same (document)
+   *     order — the user is duplicating the previous duplication's
+   *     copies and nothing else;
+   *   - `bounds_of` answers for EVERY member of both sets (a detached
+   *     member, a measureless tag, or a missing geometry provider all
+   *     refuse);
+   *   - EVERY clone is rigid against its own origin (the record's
+   *     arrays are index-paired): same size, displaced by the same
+   *     delta as the union, within {@link REPEAT_RIGID_EPSILON}. The
+   *     check is per member, not per envelope — a rearranged or
+   *     resized inner copy is no longer a translate even when the
+   *     envelope-defining copies keep the union bbox intact;
+   *   - the union top-left delta exceeds the same tolerance (a copy
+   *     that never moved — or drifted by float noise only — repeats
+   *     nothing; the in-place duplicate stays byte-equal instead of
+   *     inheriting noise-sized attribute writes).
+   *
+   * Pure and gesture-grade: reads only through `bounds_of`, never
+   * throws — every failed precondition degrades to `null` (the main
+   * editor's `active_duplication` assert-on-mismatch is deliberately
+   * NOT copied; ⌘D must never crash on a stale record).
+   */
+  export function repeat_delta(
+    record: DuplicationRecord | null,
+    targets: ReadonlyArray<NodeId>,
+    bounds_of: (id: NodeId) => Rect | null
+  ): Vec2 | null {
+    if (record === null) return null;
+    if (record.origins.length === 0) return null;
+    if (record.origins.length !== record.clones.length) return null;
+    if (!array_shallow_equal(record.clones, targets)) return null;
+    const origin_bounds = collect_bounds(record.origins, bounds_of);
+    if (origin_bounds === null) return null;
+    const clone_bounds = collect_bounds(record.clones, bounds_of);
+    if (clone_bounds === null) return null;
+    const a = cmath.rect.union(origin_bounds);
+    const b = cmath.rect.union(clone_bounds);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    for (let i = 0; i < origin_bounds.length; i++) {
+      const o = origin_bounds[i];
+      const c = clone_bounds[i];
+      if (
+        Math.abs(c.x - o.x - dx) > REPEAT_RIGID_EPSILON ||
+        Math.abs(c.y - o.y - dy) > REPEAT_RIGID_EPSILON ||
+        Math.abs(c.width - o.width) > REPEAT_RIGID_EPSILON ||
+        Math.abs(c.height - o.height) > REPEAT_RIGID_EPSILON
+      ) {
+        return null;
+      }
+    }
+    // Same tolerance as the rigidity check: a sub-epsilon net delta is
+    // float noise, not a move — degrade to the byte-equal in-place
+    // duplicate rather than fabricate noise-sized attribute writes.
+    if (
+      Math.abs(dx) <= REPEAT_RIGID_EPSILON &&
+      Math.abs(dy) <= REPEAT_RIGID_EPSILON
+    ) {
+      return null;
+    }
+    return { x: dx, y: dy };
+  }
+
+  /** All-or-nothing bounds gather for {@link repeat_delta} — one
+   *  unmeasurable member and the record can't witness a rigid
+   *  translate. */
+  function collect_bounds(
+    ids: ReadonlyArray<NodeId>,
+    bounds_of: (id: NodeId) => Rect | null
+  ): Rect[] | null {
+    const out: Rect[] = [];
+    for (const id of ids) {
+      const r = bounds_of(id);
+      if (r === null) return null;
+      out.push(r);
+    }
+    return out;
   }
 }

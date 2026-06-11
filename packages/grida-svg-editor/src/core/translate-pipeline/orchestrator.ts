@@ -99,6 +99,12 @@ export type OrchestratorDeps = {
    *  wire it still gets correct document mutations; only the selection
    *  chrome lags. */
   set_selection?: (ids: ReadonlyArray<NodeId>) => void;
+  /** Arm the editor's repeating-duplicate record on a CLONED commit
+   *  (gridaco/grida#825): ⌘D after an Alt-drag clone repeats the drag
+   *  offset. Fired exactly once per cloned commit, after the history
+   *  step exists — never on preview frames or cancel. Optional — a host
+   *  without the duplicate command omits it. */
+  on_clone_commit?: (record: subtree.DuplicationRecord) => void;
 };
 
 const PROVIDER_ID = "svg-editor";
@@ -158,8 +164,22 @@ export class TranslateOrchestrator {
     }
 
     if (opts.phase === "commit") {
+      const cloned = session.clone;
       session.preview.commit();
       this.dispose_session();
+      if (cloned !== null) {
+        // Seed the repeating-duplicate memory (#825) — a cloned drag is
+        // a duplication; ⌘D right after repeats its offset. Zero-net-
+        // movement commits seed too: the delta they witness is (0,0),
+        // which the consumer treats as duplicate-in-place. Origins come
+        // from the PLAN, not `session.ids`: the record's arrays are
+        // index-paired, and the plan is normalized (document order,
+        // refusals dropped) while the at-open ids are neither.
+        this.deps.on_clone_commit?.({
+          origins: cloned.plan.map((p) => p.origin),
+          clones: cloned.ids,
+        });
+      }
     }
     return result;
   }
