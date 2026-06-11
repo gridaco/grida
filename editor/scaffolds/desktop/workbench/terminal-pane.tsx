@@ -5,8 +5,8 @@
  * Lifecycle: one PTY per mount. The workbench keeps this component
  * mounted while the panel is merely collapsed (ctrl+` toggle), so the
  * shell — and anything running in it — survives hide/show. Unmount
- * (window close, shell exit, workbench teardown) kills the PTY; there
- * is no reattach in v1.
+ * (window close, shell exit, the header's close button, workbench
+ * teardown) kills the PTY; there is no reattach in v1.
  *
  * GRIDA-SEC-004 — this is a view over the `terminal` bridge namespace
  * (`@/lib/desktop/bridge`); it never touches `window.grida` directly.
@@ -14,6 +14,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { XIcon } from "lucide-react";
+import { Button } from "@app/ui/components/button";
+import type { ITheme, Terminal as XTerminal } from "@xterm/xterm";
 import {
   terminal as bridgeTerminal,
   type Workspace,
@@ -21,11 +24,93 @@ import {
 import { isTerminalToggleEvent } from "./workspace-workbench-keybindings";
 import "@xterm/xterm/css/xterm.css";
 
+/**
+ * Resolve a shadcn theme variable (e.g. `--background`) to a concrete
+ * `#rrggbb[aa]` string. xterm paints its grid from parsed colors, so it
+ * can't take `var(...)` references — and the theme tokens are `oklch()`
+ * values that Chromium's computed styles do NOT serialize to rgb. A 1×1
+ * canvas is the one robust CSS-color-to-bytes converter the platform
+ * gives us.
+ */
+function themeColor(varName: string, alpha?: number): string | undefined {
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(varName)
+    .trim();
+  if (!raw) return undefined;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return undefined;
+  ctx.fillStyle = "#000";
+  ctx.fillStyle = raw; // invalid strings leave the previous value
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  const hex = (n: number) => n.toString(16).padStart(2, "0");
+  const base = `#${hex(r)}${hex(g)}${hex(b)}`;
+  return alpha === undefined ? base : `${base}${hex(Math.round(alpha * 255))}`;
+}
+
+/** xterm theme derived from the active shadcn tokens. ANSI palette is
+ * left to xterm's defaults; only the chrome colors follow the app. */
+function resolveXtermTheme(): ITheme {
+  return {
+    background: themeColor("--background"),
+    foreground: themeColor("--foreground"),
+    cursor: themeColor("--foreground"),
+    cursorAccent: themeColor("--background"),
+    selectionBackground: themeColor("--primary", 0.3),
+  };
+}
+
+/**
+ * Deterministic trackpad/wheel scrolling for the normal buffer.
+ *
+ * xterm 6 scrolls through VS Code's SmoothScrollableElement, which
+ * normalizes wheel events via the legacy `wheelDeltaY / 120` and rounds
+ * every event away from zero — so each tiny pixel-delta trackpad event
+ * can scroll a whole notch, and a gesture (dozens of events) rockets
+ * the scrollback (xterm.js#4412 class). That widget's listener also
+ * runs before `attachCustomWheelEventHandler` is consulted, so the fix
+ * must intercept in the CAPTURE phase: convert pixel deltas to lines
+ * exactly (with a fractional accumulator, like any native scroller) and
+ * stop the event. Alternate-screen apps (vim/less), mouse-protocol
+ * consumers (htop), pinch-zoom (ctrl+wheel), and non-pixel wheels keep
+ * xterm's own handling.
+ */
+function attachWheelFix(el: HTMLElement, term: XTerminal): () => void {
+  let acc = 0;
+  const onWheelCapture = (e: WheelEvent) => {
+    if (e.ctrlKey) return;
+    if (e.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) return;
+    if (term.buffer.active.type === "alternate") return;
+    if (term.modes.mouseTrackingMode !== "none") return;
+    e.preventDefault();
+    e.stopPropagation();
+    const screen = el.querySelector<HTMLElement>(".xterm-screen");
+    const cell = screen && term.rows > 0 ? screen.clientHeight / term.rows : 0;
+    if (cell <= 0) return;
+    acc += e.deltaY / cell;
+    const lines = Math.trunc(acc);
+    if (lines !== 0) {
+      acc -= lines;
+      term.scrollLines(lines);
+    }
+  };
+  el.addEventListener("wheel", onWheelCapture, {
+    capture: true,
+    passive: false,
+  });
+  return () =>
+    el.removeEventListener("wheel", onWheelCapture, { capture: true });
+}
+
 export type TerminalPaneProps = {
   workspace: Workspace;
   /**
-   * The shell process ended (`exit`, crash, or kill). The workbench
-   * unmounts the pane in response; the next toggle spawns a fresh shell.
+   * The terminal session is over — the shell exited (`exit`, crash,
+   * kill) or the user clicked the header's close button. The workbench
+   * unmounts the pane in response (unmount kills the PTY); the next
+   * toggle spawns a fresh shell.
    */
   onSessionEnded: () => void;
 };
@@ -55,7 +140,11 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
       ]);
       if (disposed) return;
 
-      const term = new Terminal({ fontSize: 12, cursorBlink: true });
+      const term = new Terminal({
+        fontSize: 12,
+        cursorBlink: true,
+        theme: resolveXtermTheme(),
+      });
       const fit = new FitAddon();
       term.loadAddon(fit);
       term.open(el);
@@ -63,7 +152,18 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
       // focus: tell xterm to skip the chord so the keydown bubbles up
       // to the workbench's window handler.
       term.attachCustomKeyEventHandler((e) => !isTerminalToggleEvent(e));
+      const detachWheelFix = attachWheelFix(el, term);
       fit.fit();
+
+      // Follow live theme switches (next-themes flips the `dark` class
+      // on <html>); re-resolve the tokens and hand xterm a new theme.
+      const themeObserver = new MutationObserver(() => {
+        term.options.theme = resolveXtermTheme();
+      });
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class", "style", "data-theme"],
+      });
 
       const fitAndResize = () => {
         // A collapsed panel measures 0×0; fitting then would clamp the
@@ -72,11 +172,13 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
         fit.fit();
         if (termId) void bridgeTerminal.resize(termId, term.cols, term.rows);
       };
-      const observer = new ResizeObserver(fitAndResize);
-      observer.observe(el);
+      const resizeObserver = new ResizeObserver(fitAndResize);
+      resizeObserver.observe(el);
 
       dispose = () => {
-        observer.disconnect();
+        themeObserver.disconnect();
+        resizeObserver.disconnect();
+        detachWheelFix();
         term.dispose();
       };
 
@@ -115,12 +217,29 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
 
   return (
     <div
-      ref={containerRef}
       data-testid="terminal-pane"
-      // xterm owns the inner canvas; the wrapper just reserves the box.
-      // bg matches xterm's default dark background so the padding gutter
-      // doesn't flash the app background around the grid.
-      className="h-full w-full overflow-hidden bg-black p-1"
-    />
+      className="flex h-full w-full flex-col overflow-hidden bg-background"
+    >
+      <div className="flex shrink-0 items-center border-b px-2">
+        <span className="text-xs text-muted-foreground">Terminal</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="ml-auto"
+          aria-label="Close terminal"
+          title="Close terminal"
+          // Unmount through the workbench; the unmount cleanup above is
+          // the single PTY-kill path.
+          onClick={() => onSessionEndedRef.current()}
+        >
+          <XIcon />
+        </Button>
+      </div>
+      {/* xterm owns the inner canvas; the wrapper just reserves the box.
+          The padding gutter shows the pane background, which matches the
+          themed xterm background. */}
+      <div ref={containerRef} className="min-h-0 w-full flex-1 p-1" />
+    </div>
   );
 }
