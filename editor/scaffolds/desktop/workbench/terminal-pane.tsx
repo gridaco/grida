@@ -139,6 +139,9 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
         import("@xterm/addon-fit"),
       ]);
       if (disposed) return;
+      // From here to the bridge call the failure surface is xterm
+      // itself (terminal construction and wiring) — handled by the
+      // .catch on this IIFE, since no grid exists to print into.
 
       const term = new Terminal({
         fontSize: 12,
@@ -201,6 +204,10 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
           return;
         }
         termId = id;
+        // The pane may have been resized while create() was in flight —
+        // fitAndResize skips the PTY half when termId is null — so
+        // replay the latest fitted grid to the shell.
+        void bridgeTerminal.resize(id, term.cols, term.rows);
       } catch (err) {
         term.write(
           `\r\nfailed to start terminal: ${err instanceof Error ? err.message : String(err)}\r\n`
@@ -212,7 +219,13 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
         if (termId) void bridgeTerminal.write(termId, data);
       });
       term.focus();
-    })();
+    })().catch((err) => {
+      // Import or xterm-setup failure (bridge failures are printed into
+      // the grid above). No grid exists to render the error, so log and
+      // retreat — unmounting beats leaving a dead pane open.
+      console.error("[terminal-pane] terminal startup failed:", err);
+      if (!disposed) onSessionEndedRef.current();
+    });
 
     return () => {
       disposed = true;
