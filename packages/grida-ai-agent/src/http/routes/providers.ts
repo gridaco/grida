@@ -42,6 +42,13 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
     return c.json(list);
   });
 
+  // Where the config JSON lives — the settings UI links developers to
+  // the hand-editable file (the `overrides` escape hatch lives there).
+  // Absolute paths are an accepted part of this surface (cf. workspaces).
+  app.post("/providers/endpoints/info", (c) =>
+    c.json({ path: endpoints.filePath })
+  );
+
   app.post("/providers/endpoints/set", async (c) => {
     let raw: unknown;
     try {

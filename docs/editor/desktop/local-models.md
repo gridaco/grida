@@ -53,16 +53,16 @@ detected automatically — including whether each one supports tool calls.
 
 Review the list and click **Save**:
 
-- **Detect** re-scans the endpoint — use it after you `ollama pull` a new
-  model. You can also add a model manually by id, or remove ones you
-  don't want in the picker.
-- The **context window** is detected too: for a model that is currently
-  loaded, Grida reads the size your server actually allocated; otherwise
-  it uses the model's maximum. The value stays editable — if you cap
-  your server's context (e.g. `OLLAMA_CONTEXT_LENGTH`) below a model's
-  maximum, lower it to match so long sessions summarize at the right
-  time. Manually added models default to a conservative `8192`.
-- Leave **tools** on unless you know the model cannot make tool calls.
+- Each model shows its detected **context window** and **tool-calling**
+  support as read-only badges — these come from the endpoint and refresh
+  automatically whenever you open Settings (and on **Detect**, useful
+  after you `ollama pull` a new model). For a model that is currently
+  loaded, the context window is the size your server actually allocated;
+  otherwise it is the model's maximum.
+- A model you add manually by id (for example on a gateway that doesn't
+  report capabilities) keeps editable fields instead — there, you are
+  the data source. Manually added models default to a conservative
+  `8192` context.
 
 The first model in the list is the default — background work like session
 titles and summaries also runs on it.
@@ -113,3 +113,22 @@ local gateway such as LiteLLM or vLLM works the same way: point the base
 URL at it and register the models it serves. If the gateway needs an API
 key, save the key for it under **Settings** — it is stored by the agent
 host and never shown back.
+
+## Advanced: the config file
+
+Everything on this page is stored as plain JSON in `endpoints.json` (the
+settings card links to it). Detected values refresh automatically, so
+hand-edits to them won't stick — if an endpoint reports a value that is
+wrong for your setup (for example, your server caps context below the
+model's maximum), pin the correction in the model's `overrides` instead.
+Overrides always win over detected values, and detection never touches
+them:
+
+```json
+{
+  "id": "gemma4:31b-mlx",
+  "tool_call": true,
+  "contextWindow": 262144,
+  "overrides": { "contextWindow": 32768 }
+}
+```

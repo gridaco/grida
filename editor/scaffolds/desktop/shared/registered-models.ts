@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import _models from "@grida/ai-models";
+import { resolveEndpointModels } from "@grida/agent";
 import {
   providers,
   type EndpointModelSpec,
@@ -19,11 +20,12 @@ import {
 } from "@/lib/desktop/bridge";
 
 export namespace registered_models {
-  /** Flatten endpoint configs into the registry's custom-spec list. */
+  /** Flatten endpoint configs into the registry's custom-spec list —
+   *  OVERRIDE-RESOLVED, mirroring the host's `registeredModels()`. */
   export function specs(
     endpoints: readonly EndpointProviderConfig[]
   ): EndpointModelSpec[] {
-    return endpoints.flatMap((endpoint) => endpoint.models);
+    return endpoints.flatMap((endpoint) => resolveEndpointModels(endpoint));
   }
 
   /** Resolve a model id over catalog ∪ registered (normalized defaults). */

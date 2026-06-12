@@ -20,9 +20,10 @@ import {
   OLLAMA_ENDPOINT_PRESET,
   app,
   providers,
+  resolveEndpointModel,
   secrets,
   type ByokProviderId,
-  type EndpointModelSpec,
+  type EndpointModelEntry,
   type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
 import {
@@ -308,6 +309,82 @@ function LocalModelsSection() {
   const [probing, setProbing] = useState(false);
   const [probeNote, setProbeNote] = useState<string | null>(null);
 
+  /**
+   * Discover the endpoint's models (agent-host-side fetch of Ollama's
+   * `/api/tags` + `/api/ps`/`/api/show`, or a generic `/models`) and
+   * refresh the DETECTED fields. Detection owns the top-level
+   * `tool_call`/`contextWindow` on each entry — the probe overwrites
+   * them freely; human corrections live in `overrides` (hand-edited
+   * JSON, or the inputs shown when detection has nothing) and are never
+   * touched here.
+   *
+   * `persist: true` (an already-saved config) writes the refreshed
+   * config straight back — detected facts aren't a user choice, so they
+   * don't sit in an unsaved draft. The setup flow passes `false` and
+   * keeps the explicit Save.
+   */
+  const detectInto = useCallback(
+    async (base: EndpointProviderConfig, opts: { persist: boolean }) => {
+      setProbing(true);
+      setProbeNote(null);
+      try {
+        const result = await providers.probeEndpoint(base.base_url);
+        const probedById = new Map(result.models.map((m) => [m.id, m]));
+        let changed = 0;
+        const existing = base.models.map((m): EndpointModelEntry => {
+          const probed = probedById.get(m.id);
+          if (!probed) return m;
+          const next: EndpointModelEntry = {
+            ...m,
+            // Detected fields: probe wins when it reports; a silent
+            // probe (generic gateway) keeps the previous detection.
+            tool_call: probed.tool_call ?? m.tool_call,
+            contextWindow: probed.contextWindow ?? m.contextWindow,
+          };
+          if (
+            next.contextWindow !== m.contextWindow ||
+            next.tool_call !== m.tool_call
+          ) {
+            changed += 1;
+          }
+          return next;
+        });
+        const known = new Set(base.models.map((m) => m.id));
+        const discovered = result.models
+          .filter((m) => !known.has(m.id))
+          .map(
+            (m): EndpointModelEntry => ({
+              id: m.id,
+              tool_call: m.tool_call,
+              contextWindow: m.contextWindow,
+            })
+          );
+        setProbeNote(
+          discovered.length > 0
+            ? `Found ${discovered.length} model${discovered.length === 1 ? "" : "s"}.`
+            : changed > 0
+              ? "Updated model details."
+              : "No new models found."
+        );
+        if (discovered.length === 0 && changed === 0) return;
+        const next = { ...base, models: [...existing, ...discovered] };
+        if (opts.persist) {
+          await providers.setEndpoint(next);
+          setState({ kind: "ready", draft: next, dirty: false });
+        } else {
+          setState({ kind: "ready", draft: next, dirty: true });
+        }
+      } catch (err) {
+        setProbeNote(
+          `Couldn't reach the endpoint (${describeError(err)}) — add models manually.`
+        );
+      } finally {
+        setProbing(false);
+      }
+    },
+    []
+  );
+
   const refresh = useCallback(async () => {
     if (!providers.isSupported()) {
       setState({ kind: "unsupported" });
@@ -317,10 +394,14 @@ function LocalModelsSection() {
       const list = await providers.listEndpoints();
       const ollama = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
       setState({ kind: "ready", draft: ollama ?? null, dirty: false });
+      // Detected values converge to the server's truth on every visit —
+      // notably /api/ps starts reporting a model's REAL allocation once
+      // it has been loaded. Fire-and-forget; failures only leave a note.
+      if (ollama) void detectInto(ollama, { persist: true });
     } catch (err) {
       setState({ kind: "error", message: describeError(err), draft: null });
     }
-  }, []);
+  }, [detectInto]);
 
   useEffect(() => {
     void refresh();
@@ -337,80 +418,13 @@ function LocalModelsSection() {
     setState({ kind: "saving", draft });
     try {
       await providers.setEndpoint(draft);
-      await refresh();
+      const list = await providers.listEndpoints();
+      const saved = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
+      setState({ kind: "ready", draft: saved ?? null, dirty: false });
     } catch (err) {
       setState({ kind: "error", message: describeError(err), draft });
     }
-  }, [draft, refresh]);
-
-  /**
-   * Discover the endpoint's installed models (agent-host-side fetch of
-   * Ollama's `/api/tags` + `/api/ps`/`/api/show` for context windows,
-   * or a generic `/models`) and merge the new ids into the draft.
-   * Existing rows keep their user-set fields. Detected context windows
-   * stay editable — a server explicitly capped below a model's maximum
-   * only reports the cap once the model is loaded.
-   */
-  const detectInto = useCallback(async (base: EndpointProviderConfig) => {
-    setProbing(true);
-    setProbeNote(null);
-    try {
-      const result = await providers.probeEndpoint(base.base_url);
-      const probedById = new Map(result.models.map((m) => [m.id, m]));
-      // Existing rows: fill gaps from the probe, never clobber a value
-      // the user already set.
-      let backfilled = 0;
-      const existing = base.models.map((m): EndpointModelSpec => {
-        const probed = probedById.get(m.id);
-        if (!probed) return m;
-        const next: EndpointModelSpec = {
-          ...m,
-          tool_call:
-            m.tool_call ?? (probed.tool_call === false ? false : undefined),
-          contextWindow: m.contextWindow ?? probed.contextWindow,
-        };
-        if (
-          next.contextWindow !== m.contextWindow ||
-          next.tool_call !== m.tool_call
-        ) {
-          backfilled += 1;
-        }
-        return next;
-      });
-      const known = new Set(base.models.map((m) => m.id));
-      const discovered = result.models
-        .filter((m) => !known.has(m.id))
-        .map(
-          (m): EndpointModelSpec => ({
-            id: m.id,
-            // Only an explicit "no tools" from the endpoint lands in
-            // config; true/unknown rides the permissive default.
-            tool_call: m.tool_call === false ? false : undefined,
-            contextWindow: m.contextWindow,
-          })
-        );
-      setProbeNote(
-        discovered.length > 0
-          ? `Found ${discovered.length} model${discovered.length === 1 ? "" : "s"}.`
-          : backfilled > 0
-            ? "Updated model details."
-            : "No new models found."
-      );
-      if (discovered.length > 0 || backfilled > 0) {
-        setState({
-          kind: "ready",
-          draft: { ...base, models: [...existing, ...discovered] },
-          dirty: true,
-        });
-      }
-    } catch (err) {
-      setProbeNote(
-        `Couldn't reach the endpoint (${describeError(err)}) — add models manually.`
-      );
-    } finally {
-      setProbing(false);
-    }
-  }, []);
+  }, [draft]);
 
   const handleEnable = useCallback(() => {
     const base: EndpointProviderConfig = {
@@ -419,8 +433,9 @@ function LocalModelsSection() {
     };
     setState({ kind: "ready", draft: base, dirty: true });
     // Prefill from the running Ollama right away — the common path is
-    // "models already pulled; nothing to type".
-    void detectInto(base);
+    // "models already pulled; nothing to type". Not persisted until the
+    // user confirms with Save (the config doesn't exist yet).
+    void detectInto(base, { persist: false });
   }, [detectInto]);
 
   const handleRemove = useCallback(async () => {
@@ -513,7 +528,7 @@ function LocalModelsSection() {
                   variant="outline"
                   size="sm"
                   disabled={probing || state.kind === "saving"}
-                  onClick={() => void detectInto(draft)}
+                  onClick={() => void detectInto(draft, { persist: false })}
                 >
                   {probing ? <Loader2 className="size-4 animate-spin" /> : null}
                   Detect
@@ -614,57 +629,117 @@ function LocalModelsSection() {
             {state.message} (click to retry)
           </button>
         )}
+
+        {draft && providers.canRevealConfigFile() && (
+          <p className="text-xs text-muted-foreground">
+            Stored as plain JSON — detected values refresh automatically; to pin
+            a value the endpoint reports wrong, set <code>overrides</code> in{" "}
+            <button
+              type="button"
+              className="underline underline-offset-4 hover:text-foreground"
+              onClick={() => void providers.revealConfigFile()}
+            >
+              endpoints.json
+            </button>
+            .
+          </p>
+        )}
       </CardContent>
     </Card>
   );
 }
 
+const compactTokens = new Intl.NumberFormat("en-US", { notation: "compact" });
+
 /**
- * One registered model: id (fixed once added), context window, and the
- * tool-calling flag. The context window default is conservative (8k) —
- * overflowing a local model's real window kills the session, so users
- * raise it only when they know their serving config.
+ * One registered model. Detection owns the capability fields: a value
+ * the endpoint reported renders as a read-only badge (no input over
+ * discoverable truth — a hand-typed snapshot only rots). Inputs appear
+ * ONLY where detection has nothing (manual adds, ids-only gateways);
+ * they write to `overrides`, the sticky human slot a probe refresh
+ * never touches.
  */
 function LocalModelRow({
   model,
   onChange,
   onRemove,
 }: {
-  model: EndpointModelSpec;
-  onChange: (next: EndpointModelSpec) => void;
+  model: EndpointModelEntry;
+  onChange: (next: EndpointModelEntry) => void;
   onRemove: () => void;
 }) {
+  const resolved = resolveEndpointModel(model);
+  const ctxOverridden = model.overrides?.contextWindow !== undefined;
+  const toolsOverridden = model.overrides?.tool_call !== undefined;
+
   return (
     <div className="flex items-center gap-2 rounded-md border px-3 py-2">
       <span className="flex-1 truncate font-mono text-xs">{model.id}</span>
-      <Input
-        className="h-8 w-28 text-xs"
-        type="number"
-        min={1024}
-        step={1024}
-        value={model.contextWindow ?? ""}
-        onChange={(e) => {
-          const value = e.target.valueAsNumber;
-          onChange({
-            ...model,
-            contextWindow: Number.isFinite(value)
-              ? Math.max(1, Math.floor(value))
-              : undefined,
-          });
-        }}
-        placeholder="ctx (8192)"
-        aria-label="Context window (tokens)"
-      />
-      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Switch
-          checked={model.tool_call ?? true}
-          onCheckedChange={(checked) =>
-            onChange({ ...model, tool_call: checked })
+
+      {model.contextWindow !== undefined ? (
+        <span
+          className="shrink-0 rounded-md bg-secondary px-2 py-1 font-mono text-xs tabular-nums text-muted-foreground"
+          title={
+            ctxOverridden
+              ? "Context window (manual override from endpoints.json)"
+              : "Context window (detected from the endpoint)"
           }
-          aria-label="Supports tool calls"
+        >
+          {compactTokens.format(resolved.contextWindow ?? model.contextWindow)}{" "}
+          ctx
+          {ctxOverridden ? " ·m" : ""}
+        </span>
+      ) : (
+        <Input
+          className="h-8 w-28 text-xs"
+          type="number"
+          min={1024}
+          step={1024}
+          value={model.overrides?.contextWindow ?? ""}
+          onChange={(e) => {
+            const value = e.target.valueAsNumber;
+            onChange({
+              ...model,
+              overrides: {
+                ...model.overrides,
+                contextWindow: Number.isFinite(value)
+                  ? Math.max(1, Math.floor(value))
+                  : undefined,
+              },
+            });
+          }}
+          placeholder="ctx (8192)"
+          aria-label="Context window (tokens)"
         />
-        tools
-      </label>
+      )}
+
+      {model.tool_call !== undefined ? (
+        <span
+          className="shrink-0 rounded-md bg-secondary px-2 py-1 text-xs text-muted-foreground"
+          title={
+            toolsOverridden
+              ? "Tool-calling (manual override from endpoints.json)"
+              : "Tool-calling (detected from the endpoint)"
+          }
+        >
+          {(resolved.tool_call ?? true) ? "tools" : "no tools"}
+        </span>
+      ) : (
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Switch
+            checked={resolved.tool_call ?? true}
+            onCheckedChange={(checked) =>
+              onChange({
+                ...model,
+                overrides: { ...model.overrides, tool_call: checked },
+              })
+            }
+            aria-label="Supports tool calls"
+          />
+          tools
+        </label>
+      )}
+
       <Button
         variant="ghost"
         size="icon-sm"

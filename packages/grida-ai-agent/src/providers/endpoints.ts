@@ -19,6 +19,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  resolveEndpointModels,
   validateEndpointProviderConfig,
   type EndpointModelSpec,
   type EndpointProviderConfig,
@@ -35,6 +36,12 @@ export class EndpointProvidersStore {
 
   constructor(userDataPath: string) {
     this.file_path = path.join(userDataPath, FILE_NAME);
+  }
+
+  /** Absolute path of the backing JSON — surfaced so the settings UI can
+   *  point developers at the hand-editable file (overrides live there). */
+  get filePath(): string {
+    return this.file_path;
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -105,13 +112,15 @@ export class EndpointProvidersStore {
   }
 
   /**
-   * Every model registered across all endpoints — the custom half of the
-   * model-registry seam (`models.text.registry.resolve(id, THIS)`).
-   * Consumers: the run-input model gate, compaction limits, multimodal/
-   * tool_call capability checks.
+   * Every model registered across all endpoints, OVERRIDE-RESOLVED —
+   * the custom half of the model-registry seam
+   * (`models.text.registry.resolve(id, THIS)`). Consumers: the run-input
+   * model gate, compaction limits, multimodal/tool_call capability
+   * checks — all of them must see the effective values, never the raw
+   * detected fields.
    */
   async registeredModels(): Promise<EndpointModelSpec[]> {
     await this.ensureLoaded();
-    return this.entries.flatMap((e) => e.models);
+    return this.entries.flatMap((e) => resolveEndpointModels(e));
   }
 }

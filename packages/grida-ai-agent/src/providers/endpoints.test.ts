@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import {
   OLLAMA_ENDPOINT_PRESET,
   isValidEndpointProviderId,
+  resolveEndpointModel,
   validateEndpointProviderConfig,
   type EndpointProviderConfig,
 } from "../protocol/endpoints";
@@ -84,6 +85,46 @@ describe("validateEndpointProviderConfig", () => {
     expect(result.config.models[0]).not.toHaveProperty("evil");
   });
 
+  it("accepts overrides and resolves them over detected values", () => {
+    const result = validateEndpointProviderConfig({
+      ...OLLAMA,
+      models: [
+        {
+          id: "m",
+          tool_call: true,
+          contextWindow: 262_144,
+          overrides: { contextWindow: 32_768, junk: true },
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const entry = result.config.models[0];
+    // Stored shape keeps both halves; unknown override keys are dropped.
+    expect(entry.contextWindow).toBe(262_144);
+    expect(entry.overrides).toEqual({ contextWindow: 32_768 });
+    // Resolution: override wins, untouched fields fall through.
+    const resolved = resolveEndpointModel(entry);
+    expect(resolved.contextWindow).toBe(32_768);
+    expect(resolved.tool_call).toBe(true);
+    expect(resolved).not.toHaveProperty("overrides");
+  });
+
+  it("rejects malformed overrides", () => {
+    expect(
+      validateEndpointProviderConfig({
+        ...OLLAMA,
+        models: [{ id: "m", overrides: { contextWindow: -5 } }],
+      }).ok
+    ).toBe(false);
+    expect(
+      validateEndpointProviderConfig({
+        ...OLLAMA,
+        models: [{ id: "m", overrides: "nope" }],
+      }).ok
+    ).toBe(false);
+  });
+
   it("rejects out-of-range numeric limits", () => {
     expect(
       validateEndpointProviderConfig({
@@ -127,6 +168,21 @@ describe("EndpointProvidersStore", () => {
     await store.set(OLLAMA);
     await store.set({ ...OLLAMA, models: [{ id: "only-one" }] });
     expect(await store.registeredModels()).toHaveLength(1);
+  });
+
+  it("registeredModels applies overrides — every registry consumer sees effective values", async () => {
+    await store.set({
+      ...OLLAMA,
+      models: [
+        {
+          id: "capped:31b",
+          contextWindow: 262_144,
+          overrides: { contextWindow: 32_768 },
+        },
+      ],
+    });
+    const models = await store.registeredModels();
+    expect(models[0].contextWindow).toBe(32_768);
   });
 
   it("delete is idempotent", async () => {
@@ -177,6 +233,13 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
       headers: { "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+
+  it("info reports the config file path", async () => {
+    const res = await post("/providers/endpoints/info");
+    expect(res.status).toBe(200);
+    const { path: configPath } = (await res.json()) as { path: string };
+    expect(configPath.endsWith("endpoints.json")).toBe(true);
+  });
 
   it("set → list → delete round-trips", async () => {
     const set = await post("/providers/endpoints/set", { config: OLLAMA });

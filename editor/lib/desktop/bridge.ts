@@ -22,6 +22,8 @@ import {
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
   OLLAMA_ENDPOINT_PRESET,
+  resolveEndpointModel,
+  resolveEndpointModels,
   type AgentMode,
   type AgentUIMessageChunk,
   type AgentRunOptions,
@@ -29,6 +31,8 @@ import {
   type ChatMessageWithParts,
   type ChatSessionRow,
   type CreateSessionOptions,
+  type EndpointModelEntry,
+  type EndpointModelOverrides,
   type EndpointModelSpec,
   type EndpointProviderConfig,
   type ProbedEndpointModel,
@@ -63,6 +67,10 @@ export {
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
   OLLAMA_ENDPOINT_PRESET,
+  resolveEndpointModel,
+  resolveEndpointModels,
+  type EndpointModelEntry,
+  type EndpointModelOverrides,
   type EndpointModelSpec,
   type EndpointProviderConfig,
   type ProbedEndpointModel,
@@ -360,6 +368,26 @@ export namespace providers {
     const bridge = bridgeOrThrow().providers;
     if (!bridge?.probe_endpoint) throw new DesktopBridgeMissingError();
     return await bridge.probe_endpoint(baseUrl);
+  }
+
+  /**
+   * Reveal `endpoints.json` (the hand-editable config — `overrides` for
+   * power users live there) in the OS file manager. Returns `false` when
+   * the surface isn't available (old binary, or the web daemon bridge
+   * which has no native shell) — callers hide the affordance.
+   */
+  export async function revealConfigFile(): Promise<boolean> {
+    const bridge = getDesktopBridge();
+    if (!bridge?.providers?.info || !bridge.caps.native.shell) return false;
+    const { path } = await bridge.providers.info();
+    await bridge.shell.show_item_in_folder(path);
+    return true;
+  }
+
+  /** Whether {@link revealConfigFile} can work in this host. */
+  export function canRevealConfigFile(): boolean {
+    const bridge = getDesktopBridge();
+    return Boolean(bridge?.providers?.info && bridge.caps.native.shell);
   }
 
   /**

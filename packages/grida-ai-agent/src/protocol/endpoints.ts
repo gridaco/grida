@@ -20,9 +20,34 @@
 import type { models } from "@grida/ai-models";
 import { BYOK_PROVIDER_IDS } from "./provider-ids";
 
-/** A model registered on an endpoint — `@grida/ai-models`' open-registry
- *  custom spec (cost optional, capability flags explicit). */
+/** A model spec consumable by the open registry — `@grida/ai-models`'
+ *  custom spec (cost optional, capability flags explicit). This is the
+ *  RESOLVED shape; the stored shape is {@link EndpointModelEntry}. */
 export type EndpointModelSpec = models.text.registry.CustomModelSpec;
+
+/**
+ * Sticky human corrections for a model entry. Detection refresh NEVER
+ * writes these — they exist for the "the endpoint reports a wrong value"
+ * case and are set by hand-editing `endpoints.json` (or by the settings
+ * inputs shown when detection has nothing). Resolution order:
+ * override → detected → registry default.
+ */
+export type EndpointModelOverrides = Pick<
+  EndpointModelSpec,
+  "contextWindow" | "tool_call" | "multimodal"
+>;
+
+/**
+ * A model as STORED on an endpoint config. The top-level capability
+ * fields (`tool_call`, `contextWindow`, `multimodal`) are
+ * detection-owned: probe refresh overwrites them freely. Human
+ * corrections live in {@link EndpointModelOverrides} so a refresh can
+ * never clobber them. Resolve with {@link resolveEndpointModel} before
+ * feeding the registry.
+ */
+export type EndpointModelEntry = EndpointModelSpec & {
+  overrides?: EndpointModelOverrides;
+};
 
 /**
  * A user-configured OpenAI-compatible endpoint provider.
@@ -38,8 +63,8 @@ export type EndpointProviderConfig = {
   label?: string;
   /** OpenAI-compatible base URL, e.g. `http://localhost:11434/v1`. */
   base_url: string;
-  /** Models this endpoint serves, as registered by the user. */
-  models: EndpointModelSpec[];
+  /** Models this endpoint serves. */
+  models: EndpointModelEntry[];
   /**
    * The model every tier resolves to when a run doesn't pick an explicit
    * model (the agent's tier→catalog map is meaningless to a local
@@ -48,6 +73,28 @@ export type EndpointProviderConfig = {
    */
   default_model_id?: string;
 };
+
+/** Apply {@link EndpointModelOverrides} onto the detected fields —
+ *  override → detected (→ registry default downstream). */
+export function resolveEndpointModel(
+  entry: EndpointModelEntry
+): EndpointModelSpec {
+  const { overrides, ...detected } = entry;
+  return {
+    ...detected,
+    contextWindow: overrides?.contextWindow ?? detected.contextWindow,
+    tool_call: overrides?.tool_call ?? detected.tool_call,
+    multimodal: overrides?.multimodal ?? detected.multimodal,
+  };
+}
+
+/** All of an endpoint's models, override-resolved — the custom half of
+ *  the model-registry seam. */
+export function resolveEndpointModels(
+  config: EndpointProviderConfig
+): EndpointModelSpec[] {
+  return config.models.map(resolveEndpointModel);
+}
 
 /**
  * The Ollama preset — the "no signup, no key" path. `ollama serve`
@@ -153,16 +200,16 @@ export function validateEndpointProviderConfig(
   if (!Array.isArray(c.models) || c.models.length > MAX_MODELS) {
     return { ok: false, error: `models must be an array of ≤ ${MAX_MODELS}` };
   }
-  const modelSpecs: EndpointModelSpec[] = [];
+  const modelSpecs: EndpointModelEntry[] = [];
   const seen = new Set<string>();
   for (const m of c.models) {
-    const validated = validateModelSpec(m);
+    const validated = validateModelEntry(m);
     if (!validated.ok) return validated;
-    if (seen.has(validated.spec.id)) {
-      return { ok: false, error: `duplicate model id: ${validated.spec.id}` };
+    if (seen.has(validated.entry.id)) {
+      return { ok: false, error: `duplicate model id: ${validated.entry.id}` };
     }
-    seen.add(validated.spec.id);
-    modelSpecs.push(validated.spec);
+    seen.add(validated.entry.id);
+    modelSpecs.push(validated.entry);
   }
 
   let defaultModelId: string | undefined;
@@ -191,11 +238,11 @@ export function validateEndpointProviderConfig(
   };
 }
 
-type ModelSpecValidation =
-  | { ok: true; spec: EndpointModelSpec }
+type ModelEntryValidation =
+  | { ok: true; entry: EndpointModelEntry }
   | { ok: false; error: string };
 
-function validateModelSpec(raw: unknown): ModelSpecValidation {
+function validateModelEntry(raw: unknown): ModelEntryValidation {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return { ok: false, error: "model must be an object" };
   }
@@ -219,13 +266,59 @@ function validateModelSpec(raw: unknown): ModelSpecValidation {
       error: `model label must be a string ≤ ${MAX_LABEL_LEN}`,
     };
   }
+  const flags = validateCapabilityFields(m, "model");
+  if (!flags.ok) return flags;
+
+  let overrides: EndpointModelOverrides | undefined;
+  if (m.overrides !== undefined) {
+    if (
+      !m.overrides ||
+      typeof m.overrides !== "object" ||
+      Array.isArray(m.overrides)
+    ) {
+      return { ok: false, error: "model overrides must be an object" };
+    }
+    const o = m.overrides as Record<string, unknown>;
+    const oFlags = validateCapabilityFields(o, "model overrides");
+    if (!oFlags.ok) return oFlags;
+    overrides = {
+      multimodal: o.multimodal as boolean | undefined,
+      tool_call: o.tool_call as boolean | undefined,
+      contextWindow: o.contextWindow as number | undefined,
+    };
+    if (Object.values(overrides).every((v) => v === undefined)) {
+      overrides = undefined;
+    }
+  }
+
+  return {
+    ok: true,
+    entry: {
+      id: m.id,
+      label: typeof m.label === "string" && m.label ? m.label : undefined,
+      multimodal: m.multimodal as boolean | undefined,
+      tool_call: m.tool_call as boolean | undefined,
+      contextWindow: m.contextWindow as number | undefined,
+      outputLimit: m.outputLimit as number | undefined,
+      overrides,
+      // cost is intentionally not accepted from config input: a local/
+      // self-hosted model is unmetered on this rail, and a user-supplied
+      // price card would feed cost UI with invented numbers.
+    },
+  };
+}
+
+function validateCapabilityFields(
+  source: Record<string, unknown>,
+  scope: string
+): { ok: true } | { ok: false; error: string } {
   for (const flag of ["multimodal", "tool_call"] as const) {
-    if (m[flag] !== undefined && typeof m[flag] !== "boolean") {
-      return { ok: false, error: `model ${flag} must be a boolean` };
+    if (source[flag] !== undefined && typeof source[flag] !== "boolean") {
+      return { ok: false, error: `${scope} ${flag} must be a boolean` };
     }
   }
   for (const limit of ["contextWindow", "outputLimit"] as const) {
-    const value = m[limit];
+    const value = source[limit];
     if (value === undefined) continue;
     if (
       typeof value !== "number" ||
@@ -233,21 +326,11 @@ function validateModelSpec(raw: unknown): ModelSpecValidation {
       value <= 0 ||
       value > MAX_TOKEN_LIMIT
     ) {
-      return { ok: false, error: `model ${limit} must be a positive integer` };
+      return {
+        ok: false,
+        error: `${scope} ${limit} must be a positive integer`,
+      };
     }
   }
-  return {
-    ok: true,
-    spec: {
-      id: m.id,
-      label: typeof m.label === "string" && m.label ? m.label : undefined,
-      multimodal: m.multimodal as boolean | undefined,
-      tool_call: m.tool_call as boolean | undefined,
-      contextWindow: m.contextWindow as number | undefined,
-      outputLimit: m.outputLimit as number | undefined,
-      // cost is intentionally not accepted from config input: a local/
-      // self-hosted model is unmetered on this rail, and a user-supplied
-      // price card would feed cost UI with invented numbers.
-    },
-  };
+  return { ok: true };
 }

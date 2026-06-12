@@ -245,6 +245,8 @@ export type DesktopBridge = {
     list_endpoints: () => Promise<EndpointProviderConfig[]>;
     set_endpoint: (config: EndpointProviderConfig) => Promise<void>;
     delete_endpoint: (id: string) => Promise<void>;
+    /** Where the endpoint config JSON lives (the hand-editable file). */
+    info: () => Promise<{ path: string }>;
     /** Discover the models an endpoint serves (agent-host-side fetch —
      *  the renderer's origin can't reach a local Ollama directly). */
     probe_endpoint: (baseUrl: string) => Promise<{

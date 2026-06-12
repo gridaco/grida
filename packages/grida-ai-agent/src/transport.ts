@@ -422,6 +422,9 @@ export namespace AgentTransport {
       delete_endpoint: async (id: string): Promise<void> => {
         await this.postJson<unknown>("/providers/endpoints/delete", { id });
       },
+      /** Where the endpoint config JSON lives on disk. */
+      info: async (): Promise<{ path: string }> =>
+        await this.postJson<{ path: string }>("/providers/endpoints/info"),
       /** Discover the models an endpoint serves (host-side fetch). */
       probe_endpoint: async (
         baseUrl: string

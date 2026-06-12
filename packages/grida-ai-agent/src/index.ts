@@ -11,7 +11,11 @@ export {
 export {
   OLLAMA_ENDPOINT_PRESET,
   isValidEndpointProviderId,
+  resolveEndpointModel,
+  resolveEndpointModels,
   validateEndpointProviderConfig,
+  type EndpointModelEntry,
+  type EndpointModelOverrides,
   type EndpointModelSpec,
   type EndpointProviderConfig,
   type ProbedEndpointModel,
