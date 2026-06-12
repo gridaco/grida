@@ -79,11 +79,13 @@ export namespace color {
       const gray = (white / (white + black)) * 255;
       return [gray, gray, gray];
     }
+    // c' = c·(1−w−b) + w, scaled to the 0-255 range (CSS Color 4 §8).
+    const k = 1 - white - black;
     const rgb = hslToRGB255(h, 100, 50);
     return [
-      (rgb[0] / 255) * (1 - white - black) * 255 + white * 255,
-      (rgb[1] / 255) * (1 - white - black) * 255 + white * 255,
-      (rgb[2] / 255) * (1 - white - black) * 255 + white * 255,
+      rgb[0] * k + white * 255,
+      rgb[1] * k + white * 255,
+      rgb[2] * k + white * 255,
     ];
   }
 
@@ -192,25 +194,12 @@ export namespace color {
   }
 
   export namespace colorformats {
-    /**
-     * Clamps a value between 0.0 and 1.0.
-     *
-     * @param t - The value to clamp.
-     * @returns The clamped value.
-     */
-    function f32(t: number): number {
-      return t <= 0 ? 0 : t >= 1 ? 1 : t;
-    }
+    /** Clamps to [0.0, 1.0] — alias of the namespace-level {@link clamp01}. */
+    const f32 = clamp01;
 
-    /**
-     * Clamps a value between 0 and 255.
-     *
-     * @param value - The value to clamp.
-     * @returns The clamped value.
-     */
-    function u8(value: number): number {
-      return value <= 0 ? 0 : value >= 255 ? 255 : Math.round(value);
-    }
+    /** Clamps to [0, 255] and rounds — alias of the namespace-level
+     *  {@link clamp255}. */
+    const u8 = clamp255;
 
     function u8ToF32(value: number): number {
       return value / 255;
