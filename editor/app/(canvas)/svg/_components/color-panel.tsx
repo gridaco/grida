@@ -63,7 +63,13 @@ function classify(value: PaintValue): PaintShape {
       return { kind: "none" };
     case "color":
       if (c.value.kind === "rgb") {
-        return { kind: "solid", hex: normalizeToHex(c.value.value) };
+        // The computed channel canonicalizes resolvable solids to hex;
+        // literals the editor preserves verbatim (oklch(), lab(), …)
+        // are NOT hex-editable — show them read-only instead of a fake
+        // black swatch.
+        const hex = kolor.resolveHEX(c.value.value)?.slice(0, 7);
+        if (hex) return { kind: "solid", hex };
+        return { kind: "nonsolid", label: c.value.value };
       }
       return { kind: "nonsolid", label: "currentColor" };
     case "ref":
@@ -284,17 +290,6 @@ function NoneSwatch({ className }: { className?: string }) {
       )}
     />
   );
-}
-
-/**
- * Normalize an arbitrary CSS color string to a `#rrggbb` hex (alpha dropped —
- * the solid picker is opaque). `@grida/color`'s resolver covers hex,
- * `rgb()/rgba()`, `hsl()/hsla()`, `hwb()`, and the full CSS named-color set;
- * falls back to black for non-colors (`none` / `currentColor`) or anything
- * it refuses (`lab()` / `oklch()` / garbage).
- */
-function normalizeToHex(value: string): string {
-  return kolor.resolveHEX(value)?.slice(0, 7) ?? "#000000";
 }
 
 /**

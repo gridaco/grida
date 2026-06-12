@@ -318,6 +318,8 @@ function use_lifecycle_session<
   deps: React.DependencyList
 ): {
   ensure(): S;
+  /** Non-creating read: is a gesture currently open underneath? */
+  live(): boolean;
   finalize(action: "commit" | "discard", commit: (s: S) => void): void;
 } {
   const sessionRef = useRef<S | null>(null);
@@ -331,6 +333,10 @@ function use_lifecycle_session<
         if (sessionRef.current?.live === false) sessionRef.current = null;
         if (!sessionRef.current) sessionRef.current = open();
         return sessionRef.current;
+      },
+      /** Non-creating read: is a gesture currently open underneath? */
+      live(): boolean {
+        return sessionRef.current?.live === true;
       },
       finalize(action: "commit" | "discard", commit: (s: S) => void): void {
         const s = sessionRef.current;
@@ -364,9 +370,12 @@ export function usePaintPreview(
   );
   return useMemo<PaintPreviewSession>(
     () => ({
-      // The hook facade lazily (re)opens its underlying session — from
-      // the host's perspective it is always usable.
-      live: true,
+      // Reports whether a gesture is open underneath RIGHT NOW. The
+      // facade itself stays usable regardless — `update()` lazily
+      // (re)opens a fresh session when the previous one ended.
+      get live() {
+        return lc.live();
+      },
       update: (paint: Paint) => lc.ensure().update(paint),
       commit: () => lc.finalize("commit", (s) => s.commit()),
       discard: () => lc.finalize("discard", () => {}),
@@ -384,9 +393,11 @@ export function usePropertyPreview(name: string): PreviewSession {
   );
   return useMemo<PreviewSession>(
     () => ({
-      // Same as usePaintPreview: the facade reopens lazily, so it is
-      // always usable.
-      live: true,
+      // Same as usePaintPreview: live reads the underlying session;
+      // the facade itself reopens lazily on update().
+      get live() {
+        return lc.live();
+      },
       update: (value: string) => lc.ensure().update(value),
       commit: () => lc.finalize("commit", (s) => s.commit()),
       discard: () => lc.finalize("discard", () => {}),
