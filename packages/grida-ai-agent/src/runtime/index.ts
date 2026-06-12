@@ -19,7 +19,6 @@
 import crypto from "node:crypto";
 import { AGENT_SESSION_AGENT } from "../protocol/run";
 import { AGENT_DEFAULT_MODE } from "../protocol/mode";
-import type { ByokProviderId } from "../protocol/provider-ids";
 import {
   resolveProvider,
   ProviderUnavailableError,
@@ -28,13 +27,14 @@ import {
 import { createRecorderConsumer } from "../session/recorder";
 import { titler } from "../session/titler";
 import type { SessionsStore } from "../session/store";
-import type { MessageUsage } from "../session/rows";
+import type { ChatModel, MessageUsage } from "../session/rows";
 import {
   DEFAULT_COMPACTION_CONFIG,
   compactSession,
   resolveModelLimits,
   shouldCompact,
   type CompactionConfig,
+  type ResolveModelLimits,
 } from "../session/compaction";
 import type { compactor } from "../session/compactor";
 import { discoverSkills } from "../skills/discovery";
@@ -80,7 +80,7 @@ type SessionContext = {
 async function resolveOrCreateSession(
   store: SessionsStore,
   req: RunRequest,
-  provider: { provider_id: ByokProviderId }
+  provider: { provider_id: string }
 ): Promise<string | Response> {
   if (req.session_id) {
     const existing = await store.get(req.session_id);
@@ -470,6 +470,54 @@ export class AgentRuntime {
   }
 
   /**
+   * Registry-aware model-limits resolver (issue #806): resolves over
+   * catalog ∪ registered endpoint models, and substitutes an endpoint
+   * session's missing `model_id` with the endpoint's default model — a
+   * tier-only Ollama session must NOT fall back to the catalog tier's
+   * frontier-sized window (1M assumed on an 8k model ⇒ compaction never
+   * fires ⇒ the session dies on context overflow).
+   */
+  private async limitsResolver(): Promise<ResolveModelLimits> {
+    const endpoints = this.deps.endpoints;
+    if (!endpoints) return (model) => resolveModelLimits(model);
+    const [custom, configs] = await Promise.all([
+      endpoints.registeredModels(),
+      endpoints.list(),
+    ]);
+    return (model: ChatModel | null) => {
+      let effective = model;
+      if (model?.provider_id && !model.model_id) {
+        const endpoint = configs.find((e) => e.id === model.provider_id);
+        const defaultId = endpoint?.default_model_id ?? endpoint?.models[0]?.id;
+        if (defaultId) effective = { ...model, model_id: defaultId };
+      }
+      return resolveModelLimits(effective, custom);
+    };
+  }
+
+  /**
+   * The summarizer's input cap for a session (issue #806). The compactor
+   * subagent asks for the `nano` tier, but an endpoint factory maps every
+   * tier to the endpoint's default model — so when the session runs on a
+   * configured endpoint, the cap must be that model's window, not the
+   * catalog nano model's. `undefined` keeps the compaction default.
+   */
+  private async summarizerInputCap(
+    model: ChatModel | null,
+    resolveLimits: ResolveModelLimits
+  ): Promise<number | undefined> {
+    const providerId = model?.provider_id;
+    if (!providerId || !this.deps.endpoints) return undefined;
+    const endpoint = await this.deps.endpoints.get(providerId);
+    if (!endpoint) return undefined;
+    // Limits of the endpoint's DEFAULT model (what `nano` resolves to):
+    // a model_id-less ChatModel routes through the resolver's default-
+    // model substitution above. Reserve room for the summary output.
+    const limits = resolveLimits({ provider_id: providerId });
+    return Math.max(1_024, limits.context_window - 4_096);
+  }
+
+  /**
    * Fire auto-compaction when the session is at/over its usable context
    * (RFC `session / compaction`). Blocks the turn on the summarizer — by
    * design, the next user message waits rather than overflowing. Failures
@@ -484,7 +532,8 @@ export class AgentRuntime {
     if (!this.compaction_enabled) return;
     const session = await this.deps.sessions_store.get(sessionId);
     if (!session) return;
-    const limits = resolveModelLimits(session.model);
+    const resolveLimits = await this.limitsResolver();
+    const limits = resolveLimits(session.model);
     if (!shouldCompact(session.total_tokens, limits, this.compaction_config)) {
       return;
     }
@@ -494,12 +543,17 @@ export class AgentRuntime {
           store: this.deps.sessions_store,
           model_factory: modelFactory,
           summarize: this.compaction_summarize,
+          resolve_limits: resolveLimits,
         },
         {
           session_id: sessionId,
           auto: true,
           config: this.compaction_config,
           signal,
+          summarizer_input_cap: await this.summarizerInputCap(
+            session.model,
+            resolveLimits
+          ),
         }
       );
     } catch (err) {
@@ -997,13 +1051,23 @@ export class AgentRuntime {
       }
       throw err;
     }
+    const resolveLimits = await this.limitsResolver();
     const result = await compactSession(
       {
         store: this.deps.sessions_store,
         model_factory: provider.model_factory,
         summarize: this.compaction_summarize,
+        resolve_limits: resolveLimits,
       },
-      { session_id: sessionId, auto: false, config: this.compaction_config }
+      {
+        session_id: sessionId,
+        auto: false,
+        config: this.compaction_config,
+        summarizer_input_cap: await this.summarizerInputCap(
+          session.model,
+          resolveLimits
+        ),
+      }
     );
     return Response.json(result);
   }

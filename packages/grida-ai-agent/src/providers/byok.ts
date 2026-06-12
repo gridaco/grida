@@ -36,3 +36,28 @@ export function makeVercelFactory(apiKey: string): ModelFactory {
   const provider = createGateway({ apiKey });
   return (tier, modelId) => provider(modelId ?? MODEL_BY_TIER[tier]);
 }
+
+/**
+ * Factory for a user-configured OpenAI-compatible endpoint (issue #806) —
+ * Ollama, LiteLLM, vLLM, any self-hosted gateway. The "no signup" trick
+ * is that `api_key` is OPTIONAL: when absent (Ollama) no Authorization
+ * header is sent, and that is not an error.
+ *
+ * Tier mapping: EVERY tier resolves to the endpoint's default model. The
+ * catalog's tier→id table (`anthropic/claude-…`) is meaningless to a
+ * local endpoint, and background subagents (titler, compactor) resolve
+ * tiers too — they must land on a model this endpoint actually serves.
+ */
+export function makeEndpointFactory(config: {
+  id: string;
+  base_url: string;
+  api_key?: string;
+  default_model_id: string;
+}): ModelFactory {
+  const provider = createOpenAICompatible({
+    name: config.id,
+    baseURL: config.base_url,
+    apiKey: config.api_key,
+  });
+  return (_tier, modelId) => provider(modelId ?? config.default_model_id);
+}

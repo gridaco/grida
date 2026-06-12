@@ -9,6 +9,13 @@ export {
   type ByokProviderId,
 } from "./protocol/provider-ids";
 export {
+  OLLAMA_ENDPOINT_PRESET,
+  isValidEndpointProviderId,
+  validateEndpointProviderConfig,
+  type EndpointModelSpec,
+  type EndpointProviderConfig,
+} from "./protocol/endpoints";
+export {
   AGENT_SERVER_PROTOCOL,
   AGENT_SERVER_DEFAULT_CAPABILITIES,
   type AgentServerCapabilities,

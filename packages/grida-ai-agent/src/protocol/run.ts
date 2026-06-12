@@ -24,7 +24,13 @@ export const AGENT_SESSION_AGENT = "grida" as const;
  */
 export const GRIDA_SESSION_SSE_EVENT = "grida-session" as const;
 
-export type AgentModelId = models.text.CatalogId;
+/**
+ * A runnable model id: a catalog id, or a user-registered model id served
+ * by a configured endpoint provider (issue #806 — e.g. `llama3.1:8b` on
+ * Ollama). Open on the wire; the run-input boundary validates against
+ * catalog ∪ registered ids, so an arbitrary string still 400s.
+ */
+export type AgentModelId = models.text.CatalogId | (string & {});
 
 export type AgentRunMessagePart = {
   type: string;
@@ -64,7 +70,12 @@ export type AgentRunOptions = {
    * the one `tier` would resolve to.
    */
   model_id?: AgentModelId;
-  provider_id?: ByokProviderId;
+  /**
+   * Explicit provider pick: a BYOK provider id or a configured endpoint
+   * provider id (issue #806). Validated server-side against the allowed
+   * set; an unknown id 400s.
+   */
+  provider_id?: ByokProviderId | (string & {});
   feature?: string;
   workspace_id?: string;
   skills?: readonly SkillId[];

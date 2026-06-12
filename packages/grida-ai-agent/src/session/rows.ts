@@ -14,7 +14,8 @@ import type { AgentMode } from "../protocol/mode";
 import type { ModelTier } from "../tiers";
 
 export type ChatModel = {
-  provider_id: ByokProviderId;
+  /** A BYOK provider id or a configured endpoint provider id (#806). */
+  provider_id: ByokProviderId | (string & {});
   tier?: ModelTier;
   model_id?: AgentModelId;
 };

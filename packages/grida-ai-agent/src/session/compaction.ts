@@ -67,12 +67,27 @@ export type ModelLimits = {
   output_limit: number;
 };
 
-/** Resolve a session's model limits from the catalog. Falls back to the
- *  default tier when the model can't be resolved. */
-export function resolveModelLimits(model: ChatModel | null): ModelLimits {
-  let spec = model?.model_id
-    ? models.text.modelSpecById(model.model_id)
-    : undefined;
+/** A model-limits resolver. The default ({@link resolveModelLimits} with
+ *  no custom list) only knows the static catalog; hosts with registered
+ *  endpoint models inject a registry-aware one (see `AgentRuntime`). */
+export type ResolveModelLimits = (model: ChatModel | null) => ModelLimits;
+
+/**
+ * Resolve a session's model limits over catalog ∪ `custom` (the open-
+ * registry seam, issue #806). Falls back to the default tier when the
+ * model can't be resolved — note this fallback assumes a frontier-sized
+ * window, which is why registered local models MUST resolve through
+ * `custom` rather than land here (an 8k local model treated as 1M never
+ * compacts and dies on context overflow).
+ */
+export function resolveModelLimits(
+  model: ChatModel | null,
+  custom?: readonly models.text.registry.CustomModelSpec[]
+): ModelLimits {
+  let spec: { contextWindow: number; outputLimit: number } | undefined =
+    model?.model_id
+      ? models.text.registry.resolve(model.model_id, custom)
+      : undefined;
   if (!spec && model?.tier) spec = models.text.byTier[model.tier];
   if (!spec) spec = models.text.byTier.pro;
   return { context_window: spec.contextWindow, output_limit: spec.outputLimit };
@@ -204,6 +219,10 @@ export type CompactionDeps = {
   model_factory: ModelFactory;
   /** Injected summarizer (defaults to the real `compactor.summarize`). */
   summarize?: compactor.Summarize;
+  /** Injected model-limits resolver (defaults to the catalog-only
+   *  {@link resolveModelLimits}). Hosts with registered endpoint models
+   *  inject a registry-aware one so local-model windows resolve real. */
+  resolve_limits?: ResolveModelLimits;
   /** Warning sink. Defaults to console.warn. */
   on_warn?: (message: string) => void;
 };
@@ -256,7 +275,7 @@ export async function compactSession(
 
   const session = await deps.store.get(opts.session_id);
   if (!session) return { compacted: false, reason: "session-not-found" };
-  const limits = resolveModelLimits(session.model);
+  const limits = (deps.resolve_limits ?? resolveModelLimits)(session.model);
 
   const messages = await deps.store.listVisibleMessages(opts.session_id);
 

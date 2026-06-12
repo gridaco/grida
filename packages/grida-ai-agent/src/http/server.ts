@@ -12,6 +12,7 @@ import {
 import { registerFilesRoutes } from "./routes/files";
 import { registerRecentRoutes } from "./routes/recent";
 import { registerSecretsRoutes } from "./routes/secrets";
+import { registerProvidersRoutes } from "./routes/providers";
 import { registerAgentRoutes } from "./routes/agent";
 import { registerWorkspacesRoutes } from "./routes/workspaces";
 import { registerSessionsRoutes } from "./routes/sessions";
@@ -19,6 +20,7 @@ import { FileRegistry } from "../files/registry";
 import { RecentStore } from "../files/recent";
 import { AuthStore } from "../auth/file";
 import { SecretsStore } from "../secrets";
+import { EndpointProvidersStore } from "../providers/endpoints";
 import { WorkspaceRegistry } from "../workspaces";
 import { openSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
@@ -118,6 +120,9 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   const workspaceRegistry = new WorkspaceRegistry(opts.user_data_path);
   const authStore = new AuthStore(opts.user_data_path);
   const secretsStore = new SecretsStore(authStore);
+  // Endpoint provider configs (issue #806): plain config beside the
+  // secrets store, persisted at ${userData}/endpoints.json.
+  const endpointsStore = new EndpointProvidersStore(opts.user_data_path);
   // Chat sessions: SQLite at ${userData}/sessions.db. Opened once per
   // agent-host launch and closed via the returned cleanup. WAL mode in
   // sessions/db.ts lets a CLI inspector read concurrently.
@@ -135,7 +140,11 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   if (opts.capabilities.secrets) {
     registerSecretsRoutes(app, {
       store: secretsStore,
+      endpoints: endpointsStore,
     });
+  }
+  if (opts.capabilities.providers) {
+    registerProvidersRoutes(app, { endpoints: endpointsStore });
   }
   // Agent runtime owns the run loop + the in-flight stream registry.
   // `opts.streamRegistry` is undefined for direct callers (the runtime
@@ -156,6 +165,7 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   }
   const runtime = new AgentRuntime({
     secrets: secretsStore,
+    endpoints: endpointsStore,
     workspace_registry: workspaceRegistry,
     sessions_store: sessionsStore,
     streams: opts.stream_registry,

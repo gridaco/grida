@@ -38,6 +38,7 @@ import type {
   WorkspaceReadFileResult,
   WorkspaceWriteFileResult,
 } from "./protocol/resources";
+import type { EndpointProviderConfig } from "./protocol/endpoints";
 
 function base64(value: string): string {
   const g = globalThis as unknown as {
@@ -402,6 +403,21 @@ export namespace AgentTransport {
         await this.postJson<unknown>("/secrets/delete", {
           provider_id: providerId,
         });
+      },
+    } as const;
+
+    readonly providers = {
+      /** Endpoint provider configs (issue #806) — readable plain config,
+       *  unlike secrets. */
+      list_endpoints: async (): Promise<EndpointProviderConfig[]> =>
+        await this.postJson<EndpointProviderConfig[]>(
+          "/providers/endpoints/list"
+        ),
+      set_endpoint: async (config: EndpointProviderConfig): Promise<void> => {
+        await this.postJson<unknown>("/providers/endpoints/set", { config });
+      },
+      delete_endpoint: async (id: string): Promise<void> => {
+        await this.postJson<unknown>("/providers/endpoints/delete", { id });
       },
     } as const;
 

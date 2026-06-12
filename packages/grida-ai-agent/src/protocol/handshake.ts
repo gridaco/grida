@@ -11,6 +11,12 @@ export type AgentServerCapabilities = {
   agent: boolean;
   workspaces: boolean;
   sessions: boolean;
+  /**
+   * `/providers/endpoints/*` — endpoint provider config CRUD (issue
+   * #806). Optional so older host-supplied capability shapes stay valid;
+   * clients treat a missing flag as "not served".
+   */
+  providers?: boolean;
   /** Reserved for future `/shell/*` route group; always `false` in V1. */
   shell: boolean;
 };
@@ -24,6 +30,7 @@ export const AGENT_SERVER_DEFAULT_CAPABILITIES: AgentServerCapabilities = {
   agent: true,
   workspaces: true,
   sessions: true,
+  providers: true,
   shell: false,
 };
 

@@ -20,16 +20,13 @@ import {
   type AgentMode,
 } from "../protocol/mode";
 import { AGENT_DEFAULT_TIER, AGENT_TIERS, type ModelTier } from "../tiers";
-import {
-  BYOK_PROVIDER_IDS,
-  type ByokProviderId,
-} from "../protocol/provider-ids";
+import { BYOK_PROVIDER_IDS } from "../protocol/provider-ids";
 import type { SessionsStore } from "../session/store";
 import type { WorkspaceRegistry } from "../workspaces";
+import type { EndpointProvidersStore } from "../providers/endpoints";
 
-const ALLOWED_PROVIDER_IDS = new Set<string>(BYOK_PROVIDER_IDS);
 const ALLOWED_TIERS = new Set<string>(AGENT_TIERS);
-const ALLOWED_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
+const CATALOG_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
 const ALLOWED_ROLES = new Set<string>(["user", "assistant", "system"]);
 const ALLOWED_SKILL_IDS = new Set<string>(AGENT_SKILL_IDS);
 
@@ -42,9 +39,11 @@ export type NormalizedMessage = {
 export type RunRequest = {
   messages: NormalizedMessage[];
   tier: ModelTier;
-  /** Explicit catalog model id; overrides the tier→model mapping. */
+  /** Explicit model id (catalog or registered); overrides the tier→model
+   *  mapping. */
   model_id?: AgentModelId;
-  explicit?: ByokProviderId;
+  /** Explicit provider pick: BYOK id or configured endpoint id. */
+  explicit?: string;
   feature?: string;
   workspace_id?: string;
   workspace_root?: string;
@@ -58,6 +57,9 @@ export type RunRequest = {
 
 export type ParseRunBodyDeps = {
   workspace_registry: WorkspaceRegistry;
+  /** Endpoint provider configs (issue #806). When present, registered
+   *  model ids and endpoint provider ids join the allowed sets. */
+  endpoints?: EndpointProvidersStore;
 };
 
 export async function parseRunBody(
@@ -92,7 +94,14 @@ export async function parseRunBody(
       : AGENT_DEFAULT_TIER;
   let modelId: AgentModelId | undefined;
   if (b.model_id !== undefined) {
-    if (typeof b.model_id !== "string" || !ALLOWED_MODEL_IDS.has(b.model_id)) {
+    // Allowed model ids = static catalog ∪ user-registered endpoint
+    // models (the open-registry seam, issue #806). Still a closed gate:
+    // an id neither table knows 400s.
+    const allowed =
+      typeof b.model_id === "string" &&
+      (CATALOG_MODEL_IDS.has(b.model_id) ||
+        (await isRegisteredModelId(b.model_id, deps)));
+    if (!allowed) {
       return Response.json(
         { error: `modelId not allowed: ${String(b.model_id)}` },
         { status: 400 }
@@ -100,18 +109,20 @@ export async function parseRunBody(
     }
     modelId = b.model_id as AgentModelId;
   }
-  let explicit: ByokProviderId | undefined;
+  let explicit: string | undefined;
   if (b.provider_id !== undefined) {
-    if (
-      typeof b.provider_id !== "string" ||
-      !ALLOWED_PROVIDER_IDS.has(b.provider_id)
-    ) {
+    const providerId = typeof b.provider_id === "string" ? b.provider_id : "";
+    const allowed =
+      providerId.length > 0 &&
+      ((BYOK_PROVIDER_IDS as readonly string[]).includes(providerId) ||
+        (await deps.endpoints?.get(providerId)) != null);
+    if (!allowed) {
       return Response.json(
         { error: `providerId not allowed: ${String(b.provider_id)}` },
         { status: 400 }
       );
     }
-    explicit = b.provider_id as ByokProviderId;
+    explicit = providerId;
   }
   let workspaceId: string | undefined;
   let workspaceRoot: string | undefined;
@@ -157,6 +168,15 @@ export async function parseRunBody(
         ? b.session_id
         : undefined,
   };
+}
+
+async function isRegisteredModelId(
+  modelId: string,
+  deps: ParseRunBodyDeps
+): Promise<boolean> {
+  if (!deps.endpoints) return false;
+  const registered = await deps.endpoints.registeredModels();
+  return registered.some((m) => m.id === modelId);
 }
 
 /**
