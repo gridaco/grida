@@ -330,6 +330,65 @@ describe("History", () => {
     });
   });
 
+  describe("clear()", () => {
+    it("discards active previews — previewed delta is reverted, later commit()/discard() on the session throws per Preview semantics", () => {
+      const h = new HistoryImpl();
+      const c = { value: 0 };
+
+      const preview = h.preview("adjust");
+      preview.set({
+        providerId: "test",
+        apply: () => {
+          c.value = 99;
+        },
+        revert: () => {
+          c.value = 0;
+        },
+      });
+      expect(c.value).toBe(99);
+      expect(preview.state).toBe("active");
+
+      h.clear();
+
+      // in-flight delta reverted (Invariant 3, same as undo/redo)
+      expect(c.value).toBe(0);
+      // session sealed — liveness via preview.state is accurate
+      expect(preview.state).toBe("discarded");
+      // commit() on the sealed session throws and pushes nothing
+      expect(() => preview.commit()).toThrow(/Cannot commit discarded preview/);
+      expect(h.stack.canUndo).toBe(false);
+      expect(h.stack.pastCount).toBe(0);
+      // discard() on the sealed session likewise throws
+      expect(() => preview.discard()).toThrow(
+        /Cannot discard discarded preview/
+      );
+    });
+
+    it("discards all active previews, leaves already-sealed sessions untouched", () => {
+      const h = new HistoryImpl();
+      const a = { value: 0 };
+      const b = { value: 0 };
+
+      const p1 = h.preview("a");
+      p1.set(counterDelta(a, 1)); // set() applies → a.value = 1
+      const p2 = h.preview("b");
+      p2.set(counterDelta(b, 2)); // set() applies → b.value = 2
+
+      // p2 commits before clear — it is sealed and on the stack
+      p2.commit();
+      expect(h.stack.pastCount).toBe(1);
+
+      h.clear();
+
+      // active p1 reverted + sealed; committed p2 state unchanged
+      expect(a.value).toBe(0);
+      expect(p1.state).toBe("discarded");
+      expect(p2.state).toBe("committed");
+      expect(b.value).toBe(2); // committed result is not reverted by clear()
+      expect(h.stack.pastCount).toBe(0);
+    });
+  });
+
   describe("clearsFuture", () => {
     it("default: commit clears future", async () => {
       const h = new HistoryImpl();
