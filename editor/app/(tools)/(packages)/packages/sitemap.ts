@@ -1,33 +1,12 @@
 import type { MetadataRoute } from "next";
+import { packages } from "./data";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://grida.co/packages";
+  const baseUrl = "https://grida.co";
 
-  return [
-    {
-      url: `${baseUrl}/@grida/refig`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/@grida/ruler`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/@grida/transparency-grid`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/@grida/tree-view`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/@grida/pixel-grid`,
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-  ];
+  return packages.map((pkg) => ({
+    url: `${baseUrl}${pkg.demoPath}`,
+    changeFrequency: "monthly",
+    priority: 0.8,
+  }));
 }

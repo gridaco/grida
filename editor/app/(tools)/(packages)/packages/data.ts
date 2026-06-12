@@ -94,6 +94,22 @@ export const packages = [
     ],
   },
   {
+    name: "@grida/number-input",
+    description:
+      "Headless React hooks for editor-grade number inputs — the input behaviors of the Grida editor's properties panel. Typed parsing, step precision, commit safety, mixed-value state, unit suffixes with display scaling, scrub gestures, snapping sliders, and hex color input.",
+    demoPath: "/packages/@grida/number-input",
+    npm: true,
+    features: [
+      "Commit vs change separation (set/delta outcomes)",
+      "Mixed-value state for multi-selection editing",
+      "Unit suffix + display scale (0.5 ↔ 50%)",
+      "Step-aware precision, float artifact cleanup",
+      "Drag-to-scrub labels with pointer lock",
+      "Mark-snapping slider values (Radix-compatible)",
+      "Hex color input — fuzzy parse, alpha extraction, channel stepping",
+    ],
+  },
+  {
     name: "@grida/pixel-grid",
     description:
       "A React component for rendering pixel-perfect grids in infinite canvas applications. This package provides a flexible and performant way to display grid patterns with zoom and pan capabilities.",

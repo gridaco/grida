@@ -83,6 +83,11 @@ Public pages belong in `editor/app/sitemap.ts`.
 - Use `priority: 1` only for the homepage.
 - Match `changeFrequency` to actual update cadence.
 - When adding a new public page, always add a sitemap entry.
+- Sitemaps are split per route group (root, `/packages`, `/library`, …). A
+  new `sitemap.ts` is invisible to crawlers until it's added as a `Sitemap:`
+  line in `editor/app/robots.txt` — non-root sitemaps are not auto-discovered.
+- Prefer deriving sitemap entries from the page's data source (see
+  `packages/sitemap.ts`) over hand-maintained URL lists, which drift.
 
 ### Google Image Search
 
