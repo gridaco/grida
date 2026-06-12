@@ -54,6 +54,30 @@ function scale_path_d(
   }
 }
 
+/**
+ * `dispatch_resize`'s write surface as data: the attribute names each
+ * handler may write, by tag. Capture-side snapshots (the resize
+ * pipeline's `baseline.raw`) are built from this list so revert can
+ * restore exactly what a handler may touch — when a handler starts
+ * writing a new attribute, extend this table or undo will silently
+ * miss it. Cross-checked against the live handlers by
+ * `__tests__/resize-snapshot-coverage.test.ts`.
+ */
+export const RESIZE_WRITE_ATTRS: Readonly<
+  Record<string, ReadonlyArray<string>>
+> = {
+  rect: ["x", "y", "width", "height"],
+  image: ["x", "y", "width", "height"],
+  use: ["x", "y", "width", "height"],
+  circle: ["cx", "cy", "r"],
+  ellipse: ["cx", "cy", "rx", "ry"],
+  line: ["x1", "y1", "x2", "y2"],
+  polyline: ["points"],
+  polygon: ["points"],
+  path: ["d"],
+  text: ["x", "y", "font-size"],
+};
+
 // ─── Per-class handlers ─────────────────────────────────────────────────────
 
 /**

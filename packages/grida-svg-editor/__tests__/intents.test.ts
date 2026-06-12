@@ -142,6 +142,7 @@ describe("compute_resize_factors", () => {
   const baseline = {
     bbox: { x: 0, y: 0, width: 100, height: 50 },
     attrs: { kind: "rect" as const, x: 0, y: 0, w: 100, h: 50 },
+    raw: [],
   };
 
   it("se drag scales positive from nw anchor", () => {

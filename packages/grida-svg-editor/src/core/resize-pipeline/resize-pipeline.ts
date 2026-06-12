@@ -28,7 +28,10 @@ import type { NodeId, Rect } from "../../types";
 import type { SvgDocument } from "../document";
 import { hit_shape_svg } from "../hit-shape-svg";
 import { transform, type TransformOp } from "../transform";
-import { dispatch_resize } from "../policy-class/handlers/resize";
+import {
+  dispatch_resize,
+  RESIZE_WRITE_ATTRS,
+} from "../policy-class/handlers/resize";
 import { resize_capability } from "../resize-capability";
 import type { SnapSession } from "../snap";
 
@@ -49,9 +52,21 @@ export type ResizeAttrs =
   | { kind: "text"; x: number; y: number; fontSize: number }
   | { kind: "unsupported" };
 
+/** Exact pre-gesture attribute strings — one entry per attribute a
+ *  resize may write on the captured tag (per-tag geometry set plus
+ *  `transform`, which commit-phase pivot renormalization rewrites).
+ *  `null` = the attribute was absent. `intent.restore` writes these
+ *  back verbatim so revert is byte-exact and independent of handler
+ *  gesture semantics. */
+export type ResizeRawAttrs = ReadonlyArray<{
+  readonly name: string;
+  readonly value: string | null;
+}>;
+
 export type ResizeBaseline = {
   bbox: Rect;
   attrs: ResizeAttrs;
+  raw: ResizeRawAttrs;
 };
 
 /** Input to the pipeline. `dx` / `dy` are in **world space** (root-SVG
@@ -131,6 +146,16 @@ export namespace resize_pipeline {
       fallback = 0
     ): number {
       return svg_parse.parse_number(doc.get_attr(id, name), fallback);
+    }
+
+    /** Attribute names a resize gesture may write for `tag`: the
+     *  handler write surface (`RESIZE_WRITE_ATTRS`, owned next to the
+     *  handlers) plus `transform` — the pipeline's own write
+     *  (commit-phase `renormalize_rotate_pivot`). Drives the
+     *  `baseline.raw` snapshot that `restore` writes back. */
+    function writable_attrs(tag: string): ReadonlyArray<string> {
+      const handler_writes = RESIZE_WRITE_ATTRS[tag];
+      return handler_writes ? [...handler_writes, "transform"] : [];
     }
 
     export function is_resizable(tag: string): boolean {
@@ -238,7 +263,30 @@ export namespace resize_pipeline {
         default:
           attrs = { kind: "unsupported" };
       }
-      return { bbox, attrs };
+      const raw = writable_attrs(tag).map((name) => ({
+        name,
+        value: doc.get_attr(id, name),
+      }));
+      return { bbox, attrs, raw };
+    }
+
+    /**
+     * Restore an element to its exact pre-gesture state by writing the
+     * `baseline.raw` snapshot back verbatim (`null` removes the attr).
+     *
+     * Deliberately NOT `apply(..., 1, 1, ...)`: handlers may refuse
+     * gesture shapes (text refuses non-corner input), so an identity
+     * re-application routes the restore through those refusal arms and
+     * silently no-ops — nor can any identity-scale write recover the
+     * commit-phase `transform` rewrite. Mirrors
+     * `translate_pipeline.intent.revert`'s exact-attr restore.
+     */
+    export function restore(
+      doc: SvgDocument,
+      id: NodeId,
+      baseline: ResizeBaseline
+    ): void {
+      for (const a of baseline.raw) doc.set_attr(id, a.name, a.value);
     }
 
     export function compute_factors(
@@ -826,18 +874,9 @@ export namespace resize_pipeline {
   }
 
   export function revert(doc: SvgDocument, plan: ResizePlan): void {
-    const f = intent.compute_factors(
-      plan.baseline,
-      plan.direction,
-      0,
-      0,
-      false
-    );
     const members = plan.members ?? [{ id: plan.id, baseline: plan.baseline }];
     for (const m of members) {
-      // "preview" — revert restores baseline geometry; the transform
-      // was never touched during preview, so no recomposition is owed.
-      intent.apply(doc, m.id, m.baseline, 1, 1, f.origin, "preview");
+      intent.restore(doc, m.id, m.baseline);
     }
   }
 
@@ -872,6 +911,10 @@ export namespace resize_pipeline {
         w: union.width,
         h: union.height,
       },
+      // Math carrier only — never bound to a real node, so there is
+      // nothing to snapshot or restore. `apply`/`revert` always run
+      // against each member's own captured baseline.
+      raw: [],
     };
   }
 }

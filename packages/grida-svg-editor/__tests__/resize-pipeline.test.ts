@@ -21,6 +21,7 @@ function rect_baseline(x = 0, y = 0, w = 100, h = 50): ResizeBaseline {
   return {
     bbox: { x, y, width: w, height: h },
     attrs: { kind: "rect", x, y, w, h },
+    raw: [],
   };
 }
 
@@ -28,6 +29,7 @@ function circle_baseline(cx = 50, cy = 50, r = 25): ResizeBaseline {
   return {
     bbox: { x: cx - r, y: cy - r, width: r * 2, height: r * 2 },
     attrs: { kind: "circle", cx, cy, r },
+    raw: [],
   };
 }
 
@@ -35,6 +37,7 @@ function text_baseline_at(x: number, y: number): ResizeBaseline {
   return {
     bbox: { x, y, width: 100, height: 20 },
     attrs: { kind: "text", x, y, fontSize: 16 },
+    raw: [],
   };
 }
 
