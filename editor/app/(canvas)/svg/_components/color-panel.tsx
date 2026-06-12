@@ -109,12 +109,11 @@ export function PaintRow({
   const pickerHex = isSolid ? shape.hex : "#000000";
 
   // A discrete paint choice — a preset swatch, "none", or a committed hex —
-  // is an absolute, atomic write. The editor supersedes any in-flight
-  // picker-drag preview on the same channel (see `PreviewSession`), so the
-  // popover's close-time `preview.commit()` cannot replay a stale dragged
-  // value over this write. The explicit `discard()` is defensive only.
+  // is an absolute, atomic write. No manual discard needed: the editor
+  // supersedes any in-flight picker-drag preview on the same channel (see
+  // `PreviewSession`), so the popover's close-time `preview.commit()`
+  // cannot replay a stale dragged value over this write.
   const commitPaint = (paint: Paint) => {
-    preview.discard();
     onSetPaint(paint);
   };
 
@@ -289,20 +288,13 @@ function NoneSwatch({ className }: { className?: string }) {
 
 /**
  * Normalize an arbitrary CSS color string to a `#rrggbb` hex (alpha dropped —
- * the solid picker is opaque). Delegates parsing to `@grida/color`, which
- * covers hex, `rgb()/rgba()`, and the full CSS named-color set; falls back to
- * black for non-colors (`none` / `currentColor`) or anything unparseable.
+ * the solid picker is opaque). `@grida/color`'s resolver covers hex,
+ * `rgb()/rgba()`, `hsl()/hsla()`, `hwb()`, and the full CSS named-color set;
+ * falls back to black for non-colors (`none` / `currentColor`) or anything
+ * it refuses (`lab()` / `oklch()` / garbage).
  */
 function normalizeToHex(value: string): string {
-  const v = value?.trim().toLowerCase();
-  if (!v || v === "none" || v === "currentcolor") return "#000000";
-  const { values } = kolor.parse(v);
-  if (values.length < 3) return "#000000";
-  const ch = (n: number) =>
-    Math.max(0, Math.min(255, Math.round(n)))
-      .toString(16)
-      .padStart(2, "0");
-  return `#${ch(values[0])}${ch(values[1])}${ch(values[2])}`;
+  return kolor.resolveHEX(value ?? "")?.slice(0, 7) ?? "#000000";
 }
 
 /**

@@ -266,14 +266,6 @@ export type DomSurfaceOptions = {
 };
 
 /**
- * Surface handle for the DOM surface. Extends the editor's core
- * `SurfaceHandle` with the viewport-scoped concerns: pan/zoom (`camera`)
- * and pointer/wheel/keyboard gesture bindings (`gestures`).
- *
- * Camera + gestures are **surface-scoped**: detaching the surface drops
- * both. They never appear on the headless `SvgEditor`.
- */
-/**
  * Host-extendable attention scope — public via `handle.attention`.
  *
  * The document-level keymap (undo / redo / delete / tool keys) is gated on
@@ -297,6 +289,15 @@ export type AttentionScope = {
   remove(element: Element): void;
 };
 
+/**
+ * Surface handle for the DOM surface. Extends the editor's core
+ * `SurfaceHandle` with the viewport-scoped concerns: pan/zoom (`camera`),
+ * pointer/wheel/keyboard gesture bindings (`gestures`), and the
+ * host-extendable attention scope (`attention`).
+ *
+ * Camera, gestures, and attention are **surface-scoped**: detaching the
+ * surface drops all three. They never appear on the headless `SvgEditor`.
+ */
 export type DomSurfaceHandle = SurfaceHandle & {
   camera: Camera;
   gestures: Gestures;

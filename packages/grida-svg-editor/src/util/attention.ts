@@ -106,10 +106,11 @@ export function create_attention_tracker(
    *  onto overlapping registered chrome — `leave` and `enter` firing in
    *  either order — never reads as a gap in attention. */
   const hovered = new Set<Element>();
-  /** Registered extras → their listener pair, for exact removal. */
-  const extras = new Map<Element, { enter: () => void; leave: () => void }>();
+  /** Registered extras → their hover-tracking teardown. */
+  const extras = new Map<Element, () => void>();
 
-  const track = (element: Element) => {
+  /** Start hover-tracking `element`; returns the exact undo. */
+  const track = (element: Element): (() => void) => {
     const enter = () => {
       hovered.add(element);
     };
@@ -120,18 +121,16 @@ export function create_attention_tracker(
     // so we get a single transition per actual boundary crossing.
     element.addEventListener("pointerenter", enter);
     element.addEventListener("pointerleave", leave);
-    return { enter, leave };
-  };
-  const untrack = (
-    element: Element,
-    listeners: { enter: () => void; leave: () => void }
-  ) => {
-    element.removeEventListener("pointerenter", listeners.enter);
-    element.removeEventListener("pointerleave", listeners.leave);
-    hovered.delete(element);
+    return () => {
+      element.removeEventListener("pointerenter", enter);
+      element.removeEventListener("pointerleave", leave);
+      // The element may go away mid-hover (popover unmounting under the
+      // cursor) — its pointerleave will never fire, so drop the latch.
+      hovered.delete(element);
+    };
   };
 
-  const container_listeners = track(container);
+  const untrack_container = track(container);
 
   const is_focus_within = (): boolean => {
     const owner = container.ownerDocument;
@@ -160,14 +159,14 @@ export function create_attention_tracker(
       extras.set(element, track(element));
     },
     remove: (element: Element) => {
-      const listeners = extras.get(element);
-      if (!listeners) return;
+      const untrack = extras.get(element);
+      if (!untrack) return;
       extras.delete(element);
-      untrack(element, listeners);
+      untrack();
     },
     dispose: () => {
-      untrack(container, container_listeners);
-      for (const [element, listeners] of extras) untrack(element, listeners);
+      untrack_container();
+      for (const untrack of extras.values()) untrack();
       extras.clear();
     },
   };

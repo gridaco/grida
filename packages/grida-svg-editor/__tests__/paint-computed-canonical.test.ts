@@ -14,12 +14,12 @@ import { describe, expect, it } from "vitest";
 import { createSvgEditor } from "../src/index";
 import { paint } from "../src/core/paint";
 import type { Paint } from "../src/types";
+import { first_rect } from "./_helpers";
 
 function computed_of(fill: string) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg"><rect width="5" height="5" fill="${fill}"/></svg>`;
   const editor = createSvgEditor({ svg });
-  const rect = [...editor.tree().nodes.values()].find((n) => n.tag === "rect")!;
-  return editor.node_paint(rect.id, "fill");
+  return editor.node_paint(first_rect(editor), "fill");
 }
 
 function solid_hex(p: ReturnType<typeof computed_of>["computed"]): string {
@@ -66,10 +66,7 @@ describe("computed solid paint is canonical lowercase hex", () => {
   it("an unedited document serializes byte-equal — canonicalization never touches the file", () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg"><rect width="5" height="5" fill="RED"/></svg>`;
     const editor = createSvgEditor({ svg });
-    const rect = [...editor.tree().nodes.values()].find(
-      (n) => n.tag === "rect"
-    )!;
-    editor.node_paint(rect.id, "fill"); // force the computed read
+    editor.node_paint(first_rect(editor), "fill"); // force the computed read
     expect(editor.serialize()).toBe(svg);
   });
 
