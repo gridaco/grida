@@ -18,7 +18,7 @@
  */
 
 import type { models } from "@grida/ai-models";
-import { BYOK_PROVIDER_IDS } from "./provider-ids";
+import { isByokProviderId } from "./provider-ids";
 
 /** A model spec consumable by the open registry — `@grida/ai-models`'
  *  custom spec (cost optional, capability flags explicit). This is the
@@ -97,6 +97,20 @@ export function resolveEndpointModels(
 }
 
 /**
+ * The model a model_id-less run on this endpoint executes — explicit
+ * `default_model_id`, falling back to the first registered model. THE
+ * one source of the default-model rule: the provider factory and the
+ * runtime's limits resolution must agree on it, or compaction limits get
+ * computed for a different model than the one that actually runs.
+ * `undefined` ⇔ the endpoint has no models and is not resolvable.
+ */
+export function endpointDefaultModelId(
+  config: EndpointProviderConfig
+): string | undefined {
+  return config.default_model_id ?? config.models[0]?.id;
+}
+
+/**
  * The Ollama preset — the "no signup, no key" path. `ollama serve`
  * exposes an OpenAI-compatible API at this base URL; no API key exists
  * or is sent.
@@ -128,18 +142,92 @@ export type ProbedEndpointModel = {
   contextWindow?: number;
 };
 
+export type ProbeMergeResult = {
+  models: EndpointModelEntry[];
+  /** Count of models the probe found that the config didn't know
+   *  (appended at the end, detection fields prefilled). */
+  discovered: number;
+  /** Count of existing entries whose detected fields changed. */
+  updated: number;
+};
+
+/**
+ * Apply a probe result onto an endpoint's stored models — the executable
+ * form of the detection-owned contract on {@link EndpointModelEntry}:
+ * probed values overwrite the top-level detected fields (a silent probe —
+ * e.g. an ids-only gateway — keeps the previous detection), `overrides`
+ * are NEVER written, and models the probe discovered are appended.
+ * Pure; shared by every surface that refreshes detection.
+ */
+export function mergeProbedModels(
+  models: readonly EndpointModelEntry[],
+  probed: readonly ProbedEndpointModel[]
+): ProbeMergeResult {
+  const probedById = new Map(probed.map((m) => [m.id, m]));
+  let updated = 0;
+  const refreshed = models.map((m): EndpointModelEntry => {
+    const p = probedById.get(m.id);
+    if (!p) return m;
+    const next: EndpointModelEntry = {
+      ...m,
+      tool_call: p.tool_call ?? m.tool_call,
+      contextWindow: p.contextWindow ?? m.contextWindow,
+    };
+    if (
+      next.contextWindow !== m.contextWindow ||
+      next.tool_call !== m.tool_call
+    ) {
+      updated += 1;
+    }
+    return next;
+  });
+  const known = new Set(models.map((m) => m.id));
+  const discovered = probed
+    .filter((m) => !known.has(m.id))
+    .map(
+      (m): EndpointModelEntry => ({
+        id: m.id,
+        tool_call: m.tool_call,
+        contextWindow: m.contextWindow,
+      })
+    );
+  return {
+    models: [...refreshed, ...discovered],
+    discovered: discovered.length,
+    updated,
+  };
+}
+
 /**
  * Endpoint ids: short lowercase slugs. Must not collide with the BYOK
  * provider ids — both share the provider-id namespace on sessions,
  * run options, and the secrets store.
  */
-export const ENDPOINT_PROVIDER_ID_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
+const ENDPOINT_PROVIDER_ID_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 
 export function isValidEndpointProviderId(id: string): boolean {
-  return (
-    ENDPOINT_PROVIDER_ID_PATTERN.test(id) &&
-    !(BYOK_PROVIDER_IDS as readonly string[]).includes(id)
-  );
+  return ENDPOINT_PROVIDER_ID_PATTERN.test(id) && !isByokProviderId(id);
+}
+
+/** Narrow + pin an endpoint base URL: http(s) only. Shared by the config
+ *  validator and the probe so the two boundaries can't drift. `base_url`
+ *  is the raw input string (NOT `url.href` — no normalization surprises). */
+export function parseEndpointBaseUrl(
+  raw: unknown
+): { ok: true; base_url: string; url: URL } | { ok: false; error: string } {
+  if (typeof raw !== "string" || raw.length > MAX_BASE_URL_LEN) {
+    return { ok: false, error: "base_url must be a string" };
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return { ok: false, error: "base_url must be a valid URL" };
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return { ok: false, error: "base_url must be http(s)" };
+  }
+  return { ok: true, base_url: raw, url };
 }
 
 /** Bounds that keep a config a config (not an unbounded blob). */
@@ -184,18 +272,8 @@ export function validateEndpointProviderConfig(
     return { ok: false, error: `label must be a string ≤ ${MAX_LABEL_LEN}` };
   }
 
-  if (typeof c.base_url !== "string" || c.base_url.length > MAX_BASE_URL_LEN) {
-    return { ok: false, error: "base_url must be a string" };
-  }
-  let url: URL;
-  try {
-    url = new URL(c.base_url);
-  } catch {
-    return { ok: false, error: "base_url must be a valid URL" };
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    return { ok: false, error: "base_url must be http(s)" };
-  }
+  const baseUrl = parseEndpointBaseUrl(c.base_url);
+  if (!baseUrl.ok) return baseUrl;
 
   if (!Array.isArray(c.models) || c.models.length > MAX_MODELS) {
     return { ok: false, error: `models must be an array of ≤ ${MAX_MODELS}` };
@@ -231,7 +309,7 @@ export function validateEndpointProviderConfig(
     config: {
       id: c.id,
       label: typeof c.label === "string" && c.label ? c.label : undefined,
-      base_url: c.base_url,
+      base_url: baseUrl.base_url,
       models: modelSpecs,
       default_model_id: defaultModelId,
     },
@@ -279,7 +357,10 @@ function validateModelEntry(raw: unknown): ModelEntryValidation {
       return { ok: false, error: "model overrides must be an object" };
     }
     const o = m.overrides as Record<string, unknown>;
-    const oFlags = validateCapabilityFields(o, "model overrides");
+    // Overrides carry only the detection-owned fields — no `outputLimit`.
+    const oFlags = validateCapabilityFields(o, "model overrides", [
+      "contextWindow",
+    ]);
     if (!oFlags.ok) return oFlags;
     overrides = {
       multimodal: o.multimodal as boolean | undefined,
@@ -310,14 +391,18 @@ function validateModelEntry(raw: unknown): ModelEntryValidation {
 
 function validateCapabilityFields(
   source: Record<string, unknown>,
-  scope: string
+  scope: string,
+  limits: readonly ("contextWindow" | "outputLimit")[] = [
+    "contextWindow",
+    "outputLimit",
+  ]
 ): { ok: true } | { ok: false; error: string } {
   for (const flag of ["multimodal", "tool_call"] as const) {
     if (source[flag] !== undefined && typeof source[flag] !== "boolean") {
       return { ok: false, error: `${scope} ${flag} must be a boolean` };
     }
   }
-  for (const limit of ["contextWindow", "outputLimit"] as const) {
+  for (const limit of limits) {
     const value = source[limit];
     if (value === undefined) continue;
     if (

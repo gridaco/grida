@@ -4,7 +4,7 @@
  */
 
 import type { models, ModelTier } from "@grida/ai-models";
-import type { ByokProviderId } from "./provider-ids";
+import type { ProviderId } from "./provider-ids";
 import type { SkillId } from "./skills";
 import type { AgentMode } from "./mode";
 
@@ -71,11 +71,10 @@ export type AgentRunOptions = {
    */
   model_id?: AgentModelId;
   /**
-   * Explicit provider pick: a BYOK provider id or a configured endpoint
-   * provider id (issue #806). Validated server-side against the allowed
-   * set; an unknown id 400s.
+   * Explicit provider pick (issue #806). Validated server-side against
+   * the allowed set; an unknown id 400s.
    */
-  provider_id?: ByokProviderId | (string & {});
+  provider_id?: ProviderId;
   feature?: string;
   workspace_id?: string;
   skills?: readonly SkillId[];

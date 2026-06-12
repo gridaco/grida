@@ -11,7 +11,7 @@ import type {
   AgentRunOptions,
   AgentServerHandshakeResponse,
   AgentUIMessageChunk,
-  ByokProviderId,
+  ProviderId,
   EndpointProviderConfig,
   ProbedEndpointModel,
   ChatMessageWithParts,
@@ -226,13 +226,9 @@ export type DesktopBridge = {
     }) => Promise<void>;
   };
   secrets: {
-    /** A BYOK provider id, or a configured endpoint provider id (#806). */
-    has: (providerId: ByokProviderId | (string & {})) => Promise<boolean>;
-    set: (
-      providerId: ByokProviderId | (string & {}),
-      key: string
-    ) => Promise<void>;
-    delete: (providerId: ByokProviderId | (string & {})) => Promise<void>;
+    has: (providerId: ProviderId) => Promise<boolean>;
+    set: (providerId: ProviderId, key: string) => Promise<void>;
+    delete: (providerId: ProviderId) => Promise<void>;
   };
   /**
    * Endpoint provider config (issue #806) — user-configured OpenAI-

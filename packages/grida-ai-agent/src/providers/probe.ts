@@ -31,7 +31,10 @@
  * size cap) and the URL shape is pinned to http(s).
  */
 
-import type { ProbedEndpointModel } from "../protocol/endpoints";
+import {
+  parseEndpointBaseUrl,
+  type ProbedEndpointModel,
+} from "../protocol/endpoints";
 
 const PROBE_TIMEOUT_MS = 4_000;
 const MAX_BODY_BYTES = 1_048_576;
@@ -56,18 +59,18 @@ export async function probeEndpointModels(
   baseUrl: string,
   fetchImpl: ProbeFetch = fetch
 ): Promise<EndpointProbeResult> {
-  let url: URL;
-  try {
-    url = new URL(baseUrl);
-  } catch {
-    return { ok: false, error: "base_url must be a valid URL" };
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    return { ok: false, error: "base_url must be http(s)" };
-  }
+  const parsed = parseEndpointBaseUrl(baseUrl);
+  if (!parsed.ok) return parsed;
+  const { url } = parsed;
 
-  // 1. Ollama native — capability tags ride along.
-  const ollama = await getJson(fetchImpl, `${url.origin}/api/tags`);
+  // Both shapes probed concurrently (idempotent GETs; a generic gateway
+  // shouldn't wait out the full Ollama timeout first). Ollama wins when
+  // it answers — capability tags ride along.
+  const base = baseUrl.replace(/\/+$/, "");
+  const ollamaProbe = requestJson(fetchImpl, `${url.origin}/api/tags`);
+  const openaiProbe = requestJson(fetchImpl, `${base}/models`);
+
+  const ollama = await ollamaProbe;
   if (ollama.ok) {
     const models = parseOllamaTags(ollama.data);
     if (models) {
@@ -76,9 +79,8 @@ export async function probeEndpointModels(
     }
   }
 
-  // 2. Generic OpenAI-compatible — ids only.
-  const base = baseUrl.replace(/\/+$/, "");
-  const openai = await getJson(fetchImpl, `${base}/models`);
+  // Generic OpenAI-compatible — ids only.
+  const openai = await openaiProbe;
   if (openai.ok) {
     const models = parseOpenAiModels(openai.data);
     if (models) return { ok: true, source: "openai", models };
@@ -94,39 +96,67 @@ export async function probeEndpointModels(
 
 type JsonProbe = { ok: true; data: unknown } | { ok: false };
 
-async function getJson(fetchImpl: ProbeFetch, url: string): Promise<JsonProbe> {
+/** One bounded JSON request: GET, or POST when `body` is given. Never
+ *  throws — every failure mode (timeout, non-2xx, oversize, bad JSON)
+ *  collapses to `{ok: false}`; the probe treats them all as "no answer". */
+async function requestJson(
+  fetchImpl: ProbeFetch,
+  url: string,
+  body?: unknown
+): Promise<JsonProbe> {
   try {
     const res = await fetchImpl(url, {
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      ...(body !== undefined
+        ? {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          }
+        : {}),
     });
     if (!res.ok) return { ok: false };
-    const text = await res.text();
-    if (text.length > MAX_BODY_BYTES) return { ok: false };
+    const text = await readBodyBounded(res);
+    if (text === null) return { ok: false };
     return { ok: true, data: JSON.parse(text) };
   } catch {
     return { ok: false };
   }
 }
 
-async function postJson(
-  fetchImpl: ProbeFetch,
-  url: string,
-  body: unknown
-): Promise<JsonProbe> {
-  try {
-    const res = await fetchImpl(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    });
-    if (!res.ok) return { ok: false };
+/**
+ * Read a response body of at most {@link MAX_BODY_BYTES} — the bound is
+ * enforced ON THE WIRE (declared length first, then a capped stream
+ * read), not by buffering an arbitrarily large body and measuring after.
+ * Returns `null` when the cap is exceeded.
+ */
+async function readBodyBounded(res: Response): Promise<string | null> {
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+  if (!res.body) {
     const text = await res.text();
-    if (text.length > MAX_BODY_BYTES) return { ok: false };
-    return { ok: true, data: JSON.parse(text) };
-  } catch {
-    return { ok: false };
+    return text.length > MAX_BODY_BYTES ? null : text;
   }
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      void reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const buf = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buf.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(buf);
 }
 
 /**
@@ -142,7 +172,7 @@ async function enrichContextWindows(
   models: ProbedEndpointModel[]
 ): Promise<void> {
   const loaded = new Map<string, number>();
-  const ps = await getJson(fetchImpl, `${origin}/api/ps`);
+  const ps = await requestJson(fetchImpl, `${origin}/api/ps`);
   if (ps.ok) {
     const rows = (ps.data as { models?: unknown } | null)?.models;
     if (Array.isArray(rows)) {
@@ -162,7 +192,7 @@ async function enrichContextWindows(
         model.contextWindow = allocated;
         return;
       }
-      const show = await postJson(fetchImpl, `${origin}/api/show`, {
+      const show = await requestJson(fetchImpl, `${origin}/api/show`, {
         model: model.id,
       });
       if (!show.ok) return;

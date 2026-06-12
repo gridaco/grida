@@ -188,6 +188,9 @@ describe("@grida/agent public API", () => {
       });
       expect(typeof root.isValidEndpointProviderId).toBe("function");
       expect(typeof root.validateEndpointProviderConfig).toBe("function");
+      expect(typeof root.mergeProbedModels).toBe("function");
+      expect(root.isByokProviderId("openrouter")).toBe(true);
+      expect(root.isByokProviderId("ollama")).toBe(false);
       const config: root.EndpointProviderConfig = {
         ...root.OLLAMA_ENDPOINT_PRESET,
         models: [{ id: "llama3.1:8b", tool_call: true }],

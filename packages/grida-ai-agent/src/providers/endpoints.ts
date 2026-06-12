@@ -24,10 +24,25 @@ import {
   type EndpointModelSpec,
   type EndpointProviderConfig,
 } from "../protocol/endpoints";
+import { isByokProviderId } from "../protocol/provider-ids";
 import { atomicWrite } from "../storage/atomic-write";
 
 const FILE_NAME = "endpoints.json";
 const MAX_ENTRIES = 16;
+
+/**
+ * THE provider-id namespace gate: BYOK ids ∪ configured endpoint ids.
+ * Shared by every boundary that accepts a provider id (`/secrets/*`
+ * allowlist, the run-input `provider_id` gate) — a closed set; anything
+ * else must 400.
+ */
+export async function isKnownProviderId(
+  id: string,
+  endpoints?: EndpointProvidersStore
+): Promise<boolean> {
+  if (isByokProviderId(id)) return true;
+  return (await endpoints?.get(id)) != null;
+}
 
 export class EndpointProvidersStore {
   private entries: EndpointProviderConfig[] = [];

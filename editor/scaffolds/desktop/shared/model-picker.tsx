@@ -104,7 +104,12 @@ export function ModelToolCallNotice({
   model_id: string;
   endpoints: readonly EndpointProviderConfig[];
 }) {
-  const spec = registered_models.resolve(modelId, endpoints);
+  // Memoized: this renders inside chat panels that re-render per streamed
+  // token, and resolve() rebuilds the flattened spec list each call.
+  const spec = useMemo(
+    () => registered_models.resolve(modelId, endpoints),
+    [modelId, endpoints]
+  );
   if (!spec || spec.tool_call) return null;
   return (
     <div className="flex items-start gap-2 border-t bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">

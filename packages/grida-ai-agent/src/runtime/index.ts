@@ -37,6 +37,11 @@ import {
   type ResolveModelLimits,
 } from "../session/compaction";
 import type { compactor } from "../session/compactor";
+import {
+  endpointDefaultModelId,
+  resolveEndpointModels,
+  type EndpointProviderConfig,
+} from "../protocol/endpoints";
 import { discoverSkills } from "../skills/discovery";
 import { discoverProjectInstructions } from "../skills/project-instructions";
 import type { SkillBodyCache, SkillIndex } from "../skills/types";
@@ -199,6 +204,13 @@ export type AgentRuntimeDeps = ResolveDeps & {
 
 /** A provider resolved by {@link resolveProvider} (model factory + ids). */
 type ResolvedProvider = Awaited<ReturnType<typeof resolveProvider>>;
+
+/** One store snapshot powering both compaction limits and the summarizer
+ *  cap — see {@link AgentRuntime.limitsResolver}. */
+type LimitsResolution = {
+  resolve: ResolveModelLimits;
+  configs: readonly EndpointProviderConfig[];
+};
 
 /**
  * Everything {@link AgentRuntime.startTurn} needs to fire ONE turn, decoupled
@@ -470,29 +482,32 @@ export class AgentRuntime {
   }
 
   /**
-   * Registry-aware model-limits resolver (issue #806): resolves over
+   * Registry-aware model-limits resolution (issue #806): resolves over
    * catalog ∪ registered endpoint models, and substitutes an endpoint
    * session's missing `model_id` with the endpoint's default model — a
    * tier-only Ollama session must NOT fall back to the catalog tier's
    * frontier-sized window (1M assumed on an 8k model ⇒ compaction never
-   * fires ⇒ the session dies on context overflow).
+   * fires ⇒ the session dies on context overflow). Carries the loaded
+   * configs so downstream checks (the summarizer cap) reuse the same
+   * snapshot instead of re-reading the store.
    */
-  private async limitsResolver(): Promise<ResolveModelLimits> {
+  private async limitsResolver(): Promise<LimitsResolution> {
     const endpoints = this.deps.endpoints;
-    if (!endpoints) return (model) => resolveModelLimits(model);
-    const [custom, configs] = await Promise.all([
-      endpoints.registeredModels(),
-      endpoints.list(),
-    ]);
-    return (model: ChatModel | null) => {
+    if (!endpoints) {
+      return { resolve: (model) => resolveModelLimits(model), configs: [] };
+    }
+    const configs = await endpoints.list();
+    const custom = configs.flatMap(resolveEndpointModels);
+    const resolve: ResolveModelLimits = (model) => {
       let effective = model;
       if (model?.provider_id && !model.model_id) {
         const endpoint = configs.find((e) => e.id === model.provider_id);
-        const defaultId = endpoint?.default_model_id ?? endpoint?.models[0]?.id;
+        const defaultId = endpoint && endpointDefaultModelId(endpoint);
         if (defaultId) effective = { ...model, model_id: defaultId };
       }
       return resolveModelLimits(effective, custom);
     };
+    return { resolve, configs };
   }
 
   /**
@@ -502,19 +517,18 @@ export class AgentRuntime {
    * configured endpoint, the cap must be that model's window, not the
    * catalog nano model's. `undefined` keeps the compaction default.
    */
-  private async summarizerInputCap(
+  private summarizerInputCap(
     model: ChatModel | null,
-    resolveLimits: ResolveModelLimits
-  ): Promise<number | undefined> {
+    limits: LimitsResolution
+  ): number | undefined {
     const providerId = model?.provider_id;
-    if (!providerId || !this.deps.endpoints) return undefined;
-    const endpoint = await this.deps.endpoints.get(providerId);
-    if (!endpoint) return undefined;
+    if (!providerId) return undefined;
+    if (!limits.configs.some((e) => e.id === providerId)) return undefined;
     // Limits of the endpoint's DEFAULT model (what `nano` resolves to):
     // a model_id-less ChatModel routes through the resolver's default-
     // model substitution above. Reserve room for the summary output.
-    const limits = resolveLimits({ provider_id: providerId });
-    return Math.max(1_024, limits.context_window - 4_096);
+    const window = limits.resolve({ provider_id: providerId }).context_window;
+    return Math.max(1_024, window - 4_096);
   }
 
   /**
@@ -532,9 +546,11 @@ export class AgentRuntime {
     if (!this.compaction_enabled) return;
     const session = await this.deps.sessions_store.get(sessionId);
     if (!session) return;
-    const resolveLimits = await this.limitsResolver();
-    const limits = resolveLimits(session.model);
-    if (!shouldCompact(session.total_tokens, limits, this.compaction_config)) {
+    const limits = await this.limitsResolver();
+    const modelLimits = limits.resolve(session.model);
+    if (
+      !shouldCompact(session.total_tokens, modelLimits, this.compaction_config)
+    ) {
       return;
     }
     try {
@@ -543,17 +559,14 @@ export class AgentRuntime {
           store: this.deps.sessions_store,
           model_factory: modelFactory,
           summarize: this.compaction_summarize,
-          resolve_limits: resolveLimits,
+          resolve_limits: limits.resolve,
         },
         {
           session_id: sessionId,
           auto: true,
           config: this.compaction_config,
           signal,
-          summarizer_input_cap: await this.summarizerInputCap(
-            session.model,
-            resolveLimits
-          ),
+          summarizer_input_cap: this.summarizerInputCap(session.model, limits),
         }
       );
     } catch (err) {
@@ -1051,22 +1064,19 @@ export class AgentRuntime {
       }
       throw err;
     }
-    const resolveLimits = await this.limitsResolver();
+    const limits = await this.limitsResolver();
     const result = await compactSession(
       {
         store: this.deps.sessions_store,
         model_factory: provider.model_factory,
         summarize: this.compaction_summarize,
-        resolve_limits: resolveLimits,
+        resolve_limits: limits.resolve,
       },
       {
         session_id: sessionId,
         auto: false,
         config: this.compaction_config,
-        summarizer_input_cap: await this.summarizerInputCap(
-          session.model,
-          resolveLimits
-        ),
+        summarizer_input_cap: this.summarizerInputCap(session.model, limits),
       }
     );
     return Response.json(result);

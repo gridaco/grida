@@ -27,9 +27,13 @@ import type { ModelTier } from "../tiers";
 import type { SecretsStore } from "../secrets";
 import {
   BYOK_PROVIDER_METADATA,
+  isByokProviderId,
   type ByokProviderId,
 } from "../protocol/provider-ids";
-import type { EndpointProviderConfig } from "../protocol/endpoints";
+import {
+  endpointDefaultModelId,
+  type EndpointProviderConfig,
+} from "../protocol/endpoints";
 import type { EndpointProvidersStore } from "./endpoints";
 import {
   makeEndpointFactory,
@@ -121,10 +125,6 @@ async function resolveExplicit(
   return resolved;
 }
 
-function isByokProviderId(id: string): id is ByokProviderId {
-  return BYOK_PROVIDER_METADATA.some((provider) => provider.id === id);
-}
-
 function makeResolvedByok(
   providerId: ByokProviderId,
   key: string
@@ -157,7 +157,7 @@ async function maybeResolveEndpoint(
   endpoint: EndpointProviderConfig,
   deps: ResolveDeps
 ): Promise<ResolvedProvider | null> {
-  const defaultModelId = endpoint.default_model_id ?? endpoint.models[0]?.id;
+  const defaultModelId = endpointDefaultModelId(endpoint);
   if (!defaultModelId) return null;
   const key = await deps.secrets._getKey(endpoint.id);
   return {

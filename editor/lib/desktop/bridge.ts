@@ -22,6 +22,7 @@ import {
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
   OLLAMA_ENDPOINT_PRESET,
+  mergeProbedModels,
   resolveEndpointModel,
   resolveEndpointModels,
   type AgentMode,
@@ -67,6 +68,7 @@ export {
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
   OLLAMA_ENDPOINT_PRESET,
+  mergeProbedModels,
   resolveEndpointModel,
   resolveEndpointModels,
   type EndpointModelEntry,
@@ -377,9 +379,9 @@ export namespace providers {
    * which has no native shell) — callers hide the affordance.
    */
   export async function revealConfigFile(): Promise<boolean> {
-    const bridge = getDesktopBridge();
-    if (!bridge?.providers?.info || !bridge.caps.native.shell) return false;
-    const { path } = await bridge.providers.info();
+    if (!canRevealConfigFile()) return false;
+    const bridge = getDesktopBridge()!;
+    const { path } = await bridge.providers!.info();
     await bridge.shell.show_item_in_folder(path);
     return true;
   }

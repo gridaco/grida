@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import {
   OLLAMA_ENDPOINT_PRESET,
   isValidEndpointProviderId,
+  mergeProbedModels,
   resolveEndpointModel,
   validateEndpointProviderConfig,
   type EndpointProviderConfig,
@@ -138,6 +139,54 @@ describe("validateEndpointProviderConfig", () => {
         models: [{ id: "m", contextWindow: 1.5 }],
       }).ok
     ).toBe(false);
+  });
+});
+
+describe("mergeProbedModels — the detection-owned merge contract", () => {
+  it("probe overwrites detected fields, never overrides; silent probe keeps prior detection", () => {
+    const result = mergeProbedModels(
+      [
+        {
+          id: "gemma4:31b-mlx",
+          tool_call: false, // stale detection
+          contextWindow: 8_192,
+          overrides: { contextWindow: 32_768 },
+        },
+        { id: "unprobed:7b", tool_call: true }, // not in probe result
+      ],
+      [
+        // tool_call reported, contextWindow silent (older Ollama): the
+        // silent field keeps the previous detection.
+        { id: "gemma4:31b-mlx", tool_call: true },
+      ]
+    );
+    expect(result.updated).toBe(1);
+    expect(result.discovered).toBe(0);
+    expect(result.models[0]).toEqual({
+      id: "gemma4:31b-mlx",
+      tool_call: true,
+      contextWindow: 8_192,
+      overrides: { contextWindow: 32_768 }, // untouched, always
+    });
+    expect(result.models[1]).toEqual({ id: "unprobed:7b", tool_call: true });
+  });
+
+  it("appends newly discovered models and reports no-op merges", () => {
+    const result = mergeProbedModels(
+      [{ id: "known:8b", tool_call: true }],
+      [
+        { id: "known:8b", tool_call: true }, // unchanged
+        { id: "new:31b", tool_call: true, contextWindow: 262_144 },
+      ]
+    );
+    expect(result.updated).toBe(0);
+    expect(result.discovered).toBe(1);
+    expect(result.models.map((m) => m.id)).toEqual(["known:8b", "new:31b"]);
+    expect(result.models[1].contextWindow).toBe(262_144);
+
+    const noop = mergeProbedModels([{ id: "known:8b", tool_call: true }], []);
+    expect(noop.updated).toBe(0);
+    expect(noop.discovered).toBe(0);
   });
 });
 

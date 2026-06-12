@@ -20,10 +20,12 @@ import {
   type AgentMode,
 } from "../protocol/mode";
 import { AGENT_DEFAULT_TIER, AGENT_TIERS, type ModelTier } from "../tiers";
-import { BYOK_PROVIDER_IDS } from "../protocol/provider-ids";
 import type { SessionsStore } from "../session/store";
 import type { WorkspaceRegistry } from "../workspaces";
-import type { EndpointProvidersStore } from "../providers/endpoints";
+import {
+  isKnownProviderId,
+  type EndpointProvidersStore,
+} from "../providers/endpoints";
 
 const ALLOWED_TIERS = new Set<string>(AGENT_TIERS);
 const CATALOG_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
@@ -114,8 +116,7 @@ export async function parseRunBody(
     const providerId = typeof b.provider_id === "string" ? b.provider_id : "";
     const allowed =
       providerId.length > 0 &&
-      ((BYOK_PROVIDER_IDS as readonly string[]).includes(providerId) ||
-        (await deps.endpoints?.get(providerId)) != null);
+      (await isKnownProviderId(providerId, deps.endpoints));
     if (!allowed) {
       return Response.json(
         { error: `providerId not allowed: ${String(b.provider_id)}` },

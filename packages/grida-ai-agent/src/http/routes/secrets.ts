@@ -28,7 +28,10 @@
 
 import type { Hono } from "hono";
 import { BYOK_PROVIDER_IDS } from "../../protocol/provider-ids";
-import type { EndpointProvidersStore } from "../../providers/endpoints";
+import {
+  isKnownProviderId,
+  type EndpointProvidersStore,
+} from "../../providers/endpoints";
 import type { SecretsStore } from "../../secrets";
 import { body, v } from "../validate";
 
@@ -45,10 +48,7 @@ export function registerSecretsRoutes(app: Hono, deps: SecretsRoutesDeps) {
   const allowedProviderId = async (
     id: string
   ): Promise<{ ok: true } | { ok: false; res: Response }> => {
-    if ((BYOK_PROVIDER_IDS as readonly string[]).includes(id)) {
-      return { ok: true };
-    }
-    if (endpoints && (await endpoints.get(id))) return { ok: true };
+    if (await isKnownProviderId(id, endpoints)) return { ok: true };
     return {
       ok: false,
       res: Response.json(

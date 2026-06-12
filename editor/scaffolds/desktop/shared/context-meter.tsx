@@ -80,10 +80,12 @@ export function DesktopContextMeter({
    *  resolve their real (often small) windows through these. */
   endpoints?: readonly EndpointProviderConfig[];
 }) {
-  const contextWindow = registered_models.resolve(
-    modelId,
-    endpoints
-  )?.contextWindow;
+  // Memoized: chat panels re-render per streamed token, and resolve()
+  // rebuilds the flattened spec list each call.
+  const contextWindow = useMemo(
+    () => registered_models.resolve(modelId, endpoints)?.contextWindow,
+    [modelId, endpoints]
+  );
   const {
     usedTokens,
     maxTokens,

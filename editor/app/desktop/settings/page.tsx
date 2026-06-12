@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
@@ -19,6 +19,7 @@ import {
   DesktopBridgeMissingError,
   OLLAMA_ENDPOINT_PRESET,
   app,
+  mergeProbedModels,
   providers,
   resolveEndpointModel,
   secrets,
@@ -329,45 +330,16 @@ function LocalModelsSection() {
       setProbeNote(null);
       try {
         const result = await providers.probeEndpoint(base.base_url);
-        const probedById = new Map(result.models.map((m) => [m.id, m]));
-        let changed = 0;
-        const existing = base.models.map((m): EndpointModelEntry => {
-          const probed = probedById.get(m.id);
-          if (!probed) return m;
-          const next: EndpointModelEntry = {
-            ...m,
-            // Detected fields: probe wins when it reports; a silent
-            // probe (generic gateway) keeps the previous detection.
-            tool_call: probed.tool_call ?? m.tool_call,
-            contextWindow: probed.contextWindow ?? m.contextWindow,
-          };
-          if (
-            next.contextWindow !== m.contextWindow ||
-            next.tool_call !== m.tool_call
-          ) {
-            changed += 1;
-          }
-          return next;
-        });
-        const known = new Set(base.models.map((m) => m.id));
-        const discovered = result.models
-          .filter((m) => !known.has(m.id))
-          .map(
-            (m): EndpointModelEntry => ({
-              id: m.id,
-              tool_call: m.tool_call,
-              contextWindow: m.contextWindow,
-            })
-          );
+        const merged = mergeProbedModels(base.models, result.models);
         setProbeNote(
-          discovered.length > 0
-            ? `Found ${discovered.length} model${discovered.length === 1 ? "" : "s"}.`
-            : changed > 0
+          merged.discovered > 0
+            ? `Found ${merged.discovered} model${merged.discovered === 1 ? "" : "s"}.`
+            : merged.updated > 0
               ? "Updated model details."
               : "No new models found."
         );
-        if (discovered.length === 0 && changed === 0) return;
-        const next = { ...base, models: [...existing, ...discovered] };
+        if (merged.discovered === 0 && merged.updated === 0) return;
+        const next = { ...base, models: merged.models };
         if (opts.persist) {
           await providers.setEndpoint(next);
           setState({ kind: "ready", draft: next, dirty: false });
@@ -467,14 +439,11 @@ function LocalModelsSection() {
     setNewModelId("");
   }, [draft, newModelId, edit]);
 
-  const saveDisabled = useMemo(
-    () =>
-      state.kind !== "ready" ||
-      !state.dirty ||
-      !draft ||
-      draft.base_url.trim().length === 0,
-    [state, draft]
-  );
+  const saveDisabled =
+    state.kind !== "ready" ||
+    !state.dirty ||
+    !draft ||
+    draft.base_url.trim().length === 0;
 
   // Old desktop binaries have no bridge surface for this — hide rather
   // than render a dead section.
@@ -606,7 +575,7 @@ function LocalModelsSection() {
               </Button>
               <Button
                 size="default"
-                disabled={saveDisabled || state.kind === "saving"}
+                disabled={saveDisabled}
                 onClick={() => void handleSave()}
               >
                 {state.kind === "saving" ? (
@@ -685,8 +654,9 @@ function LocalModelRow({
               : "Context window (detected from the endpoint)"
           }
         >
-          {compactTokens.format(resolved.contextWindow ?? model.contextWindow)}{" "}
-          ctx
+          {/* non-null: this branch is gated on a detected contextWindow,
+              and resolution only ever overrides it, never unsets it */}
+          {compactTokens.format(resolved.contextWindow!)} ctx
           {ctxOverridden ? " ·m" : ""}
         </span>
       ) : (
@@ -722,7 +692,7 @@ function LocalModelRow({
               : "Tool-calling (detected from the endpoint)"
           }
         >
-          {(resolved.tool_call ?? true) ? "tools" : "no tools"}
+          {resolved.tool_call ? "tools" : "no tools"}
         </span>
       ) : (
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
