@@ -31,6 +31,7 @@ import {
   type CreateSessionOptions,
   type EndpointModelSpec,
   type EndpointProviderConfig,
+  type ProbedEndpointModel,
   type PatchSessionOptions,
   type RewindResult,
   type SessionListFilter,
@@ -64,6 +65,7 @@ export {
   OLLAMA_ENDPOINT_PRESET,
   type EndpointModelSpec,
   type EndpointProviderConfig,
+  type ProbedEndpointModel,
   type AgentMode,
   type AgentUIMessageChunk,
   type AgentRunOptions,
@@ -343,6 +345,21 @@ export namespace providers {
     const bridge = bridgeOrThrow().providers;
     if (!bridge) throw new DesktopBridgeMissingError();
     await bridge.delete_endpoint(id);
+  }
+
+  /**
+   * Discover the models an endpoint serves. The fetch happens on the
+   * agent host — the renderer's origin cannot reach a local Ollama
+   * directly (CORS). Throws when the bridge predates the surface or the
+   * endpoint is unreachable; callers fall back to manual entry.
+   */
+  export async function probeEndpoint(baseUrl: string): Promise<{
+    source: "ollama" | "openai";
+    models: ProbedEndpointModel[];
+  }> {
+    const bridge = bridgeOrThrow().providers;
+    if (!bridge?.probe_endpoint) throw new DesktopBridgeMissingError();
+    return await bridge.probe_endpoint(baseUrl);
   }
 
   /**

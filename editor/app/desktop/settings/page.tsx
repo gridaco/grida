@@ -305,6 +305,8 @@ type LocalState =
 function LocalModelsSection() {
   const [state, setState] = useState<LocalState>({ kind: "loading" });
   const [newModelId, setNewModelId] = useState("");
+  const [probing, setProbing] = useState(false);
+  const [probeNote, setProbeNote] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!providers.isSupported()) {
@@ -341,13 +343,61 @@ function LocalModelsSection() {
     }
   }, [draft, refresh]);
 
-  const handleEnable = useCallback(() => {
-    setState({
-      kind: "ready",
-      draft: { ...OLLAMA_ENDPOINT_PRESET, models: [] },
-      dirty: true,
-    });
+  /**
+   * Discover the endpoint's installed models (agent-host-side fetch of
+   * Ollama's `/api/tags`, or a generic `/models`) and merge the new ids
+   * into the draft. Existing rows keep their user-set fields; the
+   * context window is deliberately NOT probed (endpoints report a
+   * model's architectural max, not the served window) and stays at the
+   * conservative default until raised.
+   */
+  const detectInto = useCallback(async (base: EndpointProviderConfig) => {
+    setProbing(true);
+    setProbeNote(null);
+    try {
+      const result = await providers.probeEndpoint(base.base_url);
+      const known = new Set(base.models.map((m) => m.id));
+      const discovered = result.models
+        .filter((m) => !known.has(m.id))
+        .map(
+          (m): EndpointModelSpec => ({
+            id: m.id,
+            // Only an explicit "no tools" from the endpoint lands in
+            // config; true/unknown rides the permissive default.
+            tool_call: m.tool_call === false ? false : undefined,
+          })
+        );
+      setProbeNote(
+        discovered.length > 0
+          ? `Found ${discovered.length} model${discovered.length === 1 ? "" : "s"}.`
+          : "No new models found."
+      );
+      if (discovered.length > 0) {
+        setState({
+          kind: "ready",
+          draft: { ...base, models: [...base.models, ...discovered] },
+          dirty: true,
+        });
+      }
+    } catch (err) {
+      setProbeNote(
+        `Couldn't reach the endpoint (${describeError(err)}) — add models manually.`
+      );
+    } finally {
+      setProbing(false);
+    }
   }, []);
+
+  const handleEnable = useCallback(() => {
+    const base: EndpointProviderConfig = {
+      ...OLLAMA_ENDPOINT_PRESET,
+      models: [],
+    };
+    setState({ kind: "ready", draft: base, dirty: true });
+    // Prefill from the running Ollama right away — the common path is
+    // "models already pulled; nothing to type".
+    void detectInto(base);
+  }, [detectInto]);
 
   const handleRemove = useCallback(async () => {
     if (!draft) return;
@@ -405,9 +455,9 @@ function LocalModelsSection() {
           >
             Ollama
           </a>{" "}
-          — no account, no API key. Start <code>ollama serve</code>, pull a
-          model, and register it here. Local models vary widely in agent
-          ability; larger models (~30B+) are recommended for agent tasks.
+          — no account, no API key. Start <code>ollama serve</code> and pull a
+          model; Grida detects it automatically. Local models vary widely in
+          agent ability; larger models (~30B+) are recommended for agent tasks.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -433,12 +483,28 @@ function LocalModelsSection() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label className="text-sm font-medium">Models</Label>
-              {draft.models.length === 0 && (
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Models</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={probing || state.kind === "saving"}
+                  onClick={() => void detectInto(draft)}
+                >
+                  {probing ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Detect
+                </Button>
+              </div>
+              {probeNote && (
+                <p className="text-xs text-muted-foreground" role="status">
+                  {probeNote}
+                </p>
+              )}
+              {draft.models.length === 0 && !probing && (
                 <p className="text-xs text-muted-foreground">
-                  Register at least one model (e.g. <code>llama3.1:8b</code> —
-                  the id you <code>ollama pull</code>ed). The first model is the
-                  default.
+                  Models you pulled in Ollama are detected automatically — or
+                  add one by id (e.g. <code>llama3.1:8b</code>). The first model
+                  is the default.
                 </p>
               )}
               {draft.models.map((model, index) => (

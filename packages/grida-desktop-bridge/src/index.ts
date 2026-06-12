@@ -13,6 +13,7 @@ import type {
   AgentUIMessageChunk,
   ByokProviderId,
   EndpointProviderConfig,
+  ProbedEndpointModel,
   ChatMessageWithParts,
   ChatSessionRow,
   CreateSessionOptions,
@@ -244,6 +245,12 @@ export type DesktopBridge = {
     list_endpoints: () => Promise<EndpointProviderConfig[]>;
     set_endpoint: (config: EndpointProviderConfig) => Promise<void>;
     delete_endpoint: (id: string) => Promise<void>;
+    /** Discover the models an endpoint serves (agent-host-side fetch —
+     *  the renderer's origin can't reach a local Ollama directly). */
+    probe_endpoint: (baseUrl: string) => Promise<{
+      source: "ollama" | "openai";
+      models: ProbedEndpointModel[];
+    }>;
   };
   agent: {
     run: (

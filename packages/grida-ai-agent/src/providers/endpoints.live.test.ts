@@ -34,6 +34,7 @@ import { StreamRegistry } from "../runtime/stream-registry";
 import { registerAgentRoutes } from "../http/routes/agent";
 import { sessionIdFromSse } from "../testing/sse";
 import { EndpointProvidersStore } from "./endpoints";
+import { probeEndpointModels } from "./probe";
 import { resolveProvider } from ".";
 
 const LIVE = process.env.GRIDA_LIVE_OLLAMA === "1";
@@ -158,6 +159,21 @@ liveDescribe("LIVE — Ollama endpoint provider, no key (issue #806)", () => {
       const provider = await resolveProvider({ secrets, endpoints });
       expect(provider.provider_id).toBe("ollama");
       expect(provider.kind).toBe("endpoint");
+    },
+    TIMEOUT_MS
+  );
+
+  it(
+    "probes the running Ollama and discovers the test model",
+    async () => {
+      const result = await probeEndpointModels(BASE_URL);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.source).toBe("ollama");
+      const found = result.models.find((m) => m.id === MODEL_ID);
+      expect(found).toBeDefined();
+      // The live model advertises tool support via /api/tags capabilities.
+      expect(found?.tool_call).toBe(true);
     },
     TIMEOUT_MS
   );

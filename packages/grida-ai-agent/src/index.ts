@@ -14,6 +14,7 @@ export {
   validateEndpointProviderConfig,
   type EndpointModelSpec,
   type EndpointProviderConfig,
+  type ProbedEndpointModel,
 } from "./protocol/endpoints";
 export {
   AGENT_SERVER_PROTOCOL,

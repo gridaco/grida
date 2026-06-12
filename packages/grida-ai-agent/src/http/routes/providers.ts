@@ -24,14 +24,18 @@ import {
   type EndpointProviderConfig,
 } from "../../protocol/endpoints";
 import type { EndpointProvidersStore } from "../../providers/endpoints";
+import { probeEndpointModels } from "../../providers/probe";
 import { body, v } from "../validate";
 
 export type ProvidersRoutesDeps = {
   endpoints: EndpointProvidersStore;
+  /** Probe override for tests. Defaults to {@link probeEndpointModels}. */
+  probe?: typeof probeEndpointModels;
 };
 
 export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
   const { endpoints } = deps;
+  const probe = deps.probe ?? probeEndpointModels;
 
   app.post("/providers/endpoints/list", async (c) => {
     const list: EndpointProviderConfig[] = await endpoints.list();
@@ -70,5 +74,22 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
     await endpoints.delete(r.data.id);
     console.log(`[agent-host-providers] endpoint delete id=${r.data.id}`);
     return c.json({ ok: true });
+  });
+
+  // Model discovery (see providers/probe.ts for the threat note): the
+  // host fetches the endpoint's own model listing and returns the
+  // PARSED rows — never the raw body. Takes a base_url (not a stored
+  // id) so the settings flow can prefill before the config is saved.
+  app.post("/providers/endpoints/probe", async (c) => {
+    const r = await body(c, { base_url: v.string });
+    if (!r.ok) return r.res;
+    const result = await probe(r.data.base_url);
+    if (!result.ok) {
+      return c.json({ error: result.error }, 502);
+    }
+    console.log(
+      `[agent-host-providers] probe source=${result.source} models=${result.models.length}`
+    );
+    return c.json({ source: result.source, models: result.models });
   });
 }

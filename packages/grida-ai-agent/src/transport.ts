@@ -38,7 +38,10 @@ import type {
   WorkspaceReadFileResult,
   WorkspaceWriteFileResult,
 } from "./protocol/resources";
-import type { EndpointProviderConfig } from "./protocol/endpoints";
+import type {
+  EndpointProviderConfig,
+  ProbedEndpointModel,
+} from "./protocol/endpoints";
 
 function base64(value: string): string {
   const g = globalThis as unknown as {
@@ -419,6 +422,16 @@ export namespace AgentTransport {
       delete_endpoint: async (id: string): Promise<void> => {
         await this.postJson<unknown>("/providers/endpoints/delete", { id });
       },
+      /** Discover the models an endpoint serves (host-side fetch). */
+      probe_endpoint: async (
+        baseUrl: string
+      ): Promise<{
+        source: "ollama" | "openai";
+        models: ProbedEndpointModel[];
+      }> =>
+        await this.postJson("/providers/endpoints/probe", {
+          base_url: baseUrl,
+        }),
     } as const;
 
     readonly sessions = {

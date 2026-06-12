@@ -46,20 +46,22 @@ Open **Settings** from the app menu and find the **Local Models** card.
 ![The Local Models card in Grida Desktop settings, with a Set up Ollama button](./img/local-models-setup.webp)
 
 Click **Set up Ollama**. The base URL is prefilled with Ollama's local
-address (`http://localhost:11434/v1`) — you only need to change it if you
-run Ollama on a different port or host.
+address (`http://localhost:11434/v1`), and the models you have pulled are
+detected automatically — including whether each one supports tool calls.
 
-Register each model you want to use:
+![The Local Models card after setup, with an auto-detected model, context window, and tools toggle](./img/local-models-configured.webp)
 
-1. Type the model id exactly as you pulled it (e.g. `gemma4:31b-mlx`) and
-   click **Add**.
-2. Optionally set the model's **context window** in tokens. The default
-   assumes a conservative `8192`; if you serve the model with a larger
-   context, raise this so long sessions summarize at the right time.
-3. Leave **tools** on unless you know the model cannot make tool calls.
-4. Click **Save**.
+Review the list and click **Save**:
 
-![The Local Models card configured with a registered model, context window, and tools toggle](./img/local-models-configured.webp)
+- **Detect** re-scans the endpoint — use it after you `ollama pull` a new
+  model. You can also add a model manually by id, or remove ones you
+  don't want in the picker.
+- Optionally set each model's **context window** in tokens. This is the
+  one thing detection cannot fill in: Ollama reports a model's maximum
+  context, not the size your server actually runs it with, so Grida
+  assumes a conservative `8192`. If you serve the model with a larger
+  context, raise it so long sessions summarize at the right time.
+- Leave **tools** on unless you know the model cannot make tool calls.
 
 The first model in the list is the default — background work like session
 titles and summaries also runs on it.
@@ -94,8 +96,8 @@ Ollama lists each model's capabilities — `ollama show <model>` includes
   `http://localhost:11434` in a browser — it should answer
   `Ollama is running`.
 - **A model is missing from the picker.** Only registered models appear.
-  Add the model id in **Settings → Local Models** — pulling it in Ollama
-  is not enough on its own.
+  Click **Detect** in **Settings → Local Models** after pulling a new
+  model, or add its id manually.
 - **Long sessions stop or degrade.** The registered context window may be
   larger than what your Ollama serving configuration actually allows.
   Lower the context window value for the model in **Settings → Local

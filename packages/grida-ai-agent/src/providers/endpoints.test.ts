@@ -192,6 +192,40 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
     expect(await (await post("/providers/endpoints/list")).json()).toEqual([]);
   });
 
+  it("probe route returns parsed models, 502s an unreachable endpoint", async () => {
+    const probeApp = new Hono();
+    registerProvidersRoutes(probeApp, {
+      endpoints,
+      probe: async (baseUrl: string) =>
+        baseUrl.includes("11434")
+          ? {
+              ok: true as const,
+              source: "ollama" as const,
+              models: [{ id: "gemma4:31b-mlx", tool_call: true }],
+            }
+          : { ok: false as const, error: "no model listing at this endpoint" },
+    });
+    const probePost = (body: unknown) =>
+      probeApp.request("/providers/endpoints/probe", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const ok = await probePost({ base_url: "http://localhost:11434/v1" });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({
+      source: "ollama",
+      models: [{ id: "gemma4:31b-mlx", tool_call: true }],
+    });
+
+    const down = await probePost({ base_url: "http://localhost:9/v1" });
+    expect(down.status).toBe(502);
+
+    const bad = await probePost({});
+    expect(bad.status).toBe(400);
+  });
+
   it("400s an invalid config with the validator's message", async () => {
     const res = await post("/providers/endpoints/set", {
       config: { ...OLLAMA, id: "openrouter" },

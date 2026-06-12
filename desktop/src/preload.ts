@@ -453,6 +453,7 @@ const bridge: DesktopBridge = {
     delete_endpoint: async (id) => {
       await agentClient.providers.delete_endpoint(id);
     },
+    probe_endpoint: (baseUrl) => agentClient.providers.probe_endpoint(baseUrl),
   },
 
   agent: {
