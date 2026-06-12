@@ -436,3 +436,34 @@ describe("create_attention_tracker — host-extended scope", () => {
     expect(chrome.has("pointerleave")).toBe(false);
   });
 });
+
+describe("create_attention_tracker — disposed and seeded states", () => {
+  it("add() after dispose() is a no-op — no listeners are installed on the late element", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    t.dispose();
+    // Surface already detached — a late registration must not leak.
+    t.add(chrome as unknown as Element);
+    expect(chrome.has("pointerenter")).toBe(false);
+    expect(chrome.has("pointerleave")).toBe(false);
+  });
+
+  it("an element already under the pointer at add() time seeds the hover arm", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    // Popover opened at the cursor: its pointerenter fired before the
+    // tracker listened. The tracker seeds from matches(":hover").
+    (chrome as unknown as { matches: (sel: string) => boolean }).matches = (
+      sel: string
+    ) => sel === ":hover";
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    expect(t.is_attended()).toBe(false);
+    t.add(chrome as unknown as Element);
+    expect(t.is_attended()).toBe(true);
+    // …and the latch clears normally through remove().
+    t.remove(chrome as unknown as Element);
+    expect(t.is_attended()).toBe(false);
+    t.dispose();
+  });
+});

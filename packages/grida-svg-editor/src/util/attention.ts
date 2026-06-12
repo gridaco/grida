@@ -109,6 +109,8 @@ export function create_attention_tracker(
   /** Registered extras → their hover-tracking teardown. */
   const extras = new Map<Element, () => void>();
 
+  let disposed = false;
+
   /** Start hover-tracking `element`; returns the exact undo. */
   const track = (element: Element): (() => void) => {
     const enter = () => {
@@ -121,6 +123,14 @@ export function create_attention_tracker(
     // so we get a single transition per actual boundary crossing.
     element.addEventListener("pointerenter", enter);
     element.addEventListener("pointerleave", leave);
+    // Seed: the element may already be under the pointer when tracking
+    // starts (a popover opening at the cursor) — its `pointerenter`
+    // fired before we listened, so without this the hover arm stays
+    // false until a leave/re-enter crossing. Best-effort read;
+    // `matches` is absent on non-DOM fakes.
+    if (typeof element.matches === "function" && element.matches(":hover")) {
+      hovered.add(element);
+    }
     return () => {
       element.removeEventListener("pointerenter", enter);
       element.removeEventListener("pointerleave", leave);
@@ -155,6 +165,9 @@ export function create_attention_tracker(
     is_attended,
     is_focus_within,
     add: (element: Element) => {
+      // After dispose (surface detached) nothing will ever tear a new
+      // registration down — a late add() must not leak listeners.
+      if (disposed) return;
       if (element === container || extras.has(element)) return;
       extras.set(element, track(element));
     },
@@ -165,6 +178,7 @@ export function create_attention_tracker(
       untrack();
     },
     dispose: () => {
+      disposed = true;
       untrack_container();
       for (const untrack of extras.values()) untrack();
       extras.clear();

@@ -284,10 +284,7 @@ export type DomSurfaceOptions = {
  * with the tracker. Hosts with mounting/unmounting chrome (popovers,
  * panels) pair `add` on mount with `remove` on unmount.
  */
-export type AttentionScope = {
-  add(element: Element): void;
-  remove(element: Element): void;
-};
+export type AttentionScope = Pick<AttentionTracker, "add" | "remove">;
 
 /**
  * Surface handle for the DOM surface. Extends the editor's core
