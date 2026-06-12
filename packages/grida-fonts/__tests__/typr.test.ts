@@ -313,5 +313,7 @@ describe("Typr font parsing", () => {
         const _____ = font.STAT;
       }).not.toThrow(`Font ${fontPath} should parse without errors`);
     });
-  }, 20000);
+    // 60s: four variable-font parses run ~4s locally but have hit 20-22s on
+    // slow CI runners, so a 20s budget flakes at the margin.
+  }, 60000);
 });
