@@ -99,6 +99,7 @@ function BasicNumberDemo() {
         <input
           ref={input.inputRef}
           type={input.inputType}
+          aria-label="Value"
           className={inputClassName}
           value={input.internalValue}
           onChange={input.handleChange}
@@ -133,6 +134,7 @@ function PercentageDemo() {
         <input
           ref={input.inputRef}
           type={input.inputType}
+          aria-label="Opacity"
           className={inputClassName}
           value={input.internalValue}
           onChange={input.handleChange}
@@ -167,6 +169,7 @@ function MixedDemo() {
           <input
             ref={input.inputRef}
             type={input.inputType}
+            aria-label="Width"
             className={inputClassName}
             value={input.internalValue}
             onChange={input.handleChange}
@@ -204,8 +207,13 @@ function MixedDemo() {
   );
 }
 
+const SCRUB_MAX = 256;
+
 function ScrubDemo() {
   const [value, setValue] = React.useState(120);
+  const adjust = React.useCallback((delta: number) => {
+    setValue((prev) => Math.max(0, Math.min(SCRUB_MAX, prev + delta)));
+  }, []);
   const { bind } = useNumberGesture({
     mode: "auto",
     step: 1,
@@ -213,11 +221,20 @@ function ScrubDemo() {
     axisForValue: "x",
     onValueChange: (change) => {
       const c = change as NumberChange;
-      if (c.type === "delta") {
-        setValue((prev) => Math.max(0, Math.min(256, prev + c.value)));
-      }
+      if (c.type === "delta") adjust(c.value);
     },
   });
+
+  // Keyboard equivalent of the pointer scrub, so the control is not pointer-only.
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 10 : 1;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") adjust(-step);
+    else if (e.key === "ArrowRight" || e.key === "ArrowUp") adjust(step);
+    else if (e.key === "Home") setValue(0);
+    else if (e.key === "End") setValue(SCRUB_MAX);
+    else return;
+    e.preventDefault();
+  };
 
   return (
     <>
@@ -225,7 +242,14 @@ function ScrubDemo() {
         <div className="flex items-center gap-2">
           <span
             {...bind()}
-            className="px-2 py-1 text-sm font-mono border rounded-md bg-background cursor-ew-resize select-none touch-none"
+            role="slider"
+            tabIndex={0}
+            aria-label="Width"
+            aria-valuemin={0}
+            aria-valuemax={SCRUB_MAX}
+            aria-valuenow={value}
+            onKeyDown={handleKeyDown}
+            className="px-2 py-1 text-sm font-mono border rounded-md bg-background cursor-ew-resize select-none touch-none focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             W
           </span>
@@ -296,9 +320,14 @@ const fromHexColor = (hex: string): RGB => ({
 
 function HexDemo() {
   const [color, setColor] = React.useState<RGB>({ r: 255, g: 128, b: 64 });
+  // Set only when the committed input carried alpha (4- or 8-digit hex).
+  const [alpha, setAlpha] = React.useState<number | undefined>(undefined);
   const input = useHexValueInput({
     value: color,
-    onValueCommit: (rgb) => setColor(rgb),
+    onValueCommit: (rgb, opacity) => {
+      setColor(rgb);
+      setAlpha(opacity);
+    },
   });
 
   return (
@@ -317,6 +346,7 @@ function HexDemo() {
             <span className="text-sm font-mono text-muted-foreground">#</span>
             <input
               {...input}
+              aria-label="Hex color"
               className="w-20 text-sm font-mono bg-transparent focus:outline-none"
               spellCheck={false}
             />
@@ -325,6 +355,7 @@ function HexDemo() {
       </Stage>
       <Output>
         rgb({color.r}, {color.g}, {color.b})
+        {alpha !== undefined && ` · alpha ${alpha.toFixed(2)}`}
       </Output>
     </>
   );
@@ -462,15 +493,15 @@ export default function NumberInputPackagePage() {
             <>
               Alpha extraction — 4-digit (<code>RGBA</code>) and 8-digit (
               <code>RRGGBBAA</code>) input commit the RGB plus a separate 0–1
-              opacity.
+              opacity, shown in the readout when present.
             </>,
             <>
               Channel-aware stepping — a selection spanning channels steps them
               together, and the selection is restored after each step.
             </>,
             <>
-              <kbd>Shift</kbd> for coarse steps; works in <code>u8</code>{" "}
-              (0–255) or <code>f32</code> (0–1) channel units.
+              <kbd>Shift</kbd> for coarse steps — unit-aware: <code>u8</code>{" "}
+              (0–255, shown here) or <code>f32</code> (0–1).
             </>,
             <>
               Free typing while focused — invalid input reverts to the last
