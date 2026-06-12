@@ -41,24 +41,21 @@ Models in the ~30B class and up are recommended for agent tasks.
 
 ## Set up Ollama
 
-Open **Settings** from the app menu and find the **Local Models** card.
-
-![The Local Models card in Grida Desktop settings, with a Set up Ollama button](./img/local-models-setup.webp)
-
-Click **Set up Ollama**. The base URL is prefilled with Ollama's local
+Open **Settings** from the app menu, find the **Local Models** card, and
+click **Set up Ollama**. The base URL is prefilled with Ollama's local
 address (`http://localhost:11434/v1`), and the models you have pulled are
-detected automatically — including whether each one supports tool calls.
+detected automatically.
 
-![The Local Models card after setup, with an auto-detected model, context window, and tools toggle](./img/local-models-configured.webp)
+![The Local Models card after setup, with an auto-detected model and its context window and tool-support badges](./img/local-models-configured.webp)
 
 Review the list and click **Save**:
 
-- Each model shows its detected **context window** and **tool-calling**
-  support as read-only badges — these come from the endpoint and refresh
-  automatically whenever you open Settings (and on **Detect**, useful
-  after you `ollama pull` a new model). For a model that is currently
-  loaded, the context window is the size your server actually allocated;
-  otherwise it is the model's maximum.
+- Each detected model shows its **context window** and **tool-calling**
+  support as read-only badges. These come from the endpoint itself and
+  refresh whenever you open Settings (and on **Detect**, useful after you
+  `ollama pull` a new model). For a model that is currently loaded, the
+  context window is the size your server actually allocated; otherwise it
+  is the model's maximum.
 - A model you add manually by id (for example on a gateway that doesn't
   report capabilities) keeps editable fields instead — there, you are
   the data source. Manually added models default to a conservative
@@ -70,26 +67,21 @@ titles and summaries also runs on it.
 ## Use a local model
 
 Registered models appear in the model picker in every agent composer,
-grouped under the endpoint name.
-
-![The model picker listing catalog models and a local model grouped under Ollama](./img/local-models-picker.webp)
-
-Pick the model and chat as usual. Everything the agent does — reading
-your workspace files, making edits, planning — runs against the local
-model. Each session remembers the model it ran with.
+grouped under the endpoint name (for example `gpt-oss:20b · Ollama`).
+Pick one and chat as usual. Everything the agent does — reading your
+workspace files, making edits, planning — runs against the local model.
+Each session remembers the model it ran with.
 
 If you have no provider key configured at all, the agent uses your Ollama
 setup automatically.
 
-## The tools toggle
+## Models without tool support
 
 The agent works through tool calls, so a model that cannot make them
-loses most of its abilities. If you switch **tools** off for a model, the
-composer shows a warning while that model is selected, but you can still
-chat with it.
-
-Ollama lists each model's capabilities — `ollama show <model>` includes
-`tools` when the model supports tool calling.
+loses most of its abilities. Tool support is detected per model — Ollama
+reports it, and `ollama show <model>` lists `tools` when a model supports
+tool calling. When you select a model without tool support, the composer
+shows a warning, but you can still chat with it.
 
 ## Troubleshooting
 
@@ -99,10 +91,10 @@ Ollama lists each model's capabilities — `ollama show <model>` includes
 - **A model is missing from the picker.** Only registered models appear.
   Click **Detect** in **Settings → Local Models** after pulling a new
   model, or add its id manually.
-- **Long sessions stop or degrade.** The registered context window may be
-  larger than what your Ollama serving configuration actually allows.
-  Lower the context window value for the model in **Settings → Local
-  Models**.
+- **Long sessions stop or degrade.** The detected context window may be
+  larger than what your serving configuration actually allows (it
+  converges to the served size once the model has been loaded). To pin a
+  smaller value, set an override in the config file — see below.
 - **Slow responses.** Local speed is your hardware's speed. Smaller
   models respond faster but handle agent tasks worse.
 
