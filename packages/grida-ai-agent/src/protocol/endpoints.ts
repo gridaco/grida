@@ -211,23 +211,29 @@ export function isValidEndpointProviderId(id: string): boolean {
 
 /** Narrow + pin an endpoint base URL: http(s) only. Shared by the config
  *  validator and the probe so the two boundaries can't drift. `base_url`
- *  is the raw input string (NOT `url.href` — no normalization surprises). */
+ *  is the TRIMMED input string (whitespace padding would survive `new
+ *  URL` parsing yet break the string-concatenated request base later) —
+ *  but never `url.href`, no other normalization surprises. */
 export function parseEndpointBaseUrl(
   raw: unknown
 ): { ok: true; base_url: string; url: URL } | { ok: false; error: string } {
   if (typeof raw !== "string" || raw.length > MAX_BASE_URL_LEN) {
     return { ok: false, error: "base_url must be a string" };
   }
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return { ok: false, error: "base_url must be a valid URL" };
+  }
   let url: URL;
   try {
-    url = new URL(raw);
+    url = new URL(trimmed);
   } catch {
     return { ok: false, error: "base_url must be a valid URL" };
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     return { ok: false, error: "base_url must be http(s)" };
   }
-  return { ok: true, base_url: raw, url };
+  return { ok: true, base_url: trimmed, url };
 }
 
 /** Bounds that keep a config a config (not an unbounded blob). */

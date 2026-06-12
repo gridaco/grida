@@ -309,6 +309,10 @@ function LocalModelsSection() {
   const [newModelId, setNewModelId] = useState("");
   const [probing, setProbing] = useState(false);
   const [probeNote, setProbeNote] = useState<string | null>(null);
+  // Whether the endpoint config exists on the host — the API-key slot is
+  // only rendered then (the secrets allowlist accepts CONFIGURED endpoint
+  // ids; a key for an unsaved draft would 400).
+  const [persisted, setPersisted] = useState(false);
 
   /**
    * Discover the endpoint's models (agent-host-side fetch of Ollama's
@@ -366,6 +370,7 @@ function LocalModelsSection() {
       const list = await providers.listEndpoints();
       const ollama = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
       setState({ kind: "ready", draft: ollama ?? null, dirty: false });
+      setPersisted(ollama != null);
       // Detected values converge to the server's truth on every visit —
       // notably /api/ps starts reporting a model's REAL allocation once
       // it has been loaded. Fire-and-forget; failures only leave a note.
@@ -393,6 +398,7 @@ function LocalModelsSection() {
       const list = await providers.listEndpoints();
       const saved = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
       setState({ kind: "ready", draft: saved ?? null, dirty: false });
+      setPersisted(saved != null);
     } catch (err) {
       setState({ kind: "error", message: describeError(err), draft });
     }
@@ -563,6 +569,13 @@ function LocalModelsSection() {
               </div>
             </div>
 
+            {persisted && (
+              <EndpointKeyRow
+                endpointId={draft.id}
+                label={draft.label ?? draft.id}
+              />
+            )}
+
             <div className="flex items-center justify-between">
               <Button
                 variant="ghost"
@@ -615,6 +628,141 @@ function LocalModelsSection() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+type EndpointKeyState =
+  | { kind: "loading" | "empty" | "configured" | "saving" | "removing" }
+  | { kind: "error"; message: string };
+
+/**
+ * Optional API key for a configured endpoint (issue #806). Ollama needs
+ * none; a keyed self-hosted gateway stores its key HERE — through the
+ * same write/presence/delete-only `secrets` surface as BYOK keys, under
+ * the ENDPOINT's id (GRIDA-SEC-004: never inside the endpoint config,
+ * never readable back). Rendered only for a persisted endpoint, since
+ * the secrets allowlist accepts configured endpoint ids only.
+ */
+function EndpointKeyRow({
+  endpointId,
+  label,
+}: {
+  endpointId: string;
+  label: string;
+}) {
+  const [state, setState] = useState<EndpointKeyState>({ kind: "loading" });
+  const [value, setValue] = useState("");
+
+  const refresh = useCallback(async () => {
+    try {
+      setState({
+        kind: (await secrets.hasKey(endpointId)) ? "configured" : "empty",
+      });
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err) });
+    }
+  }, [endpointId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const handleSaveKey = useCallback(async () => {
+    setState({ kind: "saving" });
+    try {
+      await secrets.setKey(endpointId, value);
+      setValue("");
+      await refresh();
+    } catch (err) {
+      setValue("");
+      setState({ kind: "error", message: describeError(err) });
+    }
+  }, [endpointId, value, refresh]);
+
+  const handleRemoveKey = useCallback(async () => {
+    let confirmed = false;
+    try {
+      confirmed = await secrets.confirmDeleteKey(endpointId, label);
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err) });
+      return;
+    }
+    if (!confirmed) return;
+    setState({ kind: "removing" });
+    try {
+      await secrets.deleteKey(endpointId);
+      await refresh();
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err) });
+    }
+  }, [endpointId, label, refresh]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">API key</Label>
+        {(state.kind === "configured" || state.kind === "removing") && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={state.kind === "removing"}
+            onClick={() => void handleRemoveKey()}
+          >
+            {state.kind === "removing" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : null}
+            Remove key
+          </Button>
+        )}
+      </div>
+
+      {state.kind === "loading" ? (
+        <Skeleton className="h-9 w-full" />
+      ) : state.kind === "error" ? (
+        <button
+          type="button"
+          role="alert"
+          aria-live="polite"
+          onClick={() => void refresh()}
+          className="self-start text-left text-sm text-destructive underline-offset-4 hover:underline"
+        >
+          {state.message} (click to retry)
+        </button>
+      ) : state.kind === "configured" || state.kind === "removing" ? (
+        <p className="text-xs text-muted-foreground">
+          A key is configured for this endpoint — stored by the agent host,
+          never shown back.
+        </p>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="Optional — Ollama needs none"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              disabled={state.kind === "saving"}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <Button
+              size="default"
+              disabled={state.kind === "saving" || value.trim().length === 0}
+              onClick={() => void handleSaveKey()}
+            >
+              {state.kind === "saving" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
+              Save key
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            For gateways that require authentication (a keyed LiteLLM or vLLM).
+            Sent as a bearer token on requests to this endpoint.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 

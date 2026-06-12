@@ -46,7 +46,8 @@ export async function isKnownProviderId(
 
 export class EndpointProvidersStore {
   private entries: EndpointProviderConfig[] = [];
-  private loaded = false;
+  private load_promise: Promise<void> | null = null;
+  private write_chain: Promise<void> = Promise.resolve();
   private readonly file_path: string;
 
   constructor(userDataPath: string) {
@@ -59,9 +60,14 @@ export class EndpointProvidersStore {
     return this.file_path;
   }
 
-  private async ensureLoaded(): Promise<void> {
-    if (this.loaded) return;
-    this.loaded = true;
+  /** One shared load: concurrent first calls await the SAME read instead
+   *  of a second caller observing the default empty cache mid-load. */
+  private ensureLoaded(): Promise<void> {
+    this.load_promise ??= this.loadOnce();
+    return this.load_promise;
+  }
+
+  private async loadOnce(): Promise<void> {
     try {
       const raw = await fs.readFile(this.file_path, "utf8");
       const parsed = JSON.parse(raw);
@@ -80,6 +86,18 @@ export class EndpointProvidersStore {
       // re-enter; a hand-edit-the-JSON-to-recover UX would be hostile.
       this.entries = [];
     }
+  }
+
+  /** Serialize mutations: each read-modify-persist runs against the
+   *  previous one's result, so concurrent `set()`/`delete()` calls can't
+   *  compute from stale snapshots and overwrite each other on disk. */
+  private withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.write_chain.then(fn);
+    this.write_chain = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
   }
 
   private async persist(): Promise<void> {
@@ -106,24 +124,28 @@ export class EndpointProvidersStore {
     if (!result.ok) {
       throw new Error(`[agent-host-endpoints] invalid config: ${result.error}`);
     }
-    await this.ensureLoaded();
-    const next = this.entries.filter((e) => e.id !== result.config.id);
-    if (next.length >= MAX_ENTRIES) {
-      throw new Error(
-        `[agent-host-endpoints] too many endpoint providers (max ${MAX_ENTRIES})`
-      );
-    }
-    next.push(result.config);
-    this.entries = next;
-    await this.persist();
+    await this.withWriteLock(async () => {
+      await this.ensureLoaded();
+      const next = this.entries.filter((e) => e.id !== result.config.id);
+      if (next.length >= MAX_ENTRIES) {
+        throw new Error(
+          `[agent-host-endpoints] too many endpoint providers (max ${MAX_ENTRIES})`
+        );
+      }
+      next.push(result.config);
+      this.entries = next;
+      await this.persist();
+    });
   }
 
   async delete(id: string): Promise<void> {
-    await this.ensureLoaded();
-    const next = this.entries.filter((e) => e.id !== id);
-    if (next.length === this.entries.length) return;
-    this.entries = next;
-    await this.persist();
+    await this.withWriteLock(async () => {
+      await this.ensureLoaded();
+      const next = this.entries.filter((e) => e.id !== id);
+      if (next.length === this.entries.length) return;
+      this.entries = next;
+      await this.persist();
+    });
   }
 
   /**

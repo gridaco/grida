@@ -146,9 +146,11 @@ liveDescribe("LIVE — Ollama endpoint provider, no key (issue #806)", () => {
   });
 
   afterEach(async () => {
-    host.runtime.dispose();
-    host.store.close();
-    await fs.rm(baseDir, { recursive: true, force: true });
+    // Conditional: a beforeEach failure leaves `host`/`baseDir` unset —
+    // teardown must surface the setup error, not mask it by throwing.
+    (host as Host | undefined)?.runtime.dispose();
+    (host as Host | undefined)?.store.close();
+    if (baseDir) await fs.rm(baseDir, { recursive: true, force: true });
   });
 
   it(

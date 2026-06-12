@@ -48,10 +48,20 @@ describe("validateEndpointProviderConfig", () => {
   });
 
   it("rejects non-http(s) base URLs", () => {
-    for (const base_url of ["file:///etc", "ftp://x", "not a url", ""]) {
+    for (const base_url of ["file:///etc", "ftp://x", "not a url", "", "  "]) {
       const result = validateEndpointProviderConfig({ ...OLLAMA, base_url });
       expect(result.ok).toBe(false);
     }
+  });
+
+  it("trims whitespace padding off base_url before persisting", () => {
+    const result = validateEndpointProviderConfig({
+      ...OLLAMA,
+      base_url: "  http://localhost:11434/v1\n",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.config.base_url).toBe("http://localhost:11434/v1");
   });
 
   it("rejects duplicate model ids and a dangling default_model_id", () => {
@@ -247,6 +257,39 @@ describe("EndpointProvidersStore", () => {
     ).rejects.toThrow(/invalid config/);
   });
 
+  it("concurrent first reads share one load — no empty-cache window", async () => {
+    await fs.writeFile(
+      path.join(baseDir, "endpoints.json"),
+      JSON.stringify([OLLAMA]),
+      "utf8"
+    );
+    const fresh = new EndpointProvidersStore(baseDir);
+    const [list, entry, models] = await Promise.all([
+      fresh.list(),
+      fresh.get("ollama"),
+      fresh.registeredModels(),
+    ]);
+    expect(list).toHaveLength(1);
+    expect(entry).not.toBeNull();
+    expect(models).toHaveLength(2);
+  });
+
+  it("concurrent writes serialize — neither overwrites the other", async () => {
+    const other: EndpointProviderConfig = {
+      id: "litellm",
+      base_url: "http://localhost:4000/v1",
+      models: [{ id: "m" }],
+    };
+    await Promise.all([store.set(OLLAMA), store.set(other)]);
+    expect((await store.list()).map((e) => e.id).sort()).toEqual([
+      "litellm",
+      "ollama",
+    ]);
+    // The file agrees — a stale-snapshot persist would have dropped one.
+    const fresh = new EndpointProvidersStore(baseDir);
+    expect(await fresh.list()).toHaveLength(2);
+  });
+
   it("drops invalid entries on load instead of failing", async () => {
     await fs.writeFile(
       path.join(baseDir, "endpoints.json"),
@@ -336,6 +379,12 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
 
     const bad = await probePost({});
     expect(bad.status).toBe(400);
+
+    // Malformed input is the caller's fault — 400, not a 502 "outage".
+    const malformed = await probePost({ base_url: "not a url" });
+    expect(malformed.status).toBe(400);
+    const wrongScheme = await probePost({ base_url: "ftp://host/v1" });
+    expect(wrongScheme.status).toBe(400);
   });
 
   it("400s an invalid config with the validator's message", async () => {

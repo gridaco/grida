@@ -20,6 +20,7 @@
 
 import type { Hono } from "hono";
 import {
+  parseEndpointBaseUrl,
   validateEndpointProviderConfig,
   type EndpointProviderConfig,
 } from "../../protocol/endpoints";
@@ -73,10 +74,15 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
     try {
       await endpoints.set(result.config);
     } catch (err) {
-      return c.json(
-        { error: err instanceof Error ? err.message : String(err) },
-        400
-      );
+      const message = err instanceof Error ? err.message : String(err);
+      // The store's own rejections (re-validation, entry cap) are client
+      // errors; anything else is a persistence failure (disk full, no
+      // write permission) — the payload wasn't the problem.
+      if (message.startsWith("[agent-host-endpoints]")) {
+        return c.json({ error: message }, 400);
+      }
+      console.error(`[agent-host-providers] endpoint set failed: ${message}`);
+      return c.json({ error: "failed to persist endpoint config" }, 500);
     }
     console.log(
       `[agent-host-providers] endpoint set id=${result.config.id} models=${result.config.models.length}`
@@ -102,7 +108,13 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
   app.post("/providers/endpoints/probe", async (c) => {
     const r = await body(c, { base_url: v.string });
     if (!r.ok) return r.res;
-    const result = await probe(r.data.base_url);
+    // Malformed input is the caller's fault (400); only a well-formed
+    // URL that doesn't answer is an upstream failure (502).
+    const parsed = parseEndpointBaseUrl(r.data.base_url);
+    if (!parsed.ok) {
+      return c.json({ error: parsed.error }, 400);
+    }
+    const result = await probe(parsed.base_url);
     if (!result.ok) {
       return c.json({ error: result.error }, 502);
     }

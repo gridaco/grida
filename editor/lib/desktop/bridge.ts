@@ -29,6 +29,7 @@ import {
   type AgentUIMessageChunk,
   type AgentRunOptions,
   type ByokProviderId,
+  type ProviderId,
   type ChatMessageWithParts,
   type ChatSessionRow,
   type CreateSessionOptions,
@@ -81,6 +82,7 @@ export {
   type AgentRunOptions,
   type ByokProviderId,
   type ByokProviderMetadata,
+  type ProviderId,
   type ChatMessageRow,
   type ChatMessageWithParts,
   type ChatModel,
@@ -270,7 +272,11 @@ export namespace secrets {
     return BYOK_PROVIDER_METADATA;
   }
 
-  export async function hasKey(providerId: ByokProviderId): Promise<boolean> {
+  // Provider ids here are BYOK ids OR configured endpoint ids (#806) —
+  // a keyed gateway stores its key under its endpoint id through these
+  // same helpers. The agent host validates membership; unknown ids 400.
+
+  export async function hasKey(providerId: ProviderId): Promise<boolean> {
     return await bridgeOrThrow().secrets.has(providerId);
   }
 
@@ -281,7 +287,7 @@ export namespace secrets {
    * round-trip.
    */
   export async function setKey(
-    providerId: ByokProviderId,
+    providerId: ProviderId,
     key: string
   ): Promise<void> {
     if (key.trim().length === 0) {
@@ -290,7 +296,7 @@ export namespace secrets {
     await bridgeOrThrow().secrets.set(providerId, key);
   }
 
-  export async function deleteKey(providerId: ByokProviderId): Promise<void> {
+  export async function deleteKey(providerId: ProviderId): Promise<void> {
     await bridgeOrThrow().secrets.delete(providerId);
   }
 
@@ -305,9 +311,14 @@ export namespace secrets {
    * matches platform convention for destructive prompts.
    */
   export async function confirmDeleteKey(
-    providerId: ByokProviderId
+    providerId: ProviderId,
+    /** Display name override — endpoint ids have no BYOK label. */
+    displayLabel?: string
   ): Promise<boolean> {
-    const label = BYOK_PROVIDER_LABELS[providerId];
+    const label =
+      displayLabel ??
+      BYOK_PROVIDER_LABELS[providerId as ByokProviderId] ??
+      providerId;
     const choice = await bridgeOrThrow().dialog.confirm({
       message: `Remove ${label} key?`,
       detail:

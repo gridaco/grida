@@ -500,10 +500,18 @@ export class AgentRuntime {
     const custom = configs.flatMap(resolveEndpointModels);
     const resolve: ResolveModelLimits = (model) => {
       let effective = model;
-      if (model?.provider_id && !model.model_id) {
+      if (model?.provider_id) {
         const endpoint = configs.find((e) => e.id === model.provider_id);
         const defaultId = endpoint && endpointDefaultModelId(endpoint);
-        if (defaultId) effective = { ...model, model_id: defaultId };
+        // Substitute the endpoint default when the session has no model
+        // id — or a STALE one (saved against a model since removed from
+        // the config): either way, falling through to the catalog tier
+        // would assume a frontier-sized window on a local model.
+        const known =
+          !!model.model_id && custom.some((m) => m.id === model.model_id);
+        if (defaultId && (!model.model_id || !known)) {
+          effective = { ...model, model_id: defaultId };
+        }
       }
       return resolveModelLimits(effective, custom);
     };
@@ -526,9 +534,11 @@ export class AgentRuntime {
     if (!limits.configs.some((e) => e.id === providerId)) return undefined;
     // Limits of the endpoint's DEFAULT model (what `nano` resolves to):
     // a model_id-less ChatModel routes through the resolver's default-
-    // model substitution above. Reserve room for the summary output.
+    // model substitution above. Reserve room for the summary output —
+    // clamped to the window itself so a sub-5k model never gets handed
+    // more input than it can hold.
     const window = limits.resolve({ provider_id: providerId }).context_window;
-    return Math.max(1_024, window - 4_096);
+    return Math.min(window, Math.max(1_024, window - 4_096));
   }
 
   /**

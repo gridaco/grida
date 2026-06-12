@@ -103,8 +103,9 @@ shows a warning, but you can still chat with it.
 The base URL accepts any OpenAI-compatible server on your machine, so a
 local gateway such as LiteLLM or vLLM works the same way: point the base
 URL at it and register the models it serves. If the gateway needs an API
-key, save the key for it under **Settings** — it is stored by the agent
-host and never shown back.
+key, save it in the card's **API key** field (it appears once the
+endpoint is saved) — the key is stored by the agent host and never shown
+back. Ollama itself needs no key.
 
 ## Advanced: the config file
 
