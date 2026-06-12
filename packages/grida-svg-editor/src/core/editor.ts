@@ -1007,21 +1007,30 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       });
     }
     const preview = history.preview(`change ${name}`);
-    // Once superseded (or committed / discarded), every method is a no-op
-    // — the host's close-time `commit()` and defensive `discard()` stay
-    // valid calls instead of throwing on the dead @grida/history session.
-    let closed = false;
+    // Once the session ends — committed, discarded, superseded, OR killed
+    // by history itself (undo/redo discards every active preview) — every
+    // method is a no-op: the host's close-time `commit()` and defensive
+    // `discard()` stay valid calls instead of throwing on the dead
+    // session. Liveness is read from `preview.state`, the producer's own
+    // lifecycle, NOT a local flag: a flag cannot see history-initiated
+    // discards and would desync on the first mid-gesture undo.
+    const live = () => preview.state === "active";
+    // Drop this session's registry entry — identity-checked, because a
+    // superseding session re-occupies the same key and a late commit/
+    // discard on the old session must not evict the new one.
     const close = () => {
-      closed = true;
-      open_property_previews.delete(name);
+      if (open_property_previews.get(name) === discard) {
+        open_property_previews.delete(name);
+      }
     };
-    open_property_previews.set(name, () => {
+    const discard = () => {
       close();
-      preview.discard();
-    });
+      if (live()) preview.discard();
+    };
+    open_property_previews.set(name, discard);
     return {
       update(value: string) {
-        if (closed) return;
+        if (!live()) return;
         preview.set({
           providerId: PROVIDER_ID,
           apply: () => {
@@ -1039,15 +1048,10 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
         });
       },
       commit: () => {
-        if (closed) return;
         close();
-        preview.commit();
+        if (live()) preview.commit();
       },
-      discard: () => {
-        if (closed) return;
-        close();
-        preview.discard();
-      },
+      discard,
     };
   }
 
@@ -1796,6 +1800,15 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       .prune_nested_nodes(selection)
       .filter((id) => doc.parent_of(id) !== null);
     if (filtered.length === 0) return;
+
+    // Deletion supersedes every open property-preview session: the
+    // sessions' deltas target the very nodes being removed, so a
+    // close-time commit() after the delete would push a dead history
+    // step operating on detached nodes. Same rule as the per-name
+    // supersession on discrete writes, widened because removal
+    // invalidates every property cell of the removed nodes. (Live
+    // iteration is safe: each discard deletes only its own map entry.)
+    for (const discard of open_property_previews.values()) discard();
 
     // Sort by document order — apply removes top-to-bottom; revert
     // reinserts bottom-to-top so each captured `next_element_sibling`

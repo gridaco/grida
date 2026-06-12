@@ -413,11 +413,13 @@ export type ReorderDirection =
  * `set_paint_from_gradient`, which write through it) or opening a second
  * session on the same name silently discards this session — the discrete
  * write is the user's final intent and a later `commit()` must not replay
- * the stale previewed value over it. After the session ends for any
- * reason (commit, discard, supersession), every method is a no-op — a
- * defensive `discard()` before a discrete write is valid but no longer
- * required. Sessions on OTHER property names are untouched by discrete
- * writes.
+ * the stale previewed value over it. Deleting the selection (`remove` /
+ * `cut`) discards open sessions on EVERY name, since removal invalidates
+ * every property cell the sessions target; and an undo / redo ends the
+ * session too (history discards all in-flight previews). After the
+ * session ends for any reason, every method is a no-op — a defensive
+ * `discard()` before a discrete write is valid but no longer required.
+ * Sessions on OTHER property names are untouched by discrete writes.
  */
 export type PreviewSession = {
   update(value: string): void;

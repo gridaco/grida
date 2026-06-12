@@ -12,14 +12,15 @@
 
 import { describe, expect, it } from "vitest";
 import { createSvgEditor } from "../src/index";
+import { first_rect } from "./_helpers";
 
 const TRIVIAL = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="10" width="50" height="40" fill="red" stroke="black"/></svg>`;
 
 function setup() {
   const editor = createSvgEditor({ svg: TRIVIAL });
-  const rect = [...editor.tree().nodes.values()].find((n) => n.tag === "rect")!;
-  editor.commands.select(rect.id);
-  return { editor, id: rect.id };
+  const id = first_rect(editor);
+  editor.commands.select(id);
+  return { editor, id };
 }
 
 const hex = (v: string) =>
@@ -129,6 +130,55 @@ describe("discrete writes do NOT touch preview sessions on other properties", ()
     expect(editor.node_paint(id, "stroke").declared).toBe("#00ff00");
     editor.commands.undo();
     expect(editor.node_paint(id, "stroke").declared).toBe("black");
+  });
+});
+
+describe("sessions ended by history or by deletion are no-ops, never throws", () => {
+  it("undo during an open session ends it — commit() replays nothing and never throws", () => {
+    const { editor, id } = setup();
+    editor.commands.set_paint("fill", hex("#3b82f6")); // step 1
+    const session = editor.commands.preview_paint("fill");
+    session.update(hex("#111111"));
+    // History discards every in-flight preview before undoing step 1 —
+    // a liveness flag local to the editor cannot see this discard.
+    editor.commands.undo();
+    expect(editor.node_paint(id, "fill").declared).toBe("red");
+    expect(() => session.commit()).not.toThrow();
+    expect(editor.node_paint(id, "fill").declared).toBe("red");
+    expect(editor.state.can_redo).toBe(true); // commit pushed nothing
+  });
+
+  it("a discrete write after a history-killed session supersedes cleanly", () => {
+    const { editor, id } = setup();
+    editor.commands.set_paint("fill", hex("#3b82f6"));
+    const session = editor.commands.preview_paint("fill");
+    session.update(hex("#111111"));
+    editor.commands.undo();
+    expect(() =>
+      editor.commands.set_paint("fill", hex("#00aa00"))
+    ).not.toThrow();
+    expect(editor.node_paint(id, "fill").declared).toBe("#00aa00");
+    session.commit(); // long dead — still a no-op
+    expect(editor.node_paint(id, "fill").declared).toBe("#00aa00");
+  });
+
+  it("deleting the selection ends open sessions on EVERY name — close-time commit() pushes no dead step", () => {
+    const { editor, id } = setup();
+    const fill = editor.commands.preview_paint("fill");
+    fill.update(hex("#111111"));
+    const opacity = editor.commands.preview_property("opacity");
+    opacity.update("0.5");
+    editor.commands.remove();
+    fill.commit();
+    opacity.commit();
+    // Exactly ONE step (the remove): undo restores the rect with its
+    // authored values, not the previewed ones, and nothing remains.
+    editor.commands.undo();
+    expect(editor.node_paint(id, "fill").declared).toBe("red");
+    expect(
+      editor.node_properties(id, ["opacity"]).opacity.provenance.carrier
+    ).toBe("defaulted");
+    expect(editor.state.can_undo).toBe(false);
   });
 });
 
