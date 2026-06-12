@@ -9,16 +9,18 @@
  *
  * Two shapes, tried in order:
  *
- *   1. **Ollama native** — `GET <origin>/api/tags`. Reports ids AND
- *      capability tags, so `tool_call` comes back real.
+ *   1. **Ollama native** — `GET <origin>/api/tags` for ids + capability
+ *      tags (`tool_call` comes back real), enriched with the context
+ *      window: `/api/ps` first (a LOADED model's `context_length` is the
+ *      server's actual allocation — authoritative), then `/api/show`
+ *      `model_info` (the model's maximum) for models not loaded.
  *   2. **Generic OpenAI-compatible** — `GET <base_url>/models`
  *      (LiteLLM, vLLM, …). Ids only.
  *
- * Deliberately NOT probed: the context window. Ollama's `/api/show`
- * reports a model's architectural maximum (e.g. 262k for a model served
- * at 8k) — auto-filling it would make compaction fire too late and kill
- * long sessions on overflow. That field stays user-set with the
- * registry's conservative default.
+ * Context-window honesty: a server explicitly capped below a model's
+ * maximum (e.g. `OLLAMA_CONTEXT_LENGTH`) reports the cap via `/api/ps`
+ * only once the model is loaded — the `/api/show` maximum can overshoot
+ * such a setup. The field stays user-editable for exactly that case.
  *
  * Threat note (reviewed): the probe makes the host GET a user-supplied
  * URL. This is the SAME egress the run path already performs against a
@@ -42,7 +44,12 @@ export type EndpointProbeResult =
 /** The `fetch` seam — tests inject a fake; production uses the global. */
 export type ProbeFetch = (
   url: string,
-  init: { signal: AbortSignal }
+  init: {
+    signal: AbortSignal;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  }
 ) => Promise<Response>;
 
 export async function probeEndpointModels(
@@ -63,7 +70,10 @@ export async function probeEndpointModels(
   const ollama = await getJson(fetchImpl, `${url.origin}/api/tags`);
   if (ollama.ok) {
     const models = parseOllamaTags(ollama.data);
-    if (models) return { ok: true, source: "ollama", models };
+    if (models) {
+      await enrichContextWindows(fetchImpl, url.origin, models);
+      return { ok: true, source: "ollama", models };
+    }
   }
 
   // 2. Generic OpenAI-compatible — ids only.
@@ -96,6 +106,80 @@ async function getJson(fetchImpl: ProbeFetch, url: string): Promise<JsonProbe> {
   } catch {
     return { ok: false };
   }
+}
+
+async function postJson(
+  fetchImpl: ProbeFetch,
+  url: string,
+  body: unknown
+): Promise<JsonProbe> {
+  try {
+    const res = await fetchImpl(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    if (!res.ok) return { ok: false };
+    const text = await res.text();
+    if (text.length > MAX_BODY_BYTES) return { ok: false };
+    return { ok: true, data: JSON.parse(text) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
+ * Fill `contextWindow` per model. `/api/ps` first — a loaded model's
+ * `context_length` is what the server actually allocated; `/api/show`'s
+ * `model_info.<arch>.context_length` (the model's maximum) covers the
+ * rest. Every miss leaves the field unset (the registry default applies
+ * downstream). Mutates `models` in place.
+ */
+async function enrichContextWindows(
+  fetchImpl: ProbeFetch,
+  origin: string,
+  models: ProbedEndpointModel[]
+): Promise<void> {
+  const loaded = new Map<string, number>();
+  const ps = await getJson(fetchImpl, `${origin}/api/ps`);
+  if (ps.ok) {
+    const rows = (ps.data as { models?: unknown } | null)?.models;
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        const name = (row as { name?: unknown } | null)?.name;
+        const length = (row as { context_length?: unknown }).context_length;
+        if (typeof name === "string" && isPositiveInt(length)) {
+          loaded.set(name, length);
+        }
+      }
+    }
+  }
+  await Promise.all(
+    models.map(async (model) => {
+      const allocated = loaded.get(model.id);
+      if (allocated !== undefined) {
+        model.contextWindow = allocated;
+        return;
+      }
+      const show = await postJson(fetchImpl, `${origin}/api/show`, {
+        model: model.id,
+      });
+      if (!show.ok) return;
+      const info = (show.data as { model_info?: unknown } | null)?.model_info;
+      if (!info || typeof info !== "object") return;
+      for (const [key, value] of Object.entries(info)) {
+        if (key.endsWith(".context_length") && isPositiveInt(value)) {
+          model.contextWindow = value;
+          return;
+        }
+      }
+    })
+  );
+}
+
+function isPositiveInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
 /** `GET /api/tags` → `{models: [{name, capabilities?: string[]}]}`. */

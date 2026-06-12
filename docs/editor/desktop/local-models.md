@@ -56,11 +56,12 @@ Review the list and click **Save**:
 - **Detect** re-scans the endpoint — use it after you `ollama pull` a new
   model. You can also add a model manually by id, or remove ones you
   don't want in the picker.
-- Optionally set each model's **context window** in tokens. This is the
-  one thing detection cannot fill in: Ollama reports a model's maximum
-  context, not the size your server actually runs it with, so Grida
-  assumes a conservative `8192`. If you serve the model with a larger
-  context, raise it so long sessions summarize at the right time.
+- The **context window** is detected too: for a model that is currently
+  loaded, Grida reads the size your server actually allocated; otherwise
+  it uses the model's maximum. The value stays editable — if you cap
+  your server's context (e.g. `OLLAMA_CONTEXT_LENGTH`) below a model's
+  maximum, lower it to match so long sessions summarize at the right
+  time. Manually added models default to a conservative `8192`.
 - Leave **tools** on unless you know the model cannot make tool calls.
 
 The first model in the list is the default — background work like session

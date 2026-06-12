@@ -174,6 +174,9 @@ liveDescribe("LIVE — Ollama endpoint provider, no key (issue #806)", () => {
       expect(found).toBeDefined();
       // The live model advertises tool support via /api/tags capabilities.
       expect(found?.tool_call).toBe(true);
+      // Context window comes from /api/ps (loaded allocation) or
+      // /api/show (model max) — either way a real positive number.
+      expect(found?.contextWindow ?? 0).toBeGreaterThan(0);
     },
     TIMEOUT_MS
   );

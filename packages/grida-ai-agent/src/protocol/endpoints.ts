@@ -63,17 +63,22 @@ export const OLLAMA_ENDPOINT_PRESET = {
 /**
  * A model discovered by probing an endpoint (issue #806 — `POST
  * /providers/endpoints/probe`). Carries only what the endpoint actually
- * REPORTS: Ollama's `/api/tags` exposes ids + capability tags; a generic
- * OpenAI-compatible `/models` exposes ids only. Deliberately NO
- * `contextWindow`: Ollama reports a model's architectural maximum, not
- * the window the server actually serves — auto-filling the max would
- * overflow sessions, so that field stays user-set with a safe default.
+ * REPORTS: Ollama's `/api/tags` exposes ids + capability tags,
+ * `/api/ps` / `/api/show` expose the context window; a generic
+ * OpenAI-compatible `/models` exposes ids only.
  */
 export type ProbedEndpointModel = {
   id: string;
   /** Whether the endpoint reports native tool-calling support. Absent
    *  when the endpoint doesn't expose capabilities. */
   tool_call?: boolean;
+  /**
+   * Context window in tokens, when the endpoint reports one. For a
+   * LOADED Ollama model this is the server's actual allocation
+   * (`/api/ps` `context_length`); otherwise the model's maximum
+   * (`/api/show` `model_info`). Absent when neither reports.
+   */
+  contextWindow?: number;
 };
 
 /**

@@ -345,17 +345,38 @@ function LocalModelsSection() {
 
   /**
    * Discover the endpoint's installed models (agent-host-side fetch of
-   * Ollama's `/api/tags`, or a generic `/models`) and merge the new ids
-   * into the draft. Existing rows keep their user-set fields; the
-   * context window is deliberately NOT probed (endpoints report a
-   * model's architectural max, not the served window) and stays at the
-   * conservative default until raised.
+   * Ollama's `/api/tags` + `/api/ps`/`/api/show` for context windows,
+   * or a generic `/models`) and merge the new ids into the draft.
+   * Existing rows keep their user-set fields. Detected context windows
+   * stay editable — a server explicitly capped below a model's maximum
+   * only reports the cap once the model is loaded.
    */
   const detectInto = useCallback(async (base: EndpointProviderConfig) => {
     setProbing(true);
     setProbeNote(null);
     try {
       const result = await providers.probeEndpoint(base.base_url);
+      const probedById = new Map(result.models.map((m) => [m.id, m]));
+      // Existing rows: fill gaps from the probe, never clobber a value
+      // the user already set.
+      let backfilled = 0;
+      const existing = base.models.map((m): EndpointModelSpec => {
+        const probed = probedById.get(m.id);
+        if (!probed) return m;
+        const next: EndpointModelSpec = {
+          ...m,
+          tool_call:
+            m.tool_call ?? (probed.tool_call === false ? false : undefined),
+          contextWindow: m.contextWindow ?? probed.contextWindow,
+        };
+        if (
+          next.contextWindow !== m.contextWindow ||
+          next.tool_call !== m.tool_call
+        ) {
+          backfilled += 1;
+        }
+        return next;
+      });
       const known = new Set(base.models.map((m) => m.id));
       const discovered = result.models
         .filter((m) => !known.has(m.id))
@@ -365,17 +386,20 @@ function LocalModelsSection() {
             // Only an explicit "no tools" from the endpoint lands in
             // config; true/unknown rides the permissive default.
             tool_call: m.tool_call === false ? false : undefined,
+            contextWindow: m.contextWindow,
           })
         );
       setProbeNote(
         discovered.length > 0
           ? `Found ${discovered.length} model${discovered.length === 1 ? "" : "s"}.`
-          : "No new models found."
+          : backfilled > 0
+            ? "Updated model details."
+            : "No new models found."
       );
-      if (discovered.length > 0) {
+      if (discovered.length > 0 || backfilled > 0) {
         setState({
           kind: "ready",
-          draft: { ...base, models: [...base.models, ...discovered] },
+          draft: { ...base, models: [...existing, ...discovered] },
           dirty: true,
         });
       }

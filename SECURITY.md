@@ -420,8 +420,9 @@ routes sit behind the same CORS/Referer/Basic-Auth stack as everything
 else. The `/providers/endpoints/probe` route makes the host GET a
 user-supplied URL's model listing (the renderer's grida.co origin cannot
 reach a local Ollama itself) — the same egress a configured run already
-performs; the response is parsed and reduced to `{id, tool_call}` rows
-with bounded reads (timeout + size cap), never proxied raw. On sandboxed
+performs; responses are parsed and reduced to
+`{id, tool_call, contextWindow}` rows with bounded reads (timeout + size
+cap), never proxied raw. On sandboxed
 platforms the srt network policy additionally bounds all of this
 structurally: outbound to **localhost** is permitted via the
 `allowLocalBinding` local-ip rule (how the user's own `ollama serve` is

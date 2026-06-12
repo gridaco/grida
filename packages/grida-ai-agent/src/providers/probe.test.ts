@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { probeEndpointModels, type ProbeFetch } from "./probe";
 
-/** Fake fetch keyed by URL; anything unknown 404s. */
+/** Fake fetch keyed by URL; POSTs may key on `url body.model`. */
 function fakeFetch(routes: Record<string, unknown>): ProbeFetch {
-  return async (url) => {
-    if (url in routes) {
-      return new Response(JSON.stringify(routes[url]), { status: 200 });
+  return async (url, init) => {
+    let key = url;
+    if (init.method === "POST" && init.body) {
+      const model = (JSON.parse(init.body) as { model?: string }).model;
+      if (model && `${url} ${model}` in routes) key = `${url} ${model}`;
+    }
+    if (key in routes) {
+      return new Response(JSON.stringify(routes[key]), { status: 200 });
     }
     return new Response("not found", { status: 404 });
   };
@@ -36,6 +41,39 @@ describe("probeEndpointModels", () => {
         { id: "old-model:7b", tool_call: undefined },
       ],
     });
+  });
+
+  it("fills the context window — loaded allocation beats the model max", async () => {
+    const result = await probeEndpointModels(
+      BASE,
+      fakeFetch({
+        "http://localhost:11434/api/tags": {
+          models: [
+            { name: "loaded:31b", capabilities: ["tools"] },
+            { name: "cold:7b", capabilities: ["tools"] },
+            { name: "opaque:1b", capabilities: ["tools"] },
+          ],
+        },
+        // `loaded:31b` is running with a capped allocation — /api/ps is
+        // the server's truth and must win over the /api/show maximum.
+        "http://localhost:11434/api/ps": {
+          models: [{ name: "loaded:31b", context_length: 32_768 }],
+        },
+        "http://localhost:11434/api/show loaded:31b": {
+          model_info: { "gemma4.context_length": 262_144 },
+        },
+        "http://localhost:11434/api/show cold:7b": {
+          model_info: { "llama.context_length": 131_072 },
+        },
+        // `opaque:1b`: /api/show 404s → contextWindow stays unset.
+      })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const byId = new Map(result.models.map((m) => [m.id, m.contextWindow]));
+    expect(byId.get("loaded:31b")).toBe(32_768);
+    expect(byId.get("cold:7b")).toBe(131_072);
+    expect(byId.get("opaque:1b")).toBeUndefined();
   });
 
   it("falls back to the OpenAI /models listing (ids only)", async () => {
