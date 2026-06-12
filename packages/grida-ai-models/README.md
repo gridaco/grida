@@ -64,6 +64,8 @@ Each `ModelSpec` contains:
 - `short_label` — optional, manually-curated compact name for space-constrained
   UI (e.g. `"Opus 4.8"`); falls back to `label` when unset
 - `multimodal`
+- `tool_call` — whether the model supports native tool/function calling
+  (explicit on every entry; the agent loop is tool-heavy)
 - `contextWindow`
 - `outputLimit`
 - `cost`
@@ -73,6 +75,20 @@ Token costs are stored as USD per 1 million tokens.
 For UI that needs the compact name, call `models.text.displayLabel(spec)` — it
 returns `short_label` when present and `label` otherwise, so call sites never
 repeat the fallback.
+
+### Open registry (`models.text.registry`)
+
+`models.text.registry` is the seam for **user-registered models** the static
+catalogue does not know — local Ollama models, self-hosted OpenAI-compatible
+gateways. A `CustomModelSpec` needs only an `id`; `normalize` fills
+conservative defaults (8k context, tool-calling assumed) and
+`resolve(id, custom)` looks an id up over catalogue ∪ custom (the catalogue
+wins on collision). `cost` is optional on custom specs by design — a local
+model is first-class without a price card.
+
+```ts
+const spec = models.text.registry.resolve("llama3.1:8b", customSpecs);
+```
 
 ## Media Models
 
