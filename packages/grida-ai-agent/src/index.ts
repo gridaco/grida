@@ -5,9 +5,25 @@
 export {
   BYOK_PROVIDER_METADATA,
   BYOK_PROVIDER_IDS,
+  isByokProviderId,
   type ByokProviderMetadata,
   type ByokProviderId,
+  type ProviderId,
 } from "./protocol/provider-ids";
+export {
+  OLLAMA_ENDPOINT_PRESET,
+  isValidEndpointProviderId,
+  mergeProbedModels,
+  resolveEndpointModel,
+  resolveEndpointModels,
+  validateEndpointProviderConfig,
+  type EndpointModelEntry,
+  type EndpointModelOverrides,
+  type EndpointModelSpec,
+  type EndpointProviderConfig,
+  type ProbedEndpointModel,
+  type ProbeMergeResult,
+} from "./protocol/endpoints";
 export {
   AGENT_SERVER_PROTOCOL,
   AGENT_SERVER_DEFAULT_CAPABILITIES,

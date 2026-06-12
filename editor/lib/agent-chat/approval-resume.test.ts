@@ -26,6 +26,21 @@ describe("buildApprovalResumeBody", () => {
     });
   });
 
+  it("pins the endpoint provider on resume — same rule as a normal send (#806)", () => {
+    // A resume re-enters /agent/run: without the pin, a registered local
+    // model id would cascade BYOK-first onto a provider that can't serve it.
+    const body = buildApprovalResumeBody({
+      session_id: "ses_1",
+      model_id: "llama3.1:8b",
+      provider_id: "ollama",
+      mode: "accept-edits",
+      tool_call_id: "tc1",
+      approval_id: "ap1",
+      approved: true,
+    });
+    expect(body.provider_id).toBe("ollama");
+  });
+
   it("forwards a denial (approved: false) verbatim", () => {
     const body = buildApprovalResumeBody({
       mode: "accept-edits",

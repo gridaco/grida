@@ -90,6 +90,12 @@ export namespace models {
       short_label?: string;
       /** Whether the model accepts image/file inputs. */
       multimodal: boolean;
+      /**
+       * Whether the model supports native tool/function calling. Explicit
+       * on every entry — the agent loop is tool-heavy, so this flag gates
+       * "can this model drive the agent at all" decisions downstream.
+       */
+      tool_call: boolean;
       /** Maximum context window in tokens (input + output combined). */
       contextWindow: number;
       /** Maximum output tokens per response. */
@@ -108,6 +114,7 @@ export namespace models {
         id: "openai/gpt-5.4-nano",
         label: "GPT-5.4 Nano",
         multimodal: true,
+        tool_call: true,
         contextWindow: 400_000,
         outputLimit: 128_000,
         cost: { input: 0.2, output: 1.25, cacheRead: 0.02 },
@@ -116,6 +123,7 @@ export namespace models {
         id: "openai/gpt-5.4-mini",
         label: "GPT-5.4 Mini",
         multimodal: true,
+        tool_call: true,
         contextWindow: 400_000,
         outputLimit: 128_000,
         cost: { input: 0.75, output: 4.5, cacheRead: 0.075 },
@@ -124,6 +132,7 @@ export namespace models {
         id: "openai/gpt-5.5",
         label: "GPT-5.5",
         multimodal: true,
+        tool_call: true,
         contextWindow: 1_050_000,
         outputLimit: 128_000,
         cost: { input: 5, output: 30, cacheRead: 0.5 },
@@ -132,6 +141,7 @@ export namespace models {
         id: "openai/gpt-5.5-pro",
         label: "GPT-5.5 Pro",
         multimodal: true,
+        tool_call: true,
         contextWindow: 1_050_000,
         outputLimit: 128_000,
         cost: { input: 30, output: 180 },
@@ -141,6 +151,7 @@ export namespace models {
         label: "Claude Sonnet 4.6",
         short_label: "Sonnet 4.6",
         multimodal: true,
+        tool_call: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
@@ -150,6 +161,7 @@ export namespace models {
         label: "Claude Opus 4.8",
         short_label: "Opus 4.8",
         multimodal: true,
+        tool_call: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
@@ -159,6 +171,7 @@ export namespace models {
         label: "Claude Opus 4.7",
         short_label: "Opus 4.7",
         multimodal: true,
+        tool_call: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
@@ -170,6 +183,7 @@ export namespace models {
         id: "google/gemini-3.5-flash",
         label: "Gemini 3.5 Flash",
         multimodal: true,
+        tool_call: true,
         contextWindow: 1_048_576,
         outputLimit: 65_536,
         cost: { input: 1.5, output: 9, cacheRead: 0.15 },
@@ -179,6 +193,7 @@ export namespace models {
         label: "Gemini 3.1 Pro Preview",
         short_label: "Gemini 3.1 Pro",
         multimodal: true,
+        tool_call: true,
         contextWindow: 1_048_576,
         outputLimit: 65_536,
         cost: { input: 2, output: 12, cacheRead: 0.2 },
@@ -238,6 +253,103 @@ export namespace models {
      */
     export function displayLabel(spec: ModelSpec): string {
       return spec.short_label ?? spec.label;
+    }
+
+    // ── models.text.registry ──────────────────────────────────────────
+    //
+    // The open-registry seam (issue #806): spec resolution over the
+    // static catalogue PLUS caller-supplied user-registered models (local
+    // Ollama models, self-hosted OpenAI-compatible gateways). Pure data —
+    // the caller owns where the custom list comes from (agent-host config,
+    // renderer fetch); this namespace only normalizes and resolves.
+
+    export namespace registry {
+      /**
+       * A user-registered text model — a model the static catalogue does
+       * not know (e.g. `llama3.1:8b` served by a local Ollama). Everything
+       * but the id is optional; {@link normalize} fills defaults.
+       *
+       * `cost` is optional by design: local models are free/unmetered, and
+       * a registered model must be first-class without a price card.
+       */
+      export interface CustomModelSpec {
+        /** Provider-side model id, verbatim (e.g. `"llama3.1:8b"`). */
+        id: string;
+        /** Display label. Falls back to the id. */
+        label?: string;
+        /** Whether the model accepts image/file inputs. Default `false`. */
+        multimodal?: boolean;
+        /**
+         * Whether the model supports native tool/function calling.
+         * Default `true` (permissive) — consumers warn rather than block
+         * when this is explicitly `false`.
+         */
+        tool_call?: boolean;
+        /** Context window in tokens. Default {@link CUSTOM_MODEL_DEFAULTS}. */
+        contextWindow?: number;
+        /** Max output tokens per response. Default {@link CUSTOM_MODEL_DEFAULTS}. */
+        outputLimit?: number;
+        /** Cost per 1M tokens in USD. Absent for local/unmetered models. */
+        cost?: ModelCostPerMillion;
+      }
+
+      /**
+       * A spec resolved through the open registry: either a catalogue
+       * {@link ModelSpec} (cost present, `custom: false`) or a normalized
+       * {@link CustomModelSpec} (cost may be absent, `custom: true`).
+       */
+      export interface ResolvedModelSpec extends Omit<ModelSpec, "cost"> {
+        cost?: ModelCostPerMillion;
+        /** True when the spec came from the caller's custom list. */
+        custom: boolean;
+      }
+
+      /**
+       * Defaults applied to a {@link CustomModelSpec} by {@link normalize}.
+       *
+       * The context window is deliberately conservative: overflowing a
+       * local model's real window kills the session mid-run, while a too-
+       * small assumption merely compacts early. 8k matches the common
+       * Ollama serving default; users with larger windows raise it in the
+       * model's config.
+       */
+      export const CUSTOM_MODEL_DEFAULTS = {
+        multimodal: false,
+        tool_call: true,
+        contextWindow: 8_192,
+        outputLimit: 4_096,
+      } as const;
+
+      /** Fill a custom spec's gaps with {@link CUSTOM_MODEL_DEFAULTS}. */
+      export function normalize(spec: CustomModelSpec): ResolvedModelSpec {
+        return {
+          id: spec.id,
+          label: spec.label && spec.label.length > 0 ? spec.label : spec.id,
+          multimodal: spec.multimodal ?? CUSTOM_MODEL_DEFAULTS.multimodal,
+          tool_call: spec.tool_call ?? CUSTOM_MODEL_DEFAULTS.tool_call,
+          contextWindow:
+            spec.contextWindow ?? CUSTOM_MODEL_DEFAULTS.contextWindow,
+          outputLimit: spec.outputLimit ?? CUSTOM_MODEL_DEFAULTS.outputLimit,
+          cost: spec.cost,
+          custom: true,
+        };
+      }
+
+      /**
+       * Resolve a model id over catalogue ∪ custom. The catalogue wins on
+       * a collision (it carries curated labels + real pricing); custom ids
+       * match exactly — local ids like `llama3.1:8b` have no namespacing
+       * convention to fuzzy-match on.
+       */
+      export function resolve(
+        modelId: string,
+        custom?: readonly CustomModelSpec[]
+      ): ResolvedModelSpec | undefined {
+        const fromCatalog = modelSpecById(modelId);
+        if (fromCatalog) return { ...fromCatalog, custom: false };
+        const fromCustom = custom?.find((m) => m.id === modelId);
+        return fromCustom ? normalize(fromCustom) : undefined;
+      }
     }
   }
 

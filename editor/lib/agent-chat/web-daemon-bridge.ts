@@ -219,6 +219,13 @@ export function createWebDaemonBridge(
       set: (providerId, key) => client.secrets.set(providerId, key),
       delete: (providerId) => client.secrets.delete(providerId),
     },
+    providers: {
+      list_endpoints: () => client.providers.list_endpoints(),
+      set_endpoint: (config) => client.providers.set_endpoint(config),
+      delete_endpoint: (id) => client.providers.delete_endpoint(id),
+      info: () => client.providers.info(),
+      probe_endpoint: (baseUrl) => client.providers.probe_endpoint(baseUrl),
+    },
 
     agent: {
       run: (opts, onChunk) =>

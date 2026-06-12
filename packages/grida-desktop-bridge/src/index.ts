@@ -11,7 +11,9 @@ import type {
   AgentRunOptions,
   AgentServerHandshakeResponse,
   AgentUIMessageChunk,
-  ByokProviderId,
+  ProviderId,
+  EndpointProviderConfig,
+  ProbedEndpointModel,
   ChatMessageWithParts,
   ChatSessionRow,
   CreateSessionOptions,
@@ -224,9 +226,29 @@ export type DesktopBridge = {
     }) => Promise<void>;
   };
   secrets: {
-    has: (providerId: ByokProviderId) => Promise<boolean>;
-    set: (providerId: ByokProviderId, key: string) => Promise<void>;
-    delete: (providerId: ByokProviderId) => Promise<void>;
+    has: (providerId: ProviderId) => Promise<boolean>;
+    set: (providerId: ProviderId, key: string) => Promise<void>;
+    delete: (providerId: ProviderId) => Promise<void>;
+  };
+  /**
+   * Endpoint provider config (issue #806) — user-configured OpenAI-
+   * compatible endpoints (Ollama preset, self-hosted gateways). Plain
+   * readable config, unlike `secrets`: list returns full configs.
+   * Optional — older desktop binaries don't carry it; renderers must
+   * feature-detect and hide the surface when absent.
+   */
+  providers?: {
+    list_endpoints: () => Promise<EndpointProviderConfig[]>;
+    set_endpoint: (config: EndpointProviderConfig) => Promise<void>;
+    delete_endpoint: (id: string) => Promise<void>;
+    /** Where the endpoint config JSON lives (the hand-editable file). */
+    info: () => Promise<{ path: string }>;
+    /** Discover the models an endpoint serves (agent-host-side fetch —
+     *  the renderer's origin can't reach a local Ollama directly). */
+    probe_endpoint: (baseUrl: string) => Promise<{
+      source: "ollama" | "openai";
+      models: ProbedEndpointModel[];
+    }>;
   };
   agent: {
     run: (

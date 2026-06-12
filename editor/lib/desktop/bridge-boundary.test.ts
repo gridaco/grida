@@ -66,6 +66,7 @@ describe("/desktop bridge boundary", () => {
       "/secrets/has",
       "/secrets/set",
       "/secrets/delete",
+      "/providers/endpoints/",
       "/sessions",
       "/workspaces",
       "/files/",

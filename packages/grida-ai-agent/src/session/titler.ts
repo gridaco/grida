@@ -45,7 +45,13 @@ export namespace titler {
         system: SYSTEM_PROMPT,
         prompt,
         temperature: 0.3,
-        maxOutputTokens: 32,
+        // The cap must cover REASONING + text: on a thinking model
+        // (e.g. a local Ollama reasoning model) `completion_tokens`
+        // includes the think stream, and a tight cap is consumed before
+        // any title text lands (`finish_reason: length`, empty content).
+        // 512 leaves thinking headroom; a non-thinking nano stops at
+        // ~10 tokens anyway, so the ceiling costs nothing.
+        maxOutputTokens: 512,
         abortSignal: opts.signal,
       });
       return sanitize(text);
@@ -60,7 +66,10 @@ export namespace titler {
     model_factory: ModelFactory;
     /** First user message text — caller extracts from the request body. */
     user_text: string;
-    /** Hard timeout for the title gen call. Defaults to 15s. */
+    /** Hard timeout for the title gen call. Defaults to 60s — generous
+     *  because the call is fire-and-forget (a ceiling, not a wait): fast
+     *  hosted nanos finish in ~1s, while a local single-flight server
+     *  (Ollama) may queue the titler behind the main turn. */
     timeout_ms?: number;
   };
 
@@ -71,7 +80,7 @@ export namespace titler {
     if (!before) return null;
     if (!session_title.isDefault(before.title)) return null;
 
-    const signal = AbortSignal.timeout(opts.timeout_ms ?? 15_000);
+    const signal = AbortSignal.timeout(opts.timeout_ms ?? 60_000);
     const title = await generate({
       model_factory: opts.model_factory,
       user_text: opts.user_text,

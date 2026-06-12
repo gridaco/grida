@@ -30,6 +30,7 @@ const SUPPORTS_TAGS: Record<keyof AgentServerCapabilities, string> = {
   agent: "agent@1",
   workspaces: "workspaces@1",
   sessions: "sessions@1",
+  providers: "providers@1",
   shell: "shell@1",
 };
 

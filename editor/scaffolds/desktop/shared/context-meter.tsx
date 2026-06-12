@@ -17,9 +17,8 @@
 
 import { useMemo } from "react";
 import type { UIMessage } from "ai";
-// `@grida/ai-models` is the framework-free catalog (renderer-safe, unlike
-// the `@/lib/ai/models` server seam) — same import the model picker uses.
-import _models from "@grida/ai-models";
+import type { EndpointProviderConfig } from "@/lib/desktop/bridge";
+import { registered_models } from "./registered-models";
 import { Button } from "@app/ui/components/button";
 import {
   Popover,
@@ -70,14 +69,23 @@ export function DesktopContextMeter({
   messages,
   modelId,
   costUsd,
+  endpoints = [],
 }: {
   messages: UIMessage[];
-  /** Active model id — its catalog spec supplies the context window. */
+  /** Active model id — its resolved spec supplies the context window. */
   modelId: string;
   /** Real session cost so far, in USD. Shown when > 0. */
   costUsd?: number;
+  /** Configured endpoint providers (issue #806) — registered local models
+   *  resolve their real (often small) windows through these. */
+  endpoints?: readonly EndpointProviderConfig[];
 }) {
-  const contextWindow = _models.text.modelSpecById(modelId)?.contextWindow;
+  // Memoized: chat panels re-render per streamed token, and resolve()
+  // rebuilds the flattened spec list each call.
+  const contextWindow = useMemo(
+    () => registered_models.resolve(modelId, endpoints)?.contextWindow,
+    [modelId, endpoints]
+  );
   const {
     usedTokens,
     maxTokens,

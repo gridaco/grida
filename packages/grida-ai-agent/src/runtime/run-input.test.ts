@@ -315,3 +315,73 @@ describe("parseRunBody", () => {
     expect(parsed.approval_answer).toBeUndefined();
   });
 });
+
+describe("parseRunBody — model/provider gates over the open registry (#806)", () => {
+  const msg = { messages: [{ role: "user", content: "hi" }] };
+  const endpoints = {
+    registeredModels: async () => [{ id: "llama3.1:8b" }],
+    get: async (id: string) =>
+      id === "ollama"
+        ? { id: "ollama", base_url: "http://localhost:11434/v1", models: [] }
+        : null,
+  };
+  const deps = {
+    workspace_registry: { findById: async () => null },
+    endpoints,
+  };
+  const depsWithoutEndpoints = {
+    workspace_registry: { findById: async () => null },
+  };
+
+  it("accepts a catalog model id", async () => {
+    const parsed = await parseRunBody(
+      { ...msg, model_id: "anthropic/claude-opus-4.8" },
+      deps as never
+    );
+    expect(parsed).not.toBeInstanceOf(Response);
+  });
+
+  it("accepts a registered endpoint model id", async () => {
+    const parsed = await parseRunBody(
+      { ...msg, model_id: "llama3.1:8b" },
+      deps as never
+    );
+    expect(parsed).not.toBeInstanceOf(Response);
+    if (parsed instanceof Response) return;
+    expect(parsed.model_id).toBe("llama3.1:8b");
+  });
+
+  it("still 400s an unknown model id (the gate stays closed)", async () => {
+    const parsed = await parseRunBody(
+      { ...msg, model_id: "not-a-model" },
+      deps as never
+    );
+    expect(parsed).toBeInstanceOf(Response);
+    expect(parsed instanceof Response ? parsed.status : 0).toBe(400);
+  });
+
+  it("400s a registered-looking id when no endpoints store is wired", async () => {
+    const parsed = await parseRunBody(
+      { ...msg, model_id: "llama3.1:8b" },
+      depsWithoutEndpoints as never
+    );
+    expect(parsed).toBeInstanceOf(Response);
+  });
+
+  it("accepts a configured endpoint id as provider_id, rejects unknown", async () => {
+    const ok = await parseRunBody(
+      { ...msg, provider_id: "ollama" },
+      deps as never
+    );
+    expect(ok).not.toBeInstanceOf(Response);
+    if (ok instanceof Response) return;
+    expect(ok.explicit).toBe("ollama");
+
+    const bad = await parseRunBody(
+      { ...msg, provider_id: "nope" },
+      deps as never
+    );
+    expect(bad).toBeInstanceOf(Response);
+    expect(bad instanceof Response ? bad.status : 0).toBe(400);
+  });
+});

@@ -25,6 +25,10 @@ export function makeOpenRouterFactory(apiKey: string): ModelFactory {
     baseURL: "https://openrouter.ai/api/v1",
     apiKey,
     headers: OPENROUTER_HEADERS,
+    // OpenAI-compat streams omit the usage chunk unless
+    // `stream_options.include_usage` is requested — without it every
+    // streamed run records zero tokens (no rollups, no context meter).
+    includeUsage: true,
   });
   // Both OpenRouter and the catalog use Vercel-style `creator/model`
   // ids, so an explicit pick hands straight through; otherwise fall
@@ -35,4 +39,32 @@ export function makeOpenRouterFactory(apiKey: string): ModelFactory {
 export function makeVercelFactory(apiKey: string): ModelFactory {
   const provider = createGateway({ apiKey });
   return (tier, modelId) => provider(modelId ?? MODEL_BY_TIER[tier]);
+}
+
+/**
+ * Factory for a user-configured OpenAI-compatible endpoint (issue #806) —
+ * Ollama, LiteLLM, vLLM, any self-hosted gateway. The "no signup" trick
+ * is that `api_key` is OPTIONAL: when absent (Ollama) no Authorization
+ * header is sent, and that is not an error.
+ *
+ * Tier mapping: EVERY tier resolves to the endpoint's default model. The
+ * catalog's tier→id table (`anthropic/claude-…`) is meaningless to a
+ * local endpoint, and background subagents (titler, compactor) resolve
+ * tiers too — they must land on a model this endpoint actually serves.
+ */
+export function makeEndpointFactory(config: {
+  id: string;
+  base_url: string;
+  api_key?: string;
+  default_model_id: string;
+}): ModelFactory {
+  const provider = createOpenAICompatible({
+    name: config.id,
+    baseURL: config.base_url,
+    apiKey: config.api_key,
+    // Same as the OpenRouter factory: opt in to the streaming usage
+    // chunk, or streamed runs record zero tokens.
+    includeUsage: true,
+  });
+  return (_tier, modelId) => provider(modelId ?? config.default_model_id);
 }

@@ -402,6 +402,34 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    the BYOK provider; key material never returns to renderer. Closes
    the exfil path even if all four layers above were bypassed.
 
+**Endpoint providers (local LLMs, #806).** The agent host additionally
+serves `/providers/endpoints/*` — CRUD over user-configured
+OpenAI-compatible endpoints (Ollama preset, self-hosted gateways),
+persisted at `${userData}/endpoints.json`. The split that keeps layer 5
+intact: an endpoint **config** (base URL + registered model list) is
+plain readable config the renderer may list back, while an endpoint's
+optional **API key** rides the `/secrets/*` surface under the endpoint's
+id (the secrets-route allowlist admits configured endpoint ids) and is
+never readable. The config validator
+(`packages/grida-ai-agent/src/protocol/endpoints.ts`) pins the shape —
+http(s) URL, bounded sizes, unknown fields dropped — so a config write
+cannot smuggle credentials or blobs into the readable store. The
+`base_url` is user-owned egress by design (the desktop user points their
+own agent at their own endpoint — same trust model as BYOK), and the
+routes sit behind the same CORS/Referer/Basic-Auth stack as everything
+else. The `/providers/endpoints/probe` route makes the host GET a
+user-supplied URL's model listing (the renderer's grida.co origin cannot
+reach a local Ollama itself) — the same egress a configured run already
+performs; responses are parsed and reduced to
+`{id, tool_call, contextWindow}` rows with bounded reads (timeout + size
+cap), never proxied raw. On sandboxed
+platforms the srt network policy additionally bounds all of this
+structurally: outbound to **localhost** is permitted via the
+`allowLocalBinding` local-ip rule (how the user's own `ollama serve` is
+reached), while a config pointing at an arbitrary **remote** host is
+blocked unless that host is in the enumerated `allowed_domains` — a
+hostile config cannot turn the sidecar into an open exfil channel.
+
 **Electron-side hardening (mandatory; see the
 [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security)).**
 `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`,

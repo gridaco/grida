@@ -57,6 +57,7 @@ import {
   DesktopModelPicker,
   useModelPickerState,
 } from "@/scaffolds/desktop/shared/model-picker";
+import { useEndpointProviders } from "@/scaffolds/desktop/shared/registered-models";
 import { useWorkspaceComposerCatalog } from "@/scaffolds/desktop/shared/use-workspace-composer-catalog";
 import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 
@@ -110,6 +111,10 @@ export default function DesktopWelcomePage() {
   // empty id and yields an empty catalog.
   const catalog = useWorkspaceComposerCatalog(selectedId ?? "");
 
+  // Configured endpoint providers (issue #806): registered local models
+  // join the welcome composer's picker too.
+  const endpoints = useEndpointProviders();
+
   // Model selection for the composer. No sessions here (the welcome page
   // never loads a chat), so this just holds the user's pick at the
   // default; it rides the handoff so the workspace chat's first turn runs
@@ -117,6 +122,7 @@ export default function DesktopWelcomePage() {
   const { model_id: modelId, setModelId } = useModelPickerState({
     current_id: null,
     sessions: [],
+    endpoints,
   });
 
   const onOpen = useCallback(async () => {
@@ -271,6 +277,7 @@ export default function DesktopWelcomePage() {
                 <DesktopModelPicker
                   value={modelId}
                   onValueChange={setModelId}
+                  endpoints={endpoints}
                 />
               }
             />

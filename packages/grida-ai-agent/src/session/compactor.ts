@@ -20,8 +20,12 @@ import type { ModelTier } from "../tiers";
 
 /** Cheapest tier the provider exposes (RFC: `nano` / `small`). */
 const COMPACTOR_TIER: ModelTier = "nano";
-const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
-const DEFAULT_TIMEOUT_MS = 30_000;
+// The cap must cover REASONING + the summary: on a thinking model the
+// output budget includes the think stream, and a tight cap truncates
+// before the Markdown summary lands. Non-thinking models stop at the
+// summary length anyway, so the ceiling is free for them.
+const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 const SYSTEM_PROMPT = `You compress a long agent/user conversation into a compact, faithful summary so the conversation can continue with less context.
 
