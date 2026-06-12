@@ -311,7 +311,9 @@ export function useCanRedo(): boolean {
 // lazily opens a fresh one — picker open → commit → reopen works
 // without a remount.
 
-function use_lifecycle_session<S extends { discard(): void }>(
+function use_lifecycle_session<
+  S extends { discard(): void; readonly live?: boolean },
+>(
   open: () => S,
   deps: React.DependencyList
 ): {
@@ -322,6 +324,11 @@ function use_lifecycle_session<S extends { discard(): void }>(
   const ops = useMemo(
     () => ({
       ensure(): S {
+        // The cached session can end underneath the hook — superseded by
+        // a discrete same-name write, killed by undo/redo, or invalidated
+        // by remove/load (see `PreviewSession`'s lifecycle invariant).
+        // A dead session is a permanent no-op; drop it and reopen.
+        if (sessionRef.current?.live === false) sessionRef.current = null;
         if (!sessionRef.current) sessionRef.current = open();
         return sessionRef.current;
       },
@@ -357,6 +364,9 @@ export function usePaintPreview(
   );
   return useMemo<PaintPreviewSession>(
     () => ({
+      // The hook facade lazily (re)opens its underlying session — from
+      // the host's perspective it is always usable.
+      live: true,
       update: (paint: Paint) => lc.ensure().update(paint),
       commit: () => lc.finalize("commit", (s) => s.commit()),
       discard: () => lc.finalize("discard", () => {}),
@@ -374,6 +384,9 @@ export function usePropertyPreview(name: string): PreviewSession {
   );
   return useMemo<PreviewSession>(
     () => ({
+      // Same as usePaintPreview: the facade reopens lazily, so it is
+      // always usable.
+      live: true,
       update: (value: string) => lc.ensure().update(value),
       commit: () => lc.finalize("commit", (s) => s.commit()),
       discard: () => lc.finalize("discard", () => {}),

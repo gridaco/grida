@@ -398,7 +398,7 @@ editor.commands.preview_property(name: string): {
 
 The editor decides whether to write a presentation attribute vs. inline style for each selected node based on whichever wins the cascade for that element (P1). The preview session is what a number-input scrub or color-picker drag uses: many `update()` calls during drag, one `commit()` on pointer-up.
 
-A discrete write to the same property (`set_property(name, …)`, or `set_paint` / `set_paint_from_gradient` on the same channel) **supersedes** an open preview session on that name: the editor silently discards the session, so a UI that mixes a picker drag with preset buttons cannot replay the stale dragged value when it commits on close. After that, the session's `update` / `commit` / `discard` are no-ops. Sessions on other property names are unaffected.
+A preview session ends as soon as its result can no longer become the document's next state — and after it ends, every method is a no-op and `session.live` is `false`. A discrete write to the same property (`set_property(name, …)`, or `set_paint` / `set_paint_from_gradient` on the same channel) **supersedes** an open session on that name, so a UI that mixes a picker drag with preset buttons cannot replay the stale dragged value when it commits on close; sessions on other property names are unaffected by discrete writes. Operations that detach the session's targets (`remove` / `cut`, `ungroup`), a document swap (`load` / `reset`), and `undo` / `redo` end open sessions on every name. Hosts that cache a session should consult `live` and lazily reopen — the bundled React hooks do.
 
 ### Observation — paint (`fill` / `stroke`)
 

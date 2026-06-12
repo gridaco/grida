@@ -182,6 +182,124 @@ describe("sessions ended by history or by deletion are no-ops, never throws", ()
   });
 });
 
+describe("session.live reflects the lifecycle", () => {
+  it("true while open; false after commit, discard, supersession, and undo", () => {
+    const { editor } = setup();
+    const a = editor.commands.preview_paint("fill");
+    expect(a.live).toBe(true);
+    a.commit();
+    expect(a.live).toBe(false);
+
+    const b = editor.commands.preview_paint("fill");
+    editor.commands.set_paint("fill", hex("#3b82f6")); // supersedes b
+    expect(b.live).toBe(false);
+
+    const c = editor.commands.preview_paint("fill");
+    c.update(hex("#111111"));
+    editor.commands.undo(); // history kills c
+    expect(c.live).toBe(false);
+  });
+});
+
+describe("a session writes only the selection captured at open", () => {
+  const TWO = `<svg xmlns="http://www.w3.org/2000/svg"><rect width="5" height="5" fill="red"/><circle r="3" fill="blue"/></svg>`;
+
+  it("reselecting mid-gesture never paints the new selection, so revert is always complete", () => {
+    const editor = createSvgEditor({ svg: TWO });
+    const rect_id = first_rect(editor);
+    const circle_id = [...editor.tree().nodes.values()].find(
+      (n) => n.tag === "circle"
+    )!.id;
+    editor.commands.select(rect_id);
+    const session = editor.commands.preview_property("opacity");
+    session.update("0.3");
+    editor.commands.select(circle_id); // selection changes mid-gesture
+    session.update("0.6");
+    // The previewed writes stayed on the open-time target.
+    expect(editor.node_properties(rect_id, ["opacity"]).opacity.declared).toBe(
+      "0.6"
+    );
+    expect(
+      editor.node_properties(circle_id, ["opacity"]).opacity.provenance.carrier
+    ).toBe("defaulted");
+    session.commit();
+    editor.commands.undo();
+    expect(
+      editor.node_properties(rect_id, ["opacity"]).opacity.provenance.carrier
+    ).toBe("defaulted");
+  });
+});
+
+describe("document swap and node-detaching commands end open sessions", () => {
+  it("load() ends open sessions — close-time commit() pushes nothing into the fresh document's history", () => {
+    const { editor } = setup();
+    const session = editor.commands.preview_paint("fill");
+    session.update(hex("#111111"));
+    const NEXT = `<svg xmlns="http://www.w3.org/2000/svg"><rect width="9" height="9" fill="green"/></svg>`;
+    editor.load(NEXT);
+    expect(session.live).toBe(false);
+    session.commit();
+    expect(editor.state.can_undo).toBe(false);
+    expect(editor.node_paint(first_rect(editor), "fill").declared).toBe(
+      "green"
+    );
+  });
+
+  it("reset() ends open sessions the same way", () => {
+    const { editor, id } = setup();
+    editor.commands.set_paint("fill", hex("#3b82f6"));
+    const session = editor.commands.preview_paint("fill");
+    session.update(hex("#111111"));
+    editor.reset();
+    expect(session.live).toBe(false);
+    session.commit();
+    expect(editor.state.can_undo).toBe(false);
+    expect(editor.node_paint(id, "fill").declared).toBe("red");
+  });
+
+  it("cut during an open session captures the committed document — clipboard payload and undo agree", () => {
+    const { editor, id } = setup();
+    const session = editor.commands.preview_paint("fill");
+    session.update(hex("#111111"));
+    const payload = editor.commands.cut();
+    // The preview was discarded BEFORE the payload was captured.
+    expect(payload).toContain('fill="red"');
+    expect(payload).not.toContain("#111111");
+    session.commit();
+    editor.commands.undo(); // exactly one step: the cut
+    expect(editor.node_paint(id, "fill").declared).toBe("red");
+    expect(editor.state.can_undo).toBe(false);
+  });
+
+  it("ungroup ends open sessions — a previewed group transform is neither baked nor resurrected by undo", () => {
+    const GROUPED = `<svg xmlns="http://www.w3.org/2000/svg"><g transform="translate(1 2)"><rect width="5" height="5"/></g></svg>`;
+    const editor = createSvgEditor({ svg: GROUPED });
+    const g_id = [...editor.tree().nodes.values()].find(
+      (n) => n.tag === "g"
+    )!.id;
+    const rect_id = first_rect(editor);
+    editor.commands.select(g_id);
+    // `transform` is on ungroup's own-attribute allowlist, so a transform
+    // preview is the one gesture that can reach the dissolve.
+    const session = editor.commands.preview_property("transform");
+    session.update("translate(5 5)");
+    expect(editor.commands.ungroup()).toBe(true);
+    expect(session.live).toBe(false);
+    // The baked child transform composes the AUTHORED group transform,
+    // not the previewed one.
+    const baked = editor.node_properties(rect_id, ["transform"]).transform
+      .declared!;
+    expect(baked).toContain("translate(1 2)");
+    expect(baked).not.toContain("translate(5 5)");
+    session.commit(); // dead — pushes nothing
+    editor.commands.undo(); // exactly one step: the ungroup
+    expect(editor.node_properties(g_id, ["transform"]).transform.declared).toBe(
+      "translate(1 2)"
+    );
+    expect(editor.state.can_undo).toBe(false);
+  });
+});
+
 describe("opening a second session on the same property supersedes the first", () => {
   it("the first session's commit replays nothing; the second reverts to the true pre-gesture state on discard", () => {
     const { editor, id } = setup();

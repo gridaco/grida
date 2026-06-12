@@ -946,6 +946,17 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     open_property_previews.get(name)?.();
   }
 
+  /** End EVERY open preview session. Called by operations that detach
+   *  nodes (remove / cut, ungroup) or replace the document (load,
+   *  reset): the sessions' deltas target nodes that are about to die,
+   *  so a later close-time `commit()` would push a dead history step.
+   *  Must run BEFORE the destructive mutation — each discard reverts
+   *  its in-flight delta against the still-intact document. (Live
+   *  iteration is safe: each discard deletes only its own map entry.) */
+  function discard_open_property_previews() {
+    for (const discard of open_property_previews.values()) discard();
+  }
+
   function set_property(name: string, value: string | null) {
     if (selection.length === 0) return;
     // The discrete write supersedes any in-flight preview gesture on the
@@ -994,12 +1005,17 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     // Discard BEFORE capturing `before` so this session reverts to the
     // true pre-gesture state, not the prior session's previewed value.
     supersede_property_preview(name);
+    // Targets are pinned at session open — `before` only covers these
+    // nodes, so apply must never chase the live selection: a selection
+    // change mid-gesture (or before a history redo replays the
+    // committed delta) would write nodes the revert cannot restore.
+    const targets = [...selection];
     const before: Array<{
       id: NodeId;
       attr: string | null;
       style: string | null;
     }> = [];
-    for (const id of selection) {
+    for (const id of targets) {
       before.push({
         id,
         attr: doc.get_attr(id, name),
@@ -1029,12 +1045,15 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     };
     open_property_previews.set(name, discard);
     return {
+      get live() {
+        return live();
+      },
       update(value: string) {
         if (!live()) return;
         preview.set({
           providerId: PROVIDER_ID,
           apply: () => {
-            for (const id of selection) write_property(id, name, value);
+            for (const id of targets) write_property(id, name, value);
             emit();
           },
           revert: () => {
@@ -1064,6 +1083,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   function preview_paint(channel: "fill" | "stroke"): PaintPreviewSession {
     const session = preview_property(channel);
     return {
+      get live() {
+        return session.live;
+      },
       update: (p: Paint) => session.update(paint.serialize(p)),
       commit: () => session.commit(),
       discard: () => session.discard(),
@@ -1801,14 +1823,10 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       .filter((id) => doc.parent_of(id) !== null);
     if (filtered.length === 0) return;
 
-    // Deletion supersedes every open property-preview session: the
-    // sessions' deltas target the very nodes being removed, so a
-    // close-time commit() after the delete would push a dead history
-    // step operating on detached nodes. Same rule as the per-name
-    // supersession on discrete writes, widened because removal
-    // invalidates every property cell of the removed nodes. (Live
-    // iteration is safe: each discard deletes only its own map entry.)
-    for (const discard of open_property_previews.values()) discard();
+    // Deletion supersedes every open property-preview session — see
+    // `discard_open_property_previews`. (`cut` runs the sweep earlier,
+    // before its payload capture; this call is then a no-op.)
+    discard_open_property_previews();
 
     // Sort by document order — apply removes top-to-bottom; revert
     // reinserts bottom-to-top so each captured `next_element_sibling`
@@ -1895,6 +1913,15 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       if (selection.length !== 1) return false;
       target = selection[0];
     }
+
+    // End open preview sessions BEFORE planning: the plan must evaluate
+    // the COMMITTED document, not transient preview state — a previewed
+    // attribute would otherwise leak into the plan (a previewed
+    // `transform` passes the own-attribute allowlist and would be baked
+    // into children) or phantom-refuse it (any other previewed property
+    // fails the allowlist). Eager on refusal by design: a structural
+    // command on the gesture's own target ends the gesture.
+    discard_open_property_previews();
 
     const plan = group_policy.plan_ungroup(doc, target);
     if (!plan) return false;
@@ -2142,6 +2169,12 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   function cut_impl(deliver_external: boolean): string | null {
+    // End in-flight preview sessions BEFORE capturing the payload: the
+    // deletion will discard them anyway (remove_selection), but if that
+    // happened after the copy, the clipboard would carry the previewed
+    // (never-committed) values while undo restores the pre-gesture
+    // state — paste and undo would disagree.
+    discard_open_property_previews();
     // Extract BEFORE removing — `serialize_node` throws on detached
     // nodes, and the FRD requires the payload secured in the buffer
     // before the deletion commits.
@@ -2460,6 +2493,12 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   function load_svg(svg: string) {
+    // End open preview sessions BEFORE the document swap: their reverts
+    // must run against the old document (the parser reuses NodeIds per
+    // parse, so a late revert would stamp old values onto colliding
+    // new-document nodes), and a close-time commit() must not push a
+    // dead step into the fresh history.
+    discard_open_property_previews();
     doc.load(svg);
     selection = [];
     scope = null;
@@ -2541,6 +2580,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   function reset() {
+    // Same ordering rule as `load_svg`: end sessions against the
+    // still-intact document, before history and the doc are reset.
+    discard_open_property_previews();
     history.clear();
     doc.reset_to_original();
     selection = [];

@@ -408,20 +408,32 @@ export type ReorderDirection =
  * `commands.preview_property(name)`: many `update()` calls during a drag,
  * one `commit()` (→ single history step) or `discard()` (→ no step).
  *
- * Supersession: a discrete write to the same property
- * (`set_property(name, …)` — and for paint channels `set_paint` /
- * `set_paint_from_gradient`, which write through it) or opening a second
- * session on the same name silently discards this session — the discrete
- * write is the user's final intent and a later `commit()` must not replay
- * the stale previewed value over it. Deleting the selection (`remove` /
- * `cut`) discards open sessions on EVERY name, since removal invalidates
- * every property cell the sessions target; and an undo / redo ends the
- * session too (history discards all in-flight previews). After the
- * session ends for any reason, every method is a no-op — a defensive
- * `discard()` before a discrete write is valid but no longer required.
- * Sessions on OTHER property names are untouched by discrete writes.
+ * Lifecycle invariant: **the session ends as soon as its result can no
+ * longer become the document's next state** — and after it ends, for any
+ * reason, every method is a no-op (never a throw) and `live` is `false`.
+ * The ending events:
+ *
+ * - `commit()` / `discard()` — the host closes the gesture;
+ * - a discrete write to the same property (`set_property(name, …)`, and
+ *   for paint channels `set_paint` / `set_paint_from_gradient`, which
+ *   write through it) — the discrete write is the user's final intent
+ *   and a later `commit()` must not replay the stale previewed value;
+ * - opening a second session on the same name (same supersession rule);
+ * - an operation that detaches the session's target nodes (`remove` /
+ *   `cut`, `ungroup`) — sessions on EVERY name end, since the deltas
+ *   would target detached nodes;
+ * - a document swap (`load` / `reset`) — every NodeId dies wholesale;
+ * - `undo` / `redo` — history discards all in-flight previews.
+ *
+ * A defensive `discard()` before a discrete write is valid but not
+ * required. Sessions on OTHER property names are untouched by discrete
+ * writes. Hosts that cache a session across renders should consult
+ * `live` and lazily reopen — the bundled React hooks do this.
  */
 export type PreviewSession = {
+  /** `true` while the session can still affect the document; `false`
+   *  once it has ended for any of the reasons above. */
+  readonly live: boolean;
   update(value: string): void;
   commit(): void;
   discard(): void;
@@ -431,6 +443,7 @@ export type PreviewSession = {
  *  `commands.preview_paint(channel)`. Same lifecycle and supersession
  *  contract — the channel ("fill" / "stroke") is the property name. */
 export type PaintPreviewSession = {
+  readonly live: boolean;
   update(paint: Paint): void;
   commit(): void;
   discard(): void;
