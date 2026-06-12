@@ -7,6 +7,190 @@ export namespace color {
   }
   export const names: typeof colorname = colorname;
 
+  /**
+   * Clamps a value between 0.0 and 1.0.
+   */
+  function clamp01(v: number): number {
+    return v <= 0 ? 0 : v >= 1 ? 1 : v;
+  }
+
+  /**
+   * Clamps a value between 0 and 100.
+   */
+  function clamp100(v: number): number {
+    return v <= 0 ? 0 : v >= 100 ? 100 : v;
+  }
+
+  /**
+   * Clamps a value between 0 and 255 and rounds it to the nearest integer.
+   */
+  function clamp255(v: number): number {
+    return v <= 0 ? 0 : v >= 255 ? 255 : Math.round(v);
+  }
+
+  /**
+   * Wraps a hue (degrees) into the [0, 360) range.
+   */
+  function wrapHue(h: number): number {
+    return ((h % 360) + 360) % 360;
+  }
+
+  /**
+   * hsl -> rgb per CSS Color 4 §7 (the spec's own sample algorithm,
+   * which is what browsers implement).
+   *
+   * @param h - Hue in degrees (any finite value; wrapped mod 360).
+   * @param s - Saturation in percent (clamped to [0, 100]).
+   * @param l - Lightness in percent (clamped to [0, 100]).
+   * @returns [r, g, b] in the 0-255 range (unrounded).
+   */
+  function hslToRGB255(
+    h: number,
+    s: number,
+    l: number
+  ): [number, number, number] {
+    const hue = wrapHue(h);
+    const sat = clamp100(s) / 100;
+    const light = clamp100(l) / 100;
+    const f = (n: number): number => {
+      const k = (n + hue / 30) % 12;
+      const a = sat * Math.min(light, 1 - light);
+      return light - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    };
+    return [f(0) * 255, f(8) * 255, f(4) * 255];
+  }
+
+  /**
+   * hwb -> rgb per CSS Color 4 §8.
+   *
+   * @param h - Hue in degrees (any finite value; wrapped mod 360).
+   * @param w - Whiteness in percent (clamped to [0, 100]).
+   * @param b - Blackness in percent (clamped to [0, 100]).
+   * @returns [r, g, b] in the 0-255 range (unrounded).
+   */
+  function hwbToRGB255(
+    h: number,
+    w: number,
+    b: number
+  ): [number, number, number] {
+    const white = clamp100(w) / 100;
+    const black = clamp100(b) / 100;
+    if (white + black >= 1) {
+      const gray = (white / (white + black)) * 255;
+      return [gray, gray, gray];
+    }
+    const rgb = hslToRGB255(h, 100, 50);
+    return [
+      (rgb[0] / 255) * (1 - white - black) * 255 + white * 255,
+      (rgb[1] / 255) * (1 - white - black) * 255 + white * 255,
+      (rgb[2] / 255) * (1 - white - black) * 255 + white * 255,
+    ];
+  }
+
+  /**
+   * Resolves a CSS `<color>` string (or `0xRRGGBB` number) to its canonical
+   * sRGB form as a branded {@link colorformats.RGB888A32F} — without a DOM
+   * or canvas. Sits on top of {@link parse}; parse behavior is the source
+   * of truth for what each syntax means.
+   *
+   * **Resolvable** (returns a value):
+   * - named colors (`"red"`, `"REBECCAPURPLE"`) and `"transparent"`
+   *   (resolves to `{ r: 0, g: 0, b: 0, a: 0 }` per CSS)
+   * - 3/4/6/8-digit hex (`"#f00"`, `"#ff000080"`)
+   * - `rgb()` / `rgba()` (number or percentage channels, comma or slash syntax)
+   * - `hsl()` / `hsla()` — converted per CSS Color 4 §7
+   * - `hwb()` — converted per CSS Color 4 §8
+   * - numbers, read as `0xRRGGBB`
+   *
+   * **Not resolvable** (returns `null`, never a guess):
+   * - `currentColor` and other context-dependent keywords
+   * - `lab()` / `lch()` / `oklab()` / `oklch()` / `color()` — gamut mapping
+   *   is out of scope
+   * - `cmyk` / `gray` / other non-CSS spaces {@link parse} understands
+   * - malformed or unparseable input
+   *
+   * Edge semantics (matching browser behavior):
+   * - input is trimmed and case-insensitive
+   * - hue wraps mod 360 (negative hues allowed)
+   * - saturation / lightness / whiteness / blackness clamp to [0, 100]
+   * - rgb channels clamp to [0, 255] and round to integers
+   * - alpha clamps to [0, 1]
+   * - never throws; invalid input resolves to `null`
+   *
+   * @param cstr - CSS color string, or a number read as `0xRRGGBB`.
+   * @returns The resolved color, or `null` when resolution requires a
+   * rendering context or the space is out of scope.
+   *
+   * @example
+   * ```typescript
+   * resolve("hsl(217 91% 60%)"); // { r: 60, g: 131, b: 246, a: 1 }
+   * resolve("rgba(255, 0, 0, 0.5)"); // { r: 255, g: 0, b: 0, a: 0.5 }
+   * resolve("transparent"); // { r: 0, g: 0, b: 0, a: 0 }
+   * resolve("currentColor"); // null
+   * resolve("oklch(0.7 0.1 200)"); // null
+   * ```
+   */
+  export function resolve(
+    cstr: string | number
+  ): colorformats.RGB888A32F | null {
+    const { space, values, alpha } = colorparse(
+      typeof cstr === "string" ? cstr.trim() : cstr
+    );
+
+    if (!space) return null;
+    if (values.length !== 3) return null;
+    if (!values.every(Number.isFinite)) return null;
+    if (!Number.isFinite(alpha)) return null;
+
+    let rgb: [number, number, number];
+    switch (space) {
+      case "rgb":
+        rgb = [values[0], values[1], values[2]];
+        break;
+      case "hsl":
+        rgb = hslToRGB255(values[0], values[1], values[2]);
+        break;
+      case "hwb":
+        rgb = hwbToRGB255(values[0], values[1], values[2]);
+        break;
+      default:
+        return null;
+    }
+
+    return colorformats.newRGB888A32F(
+      clamp255(rgb[0]),
+      clamp255(rgb[1]),
+      clamp255(rgb[2]),
+      clamp01(alpha)
+    );
+  }
+
+  /**
+   * Resolves a CSS `<color>` string (or `0xRRGGBB` number) to a lowercase
+   * hex string. Sugar over {@link resolve} — same resolvable set, same
+   * sentinel.
+   *
+   * Returns `#rrggbb` when the resolved alpha is exactly 1, `#rrggbbaa`
+   * otherwise (alpha quantized to 8 bits).
+   *
+   * @param cstr - CSS color string, or a number read as `0xRRGGBB`.
+   * @returns `"#rrggbb"` | `"#rrggbbaa"`, or `null` when not resolvable.
+   *
+   * @example
+   * ```typescript
+   * resolveHEX("hsl(217 91% 60%)"); // "#3c83f6"
+   * resolveHEX("red"); // "#ff0000"
+   * resolveHEX("rgba(255, 0, 0, 0.5)"); // "#ff000080"
+   * resolveHEX("definitely-not-a-color"); // null
+   * ```
+   */
+  export function resolveHEX(cstr: string | number): string | null {
+    const c = resolve(cstr);
+    if (c === null) return null;
+    const hex8 = colorformats.RGB888A32F.intoHEX(c);
+    return c.a === 1 ? hex8.slice(0, 7) : hex8;
+  }
+
   export namespace colorformats {
     /**
      * Clamps a value between 0.0 and 1.0.

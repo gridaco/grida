@@ -13,6 +13,7 @@ import kolor from "@grida/color";
 - **Type-safe**: Branded types prevent mixing incompatible color formats
 - **Convenient**: Helper functions for common operations (`fromHEX`, `newRGB888A32F`, etc.)
 - **Color parsing**: Parse hex, rgb, hsl, named colors, and more
+- **Color resolution**: Resolve any CSS color string to canonical sRGB — no DOM or canvas required
 - **Color names**: Access to CSS color names mapping
 - **Zero-dependency**: No external dependencies
 
@@ -71,6 +72,38 @@ const parsed = kolor.parse("#ff0000");
 kolor.parse("rgb(255, 0, 0)");
 kolor.parse("hsl(0, 100%, 50%)");
 kolor.parse("blue");
+```
+
+## Color Resolution
+
+Resolve a CSS `<color>` string to its canonical sRGB form — pure TypeScript, works in headless environments (no DOM, no canvas):
+
+```ts
+import kolor from "@grida/color";
+
+// resolve to a branded RGB888A32F struct (r/g/b 0-255 ints, a 0-1)
+kolor.resolve("hsl(217 91% 60%)");
+// { r: 60, g: 131, b: 246, a: 1 }
+
+kolor.resolve("rgba(255, 0, 0, 0.5)");
+// { r: 255, g: 0, b: 0, a: 0.5 }
+
+// resolve straight to a lowercase hex string
+kolor.resolveHEX("red"); // "#ff0000"  (#rrggbb when alpha === 1)
+kolor.resolveHEX("rgba(255, 0, 0, 0.5)"); // "#ff000080"  (#rrggbbaa otherwise)
+```
+
+**Resolvable**: named colors, `transparent` (→ `rgba(0, 0, 0, 0)` per CSS), 3/4/6/8-digit hex, `rgb()`/`rgba()`, `hsl()`/`hsla()` (CSS Color 4 §7), `hwb()` (CSS Color 4 §8), and numbers read as `0xRRGGBB`.
+
+**Not resolvable** — returns `null`, never a guess: `currentColor` (context-dependent), `lab()`/`lch()`/`oklab()`/`oklch()`/`color()` (gamut mapping out of scope), non-CSS spaces, and unparseable input. `resolve` never throws.
+
+Edge semantics match browsers: input is trimmed and case-insensitive, hue wraps mod 360, saturation/lightness/whiteness/blackness clamp to `[0, 100]`, rgb channels clamp to `[0, 255]` and round to integers, alpha clamps to `[0, 1]`.
+
+The result is a branded `colorformats.RGB888A32F`, so all struct conversions compose:
+
+```ts
+const c = kolor.resolve("hsl(217 91% 60%)");
+if (c) kolor.colorformats.RGB888A32F.intoRGBA32F(c); // 0-1 float struct
 ```
 
 ## Color Names
