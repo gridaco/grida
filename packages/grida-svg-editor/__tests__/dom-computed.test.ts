@@ -45,11 +45,14 @@ describe("editor.dom_computed_*", () => {
       },
       computed_paint(_id, channel) {
         if (channel === "fill") {
+          // Mirror the real DOM resolver's shape: `computed` is the raw
+          // getComputedStyle string; `resolved_paint` goes through
+          // `paint.parse`, which canonicalizes solids to lowercase hex.
           return {
             computed: "rgb(255, 0, 0)",
             resolved_paint: {
               kind: "color",
-              value: { kind: "rgb", value: "rgb(255, 0, 0)" },
+              value: { kind: "rgb", value: "#ff0000" },
             },
           };
         }
@@ -65,7 +68,7 @@ describe("editor.dom_computed_*", () => {
     expect(computed_paint?.computed).toBe("rgb(255, 0, 0)");
     expect(computed_paint?.resolved_paint).toEqual({
       kind: "color",
-      value: { kind: "rgb", value: "rgb(255, 0, 0)" },
+      value: { kind: "rgb", value: "#ff0000" },
     });
 
     // …while the headless cascade does NOT see the `<style>` block's

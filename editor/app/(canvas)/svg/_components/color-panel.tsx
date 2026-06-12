@@ -294,7 +294,7 @@ function NoneSwatch({ className }: { className?: string }) {
  * it refuses (`lab()` / `oklch()` / garbage).
  */
 function normalizeToHex(value: string): string {
-  return kolor.resolveHEX(value ?? "")?.slice(0, 7) ?? "#000000";
+  return kolor.resolveHEX(value)?.slice(0, 7) ?? "#000000";
 }
 
 /**
