@@ -90,10 +90,48 @@ export namespace color {
   }
 
   /**
+   * `#` followed by exactly 3, 4, 6 or 8 hex digits — nothing else.
+   * (Input is lowercased before testing.)
+   */
+  const HEX_FORM = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/;
+
+  /**
+   * `rgb()` / `rgba()` / `hsl()` / `hsla()` / `hwb()` — function name
+   * directly followed by `(` (no whitespace, per CSS), a paren-free
+   * argument body, and a closing `)` at the very end of the string.
+   * Captures the function name and the argument body.
+   */
+  const FUNC_FORM = /^(rgba?|hsla?|hwb)\(([^()]*)\)$/;
+
+  /**
+   * The input gate for {@link resolve}: decides whether a (trimmed,
+   * lowercased) string is one of the resolvable *forms* before the
+   * permissive {@link parse} ever sees it. Form-level only — channel
+   * arity and numericity are still checked after parsing.
+   */
+  function isResolvableForm(cstr: string): boolean {
+    // named colors — own properties only, so prototype-chain keys like
+    // "constructor" can never reach the parser's table lookup.
+    if (Object.prototype.hasOwnProperty.call(colorname, cstr)) return true;
+    if (cstr === "transparent") return true;
+    if (cstr[0] === "#") return HEX_FORM.test(cstr);
+    const m = FUNC_FORM.exec(cstr);
+    if (m === null) return false;
+    // percentage hue is invalid CSS in hsl()/hsla()/hwb(); the permissive
+    // parser would silently misread it as a 0-100 hue. Cheap to detect
+    // (first channel token), so reject it here.
+    if (m[1] !== "rgb" && m[1] !== "rgba") {
+      const hue = m[2].trimStart().split(/[\s,/]/, 1)[0];
+      if (hue !== undefined && hue.endsWith("%")) return false;
+    }
+    return true;
+  }
+
+  /**
    * Resolves a CSS `<color>` string (or `0xRRGGBB` number) to its canonical
    * sRGB form as a branded {@link colorformats.RGB888A32F} — without a DOM
    * or canvas. Sits on top of {@link parse}; parse behavior is the source
-   * of truth for what each syntax means.
+   * of truth for what each *accepted* syntax means.
    *
    * **Resolvable** (returns a value):
    * - named colors (`"red"`, `"REBECCAPURPLE"`) and `"transparent"`
@@ -110,6 +148,30 @@ export namespace color {
    *   is out of scope
    * - `cmyk` / `gray` / other non-CSS spaces {@link parse} understands
    * - malformed or unparseable input
+   *
+   * **Strict input gate.** The null-never-guess contract is enforced by
+   * `resolve` itself, up front; the underlying {@link parse} stays
+   * permissive (it coerces, truncates and guesses, as vendored). A string
+   * must take one of these *forms* (after trimming, case-insensitive):
+   * - a named color present in {@link names} (own keys only — prototype
+   *   keys like `"constructor"` are not colors), or `"transparent"`
+   * - `#` + exactly 3/4/6/8 hex digits — `"#zzz"`, `"###"`, `"#12345"`,
+   *   `"#1234567"` are all `null`
+   * - `rgb()` / `rgba()` / `hsl()` / `hsla()` / `hwb()` with the `(`
+   *   directly after the function name (no whitespace, per CSS) and a
+   *   properly closed `)` — `"rgb(255,0,0"` is `null`
+   *
+   * Bare channel lists (`"1 2 3"`, `"255, 0, 0"`) are not CSS colors and
+   * resolve to `null`. Percentage hue in `hsl()` / `hsla()` / `hwb()`
+   * (`"hsl(50% 100% 50%)"`) is rejected: it is invalid CSS, and the
+   * permissive parser would otherwise misread it as a 0-100 hue. Inside
+   * an accepted function form, channel arity and numericity are still
+   * validated after parsing (`"hsl(foo, 10%, 10%)"`, `"rgb(1, 2)"` are
+   * `null`); other channel semantics defer to {@link parse}.
+   *
+   * A number must be an integer in `[0x000000, 0xFFFFFF]` — negative,
+   * fractional, `NaN`, non-finite, or `> 0xFFFFFF` values are `null`
+   * (never truncated or wrapped).
    *
    * Edge semantics (matching browser behavior):
    * - input is trimmed and case-insensitive
@@ -135,9 +197,19 @@ export namespace color {
   export function resolve(
     cstr: string | number
   ): colorformats.RGB888A32F | null {
-    const { space, values, alpha } = colorparse(
-      typeof cstr === "string" ? cstr.trim() : cstr
-    );
+    let input: string | number;
+    if (typeof cstr === "number") {
+      // numbers are read as 0xRRGGBB — anything outside the integer
+      // [0x000000, 0xFFFFFF] range has no such reading.
+      if (!Number.isInteger(cstr) || cstr < 0 || cstr > 0xffffff) return null;
+      input = cstr;
+    } else {
+      const normalized = cstr.trim().toLowerCase();
+      if (!isResolvableForm(normalized)) return null;
+      input = normalized;
+    }
+
+    const { space, values, alpha } = colorparse(input);
 
     if (!space) return null;
     if (values.length !== 3) return null;
@@ -172,8 +244,12 @@ export namespace color {
    * hex string. Sugar over {@link resolve} — same resolvable set, same
    * sentinel.
    *
-   * Returns `#rrggbb` when the resolved alpha is exactly 1, `#rrggbbaa`
-   * otherwise (alpha quantized to 8 bits).
+   * Alpha is quantized to 8 bits, and the 6-vs-8-digit decision is made on
+   * the *quantized* byte so the canonical form is unique per quantized
+   * color: `#rrggbb` whenever the alpha byte is `0xff`, `#rrggbbaa`
+   * otherwise. (`resolveHEX("rgba(255, 0, 0, 0.999)")` is `"#ff0000"` —
+   * never `"#ff0000ff"`, which would be a second spelling of the same
+   * quantized color.)
    *
    * @param cstr - CSS color string, or a number read as `0xRRGGBB`.
    * @returns `"#rrggbb"` | `"#rrggbbaa"`, or `null` when not resolvable.
@@ -183,6 +259,7 @@ export namespace color {
    * resolveHEX("hsl(217 91% 60%)"); // "#3c83f6"
    * resolveHEX("red"); // "#ff0000"
    * resolveHEX("rgba(255, 0, 0, 0.5)"); // "#ff000080"
+   * resolveHEX("rgba(255, 0, 0, 0.999)"); // "#ff0000" (alpha byte rounds to 0xff)
    * resolveHEX("definitely-not-a-color"); // null
    * ```
    */
@@ -190,17 +267,13 @@ export namespace color {
     const c = resolve(cstr);
     if (c === null) return null;
     const hex8 = colorformats.RGB888A32F.intoHEX(c);
-    return c.a === 1 ? hex8.slice(0, 7) : hex8;
+    // hex8 is "#rrggbbaa"; chars [7..9) are the already-quantized alpha
+    // byte — deciding on it (not on `c.a === 1`) keeps the decision
+    // consistent with intoHEX's quantization by construction.
+    return hex8.slice(7) === "ff" ? hex8.slice(0, 7) : hex8;
   }
 
   export namespace colorformats {
-    /** Clamps to [0.0, 1.0] — alias of the namespace-level {@link clamp01}. */
-    const f32 = clamp01;
-
-    /** Clamps to [0, 255] and rounds — alias of the namespace-level
-     *  {@link clamp255}. */
-    const u8 = clamp255;
-
     function u8ToF32(value: number): number {
       return value / 255;
     }
@@ -438,18 +511,18 @@ export namespace color {
 
       export function intoRGBA8888(color: RGBA32F): RGBA8888 {
         return {
-          r: u8(color.r * 255),
-          g: u8(color.g * 255),
-          b: u8(color.b * 255),
-          a: u8(color.a * 255),
+          r: clamp255(color.r * 255),
+          g: clamp255(color.g * 255),
+          b: clamp255(color.b * 255),
+          a: clamp255(color.a * 255),
         } as RGBA8888;
       }
 
       export function intoRGB888F32A(color: RGBA32F): RGB888A32F {
         return {
-          r: u8(color.r * 255),
-          g: u8(color.g * 255),
-          b: u8(color.b * 255),
+          r: clamp255(color.r * 255),
+          g: clamp255(color.g * 255),
+          b: clamp255(color.b * 255),
           a: color.a,
         } as RGB888A32F;
       }
@@ -551,16 +624,16 @@ export namespace color {
           r: color.r,
           g: color.g,
           b: color.b,
-          a: u8(color.a * 255),
+          a: clamp255(color.a * 255),
         } as RGBA8888;
       }
 
       export function intoRGBA32F(color: RGB888A32F): RGBA32F {
         return {
-          r: f32(color.r / 255),
-          g: f32(color.g / 255),
-          b: f32(color.b / 255),
-          a: f32(color.a),
+          r: clamp01(color.r / 255),
+          g: clamp01(color.g / 255),
+          b: clamp01(color.b / 255),
+          a: clamp01(color.a),
         } as RGBA32F;
       }
 

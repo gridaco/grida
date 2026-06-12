@@ -89,15 +89,27 @@ kolor.resolve("rgba(255, 0, 0, 0.5)");
 // { r: 255, g: 0, b: 0, a: 0.5 }
 
 // resolve straight to a lowercase hex string
-kolor.resolveHEX("red"); // "#ff0000"  (#rrggbb when alpha === 1)
+kolor.resolveHEX("red"); // "#ff0000"  (#rrggbb when the quantized alpha byte is 0xff)
 kolor.resolveHEX("rgba(255, 0, 0, 0.5)"); // "#ff000080"  (#rrggbbaa otherwise)
 ```
 
-**Resolvable**: named colors, `transparent` (→ `rgba(0, 0, 0, 0)` per CSS), 3/4/6/8-digit hex, `rgb()`/`rgba()`, `hsl()`/`hsla()` (CSS Color 4 §7), `hwb()` (CSS Color 4 §8), and numbers read as `0xRRGGBB`.
+**Resolvable**: named colors, `transparent` (→ `rgba(0, 0, 0, 0)` per CSS), 3/4/6/8-digit hex, `rgb()`/`rgba()`, `hsl()`/`hsla()` (CSS Color 4 §7), `hwb()` (CSS Color 4 §8), and integers in `[0x000000, 0xFFFFFF]` read as `0xRRGGBB`.
 
-**Not resolvable** — returns `null`, never a guess: `currentColor` (context-dependent), `lab()`/`lch()`/`oklab()`/`oklch()`/`color()` (gamut mapping out of scope), non-CSS spaces, and unparseable input. `resolve` never throws.
+**Not resolvable** — returns `null`, never a guess: `currentColor` (context-dependent), `lab()`/`lch()`/`oklab()`/`oklch()`/`color()` (gamut mapping out of scope), non-CSS spaces, and malformed input. `resolve` never throws.
+
+**Strict input gate.** `resolve` enforces null-never-guess up front; the underlying permissive `parse` is left untouched (it still coerces and guesses — strictness is `resolve`'s contract, not `parse`'s). Rejected at the gate:
+
+- malformed hex — wrong digit count or non-hex digits: `"#zzz"`, `"###"`, `"#12345"`, `"#1234567"` → `null`
+- bare channel lists — not CSS colors: `"1 2 3"`, `"255, 0, 0"` → `null`
+- unclosed or malformed function syntax: `"rgb(255,0,0"` → `null` (the `(` must directly follow the function name and the `)` must close it, per CSS)
+- percentage hue in `hsl()`/`hsla()`/`hwb()` — invalid CSS that the permissive parser would misread as a 0–100 hue: `"hsl(50% 100% 50%)"` → `null`
+- numbers outside the integer `[0x000000, 0xFFFFFF]` range — negative, fractional, `NaN`, or too large: `-1`, `0.5`, `0x1FFFFFF` → `null` (never wrapped or truncated)
+
+Inside an accepted function form, channel arity and numericity are still validated after parsing (`"rgb(1, 2)"`, `"hsl(foo, 10%, 10%)"` → `null`); the semantics of valid channels defer to `parse`.
 
 Edge semantics match browsers: input is trimmed and case-insensitive, hue wraps mod 360, saturation/lightness/whiteness/blackness clamp to `[0, 100]`, rgb channels clamp to `[0, 255]` and round to integers, alpha clamps to `[0, 1]`.
+
+`resolveHEX` emits one canonical spelling per quantized color: alpha is quantized to 8 bits, and `#rrggbb` is chosen whenever the quantized alpha byte is `0xff` — so `resolveHEX("rgba(255, 0, 0, 0.999)")` is `"#ff0000"`, not `"#ff0000ff"`.
 
 The result is a branded `colorformats.RGB888A32F`, so all struct conversions compose:
 
