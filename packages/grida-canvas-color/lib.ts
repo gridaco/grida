@@ -104,10 +104,37 @@ export namespace color {
   const FUNC_FORM = /^(rgba?|hsla?|hwb)\(([^()]*)\)$/;
 
   /**
+   * Legacy comma discipline for a (trimmed) argument body:
+   * `T, T, T` or `T, T, T, T` — every channel separated by a comma,
+   * whitespace around commas allowed, no slash. Token *content* is not
+   * validated here; that stays with {@link parse} and the post-parse
+   * checks in {@link resolve} (hue excepted — see {@link HUE_TOKEN}).
+   */
+  const LEGACY_BODY = /^[^\s,/]+(?:\s*,\s*[^\s,/]+){2,3}$/;
+
+  /**
+   * Modern space discipline for a (trimmed) argument body:
+   * exactly three space-separated channels, alpha only after a `/`
+   * (whitespace around the slash optional): `T T T` or `T T T / A`.
+   */
+  const MODERN_BODY = /^[^\s,/]+(?:\s+[^\s,/]+){2}(?:\s*\/\s*[^\s,/]+)?$/;
+
+  /**
+   * A CSS `<number>` (optional sign, decimal — digits required after
+   * the dot, scientific notation) with an optional angle unit. Exactly
+   * the four units the vendored parser converts — `deg` | `grad` |
+   * `rad` | `turn`. Any other unit (e.g. `px`) must not pass: the
+   * parser would fall through to `parseFloat` and silently drop it.
+   */
+  const HUE_TOKEN =
+    /^[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?(?:deg|grad|rad|turn)?$/;
+
+  /**
    * The input gate for {@link resolve}: decides whether a (trimmed,
    * lowercased) string is one of the resolvable *forms* before the
-   * permissive {@link parse} ever sees it. Form-level only — channel
-   * arity and numericity are still checked after parsing.
+   * permissive {@link parse} ever sees it. Form-level plus separator
+   * discipline and hue numericity — non-hue channel content and
+   * post-parse arity/finiteness are still checked after parsing.
    */
   function isResolvableForm(cstr: string): boolean {
     // named colors — own properties only, so prototype-chain keys like
@@ -117,12 +144,32 @@ export namespace color {
     if (cstr[0] === "#") return HEX_FORM.test(cstr);
     const m = FUNC_FORM.exec(cstr);
     if (m === null) return false;
-    // percentage hue is invalid CSS in hsl()/hsla()/hwb(); the permissive
-    // parser would silently misread it as a 0-100 hue. Cheap to detect
-    // (first channel token), so reject it here.
-    if (m[1] !== "rgb" && m[1] !== "rgba") {
-      const hue = m[2].trimStart().split(/[\s,/]/, 1)[0];
-      if (hue !== undefined && hue.endsWith("%")) return false;
+    const fn = m[1];
+    const body = m[2].trim();
+
+    // separator discipline: the body is either all-comma (legacy) or
+    // all-space (modern) — never a mix. Mixed styles are invalid CSS,
+    // and the permissive parser splits on both at once, smuggling a
+    // 4th token into alpha (`rgb(25 5, 0, 0)` -> alpha 0). The two
+    // patterns are mutually exclusive: LEGACY_BODY requires commas,
+    // MODERN_BODY forbids them.
+    const legacy = LEGACY_BODY.test(body);
+    if (!legacy && !MODERN_BODY.test(body)) return false;
+
+    // hwb() postdates the legacy comma syntax and never had a comma
+    // form in CSS — `hwb(0, 0%, 0%)` is invalid in every browser.
+    if (fn === "hwb" && legacy) return false;
+
+    if (fn !== "rgb" && fn !== "rgba") {
+      // the hue channel of hsl()/hsla()/hwb() must be numeric. The
+      // vendored parser would otherwise accept named base hues from a
+      // long-dropped css-color draft (`hsl(red 100% 50%)`) whose table
+      // values are not even CSS hue degrees (red:0, yellow:120), and
+      // would misread a percentage hue (`hsl(50% ...)`) as a 0-100
+      // hue. `none` is valid CSS for a missing hue, but only in the
+      // modern syntax — `hsl(none, 100%, 50%)` is invalid.
+      const hue = body.split(/[\s,]/, 1)[0];
+      if (!HUE_TOKEN.test(hue) && !(hue === "none" && !legacy)) return false;
     }
     return true;
   }
@@ -162,12 +209,35 @@ export namespace color {
    *   properly closed `)` — `"rgb(255,0,0"` is `null`
    *
    * Bare channel lists (`"1 2 3"`, `"255, 0, 0"`) are not CSS colors and
-   * resolve to `null`. Percentage hue in `hsl()` / `hsla()` / `hwb()`
-   * (`"hsl(50% 100% 50%)"`) is rejected: it is invalid CSS, and the
-   * permissive parser would otherwise misread it as a 0-100 hue. Inside
-   * an accepted function form, channel arity and numericity are still
-   * validated after parsing (`"hsl(foo, 10%, 10%)"`, `"rgb(1, 2)"` are
-   * `null`); other channel semantics defer to {@link parse}.
+   * resolve to `null`.
+   *
+   * **Separator discipline.** Inside an accepted function form, the
+   * argument body must follow a single separator style — legacy
+   * all-comma (`N, N, N[, A]`) or modern all-space (`N N N [/ A]`) —
+   * never a mix: `"rgb(25 5, 0, 0)"` is `null` (the permissive parser
+   * would smuggle the 4th token into alpha). Alpha in the modern form
+   * requires the slash (`"rgb(255 0 0 0.5)"` is `null`); slash alpha in
+   * the legacy form is likewise rejected (`"rgb(255, 0, 0 / 0.5)"`).
+   * `hwb()` takes the modern form only — it postdates the comma syntax
+   * and `"hwb(0, 0%, 0%)"` is invalid in every browser.
+   *
+   * **Numeric hue.** The hue channel of `hsl()` / `hsla()` / `hwb()`
+   * must be a CSS number, optionally with one of the angle units the
+   * vendored parser actually converts — `deg`, `grad`, `rad`, `turn` —
+   * or `none` (modern form only, per CSS). Named hues
+   * (`"hsl(red 100% 50%)"`) are rejected: `<named-hue>` comes from a
+   * long-dropped css-color draft, no browser accepts it, and the
+   * parser's table values are not CSS hue degrees. Percentage hue
+   * (`"hsl(50% 100% 50%)"`) is rejected — the parser would misread it
+   * as a 0-100 hue. A bare trailing dot is not a CSS number
+   * (`"hsl(120. 50% 50%)"` is `null`).
+   *
+   * Channel arity is enforced by the discipline patterns themselves
+   * (`"rgb(1, 2)"`, `"rgb(1, 2, 3, 4, 5)"` are `null`). Within those
+   * bounds, non-hue channel *content* still defers to {@link parse}
+   * plus the post-parse finiteness checks (`"rgb(foo, 0, 0)"` is
+   * `null`); e.g. `none` as a non-hue channel reads as 0, as in
+   * browsers.
    *
    * A number must be an integer in `[0x000000, 0xFFFFFF]` — negative,
    * fractional, `NaN`, non-finite, or `> 0xFFFFFF` values are `null`

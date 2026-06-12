@@ -318,6 +318,142 @@ describe("color.resolve", () => {
       });
     });
 
+    describe("separator discipline: all-comma or all-space, never a mix", () => {
+      it.each([
+        "rgb(25 5, 0, 0)", // mixed: parser would smuggle the 4th token into alpha 0
+        "rgb(255, 0 0)",
+        "rgb(255 0, 0)",
+        "rgb(255, 0, 0 / 0.5)", // slash alpha is modern-syntax only
+        "rgb(255 0 0 0.5)", // modern alpha requires the slash
+        "hsl(0, 100% 50%)",
+        "hsl(0 100%, 50%)",
+        "rgb(255, 0, 0,)", // trailing comma
+        "rgb(255,,0,0)", // empty slot
+        "rgb(255/0/0)", // slash is not a channel separator
+        "rgb(1, 2, 3, 4, 5)", // too many channels for either discipline
+      ])("%s resolves to null", (cstr) => {
+        expect(kolor.resolve(cstr)).toBeNull();
+        expect(kolor.resolveHEX(cstr)).toBeNull();
+      });
+
+      it("legacy all-comma stays accepted", () => {
+        expect(kolor.resolve("rgb(255,0,0)")).toEqual({
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 1,
+        });
+        expect(kolor.resolve("rgb( 255 , 0 , 0 )")).toEqual({
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 1,
+        });
+        expect(kolor.resolve("hsl(217, 91%, 60%)")).toEqual({
+          r: 60,
+          g: 131,
+          b: 246,
+          a: 1,
+        });
+        expect(kolor.resolve("hsla(0, 100%, 50%, 0.5)")).toEqual({
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 0.5,
+        });
+        expect(kolor.resolve("rgb(100%, 0%, 0%)")).toEqual({
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 1,
+        });
+      });
+
+      it("modern all-space stays accepted, with and without slash alpha", () => {
+        expect(kolor.resolve("rgb(255 0 0 / 50%)")).toEqual({
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 0.5,
+        });
+        // whitespace around the slash is optional
+        expect(kolor.resolve("rgb(255 0 0/0.5)")).toEqual({
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 0.5,
+        });
+        expect(kolor.resolve("hsl(217 91% 60%)")).toEqual({
+          r: 60,
+          g: 131,
+          b: 246,
+          a: 1,
+        });
+        expect(kolor.resolve("hwb(0 0% 0%)")).toEqual({
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 1,
+        });
+      });
+
+      it("hwb() has no legacy comma form in CSS", () => {
+        expect(kolor.resolve("hwb(0, 0%, 0%)")).toBeNull();
+        expect(kolor.resolveHEX("hwb(0, 0%, 0%)")).toBeNull();
+      });
+    });
+
+    describe("hue in hsl/hsla/hwb must be numeric", () => {
+      it.each([
+        "hsl(red 100% 50%)", // <named-hue> from a dropped draft; table value isn't even a CSS degree
+        "hsl(red, 100%, 50%)",
+        "hsl(yellow 100% 50%)", // parser table says 120 — CSS yellow is 60
+        "hsla(green 100% 50% / 0.5)",
+        "hwb(blue 0% 0%)",
+        "hsl(120px 100% 50%)", // wrong unit — parseFloat would silently drop it
+        "hsl(120. 50% 50%)", // bare trailing dot is not a CSS number
+        "hsl(none, 100%, 50%)", // `none` hue is modern-syntax only
+      ])("%s resolves to null", (cstr) => {
+        expect(kolor.resolve(cstr)).toBeNull();
+        expect(kolor.resolveHEX(cstr)).toBeNull();
+      });
+
+      it("numeric hues stay accepted: negative, decimal, scientific", () => {
+        expect(kolor.resolve("hsl(-120 100% 50%)")).toEqual(
+          kolor.resolve("hsl(240 100% 50%)")
+        );
+        expect(kolor.resolve("hsl(217.22 91.22% 59.8%)")).toEqual({
+          r: 59,
+          g: 130,
+          b: 246,
+          a: 1,
+        });
+        expect(kolor.resolve("hsl(1e2 100% 50%)")).toEqual(
+          kolor.resolve("hsl(100 100% 50%)")
+        );
+      });
+
+      it("angle units the parser converts are accepted: deg, grad, rad, turn", () => {
+        const halfTurn = kolor.resolve("hsl(180 100% 50%)");
+        expect(halfTurn).toEqual({ r: 0, g: 255, b: 255, a: 1 });
+        expect(kolor.resolve("hsl(180deg 100% 50%)")).toEqual(halfTurn);
+        expect(kolor.resolve("hsl(0.5turn 100% 50%)")).toEqual(halfTurn);
+        expect(kolor.resolve("hsl(200grad 100% 50%)")).toEqual(halfTurn);
+        expect(kolor.resolve("hsl(3.141592653589793rad 100% 50%)")).toEqual(
+          halfTurn
+        );
+      });
+
+      it("`none` hue is accepted in modern syntax (missing hue reads as 0)", () => {
+        expect(kolor.resolve("hsl(none 100% 50%)")).toEqual({
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 1,
+        });
+      });
+    });
+
     describe("percentage hue in hsl/hwb is invalid CSS", () => {
       it.each([
         "hsl(50% 100% 50%)",
