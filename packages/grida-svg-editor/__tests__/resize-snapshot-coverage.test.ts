@@ -70,8 +70,11 @@ function raw_names(
 
 describe("RESIZE_WRITE_ATTRS table completeness", () => {
   it("covers exactly the is_resizable tag set", () => {
+    // Bidirectional: a table entry without a fixture would silently
+    // skip that tag's per-tag coverage cases below, and vice versa.
     for (const tag of Object.keys(RESIZE_WRITE_ATTRS)) {
       expect(resize_pipeline.intent.is_resizable(tag)).toBe(true);
+      expect(FIXTURES[tag]).toBeDefined();
     }
     for (const tag of Object.keys(FIXTURES)) {
       expect(RESIZE_WRITE_ATTRS[tag]).toBeDefined();
