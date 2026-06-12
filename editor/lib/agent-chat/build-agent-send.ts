@@ -16,6 +16,13 @@ import type { AgentMode } from "@grida/agent";
 export type AgentSendBody = {
   session_id?: string;
   model_id: string;
+  /**
+   * Explicit provider pick (issue #806). Set when the chosen model is a
+   * registered endpoint model — provider resolution otherwise cascades
+   * BYOK-first, and a stored OpenRouter key would swallow a local model
+   * id it cannot serve. Omitted for catalog models (cascade is correct).
+   */
+  provider_id?: string;
   /** Permission/supervision posture for the turn (RFC `permission modes`). */
   mode?: AgentMode;
   /** Per-send skill subset (workspace tab); omitted on tab-less surfaces. */
@@ -32,15 +39,18 @@ export function buildAgentSend(opts: {
   sendMessage: SendMessageFn;
   sessionId: string | null;
   modelId: string;
+  /** Endpoint provider id serving `modelId`, when it's a registered model. */
+  providerId?: string;
   mode?: AgentMode;
   skills?: string[];
 }): (text: string, files?: FileUIPart[]) => void {
-  const { sendMessage, sessionId, modelId, mode, skills } = opts;
+  const { sendMessage, sessionId, modelId, providerId, mode, skills } = opts;
   return (text, files) => {
     const body: AgentSendBody = {
       session_id: sessionId ?? undefined,
       model_id: modelId,
     };
+    if (providerId) body.provider_id = providerId;
     if (mode) body.mode = mode;
     if (skills) body.skills = skills;
     void sendMessage(files && files.length > 0 ? { text, files } : { text }, {

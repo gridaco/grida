@@ -418,6 +418,7 @@ function AgentPaneContent({
       sendMessage,
       sessionId: chatSession.current_id,
       modelId,
+      providerId: registered_models.providerIdForModel(modelId, endpoints),
       mode,
       skills: skillsForActiveTab(activeRelPath),
     }),

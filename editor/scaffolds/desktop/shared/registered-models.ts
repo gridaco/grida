@@ -33,6 +33,21 @@ export namespace registered_models {
   ): _models.text.registry.ResolvedModelSpec | undefined {
     return _models.text.registry.resolve(modelId, specs(endpoints));
   }
+
+  /**
+   * The endpoint provider id serving `modelId`, or `undefined` for
+   * catalog models. Rides each send as `provider_id` so an explicit
+   * local-model pick can't be swallowed by the BYOK-first cascade (a
+   * stored OpenRouter key cannot serve `llama3.1:8b`).
+   */
+  export function providerIdForModel(
+    modelId: string,
+    endpoints: readonly EndpointProviderConfig[]
+  ): string | undefined {
+    return endpoints.find((endpoint) =>
+      endpoint.models.some((m) => m.id === modelId)
+    )?.id;
+  }
 }
 
 /**

@@ -282,6 +282,7 @@ export function AISidebarChat({ className }: { className?: string }) {
       sendMessage,
       sessionId: chatSession.current_id,
       modelId,
+      providerId: registered_models.providerIdForModel(modelId, endpoints),
     }),
   });
 
