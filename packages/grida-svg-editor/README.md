@@ -388,6 +388,8 @@ editor.commands.preview_property(name: string): {
 
 The editor decides whether to write a presentation attribute vs. inline style for each selected node based on whichever wins the cascade for that element (P1). The preview session is what a number-input scrub or color-picker drag uses: many `update()` calls during drag, one `commit()` on pointer-up.
 
+A discrete write to the same property (`set_property(name, …)`, or `set_paint` / `set_paint_from_gradient` on the same channel) **supersedes** an open preview session on that name: the editor silently discards the session, so a UI that mixes a picker drag with preset buttons cannot replay the stale dragged value when it commits on close. After that, the session's `update` / `commit` / `discard` are no-ops. Sessions on other property names are unaffected.
+
 ### Observation — paint (`fill` / `stroke`)
 
 `fill` and `stroke` are common enough — and shape-different enough from a plain string — that they get a dedicated typed API. A solid color, a paint-server reference, and `currentColor` are not interchangeable strings; pretending they are is what produces editors that round-trip badly.

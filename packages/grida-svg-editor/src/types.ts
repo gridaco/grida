@@ -391,12 +391,31 @@ export type ReorderDirection =
   | "bring_to_front"
   | "send_to_back";
 
+/**
+ * Continuous-gesture write session returned by
+ * `commands.preview_property(name)`: many `update()` calls during a drag,
+ * one `commit()` (→ single history step) or `discard()` (→ no step).
+ *
+ * Supersession: a discrete write to the same property
+ * (`set_property(name, …)` — and for paint channels `set_paint` /
+ * `set_paint_from_gradient`, which write through it) or opening a second
+ * session on the same name silently discards this session — the discrete
+ * write is the user's final intent and a later `commit()` must not replay
+ * the stale previewed value over it. After the session ends for any
+ * reason (commit, discard, supersession), every method is a no-op — a
+ * defensive `discard()` before a discrete write is valid but no longer
+ * required. Sessions on OTHER property names are untouched by discrete
+ * writes.
+ */
 export type PreviewSession = {
   update(value: string): void;
   commit(): void;
   discard(): void;
 };
 
+/** `PreviewSession` over typed `Paint` values, from
+ *  `commands.preview_paint(channel)`. Same lifecycle and supersession
+ *  contract — the channel ("fill" / "stroke") is the property name. */
 export type PaintPreviewSession = {
   update(paint: Paint): void;
   commit(): void;

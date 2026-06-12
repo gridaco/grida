@@ -935,8 +935,23 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     }
   }
 
+  /** Open `preview_property` sessions, keyed by property name. A discrete
+   *  write to the same name supersedes the in-flight gesture: the session
+   *  is silently discarded so a later host-side `commit()` cannot replay
+   *  the stale previewed value over the discrete write. The stored
+   *  function reverts the previewed value and unregisters itself. */
+  const open_property_previews = new Map<string, () => void>();
+
+  function supersede_property_preview(name: string) {
+    open_property_previews.get(name)?.();
+  }
+
   function set_property(name: string, value: string | null) {
     if (selection.length === 0) return;
+    // The discrete write supersedes any in-flight preview gesture on the
+    // same property. Discard BEFORE capturing `before`: the undo snapshot
+    // must be the pre-gesture state, not the previewed value.
+    supersede_property_preview(name);
     const before: Array<{
       id: NodeId;
       attr: string | null;
@@ -974,6 +989,11 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   function preview_property(name: string): PreviewSession {
+    // Opening a session on a name that already has one is the same
+    // conflict as a discrete write: the new gesture supersedes the old.
+    // Discard BEFORE capturing `before` so this session reverts to the
+    // true pre-gesture state, not the prior session's previewed value.
+    supersede_property_preview(name);
     const before: Array<{
       id: NodeId;
       attr: string | null;
@@ -987,8 +1007,21 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       });
     }
     const preview = history.preview(`change ${name}`);
+    // Once superseded (or committed / discarded), every method is a no-op
+    // — the host's close-time `commit()` and defensive `discard()` stay
+    // valid calls instead of throwing on the dead @grida/history session.
+    let closed = false;
+    const close = () => {
+      closed = true;
+      open_property_previews.delete(name);
+    };
+    open_property_previews.set(name, () => {
+      close();
+      preview.discard();
+    });
     return {
       update(value: string) {
+        if (closed) return;
         preview.set({
           providerId: PROVIDER_ID,
           apply: () => {
@@ -1005,8 +1038,16 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
           },
         });
       },
-      commit: () => preview.commit(),
-      discard: () => preview.discard(),
+      commit: () => {
+        if (closed) return;
+        close();
+        preview.commit();
+      },
+      discard: () => {
+        if (closed) return;
+        close();
+        preview.discard();
+      },
     };
   }
 
