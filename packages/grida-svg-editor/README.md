@@ -228,11 +228,21 @@ Each will become a public seam when a second surface implementation arrives and 
 
 Geometry (world-space bboxes, screen ↔ local projection) is exposed via `editor.geometry`, not the `Surface` itself — the DOM surface registers a `MemoizedGeometryProvider` with the editor on attach so headless callers can query bounds without going through the surface.
 
-`@grida/svg-editor/dom` exports `attach_dom_surface(editor, { container, ... })` as the default DOM implementation, plus the surface-scoped types (`Camera`, `Gestures`, `SnapOptions`, `MemoizedGeometryProvider`, `DomComputedResolver`) that callers writing alternative surfaces or advanced integrations may need. It mounts the SVG into the container, wires pointer / keyboard listeners scoped to that container, and uses native `getBBox` / `getScreenCTM` for geometry. It is the only place in this package that imports DOM types.
+`@grida/svg-editor/dom` exports `attach_dom_surface(editor, { container, ... })` as the default DOM implementation, plus the surface-scoped types (`Camera`, `Gestures`, `SnapOptions`, `AttentionScope`, `MemoizedGeometryProvider`, `DomComputedResolver`) that callers writing alternative surfaces or advanced integrations may need. It mounts the SVG into the container, wires pointer / keyboard listeners scoped to that container, and uses native `getBBox` / `getScreenCTM` for geometry. It is the only place in this package that imports DOM types.
 
-The container is **exclusively owned** by the surface. Render toolbars, layer lists, inspectors, and any other interactive chrome as **siblings** of the container, not children. Children of the container interfere with pointer routing (capture redirects, hit-test ordering) and produce silent click breakage. The shipped `SvgEditorCanvas` React component enforces this by creating its own internal div; hosts using `domSurface` / `keynote.attach` directly are responsible for the same discipline. In development, the surface emits a `console.warn` at attach time when the container is non-empty.
+The container is **exclusively owned** by the surface. Render toolbars, layer lists, inspectors, and any other interactive chrome as **siblings** of the container, not children. Children of the container interfere with pointer routing (capture redirects, hit-test ordering) and produce silent click breakage. The shipped `SvgEditorCanvas` React component enforces this by creating its own internal div; hosts using `domSurface` / `keynote.attach` directly are responsible for the same discipline. In development, the surface emits a `console.warn` at attach time when the container is non-empty. Sibling chrome that drives editor commands should be registered into the attention scope (`handle.attention`, below) so the keymap stays live while the user works in it.
 
-**Attention gate.** The DOM surface installs document- and window-level keydown listeners (so a user with focus on a side-panel button can still hit editor shortcuts while the pointer is on the canvas). Those listeners are gated by an internal attention predicate: a key is claimed (and `preventDefault()`-ed) only when **focus is inside the container's subtree OR the pointer is over the container**. Body-focus alone — the natural state when the surface is embedded as a block in a longer document — is not attended, so the editor stays out of the way of page-level shortcuts (Space / arrows to scroll, Cmd+= to zoom, etc.). Passive observation listeners (modifier mirrors, blur resets) are not gated — they don't call `preventDefault()` and need to stay live across focus boundaries.
+**Attention gate.** The DOM surface installs document- and window-level keydown listeners (so a user with focus on a side-panel button can still hit editor shortcuts while the pointer is on the canvas). Those listeners are gated by an internal attention predicate: a key is claimed (and `preventDefault()`-ed) only when **focus is inside the attention scope OR the pointer is over it**. Body-focus alone — the natural state when the surface is embedded as a block in a longer document — is not attended, so the editor stays out of the way of page-level shortcuts (Space / arrows to scroll, Cmd+= to zoom, etc.). Passive observation listeners (modifier mirrors, blur resets) are not gated — they don't call `preventDefault()` and need to stay live across focus boundaries.
+
+The scope starts as the container alone. Editor-adjacent host chrome — an inspector, a toolbar, a zoom menu; anything that drives `commands.*` — is a DOM sibling of the container (per the exclusive-ownership rule above), so by default the gate cannot tell it from unrelated app surface: clicking its buttons moves focus out of the container, hovering it leaves the container, and the whole keymap (undo / delete / tool keys) goes dark until the user re-attends the canvas. Register such chrome into the scope via the handle:
+
+```ts
+const handle = attach_dom_surface(editor, { container });
+handle.attention.add(inspectorEl); // counts for focus-within + pointer-over
+handle.attention.remove(inspectorEl); // e.g. on unmount
+```
+
+Registered elements get the full keymap — with text inputs inside them still excluded by the keymap's own guard. The native clipboard gate (deliberately stricter: focus-only, never pointer-over) honors the registered set's focus arm the same way. `add` is idempotent; registrations live until removed or the surface detaches.
 
 ### Lifecycle
 
@@ -380,6 +390,7 @@ Write — selection-scoped. Writing the same value to every selected node has no
 editor.commands.set_property(name: string, value: string | null): void;
 
 editor.commands.preview_property(name: string): {
+  readonly live: boolean; // false once the session has ended, for any reason
   update(value: string): void;
   commit(): void;
   discard(): void;
@@ -387,6 +398,8 @@ editor.commands.preview_property(name: string): {
 ```
 
 The editor decides whether to write a presentation attribute vs. inline style for each selected node based on whichever wins the cascade for that element (P1). The preview session is what a number-input scrub or color-picker drag uses: many `update()` calls during drag, one `commit()` on pointer-up.
+
+A preview session ends as soon as its result can no longer become the document's next state — and after it ends, every method is a no-op and `session.live` is `false`. A discrete write to the same property (`set_property(name, …)`, or `set_paint` / `set_paint_from_gradient` on the same channel) **supersedes** an open session on that name, so a UI that mixes a picker drag with preset buttons cannot replay the stale dragged value when it commits on close; sessions on other property names are unaffected by discrete writes. Operations that detach the session's targets (`remove` / `cut`, `ungroup`), a document swap (`load` / `reset`), and `undo` / `redo` end open sessions on every name. Hosts that cache a session should consult `live` and lazily reopen — the bundled React hooks do.
 
 ### Observation — paint (`fill` / `stroke`)
 
@@ -415,7 +428,9 @@ type PaintFallback = { kind: "none" } | { kind: "color"; value: Color };
 // Color preserves currentColor as a keyword at computed time (CSS Color 4 §4.4); the
 // rgb resolution happens at *used* value, which requires the surface's painting context.
 type Color =
-  | { kind: "rgb"; value: string } // any resolvable CSS color, normalized to rgb-ish
+  | { kind: "rgb"; value: string } // canonical lowercase hex (#rrggbb / #rrggbbaa) for any
+  //   literal resolvable without a rendering context (named / hex / rgb() / hsl() / hwb());
+  //   unresolved spaces (lab() / oklch() / color()) pass through as authored
   | { kind: "current_color" }; // unresolved keyword; surface dereferences at paint time
 
 type PaintValue = {
@@ -443,6 +458,7 @@ Write — selection-scoped (same reasoning as for generic properties):
 editor.commands.set_paint(channel: "fill" | "stroke", paint: Paint): void;
 
 editor.commands.preview_paint(channel: "fill" | "stroke"): {
+  readonly live: boolean; // false once the session has ended, for any reason
   update(paint: Paint): void;
   commit(): void;
   discard(): void;

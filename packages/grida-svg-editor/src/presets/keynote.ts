@@ -97,8 +97,9 @@ export function attach(
       })
   );
   return {
-    camera: inner.camera,
-    gestures: inner.gestures,
+    // Pass the surface-scoped capabilities through wholesale — only the
+    // members below genuinely wrap or extend the inner handle.
+    ...inner,
     set_padding(p: number) {
       padding = p;
       apply();

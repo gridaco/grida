@@ -63,7 +63,13 @@ function classify(value: PaintValue): PaintShape {
       return { kind: "none" };
     case "color":
       if (c.value.kind === "rgb") {
-        return { kind: "solid", hex: normalizeToHex(c.value.value) };
+        // The computed channel canonicalizes resolvable solids to hex;
+        // literals the editor preserves verbatim (oklch(), lab(), …)
+        // are NOT hex-editable — show them read-only instead of a fake
+        // black swatch.
+        const hex = kolor.resolveHEX(c.value.value)?.slice(0, 7);
+        if (hex) return { kind: "solid", hex };
+        return { kind: "nonsolid", label: c.value.value };
       }
       return { kind: "nonsolid", label: "currentColor" };
     case "ref":
@@ -109,13 +115,11 @@ export function PaintRow({
   const pickerHex = isSolid ? shape.hex : "#000000";
 
   // A discrete paint choice — a preset swatch, "none", or a committed hex —
-  // is an absolute, atomic write. Discard any in-flight picker-drag preview
-  // first: otherwise the popover's close-time `preview.commit()` would replay
-  // the stale dragged value *after* this write, splitting undo history (the
-  // discrete choice wouldn't be the final state, and undo could revert past
-  // it). `discard()` is a no-op when no drag session is open.
+  // is an absolute, atomic write. No manual discard needed: the editor
+  // supersedes any in-flight picker-drag preview on the same channel (see
+  // `PreviewSession`), so the popover's close-time `preview.commit()`
+  // cannot replay a stale dragged value over this write.
   const commitPaint = (paint: Paint) => {
-    preview.discard();
     onSetPaint(paint);
   };
 
@@ -286,24 +290,6 @@ function NoneSwatch({ className }: { className?: string }) {
       )}
     />
   );
-}
-
-/**
- * Normalize an arbitrary CSS color string to a `#rrggbb` hex (alpha dropped —
- * the solid picker is opaque). Delegates parsing to `@grida/color`, which
- * covers hex, `rgb()/rgba()`, and the full CSS named-color set; falls back to
- * black for non-colors (`none` / `currentColor`) or anything unparseable.
- */
-function normalizeToHex(value: string): string {
-  const v = value?.trim().toLowerCase();
-  if (!v || v === "none" || v === "currentcolor") return "#000000";
-  const { values } = kolor.parse(v);
-  if (values.length < 3) return "#000000";
-  const ch = (n: number) =>
-    Math.max(0, Math.min(255, Math.round(n)))
-      .toString(16)
-      .padStart(2, "0");
-  return `#${ch(values[0])}${ch(values[1])}${ch(values[2])}`;
 }
 
 /**

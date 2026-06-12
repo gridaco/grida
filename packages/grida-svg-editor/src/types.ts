@@ -153,6 +153,18 @@ export type PropertyValue<T = string | number> = {
 
 // ─── Paint (SVG 2 §13.2 `<paint>` production) ──────────────────────────────
 
+/**
+ * Computed-time color. `current_color` stays a keyword (CSS Color 4 §4.4)
+ * — its rgb resolution happens at *used* value, which needs the surface's
+ * painting context.
+ *
+ * For `rgb`, `value` is canonical lowercase hex — `#rrggbb`, or
+ * `#rrggbbaa` when alpha < 1 — whenever the literal is resolvable without
+ * a rendering context (named colors, hex, `rgb()`, `hsl()`, `hwb()`).
+ * Literals the editor does not resolve (`lab()` / `oklch()` / `color()` —
+ * gamut mapping out of scope) pass through as authored. The authored
+ * string is always available on the `declared` channel.
+ */
 export type Color = { kind: "rgb"; value: string } | { kind: "current_color" };
 
 export type PaintFallback = { kind: "none" } | { kind: "color"; value: Color };
@@ -391,13 +403,54 @@ export type ReorderDirection =
   | "bring_to_front"
   | "send_to_back";
 
+/**
+ * Continuous-gesture write session returned by
+ * `commands.preview_property(name)`: many `update()` calls during a drag,
+ * one `commit()` (→ single history step) or `discard()` (→ no step).
+ *
+ * Lifecycle invariant: **the session ends as soon as its result can no
+ * longer become the document's next state** — and after it ends, for any
+ * reason, every method is a no-op (never a throw) and `live` is `false`.
+ * The ending events:
+ *
+ * - `commit()` / `discard()` — the host closes the gesture;
+ * - a discrete write to the same property (`set_property(name, …)`, and
+ *   for paint channels `set_paint` / `set_paint_from_gradient`, which
+ *   write through it) — the discrete write is the user's final intent
+ *   and a later `commit()` must not replay the stale previewed value;
+ * - opening a second session on the same name (same supersession rule);
+ * - an operation that detaches the session's target nodes (`remove` /
+ *   `cut`, `ungroup`) — sessions on EVERY name end, since the deltas
+ *   would target detached nodes;
+ * - a document swap (`load` / `reset`) — every NodeId dies wholesale;
+ * - `undo` / `redo` — history discards all in-flight previews.
+ *
+ * A defensive `discard()` before a discrete write is valid but not
+ * required. Sessions on OTHER property names are untouched by discrete
+ * writes. Hosts that cache a session across renders should consult
+ * `live` and lazily reopen — the bundled React hooks do this.
+ *
+ * Known exclusion: the discrete GEOMETRY commands (`translate` / `nudge`,
+ * `resize*`, `rotate*`, `align`, `transform`, `flatten_transform`) write
+ * `x` / `y` / `width` / `height` / `transform` through their own
+ * pipelines and do NOT yet supersede a same-name property session —
+ * avoid mixing `preview_property` on geometry attributes with those
+ * commands until that lands.
+ */
 export type PreviewSession = {
+  /** `true` while the session can still affect the document; `false`
+   *  once it has ended for any of the reasons above. */
+  readonly live: boolean;
   update(value: string): void;
   commit(): void;
   discard(): void;
 };
 
+/** `PreviewSession` over typed `Paint` values, from
+ *  `commands.preview_paint(channel)`. Same lifecycle and supersession
+ *  contract — the channel ("fill" / "stroke") is the property name. */
 export type PaintPreviewSession = {
+  readonly live: boolean;
   update(paint: Paint): void;
   commit(): void;
   discard(): void;

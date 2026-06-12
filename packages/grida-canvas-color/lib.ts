@@ -7,27 +7,413 @@ export namespace color {
   }
   export const names: typeof colorname = colorname;
 
+  /**
+   * Clamps a value between 0.0 and 1.0.
+   */
+  function clamp01(v: number): number {
+    return v <= 0 ? 0 : v >= 1 ? 1 : v;
+  }
+
+  /**
+   * Clamps a value between 0 and 100.
+   */
+  function clamp100(v: number): number {
+    return v <= 0 ? 0 : v >= 100 ? 100 : v;
+  }
+
+  /**
+   * Clamps a value between 0 and 255 and rounds it to the nearest integer.
+   */
+  function clamp255(v: number): number {
+    return v <= 0 ? 0 : v >= 255 ? 255 : Math.round(v);
+  }
+
+  /**
+   * Wraps a hue (degrees) into the [0, 360) range.
+   */
+  function wrapHue(h: number): number {
+    return ((h % 360) + 360) % 360;
+  }
+
+  /**
+   * hsl -> rgb per CSS Color 4 §7 (the spec's own sample algorithm,
+   * which is what browsers implement).
+   *
+   * @param h - Hue in degrees (any finite value; wrapped mod 360).
+   * @param s - Saturation in percent (clamped to [0, 100]).
+   * @param l - Lightness in percent (clamped to [0, 100]).
+   * @returns [r, g, b] in the 0-255 range (unrounded).
+   */
+  function hslToRGB255(
+    h: number,
+    s: number,
+    l: number
+  ): [number, number, number] {
+    const hue = wrapHue(h);
+    const sat = clamp100(s) / 100;
+    const light = clamp100(l) / 100;
+    const f = (n: number): number => {
+      const k = (n + hue / 30) % 12;
+      const a = sat * Math.min(light, 1 - light);
+      return light - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    };
+    return [f(0) * 255, f(8) * 255, f(4) * 255];
+  }
+
+  /**
+   * hwb -> rgb per CSS Color 4 §8.
+   *
+   * @param h - Hue in degrees (any finite value; wrapped mod 360).
+   * @param w - Whiteness in percent (clamped to [0, 100]).
+   * @param b - Blackness in percent (clamped to [0, 100]).
+   * @returns [r, g, b] in the 0-255 range (unrounded).
+   */
+  function hwbToRGB255(
+    h: number,
+    w: number,
+    b: number
+  ): [number, number, number] {
+    const white = clamp100(w) / 100;
+    const black = clamp100(b) / 100;
+    if (white + black >= 1) {
+      const gray = (white / (white + black)) * 255;
+      return [gray, gray, gray];
+    }
+    // c' = c·(1−w−b) + w, scaled to the 0-255 range (CSS Color 4 §8).
+    const k = 1 - white - black;
+    const rgb = hslToRGB255(h, 100, 50);
+    return [
+      rgb[0] * k + white * 255,
+      rgb[1] * k + white * 255,
+      rgb[2] * k + white * 255,
+    ];
+  }
+
+  /**
+   * `#` followed by exactly 3, 4, 6 or 8 hex digits — nothing else.
+   * (Input is lowercased before testing.)
+   */
+  const HEX_FORM = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/;
+
+  /**
+   * `rgb()` / `rgba()` / `hsl()` / `hsla()` / `hwb()` — function name
+   * directly followed by `(` (no whitespace, per CSS), a paren-free
+   * argument body, and a closing `)` at the very end of the string.
+   * Captures the function name and the argument body.
+   */
+  const FUNC_FORM = /^(rgba?|hsla?|hwb)\(([^()]*)\)$/;
+
+  /**
+   * Legacy comma discipline for a (trimmed) argument body:
+   * `T, T, T` or `T, T, T, T` — every channel separated by a comma,
+   * whitespace around commas allowed, no slash. Token *content* is
+   * validated separately ({@link HUE_TOKEN} / {@link CHANNEL_TOKEN}).
+   */
+  const LEGACY_BODY = /^[^\s,/]+(?:\s*,\s*[^\s,/]+){2,3}$/;
+
+  /**
+   * Modern space discipline for a (trimmed) argument body:
+   * exactly three space-separated channels, alpha only after a `/`
+   * (whitespace around the slash optional): `T T T` or `T T T / A`.
+   */
+  const MODERN_BODY = /^[^\s,/]+(?:\s+[^\s,/]+){2}(?:\s*\/\s*[^\s,/]+)?$/;
+
+  /**
+   * Source pattern for a CSS `<number>`: optional sign, integer or
+   * decimal (digits required after the dot — `120.` is not a number),
+   * optional scientific exponent with *required* exponent digits
+   * (`1e` is not a number; `parseFloat("1e")` would read 1).
+   */
+  const CSS_NUMBER_SOURCE = /[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?/.source;
+
+  /**
+   * The hue position of `hsl()` / `hsla()` / `hwb()`: a CSS
+   * `<number>` with an optional angle unit. Exactly the four units
+   * the vendored parser converts — `deg` | `grad` | `rad` | `turn`.
+   * Any other unit (e.g. `px`) must not pass: the parser would fall
+   * through to `parseFloat` and silently drop it. No `%` — the parser
+   * would misread a percentage hue as a 0-100 hue.
+   */
+  const HUE_TOKEN = new RegExp(`^${CSS_NUMBER_SOURCE}(?:deg|grad|rad|turn)?$`);
+
+  /**
+   * Every non-hue channel token, alpha included: a CSS `<number>`
+   * with an optional `%` suffix — and nothing else. Stray units leak
+   * through the vendored parser's `parseFloat` (`rgb(1px 0 0)` would
+   * read 1) where every browser rejects the declaration, so they must
+   * not pass. (`none` is handled separately: it is a valid missing
+   * channel in the modern syntax only.)
+   */
+  const CHANNEL_TOKEN = new RegExp(`^${CSS_NUMBER_SOURCE}%?$`);
+
+  /**
+   * The input gate for {@link resolve}: decides whether a (trimmed,
+   * lowercased) string is one of the resolvable *forms* before the
+   * permissive {@link parse} ever sees it. Form-level plus separator
+   * discipline plus per-token channel shape — post-parse
+   * arity/finiteness are still checked after parsing.
+   */
+  function isResolvableForm(cstr: string): boolean {
+    // named colors — own properties only, so prototype-chain keys like
+    // "constructor" can never reach the parser's table lookup.
+    if (Object.prototype.hasOwnProperty.call(colorname, cstr)) return true;
+    if (cstr === "transparent") return true;
+    if (cstr[0] === "#") return HEX_FORM.test(cstr);
+    const m = FUNC_FORM.exec(cstr);
+    if (m === null) return false;
+    const fn = m[1];
+    const body = m[2].trim();
+
+    // separator discipline: the body is either all-comma (legacy) or
+    // all-space (modern) — never a mix. Mixed styles are invalid CSS,
+    // and the permissive parser splits on both at once, smuggling a
+    // 4th token into alpha (`rgb(25 5, 0, 0)` -> alpha 0). The two
+    // patterns are mutually exclusive: LEGACY_BODY requires commas,
+    // MODERN_BODY forbids them.
+    const legacy = LEGACY_BODY.test(body);
+    if (!legacy && !MODERN_BODY.test(body)) return false;
+
+    // hwb() postdates the legacy comma syntax and never had a comma
+    // form in CSS — `hwb(0, 0%, 0%)` is invalid in every browser.
+    if (fn === "hwb" && legacy) return false;
+
+    // tokenize along the discipline the body already matched: legacy
+    // is comma-separated with an optional 4th (alpha) token; modern is
+    // three space-separated channels with an optional post-slash alpha.
+    let channels: string[];
+    let alphaToken: string | null = null;
+    if (legacy) {
+      channels = body.split(",").map((t) => t.trim());
+      if (channels.length === 4) alphaToken = channels.pop()!;
+    } else {
+      const slash = body.indexOf("/");
+      if (slash !== -1) {
+        alphaToken = body.slice(slash + 1).trim();
+        channels = body.slice(0, slash).trim().split(/\s+/);
+      } else {
+        channels = body.split(/\s+/);
+      }
+    }
+
+    // per-token channel shape. `none` is a valid *missing* channel —
+    // any position, alpha included — but only in the modern syntax
+    // (CSS Color 4 §4.4); browsers reject `rgb(none, 0, 0)`. The
+    // parser reads it as 0, matching the spec's missing-behaves-as-
+    // zero rule.
+    const none = (token: string): boolean => token === "none" && !legacy;
+    const isHueForm = fn !== "rgb" && fn !== "rgba";
+    for (let i = 0; i < channels.length; i++) {
+      const token = channels[i];
+      if (i === 0 && isHueForm) {
+        // the hue channel of hsl()/hsla()/hwb() keeps its own rule
+        // (angle units allowed, `%` not) — the generic channel rule
+        // must never double-reject `hsl(120deg ...)`. The vendored
+        // parser would otherwise also accept named base hues from a
+        // long-dropped css-color draft (`hsl(red 100% 50%)`) whose
+        // table values are not even CSS hue degrees (red:0,
+        // yellow:120).
+        if (!HUE_TOKEN.test(token) && !none(token)) return false;
+      } else if (!CHANNEL_TOKEN.test(token) && !none(token)) {
+        return false;
+      }
+    }
+    // alpha — 4th legacy channel or post-slash modern — is
+    // number-or-percentage, never a unit (`rgb(255 0 0 / 1px)` is
+    // invalid CSS).
+    if (
+      alphaToken !== null &&
+      !CHANNEL_TOKEN.test(alphaToken) &&
+      !none(alphaToken)
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Resolves a CSS `<color>` string (or `0xRRGGBB` number) to its canonical
+   * sRGB form as a branded {@link colorformats.RGB888A32F} — without a DOM
+   * or canvas. Sits on top of {@link parse}; parse behavior is the source
+   * of truth for what each *accepted* syntax means.
+   *
+   * **Resolvable** (returns a value):
+   * - named colors (`"red"`, `"REBECCAPURPLE"`) and `"transparent"`
+   *   (resolves to `{ r: 0, g: 0, b: 0, a: 0 }` per CSS)
+   * - 3/4/6/8-digit hex (`"#f00"`, `"#ff000080"`)
+   * - `rgb()` / `rgba()` (number or percentage channels, comma or slash syntax)
+   * - `hsl()` / `hsla()` — converted per CSS Color 4 §7
+   * - `hwb()` — converted per CSS Color 4 §8
+   * - numbers, read as `0xRRGGBB`
+   *
+   * **Not resolvable** (returns `null`, never a guess):
+   * - `currentColor` and other context-dependent keywords
+   * - `lab()` / `lch()` / `oklab()` / `oklch()` / `color()` — gamut mapping
+   *   is out of scope
+   * - `cmyk` / `gray` / other non-CSS spaces {@link parse} understands
+   * - malformed or unparseable input
+   *
+   * **Strict input gate.** The null-never-guess contract is enforced by
+   * `resolve` itself, up front; the underlying {@link parse} stays
+   * permissive (it coerces, truncates and guesses, as vendored). A string
+   * must take one of these *forms* (after trimming, case-insensitive):
+   * - a named color present in {@link names} (own keys only — prototype
+   *   keys like `"constructor"` are not colors), or `"transparent"`
+   * - `#` + exactly 3/4/6/8 hex digits — `"#zzz"`, `"###"`, `"#12345"`,
+   *   `"#1234567"` are all `null`
+   * - `rgb()` / `rgba()` / `hsl()` / `hsla()` / `hwb()` with the `(`
+   *   directly after the function name (no whitespace, per CSS) and a
+   *   properly closed `)` — `"rgb(255,0,0"` is `null`
+   *
+   * Bare channel lists (`"1 2 3"`, `"255, 0, 0"`) are not CSS colors and
+   * resolve to `null`.
+   *
+   * **Separator discipline.** Inside an accepted function form, the
+   * argument body must follow a single separator style — legacy
+   * all-comma (`N, N, N[, A]`) or modern all-space (`N N N [/ A]`) —
+   * never a mix: `"rgb(25 5, 0, 0)"` is `null` (the permissive parser
+   * would smuggle the 4th token into alpha). Alpha in the modern form
+   * requires the slash (`"rgb(255 0 0 0.5)"` is `null`); slash alpha in
+   * the legacy form is likewise rejected (`"rgb(255, 0, 0 / 0.5)"`).
+   * `hwb()` takes the modern form only — it postdates the comma syntax
+   * and `"hwb(0, 0%, 0%)"` is invalid in every browser.
+   *
+   * **Channel tokens.** Every channel token must be a CSS `<number>`
+   * (optional sign, digits required after a decimal dot, scientific
+   * notation with *required* exponent digits — `"rgb(1e 0 0)"` is
+   * `null`) with an optional `%` suffix. Stray units reject in every
+   * position — channel (`"rgb(1px 0 0)"`, `"rgb(1px, 0, 0)"`) and
+   * alpha (`"rgb(255 0 0 / 1px)"`) alike — exactly as browsers reject
+   * the declaration; the permissive parser would `parseFloat` the unit
+   * away. `none` is a valid *missing* channel in any position, alpha
+   * included, but in the modern syntax only (CSS Color 4):
+   * `"rgb(none 0 0)"` resolves (missing reads as 0, as in browsers),
+   * `"rgb(none, 0, 0)"` is `null`.
+   *
+   * **Numeric hue.** The hue channel of `hsl()` / `hsla()` / `hwb()`
+   * keeps its own token rule in place of the generic one: a CSS
+   * number, optionally with one of the angle units the vendored
+   * parser actually converts — `deg`, `grad`, `rad`, `turn` — or
+   * `none` (modern form only). Named hues (`"hsl(red 100% 50%)"`)
+   * are rejected: `<named-hue>` comes from a long-dropped css-color
+   * draft, no browser accepts it, and the parser's table values are
+   * not CSS hue degrees. Percentage hue (`"hsl(50% 100% 50%)"`) is
+   * rejected — the parser would misread it as a 0-100 hue. A bare
+   * trailing dot is not a CSS number (`"hsl(120. 50% 50%)"` is
+   * `null`).
+   *
+   * Channel arity is enforced by the discipline patterns themselves
+   * (`"rgb(1, 2)"`, `"rgb(1, 2, 3, 4, 5)"` are `null`). Token
+   * *interpretation* within the validated shape still defers to
+   * {@link parse}: cross-token grammar is not enforced, so legacy
+   * bodies mixing `<number>` and `<percentage>` (`"rgb(50%, 0, 0)"`)
+   * or unitless hsl saturation/lightness (read as percent) resolve
+   * permissively rather than `null`.
+   *
+   * A number must be an integer in `[0x000000, 0xFFFFFF]` — negative,
+   * fractional, `NaN`, non-finite, or `> 0xFFFFFF` values are `null`
+   * (never truncated or wrapped).
+   *
+   * Edge semantics (matching browser behavior):
+   * - input is trimmed and case-insensitive
+   * - hue wraps mod 360 (negative hues allowed)
+   * - saturation / lightness / whiteness / blackness clamp to [0, 100]
+   * - rgb channels clamp to [0, 255] and round to integers
+   * - alpha clamps to [0, 1]
+   * - never throws; invalid input resolves to `null`
+   *
+   * @param cstr - CSS color string, or a number read as `0xRRGGBB`.
+   * @returns The resolved color, or `null` when resolution requires a
+   * rendering context or the space is out of scope.
+   *
+   * @example
+   * ```typescript
+   * resolve("hsl(217 91% 60%)"); // { r: 60, g: 131, b: 246, a: 1 }
+   * resolve("rgba(255, 0, 0, 0.5)"); // { r: 255, g: 0, b: 0, a: 0.5 }
+   * resolve("transparent"); // { r: 0, g: 0, b: 0, a: 0 }
+   * resolve("currentColor"); // null
+   * resolve("oklch(0.7 0.1 200)"); // null
+   * ```
+   */
+  export function resolve(
+    cstr: string | number
+  ): colorformats.RGB888A32F | null {
+    let input: string | number;
+    if (typeof cstr === "number") {
+      // numbers are read as 0xRRGGBB — anything outside the integer
+      // [0x000000, 0xFFFFFF] range has no such reading.
+      if (!Number.isInteger(cstr) || cstr < 0 || cstr > 0xffffff) return null;
+      input = cstr;
+    } else {
+      const normalized = cstr.trim().toLowerCase();
+      if (!isResolvableForm(normalized)) return null;
+      input = normalized;
+    }
+
+    const { space, values, alpha } = colorparse(input);
+
+    if (!space) return null;
+    if (values.length !== 3) return null;
+    if (!values.every(Number.isFinite)) return null;
+    if (!Number.isFinite(alpha)) return null;
+
+    let rgb: [number, number, number];
+    switch (space) {
+      case "rgb":
+        rgb = [values[0], values[1], values[2]];
+        break;
+      case "hsl":
+        rgb = hslToRGB255(values[0], values[1], values[2]);
+        break;
+      case "hwb":
+        rgb = hwbToRGB255(values[0], values[1], values[2]);
+        break;
+      default:
+        return null;
+    }
+
+    return colorformats.newRGB888A32F(
+      clamp255(rgb[0]),
+      clamp255(rgb[1]),
+      clamp255(rgb[2]),
+      clamp01(alpha)
+    );
+  }
+
+  /**
+   * Resolves a CSS `<color>` string (or `0xRRGGBB` number) to a lowercase
+   * hex string. Sugar over {@link resolve} — same resolvable set, same
+   * sentinel.
+   *
+   * Alpha is quantized to 8 bits, and the 6-vs-8-digit decision is made on
+   * the *quantized* byte so the canonical form is unique per quantized
+   * color: `#rrggbb` whenever the alpha byte is `0xff`, `#rrggbbaa`
+   * otherwise. (`resolveHEX("rgba(255, 0, 0, 0.999)")` is `"#ff0000"` —
+   * never `"#ff0000ff"`, which would be a second spelling of the same
+   * quantized color.)
+   *
+   * @param cstr - CSS color string, or a number read as `0xRRGGBB`.
+   * @returns `"#rrggbb"` | `"#rrggbbaa"`, or `null` when not resolvable.
+   *
+   * @example
+   * ```typescript
+   * resolveHEX("hsl(217 91% 60%)"); // "#3c83f6"
+   * resolveHEX("red"); // "#ff0000"
+   * resolveHEX("rgba(255, 0, 0, 0.5)"); // "#ff000080"
+   * resolveHEX("rgba(255, 0, 0, 0.999)"); // "#ff0000" (alpha byte rounds to 0xff)
+   * resolveHEX("definitely-not-a-color"); // null
+   * ```
+   */
+  export function resolveHEX(cstr: string | number): string | null {
+    const c = resolve(cstr);
+    if (c === null) return null;
+    const hex8 = colorformats.RGB888A32F.intoHEX(c);
+    // hex8 is "#rrggbbaa"; chars [7..9) are the already-quantized alpha
+    // byte — deciding on it (not on `c.a === 1`) keeps the decision
+    // consistent with intoHEX's quantization by construction.
+    return hex8.slice(7) === "ff" ? hex8.slice(0, 7) : hex8;
+  }
+
   export namespace colorformats {
-    /**
-     * Clamps a value between 0.0 and 1.0.
-     *
-     * @param t - The value to clamp.
-     * @returns The clamped value.
-     */
-    function f32(t: number): number {
-      return t <= 0 ? 0 : t >= 1 ? 1 : t;
-    }
-
-    /**
-     * Clamps a value between 0 and 255.
-     *
-     * @param value - The value to clamp.
-     * @returns The clamped value.
-     */
-    function u8(value: number): number {
-      return value <= 0 ? 0 : value >= 255 ? 255 : Math.round(value);
-    }
-
     function u8ToF32(value: number): number {
       return value / 255;
     }
@@ -265,18 +651,18 @@ export namespace color {
 
       export function intoRGBA8888(color: RGBA32F): RGBA8888 {
         return {
-          r: u8(color.r * 255),
-          g: u8(color.g * 255),
-          b: u8(color.b * 255),
-          a: u8(color.a * 255),
+          r: clamp255(color.r * 255),
+          g: clamp255(color.g * 255),
+          b: clamp255(color.b * 255),
+          a: clamp255(color.a * 255),
         } as RGBA8888;
       }
 
       export function intoRGB888F32A(color: RGBA32F): RGB888A32F {
         return {
-          r: u8(color.r * 255),
-          g: u8(color.g * 255),
-          b: u8(color.b * 255),
+          r: clamp255(color.r * 255),
+          g: clamp255(color.g * 255),
+          b: clamp255(color.b * 255),
           a: color.a,
         } as RGB888A32F;
       }
@@ -378,16 +764,16 @@ export namespace color {
           r: color.r,
           g: color.g,
           b: color.b,
-          a: u8(color.a * 255),
+          a: clamp255(color.a * 255),
         } as RGBA8888;
       }
 
       export function intoRGBA32F(color: RGB888A32F): RGBA32F {
         return {
-          r: f32(color.r / 255),
-          g: f32(color.g / 255),
-          b: f32(color.b / 255),
-          a: f32(color.a),
+          r: clamp01(color.r / 255),
+          g: clamp01(color.g / 255),
+          b: clamp01(color.b / 255),
+          a: clamp01(color.a),
         } as RGBA32F;
       }
 

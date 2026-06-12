@@ -400,11 +400,46 @@ export class HistoryImpl implements History {
 
   // -- Cleanup (for clearing all state, e.g. new document) ------------------
 
+  /**
+   * Clear all history state — e.g. when loading a new document.
+   *
+   * Active previews are discarded first (their in-flight deltas reverted,
+   * sessions sealed), exactly as `undo()`/`redo()` do (Invariant 3: no
+   * active previews across stack mutations — and `clear()` is the most
+   * drastic stack mutation there is). Without this, an in-flight `Preview`
+   * would still read `state === "active"` after `clear()`, and a later
+   * `commit()` would push a transaction whose deltas reference the
+   * pre-clear world onto the fresh stack.
+   *
+   * Why revert rather than orphan (seal without reverting)? Deltas are
+   * opaque closures over the world that existed when they were created.
+   * If the caller is throwing that world away, the revert is harmless —
+   * it writes to soon-dead state. If the caller is resetting history
+   * *without* swapping the document, the revert is required to leave the
+   * document clean. Reverting is therefore correct in the second case and
+   * neutral in the first; orphaning would be wrong in the second.
+   *
+   * Ordering contract for callers: the revert runs against the *current*
+   * world, so call `clear()` while the outgoing document is still
+   * installed — clear first, then swap. Swapping first risks stale
+   * revert closures scribbling onto the new document.
+   *
+   * What `clear()` does NOT touch: registrations. Event subscriptions
+   * made via `on()` survive, and providers stay registered (only their
+   * `reset()` hook is invoked). Observer wiring is not document state —
+   * the documented pattern is to subscribe once at construction, and a
+   * listener must keep observing across document swaps (e.g. the very
+   * next undo/redo must still fire `onUndo`/`onChange`). The only way a
+   * subscription or provider registration ends is its own
+   * `Disposable.dispose()`.
+   */
   clear(): void {
+    // Invariant 3: discard (revert + seal) active previews before any
+    // stack mutation or provider reset.
+    this._discardAllPreviews();
     this._stack.clear();
     for (const provider of this._providers.values()) {
       provider.reset?.();
     }
-    this._events.clear();
   }
 }

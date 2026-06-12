@@ -266,16 +266,39 @@ export type DomSurfaceOptions = {
 };
 
 /**
- * Surface handle for the DOM surface. Extends the editor's core
- * `SurfaceHandle` with the viewport-scoped concerns: pan/zoom (`camera`)
- * and pointer/wheel/keyboard gesture bindings (`gestures`).
+ * Host-extendable attention scope — public via `handle.attention`.
  *
- * Camera + gestures are **surface-scoped**: detaching the surface drops
- * both. They never appear on the headless `SvgEditor`.
+ * The document-level keymap (undo / redo / delete / tool keys) is gated on
+ * attention: focus inside the scope, or pointer over it. The scope starts
+ * as the container alone, which makes editor-adjacent host chrome — an
+ * inspector, a toolbar, a zoom menu; anything that drives `commands.*` —
+ * indistinguishable from unrelated page surface (chrome must be a DOM
+ * *sibling* of the container, never a child). Registering a chrome element
+ * keeps the full keymap live while the user works in it, with
+ * text-input focus still excluded by the keymap's own guard. The native
+ * clipboard gate (deliberately stricter: focus-only, never pointer-over)
+ * honors the registered set's focus arm the same way.
+ *
+ * `add` is idempotent; `remove` of an unregistered element is a no-op.
+ * Registrations live for the surface's lifetime — `detach()` drops them
+ * with the tracker. Hosts with mounting/unmounting chrome (popovers,
+ * panels) pair `add` on mount with `remove` on unmount.
+ */
+export type AttentionScope = Pick<AttentionTracker, "add" | "remove">;
+
+/**
+ * Surface handle for the DOM surface. Extends the editor's core
+ * `SurfaceHandle` with the viewport-scoped concerns: pan/zoom (`camera`),
+ * pointer/wheel/keyboard gesture bindings (`gestures`), and the
+ * host-extendable attention scope (`attention`).
+ *
+ * Camera, gestures, and attention are **surface-scoped**: detaching the
+ * surface drops all three. They never appear on the headless `SvgEditor`.
  */
 export type DomSurfaceHandle = SurfaceHandle & {
   camera: Camera;
   gestures: Gestures;
+  attention: AttentionScope;
 };
 
 /**
@@ -301,6 +324,7 @@ export function attach_dom_surface(
     },
     camera: surface.camera,
     gestures: surface.gestures,
+    attention: surface.attention_scope,
   };
 }
 
@@ -367,6 +391,9 @@ class DomSurface implements Surface {
    *  page-level shortcuts (Space, arrows, Cmd+=, Shift+0, …) when nothing
    *  signals interest in the surface. See `util/attention.ts`. */
   private readonly attention: AttentionTracker;
+  /** Host-extendable attention scope — the tracker's `add` / `remove`,
+   *  without its read/dispose surface. Public via `handle.attention`. */
+  readonly attention_scope: AttentionScope;
   /** Surface-side handle on the memoized geometry provider — drives both
    *  `bounds_of` reads and the fat-hit picker's AABB pre-filter. Same
    *  instance the editor core sees via `_internal.set_geometry`. */
@@ -555,6 +582,10 @@ class DomSurface implements Surface {
     this.fit_on_attach = options.fit === true;
     this.clipboard_enabled = options.clipboard !== false;
     this.attention = create_attention_tracker(container);
+    this.attention_scope = {
+      add: (element) => this.attention.add(element),
+      remove: (element) => this.attention.remove(element),
+    };
     this.teardown.push(() => this.attention.dispose());
     // The container is exclusively owned by the surface — interactive
     // children break pointer routing (capture redirects pointerup off

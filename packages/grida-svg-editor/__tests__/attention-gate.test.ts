@@ -302,3 +302,185 @@ describe("space-drag-pan gesture — attention gate", () => {
     uninstall();
   });
 });
+
+// ─── Host-extended scope ─────────────────────────────────────────────────
+//
+// Editor-adjacent chrome (inspector, toolbar — anything that drives
+// `commands.*`) is a DOM sibling of the container, so by default the
+// tracker cannot tell it from unrelated page surface: clicking its
+// buttons un-focuses the container and hovering it fires the container's
+// pointerleave — every keystroke is ignored until the user re-attends
+// the canvas. `add()` registers such an element into the attention scope.
+
+/** Sibling chrome element — same fake surface as the container, minus the
+ *  owner document (the tracker reads focus through the container's). */
+class FakeChromeElement extends FakeEventTarget {
+  private readonly descendants = new Set<object>();
+  contains(node: object | null): boolean {
+    if (!node) return false;
+    if (node === this) return true;
+    return this.descendants.has(node);
+  }
+  add_descendant(el: object): void {
+    this.descendants.add(el);
+  }
+}
+
+describe("create_attention_tracker — host-extended scope", () => {
+  it("focus inside a registered chrome element attends, for the keymap arm AND the focus-only clipboard arm", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    const button = { tagName: "BUTTON" };
+    chrome.add_descendant(button);
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    c.ownerDocument.activeElement = button as unknown as Element;
+    // Unregistered sibling: the blackout state.
+    expect(t.is_attended()).toBe(false);
+    expect(t.is_focus_within()).toBe(false);
+    t.add(chrome as unknown as Element);
+    expect(t.is_attended()).toBe(true);
+    expect(t.is_focus_within()).toBe(true);
+    t.dispose();
+  });
+
+  it("pointer over a registered chrome element attends the keymap arm but NEVER the focus-only clipboard arm", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    t.add(chrome as unknown as Element);
+    chrome.fire("pointerenter");
+    expect(t.is_attended()).toBe(true);
+    expect(t.is_focus_within()).toBe(false);
+    chrome.fire("pointerleave");
+    expect(t.is_attended()).toBe(false);
+    t.dispose();
+  });
+
+  it("crossing from the container onto overlapping chrome never reads as a gap, whichever event fires first", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    t.add(chrome as unknown as Element);
+    c.fire("pointerenter");
+    // Order A: chrome enter, then container leave.
+    chrome.fire("pointerenter");
+    expect(t.is_attended()).toBe(true);
+    c.fire("pointerleave");
+    expect(t.is_attended()).toBe(true);
+    // Order B: back to the container — leave fires before enter.
+    chrome.fire("pointerleave");
+    c.fire("pointerenter");
+    expect(t.is_attended()).toBe(true);
+    t.dispose();
+  });
+
+  it("remove() ends the element's contribution — focus and hover on it no longer attend", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    const button = { tagName: "BUTTON" };
+    chrome.add_descendant(button);
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    t.add(chrome as unknown as Element);
+    c.ownerDocument.activeElement = button as unknown as Element;
+    expect(t.is_attended()).toBe(true);
+    t.remove(chrome as unknown as Element);
+    expect(t.is_attended()).toBe(false);
+    expect(chrome.has("pointerenter")).toBe(false);
+    expect(chrome.has("pointerleave")).toBe(false);
+    t.dispose();
+  });
+
+  it("removing an element mid-hover clears its latched pointer-over (popover unmounting under the cursor)", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    t.add(chrome as unknown as Element);
+    chrome.fire("pointerenter");
+    expect(t.is_attended()).toBe(true);
+    t.remove(chrome as unknown as Element); // no pointerleave will ever fire
+    expect(t.is_attended()).toBe(false);
+    t.dispose();
+  });
+
+  it("add is idempotent, and remove of an unregistered element is a no-op", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    const stranger = new FakeChromeElement();
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    t.add(chrome as unknown as Element);
+    t.add(chrome as unknown as Element); // duplicate
+    t.remove(stranger as unknown as Element); // unknown
+    t.remove(chrome as unknown as Element); // single remove fully unregisters
+    expect(chrome.has("pointerenter")).toBe(false);
+    expect(chrome.has("pointerleave")).toBe(false);
+    t.dispose();
+  });
+
+  it("the container is the scope's fixed root — add/remove of it are no-ops and cannot unhook it", () => {
+    const c = new FakeContainer();
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    t.add(c as unknown as Element);
+    t.remove(c as unknown as Element);
+    c.fire("pointerenter");
+    expect(t.is_attended()).toBe(true);
+    t.dispose();
+  });
+
+  it("dispose() detaches listeners from every registered element", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    t.add(chrome as unknown as Element);
+    t.dispose();
+    expect(chrome.has("pointerenter")).toBe(false);
+    expect(chrome.has("pointerleave")).toBe(false);
+  });
+});
+
+describe("create_attention_tracker — disposed and seeded states", () => {
+  it("add() after dispose() is a no-op — no listeners are installed on the late element", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    t.dispose();
+    // Surface already detached — a late registration must not leak.
+    t.add(chrome as unknown as Element);
+    expect(chrome.has("pointerenter")).toBe(false);
+    expect(chrome.has("pointerleave")).toBe(false);
+  });
+
+  it("an element already under the pointer at add() time seeds the hover arm", () => {
+    const c = new FakeContainer();
+    const chrome = new FakeChromeElement();
+    // Popover opened at the cursor: its pointerenter fired before the
+    // tracker listened. The tracker seeds from matches(":hover").
+    (chrome as unknown as { matches: (sel: string) => boolean }).matches = (
+      sel: string
+    ) => sel === ":hover";
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    expect(t.is_attended()).toBe(false);
+    t.add(chrome as unknown as Element);
+    expect(t.is_attended()).toBe(true);
+    // …and the latch clears normally through remove().
+    t.remove(chrome as unknown as Element);
+    expect(t.is_attended()).toBe(false);
+    t.dispose();
+  });
+});
+
+describe("create_attention_tracker — the container is not hover-seeded at attach", () => {
+  it("a surface mounted under an idle cursor stays unattended until a real crossing", () => {
+    const c = new FakeContainer();
+    // Even if the platform reports the container as :hover at attach
+    // time (cursor parked over the mount point), the editor must not
+    // claim the page's keyboard until the user crosses into it.
+    (c as unknown as { matches: (sel: string) => boolean }).matches = (
+      sel: string
+    ) => sel === ":hover";
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    expect(t.is_attended()).toBe(false);
+    c.fire("pointerenter"); // the real crossing
+    expect(t.is_attended()).toBe(true);
+    t.dispose();
+  });
+});

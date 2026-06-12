@@ -330,6 +330,118 @@ describe("History", () => {
     });
   });
 
+  describe("clear()", () => {
+    it("discards active previews — previewed delta is reverted, later commit()/discard() on the session throws per Preview semantics", () => {
+      const h = new HistoryImpl();
+      const c = { value: 0 };
+
+      const preview = h.preview("adjust");
+      preview.set({
+        providerId: "test",
+        apply: () => {
+          c.value = 99;
+        },
+        revert: () => {
+          c.value = 0;
+        },
+      });
+      expect(c.value).toBe(99);
+      expect(preview.state).toBe("active");
+
+      h.clear();
+
+      // in-flight delta reverted (Invariant 3, same as undo/redo)
+      expect(c.value).toBe(0);
+      // session sealed — liveness via preview.state is accurate
+      expect(preview.state).toBe("discarded");
+      // commit() on the sealed session throws and pushes nothing
+      expect(() => preview.commit()).toThrow(/Cannot commit discarded preview/);
+      expect(h.stack.canUndo).toBe(false);
+      expect(h.stack.pastCount).toBe(0);
+      // discard() on the sealed session likewise throws
+      expect(() => preview.discard()).toThrow(
+        /Cannot discard discarded preview/
+      );
+    });
+
+    it("discards all active previews, leaves already-sealed sessions untouched", () => {
+      const h = new HistoryImpl();
+      const a = { value: 0 };
+      const b = { value: 0 };
+
+      const p1 = h.preview("a");
+      p1.set(counterDelta(a, 1)); // set() applies → a.value = 1
+      const p2 = h.preview("b");
+      p2.set(counterDelta(b, 2)); // set() applies → b.value = 2
+
+      // p2 commits before clear — it is sealed and on the stack
+      p2.commit();
+      expect(h.stack.pastCount).toBe(1);
+
+      h.clear();
+
+      // active p1 reverted + sealed; committed p2 state unchanged
+      expect(a.value).toBe(0);
+      expect(p1.state).toBe("discarded");
+      expect(p2.state).toBe("committed");
+      expect(b.value).toBe(2); // committed result is not reverted by clear()
+      expect(h.stack.pastCount).toBe(0);
+    });
+
+    it("subscriptions survive clear() — listeners registered before clear() still fire for activity after it", async () => {
+      const h = new HistoryImpl();
+      const c = { value: 0 };
+      const events: string[] = [];
+      // Documented pattern: subscribe once at construction.
+      h.on("onChange", () => events.push("change"));
+      h.on("onUndo", () => events.push("undo"));
+      h.on("onRedo", () => events.push("redo"));
+
+      // Pre-clear activity is observed...
+      h.atomic("before", (tx) => {
+        const d = counterDelta(c, 1);
+        d.apply();
+        tx.push(d);
+      });
+      expect(events).toEqual(["change"]);
+
+      // ...then the consumer loads a new document.
+      h.clear();
+      events.length = 0;
+
+      // A transaction committed after clear() still notifies the listener.
+      h.atomic("after", (tx) => {
+        const d = counterDelta(c, 2);
+        d.apply();
+        tx.push(d);
+      });
+      expect(events).toEqual(["change"]);
+
+      // Undo/redo after clear() still emit — UI bound to canUndo/canRedo
+      // keeps tracking the stack.
+      await h.undo();
+      expect(events).toEqual(["change", "undo", "change"]);
+      await h.redo();
+      expect(events).toEqual(["change", "undo", "change", "redo", "change"]);
+    });
+
+    it("dispose() is the only way to unsubscribe — a listener disposed before clear() stays silent after it", () => {
+      const h = new HistoryImpl();
+      const events: string[] = [];
+      const sub = h.on("onChange", () => events.push("change"));
+      sub.dispose();
+
+      h.clear();
+
+      h.atomic("after", (tx) => {
+        const d = counterDelta({ value: 0 }, 1);
+        d.apply();
+        tx.push(d);
+      });
+      expect(events).toEqual([]);
+    });
+  });
+
   describe("clearsFuture", () => {
     it("default: commit clears future", async () => {
       const h = new HistoryImpl();

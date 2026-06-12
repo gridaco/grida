@@ -1,6 +1,6 @@
 {
   "name": "@grida/history",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "dependency-free transaction and undo/redo engine",
   "license": "MIT",
   "author": "softmarshmallow",

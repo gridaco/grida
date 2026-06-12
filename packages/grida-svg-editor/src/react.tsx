@@ -311,19 +311,32 @@ export function useCanRedo(): boolean {
 // lazily opens a fresh one — picker open → commit → reopen works
 // without a remount.
 
-function use_lifecycle_session<S extends { discard(): void }>(
+function use_lifecycle_session<
+  S extends { discard(): void; readonly live?: boolean },
+>(
   open: () => S,
   deps: React.DependencyList
 ): {
   ensure(): S;
+  /** Non-creating read: is a gesture currently open underneath? */
+  live(): boolean;
   finalize(action: "commit" | "discard", commit: (s: S) => void): void;
 } {
   const sessionRef = useRef<S | null>(null);
   const ops = useMemo(
     () => ({
       ensure(): S {
+        // The cached session can end underneath the hook — superseded by
+        // a discrete same-name write, killed by undo/redo, or invalidated
+        // by remove/load (see `PreviewSession`'s lifecycle invariant).
+        // A dead session is a permanent no-op; drop it and reopen.
+        if (sessionRef.current?.live === false) sessionRef.current = null;
         if (!sessionRef.current) sessionRef.current = open();
         return sessionRef.current;
+      },
+      /** Non-creating read: is a gesture currently open underneath? */
+      live(): boolean {
+        return sessionRef.current?.live === true;
       },
       finalize(action: "commit" | "discard", commit: (s: S) => void): void {
         const s = sessionRef.current;
@@ -357,6 +370,12 @@ export function usePaintPreview(
   );
   return useMemo<PaintPreviewSession>(
     () => ({
+      // Reports whether a gesture is open underneath RIGHT NOW. The
+      // facade itself stays usable regardless — `update()` lazily
+      // (re)opens a fresh session when the previous one ended.
+      get live() {
+        return lc.live();
+      },
       update: (paint: Paint) => lc.ensure().update(paint),
       commit: () => lc.finalize("commit", (s) => s.commit()),
       discard: () => lc.finalize("discard", () => {}),
@@ -374,6 +393,11 @@ export function usePropertyPreview(name: string): PreviewSession {
   );
   return useMemo<PreviewSession>(
     () => ({
+      // Same as usePaintPreview: live reads the underlying session;
+      // the facade itself reopens lazily on update().
+      get live() {
+        return lc.live();
+      },
       update: (value: string) => lc.ensure().update(value),
       commit: () => lc.finalize("commit", (s) => s.commit()),
       discard: () => lc.finalize("discard", () => {}),

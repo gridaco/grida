@@ -1,6 +1,6 @@
 {
   "name": "@grida/svg-editor",
-  "version": "1.0.0-alpha.18",
+  "version": "1.0.0-alpha.19",
   "description": "Headless SVG editor (experimental).",
   "keywords": [
     "bezier",
@@ -66,6 +66,7 @@
   },
   "dependencies": {
     "@grida/cmath": "workspace:*",
+    "@grida/color": "workspace:*",
     "@grida/history": "workspace:*",
     "@grida/hud": "workspace:*",
     "@grida/keybinding": "workspace:*",

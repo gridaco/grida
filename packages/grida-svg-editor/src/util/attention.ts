@@ -14,11 +14,15 @@
 // (README → Surface), and "exclusively" should not extend its keyboard claim
 // past the boundary the surface visibly draws on screen.
 //
-// What "attended" means here. The surface is attended when at least one of:
-//   - focus is inside the container's subtree (active element is the
-//     container or one of its descendants), OR
-//   - the pointer is currently over the container (`pointerenter` fired more
-//     recently than `pointerleave`).
+// What "attended" means here. The tracker watches an **attention scope**:
+// the container, plus any host-chrome elements registered via `add()`
+// (inspector, toolbar — editor-adjacent chrome that is a DOM sibling of the
+// container by the exclusive-ownership rule). The surface is attended when
+// at least one of:
+//   - focus is inside the subtree of any element of the scope (active
+//     element is that element or one of its descendants), OR
+//   - the pointer is currently over any element of the scope
+//     (`pointerenter` fired more recently than `pointerleave` on it).
 //
 // Body-focus alone (no descendant focused, no pointer over) is the embedded
 // reading state — the editor is one block among many — and is *not* attended.
@@ -41,14 +45,16 @@
 /** The runtime handle returned by `create_attention_tracker`. */
 export interface AttentionTracker {
   /**
-   * `true` iff focus is inside `container`'s subtree OR the pointer is
-   * currently over `container`. See module doc for the rationale.
+   * `true` iff focus is inside the attention scope (the container's
+   * subtree or a registered element's subtree) OR the pointer is
+   * currently over any element of the scope. See module doc for the
+   * rationale.
    *
    * Pure read; no DOM mutation. Cheap enough to call once per keydown.
    */
   is_attended(): boolean;
   /**
-   * `true` iff focus is inside `container`'s subtree — the focus arm of
+   * `true` iff focus is inside the attention scope — the focus arm of
    * {@link is_attended} alone, WITHOUT the pointer-over arm.
    *
    * Exists for the native clipboard gate (`dom.ts`): pointer-over is a
@@ -59,7 +65,28 @@ export interface AttentionTracker {
    * §Transport "Gating the native events".
    */
   is_focus_within(): boolean;
-  /** Detach the internal pointer-tracking listeners. */
+  /**
+   * Register a host-chrome element into the attention scope. Editor-
+   * adjacent chrome — an inspector, a toolbar, a zoom menu; anything that
+   * drives `commands.*` — is a DOM *sibling* of the container (the
+   * container is exclusively surface-owned), so without registration the
+   * tracker cannot tell it apart from unrelated page surface: clicking
+   * its buttons moves focus out of the container, and hovering it fires
+   * the container's `pointerleave`, blacking out the whole keymap.
+   * Registered elements count for both arms — focus-within and
+   * pointer-over. Idempotent; re-adding a registered element is a no-op.
+   */
+  add(element: Element): void;
+  /**
+   * Unregister an element added via {@link add}. Also clears any
+   * still-latched pointer-over contribution from it (the element may be
+   * unmounted mid-hover — e.g. a popover closing under the cursor).
+   * Unknown elements are a no-op. The container itself cannot be
+   * removed; it is the scope's fixed root, not a registered extra.
+   */
+  remove(element: Element): void;
+  /** Detach the internal pointer-tracking listeners (container and every
+   *  registered element). */
   dispose(): void;
 }
 
@@ -67,42 +94,98 @@ export interface AttentionTracker {
  * Install pointer-tracking listeners on `container` and return the
  * read-side handle. The tracker is owned by the surface and disposed
  * alongside it; gesture bindings that need to consult it receive the
- * read-only `is_attended` predicate through `GestureContext`.
+ * read-only `is_attended` predicate through `GestureContext`. Hosts
+ * extend the scope through `handle.attention` (`dom.ts`), which fronts
+ * {@link AttentionTracker.add} / {@link AttentionTracker.remove}.
  */
 export function create_attention_tracker(
   container: HTMLElement
 ): AttentionTracker {
-  let pointer_over = false;
-  const on_enter = () => {
-    pointer_over = true;
+  /** Elements of the scope the pointer is currently over. Per-element
+   *  membership (not a single boolean) so crossing from the container
+   *  onto overlapping registered chrome — `leave` and `enter` firing in
+   *  either order — never reads as a gap in attention. */
+  const hovered = new Set<Element>();
+  /** Registered extras → their hover-tracking teardown. */
+  const extras = new Map<Element, () => void>();
+
+  let disposed = false;
+
+  /** Start hover-tracking `element`; returns the exact undo. */
+  const track = (element: Element): (() => void) => {
+    const enter = () => {
+      hovered.add(element);
+    };
+    const leave = () => {
+      hovered.delete(element);
+    };
+    // Use pointerenter / pointerleave (no bubbling, no fire-on-child-cross)
+    // so we get a single transition per actual boundary crossing.
+    element.addEventListener("pointerenter", enter);
+    element.addEventListener("pointerleave", leave);
+    return () => {
+      element.removeEventListener("pointerenter", enter);
+      element.removeEventListener("pointerleave", leave);
+      // The element may go away mid-hover (popover unmounting under the
+      // cursor) — its pointerleave will never fire, so drop the latch.
+      hovered.delete(element);
+    };
   };
-  const on_leave = () => {
-    pointer_over = false;
-  };
-  // Use pointerenter / pointerleave (no bubbling, no fire-on-child-cross) so
-  // we get a single transition per actual container boundary crossing.
-  container.addEventListener("pointerenter", on_enter);
-  container.addEventListener("pointerleave", on_leave);
+
+  const untrack_container = track(container);
 
   const is_focus_within = (): boolean => {
     const owner = container.ownerDocument;
     if (!owner) return false;
     const active = owner.activeElement;
+    // Body-focus alone is the embedded reading state — never attended.
+    if (!active || active === owner.body) return false;
     // Focus inside the surface's subtree counts. `contains(self)` is true,
     // so this also covers "the container itself is focused" (e.g. tabindex).
-    return !!active && active !== owner.body && container.contains(active);
+    if (container.contains(active)) return true;
+    for (const element of extras.keys()) {
+      if (element.contains(active)) return true;
+    }
+    return false;
   };
 
   const is_attended = (): boolean => {
-    return is_focus_within() || pointer_over;
+    return hovered.size > 0 || is_focus_within();
   };
 
   return {
     is_attended,
     is_focus_within,
+    add: (element: Element) => {
+      // After dispose (surface detached) nothing will ever tear a new
+      // registration down — a late add() must not leak listeners.
+      if (disposed) return;
+      if (element === container || extras.has(element)) return;
+      extras.set(element, track(element));
+      // Seed: chrome often appears under the pointer (a popover opening
+      // at the cursor) — its `pointerenter` fired before we listened, so
+      // without this the hover arm stays false until a leave/re-enter
+      // crossing. add()-time chrome ONLY: the user summoned it, so the
+      // pointer over it is a real attention signal. The container is
+      // deliberately NOT seeded at attach — a surface mounted under an
+      // idle cursor (embedded block, route change) must not claim the
+      // page's keyboard until the user actually crosses into it.
+      // Best-effort read; `matches` is absent on non-DOM fakes.
+      if (typeof element.matches === "function" && element.matches(":hover")) {
+        hovered.add(element);
+      }
+    },
+    remove: (element: Element) => {
+      const untrack = extras.get(element);
+      if (!untrack) return;
+      extras.delete(element);
+      untrack();
+    },
     dispose: () => {
-      container.removeEventListener("pointerenter", on_enter);
-      container.removeEventListener("pointerleave", on_leave);
+      disposed = true;
+      untrack_container();
+      for (const untrack of extras.values()) untrack();
+      extras.clear();
     },
   };
 }
