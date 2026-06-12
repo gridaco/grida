@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
@@ -313,6 +313,12 @@ function LocalModelsSection() {
   // only rendered then (the secrets allowlist accepts CONFIGURED endpoint
   // ids; a key for an unsaved draft would 400).
   const [persisted, setPersisted] = useState(false);
+  // Stale-write guard: detection runs async off a SNAPSHOT of the config
+  // while the form stays editable. Any user action that changes what the
+  // draft means (edit, save, remove, re-setup) bumps this; a completion
+  // holding an older number drops its write instead of resurrecting a
+  // deleted endpoint or wiping newer unsaved edits.
+  const opVersion = useRef(0);
 
   /**
    * Discover the endpoint's models (agent-host-side fetch of Ollama's
@@ -330,10 +336,14 @@ function LocalModelsSection() {
    */
   const detectInto = useCallback(
     async (base: EndpointProviderConfig, opts: { persist: boolean }) => {
+      const version = opVersion.current;
       setProbing(true);
       setProbeNote(null);
       try {
         const result = await providers.probeEndpoint(base.base_url);
+        // `base` is stale once the user edited/saved/removed mid-probe —
+        // applying it would undo their action. Drop the result silently.
+        if (opVersion.current !== version) return;
         const merged = mergeProbedModels(base.models, result.models);
         setProbeNote(
           merged.discovered > 0
@@ -346,11 +356,13 @@ function LocalModelsSection() {
         const next = { ...base, models: merged.models };
         if (opts.persist) {
           await providers.setEndpoint(next);
+          if (opVersion.current !== version) return;
           setState({ kind: "ready", draft: next, dirty: false });
         } else {
           setState({ kind: "ready", draft: next, dirty: true });
         }
       } catch (err) {
+        if (opVersion.current !== version) return;
         setProbeNote(
           `Couldn't reach the endpoint (${describeError(err)}) — add models manually.`
         );
@@ -366,9 +378,11 @@ function LocalModelsSection() {
       setState({ kind: "unsupported" });
       return;
     }
+    const version = ++opVersion.current;
     try {
       const list = await providers.listEndpoints();
       const ollama = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
+      if (opVersion.current !== version) return;
       setState({ kind: "ready", draft: ollama ?? null, dirty: false });
       setPersisted(ollama != null);
       // Detected values converge to the server's truth on every visit —
@@ -376,6 +390,7 @@ function LocalModelsSection() {
       // it has been loaded. Fire-and-forget; failures only leave a note.
       if (ollama) void detectInto(ollama, { persist: true });
     } catch (err) {
+      if (opVersion.current !== version) return;
       setState({ kind: "error", message: describeError(err), draft: null });
     }
   }, [detectInto]);
@@ -387,24 +402,30 @@ function LocalModelsSection() {
   const draft = "draft" in state ? state.draft : null;
 
   const edit = useCallback((next: EndpointProviderConfig) => {
+    opVersion.current += 1;
     setState({ kind: "ready", draft: next, dirty: true });
   }, []);
 
   const handleSave = useCallback(async () => {
     if (!draft) return;
+    const version = ++opVersion.current;
     setState({ kind: "saving", draft });
     try {
       await providers.setEndpoint(draft);
       const list = await providers.listEndpoints();
       const saved = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
-      setState({ kind: "ready", draft: saved ?? null, dirty: false });
       setPersisted(saved != null);
+      // An edit made while the save was in flight wins over the read-back.
+      if (opVersion.current !== version) return;
+      setState({ kind: "ready", draft: saved ?? null, dirty: false });
     } catch (err) {
+      if (opVersion.current !== version) return;
       setState({ kind: "error", message: describeError(err), draft });
     }
   }, [draft]);
 
   const handleEnable = useCallback(() => {
+    opVersion.current += 1;
     const base: EndpointProviderConfig = {
       ...OLLAMA_ENDPOINT_PRESET,
       models: [],
@@ -418,6 +439,9 @@ function LocalModelsSection() {
 
   const handleRemove = useCallback(async () => {
     if (!draft) return;
+    // Bump FIRST: an in-flight detection completing after this click must
+    // not persist its snapshot back and resurrect the deleted endpoint.
+    opVersion.current += 1;
     let confirmed = false;
     try {
       confirmed = await providers.confirmDeleteEndpoint(

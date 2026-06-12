@@ -506,10 +506,13 @@ export class AgentRuntime {
         // Substitute the endpoint default when the session has no model
         // id — or a STALE one (saved against a model since removed from
         // the config): either way, falling through to the catalog tier
-        // would assume a frontier-sized window on a local model.
-        const known =
-          !!model.model_id && custom.some((m) => m.id === model.model_id);
-        if (defaultId && (!model.model_id || !known)) {
+        // would assume a frontier-sized window on a local model. "Known"
+        // is scoped to THIS endpoint's models — another endpoint serving
+        // the same id must not vouch for it.
+        const knownOnEndpoint =
+          !!model.model_id &&
+          !!endpoint?.models.some((m) => m.id === model.model_id);
+        if (defaultId && !knownOnEndpoint) {
           effective = { ...model, model_id: defaultId };
         }
       }
