@@ -99,6 +99,7 @@ export function attach(
   return {
     camera: inner.camera,
     gestures: inner.gestures,
+    attention: inner.attention,
     set_padding(p: number) {
       padding = p;
       apply();
