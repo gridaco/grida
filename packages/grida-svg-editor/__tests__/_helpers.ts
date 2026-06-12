@@ -28,6 +28,25 @@ export function rect(x: number, y: number, w = 10, h = 10): Rect {
   return { x, y, width: w, height: h };
 }
 
+/** Id of the first `<tag>` in document order. Accepts either the
+ *  editor (most common) or the bare document. */
+export function first_tag(
+  source: ReturnType<typeof createSvgEditor> | SvgDocument,
+  tag: string
+): string {
+  // Editor surface has `.tree()`; SvgDocument has `.all_elements()` + `.tag_of()`.
+  if ("tree" in source) {
+    for (const [id, n] of source.tree().nodes) {
+      if (n.tag === tag) return id;
+    }
+  } else {
+    for (const id of source.all_elements()) {
+      if (source.tag_of(id) === tag) return id;
+    }
+  }
+  throw new Error(`no <${tag}> in document`);
+}
+
 /** Id of the first `<rect>` in document order. Two overloads so tests
  *  can pass either the editor (most common) or the bare document. */
 export function first_rect(editor: ReturnType<typeof createSvgEditor>): string;
@@ -35,17 +54,7 @@ export function first_rect(doc: SvgDocument): string;
 export function first_rect(
   source: ReturnType<typeof createSvgEditor> | SvgDocument
 ): string {
-  // Editor surface has `.tree()`; SvgDocument has `.all_elements()` + `.tag_of()`.
-  if ("tree" in source) {
-    for (const [id, n] of source.tree().nodes) {
-      if (n.tag === "rect") return id;
-    }
-  } else {
-    for (const id of source.all_elements()) {
-      if (source.tag_of(id) === "rect") return id;
-    }
-  }
-  throw new Error("no <rect> in document");
+  return first_tag(source, "rect");
 }
 
 /**

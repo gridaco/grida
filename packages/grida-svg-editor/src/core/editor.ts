@@ -1098,7 +1098,6 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   type ResizeMember = {
     id: NodeId;
     rz: ResizeBaseline;
-    transform_pre: string | null;
     bbox: { x: number; y: number; width: number; height: number };
   };
 
@@ -1142,7 +1141,6 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       members.push({
         id,
         rz: resize_pipeline.intent.capture_baseline(doc, id, bbox),
-        transform_pre: doc.get_attr(id, "transform"),
         bbox,
       });
     }
@@ -1207,12 +1205,13 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       emit();
     };
     const revert = () => {
-      for (const { m, origin } of ops) {
-        // apply_resize at sx=sy=1 writes attrs back to baseline regardless of
-        // origin; transform is restored directly (apply_translate.viaTransform
-        // may have rewritten it during apply; apply_resize never touches it).
-        resize_pipeline.intent.apply(doc, m.id, m.rz, 1, 1, origin);
-        doc.set_attr(m.id, "transform", m.transform_pre);
+      for (const { m } of ops) {
+        // Byte-exact snapshot restore — covers every attr the apply step
+        // can write (per-tag geometry, plus `transform` rewritten by
+        // apply_translate.viaTransform / pivot renormalization). NOT
+        // apply at sx=sy=1: handlers may refuse gesture shapes (text
+        // refuses non-corner input) and would silently skip the restore.
+        resize_pipeline.intent.restore(doc, m.id, m.rz);
       }
       emit();
     };
