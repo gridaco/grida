@@ -25,6 +25,10 @@ export function makeOpenRouterFactory(apiKey: string): ModelFactory {
     baseURL: "https://openrouter.ai/api/v1",
     apiKey,
     headers: OPENROUTER_HEADERS,
+    // OpenAI-compat streams omit the usage chunk unless
+    // `stream_options.include_usage` is requested — without it every
+    // streamed run records zero tokens (no rollups, no context meter).
+    includeUsage: true,
   });
   // Both OpenRouter and the catalog use Vercel-style `creator/model`
   // ids, so an explicit pick hands straight through; otherwise fall
@@ -58,6 +62,9 @@ export function makeEndpointFactory(config: {
     name: config.id,
     baseURL: config.base_url,
     apiKey: config.api_key,
+    // Same as the OpenRouter factory: opt in to the streaming usage
+    // chunk, or streamed runs record zero tokens.
+    includeUsage: true,
   });
   return (_tier, modelId) => provider(modelId ?? config.default_model_id);
 }
