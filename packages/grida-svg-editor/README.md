@@ -390,6 +390,7 @@ Write — selection-scoped. Writing the same value to every selected node has no
 editor.commands.set_property(name: string, value: string | null): void;
 
 editor.commands.preview_property(name: string): {
+  readonly live: boolean; // false once the session has ended, for any reason
   update(value: string): void;
   commit(): void;
   discard(): void;
@@ -457,6 +458,7 @@ Write — selection-scoped (same reasoning as for generic properties):
 editor.commands.set_paint(channel: "fill" | "stroke", paint: Paint): void;
 
 editor.commands.preview_paint(channel: "fill" | "stroke"): {
+  readonly live: boolean; // false once the session has ended, for any reason
   update(paint: Paint): void;
   commit(): void;
   discard(): void;

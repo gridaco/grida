@@ -13,7 +13,7 @@ import kolor from "@grida/color";
 - **Type-safe**: Branded types prevent mixing incompatible color formats
 - **Convenient**: Helper functions for common operations (`fromHEX`, `newRGB888A32F`, etc.)
 - **Color parsing**: Parse hex, rgb, hsl, named colors, and more
-- **Color resolution**: Resolve any CSS color string to canonical sRGB — no DOM or canvas required
+- **Color resolution**: Resolve CSS color strings to canonical sRGB — no DOM or canvas required; out-of-scope inputs (`currentColor`, `lab()`/`oklch()`, malformed) return `null`, never a guess
 - **Color names**: Access to CSS color names mapping
 - **Zero-dependency**: No external dependencies
 

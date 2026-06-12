@@ -98,6 +98,26 @@ describe("discrete write supersedes an open preview session on the same property
     expect(after.provenance.carrier).toBe("defaulted");
   });
 
+  it("supersession is keyed by NAME, not API family — set_property('fill') kills preview_paint('fill')", () => {
+    const { editor, id } = setup();
+    const session = editor.commands.preview_paint("fill");
+    session.update(hex("#111111"));
+    editor.commands.set_property("fill", "#3b82f6");
+    session.commit();
+    expect(session.live).toBe(false);
+    expect(editor.node_paint(id, "fill").declared).toBe("#3b82f6");
+  });
+
+  it("…and symmetrically: set_paint('fill') kills preview_property('fill')", () => {
+    const { editor, id } = setup();
+    const session = editor.commands.preview_property("fill");
+    session.update("#111111");
+    editor.commands.set_paint("fill", hex("#3b82f6"));
+    session.commit();
+    expect(session.live).toBe(false);
+    expect(editor.node_paint(id, "fill").declared).toBe("#3b82f6");
+  });
+
   it("set_paint_from_gradient supersedes an open preview on the same channel", () => {
     const { editor, id } = setup();
     const session = editor.commands.preview_paint("fill");
