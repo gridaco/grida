@@ -423,6 +423,15 @@ export class HistoryImpl implements History {
    * world, so call `clear()` while the outgoing document is still
    * installed — clear first, then swap. Swapping first risks stale
    * revert closures scribbling onto the new document.
+   *
+   * What `clear()` does NOT touch: registrations. Event subscriptions
+   * made via `on()` survive, and providers stay registered (only their
+   * `reset()` hook is invoked). Observer wiring is not document state —
+   * the documented pattern is to subscribe once at construction, and a
+   * listener must keep observing across document swaps (e.g. the very
+   * next undo/redo must still fire `onUndo`/`onChange`). The only way a
+   * subscription or provider registration ends is its own
+   * `Disposable.dispose()`.
    */
   clear(): void {
     // Invariant 3: discard (revert + seal) active previews before any
@@ -432,6 +441,5 @@ export class HistoryImpl implements History {
     for (const provider of this._providers.values()) {
       provider.reset?.();
     }
-    this._events.clear();
   }
 }

@@ -34,7 +34,9 @@ export class EventEmitter<Events extends Record<string, Fn>> {
     }
   }
 
-  clear(): void {
-    this.listeners.clear();
-  }
+  // Deliberately no bulk `clear()`: a subscription ends only via the
+  // Disposable returned by `on()`. HistoryImpl.clear() once mass-wiped
+  // listeners through such a method, silently killing every consumer
+  // subscription on document swap — removing the capability makes that
+  // contract violation structurally impossible.
 }

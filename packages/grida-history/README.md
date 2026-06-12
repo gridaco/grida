@@ -365,7 +365,11 @@ Returns `boolean` (sync) or `Promise<boolean>` (if any provider has async `prepa
 
 ### `history.on(event, handler)`
 
-Subscribe to events. Returns `Disposable`.
+Subscribe to events. Returns `Disposable`. Subscribing once at construction is the intended pattern — subscriptions live until you `dispose()` them, surviving `history.clear()`.
+
+### `history.clear()`
+
+Reset history state for a new document: discards active previews (reverting their in-flight deltas), clears the undo/redo stack, and calls `reset()` on registered providers. Registrations are untouched — event subscriptions and providers survive; each ends only via its own `Disposable`. Call `clear()` _before_ swapping the document, so preview reverts run against the world they captured.
 
 ### `history.stack`
 

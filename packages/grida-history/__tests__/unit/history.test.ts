@@ -387,6 +387,59 @@ describe("History", () => {
       expect(b.value).toBe(2); // committed result is not reverted by clear()
       expect(h.stack.pastCount).toBe(0);
     });
+
+    it("subscriptions survive clear() — listeners registered before clear() still fire for activity after it", async () => {
+      const h = new HistoryImpl();
+      const c = { value: 0 };
+      const events: string[] = [];
+      // Documented pattern: subscribe once at construction.
+      h.on("onChange", () => events.push("change"));
+      h.on("onUndo", () => events.push("undo"));
+      h.on("onRedo", () => events.push("redo"));
+
+      // Pre-clear activity is observed...
+      h.atomic("before", (tx) => {
+        const d = counterDelta(c, 1);
+        d.apply();
+        tx.push(d);
+      });
+      expect(events).toEqual(["change"]);
+
+      // ...then the consumer loads a new document.
+      h.clear();
+      events.length = 0;
+
+      // A transaction committed after clear() still notifies the listener.
+      h.atomic("after", (tx) => {
+        const d = counterDelta(c, 2);
+        d.apply();
+        tx.push(d);
+      });
+      expect(events).toEqual(["change"]);
+
+      // Undo/redo after clear() still emit — UI bound to canUndo/canRedo
+      // keeps tracking the stack.
+      await h.undo();
+      expect(events).toEqual(["change", "undo", "change"]);
+      await h.redo();
+      expect(events).toEqual(["change", "undo", "change", "redo", "change"]);
+    });
+
+    it("dispose() is the only way to unsubscribe — a listener disposed before clear() stays silent after it", () => {
+      const h = new HistoryImpl();
+      const events: string[] = [];
+      const sub = h.on("onChange", () => events.push("change"));
+      sub.dispose();
+
+      h.clear();
+
+      h.atomic("after", (tx) => {
+        const d = counterDelta({ value: 0 }, 1);
+        d.apply();
+        tx.push(d);
+      });
+      expect(events).toEqual([]);
+    });
   });
 
   describe("clearsFuture", () => {
