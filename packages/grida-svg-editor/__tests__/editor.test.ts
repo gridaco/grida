@@ -28,7 +28,7 @@ describe("createSvgEditor (headless)", () => {
     expect(seen.length).toBeGreaterThan(0);
   });
 
-  it("reads typed paint via node_paint", () => {
+  it("reads typed paint via node_paint — declared verbatim, computed canonicalized to hex", () => {
     const editor = createSvgEditor({ svg: TRIVIAL });
     const rect = [...editor.tree().nodes.values()].find(
       (n) => n.tag === "rect"
@@ -37,7 +37,7 @@ describe("createSvgEditor (headless)", () => {
     expect(fill.declared).toBe("red");
     expect(fill.computed).toEqual({
       kind: "color",
-      value: { kind: "rgb", value: "red" },
+      value: { kind: "rgb", value: "#ff0000" },
     });
     expect(fill.provenance.carrier).toBe("presentation_attribute");
   });

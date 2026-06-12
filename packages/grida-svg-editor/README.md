@@ -417,7 +417,9 @@ type PaintFallback = { kind: "none" } | { kind: "color"; value: Color };
 // Color preserves currentColor as a keyword at computed time (CSS Color 4 §4.4); the
 // rgb resolution happens at *used* value, which requires the surface's painting context.
 type Color =
-  | { kind: "rgb"; value: string } // any resolvable CSS color, normalized to rgb-ish
+  | { kind: "rgb"; value: string } // canonical lowercase hex (#rrggbb / #rrggbbaa) for any
+  //   literal resolvable without a rendering context (named / hex / rgb() / hsl() / hwb());
+  //   unresolved spaces (lab() / oklch() / color()) pass through as authored
   | { kind: "current_color" }; // unresolved keyword; surface dereferences at paint time
 
 type PaintValue = {

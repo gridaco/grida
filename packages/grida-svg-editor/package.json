@@ -66,6 +66,7 @@
   },
   "dependencies": {
     "@grida/cmath": "workspace:*",
+    "@grida/color": "workspace:*",
     "@grida/history": "workspace:*",
     "@grida/hud": "workspace:*",
     "@grida/keybinding": "workspace:*",

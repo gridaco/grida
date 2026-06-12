@@ -5,6 +5,7 @@
 // `inherit` and `var()` are NOT paint values — they are defaulting /
 // substitution mechanisms and appear only in `declared` strings.
 
+import kolor from "@grida/color";
 import type {
   InvalidComputedValue,
   Paint,
@@ -76,9 +77,15 @@ export namespace paint {
     if (/^currentcolor$/i.test(trimmed)) {
       return { kind: "color", value: { kind: "current_color" } };
     }
-    // Otherwise treat as a color literal (we don't resolve; surface paint
-    // context does).
-    return { kind: "color", value: { kind: "rgb", value: trimmed } };
+    // Otherwise treat as a color literal, canonicalized at computed-value
+    // time: `declared` carries the authored string (round-trip, P1);
+    // `computed` is the resolved-for-consumers channel, so resolvable
+    // literals (named / hex / rgb() / hsl() / hwb()) become lowercase
+    // `#rrggbb` / `#rrggbbaa`. Literals that need a rendering context or
+    // gamut mapping the resolver refuses (lab() / oklch() / color())
+    // pass through verbatim.
+    const hex = kolor.resolveHEX(trimmed);
+    return { kind: "color", value: { kind: "rgb", value: hex ?? trimmed } };
   }
 
   /** Serialize a Paint back to an SVG attribute / inline-style value. */

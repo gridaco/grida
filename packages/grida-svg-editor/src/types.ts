@@ -153,6 +153,18 @@ export type PropertyValue<T = string | number> = {
 
 // ─── Paint (SVG 2 §13.2 `<paint>` production) ──────────────────────────────
 
+/**
+ * Computed-time color. `current_color` stays a keyword (CSS Color 4 §4.4)
+ * — its rgb resolution happens at *used* value, which needs the surface's
+ * painting context.
+ *
+ * For `rgb`, `value` is canonical lowercase hex — `#rrggbb`, or
+ * `#rrggbbaa` when alpha < 1 — whenever the literal is resolvable without
+ * a rendering context (named colors, hex, `rgb()`, `hsl()`, `hwb()`).
+ * Literals the editor does not resolve (`lab()` / `oklch()` / `color()` —
+ * gamut mapping out of scope) pass through as authored. The authored
+ * string is always available on the `declared` channel.
+ */
 export type Color = { kind: "rgb"; value: string } | { kind: "current_color" };
 
 export type PaintFallback = { kind: "none" } | { kind: "color"; value: Color };
