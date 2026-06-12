@@ -2169,6 +2169,10 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   function cut_impl(deliver_external: boolean): string | null {
+    // No-op guard FIRST: an empty-selection cut does nothing and must
+    // not end in-flight gestures (parity with remove_selection's
+    // sweep-after-guards placement).
+    if (selection.length === 0) return null;
     // End in-flight preview sessions BEFORE capturing the payload: the
     // deletion will discard them anyway (remove_selection), but if that
     // happened after the copy, the clipboard would carry the previewed
@@ -2304,7 +2308,11 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     set_selection([id]);
 
     const preview = history.preview(`insert ${tag}`);
-    let active = true;
+    // Liveness reads the producer's own lifecycle, not a local flag — a
+    // flag cannot see history-initiated discards (undo/redo, and
+    // history.clear() on load/reset), and calling into a dead preview
+    // throws. Same rule as `preview_property`.
+    const live = () => preview.state === "active";
 
     // Reused across every `update()` — closures capture `live_attrs` by
     // reference. The redo path replays the latest committed state; the
@@ -2324,7 +2332,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     return {
       id,
       update(attrs) {
-        if (!active) return;
+        if (!live()) return;
         for (const name in attrs) {
           live_attrs[name] = attrs[name];
           doc.set_attr(id, name, attrs[name]);
@@ -2332,13 +2340,11 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
         preview.set(entry);
       },
       commit() {
-        if (!active) return;
-        active = false;
+        if (!live()) return;
         preview.commit();
       },
       discard() {
-        if (!active) return;
-        active = false;
+        if (!live()) return;
         preview.discard();
       },
     };
@@ -2385,21 +2391,20 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       set_selection(previous_selection);
     };
     const preview = history.preview("insert text");
-    let active = true;
+    // Liveness from `preview.state` — see `insert_preview`.
+    const live = () => preview.state === "active";
     // First apply: empty node, selected. Content-edit mutates the node's
     // text in place from here (the node is already in the tree).
     preview.set({ providerId: PROVIDER_ID, apply, revert });
     return {
       id,
       commit() {
-        if (!active) return;
-        active = false;
+        if (!live()) return;
         committed_text = doc.text_of(id);
         preview.commit();
       },
       discard() {
-        if (!active) return;
-        active = false;
+        if (!live()) return;
         preview.discard();
       },
     };
@@ -2499,12 +2504,17 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     // new-document nodes), and a close-time commit() must not push a
     // dead step into the fresh history.
     discard_open_property_previews();
+    // history.clear() BEFORE doc.load — @grida/history's ordering
+    // contract: clear() discards every still-active preview (gesture
+    // orchestrators, insert previews) by reverting their deltas, and
+    // those reverts must run while the outgoing document is still
+    // installed. Clear first, then swap.
+    history.clear();
     doc.load(svg);
     selection = [];
     scope = null;
     mode = "select";
     tool = TOOL_CURSOR;
-    history.clear();
     active_duplication = null;
     baseline_revision = doc.revision;
     load_version++;

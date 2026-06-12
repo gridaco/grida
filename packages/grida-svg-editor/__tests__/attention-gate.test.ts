@@ -467,3 +467,20 @@ describe("create_attention_tracker — disposed and seeded states", () => {
     t.dispose();
   });
 });
+
+describe("create_attention_tracker — the container is not hover-seeded at attach", () => {
+  it("a surface mounted under an idle cursor stays unattended until a real crossing", () => {
+    const c = new FakeContainer();
+    // Even if the platform reports the container as :hover at attach
+    // time (cursor parked over the mount point), the editor must not
+    // claim the page's keyboard until the user crosses into it.
+    (c as unknown as { matches: (sel: string) => boolean }).matches = (
+      sel: string
+    ) => sel === ":hover";
+    const t = create_attention_tracker(c as unknown as HTMLElement);
+    expect(t.is_attended()).toBe(false);
+    c.fire("pointerenter"); // the real crossing
+    expect(t.is_attended()).toBe(true);
+    t.dispose();
+  });
+});

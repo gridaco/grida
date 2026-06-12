@@ -316,3 +316,52 @@ describe("opening a second session on the same property supersedes the first", (
     expect(editor.state.can_undo).toBe(false);
   });
 });
+
+describe("non-property previews survive a document swap without throwing", () => {
+  it("load() ends an in-flight insert preview — later calls are no-ops and the incoming document is untouched", () => {
+    const { editor } = setup();
+    const ins = editor.commands.insert_preview("rect", { x: "1", y: "1" });
+    const NEXT = `<svg xmlns="http://www.w3.org/2000/svg"><rect x="7" y="7" width="9" height="9" fill="green"/></svg>`;
+    editor.load(NEXT);
+    // history.clear() ran BEFORE the swap, so the insert preview's
+    // revert removed the pending node from the OLD document — the
+    // incoming document keeps its authored attributes.
+    expect(() => {
+      ins.update({ x: "5" });
+      ins.commit();
+    }).not.toThrow();
+    const rect_id = first_rect(editor);
+    expect(editor.node_properties(rect_id, ["x"]).x.declared).toBe("7");
+    expect(editor.state.can_undo).toBe(false);
+  });
+});
+
+describe("an empty-selection cut is a complete no-op", () => {
+  it("returns null and does NOT end open preview sessions", () => {
+    const { editor } = setup();
+    const session = editor.commands.preview_paint("fill");
+    session.update(hex("#111111"));
+    editor.commands.deselect();
+    expect(editor.commands.cut()).toBe(null);
+    // The cut did nothing — the in-flight gesture is untouched.
+    expect(session.live).toBe(true);
+    session.discard();
+  });
+});
+
+describe("history-driven notifications survive a document swap", () => {
+  it("undo after load() still notifies subscribers — can_undo UI cannot go stale", () => {
+    const { editor } = setup();
+    const NEXT = `<svg xmlns="http://www.w3.org/2000/svg"><rect width="9" height="9" fill="green"/></svg>`;
+    editor.load(NEXT);
+    const seen: boolean[] = [];
+    editor.subscribe((s) => seen.push(s.can_undo));
+    editor.commands.select(first_rect(editor));
+    editor.commands.set_paint("fill", hex("#3b82f6"));
+    expect(seen[seen.length - 1]).toBe(true); // post-push onChange emit fired
+    const before_undo = seen.length;
+    editor.commands.undo();
+    expect(seen.length).toBeGreaterThan(before_undo); // undo emitted at all
+    expect(seen[seen.length - 1]).toBe(false);
+  });
+});

@@ -429,6 +429,13 @@ export type ReorderDirection =
  * required. Sessions on OTHER property names are untouched by discrete
  * writes. Hosts that cache a session across renders should consult
  * `live` and lazily reopen — the bundled React hooks do this.
+ *
+ * Known exclusion: the discrete GEOMETRY commands (`translate` / `nudge`,
+ * `resize*`, `rotate*`, `align`, `transform`, `flatten_transform`) write
+ * `x` / `y` / `width` / `height` / `transform` through their own
+ * pipelines and do NOT yet supersede a same-name property session —
+ * avoid mixing `preview_property` on geometry attributes with those
+ * commands until that lands.
  */
 export type PreviewSession = {
   /** `true` while the session can still affect the document; `false`

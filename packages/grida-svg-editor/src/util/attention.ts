@@ -123,14 +123,6 @@ export function create_attention_tracker(
     // so we get a single transition per actual boundary crossing.
     element.addEventListener("pointerenter", enter);
     element.addEventListener("pointerleave", leave);
-    // Seed: the element may already be under the pointer when tracking
-    // starts (a popover opening at the cursor) — its `pointerenter`
-    // fired before we listened, so without this the hover arm stays
-    // false until a leave/re-enter crossing. Best-effort read;
-    // `matches` is absent on non-DOM fakes.
-    if (typeof element.matches === "function" && element.matches(":hover")) {
-      hovered.add(element);
-    }
     return () => {
       element.removeEventListener("pointerenter", enter);
       element.removeEventListener("pointerleave", leave);
@@ -170,6 +162,18 @@ export function create_attention_tracker(
       if (disposed) return;
       if (element === container || extras.has(element)) return;
       extras.set(element, track(element));
+      // Seed: chrome often appears under the pointer (a popover opening
+      // at the cursor) — its `pointerenter` fired before we listened, so
+      // without this the hover arm stays false until a leave/re-enter
+      // crossing. add()-time chrome ONLY: the user summoned it, so the
+      // pointer over it is a real attention signal. The container is
+      // deliberately NOT seeded at attach — a surface mounted under an
+      // idle cursor (embedded block, route change) must not claim the
+      // page's keyboard until the user actually crosses into it.
+      // Best-effort read; `matches` is absent on non-DOM fakes.
+      if (typeof element.matches === "function" && element.matches(":hover")) {
+        hovered.add(element);
+      }
     },
     remove: (element: Element) => {
       const untrack = extras.get(element);
