@@ -12,6 +12,7 @@ import type {
   AgentServerHandshakeResponse,
   AgentUIMessageChunk,
   ByokProviderId,
+  EndpointProviderConfig,
   ChatMessageWithParts,
   ChatSessionRow,
   CreateSessionOptions,
@@ -224,9 +225,25 @@ export type DesktopBridge = {
     }) => Promise<void>;
   };
   secrets: {
-    has: (providerId: ByokProviderId) => Promise<boolean>;
-    set: (providerId: ByokProviderId, key: string) => Promise<void>;
-    delete: (providerId: ByokProviderId) => Promise<void>;
+    /** A BYOK provider id, or a configured endpoint provider id (#806). */
+    has: (providerId: ByokProviderId | (string & {})) => Promise<boolean>;
+    set: (
+      providerId: ByokProviderId | (string & {}),
+      key: string
+    ) => Promise<void>;
+    delete: (providerId: ByokProviderId | (string & {})) => Promise<void>;
+  };
+  /**
+   * Endpoint provider config (issue #806) — user-configured OpenAI-
+   * compatible endpoints (Ollama preset, self-hosted gateways). Plain
+   * readable config, unlike `secrets`: list returns full configs.
+   * Optional — older desktop binaries don't carry it; renderers must
+   * feature-detect and hide the surface when absent.
+   */
+  providers?: {
+    list_endpoints: () => Promise<EndpointProviderConfig[]>;
+    set_endpoint: (config: EndpointProviderConfig) => Promise<void>;
+    delete_endpoint: (id: string) => Promise<void>;
   };
   agent: {
     run: (

@@ -31,7 +31,6 @@ import {
 } from "@app/ui/ai-elements/conversation";
 import { cn } from "@app/ui/lib/utils";
 import type { ComposerCatalog } from "@/kits/composer";
-import _models from "@grida/ai-models";
 import {
   AGENT_SESSION_AGENT,
   sessions as bridgeSessions,
@@ -61,9 +60,14 @@ import {
 import { ChatSessionPicker } from "../shared/chat-session-picker";
 import {
   DesktopModelPicker,
+  ModelToolCallNotice,
   useModelPickerState,
 } from "../shared/model-picker";
 import { DesktopContextMeter } from "../shared/context-meter";
+import {
+  registered_models,
+  useEndpointProviders,
+} from "../shared/registered-models";
 import {
   AgentComposerInput,
   type ComposerCommandAction,
@@ -227,18 +231,24 @@ export function AISidebarChat({ className }: { className?: string }) {
     setMessages(chatSession.initial_messages);
   }, [chatSession.initial_messages, setMessages]);
 
+  // Configured endpoint providers (issue #806): their registered models
+  // join the picker and the capability gates below.
+  const endpoints = useEndpointProviders();
+
   // Flat model selection (ignores tiers). Seeds from the active
   // session's stored model and rides each send as `body.modelId`.
   const { model_id: modelId, setModelId } = useModelPickerState({
     current_id: chatSession.current_id,
     sessions: chatSession.sessions,
+    endpoints,
   });
 
-  // Whether the active model accepts image input — memoized so the catalog
-  // lookup doesn't re-scan on every render (only when the model changes).
+  // Whether the active model accepts image input — memoized so the
+  // registry lookup doesn't re-scan on every render (only when the model
+  // or endpoint list changes).
   const multimodal = useMemo(
-    () => _models.text.modelSpecById(modelId)?.multimodal ?? false,
-    [modelId]
+    () => registered_models.resolve(modelId, endpoints)?.multimodal ?? false,
+    [modelId, endpoints]
   );
 
   // The active session row carries the rolled-up cost the context meter
@@ -440,6 +450,8 @@ export function AISidebarChat({ className }: { className?: string }) {
 
       <QueuedMessages queued={queued} onCancel={cancelQueued} />
 
+      <ModelToolCallNotice model_id={modelId} endpoints={endpoints} />
+
       <div className="shrink-0 border-t p-3">
         <AgentComposerInput
           catalog={EMPTY_CATALOG}
@@ -452,11 +464,16 @@ export function AISidebarChat({ className }: { className?: string }) {
           multimodal={multimodal}
           toolbar={
             <>
-              <DesktopModelPicker value={modelId} onValueChange={setModelId} />
+              <DesktopModelPicker
+                value={modelId}
+                onValueChange={setModelId}
+                endpoints={endpoints}
+              />
               <DesktopContextMeter
                 messages={messages}
                 modelId={modelId}
                 costUsd={activeSession?.cost_usd}
+                endpoints={endpoints}
               />
             </>
           }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Label } from "@app/ui/components/label";
+import { Switch } from "@app/ui/components/switch";
 import {
   Card,
   CardContent,
@@ -16,9 +17,13 @@ import { Skeleton } from "@app/ui/components/skeleton";
 import {
   BYOK_PROVIDER_LABELS,
   DesktopBridgeMissingError,
+  OLLAMA_ENDPOINT_PRESET,
   app,
+  providers,
   secrets,
   type ByokProviderId,
+  type EndpointModelSpec,
+  type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
 import {
   DesktopPageContent,
@@ -47,11 +52,12 @@ export default function DesktopSettingsPage() {
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            AI provider keys and app info.
+            AI provider keys, local models, and app info.
           </p>
         </header>
 
         <ByokSection />
+        <LocalModelsSection />
         <AboutSection />
       </DesktopPageContent>
     </DesktopPageShell>
@@ -274,6 +280,310 @@ function StatusPill({ kind }: { kind: "loading" | "empty" | "configured" }) {
       />
       Not configured
     </span>
+  );
+}
+
+/* ─────────────────────────── Local models ───────────────────────── */
+
+/**
+ * Endpoint provider config (issue #806) — the Ollama preset slot. The
+ * agent host persists configs in `endpoints.json` (plain config, not a
+ * secret; the bridge may read them back, unlike keys).
+ *
+ * The section edits a local draft and persists on Save — endpoint config
+ * is structural (base URL + model list), so field-level autosave would
+ * fire half-formed configs at the host validator.
+ */
+
+type LocalState =
+  | { kind: "loading" }
+  | { kind: "unsupported" }
+  | { kind: "ready"; draft: EndpointProviderConfig | null; dirty: boolean }
+  | { kind: "saving"; draft: EndpointProviderConfig | null }
+  | { kind: "error"; message: string; draft: EndpointProviderConfig | null };
+
+function LocalModelsSection() {
+  const [state, setState] = useState<LocalState>({ kind: "loading" });
+  const [newModelId, setNewModelId] = useState("");
+
+  const refresh = useCallback(async () => {
+    if (!providers.isSupported()) {
+      setState({ kind: "unsupported" });
+      return;
+    }
+    try {
+      const list = await providers.listEndpoints();
+      const ollama = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
+      setState({ kind: "ready", draft: ollama ?? null, dirty: false });
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err), draft: null });
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const draft = "draft" in state ? state.draft : null;
+
+  const edit = useCallback((next: EndpointProviderConfig) => {
+    setState({ kind: "ready", draft: next, dirty: true });
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!draft) return;
+    setState({ kind: "saving", draft });
+    try {
+      await providers.setEndpoint(draft);
+      await refresh();
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err), draft });
+    }
+  }, [draft, refresh]);
+
+  const handleEnable = useCallback(() => {
+    setState({
+      kind: "ready",
+      draft: { ...OLLAMA_ENDPOINT_PRESET, models: [] },
+      dirty: true,
+    });
+  }, []);
+
+  const handleRemove = useCallback(async () => {
+    if (!draft) return;
+    let confirmed = false;
+    try {
+      confirmed = await providers.confirmDeleteEndpoint(
+        draft.label ?? draft.id
+      );
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err), draft });
+      return;
+    }
+    if (!confirmed) return;
+    setState({ kind: "saving", draft });
+    try {
+      await providers.deleteEndpoint(draft.id);
+      await refresh();
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err), draft });
+    }
+  }, [draft, refresh]);
+
+  const addModel = useCallback(() => {
+    if (!draft) return;
+    const id = newModelId.trim();
+    if (!id || draft.models.some((m) => m.id === id)) return;
+    edit({ ...draft, models: [...draft.models, { id }] });
+    setNewModelId("");
+  }, [draft, newModelId, edit]);
+
+  const saveDisabled = useMemo(
+    () =>
+      state.kind !== "ready" ||
+      !state.dirty ||
+      !draft ||
+      draft.base_url.trim().length === 0,
+    [state, draft]
+  );
+
+  // Old desktop binaries have no bridge surface for this — hide rather
+  // than render a dead section.
+  if (state.kind === "unsupported") return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Local Models</CardTitle>
+        <CardDescription>
+          Run the agent on your own machine with{" "}
+          <a
+            className="underline underline-offset-4"
+            href="https://ollama.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ollama
+          </a>{" "}
+          — no account, no API key. Start <code>ollama serve</code>, pull a
+          model, and register it here. Local models vary widely in agent
+          ability; larger models (~30B+) are recommended for agent tasks.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {state.kind === "loading" ? (
+          <Skeleton className="h-9 w-full" />
+        ) : !draft ? (
+          <div className="flex justify-start">
+            <Button variant="outline" onClick={handleEnable}>
+              Set up Ollama
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-medium">Base URL</Label>
+              <Input
+                value={draft.base_url}
+                onChange={(e) => edit({ ...draft, base_url: e.target.value })}
+                placeholder={OLLAMA_ENDPOINT_PRESET.base_url}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-medium">Models</Label>
+              {draft.models.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Register at least one model (e.g. <code>llama3.1:8b</code> —
+                  the id you <code>ollama pull</code>ed). The first model is the
+                  default.
+                </p>
+              )}
+              {draft.models.map((model, index) => (
+                <LocalModelRow
+                  key={model.id}
+                  model={model}
+                  onChange={(next) =>
+                    edit({
+                      ...draft,
+                      models: draft.models.map((m, i) =>
+                        i === index ? next : m
+                      ),
+                    })
+                  }
+                  onRemove={() =>
+                    edit({
+                      ...draft,
+                      models: draft.models.filter((_, i) => i !== index),
+                      default_model_id:
+                        draft.default_model_id === model.id
+                          ? undefined
+                          : draft.default_model_id,
+                    })
+                  }
+                />
+              ))}
+              <div className="flex gap-2">
+                <Input
+                  value={newModelId}
+                  onChange={(e) => setNewModelId(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addModel();
+                    }
+                  }}
+                  placeholder="model id, e.g. llama3.1:8b"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <Button
+                  variant="outline"
+                  disabled={newModelId.trim().length === 0}
+                  onClick={addModel}
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                disabled={state.kind === "saving"}
+                onClick={() => void handleRemove()}
+              >
+                Remove
+              </Button>
+              <Button
+                size="default"
+                disabled={saveDisabled || state.kind === "saving"}
+                onClick={() => void handleSave()}
+              >
+                {state.kind === "saving" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                Save
+              </Button>
+            </div>
+          </>
+        )}
+
+        {state.kind === "error" && (
+          <button
+            type="button"
+            role="alert"
+            aria-live="polite"
+            onClick={() => void refresh()}
+            className="self-start text-left text-sm text-destructive underline-offset-4 hover:underline"
+          >
+            {state.message} (click to retry)
+          </button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * One registered model: id (fixed once added), context window, and the
+ * tool-calling flag. The context window default is conservative (8k) —
+ * overflowing a local model's real window kills the session, so users
+ * raise it only when they know their serving config.
+ */
+function LocalModelRow({
+  model,
+  onChange,
+  onRemove,
+}: {
+  model: EndpointModelSpec;
+  onChange: (next: EndpointModelSpec) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+      <span className="flex-1 truncate font-mono text-xs">{model.id}</span>
+      <Input
+        className="h-8 w-28 text-xs"
+        type="number"
+        min={1024}
+        step={1024}
+        value={model.contextWindow ?? ""}
+        onChange={(e) => {
+          const value = e.target.valueAsNumber;
+          onChange({
+            ...model,
+            contextWindow: Number.isFinite(value)
+              ? Math.max(1, Math.floor(value))
+              : undefined,
+          });
+        }}
+        placeholder="ctx (8192)"
+        aria-label="Context window (tokens)"
+      />
+      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Switch
+          checked={model.tool_call ?? true}
+          onCheckedChange={(checked) =>
+            onChange({ ...model, tool_call: checked })
+          }
+          aria-label="Supports tool calls"
+        />
+        tools
+      </label>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={`Remove ${model.id}`}
+        onClick={onRemove}
+      >
+        <Trash2 className="size-3.5" />
+      </Button>
+    </div>
   );
 }
 

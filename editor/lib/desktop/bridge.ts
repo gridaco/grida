@@ -21,6 +21,7 @@ import {
   BYOK_PROVIDER_METADATA,
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
+  OLLAMA_ENDPOINT_PRESET,
   type AgentMode,
   type AgentUIMessageChunk,
   type AgentRunOptions,
@@ -28,6 +29,8 @@ import {
   type ChatMessageWithParts,
   type ChatSessionRow,
   type CreateSessionOptions,
+  type EndpointModelSpec,
+  type EndpointProviderConfig,
   type PatchSessionOptions,
   type RewindResult,
   type SessionListFilter,
@@ -58,6 +61,9 @@ export {
   BYOK_PROVIDER_METADATA,
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
+  OLLAMA_ENDPOINT_PRESET,
+  type EndpointModelSpec,
+  type EndpointProviderConfig,
   type AgentMode,
   type AgentUIMessageChunk,
   type AgentRunOptions,
@@ -294,6 +300,60 @@ export namespace secrets {
       message: `Remove ${label} key?`,
       detail:
         "The desktop app will stop using this key. You can add it back any time.",
+      buttons: ["Remove", "Cancel"],
+      default_id: 1,
+      cancel_id: 1,
+    });
+    return choice === 0;
+  }
+}
+
+/* ─────────────────────── providers namespace ─────────────────── */
+
+/**
+ * Endpoint provider config (issue #806) — user-configured OpenAI-
+ * compatible endpoints (Ollama preset, self-hosted gateways). Plain
+ * readable config, unlike `secrets`: the renderer may list configs back.
+ * A keyed gateway stores its key via the `secrets` namespace under the
+ * endpoint's id; this namespace never carries credentials.
+ *
+ * The bridge field is OPTIONAL (older desktop binaries) — UI must gate
+ * on {@link providers.isSupported}.
+ */
+export namespace providers {
+  export function isSupported(): boolean {
+    return getDesktopBridge()?.providers != null;
+  }
+
+  export async function listEndpoints(): Promise<EndpointProviderConfig[]> {
+    const bridge = bridgeOrThrow().providers;
+    if (!bridge) return [];
+    return await bridge.list_endpoints();
+  }
+
+  export async function setEndpoint(
+    config: EndpointProviderConfig
+  ): Promise<void> {
+    const bridge = bridgeOrThrow().providers;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    await bridge.set_endpoint(config);
+  }
+
+  export async function deleteEndpoint(id: string): Promise<void> {
+    const bridge = bridgeOrThrow().providers;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    await bridge.delete_endpoint(id);
+  }
+
+  /**
+   * Native confirm for the destructive "Remove endpoint" action —
+   * same convention as `secrets.confirmDeleteKey`.
+   */
+  export async function confirmDeleteEndpoint(label: string): Promise<boolean> {
+    const choice = await bridgeOrThrow().dialog.confirm({
+      message: `Remove ${label}?`,
+      detail:
+        "The agent will stop using this endpoint and its registered models. You can add it back any time.",
       buttons: ["Remove", "Cancel"],
       default_id: 1,
       cancel_id: 1,
