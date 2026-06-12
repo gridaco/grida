@@ -405,6 +405,10 @@ function AgentPaneContent({
   // the optimistic mirror, shared with `ai-sidebar/chat.tsx`. Skills ride the
   // live `send` from the active tab; a core-drained turn uses the session's
   // discovered skills (no per-send subset — the renderer has no tab there).
+  // Endpoint provider pin for the active model (issue #806) — rides every
+  // run-entering body: normal sends AND approval resumes below.
+  const providerId = registered_models.providerIdForModel(modelId, endpoints);
+
   const {
     queued,
     cancel: cancelQueued,
@@ -418,7 +422,7 @@ function AgentPaneContent({
       sendMessage,
       sessionId: chatSession.current_id,
       modelId,
-      providerId: registered_models.providerIdForModel(modelId, endpoints),
+      providerId,
       mode,
       skills: skillsForActiveTab(activeRelPath),
     }),
@@ -551,6 +555,7 @@ function AgentPaneContent({
         body: buildApprovalResumeBody({
           session_id: chatSession.current_id ?? undefined,
           model_id: modelId,
+          provider_id: providerId,
           mode,
           tool_call_id: pending.toolCallId,
           approval_id: pending.approvalId,
@@ -558,7 +563,7 @@ function AgentPaneContent({
         }),
       });
     },
-    [chat, chatSession.current_id, modelId, mode]
+    [chat, chatSession.current_id, modelId, providerId, mode]
   );
 
   // A pending supervised approval (the model called a mutating command in

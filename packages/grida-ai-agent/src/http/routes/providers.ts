@@ -25,16 +25,25 @@ import {
 } from "../../protocol/endpoints";
 import type { EndpointProvidersStore } from "../../providers/endpoints";
 import { probeEndpointModels } from "../../providers/probe";
+import type { SecretsStore } from "../../secrets";
 import { body, v } from "../validate";
 
 export type ProvidersRoutesDeps = {
   endpoints: EndpointProvidersStore;
+  /**
+   * When present, deleting an endpoint also deletes the key stored under
+   * its id. Without this, the key would be orphaned in auth.json: the
+   * `/secrets/*` allowlist only accepts CONFIGURED endpoint ids, so the
+   * leftover would be undeletable — and re-creating the same endpoint id
+   * later would silently reuse the stale credential.
+   */
+  secrets?: SecretsStore;
   /** Probe override for tests. Defaults to {@link probeEndpointModels}. */
   probe?: typeof probeEndpointModels;
 };
 
 export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
-  const { endpoints } = deps;
+  const { endpoints, secrets } = deps;
   const probe = deps.probe ?? probeEndpointModels;
 
   app.post("/providers/endpoints/list", async (c) => {
@@ -79,6 +88,9 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
     const r = await body(c, { id: v.string });
     if (!r.ok) return r.res;
     await endpoints.delete(r.data.id);
+    // The endpoint's key (if any) goes with it — see the deps doc. Both
+    // deletes are idempotent, so a partial failure is safe to retry.
+    await secrets?.delete(r.data.id);
     console.log(`[agent-host-providers] endpoint delete id=${r.data.id}`);
     return c.json({ ok: true });
   });

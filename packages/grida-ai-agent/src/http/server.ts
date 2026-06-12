@@ -144,7 +144,10 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     });
   }
   if (opts.capabilities.providers) {
-    registerProvidersRoutes(app, { endpoints: endpointsStore });
+    registerProvidersRoutes(app, {
+      endpoints: endpointsStore,
+      secrets: secretsStore,
+    });
   }
   // Agent runtime owns the run loop + the in-flight stream registry.
   // `opts.streamRegistry` is undefined for direct callers (the runtime

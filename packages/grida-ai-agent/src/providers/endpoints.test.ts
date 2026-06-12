@@ -268,7 +268,7 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
     endpoints = new EndpointProvidersStore(baseDir);
     secrets = new SecretsStore(new AuthStore(baseDir));
     app = new Hono();
-    registerProvidersRoutes(app, { endpoints });
+    registerProvidersRoutes(app, { endpoints, secrets });
     registerSecretsRoutes(app, { store: secrets, endpoints });
   });
 
@@ -345,6 +345,17 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toMatch(/id/);
+  });
+
+  it("deleting an endpoint deletes its stored key — no orphaned credential", async () => {
+    await post("/providers/endpoints/set", { config: OLLAMA });
+    await post("/secrets/set", { provider_id: "ollama", key: "gateway-key" });
+    expect(await secrets.has("ollama")).toBe(true);
+
+    await post("/providers/endpoints/delete", { id: "ollama" });
+    // The key went with the endpoint: nothing stale in auth.json, and a
+    // re-created "ollama" endpoint can't silently reuse the old credential.
+    expect(await secrets.has("ollama")).toBe(false);
   });
 
   it("secrets routes accept a configured endpoint id, reject unknown ids", async () => {

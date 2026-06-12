@@ -18,6 +18,13 @@ import type { AgentMode } from "@/lib/desktop/bridge";
 export type ApprovalResumeBody = {
   session_id?: string;
   model_id?: string;
+  /**
+   * Endpoint provider pin (issue #806) — same rule as a normal send: a
+   * resume re-enters `/agent/run`, so without the pin a registered local
+   * model id would cascade BYOK-first and land on a provider that cannot
+   * serve it. Omitted for catalog models.
+   */
+  provider_id?: string;
   mode: AgentMode;
   approval_answer: {
     tool_call_id: string;
@@ -29,6 +36,7 @@ export type ApprovalResumeBody = {
 export type ApprovalResumeArgs = {
   session_id?: string;
   model_id?: string;
+  provider_id?: string;
   mode: AgentMode;
   tool_call_id: string;
   approval_id: string;
@@ -41,6 +49,7 @@ export function buildApprovalResumeBody(
   return {
     session_id: args.session_id,
     model_id: args.model_id,
+    provider_id: args.provider_id,
     mode: args.mode,
     approval_answer: {
       tool_call_id: args.tool_call_id,
