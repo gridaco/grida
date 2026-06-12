@@ -106,9 +106,8 @@ export namespace color {
   /**
    * Legacy comma discipline for a (trimmed) argument body:
    * `T, T, T` or `T, T, T, T` — every channel separated by a comma,
-   * whitespace around commas allowed, no slash. Token *content* is not
-   * validated here; that stays with {@link parse} and the post-parse
-   * checks in {@link resolve} (hue excepted — see {@link HUE_TOKEN}).
+   * whitespace around commas allowed, no slash. Token *content* is
+   * validated separately ({@link HUE_TOKEN} / {@link CHANNEL_TOKEN}).
    */
   const LEGACY_BODY = /^[^\s,/]+(?:\s*,\s*[^\s,/]+){2,3}$/;
 
@@ -120,21 +119,39 @@ export namespace color {
   const MODERN_BODY = /^[^\s,/]+(?:\s+[^\s,/]+){2}(?:\s*\/\s*[^\s,/]+)?$/;
 
   /**
-   * A CSS `<number>` (optional sign, decimal — digits required after
-   * the dot, scientific notation) with an optional angle unit. Exactly
-   * the four units the vendored parser converts — `deg` | `grad` |
-   * `rad` | `turn`. Any other unit (e.g. `px`) must not pass: the
-   * parser would fall through to `parseFloat` and silently drop it.
+   * Source pattern for a CSS `<number>`: optional sign, integer or
+   * decimal (digits required after the dot — `120.` is not a number),
+   * optional scientific exponent with *required* exponent digits
+   * (`1e` is not a number; `parseFloat("1e")` would read 1).
    */
-  const HUE_TOKEN =
-    /^[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?(?:deg|grad|rad|turn)?$/;
+  const CSS_NUMBER_SOURCE = /[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?/.source;
+
+  /**
+   * The hue position of `hsl()` / `hsla()` / `hwb()`: a CSS
+   * `<number>` with an optional angle unit. Exactly the four units
+   * the vendored parser converts — `deg` | `grad` | `rad` | `turn`.
+   * Any other unit (e.g. `px`) must not pass: the parser would fall
+   * through to `parseFloat` and silently drop it. No `%` — the parser
+   * would misread a percentage hue as a 0-100 hue.
+   */
+  const HUE_TOKEN = new RegExp(`^${CSS_NUMBER_SOURCE}(?:deg|grad|rad|turn)?$`);
+
+  /**
+   * Every non-hue channel token, alpha included: a CSS `<number>`
+   * with an optional `%` suffix — and nothing else. Stray units leak
+   * through the vendored parser's `parseFloat` (`rgb(1px 0 0)` would
+   * read 1) where every browser rejects the declaration, so they must
+   * not pass. (`none` is handled separately: it is a valid missing
+   * channel in the modern syntax only.)
+   */
+  const CHANNEL_TOKEN = new RegExp(`^${CSS_NUMBER_SOURCE}%?$`);
 
   /**
    * The input gate for {@link resolve}: decides whether a (trimmed,
    * lowercased) string is one of the resolvable *forms* before the
    * permissive {@link parse} ever sees it. Form-level plus separator
-   * discipline and hue numericity — non-hue channel content and
-   * post-parse arity/finiteness are still checked after parsing.
+   * discipline plus per-token channel shape — post-parse
+   * arity/finiteness are still checked after parsing.
    */
   function isResolvableForm(cstr: string): boolean {
     // named colors — own properties only, so prototype-chain keys like
@@ -160,16 +177,55 @@ export namespace color {
     // form in CSS — `hwb(0, 0%, 0%)` is invalid in every browser.
     if (fn === "hwb" && legacy) return false;
 
-    if (fn !== "rgb" && fn !== "rgba") {
-      // the hue channel of hsl()/hsla()/hwb() must be numeric. The
-      // vendored parser would otherwise accept named base hues from a
-      // long-dropped css-color draft (`hsl(red 100% 50%)`) whose table
-      // values are not even CSS hue degrees (red:0, yellow:120), and
-      // would misread a percentage hue (`hsl(50% ...)`) as a 0-100
-      // hue. `none` is valid CSS for a missing hue, but only in the
-      // modern syntax — `hsl(none, 100%, 50%)` is invalid.
-      const hue = body.split(/[\s,]/, 1)[0];
-      if (!HUE_TOKEN.test(hue) && !(hue === "none" && !legacy)) return false;
+    // tokenize along the discipline the body already matched: legacy
+    // is comma-separated with an optional 4th (alpha) token; modern is
+    // three space-separated channels with an optional post-slash alpha.
+    let channels: string[];
+    let alphaToken: string | null = null;
+    if (legacy) {
+      channels = body.split(",").map((t) => t.trim());
+      if (channels.length === 4) alphaToken = channels.pop()!;
+    } else {
+      const slash = body.indexOf("/");
+      if (slash !== -1) {
+        alphaToken = body.slice(slash + 1).trim();
+        channels = body.slice(0, slash).trim().split(/\s+/);
+      } else {
+        channels = body.split(/\s+/);
+      }
+    }
+
+    // per-token channel shape. `none` is a valid *missing* channel —
+    // any position, alpha included — but only in the modern syntax
+    // (CSS Color 4 §4.4); browsers reject `rgb(none, 0, 0)`. The
+    // parser reads it as 0, matching the spec's missing-behaves-as-
+    // zero rule.
+    const none = (token: string): boolean => token === "none" && !legacy;
+    const isHueForm = fn !== "rgb" && fn !== "rgba";
+    for (let i = 0; i < channels.length; i++) {
+      const token = channels[i];
+      if (i === 0 && isHueForm) {
+        // the hue channel of hsl()/hsla()/hwb() keeps its own rule
+        // (angle units allowed, `%` not) — the generic channel rule
+        // must never double-reject `hsl(120deg ...)`. The vendored
+        // parser would otherwise also accept named base hues from a
+        // long-dropped css-color draft (`hsl(red 100% 50%)`) whose
+        // table values are not even CSS hue degrees (red:0,
+        // yellow:120).
+        if (!HUE_TOKEN.test(token) && !none(token)) return false;
+      } else if (!CHANNEL_TOKEN.test(token) && !none(token)) {
+        return false;
+      }
+    }
+    // alpha — 4th legacy channel or post-slash modern — is
+    // number-or-percentage, never a unit (`rgb(255 0 0 / 1px)` is
+    // invalid CSS).
+    if (
+      alphaToken !== null &&
+      !CHANNEL_TOKEN.test(alphaToken) &&
+      !none(alphaToken)
+    ) {
+      return false;
     }
     return true;
   }
@@ -221,23 +277,37 @@ export namespace color {
    * `hwb()` takes the modern form only — it postdates the comma syntax
    * and `"hwb(0, 0%, 0%)"` is invalid in every browser.
    *
+   * **Channel tokens.** Every channel token must be a CSS `<number>`
+   * (optional sign, digits required after a decimal dot, scientific
+   * notation with *required* exponent digits — `"rgb(1e 0 0)"` is
+   * `null`) with an optional `%` suffix. Stray units reject in every
+   * position — channel (`"rgb(1px 0 0)"`, `"rgb(1px, 0, 0)"`) and
+   * alpha (`"rgb(255 0 0 / 1px)"`) alike — exactly as browsers reject
+   * the declaration; the permissive parser would `parseFloat` the unit
+   * away. `none` is a valid *missing* channel in any position, alpha
+   * included, but in the modern syntax only (CSS Color 4):
+   * `"rgb(none 0 0)"` resolves (missing reads as 0, as in browsers),
+   * `"rgb(none, 0, 0)"` is `null`.
+   *
    * **Numeric hue.** The hue channel of `hsl()` / `hsla()` / `hwb()`
-   * must be a CSS number, optionally with one of the angle units the
-   * vendored parser actually converts — `deg`, `grad`, `rad`, `turn` —
-   * or `none` (modern form only, per CSS). Named hues
-   * (`"hsl(red 100% 50%)"`) are rejected: `<named-hue>` comes from a
-   * long-dropped css-color draft, no browser accepts it, and the
-   * parser's table values are not CSS hue degrees. Percentage hue
-   * (`"hsl(50% 100% 50%)"`) is rejected — the parser would misread it
-   * as a 0-100 hue. A bare trailing dot is not a CSS number
-   * (`"hsl(120. 50% 50%)"` is `null`).
+   * keeps its own token rule in place of the generic one: a CSS
+   * number, optionally with one of the angle units the vendored
+   * parser actually converts — `deg`, `grad`, `rad`, `turn` — or
+   * `none` (modern form only). Named hues (`"hsl(red 100% 50%)"`)
+   * are rejected: `<named-hue>` comes from a long-dropped css-color
+   * draft, no browser accepts it, and the parser's table values are
+   * not CSS hue degrees. Percentage hue (`"hsl(50% 100% 50%)"`) is
+   * rejected — the parser would misread it as a 0-100 hue. A bare
+   * trailing dot is not a CSS number (`"hsl(120. 50% 50%)"` is
+   * `null`).
    *
    * Channel arity is enforced by the discipline patterns themselves
-   * (`"rgb(1, 2)"`, `"rgb(1, 2, 3, 4, 5)"` are `null`). Within those
-   * bounds, non-hue channel *content* still defers to {@link parse}
-   * plus the post-parse finiteness checks (`"rgb(foo, 0, 0)"` is
-   * `null`); e.g. `none` as a non-hue channel reads as 0, as in
-   * browsers.
+   * (`"rgb(1, 2)"`, `"rgb(1, 2, 3, 4, 5)"` are `null`). Token
+   * *interpretation* within the validated shape still defers to
+   * {@link parse}: cross-token grammar is not enforced, so legacy
+   * bodies mixing `<number>` and `<percentage>` (`"rgb(50%, 0, 0)"`)
+   * or unitless hsl saturation/lightness (read as percent) resolve
+   * permissively rather than `null`.
    *
    * A number must be an integer in `[0x000000, 0xFFFFFF]` — negative,
    * fractional, `NaN`, non-finite, or `> 0xFFFFFF` values are `null`

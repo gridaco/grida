@@ -470,6 +470,77 @@ describe("color.resolve", () => {
       });
     });
 
+    describe("channel tokens must be CSS numbers (optional %)", () => {
+      it.each([
+        "rgb(1px 0 0)", // stray unit — parseFloat would read 1
+        "rgb(1px, 0, 0)", // stray unit, legacy comma syntax
+        "rgb(1e 0 0)", // 'e' with no exponent digits is not a CSS number
+        "rgb(255 0 0 / 1px)", // unit in modern slash alpha
+        "rgba(0, 0, 0, 1px)", // unit in legacy 4th-channel alpha
+        "rgb(255 0 0 / 1e)", // exponent digits required in alpha too
+        "hsl(120 91% 60px)", // unit in a non-hue hsl channel
+        "hwb(0 0% 0px)", // unit in a hwb channel
+        "rgb(255 0deg 0)", // angle units are hue-only, never rgb
+        "rgb(1.. 0 0)", // double dot is not a number
+      ])("%s resolves to null", (cstr) => {
+        expect(kolor.resolve(cstr)).toBeNull();
+        expect(kolor.resolveHEX(cstr)).toBeNull();
+      });
+
+      it("percentage / decimal / scientific channels stay accepted", () => {
+        expect(kolor.resolve("rgb(50% 0% 0%)")).toEqual({
+          r: 128, // 50% -> 127.5 -> rounds to 128
+          g: 0,
+          b: 0,
+          a: 1,
+        });
+        expect(kolor.resolve("rgb(2.5e2 0 0)")).toEqual({
+          r: 250,
+          g: 0,
+          b: 0,
+          a: 1,
+        });
+        expect(kolor.resolve("rgb(.5 0 0)")).toEqual({
+          r: 1, // 0.5 rounds to 1
+          g: 0,
+          b: 0,
+          a: 1,
+        });
+      });
+    });
+
+    describe("`none` channels: modern syntax only (CSS Color 4)", () => {
+      it("rgb(none 0 0) resolves — missing channel reads as 0", () => {
+        expect(kolor.resolve("rgb(none 0 0)")).toEqual({
+          r: 0,
+          g: 0,
+          b: 0,
+          a: 1,
+        });
+        expect(kolor.resolve("hsl(120 none 50%)")).toEqual(
+          kolor.resolve("hsl(120 0% 50%)")
+        );
+      });
+
+      it("none alpha resolves to 0 in the modern slash position", () => {
+        expect(kolor.resolve("rgb(0 0 0 / none)")).toEqual({
+          r: 0,
+          g: 0,
+          b: 0,
+          a: 0,
+        });
+      });
+
+      it.each([
+        "rgb(none, 0, 0)", // browsers reject none in legacy comma syntax
+        "rgba(0, 0, 0, none)",
+        "hsl(0, none, 50%)",
+      ])("%s resolves to null", (cstr) => {
+        expect(kolor.resolve(cstr)).toBeNull();
+        expect(kolor.resolveHEX(cstr)).toBeNull();
+      });
+    });
+
     describe("numbers must be integers in [0x000000, 0xFFFFFF]", () => {
       it.each([
         -1, // parse would wrap to white via >>> 16
