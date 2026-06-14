@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Label } from "@app/ui/components/label";
+import { Switch } from "@app/ui/components/switch";
 import {
   Card,
   CardContent,
@@ -16,9 +17,15 @@ import { Skeleton } from "@app/ui/components/skeleton";
 import {
   BYOK_PROVIDER_LABELS,
   DesktopBridgeMissingError,
+  OLLAMA_ENDPOINT_PRESET,
   app,
+  mergeProbedModels,
+  providers,
+  resolveEndpointModel,
   secrets,
   type ByokProviderId,
+  type EndpointModelEntry,
+  type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
 import {
   DesktopPageContent,
@@ -47,11 +54,12 @@ export default function DesktopSettingsPage() {
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            AI provider keys and app info.
+            AI provider keys, local models, and app info.
           </p>
         </header>
 
         <ByokSection />
+        <LocalModelsSection />
         <AboutSection />
       </DesktopPageContent>
     </DesktopPageShell>
@@ -274,6 +282,615 @@ function StatusPill({ kind }: { kind: "loading" | "empty" | "configured" }) {
       />
       Not configured
     </span>
+  );
+}
+
+/* ─────────────────────────── Local models ───────────────────────── */
+
+/**
+ * Endpoint provider config (issue #806) — the Ollama preset slot. The
+ * agent host persists configs in `endpoints.json` (plain config, not a
+ * secret; the bridge may read them back, unlike keys).
+ *
+ * The section edits a local draft and persists on Save — endpoint config
+ * is structural (base URL + model list), so field-level autosave would
+ * fire half-formed configs at the host validator.
+ */
+
+type LocalState =
+  | { kind: "loading" }
+  | { kind: "unsupported" }
+  | { kind: "ready"; draft: EndpointProviderConfig | null; dirty: boolean }
+  | { kind: "saving"; draft: EndpointProviderConfig | null }
+  | { kind: "error"; message: string; draft: EndpointProviderConfig | null };
+
+function LocalModelsSection() {
+  const [state, setState] = useState<LocalState>({ kind: "loading" });
+  const [newModelId, setNewModelId] = useState("");
+  const [probing, setProbing] = useState(false);
+  const [probeNote, setProbeNote] = useState<string | null>(null);
+  // Whether the endpoint config exists on the host — the API-key slot is
+  // only rendered then (the secrets allowlist accepts CONFIGURED endpoint
+  // ids; a key for an unsaved draft would 400).
+  const [persisted, setPersisted] = useState(false);
+  // Stale-write guard: detection runs async off a SNAPSHOT of the config
+  // while the form stays editable. Any user action that changes what the
+  // draft means (edit, save, remove, re-setup) bumps this; a completion
+  // holding an older number drops its write instead of resurrecting a
+  // deleted endpoint or wiping newer unsaved edits.
+  const opVersion = useRef(0);
+
+  /**
+   * Discover the endpoint's models (agent-host-side fetch of Ollama's
+   * `/api/tags` + `/api/ps`/`/api/show`, or a generic `/models`) and
+   * refresh the DETECTED fields. Detection owns the top-level
+   * `tool_call`/`contextWindow` on each entry — the probe overwrites
+   * them freely; human corrections live in `overrides` (hand-edited
+   * JSON, or the inputs shown when detection has nothing) and are never
+   * touched here.
+   *
+   * `persist: true` (an already-saved config) writes the refreshed
+   * config straight back — detected facts aren't a user choice, so they
+   * don't sit in an unsaved draft. The setup flow passes `false` and
+   * keeps the explicit Save.
+   */
+  const detectInto = useCallback(
+    async (base: EndpointProviderConfig, opts: { persist: boolean }) => {
+      const version = opVersion.current;
+      setProbing(true);
+      setProbeNote(null);
+      try {
+        const result = await providers.probeEndpoint(base.base_url);
+        // `base` is stale once the user edited/saved/removed mid-probe —
+        // applying it would undo their action. Drop the result silently.
+        if (opVersion.current !== version) return;
+        const merged = mergeProbedModels(base.models, result.models);
+        setProbeNote(
+          merged.discovered > 0
+            ? `Found ${merged.discovered} model${merged.discovered === 1 ? "" : "s"}.`
+            : merged.updated > 0
+              ? "Updated model details."
+              : "No new models found."
+        );
+        if (merged.discovered === 0 && merged.updated === 0) return;
+        const next = { ...base, models: merged.models };
+        if (opts.persist) {
+          await providers.setEndpoint(next);
+          if (opVersion.current !== version) return;
+          setState({ kind: "ready", draft: next, dirty: false });
+        } else {
+          setState({ kind: "ready", draft: next, dirty: true });
+        }
+      } catch (err) {
+        if (opVersion.current !== version) return;
+        setProbeNote(
+          `Couldn't reach the endpoint (${describeError(err)}) — add models manually.`
+        );
+      } finally {
+        setProbing(false);
+      }
+    },
+    []
+  );
+
+  const refresh = useCallback(async () => {
+    if (!providers.isSupported()) {
+      setState({ kind: "unsupported" });
+      return;
+    }
+    const version = ++opVersion.current;
+    try {
+      const list = await providers.listEndpoints();
+      const ollama = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
+      if (opVersion.current !== version) return;
+      setState({ kind: "ready", draft: ollama ?? null, dirty: false });
+      setPersisted(ollama != null);
+      // Detected values converge to the server's truth on every visit —
+      // notably /api/ps starts reporting a model's REAL allocation once
+      // it has been loaded. Fire-and-forget; failures only leave a note.
+      if (ollama) void detectInto(ollama, { persist: true });
+    } catch (err) {
+      if (opVersion.current !== version) return;
+      setState({ kind: "error", message: describeError(err), draft: null });
+    }
+  }, [detectInto]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const draft = "draft" in state ? state.draft : null;
+
+  const edit = useCallback((next: EndpointProviderConfig) => {
+    opVersion.current += 1;
+    setState({ kind: "ready", draft: next, dirty: true });
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!draft) return;
+    const version = ++opVersion.current;
+    setState({ kind: "saving", draft });
+    try {
+      await providers.setEndpoint(draft);
+      const list = await providers.listEndpoints();
+      const saved = list.find((e) => e.id === OLLAMA_ENDPOINT_PRESET.id);
+      setPersisted(saved != null);
+      // An edit made while the save was in flight wins over the read-back.
+      if (opVersion.current !== version) return;
+      setState({ kind: "ready", draft: saved ?? null, dirty: false });
+    } catch (err) {
+      if (opVersion.current !== version) return;
+      setState({ kind: "error", message: describeError(err), draft });
+    }
+  }, [draft]);
+
+  const handleEnable = useCallback(() => {
+    opVersion.current += 1;
+    const base: EndpointProviderConfig = {
+      ...OLLAMA_ENDPOINT_PRESET,
+      models: [],
+    };
+    setState({ kind: "ready", draft: base, dirty: true });
+    // Prefill from the running Ollama right away — the common path is
+    // "models already pulled; nothing to type". Not persisted until the
+    // user confirms with Save (the config doesn't exist yet).
+    void detectInto(base, { persist: false });
+  }, [detectInto]);
+
+  const handleRemove = useCallback(async () => {
+    if (!draft) return;
+    // Bump FIRST: an in-flight detection completing after this click must
+    // not persist its snapshot back and resurrect the deleted endpoint.
+    opVersion.current += 1;
+    let confirmed = false;
+    try {
+      confirmed = await providers.confirmDeleteEndpoint(
+        draft.label ?? draft.id
+      );
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err), draft });
+      return;
+    }
+    if (!confirmed) return;
+    setState({ kind: "saving", draft });
+    try {
+      await providers.deleteEndpoint(draft.id);
+      await refresh();
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err), draft });
+    }
+  }, [draft, refresh]);
+
+  const addModel = useCallback(() => {
+    if (!draft) return;
+    const id = newModelId.trim();
+    if (!id || draft.models.some((m) => m.id === id)) return;
+    edit({ ...draft, models: [...draft.models, { id }] });
+    setNewModelId("");
+  }, [draft, newModelId, edit]);
+
+  const saveDisabled =
+    state.kind !== "ready" ||
+    !state.dirty ||
+    !draft ||
+    draft.base_url.trim().length === 0;
+
+  // Old desktop binaries have no bridge surface for this — hide rather
+  // than render a dead section.
+  if (state.kind === "unsupported") return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Local Models</CardTitle>
+        <CardDescription>
+          Run the agent on your own machine with{" "}
+          <a
+            className="underline underline-offset-4"
+            href="https://ollama.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ollama
+          </a>{" "}
+          — no account, no API key. Start <code>ollama serve</code> and pull a
+          model; Grida detects it automatically. Local models vary widely in
+          agent ability; larger models (~30B+) are recommended for agent tasks.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {state.kind === "loading" ? (
+          <Skeleton className="h-9 w-full" />
+        ) : !draft ? (
+          <div className="flex justify-start">
+            <Button variant="outline" onClick={handleEnable}>
+              Set up Ollama
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-medium">Base URL</Label>
+              <Input
+                value={draft.base_url}
+                onChange={(e) => edit({ ...draft, base_url: e.target.value })}
+                placeholder={OLLAMA_ENDPOINT_PRESET.base_url}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Models</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={probing || state.kind === "saving"}
+                  onClick={() => void detectInto(draft, { persist: false })}
+                >
+                  {probing ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Detect
+                </Button>
+              </div>
+              {probeNote && (
+                <p className="text-xs text-muted-foreground" role="status">
+                  {probeNote}
+                </p>
+              )}
+              {draft.models.length === 0 && !probing && (
+                <p className="text-xs text-muted-foreground">
+                  Models you pulled in Ollama are detected automatically — or
+                  add one by id (e.g. <code>llama3.1:8b</code>). The first model
+                  is the default.
+                </p>
+              )}
+              {draft.models.map((model, index) => (
+                <LocalModelRow
+                  key={model.id}
+                  model={model}
+                  onChange={(next) =>
+                    edit({
+                      ...draft,
+                      models: draft.models.map((m, i) =>
+                        i === index ? next : m
+                      ),
+                    })
+                  }
+                  onRemove={() =>
+                    edit({
+                      ...draft,
+                      models: draft.models.filter((_, i) => i !== index),
+                      default_model_id:
+                        draft.default_model_id === model.id
+                          ? undefined
+                          : draft.default_model_id,
+                    })
+                  }
+                />
+              ))}
+              <div className="flex gap-2">
+                <Input
+                  value={newModelId}
+                  onChange={(e) => setNewModelId(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addModel();
+                    }
+                  }}
+                  placeholder="model id, e.g. llama3.1:8b"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <Button
+                  variant="outline"
+                  disabled={newModelId.trim().length === 0}
+                  onClick={addModel}
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            {persisted && (
+              <EndpointKeyRow
+                endpointId={draft.id}
+                label={draft.label ?? draft.id}
+              />
+            )}
+
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                disabled={state.kind === "saving"}
+                onClick={() => void handleRemove()}
+              >
+                Remove
+              </Button>
+              <Button
+                size="default"
+                disabled={saveDisabled}
+                onClick={() => void handleSave()}
+              >
+                {state.kind === "saving" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                Save
+              </Button>
+            </div>
+          </>
+        )}
+
+        {state.kind === "error" && (
+          <button
+            type="button"
+            role="alert"
+            aria-live="polite"
+            onClick={() => void refresh()}
+            className="self-start text-left text-sm text-destructive underline-offset-4 hover:underline"
+          >
+            {state.message} (click to retry)
+          </button>
+        )}
+
+        {draft && providers.canRevealConfigFile() && (
+          <p className="text-xs text-muted-foreground">
+            Stored as plain JSON — detected values refresh automatically; to pin
+            a value the endpoint reports wrong, set <code>overrides</code> in{" "}
+            <button
+              type="button"
+              className="underline underline-offset-4 hover:text-foreground"
+              onClick={() => void providers.revealConfigFile()}
+            >
+              endpoints.json
+            </button>
+            .
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+type EndpointKeyState =
+  | { kind: "loading" | "empty" | "configured" | "saving" | "removing" }
+  | { kind: "error"; message: string };
+
+/**
+ * Optional API key for a configured endpoint (issue #806). Ollama needs
+ * none; a keyed self-hosted gateway stores its key HERE — through the
+ * same write/presence/delete-only `secrets` surface as BYOK keys, under
+ * the ENDPOINT's id (GRIDA-SEC-004: never inside the endpoint config,
+ * never readable back). Rendered only for a persisted endpoint, since
+ * the secrets allowlist accepts configured endpoint ids only.
+ */
+function EndpointKeyRow({
+  endpointId,
+  label,
+}: {
+  endpointId: string;
+  label: string;
+}) {
+  const [state, setState] = useState<EndpointKeyState>({ kind: "loading" });
+  const [value, setValue] = useState("");
+
+  const refresh = useCallback(async () => {
+    try {
+      setState({
+        kind: (await secrets.hasKey(endpointId)) ? "configured" : "empty",
+      });
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err) });
+    }
+  }, [endpointId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const handleSaveKey = useCallback(async () => {
+    setState({ kind: "saving" });
+    try {
+      await secrets.setKey(endpointId, value);
+      setValue("");
+      await refresh();
+    } catch (err) {
+      setValue("");
+      setState({ kind: "error", message: describeError(err) });
+    }
+  }, [endpointId, value, refresh]);
+
+  const handleRemoveKey = useCallback(async () => {
+    let confirmed = false;
+    try {
+      confirmed = await secrets.confirmDeleteKey(endpointId, label);
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err) });
+      return;
+    }
+    if (!confirmed) return;
+    setState({ kind: "removing" });
+    try {
+      await secrets.deleteKey(endpointId);
+      await refresh();
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err) });
+    }
+  }, [endpointId, label, refresh]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">API key</Label>
+        {(state.kind === "configured" || state.kind === "removing") && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={state.kind === "removing"}
+            onClick={() => void handleRemoveKey()}
+          >
+            {state.kind === "removing" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : null}
+            Remove key
+          </Button>
+        )}
+      </div>
+
+      {state.kind === "loading" ? (
+        <Skeleton className="h-9 w-full" />
+      ) : state.kind === "error" ? (
+        <button
+          type="button"
+          role="alert"
+          aria-live="polite"
+          onClick={() => void refresh()}
+          className="self-start text-left text-sm text-destructive underline-offset-4 hover:underline"
+        >
+          {state.message} (click to retry)
+        </button>
+      ) : state.kind === "configured" || state.kind === "removing" ? (
+        <p className="text-xs text-muted-foreground">
+          A key is configured for this endpoint — stored by the agent host,
+          never shown back.
+        </p>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="Optional — Ollama needs none"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              disabled={state.kind === "saving"}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <Button
+              size="default"
+              disabled={state.kind === "saving" || value.trim().length === 0}
+              onClick={() => void handleSaveKey()}
+            >
+              {state.kind === "saving" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
+              Save key
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            For gateways that require authentication (a keyed LiteLLM or vLLM).
+            Sent as a bearer token on requests to this endpoint.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+const compactTokens = new Intl.NumberFormat("en-US", { notation: "compact" });
+
+/**
+ * One registered model. Detection owns the capability fields: a value
+ * the endpoint reported renders as a read-only badge (no input over
+ * discoverable truth — a hand-typed snapshot only rots). Inputs appear
+ * ONLY where detection has nothing (manual adds, ids-only gateways);
+ * they write to `overrides`, the sticky human slot a probe refresh
+ * never touches.
+ */
+function LocalModelRow({
+  model,
+  onChange,
+  onRemove,
+}: {
+  model: EndpointModelEntry;
+  onChange: (next: EndpointModelEntry) => void;
+  onRemove: () => void;
+}) {
+  const resolved = resolveEndpointModel(model);
+  const ctxOverridden = model.overrides?.contextWindow !== undefined;
+  const toolsOverridden = model.overrides?.tool_call !== undefined;
+
+  return (
+    <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+      <span className="flex-1 truncate font-mono text-xs">{model.id}</span>
+
+      {model.contextWindow !== undefined ? (
+        <span
+          className="shrink-0 rounded-md bg-secondary px-2 py-1 font-mono text-xs tabular-nums text-muted-foreground"
+          title={
+            ctxOverridden
+              ? "Context window (manual override from endpoints.json)"
+              : "Context window (detected from the endpoint)"
+          }
+        >
+          {/* non-null: this branch is gated on a detected contextWindow,
+              and resolution only ever overrides it, never unsets it */}
+          {compactTokens.format(resolved.contextWindow!)} ctx
+          {ctxOverridden ? " ·m" : ""}
+        </span>
+      ) : (
+        <Input
+          className="h-8 w-28 text-xs"
+          type="number"
+          min={1024}
+          step={1024}
+          value={model.overrides?.contextWindow ?? ""}
+          onChange={(e) => {
+            const value = e.target.valueAsNumber;
+            onChange({
+              ...model,
+              overrides: {
+                ...model.overrides,
+                contextWindow: Number.isFinite(value)
+                  ? Math.max(1, Math.floor(value))
+                  : undefined,
+              },
+            });
+          }}
+          placeholder="ctx (8192)"
+          aria-label="Context window (tokens)"
+        />
+      )}
+
+      {model.tool_call !== undefined ? (
+        <span
+          className="shrink-0 rounded-md bg-secondary px-2 py-1 text-xs text-muted-foreground"
+          title={
+            toolsOverridden
+              ? "Tool-calling (manual override from endpoints.json)"
+              : "Tool-calling (detected from the endpoint)"
+          }
+        >
+          {resolved.tool_call ? "tools" : "no tools"}
+        </span>
+      ) : (
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Switch
+            checked={resolved.tool_call ?? true}
+            onCheckedChange={(checked) =>
+              onChange({
+                ...model,
+                overrides: { ...model.overrides, tool_call: checked },
+              })
+            }
+            aria-label="Supports tool calls"
+          />
+          tools
+        </label>
+      )}
+
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={`Remove ${model.id}`}
+        onClick={onRemove}
+      >
+        <Trash2 className="size-3.5" />
+      </Button>
+    </div>
   );
 }
 

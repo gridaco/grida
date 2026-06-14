@@ -180,6 +180,34 @@ describe("@grida/agent public API", () => {
       expect(row.agent).toBe("grida");
     });
 
+    it("exposes the endpoint-provider contract (issue #806)", () => {
+      expect(root.OLLAMA_ENDPOINT_PRESET).toEqual({
+        id: "ollama",
+        label: "Ollama",
+        base_url: "http://localhost:11434/v1",
+      });
+      expect(typeof root.isValidEndpointProviderId).toBe("function");
+      expect(typeof root.validateEndpointProviderConfig).toBe("function");
+      expect(typeof root.mergeProbedModels).toBe("function");
+      expect(root.isByokProviderId("openrouter")).toBe(true);
+      expect(root.isByokProviderId("ollama")).toBe(false);
+      const config: root.EndpointProviderConfig = {
+        ...root.OLLAMA_ENDPOINT_PRESET,
+        models: [{ id: "llama3.1:8b", tool_call: true }],
+      };
+      const model: root.EndpointModelSpec = config.models[0];
+      expect(model.id).toBe("llama3.1:8b");
+      // The model-id and provider-id wire types are open: a registered
+      // local id type-checks (the runtime gate still validates it).
+      const localModel: AgentModelId = "llama3.1:8b";
+      const localRun: AgentRunOptions = {
+        messages: [],
+        provider_id: "ollama",
+        model_id: localModel,
+      };
+      expect(localRun.provider_id).toBe("ollama");
+    });
+
     it("does not expose internal runtime/provider/server modules from the root", () => {
       expect("AgentRuntime" in root).toBe(false);
       expect("StreamRegistry" in root).toBe(false);

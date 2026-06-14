@@ -43,11 +43,14 @@ public subpath; workspace bindings use it in-process.
 The perimeter that keeps this package small. A feature request that
 crosses one of these is the wrong tool, not a missing feature.
 
-- **Not a general model-provider router.** V1 provider selection is
-  BYOK-only and isolated to the node-only `providers/` layer
-  (OpenRouter → AI Gateway). The agent + runtime core never import
+- **Not a general model-provider router.** Provider selection is
+  isolated to the node-only `providers/` layer: the BYOK key slots
+  (OpenRouter → AI Gateway) plus ONE generalized OpenAI-compatible
+  endpoint type (`{base_url, optional key, registered models}` — Ollama
+  is the preset; issue #806). The agent + runtime core never import
   selection; they receive a resolved `ModelFactory`. There is no
-  registry for arbitrary third-party providers.
+  registry for arbitrary third-party providers — new hosted providers are
+  new BYOK slots, not config.
 - **Not a hosted model gateway.** The package does not proxy model calls
   through grida.co, own OAuth sessions, or mint hosted provider tokens.
 - **Not a billing or entitlement engine.** The package forwards per-step

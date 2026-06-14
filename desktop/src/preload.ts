@@ -445,6 +445,18 @@ const bridge: DesktopBridge = {
     },
   },
 
+  providers: {
+    list_endpoints: () => agentClient.providers.list_endpoints(),
+    set_endpoint: async (config) => {
+      await agentClient.providers.set_endpoint(config);
+    },
+    delete_endpoint: async (id) => {
+      await agentClient.providers.delete_endpoint(id);
+    },
+    info: () => agentClient.providers.info(),
+    probe_endpoint: (baseUrl) => agentClient.providers.probe_endpoint(baseUrl),
+  },
+
   agent: {
     run: (opts, onChunk) =>
       // Fresh runs always return a stream (only `reconnect` may return

@@ -50,7 +50,6 @@ import {
   type WelcomeHandoff,
 } from "@/lib/desktop/welcome-handoff";
 import { useDesktopAgentFocusSession } from "@/lib/desktop/agent-focus-session";
-import _models from "@grida/ai-models";
 import {
   buildAgentSend,
   buildApprovalResumeBody,
@@ -76,10 +75,15 @@ import { QueuedMessages } from "../shared/queued-messages";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
 import {
   DesktopModelPicker,
+  ModelToolCallNotice,
   useModelPickerState,
 } from "../shared/model-picker";
 import { DesktopModePicker, useModePickerState } from "../shared/mode-picker";
 import { DesktopContextMeter } from "../shared/context-meter";
+import {
+  registered_models,
+  useEndpointProviders,
+} from "../shared/registered-models";
 import {
   AgentComposerInput,
   type ComposerCommandAction,
@@ -345,6 +349,10 @@ function AgentPaneContent({
     setMessages(chatSession.initial_messages);
   }, [chatSession.initial_messages, setMessages]);
 
+  // Configured endpoint providers (issue #806): their registered models
+  // join the picker and the capability gates below.
+  const endpoints = useEndpointProviders();
+
   // Flat model selection (ignores tiers). Seeds from the welcome
   // composer's pick on a handed-off fresh session, otherwise from the
   // active session's stored model, and rides each send as `body.modelId`.
@@ -352,6 +360,7 @@ function AgentPaneContent({
     current_id: chatSession.current_id,
     sessions: chatSession.sessions,
     initial: handoff?.model_id,
+    endpoints,
   });
 
   // Permission/supervision posture (RFC `permission modes`). Seeds from the
@@ -361,11 +370,12 @@ function AgentPaneContent({
     sessions: chatSession.sessions,
   });
 
-  // Whether the active model accepts image input — memoized so the catalog
-  // lookup doesn't re-scan on every render (only when the model changes).
+  // Whether the active model accepts image input — memoized so the
+  // registry lookup doesn't re-scan on every render (only when the model
+  // or endpoint list changes).
   const multimodal = useMemo(
-    () => _models.text.modelSpecById(modelId)?.multimodal ?? false,
-    [modelId]
+    () => registered_models.resolve(modelId, endpoints)?.multimodal ?? false,
+    [modelId, endpoints]
   );
 
   // The active session row carries the rolled-up cost the context meter
@@ -395,6 +405,10 @@ function AgentPaneContent({
   // the optimistic mirror, shared with `ai-sidebar/chat.tsx`. Skills ride the
   // live `send` from the active tab; a core-drained turn uses the session's
   // discovered skills (no per-send subset — the renderer has no tab there).
+  // Endpoint provider pin for the active model (issue #806) — rides every
+  // run-entering body: normal sends AND approval resumes below.
+  const providerId = registered_models.providerIdForModel(modelId, endpoints);
+
   const {
     queued,
     cancel: cancelQueued,
@@ -408,6 +422,7 @@ function AgentPaneContent({
       sendMessage,
       sessionId: chatSession.current_id,
       modelId,
+      providerId,
       mode,
       skills: skillsForActiveTab(activeRelPath),
     }),
@@ -540,6 +555,7 @@ function AgentPaneContent({
         body: buildApprovalResumeBody({
           session_id: chatSession.current_id ?? undefined,
           model_id: modelId,
+          provider_id: providerId,
           mode,
           tool_call_id: pending.toolCallId,
           approval_id: pending.approvalId,
@@ -547,7 +563,7 @@ function AgentPaneContent({
         }),
       });
     },
-    [chat, chatSession.current_id, modelId, mode]
+    [chat, chatSession.current_id, modelId, providerId, mode]
   );
 
   // A pending supervised approval (the model called a mutating command in
@@ -617,6 +633,8 @@ function AgentPaneContent({
 
       <QueuedMessages queued={queued} onCancel={cancelQueued} />
 
+      <ModelToolCallNotice model_id={modelId} endpoints={endpoints} />
+
       {/* Hidden while the session is busy: clicking Allow/Deny starts the
           resume turn (busy → true), so the bar vanishes on click — instant
           feedback, no optimistic message mutation needed. */}
@@ -636,11 +654,16 @@ function AgentPaneContent({
           toolbar={
             <>
               <DesktopModePicker value={mode} onValueChange={setMode} />
-              <DesktopModelPicker value={modelId} onValueChange={setModelId} />
+              <DesktopModelPicker
+                value={modelId}
+                onValueChange={setModelId}
+                endpoints={endpoints}
+              />
               <DesktopContextMeter
                 messages={messages}
                 modelId={modelId}
                 costUsd={activeSession?.cost_usd}
+                endpoints={endpoints}
               />
             </>
           }

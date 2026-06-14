@@ -8,13 +8,13 @@
  * payloads against them.
  */
 
-import type { ByokProviderId } from "../protocol/provider-ids";
+import type { ProviderId } from "../protocol/provider-ids";
 import type { AgentModelId } from "../protocol/run";
 import type { AgentMode } from "../protocol/mode";
 import type { ModelTier } from "../tiers";
 
 export type ChatModel = {
-  provider_id: ByokProviderId;
+  provider_id: ProviderId;
   tier?: ModelTier;
   model_id?: AgentModelId;
 };

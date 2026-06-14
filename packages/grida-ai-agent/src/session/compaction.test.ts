@@ -98,6 +98,30 @@ describe("threshold helpers", () => {
     expect(limits.context_window).toBeGreaterThan(0);
     expect(limits.output_limit).toBeGreaterThan(0);
   });
+
+  it("resolveModelLimits resolves a registered local model's real window (#806)", () => {
+    const custom = [
+      { id: "llama3.1:8b", contextWindow: 8_192, outputLimit: 2_048 },
+    ];
+    const limits = resolveModelLimits(
+      { provider_id: "ollama", tier: "pro", model_id: "llama3.1:8b" },
+      custom
+    );
+    // The pre-registry behavior fell back to the pro tier's frontier
+    // window (1M) for any unknown id — compaction never fired and the
+    // session died on overflow. The registry must surface the real 8k.
+    expect(limits.context_window).toBe(8_192);
+    expect(limits.output_limit).toBe(2_048);
+  });
+
+  it("resolveModelLimits still falls back to tier for unknown ids", () => {
+    const limits = resolveModelLimits({
+      provider_id: "ollama",
+      tier: "nano",
+      model_id: "unknown:0b",
+    });
+    expect(limits.context_window).toBeGreaterThan(100_000);
+  });
 });
 
 describe("splitTail", () => {

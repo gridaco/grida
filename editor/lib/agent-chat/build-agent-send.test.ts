@@ -91,3 +91,42 @@ describe("buildAgentSend", () => {
     ).toBe(false);
   });
 });
+
+describe("buildAgentSend — endpoint provider pin (#806)", () => {
+  it("rides provider_id when the picked model is a registered endpoint model", () => {
+    const sendMessage = vi.fn<SendMessageFn>();
+    const send = buildAgentSend({
+      sendMessage,
+      sessionId: "s1",
+      modelId: "llama3.1:8b",
+      providerId: "ollama",
+    });
+
+    send("hi");
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      { text: "hi" },
+      {
+        body: {
+          session_id: "s1",
+          model_id: "llama3.1:8b",
+          provider_id: "ollama",
+        },
+      }
+    );
+  });
+
+  it("omits provider_id for catalog models (BYOK cascade stays in charge)", () => {
+    const sendMessage = vi.fn<SendMessageFn>();
+    const send = buildAgentSend({
+      sendMessage,
+      sessionId: "s1",
+      modelId: "anthropic/claude-sonnet-4.6",
+    });
+
+    send("hi");
+
+    const body = sendMessage.mock.calls[0][1]?.body;
+    expect(body).not.toHaveProperty("provider_id");
+  });
+});

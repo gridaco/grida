@@ -38,6 +38,10 @@ import type {
   WorkspaceReadFileResult,
   WorkspaceWriteFileResult,
 } from "./protocol/resources";
+import type {
+  EndpointProviderConfig,
+  ProbedEndpointModel,
+} from "./protocol/endpoints";
 
 function base64(value: string): string {
   const g = globalThis as unknown as {
@@ -403,6 +407,34 @@ export namespace AgentTransport {
           provider_id: providerId,
         });
       },
+    } as const;
+
+    readonly providers = {
+      /** Endpoint provider configs (issue #806) — readable plain config,
+       *  unlike secrets. */
+      list_endpoints: async (): Promise<EndpointProviderConfig[]> =>
+        await this.postJson<EndpointProviderConfig[]>(
+          "/providers/endpoints/list"
+        ),
+      set_endpoint: async (config: EndpointProviderConfig): Promise<void> => {
+        await this.postJson<unknown>("/providers/endpoints/set", { config });
+      },
+      delete_endpoint: async (id: string): Promise<void> => {
+        await this.postJson<unknown>("/providers/endpoints/delete", { id });
+      },
+      /** Where the endpoint config JSON lives on disk. */
+      info: async (): Promise<{ path: string }> =>
+        await this.postJson<{ path: string }>("/providers/endpoints/info"),
+      /** Discover the models an endpoint serves (host-side fetch). */
+      probe_endpoint: async (
+        baseUrl: string
+      ): Promise<{
+        source: "ollama" | "openai";
+        models: ProbedEndpointModel[];
+      }> =>
+        await this.postJson("/providers/endpoints/probe", {
+          base_url: baseUrl,
+        }),
     } as const;
 
     readonly sessions = {

@@ -21,13 +21,23 @@ import {
   BYOK_PROVIDER_METADATA,
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
+  OLLAMA_ENDPOINT_PRESET,
+  mergeProbedModels,
+  resolveEndpointModel,
+  resolveEndpointModels,
   type AgentMode,
   type AgentUIMessageChunk,
   type AgentRunOptions,
   type ByokProviderId,
+  type ProviderId,
   type ChatMessageWithParts,
   type ChatSessionRow,
   type CreateSessionOptions,
+  type EndpointModelEntry,
+  type EndpointModelOverrides,
+  type EndpointModelSpec,
+  type EndpointProviderConfig,
+  type ProbedEndpointModel,
   type PatchSessionOptions,
   type RewindResult,
   type SessionListFilter,
@@ -58,11 +68,21 @@ export {
   BYOK_PROVIDER_METADATA,
   AGENT_TIERS,
   AGENT_SESSION_AGENT,
+  OLLAMA_ENDPOINT_PRESET,
+  mergeProbedModels,
+  resolveEndpointModel,
+  resolveEndpointModels,
+  type EndpointModelEntry,
+  type EndpointModelOverrides,
+  type EndpointModelSpec,
+  type EndpointProviderConfig,
+  type ProbedEndpointModel,
   type AgentMode,
   type AgentUIMessageChunk,
   type AgentRunOptions,
   type ByokProviderId,
   type ByokProviderMetadata,
+  type ProviderId,
   type ChatMessageRow,
   type ChatMessageWithParts,
   type ChatModel,
@@ -252,7 +272,11 @@ export namespace secrets {
     return BYOK_PROVIDER_METADATA;
   }
 
-  export async function hasKey(providerId: ByokProviderId): Promise<boolean> {
+  // Provider ids here are BYOK ids OR configured endpoint ids (#806) —
+  // a keyed gateway stores its key under its endpoint id through these
+  // same helpers. The agent host validates membership; unknown ids 400.
+
+  export async function hasKey(providerId: ProviderId): Promise<boolean> {
     return await bridgeOrThrow().secrets.has(providerId);
   }
 
@@ -263,7 +287,7 @@ export namespace secrets {
    * round-trip.
    */
   export async function setKey(
-    providerId: ByokProviderId,
+    providerId: ProviderId,
     key: string
   ): Promise<void> {
     if (key.trim().length === 0) {
@@ -272,7 +296,7 @@ export namespace secrets {
     await bridgeOrThrow().secrets.set(providerId, key);
   }
 
-  export async function deleteKey(providerId: ByokProviderId): Promise<void> {
+  export async function deleteKey(providerId: ProviderId): Promise<void> {
     await bridgeOrThrow().secrets.delete(providerId);
   }
 
@@ -287,13 +311,107 @@ export namespace secrets {
    * matches platform convention for destructive prompts.
    */
   export async function confirmDeleteKey(
-    providerId: ByokProviderId
+    providerId: ProviderId,
+    /** Display name override — endpoint ids have no BYOK label. */
+    displayLabel?: string
   ): Promise<boolean> {
-    const label = BYOK_PROVIDER_LABELS[providerId];
+    const label =
+      displayLabel ??
+      BYOK_PROVIDER_LABELS[providerId as ByokProviderId] ??
+      providerId;
     const choice = await bridgeOrThrow().dialog.confirm({
       message: `Remove ${label} key?`,
       detail:
         "The desktop app will stop using this key. You can add it back any time.",
+      buttons: ["Remove", "Cancel"],
+      default_id: 1,
+      cancel_id: 1,
+    });
+    return choice === 0;
+  }
+}
+
+/* ─────────────────────── providers namespace ─────────────────── */
+
+/**
+ * Endpoint provider config (issue #806) — user-configured OpenAI-
+ * compatible endpoints (Ollama preset, self-hosted gateways). Plain
+ * readable config, unlike `secrets`: the renderer may list configs back.
+ * A keyed gateway stores its key via the `secrets` namespace under the
+ * endpoint's id; this namespace never carries credentials.
+ *
+ * The bridge field is OPTIONAL (older desktop binaries) — UI must gate
+ * on {@link providers.isSupported}.
+ */
+export namespace providers {
+  export function isSupported(): boolean {
+    return getDesktopBridge()?.providers != null;
+  }
+
+  export async function listEndpoints(): Promise<EndpointProviderConfig[]> {
+    const bridge = bridgeOrThrow().providers;
+    if (!bridge) return [];
+    return await bridge.list_endpoints();
+  }
+
+  export async function setEndpoint(
+    config: EndpointProviderConfig
+  ): Promise<void> {
+    const bridge = bridgeOrThrow().providers;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    await bridge.set_endpoint(config);
+  }
+
+  export async function deleteEndpoint(id: string): Promise<void> {
+    const bridge = bridgeOrThrow().providers;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    await bridge.delete_endpoint(id);
+  }
+
+  /**
+   * Discover the models an endpoint serves. The fetch happens on the
+   * agent host — the renderer's origin cannot reach a local Ollama
+   * directly (CORS). Throws when the bridge predates the surface or the
+   * endpoint is unreachable; callers fall back to manual entry.
+   */
+  export async function probeEndpoint(baseUrl: string): Promise<{
+    source: "ollama" | "openai";
+    models: ProbedEndpointModel[];
+  }> {
+    const bridge = bridgeOrThrow().providers;
+    if (!bridge?.probe_endpoint) throw new DesktopBridgeMissingError();
+    return await bridge.probe_endpoint(baseUrl);
+  }
+
+  /**
+   * Reveal `endpoints.json` (the hand-editable config — `overrides` for
+   * power users live there) in the OS file manager. Returns `false` when
+   * the surface isn't available (old binary, or the web daemon bridge
+   * which has no native shell) — callers hide the affordance.
+   */
+  export async function revealConfigFile(): Promise<boolean> {
+    if (!canRevealConfigFile()) return false;
+    const bridge = getDesktopBridge()!;
+    const { path } = await bridge.providers!.info();
+    await bridge.shell.show_item_in_folder(path);
+    return true;
+  }
+
+  /** Whether {@link revealConfigFile} can work in this host. */
+  export function canRevealConfigFile(): boolean {
+    const bridge = getDesktopBridge();
+    return Boolean(bridge?.providers?.info && bridge.caps.native.shell);
+  }
+
+  /**
+   * Native confirm for the destructive "Remove endpoint" action —
+   * same convention as `secrets.confirmDeleteKey`.
+   */
+  export async function confirmDeleteEndpoint(label: string): Promise<boolean> {
+    const choice = await bridgeOrThrow().dialog.confirm({
+      message: `Remove ${label}?`,
+      detail:
+        "The agent will stop using this endpoint and its registered models. You can add it back any time.",
       buttons: ["Remove", "Cancel"],
       default_id: 1,
       cancel_id: 1,
