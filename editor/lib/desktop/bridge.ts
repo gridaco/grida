@@ -839,6 +839,15 @@ export namespace workspaces {
     workspaceId: string,
     onChange: (events: WorkspaceChangeEvent[]) => void
   ): Promise<{ subscriptionId: string }> {
+    // Gate explicitly: on an old protocol-1 binary the bridge lacks this
+    // method, so an ungated call would throw an opaque `TypeError`. Fail with
+    // a clear, deterministic error instead. Callers should prefer
+    // {@link isWatchSupported} before subscribing.
+    if (!isWatchSupported()) {
+      throw new Error(
+        "workspaces.subscribe_changes: workspace watch is not supported by this desktop binary"
+      );
+    }
     const { subscription_id } =
       await bridgeOrThrow().workspaces.subscribe_changes(workspaceId, onChange);
     return { subscriptionId: subscription_id };
@@ -847,6 +856,9 @@ export namespace workspaces {
   export async function unsubscribeChanges(
     subscriptionId: string
   ): Promise<void> {
+    // No-op when unsupported: there can be no live subscription to tear down,
+    // and teardown paths must not throw (they run in effect cleanups).
+    if (!isWatchSupported()) return;
     await bridgeOrThrow().workspaces.unsubscribe_changes(subscriptionId);
   }
   /**

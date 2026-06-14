@@ -231,6 +231,26 @@ type WatchState = {
 };
 const watches = new Map<string, WatchState>();
 
+/**
+ * In-flight `startWatch` promise per root (issue #805). Serializes startup so
+ * concurrent subscribers to the same root share ONE OS watch attempt: the
+ * first subscriber starts it, later subscribers (and any sub/unsub churn that
+ * lands while the OS `subscribe()` is in flight) await the same promise rather
+ * than racing a second watch. Cleared when the start settles, and by
+ * `disposeWatch` so a fresh subscriber after a teardown starts a NEW watch
+ * instead of awaiting the disposed one.
+ */
+const startingByRoot = new Map<string, Promise<void>>();
+function ensureWatchStarted(root: string): Promise<void> {
+  const existing = startingByRoot.get(root);
+  if (existing) return existing;
+  const p = startWatch(root).finally(() => {
+    if (startingByRoot.get(root) === p) startingByRoot.delete(root);
+  });
+  startingByRoot.set(root, p);
+  return p;
+}
+
 /** WebContents ids that already have a kill-on-destroy hook. */
 const hookedWebContents = new Set<number>();
 
@@ -274,15 +294,20 @@ export async function subscribeWorkspaceChanges(
     });
   }
 
-  if (firstForRoot) {
-    try {
-      await startWatch(root);
-    } catch (err) {
-      // The OS watch couldn't start — roll the subscription back so the
-      // renderer's promise rejects and it can fall back to pull-refresh.
-      registry.remove(id);
-      throw err;
+  // The first subscriber starts the OS watch; concurrent later subscribers
+  // await that same in-flight start (so they never return success before the
+  // watch exists). If the start fails, EVERY awaiting subscriber rolls back
+  // and the renderer falls back to pull-refresh.
+  try {
+    if (firstForRoot) {
+      await ensureWatchStarted(root);
+    } else {
+      const pending = startingByRoot.get(root);
+      if (pending) await pending;
     }
+  } catch (err) {
+    registry.remove(id);
+    throw err;
   }
 }
 
@@ -293,7 +318,12 @@ export function unsubscribeWorkspaceChanges(id: unknown): void {
 }
 
 async function startWatch(root: string): Promise<void> {
-  watches.set(root, { sub: "starting", buffer: new Map(), timer: null });
+  // Hold our own state object so a teardown + fresh start that lands while our
+  // subscribe() is in flight is detected by IDENTITY, not just presence: a
+  // newer cycle replaces `watches[root]` with a different object, and we must
+  // not stamp our now-stale handle onto it (that would leak/duplicate a watch).
+  const state: WatchState = { sub: "starting", buffer: new Map(), timer: null };
+  watches.set(root, state);
   const watcher = await loadWatcher();
   let subscription: AsyncSubscription;
   try {
@@ -303,18 +333,19 @@ async function startWatch(root: string): Promise<void> {
       { ignore: [...WATCH_IGNORE] } satisfies ParcelOptions
     );
   } catch (err) {
-    watches.delete(root);
+    if (watches.get(root) === state) watches.delete(root);
     throw err;
   }
-  // A teardown (last unsubscribe / window close) may have landed while the
-  // subscribe() was in flight: `disposeWatch` deleted the entry. Honor it
-  // by closing the handle we just opened instead of resurrecting it.
-  if (!watches.has(root) || !registry.hasSubscribersForRoot(root)) {
+  // A teardown (last unsubscribe / window close) — or a newer start cycle —
+  // may have landed while subscribe() was in flight. If our state is no longer
+  // the current one (or the root lost its subscribers), close the handle we
+  // just opened instead of resurrecting or duplicating the watch.
+  if (watches.get(root) !== state || !registry.hasSubscribersForRoot(root)) {
     void subscription.unsubscribe().catch(() => {});
-    watches.delete(root);
+    if (watches.get(root) === state) watches.delete(root);
     return;
   }
-  watches.get(root)!.sub = subscription;
+  state.sub = subscription;
 }
 
 function onRawEvents(
@@ -357,6 +388,10 @@ function flush(root: string): void {
 }
 
 async function disposeWatch(root: string): Promise<void> {
+  // Invalidate any in-flight start first: a subscriber arriving after this
+  // teardown must start a fresh watch, not await the disposed one. The pending
+  // startWatch (if any) sees its state evicted and closes its own handle.
+  startingByRoot.delete(root);
   const state = watches.get(root);
   if (!state) return;
   watches.delete(root);

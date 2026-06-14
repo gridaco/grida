@@ -307,28 +307,42 @@ export namespace workspaceFs {
     // policy boundary).
     const abs = await resolveInside(workspace, relPath, { must_exist: false });
     await resolveWritableParent(workspace, abs, relPath);
-    if (options.expected_mtime !== undefined) {
-      // Plain Stats (not the bigint overload) — mtimeMs is a number that
-      // round-trips through the JSON precondition token verbatim.
-      let current: import("node:fs").Stats | undefined;
-      try {
-        current = await fs.stat(abs);
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-        // ENOENT → the file the caller expected is gone; fall through to
-        // the !current conflict below rather than re-creating it blindly.
-      }
-      if (!current || current.mtimeMs !== options.expected_mtime) {
-        throw new Exception({
-          code: "modified-since",
-          workspace_id: workspace.id,
-          rel_path: relPath,
-          mtime: current?.mtimeMs,
-        });
-      }
-    }
+    // Optimistic-concurrency precondition (issue #805), enforced as
+    // atomicWrite's `before_commit` hook so it runs immediately before the
+    // rename that publishes the bytes — the check→replace gap is then a single
+    // rename syscall, not the whole tmp-write. A mismatch (or an ENOENT: the
+    // file was deleted out from under us) aborts the write before the rename;
+    // atomicWrite removes the tmp it had staged. Omitting `expected_mtime`
+    // keeps last-writer-wins, so agent writes / first creates are unaffected.
+    const before_commit =
+      options.expected_mtime === undefined
+        ? undefined
+        : async () => {
+            // Plain Stats (not the bigint overload) — mtimeMs is a number that
+            // round-trips through the JSON precondition token verbatim.
+            let current: import("node:fs").Stats | undefined;
+            try {
+              current = await fs.stat(abs);
+            } catch (err) {
+              if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+              // ENOENT → the expected file is gone; fall through to the
+              // `!current` conflict rather than re-creating it blindly.
+            }
+            if (!current || current.mtimeMs !== options.expected_mtime) {
+              throw new Exception({
+                code: "modified-since",
+                workspace_id: workspace.id,
+                rel_path: relPath,
+                mtime: current?.mtimeMs,
+              });
+            }
+          };
     // User-owned content — default 0o644 instead of `auth.json`'s 0o600.
-    await atomicWrite(abs, content, { ensure_dir: false, mode: 0o644 });
+    await atomicWrite(abs, content, {
+      ensure_dir: false,
+      mode: 0o644,
+      before_commit,
+    });
     const stat = await fs.stat(abs);
     return { mtime: stat.mtimeMs };
   }

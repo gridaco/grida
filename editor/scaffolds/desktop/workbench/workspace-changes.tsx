@@ -62,9 +62,14 @@ export function WorkspaceChangesProvider({
       .subscribeChanges(workspaceId, (events) => {
         // Snapshot (Array.from, not live iteration) so a listener
         // attaching/detaching mid-dispatch can't mutate the set we're
-        // iterating.
+        // iterating. Isolate each callback so one throwing consumer (e.g. the
+        // editor) can't suppress the batch for the others (e.g. the file tree).
         for (const listener of Array.from(listenersRef.current)) {
-          listener(events);
+          try {
+            listener(events);
+          } catch (err) {
+            console.error("[workspace-changes] listener callback failed", err);
+          }
         }
       })
       .then((handle) => {
