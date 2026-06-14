@@ -210,6 +210,13 @@ function Surface({
     setSaveError(null);
     try {
       const r = await workspacesNs.readFile(workspaceId, relPath);
+      // Echo suppression (issue #805): our own save produces a watcher
+      // `changed` event for this same file, which lands here once the buffer
+      // is clean again. `lastMtimeRef` is the mtime we last wrote/loaded; if
+      // disk hasn't advanced past it there's nothing new to take, and calling
+      // editor.load() would needlessly reset selection / history / mode on
+      // every Cmd+S. Reload only when disk genuinely moved ahead of us.
+      if (r.mtime === lastMtimeRef.current) return;
       editor.load(r.content);
       lastMtimeRef.current = r.mtime;
       setSavedVersion(editor.state.content_version);

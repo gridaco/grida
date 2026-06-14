@@ -137,10 +137,18 @@ const missing = [];
 const closure = new Set(); // package names that legitimately ship
 const visited = new Set();
 
-function verify(name, fromDir, requiredBy) {
+function verify(name, fromDir, requiredBy, optional = false) {
   const dir = findPackageDir(name, fromDir);
   if (!dir) {
-    missing.push({ spec: name, requiredBy });
+    // A missing REQUIRED dependency crashes on launch — the whole point of
+    // this oracle. A missing OPTIONAL dependency does not: native prebuilds
+    // shipped as per-platform optionalDependencies (e.g.
+    // `@parcel/watcher-<os>-<arch>`) install only for the current platform,
+    // so every other platform's package is legitimately absent, and the
+    // owning package tolerates that absence at runtime (it requires only the
+    // one matching the host). Flagging them would make the build un-shippable
+    // on every OS. Only required deps that are missing are failures.
+    if (!optional) missing.push({ spec: name, requiredBy });
     return;
   }
   if (visited.has(dir)) return;
@@ -149,11 +157,15 @@ function verify(name, fromDir, requiredBy) {
   const pj = JSON.parse(
     fs.readFileSync(path.join(dir, "package.json"), "utf8")
   );
-  // Follow dependencies + optionalDependencies — both can be installed and ship
-  // alongside the package, so both are legitimate members of the closure.
-  const deps = { ...pj.dependencies, ...pj.optionalDependencies };
-  for (const dep of Object.keys(deps)) {
-    verify(dep, dir, name);
+  // Required deps must all resolve. Optional deps that ARE present still join
+  // the closure (so they aren't later flagged as bloat) and are recursed into
+  // to verify their own closure — but an absent one is not a failure (see the
+  // `optional` guard above).
+  for (const dep of Object.keys(pj.dependencies ?? {})) {
+    verify(dep, dir, name, false);
+  }
+  for (const dep of Object.keys(pj.optionalDependencies ?? {})) {
+    verify(dep, dir, name, true);
   }
 }
 
