@@ -183,7 +183,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
-      url: "https://grida.co/ai/music/playground",
+      url: "https://grida.co/ai/playground",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: "https://grida.co/ai/playground/music",
       changeFrequency: "monthly",
       priority: 0.5,
     },

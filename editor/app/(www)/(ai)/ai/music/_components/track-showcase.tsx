@@ -317,7 +317,7 @@ export function TrackShowcase({ tracks }: { tracks: ShowcaseTrack[] }) {
         <PromptReveal prompt={activeTrack.prompt} />
         <Link
           href={{
-            pathname: "/ai/music/playground",
+            pathname: "/ai/playground/music",
             query: { prompt: activeTrack.prompt },
           }}
           className="text-sm font-medium underline-offset-4 hover:underline mt-3"

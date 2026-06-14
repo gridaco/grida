@@ -9,6 +9,7 @@ export namespace sitemap {
     downlaods: "/downloads",
     packages: "/packages",
     ai_models: "/ai/models",
+    ai_playground: "/ai/playground",
     sdk: "/sdk",
     tools: "/tools",
     library: "/library",

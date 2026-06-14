@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   },
 };
 
-const PLAYGROUND_HREF = "/ai/music/playground";
+const PLAYGROUND_HREF = "/ai/playground/music";
 
 const FAQS: { q: string; a: string }[] = [
   {

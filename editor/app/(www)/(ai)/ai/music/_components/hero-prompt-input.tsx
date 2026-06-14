@@ -12,7 +12,7 @@ import {
   type PromptInputMessage,
 } from "@app/ui/ai-elements/prompt-input";
 
-const PLAYGROUND_HREF = "/ai/music/playground";
+const PLAYGROUND_HREF = "/ai/playground/music";
 
 export function HeroPromptInput() {
   const router = useRouter();
