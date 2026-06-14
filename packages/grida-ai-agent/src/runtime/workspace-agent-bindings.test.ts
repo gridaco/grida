@@ -143,6 +143,35 @@ describe("WorkspaceAgentFsBackend — bounded/filtered hydrate scan", () => {
     expect(listed.some((p) => p.includes("/node_modules/"))).toBe(false);
     expect(listed.some((p) => p.includes("/dist/"))).toBe(false);
   });
+
+  /**
+   * #786 follow-up (Codex review): a binary-heavy subtree that sorts BEFORE the
+   * source must not consume the file cap. `read()` returns null for binary
+   * content, so those paths never hydrate — counting them toward SCAN_MAX_FILES
+   * would let an `assets/` of images starve the real source that sorts after
+   * it. The walk must drop known-binary files at enumeration time.
+   */
+  it("does not let a binary asset subtree crowd out source files", async () => {
+    // `assets` sorts before `src`; seed it with images that read() can't serve.
+    for (let i = 0; i < 60; i++) {
+      await writeFile(`assets/img${i}.png`);
+      await writeFile(`assets/icon${i}.webp`);
+    }
+    await writeFile("assets/logo.svg"); // svg is text — must survive
+    await writeFile("src/index.ts");
+    await writeFile("src/app.tsx");
+
+    const listed = await backend.list();
+
+    expect(listed).toContain("/src/index.ts");
+    expect(listed).toContain("/src/app.tsx");
+    expect(listed).toContain("/assets/logo.svg");
+    // No binary asset leaks in — neither the .png nor the .webp.
+    expect(listed.some((p) => p.endsWith(".png"))).toBe(false);
+    expect(listed.some((p) => p.endsWith(".webp"))).toBe(false);
+    // 120 binaries dropped; only the 3 text files remain.
+    expect(listed).toHaveLength(3);
+  });
 });
 
 /**

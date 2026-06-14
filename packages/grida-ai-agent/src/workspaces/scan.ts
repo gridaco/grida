@@ -11,12 +11,23 @@
  * stream ("network error").
  *
  * This module is the scan half of the bound: which directories the hydrate
- * walk must NOT descend into, and the hard caps that stop a pathological tree
- * (no ignored dirs, just genuinely huge) regardless. It is a sibling to
- * `fs/scope.ts` (the no-clobber WRITE policy): both are hand-maintained lists
- * that fail safe — a gap here costs a slower-than-ideal scan, never a
- * correctness breach (the agent can still reach any path on demand via the
- * shell, or `read_file` once it's listed).
+ * walk must NOT descend into, which files it must NOT enumerate, and the hard
+ * caps that stop a pathological tree (no ignored dirs, just genuinely huge)
+ * regardless. It is a sibling to `fs/scope.ts` (the no-clobber WRITE policy):
+ * both are hand-maintained lists that fail safe — a gap here costs a
+ * slower-than-ideal scan, never a correctness breach (the agent can still
+ * reach any path on demand via the shell, or `read_file` once it's listed).
+ *
+ * The file-extension skip exists because hydrate can only serve TEXT: the
+ * workspace backend's `read()` returns `null` for binary / non-utf8 / oversized
+ * content, so a binary file never enters the hydrated map and is invisible to
+ * `list_files` / `read_file` regardless. Enumerating it is therefore pure
+ * waste TWICE over — a wasted `read()` that returns null, AND a slot consumed
+ * against the file cap. The second is the dangerous one: a binary-heavy subtree
+ * that sorts early (an `assets/` full of images) could otherwise fill the cap
+ * and starve the real source files that sort after it, leaving the model with
+ * an effectively empty filesystem. Skipping known-binary extensions at
+ * enumeration time keeps the cap budget for files that can actually hydrate.
  *
  * NOTE this is deliberately a curated heuristic, not a `.gitignore` engine.
  * The ignored set targets the well-known dependency / VCS / build / cache
@@ -100,4 +111,113 @@ export const SCAN_MAX_DEPTH = 32;
  */
 export function isIgnoredScanDir(name: string): boolean {
   return IGNORED_SCAN_DIRS.has(name);
+}
+
+/**
+ * File extensions the hydrate walk skips — content the workspace backend's
+ * `read()` can never serve as text, so enumerating it only wastes a `read()`
+ * and a file-cap slot (see the module header). Curated to the common binary
+ * families; an extension-less binary or an exotic format slips through and is
+ * simply read-then-dropped (the null-read safety net still holds), so a gap
+ * here is a missed optimization, never a correctness breach. Matched on the
+ * lowercased final extension. NOTE `.svg` is deliberately ABSENT — it is XML
+ * text and a first-class canvas source the agent edits.
+ */
+const IGNORED_SCAN_FILE_EXTENSIONS: ReadonlySet<string> = new Set([
+  // raster / vector-binary images
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "bmp",
+  "ico",
+  "webp",
+  "tiff",
+  "tif",
+  "avif",
+  "heic",
+  "heif",
+  "psd",
+  "ai",
+  // fonts
+  "woff",
+  "woff2",
+  "ttf",
+  "otf",
+  "eot",
+  // video
+  "mp4",
+  "webm",
+  "mov",
+  "avi",
+  "mkv",
+  "m4v",
+  "wmv",
+  "flv",
+  // audio
+  "mp3",
+  "wav",
+  "flac",
+  "ogg",
+  "m4a",
+  "aac",
+  // archives / compressed
+  "zip",
+  "tar",
+  "gz",
+  "tgz",
+  "bz2",
+  "7z",
+  "rar",
+  "xz",
+  "zst",
+  // compiled / native / bytecode
+  "exe",
+  "dll",
+  "so",
+  "dylib",
+  "o",
+  "a",
+  "class",
+  "jar",
+  "wasm",
+  "node",
+  "bin",
+  "dat",
+  // binary documents
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  // databases / data blobs / model weights
+  "sqlite",
+  "db",
+  "parquet",
+  "onnx",
+  "npy",
+  "npz",
+  "safetensors",
+  "h5",
+  "pt",
+  "pth",
+  "ckpt",
+  // disk images
+  "dmg",
+  "iso",
+  "img",
+]);
+
+/**
+ * Whether the hydrate walk should skip a file with this basename because it is
+ * known-binary (its content can't hydrate as text). `name` is the entry
+ * basename, not a path. A dotfile with no extension (`.gitignore`) or any
+ * extension-less file is kept.
+ */
+export function isIgnoredScanFile(name: string): boolean {
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return false;
+  return IGNORED_SCAN_FILE_EXTENSIONS.has(name.slice(dot + 1).toLowerCase());
 }

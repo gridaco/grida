@@ -16,6 +16,7 @@ import { createAgentCommandBackend } from "./command-backend";
 import { workspaceFs } from "../workspaces/fs";
 import {
   isIgnoredScanDir,
+  isIgnoredScanFile,
   SCAN_MAX_DEPTH,
   SCAN_MAX_FILES,
 } from "../workspaces/scan";
@@ -226,6 +227,11 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
         continue;
       }
       if (entry.kind === "file" || entry.kind === "symlink") {
+        // Skip known-binary files: `read()` returns null for them, so they
+        // never hydrate — counting them toward SCAN_MAX_FILES would let a
+        // binary-heavy subtree (an `assets/` of images) starve the real
+        // source files that sort after it. See `workspaces/scan`.
+        if (isIgnoredScanFile(entry.name)) continue;
         out.push("/" + entry.rel_path.replace(/\\/g, "/"));
       }
     }
