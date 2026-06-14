@@ -14,6 +14,11 @@ import type { SkillId } from "../agent";
 import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
 import { createAgentCommandBackend } from "./command-backend";
 import { workspaceFs } from "../workspaces/fs";
+import {
+  isIgnoredScanDir,
+  SCAN_MAX_DEPTH,
+  SCAN_MAX_FILES,
+} from "../workspaces/scan";
 import type { Workspace, WorkspaceRegistry } from "../workspaces";
 
 export type WorkspaceAgentBindingRequest = {
@@ -99,9 +104,25 @@ export async function createWorkspaceAgentBindings(
 export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   constructor(private readonly workspace: Workspace) {}
 
+  /**
+   * Enumerate the workspace tree for hydration (issue #786). The scan is
+   * BOUNDED: it skips well-known heavy/generated directories (`node_modules`,
+   * `.git`, build output — see `workspaces/scan`) and stops at a file-count /
+   * depth cap. An unbounded walk over a real repo returns hundreds of
+   * thousands to millions of paths, which the downstream read fan-out then
+   * tries to slurp at once — the OOM / "Too many elements passed to
+   * Promise.all" failure this guards against.
+   */
   async list(): Promise<string[]> {
     const out: string[] = [];
-    await this.walk("", out);
+    const truncated = await this.walk("", 0, out);
+    if (truncated) {
+      console.warn(
+        `[agent-fs] workspace hydrate scan hit a cap at ${this.workspace.root} ` +
+          `(${SCAN_MAX_FILES}-file / depth-${SCAN_MAX_DEPTH}); the agent's initial ` +
+          `file list is truncated. It can still read any path on demand via the shell.`
+      );
+    }
     return out;
   }
 
@@ -161,19 +182,54 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     return p.slice(1);
   }
 
-  private async walk(relPath: string, out: string[]): Promise<void> {
-    const entries = await workspaceFs.readDir(this.workspace, relPath);
-    await Promise.all(
-      entries.map(async (entry) => {
-        if (entry.kind === "directory") {
-          await this.walk(entry.rel_path, out);
-          return;
-        }
-        if (entry.kind === "file" || entry.kind === "symlink") {
-          out.push("/" + entry.rel_path.replace(/\\/g, "/"));
-        }
-      })
-    );
+  /**
+   * Depth-first, in-order walk that appends file paths to `out` and returns
+   * whether the scan was TRUNCATED (hit the file or depth cap somewhere). The
+   * two caps differ in reach: the file cap is global — once `out` is full every
+   * frame unwinds via the loop-top guard — while the depth cap is per-branch:
+   * a too-deep subtree is skipped but its shallower siblings are still walked.
+   * Both surface as a `true` return so the caller can warn once.
+   *
+   * Sequential (not the prior per-level `Promise.all`) so the cap is honored
+   * deterministically and the walk never holds more than one open `readDir`
+   * per level — on a huge tree the parallel version's fan-out was itself a
+   * source of fd / memory pressure. `readDir` is cheap; with the heavy dirs
+   * skipped, a normal repo's hundreds of directories cost a few ms.
+   *
+   * A directory we can't read (a permission error, or a race where it vanished
+   * between listing and descent) is skipped, not fatal: one unreadable corner
+   * of the tree must not abort the whole hydrate.
+   */
+  private async walk(
+    relPath: string,
+    depth: number,
+    out: string[]
+  ): Promise<boolean> {
+    if (depth > SCAN_MAX_DEPTH) return true;
+    let entries: workspaceFs.Entry[];
+    try {
+      entries = await workspaceFs.readDir(this.workspace, relPath);
+    } catch (err) {
+      console.warn(
+        `[agent-fs] workspace hydrate scan skipped ${relPath || "/"}:`,
+        err
+      );
+      return false;
+    }
+    let truncated = false;
+    for (const entry of entries) {
+      if (out.length >= SCAN_MAX_FILES) return true;
+      if (entry.kind === "directory") {
+        // Skip heavy/generated subtrees (node_modules, .git, build output, …).
+        if (isIgnoredScanDir(entry.name)) continue;
+        if (await this.walk(entry.rel_path, depth + 1, out)) truncated = true;
+        continue;
+      }
+      if (entry.kind === "file" || entry.kind === "symlink") {
+        out.push("/" + entry.rel_path.replace(/\\/g, "/"));
+      }
+    }
+    return truncated;
   }
 }
 

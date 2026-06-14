@@ -514,6 +514,65 @@ describe("AgentFs.hydrate", () => {
     await Promise.all([fs.hydrate(), fs.hydrate(), fs.hydrate()]);
     expect(spy).toHaveBeenCalledTimes(1);
   });
+
+  /**
+   * Issue #786 — the read fan-out must be BOUNDED. The old
+   * `Promise.allSettled(paths.map(read))` issued one concurrent read per path;
+   * on a large backend that overflows V8's promise-combinator element cap and
+   * exhausts file descriptors. A backend that reports many paths must hydrate
+   * with a constant number of reads in flight.
+   */
+  it("reads with bounded concurrency over a large path list", async () => {
+    const N = 5_000;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    // Backend that lists N synthetic paths and tracks peak read concurrency.
+    const backend: AgentFs.Backend = {
+      async list() {
+        return Array.from({ length: N }, (_, i) => `/f${i}.txt`);
+      },
+      async read(path) {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        // Yield so concurrent reads actually overlap before resolving.
+        await Promise.resolve();
+        inFlight--;
+        return `content:${path}`;
+      },
+      async write() {},
+      async delete() {},
+    };
+    const fs = new AgentFs(backend);
+    await fs.hydrate();
+
+    // Every path materialized...
+    expect(fs.list()).toHaveLength(N);
+    expect(fs.read("/f0.txt")?.content).toBe("content:/f0.txt");
+    expect(fs.read(`/f${N - 1}.txt`)?.content).toBe(`content:/f${N - 1}.txt`);
+    // ...but never more than the fixed worker width at once. (24 is the
+    // module constant; assert a small constant rather than ~N.)
+    expect(maxInFlight).toBeLessThanOrEqual(24);
+  });
+
+  it("survives a per-read rejection without aborting the hydrate", async () => {
+    const backend: AgentFs.Backend = {
+      async list() {
+        return ["/ok-a.txt", "/boom.txt", "/ok-b.txt"];
+      },
+      async read(path) {
+        if (path === "/boom.txt") throw new Error("synthetic read failure");
+        return `content:${path}`;
+      },
+      async write() {},
+      async delete() {},
+    };
+    const fs = new AgentFs(backend);
+    await fs.hydrate();
+    // The good paths still load; the failed one is simply absent.
+    expect(fs.read("/ok-a.txt")?.content).toBe("content:/ok-a.txt");
+    expect(fs.read("/ok-b.txt")?.content).toBe("content:/ok-b.txt");
+    expect(fs.read("/boom.txt")).toBeNull();
+  });
 });
 
 describe("AgentFs — auto-flush (debounced)", () => {
