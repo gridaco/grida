@@ -121,9 +121,12 @@ const config: ForgeConfig = {
     // (vendor/seccomp/*/apply-seccomp) that cannot run from inside an asar —
     // unpack it so they land on a real filesystem. node-pty likewise: its
     // native `pty.node` addon and `spawn-helper` executable cannot load/run
-    // from inside an asar.
+    // from inside an asar. @parcel/watcher (issue #805) is the same: its
+    // per-platform prebuild package (`@parcel/watcher-<platform>-<arch>`)
+    // carries the `.node` addon, which must load from the real filesystem.
     asar: {
-      unpack: "**/node_modules/{@anthropic-ai/sandbox-runtime,node-pty}/**",
+      unpack:
+        "**/node_modules/{@anthropic-ai/sandbox-runtime,node-pty,@parcel/watcher,@parcel/watcher-*}/**",
     },
     appBundleId: appBundleId,
     icon: icon,
@@ -141,16 +144,26 @@ const config: ForgeConfig = {
     extendInfo: "./Info.plist",
     appCategoryType: "public.app-category.developer-tools",
   },
-  // node-pty is the only native dependency. Upstream ships N-API prebuilt
-  // binaries for darwin/win32 (its loader falls back to prebuilds/<platform>-
-  // <arch>), so rebuilding there is pure waste — and would force every dev
-  // machine to carry a C++ toolchain. Linux has no upstream prebuilds, so it
-  // is the one platform where @electron/rebuild must compile from source
-  // (requires the distro toolchain; GitHub's ubuntu runners ship it).
-  // node-abi is overridden in pnpm-workspace.yaml so the rebuild recognizes
-  // current Electron versions.
+  // Native dependencies and their @electron/rebuild policy:
+  //
+  // - node-pty ships N-API prebuilt binaries for darwin/win32 (its loader
+  //   falls back to prebuilds/<platform>-<arch>), so rebuilding there is pure
+  //   waste — and would force every dev machine to carry a C++ toolchain.
+  //   Linux has no upstream prebuild, so it is the one platform where it must
+  //   compile from source (GitHub's ubuntu runners ship the toolchain).
+  //   node-abi is overridden in pnpm-workspace.yaml so the rebuild recognizes
+  //   current Electron versions.
+  // - @parcel/watcher (issue #805) ships N-API prebuilds for EVERY platform as
+  //   separate `@parcel/watcher-<os>-<arch>` packages, so it must never be
+  //   compiled from source. Rebuilding it is not just waste — it fails on the
+  //   windows runner (no configured VS C++ build tools), and the N-API prebuild
+  //   loads under Electron without an ABI-specific rebuild. Always ignore it;
+  //   the shipped per-platform prebuild package provides the addon.
   rebuildConfig: {
-    ignoreModules: process.platform === "linux" ? [] : ["node-pty"],
+    ignoreModules: [
+      "@parcel/watcher",
+      ...(process.platform === "linux" ? [] : ["node-pty"]),
+    ],
   },
   hooks: {
     // node-pty's npm tarball ships the darwin prebuilt `spawn-helper`

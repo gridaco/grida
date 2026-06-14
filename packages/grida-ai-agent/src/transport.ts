@@ -380,12 +380,17 @@ export namespace AgentTransport {
       write_file: async (
         workspaceId: string,
         relPath: string,
-        content: string
+        content: string,
+        // Optimistic-concurrency token (issue #805): the mtime the caller
+        // last observed. Omitted → last-writer-wins; present → the host
+        // rejects with 409 `modified-since` if disk has advanced.
+        expectedMtime?: number
       ): Promise<WorkspaceWriteFileResult> =>
         await this.postJson<WorkspaceWriteFileResult>("/workspaces/writefile", {
           workspace_id: workspaceId,
           rel_path: relPath,
           content,
+          expected_mtime: expectedMtime,
         }),
     } as const;
 

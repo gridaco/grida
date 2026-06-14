@@ -141,12 +141,17 @@ export function registerWorkspacesRoutes(
     }
   });
 
-  // POST /workspaces/writefile { workspaceId, relPath, content } → {mtime}
+  // POST /workspaces/writefile
+  //   { workspaceId, relPath, content, expected_mtime? } → {mtime}
+  // expected_mtime is the optimistic-concurrency token (issue #805):
+  // when present and the file on disk has advanced past it, the write is
+  // rejected with 409 `modified-since` carrying the current mtime.
   app.post("/workspaces/writefile", async (c) => {
     const r = await body(c, {
       workspace_id: v.string,
       rel_path: v.string,
       content: v.stringAllowEmpty,
+      expected_mtime: v.optional(v.number),
     });
     if (!r.ok) return r.res;
     const workspace = await requireWorkspace(c, registry, r.data.workspace_id);
@@ -155,7 +160,8 @@ export function registerWorkspacesRoutes(
       const result = await workspaceFs.writeFile(
         workspace,
         r.data.rel_path,
-        r.data.content
+        r.data.content,
+        { expected_mtime: r.data.expected_mtime }
       );
       return c.json(result);
     } catch (err) {
@@ -171,13 +177,19 @@ export function registerWorkspacesRoutes(
  */
 function mapFsError(err: unknown, c: Context) {
   if (err instanceof workspaceFs.Exception) {
-    const status = err.detail.code === "path-escapes-workspace" ? 403 : 400;
+    const status =
+      err.detail.code === "path-escapes-workspace"
+        ? 403
+        : err.detail.code === "modified-since"
+          ? 409
+          : 400;
     return c.json(
       {
         error: err.detail.code,
         code: err.detail.code,
         rel_path: err.detail.rel_path,
         size: err.detail.size,
+        mtime: err.detail.mtime,
       },
       status
     );

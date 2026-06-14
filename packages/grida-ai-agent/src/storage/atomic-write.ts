@@ -27,6 +27,17 @@ export type AtomicWriteOptions = {
    * created paths under `userData`.
    */
   ensure_dir?: boolean;
+  /**
+   * Last-chance precondition (issue #805 optimistic concurrency): invoked
+   * AFTER the tmp file is staged and immediately BEFORE the atomic rename.
+   * Throw to abort the publish — the staged tmp file is cleaned up and the
+   * error propagates. Running it here (rather than as a caller-side preflight)
+   * shrinks the check→replace window to the single `rename` syscall instead of
+   * spanning the potentially-slow tmp write. It is NOT fully atomic — rename(2)
+   * takes no precondition — but that residual sub-syscall window is the
+   * accepted cost of mtime-based optimistic concurrency.
+   */
+  before_commit?: () => void | Promise<void>;
 };
 
 export async function atomicWrite(
@@ -51,6 +62,9 @@ export async function atomicWrite(
   try {
     await fs.writeFile(tmpPath, content, { mode: opts.mode ?? 0o600 });
     tmpCreated = true;
+    // Enforce the optimistic-concurrency precondition as late as possible —
+    // a throw here aborts the publish and the catch below removes the tmp.
+    if (opts.before_commit) await opts.before_commit();
     await fs.rename(tmpPath, filePath);
     tmpCreated = false;
   } catch (err) {

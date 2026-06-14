@@ -34,6 +34,11 @@ export namespace v {
       ? { ok: true, value: raw }
       : { ok: false, error: "must be a boolean" };
 
+  export const number: Validator<number> = (raw) =>
+    typeof raw === "number" && Number.isFinite(raw)
+      ? { ok: true, value: raw }
+      : { ok: false, error: "must be a finite number" };
+
   export const array: Validator<unknown[]> = (raw) =>
     Array.isArray(raw)
       ? { ok: true, value: raw }

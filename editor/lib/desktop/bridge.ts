@@ -50,6 +50,7 @@ import type {
   DesktopHostAppInfo,
   NavigationState,
   Workspace,
+  WorkspaceChangeEvent,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
@@ -107,6 +108,7 @@ export type {
   RecentEntry,
   SaveDialogOptions,
   Workspace,
+  WorkspaceChangeEvent,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
@@ -775,20 +777,89 @@ export namespace workspaces {
   }
   /**
    * Atomic write via tmpfile + rename inside the workspace. Creates
-   * parent directories. The renderer should compare the returned
-   * `mtime` against its last-read `mtime` if it cares about external
-   * edits.
+   * parent directories.
+   *
+   * `expectedMtime` is the optimistic-concurrency token (issue #805):
+   * pass the mtime last observed for this file (from `readFile` or a
+   * prior `writeFile`) and the host rejects — instead of silently
+   * clobbering — when the file on disk has advanced past it. The
+   * rejection is detectable with {@link isWriteConflict}; resolve it by
+   * reloading from disk or re-calling with `expectedMtime` omitted
+   * (force overwrite). Omit it entirely for last-writer-wins.
    */
   export async function writeFile(
     workspaceId: string,
     relPath: string,
-    content: string
+    content: string,
+    expectedMtime?: number
   ): Promise<WorkspaceWriteFileResult> {
     return await bridgeOrThrow().workspaces.write_file(
       workspaceId,
       relPath,
-      content
+      content,
+      expectedMtime
     );
+  }
+  /**
+   * True when a {@link writeFile} rejection is the optimistic-concurrency
+   * conflict (HTTP 409 `modified-since`) rather than a generic failure.
+   *
+   * Detection is deliberately tolerant: on the web path the rejection is
+   * a real `AgentTransport.HttpError` carrying `status`/`code`, but on the
+   * desktop path it has crossed the Electron `contextBridge`, which can
+   * strip custom Error properties. The one field that always survives is
+   * `message` — and the host sets the 409 body's `error` to the literal
+   * code `"modified-since"`, so the carried message contains it verbatim.
+   * We key off whichever signal is present.
+   */
+  export function isWriteConflict(err: unknown): boolean {
+    if (!err || typeof err !== "object") return false;
+    const e = err as { status?: number; code?: string; message?: unknown };
+    if (e.code === "modified-since") return true;
+    return (
+      typeof e.message === "string" && e.message.includes("modified-since")
+    );
+  }
+  /**
+   * True when this desktop binary can watch the workspace for external
+   * file changes (issue #805). Additive on protocol 1 — older binaries
+   * lack the channel, so the workbench falls back to pull/manual refresh.
+   * Gate any `subscribeChanges` call on this.
+   */
+  export function isWatchSupported(): boolean {
+    return getDesktopBridge()?.caps.native.workspace_watch === true;
+  }
+  /**
+   * Subscribe to external file-system changes under the workspace root.
+   * `onChange` receives coalesced batches; the returned `subscriptionId`
+   * tears the watch down via {@link unsubscribeChanges}. The handler is
+   * registered before the OS watch starts, so no early event is dropped.
+   */
+  export async function subscribeChanges(
+    workspaceId: string,
+    onChange: (events: WorkspaceChangeEvent[]) => void
+  ): Promise<{ subscriptionId: string }> {
+    // Gate explicitly: on an old protocol-1 binary the bridge lacks this
+    // method, so an ungated call would throw an opaque `TypeError`. Fail with
+    // a clear, deterministic error instead. Callers should prefer
+    // {@link isWatchSupported} before subscribing.
+    if (!isWatchSupported()) {
+      throw new Error(
+        "workspaces.subscribe_changes: workspace watch is not supported by this desktop binary"
+      );
+    }
+    const { subscription_id } =
+      await bridgeOrThrow().workspaces.subscribe_changes(workspaceId, onChange);
+    return { subscriptionId: subscription_id };
+  }
+  /** Stop a subscription started by {@link subscribeChanges}. */
+  export async function unsubscribeChanges(
+    subscriptionId: string
+  ): Promise<void> {
+    // No-op when unsupported: there can be no live subscription to tear down,
+    // and teardown paths must not throw (they run in effect cleanups).
+    if (!isWatchSupported()) return;
+    await bridgeOrThrow().workspaces.unsubscribe_changes(subscriptionId);
   }
   /**
    * Move a workspace entry (file or folder) to the OS trash

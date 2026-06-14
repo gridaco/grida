@@ -40,6 +40,7 @@ import {
 import { FileContextMenu } from "./workbench-file-context-menu";
 import { confirmAndTrashEntry } from "./workbench-file-actions";
 import { WorkspaceFileTree } from "./file-tree-source";
+import { useWorkspaceChanges } from "./workspace-changes";
 
 const INDENT_STEP = 12;
 const INDENT_BASE = 4;
@@ -162,6 +163,20 @@ function FileTreePaneInner({
     },
     [reload]
   );
+
+  // External file changes (issue #805): surgically reload the parent dir
+  // of each changed path. Events arrive already coalesced by the host;
+  // we dedupe by parent so one `git checkout` touching many files reloads
+  // each affected (and currently-expanded) folder once. `reload` no-ops
+  // for dirs that were never listed, so a change deep in a collapsed
+  // subtree costs nothing.
+  useWorkspaceChanges((events) => {
+    const parents = new Set<string>();
+    for (const e of events) {
+      parents.add(WorkspaceFileTree.parentRelPath(e.rel_path));
+    }
+    for (const parent of parents) reload(parent);
+  });
 
   const afterTrashed = useCallback(
     (relPath: string, isDirectory: boolean) => {

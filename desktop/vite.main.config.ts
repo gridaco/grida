@@ -11,7 +11,10 @@ import { gridaBundleGuard } from "./vite.guards";
 // into `.vite/build/main.js` breaks resolution at runtime.
 // `node-pty` is externalised for the same reason: it loads a native
 // `.node` addon (and `spawn-helper`) via paths relative to its
-// install root.
+// install root. `@parcel/watcher` (issue #805 workspace watcher) is the
+// third native module: it resolves a per-platform `.node` prebuild
+// (`@parcel/watcher-<platform>-<arch>`) at require time, which can't be
+// bundled into `main.js`.
 export default defineConfig({
   build: {
     rollupOptions: {
@@ -19,6 +22,7 @@ export default defineConfig({
         ...builtinModules,
         "@anthropic-ai/sandbox-runtime",
         "node-pty",
+        "@parcel/watcher",
       ],
     },
   },

@@ -53,13 +53,21 @@ export namespace workspaceFs {
     | "not-a-directory"
     | "not-a-file"
     | "file-too-large"
-    | "file-not-utf8";
+    | "file-not-utf8"
+    | "modified-since";
 
   export type ErrorDetail = {
     code: ErrorCode;
     workspace_id?: string;
     rel_path?: string;
     size?: number;
+    /**
+     * Current on-disk mtime, set on `modified-since` so the client can
+     * reconcile (reload / overwrite-with-this-as-the-new-baseline)
+     * without a second round trip. Omitted when the expected file is
+     * gone on disk (deleted out from under the caller).
+     */
+    mtime?: number;
   };
 
   /**
@@ -265,6 +273,21 @@ export namespace workspaceFs {
    * directory). Creates parent directories if needed. Returns the new
    * mtime so the client can update its conflict-detection state.
    *
+   * Optimistic-concurrency guard (issue #805): when the caller passes
+   * `expected_mtime` (the mtime it captured the last time it read or
+   * wrote the file), the write is rejected with `modified-since` if the
+   * file on disk has advanced past that token — an external writer (or
+   * the agent) changed it in the meantime, and a blind write would
+   * silently clobber that change with no conflict detection. The caller
+   * resolves the conflict (reload from disk / overwrite anyway) and
+   * retries. Omitting `expected_mtime` keeps the old last-writer-wins
+   * behavior, so the agent's own writes and first-time creates are
+   * unaffected.
+   *
+   * A file that was deleted out from under the caller (ENOENT while an
+   * `expected_mtime` was supplied) is also a conflict — we don't
+   * silently resurrect it under the old name.
+   *
    * Note: we don't enforce MAX_FILE_BYTES on the write side — the
    * client can always re-read a file it just wrote, but a Monaco
    * buffer of 50MB is the user's problem to surface, not the agent host's
@@ -273,7 +296,8 @@ export namespace workspaceFs {
   export async function writeFile(
     workspace: Workspace,
     relPath: string,
-    content: string
+    content: string,
+    options: { expected_mtime?: number } = {}
   ): Promise<{ mtime: number }> {
     // mustExist:false — we may be creating a new file. But the parent
     // dir must be inside the workspace, which `resolveInside` verifies
@@ -283,8 +307,42 @@ export namespace workspaceFs {
     // policy boundary).
     const abs = await resolveInside(workspace, relPath, { must_exist: false });
     await resolveWritableParent(workspace, abs, relPath);
+    // Optimistic-concurrency precondition (issue #805), enforced as
+    // atomicWrite's `before_commit` hook so it runs immediately before the
+    // rename that publishes the bytes — the check→replace gap is then a single
+    // rename syscall, not the whole tmp-write. A mismatch (or an ENOENT: the
+    // file was deleted out from under us) aborts the write before the rename;
+    // atomicWrite removes the tmp it had staged. Omitting `expected_mtime`
+    // keeps last-writer-wins, so agent writes / first creates are unaffected.
+    const before_commit =
+      options.expected_mtime === undefined
+        ? undefined
+        : async () => {
+            // Plain Stats (not the bigint overload) — mtimeMs is a number that
+            // round-trips through the JSON precondition token verbatim.
+            let current: import("node:fs").Stats | undefined;
+            try {
+              current = await fs.stat(abs);
+            } catch (err) {
+              if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+              // ENOENT → the expected file is gone; fall through to the
+              // `!current` conflict rather than re-creating it blindly.
+            }
+            if (!current || current.mtimeMs !== options.expected_mtime) {
+              throw new Exception({
+                code: "modified-since",
+                workspace_id: workspace.id,
+                rel_path: relPath,
+                mtime: current?.mtimeMs,
+              });
+            }
+          };
     // User-owned content — default 0o644 instead of `auth.json`'s 0o600.
-    await atomicWrite(abs, content, { ensure_dir: false, mode: 0o644 });
+    await atomicWrite(abs, content, {
+      ensure_dir: false,
+      mode: 0o644,
+      before_commit,
+    });
     const stat = await fs.stat(abs);
     return { mtime: stat.mtimeMs };
   }

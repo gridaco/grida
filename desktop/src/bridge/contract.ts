@@ -20,6 +20,8 @@ export type {
   TerminalCreateOptions,
   TerminalHandlers,
   Workspace,
+  WorkspaceChangeEvent,
+  WorkspaceChangeHandler,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
@@ -38,6 +40,8 @@ export const IPC_CHANNELS = {
   AGENT_FOCUS_SESSION: "grida:agent:focus-session",
   WORKSPACE_COMMAND: "grida:workspace:command",
   WORKSPACE_TRASH_ENTRY: "grida:workspace:trash-entry",
+  WORKSPACE_SUBSCRIBE_CHANGES: "grida:workspace:subscribe-changes",
+  WORKSPACE_UNSUBSCRIBE_CHANGES: "grida:workspace:unsubscribe-changes",
   DIALOG_CONFIRM: "grida:dialog:confirm",
   DIALOG_OPEN: "grida:dialog:open",
   DIALOG_SAVE_AS: "grida:dialog:save-as",
@@ -52,6 +56,7 @@ export const IPC_CHANNELS = {
   // main → renderer push channels (no invoke response)
   TERMINAL_DATA: "grida:terminal:data",
   TERMINAL_EXIT: "grida:terminal:exit",
+  WORKSPACE_CHANGE: "grida:workspace:change",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

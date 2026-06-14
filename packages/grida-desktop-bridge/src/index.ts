@@ -45,6 +45,12 @@ export type DesktopNativeCapabilities = {
    * desktop binary, no terminal" and hide the surface.
    */
   terminal: boolean;
+  /**
+   * Workspace file-change watcher (issue #805) — `workspaces.subscribe_changes`.
+   * Added after protocol 1 shipped; treat a missing/falsy value as "old
+   * desktop binary" and fall back to manual/pull refresh.
+   */
+  workspace_watch: boolean;
 };
 
 export type DesktopCapabilities = {
@@ -110,6 +116,22 @@ export type DesktopHostAppInfo = {
   installed: boolean;
   supports: Array<"workspace">;
 };
+
+/**
+ * A single coalesced external change under a watched workspace root
+ * (issue #805). `kind` is intentionally coarse — the renderer reacts by
+ * re-reading the affected path / re-listing its parent, so it doesn't
+ * need byte-level deltas. A rename surfaces as `deleted` (old path) +
+ * `added` (new path) in v1.
+ */
+export type WorkspaceChangeEvent = {
+  kind: "added" | "changed" | "deleted";
+  /** Workspace-relative POSIX path of the changed entry. */
+  rel_path: string;
+};
+
+/** Receives coalesced batches of {@link WorkspaceChangeEvent}. */
+export type WorkspaceChangeHandler = (events: WorkspaceChangeEvent[]) => void;
 
 export type TerminalCreateOptions = {
   /** Workspace whose root becomes the shell's cwd. Resolved host-side
@@ -179,10 +201,19 @@ export type DesktopBridge = {
       workspaceId: string,
       relPath: string
     ) => Promise<WorkspaceReadFileBytesResult>;
+    /**
+     * Write `content` to `relPath`. `expectedMtime` is the optimistic-
+     * concurrency token (issue #805): the mtime the renderer last
+     * observed for this file. When supplied and the file on disk has
+     * advanced past it, the host rejects with a 409 `modified-since`
+     * error instead of silently clobbering the external change. Omit it
+     * for force-overwrite / first-time-create / last-writer-wins.
+     */
     write_file: (
       workspaceId: string,
       relPath: string,
-      content: string
+      content: string,
+      expectedMtime?: number
     ) => Promise<WorkspaceWriteFileResult>;
     /**
      * Move a workspace entry (file or folder) to the OS trash
@@ -194,6 +225,26 @@ export type DesktopBridge = {
      * user first.
      */
     trash_entry: (workspaceId: string, relPath: string) => Promise<void>;
+    /**
+     * Subscribe to external file-system changes under the workspace root
+     * (issue #805). The host watches the real directory tree and pushes
+     * coalesced batches of {@link WorkspaceChangeEvent} — covering edits
+     * made outside the editor, including the agent's own writes. Like
+     * `trash_entry` this is a native host capability (the OS watcher lives
+     * in the desktop main process), not an agent-sidecar operation.
+     *
+     * `subscribe_changes` registers `on_change` before the OS watch
+     * starts (caller-mints-id, mirroring `terminal.create`) so an early
+     * event can't race the subscription. Resolves with the id used to
+     * {@link unsubscribe_changes}. Additive on protocol 1 — gate the UI on
+     * `caps.native.workspace_watch`; older binaries lack the channel.
+     */
+    subscribe_changes: (
+      workspaceId: string,
+      on_change: WorkspaceChangeHandler
+    ) => Promise<{ subscription_id: string }>;
+    /** Stop a subscription started by {@link subscribe_changes}. */
+    unsubscribe_changes: (subscriptionId: string) => Promise<void>;
   };
   /**
    * GRIDA-SEC-004 — human-interactive terminal. A real, unsandboxed

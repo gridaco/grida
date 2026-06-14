@@ -33,6 +33,10 @@ import {
   resizeTerminal,
   writeTerminal,
 } from "./terminal-host";
+import {
+  subscribeWorkspaceChanges,
+  unsubscribeWorkspaceChanges,
+} from "./workspace-watcher-host";
 import { trashWorkspaceEntry } from "./workspace-files";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
@@ -287,6 +291,27 @@ export function registerIpcHandlers() {
 
   guarded(IPC_CHANNELS.TERMINAL_KILL, (event, id: string) => {
     killTerminal(event.sender, id);
+  });
+
+  // issue #805 — workspace file-change watcher. The watch root is the
+  // workspace root resolved host-side from the sidecar registry; the
+  // renderer only names a workspace id (never a raw path), exactly like
+  // TERMINAL_CREATE and WORKSPACE_TRASH_ENTRY. The watcher host binds each
+  // subscription to its creating WebContents (push + kill-on-close).
+  guarded(
+    IPC_CHANNELS.WORKSPACE_SUBSCRIBE_CHANGES,
+    async (event, opts: { id: string; workspace_id: string }) => {
+      const workspace = await findWorkspaceOrThrow(opts.workspace_id);
+      await subscribeWorkspaceChanges(event.sender, {
+        id: opts.id,
+        root: workspace.root,
+        workspaceId: opts.workspace_id,
+      });
+    }
+  );
+
+  guarded(IPC_CHANNELS.WORKSPACE_UNSUBSCRIBE_CHANGES, (_event, id: string) => {
+    unsubscribeWorkspaceChanges(id);
   });
 }
 

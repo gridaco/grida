@@ -16,7 +16,7 @@
  */
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircleIcon } from "lucide-react";
 import {
   SvgEditorCanvas,
@@ -25,11 +25,22 @@ import {
   useSvgEditor,
 } from "@grida/svg-editor/react";
 import { cn } from "@app/ui/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@app/ui/components/alert-dialog";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
+import { useWorkspaceChanges } from "./workspace-changes";
 
 type LoadState =
   | { kind: "loading" }
-  | { kind: "ready"; content: string }
+  | { kind: "ready"; content: string; mtime: number }
   | { kind: "error"; message: string };
 
 export function EditorPaneSvgEditor({
@@ -54,7 +65,7 @@ export function EditorPaneSvgEditor({
       .readFile(workspaceId, relPath)
       .then((r) => {
         if (cancelled) return;
-        setState({ kind: "ready", content: r.content });
+        setState({ kind: "ready", content: r.content, mtime: r.mtime });
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -93,6 +104,7 @@ export function EditorPaneSvgEditor({
         workspaceId={workspaceId}
         relPath={relPath}
         active={active}
+        initialMtime={state.mtime}
         onDirtyChange={onDirtyChange}
         onSaved={onSaved}
       />
@@ -106,12 +118,14 @@ function Surface({
   workspaceId,
   relPath,
   active,
+  initialMtime,
   onDirtyChange,
   onSaved,
 }: {
   workspaceId: string;
   relPath: string;
   active: boolean;
+  initialMtime: number;
   onDirtyChange: (dirty: boolean) => void;
   onSaved?: () => void;
 }) {
@@ -122,27 +136,114 @@ function Surface({
   );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // The conflict-detection token (issue #805): the mtime we last observed
+  // on disk for this file — seeded at load, advanced on every successful
+  // write / reload. A ref (not state) so `onSave` stays referentially
+  // stable and the Cmd+S listener doesn't re-bind on each save.
+  const lastMtimeRef = useRef<number>(initialMtime);
+  // Set when a save is rejected because disk advanced past our token. Holds
+  // the content the user tried to write so "Overwrite anyway" can re-issue
+  // it without re-serializing a since-changed editor.
+  const [conflict, setConflict] = useState<{
+    content: string;
+    snapshot: number;
+  } | null>(null);
   const dirty = contentVersion !== savedVersion;
 
   useEffect(() => {
     onDirtyChange(dirty);
   }, [dirty, onDirtyChange]);
 
-  const onSave = useCallback(async () => {
-    setSaveError(null);
-    setSaving(true);
+  // The single write→commit path behind both a normal save and a forced
+  // overwrite. On success it advances the mtime token and re-baselines
+  // `savedVersion` to the pre-write `snapshot`. The two callers differ only
+  // here: a guarded save passes `expectedMtime` (a stale token rejects) and
+  // an `onConflict` to raise the resolver; a force-overwrite passes neither
+  // (no precondition → last-writer-wins). Every other failure is an error.
+  const commitWrite = useCallback(
+    async (
+      content: string,
+      snapshot: number,
+      opts: { expectedMtime?: number; onConflict?: () => void }
+    ) => {
+      setSaveError(null);
+      setSaving(true);
+      try {
+        const res = await workspacesNs.writeFile(
+          workspaceId,
+          relPath,
+          content,
+          opts.expectedMtime
+        );
+        lastMtimeRef.current = res.mtime;
+        setSavedVersion(snapshot);
+        onSaved?.();
+      } catch (err) {
+        if (opts.onConflict && workspacesNs.isWriteConflict(err)) {
+          opts.onConflict();
+        } else {
+          setSaveError(err instanceof Error ? err.message : "Save failed.");
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [workspaceId, relPath, onSaved]
+  );
+
+  const onSave = useCallback(() => {
     const snapshot = editor.state.content_version;
     const content = editor.serialize();
+    return commitWrite(content, snapshot, {
+      expectedMtime: lastMtimeRef.current,
+      onConflict: () => setConflict({ content, snapshot }),
+    });
+  }, [editor, commitWrite]);
+
+  // Replace the editor's document with the current bytes on disk, then
+  // re-baseline `savedVersion` to the post-load content_version so the
+  // freshly-reloaded file reads as clean (editor.load() bumps the
+  // version — without re-baselining it would show as dirty). Used by the
+  // conflict resolver's "Reload from disk".
+  const reloadFromDisk = useCallback(async () => {
+    setConflict(null);
+    setSaveError(null);
     try {
-      await workspacesNs.writeFile(workspaceId, relPath, content);
-      setSavedVersion(snapshot);
-      onSaved?.();
+      const r = await workspacesNs.readFile(workspaceId, relPath);
+      // Echo suppression (issue #805): our own save produces a watcher
+      // `changed` event for this same file, which lands here once the buffer
+      // is clean again. `lastMtimeRef` is the mtime we last wrote/loaded; if
+      // disk hasn't advanced past it there's nothing new to take, and calling
+      // editor.load() would needlessly reset selection / history / mode on
+      // every Cmd+S. Reload only when disk genuinely moved ahead of us.
+      if (r.mtime === lastMtimeRef.current) return;
+      editor.load(r.content);
+      lastMtimeRef.current = r.mtime;
+      setSavedVersion(editor.state.content_version);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Save failed.");
-    } finally {
-      setSaving(false);
+      setSaveError(err instanceof Error ? err.message : "Reload failed.");
     }
-  }, [workspaceId, relPath, editor, onSaved]);
+  }, [workspaceId, relPath, editor]);
+
+  // Force the user's content over the disk version: empty options → no
+  // precondition (last-writer-wins) and no conflict handler.
+  const overwriteAnyway = useCallback(() => {
+    if (!conflict) return;
+    setConflict(null);
+    return commitWrite(conflict.content, conflict.snapshot, {});
+  }, [conflict, commitWrite]);
+
+  // React to external changes to THIS file (issue #805). When the buffer
+  // is clean we take the new bytes seamlessly; when it's dirty we keep the
+  // user's edits and let the save-time guard surface the conflict (the
+  // stale mtime makes the next Cmd+S reject) — VSCode's non-dirty-reload /
+  // dirty-defer split. A delete is left alone (a reload would just ENOENT;
+  // the save guard treats the missing file as a conflict too).
+  useWorkspaceChanges((events) => {
+    const mine = events.find((e) => e.rel_path === relPath);
+    if (!mine || mine.kind === "deleted") return;
+    if (!dirty && !saving && conflict === null) void reloadFromDisk();
+  });
 
   useEffect(() => {
     if (!active) return;
@@ -167,7 +268,68 @@ function Surface({
           onDismiss={() => setSaveError(null)}
         />
       )}
+      <SaveConflictDialog
+        relPath={relPath}
+        open={conflict !== null}
+        onKeepEditing={() => setConflict(null)}
+        onReload={reloadFromDisk}
+        onOverwrite={overwriteAnyway}
+      />
     </div>
+  );
+}
+
+/**
+ * Save-time conflict resolver (issue #805). Shown when a Cmd+S is
+ * rejected because the file changed on disk since we loaded it. The
+ * structured SVG editor can't show a meaningful 3-way *text* diff, so we
+ * offer the three editor-agnostic choices VSCode falls back to rather
+ * than a diff surface: keep editing, discard-and-reload, or overwrite.
+ */
+function SaveConflictDialog({
+  relPath,
+  open,
+  onKeepEditing,
+  onReload,
+  onOverwrite,
+}: {
+  relPath: string;
+  open: boolean;
+  onKeepEditing: () => void;
+  onReload: () => void;
+  onOverwrite: () => void;
+}) {
+  const name = relPath.split("/").pop() || relPath;
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onKeepEditing();
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>File changed on disk</AlertDialogTitle>
+          <AlertDialogDescription>
+            &ldquo;{name}&rdquo; was modified outside the editor since you
+            opened it. Saving now would overwrite that change. Reload to take
+            the version on disk (discarding your edits), or overwrite it with
+            yours.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onKeepEditing}>
+            Keep editing
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={onReload}>
+            Reload from disk
+          </AlertDialogAction>
+          <AlertDialogAction variant="destructive" onClick={onOverwrite}>
+            Overwrite anyway
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

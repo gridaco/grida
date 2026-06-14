@@ -26,6 +26,11 @@ allowBuilds:
   # unnecessary on darwin/win32; Linux packaging goes through forge's
   # native-module rebuild instead.
   node-pty: false
+  # Skipped: @parcel/watcher (issue #805 workspace watcher) ships per-platform
+  # N-API prebuilds as optionalDependencies (@parcel/watcher-<platform>-<arch>)
+  # that its loader resolves at require time; the `install` build-from-source
+  # script is only the no-prebuild fallback. Same story as node-pty.
+  "@parcel/watcher": false
 overrides:
   # @electron/rebuild pins an old node-abi that throws "Could not detect abi"
   # for current Electron releases. Only the Linux packaging path actually

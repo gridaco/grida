@@ -35,6 +35,8 @@ import {
   type SaveDialogOptions,
   type TerminalCreateOptions,
   type TerminalHandlers,
+  type WorkspaceChangeEvent,
+  type WorkspaceChangeHandler,
 } from "./bridge/contract";
 
 const DESKTOP_PATH_ROOT = "/desktop";
@@ -156,6 +158,25 @@ ipcRenderer.on(
     const handlers = terminalHandlers.get(payload.id);
     terminalHandlers.delete(payload.id);
     handlers?.on_exit({ exit_code: payload.exit_code });
+  }
+);
+
+/**
+ * Workspace file-change fanout (issue #805). Same payload-only discipline
+ * as the terminal fanout: one module-level `ipcRenderer.on` routes each
+ * pushed batch to the renderer-supplied handler by subscription id; the
+ * Electron event object never crosses the contextBridge (GRIDA-SEC-004).
+ * The handler is registered under a preload-minted id BEFORE the
+ * SUBSCRIBE_CHANGES invoke, so no early event can race the subscription.
+ */
+const workspaceChangeHandlers = new Map<string, WorkspaceChangeHandler>();
+ipcRenderer.on(
+  IPC_CHANNELS.WORKSPACE_CHANGE,
+  (
+    _event,
+    payload: { subscription_id: string; events: WorkspaceChangeEvent[] }
+  ) => {
+    workspaceChangeHandlers.get(payload.subscription_id)?.(payload.events);
   }
 );
 
@@ -288,6 +309,8 @@ const bridge: DesktopBridge = {
       // Human-interactive terminal pane (GRIDA-SEC-004) — distinct from
       // `shell` above and from the agent's sandboxed `run_command`.
       terminal: true,
+      // Workspace file-change watcher (issue #805).
+      workspace_watch: true,
     },
   },
 
@@ -376,8 +399,13 @@ const bridge: DesktopBridge = {
       agentClient.workspaces.read_file(workspaceId, relPath),
     read_file_bytes: (workspaceId, relPath) =>
       agentClient.workspaces.read_file_bytes(workspaceId, relPath),
-    write_file: (workspaceId, relPath, content) =>
-      agentClient.workspaces.write_file(workspaceId, relPath, content),
+    write_file: (workspaceId, relPath, content, expectedMtime) =>
+      agentClient.workspaces.write_file(
+        workspaceId,
+        relPath,
+        content,
+        expectedMtime
+      ),
     // Unlike its siblings, trash is a native host capability rather than
     // an agent-sidecar operation: it routes to the main process (which
     // re-validates workspace containment) and calls `shell.trashItem`.
@@ -386,6 +414,30 @@ const bridge: DesktopBridge = {
         workspace_id: workspaceId,
         rel_path: relPath,
       }) as Promise<void>,
+    subscribe_changes: async (workspaceId, onChange) => {
+      // Caller-mints-id (cf. terminal.create): register the handler under
+      // a preload-minted id before the invoke so no pushed event can land
+      // before the subscription exists.
+      const id = crypto.randomUUID();
+      workspaceChangeHandlers.set(id, onChange);
+      try {
+        await ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_SUBSCRIBE_CHANGES, {
+          id,
+          workspace_id: workspaceId,
+        });
+      } catch (err) {
+        workspaceChangeHandlers.delete(id);
+        throw err;
+      }
+      return { subscription_id: id };
+    },
+    unsubscribe_changes: async (subscriptionId) => {
+      workspaceChangeHandlers.delete(subscriptionId);
+      await ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_UNSUBSCRIBE_CHANGES,
+        subscriptionId
+      );
+    },
   },
 
   terminal: {
