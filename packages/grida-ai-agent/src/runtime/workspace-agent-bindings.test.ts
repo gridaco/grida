@@ -68,6 +68,113 @@ describe("WorkspaceAgentFsBackend — path mapping", () => {
 });
 
 /**
+ * Issue #786 — the hydrate enumeration must be BOUNDED + FILTERED. An
+ * unfiltered walk over a real project (`node_modules`, `.git`, build output)
+ * returns the whole tree, which the downstream read fan-out then tries to
+ * slurp at once → OOM / "Too many elements passed to Promise.all". These pin
+ * that `list()` skips the heavy/generated subtrees while still surfacing the
+ * real source files.
+ */
+describe("WorkspaceAgentFsBackend — bounded/filtered hydrate scan", () => {
+  let baseDir: string;
+  let workspaceRoot: string;
+  let backend: WorkspaceAgentFsBackend;
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-wsfs-scan-"));
+    const wsDir = path.join(baseDir, "ws");
+    await fs.mkdir(wsDir);
+    workspaceRoot = await fs.realpath(wsDir);
+    const registry = new WorkspaceRegistry(path.join(baseDir, "ud"));
+    const ws = await registry.open(workspaceRoot);
+    backend = new WorkspaceAgentFsBackend(ws);
+  });
+
+  afterEach(async () => {
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  async function writeFile(rel: string, content = "x"): Promise<void> {
+    const abs = path.join(workspaceRoot, rel);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.writeFile(abs, content);
+  }
+
+  it("walks real source but skips node_modules / .git / build output", async () => {
+    // Real source — must appear.
+    await writeFile("src/index.ts");
+    await writeFile("src/lib/util.ts");
+    await writeFile("README.md");
+    // Heavy/generated subtrees — must NOT appear. Seed each with enough
+    // entries that a regression (no filtering) is unmistakable.
+    for (let i = 0; i < 50; i++) {
+      await writeFile(`node_modules/pkg${i}/index.js`);
+      await writeFile(`node_modules/pkg${i}/nested/deep/file${i}.js`);
+    }
+    await writeFile(".git/objects/ab/cdef");
+    await writeFile(".git/HEAD", "ref: refs/heads/main");
+    await writeFile("dist/bundle.js");
+    await writeFile("target/debug/artifact.bin");
+    await writeFile(".next/cache/x");
+
+    const listed = await backend.list();
+
+    expect(listed).toContain("/src/index.ts");
+    expect(listed).toContain("/src/lib/util.ts");
+    expect(listed).toContain("/README.md");
+    // None of the ignored subtrees leak in.
+    expect(listed.some((p) => p.startsWith("/node_modules/"))).toBe(false);
+    expect(listed.some((p) => p.startsWith("/.git/"))).toBe(false);
+    expect(listed.some((p) => p.startsWith("/dist/"))).toBe(false);
+    expect(listed.some((p) => p.startsWith("/target/"))).toBe(false);
+    expect(listed.some((p) => p.startsWith("/.next/"))).toBe(false);
+    // The whole tree had 100+ node_modules files; the bounded list is tiny.
+    expect(listed).toHaveLength(3);
+  });
+
+  it("skips an ignored dir even when nested under real source", async () => {
+    await writeFile("packages/app/src/main.ts");
+    await writeFile("packages/app/node_modules/dep/index.js");
+    await writeFile("packages/app/dist/out.js");
+
+    const listed = await backend.list();
+
+    expect(listed).toContain("/packages/app/src/main.ts");
+    expect(listed.some((p) => p.includes("/node_modules/"))).toBe(false);
+    expect(listed.some((p) => p.includes("/dist/"))).toBe(false);
+  });
+
+  /**
+   * #786 follow-up (Codex review): a binary-heavy subtree that sorts BEFORE the
+   * source must not consume the file cap. `read()` returns null for binary
+   * content, so those paths never hydrate — counting them toward SCAN_MAX_FILES
+   * would let an `assets/` of images starve the real source that sorts after
+   * it. The walk must drop known-binary files at enumeration time.
+   */
+  it("does not let a binary asset subtree crowd out source files", async () => {
+    // `assets` sorts before `src`; seed it with images that read() can't serve.
+    for (let i = 0; i < 60; i++) {
+      await writeFile(`assets/img${i}.png`);
+      await writeFile(`assets/icon${i}.webp`);
+    }
+    await writeFile("assets/logo.svg"); // svg is text — must survive
+    await writeFile("src/index.ts");
+    await writeFile("src/app.tsx");
+
+    const listed = await backend.list();
+
+    expect(listed).toContain("/src/index.ts");
+    expect(listed).toContain("/src/app.tsx");
+    expect(listed).toContain("/assets/logo.svg");
+    // No binary asset leaks in — neither the .png nor the .webp.
+    expect(listed.some((p) => p.endsWith(".png"))).toBe(false);
+    expect(listed.some((p) => p.endsWith(".webp"))).toBe(false);
+    // 120 binaries dropped; only the 3 text files remain.
+    expect(listed).toHaveLength(3);
+  });
+});
+
+/**
  * GRIDA-SEC-004 — the supervised approval gate (RFC `permission modes`, Phase
  * 2) is wired here: the command capability's `needs_approval` predicate is the
  * single source the run_command tool's `needsApproval` reads. `accept-edits`

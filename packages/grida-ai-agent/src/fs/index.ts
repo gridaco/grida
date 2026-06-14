@@ -50,6 +50,48 @@ const PATH_DESCRIPTION =
   "Absolute path in the agent filesystem, starting with `/`. " +
   "Examples: `/canvas.svg`, `/notes/draft.md`.";
 
+/**
+ * Max concurrent backend reads during `hydrate()` (issue #786). A small fixed
+ * width: enough to keep disk/IPC busy, low enough to never approach the OS fd
+ * limit or V8's promise-combinator element cap even when the backend lists a
+ * whole repo. The enumeration side is also bounded (workspace backend caps the
+ * path list), so this is defense in depth: any backend handing back a large
+ * list reads safely.
+ */
+const HYDRATE_READ_CONCURRENCY = 24;
+
+/**
+ * `Promise.allSettled`-shaped map with a fixed in-flight width. Results are
+ * positionally aligned to `items` (so a downstream `items[i]` ↔ `results[i]`
+ * loop is valid). Unlike `Promise.allSettled(items.map(fn))`, only `limit`
+ * calls to `fn` are ever pending at once, and the only `Promise.all` is over
+ * `limit` workers — a small constant — so a huge `items` can't overflow the
+ * combinator's element cap.
+ */
+async function mapSettledBounded<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = Array.from({
+    length: items.length,
+  });
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      try {
+        results[i] = { status: "fulfilled", value: await fn(items[i]) };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  };
+  const width = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: width }, () => worker()));
+  return results;
+}
+
 // ---------------------------------------------------------------------------
 // AgentFs — the class.
 //
@@ -194,10 +236,18 @@ export class AgentFs {
       console.warn("[agent-fs] backend.list failed:", err);
       return;
     }
-    // Fan out reads; the apply-to-state step that follows must be
-    // sequential (binding.load + Map mutations aren't reentrant).
-    const reads = await Promise.allSettled(
-      paths.map((p) => this.backend.read(p))
+    // Fan out reads with BOUNDED concurrency (issue #786). The old
+    // `Promise.allSettled(paths.map(read))` issued one read per path at once:
+    // on a large backend (a real workspace tree) that exhausts file
+    // descriptors, and a long-enough list overflows V8's promise-combinator
+    // element cap ("Too many elements passed to Promise.all"). A fixed-width
+    // worker pool keeps in-flight reads constant regardless of list size. The
+    // apply-to-state step that follows must stay sequential (binding.load +
+    // Map mutations aren't reentrant).
+    const reads = await mapSettledBounded(
+      paths,
+      HYDRATE_READ_CONCURRENCY,
+      (p) => this.backend.read(p)
     );
     for (let i = 0; i < paths.length; i++) {
       if (this.disposed) return;
