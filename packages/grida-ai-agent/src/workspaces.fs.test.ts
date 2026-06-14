@@ -82,4 +82,71 @@ describe("workspaceFs", () => {
       fs.access(path.join(outside, "new.txt"))
     ).rejects.toMatchObject({ code: "ENOENT" });
   });
+
+  describe("writeFile optimistic-concurrency guard (issue #805)", () => {
+    it("writes without a precondition (last-writer-wins)", async () => {
+      const res = await workspaceFs.writeFile(
+        fixture.workspace,
+        "a.svg",
+        "<svg/>"
+      );
+      expect(typeof res.mtime).toBe("number");
+    });
+
+    it("accepts a write when expected_mtime matches disk", async () => {
+      const first = await workspaceFs.writeFile(
+        fixture.workspace,
+        "a.svg",
+        "<svg/>"
+      );
+      await workspaceFs.writeFile(fixture.workspace, "a.svg", "<svg id='2'/>", {
+        expected_mtime: first.mtime,
+      });
+      const { content } = await workspaceFs.readFile(
+        fixture.workspace,
+        "a.svg"
+      );
+      expect(content).toBe("<svg id='2'/>");
+    });
+
+    it("rejects a stale write with modified-since carrying the disk mtime", async () => {
+      const first = await workspaceFs.writeFile(
+        fixture.workspace,
+        "a.svg",
+        "<svg/>"
+      );
+      await expect(
+        workspaceFs.writeFile(fixture.workspace, "a.svg", "clobber", {
+          // a token older than disk → disk has "advanced" past it
+          expected_mtime: first.mtime - 1000,
+        })
+      ).rejects.toMatchObject({
+        detail: { code: "modified-since", mtime: first.mtime },
+      });
+      // the write was refused — disk content is untouched
+      const { content } = await workspaceFs.readFile(
+        fixture.workspace,
+        "a.svg"
+      );
+      expect(content).toBe("<svg/>");
+    });
+
+    it("treats a deleted-on-disk file as a conflict when expected_mtime is set", async () => {
+      const first = await workspaceFs.writeFile(
+        fixture.workspace,
+        "a.svg",
+        "<svg/>"
+      );
+      await fs.rm(path.join(fixture.workspace_root, "a.svg"));
+      await expect(
+        workspaceFs.writeFile(fixture.workspace, "a.svg", "resurrect", {
+          expected_mtime: first.mtime,
+        })
+      ).rejects.toMatchObject({ detail: { code: "modified-since" } });
+      // not silently recreated under the old name
+      await expect(
+        fs.access(path.join(fixture.workspace_root, "a.svg"))
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    });
+  });
 });

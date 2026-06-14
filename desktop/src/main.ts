@@ -17,6 +17,7 @@ import {
 } from "./main/agent-sidecar-supervisor";
 import { registerIpcHandlers } from "./main/ipc-handlers";
 import { disposeAllTerminals } from "./main/terminal-host";
+import { disposeAllWorkspaceWatches } from "./main/workspace-watcher-host";
 import { agentSidecarClient } from "./main/agent-sidecar-client";
 import { startAgentNotifications } from "./main/agent-notifications";
 import { routeDeepLink } from "./main/protocol-router";
@@ -355,7 +356,9 @@ app.on("activate", () => {
 
 app.on("before-quit", () => {
   // Belt-and-suspenders — supervisor also listens for this event, and
-  // terminal PTYs are also killed per-window on webContents teardown.
+  // terminal PTYs / workspace watches are also torn down per-window on
+  // webContents teardown.
   stopAgentSidecar();
   disposeAllTerminals();
+  void disposeAllWorkspaceWatches();
 });

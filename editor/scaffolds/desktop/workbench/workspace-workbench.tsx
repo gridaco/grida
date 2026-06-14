@@ -63,6 +63,7 @@ import { EditorPane } from "./editor-pane";
 import { WorkspaceOpenInMenu } from "./workspace-open-in-menu";
 import { AgentPane } from "./agent-pane";
 import { TerminalPane } from "./terminal-pane";
+import { WorkspaceChangesProvider } from "./workspace-changes";
 
 /**
  * Pane sizing, matching the workstation-shell conventions:
@@ -330,144 +331,148 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   }, [openFile]);
 
   return (
-    <div className="flex h-screen w-screen flex-col bg-background">
-      {/* The TitleBar exposes back/forward (Chromium history) and
+    <WorkspaceChangesProvider workspaceId={workspace.id}>
+      <div className="flex h-screen w-screen flex-col bg-background">
+        {/* The TitleBar exposes back/forward (Chromium history) and
           carries the workspace workbench's own chrome. Workspace-level
           actions sit flush right so they don't compete with the
           back/forward pair that NavButtons pins to the left. */}
-      <TitleBar>
-        <div className="flex min-w-0 flex-1 items-center overflow-hidden">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <FolderIcon className="size-3.5 shrink-0 text-sky-500" />
-            <span className="truncate font-medium text-foreground">
-              {workspace.name}
-            </span>
-            <span className="truncate font-mono text-muted-foreground">
-              {workspace.root}
-            </span>
+        <TitleBar>
+          <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <FolderIcon className="size-3.5 shrink-0 text-sky-500" />
+              <span className="truncate font-medium text-foreground">
+                {workspace.name}
+              </span>
+              <span className="truncate font-mono text-muted-foreground">
+                {workspace.root}
+              </span>
+            </div>
           </div>
-        </div>
-        <div className="ml-auto flex shrink-0 items-center gap-1">
-          <WorkspaceOpenInMenu workspace={workspace} />
-          {supportsTerminal && (
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <WorkspaceOpenInMenu workspace={workspace} />
+            {supportsTerminal && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                style={TITLEBAR_NO_DRAG_STYLE}
+                onClick={toggleTerminal}
+                aria-label={
+                  terminalOpen ? "Hide terminal pane" : "Show terminal pane"
+                }
+                aria-pressed={terminalOpen}
+                title={
+                  terminalOpen
+                    ? "Hide terminal pane (⌃`)"
+                    : "Show terminal pane (⌃`)"
+                }
+              >
+                <SquareTerminalIcon />
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
               style={TITLEBAR_NO_DRAG_STYLE}
-              onClick={toggleTerminal}
+              onClick={toggleTree}
               aria-label={
-                terminalOpen ? "Hide terminal pane" : "Show terminal pane"
+                showTree ? "Hide file tree pane" : "Show file tree pane"
               }
-              aria-pressed={terminalOpen}
+              aria-pressed={showTree}
               title={
-                terminalOpen
-                  ? "Hide terminal pane (⌃`)"
-                  : "Show terminal pane (⌃`)"
+                showTree
+                  ? "Hide file tree pane (⌘B)"
+                  : "Show file tree pane (⌘B)"
               }
             >
-              <SquareTerminalIcon />
+              {showTree ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
             </Button>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            style={TITLEBAR_NO_DRAG_STYLE}
-            onClick={toggleTree}
-            aria-label={
-              showTree ? "Hide file tree pane" : "Show file tree pane"
-            }
-            aria-pressed={showTree}
-            title={
-              showTree ? "Hide file tree pane (⌘B)" : "Show file tree pane (⌘B)"
-            }
-          >
-            {showTree ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
-          </Button>
-        </div>
-      </TitleBar>
+          </div>
+        </TitleBar>
 
-      <div className="min-h-0 flex-1">
-        {/* Vertical split: the three workbench panes on top, the
+        <div className="min-h-0 flex-1">
+          {/* Vertical split: the three workbench panes on top, the
             terminal panel at the bottom (VSCode-style). The bottom pair
             mounts on first ctrl+` and stays mounted while collapsed so
             the shell survives toggling; shell exit unmounts it. */}
-        <ResizablePanelGroup orientation="vertical">
-          <ResizablePanel>
-            {/* Horizontal is the default orientation in
+          <ResizablePanelGroup orientation="vertical">
+            <ResizablePanel>
+              {/* Horizontal is the default orientation in
                 react-resizable-panels v4 — omit the prop.
                 Order: AgentPane | EditorPane | FileTreePane. Agent-first puts the
                 agent pane in the dominant left position; the file tree pane
                 sits on the right as a secondary navigator and is
                 conditionally rendered so the EditorPane absorbs its
                 space when hidden. */}
-            <ResizablePanelGroup>
-              <ResizablePanel
-                defaultSize={AGENT_PANE_DEFAULT}
-                minSize={AGENT_PANE_MIN}
-              >
-                <AgentPane
-                  workspace={workspace}
-                  activeRelPath={activeRelPath}
-                  onMaybeMutated={bumpTreeRefresh}
-                />
-              </ResizablePanel>
-              <ResizableHandle />
-              <ResizablePanel defaultSize="57%" minSize={EDITOR_PANE_MIN}>
-                <EditorPane
-                  workspace={workspace}
-                  openTabs={openTabs}
-                  activeRelPath={activeRelPath}
-                  onSelectTab={setActiveRelPath}
-                  onCloseTab={closeTab}
-                  onReopenClosedTab={reopenClosedTab}
-                  onSaved={bumpTreeRefresh}
-                  onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
-                />
-              </ResizablePanel>
-              {showTree && (
-                <>
-                  <ResizableHandle />
-                  <ResizablePanel
-                    defaultSize={FILE_TREE_PANE_DEFAULT}
-                    minSize={FILE_TREE_PANE_MIN}
-                    maxSize={FILE_TREE_PANE_MAX}
-                    className="bg-muted/20"
-                  >
-                    <FileTreePane
-                      workspace={workspace}
-                      activeRelPath={activeRelPath}
-                      onOpenFile={(rp) => {
-                        if (rp) openFile(rp);
-                      }}
-                      refreshKey={treeRefreshKey}
-                      onEntryTrashed={handleEntryTrashed}
-                    />
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
-          </ResizablePanel>
-          {terminalSpawned && (
-            <>
-              <ResizableHandle />
-              <ResizablePanel
-                panelRef={terminalPanelRef}
-                collapsible
-                defaultSize={TERMINAL_PANE_DEFAULT}
-                minSize={TERMINAL_PANE_MIN}
-                onResize={(size) => setTerminalOpen(size.inPixels > 0)}
-              >
-                <TerminalPane
-                  workspace={workspace}
-                  onSessionEnded={handleTerminalSessionEnded}
-                />
-              </ResizablePanel>
-            </>
-          )}
-        </ResizablePanelGroup>
+              <ResizablePanelGroup>
+                <ResizablePanel
+                  defaultSize={AGENT_PANE_DEFAULT}
+                  minSize={AGENT_PANE_MIN}
+                >
+                  <AgentPane
+                    workspace={workspace}
+                    activeRelPath={activeRelPath}
+                    onMaybeMutated={bumpTreeRefresh}
+                  />
+                </ResizablePanel>
+                <ResizableHandle />
+                <ResizablePanel defaultSize="57%" minSize={EDITOR_PANE_MIN}>
+                  <EditorPane
+                    workspace={workspace}
+                    openTabs={openTabs}
+                    activeRelPath={activeRelPath}
+                    onSelectTab={setActiveRelPath}
+                    onCloseTab={closeTab}
+                    onReopenClosedTab={reopenClosedTab}
+                    onSaved={bumpTreeRefresh}
+                    onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
+                  />
+                </ResizablePanel>
+                {showTree && (
+                  <>
+                    <ResizableHandle />
+                    <ResizablePanel
+                      defaultSize={FILE_TREE_PANE_DEFAULT}
+                      minSize={FILE_TREE_PANE_MIN}
+                      maxSize={FILE_TREE_PANE_MAX}
+                      className="bg-muted/20"
+                    >
+                      <FileTreePane
+                        workspace={workspace}
+                        activeRelPath={activeRelPath}
+                        onOpenFile={(rp) => {
+                          if (rp) openFile(rp);
+                        }}
+                        refreshKey={treeRefreshKey}
+                        onEntryTrashed={handleEntryTrashed}
+                      />
+                    </ResizablePanel>
+                  </>
+                )}
+              </ResizablePanelGroup>
+            </ResizablePanel>
+            {terminalSpawned && (
+              <>
+                <ResizableHandle />
+                <ResizablePanel
+                  panelRef={terminalPanelRef}
+                  collapsible
+                  defaultSize={TERMINAL_PANE_DEFAULT}
+                  minSize={TERMINAL_PANE_MIN}
+                  onResize={(size) => setTerminalOpen(size.inPixels > 0)}
+                >
+                  <TerminalPane
+                    workspace={workspace}
+                    onSessionEnded={handleTerminalSessionEnded}
+                  />
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+        </div>
       </div>
-    </div>
+    </WorkspaceChangesProvider>
   );
 }

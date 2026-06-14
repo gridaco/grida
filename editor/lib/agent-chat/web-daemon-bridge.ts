@@ -141,6 +141,9 @@ export function createWebDaemonBridge(
         dialog: false,
         shell: false,
         terminal: false,
+        // OS file watcher is an Electron-main capability; the web daemon
+        // bridge has no main process, so the UI falls back to pull-refresh.
+        workspace_watch: false,
       },
     },
     handshake: () => client.handshake(),
@@ -198,9 +201,18 @@ export function createWebDaemonBridge(
         client.workspaces.read_file(workspaceId, relPath),
       read_file_bytes: (workspaceId, relPath) =>
         client.workspaces.read_file_bytes(workspaceId, relPath),
-      write_file: (workspaceId, relPath, content) =>
-        client.workspaces.write_file(workspaceId, relPath, content),
+      write_file: (workspaceId, relPath, content, expectedMtime) =>
+        client.workspaces.write_file(
+          workspaceId,
+          relPath,
+          content,
+          expectedMtime
+        ),
       trash_entry: () => unavailable("workspaces.trash_entry"),
+      // OS file watcher is an Electron-main capability; the daemon bridge
+      // reports `caps.native.workspace_watch: false` and the UI pull-refreshes.
+      subscribe_changes: () => unavailable("workspaces.subscribe_changes"),
+      unsubscribe_changes: () => unavailable("workspaces.unsubscribe_changes"),
     },
     terminal: {
       // PTY host is an Electron-main capability; the web daemon bridge

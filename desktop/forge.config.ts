@@ -121,9 +121,12 @@ const config: ForgeConfig = {
     // (vendor/seccomp/*/apply-seccomp) that cannot run from inside an asar —
     // unpack it so they land on a real filesystem. node-pty likewise: its
     // native `pty.node` addon and `spawn-helper` executable cannot load/run
-    // from inside an asar.
+    // from inside an asar. @parcel/watcher (issue #805) is the same: its
+    // per-platform prebuild package (`@parcel/watcher-<platform>-<arch>`)
+    // carries the `.node` addon, which must load from the real filesystem.
     asar: {
-      unpack: "**/node_modules/{@anthropic-ai/sandbox-runtime,node-pty}/**",
+      unpack:
+        "**/node_modules/{@anthropic-ai/sandbox-runtime,node-pty,@parcel/watcher,@parcel/watcher-*}/**",
     },
     appBundleId: appBundleId,
     icon: icon,
