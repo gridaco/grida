@@ -53,7 +53,7 @@ export default function AudioGenTool({
     <AuthProvider>
       <PromptInputProvider initialInput={initialPrompt}>
         <div className="container mx-auto px-4 pt-24 md:pt-28 xl:pt-36 pb-24 min-h-screen">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <header className="mb-10 text-left">
               <h1 className="text-3xl font-semibold tracking-tight mb-3">
                 AI Music Generator
@@ -111,7 +111,7 @@ function Workspace() {
           prompt,
           image_inputs: image_inputs.length > 0 ? image_inputs : undefined,
         });
-        const data = credits.consume(env, { next: "/ai/music/playground" });
+        const data = credits.consume(env, { next: "/ai/playground/music" });
         if (!data) {
           if (env.success === false) setError(env.message);
           return;
@@ -133,89 +133,92 @@ function Workspace() {
   const handleSubmitWithAuth = withAuth(handleSubmit);
 
   return (
-    <div className="grid gap-6">
-      <PromptInput
-        accept="image/*"
-        multiple
-        maxFiles={10}
-        maxFileSize={8 * 1024 * 1024}
-        onSubmit={(message) => handleSubmitWithAuth(message)}
-      >
-        <PromptInputBody>
-          <PromptInputAttachments>
-            {(attachment) => <PromptInputAttachment data={attachment} />}
-          </PromptInputAttachments>
-          <PromptInputTextarea placeholder="Describe the music you want — genre, mood, instruments, tempo…" />
-        </PromptInputBody>
-        <PromptInputFooter>
-          <PromptInputTools>
-            <PromptInputActionMenu>
-              <PromptInputActionMenuTrigger />
-              <PromptInputActionMenuContent>
-                <PromptInputActionAddAttachments label="Attach reference image" />
-              </PromptInputActionMenuContent>
-            </PromptInputActionMenu>
-            <Select
-              value={modelId}
-              onValueChange={(v) => setModelId(v as ai.audio.AudioModelId)}
-            >
-              <SelectTrigger className="w-min border-none h-8">
-                <SelectValue>{card.label}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {ai.audio.audio_model_ids.map((id) => {
-                  const m = ai.audio.models[id];
-                  return (
-                    <SelectItem key={id} value={id}>
-                      <div className="flex items-center justify-between gap-2 w-full">
-                        <span>{m.label}</span>
-                        <Badge variant="outline" className="ml-2">
-                          ~{m.duration_label}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </PromptInputTools>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground font-mono">
-              {credits.formatted ?? "—"} left
-            </span>
-            <PromptInputSubmit
-              disabled={loading}
-              status={loading ? "submitted" : undefined}
-            />
-          </div>
-        </PromptInputFooter>
-      </PromptInput>
+    <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+      {/* in */}
+      <div className="grid gap-6 content-start lg:sticky lg:top-28">
+        <PromptInput
+          accept="image/*"
+          multiple
+          maxFiles={10}
+          maxFileSize={8 * 1024 * 1024}
+          onSubmit={(message) => handleSubmitWithAuth(message)}
+        >
+          <PromptInputBody>
+            <PromptInputAttachments>
+              {(attachment) => <PromptInputAttachment data={attachment} />}
+            </PromptInputAttachments>
+            <PromptInputTextarea placeholder="Describe the music you want — genre, mood, instruments, tempo…" />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputTools>
+              <PromptInputActionMenu>
+                <PromptInputActionMenuTrigger />
+                <PromptInputActionMenuContent>
+                  <PromptInputActionAddAttachments label="Attach reference image" />
+                </PromptInputActionMenuContent>
+              </PromptInputActionMenu>
+              <Select
+                value={modelId}
+                onValueChange={(v) => setModelId(v as ai.audio.AudioModelId)}
+              >
+                <SelectTrigger className="w-min border-none h-8">
+                  <SelectValue>{card.label}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {ai.audio.audio_model_ids.map((id) => {
+                    const m = ai.audio.models[id];
+                    return (
+                      <SelectItem key={id} value={id}>
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <span>{m.label}</span>
+                          <Badge variant="outline" className="ml-2">
+                            ~{m.duration_label}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </PromptInputTools>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-mono">
+                {credits.formatted ?? "—"} left
+              </span>
+              <PromptInputSubmit
+                disabled={loading}
+                status={loading ? "submitted" : undefined}
+              />
+            </div>
+          </PromptInputFooter>
+        </PromptInput>
 
-      <div className="flex flex-wrap gap-2">
-        {PROMPT_PRESETS.map((p) => (
-          <PromptChip
-            key={p}
-            label={p}
-            disabled={loading}
-            onClick={() => handleSubmitWithAuth({ text: p, files: [] })}
-          />
-        ))}
+        <div className="flex flex-wrap gap-2">
+          {PROMPT_PRESETS.map((p) => (
+            <PromptChip
+              key={p}
+              label={p}
+              disabled={loading}
+              onClick={() => handleSubmitWithAuth({ text: p, files: [] })}
+            />
+          ))}
+        </div>
+
+        {error && (
+          <div className="text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded-md px-4 py-2">
+            {error}
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div className="text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded-md px-4 py-2">
-          {error}
-        </div>
-      )}
-
-      {loading && results.length === 0 && (
-        <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
-          <Loader2Icon className="size-4 animate-spin" />
-          Generating with {card.label} — this can take 10–30 seconds…
-        </div>
-      )}
-
+      {/* out */}
       <div className="space-y-4">
+        {loading && results.length === 0 && (
+          <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
+            <Loader2Icon className="size-4 animate-spin" />
+            Generating with {card.label} — this can take 10–30 seconds…
+          </div>
+        )}
         {results.map((r) => (
           <ResultCard key={r.id} item={r} />
         ))}

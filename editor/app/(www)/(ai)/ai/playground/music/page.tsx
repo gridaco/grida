@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     description:
       "Generate music with Google Lyria 3 and Lyria 3 Pro from a prompt or reference image.",
     type: "website",
-    url: "https://grida.co/ai/music/playground",
+    url: "https://grida.co/ai/playground/music",
   },
   twitter: {
     card: "summary_large_image",
