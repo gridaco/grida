@@ -75,6 +75,7 @@ import type { RotatableVerdict } from "./core/rotate-pipeline";
 import { transform } from "./core/transform";
 import { insertions, type DragModifiers } from "./core/insertions";
 import { resolve_text_exit } from "./core/text-edit";
+import { marquee_selection } from "./selection/marquee";
 import { paint } from "./core/paint";
 import { Gestures } from "./gestures/gestures";
 import { applyDefaultGestures } from "./gestures/defaults";
@@ -551,6 +552,21 @@ class DomSurface implements Surface {
     vertices: readonly number[];
     segments: readonly number[];
     tangents: readonly (readonly [number, 0 | 1])[];
+  } | null = null;
+
+  /** Frozen state for an in-flight SCENE marquee — the non-vector analog of
+   *  {@link vector_edit_region_baseline}. Captured on the first preview
+   *  frame, cleared on commit and on `cancel_in_flight`:
+   *    - `boxes`: every element's container-box, read from layout ONCE so
+   *      each subsequent pointer-move resolves with pure rect math instead
+   *      of an O(N) `getBBox` pass. Elements can't move while a selection
+   *      rect is dragged, so the snapshot stays valid for the gesture.
+   *    - `selection`: the gesture-start selection, used as the additive
+   *      (Shift) merge baseline so shrinking the rect releases rect-added
+   *      members without dropping the pre-gesture selection. */
+  private scene_marquee_baseline: {
+    boxes: marquee_selection.Box[];
+    selection: readonly NodeId[];
   } | null = null;
 
   /** Cached `editor.state.tool`; updated inside the `editor.subscribe`
@@ -1277,6 +1293,7 @@ class DomSurface implements Surface {
       this.vector_edit_region_baseline = null;
       this.hud.setVectorSelection(null);
     }
+    this.scene_marquee_baseline = null;
     this.gestures._dispose();
     // Cancel any in-flight gesture before RAFs are released. The
     // nudge-dwell watcher's teardown is queued separately (see ctor).
@@ -1852,6 +1869,16 @@ class DomSurface implements Surface {
    *  was canceled. */
   private cancel_in_flight(): boolean {
     let canceled = false;
+    if (this.scene_marquee_baseline) {
+      // Drop the frozen box snapshot so the next marquee re-reads layout —
+      // a stale snapshot would pick against the previous document/camera.
+      // Selection is left as-is (the last live preview), matching the
+      // vector marquee, which also keeps its last-previewed sub-selection
+      // on cancel; Escape's own keymap binding (`selection.deselect`) is
+      // what clears the selection when the surface is attended.
+      this.scene_marquee_baseline = null;
+      canceled = true;
+    }
     if (this.translate_orchestrator.has_active_session()) {
       this.translate_orchestrator.cancel();
       canceled = true;
@@ -3097,24 +3124,49 @@ class DomSurface implements Surface {
       this.handle_marquee_vectors(intent);
       return;
     }
-    // Scene branch: scene-wide intersection is O(N) over `element_index`
-    // and forces layout via `container_box` — too expensive to run on every
-    // pointer_move. Stay on commit-only here.
-    if (intent.phase !== "commit") return;
-    const ids: NodeId[] = [];
-    for (const id of this.element_index.keys()) {
-      if (id === this.editor.tree().root) continue;
-      const box = this.container_box(id);
-      if (!box) continue;
-      if (cmath.rect.intersects(box, intent.rect)) ids.push(id);
+    // Scene branch: live (preview + commit), mirroring the vector marquee.
+    // The cost the old commit-only path feared — an O(N) `getBBox` layout
+    // pass per pointer-move — is paid ONCE here, into a frozen box snapshot
+    // captured on the first frame. Every subsequent frame is pure rect math
+    // (`resolve_scene_marquee`), so the selection updates while dragging.
+    if (!this.scene_marquee_baseline) {
+      const cr = this.container.getBoundingClientRect();
+      const root = this.editor.tree().root;
+      const boxes: [NodeId, Rect][] = [];
+      // Paint order (back → front): the marquee's shadow rule keeps a
+      // containing box only when it is the FRONT-MOST box the marquee
+      // touches, so the order is load-bearing. `_ensure_z_order(false, …)`
+      // walks the document in paint order and filters out the root.
+      for (const id of this._ensure_z_order(false, root)) {
+        // Pass the pre-read container rect so the per-element layout flush
+        // doesn't also re-read `getBoundingClientRect` N times.
+        const box = this.container_box(id, cr);
+        if (box) boxes.push([id, box]);
+      }
+      this.scene_marquee_baseline = {
+        boxes,
+        selection: this.editor.state.selection,
+      };
     }
-    if (ids.length === 0) {
-      if (!intent.additive) this.editor.commands.deselect();
-      return;
-    }
-    this.editor.commands.select(ids, {
-      mode: intent.additive ? "add" : "replace",
-    });
+    // Always `replace`: every frame recomputes the whole selection from the
+    // rect (additive folds the gesture-start baseline in). `set_selection`
+    // short-circuits on an unchanged set, so idle frames are free. Selection
+    // is ephemeral state — these per-frame calls never touch undo history.
+    const next = this.resolve_scene_marquee(intent.rect, intent.additive);
+    this.editor.commands.select(next, { mode: "replace" });
+    if (intent.phase === "commit") this.scene_marquee_baseline = null;
+  }
+
+  /** Resolve the scene marquee selection for one frame from the frozen,
+   *  paint-ordered box snapshot. The rule (shadow + additive) lives in the
+   *  headless `marquee_selection` policy (`src/selection/marquee.ts`, spec
+   *  `docs/marquee-selection.md`); the surface only supplies the boxes and
+   *  the gesture-start baseline. Selection is deterministic in (marquee rect,
+   *  gesture-start selection, shift) — meta is a gesture-routing modifier
+   *  only (it decides that a drag IS a marquee), not a resolution input. */
+  private resolve_scene_marquee(rect: Rect, additive: boolean): NodeId[] {
+    const { boxes, selection } = this.scene_marquee_baseline!;
+    return marquee_selection.resolve(boxes, rect, selection, { additive });
   }
 
   /**

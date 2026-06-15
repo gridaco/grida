@@ -423,6 +423,32 @@ scenario tables follows from it plus the translate-body routing rule.
   Marquee on drag is additive — nodes intersected by the marquee rect are
   added to the current selection.
 
+### Meta — region-select from anywhere
+
+Holding **meta** (Cmd / ⌘) turns a drag into a marquee **regardless of what is
+under the pointer** — over scene content (including the content-representative
+`select_node` overlay), and over a selected node's move-body
+(`translate_handle`). Routing only: a meta-press classifies as `MetaMarquee`
+→ `start_marquee_pend` with **no on-down emit**, so it neither selects nor
+moves on down; the drag region-selects.
+
+- **Real handles are still respected.** A meta-press on a resize / rotate /
+  endpoint (or any sub-selection) handle returns its handle scenario above.
+  Meta overrides **only** the move-body — the one overlay whose job is "drag
+  to move the selection."
+- **Scoped.** `meta && !in_content_edit && click_count < 2`: dblclick still
+  enters edit; content-edit keeps meta's own meaning (segment bend).
+- **Routing, not resolution.** Meta decides a drag _is_ a marquee; it does not
+  change _what_ the marquee selects.
+
+**When it is useful.** A full-bleed background `<rect>` is a normal pickable,
+move-able node, so a plain drag over it selects or moves the background instead
+of marquee-selecting the content on top. Meta-drag is the escape hatch: start
+a marquee anywhere — even on the background — without selecting or moving it.
+It is a power-user affordance (most users will not discover it), not a
+substitute for a product-level "background is not a selection target" decision,
+which is tracked separately (issue gridaco/grida#838).
+
 ### Cursor (independent of intent)
 
 Cursor is set on every pointer-move while no gesture is active. **Driven by
