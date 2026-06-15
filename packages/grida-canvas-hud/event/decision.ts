@@ -72,6 +72,9 @@ import type { SelectMode } from "./intent";
  *   because the body's reason to exist is "the user may be about to drag
  *   the existing selection."
  * - `Empty*` — pointer hit nothing (no overlay, no scene content).
+ * - `MetaMarquee` — meta held: a drag region-selects from anywhere (even over
+ *   content or the move-body), overriding the move-body but not real handles.
+ *   Routing only. See the WG doc's "Meta — region-select from anywhere".
  * - `EnterEdit` — double-click variant.
  * - `ExitEdit` — double-click while already in content-edit, with no
  *   vector-control overlay claiming the press. The "dblclick away" exit.
@@ -199,6 +202,18 @@ export const enum Scenario {
   EmptyClearSubSelectionThenMarquee = "EmptyClearSubSelectionThenMarquee",
   EmptyMarquee = "EmptyMarquee",
   EmptyAdditiveMarquee = "EmptyAdditiveMarquee",
+
+  /**
+   * Meta held in select mode (single-click). The cursor is a region-select
+   * tool: a drag marquees from anywhere — even over an element — and never
+   * translates or selects-on-down. Real Tier-1 handles still win (resolved
+   * before this); the move-body overlay is the one meta overrides, and
+   * content-edit keeps its own meta meaning (bend). Dispatch is identical to
+   * `EmptyMarquee` (`start_marquee_pend`, `emit_on_down: "none"`); how the
+   * rect resolves (the shadow / additive rules) is the host's marquee
+   * concern, not this on-down decision.
+   */
+  MetaMarquee = "MetaMarquee",
 
   Noop = "Noop",
 }
@@ -546,6 +561,13 @@ export function classifyScenario(input: PointerDownInput): Scenario {
     sub_selection,
   } = input;
 
+  // Meta makes the cursor a marquee tool in select mode (single-click): a
+  // drag region-selects from anywhere and never moves/selects-on-down.
+  // Checked at two routing sites below — the move-body overlay (Tier 1) and
+  // scene-content / empty space (Tier 2) — so name the predicate once.
+  // Gated so dblclick still enters edit and content-edit keeps meta = bend.
+  const meta_marquee = modifiers.meta && !in_content_edit && click_count < 2;
+
   // ── Tier 0 — content-edit exit ─────────────────────────────────────────
   // While a vector sub-selection mirror is active, a dblclick that does
   // NOT land on a vector-control overlay (vertex / tangent / segment_strip)
@@ -633,6 +655,9 @@ export function classifyScenario(input: PointerDownInput): Scenario {
       }
 
       case "translate_handle":
+        // The move-body is the ONE overlay meta overrides — a meta-drag over
+        // it marquees instead of moving. Real handles returned above.
+        if (meta_marquee) return Scenario.MetaMarquee;
         return classifyBodyRegion(
           hovered_id,
           selection_ids,
@@ -641,6 +666,11 @@ export function classifyScenario(input: PointerDownInput): Scenario {
         );
     }
   }
+
+  // ── Meta — region-select over scene content / empty space ─────────────
+  // Placed AFTER Tier-1 so overlay handles still win (the move-body case
+  // above is the one exception). See `meta_marquee` for the predicate + why.
+  if (meta_marquee) return Scenario.MetaMarquee;
 
   // ── Tier 2 — scene content ─────────────────────────────────────────────
   if (hovered_id) {
@@ -1179,6 +1209,9 @@ function dispatch(
       };
     case Scenario.EmptyMarquee:
     case Scenario.EmptyAdditiveMarquee:
+    // Meta-over-content marquees with no on-down emit: selection is left
+    // untouched on press (no deselect, no select), and a drag region-selects.
+    case Scenario.MetaMarquee:
       return { kind: "start_marquee_pend", emit_on_down: "none" };
   }
 }

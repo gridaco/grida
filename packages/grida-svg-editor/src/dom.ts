@@ -75,6 +75,7 @@ import type { RotatableVerdict } from "./core/rotate-pipeline";
 import { transform } from "./core/transform";
 import { insertions, type DragModifiers } from "./core/insertions";
 import { resolve_text_exit } from "./core/text-edit";
+import { marquee_selection } from "./selection/marquee";
 import { paint } from "./core/paint";
 import { Gestures } from "./gestures/gestures";
 import { applyDefaultGestures } from "./gestures/defaults";
@@ -564,7 +565,7 @@ class DomSurface implements Surface {
    *      (Shift) merge baseline so shrinking the rect releases rect-added
    *      members without dropping the pre-gesture selection. */
   private scene_marquee_baseline: {
-    boxes: ReadonlyArray<readonly [NodeId, Rect]>;
+    boxes: marquee_selection.Box[];
     selection: readonly NodeId[];
   } | null = null;
 
@@ -3132,8 +3133,11 @@ class DomSurface implements Surface {
       const cr = this.container.getBoundingClientRect();
       const root = this.editor.tree().root;
       const boxes: [NodeId, Rect][] = [];
-      for (const id of this.element_index.keys()) {
-        if (id === root) continue;
+      // Paint order (back → front): the marquee's shadow rule keeps a
+      // containing box only when it is the FRONT-MOST box the marquee
+      // touches, so the order is load-bearing. `_ensure_z_order(false, …)`
+      // walks the document in paint order and filters out the root.
+      for (const id of this._ensure_z_order(false, root)) {
         // Pass the pre-read container rect so the per-element layout flush
         // doesn't also re-read `getBoundingClientRect` N times.
         const box = this.container_box(id, cr);
@@ -3153,29 +3157,16 @@ class DomSurface implements Surface {
     if (intent.phase === "commit") this.scene_marquee_baseline = null;
   }
 
-  /** Resolve the scene marquee selection for one frame from the frozen box
-   *  snapshot (`scene_marquee_baseline`): the ids whose box intersects `rect`.
-   *  Additive (Shift) folds the gesture-start selection in baseline-first and
-   *  deduped, so shrinking the rect releases rect-added members without
-   *  dropping the pre-gesture selection; non-additive returns the bare hits
-   *  (replace). Short and single-caller, so it lives on the surface rather
-   *  than in core — the live behavior is covered by `marquee-live.browser`. */
+  /** Resolve the scene marquee selection for one frame from the frozen,
+   *  paint-ordered box snapshot. The rule (shadow + additive) lives in the
+   *  headless `marquee_selection` policy (`src/selection/marquee.ts`, spec
+   *  `docs/marquee-selection.md`); the surface only supplies the boxes and
+   *  the gesture-start baseline. Selection is deterministic in (marquee rect,
+   *  gesture-start selection, shift) — meta is a gesture-routing modifier
+   *  only (it decides that a drag IS a marquee), not a resolution input. */
   private resolve_scene_marquee(rect: Rect, additive: boolean): NodeId[] {
     const { boxes, selection } = this.scene_marquee_baseline!;
-    const hits: NodeId[] = [];
-    for (const [id, box] of boxes) {
-      if (cmath.rect.intersects(box, rect)) hits.push(id);
-    }
-    if (!additive) return hits;
-    const next = [...selection];
-    const seen = new Set(selection);
-    for (const id of hits) {
-      if (!seen.has(id)) {
-        seen.add(id);
-        next.push(id);
-      }
-    }
-    return next;
+    return marquee_selection.resolve(boxes, rect, selection, { additive });
   }
 
   /**

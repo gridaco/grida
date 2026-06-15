@@ -923,6 +923,98 @@ describe("Scenario.EmptyAdditiveMarquee (shift)", () => {
   });
 });
 
+describe("Scenario.MetaMarquee (meta = raw region-select, even over content)", () => {
+  const META = { ...NO_MODS, meta: true };
+  const META_SHIFT = { ...NO_MODS, meta: true, shift: true };
+
+  it("classifies a meta press started on scene content as a marquee, not a content select", () => {
+    expect(classifyScenario(input({ hovered_id: "a", modifiers: META }))).toBe(
+      Scenario.MetaMarquee
+    );
+  });
+
+  it("classifies meta over empty space as a marquee too", () => {
+    expect(classifyScenario(input({ modifiers: META }))).toBe(
+      Scenario.MetaMarquee
+    );
+  });
+
+  it("classifies meta over content WITH an existing selection as a marquee (no deselect on down)", () => {
+    expect(
+      classifyScenario(
+        input({ hovered_id: "b", selection_ids: ["a"], modifiers: META })
+      )
+    ).toBe(Scenario.MetaMarquee);
+  });
+
+  it("classifies meta+shift the same — additive is the host's marquee concern, not the on-down decision", () => {
+    expect(
+      classifyScenario(input({ hovered_id: "a", modifiers: META_SHIFT }))
+    ).toBe(Scenario.MetaMarquee);
+  });
+
+  it("dispatches start_marquee_pend with no on-down emit (prevents both move and select)", () => {
+    expect(
+      decidePointerDown(input({ hovered_id: "a", modifiers: META }))
+    ).toEqual({ kind: "start_marquee_pend", emit_on_down: "none" });
+  });
+
+  it("does NOT override a real Tier-1 handle — a meta press on a resize handle still resizes", () => {
+    expect(
+      classifyScenario(
+        input({
+          ui_action: {
+            kind: "resize_handle",
+            direction: "se",
+            ids: ["a"],
+            initial_shape: { kind: "rect", rect: RECT },
+          },
+          selection_ids: ["a"],
+          modifiers: META,
+        })
+      )
+    ).toBe(Scenario.HandleResize);
+  });
+
+  it("DOES override the move-body (translate_handle) — meta-drag over the selection body marquees, not moves", () => {
+    expect(
+      classifyScenario(
+        input({ ui_action: BODY, selection_ids: ["a"], modifiers: META })
+      )
+    ).toBe(Scenario.MetaMarquee);
+  });
+
+  it("still enters edit on meta+dblclick over the move-body", () => {
+    expect(
+      classifyScenario(
+        input({
+          ui_action: BODY,
+          hovered_id: "a",
+          selection_ids: ["a"],
+          modifiers: META,
+          click_count: 2,
+        })
+      )
+    ).toBe(Scenario.EnterEdit);
+  });
+
+  it("does NOT pre-empt a double-click — meta+dblclick on content still enters edit", () => {
+    expect(
+      classifyScenario(
+        input({ hovered_id: "a", modifiers: META, click_count: 2 })
+      )
+    ).toBe(Scenario.EnterEdit);
+  });
+
+  it("is scoped to select mode — in content-edit, meta does not force a node marquee", () => {
+    expect(
+      classifyScenario(
+        input({ hovered_id: "a", modifiers: META, in_content_edit: true })
+      )
+    ).not.toBe(Scenario.MetaMarquee);
+  });
+});
+
 // ════════════════════════════════════════════════════════════════════════════
 // Idle cursor
 // ════════════════════════════════════════════════════════════════════════════
