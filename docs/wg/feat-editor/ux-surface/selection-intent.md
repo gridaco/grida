@@ -426,7 +426,8 @@ scenario tables follows from it plus the translate-body routing rule.
 ### Meta — region-select from anywhere
 
 Holding **meta** (Cmd / ⌘) turns a drag into a marquee **regardless of what is
-under the pointer** — over scene content, and over a selected node's move-body
+under the pointer** — over scene content (including the content-representative
+`select_node` overlay), and over a selected node's move-body
 (`translate_handle`). Routing only: a meta-press classifies as `MetaMarquee`
 → `start_marquee_pend` with **no on-down emit**, so it neither selects nor
 moves on down; the drag region-selects.

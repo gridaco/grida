@@ -648,9 +648,13 @@ export function classifyScenario(input: PointerDownInput): Scenario {
           : Scenario.HandleRegionReplace;
 
       case "select_node": {
-        // Treated like Tier-2 content: it's a content-representative click.
+        // Treated like Tier-2 content: it's a content-representative click,
+        // so meta region-selects over it the same way it does over a scene
+        // pick. Placed after the dblclick guard so meta+dblclick still enters
+        // edit (`meta_marquee` is single-click anyway).
         const id = ui_action.id;
         if (click_count >= 2) return Scenario.EnterEdit;
+        if (meta_marquee) return Scenario.MetaMarquee;
         return classifyContent(id, selection_ids, modifiers);
       }
 

@@ -998,6 +998,26 @@ describe("Scenario.MetaMarquee (meta = raw region-select, even over content)", (
     ).toBe(Scenario.EnterEdit);
   });
 
+  it("DOES route a content-representative select_node overlay — meta region-selects over it like a scene pick", () => {
+    expect(
+      classifyScenario(
+        input({ ui_action: { kind: "select_node", id: "a" }, modifiers: META })
+      )
+    ).toBe(Scenario.MetaMarquee);
+  });
+
+  it("still enters edit on meta+dblclick over a select_node overlay", () => {
+    expect(
+      classifyScenario(
+        input({
+          ui_action: { kind: "select_node", id: "a" },
+          modifiers: META,
+          click_count: 2,
+        })
+      )
+    ).toBe(Scenario.EnterEdit);
+  });
+
   it("does NOT pre-empt a double-click — meta+dblclick on content still enters edit", () => {
     expect(
       classifyScenario(
