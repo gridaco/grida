@@ -34,7 +34,7 @@ intersection semantics out as a non-goal; this is its sibling.
 
 The selection is a pure function of three inputs:
 
-```
+```txt
 selection = f(marquee rect, gesture-start selection, shift)
 ```
 
