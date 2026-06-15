@@ -553,6 +553,21 @@ class DomSurface implements Surface {
     tangents: readonly (readonly [number, 0 | 1])[];
   } | null = null;
 
+  /** Frozen state for an in-flight SCENE marquee — the non-vector analog of
+   *  {@link vector_edit_region_baseline}. Captured on the first preview
+   *  frame, cleared on commit and on `cancel_in_flight`:
+   *    - `boxes`: every element's container-box, read from layout ONCE so
+   *      each subsequent pointer-move resolves with pure rect math instead
+   *      of an O(N) `getBBox` pass. Elements can't move while a selection
+   *      rect is dragged, so the snapshot stays valid for the gesture.
+   *    - `selection`: the gesture-start selection, used as the additive
+   *      (Shift) merge baseline so shrinking the rect releases rect-added
+   *      members without dropping the pre-gesture selection. */
+  private scene_marquee_baseline: {
+    boxes: ReadonlyArray<readonly [NodeId, Rect]>;
+    selection: readonly NodeId[];
+  } | null = null;
+
   /** Cached `editor.state.tool`; updated inside the `editor.subscribe`
    *  block. Pointer events read this in the hot path so the per-event
    *  `editor.state` getter (which freezes a fresh snapshot) stays cold. */
@@ -1277,6 +1292,7 @@ class DomSurface implements Surface {
       this.vector_edit_region_baseline = null;
       this.hud.setVectorSelection(null);
     }
+    this.scene_marquee_baseline = null;
     this.gestures._dispose();
     // Cancel any in-flight gesture before RAFs are released. The
     // nudge-dwell watcher's teardown is queued separately (see ctor).
@@ -1852,6 +1868,16 @@ class DomSurface implements Surface {
    *  was canceled. */
   private cancel_in_flight(): boolean {
     let canceled = false;
+    if (this.scene_marquee_baseline) {
+      // Drop the frozen box snapshot so the next marquee re-reads layout —
+      // a stale snapshot would pick against the previous document/camera.
+      // Selection is left as-is (the last live preview), matching the
+      // vector marquee, which also keeps its last-previewed sub-selection
+      // on cancel; Escape's own keymap binding (`selection.deselect`) is
+      // what clears the selection when the surface is attended.
+      this.scene_marquee_baseline = null;
+      canceled = true;
+    }
     if (this.translate_orchestrator.has_active_session()) {
       this.translate_orchestrator.cancel();
       canceled = true;
@@ -3097,24 +3123,59 @@ class DomSurface implements Surface {
       this.handle_marquee_vectors(intent);
       return;
     }
-    // Scene branch: scene-wide intersection is O(N) over `element_index`
-    // and forces layout via `container_box` — too expensive to run on every
-    // pointer_move. Stay on commit-only here.
-    if (intent.phase !== "commit") return;
-    const ids: NodeId[] = [];
-    for (const id of this.element_index.keys()) {
-      if (id === this.editor.tree().root) continue;
-      const box = this.container_box(id);
-      if (!box) continue;
-      if (cmath.rect.intersects(box, intent.rect)) ids.push(id);
+    // Scene branch: live (preview + commit), mirroring the vector marquee.
+    // The cost the old commit-only path feared — an O(N) `getBBox` layout
+    // pass per pointer-move — is paid ONCE here, into a frozen box snapshot
+    // captured on the first frame. Every subsequent frame is pure rect math
+    // (`resolve_scene_marquee`), so the selection updates while dragging.
+    if (!this.scene_marquee_baseline) {
+      const cr = this.container.getBoundingClientRect();
+      const root = this.editor.tree().root;
+      const boxes: [NodeId, Rect][] = [];
+      for (const id of this.element_index.keys()) {
+        if (id === root) continue;
+        // Pass the pre-read container rect so the per-element layout flush
+        // doesn't also re-read `getBoundingClientRect` N times.
+        const box = this.container_box(id, cr);
+        if (box) boxes.push([id, box]);
+      }
+      this.scene_marquee_baseline = {
+        boxes,
+        selection: this.editor.state.selection,
+      };
     }
-    if (ids.length === 0) {
-      if (!intent.additive) this.editor.commands.deselect();
-      return;
+    // Always `replace`: every frame recomputes the whole selection from the
+    // rect (additive folds the gesture-start baseline in). `set_selection`
+    // short-circuits on an unchanged set, so idle frames are free. Selection
+    // is ephemeral state — these per-frame calls never touch undo history.
+    const next = this.resolve_scene_marquee(intent.rect, intent.additive);
+    this.editor.commands.select(next, { mode: "replace" });
+    if (intent.phase === "commit") this.scene_marquee_baseline = null;
+  }
+
+  /** Resolve the scene marquee selection for one frame from the frozen box
+   *  snapshot (`scene_marquee_baseline`): the ids whose box intersects `rect`.
+   *  Additive (Shift) folds the gesture-start selection in baseline-first and
+   *  deduped, so shrinking the rect releases rect-added members without
+   *  dropping the pre-gesture selection; non-additive returns the bare hits
+   *  (replace). Short and single-caller, so it lives on the surface rather
+   *  than in core — the live behavior is covered by `marquee-live.browser`. */
+  private resolve_scene_marquee(rect: Rect, additive: boolean): NodeId[] {
+    const { boxes, selection } = this.scene_marquee_baseline!;
+    const hits: NodeId[] = [];
+    for (const [id, box] of boxes) {
+      if (cmath.rect.intersects(box, rect)) hits.push(id);
     }
-    this.editor.commands.select(ids, {
-      mode: intent.additive ? "add" : "replace",
-    });
+    if (!additive) return hits;
+    const next = [...selection];
+    const seen = new Set(selection);
+    for (const id of hits) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        next.push(id);
+      }
+    }
+    return next;
   }
 
   /**
