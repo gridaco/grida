@@ -215,6 +215,18 @@ export const enum Scenario {
    */
   MetaMarquee = "MetaMarquee",
 
+  /**
+   * Meta held in select mode (single-click) over **content** (a hovered scene
+   * node / content-representative overlay). A meta-TAP still selects — the host
+   * resolves the click target (under meta: the leaf) and this defers the
+   * select to pointer-up — while a meta-DRAG region-selects (the pend carries
+   * no `ids_at_down`, so it promotes to a marquee). This is the meta-click /
+   * meta-drag reconciliation: targeting (what node) is the host's job, gesture
+   * (tap vs drag) is ours. Over **empty space** there is nothing to select, so
+   * `MetaMarquee` is used instead.
+   */
+  MetaSelectOrMarquee = "MetaSelectOrMarquee",
+
   Noop = "Noop",
 }
 
@@ -654,14 +666,19 @@ export function classifyScenario(input: PointerDownInput): Scenario {
         // edit (`meta_marquee` is single-click anyway).
         const id = ui_action.id;
         if (click_count >= 2) return Scenario.EnterEdit;
-        if (meta_marquee) return Scenario.MetaMarquee;
+        if (meta_marquee) return Scenario.MetaSelectOrMarquee;
         return classifyContent(id, selection_ids, modifiers);
       }
 
       case "translate_handle":
         // The move-body is the ONE overlay meta overrides — a meta-drag over
-        // it marquees instead of moving. Real handles returned above.
-        if (meta_marquee) return Scenario.MetaMarquee;
+        // it marquees instead of moving; a meta-tap still selects the content
+        // under the pointer (the leaf, per the host). Real handles returned
+        // above.
+        if (meta_marquee)
+          return contentId(ui_action, hovered_id)
+            ? Scenario.MetaSelectOrMarquee
+            : Scenario.MetaMarquee;
         return classifyBodyRegion(
           hovered_id,
           selection_ids,
@@ -671,10 +688,13 @@ export function classifyScenario(input: PointerDownInput): Scenario {
     }
   }
 
-  // ── Meta — region-select over scene content / empty space ─────────────
+  // ── Meta — select-or-region over scene content / region over empty ────
   // Placed AFTER Tier-1 so overlay handles still win (the move-body case
-  // above is the one exception). See `meta_marquee` for the predicate + why.
-  if (meta_marquee) return Scenario.MetaMarquee;
+  // above is the one exception). Over content a meta-tap selects (the leaf,
+  // per the host) and a meta-drag marquees; over empty space there's nothing
+  // to select, so a plain marquee. See `meta_marquee` for the predicate.
+  if (meta_marquee)
+    return hovered_id ? Scenario.MetaSelectOrMarquee : Scenario.MetaMarquee;
 
   // ── Tier 2 — scene content ─────────────────────────────────────────────
   if (hovered_id) {
@@ -1213,10 +1233,26 @@ function dispatch(
       };
     case Scenario.EmptyMarquee:
     case Scenario.EmptyAdditiveMarquee:
-    // Meta-over-content marquees with no on-down emit: selection is left
+    // Meta-over-empty marquees with no on-down emit: selection is left
     // untouched on press (no deselect, no select), and a drag region-selects.
     case Scenario.MetaMarquee:
       return { kind: "start_marquee_pend", emit_on_down: "none" };
+
+    // ── Meta over content — tap selects, drag marquees ──────────────────
+    // Defer the select (commit on up) like an ambiguous content pend, but
+    // with NO `ids_at_down`, so a drag promotes to a marquee instead of a
+    // translate (state.ts pending-promotion). The host resolves `node_id`
+    // (the leaf, under meta) via its own hit-testing.
+    case Scenario.MetaSelectOrMarquee: {
+      const id = contentId(ui_action, hovered_id)!;
+      return {
+        kind: "pend",
+        pending: {
+          ids_at_down: [],
+          deferred: { kind: "select", node_id: id, shift: modifiers.shift },
+        },
+      };
+    }
   }
 }
 
