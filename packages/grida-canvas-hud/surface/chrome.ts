@@ -200,7 +200,10 @@ export function buildChrome(input: ChromeInput): {
   // preview aligns with the rotated/sheared artwork the user is
   // dragging instead of its AABB.
   if (state.gesture.kind === "resize") {
-    const shape = state.gesture.current_shape;
+    // Draw the PREVIEW shape (symmetric about center under Alt), not the
+    // opposite-anchored `current_shape` that feeds the intent — so the
+    // dashed box matches where the artwork actually lands.
+    const shape = state.gesture.preview_shape;
     if (shape.kind === "transformed") {
       const corners = cmath.rect
         .toCorners(shape.local)

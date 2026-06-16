@@ -86,8 +86,21 @@ export type SurfaceGesture =
       initial_shape: SelectionShape;
       /** Anchor (pointer-down) in document-space. */
       anchor_doc: cmath.Vector2;
-      /** Current shape during the gesture. Same kind as `initial_shape`. */
+      /** Most-recent pointer position in document-space (= `anchor_doc`
+       *  until the first move). Lets a mid-drag modifier toggle recompute
+       *  `preview_shape` from the live delta without a pointer move. */
+      last_doc: cmath.Vector2;
+      /** Current shape during the gesture. Same kind as `initial_shape`.
+       *  Opposite-anchored — feeds the emitted `resize` intent (move +
+       *  commit). The host derives its own anchor (e.g. Alt → center)
+       *  from these dims, so this MUST stay opposite-anchored. */
       current_shape: SelectionShape;
+      /** Shape to DRAW for the dashed preview. Equals `current_shape`
+       *  except under Alt, where it is symmetric about the initial
+       *  center so the dashed box matches where a center-anchoring host
+       *  lands the artwork (otherwise the preview visibly lags the
+       *  actual result). Visual only — never emitted on an intent. */
+      preview_shape: SelectionShape;
     }
   | {
       kind: "rotate";
@@ -396,12 +409,14 @@ export function applyResize(
   initial: SelectionShape,
   direction: ResizeDirection,
   dx: number,
-  dy: number
+  dy: number,
+  opts?: { fromCenter?: boolean }
 ): SelectionShape {
+  const fromCenter = opts?.fromCenter ?? false;
   if (initial.kind === "rect") {
     return {
       kind: "rect",
-      rect: applyResizeRect(initial.rect, direction, dx, dy),
+      rect: applyResizeRect(initial.rect, direction, dx, dy, fromCenter),
     };
   }
   if (initial.kind === "transformed") {
@@ -415,9 +430,12 @@ export function applyResize(
     ];
     const inv_linear = cmath.transform.invert(linear);
     const [ldx, ldy] = cmath.vector2.transform([dx, dy], inv_linear);
+    // `fromCenter` symmetry runs in the local frame, so the projected
+    // preview stays symmetric about the (projected) local center even
+    // for rotated / sheared selections.
     return {
       kind: "transformed",
-      local: applyResizeRect(initial.local, direction, ldx, ldy),
+      local: applyResizeRect(initial.local, direction, ldx, ldy, fromCenter),
       matrix: m,
     };
   }
@@ -425,49 +443,48 @@ export function applyResize(
   return initial;
 }
 
+/**
+ * Resize a rect by dragging `direction`'s edge/corner by `(dx, dy)`.
+ *
+ * Default anchors the OPPOSITE edge/corner (far side pinned). With
+ * `fromCenter` (Alt), the resize is symmetric about the rect's center:
+ * the dragged edge moves by the delta and the opposite edge mirrors it,
+ * so the size delta doubles and the center stays put.
+ */
 function applyResizeRect(
   initial: Rect,
   direction: ResizeDirection,
   dx: number,
-  dy: number
+  dy: number,
+  fromCenter = false
 ): Rect {
   let { x, y, width, height } = initial;
 
-  switch (direction) {
-    case "n":
-      y += dy;
-      height -= dy;
-      break;
-    case "s":
-      height += dy;
-      break;
-    case "e":
-      width += dx;
-      break;
-    case "w":
-      x += dx;
-      width -= dx;
-      break;
-    case "ne":
-      y += dy;
-      height -= dy;
-      width += dx;
-      break;
-    case "nw":
-      y += dy;
-      height -= dy;
-      x += dx;
-      width -= dx;
-      break;
-    case "se":
-      width += dx;
-      height += dy;
-      break;
-    case "sw":
-      x += dx;
-      width -= dx;
-      height += dy;
-      break;
+  // `fromCenter` doubles the size delta (both edges travel) and shifts the
+  // origin so the center is preserved. `k === 1` reproduces the legacy
+  // opposite-anchored math exactly.
+  const k = fromCenter ? 2 : 1;
+  const hasN = direction === "n" || direction === "ne" || direction === "nw";
+  const hasS = direction === "s" || direction === "se" || direction === "sw";
+  const hasE = direction === "e" || direction === "ne" || direction === "se";
+  const hasW = direction === "w" || direction === "nw" || direction === "sw";
+
+  if (hasE) {
+    width += k * dx;
+    if (fromCenter) x -= dx;
   }
+  if (hasW) {
+    x += dx;
+    width -= k * dx;
+  }
+  if (hasS) {
+    height += k * dy;
+    if (fromCenter) y -= dy;
+  }
+  if (hasN) {
+    y += dy;
+    height -= k * dy;
+  }
+
   return { x, y, width, height };
 }

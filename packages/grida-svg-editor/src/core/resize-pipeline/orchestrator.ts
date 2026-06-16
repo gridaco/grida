@@ -223,6 +223,7 @@ export class ResizeOrchestrator {
       direction: session.direction,
       dx,
       dy,
+      from_center: modifiers.from_center,
     };
     const ctx: ResizeContext = {
       input: {

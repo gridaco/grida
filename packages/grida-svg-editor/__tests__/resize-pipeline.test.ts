@@ -17,6 +17,13 @@ const OPTS: ResizeOptions = {
   snap_threshold_px: 10,
 };
 
+/** No modifier keys held — the default opposite-anchored, snap-enabled gesture. */
+const NO_MODIFIERS = {
+  aspect_lock: "off",
+  from_center: false,
+  force_disable_snap: false,
+} as const;
+
 function rect_baseline(x = 0, y = 0, w = 100, h = 50): ResizeBaseline {
   return {
     bbox: { x, y, width: w, height: h },
@@ -58,7 +65,7 @@ describe("resize-pipeline — rect E handle", () => {
     };
     const ctx: ResizeContext = {
       input: { id: "a", direction: "e", dx: 18, dy: 0 },
-      modifiers: { aspect_lock: "off", force_disable_snap: false },
+      modifiers: NO_MODIFIERS,
       options: OPTS,
       snap_session: snap,
     };
@@ -84,7 +91,7 @@ describe("resize-pipeline — rect E handle", () => {
     };
     const ctx: ResizeContext = {
       input: { id: "a", direction: "e", dx: 5, dy: 0 },
-      modifiers: { aspect_lock: "off", force_disable_snap: false },
+      modifiers: NO_MODIFIERS,
       options: OPTS,
       snap_session: snap,
     };
@@ -108,7 +115,7 @@ describe("resize-pipeline — rect E handle", () => {
     };
     const ctx: ResizeContext = {
       input: { id: "a", direction: "e", dx: 18, dy: 0 },
-      modifiers: { aspect_lock: "off", force_disable_snap: false },
+      modifiers: NO_MODIFIERS,
       options: { ...OPTS, snap_enabled: false },
       snap_session: snap,
     };
@@ -137,7 +144,7 @@ describe("resize-pipeline — rect SE corner", () => {
     };
     const ctx: ResizeContext = {
       input: { id: "a", direction: "se", dx: 18, dy: 14 },
-      modifiers: { aspect_lock: "off", force_disable_snap: false },
+      modifiers: NO_MODIFIERS,
       options: OPTS,
       snap_session: snap,
     };
@@ -166,7 +173,7 @@ describe("resize-pipeline — circle uniformity", () => {
     };
     const ctx: ResizeContext = {
       input: { id: "c", direction: "se", dx: 8, dy: 12 },
-      modifiers: { aspect_lock: "off", force_disable_snap: false },
+      modifiers: NO_MODIFIERS,
       options: OPTS,
       snap_session: snap,
     };
@@ -196,7 +203,7 @@ describe("resize-pipeline — text edge no-op", () => {
     };
     const ctx: ResizeContext = {
       input: { id: "t", direction: "e", dx: 8, dy: 0 },
-      modifiers: { aspect_lock: "off", force_disable_snap: false },
+      modifiers: NO_MODIFIERS,
       options: OPTS,
       snap_session: snap,
     };
@@ -233,7 +240,7 @@ describe("resize-pipeline — snap jitter regression", () => {
       };
       const ctx: ResizeContext = {
         input: { id: "a", direction: "e", dx: dx_in, dy: 0 },
-        modifiers: { aspect_lock: "off", force_disable_snap: false },
+        modifiers: NO_MODIFIERS,
         options: OPTS,
         snap_session: snap,
       };
@@ -264,7 +271,7 @@ describe("resize-pipeline — pixel grid", () => {
     };
     const ctx: ResizeContext = {
       input: { id: "a", direction: "e", dx: 17.4, dy: 0 },
-      modifiers: { aspect_lock: "off", force_disable_snap: false },
+      modifiers: NO_MODIFIERS,
       options: { ...OPTS, pixel_grid_quantum: 1, snap_enabled: false },
       snap_session: null,
     };
@@ -288,7 +295,11 @@ describe("resize-pipeline — aspect lock (Shift)", () => {
     };
     const out = resize_pipeline.stages.aspect_lock.run(plan, {
       input: { id: "a", direction: "se", dx: 20, dy: 5 },
-      modifiers: { aspect_lock: "uniform", force_disable_snap: false },
+      modifiers: {
+        aspect_lock: "uniform",
+        from_center: false,
+        force_disable_snap: false,
+      },
       options: OPTS,
       snap_session: null,
     });
@@ -306,7 +317,11 @@ describe("resize-pipeline — aspect lock (Shift)", () => {
     };
     const out = resize_pipeline.stages.aspect_lock.run(plan, {
       input: { id: "a", direction: "e", dx: 20, dy: 0 },
-      modifiers: { aspect_lock: "uniform", force_disable_snap: false },
+      modifiers: {
+        aspect_lock: "uniform",
+        from_center: false,
+        force_disable_snap: false,
+      },
       options: OPTS,
       snap_session: null,
     });
@@ -330,7 +345,11 @@ describe("resize-pipeline — force_disable_snap", () => {
     };
     const out = resize_pipeline.stages.snap.run(plan, {
       input: { id: "a", direction: "e", dx: 18, dy: 0 },
-      modifiers: { aspect_lock: "off", force_disable_snap: true },
+      modifiers: {
+        aspect_lock: "off",
+        from_center: false,
+        force_disable_snap: true,
+      },
       options: OPTS,
       snap_session: snap,
     });
@@ -351,7 +370,7 @@ describe("resize-pipeline — pixel_grid stage", () => {
     };
     const out = resize_pipeline.stages.pixel_grid.run(plan, {
       input: { id: "a", direction: "e", dx: 17.4, dy: 0 },
-      modifiers: { aspect_lock: "off", force_disable_snap: false },
+      modifiers: NO_MODIFIERS,
       options: { ...OPTS, pixel_grid_quantum: null },
       snap_session: null,
     });

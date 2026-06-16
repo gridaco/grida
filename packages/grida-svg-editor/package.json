@@ -1,6 +1,6 @@
 {
   "name": "@grida/svg-editor",
-  "version": "1.0.0-alpha.21",
+  "version": "1.0.0-alpha.22",
   "description": "Headless SVG editor (experimental).",
   "keywords": [
     "bezier",

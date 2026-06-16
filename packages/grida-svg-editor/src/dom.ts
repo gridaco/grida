@@ -2516,7 +2516,9 @@ class DomSurface implements Surface {
       );
     }
     if (
-      prev.shift !== next.shift &&
+      // Resize listens to Shift (aspect lock) AND Alt (center anchor —
+      // enter/exit must land on the flip, not the next pointer move).
+      (prev.shift !== next.shift || prev.alt !== next.alt) &&
       this.resize_orchestrator.has_active_session()
     ) {
       this.resize_orchestrator.redrive_modifiers(
@@ -3322,8 +3324,15 @@ class DomSurface implements Surface {
   /** Snapshot of HUD modifier state mapped to `ResizeModifiers`. Same
    *  pull-at-consume discipline as `current_translate_modifiers`. */
   private current_resize_modifiers(): ResizeModifiers {
+    const mods = this.hud.modifiers();
     return {
-      aspect_lock: this.hud.modifiers().shift ? "uniform" : "off",
+      aspect_lock: mods.shift ? "uniform" : "off",
+      // Alt-drag resize-from-center (symmetric, bbox-anchored). Disjoint
+      // from Alt's other roles — translate-clone is a different gesture;
+      // the measurement overlay is idle-gesture gated — so no collision
+      // while a resize is in flight. Shift+Alt composes to uniform-about-
+      // center.
+      from_center: mods.alt,
       force_disable_snap: false,
     };
   }

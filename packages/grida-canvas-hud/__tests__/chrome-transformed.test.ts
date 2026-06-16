@@ -341,7 +341,9 @@ describe("transformed chrome — dashed resize preview", () => {
       direction: "se",
       initial_shape: { kind: "transformed", local, matrix },
       anchor_doc: [0, 0],
+      last_doc: [0, 0],
       current_shape: { kind: "transformed", local, matrix },
+      preview_shape: { kind: "transformed", local, matrix },
     };
     const shapeOf = () => null;
     const { decoration } = buildChrome({
@@ -382,7 +384,9 @@ describe("transformed chrome — dashed resize preview", () => {
       direction: "se",
       initial_shape: { kind: "rect", rect },
       anchor_doc: [0, 0],
+      last_doc: [0, 0],
       current_shape: { kind: "rect", rect },
+      preview_shape: { kind: "rect", rect },
     };
     const shapeOf = () => null;
     const { decoration } = buildChrome({

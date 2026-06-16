@@ -103,7 +103,11 @@ describe.each(ZOOMS)(
         };
         const ctx: ResizeContext = {
           input: { id, direction: "e", dx: dx_world, dy: 0 },
-          modifiers: { aspect_lock: "off", force_disable_snap: false },
+          modifiers: {
+            aspect_lock: "off",
+            from_center: false,
+            force_disable_snap: false,
+          },
           options: opts,
           snap_session: null,
         };
@@ -170,7 +174,11 @@ describe.each(ZOOMS)(
         };
         const ctx: ResizeContext = {
           input: { id, direction: "e", dx: dx_world, dy: 0 },
-          modifiers: { aspect_lock: "off", force_disable_snap: false },
+          modifiers: {
+            aspect_lock: "off",
+            from_center: false,
+            force_disable_snap: false,
+          },
           options: opts,
           snap_session: snap,
         };

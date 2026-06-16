@@ -88,6 +88,13 @@ export type ResizeModifiers = {
    *  (circle, text-on-corner) which is enforced by
    *  `intent.compute_factors` and `resize_capability.constraint`. */
   aspect_lock: "off" | "uniform";
+  /** Alt-drag center anchor. When `true`, the resize anchors on the
+   *  selection's baseline bbox **center** instead of the opposite
+   *  corner/edge — both opposite edges move symmetrically, the center
+   *  stays put. Named by effect (not `alt`): the key→effect binding
+   *  lives in the surface, never in this core. Composes with
+   *  `aspect_lock` (Shift+Alt = uniform scale about center). */
+  from_center: boolean;
   /** Hard override — skip the snap stage regardless of session /
    *  options. */
   force_disable_snap: boolean;
@@ -116,6 +123,10 @@ export type ResizePlan = {
   /** World-space, sign-adjusted gesture deltas. */
   dx: number;
   dy: number;
+  /** Center-anchor (Alt) for this frame. Carried on the plan so the
+   *  ctx-less `apply` can re-derive `(sx, sy, origin)` about the bbox
+   *  center; mirrors `ResizeModifiers.from_center`. Defaults falsey. */
+  from_center?: boolean;
 };
 
 export type ResizeStageEmission = {
@@ -294,7 +305,8 @@ export namespace resize_pipeline {
       dir: ResizeDirection,
       dx: number,
       dy: number,
-      shift: boolean
+      shift: boolean,
+      from_center = false
     ): { sx: number; sy: number; origin: { x: number; y: number } } {
       const b = baseline.bbox;
       let anchorX = 0;
@@ -356,6 +368,17 @@ export namespace resize_pipeline {
           baseHY = b.y + b.height / 2;
           affectsY = false;
           break;
+      }
+      // Alt: re-anchor on the bbox center. Keeping the moving handle
+      // (baseHX/baseHY) put while the anchor moves to the center makes
+      // the denominator the half-extent, so the scale auto-doubles
+      // (sx = (w/2 + dx)/(w/2)) and `origin` returns as the center —
+      // matching the "both edges move symmetrically" intent. The
+      // affectsX/affectsY masks (unchanged) still zero the off-axis on
+      // edge handles.
+      if (from_center) {
+        anchorX = b.x + b.width / 2;
+        anchorY = b.y + b.height / 2;
       }
       const newHX = baseHX + (affectsX ? dx : 0);
       const newHY = baseHY + (affectsY ? dy : 0);
@@ -675,12 +698,16 @@ export namespace resize_pipeline {
         if (ctx.modifiers.aspect_lock !== "uniform") return { plan };
         if (!resize_capability.is_corner(plan.direction)) return { plan };
         const pbase = pipeline_baseline(plan);
+        // Shift+Alt: the uniform-lock must be computed about the same
+        // (center) anchor the final apply uses, or the back-derived dx/dy
+        // wouldn't be uniform under center scaling.
         const locked = intent.compute_factors(
           pbase,
           plan.direction,
           plan.dx,
           plan.dy,
-          true
+          true,
+          ctx.modifiers.from_center
         );
         const bbox = pbase.bbox;
         const Hx_base = corner_x_of(bbox, plan.direction);
@@ -710,18 +737,24 @@ export namespace resize_pipeline {
         if (!ctx.options.snap_enabled) return { plan };
 
         const pbase = pipeline_baseline(plan);
+        // Center-aware so `eff.origin`/`eff.moving_corner` match the final
+        // apply. The free branch is mode-invariant on the moving edge
+        // (snap reads only that edge), so this only changes the
+        // `eff.uniform` back-calc (circle / text-on-corner).
         const f = intent.compute_factors(
           pbase,
           plan.direction,
           plan.dx,
           plan.dy,
-          false
+          false,
+          ctx.modifiers.from_center
         );
         const eff = resize_capability.effective(
           pbase,
           plan.direction,
           f.sx,
-          f.sy
+          f.sy,
+          ctx.modifiers.from_center
         );
         if (eff.no_op) return { plan };
 
@@ -799,13 +832,15 @@ export namespace resize_pipeline {
           plan.direction,
           plan.dx,
           plan.dy,
-          false
+          false,
+          ctx.modifiers.from_center
         );
         const eff = resize_capability.effective(
           pbase,
           plan.direction,
           f.sx,
-          f.sy
+          f.sy,
+          ctx.modifiers.from_center
         );
         if (eff.no_op) return { plan };
         const target_Hx = eff.mask.affects_x
@@ -865,7 +900,8 @@ export namespace resize_pipeline {
       plan.direction,
       plan.dx,
       plan.dy,
-      false
+      false,
+      plan.from_center ?? false
     );
     const members = plan.members ?? [{ id: plan.id, baseline: plan.baseline }];
     for (const m of members) {
