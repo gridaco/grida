@@ -23,7 +23,7 @@ re-derives nesting.
 
 ## The rule
 
-```
+```text
 selection = prune_nested_nodes(requested)
 ```
 
