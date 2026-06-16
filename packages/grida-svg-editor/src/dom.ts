@@ -23,6 +23,7 @@ import {
   type HUDRect,
   type Intent,
   type SurfaceEvent,
+  type SurfaceResponse,
   type Modifiers,
   type PointerButton,
   type SelectionShape,
@@ -77,6 +78,7 @@ import { transform } from "./core/transform";
 import { insertions, type DragModifiers } from "./core/insertions";
 import { resolve_text_exit } from "./core/text-edit";
 import { marquee_selection } from "./selection/marquee";
+import { targeting } from "./selection/targeting";
 import { paint } from "./core/paint";
 import { Gestures } from "./gestures/gestures";
 import { applyDefaultGestures } from "./gestures/defaults";
@@ -368,6 +370,13 @@ class DomSurface implements Surface {
   /** Pending RAF for `request_redraw`. Coalesces N emits within a frame
    *  into one HUD draw — see the `subscribe_geometry` wiring. */
   private redraw_raf_id: number | null = null;
+
+  /** Pending RAF for `request_hover_repick`. Coalesces selection / state
+   *  changes within a frame into one idle hover re-pick — deferred (never
+   *  synchronous) so the re-pick can't re-enter an in-flight `hud.dispatch`
+   *  (a double-click drill resolves its new selection via `onIntent`, which
+   *  fires mid-dispatch). */
+  private hover_repick_raf_id: number | null = null;
   /** Translate funnel — owns SnapSession + history.preview + baseline
    *  capture for drag, and any future translate gestures. The
    *  orchestrator is constructed once and lives for the surface's
@@ -1004,6 +1013,25 @@ class DomSurface implements Surface {
     // each emit triggers a redraw that does N `getBBox`/`getCTM` reads.
     this.teardown.push(editor.subscribe_geometry(() => this.request_redraw()));
 
+    // Hover is selection-derived: group-first targeting reads `state.selection`
+    // (the focus depth) to resolve what a pick targets, so a programmatic
+    // selection change with the pointer at rest — a double-click drill,
+    // Escape / select-parent, a layers-panel click — leaves the previous hover
+    // painted until the next move. Re-pick so the highlight stays a faithful
+    // preview of the next click. Deferred via `request_hover_repick` because a
+    // drill mutates selection from INSIDE `hud.dispatch` (the `onIntent` path).
+    // This is the selection sibling of the meta/ctrl re-pick in
+    // `sync_modifiers`. The geometry channel (font settle) is a latent cousin —
+    // it too can flip the target id, but only re-paints today; route it through
+    // `request_hover_repick` as well if that ever surfaces.
+    this.teardown.push(
+      editor.subscribe_with_selector(
+        (s) => s.selection,
+        () => this.request_hover_repick(),
+        array_shallow_equal
+      )
+    );
+
     // Track container size → resize the HUD canvas.
     if (typeof ResizeObserver !== "undefined") {
       this.resize_observer = new ResizeObserver(() => this.sync_canvas_size());
@@ -1188,7 +1216,84 @@ class DomSurface implements Surface {
     // tier-1 UI hits and resolve before `pick` is consulted, so this
     // only filters the fallback (clicks on empty space / the path body).
     if (this.vector_edit) return null;
-    return this.pick_at(x, y, false);
+    // Raw pick is leaf-first (`<g>` / nested `<svg>` are transparent).
+    // Group-first targeting lifts that leaf to the topmost container (or the
+    // sibling at the current focus depth), unless meta/ctrl asks for the leaf.
+    // The HUD uses this one id for BOTH the hover highlight and the select
+    // target, so hover-matches-click is automatic. See `resolve_group_first`.
+    const leaf = this.pick_at(x, y, false);
+    if (leaf === null) return null;
+    return this.resolve_group_first(leaf, { nested_first: false });
+  }
+
+  /** Group-first targeting over the raw leaf's ancestor chain — the host's
+   *  selection POLICY (pure rules in `src/selection/targeting.ts`). The
+   *  current selection defines the focus depth: a tap moves laterally /
+   *  sibling-aware at that depth, meta/ctrl jumps to the leaf, and
+   *  `nested_first` (double-click) descends one level. Returns the raw `leaf`
+   *  unchanged if the document is momentarily unavailable. */
+  private resolve_group_first(
+    leaf: NodeId,
+    opts: { nested_first: boolean }
+  ): NodeId | null {
+    const doc = (() => {
+      try {
+        return this.editor_internal().doc;
+      } catch {
+        return null;
+      }
+    })();
+    if (!doc) return leaf;
+    // Ancestor chain, ROOT-EXCLUDED, LEAF-FIRST: [leaf, parent, …, child-of-root].
+    const root = doc.root;
+    const hits: NodeId[] = [];
+    const seen = new Set<NodeId>();
+    let cur: NodeId | null = leaf;
+    while (cur !== null && cur !== root && !seen.has(cur)) {
+      hits.push(cur);
+      seen.add(cur);
+      cur = doc.parent_of(cur);
+    }
+    const mods = this.hud.modifiers();
+    return targeting.resolve_target(
+      hits,
+      { parent_of: (id) => doc.parent_of(id) },
+      {
+        selection: this.editor.state.selection,
+        deepest: mods.meta || mods.ctrl,
+        nested_first: opts.nested_first,
+      }
+    );
+  }
+
+  /** Double-click behaviour, as two distinct phases over the hierarchy:
+   *
+   *   1. **Descend** — resolve one level deeper toward `leaf` (relative to the
+   *      current focus, via `resolve_group_first` with `nested_first`). A
+   *      double-click that lands on a node deeper than the selection just
+   *      SELECTS it.
+   *   2. **Enter content-edit** — only when there is nowhere deeper to go: the
+   *      resolved target is already the sole selection. Then (and only then) a
+   *      double-click opens content-edit, when the node is editable.
+   *
+   *  Descending and editing never collide: progressive double-clicks peel
+   *  `G1 → G2 → … → leaf`, and one more double-click on the now-focused leaf
+   *  edits it. A top-level editable node (no container to peel) is selected by
+   *  the double-click's own first press, so its second press lands in the
+   *  edit phase — it still edits on a single double-click. */
+  private descend_or_enter_content_edit(leaf: NodeId): void {
+    const target = this.resolve_group_first(leaf, { nested_first: true });
+    if (target === null) return;
+    const selection = this.editor.state.selection;
+    const at_focus = selection.length === 1 && selection[0] === target;
+    if (at_focus) {
+      // Nowhere deeper to descend — this is the edit phase. `enter_content_edit`
+      // is a no-op for non-editable nodes, which simply stay selected.
+      this.editor.enter_content_edit(target);
+    } else {
+      // Descend one level — select only, never edit.
+      this.editor.commands.select(target);
+    }
   }
 
   /** Element-walk under (x, y) → first ancestor with `ID_ATTR`. When
@@ -1230,9 +1335,12 @@ class DomSurface implements Surface {
    *  `allow_root` controls whether the root `<svg>` may be returned:
    *  selection HUD passes `false`, measurement HUD passes `true`.
    *
-   *  Used by both `pick_at` (HUD hover / measurement) and
-   *  `SvgGeometryDriver.node_at_point` (core editor selection) so one
-   *  source of truth governs every click that resolves to a node. */
+   *  This is the RAW (leaf-first) picker — one source of truth for "what
+   *  element is under this point." Used by `pick_at` (HUD hover / measurement)
+   *  and `SvgGeometryDriver.node_at_point` (core geometry queries). Selection
+   *  targeting policy (group-first / meta-deepest / focus-depth) is applied on
+   *  top of the raw leaf by `hit_test` → `resolve_group_first`, NOT here, so
+   *  measurement and geometry queries stay leaf-exact. */
   private _pick_node_at_world(p: Vec2, allow_root: boolean): NodeId | null {
     const root_id = this.editor.tree().root;
     const tol_px = this.editor.style.hit_tolerance_px;
@@ -1341,6 +1449,11 @@ class DomSurface implements Surface {
       const win = this.container.ownerDocument.defaultView ?? window;
       win.cancelAnimationFrame(this.redraw_raf_id);
       this.redraw_raf_id = null;
+    }
+    if (this.hover_repick_raf_id !== null) {
+      const win = this.container.ownerDocument.defaultView ?? window;
+      win.cancelAnimationFrame(this.hover_repick_raf_id);
+      this.hover_repick_raf_id = null;
     }
     for (const fn of this.teardown) fn();
     this.teardown = [];
@@ -1582,6 +1695,60 @@ class DomSurface implements Surface {
     this.redraw_raf_id = win.requestAnimationFrame(() => {
       this.redraw_raf_id = null;
       this.redraw();
+    });
+  }
+
+  /**
+   * Re-pick the hover / target id at the RESTING pointer and return what
+   * changed. The hover target is a pure function of (pointer, modifiers,
+   * selection, tree) resolved through `hit_test` → group-first targeting;
+   * every input OTHER than the pointer changes off the pointer path, so the
+   * stored hover goes stale until the next real move. Replaying a synthetic
+   * idle pointer-move re-runs `pick` under the current state, keeping the
+   * highlight a faithful preview of what the next click would select.
+   *
+   * Idle-only: a synthetic move opens / cancels no gesture and leaves any tap
+   * candidate / pending press untouched. No-op (all-false) when the pointer
+   * has never been observed, has left the canvas, or a text / vector edit owns
+   * it. Pushes nothing and redraws nothing — the caller reflects the flags.
+   */
+  private repick_hover_at_rest(): SurfaceResponse {
+    if (
+      !this.last_pointer_valid ||
+      this.hud.gesture().kind !== "idle" ||
+      this.text_edit ||
+      this.vector_edit
+    ) {
+      return { needsRedraw: false, cursorChanged: false, hoverChanged: false };
+    }
+    return this.hud.dispatch({
+      kind: "pointer_move",
+      x: this.last_pointer.x,
+      y: this.last_pointer.y,
+      mods: this.hud.modifiers(),
+    });
+  }
+
+  /**
+   * Schedule an idle hover re-pick on the next frame (RAF-coalesced, like
+   * `request_redraw`). DEFERRED on purpose: the trigger — a selection change —
+   * frequently fires from inside `hud.dispatch` (a double-click drill resolves
+   * its new selection via `onIntent`, mid-dispatch), and re-picking there would
+   * re-enter the HUD. By next frame the dispatch has unwound and the gesture
+   * has settled, so `repick_hover_at_rest` runs against stable state. Multiple
+   * changes within a frame fold into one re-pick.
+   */
+  private request_hover_repick(): void {
+    if (this.hover_repick_raf_id !== null) return;
+    const win = this.container.ownerDocument.defaultView ?? window;
+    this.hover_repick_raf_id = win.requestAnimationFrame(() => {
+      this.hover_repick_raf_id = null;
+      const moved = this.repick_hover_at_rest();
+      if (moved.needsRedraw || moved.hoverChanged) this.redraw();
+      if (moved.cursorChanged) this.sync_cursor();
+      if (moved.hoverChanged) {
+        this.editor_hover_internal?.push_surface_hover(this.hud.hover());
+      }
     });
   }
 
@@ -2364,9 +2531,23 @@ class DomSurface implements Surface {
         this.current_rotate_modifiers()
       );
     }
+    let cursor_changed = response.cursorChanged;
+    let hover_changed = response.hoverChanged;
+    // Group-first targeting depends on meta/ctrl (meta → leaf). When that flips
+    // with the pointer at rest, the HUD's `modifiers` dispatch does NOT re-pick
+    // hover — re-pick so the highlight previews what a click would now select
+    // (live hover-matches-click as ⌘ is pressed / released). Synchronous here:
+    // this runs on the keyboard path, never inside `hud.dispatch`, so it can't
+    // re-enter the HUD — unlike the selection wire, which must defer. The
+    // `modifiers` dispatch above already stored `next`, so the re-pick reads it.
+    if (prev.meta !== next.meta || prev.ctrl !== next.ctrl) {
+      const moved = this.repick_hover_at_rest();
+      if (moved.cursorChanged) cursor_changed = true;
+      if (moved.hoverChanged) hover_changed = true;
+    }
     this.redraw();
-    if (response.cursorChanged) this.sync_cursor();
-    if (response.hoverChanged) {
+    if (cursor_changed) this.sync_cursor();
+    if (hover_changed) {
       this.editor_hover_internal?.push_surface_hover(this.hud.hover());
     }
   }
@@ -2839,8 +3020,23 @@ class DomSurface implements Surface {
         return;
       }
       case "enter_content_edit": {
-        this.editor.commands.select(intent.id);
-        this.editor.enter_content_edit(intent.id);
+        // A double-click is two distinct phases over the hierarchy — DESCEND
+        // one level, and (only at the bottom) ENTER content-edit. The HUD just
+        // reports "a double-click happened" via this intent; the host owns the
+        // descend-vs-edit decision. `intent.id` is the group-first container;
+        // the real target is resolved from the raw leaf under the pointer
+        // (`last_pointer` is the fresh dblclick point). See
+        // `descend_or_enter_content_edit`.
+        const leaf = this.last_pointer_valid
+          ? this.pick_at(this.last_pointer.x, this.last_pointer.y, false)
+          : null;
+        if (leaf === null) {
+          // Re-pick raced to empty — fall back to the HUD's resolved id.
+          this.editor.commands.select(intent.id);
+          this.editor.enter_content_edit(intent.id);
+          return;
+        }
+        this.descend_or_enter_content_edit(leaf);
         return;
       }
       case "exit_content_edit": {
