@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createSvgEditor } from "../src/index";
+import { MARQUEE_REDUNDANT_SVG } from "./_helpers";
 
 /** Tight (whitespace-free) SVG so we can assert byte-equal undo. */
 const TWO_TIGHT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="0" y="0" width="10" height="10"/><circle cx="20" cy="20" r="5"/></svg>`;
@@ -17,6 +18,8 @@ const NESTED_G = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
 const TEXT_TSPAN = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="0" y="0"><tspan>hello</tspan></text></svg>`;
 const CROSS_PARENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g><rect x="0" y="0" width="10" height="10"/></g><circle cx="20" cy="20" r="5"/></svg>`;
 const GRADIENT_STOPS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g"><stop offset="0"/><stop offset="1"/></linearGradient></defs><rect x="0" y="0" width="10" height="10"/></svg>`;
+/** Top-level rect, circle, and a <g> — the rect and <g> are non-adjacent. */
+const RECT_CIRCLE_GROUP = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="0" y="0" width="10" height="10"/><circle cx="20" cy="20" r="5"/><g><ellipse cx="40" cy="40" rx="5" ry="3"/></g></svg>`;
 
 function ids_by_tag(editor: ReturnType<typeof createSvgEditor>, tag: string) {
   return [...editor.tree().nodes.values()]
@@ -153,16 +156,48 @@ describe("commands.group — reject rows", () => {
     expect(editor.state.can_undo).toBe(can_undo_before);
   });
 
-  it("rejects non-contiguous siblings", () => {
+  it("gathers non-contiguous siblings — wraps them, dropping the skipped sibling behind", () => {
+    // Same parent, but the selection skips the circle in the middle. Grouping
+    // gathers rect+ellipse into a new <g> at the front-most selected position
+    // (the ellipse's); the unselected circle drops behind. No reject.
     const editor = createSvgEditor({ svg: THREE_TIGHT });
     const rect = first_by_tag(editor, "rect");
     const ellipse = first_by_tag(editor, "ellipse");
-    const original = editor.serialize();
-    const can_undo_before = editor.state.can_undo;
     editor.commands.select([rect, ellipse]); // skips circle in the middle
-    expect(editor.commands.group()).toBe(false);
-    expect(editor.serialize()).toBe(original);
-    expect(editor.state.can_undo).toBe(can_undo_before);
+    expect(editor.commands.group()).toBe(true);
+    expect(editor.serialize()).toBe(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="5"/><g><rect x="0" y="0" width="10" height="10"/><ellipse cx="40" cy="40" rx="5" ry="3"/></g></svg>`
+    );
+    expect(editor.state.selection.length).toBe(1);
+    expect(editor.tree().nodes.get(editor.state.selection[0])!.tag).toBe("g");
+  });
+
+  it("undo restores a non-contiguous gather byte-exactly", () => {
+    const editor = createSvgEditor({ svg: THREE_TIGHT });
+    const rect = first_by_tag(editor, "rect");
+    const ellipse = first_by_tag(editor, "ellipse");
+    editor.commands.select([rect, ellipse]);
+    editor.commands.group();
+    editor.commands.undo();
+    expect(editor.serialize()).toBe(THREE_TIGHT);
+  });
+
+  it("groups a <rect> with a non-adjacent <g> — same as grouping two leaves", () => {
+    // The reported case: a rect and a group (any z-order, same parent) wrap
+    // into a new shared <g>, exactly like grouping two rects.
+    const editor = createSvgEditor({ svg: RECT_CIRCLE_GROUP });
+    const rect = first_by_tag(editor, "rect"); // index 0 (top-level)
+    const g = ids_by_tag(editor, "g")[0]; // index 2 (top-level), skips circle
+    editor.commands.select([rect, g]);
+    expect(editor.commands.group()).toBe(true);
+    const outer = editor.state.selection[0];
+    expect(editor.tree().nodes.get(outer)!.tag).toBe("g");
+    // Both the rect and the inner group are now children of the new wrapper.
+    expect(editor.tree().nodes.get(rect)!.parent).toBe(outer);
+    expect(editor.tree().nodes.get(g)!.parent).toBe(outer);
+    // Undo round-trips byte-exactly.
+    editor.commands.undo();
+    expect(editor.serialize()).toBe(RECT_CIRCLE_GROUP);
   });
 
   it("preserves document order in the group regardless of selection order", () => {
@@ -195,6 +230,34 @@ describe("commands.group — reject rows", () => {
     expect(editor.commands.group()).toBe(false);
     expect(editor.serialize()).toBe(original);
     expect(editor.state.can_undo).toBe(can_undo_before);
+  });
+});
+
+describe("commands.group — marquee case (end-to-end)", () => {
+  // `group` is dumb about nesting: the selection-state invariant already
+  // compacts a marquee that caught a container AND its children to subtree
+  // roots before `group` sees it (see `selection-subtree-roots.test.ts` /
+  // `docs/selection.md`). This pins the end-to-end outcome.
+  it("marqueeing G + its children A/B + a sibling Z, then Cmd+G, wraps just G + Z", () => {
+    const editor = createSvgEditor({ svg: MARQUEE_REDUNDANT_SVG });
+    const G = first_by_tag(editor, "g");
+    const [A, B, Z] = ids_by_tag(editor, "rect"); // document order: A, B, then Z
+    editor.commands.select([G, A, B, Z]);
+    // The selection state has already compacted to [G, Z] (A/B absorbed by G).
+    expect(editor.state.selection).toEqual([G, Z]);
+    expect(editor.commands.group()).toBe(true);
+
+    const wrapper = editor.state.selection[0];
+    const tree = editor.tree();
+    expect(tree.nodes.get(wrapper)!.tag).toBe("g");
+    // G and Z are the wrapper's children; A/B ride inside G.
+    expect(tree.nodes.get(G)!.parent).toBe(wrapper);
+    expect(tree.nodes.get(Z)!.parent).toBe(wrapper);
+    expect(tree.nodes.get(A)!.parent).toBe(G);
+    expect(tree.nodes.get(B)!.parent).toBe(G);
+
+    editor.commands.undo();
+    expect(editor.serialize()).toBe(MARQUEE_REDUNDANT_SVG);
   });
 });
 

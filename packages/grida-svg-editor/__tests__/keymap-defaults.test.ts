@@ -269,13 +269,14 @@ describe("default keymap — claim vs consume (preventDefault contract)", () => 
   });
 
   it("Cmd+G claims when handler rejects (single non-wrappable tag)", () => {
-    // Selecting a single rect is wrappable in our policy, so reach for a
-    // case that does reject: tspan-style — but the fixture here is
-    // simpler with Cmd+G + a cross-parent selection.
-    const editor = createSvgEditorWithInternals({ svg: NESTED });
-    const a = findByElementId(editor, "a"); // inside #inner
-    const outer = findByElementId(editor, "outer"); // parent of #inner
-    editor.commands.select([a, outer]); // cross-parent → policy reject
+    // A <tspan> is not in STRUCTURAL_GRAPHICS_SET, so group() rejects it. (An
+    // ancestor+descendant selection is NOT a reject case — `group` compacts it
+    // to subtree roots and wraps the ancestor.) The keymap still CLAIMS Cmd+G
+    // (preventDefault) regardless of the handler's verdict.
+    const editor = createSvgEditorWithInternals({
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="0" y="10"><tspan id="t">hi</tspan></text></svg>`,
+    });
+    editor.commands.select([findByElementId(editor, "t")]);
     const e = mkEvent({
       code: "KeyG",
       ...(MOD_IS_META ? { metaKey: true } : { ctrlKey: true }),

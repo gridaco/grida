@@ -700,20 +700,29 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   // ─── Selection ───────────────────────────────────────────────────────────
 
   function set_selection(next: ReadonlyArray<NodeId>) {
+    // Selection-state invariant: a selection is always its SUBTREE ROOTS —
+    // never an ancestor AND its descendant. `prune_nested_nodes` drops any id
+    // whose ancestor is also present, so a marquee that catches `G` and its
+    // children `A`, `B` collapses to `G`. Enforcing it HERE, the one chokepoint
+    // every selection change funnels through, lets every downstream feature
+    // (group, remove, translate, …) stay dumb and trust `state.selection` is
+    // already compacted. Single-node selections short-circuit inside `prune`.
+    // Spec: `docs/selection.md`.
+    const pruned = doc.prune_nested_nodes(next);
     // No-op when membership and order are unchanged. Skips emit on
     // re-selecting the current selection (clicking an already-selected node
     // with no shift, etc.) — listeners on the hot path don't re-run.
-    if (next.length === selection.length) {
+    if (pruned.length === selection.length) {
       let same = true;
-      for (let i = 0; i < next.length; i++) {
-        if (next[i] !== selection[i]) {
+      for (let i = 0; i < pruned.length; i++) {
+        if (pruned[i] !== selection[i]) {
           same = false;
           break;
         }
       }
       if (same) return;
     }
-    selection = Object.freeze([...next]);
+    selection = Object.freeze([...pruned]);
     emit();
   }
 
@@ -1867,6 +1876,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   function group(): boolean {
+    // `selection` is already compacted to subtree roots by `set_selection`, so
+    // a marquee that caught a container AND its children arrives here as just
+    // the container(s) + siblings. `group` stays dumb about that invariant.
     const plan = group_policy.plan(doc, selection);
     if (!plan) return false;
     // create_element registers the node in doc.nodes but does not insert

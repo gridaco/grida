@@ -923,40 +923,53 @@ describe("Scenario.EmptyAdditiveMarquee (shift)", () => {
   });
 });
 
-describe("Scenario.MetaMarquee (meta = raw region-select, even over content)", () => {
+describe("Scenario.MetaMarquee / MetaSelectOrMarquee (meta over empty marquees; over content tap-selects, drag-marquees)", () => {
   const META = { ...NO_MODS, meta: true };
   const META_SHIFT = { ...NO_MODS, meta: true, shift: true };
 
-  it("classifies a meta press started on scene content as a marquee, not a content select", () => {
+  it("classifies a meta press started on scene content as select-or-marquee (tap selects the leaf, drag marquees)", () => {
     expect(classifyScenario(input({ hovered_id: "a", modifiers: META }))).toBe(
-      Scenario.MetaMarquee
+      Scenario.MetaSelectOrMarquee
     );
   });
 
-  it("classifies meta over empty space as a marquee too", () => {
+  it("classifies meta over empty space as a plain marquee (nothing to select)", () => {
     expect(classifyScenario(input({ modifiers: META }))).toBe(
       Scenario.MetaMarquee
     );
   });
 
-  it("classifies meta over content WITH an existing selection as a marquee (no deselect on down)", () => {
+  it("classifies meta over content WITH an existing selection as select-or-marquee (no deselect on down)", () => {
     expect(
       classifyScenario(
         input({ hovered_id: "b", selection_ids: ["a"], modifiers: META })
       )
-    ).toBe(Scenario.MetaMarquee);
+    ).toBe(Scenario.MetaSelectOrMarquee);
   });
 
   it("classifies meta+shift the same — additive is the host's marquee concern, not the on-down decision", () => {
     expect(
       classifyScenario(input({ hovered_id: "a", modifiers: META_SHIFT }))
-    ).toBe(Scenario.MetaMarquee);
+    ).toBe(Scenario.MetaSelectOrMarquee);
   });
 
-  it("dispatches start_marquee_pend with no on-down emit (prevents both move and select)", () => {
+  it("dispatches a pend that defers the select (commit on up) with no ids_at_down (drag promotes to marquee)", () => {
     expect(
       decidePointerDown(input({ hovered_id: "a", modifiers: META }))
-    ).toEqual({ kind: "start_marquee_pend", emit_on_down: "none" });
+    ).toEqual({
+      kind: "pend",
+      pending: {
+        ids_at_down: [],
+        deferred: { kind: "select", node_id: "a", shift: false },
+      },
+    });
+  });
+
+  it("dispatches a plain marquee over empty space (no select to defer)", () => {
+    expect(decidePointerDown(input({ modifiers: META }))).toEqual({
+      kind: "start_marquee_pend",
+      emit_on_down: "none",
+    });
   });
 
   it("does NOT override a real Tier-1 handle — a meta press on a resize handle still resizes", () => {
@@ -976,7 +989,20 @@ describe("Scenario.MetaMarquee (meta = raw region-select, even over content)", (
     ).toBe(Scenario.HandleResize);
   });
 
-  it("DOES override the move-body (translate_handle) — meta-drag over the selection body marquees, not moves", () => {
+  it("DOES override the move-body (translate_handle) — over content a meta press tap-selects / drag-marquees, never moves", () => {
+    expect(
+      classifyScenario(
+        input({
+          ui_action: BODY,
+          hovered_id: "a",
+          selection_ids: ["a"],
+          modifiers: META,
+        })
+      )
+    ).toBe(Scenario.MetaSelectOrMarquee);
+  });
+
+  it("over the move-body with no content under the pointer, a meta press is a plain marquee", () => {
     expect(
       classifyScenario(
         input({ ui_action: BODY, selection_ids: ["a"], modifiers: META })
@@ -998,12 +1024,12 @@ describe("Scenario.MetaMarquee (meta = raw region-select, even over content)", (
     ).toBe(Scenario.EnterEdit);
   });
 
-  it("DOES route a content-representative select_node overlay — meta region-selects over it like a scene pick", () => {
+  it("routes a content-representative select_node overlay like a scene pick — meta tap-selects / drag-marquees over it", () => {
     expect(
       classifyScenario(
         input({ ui_action: { kind: "select_node", id: "a" }, modifiers: META })
       )
-    ).toBe(Scenario.MetaMarquee);
+    ).toBe(Scenario.MetaSelectOrMarquee);
   });
 
   it("still enters edit on meta+dblclick over a select_node overlay", () => {

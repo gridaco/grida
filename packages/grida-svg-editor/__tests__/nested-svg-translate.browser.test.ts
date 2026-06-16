@@ -19,6 +19,7 @@ import {
   clientCenter,
   committedWorldRect,
   dragByClient,
+  nodeIdByName,
   type AttachedSurface,
 } from "./_browser-helpers";
 
@@ -52,6 +53,12 @@ describe("bug 3: translate a child inside a scaled nested <svg> (real DOM)", () 
     // tracked independently of the doubling fix under test here.
     surface.editor.set_style({ snap_enabled: false });
     expect(committedChildWorldRect(surface).x).toBeCloseTo(140, 0);
+
+    // Select the child explicitly: under group-first hit-testing (#853) a
+    // plain click resolves to the nested `<svg>` container, not the leaf, so
+    // the drag target is set directly — this test is about the translate
+    // projection for the child, not the selection policy.
+    surface.editor.commands.select(nodeIdByName(surface.editor, "child"));
 
     const center = clientCenter(surface.elementByName("child"));
     dragByClient(surface.container, center, { x: center.x + 100, y: center.y });
