@@ -32,6 +32,7 @@ import {
 import { cursors as hud_cursors } from "@grida/hud/cursors";
 import { measure, type Measurement } from "@grida/cmath/_measurement";
 import cmath from "@grida/cmath";
+import { default_nudge_handler } from "./commands/defaults";
 import { Camera } from "./core/camera";
 import type {
   DomComputedResolver,
@@ -536,6 +537,25 @@ class DomSurface implements Surface {
    *  one session at a time. */
   private vector_edit: VectorEditSession | null = null;
 
+  /** Screen-space snap guide for the in-flight point-level drag (#844) — a
+   *  dragged path vertex / `<line>` endpoint snapped to a sibling point.
+   *  Already projected to container CSS-px (the HUD's identity space) at
+   *  snap time, so `compute_snap_extra` renders it directly. `undefined`
+   *  when no point snap is engaged; cleared on the commit frame and on
+   *  `cancel_in_flight`. Point drags run only in vector/endpoint edit, which
+   *  is mutually exclusive with the orchestrator gestures, so this never
+   *  competes with the translate / resize / insert guides. */
+  private point_snap_guide:
+    | import("@grida/cmath/_snap").guide.SnapGuide
+    | undefined = undefined;
+
+  /** When set, point-level snap (#844) is bypassed for the current call.
+   *  A keyboard nudge replays the drag path (`nudge_vector_selection` →
+   *  `handle_translate_vector_selection`) but must move by the exact step,
+   *  never snap onto a neighbor — same as Figma's arrow nudge. Scoped
+   *  around the synthesized commit and reset in a `finally`. */
+  private suppress_point_snap = false;
+
   /** Snapshot of the vector-edit sub-selection at the START of an in-flight
    *  region-selection gesture (marquee OR lasso). Captured on the first
    *  preview, used as the merge baseline for every subsequent preview
@@ -1024,6 +1044,22 @@ class DomSurface implements Surface {
     this.editor_hover_internal = internal;
     internal.set_content_edit_driver((id) => this.enter_content_edit(id));
     this.teardown.push(() => internal.set_content_edit_driver(null));
+
+    // Arrow-key nudge: in vector content-edit, route to the path sub-
+    // selection (vertices / segments / tangents) instead of leaking to a
+    // whole-element move — the keyboard counterpart of dragging those
+    // points (gridaco/grida#849). Outside content-edit it falls back to
+    // the headless whole-element nudge. The registry doesn't stack
+    // handlers, so detach restores `default_nudge_handler`.
+    internal.register_command("transform.nudge", (args) =>
+      this.handle_nudge_command(args)
+    );
+    this.teardown.push(() =>
+      internal.register_command(
+        "transform.nudge",
+        default_nudge_handler(this.editor)
+      )
+    );
 
     // Delegates to `getComputedStyle()` so `dom_computed_*` honors `<style>`
     // matching, `var()`, and inheritance — the cases the headless cascade
@@ -1761,6 +1797,15 @@ class DomSurface implements Surface {
   }
 
   private compute_snap_extra(): HUDDraw | undefined {
+    // Point-level snap (#844) — a vertex / `<line>` endpoint drag. Runs only
+    // in vector/endpoint edit, mutually exclusive with every orchestrator
+    // gesture below, so it takes precedence. Already in screen space.
+    if (this.point_snap_guide) {
+      return snapGuideToHUDDraw(
+        this.point_snap_guide,
+        this.editor.style.measurement_color
+      );
+    }
     // Insertion-drag wins when active — it's mutually exclusive with the
     // other gesture types (no translate / resize / nudge-dwell can run
     // while pending_insert is open).
@@ -1894,6 +1939,8 @@ class DomSurface implements Surface {
     if (this.active_preview) {
       this.active_preview.session.discard();
       this.active_preview = null;
+      // Drop any in-flight point-snap guide (#844) along with the preview.
+      this.point_snap_guide = undefined;
       canceled = true;
     }
     if (this.pending_insert) {
@@ -2861,6 +2908,206 @@ class DomSurface implements Surface {
     if (intent.phase === "commit") this.request_redraw();
   }
 
+  /**
+   * Shift axis-lock for point-level drags (gridaco/grida#848) — the
+   * vertex / endpoint counterpart of whole-object translate's
+   * `axis_lock: "by_dominance"` (see `current_translate_modifiers`).
+   * Collapses the lesser axis of a delta when Shift is held, via the same
+   * cmath rule the translate pipeline's `axis_lock` stage uses; identity when
+   * Shift is up. Space-agnostic: the point path applies it to the raw screen
+   * delta (before snap), so dominance reflects the user's drag intent. Pull-
+   * at-consume from the HUD modifier store so a mid-drag Shift press/release
+   * reflects on the next frame.
+   */
+  private axis_lock_point_delta(dx: number, dy: number): [number, number] {
+    if (!this.hud.modifiers().shift) return [dx, dy];
+    const locked = cmath.ext.movement.axisLockedByDominance([dx, dy]);
+    return cmath.ext.movement.normalize(locked);
+  }
+
+  /**
+   * Point-level snap (gridaco/grida#844) — the vertex / endpoint counterpart
+   * of whole-object translate's edge/center snap. Snaps a dragged point's
+   * delta so it aligns with (or lands on) a sibling point: a path's other
+   * vertices, or a `<line>`'s opposite endpoint.
+   *
+   * Runs in **screen space** (container CSS-px, the HUD's identity frame). The
+   * caller projects the moving point[s] (agents) and the static sibling points
+   * (neighbors) through the element CTM first, and feeds the drag delta in the
+   * same space. Screen space is the right frame because the threshold and the
+   * rendered guide are both screen-pixel concepts: the configured
+   * `snap_threshold_px` stays user-visible pixels on BOTH axes for any element
+   * CTM — even a non-uniform / rotated one, which a single area-scale would
+   * distort (gridaco/grida#844 review) — and the guide needs no reprojection.
+   * The caller converts the returned screen delta back to local for the write.
+   *
+   * Honors the global snap toggle (`style.snap_enabled`) and threshold —
+   * snap off ⇒ free point dragging, per the issue. Bypassed when
+   * `suppress_point_snap` is set (keyboard nudge) or the point hasn't moved
+   * (a pure tap / select must never relocate a control). Identity when there
+   * are no neighbors / agents.
+   *
+   * The shared `SnapSession` drops 0-area rects (its empty-`<g>` "jerk to
+   * origin" defense), so each point is modeled as a sub-pixel square centered
+   * on it. Symmetric inflation cancels in the corrected delta (the engine's
+   * matched same-edge offset carries the same ±eps on both sides), so eps
+   * magnitude is immaterial as long as it stays far below the threshold.
+   */
+  private snap_point_delta_screen(
+    raw_dx: number,
+    raw_dy: number,
+    agents_screen: ReadonlyArray<readonly [number, number]>,
+    neighbors_screen: ReadonlyArray<readonly [number, number]>
+  ): [number, number] {
+    this.point_snap_guide = undefined;
+    const style = this.editor.style;
+    if (
+      this.suppress_point_snap ||
+      !style.snap_enabled ||
+      agents_screen.length === 0 ||
+      neighbors_screen.length === 0 ||
+      // Snap engages only once the point has actually moved. A pure tap
+      // (select) commits a zero-delta translate; without this guard a vertex
+      // already resting within threshold of a neighbor would jump onto it on
+      // mere selection — clicking a control must never relocate it.
+      (raw_dx === 0 && raw_dy === 0)
+    ) {
+      return [raw_dx, raw_dy];
+    }
+
+    // Threshold is the user's screen-pixel setting applied directly — no
+    // scale conversion, so it's the same engaged distance on x and y under
+    // any element transform.
+    const threshold = style.snap_threshold_px;
+    // Inflate each point to a sub-pixel square so the shared SnapSession keeps
+    // it (it drops 0-area rects). Symmetric and far below the threshold, so
+    // the worst-case residue (an opposite-edge match) is ≤ eps — sub-pixel.
+    const eps = threshold * 1e-6 || 1e-9;
+    const to_rect = (p: readonly [number, number]): Rect => ({
+      x: p[0] - eps / 2,
+      y: p[1] - eps / 2,
+      width: eps,
+      height: eps,
+    });
+
+    const session = new SnapSession({
+      agents: agents_screen.map(to_rect),
+      neighbors: neighbors_screen.map(to_rect),
+    });
+    const { delta, guide } = session.snap(
+      { x: raw_dx, y: raw_dy },
+      { enabled: true, threshold_px: threshold }
+    );
+    session.dispose();
+    // The guide is already in screen space (the HUD's identity frame) — render
+    // it directly, no reprojection.
+    this.point_snap_guide = guide;
+    return [delta.x, delta.y];
+  }
+
+  /** Split a path's baseline vertices into the snap agents (the moving
+   *  sub-selection) and neighbors (everything else) for the point-snap pass.
+   *  Both in path-local space; the caller projects them to screen. */
+  private vertex_snap_points(
+    model: PathModel,
+    moving: ReadonlyArray<number>
+  ): {
+    agents: Array<readonly [number, number]>;
+    neighbors: Array<readonly [number, number]>;
+  } {
+    const verts = model.snapshot().vertices;
+    const moving_set = new Set(moving);
+    const agents: Array<readonly [number, number]> = [];
+    const neighbors: Array<readonly [number, number]> = [];
+    for (let i = 0; i < verts.length; i++) {
+      (moving_set.has(i) ? agents : neighbors).push(verts[i]);
+    }
+    return { agents, neighbors };
+  }
+
+  /** Translation from screen/page CSS-px to the HUD's container-identity
+   *  space: subtract the container's page offset, add its scroll. Used at
+   *  every `getScreenCTM` projection boundary (chrome, marquee, point snap)
+   *  so they share one definition of "where the container's origin is". */
+  private container_offset(): [number, number] {
+    const cr = this.container.getBoundingClientRect();
+    return [
+      -cr.left + this.container.scrollLeft,
+      -cr.top + this.container.scrollTop,
+    ];
+  }
+
+  /**
+   * Local-frame drag delta for a point sub-selection (vertices or a `<line>`
+   * endpoint), composed exactly like whole-object translate: **axis-lock then
+   * snap** (translate-pipeline stage order `axis_lock → snap`). The raw delta
+   * and the agent / neighbor points are all in screen space (container
+   * CSS-px):
+   *
+   *   1. Shift axis-lock collapses the lesser axis of the RAW screen delta —
+   *      dominance is the user's intent, decided before snap can perturb it
+   *      (gridaco/grida#844 review: locking the snapped delta could flip the
+   *      axis). The lock is screen-aligned, matching the drag and the guides.
+   *   2. Point snap aligns the locked delta to the sibling points.
+   *   3. The result projects back into the element's local frame via the
+   *      inverse CTM for `translateVertices` / the endpoint write.
+   *
+   * `agents_local` / `neighbors_local` are projected to screen here so the
+   * snap threshold stays user-visible pixels under any element CTM.
+   */
+  private point_drag_local_delta(
+    ctm: DOMMatrix,
+    raw_screen_dx: number,
+    raw_screen_dy: number,
+    agents_local: ReadonlyArray<readonly [number, number]>,
+    neighbors_local: ReadonlyArray<readonly [number, number]>
+  ): [number, number] {
+    // 1. axis-lock the RAW screen delta (before snap — matches the pipeline).
+    let [sx, sy] = this.axis_lock_point_delta(raw_screen_dx, raw_screen_dy);
+    // 2. snap in screen space.
+    const offset = this.container_offset();
+    const to_screen = (p: readonly [number, number]): [number, number] =>
+      project_point_through_ctm(p[0], p[1], ctm, offset);
+    [sx, sy] = this.snap_point_delta_screen(
+      sx,
+      sy,
+      agents_local.map(to_screen),
+      neighbors_local.map(to_screen)
+    );
+    // 3. screen → local for the mutation.
+    const det = ctm.a * ctm.d - ctm.c * ctm.b;
+    return det !== 0 ? project_delta_inverse_ctm(sx, sy, ctm) : [sx, sy];
+  }
+
+  /**
+   * Local-frame drag delta for a vertex sub-selection, from the HUD's
+   * container-space `dx/dy`. Resolves the element CTM and the snap neighbor
+   * set (the path's other vertices), then defers to `point_drag_local_delta`
+   * for the axis-lock → snap → project composition. Falls back to a plain
+   * axis-lock of the raw delta when the element has no usable CTM. A
+   * tangent-only drag (empty `indices`) has no vertex agents, so snap is a
+   * no-op. Shared by the two vertex-translate handlers.
+   */
+  private vertex_drag_local_delta(
+    node_id: NodeId,
+    baseline_model: PathModel,
+    indices: ReadonlyArray<number>,
+    dx: number,
+    dy: number
+  ): [number, number] {
+    const el = this.element_index.get(node_id);
+    const ctm =
+      el instanceof SVGGraphicsElement && typeof el.getScreenCTM === "function"
+        ? el.getScreenCTM()
+        : null;
+    if (!ctm) return this.axis_lock_point_delta(dx, dy);
+    const { agents, neighbors } = this.vertex_snap_points(
+      baseline_model,
+      indices
+    );
+    return this.point_drag_local_delta(ctm, dx, dy, agents, neighbors);
+  }
+
   /** Snapshot of HUD modifier state mapped to the orchestrator's `GestureModifiers`.
    *  Pull-at-consume: HUD is the canonical store (see `sync_modifiers`),
    *  read live so mid-drag Shift press/release reflects on the next pass. */
@@ -3035,13 +3282,57 @@ class DomSurface implements Surface {
     const target_x = pos_own.x;
     const target_y = pos_own.y;
 
+    const base_x = endpoint === "p1" ? initial.x1 : initial.x2;
+    const base_y = endpoint === "p1" ? initial.y1 : initial.y2;
+
+    // #848 axis-lock + #844 snap, composed in pipeline order (lock → snap).
+    // The opposite endpoint is the only same-element point a line exposes, so
+    // it is the lone snap neighbor (orthogonal-align / land-on-point). Done in
+    // screen space — see `point_drag_local_delta` — relative to the gesture-
+    // start endpoint, so the result is a clean delta off the original.
+    const el = this.element_index.get(id);
+    const ctm =
+      el instanceof SVGGraphicsElement && typeof el.getScreenCTM === "function"
+        ? el.getScreenCTM()
+        : null;
+    let final_x: number;
+    let final_y: number;
+    if (ctm) {
+      const offset = this.container_offset();
+      const base_screen = project_point_through_ctm(
+        base_x,
+        base_y,
+        ctm,
+        offset
+      );
+      const other: readonly [number, number] =
+        endpoint === "p1" ? [initial.x2, initial.y2] : [initial.x1, initial.y1];
+      const [ldx, ldy] = this.point_drag_local_delta(
+        ctm,
+        intent.pos[0] - base_screen[0],
+        intent.pos[1] - base_screen[1],
+        [[base_x, base_y]],
+        [other]
+      );
+      final_x = base_x + ldx;
+      final_y = base_y + ldy;
+    } else {
+      // No usable CTM — fall back to the locally-resolved cursor target + lock.
+      const [ldx, ldy] = this.axis_lock_point_delta(
+        target_x - base_x,
+        target_y - base_y
+      );
+      final_x = base_x + ldx;
+      final_y = base_y + ldy;
+    }
+
     const apply = () => {
       if (endpoint === "p1") {
-        doc.set_attr(id, "x1", String(target_x));
-        doc.set_attr(id, "y1", String(target_y));
+        doc.set_attr(id, "x1", String(final_x));
+        doc.set_attr(id, "y1", String(final_y));
       } else {
-        doc.set_attr(id, "x2", String(target_x));
-        doc.set_attr(id, "y2", String(target_y));
+        doc.set_attr(id, "x2", String(final_x));
+        doc.set_attr(id, "y2", String(final_y));
       }
       emit();
     };
@@ -3059,6 +3350,8 @@ class DomSurface implements Surface {
       revert,
     });
     if (intent.phase === "commit") {
+      // Drag is over — drop the snap guide so it doesn't linger past pointerup.
+      this.point_snap_guide = undefined;
       this.active_preview.session.commit();
       this.active_preview = null;
     }
@@ -3200,11 +3493,7 @@ class DomSurface implements Surface {
     if (typeof el.getScreenCTM !== "function") return;
     const ctm = el.getScreenCTM();
     if (!ctm) return;
-    const cr = this.container.getBoundingClientRect();
-    const offset: [number, number] = [
-      -cr.left + this.container.scrollLeft,
-      -cr.top + this.container.scrollTop,
-    ];
+    const offset = this.container_offset();
 
     // Derive the model from the live `d` — same doctrine as `vector_of`.
     const model = this.session_model();
@@ -3302,11 +3591,7 @@ class DomSurface implements Surface {
     if (typeof el.getScreenCTM !== "function") return;
     const ctm = el.getScreenCTM();
     if (!ctm) return;
-    const cr = this.container.getBoundingClientRect();
-    const offset: [number, number] = [
-      -cr.left + this.container.scrollLeft,
-      -cr.top + this.container.scrollTop,
-    ];
+    const offset = this.container_offset();
 
     const model = this.session_model();
     if (!model) return;
@@ -3700,6 +3985,10 @@ class DomSurface implements Surface {
     }
     this.vector_edit = null;
     this.vector_edit_region_baseline = null;
+    // Drop any in-flight point-snap guide (#844) — `compute_snap_extra`
+    // prioritizes it, so it must not survive a content-edit exit that
+    // bypasses the per-gesture commit / cancel clears.
+    this.point_snap_guide = undefined;
     this.hud.setVectorSelection(null);
     if (
       this.current_tool.type === "lasso" ||
@@ -3749,11 +4038,7 @@ class DomSurface implements Surface {
     if (typeof el.getScreenCTM !== "function") return null;
     const ctm = el.getScreenCTM();
     if (!ctm) return null;
-    const cr = this.container.getBoundingClientRect();
-    const offset: [number, number] = [
-      -cr.left + this.container.scrollLeft,
-      -cr.top + this.container.scrollTop,
-    ];
+    const offset = this.container_offset();
 
     const vertices: [number, number][] = Array.from(
       { length: snap.vertices.length },
@@ -4107,30 +4392,17 @@ class DomSurface implements Surface {
 
     const baseline_d = this.active_preview.initial_d;
     const indices = this.active_preview.indices;
-    // HUD reports `dx, dy` in container CSS-px (its own doc-space).
-    // The PathModel expects deltas in the path's local SVG coord space.
-    // Project the delta back through the inverse of the CTM's linear part
-    // (no translation: a delta is camera-invariant under translation).
-    // Mirrors what `container_point_in_own_frame` does for absolute points.
-    let local_dx = intent.dx;
-    let local_dy = intent.dy;
-    const el = this.element_index.get(node_id);
-    if (
-      el instanceof SVGGraphicsElement &&
-      typeof el.getScreenCTM === "function"
-    ) {
-      const ctm = el.getScreenCTM();
-      if (ctm) {
-        const det = ctm.a * ctm.d - ctm.c * ctm.b;
-        if (det !== 0) {
-          [local_dx, local_dy] = project_delta_inverse_ctm(
-            intent.dx,
-            intent.dy,
-            ctm
-          );
-        }
-      }
-    }
+    // The HUD reports `dx, dy` in container CSS-px; resolve the local-frame
+    // delta to feed `translateVertices` — axis-lock (#848) and point-snap
+    // (#844) compose inside, in the translate pipeline's `axis_lock → snap`
+    // order. See `vertex_drag_local_delta`.
+    const [local_dx, local_dy] = this.vertex_drag_local_delta(
+      node_id,
+      this.active_preview.baseline_model,
+      indices,
+      intent.dx,
+      intent.dy
+    );
 
     // Derive the in-flight model from the baseline each frame. dx,dy is the
     // total delta from gesture start; replaying from baseline each frame
@@ -4147,6 +4419,8 @@ class DomSurface implements Surface {
     this.active_preview.preview_model = preview_model;
 
     if (intent.phase === "commit") {
+      // Drag is over — drop the snap guide so it doesn't linger past pointerup.
+      this.point_snap_guide = undefined;
       // Build the committed delta with sub-selection capture so undo /
       // redo restores selection alongside `d`. See the vector-edit
       // selection-history note in `handle_set_tangent_intent` — the
@@ -4289,28 +4563,18 @@ class DomSurface implements Surface {
     }
 
     const baseline_d = this.active_preview.initial_d;
-    // HUD reports dx/dy in container CSS-px (its own doc-space). The
-    // PathModel expects deltas in the path's local SVG coord space — same
-    // projection as `handle_translate_vertices`.
-    let local_dx = intent.dx;
-    let local_dy = intent.dy;
-    const el = this.element_index.get(node_id);
-    if (
-      el instanceof SVGGraphicsElement &&
-      typeof el.getScreenCTM === "function"
-    ) {
-      const ctm = el.getScreenCTM();
-      if (ctm) {
-        const det = ctm.a * ctm.d - ctm.c * ctm.b;
-        if (det !== 0) {
-          [local_dx, local_dy] = project_delta_inverse_ctm(
-            intent.dx,
-            intent.dy,
-            ctm
-          );
-        }
-      }
-    }
+    // The HUD reports `dx, dy` in container CSS-px; resolve the local-frame
+    // delta to feed `translateVertices`. Axis-lock (#848) and point-snap
+    // (#844) compose inside, in the translate pipeline's `axis_lock → snap`
+    // order; snap is bypassed for keyboard nudge (`suppress_point_snap`).
+    // See `vertex_drag_local_delta`.
+    const [local_dx, local_dy] = this.vertex_drag_local_delta(
+      node_id,
+      this.active_preview.baseline_model,
+      indices,
+      intent.dx,
+      intent.dy
+    );
 
     // Derive in-flight model from cached baseline each frame — replaying
     // from baseline (instead of accumulating) keeps chrome and document
@@ -4341,6 +4605,8 @@ class DomSurface implements Surface {
     this.active_preview.preview_model = preview_model;
 
     if (intent.phase === "commit") {
+      // Drag is over — drop the snap guide so it doesn't linger past pointerup.
+      this.point_snap_guide = undefined;
       const before_selection = this.active_preview.before_selection;
       const after_selection = this.vector_edit.snapshot_selection();
       this.active_preview.session.set(
@@ -4367,6 +4633,67 @@ class DomSurface implements Surface {
         )
       );
     }
+  }
+
+  /**
+   * Surface-aware `transform.nudge` handler — registered over the headless
+   * default on attach (gridaco/grida#849). In vector content-edit, arrow
+   * keys nudge the path sub-selection (the keyboard counterpart of
+   * dragging vertices / segments / tangents) rather than leaking to a
+   * whole-element move (the bug). This mirrors text-edit, where the inline
+   * editor owns the arrow keys. Outside content-edit it delegates to the
+   * headless `default_nudge_handler` (whole-element nudge) — the same
+   * handler the registry restores on detach, so the override and the
+   * default can never drift.
+   *
+   * While a vector session is open the arrows are OWNED by it: an empty
+   * sub-selection is a consumed no-op, never a whole-element nudge — same
+   * "content-edit captures arrows" contract as text-edit.
+   */
+  private handle_nudge_command(args?: unknown): boolean {
+    const { dx, dy } = args as { dx: number; dy: number };
+    if (this.editor.state.mode === "edit-content" && this.vector_edit) {
+      this.nudge_vector_selection(dx, dy);
+      return true;
+    }
+    return default_nudge_handler(this.editor)(args) === true;
+  }
+
+  /**
+   * Discrete keyboard nudge of the vector sub-selection. Reuses the drag
+   * path ({@link handle_translate_vector_selection}) by synthesizing a
+   * single commit-phase intent, so a nudge is byte-identical to a one-step
+   * drag of the same points: same union resolution (selected vertices ∪
+   * selected-segment endpoints ∪ tangents), same parent-vertex tangent
+   * exclusion, same history bracket + sub-selection capture.
+   *
+   * `dx`/`dy` arrive in world units (1px, or 10px with Shift — already
+   * resolved by the keymap binding). `handle_translate_vector_selection`
+   * expects container CSS-px (it projects back through the inverse
+   * screen-CTM), so scale by the camera zoom on the way in; the projection
+   * recovers the world delta in the path's local frame. A no-sub-selection
+   * session resolves to a no-op inside the handler.
+   */
+  private nudge_vector_selection(dx: number, dy: number): void {
+    const ses = this.vector_edit;
+    if (!ses) return;
+    const zoom = this.camera.zoom || 1;
+    // A keyboard nudge moves by the exact step — never snap onto a neighbor
+    // (#844; Figma parity). Replays the drag path with point snap bypassed.
+    this.suppress_point_snap = true;
+    try {
+      this.handle_translate_vector_selection({
+        kind: "translate_vector_selection",
+        node_id: ses.node_id,
+        additional_vertex_indices: [],
+        dx: dx * zoom,
+        dy: dy * zoom,
+        phase: "commit",
+      });
+    } finally {
+      this.suppress_point_snap = false;
+    }
+    this.request_redraw();
   }
 
   /** Mirror handler for `select_tangent` (analogous to `select_vertex`). */

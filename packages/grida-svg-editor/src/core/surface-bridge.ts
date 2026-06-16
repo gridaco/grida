@@ -14,6 +14,7 @@
 
 import type { Preview } from "@grida/history";
 import type { NodeId, PickEvent, Unsubscribe } from "../types";
+import type { CommandHandler, CommandId } from "../commands/registry";
 import type { DomComputedResolver } from "./editor";
 import type { GeometryProvider } from "./geometry";
 import type { SvgDocument } from "./document";
@@ -125,4 +126,14 @@ export interface SurfaceBridge {
    *  Required for any command that needs world bounds — `resize_to`,
    *  `rotate`, `align`. With no provider, those commands return false. */
   set_geometry(p: GeometryProvider | null): void;
+
+  /** surface → editor: register (or replace) a command handler on the
+   *  editor's command registry. The DOM surface installs surface-aware
+   *  variants of built-in commands here — e.g. a `transform.nudge` that
+   *  routes to vector sub-selection nudge during content-edit
+   *  (gridaco/grida#849). The registry does NOT stack handlers, so a plain
+   *  unregister leaves the slot empty; the surface re-registers the
+   *  headless default on detach (see `default_nudge_handler`). Returns the
+   *  registry's unregister fn. */
+  register_command(id: CommandId, handler: CommandHandler): () => void;
 }
