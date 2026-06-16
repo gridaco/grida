@@ -32,6 +32,7 @@ import {
 import { cursors as hud_cursors } from "@grida/hud/cursors";
 import { measure, type Measurement } from "@grida/cmath/_measurement";
 import cmath from "@grida/cmath";
+import { default_nudge_handler } from "./commands/defaults";
 import { Camera } from "./core/camera";
 import type {
   DomComputedResolver,
@@ -1024,6 +1025,22 @@ class DomSurface implements Surface {
     this.editor_hover_internal = internal;
     internal.set_content_edit_driver((id) => this.enter_content_edit(id));
     this.teardown.push(() => internal.set_content_edit_driver(null));
+
+    // Arrow-key nudge: in vector content-edit, route to the path sub-
+    // selection (vertices / segments / tangents) instead of leaking to a
+    // whole-element move — the keyboard counterpart of dragging those
+    // points (gridaco/grida#849). Outside content-edit it falls back to
+    // the headless whole-element nudge. The registry doesn't stack
+    // handlers, so detach restores `default_nudge_handler`.
+    internal.register_command("transform.nudge", (args) =>
+      this.handle_nudge_command(args)
+    );
+    this.teardown.push(() =>
+      internal.register_command(
+        "transform.nudge",
+        default_nudge_handler(this.editor)
+      )
+    );
 
     // Delegates to `getComputedStyle()` so `dom_computed_*` honors `<style>`
     // matching, `var()`, and inheritance — the cases the headless cascade
@@ -2861,6 +2878,21 @@ class DomSurface implements Surface {
     if (intent.phase === "commit") this.request_redraw();
   }
 
+  /**
+   * Shift axis-lock for point-level drags (gridaco/grida#848) — the
+   * vertex / endpoint counterpart of whole-object translate's
+   * `axis_lock: "by_dominance"` (see `current_translate_modifiers`).
+   * Collapses the lesser axis of a local-frame delta when Shift is held,
+   * via the same cmath rule the translate pipeline's `axis_lock` stage
+   * uses; identity when Shift is up. Pull-at-consume from the HUD modifier
+   * store so a mid-drag Shift press/release reflects on the next frame.
+   */
+  private axis_lock_point_delta(dx: number, dy: number): [number, number] {
+    if (!this.hud.modifiers().shift) return [dx, dy];
+    const locked = cmath.ext.movement.axisLockedByDominance([dx, dy]);
+    return cmath.ext.movement.normalize(locked);
+  }
+
   /** Snapshot of HUD modifier state mapped to the orchestrator's `GestureModifiers`.
    *  Pull-at-consume: HUD is the canonical store (see `sync_modifiers`),
    *  read live so mid-drag Shift press/release reflects on the next pass. */
@@ -3035,13 +3067,26 @@ class DomSurface implements Surface {
     const target_x = pos_own.x;
     const target_y = pos_own.y;
 
+    // #848: Shift axis-locks the endpoint drag relative to its gesture-
+    // start position (parity with whole-object translate). The endpoint
+    // tracks the cursor; locking the delta from the original endpoint
+    // keeps the move purely horizontal or vertical.
+    const base_x = endpoint === "p1" ? initial.x1 : initial.x2;
+    const base_y = endpoint === "p1" ? initial.y1 : initial.y2;
+    const [locked_dx, locked_dy] = this.axis_lock_point_delta(
+      target_x - base_x,
+      target_y - base_y
+    );
+    const final_x = base_x + locked_dx;
+    const final_y = base_y + locked_dy;
+
     const apply = () => {
       if (endpoint === "p1") {
-        doc.set_attr(id, "x1", String(target_x));
-        doc.set_attr(id, "y1", String(target_y));
+        doc.set_attr(id, "x1", String(final_x));
+        doc.set_attr(id, "y1", String(final_y));
       } else {
-        doc.set_attr(id, "x2", String(target_x));
-        doc.set_attr(id, "y2", String(target_y));
+        doc.set_attr(id, "x2", String(final_x));
+        doc.set_attr(id, "y2", String(final_y));
       }
       emit();
     };
@@ -4132,6 +4177,10 @@ class DomSurface implements Surface {
       }
     }
 
+    // #848: Shift axis-locks the vertex drag (by-dominance, in the path's
+    // local frame) — parity with whole-object translate.
+    [local_dx, local_dy] = this.axis_lock_point_delta(local_dx, local_dy);
+
     // Derive the in-flight model from the baseline each frame. dx,dy is the
     // total delta from gesture start; replaying from baseline each frame
     // (instead of accumulating from the previous frame) keeps the chrome
@@ -4312,6 +4361,12 @@ class DomSurface implements Surface {
       }
     }
 
+    // #848: Shift axis-locks the drag (by-dominance, in the path's local
+    // frame) — parity with whole-object translate. A keyboard nudge
+    // (`nudge_vector_selection`) feeds a single-axis delta, so the lock is
+    // a no-op there even when Shift is the 10px modifier.
+    [local_dx, local_dy] = this.axis_lock_point_delta(local_dx, local_dy);
+
     // Derive in-flight model from cached baseline each frame — replaying
     // from baseline (instead of accumulating) keeps chrome and document
     // byte-identical with no per-frame drift.
@@ -4367,6 +4422,60 @@ class DomSurface implements Surface {
         )
       );
     }
+  }
+
+  /**
+   * Surface-aware `transform.nudge` handler — registered over the headless
+   * default on attach (gridaco/grida#849). In vector content-edit, arrow
+   * keys nudge the path sub-selection (the keyboard counterpart of
+   * dragging vertices / segments / tangents) rather than leaking to a
+   * whole-element move (the bug). This mirrors text-edit, where the inline
+   * editor owns the arrow keys. Outside content-edit it delegates to the
+   * headless `default_nudge_handler` (whole-element nudge) — the same
+   * handler the registry restores on detach, so the override and the
+   * default can never drift.
+   *
+   * While a vector session is open the arrows are OWNED by it: an empty
+   * sub-selection is a consumed no-op, never a whole-element nudge — same
+   * "content-edit captures arrows" contract as text-edit.
+   */
+  private handle_nudge_command(args?: unknown): boolean {
+    const { dx, dy } = args as { dx: number; dy: number };
+    if (this.editor.state.mode === "edit-content" && this.vector_edit) {
+      this.nudge_vector_selection(dx, dy);
+      return true;
+    }
+    return default_nudge_handler(this.editor)(args) === true;
+  }
+
+  /**
+   * Discrete keyboard nudge of the vector sub-selection. Reuses the drag
+   * path ({@link handle_translate_vector_selection}) by synthesizing a
+   * single commit-phase intent, so a nudge is byte-identical to a one-step
+   * drag of the same points: same union resolution (selected vertices ∪
+   * selected-segment endpoints ∪ tangents), same parent-vertex tangent
+   * exclusion, same history bracket + sub-selection capture.
+   *
+   * `dx`/`dy` arrive in world units (1px, or 10px with Shift — already
+   * resolved by the keymap binding). `handle_translate_vector_selection`
+   * expects container CSS-px (it projects back through the inverse
+   * screen-CTM), so scale by the camera zoom on the way in; the projection
+   * recovers the world delta in the path's local frame. A no-sub-selection
+   * session resolves to a no-op inside the handler.
+   */
+  private nudge_vector_selection(dx: number, dy: number): void {
+    const ses = this.vector_edit;
+    if (!ses) return;
+    const zoom = this.camera.zoom || 1;
+    this.handle_translate_vector_selection({
+      kind: "translate_vector_selection",
+      node_id: ses.node_id,
+      additional_vertex_indices: [],
+      dx: dx * zoom,
+      dy: dy * zoom,
+      phase: "commit",
+    });
+    this.request_redraw();
   }
 
   /** Mirror handler for `select_tangent` (analogous to `select_vertex`). */

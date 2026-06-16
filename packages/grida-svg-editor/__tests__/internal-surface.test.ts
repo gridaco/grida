@@ -42,6 +42,7 @@ type Internal = {
   push_pick: (e: unknown) => void;
   set_computed_resolver: (fn: unknown) => void;
   set_geometry: (p: unknown) => void;
+  register_command: (id: string, handler: unknown) => () => void;
 };
 
 function internalOf(editor: ReturnType<typeof createSvgEditor>): Internal {
@@ -63,6 +64,7 @@ describe("editor._internal contract", () => {
         "notify_translate_commit",
         "push_pick",
         "push_surface_hover",
+        "register_command",
         "seed_duplication",
         "set_computed_resolver",
         "set_content_edit_driver",

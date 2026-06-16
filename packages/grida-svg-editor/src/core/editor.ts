@@ -2883,6 +2883,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       set_geometry(p: GeometryProvider | null) {
         geometry_provider = p;
       },
+      register_command(id, handler) {
+        return registry.register(id, handler);
+      },
       bump_geometry() {
         // A surface-observed reflow the IR can't see (web font settled
         // after the font-* write). Advance ONLY the geometry channel:
