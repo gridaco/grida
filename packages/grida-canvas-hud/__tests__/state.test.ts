@@ -473,6 +473,7 @@ describe("SurfaceState dispatch", () => {
       direction: "se",
       initial_shape,
       anchor_doc: [0, 0],
+      last_doc: [0, 0],
       current_shape: initial_shape,
       preview_shape: initial_shape,
     };
@@ -495,6 +496,61 @@ describe("SurfaceState dispatch", () => {
     expect(last.kind).toBe("resize");
     if (last.kind !== "resize") return;
     expect(last.shape).toEqual(next);
+  });
+
+  // ── Resize: mid-drag Alt toggle refreshes the dashed preview ──
+  //
+  // The host redrives its resize on an Alt flip even with the pointer at
+  // rest, so the HUD must refresh `preview_shape` on the same `modifiers`
+  // event — otherwise the dashed box lags the anchor switch until the next
+  // pointer move (the exact flow this feature supports).
+  it("resize: Alt toggle with no pointer move refreshes preview_shape (center), current_shape unchanged", () => {
+    const initial = {
+      kind: "rect" as const,
+      rect: { x: 0, y: 0, width: 100, height: 50 },
+    };
+    state.gesture = {
+      kind: "resize",
+      ids: ["a"],
+      direction: "se",
+      initial_shape: initial,
+      anchor_doc: [0, 0],
+      last_doc: [0, 0],
+      current_shape: initial,
+      preview_shape: initial,
+    };
+
+    // Drag SE by (20, 10), no modifier → opposite-anchored.
+    state.dispatch({ kind: "pointer_move", x: 20, y: 10, mods: NO_MODS }, deps);
+    if (state.gesture.kind !== "resize") return;
+    expect(state.gesture.current_shape).toEqual({
+      kind: "rect",
+      rect: { x: 0, y: 0, width: 120, height: 60 },
+    });
+    expect(state.gesture.preview_shape).toEqual(state.gesture.current_shape);
+
+    // Toggle Alt with the pointer at rest (no pointer_move).
+    const res = state.dispatch(
+      { kind: "modifiers", mods: { ...NO_MODS, alt: true } },
+      deps
+    );
+    expect(res.needsRedraw).toBe(true);
+    if (state.gesture.kind !== "resize") return;
+    // current_shape (intent dims) is anchor-independent — unchanged.
+    expect(state.gesture.current_shape).toEqual({
+      kind: "rect",
+      rect: { x: 0, y: 0, width: 120, height: 60 },
+    });
+    // preview_shape is now symmetric about the initial center.
+    expect(state.gesture.preview_shape).toEqual({
+      kind: "rect",
+      rect: { x: -20, y: -10, width: 140, height: 70 },
+    });
+
+    // Release Alt → preview snaps back to the opposite-anchored shape.
+    state.dispatch({ kind: "modifiers", mods: NO_MODS }, deps);
+    if (state.gesture.kind !== "resize") return;
+    expect(state.gesture.preview_shape).toEqual(state.gesture.current_shape);
   });
 
   // ── Rotate gesture: cursor composes initial + delta on transformed ──

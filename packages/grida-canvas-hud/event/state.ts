@@ -481,15 +481,47 @@ export class SurfaceState {
       case "pointer_up":
         this.modifiers = event.mods;
         return this.onPointerUp(event.x, event.y, event.button, deps);
-      case "modifiers":
+      case "modifiers": {
         this.modifiers = event.mods;
+        // A mid-drag Alt toggle (no pointer move) switches the resize anchor
+        // opposite<->center, so the dashed preview must refresh now —
+        // otherwise it stays stale until the next move. `current_shape` (the
+        // intent dims) is anchor-independent, so only `preview_shape` changes.
+        if (this.gesture.kind === "resize") {
+          const g = this.gesture;
+          const dx = g.last_doc[0] - g.anchor_doc[0];
+          const dy = g.last_doc[1] - g.anchor_doc[1];
+          this.gesture = {
+            ...g,
+            preview_shape: this.resizePreviewShape(g, dx, dy, g.current_shape),
+          };
+          const response = emptyResponse();
+          response.needsRedraw = true;
+          return response;
+        }
         return emptyResponse();
+      }
       case "wheel":
       case "key":
         return emptyResponse();
       case "blur":
         return this.onBlur(deps);
     }
+  }
+
+  /** The dashed-preview shape for a resize: center-symmetric under Alt,
+   *  else the opposite-anchored `opposite` shape (which the intent carries).
+   *  One rule, shared by the pointer-move handler and the modifier-toggle
+   *  refresh so the preview can't go stale on a mid-drag Alt flip. */
+  private resizePreviewShape(
+    g: Extract<SurfaceGesture, { kind: "resize" }>,
+    dx: number,
+    dy: number,
+    opposite: SelectionShape
+  ): SelectionShape {
+    return this.modifiers.alt
+      ? applyResize(g.initial_shape, g.direction, dx, dy, { fromCenter: true })
+      : opposite;
   }
 
   // ── Pointer move ─────────────────────────────────────────────────────────
@@ -779,14 +811,14 @@ export class SurfaceState {
         // lags the actual (center-anchored) result. The emitted intent
         // below still carries the opposite-anchored `next_shape` dims; the
         // host derives center from those + its own modifier read, so the
-        // anchor policy stays host-owned. Read live so a mid-drag Alt
-        // press/release re-previews on the next frame.
-        const preview_shape = this.modifiers.alt
-          ? applyResize(g.initial_shape, g.direction, dx, dy, {
-              fromCenter: true,
-            })
-          : next_shape;
-        this.gesture = { ...g, current_shape: next_shape, preview_shape };
+        // anchor policy stays host-owned.
+        const preview_shape = this.resizePreviewShape(g, dx, dy, next_shape);
+        this.gesture = {
+          ...g,
+          current_shape: next_shape,
+          preview_shape,
+          last_doc: point_doc,
+        };
         deps.emitIntent({
           kind: "resize",
           ids: g.ids,
@@ -1465,6 +1497,7 @@ export class SurfaceState {
           direction: decision.direction,
           initial_shape: decision.initial_shape,
           anchor_doc: point_doc,
+          last_doc: point_doc,
           current_shape: decision.initial_shape,
           preview_shape: decision.initial_shape,
         };

@@ -86,6 +86,10 @@ export type SurfaceGesture =
       initial_shape: SelectionShape;
       /** Anchor (pointer-down) in document-space. */
       anchor_doc: cmath.Vector2;
+      /** Most-recent pointer position in document-space (= `anchor_doc`
+       *  until the first move). Lets a mid-drag modifier toggle recompute
+       *  `preview_shape` from the live delta without a pointer move. */
+      last_doc: cmath.Vector2;
       /** Current shape during the gesture. Same kind as `initial_shape`.
        *  Opposite-anchored — feeds the emitted `resize` intent (move +
        *  commit). The host derives its own anchor (e.g. Alt → center)
