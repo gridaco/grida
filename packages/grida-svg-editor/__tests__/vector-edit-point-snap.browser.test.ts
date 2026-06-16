@@ -69,12 +69,12 @@ function tap(a: AttachedSurface, x: number, y: number): void {
   pointer(win, "pointerup", x, y, 0);
 }
 
-function arrow(a: AttachedSurface, code: string): boolean {
+function arrow(a: AttachedSurface, code: string, shiftKey = false): boolean {
   return a.editor.keymap.dispatch({
     code,
     metaKey: false,
     ctrlKey: false,
-    shiftKey: false,
+    shiftKey,
     altKey: false,
     preventDefault: () => {},
   } as unknown as KeyboardEvent);
@@ -230,5 +230,29 @@ describe("#844 — axis-lock + snap compose like the translate pipeline", () => 
     const v = vertices(s);
     expect(v[0][0]).toBeCloseTo(103.5, 1); // 7 screen px ÷ 2 = 3.5 local; NOT snapped to 100
     expect(v[0][1]).toBeCloseTo(100, 3);
+  });
+
+  it("a Shift+Arrow nudge moves the exact screen step on a skewed path (no axis-lock collapse)", () => {
+    // skewX(30): screen_x = local_x + tan(30)·local_y, screen_y = local_y.
+    // v0 local (100,100) → screen (157.7,100). Shift+ArrowDown nudges 10px DOWN
+    // ON SCREEN; projecting that screen step to local yields a delta with BOTH
+    // components (−tan30·10, 10). Locking the projected-local delta (the old
+    // order) would collapse the x part and move the point wrong; locking the
+    // RAW single-axis screen delta first is a no-op, so the nudge is exact.
+    // (gridaco/grida#844 review.)
+    const TAN30 = Math.tan(Math.PI / 6); // ≈ 0.5773
+    s = attachSurface(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400">
+        <path id="p" transform="skewX(30)" d="M 100 100 L 200 300" fill="none" stroke="#222"/>
+      </svg>`
+    );
+    enterPathEdit(s);
+    tap(s, 100 + TAN30 * 100, 100); // select v0 at its screen position
+
+    expect(arrow(s, "ArrowDown", true)).toBe(true); // Shift ⇒ 10px step
+
+    const v = vertices(s);
+    expect(v[0][0]).toBeCloseTo(100 - TAN30 * 10, 1); // x compensates ≈ 94.23
+    expect(v[0][1]).toBeCloseTo(110, 3); // y + 10 (exact screen-down step)
   });
 });

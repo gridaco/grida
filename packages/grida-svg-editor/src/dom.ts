@@ -3985,6 +3985,10 @@ class DomSurface implements Surface {
     }
     this.vector_edit = null;
     this.vector_edit_region_baseline = null;
+    // Drop any in-flight point-snap guide (#844) — `compute_snap_extra`
+    // prioritizes it, so it must not survive a content-edit exit that
+    // bypasses the per-gesture commit / cancel clears.
+    this.point_snap_guide = undefined;
     this.hud.setVectorSelection(null);
     if (
       this.current_tool.type === "lasso" ||
