@@ -196,10 +196,16 @@ export namespace resize_capability {
     baseline: ResizeBaseline,
     dir: ResizeDirection,
     sx_gesture: number,
-    sy_gesture: number
+    sy_gesture: number,
+    from_center = false
   ): EffectiveResize {
     const bbox = baseline.bbox;
-    const origin = origin_of_direction(bbox, dir);
+    // Alt: pivot on the bbox center instead of the opposite corner, so
+    // the effective rect / moving corner / origin the snap stage reads
+    // match what the center-aware `apply` will actually write.
+    const origin = from_center
+      ? { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 }
+      : origin_of_direction(bbox, dir);
     const c = constraint(baseline, dir, sx_gesture, sy_gesture);
     const mask = direction_mask(dir);
 

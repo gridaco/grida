@@ -62,7 +62,11 @@ function drag_se(
     target_width,
     target_height,
   };
-  const modifiers = { aspect_lock: "off", force_disable_snap: false } as const;
+  const modifiers = {
+    aspect_lock: "off",
+    from_center: false,
+    force_disable_snap: false,
+  } as const;
   orch.drive(input, modifiers, { phase: "preview", snap: false });
   if (phase === "commit") {
     orch.drive(input, modifiers, { phase: "commit", snap: false });

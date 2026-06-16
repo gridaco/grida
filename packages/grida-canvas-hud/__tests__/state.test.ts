@@ -474,6 +474,7 @@ describe("SurfaceState dispatch", () => {
       initial_shape,
       anchor_doc: [0, 0],
       current_shape: initial_shape,
+      preview_shape: initial_shape,
     };
 
     state.dispatch({ kind: "pointer_move", x: 10, y: 10, mods: NO_MODS }, deps);

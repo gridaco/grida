@@ -774,7 +774,19 @@ export class SurfaceState {
         const dx = point_doc[0] - g.anchor_doc[0];
         const dy = point_doc[1] - g.anchor_doc[1];
         const next_shape = applyResize(g.initial_shape, g.direction, dx, dy);
-        this.gesture = { ...g, current_shape: next_shape };
+        // Dashed preview: under Alt the artwork resizes from its center, so
+        // the preview must be symmetric to match — otherwise it visibly
+        // lags the actual (center-anchored) result. The emitted intent
+        // below still carries the opposite-anchored `next_shape` dims; the
+        // host derives center from those + its own modifier read, so the
+        // anchor policy stays host-owned. Read live so a mid-drag Alt
+        // press/release re-previews on the next frame.
+        const preview_shape = this.modifiers.alt
+          ? applyResize(g.initial_shape, g.direction, dx, dy, {
+              fromCenter: true,
+            })
+          : next_shape;
+        this.gesture = { ...g, current_shape: next_shape, preview_shape };
         deps.emitIntent({
           kind: "resize",
           ids: g.ids,
@@ -1454,6 +1466,7 @@ export class SurfaceState {
           initial_shape: decision.initial_shape,
           anchor_doc: point_doc,
           current_shape: decision.initial_shape,
+          preview_shape: decision.initial_shape,
         };
         response.needsRedraw = true;
         return response;
