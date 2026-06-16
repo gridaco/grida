@@ -29,6 +29,7 @@ import {
   type SelectionShape,
   type SelectionGroup,
   type TapOutcome,
+  type TextEditChromeInput,
 } from "@grida/hud";
 import { cursors as hud_cursors } from "@grida/hud/cursors";
 import { measure, type Measurement } from "@grida/cmath/_measurement";
@@ -86,7 +87,7 @@ import {
   create_attention_tracker,
   type AttentionTracker,
 } from "./util/attention";
-import { SvgTextSurface } from "./text-surface";
+import { SvgTextSurface, type SvgTextEditGeometry } from "./text-surface";
 import {
   PathModel,
   VectorEditSession,
@@ -530,6 +531,10 @@ class DomSurface implements Surface {
   private text_edit: TextEditor | null = null;
   private text_edit_target: NodeId | null = null;
   private text_edit_original: string = "";
+  /** Last text-edit caret/selection geometry (LOCAL svg user-space), kept so a
+   *  camera change can re-project it for the HUD without the surface
+   *  recomputing. `null` when no text edit is active. */
+  private text_edit_geom: SvgTextEditGeometry | null = null;
 
   /** Open insertion bracket for the text tool — set while the inline
    *  content-edit that follows a click-to-place is in flight. When set,
@@ -867,6 +872,11 @@ class DomSurface implements Surface {
         // container space — re-resolve it against the new CTM. The
         // flat-NodeId path (singleton / empty) is a near no-op here.
         this.sync_surface_selection();
+        // Re-project the text-edit chrome against the new camera (the local
+        // geometry is camera-independent; only its local→screen transform
+        // changes). No-op when idle. The `redraw()` below paints it.
+        if (this.text_edit_geom)
+          this.push_text_edit_chrome(this.text_edit_geom);
         this.redraw();
       })
     );
@@ -1495,9 +1505,10 @@ class DomSurface implements Surface {
   }
 
   private render() {
-    // During an active text-edit session the text element and its caret /
-    // selection rect overlays are managed live by `SvgTextSurface`. Replacing
-    // the SVG would yank them out. Skip the re-render until commit/cancel.
+    // During an active text-edit session the live text element is mutated in
+    // place by `SvgTextSurface` (and its caret/selection are drawn on the HUD).
+    // Replacing the SVG would yank the element out. Skip the re-render until
+    // commit/cancel.
     // (`rendered_doc_revision` is deliberately NOT stamped on this early
     // return — the next `flush_dom()` after the session ends re-renders.)
     if (this.text_edit) return;
@@ -3923,7 +3934,12 @@ class DomSurface implements Surface {
 
     const live_el =
       (this.element_index.get(id) as SVGTextContentElement | undefined) ?? el;
-    const text_surface = new SvgTextSurface(live_el);
+    // The surface emits caret/selection geometry in LOCAL svg space; the host
+    // projects + forwards it to the HUD (which draws it above the chrome).
+    const text_surface = new SvgTextSurface(live_el, (geom) => {
+      this.push_text_edit_chrome(geom);
+      this.request_redraw();
+    });
     const is_mac =
       typeof navigator !== "undefined" &&
       /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
@@ -3978,9 +3994,50 @@ class DomSurface implements Surface {
     this.render();
     this.sync_surface_selection();
     this.sync_cursor();
+    // Clear the HUD caret/selection chrome before repainting so it vanishes
+    // on exit (covers commit / cancel / empty-delete — all route here).
+    this.push_text_edit_chrome(null);
     this.redraw();
     this.text_edit = null;
     this.text_edit_target = null;
+  }
+
+  /**
+   * Project the active session's text-edit geometry (LOCAL svg user-space) and
+   * push it to the HUD as text-edit chrome (caret + selection), or clear it on
+   * `null`. The local→container-px transform comes from the live text
+   * element's `getScreenCTM` (which folds in the camera's CSS transform on the
+   * SVG root) minus the container offset — the same projection convention
+   * `vector_of` / `container_box` use. The HUD keeps its own transform at
+   * identity, so this per-chrome transform is the whole projection. Does NOT
+   * redraw — callers own that.
+   */
+  private push_text_edit_chrome(geom: SvgTextEditGeometry | null): void {
+    this.text_edit_geom = geom;
+    if (!geom) {
+      this.hud.setTextEditChrome(null);
+      return;
+    }
+    const el = this.text_edit_target
+      ? this.element_index.get(this.text_edit_target)
+      : undefined;
+    const ctm =
+      (el as SVGGraphicsElement | undefined)?.getScreenCTM?.() ?? null;
+    if (!ctm) {
+      this.hud.setTextEditChrome(null);
+      return;
+    }
+    const input: TextEditChromeInput = {
+      transform: ctm_to_container_transform(ctm, this.container_offset()),
+      caret: geom.caret
+        ? { top: geom.caret.top, bottom: geom.caret.bottom }
+        : undefined,
+      caretVisible: geom.caret?.visible ?? false,
+      selectionRects: geom.selection ? [geom.selection] : undefined,
+      // Black caret reads cleanly on top of the (blue) selection box.
+      style: { caretColor: "#000000" },
+    };
+    this.hud.setTextEditChrome(input);
   }
 
   /**
@@ -5272,6 +5329,24 @@ export function project_point_through_ctm(
     ]
   );
   return [sx + container_offset[0], sy + container_offset[1]];
+}
+
+/**
+ * The matrix form of {@link project_point_through_ctm}: the full
+ * `local → container-px` affine for a CTM + container offset, as a
+ * `cmath.Transform`. Use when handing the transform to a downstream projector
+ * (e.g. HUD chrome) instead of projecting a single point.
+ *
+ * Pure function, no DOM types.
+ */
+export function ctm_to_container_transform(
+  ctm: { a: number; b: number; c: number; d: number; e: number; f: number },
+  container_offset: readonly [number, number]
+): cmath.Transform {
+  return [
+    [ctm.a, ctm.c, ctm.e + container_offset[0]],
+    [ctm.b, ctm.d, ctm.f + container_offset[1]],
+  ];
 }
 
 /**

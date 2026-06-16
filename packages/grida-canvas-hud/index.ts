@@ -149,6 +149,19 @@ export {
   type TransformBoxCorners,
 } from "./primitives/transform-box";
 
+// Text-edit (named class) — @unstable. Decoration-only caret + selection
+// chrome for inline text content-edit. svg-editor is the only consumer; the
+// main canvas editor paints its caret in WASM/Skia and does not consume this.
+export {
+  buildTextEditChrome,
+  DEFAULT_CARET_SCREEN_WIDTH,
+  type TextEditChromeDraw,
+  type TextEditChromeInput,
+  type TextEditCaret,
+  type TextEditSelectionRect,
+  type TextEditChromeStyle,
+} from "./classes/text-edit";
+
 // Selection-controls — pure-geometry model + priority ladder (UX rule).
 export {
   HUDHitPriority,
