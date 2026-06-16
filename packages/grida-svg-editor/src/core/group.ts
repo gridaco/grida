@@ -117,20 +117,21 @@ export namespace group {
     const sibling_index = new Map<NodeId, number>();
     for (let i = 0; i < siblings.length; i++) sibling_index.set(siblings[i], i);
 
-    const indices: number[] = [];
+    // `Set` dedupes a defensive duplicate-id case (selection should never
+    // contain duplicates, but be defensive).
+    const indices = new Set<number>();
     for (const id of ids) {
       const i = sibling_index.get(id);
       if (i === undefined) return null;
-      indices.push(i);
+      indices.add(i);
     }
 
-    // Contiguity: indices must form an unbroken run after sorting. Set
-    // dedupes a defensive duplicate-id case (selection should never
-    // contain duplicates, but be defensive).
-    const sorted = Array.from(new Set(indices)).sort((a, b) => a - b);
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i] !== sorted[i - 1] + 1) return null;
-    }
+    // Same-parent selections wrap regardless of contiguity: non-contiguous
+    // siblings are gathered into the new <g> in document order, the group
+    // lands at the front-most selected sibling's z-position, and any
+    // unselected siblings between them drop behind it (a paint-order shift
+    // that matches Figma / Illustrator, undoable via `original_positions`).
+    const sorted = Array.from(indices).sort((a, b) => a - b);
 
     const children = sorted.map((i) => siblings[i]);
     const last_index = sorted[sorted.length - 1];

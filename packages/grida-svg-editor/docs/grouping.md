@@ -35,16 +35,15 @@ only contain text-content children; `<linearGradient>` only allows
 
 ## Decision table
 
-| Selection                                                  | Cmd+G  |
-| ---------------------------------------------------------- | ------ |
-| Empty                                                      | reject |
-| Any selected node's tag ∉ `STRUCTURAL_GRAPHICS_SET`        | reject |
-| Common parent's tag ∈ `CONSTRAINED_PARENT_SET`             | reject |
-| Selection includes the document root                       | reject |
-| ≥2 nodes with mixed parents                                | reject |
-| ≥2 nodes, same parent, **non-contiguous** in element order | reject |
-| 1 node, valid tag, unconstrained parent                    | wrap   |
-| ≥2 nodes, same parent, contiguous, unconstrained parent    | wrap   |
+| Selection                                                 | Cmd+G  |
+| --------------------------------------------------------- | ------ |
+| Empty                                                     | reject |
+| Any selected node's tag ∉ `STRUCTURAL_GRAPHICS_SET`       | reject |
+| Common parent's tag ∈ `CONSTRAINED_PARENT_SET`            | reject |
+| Selection includes the document root                      | reject |
+| ≥2 nodes with mixed parents                               | reject |
+| 1 node, valid tag, unconstrained parent                   | wrap   |
+| ≥2 nodes, same parent, unconstrained parent (any z-order) | wrap   |
 
 The single-node case is not gated on "is the tag `<g>`." A single `<g>`
 is a valid wrap target (the user gets a nested group, which is sometimes
@@ -52,10 +51,18 @@ what they want); a single `<rect>` is also valid; a single `<tspan>` is
 rejected because its tag is not in `STRUCTURAL_GRAPHICS_SET`. The axis
 is the tag's content-model role, not its identity.
 
-Non-contiguous selections are rejected even when they share a parent:
-wrapping non-contiguous siblings in a `<g>` rearranges paint order
-relative to the unselected siblings between them. Users who want this
-can group contiguous runs separately.
+A same-parent selection wraps **regardless of adjacency** — wrapping a
+`<rect>` together with a `<g>` is the same operation as wrapping two
+`<rect>`s. Non-contiguous siblings are **gathered** into the new `<g>` in
+document order; the group lands at the front-most selected sibling's
+z-position and any unselected siblings that sat between selected ones
+drop behind it. That paint-order rearrangement is exactly what grouping
+non-adjacent elements means (matches Figma / Illustrator), and it
+round-trips byte-exactly on undo via the per-child position capture
+below. The only same-parent rejections are an empty selection, the
+document root, a constrained parent, or a non-structural tag. Mixed
+parents stay rejected (which parent would host the new `<g>`, and at what
+z-position, is ambiguous).
 
 ## Wrap algorithm
 
