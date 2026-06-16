@@ -181,3 +181,54 @@ describe("#844 — point snap for <line> endpoints", () => {
     expect(num("y2")).toBeCloseTo(100, 3); // p2 y snapped onto p1's row
   });
 });
+
+describe("#844 — axis-lock + snap compose like the translate pipeline", () => {
+  it("a Shift-locked mostly-vertical drag is not flipped horizontal by an x-snap", () => {
+    // v0 (300,100), v1 (310,200). Drag v0 by (dx=4, dy=8) with Shift — the
+    // user's intent is vertical (|dy| > |dx|). Locking AFTER snap would let an
+    // x correction toward v1's column grow dx past dy and flip the lock to
+    // horizontal; locking the RAW delta BEFORE snap (translate-pipeline order
+    // `axis_lock → snap`) keeps dominance the user's intent. (gridaco/grida#844
+    // review.)
+    s = attachSurface(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400">
+        <path id="p" d="M 300 100 L 310 200" fill="none" stroke="#222"/>
+      </svg>`
+    );
+    enterPathEdit(s);
+    const win = s.container.ownerDocument.defaultView!;
+    const shift = { shiftKey: true };
+    pointer(s.container, "pointerdown", 300, 100, 1, shift);
+    pointer(win, "pointermove", 302, 104, 1, shift);
+    pointer(win, "pointermove", 304, 108, 1, shift);
+    pointer(win, "pointerup", 304, 108, 0, shift);
+
+    const v = vertices(s);
+    expect(v[0][0]).toBeCloseTo(300, 3); // x stayed locked — not flipped
+    expect(v[0][1]).toBeCloseTo(108, 3); // moved along the dominant (y) axis
+  });
+
+  it("snap threshold stays screen pixels under a non-uniform element transform", () => {
+    // transform="scale(2 1)" → 1 local x-unit = 2 screen px, 1 local y = 1px.
+    // v0 local (100,100) → screen (200,100); v1 local (100,300) → screen
+    // (200,300). Drag v0 7px right on screen — that's only 3.5 local x, which a
+    // single area-scale threshold (÷√2 ≈ 4.24 local) would treat as in-range
+    // and snap back onto v1's column. A screen-pixel threshold sees 7px > 6px
+    // and leaves it free. (gridaco/grida#844 review.)
+    s = attachSurface(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400">
+        <path id="p" transform="scale(2 1)" d="M 100 100 L 100 300" fill="none" stroke="#222"/>
+      </svg>`
+    );
+    enterPathEdit(s);
+    const win = s.container.ownerDocument.defaultView!;
+    pointer(s.container, "pointerdown", 200, 100, 1);
+    pointer(win, "pointermove", 203.5, 100, 1);
+    pointer(win, "pointermove", 207, 100, 1);
+    pointer(win, "pointerup", 207, 100, 0);
+
+    const v = vertices(s);
+    expect(v[0][0]).toBeCloseTo(103.5, 1); // 7 screen px ÷ 2 = 3.5 local; NOT snapped to 100
+    expect(v[0][1]).toBeCloseTo(100, 3);
+  });
+});

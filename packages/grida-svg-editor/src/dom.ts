@@ -2912,10 +2912,12 @@ class DomSurface implements Surface {
    * Shift axis-lock for point-level drags (gridaco/grida#848) — the
    * vertex / endpoint counterpart of whole-object translate's
    * `axis_lock: "by_dominance"` (see `current_translate_modifiers`).
-   * Collapses the lesser axis of a local-frame delta when Shift is held,
-   * via the same cmath rule the translate pipeline's `axis_lock` stage
-   * uses; identity when Shift is up. Pull-at-consume from the HUD modifier
-   * store so a mid-drag Shift press/release reflects on the next frame.
+   * Collapses the lesser axis of a delta when Shift is held, via the same
+   * cmath rule the translate pipeline's `axis_lock` stage uses; identity when
+   * Shift is up. Space-agnostic: the point path applies it to the raw screen
+   * delta (before snap), so dominance reflects the user's drag intent. Pull-
+   * at-consume from the HUD modifier store so a mid-drag Shift press/release
+   * reflects on the next frame.
    */
   private axis_lock_point_delta(dx: number, dy: number): [number, number] {
     if (!this.hud.modifiers().shift) return [dx, dy];
@@ -2929,19 +2931,21 @@ class DomSurface implements Surface {
    * delta so it aligns with (or lands on) a sibling point: a path's other
    * vertices, or a `<line>`'s opposite endpoint.
    *
-   * Runs entirely in the element's **local frame**: agents (the moving
-   * point[s]) and neighbors (the static sibling points) come straight from
-   * the path's vector network / line attributes — no projection, no separate
-   * neighbor source. The corrected delta is returned in that same local frame
-   * so the caller applies it exactly where it already applies the local drag
-   * delta. Only the snap GUIDE is projected to screen (via the element CTM)
-   * for HUD rendering.
+   * Runs in **screen space** (container CSS-px, the HUD's identity frame). The
+   * caller projects the moving point[s] (agents) and the static sibling points
+   * (neighbors) through the element CTM first, and feeds the drag delta in the
+   * same space. Screen space is the right frame because the threshold and the
+   * rendered guide are both screen-pixel concepts: the configured
+   * `snap_threshold_px` stays user-visible pixels on BOTH axes for any element
+   * CTM — even a non-uniform / rotated one, which a single area-scale would
+   * distort (gridaco/grida#844 review) — and the guide needs no reprojection.
+   * The caller converts the returned screen delta back to local for the write.
    *
-   * Honors the global snap toggle (`style.snap_enabled`) and threshold
-   * (`style.snap_threshold_px`, converted to local units by the CTM scale) —
+   * Honors the global snap toggle (`style.snap_enabled`) and threshold —
    * snap off ⇒ free point dragging, per the issue. Bypassed when
-   * `suppress_point_snap` is set (keyboard nudge). Identity when there are no
-   * neighbors / agents.
+   * `suppress_point_snap` is set (keyboard nudge) or the point hasn't moved
+   * (a pure tap / select must never relocate a control). Identity when there
+   * are no neighbors / agents.
    *
    * The shared `SnapSession` drops 0-area rects (its empty-`<g>` "jerk to
    * origin" defense), so each point is modeled as a sub-pixel square centered
@@ -2949,20 +2953,19 @@ class DomSurface implements Surface {
    * matched same-edge offset carries the same ±eps on both sides), so eps
    * magnitude is immaterial as long as it stays far below the threshold.
    */
-  private snap_local_point_delta(
+  private snap_point_delta_screen(
     raw_dx: number,
     raw_dy: number,
-    agents_local: ReadonlyArray<readonly [number, number]>,
-    neighbors_local: ReadonlyArray<readonly [number, number]>,
-    ctm: DOMMatrix
+    agents_screen: ReadonlyArray<readonly [number, number]>,
+    neighbors_screen: ReadonlyArray<readonly [number, number]>
   ): [number, number] {
     this.point_snap_guide = undefined;
     const style = this.editor.style;
     if (
       this.suppress_point_snap ||
       !style.snap_enabled ||
-      agents_local.length === 0 ||
-      neighbors_local.length === 0 ||
+      agents_screen.length === 0 ||
+      neighbors_screen.length === 0 ||
       // Snap engages only once the point has actually moved. A pure tap
       // (select) commits a zero-delta translate; without this guard a vertex
       // already resting within threshold of a neighbor would jump onto it on
@@ -2972,17 +2975,14 @@ class DomSurface implements Surface {
       return [raw_dx, raw_dy];
     }
 
-    // Local threshold = screen threshold ÷ local-to-screen scale, so the
-    // engaged distance is constant on screen regardless of camera zoom or
-    // element scale (parity with the translate pipeline's `px / zoom`).
-    const det = ctm.a * ctm.d - ctm.c * ctm.b;
-    const scale = Math.sqrt(Math.abs(det)) || 1;
-    const threshold_local = style.snap_threshold_px / scale;
-    // Inflate each point to a sub-pixel square so the shared SnapSession
-    // keeps it (it drops 0-area rects). Symmetric, and far below the
-    // threshold, so the worst-case residue it can leave in the corrected
-    // delta (an opposite-edge match) is ≤ eps — invisible (~6e-6 units).
-    const eps = threshold_local * 1e-6 || 1e-9;
+    // Threshold is the user's screen-pixel setting applied directly — no
+    // scale conversion, so it's the same engaged distance on x and y under
+    // any element transform.
+    const threshold = style.snap_threshold_px;
+    // Inflate each point to a sub-pixel square so the shared SnapSession keeps
+    // it (it drops 0-area rects). Symmetric and far below the threshold, so
+    // the worst-case residue (an opposite-edge match) is ≤ eps — sub-pixel.
+    const eps = threshold * 1e-6 || 1e-9;
     const to_rect = (p: readonly [number, number]): Rect => ({
       x: p[0] - eps / 2,
       y: p[1] - eps / 2,
@@ -2991,28 +2991,23 @@ class DomSurface implements Surface {
     });
 
     const session = new SnapSession({
-      agents: agents_local.map(to_rect),
-      neighbors: neighbors_local.map(to_rect),
+      agents: agents_screen.map(to_rect),
+      neighbors: neighbors_screen.map(to_rect),
     });
     const { delta, guide } = session.snap(
       { x: raw_dx, y: raw_dy },
-      { enabled: true, threshold_px: threshold_local }
+      { enabled: true, threshold_px: threshold }
     );
     session.dispose();
-
-    if (guide) {
-      this.point_snap_guide = this.project_local_guide_to_screen(
-        guide,
-        ctm,
-        this.container_offset()
-      );
-    }
+    // The guide is already in screen space (the HUD's identity frame) — render
+    // it directly, no reprojection.
+    this.point_snap_guide = guide;
     return [delta.x, delta.y];
   }
 
   /** Split a path's baseline vertices into the snap agents (the moving
-   *  sub-selection) and neighbors (everything else) for
-   *  {@link snap_local_point_delta}. Both in path-local space. */
+   *  sub-selection) and neighbors (everything else) for the point-snap pass.
+   *  Both in path-local space; the caller projects them to screen. */
   private vertex_snap_points(
     model: PathModel,
     moving: ReadonlyArray<number>
@@ -3030,47 +3025,6 @@ class DomSurface implements Surface {
     return { agents, neighbors };
   }
 
-  /** Project a point-snap guide from an element's local frame to screen
-   *  CSS-px (the HUD canvas's identity coordinate system), via the element
-   *  CTM + container offset — the same projection `vector_of` uses for
-   *  vertex chrome. The local-frame analog of `project_guide_to_screen`
-   *  (which projects world-space orchestrator guides via the camera). */
-  private project_local_guide_to_screen(
-    g: import("@grida/cmath/_snap").guide.SnapGuide,
-    ctm: DOMMatrix,
-    container_offset: readonly [number, number]
-  ): import("@grida/cmath/_snap").guide.SnapGuide {
-    return {
-      lines: g.lines.map((l) => {
-        const [x1, y1] = project_point_through_ctm(
-          l.x1,
-          l.y1,
-          ctm,
-          container_offset
-        );
-        const [x2, y2] = project_point_through_ctm(
-          l.x2,
-          l.y2,
-          ctm,
-          container_offset
-        );
-        return { ...l, x1, y1, x2, y2 };
-      }),
-      points: g.points.map(([x, y]) =>
-        project_point_through_ctm(x, y, ctm, container_offset)
-      ),
-      rules: g.rules.map(([axis, value]) => {
-        const [px, py] = project_point_through_ctm(
-          axis === "x" ? value : 0,
-          axis === "x" ? 0 : value,
-          ctm,
-          container_offset
-        );
-        return [axis, axis === "x" ? px : py];
-      }),
-    };
-  }
-
   /** Translation from screen/page CSS-px to the HUD's container-identity
    *  space: subtract the container's page offset, add its scroll. Used at
    *  every `getScreenCTM` projection boundary (chrome, marquee, point snap)
@@ -3084,14 +3038,55 @@ class DomSurface implements Surface {
   }
 
   /**
+   * Local-frame drag delta for a point sub-selection (vertices or a `<line>`
+   * endpoint), composed exactly like whole-object translate: **axis-lock then
+   * snap** (translate-pipeline stage order `axis_lock → snap`). The raw delta
+   * and the agent / neighbor points are all in screen space (container
+   * CSS-px):
+   *
+   *   1. Shift axis-lock collapses the lesser axis of the RAW screen delta —
+   *      dominance is the user's intent, decided before snap can perturb it
+   *      (gridaco/grida#844 review: locking the snapped delta could flip the
+   *      axis). The lock is screen-aligned, matching the drag and the guides.
+   *   2. Point snap aligns the locked delta to the sibling points.
+   *   3. The result projects back into the element's local frame via the
+   *      inverse CTM for `translateVertices` / the endpoint write.
+   *
+   * `agents_local` / `neighbors_local` are projected to screen here so the
+   * snap threshold stays user-visible pixels under any element CTM.
+   */
+  private point_drag_local_delta(
+    ctm: DOMMatrix,
+    raw_screen_dx: number,
+    raw_screen_dy: number,
+    agents_local: ReadonlyArray<readonly [number, number]>,
+    neighbors_local: ReadonlyArray<readonly [number, number]>
+  ): [number, number] {
+    // 1. axis-lock the RAW screen delta (before snap — matches the pipeline).
+    let [sx, sy] = this.axis_lock_point_delta(raw_screen_dx, raw_screen_dy);
+    // 2. snap in screen space.
+    const offset = this.container_offset();
+    const to_screen = (p: readonly [number, number]): [number, number] =>
+      project_point_through_ctm(p[0], p[1], ctm, offset);
+    [sx, sy] = this.snap_point_delta_screen(
+      sx,
+      sy,
+      agents_local.map(to_screen),
+      neighbors_local.map(to_screen)
+    );
+    // 3. screen → local for the mutation.
+    const det = ctm.a * ctm.d - ctm.c * ctm.b;
+    return det !== 0 ? project_delta_inverse_ctm(sx, sy, ctm) : [sx, sy];
+  }
+
+  /**
    * Local-frame drag delta for a vertex sub-selection, from the HUD's
-   * container-space `dx/dy`. Inverse-projects through the element CTM (so a
-   * path under a scaled `<g>` / nested viewport tracks the cursor 1:1) then
-   * point-snaps to the path's other vertices (#844) — before axis-lock, so
-   * the lock keeps final say on a constrained axis. Identity when the element
-   * has no usable CTM. A tangent-only drag (empty `indices`) yields no snap
-   * agents, so snap is a no-op. Shared by the two vertex-translate handlers;
-   * the caller applies axis-lock and feeds the result to `translateVertices`.
+   * container-space `dx/dy`. Resolves the element CTM and the snap neighbor
+   * set (the path's other vertices), then defers to `point_drag_local_delta`
+   * for the axis-lock → snap → project composition. Falls back to a plain
+   * axis-lock of the raw delta when the element has no usable CTM. A
+   * tangent-only drag (empty `indices`) has no vertex agents, so snap is a
+   * no-op. Shared by the two vertex-translate handlers.
    */
   private vertex_drag_local_delta(
     node_id: NodeId,
@@ -3105,26 +3100,12 @@ class DomSurface implements Surface {
       el instanceof SVGGraphicsElement && typeof el.getScreenCTM === "function"
         ? el.getScreenCTM()
         : null;
-    if (!ctm) return [dx, dy];
-
-    let local_dx = dx;
-    let local_dy = dy;
-    const det = ctm.a * ctm.d - ctm.c * ctm.b;
-    if (det !== 0) {
-      [local_dx, local_dy] = project_delta_inverse_ctm(dx, dy, ctm);
-    }
-
+    if (!ctm) return this.axis_lock_point_delta(dx, dy);
     const { agents, neighbors } = this.vertex_snap_points(
       baseline_model,
       indices
     );
-    return this.snap_local_point_delta(
-      local_dx,
-      local_dy,
-      agents,
-      neighbors,
-      ctm
-    );
+    return this.point_drag_local_delta(ctm, dx, dy, agents, neighbors);
   }
 
   /** Snapshot of HUD modifier state mapped to the orchestrator's `GestureModifiers`.
@@ -3303,35 +3284,47 @@ class DomSurface implements Surface {
 
     const base_x = endpoint === "p1" ? initial.x1 : initial.x2;
     const base_y = endpoint === "p1" ? initial.y1 : initial.y2;
-    let dx = target_x - base_x;
-    let dy = target_y - base_y;
 
-    // #844: snap the dragged endpoint to the line's OPPOSITE endpoint
-    // (orthogonal-align / land-on-point), in the line's own frame. The
-    // other endpoint is the only same-element point a line exposes.
+    // #848 axis-lock + #844 snap, composed in pipeline order (lock → snap).
+    // The opposite endpoint is the only same-element point a line exposes, so
+    // it is the lone snap neighbor (orthogonal-align / land-on-point). Done in
+    // screen space — see `point_drag_local_delta` — relative to the gesture-
+    // start endpoint, so the result is a clean delta off the original.
     const el = this.element_index.get(id);
     const ctm =
       el instanceof SVGGraphicsElement && typeof el.getScreenCTM === "function"
         ? el.getScreenCTM()
         : null;
+    let final_x: number;
+    let final_y: number;
     if (ctm) {
+      const offset = this.container_offset();
+      const base_screen = project_point_through_ctm(
+        base_x,
+        base_y,
+        ctm,
+        offset
+      );
       const other: readonly [number, number] =
         endpoint === "p1" ? [initial.x2, initial.y2] : [initial.x1, initial.y1];
-      [dx, dy] = this.snap_local_point_delta(
-        dx,
-        dy,
+      const [ldx, ldy] = this.point_drag_local_delta(
+        ctm,
+        intent.pos[0] - base_screen[0],
+        intent.pos[1] - base_screen[1],
         [[base_x, base_y]],
-        [other],
-        ctm
+        [other]
       );
+      final_x = base_x + ldx;
+      final_y = base_y + ldy;
+    } else {
+      // No usable CTM — fall back to the locally-resolved cursor target + lock.
+      const [ldx, ldy] = this.axis_lock_point_delta(
+        target_x - base_x,
+        target_y - base_y
+      );
+      final_x = base_x + ldx;
+      final_y = base_y + ldy;
     }
-
-    // #848: Shift axis-locks the (snapped) endpoint delta relative to its
-    // gesture-start position (parity with whole-object translate) — the lock
-    // keeps final say on a constrained axis, keeping the move orthogonal.
-    const [locked_dx, locked_dy] = this.axis_lock_point_delta(dx, dy);
-    const final_x = base_x + locked_dx;
-    const final_y = base_y + locked_dy;
 
     const apply = () => {
       if (endpoint === "p1") {
@@ -4395,24 +4388,17 @@ class DomSurface implements Surface {
 
     const baseline_d = this.active_preview.initial_d;
     const indices = this.active_preview.indices;
-    // HUD reports `dx, dy` in container CSS-px (its own doc-space).
-    // The PathModel expects deltas in the path's local SVG coord space.
-    // Project the delta back through the inverse of the CTM's linear part
-    // (no translation: a delta is camera-invariant under translation).
-    // Mirrors what `container_point_in_own_frame` does for absolute points.
-    // Project the HUD's container-space delta into the path's local frame
-    // and point-snap it (#844). See `vertex_drag_local_delta`.
-    let [local_dx, local_dy] = this.vertex_drag_local_delta(
+    // The HUD reports `dx, dy` in container CSS-px; resolve the local-frame
+    // delta to feed `translateVertices` — axis-lock (#848) and point-snap
+    // (#844) compose inside, in the translate pipeline's `axis_lock → snap`
+    // order. See `vertex_drag_local_delta`.
+    const [local_dx, local_dy] = this.vertex_drag_local_delta(
       node_id,
       this.active_preview.baseline_model,
       indices,
       intent.dx,
       intent.dy
     );
-
-    // #848: Shift axis-locks the vertex drag (by-dominance, in the path's
-    // local frame) — parity with whole-object translate.
-    [local_dx, local_dy] = this.axis_lock_point_delta(local_dx, local_dy);
 
     // Derive the in-flight model from the baseline each frame. dx,dy is the
     // total delta from gesture start; replaying from baseline each frame
@@ -4573,25 +4559,18 @@ class DomSurface implements Surface {
     }
 
     const baseline_d = this.active_preview.initial_d;
-    // HUD reports dx/dy in container CSS-px (its own doc-space). The
-    // PathModel expects deltas in the path's local SVG coord space — same
-    // projection as `handle_translate_vertices`.
-    // Project the HUD's container-space delta into the path's local frame
-    // and point-snap it (#844; bypassed for keyboard nudge via
-    // `suppress_point_snap`). See `vertex_drag_local_delta`.
-    let [local_dx, local_dy] = this.vertex_drag_local_delta(
+    // The HUD reports `dx, dy` in container CSS-px; resolve the local-frame
+    // delta to feed `translateVertices`. Axis-lock (#848) and point-snap
+    // (#844) compose inside, in the translate pipeline's `axis_lock → snap`
+    // order; snap is bypassed for keyboard nudge (`suppress_point_snap`).
+    // See `vertex_drag_local_delta`.
+    const [local_dx, local_dy] = this.vertex_drag_local_delta(
       node_id,
       this.active_preview.baseline_model,
       indices,
       intent.dx,
       intent.dy
     );
-
-    // #848: Shift axis-locks the drag (by-dominance, in the path's local
-    // frame) — parity with whole-object translate. A keyboard nudge
-    // (`nudge_vector_selection`) feeds a single-axis delta, so the lock is
-    // a no-op there even when Shift is the 10px modifier.
-    [local_dx, local_dy] = this.axis_lock_point_delta(local_dx, local_dy);
 
     // Derive in-flight model from cached baseline each frame — replaying
     // from baseline (instead of accumulating) keeps chrome and document
