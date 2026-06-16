@@ -57,6 +57,24 @@ export function first_rect(
   return first_tag(source, "rect");
 }
 
+/** Internal id of the element authored with SVG `id="<name>"` (stored as the
+ *  node's `name`). The by-name companion to {@link first_tag}. */
+export function id_of(
+  editor: ReturnType<typeof createSvgEditor>,
+  name: string
+): string {
+  for (const [id, n] of editor.tree().nodes) {
+    if (n.name === name) return id;
+  }
+  throw new Error(`no node named "${name}"`);
+}
+
+/** A container `<g id="G">` with children `A`, `B`, plus two top-level
+ *  siblings `M` and `Z` — the tree a marquee produces when it sweeps a group
+ *  AND its children. Shared by the selection-invariant spec and the group
+ *  end-to-end test so they can't drift. */
+export const MARQUEE_REDUNDANT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g id="G"><rect id="A" x="0" y="0" width="10" height="10"/><rect id="B" x="20" y="0" width="10" height="10"/></g><circle id="M" cx="50" cy="50" r="5"/><rect id="Z" x="70" y="0" width="10" height="10"/></svg>`;
+
 /**
  * Install a headless `GeometryProvider` that derives bbox from the doc's own
  * attrs — covers `<rect>` / `<image>` / `<use>` / `<circle>` / `<ellipse>`.

@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createSvgEditor } from "../src/index";
+import { MARQUEE_REDUNDANT_SVG } from "./_helpers";
 
 /** Tight (whitespace-free) SVG so we can assert byte-equal undo. */
 const TWO_TIGHT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="0" y="0" width="10" height="10"/><circle cx="20" cy="20" r="5"/></svg>`;
@@ -229,6 +230,34 @@ describe("commands.group — reject rows", () => {
     expect(editor.commands.group()).toBe(false);
     expect(editor.serialize()).toBe(original);
     expect(editor.state.can_undo).toBe(can_undo_before);
+  });
+});
+
+describe("commands.group — marquee case (end-to-end)", () => {
+  // `group` is dumb about nesting: the selection-state invariant already
+  // compacts a marquee that caught a container AND its children to subtree
+  // roots before `group` sees it (see `selection-subtree-roots.test.ts` /
+  // `docs/selection.md`). This pins the end-to-end outcome.
+  it("marqueeing G + its children A/B + a sibling Z, then Cmd+G, wraps just G + Z", () => {
+    const editor = createSvgEditor({ svg: MARQUEE_REDUNDANT_SVG });
+    const G = first_by_tag(editor, "g");
+    const [A, B, Z] = ids_by_tag(editor, "rect"); // document order: A, B, then Z
+    editor.commands.select([G, A, B, Z]);
+    // The selection state has already compacted to [G, Z] (A/B absorbed by G).
+    expect(editor.state.selection).toEqual([G, Z]);
+    expect(editor.commands.group()).toBe(true);
+
+    const wrapper = editor.state.selection[0];
+    const tree = editor.tree();
+    expect(tree.nodes.get(wrapper)!.tag).toBe("g");
+    // G and Z are the wrapper's children; A/B ride inside G.
+    expect(tree.nodes.get(G)!.parent).toBe(wrapper);
+    expect(tree.nodes.get(Z)!.parent).toBe(wrapper);
+    expect(tree.nodes.get(A)!.parent).toBe(G);
+    expect(tree.nodes.get(B)!.parent).toBe(G);
+
+    editor.commands.undo();
+    expect(editor.serialize()).toBe(MARQUEE_REDUNDANT_SVG);
   });
 });
 
