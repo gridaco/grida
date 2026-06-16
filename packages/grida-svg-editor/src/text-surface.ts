@@ -1,40 +1,59 @@
 // `Surface` + `LayoutEngine` adapter that bridges `@grida/text-editor` to a
-// live `SVGTextContentElement` (a `<text>` or leaf `<tspan>`). Caret +
-// selection are SVG `<rect>` siblings of the outer `<text>`.
+// live `SVGTextContentElement` (a `<text>` or leaf `<tspan>`).
+//
+// This is a GEOMETRY PROVIDER, not a renderer. It owns the text-editing DOM
+// mutations (the live text content + edit-time `xml:space` / `pointer-events`)
+// and computes the caret + selection geometry in LOCAL svg user-space, but it
+// does NOT paint them. Instead it emits that geometry to a host `sink`, which
+// the editor (`dom.ts`) projects and hands to `@grida/hud`'s text-edit chrome.
+// The HUD draws caret + selection on its canvas — above the content and the
+// selection box (never occluded) and at a constant on-screen thickness.
 
 import type { LayoutEngine, Surface } from "@grida/text-editor";
 
-const SVG_NS = "http://www.w3.org/2000/svg";
 const XML_NS = "http://www.w3.org/XML/1998/namespace";
+
+/**
+ * Caret + selection geometry in LOCAL svg user-space. `null` = no chrome.
+ * The host projects this to screen space (the local→world transform comes from
+ * the live element's CTM) before handing it to the HUD.
+ */
+export interface SvgTextEditGeometry {
+  /** Caret endpoints (local) + blink visibility; `null` when there's no caret. */
+  caret: {
+    top: [number, number];
+    bottom: [number, number];
+    visible: boolean;
+  } | null;
+  /** Selection highlight rect (local); `null` when the selection is collapsed. */
+  selection: { x: number; y: number; width: number; height: number } | null;
+}
+
+/** Sink the host wires to push geometry into the HUD (and clear it on `null`). */
+export type SvgTextEditChromeSink = (geom: SvgTextEditGeometry | null) => void;
 
 export class SvgTextSurface implements Surface, LayoutEngine {
   private readonly textEl: SVGTextContentElement;
-  private readonly caretRect: SVGRectElement;
-  private readonly selectionRect: SVGRectElement;
+  private readonly sink: SvgTextEditChromeSink;
   private prevXmlSpace: string | null | undefined = undefined;
   private prevPointerEvents: string | null | undefined = undefined;
+  private caret: SvgTextEditGeometry["caret"] = null;
+  private selection: SvgTextEditGeometry["selection"] = null;
   private last_caret_idx = -1;
   private last_caret_visible = false;
   private last_sel_start = -1;
   private last_sel_end = -1;
 
-  constructor(textEl: SVGTextContentElement) {
+  /**
+   * @param textEl the live text element to drive.
+   * @param sink   receives the caret + selection geometry (local space) on
+   *   every change; the host projects + forwards it to the HUD. Called with
+   *   `null` on dispose so the host clears the chrome.
+   */
+  constructor(textEl: SVGTextContentElement, sink: SvgTextEditChromeSink) {
     this.textEl = textEl;
+    this.sink = sink;
     const ownerDoc = textEl.ownerDocument;
-
-    // SVG's text content model rejects `<rect>` as a child of `<text>` —
-    // walk up to the outermost text element to mount the chrome rects as
-    // valid siblings.
-    let mountAnchor: SVGElement = textEl;
-    while (
-      mountAnchor.parentElement instanceof SVGElement &&
-      (mountAnchor.localName === "tspan" ||
-        mountAnchor.localName === "textPath")
-    ) {
-      mountAnchor = mountAnchor.parentElement;
-    }
-    const parent = mountAnchor.parentNode;
-    if (!parent) throw new Error("text element has no parent");
 
     const computedWhitespace =
       ownerDoc.defaultView?.getComputedStyle(textEl).whiteSpace;
@@ -53,23 +72,6 @@ export class SvgTextSurface implements Surface, LayoutEngine {
     // between characters land on the text for caret positioning.
     this.prevPointerEvents = textEl.getAttribute("pointer-events");
     textEl.setAttribute("pointer-events", "bounding-box");
-
-    const selection = ownerDoc.createElementNS(SVG_NS, "rect");
-    selection.setAttribute("fill", "#2563eb");
-    selection.setAttribute("fill-opacity", "0.25");
-    selection.setAttribute("pointer-events", "none");
-    selection.setAttribute("data-svg-text-edit-selection", "");
-    selection.style.display = "none";
-    parent.insertBefore(selection, mountAnchor);
-    this.selectionRect = selection;
-
-    const caret = ownerDoc.createElementNS(SVG_NS, "rect");
-    caret.setAttribute("fill", "#2563eb");
-    caret.setAttribute("pointer-events", "none");
-    caret.setAttribute("data-svg-text-edit-caret", "");
-    caret.style.display = "none";
-    parent.insertBefore(caret, mountAnchor.nextSibling);
-    this.caretRect = caret;
   }
 
   // ─── Surface ─────────────────────────────────────────────────────────────
@@ -83,17 +85,14 @@ export class SvgTextSurface implements Surface, LayoutEngine {
       return;
     this.last_caret_idx = index;
     this.last_caret_visible = visible;
-    if (!visible) {
-      this.caretRect.style.display = "none";
-      return;
-    }
     const m = this.metrics();
     const x = this.charX(index);
-    this.caretRect.setAttribute("x", String(x - 0.75));
-    this.caretRect.setAttribute("y", String(m.top));
-    this.caretRect.setAttribute("width", "1.5");
-    this.caretRect.setAttribute("height", String(m.height));
-    this.caretRect.style.display = "block";
+    this.caret = {
+      top: [x, m.top],
+      bottom: [x, m.top + m.height],
+      visible,
+    };
+    this.emit();
   }
 
   setSelection(start: number, end: number): void {
@@ -101,22 +100,28 @@ export class SvgTextSurface implements Surface, LayoutEngine {
     this.last_sel_start = start;
     this.last_sel_end = end;
     if (start === end) {
-      this.selectionRect.style.display = "none";
+      this.selection = null;
+      this.emit();
       return;
     }
     const m = this.metrics();
     const x1 = this.charX(start);
     const x2 = this.charX(end);
-    this.selectionRect.setAttribute("x", String(Math.min(x1, x2)));
-    this.selectionRect.setAttribute("y", String(m.top));
-    this.selectionRect.setAttribute("width", String(Math.abs(x2 - x1)));
-    this.selectionRect.setAttribute("height", String(m.height));
-    this.selectionRect.style.display = "block";
+    this.selection = {
+      x: Math.min(x1, x2),
+      y: m.top,
+      width: Math.abs(x2 - x1),
+      height: m.height,
+    };
+    this.emit();
+  }
+
+  private emit(): void {
+    this.sink({ caret: this.caret, selection: this.selection });
   }
 
   dispose(keepEditMutations = false): void {
-    this.caretRect.remove();
-    this.selectionRect.remove();
+    this.sink(null);
     if (this.prevXmlSpace !== undefined && !keepEditMutations) {
       if (this.prevXmlSpace === null) {
         this.textEl.removeAttributeNS(XML_NS, "space");

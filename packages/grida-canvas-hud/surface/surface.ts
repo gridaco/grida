@@ -49,6 +49,10 @@ import {
   buildTransformBox,
   type TransformBoxInput,
 } from "../classes/transform-box";
+import {
+  buildTextEditChrome,
+  type TextEditChromeInput,
+} from "../classes/text-edit";
 import type { OverlayElement } from "../event/overlay";
 import type { VectorSubSelection } from "../event/state";
 
@@ -216,6 +220,12 @@ export class Surface {
    * `setPaddingOverlay`.
    */
   private paddingOverlay: PaddingOverlayInput | null = null;
+  /**
+   * Text-edit chrome input (caret + selection). `null` = no chrome drawn.
+   * Hosts push on inline content-edit (and on every caret move / blink tick /
+   * selection change / camera change); clear on exit. See `setTextEditChrome`.
+   */
+  private textEditChrome: TextEditChromeInput | null = null;
   // Explicit host color override; when set, beats `style.chromeColor` in
   // every paint until cleared via `setColor(null)`.
   private colorOverride: string | undefined;
@@ -393,6 +403,29 @@ export class Surface {
    */
   setPaddingOverlay(input: PaddingOverlayInput | null): void {
     this.paddingOverlay = input;
+  }
+
+  /**
+   * Configure or clear the built-in text-edit chrome — caret + selection
+   * highlights for inline text content-edit. `null` = no chrome drawn
+   * (schema-level feature flag).
+   *
+   * One atomic setter (not separate setCaret / setSelection): caret and
+   * selection are one visual state of one editing session, and a blink tick
+   * only flips `caretVisible` while the selection is unchanged — re-pushing
+   * the whole struct keeps the two from tearing across frames and matches the
+   * Skia `TextEditingDecorations` model. Re-push on every caret move /
+   * selection change / blink tick / camera change. The host owns redraw
+   * timing (this only stores state; `draw()` paints it next frame).
+   *
+   * The caret is drawn ABOVE the selection box (it's a screen-sized rect in
+   * the screenRects band) at a constant on-screen thickness, so it is never
+   * occluded and never scales with zoom. See `@grida/hud/classes/text-edit`.
+   *
+   * @unstable
+   */
+  setTextEditChrome(input: TextEditChromeInput | null): void {
+    this.textEditChrome = input;
   }
 
   /**
@@ -653,10 +686,26 @@ export class Surface {
     } else {
       this.hudCanvas.setParametricHandles(null);
     }
+    // Text-edit chrome (caret + selection). Decoration-only — built here and
+    // merged directly (no `fanOverlays`, no hit regions). Selection fills join
+    // the `polylines` band; the caret joins the `screenRects` band so it paints
+    // ABOVE the selection box and stays a constant on-screen thickness.
+    const text_edit = this.textEditChrome
+      ? buildTextEditChrome({
+          chrome: this.textEditChrome,
+          camera: this.state.getTransform(),
+        })
+      : null;
+
     // Merge overlay-fanned lines + polylines into the decoration so they're
     // drawn in the same pass as everything else. Polylines carry the
-    // path-edit segment outlines; lines carry tangent handle lines.
-    const has_extras = lines.length > 0 || polylines.length > 0;
+    // path-edit segment outlines + text-edit selection fills; lines carry
+    // tangent handle lines. When nothing is active these stay the original
+    // (empty) references — no per-frame allocation on the idle path.
+    const all_polylines = text_edit
+      ? [...polylines, ...text_edit.polylines]
+      : polylines;
+    const has_extras = lines.length > 0 || all_polylines.length > 0;
     const decoration_with_extras: HUDDraw = has_extras
       ? {
           ...decoration,
@@ -665,14 +714,17 @@ export class Surface {
               ? [...(decoration.lines ?? []), ...lines]
               : decoration.lines,
           polylines:
-            polylines.length > 0
-              ? [...(decoration.polylines ?? []), ...polylines]
+            all_polylines.length > 0
+              ? [...(decoration.polylines ?? []), ...all_polylines]
               : decoration.polylines,
         }
       : decoration;
+    const all_screenRects = text_edit
+      ? [...screenRects, ...text_edit.screenRects]
+      : screenRects;
     this.hudCanvas.draw(
       filterHUDDrawByGroup(
-        mergeDraws(decoration_with_extras, extra, screenRects),
+        mergeDraws(decoration_with_extras, extra, all_screenRects),
         { hidden }
       )
     );
