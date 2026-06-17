@@ -1,6 +1,6 @@
 {
   "name": "@grida/keybinding",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Declarative keybinding primitives — types, modifiers, platform resolution, and event matching. Building blocks for hotkey systems; not a hotkey manager.",
   "keywords": [
     "hotkey",
