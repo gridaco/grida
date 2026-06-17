@@ -463,10 +463,15 @@ Current implementation notes:
   `transform.nudge` (Arrow / Shift+Arrow, 1px / 10px via `args: { dx, dy }`),
   `reorder` (`]` / `[` / `Cmd+]` / `Cmd+[`, direction via `args`),
   `selection.duplicate` (Cmd+D — see §5).
+- Command ships, binding deliberately deferred:
+  `selection.set_opacity` (digit → opacity). The command is registered
+  and `editor.commands.set_opacity` exists; the digit keybindings are NOT
+  in the default keymap by decision (silent failure mode; issue #850). See
+  `docs/keybindings.md` → Object Properties for the intended semantics.
 - Missing (per `docs/keybindings.md` `[~]` and `[-]`):
   `clipboard.cut` / `copy` / `paste`, distribute
   (`Alt+Ctrl+H`/`V`), `paint.remove_fill` /
-  `remove_stroke` / `swap` / `set_opacity`, visibility / lock toggles,
+  `remove_stroke` / `swap`, visibility / lock toggles,
   viewport keys (zoom is in `gestures/defaults.ts` instead — see below),
   no tool-letter shortcuts (`V`/`R`/`O`/…) because the editor has no
   tool model.

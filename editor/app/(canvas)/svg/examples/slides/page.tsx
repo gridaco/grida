@@ -18,6 +18,7 @@ import {
 } from "../../_components/path-toolbar";
 import { Presentation } from "./_components/presentation";
 import { SlidesNav } from "./_components/slides-nav";
+import { useOpacityDigitsHotkeys } from "../../_components/use-opacity-digits";
 import { TITLE_SLIDE_SVG, type SlideTemplate } from "./_components/templates";
 import { EMPTY_SLIDE_SVG } from "./_components/types";
 import { SvgRouteShell, useSvgDocStore } from "../../_storage";
@@ -54,6 +55,10 @@ function SlidesBody() {
   const activeDoc = docs.find((d) => d.id === activeId);
   const activeIndex = docs.findIndex((d) => d.id === activeId);
   const hydrated = useSvgAgentHydrated();
+
+  // Host-owned digit → opacity shortcut (1–9 / 0 / 0 0) + toast. Suppressed
+  // while presenting, where digits are not an authoring gesture.
+  useOpacityDigitsHotkeys({ enabled: !presenting });
 
   const loadSvgFile = (file: File) => {
     const reader = new FileReader();

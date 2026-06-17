@@ -20,11 +20,27 @@ describe("builders", () => {
     ]);
   });
 
-  it("seq() composes multiple chunks (chord)", () => {
-    const chord = seq(c(M.CtrlCmd, KeyCode.KeyK), c(M.CtrlCmd, KeyCode.KeyS));
-    expect(chord).toHaveLength(2);
-    expect(chord[0]).toEqual([M.CtrlCmd, KeyCode.KeyK]);
-    expect(chord[1]).toEqual([M.CtrlCmd, KeyCode.KeyS]);
+  it("seq() composes heterogeneous chunks into a chord-sequence (Ctrl+K Ctrl+C)", () => {
+    const sequence = seq(
+      c(M.CtrlCmd, KeyCode.KeyK),
+      c(M.CtrlCmd, KeyCode.KeyC)
+    );
+    expect(sequence).toHaveLength(2);
+    expect(sequence[0]).toEqual([M.CtrlCmd, KeyCode.KeyK]);
+    expect(sequence[1]).toEqual([M.CtrlCmd, KeyCode.KeyC]);
+  });
+
+  it("seq() of a repeated chunk is a structural chord-sequence with no tap/timing metadata", () => {
+    // `0 0` is a multi-TAP gesture (clock-disambiguated), NOT a chord-sequence.
+    // seq() does not (and cannot) model that — it just returns the two chunks
+    // verbatim. Pins that the vocabulary carries no tap concept: a repeated
+    // chunk is structurally indistinct from any other 2-chunk sequence.
+    const repeated = seq(c(0, KeyCode.Digit0), c(0, KeyCode.Digit0));
+    expect(repeated).toEqual([
+      [0, KeyCode.Digit0],
+      [0, KeyCode.Digit0],
+    ]);
+    expect(repeated).toHaveLength(2);
   });
 
   it("platformKb() preserves per-platform mapping", () => {

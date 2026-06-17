@@ -1,6 +1,29 @@
 import { KeyCode, KeyCodeUtils } from "./keycode";
 
 /**
+ * # Concepts (terminology)
+ *
+ * Four terms that must never be conflated. Mirrored in the README §Concepts.
+ *
+ * - **Chunk** — one keypress: modifiers + key pressed together (`Cmd+Z`).
+ *   The atom. (`Chunk` below.)
+ * - **Chord** — a single chunk used as a complete binding. Dispatched today.
+ * - **Chord-sequence** (`Sequence` below) — ordered, typically *heterogeneous*
+ *   chunks pressed in succession (`Ctrl+K` then `Ctrl+C`). Disambiguated by
+ *   **structure** (the leader defers). Typed + resolvable + labelable here, but
+ *   **not dispatched in V1** — `match()` and the shipped `Keymap`s skip
+ *   `seq.length !== 1` by design.
+ * - **Multi-tap** — the **same** chunk repeated within a time window (`0 0`,
+ *   double-tap-Shift). Disambiguated by **timing (a clock)**: the single press
+ *   fires *and* the double press fires a *different* action. **Not a
+ *   `Sequence`**, and its modeling is an open design decision (see README
+ *   §Status) — these primitives stay clockless, so it is not represented here.
+ *
+ * Load-bearing rule: **structure-disambiguated → belongs in this vocabulary;
+ * clock-disambiguated → does not enter these clockless primitives.**
+ */
+
+/**
  * Modifier bitmask flags
  * Use bitwise OR to combine: M.Ctrl | M.Shift
  */
@@ -29,12 +52,22 @@ export enum M {
 export type Chunk = readonly [mods: number, ...keys: KeyCode[]];
 
 /**
- * A keybinding sequence
- * Represents a sequence of chunks that must be pressed in order
+ * A keybinding sequence — a **chord-sequence**.
+ *
+ * Ordered chunks pressed in succession; the leader defers (fires nothing) until
+ * the sequence completes. Disambiguated by **structure**, not timing. This is
+ * the VS Code `Ctrl+K Ctrl+C` shape. Typed + resolvable + labelable, but **not
+ * dispatched in V1** (see the `Concepts` block above).
  *
  * Examples:
- * - [[0, KeyCode.Digit0], [0, KeyCode.Digit0]] - double press 0
- * - [[M.CtrlCmd, KeyCode.KeyR], [M.CtrlCmd, KeyCode.KeyS]] - CMD+R then CMD+S
+ * - [[M.CtrlCmd, KeyCode.KeyK], [M.CtrlCmd, KeyCode.KeyC]] - Ctrl+K then Ctrl+C
+ * - [[M.CtrlCmd, KeyCode.KeyR], [M.CtrlCmd, KeyCode.KeyS]] - Ctrl+R then Ctrl+S
+ *
+ * NOT this: a `Sequence` of the **same** chunk repeated — e.g.
+ * `[[0, KeyCode.Digit0], [0, KeyCode.Digit0]]` — is **not** a multi-tap gesture.
+ * Multi-tap (`0 0` → a distinct action) is timing-disambiguated and is a
+ * separate concept that these clockless primitives do not model (see `Concepts`
+ * above and README §Status). Expressing it as a `Sequence` is a category error.
  */
 export type Sequence = readonly Chunk[];
 
@@ -86,7 +119,13 @@ export function c(mods: number, ...keys: KeyCode[]): Chunk {
 }
 
 /**
- * Helper function to create a keybinding sequence
+ * Helper function to create a keybinding sequence.
+ *
+ * Composes a chord-SEQUENCE (heterogeneous, ordered — `Ctrl+K Ctrl+C`). It is
+ * NOT a multi-tap builder: repeating the same chunk does not create a `0 0`-style
+ * tap gesture (that is timing-disambiguated and not modeled here — see
+ * `Sequence` and the `Concepts` block).
+ *
  * @param chunks - Array of chunks that form the sequence
  */
 export function seq(...chunks: Chunk[]): Sequence {

@@ -12,10 +12,22 @@
  * and get a boolean. The host is then free to build its own command
  * registry / keymap / dispatch logic.
  *
- * V1 supports single-chunk sequences only. Multi-chunk (chord) sequences
- * — like VS Code's `Ctrl+K Ctrl+S` — are typed in `Keybinding` but not
- * matched here; they would require a stateful matcher (track the leader
- * chunk between events). Not needed today; add when needed.
+ * V1 supports single-chunk sequences only. Two distinct multi-keystroke
+ * concepts are deliberately OUT OF SCOPE here — keep them separate (see the
+ * `Concepts` block in `keybinding.ts`):
+ *
+ *  1. **Chord-sequence** dispatch (`Ctrl+K Ctrl+C`) — typed in `Sequence` but
+ *     not matched here. It needs a stateful matcher that tracks the leader
+ *     chunk between events (timing, if any, is only a give-up watchdog). Add a
+ *     dedicated resolver when needed; do not fold it into `match()`.
+ *  2. **Multi-tap** (`0 0`, double-tap-Shift) — same-key timed repetition is a
+ *     **clock-driven gesture**, not a binding `match()` can answer. It is not a
+ *     `Sequence` and these primitives stay clockless. The pointer-side
+ *     precedent for "consecutive same-event within a window" lives in
+ *     `@grida/canvas-hud` (`core/click-tracker.ts`); the keyboard analogue, if
+ *     built, belongs in the dispatcher/surface layer, never here.
+ *
+ * This matcher therefore skips any sequence with `length !== 1`.
  */
 
 import { KeyCode } from "./keycode";

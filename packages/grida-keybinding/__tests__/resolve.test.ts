@@ -63,7 +63,7 @@ describe("resolveChunk", () => {
 });
 
 describe("resolveSequence", () => {
-  it("resolves every chunk in the sequence", () => {
+  it("resolves every chunk in a chord-sequence (resolvable, though not dispatched in V1)", () => {
     const resolved = resolveSequence(
       [
         [M.CtrlCmd, KeyCode.KeyK],

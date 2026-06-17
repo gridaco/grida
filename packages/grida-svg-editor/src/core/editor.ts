@@ -189,6 +189,21 @@ export type Commands = {
     definition: GradientDefinition,
     opts?: { reuse_existing?: boolean }
   ): { gradient_id: string };
+  /**
+   * Set the `opacity` presentation property across the whole selection in
+   * one history step. Typed, clamped sugar over `set_property("opacity", …)`
+   * — `value` is clamped to `[0, 1]` (CSS clamps opacity to that range at
+   * used-value time), so callers don't have to. A non-finite `value` is a
+   * no-op, as is an empty selection. The write picks each member's winning
+   * cascade carrier exactly like `set_property` (P1), and an in-flight
+   * `preview_property("opacity")` session is superseded the same way a
+   * discrete `set_property` write is.
+   *
+   * This is the editor-owned command behind the digit → opacity shortcut
+   * (see `docs/keybindings.md` → Object Properties); the keybindings
+   * themselves are intentionally not shipped in the default keymap.
+   */
+  set_opacity(value: number): void;
   // transforms
   translate(delta: { dx: number; dy: number }): void;
   nudge(delta: { dx: number; dy: number }): void;
@@ -1109,6 +1124,16 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     const gradient_id = defs.gradients.upsert(definition);
     set_paint(channel, { kind: "ref", id: gradient_id });
     return { gradient_id };
+  }
+
+  function set_opacity(value: number) {
+    // No-op on a non-finite arg rather than writing `opacity="NaN"`; the
+    // empty-selection no-op is `set_property`'s own guard.
+    if (!Number.isFinite(value)) return;
+    const clamped = cmath.clamp01(value);
+    // `String(clamped)` keeps the value compact (`0.1`, `1`, `0`) — the same
+    // shape the digit shortcut produces. One atomic "set opacity" step.
+    set_property("opacity", String(clamped));
   }
 
   /** World→local delta projection shared by every one-shot translate
@@ -2560,6 +2585,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     set_paint,
     preview_paint,
     set_paint_from_gradient,
+    set_opacity,
     translate,
     nudge,
     resize_to,
