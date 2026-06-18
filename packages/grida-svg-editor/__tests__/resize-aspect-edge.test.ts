@@ -292,6 +292,37 @@ describe("apply — Shift+Alt on an edge is uniform about the bbox center", () =
   });
 });
 
+// ─── text-on-edge stays a no-op under Shift ─────────────────────────────────
+
+describe("text-on-edge stays a no-op under Shift (the per-element refusal wins)", () => {
+  // Regression: the edge aspect-lock makes both factors non-1; `resize_text`
+  // infers corner-ness from `sx`/`sy !== 1`, so without the `constraint.no_op`
+  // gate in `apply` it would misread the edge drag as a corner drag and scale
+  // the text. Drive `resize_pipeline.apply` (NOT `apply_aspect`, which calls
+  // `compute_factors` directly and bypasses the gate) so the gate is exercised.
+  it("text + 'e' edge + aspect-lock writes nothing", () => {
+    const { doc, id } = single(`<text x="10" y="20" font-size="16">hi</text>`);
+    const baseline = resize_pipeline.intent.capture_baseline(doc, id, {
+      x: 10,
+      y: 8,
+      width: 40,
+      height: 16,
+    });
+    const plan: ResizePlan = {
+      id,
+      baseline,
+      direction: "e",
+      dx: 40,
+      dy: 0,
+      aspect_lock: true,
+    };
+    resize_pipeline.apply(doc, plan);
+    expect(doc.get_attr(id, "x")).toBe("10");
+    expect(doc.get_attr(id, "y")).toBe("20"); // unchanged — edge drag refused
+    expect(doc.get_attr(id, "font-size")).toBe("16");
+  });
+});
+
 // ─── multi-member — union edge aspect-lock ──────────────────────────────────
 
 describe("multi-member — 'e' aspect-lock scales about the union's left-edge center", () => {

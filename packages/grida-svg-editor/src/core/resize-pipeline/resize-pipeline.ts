@@ -917,23 +917,45 @@ export namespace resize_pipeline {
     plan: ResizePlan,
     phase: "preview" | "commit" = "commit"
   ): void {
-    // Aspect-lock (Shift): the corner path carries the lock as rewritten
-    // deltas (the `aspect_lock` stage), so `apply` must NOT re-lock it
-    // here — passing shift only for edges keeps the corner path
-    // byte-identical. Edges carry the lock as a derived perpendicular
-    // factor (an edge handle's tracked midpoint doesn't move under
-    // perpendicular center-scaling, so the lock can't live in the delta).
-    const shift =
-      (plan.aspect_lock ?? false) &&
-      !resize_capability.is_corner(plan.direction);
-    const f = intent.compute_factors(
+    // Free (per-axis) factors first. Aspect-lock (Shift) re-locks ONLY for
+    // edges: the corner path carries the lock as rewritten deltas (the
+    // `aspect_lock` stage), so re-locking here would double-apply — passing
+    // shift only for edges keeps the corner path byte-identical. Edges carry
+    // the lock as a derived perpendicular factor (an edge handle's tracked
+    // midpoint doesn't move under perpendicular center-scaling, so the lock
+    // can't live in the delta).
+    //
+    // But skip the re-lock when the element refuses the edge gesture outright:
+    // text-on-edge is a no-op (`constraint.no_op`), and a fabricated uniform
+    // factor would make the per-element handler misread the edge drag as a
+    // corner drag (`resize_text` keys off `sx`/`sy !== 1`) and resize the
+    // text — diverging from snap / pixel-grid, which already gate on the same
+    // `constraint`. The synthesized group baseline is a free `rect`, so group
+    // members (text included) still scale uniformly, matching corner-drag.
+    const from_center = plan.from_center ?? false;
+    let f = intent.compute_factors(
       plan.baseline,
       plan.direction,
       plan.dx,
       plan.dy,
-      shift,
-      plan.from_center ?? false
+      false,
+      from_center
     );
+    if (
+      (plan.aspect_lock ?? false) &&
+      !resize_capability.is_corner(plan.direction) &&
+      !resize_capability.constraint(plan.baseline, plan.direction, f.sx, f.sy)
+        .no_op
+    ) {
+      f = intent.compute_factors(
+        plan.baseline,
+        plan.direction,
+        plan.dx,
+        plan.dy,
+        true,
+        from_center
+      );
+    }
     const members = plan.members ?? [{ id: plan.id, baseline: plan.baseline }];
     for (const m of members) {
       intent.apply(doc, m.id, m.baseline, f.sx, f.sy, f.origin, phase);
