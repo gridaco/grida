@@ -115,16 +115,36 @@ export namespace inline_style {
   }
 
   /**
+   * The effective declared value of `property`, or `null` if absent.
+   *
+   * Returns the **last** matching declaration: CSS resolves declarations of
+   * equal weight last-one-wins (CSS 2.1 §6.4.1), so for `fill:red;fill:blue`
+   * the winner is `blue`. Keeps the cascade rule co-located with {@link set}
+   * (which edits that same winner) so reads and writes agree.
+   */
+  export function get(style: string, property: string): string | null {
+    let value: string | null = null;
+    for (const seg of tokenize(style)) {
+      if (seg.kind === "decl" && seg.property === property) value = seg.value;
+    }
+    return value;
+  }
+
+  /**
    * Return `style` with `property` set to `value`, or removed when `value` is
    * `null`. Trivia-preserving: the touched declaration's own colon/space form
    * and every untouched sibling re-emit byte-for-byte.
    *
-   *  - Edit: only the matched declaration's value changes.
+   *  - Edit: only the **effective** (last, per CSS last-one-wins) declaration's
+   *    value changes; any earlier shadowed duplicate is left byte-equal, so the
+   *    edit is the one that actually wins the cascade.
    *  - Add (property absent): a canonical `property: value` is appended,
    *    inserted before a trailing empty segment so an authored trailing `;`
    *    stays trailing.
-   *  - Remove: the matched declaration is spliced; surviving declarations stay
-   *    byte-equal. Returns `""` when the last declaration is removed.
+   *  - Remove: **every** declaration of `property` is dropped — a surviving
+   *    duplicate would keep the property in the cascade. Other declarations
+   *    stay byte-equal. Returns `""` when no declaration remains (so the caller
+   *    can drop the attribute rather than emit a stray separator tail).
    *  - Remove of an absent property: returns the input unchanged.
    */
   export function set(
@@ -133,20 +153,27 @@ export namespace inline_style {
     value: string | null
   ): string {
     const segs = tokenize(style);
-    const idx = segs.findIndex(
-      (s) => s.kind === "decl" && s.property === property
-    );
     if (value === null) {
-      if (idx === -1) return style;
-      segs.splice(idx, 1);
-      // Once the last declaration is gone, any leftover segments are pure
-      // separators / whitespace (or unmodeled `raw` fragments) — never
-      // declarations worth preserving. Collapse to "" so the caller drops the
-      // attribute, matching the prior parser and this function's last-removal
-      // contract; otherwise `fill:red; ` / `fill:red;;` would re-emit a stray
-      // `" "` / `";"` and leave an empty `style` behind.
-      if (!segs.some((s) => s.kind === "decl")) return "";
-    } else if (idx === -1) {
+      const kept = segs.filter(
+        (s) => s.kind !== "decl" || s.property !== property
+      );
+      if (kept.length === segs.length) return style; // nothing matched
+      // Only separators / whitespace left (no declaration): collapse so the
+      // caller drops the attribute instead of emitting a stray `" "` / `";"`.
+      if (!kept.some((s) => s.kind === "decl")) return "";
+      return emit(kept);
+    }
+    // Edit / add target the LAST occurrence — the cascade winner — so the edit
+    // is the effective one even when the property is authored more than once.
+    let idx = -1;
+    for (let i = segs.length - 1; i >= 0; i--) {
+      const s = segs[i];
+      if (s.kind === "decl" && s.property === property) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx === -1) {
       const decl: Segment = {
         kind: "decl",
         pre: "",

@@ -1,8 +1,9 @@
 // Spec for the inline-`style` declaration grammar: trivia-preserving authoring
 // (Grida svg-editor issue #823). Editing one declaration must not churn the
 // formatting of untouched siblings, and a removed property must leave the
-// survivors byte-equal. The token model is private; these tests pin the two
-// public functions (`declarations` read view, `set` edit).
+// survivors byte-equal. The token model is private; these tests pin the three
+// public functions (`declarations` read view, `get` cascade winner, `set`
+// edit) — including CSS last-one-wins for duplicate properties.
 
 import { describe, expect, it } from "vitest";
 import { inline_style } from "../inline-style";
@@ -32,6 +33,28 @@ describe("inline_style.declarations (read projection)", () => {
     expect(inline_style.declarations("background:url(a:b)")).toEqual([
       { property: "background", value: "url(a:b)" },
     ]);
+  });
+
+  it("preserves duplicate properties in source order (read view, not cascade)", () => {
+    expect(inline_style.declarations("fill:red;fill:blue")).toEqual([
+      { property: "fill", value: "red" },
+      { property: "fill", value: "blue" },
+    ]);
+  });
+});
+
+describe("inline_style.get (cascade winner)", () => {
+  it("returns the sole declaration's value", () => {
+    expect(inline_style.get("fill: red ;stroke:blue", "fill")).toBe("red");
+  });
+
+  it("returns null for an absent property and empty input", () => {
+    expect(inline_style.get("fill:red", "stroke")).toBe(null);
+    expect(inline_style.get("", "fill")).toBe(null);
+  });
+
+  it("returns the LAST declaration when a property is duplicated (last-one-wins)", () => {
+    expect(inline_style.get("fill:red;fill:blue", "fill")).toBe("blue");
   });
 });
 
@@ -123,5 +146,21 @@ describe("inline_style.set (trivia-preserving edit)", () => {
 
   it("adds the first declaration to an empty style with no leading separator", () => {
     expect(inline_style.set("", "fill", "red")).toBe("fill: red");
+  });
+
+  it("editing a duplicated property edits the LAST (cascade-winning) occurrence", () => {
+    // The earlier shadowed `fill:red` stays byte-equal; the edit lands on the
+    // declaration that actually wins, so it isn't silently ineffective.
+    expect(inline_style.set("fill:red;fill:blue", "fill", "green")).toBe(
+      "fill:red;fill:green"
+    );
+  });
+
+  it("removing a duplicated property drops EVERY occurrence", () => {
+    // A surviving duplicate would keep the property in the cascade.
+    expect(inline_style.set("fill:red;fill:blue", "fill", null)).toBe("");
+    expect(
+      inline_style.set("fill:red;stroke:blue;fill:green", "fill", null)
+    ).toBe("stroke:blue");
   });
 });

@@ -533,10 +533,9 @@ export class SvgDocument implements DocumentEvents {
   get_style(id: NodeId, property: string): string | null {
     const style = this.get_attr(id, "style");
     if (!style) return null;
-    for (const d of inline_style.declarations(style)) {
-      if (d.property === property) return d.value;
-    }
-    return null;
+    // `inline_style.get` returns the cascade winner (last declaration) — the
+    // CSS last-one-wins rule stays owned by `@grida/svg`, not reimplemented here.
+    return inline_style.get(style, property);
   }
 
   set_style(id: NodeId, property: string, value: string | null): void {
