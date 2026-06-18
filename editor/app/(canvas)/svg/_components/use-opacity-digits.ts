@@ -41,8 +41,11 @@ export function useOpacityDigitsHotkeys(opts?: { enabled?: boolean }): void {
     };
 
     const on_key_down = (e: KeyboardEvent) => {
-      // Modifier chords belong to other shortcuts (Cmd+0 zoom-to-100, etc.).
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Bare digits only. Any modifier means another shortcut owns the chord —
+      // notably Shift+digit is the surface's KEYBOARD_ZOOM gesture (Shift+0
+      // reset, Shift+1/9 fit, Shift+2 zoom-to-selection); it must not also set
+      // opacity. (Cmd/Ctrl/Alt+digit likewise belong elsewhere.)
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       // Ignore OS key-repeat (held key) — one press = one opacity step, not a
       // flood of identical history entries + toasts.
       if (e.repeat) return;
