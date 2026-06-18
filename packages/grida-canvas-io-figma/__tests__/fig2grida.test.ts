@@ -249,6 +249,58 @@ describe("fig2grida", () => {
       });
       expect(result.document.scenes_ref.length).toBe(1);
     });
+
+    // `GET /v1/files/:key/nodes?ids=…` returns `{ nodes: { "<id>": { document } } }`.
+    // Scoping a render to that id must resolve through the nodes-map wrapper.
+    describe("`/nodes` response shape with rootNodeId scoping", () => {
+      const frame = (id: string, children: unknown[] = []) => ({
+        id,
+        type: "FRAME",
+        name: `frame-${id}`,
+        children,
+        fills: [],
+        strokes: [],
+        effects: [],
+        absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+        size: { x: 100, y: 100 },
+        blendMode: "NORMAL",
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+      });
+      const nodesResponse = (doc: unknown) => ({
+        name: "x",
+        role: "owner",
+        editorType: "figma",
+        nodes: { "1:2": { document: doc, components: {}, styles: {} } },
+      });
+
+      test("resolves a leaf frame fetched via /nodes", () => {
+        const result = restJsonToGridaDocument(nodesResponse(frame("1:2")), {
+          rootNodeId: "1:2",
+          preserve_figma_ids: true,
+        });
+        expect(result.document.nodes["1:2"]).toBeDefined();
+      });
+
+      test("resolves a frame that itself has children (not just its descendants)", () => {
+        const doc = frame("1:2", [frame("3:4")]);
+        const result = restJsonToGridaDocument(nodesResponse(doc), {
+          rootNodeId: "1:2",
+          preserve_figma_ids: true,
+        });
+        // The requested frame is the root, and its child came along.
+        expect(result.document.nodes["1:2"]).toBeDefined();
+        expect(result.document.nodes["3:4"]).toBeDefined();
+      });
+
+      test("can scope to a descendant id within the /nodes subtree", () => {
+        const doc = frame("1:2", [frame("3:4")]);
+        const result = restJsonToGridaDocument(nodesResponse(doc), {
+          rootNodeId: "3:4",
+          preserve_figma_ids: true,
+        });
+        expect(result.document.nodes["3:4"]).toBeDefined();
+      });
+    });
   });
 
   describe("preserve_figma_ids", () => {
