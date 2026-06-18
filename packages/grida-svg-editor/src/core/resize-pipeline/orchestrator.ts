@@ -224,6 +224,7 @@ export class ResizeOrchestrator {
       dx,
       dy,
       from_center: modifiers.from_center,
+      aspect_lock: modifiers.aspect_lock === "uniform",
     };
     const ctx: ResizeContext = {
       input: {

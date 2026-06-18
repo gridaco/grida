@@ -127,6 +127,13 @@ export type ResizePlan = {
    *  ctx-less `apply` can re-derive `(sx, sy, origin)` about the bbox
    *  center; mirrors `ResizeModifiers.from_center`. Defaults falsey. */
   from_center?: boolean;
+  /** Aspect-lock (Shift) for this frame. Carried on the plan so the
+   *  ctx-less `apply` can re-derive the perpendicular (uniform) factor
+   *  on **edge** handles — where the lock can't be encoded as a delta
+   *  (see `apply`); mirrors `ResizeModifiers.aspect_lock === "uniform"`.
+   *  Corners ignore this (handled by the `aspect_lock` stage). Defaults
+   *  falsey. */
+  aspect_lock?: boolean;
 };
 
 export type ResizeStageEmission = {
@@ -386,10 +393,25 @@ export namespace resize_pipeline {
       const denomY = baseHY - anchorY;
       let sx = affectsX && denomX !== 0 ? (newHX - anchorX) / denomX : 1;
       let sy = affectsY && denomY !== 0 ? (newHY - anchorY) / denomY : 1;
-      if (shift && affectsX && affectsY) {
-        const mag = Math.max(Math.abs(sx), Math.abs(sy));
-        sx = sx >= 0 ? mag : -mag;
-        sy = sy >= 0 ? mag : -mag;
+      if (shift) {
+        if (affectsX && affectsY) {
+          // Corner — max-magnitude uniform. Reached via the `aspect_lock`
+          // stage (delta-rewrite) and direct callers; idempotent.
+          const mag = Math.max(Math.abs(sx), Math.abs(sy));
+          sx = sx >= 0 ? mag : -mag;
+          sy = sy >= 0 ? mag : -mag;
+        } else if (affectsX) {
+          // Edge e/w — the perpendicular (height) follows the driven
+          // (width) factor. `anchorY` is already the opposite-edge center
+          // (b.y + h/2, or the bbox center under Alt), so applying sy = sx
+          // about it scales the box symmetrically and keeps aspect ratio.
+          sy = sx;
+        } else if (affectsY) {
+          // Edge n/s — symmetric: width follows the driven height factor
+          // about the opposite-edge center (anchorX = b.x + w/2 / bbox
+          // center under Alt).
+          sx = sy;
+        }
       }
       sx = Math.max(0.001, sx);
       sy = Math.max(0.001, sy);
@@ -895,14 +917,45 @@ export namespace resize_pipeline {
     plan: ResizePlan,
     phase: "preview" | "commit" = "commit"
   ): void {
-    const f = intent.compute_factors(
+    // Free (per-axis) factors first. Aspect-lock (Shift) re-locks ONLY for
+    // edges: the corner path carries the lock as rewritten deltas (the
+    // `aspect_lock` stage), so re-locking here would double-apply — passing
+    // shift only for edges keeps the corner path byte-identical. Edges carry
+    // the lock as a derived perpendicular factor (an edge handle's tracked
+    // midpoint doesn't move under perpendicular center-scaling, so the lock
+    // can't live in the delta).
+    //
+    // But skip the re-lock when the element refuses the edge gesture outright:
+    // text-on-edge is a no-op (`constraint.no_op`), and a fabricated uniform
+    // factor would make the per-element handler misread the edge drag as a
+    // corner drag (`resize_text` keys off `sx`/`sy !== 1`) and resize the
+    // text — diverging from snap / pixel-grid, which already gate on the same
+    // `constraint`. The synthesized group baseline is a free `rect`, so group
+    // members (text included) still scale uniformly, matching corner-drag.
+    const from_center = plan.from_center ?? false;
+    let f = intent.compute_factors(
       plan.baseline,
       plan.direction,
       plan.dx,
       plan.dy,
       false,
-      plan.from_center ?? false
+      from_center
     );
+    if (
+      (plan.aspect_lock ?? false) &&
+      !resize_capability.is_corner(plan.direction) &&
+      !resize_capability.constraint(plan.baseline, plan.direction, f.sx, f.sy)
+        .no_op
+    ) {
+      f = intent.compute_factors(
+        plan.baseline,
+        plan.direction,
+        plan.dx,
+        plan.dy,
+        true,
+        from_center
+      );
+    }
     const members = plan.members ?? [{ id: plan.id, baseline: plan.baseline }];
     for (const m of members) {
       intent.apply(doc, m.id, m.baseline, f.sx, f.sy, f.origin, phase);

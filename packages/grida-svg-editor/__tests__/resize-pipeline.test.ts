@@ -307,7 +307,13 @@ describe("resize-pipeline — aspect lock (Shift)", () => {
     expect(out.plan.dy).toBeCloseTo(10, 6);
   });
 
-  it("identity on edge handle even when Shift held", () => {
+  it("STAGE is a delta no-op on edge handles even when Shift held", () => {
+    // The aspect_lock STAGE rewrites deltas only for corners. An edge
+    // handle's tracked midpoint doesn't move under perpendicular
+    // center-scaling, so edge aspect-lock can't be encoded as a delta —
+    // it's carried as a factor at apply time (`plan.aspect_lock` →
+    // `compute_factors`), exercised by `resize-aspect-edge.test.ts`. This
+    // test pins that the stage leaves edge deltas untouched.
     const plan: ResizePlan = {
       id: "a",
       baseline: rect_baseline(),
