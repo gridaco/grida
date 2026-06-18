@@ -93,7 +93,11 @@ export type AgentProviderModelId = keyof typeof AGENT_PROVIDER_MODELS;
 export function isAgentProviderModel(
   modelId: string | null | undefined
 ): modelId is AgentProviderModelId {
-  return typeof modelId === "string" && modelId in AGENT_PROVIDER_MODELS;
+  // Own-property check (not `in`): a prototype key like `toString`/`__proto__`
+  // must NOT pass, or the later `AGENT_PROVIDER_MODELS[id]` lookup yields junk.
+  return (
+    typeof modelId === "string" && Object.hasOwn(AGENT_PROVIDER_MODELS, modelId)
+  );
 }
 
 /**

@@ -3,6 +3,7 @@ extend-ignore-identifiers-re = [
   "cargo",
   "clippy",
   "deno",
+  "ndJsonStream",
   "pnpm",
   "turbo",
   "vite",

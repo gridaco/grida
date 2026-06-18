@@ -71,9 +71,13 @@ const AGENT_PROVIDER_OPTIONS = [
   { id: "claude-code/sonnet-4.6", label: "Sonnet 4.6" },
   { id: "claude-code/haiku-4.5", label: "Haiku 4.5" },
 ] as const;
-const AGENT_PROVIDER_IDS = new Set<string>(
-  AGENT_PROVIDER_OPTIONS.map((o) => o.id)
-);
+const AGENT_PROVIDER_IDS = new Set<string>([
+  ...AGENT_PROVIDER_OPTIONS.map((o) => o.id),
+  // Legacy bare id (runtime back-compat in `AGENT_PROVIDER_MODELS`): keep a
+  // session stored with it recognized so it re-seeds + runs instead of being
+  // clobbered to the default.
+  "claude-code",
+]);
 
 function isCatalogId(id: string | undefined | null): id is CatalogId {
   return typeof id === "string" && Object.hasOwn(catalog, id);

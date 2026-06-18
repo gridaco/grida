@@ -44,15 +44,18 @@ async function main(): Promise<void> {
     `[grida] session ready: ${JSON.stringify(session.info)}\n\n`
   );
 
-  const t0 = process.hrtime.bigint();
-  const result = await session.prompt(prompt, printChunk);
-  const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+  try {
+    const t0 = process.hrtime.bigint();
+    const result = await session.prompt(prompt, printChunk);
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6;
 
-  process.stdout.write("\n");
-  process.stderr.write(
-    `\n[grida] turn done: stopReason=${result.stopReason} sessionId=${result.providerSessionId} (${ms.toFixed(0)}ms)\n`
-  );
-  await session.dispose();
+    process.stdout.write("\n");
+    process.stderr.write(
+      `\n[grida] turn done: stopReason=${result.stopReason} sessionId=${result.providerSessionId} (${ms.toFixed(0)}ms)\n`
+    );
+  } finally {
+    await session.dispose();
+  }
   process.exit(0);
 }
 

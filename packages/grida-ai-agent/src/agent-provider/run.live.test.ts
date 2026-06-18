@@ -73,8 +73,10 @@ async function runTurn(
 liveDescribe("LIVE — agent-provider class, no key (issue #813)", () => {
   let baseDir: string;
   let host: Host;
+  let prevAnthropicApiKey: string | undefined;
 
   beforeEach(async () => {
+    prevAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
     delete process.env.ANTHROPIC_API_KEY; // subscription billing only
     baseDir = await fs.mkdtemp(
       path.join(os.tmpdir(), "grida-agentprovider-live-")
@@ -83,6 +85,9 @@ liveDescribe("LIVE — agent-provider class, no key (issue #813)", () => {
   });
 
   afterEach(async () => {
+    // Restore the process-wide env we mutated so it can't bleed into other suites.
+    if (prevAnthropicApiKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = prevAnthropicApiKey;
     (host as Host | undefined)?.runtime.dispose();
     (host as Host | undefined)?.store.close();
     if (baseDir) await fs.rm(baseDir, { recursive: true, force: true });

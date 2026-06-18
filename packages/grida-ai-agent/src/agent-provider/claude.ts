@@ -214,37 +214,47 @@ export async function openClaudeSession(
     transport.stream
   );
 
-  const init = await conn.initialize({
-    protocolVersion: PROTOCOL_VERSION,
-    clientCapabilities: {},
-    clientInfo: { name: "grida-agent-provider", version: "0.0.0" },
-  });
-  const canResume = init.agentCapabilities?.sessionCapabilities?.resume != null;
-
   let sessionId: string;
   let resumed = false;
-  const meta = sessionMeta(opts.model);
-  const startFresh = async () =>
-    (await conn.newSession({ cwd, mcpServers: [], _meta: meta })).sessionId;
+  let protocolVersion: number;
+  try {
+    const init = await conn.initialize({
+      protocolVersion: PROTOCOL_VERSION,
+      clientCapabilities: {},
+      clientInfo: { name: "grida-agent-provider", version: "0.0.0" },
+    });
+    protocolVersion = init.protocolVersion;
+    const canResume =
+      init.agentCapabilities?.sessionCapabilities?.resume != null;
+    const meta = sessionMeta(opts.model);
+    const startFresh = async () =>
+      (await conn.newSession({ cwd, mcpServers: [], _meta: meta })).sessionId;
 
-  if (opts.resumeSessionId && canResume) {
-    try {
-      await conn.resumeSession({
-        sessionId: opts.resumeSessionId,
-        cwd,
-        mcpServers: [],
-        _meta: meta,
-      });
-      sessionId = opts.resumeSessionId;
-      resumed = true;
-    } catch {
-      // Stale/unknown id — the bridge restarted, the session expired, or the
-      // id never existed. Continuity is best-effort: start a fresh session
-      // rather than failing the turn. The new id is persisted for next time.
+    if (opts.resumeSessionId && canResume) {
+      try {
+        await conn.resumeSession({
+          sessionId: opts.resumeSessionId,
+          cwd,
+          mcpServers: [],
+          _meta: meta,
+        });
+        sessionId = opts.resumeSessionId;
+        resumed = true;
+      } catch {
+        // Stale/unknown id — the bridge restarted, the session expired, or the
+        // id never existed. Continuity is best-effort: start a fresh session
+        // rather than failing the turn. The new id is persisted for next time.
+        sessionId = await startFresh();
+      }
+    } else {
       sessionId = await startFresh();
     }
-  } else {
-    sessionId = await startFresh();
+  } catch (err) {
+    // Handshake failed before a session was returned — `dispose()` is
+    // unreachable from the caller, so close the spawned bridge here rather
+    // than leak the process.
+    transport.close();
+    throw err;
   }
 
   return {
@@ -252,7 +262,7 @@ export async function openClaudeSession(
     info: {
       transport: "acp",
       bridge: `npx ${BRIDGE_PKG}`,
-      protocolVersion: init.protocolVersion,
+      protocolVersion,
       model: opts.model ?? "(subscription default)",
       sessionId,
       resumed,
