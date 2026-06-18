@@ -410,13 +410,21 @@ export function applyResize(
   direction: ResizeDirection,
   dx: number,
   dy: number,
-  opts?: { fromCenter?: boolean }
+  opts?: { fromCenter?: boolean; aspect?: boolean }
 ): SelectionShape {
   const fromCenter = opts?.fromCenter ?? false;
+  const aspect = opts?.aspect ?? false;
   if (initial.kind === "rect") {
     return {
       kind: "rect",
-      rect: applyResizeRect(initial.rect, direction, dx, dy, fromCenter),
+      rect: applyResizeRect(
+        initial.rect,
+        direction,
+        dx,
+        dy,
+        fromCenter,
+        aspect
+      ),
     };
   }
   if (initial.kind === "transformed") {
@@ -435,7 +443,14 @@ export function applyResize(
     // for rotated / sheared selections.
     return {
       kind: "transformed",
-      local: applyResizeRect(initial.local, direction, ldx, ldy, fromCenter),
+      local: applyResizeRect(
+        initial.local,
+        direction,
+        ldx,
+        ldy,
+        fromCenter,
+        aspect
+      ),
       matrix: m,
     };
   }
@@ -450,13 +465,19 @@ export function applyResize(
  * `fromCenter` (Alt), the resize is symmetric about the rect's center:
  * the dragged edge moves by the delta and the opposite edge mirrors it,
  * so the size delta doubles and the center stays put.
+ *
+ * With `aspect` (Shift), the resize is uniform: a corner takes the
+ * max-magnitude axis factor; a side edge drives the perpendicular axis by
+ * the same factor about the perpendicular center. This mirrors the host's
+ * core `compute_factors`, so the dashed preview tracks what gets written.
  */
 function applyResizeRect(
   initial: Rect,
   direction: ResizeDirection,
   dx: number,
   dy: number,
-  fromCenter = false
+  fromCenter = false,
+  aspect = false
 ): Rect {
   let { x, y, width, height } = initial;
 
@@ -486,5 +507,42 @@ function applyResizeRect(
     height -= k * dy;
   }
 
-  return { x, y, width, height };
+  if (!aspect) return { x, y, width, height };
+
+  // Aspect-lock (Shift). Take the signed per-axis factors the free math
+  // produced, lock them to one magnitude, then rebuild the box about the
+  // anchor the free math pins — the opposite edge/corner, or the bbox
+  // center under `fromCenter`. A side edge has only one driven axis, so the
+  // perpendicular follows it about the perpendicular center.
+  const affectsX = hasE || hasW;
+  const affectsY = hasN || hasS;
+  // Per-axis anchor: bbox center under Alt or on the free (perpendicular)
+  // axis; else the pinned far edge — `pinLo` (moving the high edge) pins the
+  // low coordinate, otherwise the high one.
+  const anchorAxis = (
+    affected: boolean,
+    lo: number,
+    size: number,
+    pinLo: boolean
+  ) => (fromCenter || !affected ? lo + size / 2 : pinLo ? lo : lo + size);
+  const ax = anchorAxis(affectsX, initial.x, initial.width, hasE);
+  const ay = anchorAxis(affectsY, initial.y, initial.height, hasS);
+
+  const sxRaw = initial.width !== 0 ? width / initial.width : 1;
+  const syRaw = initial.height !== 0 ? height / initial.height : 1;
+  let sx: number;
+  let sy: number;
+  if (affectsX && affectsY) {
+    const mag = Math.max(Math.abs(sxRaw), Math.abs(syRaw));
+    sx = sxRaw >= 0 ? mag : -mag;
+    sy = syRaw >= 0 ? mag : -mag;
+  } else if (affectsX) {
+    sx = sxRaw;
+    sy = sxRaw;
+  } else {
+    sx = syRaw;
+    sy = syRaw;
+  }
+
+  return cmath.rect.scale(initial, [ax, ay], [sx, sy]);
 }

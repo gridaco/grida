@@ -483,10 +483,12 @@ export class SurfaceState {
         return this.onPointerUp(event.x, event.y, event.button, deps);
       case "modifiers": {
         this.modifiers = event.mods;
-        // A mid-drag Alt toggle (no pointer move) switches the resize anchor
-        // opposite<->center, so the dashed preview must refresh now —
-        // otherwise it stays stale until the next move. `current_shape` (the
-        // intent dims) is anchor-independent, so only `preview_shape` changes.
+        // A mid-drag Alt toggle (anchor opposite<->center) or Shift toggle
+        // (aspect-lock on/off) — both with no pointer move — change the
+        // dashed preview, so it must refresh now or it stays stale until the
+        // next move. `current_shape` (the intent dims) is modifier-independent
+        // (the host applies anchor/aspect itself), so only `preview_shape`
+        // changes.
         if (this.gesture.kind === "resize") {
           const g = this.gesture;
           const dx = g.last_doc[0] - g.anchor_doc[0];
@@ -509,19 +511,23 @@ export class SurfaceState {
     }
   }
 
-  /** The dashed-preview shape for a resize: center-symmetric under Alt,
-   *  else the opposite-anchored `opposite` shape (which the intent carries).
-   *  One rule, shared by the pointer-move handler and the modifier-toggle
-   *  refresh so the preview can't go stale on a mid-drag Alt flip. */
+  /** The dashed-preview shape for a resize: aspect-locked under Shift
+   *  and/or center-symmetric under Alt (the two compose), else the
+   *  opposite-anchored `opposite` shape (which the intent carries). One
+   *  rule, shared by the pointer-move handler and the modifier-toggle
+   *  refresh so the preview can't go stale on a mid-drag Shift/Alt flip. */
   private resizePreviewShape(
     g: Extract<SurfaceGesture, { kind: "resize" }>,
     dx: number,
     dy: number,
     opposite: SelectionShape
   ): SelectionShape {
-    return this.modifiers.alt
-      ? applyResize(g.initial_shape, g.direction, dx, dy, { fromCenter: true })
-      : opposite;
+    const { alt, shift } = this.modifiers;
+    if (!alt && !shift) return opposite;
+    return applyResize(g.initial_shape, g.direction, dx, dy, {
+      fromCenter: alt,
+      aspect: shift,
+    });
   }
 
   // ── Pointer move ─────────────────────────────────────────────────────────
