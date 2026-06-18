@@ -90,6 +90,20 @@ describe("inline_style.set (trivia-preserving edit)", () => {
     expect(inline_style.set("fill:red", "fill", null)).toBe("");
   });
 
+  it("removing the last declaration drops authored trailing separators / whitespace", () => {
+    // The leftover raw tail (`" "`, `";"`, `" ;"`) must not survive as the
+    // whole style value — otherwise the caller can't drop the attribute.
+    expect(inline_style.set("fill:red; ", "fill", null)).toBe("");
+    expect(inline_style.set("fill:red;;", "fill", null)).toBe("");
+    expect(inline_style.set("fill:red ;", "fill", null)).toBe("");
+  });
+
+  it("removing a non-last declaration keeps the surviving declaration's trailing trivia", () => {
+    expect(inline_style.set("fill:red;stroke:blue; ", "stroke", null)).toBe(
+      "fill:red; "
+    );
+  });
+
   it("removing an absent property returns the input unchanged", () => {
     expect(inline_style.set("fill:red", "stroke", null)).toBe("fill:red");
     expect(inline_style.set("", "stroke", null)).toBe("");

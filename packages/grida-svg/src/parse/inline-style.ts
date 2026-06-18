@@ -139,6 +139,13 @@ export namespace inline_style {
     if (value === null) {
       if (idx === -1) return style;
       segs.splice(idx, 1);
+      // Once the last declaration is gone, any leftover segments are pure
+      // separators / whitespace (or unmodeled `raw` fragments) — never
+      // declarations worth preserving. Collapse to "" so the caller drops the
+      // attribute, matching the prior parser and this function's last-removal
+      // contract; otherwise `fill:red; ` / `fill:red;;` would re-emit a stray
+      // `" "` / `";"` and leave an empty `style` behind.
+      if (!segs.some((s) => s.kind === "decl")) return "";
     } else if (idx === -1) {
       const decl: Segment = {
         kind: "decl",
