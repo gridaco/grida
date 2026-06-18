@@ -17,6 +17,7 @@ import {
 } from "../../_components/path-toolbar";
 import { DocsNav } from "../../_components/docs-nav";
 import { SvgLibraryWindow } from "../../_components/library-window";
+import { useOpacityDigitsHotkeys } from "../../_components/use-opacity-digits";
 import { fragment } from "../../_components/fragment";
 import SAMPLE_SVG from "../../_fixtures/artwork";
 import { SvgRouteShell, useSvgDocStore } from "../../_storage";
@@ -54,6 +55,10 @@ function SvgEditorDevPageBody() {
   // Defer canvas paint until the store has hydrated, so the seed fixture
   // doesn't flash before persisted content loads in.
   const hydrated = useSvgAgentHydrated();
+
+  // Host-owned digit → opacity shortcut (1–9 / 0 / 0 0) + toast. svg-editor
+  // ships the `set_opacity` command but not this binding — see the hook.
+  useOpacityDigitsHotkeys();
 
   const loadSvgFile = (file: File) => {
     const reader = new FileReader();

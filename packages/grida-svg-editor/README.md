@@ -636,6 +636,12 @@ editor.commands.{
     opts?: { reuse_existing?: boolean },
   ): { gradient_id: string };
 
+  // opacity — typed, clamped sugar for set_property("opacity", …); one
+  // history step across the selection. `value` is clamped to [0, 1]. This
+  // is the command behind the digit → opacity shortcut; the digit
+  // keybindings are NOT shipped in the default keymap (host-wired).
+  set_opacity(value: number): void;
+
   // transforms (atomic — the bundled HUD drives drag-resize-rotate internally)
   translate(delta: { dx: number; dy: number }): void;
   nudge(direction: "left" | "right" | "up" | "down", step?: number): void;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { kb, M, type Keybinding } from "../src/keybinding";
+import { c, kb, seq, M, type Keybinding } from "../src/keybinding";
 import { KeyCode } from "../src/keycode";
 import { chunkKey, eventToChunk, match } from "../src/match";
 
@@ -163,6 +163,29 @@ describe("match", () => {
     expect(match(mkEvent({ code: "Lang1" }), kb(KeyCode.KeyZ), "mac")).toBe(
       false
     );
+  });
+
+  it("matches single-chunk only — a multi-chunk sequence needs a stateful matcher not present in V1", () => {
+    // `seq(Ctrl+K, Ctrl+C)` is a chord-sequence; a single keydown can never
+    // satisfy it. match() skips `length !== 1`, so the first chunk does NOT
+    // match on its own.
+    const chordSeq = seq(
+      c(M.CtrlCmd, KeyCode.KeyK),
+      c(M.CtrlCmd, KeyCode.KeyC)
+    );
+    const ev = mkEvent({ code: "KeyK", metaKey: true });
+    expect(match(ev, chordSeq, "mac")).toBe(false);
+  });
+
+  it("is stateless across events — a repeated key is never coalesced into a double-tap", () => {
+    // `0 0` (multi-tap) is timing-disambiguated and out of scope. match() holds
+    // no cross-event state and no clock: feeding two Digit0 events against a
+    // repeated-chunk sequence matches neither time — there is no "double".
+    const repeated = seq(c(0, KeyCode.Digit0), c(0, KeyCode.Digit0));
+    const first = mkEvent({ code: "Digit0" });
+    const second = mkEvent({ code: "Digit0" });
+    expect(match(first, repeated)).toBe(false);
+    expect(match(second, repeated)).toBe(false);
   });
 });
 

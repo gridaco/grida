@@ -162,6 +162,21 @@ export function registerDefaultCommands(
     return editor.commands.flatten_transform();
   });
 
+  // Set the `opacity` of every selected element in one history step.
+  // `args` is the opacity value (clamped to [0,1] by the command). The
+  // editor-owned command behind the digit → opacity shortcut; the digit
+  // keybindings are intentionally NOT shipped in `keymap/defaults.ts`
+  // (host wires them — see docs/keybindings.md → Object Properties and
+  // issue #850). Guarded on select mode + non-empty selection so a
+  // programmatic invoke during text-edit can't mutate presentation, and
+  // so the keymap chain can fall through on an empty selection.
+  reg.register("selection.set_opacity", (args) => {
+    if (editor.state.mode !== "select") return false;
+    if (editor.state.selection.length === 0) return false;
+    editor.commands.set_opacity(args as number);
+    return true;
+  });
+
   // Replace the selection with every element-child of the current scope.
   // Cmd+A binding. Returns false on an empty scope so the chain can
   // try the next candidate (no candidates today; matches the deselect
