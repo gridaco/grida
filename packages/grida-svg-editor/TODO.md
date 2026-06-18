@@ -469,7 +469,7 @@ Current implementation notes:
   in the default keymap by decision (silent failure mode; issue #850). See
   `docs/keybindings.md` → Object Properties for the intended semantics.
 - Missing (per `docs/keybindings.md` `[~]` and `[-]`):
-  `clipboard.cut` / `copy` / `paste`, distribute
+  distribute
   (`Alt+Ctrl+H`/`V`), `paint.remove_fill` /
   `remove_stroke` / `swap`, visibility / lock toggles,
   viewport keys (zoom is in `gestures/defaults.ts` instead — see below),
