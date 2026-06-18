@@ -49,6 +49,18 @@ describe("applyResize — aspect (Shift) on a side edge follows the perpendicula
     expect(r.x + r.width / 2).toBe(50); // horizontal center preserved
     expect(r.y + r.height).toBe(50); // bottom edge pinned
   });
+
+  it("e: crossing the opposite edge clamps (no flip), matching core", () => {
+    // Drag the E edge far left, past the left edge → free width would be -50.
+    // Core clamps sx/sy to 0.001 (a thin box pinned at the left edge); the
+    // preview must match, not mirror.
+    const r = bbox(
+      applyResize(rect(0, 0, 100, 50), "e", -150, 0, { aspect: true })
+    );
+    expect(r.width).toBeCloseTo(0.1, 6); // 100 * 0.001, never negative
+    expect(r.height).toBeCloseTo(0.05, 6); // 50 * 0.001, followed
+    expect(r.x).toBe(0); // left edge still pinned
+  });
 });
 
 describe("applyResize — aspect (Shift) on a corner is max-magnitude uniform", () => {

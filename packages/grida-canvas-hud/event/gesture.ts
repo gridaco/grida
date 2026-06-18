@@ -544,5 +544,12 @@ function applyResizeRect(
     sy = syRaw;
   }
 
+  // Clamp to the same positive floor as core `compute_factors`. When the drag
+  // crosses the opposite edge the core commits a degenerate-thin box pinned at
+  // the anchor (not a mirror), so the aspect preview must too — otherwise the
+  // dashed box flips while the committed geometry collapses.
+  sx = Math.max(0.001, sx);
+  sy = Math.max(0.001, sy);
+
   return cmath.rect.scale(initial, [ax, ay], [sx, sy]);
 }
