@@ -7,8 +7,10 @@ pub fn sk_solid_paint(paint: impl Into<SolidPaint>, aa: bool) -> skia_safe::Pain
     let mut skia_paint = skia_safe::Paint::default();
     skia_paint.set_anti_alias(aa);
     let CGColor { r, g, b, a } = p.color;
-    let final_alpha = (a as f32 * p.opacity()) as u8;
-    skia_paint.set_color(skia_safe::Color::from_argb(final_alpha, r, g, b));
+    // A solid paint's effective alpha is its color alpha. Do NOT multiply by
+    // `opacity()` — for SolidPaint that method derives opacity from the color
+    // alpha (`color.a / 255`), so `a * opacity()` squares the alpha.
+    skia_paint.set_color(skia_safe::Color::from_argb(a, r, g, b));
     skia_paint
 }
 
@@ -36,10 +38,10 @@ pub fn sk_paint_stack(
     if paints.len() == 1 {
         if let Paint::Solid(solid) = &paints[0] {
             let CGColor { r, g, b, a } = solid.color;
-            let final_alpha = (a as f32 * solid.opacity()).round() as u8;
+            // Color alpha is the solid paint's opacity; see `sk_solid_paint`.
             let mut paint = skia_safe::Paint::default();
             paint.set_anti_alias(aa);
-            paint.set_color(Color::from_argb(final_alpha, r, g, b));
+            paint.set_color(Color::from_argb(a, r, g, b));
             paint.set_blend_mode(solid.blend_mode.into());
             return Some(paint);
         }
@@ -93,10 +95,10 @@ pub fn sk_paint_stack_without_images(
     if paints.len() == 1 {
         if let Paint::Solid(solid) = &paints[0] {
             let CGColor { r, g, b, a } = solid.color;
-            let final_alpha = (a as f32 * solid.opacity()).round() as u8;
+            // Color alpha is the solid paint's opacity; see `sk_solid_paint`.
             let mut paint = skia_safe::Paint::default();
             paint.set_anti_alias(aa);
-            paint.set_color(Color::from_argb(final_alpha, r, g, b));
+            paint.set_color(Color::from_argb(a, r, g, b));
             paint.set_blend_mode(solid.blend_mode.into());
             return Some(paint);
         }
@@ -130,8 +132,8 @@ pub fn shader_from_paint(
     match paint {
         Paint::Solid(solid) => {
             let CGColor { r, g, b, a } = solid.color;
-            let final_alpha = (a as f32 * solid.opacity()).round() as u8;
-            Some(shaders::color(Color::from_argb(final_alpha, r, g, b)))
+            // Color alpha is the solid paint's opacity; see `sk_solid_paint`.
+            Some(shaders::color(Color::from_argb(a, r, g, b)))
         }
         Paint::LinearGradient(g) => gradient::linear_gradient_shader(g, size),
         Paint::RadialGradient(g) => gradient::radial_gradient_shader(g, size),
@@ -147,5 +149,81 @@ pub fn shader_from_paint(
             let skia_image = repo.get(key)?;
             image::image_shader(img, skia_image, size)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cg::types::BlendMode;
+
+    fn solid(r: u8, g: u8, b: u8, a: u8) -> SolidPaint {
+        SolidPaint {
+            active: true,
+            color: CGColor { r, g, b, a },
+            blend_mode: BlendMode::Normal,
+        }
+    }
+
+    // Regression: a solid paint's color alpha must be used verbatim. Previously
+    // `final_alpha = a * solid.opacity()` squared the alpha because
+    // `SolidPaint::opacity()` derives opacity from the color alpha (`a / 255`),
+    // so a 50%-opaque fill rendered at ~25%.
+    #[test]
+    fn solid_paint_alpha_is_not_squared() {
+        for a in [0u8, 26, 64, 128, 191, 255] {
+            let p = sk_solid_paint(solid(255, 255, 255, a), true);
+            assert_eq!(p.color().a(), a, "sk_solid_paint dropped/squared alpha");
+
+            let stacked = sk_paint_stack_without_images(
+                &[Paint::Solid(solid(255, 255, 255, a))],
+                (100.0, 100.0),
+                true,
+            )
+            .expect("single solid fill produces a paint");
+            assert_eq!(
+                stacked.color().a(),
+                a,
+                "sk_paint_stack_without_images squared single-solid alpha"
+            );
+        }
+    }
+
+    /// Draw `paint` over an opaque black background and return the center
+    /// pixel's gray level. Black + white means all three RGB channels are
+    /// equal, so the result is independent of the surface's byte order.
+    fn render_center_gray(paint: &skia_safe::Paint) -> u8 {
+        use skia_safe::{surfaces, Color, Rect};
+        let (w, h) = (40, 40);
+        let mut surface = surfaces::raster_n32_premul((w, h)).expect("surface");
+        surface.canvas().clear(Color::BLACK);
+        surface
+            .canvas()
+            .draw_rect(Rect::from_xywh(0.0, 0.0, w as f32, h as f32), paint);
+        let img = surface.image_snapshot();
+        let info = img.image_info();
+        let row_bytes = info.min_row_bytes();
+        let mut raw = vec![0u8; row_bytes * h as usize];
+        img.read_pixels(
+            &info,
+            &mut raw,
+            row_bytes,
+            skia_safe::IPoint::new(0, 0),
+            skia_safe::image::CachingHint::Allow,
+        );
+        let off = ((h / 2) as usize * row_bytes) + (w / 2) as usize * 4;
+        // R == G == B for gray; read the first channel.
+        raw[off]
+    }
+
+    // End-to-end: 50% white over opaque black must src-over blend to ~50% gray
+    // (≈128), not the squared ~64 (white·0.25) the doubled-alpha bug produced.
+    #[test]
+    fn solid_half_alpha_blends_at_half() {
+        let gray = render_center_gray(&sk_solid_paint(solid(255, 255, 255, 128), false));
+        assert!(
+            (120..=136).contains(&gray),
+            "expected ~50% gray (≈128), got {gray} (squared-alpha bug would be ~64)"
+        );
     }
 }

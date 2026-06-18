@@ -4,7 +4,7 @@ use crate::{
     cg::{alignment::Alignment, types::*},
 };
 use math2::transform::AffineTransform;
-use skia_safe::{self, shaders, Color, FilterMode, MipmapMode, SamplingOptions, Shader, TileMode};
+use skia_safe::{self, shaders, Color, CubicResampler, SamplingOptions, Shader, TileMode};
 
 fn tile_modes_for_repeat(repeat: ImageRepeat) -> (TileMode, TileMode) {
     match repeat {
@@ -36,12 +36,16 @@ pub fn image_shader(
         (image.width() as f32, image.height() as f32),
         size,
     ));
-    // Nearest-neighbor keeps every source texel crisp when the image is
-    // displayed larger than its natural size — essential for pixel art,
-    // checker patterns, QR codes, etc. Mipmaps are still used for
-    // downscaling (Skia selects LOD from the mipmap chain built by
-    // `with_default_mipmaps()` in ImageRepository).
-    let sampling = SamplingOptions::new(FilterMode::Nearest, MipmapMode::Nearest);
+    // High-quality cubic (Mitchell) resampling. Photographic and logo image
+    // fills are almost always displayed at a different size than their source
+    // (here, large source assets downscaled into small boxes), and the prior
+    // `Nearest`/`Nearest` default aliased badly on downscale even with the
+    // mipmap chain attached by `with_default_mipmaps()` in ImageRepository
+    // (nearest-LOD + nearest-texel). Mitchell gives smooth, sharp results
+    // across both up- and down-scaling and matches Figma/CSS smooth-by-default
+    // behavior. Pixel-art-style crisp upscaling (QR, checker) would need an
+    // explicit opt-in (cf. CSS `image-rendering: pixelated`).
+    let sampling = SamplingOptions::from(CubicResampler::mitchell());
 
     // Extract repeat mode based on the fit variant
     let tile_modes = match &img.fit {

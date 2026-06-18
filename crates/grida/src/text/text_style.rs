@@ -107,6 +107,11 @@ pub fn textstyle(
             let fs = style.font_size.max(f32::EPSILON); // avoid div-by-zero
             let factor = (px / fs).max(MIN_LINE_HEIGHT_FACTOR);
             ts.set_height(factor);
+            // Distribute extra leading evenly above/below the glyphs. Skia's
+            // default splits it proportional to ascent:descent, which (for
+            // typical 3:1 fonts) drops the baseline and renders text lower than
+            // CSS / Figma, whose line-height model is half-leading.
+            ts.set_half_leading(true);
         }
         TextLineHeight::Factor(mult) => {
             ts.set_height_override(true); // force exact spacing
@@ -114,6 +119,7 @@ pub fn textstyle(
                                           // Percent is already a factor of font size.
             let factor = (mult).max(MIN_LINE_HEIGHT_FACTOR);
             ts.set_height(factor);
+            ts.set_half_leading(true); // see Fixed branch — match CSS/Figma half-leading
         }
     }
     ts.set_decoration(&decoration);
