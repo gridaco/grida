@@ -224,6 +224,31 @@ export function buildChrome(input: ChromeInput): {
         group: groups?.transformPreview,
       });
     }
+
+    // Aspect-ratio guide: while Shift aspect-locks the resize, draw the
+    // diagonal of the preview box opposite the dragged handle (the locked
+    // ratio the user is holding). Mirrors the main editor's
+    // `AspectRatioGuide`; geometry via the shared `cmath.ui.diagonalForDirection`.
+    // The HUD can't see per-element refusals (e.g. text-on-edge no-ops), so
+    // the guide tracks the gesture, not the committed write.
+    if (state.modifiers.shift) {
+      const dir = state.gesture.direction;
+      // For a rotated/sheared box, take the diagonal of the local frame and
+      // project it through `matrix` (`cmath.ui.transformLine`); the rect path
+      // is already in doc space.
+      const diagonal =
+        shape.kind === "transformed"
+          ? cmath.ui.transformLine(
+              cmath.ui.diagonalForDirection(shape.local, dir),
+              shape.matrix
+            )
+          : cmath.ui.diagonalForDirection(shapeBounds(shape), dir);
+      decoration_lines.push({
+        ...diagonal,
+        dashed: true,
+        group: groups?.transformPreview,
+      });
+    }
   }
 
   return {
