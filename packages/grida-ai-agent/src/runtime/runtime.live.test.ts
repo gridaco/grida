@@ -23,7 +23,7 @@
  */
 
 import fs from "node:fs/promises";
-import { sessionIdFromSse } from "../testing/sse";
+import { assistantTextFromSse, sessionIdFromSse } from "../testing/sse";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
@@ -86,27 +86,6 @@ function solidPngDataUrl(rgb: [number, number, number], size = 64): string {
     pngChunk("IEND", Buffer.alloc(0)),
   ]);
   return `data:image/png;base64,${png.toString("base64")}`;
-}
-
-// Concatenate the assistant's streamed text out of a drained SSE body.
-function assistantTextFromSse(body: string): string {
-  let text = "";
-  for (const frame of body.split("\n\n")) {
-    for (const line of frame.split("\n")) {
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice("data:".length).trim();
-      if (!payload || payload === "[DONE]") continue;
-      try {
-        const obj = JSON.parse(payload) as { type?: string; delta?: string };
-        if (obj.type === "text-delta" && typeof obj.delta === "string") {
-          text += obj.delta;
-        }
-      } catch {
-        /* not a JSON UIMessageChunk frame (e.g. the session frame) */
-      }
-    }
-  }
-  return text;
 }
 
 type Host = {

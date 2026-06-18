@@ -32,7 +32,7 @@ import { session_title } from "../session/title";
 import { AgentRuntime } from "../runtime";
 import { StreamRegistry } from "../runtime/stream-registry";
 import { registerAgentRoutes } from "../http/routes/agent";
-import { sessionIdFromSse } from "../testing/sse";
+import { assistantTextFromSse, sessionIdFromSse } from "../testing/sse";
 import { EndpointProvidersStore } from "./endpoints";
 import { probeEndpointModels } from "./probe";
 import { resolveProvider } from ".";
@@ -55,27 +55,6 @@ async function detectModelId(): Promise<string> {
   const first = data.models?.[0]?.name;
   if (!first) throw new Error("no Ollama models installed — `ollama pull` one");
   return first;
-}
-
-// Concatenate the assistant's streamed text out of a drained SSE body.
-function assistantTextFromSse(body: string): string {
-  let text = "";
-  for (const frame of body.split("\n\n")) {
-    for (const line of frame.split("\n")) {
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice("data:".length).trim();
-      if (!payload || payload === "[DONE]") continue;
-      try {
-        const obj = JSON.parse(payload) as { type?: string; delta?: string };
-        if (obj.type === "text-delta" && typeof obj.delta === "string") {
-          text += obj.delta;
-        }
-      } catch {
-        /* not a JSON UIMessageChunk frame (e.g. the session frame) */
-      }
-    }
-  }
-  return text;
 }
 
 type Host = {

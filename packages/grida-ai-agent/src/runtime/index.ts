@@ -21,9 +21,17 @@ import { AGENT_SESSION_AGENT } from "../protocol/run";
 import { AGENT_DEFAULT_MODE } from "../protocol/mode";
 import {
   resolveProvider,
+  makeAgentProvider,
   ProviderUnavailableError,
   type ResolveDeps,
 } from "../providers";
+import {
+  AGENT_PROVIDER_MODELS,
+  agentProviderModel,
+  isAgentProviderModel,
+  type AgentProviderId,
+} from "../agent-provider/types";
+import { runAgentProviderTurn } from "./agent-provider-run";
 import { createRecorderConsumer } from "../session/recorder";
 import { titler } from "../session/titler";
 import type { SessionsStore } from "../session/store";
@@ -59,6 +67,7 @@ import { AGENT_DEFAULT_TIER } from "../tiers";
 import {
   applyApprovalAnswer,
   extractFirstUserText,
+  extractLastUserText,
   extractLastUserMessageId,
   parseRunBody,
   persistIncomingTail,
@@ -234,6 +243,11 @@ type StartTurnOptions = {
    * fires no new user message and leaves this absent.
    */
   fired_message_id?: string;
+  /**
+   * Set only when `provider.kind === "agent-provider"`: the single prompt
+   * string handed to the external agent for this turn (issue #813).
+   */
+  agent_prompt?: string;
 };
 
 export class AgentRuntime {
@@ -605,22 +619,29 @@ export class AgentRuntime {
     // Resolve provider BEFORE opening the stream so a 4xx stays a proper
     // HTTP error instead of a half-opened SSE.
     let provider;
-    try {
-      provider = await resolveProvider(this.deps, { explicit: req.explicit });
-    } catch (err) {
-      if (err instanceof ProviderUnavailableError) {
-        return Response.json(
-          err.provider_id
-            ? {
-                error: err.message,
-                code: err.code,
-                provider_id: err.provider_id,
-              }
-            : { error: err.message, code: err.code },
-          { status: 409 }
-        );
+    if (isAgentProviderModel(req.model_id)) {
+      // Agent-provider class (issue #813): an external agent owns its own
+      // loop. No BYOK/endpoint resolution, no model factory — the runtime
+      // streams from the agent-provider consumer in startTurn.
+      provider = makeAgentProvider(AGENT_PROVIDER_MODELS[req.model_id].id);
+    } else {
+      try {
+        provider = await resolveProvider(this.deps, { explicit: req.explicit });
+      } catch (err) {
+        if (err instanceof ProviderUnavailableError) {
+          return Response.json(
+            err.provider_id
+              ? {
+                  error: err.message,
+                  code: err.code,
+                  provider_id: err.provider_id,
+                }
+              : { error: err.message, code: err.code },
+            { status: 409 }
+          );
+        }
+        throw err;
       }
-      throw err;
     }
 
     const runId = crypto.randomUUID();
@@ -688,7 +709,8 @@ export class AgentRuntime {
     // Fire-and-forget title generation; writes title only if still the
     // default sentinel, so a user rename always wins. Failures swallowed.
     const firstUserText = extractFirstUserText(messages);
-    if (firstUserText.length > 0) {
+    // Titling runs a model-provider; skip it for agent-providers (no factory).
+    if (provider.kind !== "agent-provider" && firstUserText.length > 0) {
       void titler
         .maybeGenerate({
           store: this.deps.sessions_store,
@@ -724,6 +746,12 @@ export class AgentRuntime {
         fired_message_id: approvalAnswer
           ? undefined
           : extractLastUserMessageId(messages),
+        // Agent-provider turns take a single prompt string (the external
+        // agent owns history); the tail user message is this turn's prompt.
+        agent_prompt:
+          provider.kind === "agent-provider"
+            ? extractLastUserText(messages)
+            : undefined,
       });
     } catch (err) {
       if (err instanceof RunInFlightError) {
@@ -817,6 +845,54 @@ export class AgentRuntime {
     // consumer (HTTP) or reconnects later (a core drain has no live consumer).
     void (async () => {
       try {
+        // Agent-provider class (issue #813): the external agent owns the loop.
+        // Skip compaction/model-factory/tool-injection entirely — just run one
+        // turn and push its mapped chunks into the registry. The recorder
+        // (attached above) persists the assistant message from those chunks;
+        // `streams.finish` flushes it, same as the normal terminal edge.
+        if (provider.kind === "agent-provider") {
+          // Continuity (issue #813): resume the external agent's prior session
+          // so it keeps the conversation. Read the id stored last turn, pass it
+          // in, and persist the id observed this turn for the NEXT turn.
+          const priorRow = await sessionsStore.get(sessionId);
+          const resumeSessionId = (
+            priorRow?.metadata?.agent_provider as
+              | { session_id?: string }
+              | undefined
+          )?.session_id;
+          // The picker's synthetic model_id selects the vendor model (issue
+          // #813). Derived from opts.model_id so it works on BOTH the HTTP run
+          // and the queue-drain path.
+          const agentModel = isAgentProviderModel(opts.model_id)
+            ? agentProviderModel(opts.model_id)
+            : undefined;
+          const result = await runAgentProviderTurn({
+            provider_id: provider.provider_id as AgentProviderId,
+            prompt: opts.agent_prompt ?? "",
+            cwd: workspaceRoot,
+            resume_session_id: resumeSessionId,
+            model: agentModel,
+            signal: entry.model_abort.signal,
+            emit: (chunk) => streams.push(sessionId, JSON.stringify(chunk)),
+          });
+          if (
+            result.providerSessionId &&
+            result.providerSessionId !== resumeSessionId
+          ) {
+            await sessionsStore
+              .setAgentProviderSessionId(sessionId, result.providerSessionId)
+              .catch(() => undefined);
+          }
+          // Deterministic recorder flush — mirror the normal success path:
+          // detach so `streams.finish` won't re-fire `on_end`, then AWAIT the
+          // terminal flush so the assistant row is committed before the
+          // response is consumed (otherwise a fast reader sees no history).
+          detachRecorder();
+          await recorder.on_end("finish");
+          streams.finish(sessionId, "finish");
+          return;
+        }
+
         // Auto-compaction (RFC `session / compaction`): if the session is
         // at/over its usable context, block this turn on the summarizer.
         await this.maybeAutoCompact(

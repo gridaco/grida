@@ -26,3 +26,29 @@ export function sessionIdFromSse(body: string): string {
   }
   return "";
 }
+
+/**
+ * Concatenate the assistant's visible text from a drained SSE body — every
+ * `text-delta` UIMessageChunk's `delta`, in order. Non-JSON / non-text frames
+ * (the `grida-session` frame, `[DONE]`) are skipped. The shared assertion
+ * helper for live run suites.
+ */
+export function assistantTextFromSse(body: string): string {
+  let text = "";
+  for (const frame of body.split("\n\n")) {
+    for (const line of frame.split("\n")) {
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice("data:".length).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const obj = JSON.parse(payload) as { type?: string; delta?: string };
+        if (obj.type === "text-delta" && typeof obj.delta === "string") {
+          text += obj.delta;
+        }
+      } catch {
+        /* not a JSON UIMessageChunk frame (e.g. the session frame) */
+      }
+    }
+  }
+  return text;
+}

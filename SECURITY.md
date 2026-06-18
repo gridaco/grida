@@ -430,6 +430,18 @@ reached), while a config pointing at an arbitrary **remote** host is
 blocked unless that host is in the enumerated `allowed_domains` — a
 hostile config cannot turn the sidecar into an open exfil channel.
 
+**Agent providers (external agents, #813).** When the host drives an
+EXTERNAL agent that owns its own loop (Claude Code via
+`@anthropic-ai/claude-agent-sdk`), that agent makes its own outbound auth +
+inference calls to its vendor. Those vendor hosts (Anthropic:
+`api.anthropic.com` incl. `/api/oauth/claude_cli/*`, `*.anthropic.com`,
+`claude.ai`) are added to the same enumerated `allowed_domains` allowlist as
+the BYOK provider hosts (`sandbox/policy.ts` `AGENT_PROVIDER_NETWORK_HOSTS`) —
+NOT a `*` opening. The external agent still runs tools/shell in the workspace
+under the same srt confinement, so its egress stays bounded to its legitimate
+vendor endpoints; this is the same trust model as a BYOK provider host (the
+provider sees the conversation by design), not a new exfil class.
+
 **Electron-side hardening (mandatory; see the
 [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security)).**
 `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`,

@@ -233,6 +233,9 @@ describe("@grida/agent public API", () => {
         home: "/Users/example",
       });
       expect(policy.network.allowed_domains).toContain("openrouter.ai");
+      // Agent-provider class (issue #813): the external agent's vendor backend
+      // must be reachable through the srt allowlist.
+      expect(policy.network.allowed_domains).toContain("api.anthropic.com");
       expect(policy.filesystem.deny_read.some((p) => p.includes(".ssh"))).toBe(
         true
       );

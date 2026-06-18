@@ -47,11 +47,37 @@ export { EndpointProvidersStore } from "./endpoints";
 export const MODEL_BY_TIER: Record<ModelTier, TierModelId> = TIER_MODEL_IDS;
 
 export type ResolvedProvider = {
-  /** A BYOK provider id or a configured endpoint id. */
+  /** A BYOK provider id, a configured endpoint id, or an agent-provider id. */
   provider_id: string;
-  kind: "byok" | "endpoint";
+  /**
+   * `byok`/`endpoint` are MODEL providers (the host owns the loop, calls
+   * `model_factory`). `agent-provider` is an EXTERNAL agent that owns its own
+   * loop (issue #813); `model_factory` is never called — the runtime branches
+   * on this kind and streams from the agent-provider consumer instead.
+   */
+  kind: "byok" | "endpoint" | "agent-provider";
   model_factory: ModelFactory;
 };
+
+/**
+ * Build a `ResolvedProvider` for the agent-provider class. Agent-providers run
+ * an EXTERNAL loop (no model factory), so — by design, not as a shortcut — the
+ * runtime identifies them up front (`isAgentProviderModel`) and constructs them
+ * here directly; `resolveProvider` deliberately handles only the model-provider
+ * kinds (BYOK + endpoint) and never returns one. The `model_factory` throws as a
+ * guard — nothing in the agent-provider path may call it.
+ */
+export function makeAgentProvider(providerId: string): ResolvedProvider {
+  return {
+    provider_id: providerId,
+    kind: "agent-provider",
+    model_factory: () => {
+      throw new Error(
+        "[agent-host-providers] agent-provider runs an external loop; model_factory must not be called"
+      );
+    },
+  };
+}
 
 /**
  * Single error class for both "no provider configured" and "you picked

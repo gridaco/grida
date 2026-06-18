@@ -1,7 +1,8 @@
 /**
- * Desktop model picker — flat list of every catalog model, plus any
- * user-registered endpoint models (issue #806 — local Ollama, self-
- * hosted gateways).
+ * Desktop model picker — every catalog model grouped by provider, plus
+ * the Claude Code agent-provider options (issue #813) and any user-
+ * registered endpoint models (issue #806 — local Ollama, self-hosted
+ * gateways).
  *
  * The agent system is tier-based (4 tiers → 4 models), but the catalog
  * holds more models than the tiers map to, leaving some unreachable.
@@ -22,11 +23,17 @@ import {
   PromptInputSelectTrigger,
   PromptInputSelectValue,
 } from "@app/ui/ai-elements/prompt-input";
+// Grouping primitives — the prompt-input select doesn't re-export these.
+import {
+  SelectGroup,
+  SelectLabel,
+  SelectSeparator,
+} from "@app/ui/components/select";
 // Pull the catalog from the framework-free `@grida/ai-models` package,
 // NOT the editor's `@/lib/ai/models` seam — that seam constructs server
 // providers (live keys) and is lint-blocked from the desktop renderer
 // (GRIDA-SEC-004). This package is pure data and renderer-safe.
-import _models, { TIER_MODEL_IDS } from "@grida/ai-models";
+import _models from "@grida/ai-models";
 import type {
   ChatSessionRow,
   EndpointProviderConfig,
@@ -36,14 +43,79 @@ import { registered_models } from "./registered-models";
 const catalog = _models.text.catalog;
 type CatalogId = _models.text.CatalogId;
 
-/** Default selection — the "pro" tier's model (Claude Sonnet 4.6). */
-export const DEFAULT_MODEL_ID: string = TIER_MODEL_IDS.pro;
+/**
+ * Default selection — Claude Code on Opus 4.8 (1M), the user's own Claude
+ * subscription (issue #813): zero key, the largest context, the path we want
+ * users to land on. NOTE: assumes the user is logged in to Claude — a
+ * no-Claude fallback wants the zero-config auto-detect (see
+ * `docs/wg/ai/agent/acp-provider.plan.md`); until then a signed-out user's
+ * first run hits `auth_required`. Revert to `TIER_MODEL_IDS.pro` (hosted
+ * Sonnet 4.6) for a catalog default.
+ */
+export const DEFAULT_MODEL_ID: string = "claude-code/opus-4.8-1m";
 
 const MODEL_OPTIONS = Object.values(catalog);
+
+/**
+ * Agent-provider options (issue #813): synthetic ids that route a run to an
+ * EXTERNAL agent owning its own loop (e.g. Claude Code) on the USER'S OWN
+ * subscription — not a catalog model. Keep these ids in sync with
+ * `AGENT_PROVIDER_MODELS` in
+ * `packages/grida-ai-agent/src/agent-provider/types.ts`. (Hardcoded, not
+ * imported: that module is node-only and would break the renderer bundle.)
+ */
+const AGENT_PROVIDER_OPTIONS = [
+  // Opus 4.8 is the 1M-context variant (the synthetic id keeps the `-1m` tag;
+  // the label hides it). The smaller-context build isn't surfaced.
+  { id: "claude-code/opus-4.8-1m", label: "Opus 4.8" },
+  { id: "claude-code/sonnet-4.6", label: "Sonnet 4.6" },
+  { id: "claude-code/haiku-4.5", label: "Haiku 4.5" },
+] as const;
+const AGENT_PROVIDER_IDS = new Set<string>(
+  AGENT_PROVIDER_OPTIONS.map((o) => o.id)
+);
 
 function isCatalogId(id: string | undefined | null): id is CatalogId {
   return typeof id === "string" && Object.hasOwn(catalog, id);
 }
+
+// Group the flat catalog by provider for the picker. Vendor is the `vendor/`
+// id prefix (e.g. `anthropic/claude-opus-4.8`); Anthropic is surfaced first.
+type CatalogSpec = (typeof MODEL_OPTIONS)[number];
+const VENDOR_LABELS: Record<string, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+};
+function vendorOf(id: string): string {
+  const slash = id.indexOf("/");
+  return slash > 0 ? id.slice(0, slash) : "other";
+}
+function vendorLabel(vendor: string): string {
+  return VENDOR_LABELS[vendor] ?? vendor.replace(/^\w/, (c) => c.toUpperCase());
+}
+const CATALOG_GROUPS: {
+  vendor: string;
+  label: string;
+  models: CatalogSpec[];
+}[] = (() => {
+  const groups = new Map<string, CatalogSpec[]>();
+  for (const m of MODEL_OPTIONS) {
+    const v = vendorOf(m.id);
+    const arr = groups.get(v);
+    if (arr) arr.push(m);
+    else groups.set(v, [m]);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) =>
+      a === "anthropic" ? -1 : b === "anthropic" ? 1 : a.localeCompare(b)
+    )
+    .map(([vendor, models]) => ({
+      vendor,
+      label: vendorLabel(vendor),
+      models,
+    }));
+})();
 
 export function DesktopModelPicker({
   value,
@@ -66,26 +138,47 @@ export function DesktopModelPicker({
         <PromptInputSelectValue placeholder="Model" />
       </PromptInputSelectTrigger>
       <PromptInputSelectContent>
-        {MODEL_OPTIONS.map((m) => (
-          <PromptInputSelectItem key={m.id} value={m.id} className="text-xs">
-            {_models.text.displayLabel(m)}
-          </PromptInputSelectItem>
-        ))}
-        {endpoints.map((endpoint) =>
-          endpoint.models.map((m) => (
-            <PromptInputSelectItem
-              key={`${endpoint.id}/${m.id}`}
-              value={m.id}
-              className="text-xs"
-            >
-              {m.label ?? m.id}
-              <span className="text-muted-foreground">
-                {" "}
-                · {endpoint.label ?? endpoint.id}
-              </span>
+        {/* Claude Code — external agent on the user's own subscription (#813) */}
+        <SelectGroup>
+          <SelectLabel>Claude Code</SelectLabel>
+          {AGENT_PROVIDER_OPTIONS.map((o) => (
+            <PromptInputSelectItem key={o.id} value={o.id} className="text-xs">
+              {o.label}
             </PromptInputSelectItem>
-          ))
-        )}
+          ))}
+        </SelectGroup>
+        {/* Hosted catalog, grouped by provider (Anthropic first) */}
+        {CATALOG_GROUPS.map((group) => (
+          <SelectGroup key={group.vendor}>
+            <SelectSeparator />
+            <SelectLabel>{group.label}</SelectLabel>
+            {group.models.map((m) => (
+              <PromptInputSelectItem
+                key={m.id}
+                value={m.id}
+                className="text-xs"
+              >
+                {_models.text.displayLabel(m)}
+              </PromptInputSelectItem>
+            ))}
+          </SelectGroup>
+        ))}
+        {/* User-configured endpoints (Ollama, self-hosted gateways) */}
+        {endpoints.map((endpoint) => (
+          <SelectGroup key={endpoint.id}>
+            <SelectSeparator />
+            <SelectLabel>{endpoint.label ?? endpoint.id}</SelectLabel>
+            {endpoint.models.map((m) => (
+              <PromptInputSelectItem
+                key={`${endpoint.id}/${m.id}`}
+                value={m.id}
+                className="text-xs"
+              >
+                {m.label ?? m.id}
+              </PromptInputSelectItem>
+            ))}
+          </SelectGroup>
+        ))}
       </PromptInputSelectContent>
     </PromptInputSelect>
   );
@@ -151,7 +244,9 @@ export function useModelPickerState({
     [endpoints]
   );
   const isKnownId = (id: string | undefined | null): id is string =>
-    isCatalogId(id) || (typeof id === "string" && registeredIds.has(id));
+    isCatalogId(id) ||
+    (typeof id === "string" &&
+      (registeredIds.has(id) || AGENT_PROVIDER_IDS.has(id)));
 
   const [modelId, setModelId] = useState<string>(
     isKnownId(initial) ? initial : DEFAULT_MODEL_ID

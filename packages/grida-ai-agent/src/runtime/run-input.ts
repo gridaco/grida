@@ -26,6 +26,8 @@ import {
   isKnownProviderId,
   type EndpointProvidersStore,
 } from "../providers/endpoints";
+// Neutral (no node/SDK) import — just the synthetic-model-id contract.
+import { isAgentProviderModel } from "../agent-provider/types";
 
 const ALLOWED_TIERS = new Set<string>(AGENT_TIERS);
 const CATALOG_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
@@ -102,6 +104,7 @@ export async function parseRunBody(
     const allowed =
       typeof b.model_id === "string" &&
       (CATALOG_MODEL_IDS.has(b.model_id) ||
+        isAgentProviderModel(b.model_id) || // issue #813 agent-provider class
         (await isRegisteredModelId(b.model_id, deps)));
     if (!allowed) {
       return Response.json(
@@ -198,6 +201,25 @@ export function extractLastUserMessageId(
 
 export function extractFirstUserText(msgs: NormalizedMessage[]): string {
   for (const m of msgs) {
+    if (m.role !== "user") continue;
+    const text = m.parts
+      .filter((p) => p.type === "text")
+      .map((p) => p.text)
+      .join("\n")
+      .trim();
+    if (text.length > 0) return text;
+  }
+  return "";
+}
+
+/**
+ * The latest user message's text — the prompt for an agent-provider turn
+ * (issue #813). The client resends full history; the tail user message is the
+ * new turn. Mirrors {@link extractFirstUserText} but walks from the end.
+ */
+export function extractLastUserText(msgs: NormalizedMessage[]): string {
+  for (let i = msgs.length - 1; i >= 0; i -= 1) {
+    const m = msgs[i];
     if (m.role !== "user") continue;
     const text = m.parts
       .filter((p) => p.type === "text")
