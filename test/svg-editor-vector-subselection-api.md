@@ -60,14 +60,26 @@ atomic-entry path shows no unselected flash.
 5. **Undo.** Press Cmd/Ctrl+Z once.
    - Expected: a single undo restores the step-3 sub-selection (vertices 0, 2),
      visible in the HUD — selection is history-coherent, like a click.
-6. **Out-of-range refusal.** Call
+6. **Out-of-range refusal (mid-session).** Call
    `editor.commands.set_vector_selection({ vertices: [99] })`.
    - Expected: returns `false`; the HUD selection is unchanged (no phantom
      knob, no exception).
-7. **No session.** Exit content-edit (Escape), then call
+7. **Out-of-range refusal (atomic entry).** From `select` mode, call
+   `editor.enter_content_edit(p, { vertices: [99] })`.
+   - Expected: returns `false`; the path does **not** enter content-edit (no
+     vertices shown), and `editor.vector_subselection()` stays `null`. A bad
+     index refuses the whole call — it cannot masquerade as a successful
+     preselect or open the path with an empty selection.
+8. **No session.** Exit content-edit (Escape), then call
    `editor.commands.set_vector_selection({ vertices: [0] })`.
    - Expected: returns `false` (no-op); `editor.vector_subselection()` is
      `null`; a subscriber fired with `null` on the Escape exit.
+9. **Detach / unmount while editing.** Re-enter path-edit (step 2), then unmount
+   the tile / call `handle.detach()`.
+   - Expected: a `subscribe_vector_subselection` listener on the (still-alive)
+     editor receives `null`, and `editor.vector_subselection()` returns `null` —
+     surface disposal ends the session, so the read channel must drop, not go
+     stale.
 
 ## Notes
 

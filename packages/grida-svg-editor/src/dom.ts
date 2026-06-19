@@ -98,6 +98,7 @@ import {
   vector_apply,
   vector_revert,
   apply_subselection,
+  validate_subselection,
   type SubSelectionSnapshot,
 } from "./core/vector-edit";
 import type { RetypeRecord } from "./core/document";
@@ -1460,6 +1461,11 @@ class DomSurface implements Surface {
       this.vector_edit = null;
       this.vector_edit_region_baseline = null;
       this.hud.setVectorSelection(null);
+      // Clear the editor read channel too (gridaco/grida#790): disposing the
+      // surface ends the session, so `vector_subselection()` must drop to null
+      // and subscribers must see it — this detach/unmount path bypasses
+      // `_do_exit_vector_edit`, which is where the normal-exit null push lives.
+      this.editor_internal().push_vector_subselection(null);
     }
     this.scene_marquee_baseline = null;
     this.gestures._dispose();
@@ -4159,12 +4165,21 @@ class DomSurface implements Surface {
     opts?: VectorSubSelectionInput
   ): boolean {
     if (this.vector_edit) return false;
+    // Honor the `VectorSubSelectionInput` contract for the atomic-entry form:
+    // an out-of-range initial sub-selection refuses the WHOLE call (no entry,
+    // no history) — the same strict semantics as `set_vector_selection`, so a
+    // bad index can't masquerade as a successful preselect (gridaco/grida#790).
+    // Validate against the path BEFORE entering, so refusal leaves zero trace
+    // (no transient session, no read-channel blip).
+    if (opts) {
+      const source = this.editor_internal().doc.is_vector_edit_target(id);
+      if (!source) return false;
+      const model = PathModel.fromSvgPathD(source_to_session_d(source));
+      if (!validate_subselection(opts, model)) return false;
+    }
     if (!this._do_enter_vector_edit(id)) return false;
-    // Apply the optional initial sub-selection (gridaco/grida#790) as part of
-    // THIS entry — one history step, no intermediate empty-selection frame.
-    // `apply_subselection_to_session` self-validates against the live model;
-    // invalid opts are ignored and entry still succeeds with an empty
-    // selection (entry eligibility and sub-selection validity are separate).
+    // Apply the (now-validated) initial sub-selection as part of THIS entry —
+    // one history step, no intermediate empty-selection frame.
     if (opts) this.apply_subselection_to_session(opts, "replace");
     // Capture the post-opts selection so REDO of this entry restores it —
     // symmetric to how `exit_vector_edit`'s revert restores `final_selection`.
