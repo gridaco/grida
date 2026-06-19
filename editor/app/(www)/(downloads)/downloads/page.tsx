@@ -31,7 +31,7 @@ export default async function DownloadsPage() {
       <main className="container items-center">
         <section className="container bg-background max-w-xl lg:max-w-7xl mx-auto py-8 px-12 lg:px-16 lg:py-10 xl:py-2 text-left border rounded-lg flex flex-col-reverse lg:flex-row items-center justify-between overflow-hidden">
           <div className="max-w-lg text-center lg:text-left">
-            <h1 className="text-black text-4xl md:text-6xl font-bold mb-16 lg:mb-24">
+            <h1 className="text-4xl md:text-6xl font-bold mb-16 lg:mb-24">
               Download <br />
               Grida for Desktop
             </h1>
@@ -56,10 +56,12 @@ export default async function DownloadsPage() {
           </div>
 
           <div className="w-full h-full md:w-1/2 flex justify-center md:justify-end mt-10 md:mt-0">
+            {/* width/height match the artwork's true aspect ratio (2645x2264) so
+                the reserved box equals the loaded box — no layout shift on load. */}
             <Image
               src="/images/download.png"
               width={600}
-              height={400}
+              height={513}
               alt="download"
               className="object-contain hover:scale-110 transition-all duration-300"
             />
