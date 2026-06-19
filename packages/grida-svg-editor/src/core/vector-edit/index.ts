@@ -30,3 +30,6 @@ export {
 
 export { marquee } from "./marquee";
 export type { SubpathSelectCandidates } from "./marquee";
+
+export { apply_subselection, validate_subselection } from "./subselection";
+export type { SubSelectionInput } from "./subselection";

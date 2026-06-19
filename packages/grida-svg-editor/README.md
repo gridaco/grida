@@ -333,6 +333,26 @@ The point is document-space and always the pointer-**down** point — so it stay
 
 > **Status:** `@unstable` — shipped against one consumer; the shape is open until a second click-driven tool exercises it (P6).
 
+### Observation — vector sub-selection
+
+While a path is open in vector content-edit, the **sub-selection** (which vertices / segments / tangents are selected) is its own piece of state, distinct from `state.selection` (which names the whole node under edit). It is exposed as a designed read view — the read half of [#790](https://github.com/gridaco/grida/issues/790), paired with the `set_vector_selection` command.
+
+```ts
+type VectorSubSelection = {
+  node_id: NodeId;
+  vertices: readonly number[]; // ordinal vertex indices (PathModel order)
+  segments: readonly number[]; // ordinal segment indices
+  tangents: readonly (readonly [number, 0 | 1])[]; // [vertexIndex, 0=ta | 1=tb]
+};
+
+editor.vector_subselection(): VectorSubSelection | null; // null = no session
+editor.subscribe_vector_subselection(
+  fn: (sel: VectorSubSelection | null) => void,
+): Unsubscribe;
+```
+
+The channel fires on every sub-selection change (click, marquee, lasso, programmatic `set_vector_selection`, undo/redo) and on session enter/exit (`null` on exit). Like pick and surface-hover it is kept **off `state.version`** — sub-selection changes at pointer rate during marquee/lasso, so folding it into the version stream would re-render the whole app per knob (P4). Subscribe to this channel instead of polling `state`.
+
 ### Observation — properties
 
 This section is about **property semantics on a single node**, following the CSS / SVG spec. Multi-selection ("mixed values") is a separate concern; see the [Multi-selection](#multi-selection-mixed-values) section below. The two are kept apart on purpose: property semantics is defined by the spec; mixed semantics is an aggregation layer the editor adds because it supports multi-select.
@@ -714,7 +734,16 @@ editor.commands.{
 
   // content
   set_text(value: string): void;
-  enter_content_edit(target?: NodeId): boolean;
+  enter_content_edit(target?: NodeId, opts?: VectorSubSelectionInput): boolean;
+  // vector content-edit — set the vertex / segment / tangent sub-selection
+  // while a path is open in content-edit (the write half of #790). `mode`
+  // defaults to "replace"; "add"/"toggle" fold into the existing selection.
+  // One undoable step, like a knob click. Returns false (no-op) when no vector
+  // session is active, no surface is attached, the input is out of range, or
+  // it resolves to the current selection — a strict surface refuses rather
+  // than silently mishandling. To open a path with an initial sub-selection in
+  // ONE step, pass the same input as `enter_content_edit`'s `opts`.
+  set_vector_selection(input: VectorSubSelectionInput, mode?: SelectMode): boolean;
 
   // file
   load_svg(svg: string): void;

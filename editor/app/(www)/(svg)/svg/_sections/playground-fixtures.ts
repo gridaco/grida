@@ -12,6 +12,14 @@ export type PlaygroundFixture = {
   svg: string;
   /** Open in plain selection instead of path-edit mode. */
   selectOnly?: boolean;
+  /**
+   * Open path-edit with these vertices already selected (gridaco/grida#790's
+   * atomic-entry form, `enter_content_edit(id, { vertices })`). `"all"` derives
+   * the full vertex set from the live path model. The motivating demo: a tile
+   * that lands straight in an *active* sub-selection so editability is obvious,
+   * not just "vertices on display, nothing picked." Ignored when `selectOnly`.
+   */
+  initialVertexSelection?: "all" | readonly number[];
 };
 
 // The Grida brand symbol (from components/grida-logo) — kept monochrome
@@ -32,6 +40,8 @@ const heart = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 export const PLAYGROUND_FIXTURES: PlaygroundFixture[] = [
   { label: "artwork", svg: artwork },
   { label: "illustration", svg: illustration },
-  { label: "heart", svg: heart },
+  // Heart opens with every anchor pre-selected — the clearest "this is live,
+  // editable, and already in an edit state" cue on a simple recognizable shape.
+  { label: "heart", svg: heart, initialVertexSelection: "all" },
   { label: "grida", svg: grida, selectOnly: true },
 ];

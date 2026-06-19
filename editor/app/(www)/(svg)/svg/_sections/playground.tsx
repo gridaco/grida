@@ -7,6 +7,7 @@ import {
   SvgEditorCanvas,
   useSvgEditor,
 } from "@grida/svg-editor/react";
+import { PathModel } from "@grida/svg-editor";
 import type { DomSurfaceHandle } from "@grida/svg-editor/dom";
 import { cn } from "@app/ui/lib/utils";
 import { GridCells } from "./grid";
@@ -27,18 +28,41 @@ const TILE_LAYOUT = [
 ];
 
 /**
+ * Resolve a fixture's `initialVertexSelection` to concrete vertex indices
+ * against the live path. `"all"` derives the count from a `PathModel` built off
+ * the path's authored `d` (read via the editor's property view) — no fragile
+ * hardcoded indices. Returns `undefined` when there's nothing to select, so the
+ * caller falls back to a plain path-edit entry.
+ */
+function resolveInitialVertices(
+  editor: ReturnType<typeof useSvgEditor>,
+  pathId: string,
+  sel: "all" | readonly number[]
+): number[] | undefined {
+  if (sel !== "all") return sel.length > 0 ? [...sel] : undefined;
+  const d = editor.node_properties(pathId, ["d"])["d"]?.declared;
+  if (!d) return undefined;
+  const count = PathModel.fromSvgPathD(d).vertexCount();
+  return count > 0 ? Array.from({ length: count }, (_, i) => i) : undefined;
+}
+
+/**
  * The canvas + its auto-edit wiring. The select / enter-edit must run *after*
  * the DOM surface attaches (it installs the content-edit driver), so it's done
  * in `onAttach`, not a mount effect — opening each tile straight into path-edit
- * mode on its primary <path> with the vector vertices on display. Falls back to
- * selecting all top-level elements when the fixture has no path.
+ * mode on its primary <path> with the vector vertices on display. A fixture
+ * carrying `initialVertexSelection` lands with those anchors already selected
+ * (gridaco/grida#790's atomic entry — one step, no unselected flash). Falls
+ * back to selecting all top-level elements when the fixture has no path.
  */
 function TileCanvas({
   active,
   selectOnly,
+  initialVertexSelection,
 }: {
   active: boolean;
   selectOnly?: boolean;
+  initialVertexSelection?: "all" | readonly number[];
 }) {
   const editor = useSvgEditor();
   const onAttach = useCallback(
@@ -57,14 +81,21 @@ function TileCanvas({
         }
         if (pathId) {
           editor.commands.select(pathId);
-          editor.enter_content_edit(pathId);
+          // Atomic entry: open AND seed the sub-selection in one step (#790).
+          const vertices = initialVertexSelection
+            ? resolveInitialVertices(editor, pathId, initialVertexSelection)
+            : undefined;
+          editor.enter_content_edit(
+            pathId,
+            vertices ? { vertices } : undefined
+          );
           return;
         }
       }
       const children = tree.nodes.get(tree.root)?.children ?? [];
       if (children.length > 0) editor.commands.select([...children]);
     },
-    [editor, selectOnly]
+    [editor, selectOnly, initialVertexSelection]
   );
   return (
     <SvgEditorCanvas
@@ -87,12 +118,14 @@ function PlaygroundTile({
   index,
   className,
   selectOnly,
+  initialVertexSelection,
 }: {
   svg: string;
   label: string;
   index: number;
   className?: string;
   selectOnly?: boolean;
+  initialVertexSelection?: "all" | readonly number[];
 }) {
   const [active, setActive] = useState(false);
   return (
@@ -104,7 +137,11 @@ function PlaygroundTile({
       className={cn("group relative bg-background", className)}
     >
       <SvgEditorProvider initialSvg={svg}>
-        <TileCanvas active={active} selectOnly={selectOnly} />
+        <TileCanvas
+          active={active}
+          selectOnly={selectOnly}
+          initialVertexSelection={initialVertexSelection}
+        />
       </SvgEditorProvider>
       <span className="pointer-events-none absolute left-3 top-3 z-10 font-mono text-[10px] text-muted-foreground/50">
         {label}.svg
@@ -136,6 +173,7 @@ export default function Playground() {
           index={i}
           className={TILE_LAYOUT[i]}
           selectOnly={f.selectOnly}
+          initialVertexSelection={f.initialVertexSelection}
         />
       ))}
     </GridCells>
