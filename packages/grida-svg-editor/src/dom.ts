@@ -4165,25 +4165,28 @@ class DomSurface implements Surface {
     opts?: VectorSubSelectionInput
   ): boolean {
     if (this.vector_edit) return false;
-    // Honor the `VectorSubSelectionInput` contract for the atomic-entry form:
-    // an out-of-range initial sub-selection refuses the WHOLE call (no entry,
-    // no history) — the same strict semantics as `set_vector_selection`, so a
-    // bad index can't masquerade as a successful preselect (gridaco/grida#790).
-    // Validate against the path BEFORE entering, so refusal leaves zero trace
-    // (no transient session, no read-channel blip).
+    // Resolve + validate the optional initial sub-selection BEFORE entering, so
+    // (a) an out-of-range opts refuses the WHOLE call (the
+    // `VectorSubSelectionInput` contract, matching `set_vector_selection`) — a
+    // bad index can't masquerade as a successful preselect — and (b) entry can
+    // install it before the session's first mirror push, so the public read
+    // channel never sees a transient empty frame (gridaco/grida#790). Atomic
+    // entry is always "replace": the validated opts ARE the selection.
+    let initial: SubSelectionSnapshot | undefined;
     if (opts) {
       const source = this.editor_internal().doc.is_vector_edit_target(id);
       if (!source) return false;
       const model = PathModel.fromSvgPathD(source_to_session_d(source));
       if (!validate_subselection(opts, model)) return false;
+      initial = {
+        vertices: opts.vertices ?? [],
+        segments: opts.segments ?? [],
+        tangents: (opts.tangents ?? []).map((t) => [t[0], t[1]] as const),
+      };
     }
-    if (!this._do_enter_vector_edit(id)) return false;
-    // Apply the (now-validated) initial sub-selection as part of THIS entry —
-    // one history step, no intermediate empty-selection frame.
-    if (opts) this.apply_subselection_to_session(opts, "replace");
-    // Capture the post-opts selection so REDO of this entry restores it —
+    if (!this._do_enter_vector_edit(id, initial)) return false;
+    // Capture the installed selection so REDO of this entry restores it —
     // symmetric to how `exit_vector_edit`'s revert restores `final_selection`.
-    // (Empty when no opts, so the no-opts path keeps its old behavior.)
     const initial_selection = this.vector_edit!.snapshot_selection();
     // Apply succeeded — push a delta so undo can reverse it. Use
     // preview+set+commit (the surface seam exposes `preview()` only).
@@ -4194,7 +4197,9 @@ class DomSurface implements Surface {
     preview.set({
       providerId: "svg-editor",
       descriptor: { kind: "vector-mode-enter" },
-      apply: () => this.reenter_vector_session(node_id, initial_selection),
+      apply: () => {
+        this._do_enter_vector_edit(node_id, initial_selection);
+      },
       revert: () => {
         this._do_exit_vector_edit();
       },
@@ -4226,40 +4231,31 @@ class DomSurface implements Surface {
       apply: () => {
         this._do_exit_vector_edit();
       },
-      revert: () => this.reenter_vector_session(node_id, final_selection),
+      revert: () => {
+        this._do_enter_vector_edit(node_id, final_selection);
+      },
     });
     preview.commit();
   }
 
   /**
-   * Re-enter the vector session on `node_id` and reinstate a captured
-   * sub-selection. The shared tail of two history closures that must land
-   * back in the same path with the same anchors picked: the enter-delta's
-   * REDO (gridaco/grida#790's atomic entry) and the exit-delta's UNDO. No-op
-   * if re-entry fails.
-   *
-   * Indices may have drifted under collab/AI mutations; the HUD's `vectorOf`
-   * provider tolerates stale indices (chrome simply doesn't render for missing
-   * vertices), and the next user click rebuilds a valid selection.
-   */
-  private reenter_vector_session(
-    node_id: NodeId,
-    selection: SubSelectionSnapshot
-  ): void {
-    if (!this._do_enter_vector_edit(node_id)) return;
-    this.vector_edit?.restore_selection(selection);
-    this.sync_selection_mirror();
-    this.redraw();
-  }
-
-  /**
    * Unchecked enter — performs the mode flip + HUD wiring without
    * pushing to history. Called by {@link enter_vector_edit} (user-facing,
-   * which pushes the delta) and by the exit-delta's revert (history-
-   * driven re-entry on undo). Returns `false` if the node has no usable
-   * `d` attribute, leaving editor state untouched.
+   * which pushes the delta), by the enter-delta's redo, and by the
+   * exit-delta's revert (history-driven re-entry on undo). Returns `false`
+   * if the node has no usable `d` attribute, leaving editor state untouched.
+   *
+   * `initialSelection` installs a sub-selection BEFORE the first mirror push,
+   * so the session publishes its final state ONCE — atomic entry and undo/redo
+   * re-entry never leak a transient empty selection through the public read
+   * channel (gridaco/grida#790). Indices may have drifted under collab/AI
+   * mutation; the HUD's `vectorOf` provider tolerates stale ones (chrome just
+   * doesn't render missing vertices) and the next click rebuilds a valid set.
    */
-  private _do_enter_vector_edit(id: NodeId): boolean {
+  private _do_enter_vector_edit(
+    id: NodeId,
+    initialSelection?: SubSelectionSnapshot
+  ): boolean {
     if (this.vector_edit) return false;
     const internal = this.editor_internal();
     const doc = internal.doc;
@@ -4276,6 +4272,7 @@ class DomSurface implements Surface {
     // first gesture commit calls apply_session_d to project back.
     const session_d = source_to_session_d(source);
     this.vector_edit = new VectorEditSession(id, source, session_d);
+    if (initialSelection) this.vector_edit.restore_selection(initialSelection);
     this.editor.commands.set_mode("edit-content");
     this.sync_selection_mirror();
     this.sync_surface_selection();
@@ -4445,14 +4442,18 @@ class DomSurface implements Surface {
    */
   private sync_selection_mirror(): void {
     if (!this.vector_edit) return;
-    // The session reassigns (never mutates-in-place) its selection arrays, so
-    // sharing them by reference is safe — a held reference is a stable
-    // snapshot. Build one value for both sinks.
+    // Detach the published value from the session's live arrays. TS `readonly`
+    // is compile-time only, and the same value feeds the PUBLIC read channel —
+    // so a stray runtime mutation by a consumer must not be able to poison the
+    // session's own selection state. Copy all three tracks (one value, both
+    // sinks).
     const sel: VectorSubSelection = {
       node_id: this.vector_edit.node_id,
-      vertices: this.vector_edit.selected_vertices,
-      segments: this.vector_edit.selected_segments,
-      tangents: this.vector_edit.selected_tangents,
+      vertices: [...this.vector_edit.selected_vertices],
+      segments: [...this.vector_edit.selected_segments],
+      tangents: this.vector_edit.selected_tangents.map(
+        (t) => [t[0], t[1]] as const
+      ),
     };
     this.hud.setVectorSelection(sel);
     // Mirror to the editor's public read channel (gridaco/grida#790). Off the
@@ -4618,8 +4619,9 @@ class DomSurface implements Surface {
    * headlessly testable). Returns `false` (no mutation) when no session is
    * active, the input is out of range, or it resolves to the current
    * sub-selection. Syncs the mirror + redraws on change, but does NOT push a
-   * history step — callers wrap it (`apply_vector_subselection_command`) or
-   * fold it into a larger delta (atomic entry via `enter_vector_edit`).
+   * history step — the caller (`apply_vector_subselection_command`) wraps it in
+   * one. (Atomic entry installs its selection directly via
+   * `_do_enter_vector_edit`, not through here.)
    */
   private apply_subselection_to_session(
     input: VectorSubSelectionInput,
@@ -4649,6 +4651,11 @@ class DomSurface implements Surface {
     mode: SelectMode = "replace"
   ): boolean {
     if (!this.vector_edit) return false;
+    // Refuse mid-gesture: this records a history step, and landing it inside an
+    // open gesture bracket (a vector preview drag, or a HUD marquee/lasso)
+    // would break undo order — the same class of bug the keyboard path avoids
+    // by dropping non-Escape keys during a gesture.
+    if (this.active_preview || this.hud.gesture().kind !== "idle") return false;
     const before = this.vector_edit.snapshot_selection();
     if (!this.apply_subselection_to_session(input, mode)) return false;
     this.record_vector_selection_change(before, "set vector selection");
