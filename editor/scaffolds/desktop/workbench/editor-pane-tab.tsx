@@ -12,13 +12,13 @@
  *
  * Modes (`detectFileMode`):
  *
- *   - `.svg` → editable SVG editor (the only writable mode today)
- *   - `.md` / `.markdown` → Streamdown markdown viewer (read-only)
+ *   - `.svg` → editable SVG editor
+ *   - `.md` / `.markdown` → editable CodeMirror markdown editor + preview
  *   - image/* (.png/.jpg/.gif/.webp/…) → base64 image viewer
  *   - video/* (.mp4/.webm/.mov/…) → base64 video viewer
- *   - everything else → Shiki-highlighted text viewer; the agent sidecar's
- *     `readFile` rejects binary content, so unknown binary types
- *     surface as the agent sidecar's error message rather than as gibberish
+ *   - everything else → editable CodeMirror text editor (the fallback for any
+ *     text format); the agent sidecar's `readFile` rejects binary / >1MiB
+ *     content, which surfaces as the editor's error state, not gibberish
  *
  * The per-tab error boundary keeps a crash inside one viewer from
  * taking down the whole workspace window — see `EditorCrashFallback`.
@@ -28,16 +28,11 @@
 import { useCallback, useMemo } from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { AlertTriangleIcon } from "lucide-react";
-import type { BundledLanguage } from "shiki";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { EditorPaneSvgEditor } from "./editor-pane-svg-editor";
-import {
-  ImageViewer,
-  MarkdownViewer,
-  TextViewer,
-  VideoViewer,
-} from "./editor-pane-viewers";
+import { EditorPaneCodeEditor } from "./editor-pane-code-editor";
+import { ImageViewer, VideoViewer } from "./editor-pane-viewers";
 
 export type EditorPaneTabProps = {
   workspaceId: string;
@@ -113,10 +108,10 @@ export function EditorPaneTab({
 
 type FileMode =
   | { kind: "svg-editor" }
-  | { kind: "markdown" }
+  | { kind: "markdown-editor" }
   | { kind: "image" }
   | { kind: "video" }
-  | { kind: "text"; lang: BundledLanguage };
+  | { kind: "text" };
 
 function ModeBody({
   mode,
@@ -144,18 +139,29 @@ function ModeBody({
           onSaved={onSaved}
         />
       );
-    case "markdown":
-      return <MarkdownViewer workspaceId={workspaceId} relPath={relPath} />;
+    case "markdown-editor":
+      return (
+        <EditorPaneCodeEditor
+          workspaceId={workspaceId}
+          relPath={relPath}
+          active={active}
+          markdownMode
+          onDirtyChange={onDirtyChange}
+          onSaved={onSaved}
+        />
+      );
     case "image":
       return <ImageViewer workspaceId={workspaceId} relPath={relPath} />;
     case "video":
       return <VideoViewer workspaceId={workspaceId} relPath={relPath} />;
     case "text":
       return (
-        <TextViewer
+        <EditorPaneCodeEditor
           workspaceId={workspaceId}
           relPath={relPath}
-          language={mode.lang}
+          active={active}
+          onDirtyChange={onDirtyChange}
+          onSaved={onSaved}
         />
       );
   }
@@ -193,69 +199,17 @@ const VIDEO_EXTENSIONS = new Set([
   ".3g2",
 ]);
 
-/** File extension → Shiki bundled language. Anything not listed
- * falls through to `plaintext`, which still gets monospace +
- * line-aware rendering. The set covers languages that actually
- * appear in typical Grida workspaces — expand on demand rather than
- * eagerly bundling Shiki grammars we never touch. */
-const EXT_TO_LANG: Record<string, BundledLanguage> = {
-  ts: "typescript",
-  tsx: "tsx",
-  js: "javascript",
-  jsx: "jsx",
-  mjs: "javascript",
-  cjs: "javascript",
-  json: "json",
-  jsonc: "jsonc",
-  py: "python",
-  rs: "rust",
-  go: "go",
-  rb: "ruby",
-  java: "java",
-  kt: "kotlin",
-  swift: "swift",
-  c: "c",
-  h: "c",
-  cc: "cpp",
-  cpp: "cpp",
-  hpp: "cpp",
-  cs: "csharp",
-  php: "php",
-  sh: "bash",
-  bash: "bash",
-  zsh: "bash",
-  yml: "yaml",
-  yaml: "yaml",
-  toml: "toml",
-  ini: "ini",
-  html: "html",
-  htm: "html",
-  xml: "xml",
-  css: "css",
-  scss: "scss",
-  less: "less",
-  sql: "sql",
-  graphql: "graphql",
-  gql: "graphql",
-  lua: "lua",
-  vue: "vue",
-  svelte: "svelte",
-  dockerfile: "dockerfile",
-};
-
 function detectFileMode(relPath: string): FileMode {
   const ext = getExtension(relPath); // includes the leading dot, lowercased
   if (ext === ".svg") return { kind: "svg-editor" };
-  if (MARKDOWN_EXTENSIONS.has(ext)) return { kind: "markdown" };
+  if (MARKDOWN_EXTENSIONS.has(ext)) return { kind: "markdown-editor" };
   if (IMAGE_EXTENSIONS.has(ext)) return { kind: "image" };
   if (VIDEO_EXTENSIONS.has(ext)) return { kind: "video" };
-  // Anything else → text view. Unknown extensions (or dotfiles like
-  // `.gitignore`) fall back to plaintext — still readable. Truly
-  // binary content surfaces as the agent sidecar's `file-not-utf8` error
-  // inside the text viewer.
-  const key = ext.startsWith(".") ? ext.slice(1) : ext;
-  const lang = EXT_TO_LANG[key] ?? ("plaintext" as BundledLanguage);
-  return { kind: "text", lang };
+  // Anything else → editable text. Unknown extensions / dotfiles open as
+  // plain text (CodeMirror resolves a language from the filename when it
+  // can, lazily). Truly binary or >1MiB content is rejected by the agent
+  // sidecar's `readFile` and surfaces as the editor's error state.
+  return { kind: "text" };
 }
 
 function getExtension(relPath: string): string {
