@@ -269,10 +269,14 @@ function Surface({
       handleRef.current?.setValue(r.content);
       lastMtimeRef.current = r.mtime;
       baselineTo(versionRef.current);
+      // Keep the preview snapshot in sync — otherwise a reload while the
+      // preview overlay is up (clean watcher refresh, or the conflict dialog's
+      // "Reload from disk") would keep rendering the stale pre-reload snapshot.
+      if (markdownMode) setPreviewContent(r.content);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Reload failed.");
     }
-  }, [workspaceId, relPath, baselineTo]);
+  }, [workspaceId, relPath, markdownMode, baselineTo]);
 
   const overwriteAnyway = useCallback(() => {
     if (!conflict) return;
