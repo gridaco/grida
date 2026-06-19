@@ -24,7 +24,7 @@ import {
   XMLNS_NS,
   XML_NS,
 } from "@grida/svg/parser";
-import { svg_parse } from "@grida/svg/parse";
+import { inline_style, svg_parse } from "@grida/svg/parse";
 import type { NodeId } from "../types";
 
 /**
@@ -533,33 +533,26 @@ export class SvgDocument implements DocumentEvents {
   get_style(id: NodeId, property: string): string | null {
     const style = this.get_attr(id, "style");
     if (!style) return null;
-    const decls = parse_inline_style(style);
-    for (const d of decls) {
-      if (d.property === property) return d.value;
-    }
-    return null;
+    // `inline_style.get` returns the cascade winner (last declaration) — the
+    // CSS last-one-wins rule stays owned by `@grida/svg`, not reimplemented here.
+    return inline_style.get(style, property);
   }
 
   set_style(id: NodeId, property: string, value: string | null): void {
+    // The trivia-preserving declaration-list surgery lives in `@grida/svg`
+    // (`inline_style.set`) — the editor only plumbs the `style` attribute
+    // through it. `set` returns the input unchanged on a no-op (e.g. removing
+    // an absent property), so skipping the write keeps history clean.
     const style = this.get_attr(id, "style") ?? "";
-    const decls = parse_inline_style(style);
-    const idx = decls.findIndex((d) => d.property === property);
-    if (value === null) {
-      if (idx === -1) return;
-      decls.splice(idx, 1);
-    } else if (idx === -1) {
-      decls.push({ property, value });
-    } else {
-      decls[idx].value = value;
-    }
-    const next = decls.map((d) => `${d.property}: ${d.value}`).join("; ");
+    const next = inline_style.set(style, property, value);
+    if (next === style) return;
     this.set_attr(id, "style", next === "" ? null : next);
   }
 
-  get_all_styles(id: NodeId): Array<{ property: string; value: string }> {
+  get_all_styles(id: NodeId): inline_style.Declaration[] {
     const style = this.get_attr(id, "style");
     if (!style) return [];
-    return parse_inline_style(style);
+    return inline_style.declarations(style);
   }
 
   // ─── Text content ────────────────────────────────────────────────────────
@@ -1261,25 +1254,6 @@ export class SvgDocument implements DocumentEvents {
       a.quote
     )}${a.quote}`;
   }
-}
-
-// ─── Inline style helpers ──────────────────────────────────────────────────
-
-function parse_inline_style(
-  s: string
-): Array<{ property: string; value: string }> {
-  // Very small CSS declaration list parser. Doesn't handle comments / nested
-  // parens precisely; SVG editors don't usually need that. Sufficient for v0.
-  const out: Array<{ property: string; value: string }> = [];
-  const decls = s.split(";");
-  for (const decl of decls) {
-    const colon = decl.indexOf(":");
-    if (colon === -1) continue;
-    const property = decl.slice(0, colon).trim();
-    const value = decl.slice(colon + 1).trim();
-    if (property) out.push({ property, value });
-  }
-  return out;
 }
 
 /**
