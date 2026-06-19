@@ -100,9 +100,13 @@ export default function CodeMirrorDemoPage() {
   // Resolve the active preset's language — covers mount and every switch.
   useEffect(() => {
     let cancelled = false;
-    void languageFor(PRESETS[activeIndex]).then((ext) => {
-      if (!cancelled) setLanguage(ext);
-    });
+    void languageFor(PRESETS[activeIndex])
+      .then((ext) => {
+        if (!cancelled) setLanguage(ext);
+      })
+      .catch(() => {
+        if (!cancelled) setLanguage(undefined);
+      });
     return () => {
       cancelled = true;
     };

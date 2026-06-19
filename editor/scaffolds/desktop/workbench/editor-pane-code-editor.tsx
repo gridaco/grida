@@ -186,9 +186,15 @@ function Surface({
   useEffect(() => {
     if (markdownMode) return;
     let cancelled = false;
-    void resolveLanguage(relPath).then((ext) => {
-      if (!cancelled) setLanguage(ext);
-    });
+    void resolveLanguage(relPath)
+      .then((ext) => {
+        if (!cancelled) setLanguage(ext);
+      })
+      .catch(() => {
+        // Grammar failed to load (e.g. dynamic import error) — fall back to
+        // plain text rather than leaking an unhandled rejection.
+        if (!cancelled) setLanguage(undefined);
+      });
     return () => {
       cancelled = true;
     };
@@ -302,6 +308,14 @@ function Surface({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active, onSave]);
+
+  // Tabs stay mounted across switches, so `autoFocus` (mount-only) doesn't
+  // refocus when this pane becomes active again. Focus the editor on activate
+  // so typing lands immediately — but not while the read-only preview overlay
+  // is up (that editor is hidden underneath).
+  useEffect(() => {
+    if (active && mode === "edit") handleRef.current?.focus();
+  }, [active, mode]);
 
   const togglePreview = useCallback(() => {
     setMode((prev) => {
