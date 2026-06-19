@@ -49,6 +49,8 @@ export type {
   Tool,
   Unsubscribe,
   Vec2,
+  VectorSubSelection,
+  VectorSubSelectionInput,
 } from "./types";
 
 export { DEFAULT_STYLE, TOOL_CURSOR } from "./types";

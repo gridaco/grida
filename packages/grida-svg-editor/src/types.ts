@@ -395,6 +395,48 @@ export type EditorState = {
 
 export type Unsubscribe = () => void;
 
+// ─── Vector sub-selection ────────────────────────────────────────────────────
+
+/**
+ * The current vertex / segment / tangent sub-selection inside a vector
+ * content-edit session. This is a **read** view — the outcome emitted on the
+ * transient `editor.subscribe_vector_subselection` channel and returned by
+ * `editor.vector_subselection()`. `null` when no vector content-edit session
+ * is active.
+ *
+ * Indices are ordinal positions into the path under edit — the same ordinals
+ * `PathModel` exposes (vertex 0 is the first authored vertex, etc.). A tangent
+ * ref is `[vertexIndex, 0 | 1]`: `0` = the tangent entering that vertex (`ta`),
+ * `1` = the tangent leaving it (`tb`).
+ *
+ * Kept off `EditorState` on purpose: it changes at pointer rate during marquee
+ * / lasso, so folding it into the `version` stream would re-render the whole
+ * app per knob. Subscribe to this channel instead (P4 — subscribe to outcomes).
+ */
+export type VectorSubSelection = {
+  readonly node_id: NodeId;
+  readonly vertices: ReadonlyArray<number>;
+  readonly segments: ReadonlyArray<number>;
+  readonly tangents: ReadonlyArray<readonly [number, 0 | 1]>;
+};
+
+/**
+ * Write triple for `commands.set_vector_selection(input, mode?)` and the
+ * atomic-entry form `enter_content_edit(id, input)`. Every track is optional.
+ * In `"replace"` mode an omitted track is treated as empty (cleared); in
+ * `"add"` / `"toggle"` mode an omitted track means "nothing to add/toggle on
+ * that track" (the existing sub-selection there is left intact).
+ *
+ * Indices follow the same ordinal convention as {@link VectorSubSelection}.
+ * Out-of-range indices or refs cause the whole call to refuse (no-op): a
+ * strict surface rejects wrong contents rather than silently mishandling them.
+ */
+export type VectorSubSelectionInput = {
+  readonly vertices?: ReadonlyArray<number>;
+  readonly segments?: ReadonlyArray<number>;
+  readonly tangents?: ReadonlyArray<readonly [number, 0 | 1]>;
+};
+
 // ─── Commands ──────────────────────────────────────────────────────────────
 
 export type ReorderDirection =

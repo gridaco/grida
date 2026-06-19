@@ -13,7 +13,14 @@
 //     a fact or open a history bracket.
 
 import type { Preview } from "@grida/history";
-import type { NodeId, PickEvent, Unsubscribe } from "../types";
+import type { SelectMode } from "@grida/hud";
+import type {
+  NodeId,
+  PickEvent,
+  Unsubscribe,
+  VectorSubSelection,
+  VectorSubSelectionInput,
+} from "../types";
 import type { CommandHandler, CommandId } from "../commands/registry";
 import type { DomComputedResolver } from "./editor";
 import type { GeometryProvider } from "./geometry";
@@ -93,9 +100,30 @@ export interface SurfaceBridge {
 
   /** editor → surface: register the driver that mounts inline content
    *  editing (text-edit, vector-edit) on a target node. The editor calls
-   *  `editor.enter_content_edit(id)` and routes here. Pass `null` to
+   *  `editor.enter_content_edit(id, opts?)` and routes here. `opts` carries an
+   *  optional initial vector sub-selection (gridaco/grida#790) applied as part
+   *  of the entry transition — ignored for text targets. Pass `null` to
    *  unregister on detach. */
-  set_content_edit_driver(fn: ((target: NodeId) => boolean) | null): void;
+  set_content_edit_driver(
+    fn: ((target: NodeId, opts?: VectorSubSelectionInput) => boolean) | null
+  ): void;
+
+  /** editor → surface: register the driver that applies a vector
+   *  sub-selection write while a vector content-edit session is open
+   *  (`commands.set_vector_selection`, gridaco/grida#790). Returns `false`
+   *  when no session is active, the input is out of range, or the surface
+   *  refuses; `true` when the sub-selection changed. Pass `null` to unregister
+   *  on detach. The session is surface-owned, so this is the only write path
+   *  the headless command has into it — symmetric to the content-edit driver. */
+  set_vector_subselect_driver(
+    fn: ((input: VectorSubSelectionInput, mode?: SelectMode) => boolean) | null
+  ): void;
+
+  /** surface → editor: publish the current vector sub-selection. Goes to
+   *  `editor.subscribe_vector_subselection()` listeners and updates
+   *  `editor.vector_subselection()`; does NOT bump `state.version` (it changes
+   *  at pointer rate during marquee / lasso — P4). `null` on session exit. */
+  push_vector_subselection(sel: VectorSubSelection | null): void;
 
   /** editor → surface: register the driver that pushes a hover override
    *  (e.g. from a layers panel) into the HUD. Invoked immediately on

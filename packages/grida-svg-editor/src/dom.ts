@@ -22,6 +22,7 @@ import {
   type HUDLine,
   type HUDRect,
   type Intent,
+  type SelectMode,
   type SurfaceEvent,
   type SurfaceResponse,
   type Modifiers,
@@ -96,6 +97,8 @@ import {
   source_to_session_d,
   vector_apply,
   vector_revert,
+  apply_subselection,
+  validate_subselection,
   type SubSelectionSnapshot,
 } from "./core/vector-edit";
 import type { RetypeRecord } from "./core/document";
@@ -106,6 +109,8 @@ import type {
   Rect,
   Tool,
   Vec2,
+  VectorSubSelection,
+  VectorSubSelectionInput,
 } from "./types";
 import { TOOL_CURSOR } from "./types";
 import { array_shallow_equal } from "./util/equal";
@@ -1080,8 +1085,18 @@ class DomSurface implements Surface {
     // Surface-side handlers for editor-registered drivers.
     const internal = editor._internal;
     this.editor_hover_internal = internal;
-    internal.set_content_edit_driver((id) => this.enter_content_edit(id));
+    internal.set_content_edit_driver((id, opts) =>
+      this.enter_content_edit(id, opts)
+    );
     this.teardown.push(() => internal.set_content_edit_driver(null));
+
+    // Programmatic vector sub-selection write (gridaco/grida#790). The
+    // session is surface-private, so `commands.set_vector_selection` reaches
+    // it only through this driver — symmetric to the content-edit driver.
+    internal.set_vector_subselect_driver((input, mode) =>
+      this.apply_vector_subselection_command(input, mode)
+    );
+    this.teardown.push(() => internal.set_vector_subselect_driver(null));
 
     // Arrow-key nudge: in vector content-edit, route to the path sub-
     // selection (vertices / segments / tangents) instead of leaking to a
@@ -1446,6 +1461,11 @@ class DomSurface implements Surface {
       this.vector_edit = null;
       this.vector_edit_region_baseline = null;
       this.hud.setVectorSelection(null);
+      // Clear the editor read channel too (gridaco/grida#790): disposing the
+      // surface ends the session, so `vector_subselection()` must drop to null
+      // and subscribers must see it — this detach/unmount path bypasses
+      // `_do_exit_vector_edit`, which is where the normal-exit null push lives.
+      this.editor_internal().push_vector_subselection(null);
     }
     this.scene_marquee_baseline = null;
     this.gestures._dispose();
@@ -3874,10 +3894,15 @@ class DomSurface implements Surface {
    * editor has already gated on text-OR-path eligibility; this method
    * routes on the actual tag.
    */
-  private enter_content_edit(id: NodeId): boolean {
+  private enter_content_edit(
+    id: NodeId,
+    opts?: VectorSubSelectionInput
+  ): boolean {
     if (this.text_edit || this.vector_edit) return false;
     const tag = this.tag_of(id);
     if (tag === "text" || tag === "tspan") {
+      // `opts` is a vector-only affordance — text content-edit has no
+      // sub-selection. Ignore it rather than refusing the entry.
       return this.enter_text_edit(id);
     }
     // Vector-edit: the doc-side `is_vector_edit_target` predicate is the
@@ -3888,7 +3913,7 @@ class DomSurface implements Surface {
     // eligibility change lands in one place. (`<image>` / `<use>` stay
     // ineligible there.)
     if (this.editor_internal().doc.is_vector_edit_target(id) !== null) {
-      return this.enter_vector_edit(id);
+      return this.enter_vector_edit(id, opts);
     }
     return false;
   }
@@ -4135,9 +4160,34 @@ class DomSurface implements Surface {
    * {@link _do_exit_vector_edit} helpers; the public wrappers below own
    * the history side, the unchecked helpers own the state mutation.
    */
-  private enter_vector_edit(id: NodeId): boolean {
+  private enter_vector_edit(
+    id: NodeId,
+    opts?: VectorSubSelectionInput
+  ): boolean {
     if (this.vector_edit) return false;
-    if (!this._do_enter_vector_edit(id)) return false;
+    // Resolve + validate the optional initial sub-selection BEFORE entering, so
+    // (a) an out-of-range opts refuses the WHOLE call (the
+    // `VectorSubSelectionInput` contract, matching `set_vector_selection`) — a
+    // bad index can't masquerade as a successful preselect — and (b) entry can
+    // install it before the session's first mirror push, so the public read
+    // channel never sees a transient empty frame (gridaco/grida#790). Atomic
+    // entry is always "replace": the validated opts ARE the selection.
+    let initial: SubSelectionSnapshot | undefined;
+    if (opts) {
+      const source = this.editor_internal().doc.is_vector_edit_target(id);
+      if (!source) return false;
+      const model = PathModel.fromSvgPathD(source_to_session_d(source));
+      if (!validate_subselection(opts, model)) return false;
+      initial = {
+        vertices: opts.vertices ?? [],
+        segments: opts.segments ?? [],
+        tangents: (opts.tangents ?? []).map((t) => [t[0], t[1]] as const),
+      };
+    }
+    if (!this._do_enter_vector_edit(id, initial)) return false;
+    // Capture the installed selection so REDO of this entry restores it —
+    // symmetric to how `exit_vector_edit`'s revert restores `final_selection`.
+    const initial_selection = this.vector_edit!.snapshot_selection();
     // Apply succeeded — push a delta so undo can reverse it. Use
     // preview+set+commit (the surface seam exposes `preview()` only).
     // Apply (= redo) re-runs the unchecked enter; revert undoes it.
@@ -4148,7 +4198,7 @@ class DomSurface implements Surface {
       providerId: "svg-editor",
       descriptor: { kind: "vector-mode-enter" },
       apply: () => {
-        this._do_enter_vector_edit(node_id);
+        this._do_enter_vector_edit(node_id, initial_selection);
       },
       revert: () => {
         this._do_exit_vector_edit();
@@ -4182,16 +4232,7 @@ class DomSurface implements Surface {
         this._do_exit_vector_edit();
       },
       revert: () => {
-        if (this._do_enter_vector_edit(node_id)) {
-          // Restore the sub-selection the user had when they left.
-          // Indices may have drifted under collab/AI mutations; the
-          // HUD's vectorOf provider tolerates stale indices (chrome
-          // simply doesn't render for missing vertices), and the next
-          // user click will rebuild a valid selection.
-          this.vector_edit?.restore_selection(final_selection);
-          this.sync_selection_mirror();
-          this.redraw();
-        }
+        this._do_enter_vector_edit(node_id, final_selection);
       },
     });
     preview.commit();
@@ -4200,11 +4241,21 @@ class DomSurface implements Surface {
   /**
    * Unchecked enter — performs the mode flip + HUD wiring without
    * pushing to history. Called by {@link enter_vector_edit} (user-facing,
-   * which pushes the delta) and by the exit-delta's revert (history-
-   * driven re-entry on undo). Returns `false` if the node has no usable
-   * `d` attribute, leaving editor state untouched.
+   * which pushes the delta), by the enter-delta's redo, and by the
+   * exit-delta's revert (history-driven re-entry on undo). Returns `false`
+   * if the node has no usable `d` attribute, leaving editor state untouched.
+   *
+   * `initialSelection` installs a sub-selection BEFORE the first mirror push,
+   * so the session publishes its final state ONCE — atomic entry and undo/redo
+   * re-entry never leak a transient empty selection through the public read
+   * channel (gridaco/grida#790). Indices may have drifted under collab/AI
+   * mutation; the HUD's `vectorOf` provider tolerates stale ones (chrome just
+   * doesn't render missing vertices) and the next click rebuilds a valid set.
    */
-  private _do_enter_vector_edit(id: NodeId): boolean {
+  private _do_enter_vector_edit(
+    id: NodeId,
+    initialSelection?: SubSelectionSnapshot
+  ): boolean {
     if (this.vector_edit) return false;
     const internal = this.editor_internal();
     const doc = internal.doc;
@@ -4221,6 +4272,7 @@ class DomSurface implements Surface {
     // first gesture commit calls apply_session_d to project back.
     const session_d = source_to_session_d(source);
     this.vector_edit = new VectorEditSession(id, source, session_d);
+    if (initialSelection) this.vector_edit.restore_selection(initialSelection);
     this.editor.commands.set_mode("edit-content");
     this.sync_selection_mirror();
     this.sync_surface_selection();
@@ -4252,6 +4304,9 @@ class DomSurface implements Surface {
     // bypasses the per-gesture commit / cancel clears.
     this.point_snap_guide = undefined;
     this.hud.setVectorSelection(null);
+    // Clear the public read channel too (gridaco/grida#790): no session ⇒
+    // no sub-selection. Off the `version` stream.
+    this.editor_internal().push_vector_subselection(null);
     if (
       this.current_tool.type === "lasso" ||
       this.current_tool.type === "bend"
@@ -4387,12 +4442,23 @@ class DomSurface implements Surface {
    */
   private sync_selection_mirror(): void {
     if (!this.vector_edit) return;
-    this.hud.setVectorSelection({
+    // Detach the published value from the session's live arrays. TS `readonly`
+    // is compile-time only, and the same value feeds the PUBLIC read channel —
+    // so a stray runtime mutation by a consumer must not be able to poison the
+    // session's own selection state. Copy all three tracks (one value, both
+    // sinks).
+    const sel: VectorSubSelection = {
       node_id: this.vector_edit.node_id,
-      vertices: this.vector_edit.selected_vertices,
-      segments: this.vector_edit.selected_segments,
-      tangents: this.vector_edit.selected_tangents,
-    });
+      vertices: [...this.vector_edit.selected_vertices],
+      segments: [...this.vector_edit.selected_segments],
+      tangents: this.vector_edit.selected_tangents.map(
+        (t) => [t[0], t[1]] as const
+      ),
+    };
+    this.hud.setVectorSelection(sel);
+    // Mirror to the editor's public read channel (gridaco/grida#790). Off the
+    // `version` stream — `subscribe_vector_subselection` consumers only.
+    this.editor_internal().push_vector_subselection(sel);
   }
 
   /**
@@ -4545,6 +4611,55 @@ class DomSurface implements Surface {
       },
     });
     preview.commit();
+  }
+
+  /**
+   * Apply a sub-selection write to the open vector session via the pure
+   * `apply_subselection` core (validation + mutation live there so they're
+   * headlessly testable). Returns `false` (no mutation) when no session is
+   * active, the input is out of range, or it resolves to the current
+   * sub-selection. Syncs the mirror + redraws on change, but does NOT push a
+   * history step — the caller (`apply_vector_subselection_command`) wraps it in
+   * one. (Atomic entry installs its selection directly via
+   * `_do_enter_vector_edit`, not through here.)
+   */
+  private apply_subselection_to_session(
+    input: VectorSubSelectionInput,
+    mode: SelectMode
+  ): boolean {
+    const ses = this.vector_edit;
+    if (!ses) return false;
+    const model = this.session_model();
+    if (!model) return false;
+    if (!apply_subselection(ses, model, input, mode)) return false;
+    this.sync_selection_mirror();
+    this.redraw();
+    return true;
+  }
+
+  /**
+   * Driver behind `commands.set_vector_selection` (gridaco/grida#790). Applies
+   * a programmatic sub-selection write as one undoable step — the same shape
+   * as a knob click (mutate, mirror, record). Returns `false` (no-op) when no
+   * vector session is active, the input is out of range, or it resolves to the
+   * current sub-selection.
+   *
+   * (see test/svg-editor-vector-subselection-api.md)
+   */
+  private apply_vector_subselection_command(
+    input: VectorSubSelectionInput,
+    mode: SelectMode = "replace"
+  ): boolean {
+    if (!this.vector_edit) return false;
+    // Refuse mid-gesture: this records a history step, and landing it inside an
+    // open gesture bracket (a vector preview drag, or a HUD marquee/lasso)
+    // would break undo order — the same class of bug the keyboard path avoids
+    // by dropping non-Escape keys during a gesture.
+    if (this.active_preview || this.hud.gesture().kind !== "idle") return false;
+    const before = this.vector_edit.snapshot_selection();
+    if (!this.apply_subselection_to_session(input, mode)) return false;
+    this.record_vector_selection_change(before, "set vector selection");
+    return true;
   }
 
   /** Resolve the in-flight `PathModel` for the named node id when a

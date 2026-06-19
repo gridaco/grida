@@ -53,6 +53,8 @@ import type {
   Tool,
   Unsubscribe,
   Vec2,
+  VectorSubSelection,
+  VectorSubSelectionInput,
 } from "../types";
 import { DEFAULT_STYLE, TOOL_CURSOR } from "../types";
 import { array_shallow_equal } from "../util/equal";
@@ -547,6 +549,25 @@ export type Commands = {
   ): InsertPreviewSession;
   // content
   set_text(value: string): void;
+  /**
+   * Set the vertex / segment / tangent sub-selection while a vector
+   * content-edit session is open (gridaco/grida#790). Returns `true` when the
+   * sub-selection changed, `false` (no-op) when no vector session is active,
+   * no DOM surface is attached, the input is out of range, or it resolves to
+   * the current selection.
+   *
+   * `mode` defaults to `"replace"` (the input becomes the whole sub-selection;
+   * omitted tracks are cleared). `"add"` / `"toggle"` fold the input into the
+   * existing sub-selection per track, leaving omitted tracks intact. The write
+   * is one undoable step, like a knob click. Indices are validated against the
+   * path under edit; an out-of-range index or tangent ref refuses the whole
+   * call. To open a path with an initial sub-selection in one step, pass the
+   * same input to {@link SvgEditor.enter_content_edit}.
+   */
+  set_vector_selection(
+    input: VectorSubSelectionInput,
+    mode?: SelectMode
+  ): boolean;
   // file
   load_svg(svg: string): void;
   serialize_svg(): string;
@@ -2478,7 +2499,15 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     });
   }
 
-  let content_edit_driver: ((target: NodeId) => boolean) | null = null;
+  let content_edit_driver:
+    | ((target: NodeId, opts?: VectorSubSelectionInput) => boolean)
+    | null = null;
+  // Editor → surface driver for vector sub-selection writes. The session is
+  // surface-owned, so `commands.set_vector_selection` reaches it only through
+  // this slot (symmetric to `content_edit_driver`). Null without a surface.
+  let vector_subselect_driver:
+    | ((input: VectorSubSelectionInput, mode?: SelectMode) => boolean)
+    | null = null;
   let computed_resolver: DomComputedResolver | null = null;
 
   function dom_computed_property(id: NodeId, name: string): string | null {
@@ -2520,18 +2549,52 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     for (const cb of pick_listeners) cb(e);
   }
 
-  function enter_content_edit(target?: NodeId): boolean {
+  // Vector sub-selection channel — the surface publishes the live vertex /
+  // segment / tangent sub-selection here. Like surface-hover and pick, kept
+  // out of EditorState and off the `version` stream: it changes at pointer
+  // rate during marquee / lasso, so a `version` bump per knob would re-render
+  // the whole app (P4 — subscribe to outcomes). `null` when no session.
+  let current_vector_subselection: VectorSubSelection | null = null;
+  const vector_subselection_listeners = new Set<
+    (sel: VectorSubSelection | null) => void
+  >();
+  function notify_vector_subselection() {
+    for (const cb of vector_subselection_listeners) {
+      cb(current_vector_subselection);
+    }
+  }
+  function _set_current_vector_subselection(sel: VectorSubSelection | null) {
+    current_vector_subselection = sel;
+    notify_vector_subselection();
+  }
+
+  function enter_content_edit(
+    target?: NodeId,
+    opts?: VectorSubSelectionInput
+  ): boolean {
     const id = target ?? (selection.length === 1 ? selection[0] : null);
     if (!id) return false;
     // Accept text (`<text>`/`<tspan>` leaf) OR vector (`<path>`/`<line>`/
     // `<polyline>`/`<polygon>`). The vector predicate widens what was
     // previously a path-only gate (see core/document.ts
     // `is_vector_edit_target`). The driver (DOM surface) routes by tag
-    // inside `dom.ts:enter_content_edit`.
+    // inside `dom.ts:enter_content_edit`. `opts` carries an optional initial
+    // vector sub-selection (gridaco/grida#790) — ignored for text targets.
     if (!doc.is_text_edit_target(id) && doc.is_vector_edit_target(id) === null)
       return false;
     if (!content_edit_driver) return false;
-    return content_edit_driver(id);
+    return content_edit_driver(id, opts);
+  }
+
+  function set_vector_selection(
+    input: VectorSubSelectionInput,
+    mode?: SelectMode
+  ): boolean {
+    // The vector session lives on the surface; reach it through the driver
+    // (no surface ⇒ no session ⇒ no-op). The driver owns validation, the
+    // session mutation, and the undoable history step.
+    if (!vector_subselect_driver) return false;
+    return vector_subselect_driver(input, mode);
   }
 
   function load_svg(svg: string) {
@@ -2607,6 +2670,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     insert_fragment,
     insert_preview,
     set_text,
+    set_vector_selection,
     load_svg,
     serialize_svg,
     undo,
@@ -2676,6 +2740,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     geometry_listeners.clear();
     translate_commit_listeners.clear();
     pick_listeners.clear();
+    vector_subselection_listeners.clear();
   }
 
   function set_style(partial: Partial<EditorStyle>) {
@@ -2818,6 +2883,33 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     },
 
     /**
+     * The current vector sub-selection (vertices / segments / tangents) inside
+     * an open vector content-edit session, or `null` when no such session is
+     * active (gridaco/grida#790). The read counterpart to
+     * `commands.set_vector_selection`. See {@link VectorSubSelection}.
+     */
+    vector_subselection(): VectorSubSelection | null {
+      return current_vector_subselection;
+    },
+
+    /**
+     * Subscribe to vector sub-selection changes — fires whenever the live
+     * vertex / segment / tangent selection changes (click, marquee, lasso,
+     * programmatic `set_vector_selection`, undo/redo) and on session
+     * enter/exit (`null` on exit). The callback receives the new value, also
+     * readable via {@link vector_subselection}. Cheap channel — does NOT bump
+     * `state.version`.
+     */
+    subscribe_vector_subselection(
+      cb: (sel: VectorSubSelection | null) => void
+    ): Unsubscribe {
+      vector_subselection_listeners.add(cb);
+      return () => {
+        vector_subselection_listeners.delete(cb);
+      };
+    },
+
+    /**
      * Subscribe to bounds-affecting changes. Fires when any document
      * mutation advances `state.geometry_version` — drag, resize, text
      * edit, structural insert/remove. Skips presentation-only writes
@@ -2900,8 +2992,20 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       seed_duplication(record: subtree.DuplicationRecord) {
         active_duplication = record;
       },
-      set_content_edit_driver(fn: ((target: NodeId) => boolean) | null) {
+      set_content_edit_driver(
+        fn: ((target: NodeId, opts?: VectorSubSelectionInput) => boolean) | null
+      ) {
         content_edit_driver = fn;
+      },
+      set_vector_subselect_driver(
+        fn:
+          | ((input: VectorSubSelectionInput, mode?: SelectMode) => boolean)
+          | null
+      ) {
+        vector_subselect_driver = fn;
+      },
+      push_vector_subselection(sel: VectorSubSelection | null) {
+        _set_current_vector_subselection(sel);
       },
       set_surface_hover_override_driver(
         fn: ((id: NodeId | null) => void) | null
