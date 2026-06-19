@@ -32,6 +32,7 @@ import {
   type LanguageModel,
 } from "ai";
 import { composeSystemPrompt } from "./prompts";
+import { prompts } from "../prompts";
 import type { AgentModelId } from "../protocol/run";
 import type { SkillId } from "../protocol/skills";
 import {
@@ -187,14 +188,10 @@ function buildCapabilityHints(opts: CreateAgentOptions): string[] {
   const hints: string[] = [];
   if (opts.command) {
     hints.push(
-      [
-        '<capability name="command">',
-        `You have command execution access via the \`${RUN_COMMAND_TOOL_NAME}\` tool.`,
-        `The default workdir is \`${opts.command.default_workdir}\`. The agent host enforces`,
-        "an allowlist on the command and checks that the workdir is inside the",
-        "workspace.",
-        "</capability>",
-      ].join("\n")
+      prompts.command_capability(
+        RUN_COMMAND_TOOL_NAME,
+        opts.command.default_workdir
+      )
     );
   }
   return hints;

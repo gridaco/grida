@@ -61,6 +61,24 @@ describe("agent-provider JTBD (issue #813)", () => {
     expect(result.stopReason).toBe("end_turn");
   });
 
+  it("hands our managed system prompt to the agent", async () => {
+    const bridge = createFakeBridge({ onPrompt: () => "end_turn" });
+    await runAgentProviderTurn({
+      provider_id: "claude",
+      prompt: "hi",
+      connect: bridge.connect,
+      emit: () => {},
+    });
+    // We append a managed system prompt (registry `prompts.acp_system`) onto
+    // Claude Code's preset — assert it reaches the agent's session, without
+    // pinning the exact text (so editing the prompt copy doesn't break this).
+    const meta = bridge.calls.lastMeta as
+      | { systemPrompt?: { append?: string } }
+      | undefined;
+    expect(typeof meta?.systemPrompt?.append).toBe("string");
+    expect((meta?.systemPrompt?.append ?? "").length).toBeGreaterThan(0);
+  });
+
   it("continues the SAME external session on a follow-up turn", async () => {
     const bridge = createFakeBridge({
       resume: true, // advertise session/resume so the consumer resumes

@@ -10,19 +10,9 @@ import { generateText } from "ai";
 import type { ModelFactory } from "../agent";
 import type { SessionsStore } from "./store";
 import { session_title } from "./title";
+import { prompts } from "../prompts";
 
 const MAX_TITLE_LEN = 60;
-
-const SYSTEM_PROMPT = `You generate short titles for chat conversations.
-
-Rules:
-- Output ONLY the title text. No quotes, no markdown, no code, no trailing punctuation.
-- Maximum 8 words AND 50 characters. Shorter is better.
-- The title MUST be in the same language as the user message.
-- Capture the user's intent (what they want to do), not tool names or chitchat.
-- Do NOT answer or respond to the message. Only summarize the intent.
-- Do NOT include the words "title" or "summary".
-- For minimal / conversational input, produce a short, sensible label.`;
 
 export namespace titler {
   export type GenerateOptions = {
@@ -42,7 +32,7 @@ export namespace titler {
       const model = opts.model_factory("nano");
       const { text } = await generateText({
         model,
-        system: SYSTEM_PROMPT,
+        system: prompts.titler_system,
         prompt,
         temperature: 0.3,
         // The cap must cover REASONING + text: on a thinking model

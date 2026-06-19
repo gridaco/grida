@@ -62,6 +62,9 @@ export type FakeBridgeCalls = {
   resumeSession: Array<{ sessionId: string }>;
   setSessionMode: Array<{ sessionId: string; modeId: string }>;
   cancel: number;
+  /** The `_meta` of the most recent `session/new` or `session/resume` — lets a
+   *  test assert what config the consumer hands the agent (system prompt, etc). */
+  lastMeta: unknown;
 };
 
 export type FakeBridge = {
@@ -79,6 +82,7 @@ export function createFakeBridge(script: FakeAgentScript): FakeBridge {
     resumeSession: [],
     setSessionMode: [],
     cancel: 0,
+    lastMeta: undefined,
   };
   // Shared across connects so resumed/repeat turns get distinct session ids.
   let seq = 0;
@@ -105,12 +109,14 @@ export function createFakeBridge(script: FakeAgentScript): FakeBridge {
             },
           } as InitializeResponse;
         },
-        async newSession(): Promise<NewSessionResponse> {
+        async newSession(params): Promise<NewSessionResponse> {
           calls.newSession++;
+          calls.lastMeta = params._meta;
           return { sessionId: `fake-sess-${++seq}` } as NewSessionResponse;
         },
         async resumeSession(params): Promise<ResumeSessionResponse> {
           calls.resumeSession.push({ sessionId: String(params.sessionId) });
+          calls.lastMeta = params._meta;
           if (script.failResume) {
             throw new Error("fake: unknown or stale session id");
           }

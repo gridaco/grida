@@ -30,28 +30,21 @@ import type {
   ProviderChunk,
   TurnResult,
 } from "./types";
-
-const BRIDGE_PKG = "@agentclientprotocol/claude-agent-acp";
+import { acp_config, BRIDGE_PACKAGE } from "./config";
 
 /**
- * SDK options injected into the bridge via ACP `_meta.claudeCode.options` (the
- * bridge merges these into its `query()` Options). Opus 4.7+ defaults
- * `thinking.display` to `"omitted"`, so thinking blocks stream EMPTY; opting
- * back in to `"summarized"` here restores visible reasoning. Verified to work
- * on the default model via the SDK-options path (the CLI `--thinking-display`
- * flag is buggy on 4.7 — anthropics/claude-code#56356 — but this path isn't).
- */
-/**
- * Build the ACP `_meta` that carries SDK options into the bridge: always opt
- * back in to summarized thinking; pass `model` when the picker chose one
- * (issue #813 model picker — verified the `_meta` model override switches the
- * model, incl. the `claude-opus-4-8[1m]` 1M variant).
+ * Build the ACP `_meta` for a session from the static {@link acp_config} plus
+ * this turn's picked `model`. It carries our system prompt (`_meta.systemPrompt`)
+ * and the SDK options the bridge merges into `query()`
+ * (`_meta.claudeCode.options`). The values themselves live in `config.ts` — this
+ * is just the per-turn assembly.
  */
 function sessionMeta(model?: string) {
   return {
+    systemPrompt: acp_config.system_prompt,
     claudeCode: {
       options: {
-        thinking: { type: "adaptive", display: "summarized" },
+        thinking: acp_config.thinking,
         ...(model ? { model } : {}),
       },
     },
@@ -156,7 +149,7 @@ const spawnBridge: BridgeConnect = ({ cwd }) => {
   const env = { ...process.env };
   delete env.ANTHROPIC_API_KEY; // subscription billing only
 
-  const child = spawn("npx", ["-y", BRIDGE_PKG], {
+  const child = spawn("npx", ["-y", BRIDGE_PACKAGE], {
     cwd,
     stdio: ["pipe", "pipe", "pipe"],
     env,
@@ -220,7 +213,7 @@ export async function openClaudeSession(
   try {
     const init = await conn.initialize({
       protocolVersion: PROTOCOL_VERSION,
-      clientCapabilities: {},
+      clientCapabilities: acp_config.client_capabilities,
       clientInfo: { name: "grida-agent-provider", version: "0.0.0" },
     });
     protocolVersion = init.protocolVersion;
@@ -228,14 +221,20 @@ export async function openClaudeSession(
       init.agentCapabilities?.sessionCapabilities?.resume != null;
     const meta = sessionMeta(opts.model);
     const startFresh = async () =>
-      (await conn.newSession({ cwd, mcpServers: [], _meta: meta })).sessionId;
+      (
+        await conn.newSession({
+          cwd,
+          mcpServers: acp_config.mcp_servers,
+          _meta: meta,
+        })
+      ).sessionId;
 
     if (opts.resumeSessionId && canResume) {
       try {
         await conn.resumeSession({
           sessionId: opts.resumeSessionId,
           cwd,
-          mcpServers: [],
+          mcpServers: acp_config.mcp_servers,
           _meta: meta,
         });
         sessionId = opts.resumeSessionId;
@@ -261,7 +260,7 @@ export async function openClaudeSession(
     id: "claude",
     info: {
       transport: "acp",
-      bridge: `npx ${BRIDGE_PKG}`,
+      bridge: `npx ${BRIDGE_PACKAGE}`,
       protocolVersion,
       model: opts.model ?? "(subscription default)",
       sessionId,
@@ -278,7 +277,7 @@ export async function openClaudeSession(
       } catch (err) {
         const tail = transport.errorTail();
         throw new Error(
-          `${BRIDGE_PKG} prompt failed: ${String(err)}${tail ? `\n--- bridge stderr ---\n${tail}` : ""}`
+          `${BRIDGE_PACKAGE} prompt failed: ${String(err)}${tail ? `\n--- bridge stderr ---\n${tail}` : ""}`
         );
       } finally {
         sink = undefined;
