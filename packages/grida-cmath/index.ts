@@ -1361,6 +1361,48 @@ namespace cmath {
           return "left";
       }
     }
+
+    /**
+     * The 8 cardinal/diagonal directions of a resize handle.
+     *
+     * Structurally identical to {@link CardinalDirection} — this alias is
+     * the single source of truth for the resize-handle direction union that
+     * `@grida/hud` and `@grida/svg-editor` previously each re-declared. Named
+     * for the resize-handle context at the call sites.
+     */
+    export type ResizeDirection = CardinalDirection;
+
+    /**
+     * Decompose a cardinal direction into its N/S/E/W membership.
+     *
+     * A diagonal belongs to two components (`"ne"` → north + east); an
+     * orthogonal direction to one. This is the shared primitive behind
+     * resize-handle math — the HUD's preview rect and svg-editor's
+     * direction mask both build on it instead of re-deriving the four
+     * boolean ORs.
+     *
+     * Derived from {@link cardinal_direction_vector} so the direction set
+     * has a single source of truth: the unit vector's sign *is* the axis
+     * membership (`x > 0` → east, `y < 0` → north).
+     *
+     * @example
+     * cmath.compass.cardinalComponents("ne");
+     * // { north: true, south: false, east: true, west: false }
+     */
+    export function cardinalComponents(dir: CardinalDirection): {
+      north: boolean;
+      south: boolean;
+      east: boolean;
+      west: boolean;
+    } {
+      const [x, y] = cardinal_direction_vector[dir];
+      return {
+        north: y < 0,
+        south: y > 0,
+        east: x > 0,
+        west: x < 0,
+      };
+    }
   }
 
   export namespace rect {

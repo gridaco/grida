@@ -1,5 +1,9 @@
-/** 8 cardinal/diagonal resize directions. */
-export type ResizeDirection = "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
+import type cmath from "@grida/cmath";
+
+/** 8 cardinal/diagonal resize directions. Aliased from the cmath single
+ *  source of truth (`cmath.compass.ResizeDirection`); re-exported here so
+ *  existing consumers keep their import path. */
+export type ResizeDirection = cmath.compass.ResizeDirection;
 
 /** 4 corner positions for rotation handles. */
 export type RotationCorner = "nw" | "ne" | "se" | "sw";
