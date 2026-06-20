@@ -1,16 +1,21 @@
 // Cursor icons — value types and pure helpers.
 //
-// Bedrock primitives. Self-contained: no imports beyond the standard
-// library. `CursorIcon` is the logical name a `HUDObject.cursor` field
-// carries; rendering to a CSS `cursor` string (or to a custom SVG
-// renderer) is a host concern wired by the deferred orchestrator.
+// Bedrock primitives: the only external dependency permitted is the
+// `@grida/cmath` type vocabulary (per the `primitives/bedrock.ts` layering
+// contract, enforced by `__tests__/api/import-graph.test.ts`). `CursorIcon`
+// is the logical name a `HUDObject.cursor` field carries; rendering to a CSS
+// `cursor` string (or to a custom SVG renderer) is a host concern wired by
+// the deferred orchestrator.
 //
 // Mirrors `event/cursor.ts`; the legacy file remains in place until the
 // orchestrator follow-up dissolves it. While both files exist, this
 // copy is the canonical bedrock form.
 
-/** 8 cardinal/diagonal resize directions. */
-export type ResizeDirection = "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw";
+import type cmath from "@grida/cmath";
+
+/** 8 cardinal/diagonal resize directions. Aliased from the cmath single
+ *  source of truth (`cmath.compass.ResizeDirection`). */
+export type ResizeDirection = cmath.compass.ResizeDirection;
 
 /** 4 corner positions for rotation handles. */
 export type RotationCorner = "nw" | "ne" | "se" | "sw";

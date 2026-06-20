@@ -9,6 +9,7 @@
 // Editor-agnostic — no document, DOM, or editor type. Operates on the
 // `ResizeBaseline` already captured by `intents.ts`.
 
+import cmath from "@grida/cmath";
 import type { Rect, Vec2 } from "../types";
 import type {
   ResizeBaseline,
@@ -65,10 +66,12 @@ export type EffectiveResize = {
 
 export namespace resize_capability {
   export function direction_mask(dir: ResizeDirection): DirectionMask {
-    const has_n = dir === "n" || dir === "ne" || dir === "nw";
-    const has_s = dir === "s" || dir === "se" || dir === "sw";
-    const has_e = dir === "e" || dir === "ne" || dir === "se";
-    const has_w = dir === "w" || dir === "nw" || dir === "sw";
+    const {
+      north: has_n,
+      south: has_s,
+      east: has_e,
+      west: has_w,
+    } = cmath.compass.cardinalComponents(dir);
     return {
       affects_x: has_e || has_w,
       affects_y: has_n || has_s,

@@ -485,10 +485,12 @@ function applyResizeRect(
   // origin so the center is preserved. `k === 1` reproduces the legacy
   // opposite-anchored math exactly.
   const k = fromCenter ? 2 : 1;
-  const hasN = direction === "n" || direction === "ne" || direction === "nw";
-  const hasS = direction === "s" || direction === "se" || direction === "sw";
-  const hasE = direction === "e" || direction === "ne" || direction === "se";
-  const hasW = direction === "w" || direction === "nw" || direction === "sw";
+  const {
+    north: hasN,
+    south: hasS,
+    east: hasE,
+    west: hasW,
+  } = cmath.compass.cardinalComponents(direction);
 
   if (hasE) {
     width += k * dx;

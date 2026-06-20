@@ -37,7 +37,10 @@ import type { SnapSession } from "../snap";
 
 const XLINK_NS = "http://www.w3.org/1999/xlink";
 
-export type ResizeDirection = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+/** The 8 resize-handle directions — aliased from the cmath single source
+ *  of truth (`cmath.compass.ResizeDirection`). Re-exported here so existing
+ *  `resize-pipeline` consumers keep their import path. */
+export type ResizeDirection = cmath.compass.ResizeDirection;
 
 export type ResizeAttrs =
   | { kind: "rect"; x: number; y: number; w: number; h: number }

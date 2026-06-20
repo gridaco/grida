@@ -42,9 +42,11 @@ function sign_adjust(
   dx_world: number,
   dy_world: number
 ): { dx: number; dy: number } {
-  const dx = dir === "w" || dir === "nw" || dir === "sw" ? -dx_world : dx_world;
-  const dy = dir === "n" || dir === "ne" || dir === "nw" ? -dy_world : dy_world;
-  return { dx, dy };
+  const { north, west } = cmath.compass.cardinalComponents(dir);
+  return {
+    dx: west ? -dx_world : dx_world,
+    dy: north ? -dy_world : dy_world,
+  };
 }
 
 /** Stable, order-independent key for an id set — used by `is_active_for`
