@@ -1290,15 +1290,9 @@ importers:
       '@grida/schema':
         specifier: workspace:*
         version: link:../grida-canvas-schema
-      '@types/pngjs':
-        specifier: ^6.0.5
-        version: 6.0.5
       fflate:
         specifier: ^0.8.2
         version: 0.8.2
-      pngjs:
-        specifier: ^7.0.0
-        version: 7.0.0
       tsdown:
         specifier: ^0.22.1
         version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)

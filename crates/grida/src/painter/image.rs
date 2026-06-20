@@ -552,4 +552,62 @@ mod tests {
         assert!((matrix[0][2] - expected_translation_x).abs() < 1e-6);
         assert!((matrix[1][2] - expected_translation_y).abs() < 1e-6);
     }
+
+    // Regression: image fills must be sampled smoothly (cubic), not nearest. A
+    // 4px [black,black,white,white] source stretched to 100px is rendered with
+    // `BoxFit::Fill`; smooth sampling produces a black→white ramp with
+    // intermediate grays around the boundary, whereas nearest-neighbor would
+    // emit only pure 0/255. We assert intermediate grays exist — robust to the
+    // exact Mitchell coefficients.
+    #[test]
+    fn image_shader_samples_smoothly_not_nearest() {
+        use skia_safe::{image::CachingHint, surfaces, Color, IPoint, Paint, Rect};
+
+        // 4x1 source: left half black, right half white.
+        let mut src = surfaces::raster_n32_premul((4, 1)).expect("src surface");
+        {
+            let c = src.canvas();
+            c.clear(Color::BLACK);
+            let mut white = Paint::default();
+            white.set_color(Color::WHITE);
+            c.draw_rect(Rect::from_xywh(2.0, 0.0, 2.0, 1.0), &white);
+        }
+        let image = src.image_snapshot();
+
+        let cfg = base_paint(ImagePaintFit::Fit(BoxFit::Fill), 0);
+        let shader = image_shader(&cfg, &image, (100.0, 10.0)).expect("shader");
+
+        let (w, h) = (100i32, 10i32);
+        let mut dst = surfaces::raster_n32_premul((w, h)).expect("dst surface");
+        dst.canvas().clear(Color::BLACK);
+        let mut paint = Paint::default();
+        paint.set_anti_alias(false);
+        paint.set_shader(Some(shader));
+        dst.canvas()
+            .draw_rect(Rect::from_xywh(0.0, 0.0, w as f32, h as f32), &paint);
+
+        let img = dst.image_snapshot();
+        let info = img.image_info();
+        let row_bytes = info.min_row_bytes();
+        let mut raw = vec![0u8; row_bytes * h as usize];
+        img.read_pixels(
+            &info,
+            &mut raw,
+            row_bytes,
+            IPoint::new(0, 0),
+            CachingHint::Allow,
+        );
+
+        // Middle row; R == G == B for grayscale so byte order is irrelevant.
+        let y = (h / 2) as usize;
+        let intermediate = (0..w as usize)
+            .map(|x| raw[y * row_bytes + x * 4])
+            .filter(|&g| g > 30 && g < 225)
+            .count();
+        assert!(
+            intermediate > 0,
+            "expected a smooth black→white ramp (cubic); nearest-neighbor would \
+             yield only pure 0/255, found {intermediate} intermediate pixels"
+        );
+    }
 }

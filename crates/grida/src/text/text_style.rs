@@ -173,3 +173,64 @@ fn tag_from_str(tag: &str) -> skia_safe::FourByteTag {
     let b3 = *bytes.get(3).unwrap_or(&b' ');
     skia_safe::FourByteTag::from((b0 as char, b1 as char, b2 as char, b3 as char))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn style_with_line_height(line_height: TextLineHeight) -> TextStyleRec {
+        let mut s = TextStyleRec::from_font("Inter", 16.0);
+        s.line_height = line_height;
+        s
+    }
+
+    // Regression: explicit (Fixed/Factor) line heights must distribute extra
+    // leading evenly above/below the glyphs (CSS/Figma half-leading). Skia's
+    // default splits leading proportional to ascent:descent, which drops the
+    // baseline and renders text lower than the reference model. `Normal` keeps
+    // the font's natural metrics (no height override), so half-leading must NOT
+    // be forced there.
+    #[test]
+    fn explicit_line_height_uses_half_leading() {
+        let fixed = textstyle(
+            &style_with_line_height(TextLineHeight::Fixed(24.0)),
+            &None,
+            None,
+        );
+        assert!(
+            fixed.half_leading(),
+            "Fixed line-height must use half-leading"
+        );
+        assert!(
+            fixed.height_override(),
+            "Fixed line-height overrides height"
+        );
+
+        let factor = textstyle(
+            &style_with_line_height(TextLineHeight::Factor(1.5)),
+            &None,
+            None,
+        );
+        assert!(
+            factor.half_leading(),
+            "Factor line-height must use half-leading"
+        );
+        assert!(
+            factor.height_override(),
+            "Factor line-height overrides height"
+        );
+    }
+
+    #[test]
+    fn normal_line_height_does_not_force_half_leading() {
+        let normal = textstyle(&style_with_line_height(TextLineHeight::Normal), &None, None);
+        assert!(
+            !normal.half_leading(),
+            "Normal line-height must keep natural font metrics (no forced half-leading)"
+        );
+        assert!(
+            !normal.height_override(),
+            "Normal line-height must not override height"
+        );
+    }
+}

@@ -71,9 +71,7 @@
     "@grida/io": "workspace:*",
     "@grida/io-figma": "workspace:*",
     "@grida/schema": "workspace:*",
-    "@types/pngjs": "^6.0.5",
     "fflate": "^0.8.2",
-    "pngjs": "^7.0.0",
     "tsdown": "^0.22.1"
   },
   "peerDependencies": {
