@@ -243,6 +243,29 @@ export class SessionsStore {
       .where(eq(chatSessions.id, id));
   }
 
+  /**
+   * Persist the EXTERNAL agent-provider's own session id (issue #813) under
+   * `metadata.agent_provider.session_id`, so the next turn can RESUME that
+   * agent's conversation instead of starting fresh. The external agent keeps
+   * the history; Grida only sends the new user message. Read-modify-write of
+   * the metadata bag (single-flight per session, so no concurrent-write race).
+   */
+  async setAgentProviderSessionId(
+    id: string,
+    providerSessionId: string
+  ): Promise<void> {
+    const row = await this.get(id);
+    if (!row) throw new SessionNotFoundError(id);
+    const metadata = {
+      ...row.metadata,
+      agent_provider: { session_id: providerSessionId },
+    };
+    await this.db
+      .update(chatSessions)
+      .set({ metadata_json: JSON.stringify(metadata), updated_at: Date.now() })
+      .where(eq(chatSessions.id, id));
+  }
+
   /** Persist the session's permission mode (RFC `permission modes`). The
    *  runtime calls this when an incoming run carries a mode that differs from
    *  the stored one, so a later queued-turn drain (which has no client request)

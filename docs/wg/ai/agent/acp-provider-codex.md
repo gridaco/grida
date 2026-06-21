@@ -31,6 +31,11 @@ an implementor building an ACP-compatible agent runtime. This page is
 for an implementor consuming an external agent provider and normalizing
 that provider into their own agent system.
 
+It is one profile of the **agent-provider class** decided in
+[ACP Provider Class](./acp-provider.md) — read that page first for
+whether the host should host this class of provider at all, and what it
+costs to do so.
+
 ## Position
 
 Codex should be treated as an **agent provider**, not as a bare model

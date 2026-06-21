@@ -17,6 +17,7 @@
 import { generateText } from "ai";
 import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
+import { prompts } from "../prompts";
 
 /** Cheapest tier the provider exposes (RFC: `nano` / `small`). */
 const COMPACTOR_TIER: ModelTier = "nano";
@@ -26,28 +27,6 @@ const COMPACTOR_TIER: ModelTier = "nano";
 // summary length anyway, so the ceiling is free for them.
 const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
 const DEFAULT_TIMEOUT_MS = 60_000;
-
-const SYSTEM_PROMPT = `You compress a long agent/user conversation into a compact, faithful summary so the conversation can continue with less context.
-
-Output a Markdown summary with these sections (omit a section only if truly empty):
-
-## Goal
-What the user is ultimately trying to accomplish.
-
-## Progress
-What has been done so far — files created/edited, decisions executed, tools run and their salient results.
-
-## Decisions
-Choices made and constraints established that later turns must respect.
-
-## Next steps
-What remains to be done.
-
-Rules:
-- Preserve concrete facts: file paths, identifiers, function/variable names, numeric values, error messages. These are load-bearing — do NOT paraphrase them away.
-- Be terse. No preamble, no "Here is the summary". Start with the first heading.
-- Do NOT invent progress that did not happen. If unsure, omit.
-- Write in the same language as the conversation.`;
 
 export namespace compactor {
   export type SummarizeOptions = {
@@ -74,7 +53,7 @@ export namespace compactor {
       opts.signal ?? AbortSignal.timeout(opts.timeout_ms ?? DEFAULT_TIMEOUT_MS);
     const { text } = await generateText({
       model,
-      system: SYSTEM_PROMPT,
+      system: prompts.compactor_system,
       prompt,
       temperature: 0.2,
       maxOutputTokens: opts.max_output_tokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
