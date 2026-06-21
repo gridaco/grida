@@ -52,7 +52,7 @@ A directory is never _invalid_ — at worst it is _implicit_.
 
 JSON. **The minimal valid manifest is `{}`** — every field is optional and the reader
 fills defaults. All paths are **relative to the bundle root**; `..` escape and absolute
-paths are out of scope for V1 (see [§9](#9-open-questions-need-an-rfd-before-v2)).
+paths are out of scope for V1 (see [§9](#9-open-questions-need-an-rfd-before-theyre-v2)).
 
 ```jsonc
 {

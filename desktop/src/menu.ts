@@ -136,6 +136,10 @@ async function open_picker_and_register(
       workspace_id: workspaceId,
     });
   }
+  // Record the folder in Recents, matching the OS-open paths (`main.ts` adds
+  // both files and directories). The file branch above already does this via
+  // `onOpenFile`, so only the directory branch needs it here.
+  app.addRecentDocument(picked);
 }
 
 /**

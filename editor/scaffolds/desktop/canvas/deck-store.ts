@@ -17,6 +17,24 @@ export interface WorkspaceDeckClient extends WorkspaceFsClient {
   trashEntry(workspaceId: string, relPath: string): Promise<void>;
 }
 
+/**
+ * Refuse a document `src` that isn't bundle-local. Per the `.canvas` contract
+ * (§2) every path is relative to the bundle root; `..` traversal and absolute
+ * paths are out of scope for V1. Enforcing it here keeps a hostile or garbled
+ * manifest from steering a file op (e.g. `trashEntry`) outside the bundle.
+ */
+function assertBundleLocalSrc(src: string): void {
+  const normalized = src.replaceAll("\\", "/");
+  if (
+    normalized.length === 0 ||
+    normalized.startsWith("/") ||
+    /^[a-zA-Z]:/.test(normalized) || // drive-letter absolute (Windows)
+    normalized.split("/").includes("..")
+  ) {
+    throw new Error(`.canvas: non-bundle-local document src rejected: ${src}`);
+  }
+}
+
 function slidesFromManifest(m: iocanvas.Manifest): Slide[] {
   return (m.documents ?? [])
     .filter((d) => typeof d?.src === "string" && d.src.length > 0)
@@ -79,8 +97,12 @@ export class CanvasDeck {
     this.fs = workspaceBundleFs(workspaceId, client, basePath);
   }
 
-  /** Map a bundle-relative `src` to its workspace-relative path. */
+  /** Map a bundle-relative `src` to its workspace-relative path. Refuses a
+   *  non-bundle-local `src` so a hostile/garbled `canvas.json` can't drive a
+   *  file op (notably `trashEntry`) outside the bundle — spec §2: paths are
+   *  bundle-root-relative; `..` escape and absolute paths are out of scope. */
   private abs(src: string): string {
+    assertBundleLocalSrc(src);
     return this.basePath ? `${this.basePath}/${src}` : src;
   }
 

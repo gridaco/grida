@@ -61,6 +61,12 @@ export function useWorkspaceFileSave({
   // reload. A ref (not state) so `onSave` stays referentially stable and the
   // Cmd+S listener doesn't re-bind on each save.
   const lastMtimeRef = useRef<number>(initialMtime);
+  // Guards against overlapping writes: a second save dispatched while one is
+  // still in flight would carry the same (pre-write) `expectedMtime` and so
+  // conflict against the first save's own result — a false conflict with no
+  // external edit. Drop the overlap; the buffer stays dirty and re-saves cleanly
+  // once the in-flight write lands.
+  const writeInFlightRef = useRef(false);
   // Set when a save is rejected because disk advanced past our token. Holds the
   // content the user tried to write so "Overwrite anyway" can re-issue it
   // without re-serializing a since-changed editor.
@@ -86,6 +92,8 @@ export function useWorkspaceFileSave({
       snapshot: number,
       opts: { expectedMtime?: number; onConflict?: () => void }
     ) => {
+      if (writeInFlightRef.current) return;
+      writeInFlightRef.current = true;
       setSaveError(null);
       setSaving(true);
       try {
@@ -106,6 +114,7 @@ export function useWorkspaceFileSave({
         }
       } finally {
         setSaving(false);
+        writeInFlightRef.current = false;
       }
     },
     [workspaceId, relPath, onSaved]

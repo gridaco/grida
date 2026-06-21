@@ -251,7 +251,7 @@ export async function persistIncomingTail(
       // arrives only on the next request's assistant message. Fill just those
       // into the existing (recorder-written) tool row so the server-authoritative
       // model view (`buildModelMessages`) stops dropping the call as incomplete.
-      await persistResolvedToolResults(store, m);
+      await persistResolvedToolResults(store, sessionId, m);
       continue;
     }
     if (seen.has(m.id)) continue;
@@ -285,12 +285,13 @@ export async function persistIncomingTail(
  */
 async function persistResolvedToolResults(
   store: SessionsStore,
+  sessionId: string,
   message: NormalizedMessage
 ): Promise<void> {
   for (const part of message.parts) {
     const toolCallId = toolCallIdOf(part);
     if (toolCallId === null || !isResolvedToolPart(part)) continue;
-    await store.fillToolResult(message.id, toolCallId, {
+    await store.fillToolResult(sessionId, message.id, toolCallId, {
       type: part.type,
       data: part,
       // `isResolvedToolPart` already verified this is a terminal-state string.

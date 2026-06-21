@@ -139,6 +139,11 @@ export class SvgDocStore {
     const resolved = await iocanvas.read(bundleFs(this.canvasBackend));
     if (this.disposed) return;
 
+    // Tracks whether any on-disk document was skipped because its bytes didn't
+    // load (AgentFs.hydrate logs-and-continues on per-file read failures). When
+    // true we must NOT rewrite the manifest below, or a transiently-unreadable
+    // slide would be pruned from `canvas.json` permanently.
+    let skippedDocs = false;
     if (resolved.documents.length > 0) {
       const rawByStem = new Map<string, iocanvas.ManifestDocument>();
       for (const e of resolved.manifest?.documents ?? []) {
@@ -148,7 +153,10 @@ export class SvgDocStore {
       let n = 1;
       for (const d of resolved.documents) {
         const id = stemOf(d.src);
-        if (!this.content.has(id)) continue;
+        if (!this.content.has(id)) {
+          skippedDocs = true;
+          continue;
+        }
         const raw = rawByStem.get(id);
         const createdAt =
           typeof raw?.createdAt === "number" ? raw.createdAt : now;
@@ -167,7 +175,9 @@ export class SvgDocStore {
     if (this.docs.length === 0) this.seedFirstDoc();
 
     this.hydrated = true;
-    this.persistManifest();
+    // Skip the normalizing rewrite when hydrate had partial read coverage —
+    // persisting now would drop the unreadable slide(s) from the manifest.
+    if (!skippedDocs) this.persistManifest();
     this.notify();
   }
 

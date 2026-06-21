@@ -1223,8 +1223,13 @@ export class SessionsStore {
    * conditional `WHERE` matches 0 rows and is a no-op). A missing row is also a
    * no-op, which keeps the server authoritative: the renderer can only supply a
    * result for a call the server delegated to it and is still waiting on.
+   *
+   * GRIDA-SEC-004: scoped by `sessionId` so a client-authored resend can only
+   * fill a pending row in its OWN session — `message_id` already pins the
+   * session, but the explicit predicate makes the boundary part of the query.
    */
   async fillToolResult(
+    sessionId: string,
     messageId: string,
     toolCallId: string,
     result: { type: string; data: unknown; tool_state: string }
@@ -1239,6 +1244,7 @@ export class SessionsStore {
       })
       .where(
         and(
+          eq(chatParts.session_id, sessionId),
           eq(chatParts.message_id, messageId),
           eq(chatParts.tool_call_id, toolCallId),
           eq(chatParts.tool_state, "input-available")

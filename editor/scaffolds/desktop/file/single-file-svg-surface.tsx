@@ -169,18 +169,27 @@ function Surface({
     onMeta({ title: docName, displayPath, dirty: isDirty });
   }, [docName, displayPath, isDirty, onMeta]);
 
-  // Debounce the close-prompt IPC: `set_document_edited` round-trips to the
-  // main process, and a drag can emit many version bumps per frame.
+  // Mirror dirty state to the main process so Cmd+W prompts before discarding
+  // unsaved edits. Arm `true` IMMEDIATELY (a quick close right after an edit must
+  // still hit the prompt); only debounce the clear to `false`, since
+  // `set_document_edited` round-trips and a drag emits many version bumps per
+  // frame. The inline dirty dot remains the source of truth the user sees, so
+  // any IPC failure here is non-fatal.
   const lastSentEditedRef = useRef<boolean | null>(null);
   useEffect(() => {
     const bridge = getDesktopBridge();
     if (!bridge) return;
+    if (isDirty) {
+      if (lastSentEditedRef.current !== true) {
+        lastSentEditedRef.current = true;
+        void bridge.window.set_document_edited(true).catch(() => {});
+      }
+      return;
+    }
     const timer = setTimeout(() => {
-      if (lastSentEditedRef.current === isDirty) return;
-      lastSentEditedRef.current = isDirty;
-      void bridge.window.set_document_edited(isDirty).catch(() => {
-        // Non-fatal — the inline dirty dot is the source of truth the user sees.
-      });
+      if (lastSentEditedRef.current === false) return;
+      lastSentEditedRef.current = false;
+      void bridge.window.set_document_edited(false).catch(() => {});
     }, DIRTY_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [isDirty]);
@@ -194,14 +203,16 @@ function Surface({
     try {
       await bridge.files.write(docId, content);
       setSavedVersion(snapshot);
-      // Tell the main process the document is clean so Cmd+W after a save
-      // doesn't re-fire the dirty-close prompt.
-      lastSentEditedRef.current = false;
-      await bridge.window.set_document_edited(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setSaveError(`Save failed: ${msg}`);
+      return;
     }
+    // The file is saved; tell the main process it's clean so Cmd+W after a save
+    // doesn't re-fire the dirty-close prompt. A failure here must NOT report the
+    // (successful) save as failed — keep it non-fatal.
+    lastSentEditedRef.current = false;
+    void bridge.window.set_document_edited(false).catch(() => {});
   }, [docId, editor]);
 
   // Global Cmd+S / Ctrl+S — listened at `window` (not the canvas) so it fires

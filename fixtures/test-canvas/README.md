@@ -9,7 +9,7 @@ directory of standalone SVG documents plus a `canvas.json` manifest. Consumed by
 The default happy-path deck. A valid `type: "svg-slides"` bundle exercising the
 load-bearing parts of the contract:
 
-```
+```text
 demo.canvas/
 ├── canvas.json     # manifest: order + ids + per-slide names + one layout + ext
 ├── 000.svg         # Slide 1 — Title   (id "intro")

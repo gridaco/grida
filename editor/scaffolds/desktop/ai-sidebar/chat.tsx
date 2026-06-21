@@ -78,27 +78,39 @@ import {
 // commands — the composer is still the input for its rich-text + paste UX.
 const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
 
+/**
+ * Props for {@link AISidebarChat}. `fs` and `workspaceId` select the fs model
+ * and are MUTUALLY EXCLUSIVE — the type forbids passing both — so the component
+ * is always bound to exactly one (or neither: the empty placeholder state).
+ */
+type AISidebarChatProps = { className?: string } & (
+  | {
+      /**
+       * Renderer-resolved fs for SINGLE-FILE (in-memory) mode: the agent's fs
+       * tool calls resolve against this `AgentFs`, owned by the file-window
+       * shell and bound to the live editor. See
+       * {@link ../file/active-editor-agent-fs}.
+       */
+      fs?: AgentFs;
+      workspaceId?: never;
+    }
+  | {
+      /**
+       * WORKSPACE-bound: the session + run target this workspace, and the agent
+       * gets a server-side fs over its directory — for a `.canvas` deck it sees
+       * `canvas.json` + every slide, resolved server-side. Mirrors
+       * `workbench/agent-pane`.
+       */
+      workspaceId?: string;
+      fs?: never;
+    }
+);
+
 export function AISidebarChat({
   fs,
   workspaceId,
   className,
-}: {
-  /**
-   * Renderer-resolved fs for SINGLE-FILE (in-memory) mode: the agent's fs tool
-   * calls resolve against this `AgentFs`, owned by the file-window shell and
-   * bound to the live editor. Omitted in workspace mode, where fs tools resolve
-   * SERVER-SIDE (see `workspaceId`). See {@link ../file/active-editor-agent-fs}.
-   */
-  fs?: AgentFs;
-  /**
-   * When set, the chat is WORKSPACE-bound: the session + run target this
-   * workspace, and the agent gets a server-side fs over its directory — for a
-   * `.canvas` deck that means it sees `canvas.json` + every slide, resolved
-   * server-side. Mutually exclusive with `fs`. Mirrors `workbench/agent-pane`.
-   */
-  workspaceId?: string;
-  className?: string;
-}) {
+}: AISidebarChatProps) {
   const isWorkspace = !!workspaceId;
   // Chat-session lifecycle: list, pick, hydrate. Scoped to `workspaceId` when
   // workspace-bound (deck mode); unscoped for the single-file in-memory surface.
