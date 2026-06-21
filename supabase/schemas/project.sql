@@ -88,7 +88,7 @@ create table public.user_project_access_state (
 ) TABLESPACE pg_default;
 
 ALTER TABLE public.user_project_access_state ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all based on user_id" ON public.user_project_access_state USING ((user_id = auth.uid())) WITH CHECK (user_id = auth.uid());
+CREATE POLICY "Allow all based on user_id" ON public.user_project_access_state USING ((user_id = (select auth.uid()))) WITH CHECK (user_id = (select auth.uid()));
 
 
 
