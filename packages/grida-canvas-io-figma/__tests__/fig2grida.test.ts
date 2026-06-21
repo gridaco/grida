@@ -100,6 +100,9 @@ describe("fig2grida", () => {
       expect(result.nodeCount).toBeGreaterThan(0);
     });
 
+    // Heaviest community fixture (~8–16s locally, highly variable); the 60s
+    // default is too tight for a contended CI runner. Match the explicit
+    // 120s budget the other heavy fig/REST integration tests use.
     test("converts simple design system .fig", () => {
       const input = new Uint8Array(
         readFileSync(
@@ -110,7 +113,7 @@ describe("fig2grida", () => {
 
       expect(result.pageNames.length).toBeGreaterThan(0);
       expect(result.nodeCount).toBeGreaterThan(0);
-    });
+    }, 120_000);
   });
 
   describe("page filtering", () => {
