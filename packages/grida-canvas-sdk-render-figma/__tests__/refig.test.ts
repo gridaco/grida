@@ -343,6 +343,42 @@ describe("@grida/refig (real render)", () => {
     }
   }, 30_000);
 
+  it("renders from the `GET /v1/files/:key/nodes` response shape", async () => {
+    // The scoped /nodes endpoint returns `{ nodes: { "<id>": { document } } }`
+    // instead of the full-file `{ document: { children: [...] } }` shape. The
+    // requested frame here has children, so the renderer must resolve the
+    // wrapped subtree by id (not just the page roots) — see issue with refig
+    // 0.0.5 throwing "node not found"/"no document pages" on this shape.
+    const nodesResponse = {
+      name: "Test Doc",
+      role: "owner",
+      editorType: "figma",
+      nodes: {
+        "1:1": {
+          document: MINIMAL_REST_FIXTURE.document.children[0].children[0],
+          components: {},
+          componentSets: {},
+          styles: {},
+        },
+      },
+    };
+
+    const renderer = new FigmaRenderer(nodesResponse, {
+      loadFigmaDefaultFonts: false,
+    });
+    try {
+      const result = await renderer.render("1:1", {
+        format: "png",
+        width: 128,
+        height: 128,
+      });
+      expect(result.mimeType).toBe("image/png");
+      expectPng(result.data);
+    } finally {
+      renderer.dispose();
+    }
+  }, 30_000);
+
   it("renders a REST JSON document as SVG", async () => {
     const renderer = new FigmaRenderer(MINIMAL_REST_FIXTURE, {
       loadFigmaDefaultFonts: false,
@@ -627,5 +663,128 @@ describe("@grida/refig (real render)", () => {
     } finally {
       renderer.dispose();
     }
+  }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// reflowAutoLayout — auto-layout HUG frames reflow when text changes
+// ---------------------------------------------------------------------------
+
+describe("@grida/refig reflowAutoLayout", () => {
+  const GEIST = join(
+    __dirname,
+    "../../../fixtures/fonts/Geist/Geist-VariableFont_wght.ttf"
+  );
+
+  // HORIZONTAL HUG "pill" with a single WIDTH_AND_HEIGHT text child, nested in
+  // a fixed root frame. Rendered by the pill's id.
+  function autoLayoutDoc(characters: string) {
+    const text = {
+      id: "1:2",
+      name: "label",
+      type: "TEXT",
+      blendMode: "PASS_THROUGH",
+      absoluteBoundingBox: { x: 30, y: 16, width: 240, height: 52 },
+      constraints: { vertical: "TOP", horizontal: "LEFT" },
+      fills: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }],
+      strokes: [],
+      characters,
+      style: {
+        fontFamily: "Geist",
+        fontWeight: 400,
+        fontSize: 40,
+        textAlignHorizontal: "CENTER",
+        textAlignVertical: "CENTER",
+        lineHeightPx: 52,
+        lineHeightUnit: "PIXELS",
+        textAutoResize: "WIDTH_AND_HEIGHT",
+      },
+      layoutSizingHorizontal: "HUG",
+      layoutSizingVertical: "HUG",
+    };
+    const pill = {
+      id: "1:1",
+      name: "pill",
+      type: "FRAME",
+      blendMode: "PASS_THROUGH",
+      layoutMode: "HORIZONTAL",
+      layoutSizingHorizontal: "HUG",
+      layoutSizingVertical: "HUG",
+      primaryAxisAlignItems: "CENTER",
+      counterAxisAlignItems: "CENTER",
+      paddingLeft: 30,
+      paddingRight: 30,
+      paddingTop: 16,
+      paddingBottom: 16,
+      itemSpacing: 0,
+      absoluteBoundingBox: { x: 0, y: 0, width: 300, height: 92 },
+      constraints: { vertical: "TOP", horizontal: "LEFT" },
+      clipsContent: false,
+      cornerRadius: 20,
+      fills: [{ type: "SOLID", color: { r: 0.9, g: 0.08, b: 0.5, a: 1 } }],
+      strokes: [],
+      children: [text],
+    };
+    return {
+      name: "x",
+      role: "owner",
+      editorType: "figma",
+      document: {
+        id: "0:0",
+        name: "D",
+        type: "DOCUMENT",
+        children: [
+          {
+            id: "0:1",
+            name: "P",
+            type: "CANVAS",
+            backgroundColor: { r: 1, g: 1, b: 1, a: 1 },
+            children: [pill],
+          },
+        ],
+      },
+    };
+  }
+
+  async function renderPillWidth(
+    characters: string,
+    reflowAutoLayout: boolean
+  ): Promise<number> {
+    const geist = new Uint8Array(readFileSync(GEIST));
+    const renderer = new FigmaRenderer(
+      new FigmaDocument(autoLayoutDoc(characters)),
+      {
+        loadFigmaDefaultFonts: false,
+        fonts: { Geist: geist },
+        reflowAutoLayout,
+      }
+    );
+    try {
+      const { data } = await renderer.render("1:1", { format: "png" });
+      expectPng(data);
+      // PNG width = bytes 16..20 (IHDR). The export size tracks the node's
+      // rendered bounds, so this reflects the (possibly reflowed) pill width.
+      return (data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19];
+    } finally {
+      renderer.dispose();
+    }
+  }
+
+  it("grows a HUG pill when the text gets longer (reflow on)", async () => {
+    const short = await renderPillWidth("Hi", true);
+    const long = await renderPillWidth(
+      "A considerably longer label string",
+      true
+    );
+    expect(long).toBeGreaterThan(short + 50);
+  }, 30_000);
+
+  it("keeps baked size regardless of text when reflow is off (default)", async () => {
+    const short = await renderPillWidth("Hi", false);
+    const long = await renderPillWidth(
+      "A considerably longer label string",
+      false
+    );
+    expect(long).toBe(short);
   }, 30_000);
 });

@@ -87,7 +87,13 @@ The package uses trait-based conversion to ensure consistency and maintainabilit
 
 - Component sets not supported
 - FigJam-specific nodes (STICKY, CONNECTOR, TABLE, etc.) not supported
-- Advanced auto-layout properties partially supported
+- Auto-layout: by default every node is emitted absolutely positioned (a
+  faithful snapshot). Pass `prefer_auto_layout: true` to map auto-layout
+  frames to Grida flex containers so they reflow at render time (e.g. a HUG
+  frame grows to fit substituted text). Approximated when enabled: per-child
+  `FILL` keeps its baked size (no per-child flex-grow encode path yet) and
+  cross-axis stretch / `BASELINE` alignment fall back to `start`. REST path
+  only; `.fig`/Kiwi remains snapshot-only.
 - Style and variable bindings not preserved
 - Rich text: `characterStyleOverrides` / `styleOverrideTable` not fully mapped from Kiwi; per-run overrides may be incomplete
 - Kiwi format instability: Figma's internal format is not a public API and may break without notice

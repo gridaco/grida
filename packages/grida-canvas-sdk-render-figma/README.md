@@ -213,6 +213,7 @@ const renderer = new FigmaRenderer(document: FigmaDocument, options?: {
   loadFigmaDefaultFonts?: boolean;  // default: true — Inter, Noto Sans KR/JP/SC, etc.
   images?: Record<string, Uint8Array>;  // image ref → bytes; used for REST API IMAGE fills
   fonts?: Record<string, Uint8Array | Uint8Array[]>;  // font family → bytes (TTF/OTF); one or more files per family
+  reflowAutoLayout?: boolean;       // default: false — see "Auto-layout reflow" below
 });
 
 const result = await renderer.render(nodeId: string, {
@@ -442,6 +443,34 @@ REST JSON ───┘
   (expects `my-figma-export/document.json` and, if present, `my-figma-export/images/` and `my-figma-export/fonts/`.)
 
 For **`.fig`** input, images are embedded in the file; no extra images directory is needed. For **REST** input, use `--images` or a project directory with `images/` to render IMAGE fills correctly.
+
+## Auto-layout reflow
+
+By default refig renders a **faithful snapshot** — every node is placed at the
+exact bounds Figma baked into the response, so the output matches Figma's
+render even if your fonts differ. Substituting different text does **not**
+resize anything; a frame keeps its original dimensions.
+
+Set `reflowAutoLayout: true` to instead map Figma auto-layout frames to flex
+containers and let the engine reflow them. A `HUG` frame then grows/shrinks to
+fit its content, so swapping in longer/shorter text reflows correctly — the key
+feature for templated/dynamic rendering.
+
+```ts
+const renderer = new FigmaRenderer(doc, {
+  fonts: { Inter: interBytes },
+  reflowAutoLayout: true,
+});
+// `render(frameId)` now reflects the measured text, not the baked size.
+```
+
+Notes when enabled:
+
+- Reflow re-measures text with **your** fonts. Provide the design's fonts (via
+  `fonts` / `loadFigmaDefaultFonts`) or the reflow won't match Figma.
+- `FILL` sizing keeps its baked size (no per-child flex-grow yet), and
+  per-child cross-axis stretch / `BASELINE` alignment fall back to `start`.
+- Wired for REST API / JSON input. `.fig` input remains snapshot-only.
 
 ## Known limitations
 

@@ -6,28 +6,29 @@
  *
  * @see https://grida.co/docs/wg/feat-fig/glossary/fig.kiwi — Fig.kiwi format glossary
  *
- * ## TODO — Auto-layout conversion (not implemented)
+ * ## Auto-layout conversion (opt-in via `prefer_auto_layout`)
  *
- * Currently ALL nodes are emitted with `layout_positioning: "absolute"` and
- * `layout_mode: "flow"`. Figma auto-layout properties (`layoutMode`,
- * `layoutAlign`, `layoutGrow`, `primaryAxisAlignItems`,
- * `counterAxisAlignItems`, `layoutPositioning`, sizing modes, `layoutWrap`)
- * are completely dropped during conversion. Positions are always derived
- * from `absoluteBoundingBox` / `relativeTransform`.
+ * By default ALL nodes are emitted with `layout_positioning: "absolute"` and
+ * `layout_mode: "flow"`, derived from `absoluteBoundingBox` /
+ * `relativeTransform` — a faithful, non-reflowing snapshot that is safe for
+ * `skip_layout`.
  *
- * This means:
- * - The output is always safe for `skip_layout` (no flex containers exist)
- * - Auto-layout semantics are lost — re-layout in Grida won't match Figma
- * - Resizing a container won't reflow children as it would in Figma
+ * When `prefer_auto_layout` is set, frames whose `layoutMode` is
+ * HORIZONTAL/VERTICAL become Grida flex containers so the layout engine
+ * reflows children at render time (a HUG frame grows to fit its content):
+ * - `layoutMode` → `layout_mode: "flex"` + `layout_direction`
+ * - `primaryAxisAlignItems` / `counterAxisAlignItems` → main/cross alignment
+ * - `layoutWrap` → `layout_wrap`; padding → `layout_padding_*`; gaps preserved
+ * - in-flow children (`layoutPositioning !== "ABSOLUTE"`) →
+ *   `layout_positioning: "relative"`
+ * - HUG axes (`layoutSizing* === "HUG"`, plus text `textAutoResize`) → `"auto"`
  *
- * To support true auto-layout round-trip:
- * - Map `layoutMode` → `layout_mode: "flex"`
- * - Map `layoutAlign`, `layoutGrow`, `layoutPositioning` per child
- * - Map `primaryAxisAlignItems` / `counterAxisAlignItems` → alignment
- * - Map `primaryAxisSizingMode` / `counterAxisSizingMode` → sizing
- * - Map `layoutWrap` → `layout_wrap`
- * - Only set `layout_positioning: "absolute"` for children with
- *   `layoutPositioning: "ABSOLUTE"` in Figma
+ * Requires layout computation at render time — do NOT combine with
+ * `skip_layout`. Not yet mapped (approximated): per-child `layoutGrow` (FILL on
+ * the main axis — the schema has no per-child flex-grow encode path yet, so
+ * FILL keeps the baked size) and per-child cross-axis stretch / `BASELINE`
+ * alignment (fall back to `start`). Wired for the REST path; the Kiwi/.fig
+ * path is still snapshot-only.
  *
  * ## TODO — Kiwi → REST (not yet fully mapped)
  *
@@ -811,6 +812,35 @@ export namespace iofigma {
         prefer_fixed_text_sizing?: boolean;
 
         /**
+         * When true, map Figma auto-layout frames to Grida flex containers so
+         * the layout engine reflows children at render time. A HUG frame then
+         * grows/shrinks to fit its content (e.g. swapping in longer text grows
+         * the frame), matching Figma's auto-layout — the key feature for
+         * templated/dynamic rendering.
+         *
+         * Specifically, for frames whose `layoutMode` is HORIZONTAL/VERTICAL:
+         * - `layout_mode: "flex"` with direction/alignment/wrap/gap/padding
+         *   mapped from Figma.
+         * - In-flow children (`layoutPositioning !== "ABSOLUTE"`) become
+         *   `layout_positioning: "relative"` so Taffy flows them.
+         * - HUG axes (`layoutSizingHorizontal/Vertical === "HUG"`) become
+         *   `"auto"` so the axis sizes to content.
+         *
+         * Requires layout computation at render time (the renderer default).
+         * Do NOT combine with `skip_layout` — that path trusts baked positions
+         * and would ignore the flex layout.
+         *
+         * **Limitations (approximated):** `FILL` sizing keeps the baked size
+         * (no per-child `flex-grow` in the schema yet) and per-child cross-axis
+         * stretch / `BASELINE` alignment fall back to `start`.
+         *
+         * When false (default), every node is emitted absolutely positioned
+         * from its baked bounding box — a faithful, non-reflowing snapshot.
+         * @default false
+         */
+        prefer_auto_layout?: boolean;
+
+        /**
          * When true, disable faux-list rendering for TEXT nodes.
          *
          * By default (`false`), Figma list metadata (`lineTypes`,
@@ -908,6 +938,31 @@ export namespace iofigma {
         };
       }
 
+      /**
+       * Invert a 2x3 affine matrix `[[a,b,c],[d,e,f]]`.
+       *
+       * Figma's `imageTransform` (present only for `scaleMode: "STRETCH"`, the
+       * editor's CROP fill) maps **container → image** in normalized space — it
+       * selects which sub-region of the image is sampled. Grida's
+       * `ImagePaintFit::Transform` wants the opposite: an **image → container**
+       * placement applied on top of a fill (identity == BoxFit.Fill). So the
+       * Grida transform is the inverse of Figma's matrix. Returns identity if
+       * the matrix is singular.
+       */
+      function invertAffine2x3(
+        m: [[number, number, number], [number, number, number]]
+      ): cmath.Transform {
+        const [[a, b, c], [d, e, f]] = m;
+        const det = a * e - b * d;
+        if (!Number.isFinite(det) || Math.abs(det) < 1e-12) {
+          return cmath.transform.identity;
+        }
+        return [
+          [e / det, -b / det, (b * f - e * c) / det],
+          [-d / det, a / det, (d * c - a * f) / det],
+        ];
+      }
+
       function convertPaint(
         p: figrest.Paint,
         ctx: FactoryContext,
@@ -939,32 +994,47 @@ export namespace iofigma {
             if (src !== _GRIDA_SYSTEM_EMBEDDED_CHECKER && imageRef) {
               imageRefsUsed.add(imageRef);
             }
+            // STRETCH (= editor CROP) carries an `imageTransform` describing the
+            // sampled crop. Route it through Grida's `fit: "transform"` (the only
+            // fit that honors `transform`) with the inverted matrix; otherwise the
+            // crop is silently dropped and the whole image is stretched to fill.
+            const imageTransform = (p as figrest.ImagePaint).imageTransform;
+            const isCrop = p.scaleMode === "STRETCH" && !!imageTransform;
             return {
               type: "image",
               src,
-              fit: p.scaleMode
-                ? p.scaleMode === "FILL"
-                  ? "cover"
-                  : p.scaleMode === "FIT"
-                    ? "contain"
-                    : p.scaleMode === "TILE"
-                      ? "tile"
-                      : "fill"
-                : "cover",
-              transform: p.imageTransform
-                ? [
-                    [
-                      p.imageTransform[0][0],
-                      p.imageTransform[0][1],
-                      p.imageTransform[0][2],
-                    ],
-                    [
-                      p.imageTransform[1][0],
-                      p.imageTransform[1][1],
-                      p.imageTransform[1][2],
-                    ],
-                  ]
-                : cmath.transform.identity,
+              fit: isCrop
+                ? "transform"
+                : p.scaleMode
+                  ? p.scaleMode === "FILL"
+                    ? "cover"
+                    : p.scaleMode === "FIT"
+                      ? "contain"
+                      : p.scaleMode === "TILE"
+                        ? "tile"
+                        : "fill"
+                  : "cover",
+              transform: isCrop
+                ? invertAffine2x3(
+                    imageTransform as [
+                      [number, number, number],
+                      [number, number, number],
+                    ]
+                  )
+                : imageTransform
+                  ? [
+                      [
+                        imageTransform[0][0],
+                        imageTransform[0][1],
+                        imageTransform[0][2],
+                      ],
+                      [
+                        imageTransform[1][0],
+                        imageTransform[1][1],
+                        imageTransform[1][2],
+                      ],
+                    ]
+                  : cmath.transform.identity,
               filters: p.filters
                 ? {
                     exposure: p.filters.exposure ?? 0,
@@ -1118,6 +1188,58 @@ export namespace iofigma {
        * back to `absoluteBoundingBox` for dimensions and computes insets from
        * absolute positions relative to the parent node's absolute bounding box.
        */
+      // ── Figma auto-layout → Grida flex (prefer_auto_layout) ──────────────
+      // REST enum maps. BASELINE has no Grida equivalent → "start".
+      const FIGMA_MAIN_AXIS_ALIGN: Record<string, cg.MainAxisAlignment> = {
+        MIN: "start",
+        CENTER: "center",
+        MAX: "end",
+        SPACE_BETWEEN: "space-between",
+      };
+      const FIGMA_CROSS_AXIS_ALIGN: Record<string, cg.CrossAxisAlignment> = {
+        MIN: "start",
+        CENTER: "center",
+        MAX: "end",
+        BASELINE: "start",
+      };
+
+      type FigmaAutoLayoutNode = {
+        // `string` (not a narrow union) so this structurally accepts every
+        // Figma node type, including ones with extra modes like "GRID".
+        layoutMode?: string;
+        primaryAxisAlignItems?: string;
+        counterAxisAlignItems?: string;
+        layoutWrap?: string;
+        layoutSizingHorizontal?: string;
+        layoutSizingVertical?: string;
+        layoutPositioning?: string;
+      };
+
+      function figmaIsAutoLayout(node: unknown): boolean {
+        const m = (node as FigmaAutoLayoutNode | null | undefined)?.layoutMode;
+        return m === "HORIZONTAL" || m === "VERTICAL";
+      }
+
+      /** A child is in-flow when its auto-layout parent positions it. */
+      function figmaChildInFlow(
+        node: unknown,
+        parent: unknown,
+        preferAutoLayout: boolean | undefined
+      ): boolean {
+        if (!preferAutoLayout || !figmaIsAutoLayout(parent)) return false;
+        return (node as FigmaAutoLayoutNode).layoutPositioning !== "ABSOLUTE";
+      }
+
+      /** Map a Figma axis sizing mode to a Grida dimension. HUG → "auto". */
+      function figmaAxisSize(
+        sizing: string | undefined,
+        fixed: number,
+        preferAutoLayout: boolean | undefined
+      ): number | "auto" {
+        // FILL keeps the baked size (no per-child flex-grow yet); see flag docs.
+        return preferAutoLayout && sizing === "HUG" ? "auto" : fixed;
+      }
+
       function positioning_trait(
         node:
           | (figrest.HasLayoutTrait & Partial<__ir.HasLayoutTraitIR>)
@@ -1131,7 +1253,8 @@ export namespace iofigma {
             },
         parent?: {
           absoluteBoundingBox?: { x: number; y: number } | null;
-        } | null
+        } | null,
+        preferAutoLayout?: boolean
       ): Pick<
         grida.program.nodes.ContainerNode,
         | "layout_positioning"
@@ -1178,13 +1301,40 @@ export namespace iofigma {
           inset_top = 0;
         }
 
+        const width = figmaAxisSize(
+          (node as FigmaAutoLayoutNode).layoutSizingHorizontal,
+          szx,
+          preferAutoLayout
+        );
+        const height = figmaAxisSize(
+          (node as FigmaAutoLayoutNode).layoutSizingVertical,
+          szy,
+          preferAutoLayout
+        );
+        // Aspect ratio is meaningless once an axis hugs content.
+        const aspect_ratio =
+          width === "auto" || height === "auto"
+            ? undefined
+            : layout_target_aspect_ratio;
+
+        // In-flow children of an auto-layout parent are positioned by the flex
+        // engine — emit them as "relative" (no baked insets) so Taffy reflows.
+        if (figmaChildInFlow(node, parent, preferAutoLayout)) {
+          return {
+            layout_positioning: "relative" as const,
+            layout_target_width: width,
+            layout_target_height: height,
+            layout_target_aspect_ratio: aspect_ratio,
+          };
+        }
+
         return {
           layout_positioning: "absolute" as const,
           layout_inset_left: inset_left,
           layout_inset_top: inset_top,
-          layout_target_width: szx,
-          layout_target_height: szy,
-          layout_target_aspect_ratio,
+          layout_target_width: width,
+          layout_target_height: height,
+          layout_target_aspect_ratio: aspect_ratio,
         };
       }
 
@@ -1463,8 +1613,9 @@ export namespace iofigma {
           paddingBottom?: number;
           itemSpacing?: number;
           counterAxisSpacing?: number;
-        },
-        expanded: boolean
+        } & FigmaAutoLayoutNode,
+        expanded: boolean,
+        preferAutoLayout?: boolean
       ) {
         const { paddingLeft, paddingRight, paddingTop, paddingBottom } = node;
         const padding =
@@ -1478,6 +1629,38 @@ export namespace iofigma {
                 layout_padding_bottom: paddingBottom ?? 0,
                 layout_padding_left: paddingLeft ?? 0,
               };
+
+        // Auto-layout → flex. Padding is emitted as the per-side
+        // `layout_padding_*` fields the encoder reads (the legacy `padding`
+        // shorthand is dropped at encode time), and direction/alignment/wrap
+        // are mapped from Figma.
+        if (preferAutoLayout && figmaIsAutoLayout(node)) {
+          return {
+            expanded,
+            layout_padding_top: paddingTop ?? 0,
+            layout_padding_right: paddingRight ?? 0,
+            layout_padding_bottom: paddingBottom ?? 0,
+            layout_padding_left: paddingLeft ?? 0,
+            layout_mode: "flex" as const,
+            layout_direction:
+              node.layoutMode === "VERTICAL"
+                ? ("vertical" as const)
+                : ("horizontal" as const),
+            layout_main_axis_alignment:
+              FIGMA_MAIN_AXIS_ALIGN[node.primaryAxisAlignItems ?? ""] ??
+              "start",
+            layout_cross_axis_alignment:
+              FIGMA_CROSS_AXIS_ALIGN[node.counterAxisAlignItems ?? ""] ??
+              "start",
+            layout_wrap:
+              node.layoutWrap === "WRAP"
+                ? ("wrap" as const)
+                : ("nowrap" as const),
+            layout_main_axis_gap: node.itemSpacing ?? 0,
+            layout_cross_axis_gap:
+              node.counterAxisSpacing ?? node.itemSpacing ?? 0,
+          };
+        }
 
         return {
           expanded,
@@ -1829,6 +2012,89 @@ export namespace iofigma {
          * Processes fill geometries from a node with HasGeometryTrait.
          * Returns array of child node IDs that were successfully created.
          */
+        /**
+         * Build the box-normalized [0,1]² transform `N` equivalent to baking a
+         * node's non-rotational `pathTransform` (flip/skew/rotation 2×2) into its
+         * geometry. `transformSvgPath` bakes the 2×2 into the path coordinates and
+         * re-offsets to the new AABB; gradient/CROP-image fills are specified in
+         * the node's normalized box space and must undergo the *same* mapping or
+         * they stay in the un-baked local frame (e.g. a flipped scrim gradient
+         * renders upside-down — Figma `relativeTransform` scaleY = −1).
+         *
+         * Maps an original normalized point `u` → baked normalized point:
+         *   pixel  = (a·ux·w + c·uy·h, b·ux·w + d·uy·h)
+         *   baked  = (pixel − aabbMin) / aabbSize
+         * Returns `null` for an identity 2×2 or a degenerate AABB.
+         */
+        function boxNormalizedTransform(
+          pt: { a: number; c: number; b: number; d: number },
+          w: number,
+          h: number
+        ): cmath.Transform | null {
+          const { a, c, b, d } = pt;
+          const isIdentity =
+            Math.abs(a - 1) < 1e-6 &&
+            Math.abs(d - 1) < 1e-6 &&
+            Math.abs(b) < 1e-6 &&
+            Math.abs(c) < 1e-6;
+          if (isIdentity || !(w > 0) || !(h > 0)) return null;
+          // AABB of the transformed local box corners (origin at 0,0).
+          const xs = [0, a * w, c * h, a * w + c * h];
+          const ys = [0, b * w, d * h, b * w + d * h];
+          const minX = Math.min(...xs),
+            minY = Math.min(...ys);
+          const aabbW = Math.max(...xs) - minX;
+          const aabbH = Math.max(...ys) - minY;
+          if (!(aabbW > 0) || !(aabbH > 0)) return null;
+          return [
+            [(a * w) / aabbW, (c * h) / aabbW, -minX / aabbW],
+            [(b * w) / aabbH, (d * h) / aabbH, -minY / aabbH],
+          ];
+        }
+
+        /** Compose two 2×3 affines: returns `n ∘ t` (apply `t`, then `n`). */
+        function composeAffine(
+          n: cmath.Transform,
+          t: cmath.Transform
+        ): cmath.Transform {
+          const [[na, nb, nc], [nd, ne, nf]] = n;
+          const [[ta, tb, tc], [td, te, tf]] = t;
+          return [
+            [na * ta + nb * td, na * tb + nb * te, na * tc + nb * tf + nc],
+            [nd * ta + ne * td, nd * tb + ne * te, nd * tc + ne * tf + nf],
+          ];
+        }
+
+        /**
+         * Pre-multiply the box-normalized transform `n` onto any gradient or
+         * transform-fit image paint on `gridaNode`, so fills stay aligned with a
+         * geometry that had its `pathTransform` baked in. SOLID/COVER/etc. paints
+         * are box-fit and unaffected.
+         */
+        function applyBoxTransformToFills(
+          gridaNode: unknown,
+          n: cmath.Transform
+        ): void {
+          const paints = (gridaNode as { fill_paints?: cg.Paint[] })
+            .fill_paints;
+          if (!paints) return;
+          for (const paint of paints) {
+            if (
+              paint.type === "linear_gradient" ||
+              paint.type === "radial_gradient" ||
+              paint.type === "sweep_gradient" ||
+              paint.type === "diamond_gradient" ||
+              (paint.type === "image" && paint.fit === "transform")
+            ) {
+              const t = (paint as { transform?: cmath.Transform }).transform;
+              if (t) {
+                (paint as { transform: cmath.Transform }).transform =
+                  composeAffine(n, t);
+              }
+            }
+          }
+        }
+
         function processFillGeometries(
           node: InputNode & figrest.HasGeometryTrait,
           parentGridaId: string,
@@ -1843,6 +2109,15 @@ export namespace iofigma {
           if (!node.fillGeometry?.length) return [];
 
           const childIds: string[] = [];
+          const sizeForFill = "size" in node ? node.size : undefined;
+          const fillN =
+            pathTransform && sizeForFill
+              ? boxNormalizedTransform(
+                  pathTransform,
+                  sizeForFill.x,
+                  sizeForFill.y
+                )
+              : null;
 
           node.fillGeometry.forEach((geometry, idx) => {
             const childId = `${parentGridaId}_fill_${idx}`;
@@ -1887,6 +2162,7 @@ export namespace iofigma {
                 );
 
             if (childNode) {
+              if (fillN) applyBoxTransformToFills(childNode, fillN);
               nodes[childId] = childNode;
               childIds.push(childId);
             }
@@ -2699,7 +2975,7 @@ export namespace iofigma {
                 opacity: 1,
                 blendMode: "PASS_THROUGH",
               }),
-              ...positioning_trait(node, parent),
+              ...positioning_trait(node, parent, context.prefer_auto_layout),
               ...fills_trait(node.fills ?? [], context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...rectangular_stroke_width_trait(node),
@@ -2721,7 +2997,7 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node, parent),
+              ...positioning_trait(node, parent, context.prefer_auto_layout),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...rectangular_stroke_width_trait(node),
@@ -2729,7 +3005,7 @@ export namespace iofigma {
                 overflow: node.clipsContent ? "clip" : undefined,
               }),
               ...corner_radius_trait(node),
-              ...container_layout_trait(node, true),
+              ...container_layout_trait(node, true, context.prefer_auto_layout),
               ...effects_trait(node.effects),
               type: "container",
               // In Figma, FRAME/COMPONENT/INSTANCE clip by default unless explicitly disabled
@@ -2765,13 +3041,18 @@ export namespace iofigma {
             return {
               id: gridaId,
               ...base_node_trait(node),
-              ...positioning_trait(node, parent),
+              ...positioning_trait(node, parent, context.prefer_auto_layout),
               type: "group",
               transform: groupTransform,
             } satisfies grida.program.nodes.GroupNode;
           }
           case "TEXT": {
-            const figma_text_resizing_model = node.style.textAutoResize;
+            // `textAutoResize` is canonically under `style`, but some payloads
+            // (and the published repro) carry it at the node top level — accept
+            // both.
+            const figma_text_resizing_model =
+              node.style.textAutoResize ??
+              (node as { textAutoResize?: string }).textAutoResize;
             const figma_constraints_horizontal = node.constraints?.horizontal;
             const figma_constraints_vertical = node.constraints?.vertical;
 
@@ -2830,25 +3111,48 @@ export namespace iofigma {
               ? map.textAlignVerticalMap[node.style.textAlignVertical]
               : "top";
 
-            // Shared layout properties for text nodes
-            const textLayoutProps = {
-              layout_positioning: "absolute" as const,
-              layout_inset_left: constraints.left,
-              layout_inset_top: constraints.top,
-              layout_inset_right: constraints.right,
-              layout_inset_bottom: constraints.bottom,
-              layout_target_width:
-                !context.prefer_fixed_text_sizing &&
-                figma_text_resizing_model === "WIDTH_AND_HEIGHT"
-                  ? ("auto" as const)
-                  : fixedwidth,
-              layout_target_height:
-                !context.prefer_fixed_text_sizing &&
-                (figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
-                  figma_text_resizing_model === "HEIGHT")
-                  ? ("auto" as const)
-                  : fixedheight,
-            };
+            // Shared layout properties for text nodes. A text node in an
+            // auto-layout parent also hugs via node-level `layoutSizing*`, so
+            // treat HUG on an axis as auto (so the flex engine re-measures it).
+            const textHugW =
+              context.prefer_auto_layout &&
+              (node as FigmaAutoLayoutNode).layoutSizingHorizontal === "HUG";
+            const textHugH =
+              context.prefer_auto_layout &&
+              (node as FigmaAutoLayoutNode).layoutSizingVertical === "HUG";
+            const textWidth =
+              !context.prefer_fixed_text_sizing &&
+              (figma_text_resizing_model === "WIDTH_AND_HEIGHT" || textHugW)
+                ? ("auto" as const)
+                : fixedwidth;
+            const textHeight =
+              !context.prefer_fixed_text_sizing &&
+              (figma_text_resizing_model === "WIDTH_AND_HEIGHT" ||
+                figma_text_resizing_model === "HEIGHT" ||
+                textHugH)
+                ? ("auto" as const)
+                : fixedheight;
+            // In an auto-layout parent, the text node flows ("relative") so the
+            // flex engine positions it and the container hugs/grows around it.
+            const textLayoutProps = figmaChildInFlow(
+              node,
+              parent,
+              context.prefer_auto_layout
+            )
+              ? {
+                  layout_positioning: "relative" as const,
+                  layout_target_width: textWidth,
+                  layout_target_height: textHeight,
+                }
+              : {
+                  layout_positioning: "absolute" as const,
+                  layout_inset_left: constraints.left,
+                  layout_inset_top: constraints.top,
+                  layout_inset_right: constraints.right,
+                  layout_inset_bottom: constraints.bottom,
+                  layout_target_width: textWidth,
+                  layout_target_height: textHeight,
+                };
 
             // Helper to convert a REST-format style object into a Grida ITextStyle
             const restStyleToGrida = (
@@ -3068,7 +3372,7 @@ export namespace iofigma {
                 id: gridaId,
                 ...base_node_trait(node),
                 ...mask_trait(node),
-                ...positioning_trait(node, parent),
+                ...positioning_trait(node, parent, context.prefer_auto_layout),
                 type: "group",
               } satisfies grida.program.nodes.GroupNode;
             }
@@ -3077,7 +3381,7 @@ export namespace iofigma {
                 id: gridaId,
                 ...base_node_trait(node),
                 ...mask_trait(node),
-                ...positioning_trait(node, parent),
+                ...positioning_trait(node, parent, context.prefer_auto_layout),
                 ...fills_trait(node.fills, context, imageRefsUsed),
                 ...stroke_trait(node, context, imageRefsUsed),
                 ...rectangular_stroke_width_trait(node),
@@ -3090,7 +3394,7 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...mask_trait(node),
-              ...positioning_trait(node, parent),
+              ...positioning_trait(node, parent, context.prefer_auto_layout),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...arc_data_trait(node),
@@ -3112,7 +3416,7 @@ export namespace iofigma {
                 id: gridaId,
                 ...base_node_trait(node),
                 ...mask_trait(node),
-                ...positioning_trait(node, parent),
+                ...positioning_trait(node, parent, context.prefer_auto_layout),
                 type: "group",
               } satisfies grida.program.nodes.GroupNode;
             }
@@ -3120,7 +3424,7 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...mask_trait(node),
-              ...positioning_trait(node, parent),
+              ...positioning_trait(node, parent, context.prefer_auto_layout),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
@@ -3193,7 +3497,11 @@ export namespace iofigma {
                     id: gridaId,
                     ...base_node_trait(node),
                     ...mask_trait(node),
-                    ...positioning_trait(node, parent),
+                    ...positioning_trait(
+                      node,
+                      parent,
+                      context.prefer_auto_layout
+                    ),
                     ...fills_trait(node.fills, context, imageRefsUsed),
                     ...stroke_trait(node, context, imageRefsUsed),
                     ...corner_radius_trait(node),
@@ -3212,7 +3520,7 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...mask_trait(node),
-              ...positioning_trait(node, parent),
+              ...positioning_trait(node, parent, context.prefer_auto_layout),
               type: "group",
             } satisfies grida.program.nodes.GroupNode;
           }
@@ -3234,7 +3542,7 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...mask_trait(node),
-              ...positioning_trait(node, parent),
+              ...positioning_trait(node, parent, context.prefer_auto_layout),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...corner_radius_trait(node),
@@ -3248,7 +3556,7 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...mask_trait(node),
-              ...positioning_trait(node, parent),
+              ...positioning_trait(node, parent, context.prefer_auto_layout),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),
@@ -3262,7 +3570,7 @@ export namespace iofigma {
               id: gridaId,
               ...base_node_trait(node),
               ...mask_trait(node),
-              ...positioning_trait(node, parent),
+              ...positioning_trait(node, parent, context.prefer_auto_layout),
               ...fills_trait(node.fills, context, imageRefsUsed),
               ...stroke_trait(node, context, imageRefsUsed),
               ...effects_trait(node.effects),

@@ -13,6 +13,7 @@
 import { iofigma } from "../lib";
 import type * as figrest from "@figma/rest-api-spec";
 import type grida from "@grida/schema";
+import type cg from "@grida/cg";
 
 const context: iofigma.restful.factory.FactoryContext = {
   gradient_id_generator: () => "grad-1",
@@ -490,6 +491,343 @@ describe("iofigma.restful.factory – REST API without geometry=paths", () => {
       expect(containerGrida!.rectangular_stroke_width_right).toBeUndefined();
       expect(containerGrida!.rectangular_stroke_width_bottom).toBeUndefined();
       expect(containerGrida!.rectangular_stroke_width_left).toBeUndefined();
+    });
+  });
+
+  describe("per-fill opacity (SOLID)", () => {
+    function rectWithFill(fill: figrest.Paint): figrest.RectangleNode {
+      return {
+        id: "1:2",
+        name: "Rect",
+        type: "RECTANGLE",
+        scrollBehavior: "SCROLLS",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        fills: [fill],
+        strokes: [],
+        strokeWeight: 1,
+        strokeAlign: "INSIDE",
+        effects: [],
+        cornerRadius: 0,
+        exportSettings: [],
+        interactions: [],
+      } as unknown as figrest.RectangleNode;
+    }
+
+    function solidFillOf(node: figrest.RectangleNode) {
+      const { document: doc } = iofigma.restful.factory.document(
+        node,
+        {},
+        context
+      );
+      const rect = Object.values(doc.nodes).find(
+        (n): n is grida.program.nodes.RectangleNode => n.type === "rectangle"
+      )!;
+      const paints = (rect as unknown as { fill_paints?: unknown[] })
+        .fill_paints;
+      const paint = (paints?.[0] ??
+        (rect as unknown as { fill?: unknown }).fill) as cg.SolidPaint;
+      return paint;
+    }
+
+    // The renderer has no separate opacity channel for SOLID paints, so the
+    // per-fill `opacity` must be baked into the color's alpha. Otherwise it is
+    // silently dropped (the symptom reported against refig 0.0.5).
+    it("bakes per-fill opacity into the SOLID color alpha", () => {
+      const paint = solidFillOf(
+        rectWithFill({
+          type: "SOLID",
+          opacity: 0.1,
+          color: { r: 1, g: 1, b: 1, a: 1 },
+          blendMode: "NORMAL",
+          visible: true,
+        } as figrest.Paint)
+      );
+      expect(paint.type).toBe("solid");
+      expect(paint.color.a).toBeCloseTo(0.1, 5);
+    });
+
+    it("multiplies per-fill opacity with the color's own alpha", () => {
+      const paint = solidFillOf(
+        rectWithFill({
+          type: "SOLID",
+          opacity: 0.5,
+          color: { r: 1, g: 1, b: 1, a: 0.4 },
+          blendMode: "NORMAL",
+          visible: true,
+        } as figrest.Paint)
+      );
+      expect(paint.color.a).toBeCloseTo(0.2, 5);
+    });
+
+    it("defaults to the color alpha when opacity is absent", () => {
+      const paint = solidFillOf(
+        rectWithFill({
+          type: "SOLID",
+          color: { r: 1, g: 1, b: 1, a: 1 },
+          blendMode: "NORMAL",
+          visible: true,
+        } as figrest.Paint)
+      );
+      expect(paint.color.a).toBeCloseTo(1, 5);
+    });
+  });
+
+  describe("IMAGE scaleMode CROP (STRETCH) imageTransform", () => {
+    function rectWithFill(fill: figrest.Paint): figrest.RectangleNode {
+      return {
+        id: "1:2",
+        name: "Rect",
+        type: "RECTANGLE",
+        scrollBehavior: "SCROLLS",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+        absoluteRenderBounds: { x: 0, y: 0, width: 100, height: 100 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        fills: [fill],
+        strokes: [],
+        strokeWeight: 1,
+        strokeAlign: "INSIDE",
+        effects: [],
+        cornerRadius: 0,
+        exportSettings: [],
+        interactions: [],
+      } as unknown as figrest.RectangleNode;
+    }
+
+    function imageFillOf(node: figrest.RectangleNode) {
+      const { document: doc } = iofigma.restful.factory.document(
+        node,
+        {},
+        context
+      );
+      const rect = Object.values(doc.nodes).find(
+        (n): n is grida.program.nodes.RectangleNode => n.type === "rectangle"
+      )!;
+      const paints = (rect as unknown as { fill_paints?: unknown[] })
+        .fill_paints;
+      return (paints?.[0] ??
+        (rect as unknown as { fill?: unknown }).fill) as cg.ImagePaint;
+    }
+
+    // Figma's `imageTransform` (only present for scaleMode STRETCH = editor
+    // CROP) maps container -> image (the sampled crop). Grida's only fit that
+    // honors a transform is "transform", and it expects image -> container, so
+    // the matrix must be inverted. Otherwise the crop is dropped and the whole
+    // image is stretched to fill (the refig 0.0.5 symptom).
+    it("routes STRETCH+imageTransform to fit:transform with the inverse matrix", () => {
+      const paint = imageFillOf(
+        rectWithFill({
+          type: "IMAGE",
+          scaleMode: "STRETCH",
+          imageRef: "ref-1",
+          // pure vertical scale 0.5 + y-translate 0.1
+          imageTransform: [
+            [1, 0, 0],
+            [0, 0.5, 0.1],
+          ],
+          blendMode: "NORMAL",
+          visible: true,
+        } as unknown as figrest.Paint)
+      );
+      expect(paint.type).toBe("image");
+      expect(paint.fit).toBe("transform");
+      // inverse of [[1,0,0],[0,0.5,0.1]] = [[1,0,0],[0,2,-0.2]]
+      expect(paint.transform![0][0]).toBeCloseTo(1, 6);
+      expect(paint.transform![0][1]).toBeCloseTo(0, 6);
+      expect(paint.transform![0][2]).toBeCloseTo(0, 6);
+      expect(paint.transform![1][0]).toBeCloseTo(0, 6);
+      expect(paint.transform![1][1]).toBeCloseTo(2, 6);
+      expect(paint.transform![1][2]).toBeCloseTo(-0.2, 6);
+    });
+
+    it("keeps fit:cover for FILL (no crop routing)", () => {
+      const paint = imageFillOf(
+        rectWithFill({
+          type: "IMAGE",
+          scaleMode: "FILL",
+          imageRef: "ref-1",
+          blendMode: "NORMAL",
+          visible: true,
+        } as unknown as figrest.Paint)
+      );
+      expect(paint.fit).toBe("cover");
+    });
+
+    it("falls back to fit:fill for STRETCH without an imageTransform", () => {
+      const paint = imageFillOf(
+        rectWithFill({
+          type: "IMAGE",
+          scaleMode: "STRETCH",
+          imageRef: "ref-1",
+          blendMode: "NORMAL",
+          visible: true,
+        } as unknown as figrest.Paint)
+      );
+      expect(paint.fit).toBe("fill");
+    });
+  });
+
+  describe("flipped node bakes transform into gradient fill", () => {
+    // A vertically-flipped rectangle (relativeTransform scaleY = -1, the way
+    // Figma encodes a flipped scrim) with a vertical linear gradient. The flip
+    // is baked into the path geometry; the gradient must be flipped with it,
+    // otherwise it renders upside-down (the refig 0.0.5 symptom on the photo
+    // darkening band). Requires geometry (fillGeometry) → prefer_path_for_geometry.
+    function flippedGradientRect(): figrest.RectangleNode {
+      return {
+        id: "1:2",
+        name: "Scrim",
+        type: "RECTANGLE",
+        scrollBehavior: "SCROLLS",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 0, y: 0, width: 100, height: 100 },
+        size: { x: 100, y: 100 },
+        // vertical flip: scaleY = -1, ty = 100
+        relativeTransform: [
+          [1, 0, 0],
+          [0, -1, 100],
+        ],
+        fillGeometry: [
+          { path: "M0 0L100 0L100 100L0 100Z", windingRule: "NONZERO" },
+        ],
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        fills: [
+          {
+            type: "GRADIENT_LINEAR",
+            blendMode: "NORMAL",
+            // start top, end bottom (local space)
+            gradientHandlePositions: [
+              { x: 0.5, y: 0 },
+              { x: 0.5, y: 1 },
+              { x: 0, y: 0 },
+            ],
+            gradientStops: [
+              { color: { r: 0, g: 0, b: 0, a: 0 }, position: 0 },
+              { color: { r: 0, g: 0, b: 0, a: 0.5 }, position: 1 },
+            ],
+          } as figrest.Paint,
+        ],
+        strokes: [],
+        strokeWeight: 1,
+        strokeAlign: "INSIDE",
+      } as unknown as figrest.RectangleNode;
+    }
+
+    it("composes the flip into the gradient transform", () => {
+      const { document: doc } = iofigma.restful.factory.document(
+        flippedGradientRect(),
+        {},
+        { ...context, gradient_id_generator: () => "g1" }
+      );
+      // geometry path node carrying the fill
+      const path = Object.values(doc.nodes).find(
+        (n): n is grida.program.nodes.PathNode =>
+          n.type === "path" &&
+          Array.isArray((n as { fill_paints?: unknown[] }).fill_paints)
+      )!;
+      const grad = (path as unknown as { fill_paints: cg.Paint[] })
+        .fill_paints[0] as cg.LinearGradientPaint;
+      expect(grad.type).toBe("linear_gradient");
+      // Base transform for A=(.5,0)->B=(.5,1) is [[0,-1,1],[1,0,0]]. The
+      // vertical flip N=[[1,0,0],[0,-1,1]] composes to [[0,-1,1],[-1,0,1]],
+      // which moves the dark stop to the top — matching Figma's render.
+      const t = grad.transform!;
+      expect(t[0][0]).toBeCloseTo(0, 5);
+      expect(t[0][1]).toBeCloseTo(-1, 5);
+      expect(t[0][2]).toBeCloseTo(1, 5);
+      expect(t[1][0]).toBeCloseTo(-1, 5);
+      expect(t[1][1]).toBeCloseTo(0, 5);
+      expect(t[1][2]).toBeCloseTo(1, 5);
+    });
+  });
+
+  describe("auto-layout → flex (prefer_auto_layout)", () => {
+    // A HORIZONTAL HUG auto-layout frame with one HUG text child.
+    function autoLayoutFrame(): figrest.FrameNode {
+      const text = {
+        id: "1:2",
+        name: "Label",
+        type: "TEXT",
+        scrollBehavior: "SCROLLS",
+        blendMode: "PASS_THROUGH",
+        absoluteBoundingBox: { x: 30, y: 16, width: 80, height: 40 },
+        constraints: { vertical: "TOP", horizontal: "LEFT" },
+        fills: [],
+        strokes: [],
+        characters: "Hi",
+        style: {
+          fontFamily: "Inter",
+          fontSize: 40,
+          textAlignHorizontal: "CENTER",
+          textAutoResize: "WIDTH_AND_HEIGHT",
+        },
+        layoutSizingHorizontal: "HUG",
+        layoutSizingVertical: "HUG",
+      } as unknown as figrest.SubcanvasNode;
+      return makeFrameNodeWithoutGeometry({
+        id: "1:1",
+        name: "Pill",
+        layoutMode: "HORIZONTAL",
+        layoutSizingHorizontal: "HUG",
+        layoutSizingVertical: "HUG",
+        primaryAxisAlignItems: "CENTER",
+        counterAxisAlignItems: "CENTER",
+        paddingLeft: 30,
+        paddingRight: 30,
+        paddingTop: 16,
+        paddingBottom: 16,
+        itemSpacing: 8,
+        children: [text],
+      } as Partial<figrest.FrameNode>);
+    }
+
+    function convert(preferAutoLayout: boolean) {
+      const { document: doc } = iofigma.restful.factory.document(
+        autoLayoutFrame(),
+        {},
+        { ...context, prefer_auto_layout: preferAutoLayout }
+      );
+      const frame = Object.values(doc.nodes).find(
+        (n): n is grida.program.nodes.ContainerNode =>
+          n.type === "container" && n.name === "Pill"
+      )!;
+      const text = Object.values(doc.nodes).find(
+        (n) => n.name === "Label"
+      ) as unknown as grida.program.nodes.i.ILayoutChildTrait &
+        grida.program.nodes.i.ICSSDimension;
+      return { frame, text };
+    }
+
+    it("maps a HORIZONTAL HUG frame to a flex container", () => {
+      const { frame } = convert(true);
+      expect(frame.layout_mode).toBe("flex");
+      expect(frame.layout_direction).toBe("horizontal");
+      expect(frame.layout_main_axis_alignment).toBe("center");
+      expect(frame.layout_cross_axis_alignment).toBe("center");
+      expect(frame.layout_main_axis_gap).toBe(8);
+      // HUG axes size to content.
+      expect(frame.layout_target_width).toBe("auto");
+      expect(frame.layout_target_height).toBe("auto");
+      // Padding is emitted as the per-side fields the encoder reads.
+      expect(frame.layout_padding_left).toBe(30);
+      expect(frame.layout_padding_top).toBe(16);
+    });
+
+    it("flows in-flow children as relative + auto-sized", () => {
+      const { text } = convert(true);
+      expect(text.layout_positioning).toBe("relative");
+      expect(text.layout_target_width).toBe("auto");
+      expect(text.layout_target_height).toBe("auto");
+    });
+
+    it("stays a flow container with absolute children when disabled", () => {
+      const { frame, text } = convert(false);
+      expect(frame.layout_mode).toBe("flow");
+      expect(typeof frame.layout_target_width).toBe("number");
+      expect(text.layout_positioning).toBe("absolute");
     });
   });
 });

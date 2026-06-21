@@ -518,7 +518,8 @@ function restJsonToMergedDocument(
   images: Record<string, Uint8Array> | undefined,
   placeholderForMissing: boolean,
   preserveFigmaIds?: boolean,
-  preferFixedTextSizing?: boolean
+  preferFixedTextSizing?: boolean,
+  preferAutoLayout?: boolean
 ): MergedDocument {
   const rawCanvases = extractCanvases(json);
 
@@ -530,6 +531,7 @@ function restJsonToMergedDocument(
     placeholder_for_missing_images: placeholderForMissing,
     preserve_figma_ids: preserveFigmaIds,
     prefer_fixed_text_sizing: preferFixedTextSizing,
+    prefer_auto_layout: preferAutoLayout,
     node_id_generator: preserveFigmaIds
       ? undefined
       : makeIdGenerator("rest-import"),
@@ -594,6 +596,7 @@ export interface RestJsonToGridaOptions extends Pick<
   | "prefer_fixed_text_sizing"
   | "preserve_figma_ids"
   | "placeholder_for_missing_images"
+  | "prefer_auto_layout"
 > {
   /**
    * Image hashes from Figma `images` metadata to raw bytes. When provided,
@@ -647,6 +650,7 @@ export function restJsonToGridaDocument(
       placeholder_for_missing_images: placeholderForMissing,
       preserve_figma_ids: preserveFigmaIds,
       prefer_fixed_text_sizing: options?.prefer_fixed_text_sizing,
+      prefer_auto_layout: options?.prefer_auto_layout,
       node_id_generator: preserveFigmaIds
         ? undefined
         : () => {
@@ -692,7 +696,8 @@ export function restJsonToGridaDocument(
     images,
     placeholderForMissing,
     preserveFigmaIds,
-    options?.prefer_fixed_text_sizing
+    options?.prefer_fixed_text_sizing,
+    options?.prefer_auto_layout
   );
 
   return {
@@ -899,35 +904,53 @@ type RestNode = Record<string, unknown> & {
 /**
  * Find a node by id in a Figma REST JSON document tree (walks all pages and
  * descendants).
+ *
+ * Accepts the same response shapes as {@link extractCanvases}, notably the
+ * `GET /v1/files/:key/nodes` shape (`{ nodes: { "<id>": { document, … } } }`),
+ * where each `nodes[id].document` is itself a candidate root (it may be the
+ * target node or contain it). Without this, scoping a render to a node fetched
+ * via `/nodes` throws "node not found".
  */
 export function findNodeInRestJson(
   json: unknown,
   nodeId: string
 ): RestNode | undefined {
-  const doc = json as { document?: { children?: RestNode[] } };
-  const pages = doc?.document?.children;
-  if (!pages?.length) return undefined;
-
-  function walk(nodes: RestNode[]): RestNode | undefined {
-    for (const node of nodes) {
-      if (String(node.id) === nodeId) return node;
-      const children = node.children as RestNode[] | undefined;
-      if (children?.length) {
-        const found = walk(children);
+  // Shape-agnostic search: descend through the `nodes` map (`/nodes` response),
+  // the `document` wrapper, and `children`. Matching the node itself (not just
+  // its descendants) is required for the `/nodes` shape, where the requested id
+  // is the fetched entry's `document` root — including frames that have
+  // children, which a page-children-only walk would miss.
+  function search(value: unknown): RestNode | undefined {
+    if (!value || typeof value !== "object") return undefined;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = search(item);
         if (found) return found;
       }
+      return undefined;
+    }
+    const node = value as RestNode & { document?: unknown; nodes?: unknown };
+    // Only match real Figma nodes (every node carries a `type`), so we never
+    // mistake a wrapper object that happens to have an `id` for the target.
+    if (String(node.id) === nodeId && typeof node.type === "string") {
+      return node;
+    }
+    if (node.children) {
+      const found = search(node.children);
+      if (found) return found;
+    }
+    if (node.document) {
+      const found = search(node.document);
+      if (found) return found;
+    }
+    if (node.nodes && typeof node.nodes === "object") {
+      const found = search(Object.values(node.nodes));
+      if (found) return found;
     }
     return undefined;
   }
 
-  for (const page of pages) {
-    const pageChildren = page.children as RestNode[] | undefined;
-    if (pageChildren?.length) {
-      const found = walk(pageChildren);
-      if (found) return found;
-    }
-  }
-  return undefined;
+  return search(json);
 }
 
 /**

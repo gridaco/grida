@@ -70,6 +70,21 @@ export interface RefigRendererOptions {
    * those are loaded by `loadFigmaDefaultFonts`.
    */
   fonts?: Record<string, Uint8Array | Uint8Array[]>;
+
+  /**
+   * When true, map Figma auto-layout frames to flex containers and let the
+   * renderer reflow them, instead of rendering the baked snapshot geometry.
+   * A HUG auto-layout frame then grows/shrinks to fit its content — so
+   * substituting longer/shorter text reflows correctly (templated rendering).
+   *
+   * Only affects REST API / `.fig` documents with auto-layout frames. When
+   * false (default), the render is a faithful snapshot of Figma's baked
+   * bounds. See `prefer_auto_layout` in `@grida/io-figma` for the precise
+   * mapping and limitations (FILL sizing and per-child cross-axis stretch are
+   * approximated).
+   * @default false
+   */
+  reflowAutoLayout?: boolean;
 }
 
 export interface RefigRenderOptions {
@@ -167,11 +182,16 @@ export class FigmaDocument {
    */
   _resolve(
     rootNodeId?: string,
-    images?: Record<string, Uint8Array>
+    images?: Record<string, Uint8Array>,
+    preferAutoLayout?: boolean
   ): ResolvedScene {
-    const cacheKey = rootNodeId ?? "";
+    // prefer_auto_layout changes the resolved geometry, so it is part of the
+    // cache identity.
+    const cacheKey = `${rootNodeId ?? ""}|${preferAutoLayout ? 1 : 0}`;
 
     if (this.sourceType === "fig-file") {
+      // Auto-layout reflow is wired for the REST import path only; .fig imports
+      // remain faithful-snapshot regardless of preferAutoLayout.
       const cached = this._sceneCacheGet(cacheKey);
       if (cached) return cached;
       const resolved = this._figToScene(rootNodeId);
@@ -182,12 +202,16 @@ export class FigmaDocument {
     if (images == null || Object.keys(images).length === 0) {
       const cached = this._sceneCacheGet(cacheKey);
       if (cached) return cached;
-      const resolved = this._restToScene(rootNodeId);
+      const resolved = this._restToScene(
+        rootNodeId,
+        undefined,
+        preferAutoLayout
+      );
       this._sceneCacheSet(cacheKey, resolved);
       return resolved;
     }
 
-    return this._restToScene(rootNodeId, images);
+    return this._restToScene(rootNodeId, images, preferAutoLayout);
   }
 
   private _sceneCacheGet(key: string): ResolvedScene | undefined {
@@ -209,13 +233,15 @@ export class FigmaDocument {
   /** @internal */
   private _restToScene(
     rootNodeId?: string,
-    images?: Record<string, Uint8Array>
+    images?: Record<string, Uint8Array>,
+    preferAutoLayout?: boolean
   ): ResolvedScene {
     const result = restJsonToGridaDocument(this.payload as FigmaJsonDocument, {
       images,
       rootNodeId,
       preserve_figma_ids: true,
       placeholder_for_missing_images: false,
+      prefer_auto_layout: preferAutoLayout,
     });
     return gridaDocumentResultToResolvedScene(result);
   }
@@ -624,7 +650,8 @@ export class FigmaRenderer {
 
     const resolved = this.document._resolve(
       nodeId || undefined,
-      this.options.images
+      this.options.images,
+      this.options.reflowAutoLayout
     );
     for (const [ref, bytes] of Object.entries(resolved.images)) {
       canvas.addImageWithId(bytes, `res://images/${ref}`);
