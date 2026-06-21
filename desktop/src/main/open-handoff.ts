@@ -28,6 +28,10 @@ import path from "node:path";
 
 const DEEP_LINK_SCHEME = "grida://";
 const SUPPORTED_FILE_EXTENSIONS = new Set([".svg", ".grida"]);
+/** A `.canvas` is a directory (a macOS package), not a file — routed to the
+ * slides editor rather than the single-document/docId flow. Recognized by the
+ * suffix, which the bundle declaration guarantees. */
+const CANVAS_BUNDLE_EXTENSION = ".canvas";
 
 // Tagged envelope: `additionalData` is `Record<any, any>`, so the primary
 // must be able to tell our forward from an arbitrary payload. The version
@@ -48,6 +52,12 @@ export namespace open_handoff {
     return SUPPORTED_FILE_EXTENSIONS.has(path.extname(filePath).toLowerCase());
   }
 
+  /** Does this path look like a `.canvas` bundle (a directory opened as a deck)?
+   * Suffix-only; the OS hands us the package path on a Finder open. */
+  export function isCanvasBundle(filePath: string): boolean {
+    return path.extname(filePath).toLowerCase() === CANVAS_BUNDLE_EXTENSION;
+  }
+
   /**
    * Classify command-line arguments into opens (Windows/Linux file
    * associations + `grida://` deep links). Content-based, not
@@ -60,7 +70,8 @@ export namespace open_handoff {
     for (const arg of argv) {
       if (arg.startsWith(DEEP_LINK_SCHEME))
         opens.push({ kind: "url", url: arg });
-      else if (isSupportedFile(arg)) opens.push({ kind: "file", path: arg });
+      else if (isSupportedFile(arg) || isCanvasBundle(arg))
+        opens.push({ kind: "file", path: arg });
     }
     return opens;
   }

@@ -28,10 +28,12 @@
 import { useCallback, useMemo } from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { AlertTriangleIcon } from "lucide-react";
+import { iocanvas } from "@grida/io-canvas";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { EditorPaneSvgEditor } from "./editor-pane-svg-editor";
 import { EditorPaneCodeEditor } from "./editor-pane-code-editor";
+import { DesktopCanvasShell } from "../canvas/canvas-shell";
 import { ImageViewer, VideoViewer } from "./editor-pane-viewers";
 
 export type EditorPaneTabProps = {
@@ -108,6 +110,7 @@ export function EditorPaneTab({
 
 type FileMode =
   | { kind: "svg-editor" }
+  | { kind: "canvas" }
   | { kind: "markdown-editor" }
   | { kind: "image" }
   | { kind: "video" }
@@ -137,6 +140,17 @@ function ModeBody({
           active={active}
           onDirtyChange={onDirtyChange}
           onSaved={onSaved}
+        />
+      );
+    case "canvas":
+      // A `.canvas` directory opened as a slides deck, scoped to its subpath
+      // within this workspace. `active` gates the deck's Cmd+S (a hidden tab
+      // must not grab the save). The deck auto-persists, so no tab dirty state.
+      return (
+        <DesktopCanvasShell
+          workspaceId={workspaceId}
+          basePath={relPath}
+          active={active}
         />
       );
     case "markdown-editor":
@@ -201,6 +215,7 @@ const VIDEO_EXTENSIONS = new Set([
 
 function detectFileMode(relPath: string): FileMode {
   const ext = getExtension(relPath); // includes the leading dot, lowercased
+  if (ext === iocanvas.BUNDLE_EXTENSION) return { kind: "canvas" }; // a `.canvas` directory
   if (ext === ".svg") return { kind: "svg-editor" };
   if (MARKDOWN_EXTENSIONS.has(ext)) return { kind: "markdown-editor" };
   if (IMAGE_EXTENSIONS.has(ext)) return { kind: "image" };

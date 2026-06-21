@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, Menu, dialog } from "electron";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
-import create_menu from "./menu";
+import create_menu, { focus_or_open_canvas_window } from "./menu";
 import { open_welcome_window, open_document_window } from "./window";
 import { EDITOR_BASE_URL } from "./env";
 import {
@@ -68,7 +68,11 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 app.setName(RUNTIME_APP_NAME);
 app.setAsDefaultProtocolClient("grida");
 
-const menu = create_menu(app, shell);
+// `onOpenFile` lets the File ▸ Open… picker route a chosen single file
+// through the same handler the OS file-open path uses (dedup + dirty-close
+// shared). `handleFilePath` is a hoisted declaration, so it's referenceable
+// here even though it's defined further down.
+const menu = create_menu(app, shell, { onOpenFile: handleFilePath });
 Menu.setApplicationMenu(menu);
 
 // `grida://` deep-link router lives in `main/protocol-router.ts`.
@@ -183,16 +187,48 @@ async function openDocumentWindowForPath(filePath: string) {
   });
 }
 
+/**
+ * Open a `.canvas` package directory as a slides deck. Unlike a single
+ * document (registered by docId), a `.canvas` is a folder: register it as a
+ * workspace — the registry respects the opened path as-is, no git-root
+ * expansion — and open (or focus) its canvas window.
+ */
+async function openCanvasBundleForPath(dirPath: string) {
+  const agentSidecar = getAgentSidecarInfo();
+  if (!agentSidecar) {
+    console.warn("[grida] cannot open .canvas: agent sidecar not ready");
+    return;
+  }
+  let workspaceId: string;
+  try {
+    const workspace = await agentSidecarClient.openWorkspace(dirPath);
+    workspaceId = workspace.id;
+  } catch (err) {
+    console.error("[grida] open .canvas failed:", err);
+    dialog.showErrorBox(
+      "Couldn't open canvas",
+      `Grida couldn't open this canvas.\n\n${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+    return;
+  }
+  focus_or_open_canvas_window({ app, agentSidecar, workspace_id: workspaceId });
+  app.addRecentDocument(dirPath);
+}
+
 function handleFilePath(filePath: string) {
-  if (!open_handoff.isSupportedFile(filePath)) {
+  const isCanvas = open_handoff.isCanvasBundle(filePath);
+  if (!isCanvas && !open_handoff.isSupportedFile(filePath)) {
     console.warn("[grida] unsupported file type:", filePath);
     return;
   }
-  if (app.isReady()) {
-    void openDocumentWindowForPath(filePath);
-  } else {
+  if (!app.isReady()) {
     pendingFiles.push(filePath);
+    return;
   }
+  if (isCanvas) void openCanvasBundleForPath(filePath);
+  else void openDocumentWindowForPath(filePath);
 }
 
 function handleDeepLink(url: string) {

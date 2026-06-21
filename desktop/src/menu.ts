@@ -7,10 +7,13 @@ import {
   dialog,
   type BaseWindow,
 } from "electron";
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 import {
   open_welcome_window,
   open_settings_window,
   open_workspace_window,
+  open_canvas_window,
 } from "./window";
 import { EDITOR_BASE_URL } from "./env";
 import { getAgentSidecarInfo } from "./main/agent-sidecar-supervisor";
@@ -32,36 +35,75 @@ function open_or_focus_settings(app: App) {
 }
 
 /**
- * "Open Folder…" menu handler. Drives the native directory picker
- * from main, registers the chosen path with the agent server, then opens
- * (or focuses) a workspace window for it.
+ * "Open…" menu handler. Drives the native open panel from main. The
+ * picker accepts **both** a folder (opened as a workspace, or as a
+ * `.canvas` deck when it contains `canvas.json`) and a single supported
+ * file (`.svg` / `.grida`, opened in its own document window). The
+ * file branch is delegated to `onOpenFile` — the same handler the OS
+ * file-open path uses — so document dedup + the dirty-close prompt are
+ * shared, not re-implemented here.
  *
  * Each workspace gets at most one Electron BrowserWindow — opening
  * an already-open workspace refocuses the existing window rather
  * than spawning a duplicate. Dedup is by the URL's `?id=` query
  * since the renderer side encodes it there.
  */
-async function open_folder_picker_and_register(app: App): Promise<void> {
+async function open_picker_and_register(
+  app: App,
+  onOpenFile?: (filePath: string) => void
+): Promise<void> {
   const agentSidecar = getAgentSidecarInfo();
   if (!agentSidecar) return; // pre-ready / between restarts
   const focused = BrowserWindow.getFocusedWindow() ?? undefined;
+  // `openFile` + `openDirectory` makes the panel accept either kind. The
+  // file filter gates selectable files to the types Grida can actually open
+  // (folders stay selectable regardless of filter) — so the user can't pick
+  // an unopenable file and have it silently dropped. `.canvas` lists here so
+  // a packaged build (where it's a macOS package, i.e. a "file") can pick it;
+  // unpackaged it's a plain folder and selected via `openDirectory`.
   // `createDirectory` surfaces the macOS "New Folder" button so users can
-  // scaffold a fresh workspace folder from within the picker. macOS-only;
-  // safely ignored on Windows/Linux.
+  // scaffold a fresh workspace folder from within the picker. macOS-only
+  // niceties; safely ignored on Windows/Linux (which fall back to a directory
+  // selector when both `openFile` and `openDirectory` are set).
+  const options: Electron.OpenDialogOptions = {
+    properties: ["openFile", "openDirectory", "createDirectory"],
+    filters: [{ name: "Grida", extensions: ["grida", "svg", "canvas"] }],
+  };
   const result = focused
-    ? await dialog.showOpenDialog(focused, {
-        properties: ["openDirectory", "createDirectory"],
-      })
-    : await dialog.showOpenDialog({
-        properties: ["openDirectory", "createDirectory"],
-      });
+    ? await dialog.showOpenDialog(focused, options)
+    : await dialog.showOpenDialog(options);
   if (result.canceled || result.filePaths.length === 0) return;
-  let workspaceId: string;
+  const picked = result.filePaths[0];
+
+  // A single supported file → the document-window path (handled by the OS
+  // file-open handler, so dedup + dirty-close are shared). A `.canvas`
+  // package is a directory on disk even when the panel treats it as a file,
+  // so `statSync` keeps it on the workspace/deck branch below.
+  let isDirectory: boolean;
   try {
-    const workspace = await agentSidecarClient.openWorkspace(
-      result.filePaths[0]
+    isDirectory = statSync(picked).isDirectory();
+  } catch (err) {
+    console.error("[grida] open: stat failed:", err);
+    dialog.showErrorBox(
+      "Couldn't open",
+      err instanceof Error ? err.message : String(err)
     );
+    return;
+  }
+  if (!isDirectory) {
+    onOpenFile?.(picked);
+    return;
+  }
+
+  let workspaceId: string;
+  // Auto-detect: a folder that contains `canvas.json` opens the `.canvas`
+  // slides editor; anything else opens the file workbench. Sniff the RESOLVED
+  // root (the agent server may expand the picked path to a containing repo).
+  let isCanvas = false;
+  try {
+    const workspace = await agentSidecarClient.openWorkspace(picked);
     workspaceId = workspace.id;
+    isCanvas = existsSync(join(workspace.root, "canvas.json"));
   } catch (err) {
     console.error("[grida] open workspace failed:", err);
     dialog.showErrorBox(
@@ -70,11 +112,19 @@ async function open_folder_picker_and_register(app: App): Promise<void> {
     );
     return;
   }
-  focus_or_open_workspace_window({
-    app,
-    agentSidecar,
-    workspace_id: workspaceId,
-  });
+  if (isCanvas) {
+    focus_or_open_canvas_window({
+      app,
+      agentSidecar,
+      workspace_id: workspaceId,
+    });
+  } else {
+    focus_or_open_workspace_window({
+      app,
+      agentSidecar,
+      workspace_id: workspaceId,
+    });
+  }
 }
 
 /**
@@ -104,7 +154,31 @@ function focus_or_open_workspace_window({
   });
 }
 
-export { focus_or_open_workspace_window };
+/**
+ * Focus a `.canvas` slides window for `workspaceId` if one exists, else spawn
+ * one. Mirrors {@link focus_or_open_workspace_window}; match is by the
+ * `/desktop/file?id=` URL the shared file window encodes for bundle mode.
+ */
+function focus_or_open_canvas_window({
+  app,
+  agentSidecar,
+  workspace_id: workspaceId,
+}: {
+  app: App;
+  agentSidecar: ReturnType<typeof getAgentSidecarInfo>;
+  workspace_id: string;
+}) {
+  if (!agentSidecar) return;
+  const needle = `/desktop/file?id=${encodeURIComponent(workspaceId)}`;
+  if (focusWindowByUrl(needle)) return;
+  open_canvas_window({
+    app,
+    base_url: EDITOR_BASE_URL,
+    workspace_id: workspaceId,
+  });
+}
+
+export { focus_or_open_workspace_window, focus_or_open_canvas_window };
 
 function is_workspace_window(window: BrowserWindow): boolean {
   try {
@@ -291,7 +365,11 @@ export function create_default_menu(
   return template;
 }
 
-export default function create_menu(app: App, shell: Shell) {
+export default function create_menu(
+  app: App,
+  shell: Shell,
+  opts?: { onOpenFile?: (filePath: string) => void }
+) {
   const default_menu = create_default_menu(app, shell);
   // Minimal File menu. An extension-keyed registry (one entry per
   // openable file type) is the next iteration when modules other than
@@ -315,10 +393,10 @@ export default function create_menu(app: App, shell: Shell) {
           },
         },
         {
-          label: "Open Folder…",
-          accelerator: "CmdOrCtrl+Shift+O",
+          label: "Open…",
+          accelerator: "CmdOrCtrl+O",
           click: () => {
-            void open_folder_picker_and_register(app);
+            void open_picker_and_register(app, opts?.onOpenFile);
           },
         },
         // Cross-platform shortcut to Settings. macOS gets the same

@@ -5,15 +5,14 @@
  * is V2). Persisted at `${userData}/workspaces.json` with the same
  * atomic-write + 0o600 pattern as `recent.json` / `auth.json`.
  *
- * On `open(path)`, we resolve the path:
- *   1. `realpath` it (collapses `..`, follows symlinks, normalises
- *      trailing slashes) so two opens of the same directory return
- *      the same workspace id even if the user typed slightly different
- *      strings.
- *   2. Walk up looking for a `.git` entry. If found, the workspace's
- *      `root` is the git repo root, not the originally-opened
- *      subdirectory. Opening `~/code/grida/src` registers
- *      `~/code/grida` as the workspace.
+ * On `open(path)`, we `realpath` it (collapses `..`, follows symlinks,
+ * normalises trailing slashes) so two opens of the same directory return the
+ * same workspace id even if the user typed slightly different strings. The
+ * workspace root is then exactly that directory — we do NOT expand to a
+ * containing git repo. Opening `~/code/grida/editor` registers `editor`, not
+ * the whole repo: always respect what the user opened. (Git stays relevant to
+ * future per-file features like a diff panel, but it must not redefine which
+ * folder the user opened.)
  *
  * Workspace id is the first 16 hex chars of `sha256(realRoot)` —
  * stable across launches as long as the path doesn't move on disk. A
@@ -35,8 +34,7 @@ import { atomicWrite } from "./storage/atomic-write";
 export type Workspace = {
   /** sha256(realRoot).slice(0,16) — stable across launches. */
   id: string;
-  /** Absolute, realpath'd root directory. May differ from the path the
-   * caller passed if the caller pointed at a subdirectory of a git repo. */
+  /** Absolute, realpath'd directory the caller opened. */
   root: string;
   /** `basename(root)`. Display label; client may override. */
   name: string;
@@ -91,8 +89,8 @@ export class WorkspaceRegistry {
 
   /**
    * Register an opened directory. Idempotent: opening the same path
-   * twice returns the same workspace (updating `openedAt`). Git-root
-   * expansion happens here — see file header.
+   * twice returns the same workspace (updating `openedAt`). The root is
+   * exactly the opened directory — no git-root expansion (see file header).
    *
    * Throws if the path doesn't exist or isn't a directory.
    */
@@ -102,8 +100,9 @@ export class WorkspaceRegistry {
     if (!stat.isDirectory()) {
       throw new Error(`workspace path is not a directory: ${rootPath}`);
     }
-    const gitRoot = await findGitRoot(real);
-    const resolvedRoot = gitRoot ?? real;
+    // The workspace root is exactly what the user opened — never expand to a
+    // containing git repo. Always respect what the user opened, as-is.
+    const resolvedRoot = real;
     const id = crypto
       .createHash("sha256")
       .update(resolvedRoot)
@@ -213,45 +212,5 @@ export class WorkspaceRegistry {
   }
 }
 
-// ─────────────────────────── git-root walk ───────────────────────────
-/**
- * Walk up from a starting path looking for a `.git` entry (directory
- * for a normal repo, file for a worktree linked to a parent). Returns
- * the absolute path of the directory containing `.git`, or `null` if
- * none is found before reaching the filesystem root.
- *
- * Opening `src/` should expand to the repo root so the workspace's
- * read/write scope covers the whole project, not just the subdirectory
- * the user happened to point at.
- *
- * No external dep — `simple-git` etc. would be overkill for what is
- * effectively three `fs.stat` calls in the average case.
- */
-
-export async function findGitRoot(startPath: string): Promise<string | null> {
-  let current = path.resolve(startPath);
-  // Bound the walk so a deeply pathological path can't loop forever
-  // (path.dirname eventually reaches a fixed point, but the explicit
-  // depth cap is the kind of belt-and-suspenders that pays off).
-  for (let depth = 0; depth < 64; depth++) {
-    try {
-      const gitPath = path.join(current, ".git");
-      const stat = await fs.stat(gitPath);
-      // `.git` can be a directory (normal repo) OR a file (git worktree
-      // link). Both count — what matters is "this is where the project
-      // boundary sits."
-      if (stat.isDirectory() || stat.isFile()) {
-        return current;
-      }
-    } catch {
-      // ENOENT — not a git dir at this level; keep walking up.
-    }
-    const parent = path.dirname(current);
-    if (parent === current) return null; // hit filesystem root
-    current = parent;
-  }
-  return null;
-}
-
 // `workspaceFs` is NOT re-exported here (de-barreled): import it directly
-// from "./workspaces/fs". This file owns the registry + git-root walk only.
+// from "./workspaces/fs". This file owns the registry only.

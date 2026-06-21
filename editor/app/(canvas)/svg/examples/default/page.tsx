@@ -23,7 +23,9 @@ import SAMPLE_SVG from "../../_fixtures/artwork";
 import { SvgRouteShell, useSvgDocStore } from "../../_storage";
 import { useSvgAgentHydrated } from "../../_ai/provider";
 
-const OPFS_BASE = ["grida-svg-demo", "v3", "default"] as const;
+// v4: persistence moved from the `_meta/index.json` sidecar to a `.canvas`
+// bundle (canvas.json + <id>.svg) via @grida/io-canvas. Old data is dropped.
+const OPFS_BASE = ["grida-svg-demo", "v4", "default"] as const;
 
 export default function SvgEditorDevPage() {
   return (

@@ -1,9 +1,11 @@
 /**
- * Desktop AI sidebar chat — wire-driven, single-document.
+ * Desktop AI sidebar chat — wire-driven, single-editor.
  *
  * Talks to `AgentSidecar` via an AI SDK `ChatTransport` over the desktop
- * bridge, and resolves fs tool calls locally against the live
- * `SvgEditor` via {@link useAgentFsBinding}.
+ * bridge, and resolves fs tool calls locally against an `AgentFs` passed in by
+ * the file-window shell (re-pointed at the active editor — the single document,
+ * or the active slide; see {@link ../file/active-editor-agent-fs}). Taking the
+ * fs as a prop is what lets this chat stay mounted across slide switches.
  * Presentation is built on the repo's `@app/ui/ai-elements/*`
  * primitives so the panel matches the web `/svg` route's shape.
  *
@@ -48,7 +50,6 @@ import {
   useTurnQueueController,
   type ChatMessage,
 } from "@/lib/agent-chat";
-import { useAgentFsBinding } from "./agent-fs-binding";
 import { QueuedMessages } from "../shared/queued-messages";
 import {
   ChatMessageView,
@@ -77,13 +78,34 @@ import {
 // commands — the composer is still the input for its rich-text + paste UX.
 const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
 
-export function AISidebarChat({ className }: { className?: string }) {
-  const { fs } = useAgentFsBinding();
-
-  // Chat-session lifecycle: list, pick, hydrate. Filter is fixed
-  // (`agent: "grida"`, no workspace) — this panel is the standalone-doc
-  // surface.
-  const chatSession = useChatSession({ agent: AGENT_SESSION_AGENT });
+export function AISidebarChat({
+  fs,
+  workspaceId,
+  className,
+}: {
+  /**
+   * Renderer-resolved fs for SINGLE-FILE (in-memory) mode: the agent's fs tool
+   * calls resolve against this `AgentFs`, owned by the file-window shell and
+   * bound to the live editor. Omitted in workspace mode, where fs tools resolve
+   * SERVER-SIDE (see `workspaceId`). See {@link ../file/active-editor-agent-fs}.
+   */
+  fs?: AgentFs;
+  /**
+   * When set, the chat is WORKSPACE-bound: the session + run target this
+   * workspace, and the agent gets a server-side fs over its directory — for a
+   * `.canvas` deck that means it sees `canvas.json` + every slide, resolved
+   * server-side. Mutually exclusive with `fs`. Mirrors `workbench/agent-pane`.
+   */
+  workspaceId?: string;
+  className?: string;
+}) {
+  const isWorkspace = !!workspaceId;
+  // Chat-session lifecycle: list, pick, hydrate. Scoped to `workspaceId` when
+  // workspace-bound (deck mode); unscoped for the single-file in-memory surface.
+  const chatSession = useChatSession({
+    agent: AGENT_SESSION_AGENT,
+    workspaceId,
+  });
 
   // The `Chat` instance is rebuilt per real session switch / new chat (keyed
   // on hydrated `initialMessages`; see the memo deps below), NOT when a fresh
@@ -97,6 +119,7 @@ export function AISidebarChat({ className }: { className?: string }) {
       id: chatSession.current_id ?? undefined,
       messages: chatSession.initial_messages,
       transport: desktopAgentTransport.create({
+        workspace_id: workspaceId,
         session_id: chatSession.current_id ?? undefined,
         onSessionId: (resolvedId) => {
           chatSession.apply_resolved_session_id(resolvedId);
@@ -122,8 +145,11 @@ export function AISidebarChat({ className }: { className?: string }) {
           input: toolCall.input,
           dynamic: toolCall.dynamic,
         };
+        // Single-file mode resolves fs tools here against the in-memory editor
+        // fs; workspace mode has no client fs (the server resolves fs tools), so
+        // the fs leg is skipped and only todos resolve client-side.
         const output =
-          AgentFs.resolveToolCall(fs, agentToolCall) ??
+          (fs ? AgentFs.resolveToolCall(fs, agentToolCall) : undefined) ??
           AgentTodos.resolveToolCall(todos, agentToolCall);
         if (output === undefined) return;
         void chat.addToolResult({
@@ -423,7 +449,11 @@ export function AISidebarChat({ className }: { className?: string }) {
             <ConversationEmptyState
               icon={<SparklesIcon className="size-5" />}
               title="Start a conversation"
-              description="Ask the assistant to draw or edit the SVG. You can drag and color shapes between turns."
+              description={
+                isWorkspace
+                  ? "Ask the assistant about this deck — it can read and edit any slide and the manifest."
+                  : "Ask the assistant to draw or edit the SVG. You can drag and color shapes between turns."
+              }
             />
           ) : (
             settledList
@@ -461,7 +491,11 @@ export function AISidebarChat({ className }: { className?: string }) {
           isStreaming={isStreaming}
           busy={busy}
           onStop={stop}
-          placeholder="Ask the assistant to edit the SVG…"
+          placeholder={
+            isWorkspace
+              ? "Ask the assistant to edit the deck…"
+              : "Ask the assistant to edit the SVG…"
+          }
           multimodal={multimodal}
           toolbar={
             <>

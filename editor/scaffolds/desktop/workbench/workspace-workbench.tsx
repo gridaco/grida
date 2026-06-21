@@ -66,7 +66,7 @@ import { TerminalPane } from "./terminal-pane";
 import { WorkspaceChangesProvider } from "./workspace-changes";
 
 /**
- * Pane sizing, matching the workstation-shell conventions:
+ * Pane sizing, matching the file window's shell conventions:
  *   - Default size as a percentage (scales with window width).
  *   - Min (and optional max) as pixels (pane readability is a pixel concern).
  *

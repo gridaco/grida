@@ -15,7 +15,7 @@
  *   3. Main process calls `agentSidecarClient.touchRecent(path)` → agent server
  *      prepends it to `recent.json`.
  *   4. Main process spawns a BrowserWindow loading
- *      `${EDITOR_BASE_URL}/desktop/svg?docId=${docId}` (or similar).
+ *      `${EDITOR_BASE_URL}/desktop/file?docId=${docId}` (or similar).
  *   5. The renderer reads the docId from the URL and calls
  *      `bridge.files.read(docId)` to load content.
  *
