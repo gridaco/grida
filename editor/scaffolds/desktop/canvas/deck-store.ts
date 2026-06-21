@@ -29,6 +29,29 @@ function slidesFromManifest(m: iocanvas.Manifest): Slide[] {
 }
 
 /**
+ * Fold io-canvas's reconciled projection back into a manifest: membership +
+ * order come from `resolved.documents` (disk truth — missing `src`s dropped,
+ * disk-only SVGs appended, final order), while each surviving entry keeps its
+ * parsed manifest fields (`name`, `layout`, unknowns) and the top-level fields
+ * are preserved. Disk-appended slides enter as minimal `{ src, id }` records.
+ * The result is what the deck both renders and writes, so neither drifts from
+ * disk.
+ */
+function reconcileManifest(
+  resolved: iocanvas.ResolvedCanvas
+): iocanvas.Manifest {
+  const prior = new Map(
+    (resolved.manifest?.documents ?? [])
+      .filter((d): d is iocanvas.ManifestDocument => typeof d?.src === "string")
+      .map((d) => [d.src, d] as const)
+  );
+  const documents = resolved.documents.map(
+    (d) => prior.get(d.src) ?? { src: d.src, id: d.id }
+  );
+  return { ...(resolved.manifest ?? { type: "svg-slides" }), documents };
+}
+
+/**
  * The desktop deck's source of truth: a carried `iocanvas.Manifest` mutated
  * through the pure `iocanvas` transforms (`add` / `remove` / `reorder`) and
  * written back. This is the **stateless read-modify-write** consumer the
@@ -77,13 +100,12 @@ export class CanvasDeck {
   /** Read `canvas.json` and reconcile it against the on-disk SVGs. */
   async load(): Promise<void> {
     const resolved = await iocanvas.read(this.fs);
-    // Carry the parsed manifest verbatim (preserves unknown fields). When the
-    // bundle is implicit (no/garbled canvas.json), materialize one from the
-    // disk-derived documents so transforms have something to operate on.
-    this.manifest = resolved.manifest ?? {
-      type: "svg-slides",
-      documents: resolved.documents.map((d) => ({ src: d.src, id: d.id })),
-    };
+    // Carry the RECONCILED projection (not the raw manifest) as the round-trip
+    // source: a slide added or removed outside the UI — e.g. by the
+    // workspace-bound agent — then shows up in the strip, and a later persist
+    // writes disk truth instead of resurrecting stale entries. Unknown +
+    // per-doc fields survive via the merge in `reconcileManifest`.
+    this.manifest = reconcileManifest(resolved);
     this.slides = slidesFromManifest(this.manifest);
     this.notify();
   }

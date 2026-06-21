@@ -160,6 +160,37 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
     expect(a?.name).toBe("Intro"); // unknown field survived the transform
   });
 
+  it("reconciles against disk on load: drops missing slides, appends disk-only ones", async () => {
+    const ws = new FakeWorkspace({
+      "canvas.json": JSON.stringify({
+        type: "svg-slides",
+        documents: [
+          { src: "a.svg", id: "a", name: "Intro" },
+          { src: "missing.svg", id: "gone" }, // declared but absent on disk
+        ],
+      }),
+      "a.svg": "<svg/>",
+      "c.svg": "<svg/>", // on disk but not in the manifest (added externally)
+    });
+    const deck = new CanvasDeck("w", ws);
+    await deck.load();
+    // The rendered view follows disk: the missing slide is gone, the disk-only
+    // one is appended, and the surviving entry keeps its name.
+    expect(deck.getSlides().map((s) => s.src)).toEqual(["a.svg", "c.svg"]);
+    expect(deck.getSlides()[0].name).toBe("Intro");
+
+    // A later persist writes the reconciled state, not the stale manifest.
+    await deck.reorder(["a", "c.svg"]); // identities (id ?? src)
+    await deck.flush();
+    expect(ws.manifest().documents?.map((d) => d.src)).toEqual([
+      "a.svg",
+      "c.svg",
+    ]);
+    expect(ws.manifest().documents?.find((d) => d.id === "a")?.name).toBe(
+      "Intro"
+    );
+  });
+
   it("operates on a `.canvas` nested at basePath, not the workspace root", async () => {
     const ws = new FakeWorkspace({
       "decks/intro.canvas/canvas.json": JSON.stringify({

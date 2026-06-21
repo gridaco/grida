@@ -48,25 +48,36 @@ function open_or_focus_settings(app: App) {
  * than spawning a duplicate. Dedup is by the URL's `?id=` query
  * since the renderer side encodes it there.
  */
+/** What the open panel selects. macOS can offer both in one dialog; Windows
+ *  and Linux can't — Electron degrades a combined `openFile` + `openDirectory`
+ *  panel to a directory selector — so there the File menu splits this into
+ *  separate "Open File…" / "Open Folder…" items, each requesting one `kind`. */
+type OpenKind = "any" | "file" | "directory";
+
 async function open_picker_and_register(
   app: App,
+  kind: OpenKind,
   onOpenFile?: (filePath: string) => void
 ): Promise<void> {
   const agentSidecar = getAgentSidecarInfo();
   if (!agentSidecar) return; // pre-ready / between restarts
   const focused = BrowserWindow.getFocusedWindow() ?? undefined;
-  // `openFile` + `openDirectory` makes the panel accept either kind. The
-  // file filter gates selectable files to the types Grida can actually open
-  // (folders stay selectable regardless of filter) — so the user can't pick
-  // an unopenable file and have it silently dropped. `.canvas` lists here so
-  // a packaged build (where it's a macOS package, i.e. a "file") can pick it;
-  // unpackaged it's a plain folder and selected via `openDirectory`.
-  // `createDirectory` surfaces the macOS "New Folder" button so users can
-  // scaffold a fresh workspace folder from within the picker. macOS-only
-  // niceties; safely ignored on Windows/Linux (which fall back to a directory
-  // selector when both `openFile` and `openDirectory` are set).
+  // The file filter gates selectable files to the types Grida can open (folders
+  // stay selectable regardless) so the user can't pick an unopenable file and
+  // have it silently dropped. `.canvas` lists here so a packaged build (where
+  // it's a macOS package, i.e. a "file") can pick it as a file; unpackaged — and
+  // always on Windows/Linux — it's a plain folder, selected in directory mode.
+  // `createDirectory` surfaces the macOS "New Folder" button. Electron can't
+  // combine file + directory selection on Windows/Linux, so each menu item
+  // requests one concrete `kind` there ("any" is only ever used on macOS).
+  const properties: NonNullable<Electron.OpenDialogOptions["properties"]> =
+    kind === "file"
+      ? ["openFile"]
+      : kind === "directory"
+        ? ["openDirectory", "createDirectory"]
+        : ["openFile", "openDirectory", "createDirectory"];
   const options: Electron.OpenDialogOptions = {
-    properties: ["openFile", "openDirectory", "createDirectory"],
+    properties,
     filters: [{ name: "Grida", extensions: ["grida", "svg", "canvas"] }],
   };
   const result = focused
@@ -392,13 +403,39 @@ export default function create_menu(
             });
           },
         },
-        {
-          label: "Open…",
-          accelerator: "CmdOrCtrl+O",
-          click: () => {
-            void open_picker_and_register(app, opts?.onOpenFile);
-          },
-        },
+        // macOS offers files + folders in one panel; Windows/Linux can't, so
+        // they get two items (a combined panel would silently become folder-only
+        // there, making `.svg`/`.grida` files unopenable from the menu).
+        ...(process.platform === "darwin"
+          ? [
+              {
+                label: "Open…",
+                accelerator: "CmdOrCtrl+O",
+                click: () => {
+                  void open_picker_and_register(app, "any", opts?.onOpenFile);
+                },
+              },
+            ]
+          : [
+              {
+                label: "Open File…",
+                accelerator: "CmdOrCtrl+O",
+                click: () => {
+                  void open_picker_and_register(app, "file", opts?.onOpenFile);
+                },
+              },
+              {
+                label: "Open Folder…",
+                accelerator: "CmdOrCtrl+Shift+O",
+                click: () => {
+                  void open_picker_and_register(
+                    app,
+                    "directory",
+                    opts?.onOpenFile
+                  );
+                },
+              },
+            ]),
         // Cross-platform shortcut to Settings. macOS gets the same
         // entry under the app menu (above) per platform convention,
         // but Cmd/Ctrl+, is the universal expectation — keep it here
