@@ -14,6 +14,7 @@ import {
   FileIcon,
   FolderIcon,
   FolderOpenIcon,
+  GalleryVerticalEndIcon,
   RefreshCwIcon,
 } from "lucide-react";
 import {
@@ -191,7 +192,9 @@ function FileTreePaneInner({
       const meta = readMeta(controller, id);
       if (!meta) return;
       controller.focus(id);
-      if (meta.kind === "directory") {
+      // A `.canvas` bundle is a directory on disk but opens like a file (its
+      // deck), so only real containers toggle; everything else opens.
+      if (meta.kind === "directory" && !meta.bundle) {
         controller.toggle(id);
       } else {
         onOpenFile(id);
@@ -333,22 +336,27 @@ function FileTreeRow({
   if (!meta) return null;
 
   const isDirectory = meta.kind === "directory";
+  // A `.canvas` bundle is a directory we present as an opaque package: no
+  // chevron, click opens the deck. `isContainer` = a directory the tree
+  // actually descends into (everything expand-related keys off it).
+  const isBundle = meta.bundle;
+  const isContainer = isDirectory && !isBundle;
   const loadState = handle.hasNode(row.id)
     ? handle.getLoadState(row.id)
     : "loaded";
   const error = handle.hasNode(row.id) ? handle.getError(row.id) : null;
   const childCount = controller.source.getNode(row.id).children.length;
-  const showLoading = isDirectory && row.isExpanded && loadState === "loading";
-  const showError = isDirectory && row.isExpanded && loadState === "error";
+  const showLoading = isContainer && row.isExpanded && loadState === "loading";
+  const showError = isContainer && row.isExpanded && loadState === "error";
   const showEmpty =
-    isDirectory && row.isExpanded && loadState === "loaded" && childCount === 0;
+    isContainer && row.isExpanded && loadState === "loaded" && childCount === 0;
 
   const button = (
     <button
       type="button"
       role="treeitem"
       aria-selected={selected}
-      aria-expanded={isDirectory ? row.isExpanded : undefined}
+      aria-expanded={isContainer ? row.isExpanded : undefined}
       aria-level={row.depth + 1}
       data-tree-row-id={row.id}
       data-row-depth={row.depth}
@@ -364,18 +372,20 @@ function FileTreeRow({
       onClick={(e) => {
         controller.focus(row.id);
         controller.select([row.id], modeFromEvent(e));
-        if (isDirectory) controller.toggle(row.id);
+        if (isContainer) controller.toggle(row.id);
         else controller.dispatch("activate");
       }}
     >
       <ChevronRightIcon
         className={cn(
           "size-3 shrink-0 text-muted-foreground transition-transform",
-          isDirectory && row.isExpanded && "rotate-90",
-          !isDirectory && "invisible"
+          isContainer && row.isExpanded && "rotate-90",
+          !isContainer && "invisible"
         )}
       />
-      {isDirectory ? (
+      {isBundle ? (
+        <GalleryVerticalEndIcon className="size-3.5 shrink-0 text-violet-500" />
+      ) : isDirectory ? (
         row.isExpanded ? (
           <FolderOpenIcon className="size-3.5 shrink-0 text-sky-500" />
         ) : (

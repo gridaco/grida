@@ -1210,6 +1210,49 @@ export class SessionsStore {
   }
 
   /**
+   * Fill in a CLIENT-resolved tool result — the desktop file-window sidebar's
+   * single-file mode resolves fs tools in the renderer, so the result reaches
+   * the server only on the next request's assistant message (see
+   * `persistResolvedToolResults` in `runtime/run-input.ts`). Flips a tool part
+   * from the called-but-unresolved state (`input-available`) to its terminal
+   * result, IN PLACE — keyed by `tool_call_id`, **never touching the part's
+   * `index`** (so it can't collide with a sibling part's slot — the bug that
+   * 500'd turn 2 once decks went server-bound and produced many tool parts) and
+   * **never overwriting an already-resolved row** (a server-executed tool, or a
+   * re-send of an already-filled one — those stay `output-available`, so the
+   * conditional `WHERE` matches 0 rows and is a no-op). A missing row is also a
+   * no-op, which keeps the server authoritative: the renderer can only supply a
+   * result for a call the server delegated to it and is still waiting on.
+   *
+   * GRIDA-SEC-004: scoped by `sessionId` so a client-authored resend can only
+   * fill a pending row in its OWN session — `message_id` already pins the
+   * session, but the explicit predicate makes the boundary part of the query.
+   */
+  async fillToolResult(
+    sessionId: string,
+    messageId: string,
+    toolCallId: string,
+    result: { type: string; data: unknown; tool_state: string }
+  ): Promise<void> {
+    await this.db
+      .update(chatParts)
+      .set({
+        type: result.type,
+        data_json: JSON.stringify(result.data ?? null),
+        tool_state: result.tool_state,
+        updated_at: Date.now(),
+      })
+      .where(
+        and(
+          eq(chatParts.session_id, sessionId),
+          eq(chatParts.message_id, messageId),
+          eq(chatParts.tool_call_id, toolCallId),
+          eq(chatParts.tool_state, "input-available")
+        )
+      );
+  }
+
+  /**
    * GRIDA-SEC-004 — does this session have an UNANSWERED supervised approval?
    * True iff a persisted tool part is still `approval-requested` (RFC
    * `permission modes`, Phase 2). A turn blocked awaiting the user's Allow/Deny

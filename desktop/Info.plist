@@ -42,6 +42,41 @@
             <key>LSHandlerRank</key>
             <string>Alternate</string>
          </dict>
+         <dict>
+            <key>CFBundleTypeName</key>
+            <string>Grida Canvas</string>
+            <key>LSItemContentTypes</key>
+            <array>
+               <string>co.grida.canvas</string>
+            </array>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSTypeIsPackage</key>
+            <true/>
+         </dict>
+      </array>
+      <key>UTExportedTypeDeclarations</key>
+      <array>
+         <dict>
+            <key>UTTypeIdentifier</key>
+            <string>co.grida.canvas</string>
+            <key>UTTypeDescription</key>
+            <string>Grida Canvas</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+               <string>com.apple.package</string>
+               <string>public.composite-content</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+               <key>public.filename-extension</key>
+               <array>
+                  <string>canvas</string>
+               </array>
+            </dict>
+         </dict>
       </array>
    </dict>
 </plist>

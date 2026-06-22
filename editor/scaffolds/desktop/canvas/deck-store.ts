@@ -1,0 +1,189 @@
+import { nanoid } from "nanoid";
+import { iocanvas } from "@grida/io-canvas";
+import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
+import {
+  workspaceBundleFs,
+  type WorkspaceFsClient,
+} from "./workspace-bundle-fs";
+
+/** One slide as the deck UI sees it. `id` is the **iocanvas identity** (the
+ *  doc's `id`, else its `src`) — the key the transforms (`reorder`/`remove`)
+ *  match on. `name` is optional view metadata (a web-authored deck may carry
+ *  it; desktop-created slides don't). */
+export type Slide = { id: string; src: string; name?: string };
+
+/** `WorkspaceFsClient` plus the trash capability `removeSlide` needs. */
+export interface WorkspaceDeckClient extends WorkspaceFsClient {
+  trashEntry(workspaceId: string, relPath: string): Promise<void>;
+}
+
+/**
+ * Refuse a document `src` that isn't bundle-local. Per the `.canvas` contract
+ * (§2) every path is relative to the bundle root; `..` traversal and absolute
+ * paths are out of scope for V1. Enforcing it here keeps a hostile or garbled
+ * manifest from steering a file op (e.g. `trashEntry`) outside the bundle.
+ */
+function assertBundleLocalSrc(src: string): void {
+  const normalized = src.replaceAll("\\", "/");
+  if (
+    normalized.length === 0 ||
+    normalized.startsWith("/") ||
+    /^[a-zA-Z]:/.test(normalized) || // drive-letter absolute (Windows)
+    normalized.split("/").includes("..")
+  ) {
+    throw new Error(`.canvas: non-bundle-local document src rejected: ${src}`);
+  }
+}
+
+function slidesFromManifest(m: iocanvas.Manifest): Slide[] {
+  return (m.documents ?? [])
+    .filter((d) => typeof d?.src === "string" && d.src.length > 0)
+    .map((d) => ({
+      // Identity, matching io-canvas: explicit id, else src.
+      id: typeof d.id === "string" && d.id ? d.id : d.src,
+      src: d.src,
+      name: typeof d.name === "string" ? d.name : undefined,
+    }));
+}
+
+/**
+ * Fold io-canvas's reconciled projection back into a manifest: membership +
+ * order come from `resolved.documents` (disk truth — missing `src`s dropped,
+ * disk-only SVGs appended, final order), while each surviving entry keeps its
+ * parsed manifest fields (`name`, `layout`, unknowns) and the top-level fields
+ * are preserved. Disk-appended slides enter as minimal `{ src, id }` records.
+ * The result is what the deck both renders and writes, so neither drifts from
+ * disk.
+ */
+function reconcileManifest(
+  resolved: iocanvas.ResolvedCanvas
+): iocanvas.Manifest {
+  const prior = new Map(
+    (resolved.manifest?.documents ?? [])
+      .filter((d): d is iocanvas.ManifestDocument => typeof d?.src === "string")
+      .map((d) => [d.src, d] as const)
+  );
+  const documents = resolved.documents.map(
+    (d) => prior.get(d.src) ?? { src: d.src, id: d.id }
+  );
+  return { ...(resolved.manifest ?? { type: "svg-slides" }), documents };
+}
+
+/**
+ * The desktop deck's source of truth: a carried `iocanvas.Manifest` mutated
+ * through the pure `iocanvas` transforms (`add` / `remove` / `reorder`) and
+ * written back. This is the **stateless read-modify-write** consumer the
+ * transforms were promoted for (the web store rebuilds the whole manifest
+ * instead) — so it's the genuine dogfood.
+ *
+ * The manifest is the truth; `slides` is derived from it. Each mutation pairs a
+ * transform with the matching file op (write / trash the `<src>` SVG), then
+ * persists `canvas.json`. Framework-agnostic + DI-friendly so it's unit-tested
+ * over a fake bridge with no React or Electron.
+ */
+export class CanvasDeck {
+  private manifest: iocanvas.Manifest = { type: "svg-slides", documents: [] };
+  private slides: Slide[] = [];
+  private readonly fs: iocanvas.WritableFs;
+  private readonly listeners = new Set<() => void>();
+  private writeChain: Promise<void> = Promise.resolve();
+
+  constructor(
+    private readonly workspaceId: string,
+    private readonly client: WorkspaceDeckClient = workspacesNs,
+    /** Workspace-relative dir of the `.canvas` bundle; "" when it IS the root. */
+    private readonly basePath = ""
+  ) {
+    this.fs = workspaceBundleFs(workspaceId, client, basePath);
+  }
+
+  /** Map a bundle-relative `src` to its workspace-relative path. Refuses a
+   *  non-bundle-local `src` so a hostile/garbled `canvas.json` can't drive a
+   *  file op (notably `trashEntry`) outside the bundle — spec §2: paths are
+   *  bundle-root-relative; `..` escape and absolute paths are out of scope. */
+  private abs(src: string): string {
+    assertBundleLocalSrc(src);
+    return this.basePath ? `${this.basePath}/${src}` : src;
+  }
+
+  // ── snapshots ──────────────────────────────────────────────────────
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+  getSlides = (): readonly Slide[] => this.slides;
+
+  private notify(): void {
+    for (const l of this.listeners) l();
+  }
+
+  // ── lifecycle ──────────────────────────────────────────────────────
+
+  /** Read `canvas.json` and reconcile it against the on-disk SVGs. */
+  async load(): Promise<void> {
+    const resolved = await iocanvas.read(this.fs);
+    // Carry the RECONCILED projection (not the raw manifest) as the round-trip
+    // source: a slide added or removed outside the UI — e.g. by the
+    // workspace-bound agent — then shows up in the strip, and a later persist
+    // writes disk truth instead of resurrecting stale entries. Unknown +
+    // per-doc fields survive via the merge in `reconcileManifest`.
+    this.manifest = reconcileManifest(resolved);
+    this.slides = slidesFromManifest(this.manifest);
+    this.notify();
+  }
+
+  // ── mutations (transform + file op + persist) ──────────────────────
+
+  /** Create a new slide from `svg` and append it to the deck. */
+  async addSlide(svg: string): Promise<string> {
+    const id = nanoid();
+    const src = `${id}.svg`;
+    await this.client.writeFile(this.workspaceId, this.abs(src), svg);
+    this.manifest = iocanvas.add(this.manifest, { src, id });
+    this.commit();
+    return id;
+  }
+
+  /** Drop a slide (by id or src) and move its file to the trash. */
+  async removeSlide(idOrSrc: string): Promise<void> {
+    const slide = this.slides.find(
+      (s) => s.id === idOrSrc || s.src === idOrSrc
+    );
+    if (!slide) return;
+    // Trash first: if the manifest dropped it but the file lingered, the next
+    // load would re-append it as a disk-origin slide (it'd reappear).
+    await this.client.trashEntry(this.workspaceId, this.abs(slide.src));
+    this.manifest = iocanvas.remove(this.manifest, idOrSrc);
+    this.commit();
+  }
+
+  /** Reorder the slides view by id/src. */
+  async reorder(orderedKeys: string[]): Promise<void> {
+    this.manifest = iocanvas.reorder(this.manifest, orderedKeys);
+    this.commit();
+  }
+
+  // ── internals ──────────────────────────────────────────────────────
+
+  /** Re-derive slides, notify subscribers, and persist `canvas.json`. */
+  private commit(): void {
+    this.slides = slidesFromManifest(this.manifest);
+    this.notify();
+    this.persist();
+  }
+
+  /** Serialize chained so the latest snapshot is the last to hit disk. */
+  private persist(): void {
+    const manifest = this.manifest;
+    this.writeChain = this.writeChain
+      .then(() => iocanvas.write(this.fs, manifest))
+      .catch((err) => {
+        console.warn("[canvas-deck] manifest write failed:", err);
+      });
+  }
+
+  /** Await any in-flight manifest writes (tests, and final flush on unmount). */
+  async flush(): Promise<void> {
+    await this.writeChain;
+  }
+}

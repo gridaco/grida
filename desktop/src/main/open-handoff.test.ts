@@ -21,6 +21,18 @@ describe("open_handoff.isSupportedFile", () => {
     ).toBe(false);
     expect(open_handoff.isSupportedFile("--insiders")).toBe(false);
     expect(open_handoff.isSupportedFile(".")).toBe(false);
+    // A `.canvas` is a bundle (directory), not a single file — handled separately.
+    expect(open_handoff.isSupportedFile("/a/b/deck.canvas")).toBe(false);
+  });
+});
+
+describe("open_handoff.isCanvasBundle", () => {
+  it("accepts .canvas case-insensitively, rejects everything else", () => {
+    expect(open_handoff.isCanvasBundle("/a/b/deck.canvas")).toBe(true);
+    expect(open_handoff.isCanvasBundle("/a/b/DECK.CANVAS")).toBe(true);
+    expect(open_handoff.isCanvasBundle("/a/b/c.svg")).toBe(false);
+    expect(open_handoff.isCanvasBundle("/a/b/c.grida")).toBe(false);
+    expect(open_handoff.isCanvasBundle("/a/b/plain-folder")).toBe(false);
   });
 });
 
@@ -39,6 +51,12 @@ describe("open_handoff.fromArgv", () => {
       { kind: "file", path: "/Users/u/Desktop/logo.svg" },
       { kind: "file", path: "/Users/u/doc.grida" },
     ]);
+  });
+
+  it("classifies a .canvas bundle path as a file open", () => {
+    expect(
+      open_handoff.fromArgv(["/exec/path", "/Users/u/intro-deck.canvas"])
+    ).toEqual([{ kind: "file", path: "/Users/u/intro-deck.canvas" }]);
   });
 
   it("returns [] when nothing classifies", () => {

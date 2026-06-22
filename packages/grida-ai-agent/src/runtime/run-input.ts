@@ -243,7 +243,17 @@ export async function persistIncomingTail(
   // one outgoing array twice — so we record each id as we go.
   const seen = new Set(await store.listMessageIds(sessionId));
   for (const m of incoming) {
-    if (m.role === "assistant") continue;
+    if (m.role === "assistant") {
+      // The recorder owns assistant messages — it writes them from the model
+      // stream. The ONE thing the stream can't carry is a CLIENT-resolved tool
+      // result: a session with no server-side fs (the desktop file window's
+      // single-file sidebar) resolves fs tools in the renderer, and the result
+      // arrives only on the next request's assistant message. Fill just those
+      // into the existing (recorder-written) tool row so the server-authoritative
+      // model view (`buildModelMessages`) stops dropping the call as incomplete.
+      await persistResolvedToolResults(store, sessionId, m);
+      continue;
+    }
     if (seen.has(m.id)) continue;
     seen.add(m.id);
     // Idempotent insert: a concurrent run on the same session can land
@@ -258,6 +268,54 @@ export async function persistIncomingTail(
       await store.upsertPart(m.id, { index: i, type: part.type, data: part });
     }
   }
+}
+
+/**
+ * Fill the CLIENT-resolved tool results carried on an incoming assistant
+ * message into their existing (recorder-written) rows — see
+ * {@link SessionsStore.fillToolResult} for the in-place, never-overwrite,
+ * never-reindex semantics. Only terminal tool parts
+ * (`output-available` / `output-error`) are considered; non-tool parts (text,
+ * reasoning) and already-resolved rows are left to the recorder.
+ *
+ * GRIDA-SEC-004: the loopback's trusted renderer supplies a result only for a
+ * call the server delegated to it and is still waiting on (the `WHERE
+ * tool_state = 'input-available'` guard); it cannot inject or rewrite anything
+ * else.
+ */
+async function persistResolvedToolResults(
+  store: SessionsStore,
+  sessionId: string,
+  message: NormalizedMessage
+): Promise<void> {
+  for (const part of message.parts) {
+    const toolCallId = toolCallIdOf(part);
+    if (toolCallId === null || !isResolvedToolPart(part)) continue;
+    await store.fillToolResult(sessionId, message.id, toolCallId, {
+      type: part.type,
+      data: part,
+      // `isResolvedToolPart` already verified this is a terminal-state string.
+      tool_state: (part as { state?: unknown }).state as string,
+    });
+  }
+}
+
+/** A terminal tool part — the only assistant part a client authors that the
+ *  model stream never carried. */
+function isResolvedToolPart(part: AgentRunMessagePart): boolean {
+  if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") {
+    return false;
+  }
+  const state = (part as { state?: unknown }).state;
+  return state === "output-available" || state === "output-error";
+}
+
+/** The tool call id off an incoming part, tolerating camel/snake (the AI SDK
+ *  client sends `toolCallId`; the persisted shape uses `tool_call_id`). */
+function toolCallIdOf(part: AgentRunMessagePart): string | null {
+  const p = part as { toolCallId?: unknown; tool_call_id?: unknown };
+  const id = typeof p.toolCallId === "string" ? p.toolCallId : p.tool_call_id;
+  return typeof id === "string" && id.length > 0 ? id : null;
 }
 
 /**

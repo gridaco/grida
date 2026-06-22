@@ -64,6 +64,8 @@ export function FileContextMenu({
   /** The right-click target — usually a tree row button or a tab. */
   children: ReactNode;
 }) {
+  // `.canvas` bundles open on click (the tree renders them as opaque leaves),
+  // so there's no longer a dedicated "Open as Canvas" item here.
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>

@@ -4,10 +4,11 @@
  * Maps to docs/wg/ai/grida/architecture.md §Test pins → describe("Workspaces").
  *
  * The registry is the agent host's record of "directories the user opened."
- * Its three load-bearing behaviors: git-root expansion (open a subdir,
- * register the repo), a path-stable id (same dir → same id across
- * launches), and independent coexistence of multiple opened roots —
- * the per-root scopes the future srt fs-policy unions together.
+ * Its load-bearing behaviors: the root is exactly the opened directory (no
+ * git-root expansion — always respect what the user opened), a path-stable id
+ * (same dir → same id across launches), and independent coexistence of
+ * multiple opened roots — the per-root scopes the future srt fs-policy unions
+ * together.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import crypto from "node:crypto";
@@ -37,11 +38,10 @@ describe("Workspaces", () => {
     await fs.rm(baseDir, { recursive: true, force: true });
   });
 
-  it("open(directory-inside-repo) expands to repo root", async () => {
-    // A repo is "a directory containing a .git entry" — findGitRoot
-    // accepts a .git directory or file, so a bare mkdir is enough; no
-    // child process needed. (os.tmpdir() is not inside a git tree, so
-    // this .git is the only one the upward walk can find.)
+  it("open(directory-inside-repo) registers the opened directory, not the repo root", async () => {
+    // A `.git` at the repo root must NOT pull the workspace up to it — the
+    // root is exactly what the user opened. (os.tmpdir() is not inside a git
+    // tree, so this `.git` is the only one an upward walk could have found.)
     const repo = path.join(baseDir, "repo");
     const sub = path.join(repo, "packages", "deep");
     await fs.mkdir(path.join(repo, ".git"), { recursive: true });
@@ -50,9 +50,9 @@ describe("Workspaces", () => {
     const registry = new WorkspaceRegistry(userDataDir);
     const ws = await registry.open(sub);
 
-    const repoReal = await fs.realpath(repo);
-    expect(ws.root).toBe(repoReal);
-    expect(ws.name).toBe(path.basename(repoReal));
+    const subReal = await fs.realpath(sub);
+    expect(ws.root).toBe(subReal);
+    expect(ws.name).toBe(path.basename(subReal)); // "deep"
   });
 
   it("workspace id is stable across close/reopen", async () => {
