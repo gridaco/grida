@@ -20,9 +20,11 @@
  * root-relative; `..`-escape and absolute paths are out of scope for V1.
  */
 export interface ReadableFs {
-  /** Enumerate every path in the bundle, **recursively** — nested paths
-   *  included, not only root-level entries — so an existence check for a nested
-   *  `src` works. Order is undefined. */
+  /** Enumerate the bundle's paths — every path that may appear as a document
+   *  `src`, so existence checks resolve. For the V1 root-level `src` convention
+   *  (`nnn.svg` at the root) a **root-level** listing is sufficient; to support a
+   *  nested `src` (e.g. `slides/001.svg`) the adapter must enumerate
+   *  **recursively** so that nested path is present. Order is undefined. */
   list(): Promise<string[]>;
   /** Read the text at `path`, or `null` if no such file. */
   read(path: string): Promise<string | null>;

@@ -30,8 +30,14 @@ export interface WorkspaceFsClient {
 
 /**
  * An `dotcanvas.WritableFs` bound to one workspace. `list()` enumerates the
- * bundle root (dotcanvas filters to root-level SVGs itself); `read()` returns
- * `null` when the file is absent (a missing `canvas.json` → implicit mode).
+ * bundle's **root-level** entries only — the bridge `readdir` lists immediate
+ * children, and there is no recursive primitive. That satisfies the port for
+ * Grida's `.canvas` decks, which use the root-level `nnn.svg` / `<id>.svg`
+ * convention (Grida never authors a nested `src`); a bundle that referenced a
+ * nested `src` would need a recursive adapter, which we deliberately avoid here
+ * to keep `read()`/`load()` off an unbounded workspace-tree walk. `read()`
+ * returns `null` when the file is absent (a missing `canvas.json` → implicit
+ * mode).
  */
 export function workspaceBundleFs(
   workspaceId: string,
