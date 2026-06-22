@@ -139,21 +139,21 @@ One list, two projections. A deck with no `layout` anywhere is still valid.
 
 ## Public surface
 
-| export                          | kind  | what                                                            |
-| ------------------------------- | ----- | --------------------------------------------------------------- |
-| `read(fs)`                      | IO    | load a bundle → `ResolvedCanvas`                                |
-| `write(fs, manifest)`           | IO    | serialize + persist `canvas.json`                               |
-| `resolve(m, entries)`           | pure  | reconcile a manifest against a listing → read view (the heart)  |
-| `heal(m, entries)`              | pure  | reconcile a manifest against a listing → **writable** manifest  |
-| `serialize(manifest)`           | pure  | stable JSON (sorted keys, trailing newline)                     |
-| `add(m, { src, id?, layout? })` | pure  | append a document; duplicate identity → no-op                   |
-| `remove(m, idOrSrc)`            | pure  | drop a document by identity; absent key → no-op                 |
-| `reorder(m, orderedKeys)`       | pure  | permute by identity; named first, unnamed keep order at the end |
-| `setLayout(m, idOrSrc, layout)` | pure  | set placement; `null`/empty clears it; absent key → no-op       |
+| export                          | kind  | what                                                              |
+| ------------------------------- | ----- | ----------------------------------------------------------------- |
+| `read(fs)`                      | IO    | load a bundle → `ResolvedCanvas`                                  |
+| `write(fs, manifest)`           | IO    | serialize + persist `canvas.json`                                 |
+| `resolve(m, entries)`           | pure  | reconcile a manifest against a listing → read view (the heart)    |
+| `heal(m, entries)`              | pure  | reconcile a manifest against a listing → **writable** manifest    |
+| `serialize(manifest)`           | pure  | stable JSON (sorted keys, trailing newline)                       |
+| `add(m, { src, id?, layout? })` | pure  | append a document; duplicate identity → no-op                     |
+| `remove(m, idOrSrc)`            | pure  | drop a document by identity; absent key → no-op                   |
+| `reorder(m, orderedKeys)`       | pure  | permute by identity; named first, unnamed keep order at the end   |
+| `setLayout(m, idOrSrc, layout)` | pure  | set placement; `null`/empty clears it; absent key → no-op         |
 | `setSkip(m, idOrSrc, skip)`     | pure  | skip in the slides view; `false` clears the field; absent → no-op |
-| `MANIFEST_FILENAME`             | const | `"canvas.json"`                                                 |
-| `THUMBNAIL_NAMES`               | const | thumbnail filenames in precedence order                         |
-| _types_                         | —     | `Manifest`, `ResolvedCanvas`, `ReadableFs`, `WritableFs`, …     |
+| `MANIFEST_FILENAME`             | const | `"canvas.json"`                                                   |
+| `THUMBNAIL_NAMES`               | const | thumbnail filenames in precedence order                           |
+| _types_                         | —     | `Manifest`, `ResolvedCanvas`, `ReadableFs`, `WritableFs`, …       |
 
 The five `pure` transforms above share one contract: `(manifest, …) -> manifest`,
 never mutating the input, always preserving unknown top-level / per-document

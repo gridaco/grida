@@ -148,15 +148,15 @@ A reader looks for a root file named **`thumbnail.png` / `thumbnail.svg` / `thum
 
 A conforming reader is tolerant by construction:
 
-| Situation                                    | Behavior                                                                                                 |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `canvas.json` missing                        | Open in **implicit mode**, `type: "unknown"`; MAY derive a document list from on-disk files.             |
-| `canvas.json` is malformed JSON              | **Degrade to implicit mode + surface a warning.** Do not hard-fail.                                      |
-| Unknown top-level fields / unknown `type`    | **Ignore** (and SHOULD preserve on write).                                                               |
+| Situation                                    | Behavior                                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `canvas.json` missing                        | Open in **implicit mode**, `type: "unknown"`; MAY derive a document list from on-disk files.                 |
+| `canvas.json` is malformed JSON              | **Degrade to implicit mode + surface a warning.** Do not hard-fail.                                          |
+| Unknown top-level fields / unknown `type`    | **Ignore** (and SHOULD preserve on write).                                                                   |
 | `documents` absent                           | **Derive from disk:** list SVGs at the root, order **lexically by filename** (the `nnn.svg` convention, §8). |
-| A `documents[].src` points at a missing file | **Skip it with a warning.** Disk wins.                                                                   |
-| Disk has SVGs not listed in `documents`      | Reader **MAY append** them after the listed ones (disk wins for _existence_; manifest wins for _order_). |
-| Two entries share an `id`/`src`              | Linter warning; reader keeps the first.                                                                  |
+| A `documents[].src` points at a missing file | **Skip it with a warning.** Disk wins.                                                                       |
+| Disk has SVGs not listed in `documents`      | Reader **MAY append** them after the listed ones (disk wins for _existence_; manifest wins for _order_).     |
+| Two entries share an `id`/`src`              | Linter warning; reader keeps the first.                                                                      |
 
 The reconcile rule in one line: **the manifest is authoritative for order and placement;
 disk is authoritative for existence.**

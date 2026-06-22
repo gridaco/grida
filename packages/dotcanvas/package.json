@@ -28,12 +28,12 @@
     "url": "https://github.com/gridaco/grida.git",
     "directory": "packages/dotcanvas"
   },
-  "type": "module",
-  "sideEffects": false,
   "files": [
     "dist",
     "CHANGELOG.md"
   ],
+  "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
