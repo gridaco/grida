@@ -6,7 +6,7 @@ import type { dotcanvas } from "dotcanvas";
 // BARE, root-relative paths (`canvas.json`, `001.svg`) — the same convention
 // dotcanvas uses — so there is NO leading-slash translation here.
 //
-// dotcanvas only reads `canvas.json` and lists the root through this port; the
+// dotcanvas reads `canvas.json` and enumerates the bundle through this port; the
 // per-slide SVG bytes are read/written by the editor surface directly (with
 // mtime-conflict handling), not through here.
 
@@ -18,7 +18,12 @@ export interface WorkspaceFsClient {
   readdir(
     workspaceId: string,
     relPath?: string
-  ): Promise<ReadonlyArray<{ rel_path: string }>>;
+  ): Promise<
+    ReadonlyArray<{
+      rel_path: string;
+      kind: "file" | "directory" | "symlink" | "other";
+    }>
+  >;
   readFile(workspaceId: string, relPath: string): Promise<{ content: string }>;
   writeFile(
     workspaceId: string,
@@ -30,14 +35,13 @@ export interface WorkspaceFsClient {
 
 /**
  * An `dotcanvas.WritableFs` bound to one workspace. `list()` enumerates the
- * bundle's **root-level** entries only — the bridge `readdir` lists immediate
- * children, and there is no recursive primitive. That satisfies the port for
- * Grida's `.canvas` decks, which use the root-level `nnn.svg` / `<id>.svg`
- * convention (Grida never authors a nested `src`); a bundle that referenced a
- * nested `src` would need a recursive adapter, which we deliberately avoid here
- * to keep `read()`/`load()` off an unbounded workspace-tree walk. `read()`
- * returns `null` when the file is absent (a missing `canvas.json` → implicit
- * mode).
+ * bundle's files **recursively** — descending into subdirectories itself, since
+ * the bridge `readdir` lists immediate children only — so a nested `src` such as
+ * `slides/001.svg` resolves for existence checks (per the `ReadableFs.list()`
+ * contract). Grida's own decks are flat (root-level `nnn.svg` / `<id>.svg`), so
+ * in practice no subdirectory is walked; symlinks are not followed (bundles are
+ * self-contained — this also avoids cycles). `read()` returns `null` when the
+ * file is absent (a missing `canvas.json` → implicit mode).
  */
 export function workspaceBundleFs(
   workspaceId: string,
@@ -57,8 +61,17 @@ export function workspaceBundleFs(
       : relPath;
   return {
     list: async () => {
-      const entries = await client.readdir(workspaceId, base || undefined);
-      return entries.map((e) => stripBase(e.rel_path));
+      // Walk subdirectories ourselves (the bridge `readdir` is shallow) so a
+      // nested `src` resolves; a flat deck (the common case) walks nothing.
+      const out: string[] = [];
+      const walk = async (dir: string | undefined): Promise<void> => {
+        for (const e of await client.readdir(workspaceId, dir)) {
+          if (e.kind === "directory") await walk(e.rel_path);
+          else if (e.kind === "file") out.push(stripBase(e.rel_path));
+        }
+      };
+      await walk(base || undefined);
+      return out;
     },
     read: async (path) => {
       try {
