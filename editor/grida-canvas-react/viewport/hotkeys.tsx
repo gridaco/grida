@@ -1,4 +1,5 @@
-import { useHotkeys } from "react-hotkeys-hook";
+import { useHotkeys as useRawHotkeys } from "react-hotkeys-hook";
+import type { Keys, HotkeyCallback, Options } from "react-hotkeys-hook";
 import {
   useToolState,
   useA11yArrow,
@@ -10,6 +11,35 @@ import { useEffect, useRef, useState } from "react";
 import { useCurrentEditor } from "../use-editor";
 import { keyboardShortcutText } from "@/grida-canvas-hosted/playground/uxhost-shortcut-renderer";
 import { getKeyboardOS } from "@grida/keybinding";
+
+/**
+ * Editor-local `useHotkeys` that makes `preventDefault: true` the **default**
+ * for every binding registered through it (#767).
+ *
+ * Rationale: a chord we've bound already has an intended editor action, so
+ * letting the browser *also* act on that chord is never what we want — and the
+ * set of browser-default chords is not stable. (A recent Chrome bound `⌘⌥R` to
+ * the Reading-mode panel, which then double-fired with our align-right
+ * shortcut.) Defaulting to `preventDefault` stops future, undocumented browser
+ * accelerators from silently stealing keys we've already claimed.
+ *
+ * The blast radius is bounded: this only `preventDefault`s chords we register a
+ * binding for — unbound browser chords (`⌘R`, `⌘T`, `⌘W`, the address bar, …)
+ * stay fully native. Typing also stays safe: react-hotkeys-hook defaults
+ * `enableOnFormTags: false` / `enableOnContentEditable: false`, so these
+ * handlers (and their `preventDefault`) don't fire while typing in an input.
+ *
+ * Opt out explicitly with `{ preventDefault: false }` (and a one-line reason)
+ * for the rare binding that must let the browser default through.
+ *
+ * NOTE: the wildcard modifier listeners (`"*"`) and the momentary tool-hold
+ * listeners (`space` / `z` / `meta` / `p`) intentionally use the raw hook
+ * (`useRawHotkeys`) instead — they manage their own `preventDefault` and must
+ * not blanket-suppress every keystroke.
+ */
+function useHotkeys(keys: Keys, callback: HotkeyCallback, options?: Options) {
+  return useRawHotkeys(keys, callback, { preventDefault: true, ...options });
+}
 
 function useSingleDoublePressHotkey(
   key: string,
@@ -55,7 +85,9 @@ export function useEditorHotKeys() {
   }, [tool.type, altKey, editor]);
 
   // always triggering. (alt, meta, ctrl, shift)
-  useHotkeys(
+  // raw hook: a wildcard listener must NOT blanket-preventDefault every key — it
+  // preventDefaults only the Alt case explicitly (menu-focus on win/chrome).
+  useRawHotkeys(
     "*",
     (e) => {
       switch (e.key) {
@@ -98,7 +130,8 @@ export function useEditorHotKeys() {
     }
   );
 
-  useHotkeys(
+  // raw hook: wildcard keyup listener (see the keydown counterpart above).
+  useRawHotkeys(
     "*",
     (e) => {
       switch (e.key) {
@@ -140,8 +173,9 @@ export function useEditorHotKeys() {
   );
   //
 
+  // raw hook: momentary hand-tool hold (keydown/keyup); keep browser default.
   const __hand_tool_triggered_by_hotkey = useRef(false);
-  useHotkeys(
+  useRawHotkeys(
     "space",
     (e) => {
       // cancel if already in hand tool, but not triggered by hotkey
@@ -168,8 +202,9 @@ export function useEditorHotKeys() {
     }
   );
 
+  // raw hook: momentary zoom-tool hold (keydown/keyup).
   const __zoom_tool_triggered_by_hotkey = useRef(false);
-  useHotkeys(
+  useRawHotkeys(
     "z",
     (e) => {
       // cancel if already in zoom tool, but not triggered by hotkey
@@ -196,8 +231,10 @@ export function useEditorHotKeys() {
     }
   );
 
+  // raw hook: momentary bend-tool hold on a lone modifier (`meta`); a lone
+  // modifier must not preventDefault.
   const __bend_tool_triggered_by_hotkey = useRef(false);
-  useHotkeys(
+  useRawHotkeys(
     "meta",
     (e) => {
       if (e.type === "keydown" && content_edit_mode?.type !== "vector") return;
@@ -835,7 +872,9 @@ export function useEditorHotKeys() {
     editor.surface.surfaceSetTool({ type: "draw", tool: "arrow" });
   });
 
-  useHotkeys(
+  // raw hook: momentary path-tool hold (keydown sets the keep-projecting
+  // modifier, keyup clears it).
+  useRawHotkeys(
     "p",
     () => {
       // Holding `p` continues a path even when closing on an existing vertex.
@@ -845,7 +884,7 @@ export function useEditorHotKeys() {
     { keydown: true, keyup: false }
   );
 
-  useHotkeys(
+  useRawHotkeys(
     "p",
     () => {
       editor.surface.surfaceConfigurePathKeepProjectingModifier("off");
