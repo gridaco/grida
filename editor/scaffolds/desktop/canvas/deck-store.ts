@@ -1,12 +1,12 @@
 import { nanoid } from "nanoid";
-import { iocanvas } from "@grida/io-canvas";
+import { dotcanvas } from "dotcanvas";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import {
   workspaceBundleFs,
   type WorkspaceFsClient,
 } from "./workspace-bundle-fs";
 
-/** One slide as the deck UI sees it. `id` is the **iocanvas identity** (the
+/** One slide as the deck UI sees it. `id` is the **dotcanvas identity** (the
  *  doc's `id`, else its `src`) — the key the transforms (`reorder`/`remove`)
  *  match on. `name` is optional view metadata (a web-authored deck may carry
  *  it; desktop-created slides don't). */
@@ -35,11 +35,11 @@ function assertBundleLocalSrc(src: string): void {
   }
 }
 
-function slidesFromManifest(m: iocanvas.Manifest): Slide[] {
+function slidesFromManifest(m: dotcanvas.Manifest): Slide[] {
   return (m.documents ?? [])
     .filter((d) => typeof d?.src === "string" && d.src.length > 0)
     .map((d) => ({
-      // Identity, matching io-canvas: explicit id, else src.
+      // Identity, matching dotcanvas: explicit id, else src.
       id: typeof d.id === "string" && d.id ? d.id : d.src,
       src: d.src,
       name: typeof d.name === "string" ? d.name : undefined,
@@ -47,31 +47,8 @@ function slidesFromManifest(m: iocanvas.Manifest): Slide[] {
 }
 
 /**
- * Fold io-canvas's reconciled projection back into a manifest: membership +
- * order come from `resolved.documents` (disk truth — missing `src`s dropped,
- * disk-only SVGs appended, final order), while each surviving entry keeps its
- * parsed manifest fields (`name`, `layout`, unknowns) and the top-level fields
- * are preserved. Disk-appended slides enter as minimal `{ src, id }` records.
- * The result is what the deck both renders and writes, so neither drifts from
- * disk.
- */
-function reconcileManifest(
-  resolved: iocanvas.ResolvedCanvas
-): iocanvas.Manifest {
-  const prior = new Map(
-    (resolved.manifest?.documents ?? [])
-      .filter((d): d is iocanvas.ManifestDocument => typeof d?.src === "string")
-      .map((d) => [d.src, d] as const)
-  );
-  const documents = resolved.documents.map(
-    (d) => prior.get(d.src) ?? { src: d.src, id: d.id }
-  );
-  return { ...(resolved.manifest ?? { type: "svg-slides" }), documents };
-}
-
-/**
- * The desktop deck's source of truth: a carried `iocanvas.Manifest` mutated
- * through the pure `iocanvas` transforms (`add` / `remove` / `reorder`) and
+ * The desktop deck's source of truth: a carried `dotcanvas.Manifest` mutated
+ * through the pure `dotcanvas` transforms (`add` / `remove` / `reorder`) and
  * written back. This is the **stateless read-modify-write** consumer the
  * transforms were promoted for (the web store rebuilds the whole manifest
  * instead) — so it's the genuine dogfood.
@@ -82,9 +59,9 @@ function reconcileManifest(
  * over a fake bridge with no React or Electron.
  */
 export class CanvasDeck {
-  private manifest: iocanvas.Manifest = { type: "svg-slides", documents: [] };
+  private manifest: dotcanvas.Manifest = { type: "svg-slides", documents: [] };
   private slides: Slide[] = [];
-  private readonly fs: iocanvas.WritableFs;
+  private readonly fs: dotcanvas.WritableFs;
   private readonly listeners = new Set<() => void>();
   private writeChain: Promise<void> = Promise.resolve();
 
@@ -121,13 +98,23 @@ export class CanvasDeck {
 
   /** Read `canvas.json` and reconcile it against the on-disk SVGs. */
   async load(): Promise<void> {
-    const resolved = await iocanvas.read(this.fs);
-    // Carry the RECONCILED projection (not the raw manifest) as the round-trip
-    // source: a slide added or removed outside the UI — e.g. by the
-    // workspace-bound agent — then shows up in the strip, and a later persist
-    // writes disk truth instead of resurrecting stale entries. Unknown +
-    // per-doc fields survive via the merge in `reconcileManifest`.
-    this.manifest = reconcileManifest(resolved);
+    const resolved = await dotcanvas.read(this.fs);
+    // Carry the RECONCILED manifest (not the raw one) as the round-trip source:
+    // a slide added or removed outside the UI — e.g. by the workspace-bound
+    // agent — shows up in the strip, and a later persist writes disk truth
+    // instead of resurrecting stale entries. Fold the already-resolved view back
+    // to a manifest via each doc's `meta` (its source entry; a disk-appended doc
+    // has none → minimal `{ src, id }`). Reuses the `resolved` we already hold,
+    // so no second `fs.list()` and no risk of reconciling against a newer disk
+    // snapshot than the one we render. `type` is defaulted to svg-slides only for
+    // an implicit (no canvas.json) bundle.
+    const documents = resolved.documents.map(
+      (d) => d.meta ?? { src: d.src, id: d.id }
+    );
+    this.manifest = {
+      ...(resolved.manifest ?? { type: "svg-slides" }),
+      documents,
+    };
     this.slides = slidesFromManifest(this.manifest);
     this.notify();
   }
@@ -139,7 +126,7 @@ export class CanvasDeck {
     const id = nanoid();
     const src = `${id}.svg`;
     await this.client.writeFile(this.workspaceId, this.abs(src), svg);
-    this.manifest = iocanvas.add(this.manifest, { src, id });
+    this.manifest = dotcanvas.add(this.manifest, { src, id });
     this.commit();
     return id;
   }
@@ -153,13 +140,13 @@ export class CanvasDeck {
     // Trash first: if the manifest dropped it but the file lingered, the next
     // load would re-append it as a disk-origin slide (it'd reappear).
     await this.client.trashEntry(this.workspaceId, this.abs(slide.src));
-    this.manifest = iocanvas.remove(this.manifest, idOrSrc);
+    this.manifest = dotcanvas.remove(this.manifest, idOrSrc);
     this.commit();
   }
 
   /** Reorder the slides view by id/src. */
   async reorder(orderedKeys: string[]): Promise<void> {
-    this.manifest = iocanvas.reorder(this.manifest, orderedKeys);
+    this.manifest = dotcanvas.reorder(this.manifest, orderedKeys);
     this.commit();
   }
 
@@ -176,7 +163,7 @@ export class CanvasDeck {
   private persist(): void {
     const manifest = this.manifest;
     this.writeChain = this.writeChain
-      .then(() => iocanvas.write(this.fs, manifest))
+      .then(() => dotcanvas.write(this.fs, manifest))
       .catch((err) => {
         console.warn("[canvas-deck] manifest write failed:", err);
       });

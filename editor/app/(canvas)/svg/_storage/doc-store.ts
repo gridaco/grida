@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { AgentFs } from "@grida/agent/fs";
 import { OpfsBackend } from "@grida/agent/fs/backends/opfs";
-import { iocanvas } from "@grida/io-canvas";
+import { dotcanvas } from "dotcanvas";
 import type { SvgEditor } from "@grida/svg-editor";
 import { svgEditorBinding } from "../_ai/binding-svg";
 import { bundleFs, ManifestHidingBackend } from "./bundle-fs";
@@ -23,7 +23,7 @@ export type SvgDocStoreOptions = {
 };
 
 /** The `.canvas` type this demo writes. Each document is one SVG slide. */
-const CANVAS_TYPE: iocanvas.CanvasType = "svg-slides";
+const CANVAS_TYPE: dotcanvas.CanvasType = "svg-slides";
 
 /** App extension key under the manifest `ext` bag for demo view-state. */
 const APP_EXT_KEY = "co.grida.svg-demo";
@@ -57,12 +57,12 @@ function idFromPath(path: string): string | null {
 /**
  * Owns the multi-document state for one SVG demo route, persisted as a
  * portable `.canvas` bundle (a `canvas.json` manifest + `<id>.svg` files)
- * via `@grida/io-canvas`. Composes:
+ * via `dotcanvas`. Composes:
  *
  *  - **Bundle backend** — OPFS (or memory) holding `canvas.json` + every
  *    `/<id>.svg`. The manifest (order + per-doc `name`/`createdAt` + the
- *    active id in `ext`) is read with `iocanvas.read` and rewritten with
- *    `iocanvas.write` on every mutation.
+ *    active id in `ext`) is read with `dotcanvas.read` and rewritten with
+ *    `dotcanvas.write` on every mutation.
  *  - **Agent `AgentFs`** — built over `ManifestHidingBackend(bundle)` so the
  *    AI copilot sees only the `/<id>.svg` documents, never `canvas.json`.
  *    Hot-swaps a `LiveBinding` to the active editor on `attachEditor` /
@@ -133,10 +133,10 @@ export class SvgDocStore {
       if (r) this.content.set(id, r.content);
     }
 
-    // Read the manifest. `iocanvas.read` reconciles it against disk: it skips
+    // Read the manifest. `dotcanvas.read` reconciles it against disk: it skips
     // documents whose file is missing, appends on-disk SVGs the manifest omits,
     // and derives the list from disk entirely when `canvas.json` is absent.
-    const resolved = await iocanvas.read(bundleFs(this.canvasBackend));
+    const resolved = await dotcanvas.read(bundleFs(this.canvasBackend));
     if (this.disposed) return;
 
     // Tracks whether any on-disk document was skipped because its bytes didn't
@@ -145,10 +145,6 @@ export class SvgDocStore {
     // slide would be pruned from `canvas.json` permanently.
     let skippedDocs = false;
     if (resolved.documents.length > 0) {
-      const rawByStem = new Map<string, iocanvas.ManifestDocument>();
-      for (const e of resolved.manifest?.documents ?? []) {
-        rawByStem.set(stemOf(e.src), e);
-      }
       const now = Date.now();
       let n = 1;
       for (const d of resolved.documents) {
@@ -157,7 +153,10 @@ export class SvgDocStore {
           skippedDocs = true;
           continue;
         }
-        const raw = rawByStem.get(id);
+        // The source manifest entry rides on the resolved doc as `meta`
+        // (undefined for a disk-appended slide) — read `createdAt`/`name` off it
+        // directly, no re-join against `resolved.manifest`.
+        const raw = d.meta;
         const createdAt =
           typeof raw?.createdAt === "number" ? raw.createdAt : now;
         const name = typeof raw?.name === "string" ? raw.name : `Document ${n}`;
@@ -520,7 +519,7 @@ export class SvgDocStore {
   }
 
   /** Rebuild `canvas.json` from authoritative in-memory state. */
-  private buildManifest(): iocanvas.Manifest {
+  private buildManifest(): dotcanvas.Manifest {
     return {
       type: CANVAS_TYPE,
       documents: this.docs.map((d) => ({
@@ -545,7 +544,7 @@ export class SvgDocStore {
   private persistManifest(): void {
     const manifest = this.buildManifest();
     this.manifestWriteChain = this.manifestWriteChain
-      .then(() => iocanvas.write(bundleFs(this.canvasBackend), manifest))
+      .then(() => dotcanvas.write(bundleFs(this.canvasBackend), manifest))
       .catch((err) => {
         console.warn("[svg-doc-store] manifest write failed:", err);
       });

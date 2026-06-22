@@ -3,7 +3,7 @@
     {
       "id": "intro",
       "name": "Title",
-      "src": "000.svg"
+      "src": "001.svg"
     },
     {
       "id": "chart",
@@ -15,12 +15,12 @@
         "z": 0
       },
       "name": "Chart",
-      "src": "001.svg"
+      "src": "002.svg"
     },
     {
       "id": "thanks",
       "name": "Thanks",
-      "src": "002.svg"
+      "src": "003.svg"
     }
   ],
   "ext": {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { AgentFs } from "@grida/agent/fs";
-import { iocanvas } from "@grida/io-canvas";
+import { dotcanvas } from "dotcanvas";
 import { bundleFs, ManifestHidingBackend } from "./bundle-fs";
 
-// The seam between SvgDocStore and `@grida/io-canvas`: the store persists a
+// The seam between SvgDocStore and `dotcanvas`: the store persists a
 // `.canvas` bundle (canvas.json + <id>.svg) over an `AgentFs.Backend`, reads
 // the manifest through `bundleFs`, and exposes the SVG documents to the AI
 // copilot through `ManifestHidingBackend` (which must keep canvas.json out of
@@ -11,14 +11,14 @@ import { bundleFs, ManifestHidingBackend } from "./bundle-fs";
 
 const APP_EXT_KEY = "co.grida.svg-demo";
 
-describe("bundleFs — io-canvas path adapter", () => {
-  it("translates io-canvas's bare paths to the backend's leading-slash convention", async () => {
+describe("bundleFs — dotcanvas path adapter", () => {
+  it("translates dotcanvas's bare paths to the backend's leading-slash convention", async () => {
     const backend = new AgentFs.MemoryBackend();
-    // io-canvas writes `canvas.json` (no leading slash); the backend stores it
+    // dotcanvas writes `canvas.json` (no leading slash); the backend stores it
     // leading-slash, as a sibling of the leading-slash document files.
-    await iocanvas.write(bundleFs(backend), { type: "svg-slides" });
+    await dotcanvas.write(bundleFs(backend), { type: "svg-slides" });
     expect(await backend.read("/canvas.json")).not.toBeNull();
-    expect(await iocanvas.read(bundleFs(backend)).then((c) => c.type)).toBe(
+    expect(await dotcanvas.read(bundleFs(backend)).then((c) => c.type)).toBe(
       "svg-slides"
     );
   });
@@ -27,11 +27,11 @@ describe("bundleFs — io-canvas path adapter", () => {
 describe("ManifestHidingBackend — copilot view", () => {
   it("hides canvas.json from list/read and drops writes to it", async () => {
     const backend = new AgentFs.MemoryBackend();
-    await backend.write("/000.svg", "<svg/>");
-    await iocanvas.write(bundleFs(backend), { type: "svg-slides" });
+    await backend.write("/001.svg", "<svg/>");
+    await dotcanvas.write(bundleFs(backend), { type: "svg-slides" });
 
     const hidden = new ManifestHidingBackend(backend);
-    expect(await hidden.list()).toEqual(["/000.svg"]); // no /canvas.json
+    expect(await hidden.list()).toEqual(["/001.svg"]); // no /canvas.json
     expect(await hidden.read("/canvas.json")).toBeNull();
 
     await hidden.write("/canvas.json", "tampered");
@@ -48,14 +48,14 @@ describe("ManifestHidingBackend — copilot view", () => {
   });
 });
 
-describe("manifest round-trip (store ↔ io-canvas)", () => {
+describe("manifest round-trip (store ↔ dotcanvas)", () => {
   it("preserves order, per-doc name/createdAt, and the activeId in ext", async () => {
     const backend = new AgentFs.MemoryBackend();
     await backend.write("/a.svg", "<svg/>");
     await backend.write("/b.svg", "<svg/>");
 
     // Shaped exactly as SvgDocStore.buildManifest() does.
-    const manifest: iocanvas.Manifest = {
+    const manifest: dotcanvas.Manifest = {
       type: "svg-slides",
       documents: [
         { src: "b.svg", id: "b", name: "Second", createdAt: 1 },
@@ -63,9 +63,9 @@ describe("manifest round-trip (store ↔ io-canvas)", () => {
       ],
       ext: { [APP_EXT_KEY]: { activeId: "b" } },
     };
-    await iocanvas.write(bundleFs(backend), manifest);
+    await dotcanvas.write(bundleFs(backend), manifest);
 
-    const c = await iocanvas.read(bundleFs(backend));
+    const c = await dotcanvas.read(bundleFs(backend));
     // Manifest is authoritative for order: b before a, both origin manifest.
     expect(c.documents.map((d) => d.src)).toEqual(["b.svg", "a.svg"]);
     expect(c.documents.every((d) => d.origin === "manifest")).toBe(true);
@@ -80,10 +80,10 @@ describe("manifest round-trip (store ↔ io-canvas)", () => {
   it("derives the deck from disk when canvas.json is absent (fresh bundle)", async () => {
     const backend = new AgentFs.MemoryBackend();
     await backend.write("/010.svg", "<svg/>");
-    await backend.write("/000.svg", "<svg/>");
+    await backend.write("/001.svg", "<svg/>");
 
-    const c = await iocanvas.read(bundleFs(backend));
+    const c = await dotcanvas.read(bundleFs(backend));
     expect(c.mode).toBe("implicit");
-    expect(c.documents.map((d) => d.src)).toEqual(["000.svg", "010.svg"]);
+    expect(c.documents.map((d) => d.src)).toEqual(["001.svg", "010.svg"]);
   });
 });

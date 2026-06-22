@@ -1,12 +1,12 @@
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
-import type { iocanvas } from "@grida/io-canvas";
+import type { dotcanvas } from "dotcanvas";
 
-// Adapts the desktop workspace bridge fs to `@grida/io-canvas`'s `WritableFs`
+// Adapts the desktop workspace bridge fs to `dotcanvas`'s `WritableFs`
 // port. Unlike the web OPFS path, the bridge already addresses files with
-// BARE, root-relative paths (`canvas.json`, `000.svg`) — the same convention
-// io-canvas uses — so there is NO leading-slash translation here.
+// BARE, root-relative paths (`canvas.json`, `001.svg`) — the same convention
+// dotcanvas uses — so there is NO leading-slash translation here.
 //
-// io-canvas only reads `canvas.json` and lists the root through this port; the
+// dotcanvas only reads `canvas.json` and lists the root through this port; the
 // per-slide SVG bytes are read/written by the editor surface directly (with
 // mtime-conflict handling), not through here.
 
@@ -29,19 +29,19 @@ export interface WorkspaceFsClient {
 }
 
 /**
- * An `iocanvas.WritableFs` bound to one workspace. `list()` enumerates the
- * bundle root (io-canvas filters to root-level SVGs itself); `read()` returns
+ * An `dotcanvas.WritableFs` bound to one workspace. `list()` enumerates the
+ * bundle root (dotcanvas filters to root-level SVGs itself); `read()` returns
  * `null` when the file is absent (a missing `canvas.json` → implicit mode).
  */
 export function workspaceBundleFs(
   workspaceId: string,
   client: WorkspaceFsClient = workspacesNs,
   basePath = ""
-): iocanvas.WritableFs {
+): dotcanvas.WritableFs {
   // A `.canvas` is NOT always the workspace root — it can live at `basePath`
   // inside a larger workspace (a projects folder opened in the workbench). The
   // bundle's own paths stay relative to the `.canvas` dir (`canvas.json`,
-  // `000.svg`); this adapter maps them to/from the workspace-relative paths the
+  // `001.svg`); this adapter maps them to/from the workspace-relative paths the
   // bridge speaks. `basePath` is "" when the `.canvas` itself is the workspace.
   const base = basePath.replace(/\/+$/, "");
   const abs = (p: string) => (base ? `${base}/${p}` : p);
@@ -59,7 +59,7 @@ export function workspaceBundleFs(
         return (await client.readFile(workspaceId, abs(path))).content;
       } catch {
         // The manifest is optional by contract — any read failure (absent,
-        // binary, oversized) degrades to "no manifest", and io-canvas derives
+        // binary, oversized) degrades to "no manifest", and dotcanvas derives
         // the deck from the on-disk SVGs instead.
         return null;
       }

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d0d1a" />
+      <stop offset="100%" stop-color="#1a1a3e" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8080d0" />
+      <stop offset="100%" stop-color="#4a4a8a" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4a4a8a" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#0d0d1a" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bg)" />
+
+  <!-- Radial glow behind circle -->
+  <ellipse cx="960" cy="460" rx="500" ry="460" fill="url(#glow)" />
+
+  <!-- Concentric decorative rings -->
+  <circle cx="960" cy="460" r="340" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.05" />
+  <circle cx="960" cy="460" r="260" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.08" />
+  <circle cx="960" cy="460" r="180" fill="none" stroke="#8080d0" stroke-width="2" stroke-opacity="0.2" />
+
+  <!-- Main circle (enriched) -->
+  <circle cx="960" cy="460" r="110" fill="none" stroke="url(#accent)" stroke-width="4" />
+
+  <!-- Checkmark inside circle -->
+  <polyline points="910,460 945,498 1015,418" fill="none" stroke="#8080d0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Thank you text -->
+  <text x="960" y="700" font-family="ui-sans-serif, system-ui, sans-serif" font-size="110" font-weight="800" text-anchor="middle" fill="#ffffff" letter-spacing="-2">Thank You</text>
+
+  <!-- Subtitle -->
+  <text x="960" y="790" font-family="ui-monospace, monospace" font-size="38" text-anchor="middle" fill="#8080d0" fill-opacity="0.8" letter-spacing="4">Slide 3 — Thanks</text>
+
+  <!-- Horizontal rule -->
+  <line x1="760" y1="840" x2="1160" y2="840" stroke="#8080d0" stroke-width="1.5" stroke-opacity="0.3" />
+
+  <!-- CTA / footnote -->
+  <text x="960" y="900" font-family="ui-monospace, monospace" font-size="32" text-anchor="middle" fill="#aaaaaa" fill-opacity="0.5" letter-spacing="3">grida.co</text>
+
+  <!-- Bottom metadata -->
+  <text x="160" y="1040" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" fill-opacity="0.3" letter-spacing="2">grida.co</text>
+  <text x="1760" y="1040" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" fill-opacity="0.3" text-anchor="end" letter-spacing="2">3 / 3</text>
+</svg>

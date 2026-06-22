@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { iocanvas } from "./index";
+import { dotcanvas } from "./index";
 
-const { add, remove, reorder, resolve, serialize, setLayout } = iocanvas;
+const { add, heal, remove, reorder, resolve, serialize, setLayout, setSkip } =
+  dotcanvas;
 
 describe("isBundlePath — `.canvas` package suffix", () => {
   it("matches the `.canvas` extension, case-insensitively", () => {
-    expect(iocanvas.isBundlePath("deck.canvas")).toBe(true);
-    expect(iocanvas.isBundlePath("/a/b/intro.canvas")).toBe(true);
-    expect(iocanvas.isBundlePath("Deck.Canvas")).toBe(true);
+    expect(dotcanvas.isBundlePath("deck.canvas")).toBe(true);
+    expect(dotcanvas.isBundlePath("/a/b/intro.canvas")).toBe(true);
+    expect(dotcanvas.isBundlePath("Deck.Canvas")).toBe(true);
   });
 
   it("rejects non-bundle paths", () => {
-    expect(iocanvas.isBundlePath("deck.svg")).toBe(false);
-    expect(iocanvas.isBundlePath("canvas")).toBe(false);
-    expect(iocanvas.isBundlePath("a/canvas.json")).toBe(false);
+    expect(dotcanvas.isBundlePath("deck.svg")).toBe(false);
+    expect(dotcanvas.isBundlePath("canvas")).toBe(false);
+    expect(dotcanvas.isBundlePath("a/canvas.json")).toBe(false);
   });
 });
 
@@ -41,10 +42,10 @@ describe("resolve — RFD §5 reconcile", () => {
   });
 
   it("documents absent → derive from disk, lexical by filename", () => {
-    const c = resolve({}, ["010.svg", "000.svg", "001.svg"]);
+    const c = resolve({}, ["010.svg", "001.svg", "002.svg"]);
     expect(c.documents.map((d) => d.src)).toEqual([
-      "000.svg",
       "001.svg",
+      "002.svg",
       "010.svg",
     ]);
     expect(c.documents.every((d) => d.origin === "disk")).toBe(true);
@@ -88,10 +89,10 @@ describe("resolve — RFD §5 reconcile", () => {
 
   it("explicit id is the identity; absent id falls back to src", () => {
     const c = resolve(
-      { documents: [{ src: "000.svg", id: "n_a1b2" }, { src: "001.svg" }] },
-      ["000.svg", "001.svg"]
+      { documents: [{ src: "001.svg", id: "n_a1b2" }, { src: "002.svg" }] },
+      ["001.svg", "002.svg"]
     );
-    expect(c.documents.map((d) => d.id)).toEqual(["n_a1b2", "001.svg"]);
+    expect(c.documents.map((d) => d.id)).toEqual(["n_a1b2", "002.svg"]);
   });
 
   it("unrecognized type → unknown (+ warning); unknown top-level + ext preserved", () => {
@@ -110,6 +111,19 @@ describe("resolve — RFD §5 reconcile", () => {
     const c = resolve({ type: "svg-slides" }, []);
     expect(c.type).toBe("svg-slides");
     expect(c.warnings).toEqual([]);
+  });
+
+  it("resolved documents carry their source manifest entry as meta (disk-origin → undefined)", () => {
+    const entry = { src: "a.svg", id: "n_a", name: "Intro", hidden: true };
+    const c = resolve({ documents: [entry] }, ["a.svg", "b.svg"]);
+    // manifest-origin: meta is the source entry, unknown fields (name/hidden) and all.
+    expect(c.documents[0].origin).toBe("manifest");
+    expect(c.documents[0].meta).toEqual(entry);
+    // disk-appended: no authored entry → meta undefined.
+    expect(c.documents[1].origin).toBe("disk");
+    expect(c.documents[1].meta).toBeUndefined();
+    // derive-from-disk (documents absent) is also disk-origin → meta undefined.
+    expect(resolve({}, ["c.svg"]).documents[0].meta).toBeUndefined();
   });
 });
 
@@ -143,23 +157,23 @@ describe("resolve — thumbnail", () => {
   });
 
   it("a root thumbnail.svg is the cover, not an appended slide", () => {
-    const c = resolve({ documents: [{ src: "000.svg" }] }, [
-      "000.svg",
+    const c = resolve({ documents: [{ src: "001.svg" }] }, [
+      "001.svg",
       "thumbnail.svg",
     ]);
-    expect(c.documents.map((d) => d.src)).toEqual(["000.svg"]);
+    expect(c.documents.map((d) => d.src)).toEqual(["001.svg"]);
     expect(c.thumbnail).toBe("thumbnail.svg");
   });
 
   it("derive-from-disk treats thumbnail.svg as the cover, not a slide", () => {
-    const c = resolve({}, ["000.svg", "thumbnail.svg"]);
-    expect(c.documents.map((d) => d.src)).toEqual(["000.svg"]);
+    const c = resolve({}, ["001.svg", "thumbnail.svg"]);
+    expect(c.documents.map((d) => d.src)).toEqual(["001.svg"]);
     expect(c.thumbnail).toBe("thumbnail.svg");
   });
 
   it("an explicit thumbnail SVG is excluded from derived slides", () => {
-    const c = resolve({ thumbnail: "cover.svg" }, ["000.svg", "cover.svg"]);
-    expect(c.documents.map((d) => d.src)).toEqual(["000.svg"]);
+    const c = resolve({ thumbnail: "cover.svg" }, ["001.svg", "cover.svg"]);
+    expect(c.documents.map((d) => d.src)).toEqual(["001.svg"]);
     expect(c.thumbnail).toBe("cover.svg");
   });
 
@@ -173,13 +187,13 @@ describe("resolve — thumbnail", () => {
 
 describe("resolve — tolerance", () => {
   it("leading slashes in disk paths normalize to root entries", () => {
-    const c = resolve({}, ["/000.svg", "/001.svg"]);
-    expect(c.documents.map((d) => d.src)).toEqual(["000.svg", "001.svg"]);
+    const c = resolve({}, ["/001.svg", "/002.svg"]);
+    expect(c.documents.map((d) => d.src)).toEqual(["001.svg", "002.svg"]);
   });
 
   it("nested paths are not treated as root-level slides", () => {
-    const c = resolve({}, ["assets/icon.svg", "000.svg"]);
-    expect(c.documents.map((d) => d.src)).toEqual(["000.svg"]);
+    const c = resolve({}, ["assets/icon.svg", "001.svg"]);
+    expect(c.documents.map((d) => d.src)).toEqual(["001.svg"]);
   });
 
   it("layout keeps only finite numeric fields; empty layout → null", () => {
@@ -199,7 +213,7 @@ describe("resolve — tolerance", () => {
 
 describe("serialize — stable, lossless (RFD §8)", () => {
   it("serialize preserves ext + unknown fields; stable (sorted keys, trailing newline)", () => {
-    const manifest: iocanvas.Manifest = {
+    const manifest: dotcanvas.Manifest = {
       type: "svg-slides",
       version: "1",
       zzz: "keep",
@@ -220,11 +234,65 @@ describe("serialize — stable, lossless (RFD §8)", () => {
     expect(at("version")).toBeLessThan(at("zzz"));
 
     // Array order (documents) is preserved, not sorted.
-    const parsed = JSON.parse(out) as iocanvas.Manifest;
+    const parsed = JSON.parse(out) as dotcanvas.Manifest;
     expect(parsed.documents?.map((d) => d.src)).toEqual(["b.svg", "a.svg"]);
 
     // Round-trips structurally (key order aside).
     expect(parsed).toEqual(manifest);
+  });
+});
+
+describe("heal — read→writable reconcile (R3)", () => {
+  it("heal drops missing src, appends disk-only SVGs, preserves id/layout/skip/unknown per-doc fields", () => {
+    const manifest: dotcanvas.Manifest = {
+      type: "svg-slides",
+      documents: [
+        {
+          src: "a.svg",
+          id: "n_a",
+          name: "Intro",
+          skip: true,
+          layout: { x: 1, y: 2 },
+        },
+        { src: "gone.svg" }, // missing on disk → dropped
+      ],
+    };
+    // b.svg exists on disk but isn't listed → appended after the surviving entry.
+    const healed = heal(manifest, ["a.svg", "b.svg"]);
+    expect(healed.documents).toEqual([
+      // `skip` (and `name`) ride through untouched on the source entry (`meta`).
+      {
+        src: "a.svg",
+        id: "n_a",
+        name: "Intro",
+        skip: true,
+        layout: { x: 1, y: 2 },
+      },
+      { src: "b.svg", id: "b.svg" },
+    ]);
+  });
+
+  it("heal preserves unknown top-level fields and ext", () => {
+    const manifest: dotcanvas.Manifest = {
+      type: "svg-slides",
+      version: "1",
+      foo: "keep",
+      ext: { vendor: { a: 1 } },
+      documents: [{ src: "a.svg" }],
+    };
+    const healed = heal(manifest, ["a.svg"]);
+    expect(healed.type).toBe("svg-slides");
+    expect(healed.version).toBe("1");
+    expect(healed.foo).toBe("keep");
+    expect(healed.ext).toEqual({ vendor: { a: 1 } });
+  });
+
+  it("heal(null, entries) derives a writable manifest from disk", () => {
+    const healed = heal(null, ["002.svg", "001.svg"]);
+    expect(healed.documents).toEqual([
+      { src: "001.svg", id: "001.svg" },
+      { src: "002.svg", id: "002.svg" },
+    ]);
   });
 });
 
@@ -352,8 +420,26 @@ describe("edit — pure manifest transforms", () => {
     expect(setLayout(m, "nope.svg", { x: 1 })).toBe(m);
   });
 
+  it("setSkip marks a document skipped; false clears it (absent ⇒ not skipped)", () => {
+    const set = setSkip(
+      { documents: [{ src: "a.svg" }, { src: "b.svg" }] },
+      "b.svg",
+      true
+    );
+    expect(set.documents?.[0].skip).toBeUndefined();
+    expect(set.documents?.[1].skip).toBe(true);
+    // `false` drops the field entirely so the manifest stays minimal.
+    const cleared = setSkip(set, "b.svg", false);
+    expect("skip" in (cleared.documents![1] as object)).toBe(false);
+  });
+
+  it("setSkip on an absent key is a no-op", () => {
+    const m = { documents: [{ src: "a.svg" }] };
+    expect(setSkip(m, "nope.svg", true)).toBe(m);
+  });
+
   it("add/remove/reorder/setLayout preserve the top-level unknown bag and ext", () => {
-    const base: iocanvas.Manifest = {
+    const base: dotcanvas.Manifest = {
       type: "svg-slides",
       foo: "keep",
       ext: { vendor: { a: 1 } },
@@ -372,7 +458,7 @@ describe("edit — pure manifest transforms", () => {
   });
 
   it("add/reorder/setLayout preserve unknown per-document fields (serialize round-trips)", () => {
-    const base: iocanvas.Manifest = {
+    const base: dotcanvas.Manifest = {
       documents: [
         { src: "a.svg", name: "Intro", createdAt: 7 },
         { src: "b.svg", id: "n_b", note: { deep: true } },
@@ -384,7 +470,7 @@ describe("edit — pure manifest transforms", () => {
       reorder(base, ["b.svg", "a.svg"]),
       setLayout(base, "b.svg", { x: 1 }),
     ]) {
-      const parsed = JSON.parse(serialize(result)) as iocanvas.Manifest;
+      const parsed = JSON.parse(serialize(result)) as dotcanvas.Manifest;
       const a = parsed.documents!.find((d) => d.src === "a.svg")!;
       const b = parsed.documents!.find((d) => d.src === "b.svg")!;
       expect(a.name).toBe("Intro");
@@ -395,7 +481,7 @@ describe("edit — pure manifest transforms", () => {
   });
 
   it("remove keeps the surviving document's unknown fields untouched", () => {
-    const base: iocanvas.Manifest = {
+    const base: dotcanvas.Manifest = {
       documents: [
         { src: "a.svg", name: "Intro" },
         { src: "b.svg", id: "n_b", note: { deep: true } },
@@ -403,14 +489,14 @@ describe("edit — pure manifest transforms", () => {
     };
     const parsed = JSON.parse(
       serialize(remove(base, "a.svg"))
-    ) as iocanvas.Manifest;
+    ) as dotcanvas.Manifest;
     expect(parsed.documents).toEqual([
       { src: "b.svg", id: "n_b", note: { deep: true } },
     ]);
   });
 
   it("transforms never mutate the input manifest", () => {
-    const base: iocanvas.Manifest = {
+    const base: dotcanvas.Manifest = {
       documents: [{ src: "a.svg", layout: { x: 1 } }],
     };
     const snapshot = serialize(base);

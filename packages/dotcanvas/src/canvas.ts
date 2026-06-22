@@ -20,7 +20,9 @@
  * root-relative; `..`-escape and absolute paths are out of scope for V1.
  */
 export interface ReadableFs {
-  /** Enumerate every path in the bundle. Order undefined. */
+  /** Enumerate every path in the bundle, **recursively** — nested paths
+   *  included, not only root-level entries — so an existence check for a nested
+   *  `src` works. Order is undefined. */
   list(): Promise<string[]>;
   /** Read the text at `path`, or `null` if no such file. */
   read(path: string): Promise<string | null>;
@@ -51,18 +53,34 @@ export type ManifestDocument = {
   src: string;
   id?: string;
   layout?: Layout;
+  /** Skip this document in the **linear slides / sequence (present) view** — it
+   *  is omitted from the running order, but still EXISTS and stays visible in
+   *  canvas / grid / editor views. It is *skipped*, not *hidden* — a viewer in a
+   *  non-linear mode can still see it. Optional; absent ⇒ not skipped. Advisory:
+   *  the reader round-trips it but never acts on it (`resolve` does NOT drop
+   *  skipped documents). The slides family's analogue to PowerPoint
+   *  (`sld@show="0"`) / Google Slides (`isSkipped`) / Keynote·Figma "Skip Slide".
+   *  A human *label* is intentionally NOT modeled here — that is the document's
+   *  own content's job (for an SVG slide, its `<title>` element). */
+  skip?: boolean;
   [key: string]: unknown;
 };
 
 /** `canvas.json` as authored. The minimal valid manifest is `{}`. Unknown
- *  top-level fields are retained so a newer writer's data survives round-trip. */
-export type Manifest = {
+ *  top-level fields are retained so a newer writer's data survives round-trip.
+ *
+ *  `TExt` lets a consumer type the vendor bag it owns (`ext`). The default
+ *  reproduces the untyped `Record<string, unknown>`, so `Manifest` and
+ *  `Manifest<MyExt>` are interchangeable wherever the ext shape doesn't matter.
+ *  `TExt` is *trusted, not validated* — the reader never checks `ext` against it
+ *  (see {@link resolve}). */
+export type Manifest<TExt = Record<string, unknown>> = {
   version?: string;
   $schema?: string;
   type?: string;
   thumbnail?: string;
   documents?: ManifestDocument[];
-  ext?: Record<string, unknown>;
+  ext?: TExt;
   [key: string]: unknown;
 };
 
@@ -93,11 +111,21 @@ export type ResolvedDocument = {
   exists: boolean;
   /** Whether this came from the manifest list or was appended from disk. */
   origin: "manifest" | "disk";
+  /** The matched source manifest entry this resolved doc came from — present
+   *  for `origin: "manifest"`, `undefined` for `origin: "disk"` (a disk-appended
+   *  document has no authored entry). Carries every authored field, including
+   *  unknown per-document fields (a human `name`, a `hidden` flag, etc.), so the
+   *  resolved view is self-sufficient: a consumer renders per-document metadata
+   *  from `resolved.documents` alone, without re-joining `resolved.manifest`. The
+   *  package never interprets it — it is the raw entry, round-tripped untouched. */
+  meta?: ManifestDocument;
 };
 
 /** The derived, reconciled view a consumer renders from. Rebuilt on every
- *  read — never a cache, never the source of truth. */
-export type ResolvedCanvas = {
+ *  read — never a cache, never the source of truth. `TExt` types `ext` (and the
+ *  carried `manifest`); it defaults to the untyped bag and is trusted, not
+ *  validated. */
+export type ResolvedCanvas<TExt = Record<string, unknown>> = {
   /** `declared` = `canvas.json` parsed OK; `implicit` = absent or malformed. */
   mode: "declared" | "implicit";
   type: CanvasType;
@@ -106,12 +134,12 @@ export type ResolvedCanvas = {
   thumbnail: string | null;
   /** Final reconciled order (the slides view); `layout` is the canvas view. */
   documents: ResolvedDocument[];
-  ext: Record<string, unknown>;
+  ext: TExt;
   warnings: Warning[];
   /** The parsed manifest (or `null` in implicit mode). This is the round-trip
    *  source: a consumer that edits then writes back mutates THIS and passes it
    *  to `write`, so unknown fields survive. */
-  manifest: Manifest | null;
+  manifest: Manifest<TExt> | null;
 };
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -194,13 +222,28 @@ export function parse(text: string): {
  * Reconcile a manifest (or `null`, for implicit mode) against a directory
  * listing into the projection a consumer renders.
  *
+ * `TExt` types the returned `ext` (and the carried `manifest`). It is *trusted,
+ * not validated*: when `ext` is absent or not an object, this returns `{}` typed
+ * as `TExt` — an unchecked convenience, not a runtime guarantee that the bag
+ * matches `TExt`.
+ *
+ * Containment is the **host's** job. This checks existence only (`diskAll.has`);
+ * it does NOT reject a `..`-traversal or absolute `src`. A consumer that maps a
+ * `src` to a real file MUST guard containment itself before any file op — never
+ * trust `resolve` for safety. Ordering is fixed: `documents` order, then
+ * disk-only SVGs appended lexically; there is no auto-renumber, and there won't be.
+ *
+ * Skipped documents (`skip: true`) are **not** dropped — `skip` is advisory
+ * view-state that rides through on each document's `meta`; honoring it in a
+ * linear slides view is the consumer's job, not the reader's.
+ *
  * @param manifest    parsed manifest, or `null` (missing / malformed)
  * @param rootEntries every path in the bundle (as from `fs.list()`)
  */
-export function resolve(
-  manifest: Manifest | null,
+export function resolve<TExt = Record<string, unknown>>(
+  manifest: Manifest<TExt> | null,
   rootEntries: string[]
-): ResolvedCanvas {
+): ResolvedCanvas<TExt> {
   const warnings: Warning[] = [];
 
   // Disk views: a set of all normalized paths (for existence) and the sorted
@@ -214,7 +257,7 @@ export function resolve(
     const root = rootName(entry);
     if (root && isSvg(root)) diskRootSvgs.push(root);
   }
-  diskRootSvgs.sort(); // lexical by filename (the `000.svg` convention)
+  diskRootSvgs.sort(); // lexical by filename (the `nnn.svg` convention, 1-based)
 
   const mode: ResolvedCanvas["mode"] = manifest ? "declared" : "implicit";
   const type = resolveType(manifest?.type, warnings);
@@ -250,7 +293,9 @@ export function resolve(
     version: typeof manifest?.version === "string" ? manifest.version : null,
     thumbnail: resolveThumbnail(manifest, diskAll, warnings),
     documents,
-    ext: manifest && isObject(manifest.ext) ? manifest.ext : {},
+    // Trusted, not validated: absent / non-object ext degrades to `{}` typed as
+    // TExt. The cast is the unsound-but-deliberate convenience R1 asks for.
+    ext: (manifest && isObject(manifest.ext) ? manifest.ext : {}) as TExt,
     warnings,
     manifest: manifest ?? null,
   };
@@ -334,6 +379,9 @@ function resolveDocuments(
       layout: normalizeLayout(entry.layout),
       exists: true,
       origin: "manifest",
+      // The raw source entry, round-tripped untouched (R2): unknown per-doc
+      // fields ride along so the resolved view is self-sufficient.
+      meta: entry,
     });
   }
 
@@ -355,7 +403,7 @@ function resolveDocuments(
 }
 
 function resolveThumbnail(
-  manifest: Manifest | null,
+  manifest: Manifest<unknown> | null,
   diskAll: Set<string>,
   warnings: Warning[]
 ): string | null {
@@ -386,8 +434,47 @@ function resolveThumbnail(
  * `documents[]` — is preserved; only object keys are sorted. `ext` and unknown
  * fields pass through untouched.
  */
-export function serialize(manifest: Manifest): string {
+export function serialize<TExt = Record<string, unknown>>(
+  manifest: Manifest<TExt>
+): string {
   return JSON.stringify(sortKeysDeep(manifest), null, 2) + "\n";
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Heal — the write-side twin of `resolve`. Same inputs, but returns a WRITABLE,
+// reconciled manifest (the input to `write`) instead of the read-side view.
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Reconcile a manifest against a directory listing into a **writable** manifest:
+ * the canonical "reconcile against disk, then persist the healed file" fold, so
+ * the one-line self-heal is `await write(fs, heal(parsed, entries))`.
+ *
+ * It drops documents whose `src` is missing on disk, appends disk-only root
+ * SVGs, and preserves every surviving entry's `id`/`layout`/unknown fields, plus
+ * every unknown top-level field and `ext` — because membership and order come
+ * from {@link resolve}'s reconciled view while each entry's fields come from its
+ * carried source (`ResolvedDocument.meta`). Disk-appended documents enter as
+ * minimal `{ src, id }` records.
+ *
+ * By construction `heal(m, entries)` equals folding `resolve(m, entries)` back
+ * to a manifest; it exists so consumers don't re-implement that delicate fold.
+ *
+ * @param manifest    parsed manifest, or `null` (missing / malformed)
+ * @param rootEntries every path in the bundle (as from `fs.list()`)
+ */
+export function heal<TExt = Record<string, unknown>>(
+  manifest: Manifest<TExt> | null,
+  rootEntries: string[]
+): Manifest<TExt> {
+  const resolved = resolve(manifest, rootEntries);
+  const documents: ManifestDocument[] = resolved.documents.map(
+    (d) => d.meta ?? { src: d.src, id: d.id }
+  );
+  // Preserve every top-level field (version/$schema/type/thumbnail/ext and any
+  // unknowns); replace only `documents` with the reconciled, disk-true set.
+  // Spreading `null` is a no-op, so no `?? {}` fallback is needed.
+  return { ...manifest, documents } as Manifest<TExt>;
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -418,8 +505,24 @@ function identityOf(doc: ManifestDocument): string {
 /** The current `documents[]` as a fresh array (tolerant: absent/non-array → []).
  *  Each entry is the original object reference — transforms build new entries
  *  only where they change something, so unknown fields ride along untouched. */
-function documentsOf(manifest: Manifest): ManifestDocument[] {
+function documentsOf(manifest: Manifest<unknown>): ManifestDocument[] {
   return Array.isArray(manifest.documents) ? [...manifest.documents] : [];
+}
+
+/** Index of the document whose identity (`id ?? src`) equals `idOrSrc`, or `-1`.
+ *  The shared lookup for `add`'s collision check and `remove`/`setLayout`/
+ *  `setSkip` — there is at most one match under the identity invariant. */
+function indexOfIdentity(
+  documents: ManifestDocument[],
+  idOrSrc: string
+): number {
+  return documents.findIndex(
+    (doc) =>
+      isObject(doc) &&
+      typeof doc.src === "string" &&
+      doc.src.length > 0 &&
+      identityOf(doc) === idOrSrc
+  );
 }
 
 /**
@@ -431,10 +534,10 @@ function documentsOf(manifest: Manifest): ManifestDocument[] {
  * `layout` is normalized (finite numeric fields only; an empty layout is
  * dropped). The input manifest is not mutated.
  */
-export function add(
-  manifest: Manifest,
+export function add<TExt = Record<string, unknown>>(
+  manifest: Manifest<TExt>,
   entry: { src: string; id?: string; layout?: Layout }
-): Manifest {
+): Manifest<TExt> {
   const src = entry.src;
   if (typeof src !== "string" || !src) return manifest; // no usable src → no-op
 
@@ -445,11 +548,8 @@ export function add(
 
   const documents = documentsOf(manifest);
   const identity = identityOf(next);
-  for (const doc of documents) {
-    if (isObject(doc) && typeof doc.src === "string" && doc.src) {
-      if (identityOf(doc) === identity) return manifest; // duplicate identity → no-op
-    }
-  }
+  // duplicate identity → no-op (mirrors `resolve` keeping the first).
+  if (indexOfIdentity(documents, identity) >= 0) return manifest;
 
   return { ...manifest, documents: [...documents, next] };
 }
@@ -460,15 +560,12 @@ export function add(
  * mutated; only the first match is removed (there is at most one under the
  * identity invariant these transforms maintain).
  */
-export function remove(manifest: Manifest, idOrSrc: string): Manifest {
+export function remove<TExt = Record<string, unknown>>(
+  manifest: Manifest<TExt>,
+  idOrSrc: string
+): Manifest<TExt> {
   const documents = documentsOf(manifest);
-  const index = documents.findIndex(
-    (doc) =>
-      isObject(doc) &&
-      typeof doc.src === "string" &&
-      doc.src.length > 0 &&
-      identityOf(doc) === idOrSrc
-  );
+  const index = indexOfIdentity(documents, idOrSrc);
   if (index === -1) return manifest; // absent key → no-op
   documents.splice(index, 1);
   return { ...manifest, documents };
@@ -481,7 +578,10 @@ export function remove(manifest: Manifest, idOrSrc: string): Manifest {
  * order differs. Unknown keys in `orderedKeys` (and repeats) are ignored; each
  * existing document is placed at most once. The input is not mutated.
  */
-export function reorder(manifest: Manifest, orderedKeys: string[]): Manifest {
+export function reorder<TExt = Record<string, unknown>>(
+  manifest: Manifest<TExt>,
+  orderedKeys: string[]
+): Manifest<TExt> {
   const documents = documentsOf(manifest);
   const valid = documents.filter(
     (doc) => isObject(doc) && typeof doc.src === "string" && doc.src.length > 0
@@ -517,19 +617,13 @@ export function reorder(manifest: Manifest, orderedKeys: string[]): Manifest {
  * clears placement (drops the `layout` field entirely). An absent `idOrSrc` is
  * a no-op. The input, and every other entry, are left untouched.
  */
-export function setLayout(
-  manifest: Manifest,
+export function setLayout<TExt = Record<string, unknown>>(
+  manifest: Manifest<TExt>,
   idOrSrc: string,
   layout: Layout | null
-): Manifest {
+): Manifest<TExt> {
   const documents = documentsOf(manifest);
-  const index = documents.findIndex(
-    (doc) =>
-      isObject(doc) &&
-      typeof doc.src === "string" &&
-      doc.src.length > 0 &&
-      identityOf(doc) === idOrSrc
-  );
+  const index = indexOfIdentity(documents, idOrSrc);
   if (index === -1) return manifest; // absent key → no-op
 
   const normalized = normalizeLayout(layout);
@@ -537,6 +631,32 @@ export function setLayout(
   const updated: ManifestDocument = { ...current };
   if (normalized) updated.layout = normalized;
   else delete updated.layout;
+
+  documents[index] = updated;
+  return { ...manifest, documents };
+}
+
+/**
+ * Mark or unmark a document as skipped in the linear slides view. `true` sets
+ * `skip: true`; `false` **clears** it (drops the field — absent ⇒ not skipped, so
+ * the manifest stays minimal), mirroring `setLayout(null)`. An absent `idOrSrc`
+ * is a no-op. The input, and every other entry, are left untouched. This is the
+ * authored-side toggle for {@link ManifestDocument.skip}; the reader never acts
+ * on it.
+ */
+export function setSkip<TExt = Record<string, unknown>>(
+  manifest: Manifest<TExt>,
+  idOrSrc: string,
+  skip: boolean
+): Manifest<TExt> {
+  const documents = documentsOf(manifest);
+  const index = indexOfIdentity(documents, idOrSrc);
+  if (index === -1) return manifest; // absent key → no-op
+
+  const current = documents[index];
+  const updated: ManifestDocument = { ...current };
+  if (skip) updated.skip = true;
+  else delete updated.skip;
 
   documents[index] = updated;
   return { ...manifest, documents };

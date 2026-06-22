@@ -52,7 +52,7 @@
     "@grida/history": "workspace:*",
     "@grida/hud": "workspace:*",
     "@grida/io": "workspace:*",
-    "@grida/io-canvas": "workspace:*",
+    "dotcanvas": "workspace:*",
     "@grida/io-figma": "workspace:*",
     "@grida/keybinding": "workspace:*",
     "@grida/mixed-properties": "workspace:*",

@@ -22,18 +22,22 @@ import {
  * - `canvas.json` missing → implicit mode, no warning (a normal state).
  * - `canvas.json` malformed → implicit mode + a `manifest_malformed` warning.
  */
-export async function read(fs: ReadableFs): Promise<ResolvedCanvas> {
+export async function read<TExt = Record<string, unknown>>(
+  fs: ReadableFs
+): Promise<ResolvedCanvas<TExt>> {
   const text = await fs.read(MANIFEST_FILENAME);
 
-  let manifest: Manifest | null = null;
+  let manifest: Manifest<TExt> | null = null;
   let parseWarning: Warning | null = null;
   if (text !== null) {
     const parsed = parse(text);
-    manifest = parsed.manifest;
+    // `parse` is shape-blind (runtime JSON); `TExt` is the caller's trusted,
+    // unvalidated declaration of the ext bag.
+    manifest = parsed.manifest as Manifest<TExt> | null;
     parseWarning = parsed.warning;
   }
 
-  const resolved = resolve(manifest, await fs.list());
+  const resolved = resolve<TExt>(manifest, await fs.list());
 
   // Surface the malformed-manifest warning ahead of any reconcile warnings.
   return parseWarning
@@ -45,6 +49,9 @@ export async function read(fs: ReadableFs): Promise<ResolvedCanvas> {
  * Persist a manifest to `canvas.json`. The caller owns the manifest object
  * (including any unknown fields it read in); `write` only serializes it.
  */
-export async function write(fs: WritableFs, manifest: Manifest): Promise<void> {
+export async function write<TExt = Record<string, unknown>>(
+  fs: WritableFs,
+  manifest: Manifest<TExt>
+): Promise<void> {
   await fs.write(MANIFEST_FILENAME, serialize(manifest));
 }
