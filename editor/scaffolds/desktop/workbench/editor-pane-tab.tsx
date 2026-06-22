@@ -28,7 +28,7 @@
 import { useCallback, useMemo } from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { AlertTriangleIcon } from "lucide-react";
-import { iocanvas } from "@grida/io-canvas";
+import { dotcanvas } from "dotcanvas";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { EditorPaneSvgEditor } from "./editor-pane-svg-editor";
@@ -215,7 +215,7 @@ const VIDEO_EXTENSIONS = new Set([
 
 function detectFileMode(relPath: string): FileMode {
   const ext = getExtension(relPath); // includes the leading dot, lowercased
-  if (ext === iocanvas.BUNDLE_EXTENSION) return { kind: "canvas" }; // a `.canvas` directory
+  if (ext === dotcanvas.BUNDLE_EXTENSION) return { kind: "canvas" }; // a `.canvas` directory
   if (ext === ".svg") return { kind: "svg-editor" };
   if (MARKDOWN_EXTENSIONS.has(ext)) return { kind: "markdown-editor" };
   if (IMAGE_EXTENSIONS.has(ext)) return { kind: "image" };

@@ -409,9 +409,6 @@ importers:
       '@grida/io':
         specifier: workspace:*
         version: link:../packages/grida-canvas-io
-      '@grida/io-canvas':
-        specifier: workspace:*
-        version: link:../packages/grida-canvas-io-canvas
       '@grida/io-figma':
         specifier: workspace:*
         version: link:../packages/grida-canvas-io-figma
@@ -706,6 +703,9 @@ importers:
       dompurify:
         specifier: ^3.4.7
         version: 3.4.8
+      dotcanvas:
+        specifier: workspace:*
+        version: link:../packages/dotcanvas
       embla-carousel-autoplay:
         specifier: ^8.3.0
         version: 8.6.0(embla-carousel@8.6.0)
@@ -1059,6 +1059,12 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  packages/dotcanvas:
+    devDependencies:
+      tsdown:
+        specifier: ^0.22.1
+        version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)
+
   packages/grida-ai-agent:
     dependencies:
       '@agentclientprotocol/sdk':
@@ -1195,8 +1201,6 @@ importers:
       '@grida/vn':
         specifier: workspace:*
         version: link:../grida-canvas-vn
-
-  packages/grida-canvas-io-canvas: {}
 
   packages/grida-canvas-io-figma:
     dependencies:
@@ -20540,10 +20544,10 @@ snapshots:
       '@rollup/pluginutils': 5.1.4(rollup@4.53.5)
       commondir: 1.0.1
       estree-walker: 2.0.2
-      fdir: 6.5.0(picomatch@4.0.3)
+      fdir: 6.5.0(picomatch@4.0.4)
       is-reference: 1.2.1
       magic-string: 0.30.21
-      picomatch: 4.0.3
+      picomatch: 4.0.4
     optionalDependencies:
       rollup: 4.53.5
 
@@ -29377,7 +29381,7 @@ snapshots:
 
   semver-diff@4.0.0:
     dependencies:
-      semver: 7.7.4
+      semver: 7.8.1
 
   semver@6.3.1: {}
 
@@ -30536,7 +30540,7 @@ snapshots:
       is-yarn-global: 0.4.1
       latest-version: 7.0.0
       pupa: 3.1.0
-      semver: 7.7.4
+      semver: 7.8.1
       semver-diff: 4.0.0
       xdg-basedir: 5.1.0
 

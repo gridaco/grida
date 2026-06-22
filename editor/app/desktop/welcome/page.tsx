@@ -48,7 +48,7 @@ import {
   type Workspace,
 } from "@/lib/desktop/bridge";
 import { welcome_handoff } from "@/lib/desktop/welcome-handoff";
-import { iocanvas } from "@grida/io-canvas";
+import { dotcanvas } from "dotcanvas";
 import {
   TitleBar,
   TITLEBAR_NO_DRAG_STYLE,
@@ -120,7 +120,7 @@ export default function DesktopWelcomePage() {
           try {
             const entries = await workspacesNs.readdir(w.id);
             return entries.some(
-              (e) => e.rel_path === iocanvas.MANIFEST_FILENAME
+              (e) => e.rel_path === dotcanvas.MANIFEST_FILENAME
             )
               ? w.id
               : null;

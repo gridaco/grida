@@ -54,6 +54,11 @@ JSON. **The minimal valid manifest is `{}`** — every field is optional and the
 fills defaults. All paths are **relative to the bundle root**; `..` escape and absolute
 paths are out of scope for V1 (see [§9](#9-open-questions-need-an-rfd-before-theyre-v2)).
 
+**Containment is the host's responsibility.** A reader reconciles `src` against the
+directory listing for _existence only_ — it is **not** a security boundary and does not
+reject `..`-traversal or absolute paths. A consuming application that maps a `src` to a
+real file MUST guard containment itself before any file operation.
+
 ```jsonc
 {
   // OPTIONAL. Spec version this manifest targets. Missing → reader assumes current.
@@ -72,7 +77,7 @@ paths are out of scope for V1 (see [§9](#9-open-questions-need-an-rfd-before-th
   // Array order IS the sequence order (the "slides view").
   "documents": [
     {
-      "src": "000.svg", // the only field that means anything; relative path
+      "src": "001.svg", // the only field that means anything; relative path
       "id": "n_a1b2", // OPTIONAL stable id; absent → `src` is the identity
       "layout": {
         // OPTIONAL 2D placement (the "canvas view"); absent → no canvas position
@@ -82,6 +87,11 @@ paths are out of scope for V1 (see [§9](#9-open-questions-need-an-rfd-before-th
         "h": 1080,
         "z": 0,
       },
+      // OPTIONAL. Skip this document in the LINEAR slides view (it still EXISTS
+      // and shows in the canvas view); absent → not skipped. Advisory only.
+      "skip": false,
+      // NOTE: there is no `name`/`title` field — a human label is the document's
+      // own content's job (for an SVG slide, its `<title>` element).
     },
   ],
 
@@ -102,6 +112,19 @@ This is the Figma-Slides duality (slides view + canvas view), expressed minimall
 
 One list, two projections. The canvas view is purely additive: an `svg-slides` document
 with no `layout` anywhere is still a perfectly valid linear deck.
+
+**Skip (slides view).** A document may carry `"skip": true` — omitted from the linear
+slides view's running order while it still **exists** and shows in the canvas view. It is
+_skipped_, not _hidden_: a non-linear viewer still sees it. Skip is **advisory** — the
+reader round-trips it but does not drop skipped documents; honoring it is the slides UI's
+job. This mirrors PowerPoint (`sld@show`), Google Slides (`isSkipped`), and
+Keynote/Figma "Skip Slide".
+
+**No `name`/`title`.** A human label is deliberately **not** a manifest field — it is the
+document's own content's job (for an SVG slide, its `<title>` element), matching how
+PowerPoint, Google Slides, and Keynote derive a slide's title from its content rather
+than from deck metadata. The manifest governs order, placement, existence, and skip; the
+label travels inside the document.
 
 ## 3. Document types
 
@@ -125,18 +148,22 @@ A reader looks for a root file named **`thumbnail.png` / `thumbnail.svg` / `thum
 
 A conforming reader is tolerant by construction:
 
-| Situation                                    | Behavior                                                                                                 |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `canvas.json` missing                        | Open in **implicit mode**, `type: "unknown"`; MAY derive a document list from on-disk files.             |
-| `canvas.json` is malformed JSON              | **Degrade to implicit mode + surface a warning.** Do not hard-fail.                                      |
-| Unknown top-level fields / unknown `type`    | **Ignore** (and SHOULD preserve on write).                                                               |
-| `documents` absent                           | **Derive from disk:** list SVGs at the root, order **lexically by filename** (the `000.svg` convention). |
-| A `documents[].src` points at a missing file | **Skip it with a warning.** Disk wins.                                                                   |
-| Disk has SVGs not listed in `documents`      | Reader **MAY append** them after the listed ones (disk wins for _existence_; manifest wins for _order_). |
-| Two entries share an `id`/`src`              | Linter warning; reader keeps the first.                                                                  |
+| Situation                                    | Behavior                                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `canvas.json` missing                        | Open in **implicit mode**, `type: "unknown"`; MAY derive a document list from on-disk files.                 |
+| `canvas.json` is malformed JSON              | **Degrade to implicit mode + surface a warning.** Do not hard-fail.                                          |
+| Unknown top-level fields / unknown `type`    | **Ignore** (and SHOULD preserve on write).                                                                   |
+| `documents` absent                           | **Derive from disk:** list SVGs at the root, order **lexically by filename** (the `nnn.svg` convention, §8). |
+| A `documents[].src` points at a missing file | **Skip it with a warning.** Disk wins.                                                                       |
+| Disk has SVGs not listed in `documents`      | Reader **MAY append** them after the listed ones (disk wins for _existence_; manifest wins for _order_).     |
+| Two entries share an `id`/`src`              | Linter warning; reader keeps the first.                                                                      |
 
 The reconcile rule in one line: **the manifest is authoritative for order and placement;
 disk is authoritative for existence.**
+
+Ordering is exactly **`documents` order, then disk-only SVGs appended lexically** — there
+is no auto-renumber or re-sort mode (no "re-sequence to `nnn.svg`"), and there won't be.
+Any renumbering is a consumer's own behavior, not the reader's.
 
 ## 6. Editor semantics (informative)
 
@@ -172,6 +199,14 @@ These are SHOULDs, offered so the format ages well — not gates:
   legible — nice for local-first, not required.
 - Prefer convention (`nnn.svg`, `thumbnail.png`) when you have no reason to deviate, so
   the implicit-mode reader degrades gracefully.
+- **Number slide files `001.svg`, `002.svg`, … — 1-based, zero-padded.** Page numbers
+  start at 1, so a 1-based filename matches the slide number a viewer shows (file `00N.svg`
+  ≈ page N), which is friendlier than the 0-based `000.svg`. This is only a writer
+  recommendation: the reader sorts lexically and is indifferent to the starting index
+  (`000.svg` is still read fine). _Nuance:_ once a slide is **skipped** (or `documents[]`
+  reorders away from filename order), the file number and the visible page number diverge
+  by the skipped count — that misalignment is inherent to any file-number scheme and is
+  **not** a reason to 0-base or to avoid numbering.
 
 ## 9. Open questions (need an RFD before they're V2)
 

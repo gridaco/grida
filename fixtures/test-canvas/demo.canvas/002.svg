@@ -1,49 +1,79 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0d0d1a" />
-      <stop offset="100%" stop-color="#1a1a3e" />
+      <stop offset="0%" stop-color="#f8f8fc" />
+      <stop offset="100%" stop-color="#eeeef8" />
+    </linearGradient>
+    <linearGradient id="bar1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4a4a8a" />
+      <stop offset="100%" stop-color="#1a1a2e" />
+    </linearGradient>
+    <linearGradient id="bar2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5a5aaa" />
+      <stop offset="100%" stop-color="#2a2a5e" />
+    </linearGradient>
+    <linearGradient id="bar3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6a6abb" />
+      <stop offset="100%" stop-color="#3a3a7e" />
+    </linearGradient>
+    <linearGradient id="bar4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8080d0" />
+      <stop offset="100%" stop-color="#5050a0" />
     </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#8080d0" />
+      <stop offset="0%" stop-color="#1a1a2e" />
       <stop offset="100%" stop-color="#4a4a8a" />
     </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#4a4a8a" stop-opacity="0.3" />
-      <stop offset="100%" stop-color="#0d0d1a" stop-opacity="0" />
-    </radialGradient>
   </defs>
 
   <!-- Background -->
   <rect width="1920" height="1080" fill="url(#bg)" />
 
-  <!-- Radial glow behind circle -->
-  <ellipse cx="960" cy="460" rx="500" ry="460" fill="url(#glow)" />
+  <!-- Left accent bar -->
+  <rect x="0" y="0" width="20" height="1080" fill="url(#accent)" />
 
-  <!-- Concentric decorative rings -->
-  <circle cx="960" cy="460" r="340" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.05" />
-  <circle cx="960" cy="460" r="260" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.08" />
-  <circle cx="960" cy="460" r="180" fill="none" stroke="#8080d0" stroke-width="2" stroke-opacity="0.2" />
+  <!-- Title -->
+  <text x="160" y="140" font-family="ui-sans-serif, system-ui, sans-serif" font-size="80" font-weight="800" fill="#0d0d1a" letter-spacing="-2">Slide 2 — Chart</text>
+  <text x="160" y="200" font-family="ui-monospace, monospace" font-size="32" fill="#4a4a8a" fill-opacity="0.6" letter-spacing="3">QUARTERLY GROWTH</text>
 
-  <!-- Main circle (enriched) -->
-  <circle cx="960" cy="460" r="110" fill="none" stroke="url(#accent)" stroke-width="4" />
+  <!-- Horizontal grid lines -->
+  <line x1="240" y1="320" x2="1680" y2="320" stroke="#1a1a2e" stroke-width="1" stroke-opacity="0.07" />
+  <line x1="240" y1="460" x2="1680" y2="460" stroke="#1a1a2e" stroke-width="1" stroke-opacity="0.07" />
+  <line x1="240" y1="600" x2="1680" y2="600" stroke="#1a1a2e" stroke-width="1" stroke-opacity="0.07" />
+  <line x1="240" y1="740" x2="1680" y2="740" stroke="#1a1a2e" stroke-width="1" stroke-opacity="0.07" />
 
-  <!-- Checkmark inside circle -->
-  <polyline points="910,460 945,498 1015,418" fill="none" stroke="#8080d0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Y-axis labels -->
+  <text x="200" y="328" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" text-anchor="end">100</text>
+  <text x="200" y="468" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" text-anchor="end">75</text>
+  <text x="200" y="608" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" text-anchor="end">50</text>
+  <text x="200" y="748" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" text-anchor="end">25</text>
 
-  <!-- Thank you text -->
-  <text x="960" y="700" font-family="ui-sans-serif, system-ui, sans-serif" font-size="110" font-weight="800" text-anchor="middle" fill="#ffffff" letter-spacing="-2">Thank You</text>
+  <!-- Bars (baseline at y=880) -->
+  <!-- Q1: height=280 (35%) -->
+  <rect x="320" y="600" width="240" height="280" fill="url(#bar1)" rx="6" ry="6" />
+  <!-- Q2: height=420 (52%) -->
+  <rect x="680" y="460" width="240" height="420" fill="url(#bar2)" rx="6" ry="6" />
+  <!-- Q3: height=560 (70%) -->
+  <rect x="1040" y="320" width="240" height="560" fill="url(#bar3)" rx="6" ry="6" />
+  <!-- Q4: height=700 (87%) -->
+  <rect x="1400" y="180" width="240" height="700" fill="url(#bar4)" rx="6" ry="6" />
 
-  <!-- Subtitle -->
-  <text x="960" y="790" font-family="ui-monospace, monospace" font-size="38" text-anchor="middle" fill="#8080d0" fill-opacity="0.8" letter-spacing="4">Slide 3 — Thanks</text>
+  <!-- Value labels above bars -->
+  <text x="440" y="580" font-family="ui-monospace, monospace" font-size="36" font-weight="700" fill="#4a4a8a" text-anchor="middle">35%</text>
+  <text x="800" y="440" font-family="ui-monospace, monospace" font-size="36" font-weight="700" fill="#5a5aaa" text-anchor="middle">52%</text>
+  <text x="1160" y="300" font-family="ui-monospace, monospace" font-size="36" font-weight="700" fill="#6a6abb" text-anchor="middle">70%</text>
+  <text x="1520" y="160" font-family="ui-monospace, monospace" font-size="36" font-weight="700" fill="#8080d0" text-anchor="middle">87%</text>
 
-  <!-- Horizontal rule -->
-  <line x1="760" y1="840" x2="1160" y2="840" stroke="#8080d0" stroke-width="1.5" stroke-opacity="0.3" />
+  <!-- Baseline axis -->
+  <line x1="240" y1="880" x2="1700" y2="880" stroke="#1a1a2e" stroke-width="3" stroke-opacity="0.3" />
 
-  <!-- CTA / footnote -->
-  <text x="960" y="900" font-family="ui-monospace, monospace" font-size="32" text-anchor="middle" fill="#aaaaaa" fill-opacity="0.5" letter-spacing="3">grida.co</text>
+  <!-- X-axis labels -->
+  <text x="440" y="930" font-family="ui-sans-serif, system-ui, sans-serif" font-size="36" fill="#4a4a8a" text-anchor="middle" font-weight="600">Q1</text>
+  <text x="800" y="930" font-family="ui-sans-serif, system-ui, sans-serif" font-size="36" fill="#4a4a8a" text-anchor="middle" font-weight="600">Q2</text>
+  <text x="1160" y="930" font-family="ui-sans-serif, system-ui, sans-serif" font-size="36" fill="#4a4a8a" text-anchor="middle" font-weight="600">Q3</text>
+  <text x="1520" y="930" font-family="ui-sans-serif, system-ui, sans-serif" font-size="36" fill="#4a4a8a" text-anchor="middle" font-weight="600">Q4</text>
 
   <!-- Bottom metadata -->
-  <text x="160" y="1040" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" fill-opacity="0.3" letter-spacing="2">grida.co</text>
-  <text x="1760" y="1040" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" fill-opacity="0.3" text-anchor="end" letter-spacing="2">3 / 3</text>
+  <text x="160" y="1040" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" letter-spacing="2">grida.co</text>
+  <text x="1760" y="1040" font-family="ui-monospace, monospace" font-size="28" fill="#aaaaaa" text-anchor="end" letter-spacing="2">2 / 3</text>
 </svg>

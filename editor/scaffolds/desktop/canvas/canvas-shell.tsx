@@ -1,7 +1,7 @@
 /**
  * Desktop `.canvas` slides editor. The folder is registered as a workspace, so
  * this reads/writes through the `workspaces` bridge fs. The deck's order +
- * structure live in `canvas.json` (mutated via the `@grida/io-canvas`
+ * structure live in `canvas.json` (mutated via the `dotcanvas`
  * transforms in {@link CanvasDeck}); each slide is one `<src>.svg` edited with
  * the keynote camera + mtime-safe save.
  *
@@ -20,7 +20,7 @@ import {
 } from "react";
 import { Play, Plus, Trash2 } from "lucide-react";
 import { SvgEditorProvider } from "@grida/svg-editor/react";
-import { iocanvas } from "@grida/io-canvas";
+import { dotcanvas } from "dotcanvas";
 import { Button } from "@app/ui/components/button";
 import {
   SlideListFocusScope,
@@ -71,8 +71,8 @@ export function DesktopCanvasShell({
   // Needs a `WorkspaceChangesProvider` ancestor (the file window's deck mode and
   // the workbench both provide one); a no-op otherwise.
   const manifestRel = basePath
-    ? `${basePath}/${iocanvas.MANIFEST_FILENAME}`
-    : iocanvas.MANIFEST_FILENAME;
+    ? `${basePath}/${dotcanvas.MANIFEST_FILENAME}`
+    : dotcanvas.MANIFEST_FILENAME;
   useWorkspaceChanges((events) => {
     if (
       events.some((e) => e.rel_path === manifestRel && e.kind !== "deleted")

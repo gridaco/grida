@@ -1,10 +1,10 @@
 import { AgentFs } from "@grida/agent/fs";
-import { iocanvas } from "@grida/io-canvas";
+import { dotcanvas } from "dotcanvas";
 
 // Consumer-side adapters that reconcile the demo's `AgentFs.Backend` (OPFS /
 // memory) with the two fs consumers sitting on top of one `.canvas` bundle:
-// `@grida/io-canvas` (the manifest) and the AI copilot's `AgentFs` (the SVG
-// documents). Both adapters live here, not in io-canvas — io-canvas is
+// `dotcanvas` (the manifest) and the AI copilot's `AgentFs` (the SVG
+// documents). Both adapters live here, not in dotcanvas — dotcanvas is
 // host-agnostic and "not a filesystem"; path conventions and agent-view
 // filtering are the host's concern.
 
@@ -21,12 +21,12 @@ function abs(path: string): string {
 }
 
 /**
- * Adapt an `AgentFs.Backend` to the `@grida/io-canvas` fs port. io-canvas
+ * Adapt an `AgentFs.Backend` to the `dotcanvas` fs port. dotcanvas
  * addresses files root-relative *without* a leading slash (it reads/writes
  * `canvas.json`), while `AgentFs.Backend` (e.g. `OpfsBackend`) requires a
  * leading slash. This bridges the two path conventions.
  */
-export function bundleFs(backend: AgentFs.Backend): iocanvas.WritableFs {
+export function bundleFs(backend: AgentFs.Backend): dotcanvas.WritableFs {
   return {
     list: () => backend.list(),
     read: (p) => backend.read(abs(p)),
@@ -44,7 +44,7 @@ export class ManifestHidingBackend implements AgentFs.Backend {
   constructor(private readonly inner: AgentFs.Backend) {}
 
   private isManifest(path: string): boolean {
-    return bare(path) === iocanvas.MANIFEST_FILENAME;
+    return bare(path) === dotcanvas.MANIFEST_FILENAME;
   }
 
   async list(): Promise<string[]> {

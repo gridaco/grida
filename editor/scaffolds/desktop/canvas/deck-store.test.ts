@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { iocanvas } from "@grida/io-canvas";
+import { dotcanvas } from "dotcanvas";
 import { workspaceBundleFs } from "./workspace-bundle-fs";
 import { CanvasDeck, type WorkspaceDeckClient } from "./deck-store";
 
@@ -12,14 +12,27 @@ class FakeWorkspace implements WorkspaceDeckClient {
     for (const [k, v] of Object.entries(init)) this.files.set(k, v);
   }
   async readdir(_w: string, relPath?: string) {
-    // Immediate children of `relPath` (workspace root when omitted), with
-    // full workspace-relative `rel_path` — matching the real bridge.
+    // Immediate children of `relPath` (workspace root when omitted), with full
+    // workspace-relative `rel_path` and a `kind` — matching the real bridge. A
+    // leaf key is a file; a deeper key surfaces its first segment as a directory.
     const prefix = relPath ? `${relPath}/` : "";
-    return [...this.files.keys()]
-      .filter(
-        (k) => k.startsWith(prefix) && !k.slice(prefix.length).includes("/")
-      )
-      .map((rel_path) => ({ rel_path }));
+    const seen = new Set<string>();
+    const out: { rel_path: string; kind: "file" | "directory" }[] = [];
+    for (const k of this.files.keys()) {
+      if (!k.startsWith(prefix)) continue;
+      const rest = k.slice(prefix.length);
+      const slash = rest.indexOf("/");
+      if (slash === -1) {
+        out.push({ rel_path: k, kind: "file" });
+      } else {
+        const dir = prefix + rest.slice(0, slash);
+        if (!seen.has(dir)) {
+          seen.add(dir);
+          out.push({ rel_path: dir, kind: "directory" });
+        }
+      }
+    }
+    return out;
   }
   async readFile(_w: string, relPath: string) {
     const content = this.files.get(relPath);
@@ -33,34 +46,49 @@ class FakeWorkspace implements WorkspaceDeckClient {
   async trashEntry(_w: string, relPath: string) {
     this.files.delete(relPath);
   }
-  manifest(): iocanvas.Manifest {
+  manifest(): dotcanvas.Manifest {
     return JSON.parse(this.files.get("canvas.json") ?? "{}");
   }
 }
 
-describe("workspaceBundleFs — bridge → io-canvas port", () => {
+describe("workspaceBundleFs — bridge → dotcanvas port", () => {
   it("addresses files with bare paths (no leading-slash translation)", async () => {
     const ws = new FakeWorkspace();
-    await iocanvas.write(workspaceBundleFs("w", ws), { type: "svg-slides" });
+    await dotcanvas.write(workspaceBundleFs("w", ws), { type: "svg-slides" });
     expect(ws.files.has("canvas.json")).toBe(true);
-    const c = await iocanvas.read(workspaceBundleFs("w", ws));
+    const c = await dotcanvas.read(workspaceBundleFs("w", ws));
     expect(c.type).toBe("svg-slides");
   });
 
   it("read returns null for an absent file (→ implicit mode)", async () => {
-    const ws = new FakeWorkspace({ "000.svg": "<svg/>" });
-    const c = await iocanvas.read(workspaceBundleFs("w", ws));
+    const ws = new FakeWorkspace({ "001.svg": "<svg/>" });
+    const c = await dotcanvas.read(workspaceBundleFs("w", ws));
     expect(c.mode).toBe("implicit");
-    expect(c.documents.map((d) => d.src)).toEqual(["000.svg"]);
+    expect(c.documents.map((d) => d.src)).toEqual(["001.svg"]);
   });
 
   it("scopes to basePath: lists bundle-relative, reads/writes under the subdir", async () => {
-    const ws = new FakeWorkspace({ "decks/d.canvas/000.svg": "<svg/>" });
+    const ws = new FakeWorkspace({ "decks/d.canvas/001.svg": "<svg/>" });
     const fs = workspaceBundleFs("w", ws, "decks/d.canvas");
-    expect(await fs.list()).toEqual(["000.svg"]); // stripped to bundle-relative
+    expect(await fs.list()).toEqual(["001.svg"]); // stripped to bundle-relative
     await fs.write("canvas.json", "{}");
     expect(ws.files.has("decks/d.canvas/canvas.json")).toBe(true); // prefixed
-    expect(await fs.read("000.svg")).toBe("<svg/>");
+    expect(await fs.read("001.svg")).toBe("<svg/>");
+  });
+
+  it("list() walks subdirectories so a nested src resolves (not missing_src)", async () => {
+    const ws = new FakeWorkspace({
+      "canvas.json": JSON.stringify({
+        type: "svg-slides",
+        documents: [{ src: "slides/001.svg" }],
+      }),
+      "slides/001.svg": "<svg/>",
+    });
+    const c = await dotcanvas.read(workspaceBundleFs("w", ws));
+    // The shallow bridge readdir would miss `slides/001.svg`; the recursive
+    // walk finds it, so it resolves as present rather than `missing_src`.
+    expect(c.documents.map((d) => d.src)).toEqual(["slides/001.svg"]);
+    expect(c.warnings).toEqual([]);
   });
 });
 
@@ -82,7 +110,7 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
     expect(deck.getSlides().map((s) => s.src)).toEqual(["b.svg", "a.svg"]);
   });
 
-  it("addSlide writes the SVG file and appends it to canvas.json (via iocanvas.add)", async () => {
+  it("addSlide writes the SVG file and appends it to canvas.json (via dotcanvas.add)", async () => {
     const ws = new FakeWorkspace({
       "canvas.json": JSON.stringify({ type: "svg-slides", documents: [] }),
     });
@@ -195,14 +223,14 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
     const ws = new FakeWorkspace({
       "decks/intro.canvas/canvas.json": JSON.stringify({
         type: "svg-slides",
-        documents: [{ src: "000.svg", id: "a" }],
+        documents: [{ src: "001.svg", id: "a" }],
       }),
-      "decks/intro.canvas/000.svg": "<svg/>",
+      "decks/intro.canvas/001.svg": "<svg/>",
       "other/notes.txt": "x", // sibling content the deck must ignore
     });
     const deck = new CanvasDeck("w", ws, "decks/intro.canvas");
     await deck.load();
-    expect(deck.getSlides().map((s) => s.src)).toEqual(["000.svg"]);
+    expect(deck.getSlides().map((s) => s.src)).toEqual(["001.svg"]);
 
     const id = await deck.addSlide("<svg id='new'/>");
     await deck.flush();
@@ -212,9 +240,9 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
     // canvas.json under the bundle dir; its `src` stays bundle-relative (portable).
     const manifest = JSON.parse(
       ws.files.get("decks/intro.canvas/canvas.json")!
-    ) as iocanvas.Manifest;
+    ) as dotcanvas.Manifest;
     expect(manifest.documents?.map((d) => d.src)).toEqual([
-      "000.svg",
+      "001.svg",
       `${id}.svg`,
     ]);
   });

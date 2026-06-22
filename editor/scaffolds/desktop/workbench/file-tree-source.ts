@@ -1,4 +1,4 @@
-import { iocanvas } from "@grida/io-canvas";
+import { dotcanvas } from "dotcanvas";
 import type { WorkspaceFsEntry } from "@grida/desktop-bridge";
 import type { AsyncTreeEntry, AsyncTreeProvider } from "@grida/tree-view/async";
 
@@ -10,7 +10,7 @@ export namespace WorkspaceFileTree {
    * directory is actually a `.canvas` *bundle* — a macOS-style package the tree
    * presents as a single openable document (no chevron, click opens the deck)
    * instead of an expandable folder. Derived once, here, from the format
-   * library's {@link iocanvas.isBundlePath}, so the row icon, activation, and
+   * library's {@link dotcanvas.isBundlePath}, so the row icon, activation, and
    * `hasChildren` all read the same flag rather than re-testing the suffix.
    */
   export type Meta = WorkspaceFsEntry & { readonly bundle: boolean };
@@ -21,7 +21,7 @@ export namespace WorkspaceFileTree {
 
   /** A directory whose name marks it a `.canvas` bundle (an opaque package). */
   export function isBundle(entry: WorkspaceFsEntry): boolean {
-    return entry.kind === "directory" && iocanvas.isBundlePath(entry.rel_path);
+    return entry.kind === "directory" && dotcanvas.isBundlePath(entry.rel_path);
   }
 
   export function rootMeta(name: string): Meta {

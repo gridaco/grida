@@ -1,9 +1,10 @@
-// The public surface of `@grida/io-canvas`, re-exported as the `iocanvas`
+// The public surface of `dotcanvas`, re-exported as the `dotcanvas`
 // namespace from `./index`. Kept deliberately tight: read/write + the pure
-// core (resolve/serialize) + pure editing transforms (add/remove/reorder/
+// core (resolve/heal/serialize) + pure editing transforms (add/remove/reorder/
 // setLayout). `parse` stays internal (folded into `read`). The editing
 // transforms were promoted once a second consumer dogfooded the manifest-edit
-// shape (see README "Public surface").
+// shape; `heal` (the read→writable bridge) was promoted once two consumers
+// re-implemented the same reconcile fold (see README "Public surface").
 
 export type {
   CanvasType,
@@ -24,10 +25,12 @@ export {
   THUMBNAIL_NAMES,
   isBundlePath,
   add,
+  heal,
   remove,
   reorder,
   resolve,
   serialize,
   setLayout,
+  setSkip,
 } from "./canvas";
 export { read, write } from "./io";

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { iocanvas } from "./index";
+import { dotcanvas } from "./index";
 
 // Reads the on-disk demo bundle through a node:fs-backed `ReadableFs`. Using
 // node:fs HERE (in a test) is fine — the package itself never touches the
@@ -14,7 +14,7 @@ const DEMO = path.resolve(
   "../../../fixtures/test-canvas/demo.canvas"
 );
 
-function nodeReadableFs(dir: string): iocanvas.ReadableFs {
+function nodeReadableFs(dir: string): dotcanvas.ReadableFs {
   return {
     list: () => fs.readdir(dir),
     read: async (p) => {
@@ -29,16 +29,16 @@ function nodeReadableFs(dir: string): iocanvas.ReadableFs {
 
 describe("fixtures/test-canvas/demo.canvas", () => {
   it("reads as a clean 3-slide svg-slides deck", async () => {
-    const c = await iocanvas.read(nodeReadableFs(DEMO));
+    const c = await dotcanvas.read(nodeReadableFs(DEMO));
 
     expect(c.mode).toBe("declared");
     expect(c.type).toBe("svg-slides");
     // Order is the manifest order; identity is each doc's id (≠ filename stem).
     expect(c.documents.map((d) => d.id)).toEqual(["intro", "chart", "thanks"]);
     expect(c.documents.map((d) => d.src)).toEqual([
-      "000.svg",
       "001.svg",
       "002.svg",
+      "003.svg",
     ]);
     expect(c.documents.every((d) => d.origin === "manifest" && d.exists)).toBe(
       true
