@@ -56,8 +56,8 @@ detached, and that an empty sub-selection / policy refusal is a clean no-op.
      vertex that was deleted.
 5. Repeat step 3 with <kbd>Backspace</kbd> — identical behavior to
    <kbd>Delete</kbd>.
-6. With nothing sub-selected (click empty space inside edit mode to clear the
-   sub-selection), press <kbd>Delete</kbd>.
+6. With nothing sub-selected (click empty space to clear the sub-selection),
+   press <kbd>Delete</kbd>.
    - Expected: no-op — the element is NOT deleted and the file is unchanged.
 7. **Policy — vertex-chain restrict.** Mount a triangle
    `<polygon points="0,0 40,0 20,40"/>`, enter edit mode, sub-select one vertex,
