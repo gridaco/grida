@@ -130,6 +130,27 @@ describe("PathModel.deleteSubSelection — geometry", () => {
     ]);
   });
 
+  it("preserves untouched segments' verbs on a tangent-only delete (minimal mutation)", () => {
+    // An H segment followed by a cubic. Deleting only the cubic's tangents is
+    // not a topology change, so the untouched H must keep its authored verb;
+    // the cubic auto-demotes to L via emit-time honesty (#880 Codex review).
+    const m = PathModel.fromSvgPathD("M0,0 H10 C15,-5 15,5 20,0");
+    const out = m.deleteSubSelection({
+      vertices: [],
+      segments: [],
+      tangents: [
+        [1, 0], // ta of the cubic (segment whose a === vertex 1)
+        [2, 1], // tb of the cubic (segment whose b === vertex 2)
+      ] as ReadonlyArray<readonly [number, 0 | 1]>,
+    });
+    const snap = PathModel.fromSvgPathD(out.toSvgPathD()).snapshot();
+    expect(snap.segments[0].source_verb).toBe("H"); // untouched verb survives
+    // the cubic's tangents are gone → it demoted to a straight line
+    expect(snap.segments[1].source_verb).toBe("L");
+    expect(snap.segments[1].ta).toEqual([0, 0]);
+    expect(snap.segments[1].tb).toEqual([0, 0]);
+  });
+
   it("empty selection is an identity (geometry unchanged)", () => {
     const m = PathModel.fromSvgPathD(OPEN);
     const out = m.deleteSubSelection({

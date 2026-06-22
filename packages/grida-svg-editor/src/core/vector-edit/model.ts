@@ -549,13 +549,22 @@ export class PathModel {
    *      the neighbours (matching the main editor), so deleting an interior
    *      vertex can leave an isolated neighbour that simply doesn't emit.
    *
-   * Verb metadata is intentionally not carried across: a deletion is a
-   * topology change, so the result keeps fresh (verb-less) meta and every
-   * surviving segment re-derives its verb from geometry at emit time
-   * (straight → `L`, curved → `C`). This keeps the
-   * `segments.length === meta.length` invariant trivially — the same
-   * pragmatic choice {@link splitSegment} makes when it drops arc-group
-   * identity.
+   * Verb-metadata handling depends on whether the topology changed:
+   *
+   *   - **Tangent-only delete** (no segment / vertex removed) — the segment
+   *     array keeps its shape, so the original meta is preserved verbatim.
+   *     Untouched segments keep their authored verbs (`A` / `H` / `V` / `Z`);
+   *     the edited tangent's owning segment (or arc group) auto-invalidates at
+   *     emit time via the geometry-honesty checks (zeroed tangents → `L`; a
+   *     mutated arc group demotes to `C`). This honors the minimal-mutation
+   *     contract — deleting a tangent must not re-serialize unrelated segments.
+   *   - **Topology change** (a segment or vertex removed) — `vn` filters /
+   *     reindexes the segment array, so the result keeps fresh (verb-less)
+   *     meta and every surviving segment re-derives its verb from geometry at
+   *     emit time. The same pragmatic choice {@link splitSegment} makes when
+   *     it drops arc-group identity.
+   *
+   * Either way the `segments.length === meta.length` invariant holds.
    *
    * Indices are interpreted in THIS model's index space. Callers that
    * re-derive a model from the live `d` each frame (the surface) should
@@ -575,10 +584,16 @@ export class PathModel {
       }
     }
 
+    // Track whether the segment array's shape changed. A segment / vertex
+    // removal filters and reindexes it (meta can no longer align); a
+    // tangent-only edit leaves it structurally identical (meta stays aligned).
+    let topology_changed = false;
+
     // 2. segments — descending so a splice never shifts a later index.
     for (const seg_idx of [...sel.segments].sort((a, b) => b - a)) {
       if (seg_idx >= 0 && seg_idx < vne.value.segments.length) {
         vne.deleteSegment(seg_idx);
+        topology_changed = true;
       }
     }
 
@@ -586,13 +601,19 @@ export class PathModel {
     for (const vertex_idx of [...sel.vertices].sort((a, b) => b - a)) {
       if (vertex_idx >= 0 && vertex_idx < vne.value.vertices.length) {
         vne.deleteVertex(vertex_idx);
+        topology_changed = true;
       }
     }
 
     // `next_network` is this method's own clone — hand it to PathModel
-    // directly (no second clone) with fresh verb-less meta, matching the
-    // sibling mutators (`translateVertex`, `splitSegment`, …).
-    const meta: SegmentMeta[] = vne.value.segments.map(() => ({}));
+    // directly (no second clone), matching the sibling mutators
+    // (`translateVertex`, `splitSegment`, …). Preserve the original meta when
+    // only tangents changed (the segment array is unchanged, so untouched
+    // verbs survive); reset to fresh verb-less meta when the topology changed
+    // (the array was filtered / reindexed — see the doc comment).
+    const meta: ReadonlyArray<SegmentMeta> = topology_changed
+      ? vne.value.segments.map(() => ({}))
+      : this._meta;
     return new PathModel(vne.value, meta);
   }
 
