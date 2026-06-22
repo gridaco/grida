@@ -99,6 +99,28 @@ describe("PathModel.deleteSubSelection — geometry", () => {
     ]);
   });
 
+  it("dedupes repeated vertex indices (no over-delete from reindexing)", () => {
+    // A duplicate index would, without dedupe, delete a DIFFERENT vertex on
+    // its second visit after the first splice reindexes the rest. [1, 1] must
+    // behave exactly like [1] — only vertex 1 (and its segments) removed.
+    const m = PathModel.fromSvgPathD(OPEN);
+    const once = m.deleteSubSelection({
+      vertices: [1],
+      segments: [],
+      tangents: [],
+    });
+    const twice = m.deleteSubSelection({
+      vertices: [1, 1],
+      segments: [],
+      tangents: [],
+    });
+    expect(verts(twice)).toEqual(verts(once));
+    expect(verts(twice)).toEqual([
+      [20, 0],
+      [30, 0],
+    ]);
+  });
+
   it("deletes a segment without touching its endpoints' other segments", () => {
     const m = PathModel.fromSvgPathD(OPEN);
     const out = m.deleteSubSelection({

@@ -589,16 +589,25 @@ export class PathModel {
     // tangent-only edit leaves it structurally identical (meta stays aligned).
     let topology_changed = false;
 
-    // 2. segments — descending so a splice never shifts a later index.
-    for (const seg_idx of [...sel.segments].sort((a, b) => b - a)) {
+    // 2. segments — dedupe, then descending so a splice never shifts a later
+    //    index. Dedupe matters: a repeated index would, after the first
+    //    splice reindexes the rest, delete a DIFFERENT segment on its second
+    //    visit (over-delete) — and diverge from the policy gate's unique-count
+    //    reasoning in `delete_vector_subselection`.
+    for (const seg_idx of Array.from(new Set(sel.segments)).sort(
+      (a, b) => b - a
+    )) {
       if (seg_idx >= 0 && seg_idx < vne.value.segments.length) {
         vne.deleteSegment(seg_idx);
         topology_changed = true;
       }
     }
 
-    // 3. vertices — descending (deleteVertex reindexes higher vertices on splice).
-    for (const vertex_idx of [...sel.vertices].sort((a, b) => b - a)) {
+    // 3. vertices — dedupe, then descending (deleteVertex reindexes higher
+    //    vertices on splice; same over-delete hazard as segments above).
+    for (const vertex_idx of Array.from(new Set(sel.vertices)).sort(
+      (a, b) => b - a
+    )) {
       if (vertex_idx >= 0 && vertex_idx < vne.value.vertices.length) {
         vne.deleteVertex(vertex_idx);
         topology_changed = true;
