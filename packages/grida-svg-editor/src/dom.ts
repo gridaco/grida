@@ -99,6 +99,7 @@ import {
   vector_revert,
   apply_subselection,
   validate_subselection,
+  delete_vector_subselection,
   type SubSelectionSnapshot,
 } from "./core/vector-edit";
 import type { RetypeRecord } from "./core/document";
@@ -178,6 +179,16 @@ const IS_MODIFIER_KEY: Record<string, true> = {
  *  surface skips render() during the in-flight mount and doesn't yank the
  *  live `<text>` element out from under the about-to-mount text surface. */
 const TEXT_EDIT_PENDING = { __pending: true } as const;
+
+/** A frozen empty vector sub-selection — the `after` state a deletion
+ *  replays so the cleared sub-selection is itself part of the undo step.
+ *  Shaped exactly like {@link VectorEditSession.snapshot_selection}'s
+ *  output so `restore_selection` consumes it verbatim. */
+const EMPTY_SUB_SELECTION: SubSelectionSnapshot = Object.freeze({
+  vertices: Object.freeze([] as number[]),
+  segments: Object.freeze([] as number[]),
+  tangents: Object.freeze([] as ReadonlyArray<readonly [number, 0 | 1]>),
+});
 
 /**
  * Wire a web-font settle source to the editor's geometry channel.
@@ -1097,6 +1108,13 @@ class DomSurface implements Surface {
       this.apply_vector_subselection_command(input, mode)
     );
     this.teardown.push(() => internal.set_vector_subselect_driver(null));
+
+    // Delete / Backspace in path-edit mode (gridaco/grida#880). Same
+    // surface-private-session routing as the sub-selection write above.
+    internal.set_vector_delete_driver(() =>
+      this.delete_vector_selection_command()
+    );
+    this.teardown.push(() => internal.set_vector_delete_driver(null));
 
     // Arrow-key nudge: in vector content-edit, route to the path sub-
     // selection (vertices / segments / tangents) instead of leaking to a
@@ -4659,6 +4677,67 @@ class DomSurface implements Surface {
     const before = this.vector_edit.snapshot_selection();
     if (!this.apply_subselection_to_session(input, mode)) return false;
     this.record_vector_selection_change(before, "set vector selection");
+    return true;
+  }
+
+  /**
+   * Driver behind `commands.delete_vector_selection` (gridaco/grida#880).
+   * Deletes the open session's vertex / segment / tangent sub-selection from
+   * the path under edit and writes the smaller geometry back as ONE undoable
+   * step (the same `vector_geometry_step` chokepoint every other vector edit
+   * routes through, so native-attr writeback and promote-to-`<path>` are
+   * handled uniformly). The policy gate + geometry live in the pure core
+   * (`delete_vector_subselection` / `PathModel.deleteSubSelection`); this is
+   * the thin surface shell that resolves the session, brackets history, and
+   * clears the now-stale sub-selection.
+   *
+   * Returns `false` (no-op) when no session is active, a gesture is in
+   * flight, the session has no `d`, nothing is sub-selected, or the policy
+   * verdict refuses (e.g. a triangle `<polygon>` would drop below 3
+   * vertices). On success the element survives and stays in edit mode.
+   *
+   * (see test/svg-editor-vector-delete.md)
+   */
+  private delete_vector_selection_command(): boolean {
+    if (!this.vector_edit) return false;
+    // Refuse mid-gesture: landing a history step inside an open preview drag
+    // or HUD marquee / lasso would break undo order — the same guard
+    // `apply_vector_subselection_command` applies.
+    if (this.active_preview || this.hud.gesture().kind !== "idle") return false;
+
+    const baseline_d = this.read_session_d();
+    if (baseline_d === null) return false;
+    const model = PathModel.fromSvgPathD(baseline_d);
+    const outcome = delete_vector_subselection(
+      this.vector_edit,
+      model,
+      this.vector_edit.source.kind
+    );
+    if (outcome.kind !== "deleted") return false;
+
+    const node_id = this.vector_edit.node_id;
+    const before_selection = this.vector_edit.snapshot_selection();
+    // Deletion invalidates the old indices — clear the sub-selection. The
+    // geometry step's `apply()` replays this empty selection (and `revert()`
+    // the pre-delete one), so undo restores both geometry AND selection.
+    const after_selection = EMPTY_SUB_SELECTION;
+    // One-shot edit → local promotion-token holder (no active_preview); same
+    // preview() + set() + commit() shape `handle_split_segment` uses.
+    const promo: { token: RetypeRecord | null } = { token: null };
+    const internal = this.editor_internal();
+    const delete_session = internal.history.preview("vector/delete");
+    delete_session.set(
+      this.vector_geometry_step(
+        node_id,
+        outcome.d,
+        baseline_d,
+        promo,
+        after_selection,
+        before_selection
+      )
+    );
+    delete_session.commit();
+    this.redraw();
     return true;
   }
 

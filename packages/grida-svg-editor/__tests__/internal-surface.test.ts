@@ -44,6 +44,7 @@ type Internal = {
   set_computed_resolver: (fn: unknown) => void;
   set_geometry: (p: unknown) => void;
   set_vector_subselect_driver: (fn: unknown) => void;
+  set_vector_delete_driver: (fn: unknown) => void;
   register_command: (id: string, handler: unknown) => () => void;
 };
 
@@ -74,6 +75,7 @@ describe("editor._internal contract", () => {
         "set_geometry",
         "set_surface_hover_override_driver",
         "set_vector_subselect_driver",
+        "set_vector_delete_driver",
         "subscribe_translate_commit",
       ].sort()
     );

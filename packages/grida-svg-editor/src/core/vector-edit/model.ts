@@ -530,6 +530,72 @@ export class PathModel {
     };
   }
 
+  /**
+   * Remove the sub-selected tangents, segments, and vertices, returning a
+   * new model. Mirrors the main canvas editor's path-edit deletion
+   * (`__self_delete_vector_network_selection` in
+   * `editor/grida-canvas/reducers/document.reducer.ts`) — the established
+   * reference for this op — and applies the three tracks in the same order:
+   *
+   *   1. **tangents** — zero each selected tangent (`ta` for side `0`, `tb`
+   *      for side `1`) on every segment that owns it. A curve whose tangents
+   *      both go to zero demotes to a line at emit time (verb honesty), so
+   *      this is geometry-only, not a topology change.
+   *   2. **segments** — drop each selected segment, descending so an earlier
+   *      splice never shifts a not-yet-deleted index.
+   *   3. **vertices** — drop each selected vertex, descending for the same
+   *      reason. `vn`'s `deleteVertex` also drops every segment that
+   *      referenced the vertex and reindexes the rest; it does NOT reconnect
+   *      the neighbours (matching the main editor), so deleting an interior
+   *      vertex can leave an isolated neighbour that simply doesn't emit.
+   *
+   * Verb metadata is intentionally not carried across: a deletion is a
+   * topology change, so the result keeps fresh (verb-less) meta and every
+   * surviving segment re-derives its verb from geometry at emit time
+   * (straight → `L`, curved → `C`). This keeps the
+   * `segments.length === meta.length` invariant trivially — the same
+   * pragmatic choice {@link splitSegment} makes when it drops arc-group
+   * identity.
+   *
+   * Indices are interpreted in THIS model's index space. Callers that
+   * re-derive a model from the live `d` each frame (the surface) should
+   * build it from the current session-d so the sub-selection indices line
+   * up. Out-of-range indices are skipped defensively rather than throwing.
+   */
+  deleteSubSelection(sel: SubSelection): PathModel {
+    const next_network = cloneNetwork(this._network);
+    const vne = new vn.VectorNetworkEditor(next_network);
+
+    // 1. tangents — zero the owning control on every segment touching the vertex.
+    for (const [vertex_idx, side] of sel.tangents) {
+      const point = side === 0 ? "a" : "b";
+      const control = side === 0 ? "ta" : "tb";
+      for (const seg_idx of vne.findSegments(vertex_idx, point)) {
+        vne.deleteTangent(seg_idx, control);
+      }
+    }
+
+    // 2. segments — descending so a splice never shifts a later index.
+    for (const seg_idx of [...sel.segments].sort((a, b) => b - a)) {
+      if (seg_idx >= 0 && seg_idx < vne.value.segments.length) {
+        vne.deleteSegment(seg_idx);
+      }
+    }
+
+    // 3. vertices — descending (deleteVertex reindexes higher vertices on splice).
+    for (const vertex_idx of [...sel.vertices].sort((a, b) => b - a)) {
+      if (vertex_idx >= 0 && vertex_idx < vne.value.vertices.length) {
+        vne.deleteVertex(vertex_idx);
+      }
+    }
+
+    // `next_network` is this method's own clone — hand it to PathModel
+    // directly (no second clone) with fresh verb-less meta, matching the
+    // sibling mutators (`translateVertex`, `splitSegment`, …).
+    const meta: SegmentMeta[] = vne.value.segments.map(() => ({}));
+    return new PathModel(vne.value, meta);
+  }
+
   // ─── Math reads (POJO-only return values) ────────────────────────────────
   //
   // The surface area here is deliberately narrow. Direct math reads

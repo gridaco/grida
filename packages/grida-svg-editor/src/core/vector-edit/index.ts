@@ -33,3 +33,6 @@ export type { SubpathSelectCandidates } from "./marquee";
 
 export { apply_subselection, validate_subselection } from "./subselection";
 export type { SubSelectionInput } from "./subselection";
+
+export { delete_vector_subselection } from "./delete";
+export type { DeleteVectorOutcome } from "./delete";
