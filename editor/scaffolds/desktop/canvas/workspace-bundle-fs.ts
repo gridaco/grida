@@ -63,9 +63,15 @@ export function workspaceBundleFs(
     list: async () => {
       // Walk subdirectories ourselves (the bridge `readdir` is shallow) so a
       // nested `src` resolves; a flat deck (the common case) walks nothing.
+      // Sort each batch so traversal is deterministic regardless of the bridge's
+      // readdir order (the port contract leaves order undefined).
       const out: string[] = [];
       const walk = async (dir: string | undefined): Promise<void> => {
-        for (const e of await client.readdir(workspaceId, dir)) {
+        const entries = [...(await client.readdir(workspaceId, dir))].sort(
+          (a, b) =>
+            a.rel_path < b.rel_path ? -1 : a.rel_path > b.rel_path ? 1 : 0
+        );
+        for (const e of entries) {
           if (e.kind === "directory") await walk(e.rel_path);
           else if (e.kind === "file") out.push(stripBase(e.rel_path));
         }
