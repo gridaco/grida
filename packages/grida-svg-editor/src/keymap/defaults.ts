@@ -40,7 +40,16 @@ export const DEFAULT_BINDINGS: readonly KeymapBinding[] = [
 
   // ─── selection ────────────────────────────────────────────────────────────
   { keybinding: kb(KeyCode.Escape), command: "selection.deselect" },
+  // Delete / Backspace are overloaded; chain order matters. In path-edit
+  // (`edit-content`) mode, `vector.delete-vertex` removes the sub-selected
+  // vertices / segments / tangents and consumes the key. Outside that mode
+  // it returns false, so the chain falls through to `selection.remove`,
+  // which deletes the selected element(s) (guarded on `select` mode). This
+  // is the same `false`-return chain `content.enter` → `hierarchy.enter`
+  // uses for Enter (gridaco/grida#880).
+  { keybinding: kb(KeyCode.Backspace), command: "vector.delete-vertex" },
   { keybinding: kb(KeyCode.Backspace), command: "selection.remove" },
+  { keybinding: kb(KeyCode.Delete), command: "vector.delete-vertex" },
   { keybinding: kb(KeyCode.Delete), command: "selection.remove" },
   { keybinding: kb(KeyCode.KeyG, M.CtrlCmd), command: "selection.group" },
   {

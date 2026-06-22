@@ -61,10 +61,32 @@ export function registerDefaultCommands(
     return true;
   });
 
+  // Delete / Backspace — remove the selected ELEMENT(s). Guarded on `select`
+  // mode, the same shape every sibling structural command (group / duplicate
+  // / ungroup / clipboard.*) uses: this is the ONE structural handler that
+  // historically lacked the guard, so Delete in path-edit (`edit-content`)
+  // mode detached the whole node under edit instead of its sub-selected
+  // vertices (gridaco/grida#880). The chained `vector.delete-vertex` row in
+  // `keymap/defaults.ts` runs FIRST in edit-content mode; this falls through
+  // (returns false) there, leaving the element intact.
   reg.register("selection.remove", () => {
+    if (editor.state.mode !== "select") return false;
     if (editor.state.selection.length === 0) return false;
     editor.commands.remove();
     return true;
+  });
+
+  // Delete / Backspace inside path edit mode (`edit-content`) — remove the
+  // vertex / segment / tangent sub-selection from the path under edit
+  // instead of the element. Chained BEFORE `selection.remove` (see
+  // `keymap/defaults.ts`); returns false outside edit-content so the chain
+  // falls through to the element-delete. The editor command routes to the
+  // surface-owned session, which owns the policy-class `delete-vertex`
+  // verdict (e.g. `restrict` refuses dropping a polygon below 3 vertices);
+  // a refusal / empty sub-selection returns false → a no-op in this mode.
+  reg.register("vector.delete-vertex", () => {
+    if (editor.state.mode !== "edit-content") return false;
+    return editor.commands.delete_vector_selection();
   });
 
   // Cmd+G — wrap selection in a new <g>. Returns false when policy

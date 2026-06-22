@@ -568,6 +568,21 @@ export type Commands = {
     input: VectorSubSelectionInput,
     mode?: SelectMode
   ): boolean;
+  /**
+   * Delete the current vertex / segment / tangent sub-selection from the
+   * open vector content-edit session (gridaco/grida#880). Removes only the
+   * sub-selected geometry from the path under edit and rewrites its `d` (or
+   * native attrs) as one undoable step; the element survives and stays in
+   * edit mode, and the sub-selection is cleared. Returns `true` when a
+   * deletion was applied, `false` (no-op) when no vector session is active,
+   * no DOM surface is attached, nothing is sub-selected, or the policy-class
+   * `delete-vertex` verdict refuses it (e.g. dropping a triangle `<polygon>`
+   * below 3 vertices under the `restrict` policy).
+   *
+   * The session is surface-owned, so this routes through the surface driver
+   * (symmetric to {@link Commands.set_vector_selection}).
+   */
+  delete_vector_selection(): boolean;
   // file
   load_svg(svg: string): void;
   serialize_svg(): string;
@@ -2508,6 +2523,10 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   let vector_subselect_driver:
     | ((input: VectorSubSelectionInput, mode?: SelectMode) => boolean)
     | null = null;
+  // Editor → surface driver for vector sub-selection DELETION (#880). Same
+  // rationale as `vector_subselect_driver`: the session is surface-owned, so
+  // `commands.delete_vector_selection` reaches it only through this slot.
+  let vector_delete_driver: (() => boolean) | null = null;
   let computed_resolver: DomComputedResolver | null = null;
 
   function dom_computed_property(id: NodeId, name: string): string | null {
@@ -2597,6 +2616,14 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     return vector_subselect_driver(input, mode);
   }
 
+  function delete_vector_selection(): boolean {
+    // Same surface-owned-session routing as `set_vector_selection`: no driver
+    // ⇒ no session ⇒ no-op. The driver owns the policy gate, the geometry
+    // write, and the undoable history step.
+    if (!vector_delete_driver) return false;
+    return vector_delete_driver();
+  }
+
   function load_svg(svg: string) {
     // End open preview sessions BEFORE the document swap: their reverts
     // must run against the old document (the parser reuses NodeIds per
@@ -2671,6 +2698,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     insert_preview,
     set_text,
     set_vector_selection,
+    delete_vector_selection,
     load_svg,
     serialize_svg,
     undo,
@@ -3003,6 +3031,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
           | null
       ) {
         vector_subselect_driver = fn;
+      },
+      set_vector_delete_driver(fn: (() => boolean) | null) {
+        vector_delete_driver = fn;
       },
       push_vector_subselection(sel: VectorSubSelection | null) {
         _set_current_vector_subselection(sel);

@@ -119,6 +119,16 @@ export interface SurfaceBridge {
     fn: ((input: VectorSubSelectionInput, mode?: SelectMode) => boolean) | null
   ): void;
 
+  /** editor → surface: register the driver that deletes the current vector
+   *  sub-selection while a vector content-edit session is open
+   *  (`commands.delete_vector_selection`, gridaco/grida#880). Returns `true`
+   *  when geometry was deleted, `false` when no session is active, nothing is
+   *  sub-selected, or the policy-class `delete-vertex` verdict refuses it.
+   *  Pass `null` to unregister on detach. The session is surface-owned, so
+   *  this is the only delete path the headless command has into it —
+   *  symmetric to the sub-selection write driver. */
+  set_vector_delete_driver(fn: (() => boolean) | null): void;
+
   /** surface → editor: publish the current vector sub-selection. Goes to
    *  `editor.subscribe_vector_subselection()` listeners and updates
    *  `editor.vector_subselection()`; does NOT bump `state.version` (it changes
