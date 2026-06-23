@@ -328,6 +328,41 @@ pixel-perfect on the control point). Delta-based gestures (e.g.
 special handling; the invariant applies only to absolute-position
 commits (`set_tangent`, `bend_segment`).
 
+### Transform box over a sub-selection
+
+A **transform box** is a drag-claiming overlay that presents a selection as a
+single transformable object: its body translates, its edges and corners scale,
+and a corner ring rotates. It is the same affordance whether bound to an
+element's free-transform frame or to a vector sub-selection (a set of points).
+
+When the box is bound to a **sub-selection**, its handles are drawn over the
+very controls they bound — the box's corners and edges coincide with the
+selected vertices. A press there has two plausible intents: **transform the
+box** (drag) or **re-select the coincident control** (click). By the
+singleton-vs-ambiguous rule the press is therefore **ambiguous**, not a
+singleton, and routes by **defer**:
+
+- **On drag** — run the transform. The deferred select is cancelled, exactly
+  as a translate-body drag cancels its deferred select.
+- **On pointer-up without drag** — commit the coincident control's select:
+  **narrow** to it (no shift) or **toggle** it (shift), per the same per-axis
+  asymmetry as a bare vertex / segment / tangent handle.
+
+This is the resize / rotate handle's "commit on-down, singleton" rule
+specialized for the one case where it is **not** a singleton: a selectable
+control lies beneath the handle. With nothing selectable underneath — an
+element free-transform frame, or a box corner over empty canvas — the press is
+a singleton again and the click is a no-op; the handle owns it. The box thus
+claims drags while the points underneath stay click-selectable, so both
+interaction models coexist without a mode switch.
+
+The deferred target is also previewed on **hover**: while the box owns the
+pixel, the coincident control a click would select is highlighted as if hovered
+directly, even though the box claims the drag. Hover therefore tracks the
+click-through outcome — a control with no deferred select (a region body, a
+ghost insertion) does not light up, matching its no-op click — so the user reads
+what the next click will select before pressing.
+
 ### Ghost-handle (eager) scenario
 
 | Scenario           | Trigger                                                 | Outcome                                                                                                                                        |

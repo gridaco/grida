@@ -36,3 +36,10 @@ export type { SubSelectionInput } from "./subselection";
 
 export { delete_vector_subselection } from "./delete";
 export type { DeleteVectorOutcome } from "./delete";
+
+export {
+  transform_vector_subselection,
+  subselection_transform_vertices,
+  subset_translation_delta,
+} from "./transform";
+export type { TransformVectorOutcome } from "./transform";

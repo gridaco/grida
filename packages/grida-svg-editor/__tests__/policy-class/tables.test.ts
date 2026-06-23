@@ -109,6 +109,20 @@ describe("Table 3 — chosen policy (canonical cells)", () => {
       "promote"
     );
   });
+
+  it("transform-vertices: 'bake' on vertex-chain & path, rejected elsewhere (gridaco/grida#881)", () => {
+    // Accepted by exactly the two vector-edit classes, always single-solution
+    // `bake` (count- & type-preserving — no promote / restrict fork).
+    expect(
+      policy_class.chosen_policy("vertex-chain", "transform-vertices")
+    ).toBe("bake");
+    expect(policy_class.legal_solutions("path", "transform-vertices")).toEqual([
+      "bake",
+    ]);
+    for (const cls of ["vertex-box", "circle", "ellipse"] as const) {
+      expect(policy_class.accepts(cls, "transform-vertices")).toBe(false);
+    }
+  });
 });
 
 // ─── Invariant I1 — chosen policy implies legal solution-space entry ────────

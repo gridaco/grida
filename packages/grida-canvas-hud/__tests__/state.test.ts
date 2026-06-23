@@ -768,3 +768,181 @@ describe("SurfaceState.isInteracting() (interaction phase)", () => {
     expect(r.needsRedraw).toBe(true);
   });
 });
+
+// ── Transform-box defer-to-underlying-control (gridaco/grida#881) ────────────
+// A box handle (corner / side / body) that sits over a vector control claims
+// DRAGS (transform) but lets a CLICK (pointer-up before the drag threshold)
+// fall through to select the control beneath it — the selection-intent
+// translate-handle defer model, so a point at / in the box stays
+// click-selectable (narrow / toggle).
+
+describe("transform-box — click falls through to the control underneath", () => {
+  const IDENTITY: cmath.Transform = [
+    [1, 0, 0],
+    [0, 1, 0],
+  ];
+
+  // A box whose SE corner-scale handle (priority 0, wins the hit) overlays a
+  // vertex handle (priority 5) at the same screen point — the real svg-editor
+  // arrangement (selected vertices sit at the box's corners / edges).
+  function boxOverVertex(): {
+    state: SurfaceState;
+    deps: StateDeps;
+    intents: Intent[];
+  } {
+    const state = new SurfaceState();
+    state.setTransformBox({
+      id: "tb-1",
+      transform: IDENTITY,
+      size: [100, 100],
+      origin: [0, 0],
+      rotation: 0,
+    });
+    const hr = state.hitRegions();
+    hr.clear();
+    hr.push({
+      label: "corner",
+      action: {
+        kind: "transform_box_corner_scale",
+        id: "tb-1",
+        corner: "se",
+        base_angle: 0,
+      },
+      rect: { x: 40, y: 40, width: 20, height: 20 },
+      priority: 0,
+    });
+    hr.push({
+      label: "vertex",
+      action: { kind: "vertex_handle", node_id: "n", index: 3, pos: [50, 50] },
+      rect: { x: 40, y: 40, width: 20, height: 20 },
+      priority: 5,
+    });
+    const { deps, intents } = makeDeps();
+    return { state, deps, intents };
+  }
+
+  it("click on the box (no drag) selects the vertex beneath it (narrow)", () => {
+    const { state, deps, intents } = boxOverVertex();
+    state.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    state.dispatch(
+      { kind: "pointer_up", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    expect(intents).toContainEqual({
+      kind: "select_vertex",
+      node_id: "n",
+      index: 3,
+      mode: "replace",
+    });
+    expect(intents.find((i) => i.kind === "transform_box")).toBeUndefined();
+  });
+
+  it("shift-click toggles the vertex beneath", () => {
+    const { state, deps, intents } = boxOverVertex();
+    const shift = { ...NO_MODS, shift: true };
+    state.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: shift },
+      deps
+    );
+    state.dispatch(
+      { kind: "pointer_up", x: 50, y: 50, button: "primary", mods: shift },
+      deps
+    );
+    expect(intents).toContainEqual({
+      kind: "select_vertex",
+      node_id: "n",
+      index: 3,
+      mode: "toggle",
+    });
+  });
+
+  it("drag transforms the box and does NOT select the vertex", () => {
+    const { state, deps, intents } = boxOverVertex();
+    state.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    state.dispatch({ kind: "pointer_move", x: 90, y: 90, mods: NO_MODS }, deps);
+    state.dispatch(
+      { kind: "pointer_up", x: 90, y: 90, button: "primary", mods: NO_MODS },
+      deps
+    );
+    expect(intents.find((i) => i.kind === "select_vertex")).toBeUndefined();
+    expect(intents.some((i) => i.kind === "transform_box")).toBe(true);
+  });
+
+  it("click on a box handle with nothing underneath is a clean no-op", () => {
+    const { state, deps, intents } = boxOverVertex();
+    state.hitRegions().clear();
+    state.hitRegions().push({
+      label: "corner",
+      action: {
+        kind: "transform_box_corner_scale",
+        id: "tb-1",
+        corner: "se",
+        base_angle: 0,
+      },
+      rect: { x: 40, y: 40, width: 20, height: 20 },
+      priority: 0,
+    });
+    state.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    state.dispatch(
+      { kind: "pointer_up", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    expect(intents.find((i) => i.kind === "select_vertex")).toBeUndefined();
+    expect(intents.find((i) => i.kind === "transform_box")).toBeUndefined();
+  });
+
+  // Hover counterpart of the click fall-through: an idle pointer over a box
+  // handle still colorizes the control the next click WOULD select, so the
+  // user previews the selection target even though the box owns the pixel.
+  it("idle hover over a box handle lights up the vertex beneath it", () => {
+    const { state, deps } = boxOverVertex();
+    state.dispatch({ kind: "pointer_move", x: 50, y: 50, mods: NO_MODS }, deps);
+    expect(state.getVectorHover()).toEqual({
+      kind: "vertex",
+      node_id: "n",
+      index: 3,
+    });
+  });
+
+  it("idle hover over a box handle with nothing selectable beneath shows no vertex hover", () => {
+    const { state, deps } = boxOverVertex();
+    // Replace the underlying vertex with a region body — a region has no
+    // deferred select (a click on the box over it is a no-op), so the hover
+    // must NOT light up (hover ≙ click-through outcome).
+    state.hitRegions().clear();
+    state.hitRegions().push({
+      label: "corner",
+      action: {
+        kind: "transform_box_corner_scale",
+        id: "tb-1",
+        corner: "se",
+        base_angle: 0,
+      },
+      rect: { x: 40, y: 40, width: 20, height: 20 },
+      priority: 0,
+    });
+    state.hitRegions().push({
+      label: "region",
+      action: {
+        kind: "region",
+        node_id: "n",
+        region: 0,
+        segments: [0, 1, 2],
+        vertices: [0, 1, 2],
+      },
+      rect: { x: 40, y: 40, width: 20, height: 20 },
+      priority: 5,
+    });
+    state.dispatch({ kind: "pointer_move", x: 50, y: 50, mods: NO_MODS }, deps);
+    expect(state.getVectorHover()).toBeNull();
+  });
+});

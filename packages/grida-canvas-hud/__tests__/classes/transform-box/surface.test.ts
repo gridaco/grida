@@ -631,3 +631,148 @@ describe("transform-box — id echo through intent", () => {
     expect(last.id).toBe("custom-id-42");
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// 11. corner_role: "scale" + priority overrides (gridaco/grida#881)
+// ───────────────────────────────────────────────────────────────────────────
+
+function scaleCornersOf(
+  els: readonly OverlayElement[]
+): readonly OverlayElement[] {
+  return els.filter((e) => e.action.kind === "transform_box_corner_scale");
+}
+
+describe("transform-box — corner_role", () => {
+  it('default ("rotate") emits 4 rotate corners and no scale corners', () => {
+    const els = build(basicInput());
+    expect(cornersOf(els).length).toBe(4);
+    expect(scaleCornersOf(els).length).toBe(0);
+    expect(cornersOf(els)[0].priority).toBe(TRANSFORM_BOX_CORNER_PRIORITY);
+  });
+
+  it('"scale" emits 4 inner scale knobs + 4 outer rotate rings', () => {
+    const els = build(basicInput({ corner_role: "scale" }));
+    expect(scaleCornersOf(els).length).toBe(4);
+    expect(cornersOf(els).length).toBe(4); // the rotate rings
+  });
+
+  it('"scale" inner knob wins the corner over its rotate ring (lower priority)', () => {
+    const els = build(basicInput({ corner_role: "scale" }));
+    expect(scaleCornersOf(els)[0].priority).toBeLessThan(
+      cornersOf(els)[0].priority
+    );
+  });
+
+  it('"scale" inner knob uses a diagonal resize cursor; ring uses rotate', () => {
+    const els = build(basicInput({ corner_role: "scale" }));
+    const scale = scaleCornersOf(els).find(
+      (e) =>
+        e.action.kind === "transform_box_corner_scale" &&
+        e.action.corner === "se"
+    );
+    const ring = cornersOf(els).find(
+      (e) =>
+        e.action.kind === "transform_box_corner" && e.action.corner === "se"
+    );
+    expect(scale?.cursor).toMatchObject({ kind: "resize", direction: "se" });
+    expect(ring?.cursor).toMatchObject({ kind: "rotate", corner: "se" });
+  });
+
+  it("priority overrides apply to body / side / corner / rotate ring", () => {
+    const els = build(
+      basicInput({
+        corner_role: "scale",
+        priority: { body: 6, side: 1, corner: 0, rotate: 2 },
+      })
+    );
+    expect(bodyOf(els)?.priority).toBe(6);
+    expect(sidesOf(els)[0].priority).toBe(1);
+    expect(scaleCornersOf(els)[0].priority).toBe(0);
+    expect(cornersOf(els)[0].priority).toBe(2);
+  });
+
+  it("pointer-down on a scale corner opens a scale_corner gesture → intent", () => {
+    const input = basicInput({ corner_role: "scale" });
+    const { state, intents } = newState(input);
+    gestureWith(
+      state,
+      input,
+      { type: "scale_corner", corner: "se" },
+      [200, 100]
+    );
+    state.dispatch(
+      { kind: "pointer_move", x: 240, y: 120, mods: NO_MODS },
+      {
+        pick: () => null,
+        shapeOf: () => null,
+        emitIntent: (i) => intents.push(i),
+      }
+    );
+    const last = intents[intents.length - 1];
+    if (last.kind !== "transform_box") {
+      throw new Error(`expected transform_box intent, got ${last.kind}`);
+    }
+    expect(last.op.type).toBe("scale_corner");
+    if (last.op.type !== "scale_corner") {
+      throw new Error(`expected scale_corner op, got ${last.op.type}`);
+    }
+    expect(last.op.corner).toBe("se");
+  });
+
+  it("the scale-corner hit classifies as HandleTransformBoxDrag", () => {
+    expect(
+      classifyScenario({
+        hovered_id: null,
+        selection_ids: [] as readonly string[],
+        modifiers: NO_MODS,
+        click_count: 1,
+        readonly: false,
+        in_content_edit: false,
+        ui_action: {
+          kind: "transform_box_corner_scale",
+          id: "tb-1",
+          corner: "se",
+          base_angle: 0,
+        },
+      })
+    ).toBe(Scenario.HandleTransformBoxDrag);
+  });
+});
+
+describe("transform-box — modifier re-emit (gridaco/grida#881)", () => {
+  it("a mid-drag Shift toggle (no pointer move) re-reduces + re-emits the intent", () => {
+    const input = basicInput({ corner_role: "scale" });
+    const { state, intents } = newState(input);
+    gestureWith(
+      state,
+      input,
+      { type: "scale_corner", corner: "se" },
+      [200, 100]
+    );
+    const deps = {
+      pick: () => null,
+      shapeOf: () => null,
+      emitIntent: (i: Intent) => intents.push(i),
+    };
+    // Advance the drag so last_doc ≠ start_doc.
+    state.dispatch(
+      { kind: "pointer_move", x: 240, y: 110, mods: NO_MODS },
+      deps
+    );
+    const free = intents[intents.length - 1];
+    const before = intents.length;
+    // Toggle Shift with NO pointer move.
+    state.dispatch(
+      { kind: "modifiers", mods: { ...NO_MODS, shift: true } },
+      deps
+    );
+    expect(intents.length).toBeGreaterThan(before);
+    const snapped = intents[intents.length - 1];
+    if (free.kind !== "transform_box" || snapped.kind !== "transform_box") {
+      throw new Error("expected transform_box intents");
+    }
+    expect(snapped.phase).toBe("preview");
+    // Aspect-lock changed the reduction (the free corner drag was anisotropic).
+    expect(snapped.transform).not.toEqual(free.transform);
+  });
+});

@@ -7,6 +7,7 @@ import type {
 } from "../classes/transform-box/input";
 import { docDeltaToBoxLocal } from "../classes/transform-box/surface";
 import {
+  type AffineTransform,
   decompose as decomposeTransformBox,
   reduceTransformBox,
 } from "../primitives/transform-box";
@@ -399,6 +400,29 @@ export class SurfaceState {
   }
 
   /**
+   * Resolve the selectable vector control that lies BENEATH a transform box at
+   * `screen`, paired with the deferred select it would commit — the box's
+   * "defers to the control beneath" relationship (gridaco/grida#881). Returns
+   * `null` when nothing selectable is under the box (an element free-transform
+   * frame, a region body, a ghost insertion).
+   *
+   * This is the SINGLE source for that relationship. The press-defer (records
+   * `pending.deferred`) and the idle hover-preview (lights up the target) both
+   * read it here, so "hover ≙ what the click selects" is structural, not a
+   * hand-kept invariant. `shift` only colors the deferred select's mode; the
+   * resolved control is shift-independent, so hover passes `false`.
+   */
+  private deferredUnderTransformBox(
+    screen: cmath.Vector2,
+    shift: boolean
+  ): { control: OverlayAction; deferred: DeferredIntent } | null {
+    const control = this.hit_regions.hitTest(screen, isTransformBoxAction);
+    if (!control) return null;
+    const deferred = deferredSelectFromControl(control, shift);
+    return deferred ? { control, deferred } : null;
+  }
+
+  /**
    * True when the user has committed pointer input — either a pending
    * pointer-down (drag-vs-click discriminator window) or an active
    * gesture (translate, bend, marquee, …). Idle hover otherwise.
@@ -501,6 +525,26 @@ export class SurfaceState {
           response.needsRedraw = true;
           return response;
         }
+        // A mid-drag Alt / Shift toggle (no pointer move) changes the
+        // transform-box reduction (from-center / aspect / angle-snap), so
+        // re-reduce from the frozen base at the last cursor point and re-emit.
+        // Unlike resize (host applies the modifier), the HUD reduces the
+        // box transform itself, so the new value must reach the host now.
+        if (this.gesture.kind === "transform_box") {
+          const g = this.gesture;
+          const next_transform = this.reduceTransformBoxGesture(g, g.last_doc);
+          this.gesture = { ...g, transform: next_transform };
+          deps.emitIntent({
+            kind: "transform_box",
+            id: g.id,
+            op: g.op,
+            transform: next_transform,
+            phase: "preview",
+          });
+          const response = emptyResponse();
+          response.needsRedraw = true;
+          return response;
+        }
         return emptyResponse();
       }
       case "wheel":
@@ -527,6 +571,58 @@ export class SurfaceState {
     return applyResize(g.initial_shape, g.direction, dx, dy, {
       fromCenter: alt,
       aspect: shift,
+    });
+  }
+
+  /**
+   * Reduce a `transform_box` gesture to its next box-relative affine for a
+   * given doc-space cursor point, applying the LIVE modifiers (Alt from-center,
+   * Shift aspect / angle-snap / axis-lock — identical to the element box).
+   * Shared by the pointer-move handler and the modifier-toggle refresh so a
+   * mid-drag Shift / Alt flip (no pointer move) re-reduces from the same
+   * frozen base. Reduces from `base_transform` (frozen at gesture start), never
+   * the previous frame's transform, so it can't drift.
+   */
+  private reduceTransformBoxGesture(
+    g: Extract<SurfaceGesture, { kind: "transform_box" }>,
+    point_doc: cmath.Vector2
+  ): AffineTransform {
+    const doc_delta: cmath.Vector2 = [
+      point_doc[0] - g.start_doc[0],
+      point_doc[1] - g.start_doc[1],
+    ];
+    // De-rotate by the container rotation into the box's un-rotated frame
+    // (origin/size are irrelevant to the delta transform).
+    const box_delta = docDeltaToBoxLocal(
+      {
+        id: g.id,
+        transform: g.base_transform,
+        size: g.size,
+        origin: [0, 0],
+        rotation: g.rotation,
+      },
+      doc_delta
+    );
+    const action =
+      g.op.type === "translate"
+        ? { type: "translate" as const, delta: box_delta }
+        : g.op.type === "scale_side"
+          ? { type: "scale-side" as const, side: g.op.side, delta: box_delta }
+          : g.op.type === "scale_corner"
+            ? {
+                type: "scale-corner" as const,
+                corner: g.op.corner,
+                delta: box_delta,
+              }
+            : {
+                type: "rotate" as const,
+                corner: g.op.corner,
+                delta: box_delta,
+              };
+    return reduceTransformBox(g.base_transform, action, {
+      size: g.size,
+      rotation: g.rotation,
+      modifiers: { alt: this.modifiers.alt, shift: this.modifiers.shift },
     });
   }
 
@@ -675,11 +771,28 @@ export class SurfaceState {
         // `"midpoint"` pins to 0.5; `"projected"` runs
         // `cmath.bezier.project` against the cursor. Both modes share
         // every other code path — only the `t` differs.
-        const next_vh = vectorHoverFromAction(
+        let next_vh = vectorHoverFromAction(
           ui_action,
           point_doc,
           this.vector_insertion_mode
         );
+        // Hover-through a transform box (gridaco/grida#881). When a box handle
+        // owns the pixel, the vector control BENEATH it is still click-
+        // selectable (the box defers to it on click-no-drag). Preview that by
+        // lighting up the control the next click would select — resolved via
+        // the SAME `deferredUnderTransformBox` the press-defer uses, so hover ≙
+        // click outcome is structural. The `isTransformBoxAction` gate keeps
+        // the extra skip-pass off every non-box pixel.
+        if (next_vh === null && ui_action && isTransformBoxAction(ui_action)) {
+          const under = this.deferredUnderTransformBox([sx, sy], false);
+          if (under) {
+            next_vh = vectorHoverFromAction(
+              under.control,
+              point_doc,
+              this.vector_insertion_mode
+            );
+          }
+        }
         // Padding hover — derived from the SAME ui_action under a
         // separate identity space (vector_hover and padding_hover never
         // co-exist; vector chrome only shows during content-edit, padding
@@ -1118,52 +1231,22 @@ export class SurfaceState {
       }
       case "transform_box": {
         const g = this.gesture;
-        // Compute doc-space delta from gesture start, de-rotate by
-        // -rotation to get the un-rotated pixel-space delta the math
-        // reducer expects, then call `reduceTransformBox` to reduce
-        // from `base_transform` (NOT from the previous frame's
-        // `transform` — frame-accumulation would drift on a slow
-        // reducer).
-        const doc_delta: cmath.Vector2 = [
-          point_doc[0] - g.start_doc[0],
-          point_doc[1] - g.start_doc[1],
-        ];
-        // Synthesize a TransformBoxInput shape for `docDeltaToBoxLocal`.
-        // The de-rotation only needs `rotation`; we don't need the
-        // origin/size for the delta transform.
-        const box_delta = docDeltaToBoxLocal(
-          {
-            id: g.id,
-            transform: g.base_transform,
-            size: g.size,
-            origin: [0, 0],
-            rotation: g.rotation,
-          },
-          doc_delta
-        );
-        const action =
-          g.op.type === "translate"
-            ? { type: "translate" as const, delta: box_delta }
-            : g.op.type === "scale_side"
-              ? {
-                  type: "scale-side" as const,
-                  side: g.op.side,
-                  delta: box_delta,
-                }
-              : {
-                  type: "rotate" as const,
-                  corner: g.op.corner,
-                  delta: box_delta,
-                };
-        const next_transform = reduceTransformBox(g.base_transform, action, {
-          size: g.size,
-        });
+        // Reduce from `base_transform` (NOT the previous frame's transform —
+        // frame-accumulation drifts) against the cumulative cursor delta, with
+        // live modifiers (Alt from-center, Shift aspect / angle-snap / axis-
+        // lock) applied identically to the element box.
+        const next_transform = this.reduceTransformBoxGesture(g, point_doc);
         this.gesture = {
           ...g,
           last_doc: point_doc,
           transform: next_transform,
           dragged: true,
         };
+        // Drag wins — cancel the click-to-select-underneath fall-through
+        // (gridaco/grida#881; spec invariant "promotion cancels deferred
+        // select"). The gesture is already open, so the idle-pending
+        // promotion in `onPointerMove` never runs; clear it here.
+        this.pending = null;
         deps.emitIntent({
           kind: "transform_box",
           id: g.id,
@@ -1189,6 +1272,15 @@ export class SurfaceState {
               kind: "resize",
               direction:
                 g.op.side === "top" || g.op.side === "bottom" ? "n" : "w",
+              baseAngle: live_angle_rad,
+            },
+            response
+          );
+        } else if (g.op.type === "scale_corner") {
+          this.setCursor(
+            {
+              kind: "resize",
+              direction: g.op.corner,
               baseAngle: live_angle_rad,
             },
             response
@@ -1405,12 +1497,7 @@ export class SurfaceState {
     // `rotation`, and the base
     // transform — frozen at gesture start, the chrome rebuild
     // doesn't re-derive them.
-    if (
-      ui_action &&
-      (ui_action.kind === "transform_box_body" ||
-        ui_action.kind === "transform_box_side" ||
-        ui_action.kind === "transform_box_corner")
-    ) {
+    if (ui_action && isTransformBoxAction(ui_action)) {
       if (this.readonly) return response;
       const input = this.transform_box_input;
       // Defensive: if the host cleared the input between chrome build
@@ -1422,7 +1509,9 @@ export class SurfaceState {
           ? ({ type: "translate" } as const)
           : ui_action.kind === "transform_box_side"
             ? ({ type: "scale_side", side: ui_action.side } as const)
-            : ({ type: "rotate", corner: ui_action.corner } as const);
+            : ui_action.kind === "transform_box_corner_scale"
+              ? ({ type: "scale_corner", corner: ui_action.corner } as const)
+              : ({ type: "rotate", corner: ui_action.corner } as const);
       this.gesture = {
         kind: "transform_box",
         id: input.id,
@@ -1435,6 +1524,25 @@ export class SurfaceState {
         transform: input.transform,
         dragged: false,
       };
+      // Defer-to-underlying-control (gridaco/grida#881; the selection-intent
+      // "translate-handle defers + records a deferred select" model). A click
+      // (pointer-up before the drag threshold) on the box falls through to
+      // select the vector control BENEATH it, so a point inside / at the box
+      // stays click-selectable (narrow / toggle) while a drag transforms the
+      // box. Same resolver the idle hover-preview reads. The drag promotion
+      // clears this in `onPointerMove`.
+      const under = this.deferredUnderTransformBox(
+        screen,
+        this.modifiers.shift
+      );
+      this.pending = under
+        ? {
+            anchor_doc: point_doc,
+            anchor_screen: screen,
+            ids_at_down: [],
+            deferred: under.deferred,
+          }
+        : null;
       response.needsRedraw = true;
       return response;
     }
@@ -2215,6 +2323,65 @@ type SegmentBearingAction = Extract<
   OverlayAction,
   { kind: "segment_strip" | "ghost_handle" }
 >;
+
+type TransformBoxAction = Extract<
+  OverlayAction,
+  {
+    kind:
+      | "transform_box_body"
+      | "transform_box_side"
+      | "transform_box_corner"
+      | "transform_box_corner_scale";
+  }
+>;
+
+/** True for the transform-box's own overlay actions (body / side / corners).
+ *  A type guard, so a pointer-down intercept can narrow `ui_action` to the box
+ *  subset; also used as the `skip` predicate to hit-test what lies BENEATH a
+ *  box handle (gridaco/grida#881). */
+function isTransformBoxAction(a: OverlayAction): a is TransformBoxAction {
+  return (
+    a.kind === "transform_box_body" ||
+    a.kind === "transform_box_side" ||
+    a.kind === "transform_box_corner" ||
+    a.kind === "transform_box_corner_scale"
+  );
+}
+
+/** Map a vector-control overlay action to the deferred (commit-on-up-no-drag)
+ *  select it would normally fire, so a click on the transform box can fall
+ *  through to it (gridaco/grida#881). `null` for non-control actions. The
+ *  narrow-vs-toggle `mode` is resolved from `shift` at commit time. */
+function deferredSelectFromControl(
+  a: OverlayAction,
+  shift: boolean
+): DeferredIntent | null {
+  switch (a.kind) {
+    case "vertex_handle":
+      return {
+        kind: "select_vertex",
+        node_id: a.node_id,
+        index: a.index,
+        shift,
+      };
+    case "tangent_handle":
+      return {
+        kind: "select_tangent",
+        node_id: a.node_id,
+        tangent: a.tangent,
+        shift,
+      };
+    case "segment_strip":
+      return {
+        kind: "select_segment",
+        node_id: a.node_id,
+        segment: a.segment,
+        shift,
+      };
+    default:
+      return null;
+  }
+}
 
 function segmentTForMode(
   action: SegmentBearingAction,

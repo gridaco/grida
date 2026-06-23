@@ -355,6 +355,7 @@ export type SurfaceGesture =
       op:
         | { type: "translate" }
         | { type: "scale_side"; side: cmath.RectangleSide }
+        | { type: "scale_corner"; corner: cmath.IntercardinalDirection }
         | { type: "rotate"; corner: cmath.IntercardinalDirection };
       /** Box size in doc-space units (frozen at gesture start). */
       size: cmath.Vector2;

@@ -467,6 +467,7 @@ intent (e.g. double-click on a polyline / polygon / path); exited by an
   | Sub-intent             | VertexChain                                                                                                          | Path                                                          |
   | ---------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
   | `translate-vertex`     | 1 — `bake` (move point N in `points`)                                                                                | 1 — `bake` (move the endpoint of segment N in `d`)            |
+  | `transform-vertices`   | 1 — `bake` (one affine over the selected vertices; count- & type-preserving — gridaco/grida#881)                     | 1 — `bake` (one affine over the selected vertices)            |
   | `insert-vertex`        | 1 — `bake` (insert at parameter `t` along segment)                                                                   | 1 — `bake`                                                    |
   | `delete-vertex`        | **2** — `bake` / `restrict` (polygon must have ≥ 3 vertices; line must have exactly 2)                               | 1 — `bake` (the path may collapse to empty, separate concern) |
   | `close-shape`          | **2** — `promote→polygon` (the natural target) / `promote→path` (when the chain already has curve-shaped extensions) | 1 — `bake` (close the current sub-path with `Z`)              |

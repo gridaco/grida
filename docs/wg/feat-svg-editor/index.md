@@ -65,6 +65,14 @@ preserving the author's source on round-trip.
   (byte-equal until the first re-typing edit), a single `<path>` target,
   and a cubic-Bézier conic representation, with the round-trip invariants
   that keep the conversion honest.
+- [`vertex-transform-box.md`](./vertex-transform-box.md) — treating a
+  multi-vertex sub-selection as a single transformable object
+  (translate / scale / rotate via one affine), with the same handles and
+  modifiers as the element transform box. Covers the click-vs-drag
+  routing (a click selects the point underneath, a drag transforms), the
+  session-persistent frame (rotation carries across gestures and
+  reconciles to the geometry), the `transform-vertices` policy, and the
+  degenerate point / line cases.
 - [`clipboard.md`](./clipboard.md) — FRD for copy/cut/paste. The
   payload is a standalone SVG document, not a private format. Names two
   extraction operations (standalone payload vs in-document clone) and

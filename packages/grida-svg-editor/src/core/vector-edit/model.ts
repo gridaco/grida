@@ -341,6 +341,71 @@ export class PathModel {
     return new PathModel(vne.value, this._meta);
   }
 
+  /**
+   * Apply a single affine `matrix` (2×3, doc-space) to a set of vertices,
+   * returning a new model. The mathematical heart of the Vertex Transform
+   * Box (gridaco/grida#881): a multi-vertex sub-selection is treated as a
+   * transformable object — one affine over the selected positions, the rest
+   * untouched.
+   *
+   * Two parts of the matrix act on two kinds of data:
+   *   - **Vertex positions** get the full affine (linear part + translation):
+   *     `v' = M · v`.
+   *   - **Tangents** of a selected vertex get only the **linear part**
+   *     (translation dropped): `t' = L · t`. Tangents are stored relative to
+   *     their owning vertex, so they must rotate / scale / shear with the
+   *     vertex but not be displaced by the translation column (the owning
+   *     vertex already carries that). A tangent is transformed iff its owning
+   *     endpoint is in `indices` — a segment with one selected endpoint keeps
+   *     its other handle fixed, deforming the curve, which is the honest
+   *     result of transforming a partial sub-selection.
+   *
+   * Verb metadata is preserved verbatim, exactly like {@link translateVertices}
+   * and {@link translateVertex}: the emitter's geometry-honesty checks demote
+   * at serialization time when the transform breaks a recorded verb (a scaled
+   * arc group whose tangents no longer match its baseline demotes to `C`; an
+   * `H` whose endpoint leaves its row demotes to `L`). Count- and type-
+   * preserving for the policy's purposes — no vertex is added or removed, and
+   * a zero-tangent vertex-chain (`polyline` / `polygon`) stays expressible in
+   * native attrs after the transform (scale / rotate of positions keeps
+   * tangents zero).
+   *
+   * Atomic — input is validated up-front (duplicates are tolerated; each
+   * vertex moves exactly once). A degenerate `matrix` (zero determinant)
+   * collapses the selected geometry but never throws or produces `NaN`;
+   * guarding the gesture against collapse is the surface's job.
+   */
+  transformVertices(
+    indices: ReadonlyArray<VertexId>,
+    matrix: cmath.Transform
+  ): PathModel {
+    if (indices.length === 0) return this;
+    const moving = new Set<VertexId>();
+    for (const v of indices) {
+      if (v < 0 || v >= this._network.vertices.length) {
+        throw new Error(`PathModel.transformVertices: invalid vertex ${v}`);
+      }
+      moving.add(v);
+    }
+    // Linear part only (translation dropped) — for tangent offsets.
+    const linear: cmath.Transform = [
+      [matrix[0][0], matrix[0][1], 0],
+      [matrix[1][0], matrix[1][1], 0],
+    ];
+    const next_network = cloneNetwork(this._network);
+    for (const v of moving) {
+      next_network.vertices[v] = cmath.vector2.transform(
+        next_network.vertices[v],
+        matrix
+      );
+    }
+    for (const seg of next_network.segments) {
+      if (moving.has(seg.a)) seg.ta = cmath.vector2.transform(seg.ta, linear);
+      if (moving.has(seg.b)) seg.tb = cmath.vector2.transform(seg.tb, linear);
+    }
+    return new PathModel(next_network, this._meta);
+  }
+
   /** Translate one segment by `delta` — moves both endpoints, dragging
    *  their tangents along (tangents are stored relative to vertices, so
    *  this is automatic). Other segments connected to the moved endpoints
