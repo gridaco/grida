@@ -313,10 +313,16 @@ function gestureWith(
   state: SurfaceState,
   input: TransformBoxInput,
   op: TransformBoxActiveOp,
-  start_doc: cmath.Vector2
+  start_doc: cmath.Vector2,
+  // `dragged` seeds an already-past-threshold drag — for tests that exercise
+  // the reducer at a delta the drag-threshold gate would otherwise suppress
+  // (e.g. a mid-drag return to the exact start). Default mirrors pointer-down.
+  dragged = false
 ): void {
   // Seed the gesture as `pointer_down` would. The dispatcher then
-  // streams `pointer_move` previews from `state.gesture`.
+  // streams `pointer_move` previews from `state.gesture`. Tests run with an
+  // identity surface transform, so screen == doc and `start_screen` mirrors
+  // `start_doc` (the drag-threshold gate measures screen-px from here).
   (state as unknown as { gesture: unknown }).gesture = {
     kind: "transform_box",
     id: input.id,
@@ -325,9 +331,10 @@ function gestureWith(
     rotation: input.rotation ?? 0,
     base_transform: input.transform,
     start_doc,
+    start_screen: start_doc,
     last_doc: start_doc,
     transform: input.transform,
-    dragged: false,
+    dragged,
   };
 }
 
@@ -420,7 +427,15 @@ describe("transform-box — scale-side intent", () => {
   it("delta=0 produces identity reduction (still emits)", () => {
     const input = basicInput();
     const { state, intents } = newState(input);
-    gestureWith(state, input, { type: "scale_side", side: "right" }, [200, 50]);
+    // Mid-drag (dragged) so a return to the exact start still re-emits, past
+    // the drag-threshold gate — the reducer must yield base/identity here.
+    gestureWith(
+      state,
+      input,
+      { type: "scale_side", side: "right" },
+      [200, 50],
+      true
+    );
     state.dispatch(
       { kind: "pointer_move", x: 200, y: 50, mods: NO_MODS },
       {

@@ -1231,6 +1231,23 @@ export class SurfaceState {
       }
       case "transform_box": {
         const g = this.gesture;
+        // Drag-threshold gate. The gesture is opened EAGERLY at pointer-down,
+        // so the idle pending→drag promotion never runs for it — gate here
+        // instead. Below `DRAG_THRESHOLD_PX` of physical (screen-px) movement
+        // the press is still a CLICK: don't mark `dragged`, don't clear the
+        // deferred click-through select, don't emit a transform. Otherwise a
+        // 1px jitter on a click would commit a tiny transform and steal the
+        // click-through (gridaco/grida#881). Mirrors corner-radius /
+        // parametric-handle threshold gating.
+        const sdx = sx - g.start_screen[0];
+        const sdy = sy - g.start_screen[1];
+        if (
+          !g.dragged &&
+          sdx * sdx + sdy * sdy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX
+        ) {
+          this.gesture = { ...g, last_doc: point_doc };
+          return response;
+        }
         // Reduce from `base_transform` (NOT the previous frame's transform —
         // frame-accumulation drifts) against the cumulative cursor delta, with
         // live modifiers (Alt from-center, Shift aspect / angle-snap / axis-
@@ -1520,6 +1537,7 @@ export class SurfaceState {
         rotation: input.rotation ?? 0,
         base_transform: input.transform,
         start_doc: point_doc,
+        start_screen: screen,
         last_doc: point_doc,
         transform: input.transform,
         dragged: false,

@@ -874,6 +874,29 @@ describe("transform-box — click falls through to the control underneath", () =
     expect(intents.some((i) => i.kind === "transform_box")).toBe(true);
   });
 
+  it("a sub-threshold jitter is still a click — selects the vertex, no transform", () => {
+    // The transform_box gesture opens EAGERLY at pointer-down, so a 1px wobble
+    // before release must NOT promote to a drag (DRAG_THRESHOLD_PX = 3): the
+    // deferred click-through survives and no tiny transform is committed.
+    const { state, deps, intents } = boxOverVertex();
+    state.dispatch(
+      { kind: "pointer_down", x: 50, y: 50, button: "primary", mods: NO_MODS },
+      deps
+    );
+    state.dispatch({ kind: "pointer_move", x: 51, y: 51, mods: NO_MODS }, deps);
+    state.dispatch(
+      { kind: "pointer_up", x: 51, y: 51, button: "primary", mods: NO_MODS },
+      deps
+    );
+    expect(intents).toContainEqual({
+      kind: "select_vertex",
+      node_id: "n",
+      index: 3,
+      mode: "replace",
+    });
+    expect(intents.some((i) => i.kind === "transform_box")).toBe(false);
+  });
+
   it("click on a box handle with nothing underneath is a clean no-op", () => {
     const { state, deps, intents } = boxOverVertex();
     state.hitRegions().clear();
