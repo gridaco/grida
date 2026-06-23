@@ -19,7 +19,7 @@
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.29.4",
+    "@changesets/cli": "^2.31.0",
     "@types/node": "^24",
     "lefthook": "^2.1.5",
     "oxfmt": "^0.44.0",
