@@ -137,37 +137,34 @@ function SvgEditorDevPageBody() {
     [insertFromSrc, handle]
   );
 
-  // Raster image drop/pick: resolve the File to a data: URI and decode its
-  // intrinsic size (host I/O, P2), then hand the resolved href + size to the
-  // editor's `insert_image` command as ONE history step. The editor centers
-  // the <image> on `at` (anchors at origin when null).
+  // Raster image drop: resolve the File to a data: URI and decode its intrinsic
+  // size (host I/O, P2), then hand the resolved href + size to the editor's
+  // `insert_image` command as ONE history step. The editor centers the <image>
+  // on `at` (anchors at origin when null).
   // (see test/svg-editor-image-insertion.md)
   const insertImageFile = useCallback(
-    (file: File, at: { x: number; y: number } | null) => {
-      const task = (async () => {
-        const href = await readFileAsDataURL(file);
-        const { width, height } = await imageIntrinsicSize(href);
-        cmd.insert_image(href, at ? { at, width, height } : { width, height });
-      })();
-      toast.promise(task, {
-        loading: "Inserting image...",
-        success: "Image inserted",
-        error: "Failed to insert image",
-      });
+    async (file: File, at: { x: number; y: number } | null) => {
+      // SvgRouteShell keys the provider by activeId, so switching the active
+      // doc mid-decode remounts (detaches) this editor — the captured `cmd`
+      // would then strand the insertion in a stale instance while still
+      // toasting success. Capture the doc and bail if it changed before we
+      // write.
+      const docAtStart = store.getActiveId();
+      let href: string;
+      let size: { width: number; height: number };
+      try {
+        href = await readFileAsDataURL(file);
+        size = await imageIntrinsicSize(href);
+      } catch {
+        toast.error("Failed to insert image");
+        return;
+      }
+      if (store.getActiveId() !== docAtStart) return;
+      cmd.insert_image(href, at ? { at, ...size } : size);
+      toast.success("Image inserted");
     },
-    [cmd]
+    [cmd, store]
   );
-
-  // A dropped/picked file is one of two kinds: an SVG *document* (load it as a
-  // page) or a raster *image* (insert it as an <image> into the open doc).
-  // `image/svg+xml` is an image MIME but is a document — route it to load.
-  const handleFile = (file: File, at: { x: number; y: number } | null) => {
-    if (file.type.startsWith("image/") && file.type !== "image/svg+xml") {
-      insertImageFile(file, at);
-      return;
-    }
-    loadSvgFile(file);
-  };
 
   const dragKind = (dt: DataTransfer | null): "file" | "library" | null => {
     if (dt?.types?.includes(datatransfer.key)) return "library";
@@ -205,7 +202,15 @@ function SvgEditorDevPageBody() {
       return;
     }
     const file = e.dataTransfer?.files?.[0];
-    if (file) handleFile(file, at);
+    if (!file) return;
+    // A dropped raster image is inserted as an <image> at the drop point; an
+    // SVG file loads as a document. `image/svg+xml` is an image MIME but is a
+    // document, so it routes to load.
+    if (file.type.startsWith("image/") && file.type !== "image/svg+xml") {
+      insertImageFile(file, at);
+    } else {
+      loadSvgFile(file);
+    }
   };
 
   return (
@@ -215,7 +220,7 @@ function SvgEditorDevPageBody() {
       handle={handle}
       sourceName={sourceName ?? activeDoc?.name ?? null}
       loadError={loadError}
-      onPickFile={(file) => handleFile(file, handle?.camera.center ?? null)}
+      onPickFile={loadSvgFile}
       onReset={() => {
         setLoadError(null);
         setSourceName(null);

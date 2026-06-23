@@ -38,7 +38,7 @@ the headless core has no decoder, no network, no rendering context. So the
 host resolves and measures, then calls the command synchronously. Spec:
 `docs/wg/feat-svg-editor/image-insertion.md`.
 
-The `/svg/examples/default` demo is the host here. Its drop/pick handler
+The `/svg/examples/default` demo is the host here. Its **drop** handler
 branches on file kind:
 
 - A **raster image** (`image/png`, `image/jpeg`, … — anything
@@ -50,6 +50,10 @@ branches on file kind:
   bundle, and reload.
 - An **SVG file** (`image/svg+xml` or `.svg`) keeps the existing
   behavior: it loads as a new document/page, not as an embedded `<image>`.
+
+The **Open-file** picker is SVG-only — the shared file input filters to
+`.svg,image/svg+xml`, so a raster cannot be selected there. Raster image
+insertion is a **drop-only** affordance in this demo.
 
 The editor authors SVG 2 `href` (never `xlink:href`, so no `xmlns:xlink`
 is forced onto the root), always writes an explicit `width`/`height`
@@ -82,9 +86,10 @@ consume.
 7. Drag an **`.svg`** file onto the canvas. Expected: it loads as a new
    document/page (the pre-existing behavior), **not** as an embedded
    `<image>`.
-8. Pick a raster image via the file-open affordance instead of dropping.
-   Expected: it inserts as an `<image>` at the **viewport center** (no
-   drop point), same as the drop path otherwise.
+8. While a large image is still decoding (e.g. a multi-MB photo), switch
+   the active document before it lands. Expected: the insertion is silently
+   abandoned (no success toast, nothing inserted into the now-detached
+   editor), rather than landing in a stale instance.
 
 ## Notes
 
@@ -95,7 +100,8 @@ consume.
   serialize round-trip with a large `data:` URI, headless/synchronous) is
   fully covered headlessly by `image-insertion.test.ts`; this TC exists
   for the **host-side transport** (file → `data:` URI → decode → insert,
-  the drop/pick branch, persistence) that is impractical to automate.
+  the drop branch, the active-doc guard, persistence) that is impractical
+  to automate.
 - The image-only-paste carve-out (editor leaves an `image/*`-only paste
   for the host) is pinned by `clipboard.browser.test.ts`.
 - Named deferrals (not part of this TC): an async resolver provider, a
