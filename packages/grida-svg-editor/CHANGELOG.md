@@ -1,5 +1,15 @@
 # @grida/svg-editor
 
+## 1.1.0
+
+### Minor Changes
+
+- Image insertion ([#885](https://github.com/gridaco/grida/issues/885)). New `commands.insert_image(href, opts?)` — a designed, **synchronous, headless** command that adds one `<image>` to the open document from a **resolvable href** (a remote URL, a `data:` URI, or a host-served URL). It authors SVG 2 `href` (never `xlink:href`, so no `xmlns:xlink` is forced onto the root), always writes an explicit `width`/`height` (the supplied intrinsic size, or a named `DEFAULT_IMAGE_SIZE` placeholder when omitted), centers the element on `opts.at` (anchors at the document origin when absent), imposes **no** content policy on the href (no `data:` size cap, no scheme filter, no fetch), and records one undoable step.
+
+  The boundary is the point: the editor inserts a _reference_ and never reads a file. Turning a local `File` or an `image/*` blob into a resolvable href, and decoding bytes to learn an intrinsic size, is host-owned I/O — the host resolves and measures, then calls this command. `<image>` is deliberately **not** an `InsertableTag` (it has an intrinsic size and carries content — the mirror of why `<text>` is excluded). An async resolver provider, a pointer-driven place tool, and a passive drop-observation channel are named deferrals. Design: [`docs/wg/feat-svg-editor/image-insertion.md`](https://github.com/gridaco/grida/blob/main/docs/wg/feat-svg-editor/image-insertion.md).
+
+  Also: the DOM surface's native paste handler now calls `preventDefault()` only when it actually consumed `text/plain` SVG markup, so an `image/*`-only paste is left unclaimed for the host to handle.
+
 ## 1.0.0
 
 ### Minor Changes
