@@ -117,7 +117,10 @@ describe("commands.insert_image — one history step (FRD R5)", () => {
 
   it("does not auto-select when opts.select === false", () => {
     const editor = createSvgEditor({ svg: EMPTY });
-    const before = editor.state.selection;
+    // Snapshot by value: a "selection did not change" assertion must not
+    // alias the live array, or an in-place mutation would compare equal to
+    // itself and pass falsely.
+    const before = [...editor.state.selection];
     editor.commands.insert_image(PNG_DATA_URI, { select: false });
     expect(editor.state.selection).toEqual(before);
   });
