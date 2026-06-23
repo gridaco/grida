@@ -180,6 +180,60 @@ export namespace insertions {
     };
   }
 
+  /** Named placeholder size for an inserted `<image>` whose caller supplied
+   *  no intrinsic dimensions (FRD R3 — a size is ALWAYS written, with a
+   *  defined fallback). Explicitly NOT the image's intrinsic size: the
+   *  headless core cannot decode bytes, so a host that knows the real size
+   *  passes it in (`width`/`height`); when it does not, the node still lands
+   *  selectable and resizable at this square. Distinct constant from
+   *  `DEFAULT_SIZE` (the drag-to-size click-no-drag default) because this is
+   *  a content-bearing placeholder, not a shape default — they may diverge.
+   *  CSS px in world space. */
+  export const DEFAULT_IMAGE_SIZE = 100;
+
+  /**
+   * Attrs for an `<image>` insert (FRD: image-insertion). Authors the
+   * SVG 2 namespace-free `href` (never `xlink:href` — that would force an
+   * `xmlns:xlink` declaration onto the root for no modern-renderer benefit;
+   * see FRD § Round-trip) and an EXPLICIT `width`/`height` always (FRD R3).
+   *
+   * `<image>`'s `x`/`y` are its TOP-LEFT (like `<rect>`, unlike `<ellipse>`'s
+   * center), so:
+   *  - with `at`     → centered on the point: top-left = at − size/2.
+   *  - without `at`  → anchored at the document origin: top-left = (0, 0).
+   *
+   * `width`/`height` default to {@link DEFAULT_IMAGE_SIZE} per axis when the
+   * caller omits them. The href is written verbatim — no length cap, no
+   * scheme filter, no fetch (FRD R6: content is sovereign).
+   *
+   * `<image>` is intentionally NOT an {@link InsertableTag}: that closed set
+   * is the drag-to-size vocabulary, whose members have NO intrinsic size (the
+   * user's drag IS the size) and carry NO content payload. `<image>` is the
+   * mirror — it HAS an intrinsic size and its href IS its content — exactly
+   * the pair of reasons `<text>` is also excluded. So it lives outside the
+   * per-tag switches above as its own factory, driven by the dedicated
+   * `commands.insert_image` command rather than the insert tool.
+   */
+  export function image_attrs(
+    href: string,
+    opts?: { at?: Vec2; width?: number; height?: number }
+  ): Record<string, string> {
+    const w = opts?.width ?? DEFAULT_IMAGE_SIZE;
+    const h = opts?.height ?? DEFAULT_IMAGE_SIZE;
+    // Center on `at`; anchor at origin when absent.
+    const x = opts?.at ? opts.at.x - w / 2 : 0;
+    const y = opts?.at ? opts.at.y - h / 2 : 0;
+    return {
+      x: fmt(x),
+      y: fmt(y),
+      width: fmt(w),
+      height: fmt(h),
+      // SVG 2 href LAST so attribute order reads geometry-then-content; the
+      // raw string is written verbatim (P1) — no encoding, no length cap.
+      href,
+    };
+  }
+
   // ─── Per-tag drag math ───────────────────────────────────────────────
 
   function rect_attrs(

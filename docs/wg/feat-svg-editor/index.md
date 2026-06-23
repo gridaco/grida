@@ -82,6 +82,15 @@ preserving the author's source on round-trip.
   rather than hidden. Also: command/history semantics, in-place
   appended placement, transport ownership and the engine floor for
   native clipboard events, and the paste-is-load trust model.
+- [`image-insertion.md`](./image-insertion.md) — FRD for inserting
+  `<image>` elements. The editor accepts an insertion at a point given a
+  _resolvable_ href (remote URL, `data:` URI, host-served URL) and a
+  host-supplied intrinsic size; turning a local file into a usable URL,
+  and loading bytes to learn a natural size, are host-owned I/O — the
+  same seam clipboard draws for transport. Covers the insertion contract
+  (why it is a dedicated command, not a drag-to-size tag), placement,
+  SVG 2 `href` authoring, the no-content-policy round-trip, and the
+  deferred resolver-provider / drop-observation seams.
 - [`durable-node-identity.md`](./durable-node-identity.md) — the open
   problem behind #775: `NodeId` is parse-ephemeral, so no reference
   survives a `load()`, let alone an external rewrite of the file. Frames

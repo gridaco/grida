@@ -175,4 +175,25 @@ describe("paste over the focused canvas", () => {
     expect(s.editor.serialize()).toBe(baseline);
     expect(s.editor.state.can_undo).toBe(false);
   });
+
+  it("an image-only paste (no text/plain) is left unclaimed for the host", () => {
+    // The editor transports SVG markup as text; raster-image paste is
+    // host-owned (clipboard FRD + image-insertion FRD § Transport). With no
+    // text/plain to consider, the handler must NOT preventDefault — else it
+    // swallows a paste the host's own listener wants (resolve the blob to an
+    // href and call commands.insert_image).
+    const s = mount();
+    const baseline = s.editor.serialize();
+    s.container.focus();
+    const dt = new DataTransfer();
+    dt.items.add(
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "a.png", {
+        type: "image/png",
+      })
+    );
+    const { e } = dispatch_clipboard(s.container, "paste", dt);
+    expect(e.defaultPrevented).toBe(false);
+    expect(s.editor.serialize()).toBe(baseline);
+    expect(s.editor.state.can_undo).toBe(false);
+  });
 });

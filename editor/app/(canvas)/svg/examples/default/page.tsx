@@ -27,6 +27,37 @@ import { useSvgAgentHydrated } from "../../_ai/provider";
 // bundle (canvas.json + <id>.svg) via dotcanvas. Old data is dropped.
 const OPFS_BASE = ["grida-svg-demo", "v4", "default"] as const;
 
+// ─── Host-owned image I/O (the P2 boundary) ────────────────────────────────
+// Turning a local File into a *resolvable* href, and decoding it to learn its
+// intrinsic size, is host work — `@grida/svg-editor` never reads a File. The
+// editor only accepts the resolved href + size via `commands.insert_image`.
+// See docs/wg/feat-svg-editor/image-insertion.md.
+//
+// We resolve to a `data:` URI rather than `URL.createObjectURL`: a `blob:` URL
+// is ephemeral (it dies on reload and cannot be persisted to the .canvas
+// bundle), whereas a data: URI embeds the bytes and round-trips + persists.
+
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function imageIntrinsicSize(
+  src: string
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () =>
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error("Failed to decode image"));
+    img.src = src;
+  });
+}
+
 export default function SvgEditorDevPage() {
   return (
     <SvgRouteShell opfsBase={OPFS_BASE} defaultSvg={SAMPLE_SVG}>
@@ -106,6 +137,38 @@ function SvgEditorDevPageBody() {
     [insertFromSrc, handle]
   );
 
+  // Raster image drop/pick: resolve the File to a data: URI and decode its
+  // intrinsic size (host I/O, P2), then hand the resolved href + size to the
+  // editor's `insert_image` command as ONE history step. The editor centers
+  // the <image> on `at` (anchors at origin when null).
+  // (see test/svg-editor-image-insertion.md)
+  const insertImageFile = useCallback(
+    (file: File, at: { x: number; y: number } | null) => {
+      const task = (async () => {
+        const href = await readFileAsDataURL(file);
+        const { width, height } = await imageIntrinsicSize(href);
+        cmd.insert_image(href, at ? { at, width, height } : { width, height });
+      })();
+      toast.promise(task, {
+        loading: "Inserting image...",
+        success: "Image inserted",
+        error: "Failed to insert image",
+      });
+    },
+    [cmd]
+  );
+
+  // A dropped/picked file is one of two kinds: an SVG *document* (load it as a
+  // page) or a raster *image* (insert it as an <image> into the open doc).
+  // `image/svg+xml` is an image MIME but is a document — route it to load.
+  const handleFile = (file: File, at: { x: number; y: number } | null) => {
+    if (file.type.startsWith("image/") && file.type !== "image/svg+xml") {
+      insertImageFile(file, at);
+      return;
+    }
+    loadSvgFile(file);
+  };
+
   const dragKind = (dt: DataTransfer | null): "file" | "library" | null => {
     if (dt?.types?.includes(datatransfer.key)) return "library";
     if (dt?.types?.includes("Files")) return "file";
@@ -125,23 +188,24 @@ function SvgEditorDevPageBody() {
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(null);
+    // Drop point → world space, so dropped content lands centered under the
+    // pointer. Same screen-space convention as the surface's gestures; shared
+    // by the library, raster-image, and (origin-only) SVG paths.
+    const cr = e.currentTarget.getBoundingClientRect();
+    const at =
+      handle?.camera.screen_to_world({
+        x: e.clientX - cr.left,
+        y: e.clientY - cr.top,
+      }) ?? null;
     const known = e.dataTransfer?.getData(datatransfer.key);
     if (known) {
       const data = datatransfer.decode(known);
       if (data.type !== "svg") return;
-      // Drop point → world space, so the icon lands centered under the
-      // pointer. Same screen-space convention as the surface's gestures.
-      const cr = e.currentTarget.getBoundingClientRect();
-      const at =
-        handle?.camera.screen_to_world({
-          x: e.clientX - cr.left,
-          y: e.clientY - cr.top,
-        }) ?? null;
       insertFromSrc(data.src, at);
       return;
     }
     const file = e.dataTransfer?.files?.[0];
-    if (file) loadSvgFile(file);
+    if (file) handleFile(file, at);
   };
 
   return (
@@ -151,7 +215,7 @@ function SvgEditorDevPageBody() {
       handle={handle}
       sourceName={sourceName ?? activeDoc?.name ?? null}
       loadError={loadError}
-      onPickFile={loadSvgFile}
+      onPickFile={(file) => handleFile(file, handle?.camera.center ?? null)}
       onReset={() => {
         setLoadError(null);
         setSourceName(null);
@@ -178,7 +242,9 @@ function SvgEditorDevPageBody() {
           </PathToolbarPosition>
           {dragging && (
             <div className="absolute inset-0 flex items-center justify-center bg-primary/5 text-primary text-sm font-semibold pointer-events-none">
-              {dragging === "file" ? "Drop SVG to load" : "Drop to insert"}
+              {dragging === "file"
+                ? "Drop SVG to load, or an image to insert"
+                : "Drop to insert"}
             </div>
           )}
         </div>

@@ -731,6 +731,24 @@ editor.commands.{
   // undo step, no placement opt.
   insert_fragment(svg: string, opts?: { parent?: NodeId; index?: number; select?: boolean }): NodeId[];
   insert_preview(tag: string, initial?: Readonly<Record<string, string>>): InsertPreviewSession;
+  // image insertion — designed, synchronous, headless. `href` is a
+  // RESOLVABLE href (remote URL / data: URI / host-served URL); the host
+  // supplies the intrinsic size. The editor authors SVG 2 `href` (never
+  // `xlink:href`, no forced `xmlns:xlink`), always writes explicit
+  // width/height (supplied or a named default), centers on `at` (anchors
+  // at origin when absent), and never reads/decodes/fetches. See the
+  // "Image insertion" subsection below.
+  insert_image(
+    href: string,
+    opts?: {
+      at?: Vec2;
+      width?: number;
+      height?: number;
+      parent?: NodeId;
+      index?: number;
+      select?: boolean;
+    },
+  ): NodeId;
 
   // content
   set_text(value: string): void;
@@ -763,6 +781,34 @@ All commands operate on `state.selection` unless they take an explicit target. C
 `transform` composes a general 2×3 affine onto the selection **relative** and **in world space about a pivot** (default: the selection union-bbox center) — `E = T(pivot) · matrix · T(-pivot)` — so a bare `[-1, 0, 0, 1, 0, 0]` is an in-place horizontal flip and `[1, 0, 0, -1, 0, 0]` a vertical one. The editor owns the round-trip: `E` is folded onto each member's transform list as a **single leading `matrix` op** (existing `rotate`/`translate` tokens are preserved after it; repeated applies collapse into one matrix; a net-identity leading matrix is dropped). It refuses (returns `false`, no history) on empty selection, no attached surface, or any member that isn't rotatable (matrix / scale / skew / `<text rotate>` / CSS-property / animated transforms — same gate as `rotate`; Flatten Transform is the recovery path). Flat-doc only: nested transformed ancestors are out of scope.
 
 (Naming convention for the API surface is `snake_case` to match the SVG / CSS property naming the editor already echoes — `set_property("stroke-width", …)` reads cleanly next to `set_paint("fill", …)`. JavaScript identifiers use `snake_case`; user-facing strings that mirror SVG attribute names stay `kebab-case` exactly as the spec writes them.)
+
+#### Image insertion
+
+`insert_image` adds one `<image>` to the open document from a **resolvable href** — a reference the rendering context can already fetch as-is: a remote URL, a `data:` URI, or a host-served URL. It is a **designed, synchronous, headless** command, distinct from the generic `insert(tag, attrs)` primitive because an image carries content (the href is its payload, a first-class argument) and has an intrinsic size the contract must answer for. Design: [`docs/wg/feat-svg-editor/image-insertion.md`](https://grida.co/docs/wg/feat-svg-editor/image-insertion).
+
+```ts
+editor.commands.insert_image(href, {
+  at,        // document-space placement point; the element is CENTERED on it.
+             //   omit → anchored at the document origin (top-left at 0,0).
+  width,     // intrinsic width  — HOST-SUPPLIED (see "the boundary" below).
+  height,    // intrinsic height
+  parent,    // default: root, like the other insert commands.
+  index,     // position among parent's element-children; default: append.
+  select,    // default: true.
+}): NodeId;
+```
+
+What it guarantees:
+
+- **SVG 2 `href`, never `xlink:href`.** A new image is authored with the namespace-free `href` attribute, so no `xmlns:xlink` is forced onto the root (P1 — no proprietary noise). Existing `xlink:href` images are still preserved verbatim on edit; the legacy form is just never _authored_.
+- **An explicit size, always.** The inserted `<image>` always carries explicit `width`/`height` so it is immediately selectable and resizable. When you supply a size it is used; when you omit it, a named placeholder (`DEFAULT_IMAGE_SIZE`, explicitly **not** intrinsic) is written. This is a deliberate fallback, not a refusal — insertion corrupts nothing, so a missing size degrades to a resizable placeholder rather than rejecting the gesture.
+- **Center-on-point placement.** With `at`, the element is centered on the point (an `<image>`'s `x`/`y` are its top-left, so top-left = `at − size/2`). Without it, the element is anchored at the document origin.
+- **No content policy.** The href is written and round-trips **verbatim** — no size cap on a `data:` URI, no scheme allowlist, no fetch-to-validate (P1 — content is sovereign). Whether to inline a large `data:` URI or upload to a served URL is the host's choice, made before the href reaches the editor.
+- **One history step.** Insertion is a single undoable gesture; undo restores the document byte-equal, redo re-inserts and re-selects.
+
+**The boundary — the editor inserts a reference, never reads a file.** Turning a local `File` or an `image/*` blob into a resolvable href, and **decoding bytes to learn an intrinsic size**, is host-owned I/O (P2): the headless core has no decoder, no network, no rendering context, by construction. The host already holds those — it had to, to produce the href — so it resolves and measures, then calls this command synchronously. The editor never installs drop / dragover / image-paste listeners of its own; transport is the host's. The pieces the editor uniquely owns (document-space projection for a screen-space drop point, and the insertion itself) are exposed for the host to compose. An async resolver provider, a pointer-driven place tool, and a passive drop-observation channel are **named deferrals** ([`TODO.md`](./TODO.md) → Insertion subsystem follow-ups), each gated on a second consumer (P6).
+
+`<image>` is deliberately **not** an `InsertableTag` (the drag-to-size set). That set's members have no intrinsic size — the user's drag _is_ the size — and carry no content. `<image>` is the mirror: it _has_ an intrinsic size and _is_ content, exactly the pair of reasons `<text>` is also excluded. So it is its own command, not a tool tag.
 
 ### Providers
 
@@ -1007,7 +1053,8 @@ If a consumer needs any of the above, the right answer is "this is the wrong too
 ## Status
 
 - `v0.x` — selection, transform, insert (rect / ellipse / line), inline text
-  edit, and the click-to-place text tool. Experimental.
+  edit, the click-to-place text tool, and `insert_image` (designed
+  `<image>` insertion). Experimental.
 
 The shape of the API, the mental model, the file-format guarantees, and the scope are all unsettled. Nothing here is stable — public types still in flux include the `Tool` union (a planned axis split, see `TODO.md` F2). Do not depend on it from production code.
 

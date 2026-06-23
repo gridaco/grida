@@ -2635,16 +2635,30 @@ class DomSurface implements Surface {
   }
 
   /**
-   * Claim-then-act (mirrors the keydown claim doctrine: swallow when the
-   * gesture is aimed at the editor, not just when a handler consumed):
-   * a refused paste — junk text — still claims; the suppressed default is
-   * a no-op on a div anyway.
+   * Claim-then-act, gated on the presence of a `text/plain` payload:
+   * mirrors the keydown claim doctrine (swallow when the gesture is aimed
+   * at the editor, not just when a handler consumed) for the channel the
+   * editor actually transports. When the clipboard carries `text/plain`,
+   * the editor claims it even if the text is junk — a refused paste still
+   * `preventDefault()`s, and the suppressed default is a no-op on a div
+   * anyway.
+   *
+   * But when there is NO `text/plain` at all — e.g. an `image/*`-only paste
+   * — the editor has nothing to transport (it consumes SVG markup as text;
+   * raster-image paste is host-owned per the clipboard FRD and the
+   * image-insertion FRD § Transport). It must NOT `preventDefault()` there,
+   * or it would swallow a paste a host's own listener wants to handle (turn
+   * the blob into a resolvable href and call `commands.insert_image`). So
+   * the default is suppressed only when text was present to consider.
    */
   private on_paste(e: ClipboardEvent): void {
     if (!this.claims_clipboard("paste")) return;
-    e.preventDefault();
     const text = e.clipboardData?.getData("text/plain");
-    if (text) this.editor.commands.paste(text);
+    // No text payload (image-only paste, empty clipboard) → leave the
+    // event for the host. The editor transports text; it has nothing here.
+    if (!text) return;
+    e.preventDefault();
+    this.editor.commands.paste(text);
   }
 
   /**
