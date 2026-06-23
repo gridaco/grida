@@ -56,6 +56,34 @@ export interface TransformBoxInput {
    * toggle suppresses the whole model atomically.
    */
   group?: HUDSemanticGroup;
+
+  /**
+   * What the four corner knobs do.
+   *
+   * - `"rotate"` (default) — the original model: corner knob rotates about
+   *   the box center; sides scale. Free-transform / image-paint consumers
+   *   keep this unchanged.
+   * - `"scale"` — corners SCALE (about the opposite corner), and rotation
+   *   moves to an outer ring around each corner (the standard design-tool
+   *   corner). Both affordances are emitted per corner; the inner scale
+   *   knob wins the center, the surround rotates.
+   */
+  corner_role?: "rotate" | "scale";
+
+  /**
+   * Per-handle hit-priority overrides (lower wins). Omitted handles fall
+   * back to the model defaults. Hosts whose transform box must win over
+   * coincident chrome (e.g. svg-editor's box over vector vertices /
+   * segments) lower these below the competing controls' priorities.
+   */
+  priority?: {
+    body?: number;
+    side?: number;
+    /** Inner corner knob (rotate when `corner_role` is "rotate", else scale). */
+    corner?: number;
+    /** Outer rotate ring (only emitted when `corner_role === "scale"`). */
+    rotate?: number;
+  };
 }
 
 /**
@@ -83,4 +111,5 @@ export type TransformBoxHover =
 export type TransformBoxActiveOp =
   | { type: "translate" }
   | { type: "scale_side"; side: cmath.RectangleSide }
+  | { type: "scale_corner"; corner: cmath.IntercardinalDirection }
   | { type: "rotate"; corner: cmath.IntercardinalDirection };

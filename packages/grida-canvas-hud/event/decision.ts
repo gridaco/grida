@@ -638,8 +638,9 @@ export function classifyScenario(input: PointerDownInput): Scenario {
       case "transform_box_body":
       case "transform_box_side":
       case "transform_box_corner":
+      case "transform_box_corner_scale":
         // Transform-box gestures are opened eagerly in state.ts (before
-        // classifyScenario runs) for all 3 hit kinds. This case is
+        // classifyScenario runs) for all hit kinds. This case is
         // reached only when classification is exercised directly
         // (tests / inspectors).
         return readonly ? Scenario.Noop : Scenario.HandleTransformBoxDrag;
@@ -1351,6 +1352,15 @@ export function decideIdleCursor(input: {
         return {
           kind: "rotate",
           corner: ui_action.corner,
+          baseAngle: ui_action.base_angle,
+        };
+      case "transform_box_corner_scale":
+        // Inner corner knob in `corner_role: "scale"` mode: diagonal
+        // resize. Direction = the corner itself (a valid CardinalDirection),
+        // tilted by `base_angle` to track the visible box rotation.
+        return {
+          kind: "resize",
+          direction: ui_action.corner,
           baseAngle: ui_action.base_angle,
         };
     }

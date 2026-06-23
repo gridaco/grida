@@ -23,6 +23,7 @@ export type TransformBoxIntent = {
   op:
     | { type: "translate" }
     | { type: "scale_side"; side: cmath.RectangleSide }
+    | { type: "scale_corner"; corner: cmath.IntercardinalDirection }
     | { type: "rotate"; corner: cmath.IntercardinalDirection };
   transform: AffineTransform;
   phase: IntentPhase;

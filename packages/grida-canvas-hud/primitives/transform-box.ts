@@ -46,6 +46,11 @@ export type TransformBoxAction =
       delta: cmath.Vector2;
     }
   | {
+      type: "scale-corner";
+      corner: cmath.IntercardinalDirection;
+      delta: cmath.Vector2;
+    }
+  | {
       type: "rotate";
       corner: cmath.IntercardinalDirection;
       delta: cmath.Vector2;
@@ -53,7 +58,28 @@ export type TransformBoxAction =
 
 export interface TransformBoxOptions {
   size: cmath.Vector2;
+  /**
+   * Live modifier state, applied identically to the element box's resize /
+   * rotate:
+   *   - `alt` — scale from the box CENTER (anchor the center instead of the
+   *     opposite edge / corner).
+   *   - `shift` — aspect-lock a scale (uniform), snap a rotation to
+   *     {@link ROTATE_SNAP_DEG}, or axis-lock a translation to the box's
+   *     dominant axis.
+   * Omitted ⇒ no modifiers (the unconstrained reduction).
+   */
+  modifiers?: { alt?: boolean; shift?: boolean };
+  /**
+   * The box's container rotation in degrees (the host's `TransformBoxInput.
+   * rotation`). Used ONLY to snap a Shift-rotate to an ABSOLUTE
+   * {@link ROTATE_SNAP_DEG} grid (visible angle = `rotation` +
+   * `decompose(base).rotation` + the gesture's delta). Omitted ⇒ 0.
+   */
+  rotation?: number;
 }
+
+/** Rotation snap increment (degrees) under Shift — matches the element box. */
+const ROTATE_SNAP_DEG = 15;
 
 export type TransformBoxCorners = {
   nw: cmath.Vector2;
@@ -72,16 +98,172 @@ export function reduceTransformBox(
   action: TransformBoxAction,
   options: TransformBoxOptions
 ): AffineTransform {
-  const { size } = options;
+  const { size, modifiers } = options;
+  const alt = !!modifiers?.alt;
+  const shift = !!modifiers?.shift;
+  const container_rotation = options.rotation ?? 0;
 
   switch (action.type) {
     case "translate":
-      return applyTranslation(base, action.delta, size);
+      return applyTranslation(base, action.delta, size, shift);
     case "scale-side":
-      return applyScaling(base, action.side, action.delta, size);
+      return applyScaling(base, action.side, action.delta, size, alt, shift);
+    case "scale-corner":
+      return applyCornerScaling(
+        base,
+        action.corner,
+        action.delta,
+        size,
+        alt,
+        shift
+      );
     case "rotate":
-      return applyRotation(base, action.corner, action.delta, size);
+      return applyRotation(
+        base,
+        action.corner,
+        action.delta,
+        size,
+        shift,
+        container_rotation
+      );
   }
+}
+
+// Unit-square local coords (a, b) ∈ {0,1}² of each corner, in the box's own
+// frame: nw = (0,0), ne = (1,0), se = (1,1), sw = (0,1).
+function cornerLocalCoord(
+  corner: cmath.IntercardinalDirection
+): [number, number] {
+  switch (corner) {
+    case "nw":
+      return [0, 0];
+    case "ne":
+      return [1, 0];
+    case "se":
+      return [1, 1];
+    case "sw":
+      return [0, 1];
+  }
+}
+
+/**
+ * The box's edge vectors `u` (nw→ne, width) and `v` (nw→sw, height) in
+ * pixel space, with degenerate-axis recovery: once a drag has driven a side
+ * to ~0 its corner-derived vector is the zero vector, so we rebuild that
+ * axis's direction from the base linear part (the perpendicular of the
+ * surviving axis, scaled by `size`) — letting a collapsed box re-expand
+ * instead of stranding the user. `null` iff BOTH axes are fully collapsed.
+ */
+function boxAxes(
+  corners: TransformBoxCorners,
+  base: AffineTransform,
+  size: cmath.Vector2
+): { u: cmath.Vector2; v: cmath.Vector2 } | null {
+  let u = cmath.vector2.sub(corners.ne, corners.nw);
+  let v = cmath.vector2.sub(corners.sw, corners.nw);
+  const lu = Math.hypot(u[0], u[1]);
+  const lv = Math.hypot(v[0], v[1]);
+  if (lu < SIZE_EPSILON && lv < SIZE_EPSILON) return null;
+  if (lu < SIZE_EPSILON) {
+    const vn: cmath.Vector2 = [v[0] / lv, v[1] / lv];
+    const w = Math.abs(size[0]) > SIZE_EPSILON ? size[0] : lv;
+    u = [vn[1] * w, -vn[0] * w]; // perpendicular of v
+  } else if (lv < SIZE_EPSILON) {
+    const un: cmath.Vector2 = [u[0] / lu, u[1] / lu];
+    const h = Math.abs(size[1]) > SIZE_EPSILON ? size[1] : lu;
+    v = [-un[1] * h, un[0] * h]; // perpendicular of u
+  }
+  return { u, v };
+}
+
+/**
+ * Scale the box in its own local frame (gridaco/grida#881 modifiers). The
+ * dragged handle's local coord is `(ca, cb)` ∈ {0,1}²; `scaleX` / `scaleY`
+ * pick which axes it drives (a corner drives both, a side one). Solves the
+ * per-axis scale factor that puts the dragged handle under the cursor while
+ * the anchor stays fixed, then rebuilds the four corners — so the box stays a
+ * parallelogram (no shear) and works on a rotated box (the `u`/`v` edge
+ * vectors carry the orientation).
+ *
+ * Modifiers, identical to the element box:
+ *   - `alt` (from-center) — anchor the box CENTER (a = b = 0.5) instead of the
+ *     opposite edge / corner, so the box grows symmetrically.
+ *   - `shift` (aspect-lock) — for a corner, lock both factors to the larger
+ *     magnitude (sign-preserving); for a side, drive the perpendicular axis by
+ *     the same factor about its center (uniform scale).
+ *
+ * Returns `base` unchanged on a fully-collapsed box (no `NaN`).
+ */
+function scaleBox(
+  base: AffineTransform,
+  size: cmath.Vector2,
+  ca: number,
+  cb: number,
+  scaleX: boolean,
+  scaleY: boolean,
+  pixelDelta: cmath.Vector2,
+  alt: boolean,
+  shift: boolean
+): AffineTransform {
+  const corners = getTransformBoxCorners(base, size);
+  const axes = boxAxes(corners, base, size);
+  if (!axes) return base;
+  const { u, v } = axes;
+  const det = u[0] * v[1] - v[0] * u[1];
+  if (Math.abs(det) < SIZE_EPSILON) return base;
+
+  // Local-coord (a, b) displacement of the dragged handle: solve
+  // da·u + db·v = pixelDelta.
+  const da = (pixelDelta[0] * v[1] - v[0] * pixelDelta[1]) / det;
+  const db = (u[0] * pixelDelta[1] - pixelDelta[0] * u[1]) / det;
+
+  // Anchor: opposite edge / corner, or the box center under `alt`. An
+  // un-driven axis anchors at its center (0.5) so aspect grows it both ways.
+  const ax = alt ? 0.5 : scaleX ? 1 - ca : 0.5;
+  const ay = alt ? 0.5 : scaleY ? 1 - cb : 0.5;
+
+  let sx = 1;
+  let sy = 1;
+  if (scaleX && Math.abs(ca - ax) > EPSILON) sx = (ca + da - ax) / (ca - ax);
+  if (scaleY && Math.abs(cb - ay) > EPSILON) sy = (cb + db - ay) / (cb - ay);
+
+  if (shift) {
+    if (scaleX && scaleY) {
+      const mag = Math.max(Math.abs(sx), Math.abs(sy));
+      sx = sx < 0 ? -mag : mag;
+      sy = sy < 0 ? -mag : mag;
+    } else if (scaleX) {
+      sy = sx;
+    } else if (scaleY) {
+      sx = sy;
+    }
+  }
+
+  const mk = (a: number, b: number): cmath.Vector2 => {
+    const na = ax + sx * (a - ax);
+    const nb = ay + sy * (b - ay);
+    return [
+      corners.nw[0] + na * u[0] + nb * v[0],
+      corners.nw[1] + na * u[1] + nb * v[1],
+    ];
+  };
+  return cornersToBoxTransform(
+    { nw: mk(0, 0), ne: mk(1, 0), se: mk(1, 1), sw: mk(0, 1) },
+    size
+  );
+}
+
+/** Corner scaling — drives both axes from the dragged corner. */
+function applyCornerScaling(
+  base: AffineTransform,
+  corner: cmath.IntercardinalDirection,
+  pixelDelta: cmath.Vector2,
+  size: cmath.Vector2,
+  alt = false,
+  shift = false
+): AffineTransform {
+  const [ca, cb] = cornerLocalCoord(corner);
+  return scaleBox(base, size, ca, cb, true, true, pixelDelta, alt, shift);
 }
 
 /**
@@ -187,13 +369,23 @@ const SIZE_EPSILON = 1e-8;
 function applyTranslation(
   base: AffineTransform,
   pixelDelta: cmath.Vector2,
-  size: cmath.Vector2
+  size: cmath.Vector2,
+  shift = false
 ): AffineTransform {
+  // Shift axis-lock: constrain the drag to the box's dominant axis (the
+  // delta is already de-rotated into the box's un-rotated frame upstream).
+  let delta = pixelDelta;
+  if (shift) {
+    delta =
+      Math.abs(pixelDelta[0]) >= Math.abs(pixelDelta[1])
+        ? [pixelDelta[0], 0]
+        : [0, pixelDelta[1]];
+  }
   const sx = Math.abs(size[0]) > SIZE_EPSILON ? size[0] : 0;
   const sy = Math.abs(size[1]) > SIZE_EPSILON ? size[1] : 0;
   if (sx === 0 && sy === 0) return base;
-  const dx = sx === 0 ? 0 : pixelDelta[0] / sx;
-  const dy = sy === 0 ? 0 : pixelDelta[1] / sy;
+  const dx = sx === 0 ? 0 : delta[0] / sx;
+  const dy = sy === 0 ? 0 : delta[1] / sy;
   return [
     [base[0][0], base[0][1], base[0][2] + dx],
     [base[1][0], base[1][1], base[1][2] + dy],
@@ -201,106 +393,45 @@ function applyTranslation(
 }
 
 /**
- * Side scaling.
+ * Side scaling — drives one axis from the dragged edge (the other is
+ * untouched unless Shift aspect-locks it). Delegates to {@link scaleBox}.
  *
- * TODO: true original-direction scaling (scaling pure X/Y axes
- * regardless of current rotation) is unimplemented. The current
- * implementation falls back to a geometry-based approach — scaling
- * follows the current rotated axes. This was inherited from the
- * editor's image-paint editor and ships as-is.
+ * TODO: true original-direction scaling (scaling pure X/Y axes regardless of
+ * current rotation) is unimplemented — scaling follows the box's current
+ * (possibly rotated) axes, inherited from the editor's image-paint editor.
  */
-// Direction-of-axis fallback for `applyScaling`. The base transform's
-// 2×2 linear part encodes rotation × scale; when one scale collapses,
-// the corresponding column of [[a, b], [c, d]] is the zero vector and
-// the corner-derived axis collapses with it. We recover the local-axis
-// direction from the other column (perpendicular rotated ±90°), then
-// scale it by `size` so the projection magnitude is comparable to the
-// non-degenerate case. Returns the zero vector iff both columns and
-// `size` are fully collapsed — caller handles that as a true no-op.
-function degenerateAxisFallback(
-  base: AffineTransform,
-  side: cmath.RectangleSide,
-  size: cmath.Vector2
-): cmath.Vector2 {
-  const a = base[0][0];
-  const b = base[0][1];
-  const c = base[1][0];
-  const d = base[1][1];
-  const sx = Math.hypot(a, c);
-  const sy = Math.hypot(b, d);
-  let ux: cmath.Vector2;
-  let uy: cmath.Vector2;
-  if (sx > SIZE_EPSILON) {
-    ux = [a / sx, c / sx];
-    uy = [-c / sx, a / sx];
-  } else if (sy > SIZE_EPSILON) {
-    uy = [b / sy, d / sy];
-    ux = [d / sy, -b / sy];
-  } else {
-    ux = [1, 0];
-    uy = [0, 1];
-  }
-  const w = Math.abs(size[0]) > SIZE_EPSILON ? size[0] : 0;
-  const h = Math.abs(size[1]) > SIZE_EPSILON ? size[1] : 0;
-  return side === "left" || side === "right"
-    ? [ux[0] * w, ux[1] * w]
-    : [uy[0] * h, uy[1] * h];
-}
-
 function applyScaling(
   base: AffineTransform,
   side: cmath.RectangleSide,
   pixelDelta: cmath.Vector2,
-  size: cmath.Vector2
+  size: cmath.Vector2,
+  alt = false,
+  shift = false
 ): AffineTransform {
-  const corners = getTransformBoxCorners(base, size);
-
-  let axis =
-    side === "left" || side === "right"
-      ? cmath.vector2.sub(corners.ne, corners.nw)
-      : cmath.vector2.sub(corners.sw, corners.nw);
-
-  // Recovery from a collapsed side: once a drag has driven the box's
-  // width or height to ~0, the corner-derived axis is the zero vector
-  // and projecting `pixelDelta` onto it would yield NaN. Bailing out
-  // here would also strand the user — the box could never re-expand
-  // because every subsequent drag on that axis would no-op. Fall back
-  // to the box's local axis direction, derived from whichever column
-  // of the base's linear part is still non-degenerate (one collapse
-  // axis at a time is the common case; full collapse is the exception
-  // and we keep the bail-out for that).
-  if (Math.hypot(axis[0], axis[1]) < SIZE_EPSILON) {
-    const fallback = degenerateAxisFallback(base, side, size);
-    if (Math.hypot(fallback[0], fallback[1]) < SIZE_EPSILON) return base;
-    axis = fallback;
-  }
-
-  const projected = cmath.vector2.project(pixelDelta, axis);
-
+  // Dragged edge's local coord on its driven axis; the other coord is unused.
+  let ca = 0.5;
+  let cb = 0.5;
+  let scaleX = false;
+  let scaleY = false;
   switch (side) {
-    case "left": {
-      corners.nw = cmath.vector2.add(corners.nw, projected);
-      corners.sw = cmath.vector2.add(corners.sw, projected);
+    case "left":
+      ca = 0;
+      scaleX = true;
       break;
-    }
-    case "right": {
-      corners.ne = cmath.vector2.add(corners.ne, projected);
-      corners.se = cmath.vector2.add(corners.se, projected);
+    case "right":
+      ca = 1;
+      scaleX = true;
       break;
-    }
-    case "top": {
-      corners.nw = cmath.vector2.add(corners.nw, projected);
-      corners.ne = cmath.vector2.add(corners.ne, projected);
+    case "top":
+      cb = 0;
+      scaleY = true;
       break;
-    }
-    case "bottom": {
-      corners.sw = cmath.vector2.add(corners.sw, projected);
-      corners.se = cmath.vector2.add(corners.se, projected);
+    case "bottom":
+      cb = 1;
+      scaleY = true;
       break;
-    }
   }
-
-  return cornersToBoxTransform(corners, size);
+  return scaleBox(base, size, ca, cb, scaleX, scaleY, pixelDelta, alt, shift);
 }
 
 /**
@@ -333,7 +464,9 @@ function applyRotation(
   base: AffineTransform,
   corner: cmath.IntercardinalDirection,
   pixelDelta: cmath.Vector2,
-  size: cmath.Vector2
+  size: cmath.Vector2,
+  shift = false,
+  containerRotationDeg = 0
 ): AffineTransform {
   const corners = getTransformBoxCorners(base, size);
   const center = cmath.vector2.multiply(
@@ -359,7 +492,22 @@ function applyRotation(
 
   const dot = cmath.vector2.dot(baseVector, normalizedTarget);
   const cross = cmath.vector2.cross(baseVector, normalizedTarget);
-  const angle = Math.atan2(cross, dot);
+  let angle = Math.atan2(cross, dot);
+
+  // Shift angle-snap: snap the ABSOLUTE visible rotation (container + base's
+  // own rotation + this delta) to the ROTATE_SNAP_DEG grid, then back out the
+  // delta to apply. Snapping the absolute angle (not the delta) matches the
+  // element box, so the box can land on an exact 15° even from an off-grid
+  // start.
+  if (shift) {
+    const base_deg = containerRotationDeg + decompose(base).rotation;
+    const total_deg = base_deg + (angle * 180) / Math.PI;
+    const snapped_deg =
+      Math.round(total_deg / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG;
+    angle = ((snapped_deg - base_deg) * Math.PI) / 180;
+  } else if (Math.abs(angle) < EPSILON) {
+    return base;
+  }
 
   if (Math.abs(angle) < EPSILON) return base;
 

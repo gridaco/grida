@@ -113,6 +113,11 @@ export namespace policy_class {
       rotate: ["via-transform"],
       "enter-vector-edit": ["bake"],
       "translate-vertex": ["bake"],
+      // transform-vertices (Vertex Transform Box, #881) — always bake,
+      // count- and type-preserving: scaling / rotating the selected vertex
+      // positions keeps tangents zero, so the chain stays a native
+      // line/polyline/polygon (no promote, no restrict fork).
+      "transform-vertices": ["bake"],
       "insert-vertex": ["bake"],
       "delete-vertex": ["bake", "restrict"],
       "close-shape": ["promote"],
@@ -156,6 +161,7 @@ export namespace policy_class {
       rotate: ["bake", "via-transform"],
       "enter-vector-edit": ["bake"],
       "translate-vertex": ["bake"],
+      "transform-vertices": ["bake"],
       "insert-vertex": ["bake"],
       "delete-vertex": ["bake"],
       "close-shape": ["bake"],
@@ -198,6 +204,7 @@ export namespace policy_class {
       rotate: "via-transform",
       "enter-vector-edit": "bake",
       "translate-vertex": "bake",
+      "transform-vertices": "bake",
       "insert-vertex": "bake",
       "delete-vertex": "restrict", // conservative v1: refuse below the minimum
       "close-shape": "promote",
@@ -226,6 +233,7 @@ export namespace policy_class {
       resize: "bake", // current: scale_path_d via svg-pathdata MATRIX
       translate: "bake",
       rotate: "via-transform",
+      "transform-vertices": "bake", // single mandated solution (#881)
     },
 
     text: {},

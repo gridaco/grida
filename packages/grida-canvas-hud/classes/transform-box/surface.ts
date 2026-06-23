@@ -46,6 +46,8 @@ import {
   TRANSFORM_BOX_BODY_PRIORITY,
   TRANSFORM_BOX_CORNER_HIT_SIZE,
   TRANSFORM_BOX_CORNER_PRIORITY,
+  TRANSFORM_BOX_ROTATE_RING_HIT_SIZE,
+  TRANSFORM_BOX_ROTATE_RING_PRIORITY,
   TRANSFORM_BOX_SIDE_HIT_THICKNESS,
   TRANSFORM_BOX_SIDE_PRIORITY,
 } from "./priority";
@@ -162,6 +164,13 @@ export function buildTransformBox(input: {
   const { overlay, style, transform } = input;
 
   const { id, group } = overlay;
+  const corner_role = overlay.corner_role ?? "rotate";
+  const body_priority = overlay.priority?.body ?? TRANSFORM_BOX_BODY_PRIORITY;
+  const side_priority = overlay.priority?.side ?? TRANSFORM_BOX_SIDE_PRIORITY;
+  const corner_priority =
+    overlay.priority?.corner ?? TRANSFORM_BOX_CORNER_PRIORITY;
+  const rotate_ring_priority =
+    overlay.priority?.rotate ?? TRANSFORM_BOX_ROTATE_RING_PRIORITY;
   const out: OverlayElement[] = [];
 
   const doc_corners = getTransformBoxDocCorners(overlay);
@@ -208,7 +217,7 @@ export function buildTransformBox(input: {
     action: { kind: "transform_box_body", id },
     hit: { kind: "screen_aabb", rect: body_hit_rect },
     render: quad_render,
-    priority: TRANSFORM_BOX_BODY_PRIORITY,
+    priority: body_priority,
     cursor: "move",
   });
 
@@ -245,7 +254,7 @@ export function buildTransformBox(input: {
       group,
       action: { kind: "transform_box_side", id, side, base_angle },
       hit,
-      priority: TRANSFORM_BOX_SIDE_PRIORITY,
+      priority: side_priority,
       cursor:
         side === "top" || side === "bottom"
           ? { kind: "resize", direction: "n", baseAngle: base_angle }
@@ -255,20 +264,45 @@ export function buildTransformBox(input: {
 
   for (const corner of CORNERS) {
     const p = doc_corners[corner];
-    out.push({
-      label: `transform_box_corner:${id}:${corner}`,
-      group,
-      action: { kind: "transform_box_corner", id, corner, base_angle },
-      hit: {
-        kind: "screen_rect_at_doc",
-        anchor_doc: p,
-        width: TRANSFORM_BOX_CORNER_HIT_SIZE,
-        height: TRANSFORM_BOX_CORNER_HIT_SIZE,
-        placement: "center",
-      },
-      priority: TRANSFORM_BOX_CORNER_PRIORITY,
-      cursor: { kind: "rotate", corner, baseAngle: base_angle },
+    // Centered square hit at the corner, sized per role.
+    const corner_hit = (size: number): HitShape => ({
+      kind: "screen_rect_at_doc",
+      anchor_doc: p,
+      width: size,
+      height: size,
+      placement: "center",
     });
+    if (corner_role === "scale") {
+      // Outer rotate ring — a larger square around the corner, lower
+      // precedence than the inner scale knob, so the corner's surround
+      // rotates while its center scales (the standard design-tool corner).
+      out.push({
+        label: `transform_box_corner:${id}:${corner}`,
+        group,
+        action: { kind: "transform_box_corner", id, corner, base_angle },
+        hit: corner_hit(TRANSFORM_BOX_ROTATE_RING_HIT_SIZE),
+        priority: rotate_ring_priority,
+        cursor: { kind: "rotate", corner, baseAngle: base_angle },
+      });
+      // Inner scale knob — wins the center over the ring.
+      out.push({
+        label: `transform_box_corner_scale:${id}:${corner}`,
+        group,
+        action: { kind: "transform_box_corner_scale", id, corner, base_angle },
+        hit: corner_hit(TRANSFORM_BOX_CORNER_HIT_SIZE),
+        priority: corner_priority,
+        cursor: { kind: "resize", direction: corner, baseAngle: base_angle },
+      });
+    } else {
+      out.push({
+        label: `transform_box_corner:${id}:${corner}`,
+        group,
+        action: { kind: "transform_box_corner", id, corner, base_angle },
+        hit: corner_hit(TRANSFORM_BOX_CORNER_HIT_SIZE),
+        priority: corner_priority,
+        cursor: { kind: "rotate", corner, baseAngle: base_angle },
+      });
+    }
   }
 
   return out;
