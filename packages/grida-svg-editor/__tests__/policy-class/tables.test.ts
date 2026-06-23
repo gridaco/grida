@@ -116,6 +116,9 @@ describe("Table 3 — chosen policy (canonical cells)", () => {
     expect(
       policy_class.chosen_policy("vertex-chain", "transform-vertices")
     ).toBe("bake");
+    expect(policy_class.chosen_policy("path", "transform-vertices")).toBe(
+      "bake"
+    );
     expect(policy_class.legal_solutions("path", "transform-vertices")).toEqual([
       "bake",
     ]);

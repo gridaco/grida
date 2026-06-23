@@ -233,6 +233,7 @@ export namespace policy_class {
       resize: "bake", // current: scale_path_d via svg-pathdata MATRIX
       translate: "bake",
       rotate: "via-transform",
+      "transform-vertices": "bake", // single mandated solution (#881)
     },
 
     text: {},

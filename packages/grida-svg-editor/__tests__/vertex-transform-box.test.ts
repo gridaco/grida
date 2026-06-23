@@ -22,6 +22,7 @@ import cmath from "@grida/cmath";
 import {
   box_transform_to_local_affine,
   obb_frame_from_corners,
+  pad_box_min_axis,
 } from "../src/dom";
 import {
   PathModel,
@@ -286,6 +287,47 @@ describe("obb_frame_from_corners", () => {
     expect(f.rotation).toBeCloseTo(90, 9);
     expect(f.size[0]).toBeCloseTo(10, 9);
     expect(f.size[1]).toBeCloseTo(5, 9);
+  });
+});
+
+describe("pad_box_min_axis", () => {
+  const MIN = 6;
+
+  it("a non-degenerate box (both axes ≥ min px) is returned unchanged", () => {
+    const box = { x: 0, y: 0, width: 40, height: 30 };
+    expect(pad_box_min_axis(box, 1, 1, MIN)).toEqual(box);
+  });
+
+  it("a vertical line (thin x) is padded + centered along x only", () => {
+    const padded = pad_box_min_axis(
+      { x: 10, y: 0, width: 0, height: 100 },
+      1,
+      1,
+      MIN
+    );
+    expect(padded).not.toBeNull();
+    expect(padded!.width).toBeCloseTo(6); // 6 / scale_x(1)
+    expect(padded!.x).toBeCloseTo(10 - 3); // centered on the collapsed axis
+    expect(padded!.height).toBe(100); // y axis untouched
+    expect(padded!.y).toBe(0);
+  });
+
+  it("a point (both axes thin) yields null — no box renders", () => {
+    expect(
+      pad_box_min_axis({ x: 5, y: 5, width: 0, height: 0 }, 1, 1, MIN)
+    ).toBeNull();
+  });
+
+  it("the strip is a STABLE container-px width across zoom (regression: stale pad)", () => {
+    // A vertical line: width collapses, so the pad is keyed off scale_x. At any
+    // zoom the padded width must project back to exactly MIN container px —
+    // padding is re-derived from the current scale, not baked at one zoom.
+    const line = { x: 10, y: 0, width: 0, height: 100 };
+    for (const scale of [0.25, 0.5, 1, 2, 4]) {
+      const padded = pad_box_min_axis(line, scale, scale, MIN);
+      expect(padded).not.toBeNull();
+      expect(padded!.width * scale).toBeCloseTo(MIN, 9);
+    }
   });
 });
 

@@ -88,7 +88,7 @@ the element's own transform). The gesture therefore produces a screen-space
 affine that must be carried into local space before it touches geometry: an
 affine `A` applied in screen space is the local affine
 
-```
+```text
 A_local = T⁻¹ · A · T
 ```
 

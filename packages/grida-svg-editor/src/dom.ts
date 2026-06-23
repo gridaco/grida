@@ -232,8 +232,10 @@ type TransformBoxSession = {
   indices: readonly number[];
   /** Geometry when the frame was established (accumulated === identity). */
   baseline_model: PathModel;
-  /** Axis-aligned bbox of the baseline selected vertices, LOCAL space
-   *  (padded on a degenerate axis so a line stays grabbable + rotatable). */
+  /** Axis-aligned bbox of the baseline selected vertices, LOCAL space,
+   *  UNPADDED. Min-axis padding (degenerate-line strip) + point-suppression are
+   *  applied at projection time against the current CTM, so they stay correct
+   *  across zoom (see {@link pad_box_min_axis} / {@link transform_box_obb_frame}). */
   base_aabb: cmath.Rectangle;
   /** Accumulated LOCAL affine across gestures (identity at establishment). */
   accumulated: cmath.Transform;
@@ -4811,40 +4813,17 @@ class DomSurface implements Surface {
     }
     if (!Number.isFinite(minx)) return null;
 
-    // Per-axis local→px scale, to decide degeneracy + pad in LOCAL units so the
-    // strip is a stable container-px width.
-    const el = this.element_index.get(node_id);
-    const ctm =
-      el instanceof SVGGraphicsElement && typeof el.getScreenCTM === "function"
-        ? el.getScreenCTM()
-        : null;
-    if (!ctm) return null;
-    const sx = Math.hypot(ctm.a, ctm.b) || 1;
-    const sy = Math.hypot(ctm.c, ctm.d) || 1;
-    let x = minx;
-    let y = miny;
-    let w = maxx - minx;
-    let h = maxy - miny;
-    const thin_x = w * sx < TRANSFORM_BOX_MIN_AXIS_PX;
-    const thin_y = h * sy < TRANSFORM_BOX_MIN_AXIS_PX;
-    // Point — both axes collapse; no box.
-    if (thin_x && thin_y) return null;
-    if (thin_x) {
-      const pad = TRANSFORM_BOX_MIN_AXIS_PX / sx;
-      x = minx - (pad - w) / 2;
-      w = pad;
-    }
-    if (thin_y) {
-      const pad = TRANSFORM_BOX_MIN_AXIS_PX / sy;
-      y = miny - (pad - h) / 2;
-      h = pad;
-    }
-
+    // Store the UNPADDED baseline bbox. Min-axis padding (degenerate-line
+    // strip) and point-suppression are applied at projection time against the
+    // CURRENT CTM in `transform_box_obb_frame`, so they stay correct across
+    // zoom rather than baking the establishment-zoom scale (gridaco/grida#881
+    // review). A point (both axes zero) still yields a session here, but
+    // projects to `null` — so no box renders.
     return {
       node_id,
       indices: [...indices],
       baseline_model: model,
-      base_aabb: { x, y, width: w, height: h },
+      base_aabb: { x: minx, y: miny, width: maxx - minx, height: maxy - miny },
       accumulated: cmath.transform.identity,
     };
   }
@@ -4862,7 +4841,20 @@ class DomSurface implements Surface {
     const ctm = el.getScreenCTM();
     if (!ctm) return null;
     const offset = this.container_offset();
-    const { x, y, width: w, height: h } = session.base_aabb;
+    // Pad the unpadded baseline bbox against the CURRENT local→px scale, so a
+    // degenerate line stays a grabbable strip and a point suppresses (`null`)
+    // at any zoom (gridaco/grida#881 review). Done before `accumulated` so the
+    // strip rotates with a prior gesture's rotation.
+    const sx = Math.hypot(ctm.a, ctm.b) || 1;
+    const sy = Math.hypot(ctm.c, ctm.d) || 1;
+    const padded = pad_box_min_axis(
+      session.base_aabb,
+      sx,
+      sy,
+      TRANSFORM_BOX_MIN_AXIS_PX
+    );
+    if (!padded) return null;
+    const { x, y, width: w, height: h } = padded;
     const m = session.accumulated;
     const corner = (cx: number, cy: number): [number, number] => {
       const [lx, ly] = cmath.vector2.transform([cx, cy], m);
@@ -6228,6 +6220,43 @@ export function obb_frame_from_corners(corners: {
     size: [Math.hypot(wvec[0], wvec[1]), Math.hypot(hvec[0], hvec[1])],
     rotation: (Math.atan2(wvec[1], wvec[0]) * 180) / Math.PI,
   };
+}
+
+/**
+ * Grow a baseline (local-space) bbox so each axis spans at least `min_px`
+ * container pixels, given the current local→container per-axis scale. A
+ * degenerate axis (a line, where one axis collapses) becomes a grabbable,
+ * rotatable strip; padding is centered so the strip stays on the points.
+ *
+ * Returns `null` when BOTH axes are below `min_px` (a point — no box).
+ *
+ * Pure, and evaluated against the CURRENT scale at projection time (NOT baked
+ * into the persisted session), so a line box stays a stable container-px strip
+ * across zoom / CTM changes rather than going stale at the establishment zoom
+ * (gridaco/grida#881 review).
+ */
+export function pad_box_min_axis(
+  bbox: cmath.Rectangle,
+  scale_x: number,
+  scale_y: number,
+  min_px: number
+): cmath.Rectangle | null {
+  let { x, y, width: w, height: h } = bbox;
+  const thin_x = w * scale_x < min_px;
+  const thin_y = h * scale_y < min_px;
+  // Point — both axes collapse at this zoom; no box.
+  if (thin_x && thin_y) return null;
+  if (thin_x) {
+    const pad = min_px / scale_x;
+    x = x - (pad - w) / 2;
+    w = pad;
+  }
+  if (thin_y) {
+    const pad = min_px / scale_y;
+    y = y - (pad - h) / 2;
+    h = pad;
+  }
+  return { x, y, width: w, height: h };
 }
 
 /**
