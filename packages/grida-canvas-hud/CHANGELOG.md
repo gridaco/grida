@@ -1,6 +1,6 @@
-# @grida/svg-editor
+# @grida/hud
 
-## 1.0.0
+## 0.4.0
 
 ### Minor Changes
 
@@ -9,14 +9,3 @@
   The box frame is **edit-session state**, shared across gestures: a rotation carries into the next gesture and reconciles to the geometry (a uniform translation of the selection is absorbed; any other edit resets it to a fresh axis-aligned box). The box claims drags while the vector control beneath each handle stays **click-selectable** — a click narrows/toggles the point underneath, and it **lights up on hover** to preview that selection.
 
   `@grida/hud`'s transform box gains a `corner_role: "scale"` mode (inner scale knob + outer rotate ring), per-handle `priority` overrides, a `scale_corner` op, and `Shift`/`Alt` modifier support in `reduceTransformBox`. A selectable control beneath a box handle now defers to it uniformly for both click-through and hover-preview.
-
-### Patch Changes
-
-- Updated dependencies [b0d2c6a]
-  - @grida/hud@0.4.0
-
-## 1.0.0-alpha.26
-
-### Patch Changes
-
-- Delete / Backspace in path edit mode (`mode === "edit-content"`) now removes the sub-selected vertices / segments / tangents instead of detaching the whole element ([#880](https://github.com/gridaco/grida/issues/880)). `selection.remove` is guarded on `select` mode, and a new `vector.delete-vertex` command honors the policy-class `delete-vertex` verdict (vertex-chain `restrict` — polygon ≥ 3, polyline ≥ 2, line keeps 2; path `bake`). Deletion is a single undo step that restores both the geometry and the sub-selection; tangent-only deletes preserve untouched segments' authored verbs.
