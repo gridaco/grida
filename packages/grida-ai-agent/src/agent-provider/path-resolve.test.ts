@@ -55,7 +55,7 @@ describe("claude_path.augmentedPathValue", () => {
     const value = claude_path.augmentedPathValue(
       posix(["/opt/homebrew/bin"], { PATH: "/usr/bin" })
     );
-    expect(value.split(path.delimiter)).toContain("/opt/homebrew/bin");
+    expect(value.split(path.posix.delimiter)).toContain("/opt/homebrew/bin");
     expect(value.startsWith("/usr/bin")).toBe(true);
   });
 });

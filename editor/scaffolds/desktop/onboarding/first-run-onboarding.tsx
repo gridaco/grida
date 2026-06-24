@@ -39,7 +39,12 @@ const STEPS: StepDef[] = [
   { id: "finish", Body: FinishStep },
 ];
 
-export function FirstRunOnboarding({ onDone }: { onDone: () => void }) {
+export function FirstRunOnboarding({
+  onDone,
+}: {
+  /** Called when onboarding finishes; carries a workspace opened mid-flow. */
+  onDone: (openedWorkspaceId?: string) => void;
+}) {
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const [state, setState] = useState<OnboardingState>({
@@ -52,8 +57,8 @@ export function FirstRunOnboarding({ onDone }: { onDone: () => void }) {
 
   const complete = useCallback(() => {
     onboarding_flag.markComplete();
-    onDone();
-  }, [onDone]);
+    onDone(state.openedWorkspace?.id);
+  }, [onDone, state.openedWorkspace]);
 
   const openSettings = useCallback(() => {
     // Choosing an alternative provider finishes onboarding and hands off to the
