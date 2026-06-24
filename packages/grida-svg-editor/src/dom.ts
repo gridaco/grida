@@ -416,6 +416,10 @@ type PendingInsertCommon = {
 class DomSurface implements Surface {
   private svg_root: SVGSVGElement | null = null;
   private hud_canvas: HTMLCanvasElement;
+  // Cached container ancestor CSS-transform scale (gridaco/grida#892), refreshed
+  // on every `sync_canvas_size`. Read from the camera hot path (pixel-grid
+  // transform) so it must not re-trigger a layout read there.
+  private ancestor_scale: { sx: number; sy: number } = { sx: 1, sy: 1 };
   private hud: HUDSurface;
   private teardown: Array<() => void> = [];
   private element_index = new Map<NodeId, SVGElement>();
@@ -1000,11 +1004,11 @@ class DomSurface implements Surface {
       resolve_bounds: (target) => this.resolve_world_bounds(target),
       initial: options.initial_camera,
     });
-    this.hud.setPixelGridTransform(this.camera.transform);
+    this.push_pixel_grid_transform();
     this.teardown.push(
       this.camera.subscribe(() => {
         this.apply_camera_transform();
-        this.hud.setPixelGridTransform(this.camera.transform);
+        this.push_pixel_grid_transform();
         // Multi-member envelope chrome stores a baked union rect in
         // container space — re-resolve it against the new CTM. The
         // flat-NodeId path (singleton / empty) is a near no-op here.
@@ -1728,13 +1732,37 @@ class DomSurface implements Surface {
     // space 1:1 with screen px — the convention the whole surface assumes — so
     // chrome tracks content instead of drifting toward the top-left at z².
     // Identity (`""`) at 1:1, so this is a no-op for the common mount.
-    const { sx, sy } = this.container_ancestor_scale(cr);
+    this.ancestor_scale = this.container_ancestor_scale(cr);
+    const { sx, sy } = this.ancestor_scale;
     this.hud_canvas.style.transform =
       sx === 1 && sy === 1 ? "" : `scale(${1 / sx}, ${1 / sy})`;
+    // The pixel grid is projected in the camera frame, not the screen-px frame
+    // the counter-scaled canvas now uses — re-fold the (possibly changed)
+    // ancestor scale into it so it stays aligned with content.
+    this.push_pixel_grid_transform();
     // Push viewport size to the camera so `camera.fit`, `bounds`, `center`
     // compute against the live container dimensions.
     this.camera._set_viewport_size(cr.width, cr.height);
     this.redraw();
+  }
+
+  /**
+   * Feed the pixel grid the camera transform folded with the container's
+   * ancestor scale (gridaco/grida#892).
+   *
+   * Unlike the selection chrome — projected to screen px via `getScreenCTM`,
+   * which the canvas's `1/z` counter-scale cancels — the pixel grid is drawn in
+   * the editor *camera* frame (container-local px, the frame the SVG content
+   * lives in). On the counter-scaled canvas that frame is no longer 1:1 with
+   * the rendered content, so without folding the ancestor scale back in the
+   * grid would drift from the content by `1/z`. Identity at 1:1. Uses the cached
+   * `ancestor_scale` so the per-camera-frame path stays off the layout-read path.
+   */
+  private push_pixel_grid_transform(): void {
+    const { sx, sy } = this.ancestor_scale;
+    this.hud.setPixelGridTransform(
+      fold_scale_into_transform(this.camera.transform, sx, sy)
+    );
   }
 
   /**
@@ -6131,6 +6159,27 @@ function sameTangentRefs(
  *
  * Exported for headless test coverage — pure function, no DOM types.
  */
+/**
+ * Pre-multiply a `cmath.Transform`'s output by an axis-aligned scale: row 0
+ * (output x) by `sx`, row 1 (output y) by `sy`. Equivalent to `scale(sx, sy) ∘
+ * t`. Used to fold the container's ancestor CSS scale into the camera-frame
+ * pixel-grid transform so it stays aligned on the counter-scaled HUD canvas
+ * (gridaco/grida#892). Returns `t` unchanged at unit scale.
+ *
+ * Pure function, no DOM types.
+ */
+export function fold_scale_into_transform(
+  t: cmath.Transform,
+  sx: number,
+  sy: number
+): cmath.Transform {
+  if (sx === 1 && sy === 1) return t;
+  return [
+    [t[0][0] * sx, t[0][1] * sx, t[0][2] * sx],
+    [t[1][0] * sy, t[1][1] * sy, t[1][2] * sy],
+  ];
+}
+
 export function project_point_through_ctm(
   px: number,
   py: number,
