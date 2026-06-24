@@ -31,6 +31,7 @@ import type {
   TurnResult,
 } from "./types";
 import { acp_config, BRIDGE_PACKAGE } from "./config";
+import { claude_path } from "./path-resolve";
 
 /**
  * Build the ACP `_meta` for a session from the static {@link acp_config} plus
@@ -148,6 +149,11 @@ export type BridgeConnect = (ctx: { cwd: string }) => BridgeTransport;
 const spawnBridge: BridgeConnect = ({ cwd }) => {
   const env = { ...process.env };
   delete env.ANTHROPIC_API_KEY; // subscription billing only
+  // A GUI-launched desktop app inherits a STRIPPED PATH, so `npx`/`node`/the
+  // user's `claude` (Homebrew, ~/.local/bin, version-manager shims) may be
+  // unfindable. Augment PATH with the well-known install dirs — the same
+  // source of truth `detect` resolves against. (#871 part 2 / #813.)
+  env.PATH = claude_path.augmentedPathValue();
 
   const child = spawn("npx", ["-y", BRIDGE_PACKAGE], {
     cwd,
