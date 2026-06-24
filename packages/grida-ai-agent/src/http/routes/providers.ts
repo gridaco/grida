@@ -26,6 +26,7 @@ import {
 } from "../../protocol/endpoints";
 import type { EndpointProvidersStore } from "../../providers/endpoints";
 import { probeEndpointModels } from "../../providers/probe";
+import { detectClaude } from "../../agent-provider/detect";
 import type { SecretsStore } from "../../secrets";
 import { body, v } from "../validate";
 
@@ -41,11 +42,14 @@ export type ProvidersRoutesDeps = {
   secrets?: SecretsStore;
   /** Probe override for tests. Defaults to {@link probeEndpointModels}. */
   probe?: typeof probeEndpointModels;
+  /** Claude-detect override for tests. Defaults to {@link detectClaude}. */
+  detect?: typeof detectClaude;
 };
 
 export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
   const { endpoints, secrets } = deps;
   const probe = deps.probe ?? probeEndpointModels;
+  const detect = deps.detect ?? detectClaude;
 
   app.post("/providers/endpoints/list", async (c) => {
     const list: EndpointProviderConfig[] = await endpoints.list();
@@ -122,5 +126,17 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
       `[agent-host-providers] probe source=${result.source} models=${result.models.length}`
     );
     return c.json({ source: result.source, models: result.models });
+  });
+
+  // Zero-config Claude detection (issue #813): is the user's `claude` CLI
+  // resolvable on the augmented PATH? Cheap filesystem probe — does NOT
+  // verify login (that's surfaced by the first real run). Only the host can
+  // answer: the resolver searches the machine's well-known install dirs.
+  app.post("/providers/claude/detect", (c) => {
+    const result = detect();
+    console.log(
+      `[agent-host-providers] claude detect installed=${result.installed}`
+    );
+    return c.json(result);
   });
 }

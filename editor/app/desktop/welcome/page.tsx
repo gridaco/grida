@@ -48,6 +48,8 @@ import {
   type Workspace,
 } from "@/lib/desktop/bridge";
 import { welcome_handoff } from "@/lib/desktop/welcome-handoff";
+import { onboarding_flag } from "@/lib/desktop/onboarding-flag";
+import { FirstRunOnboarding } from "@/scaffolds/desktop/onboarding/first-run-onboarding";
 import { dotcanvas } from "dotcanvas";
 import {
   TitleBar,
@@ -69,6 +71,14 @@ export default function DesktopWelcomePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // First-run onboarding (issue #813): zero-config Claude detection. Start
+  // hidden so the server render and first client render agree — `localStorage`
+  // is client-only, so seeding in the initializer would render the modal during
+  // SSR and tear it down on hydration for returning users. Decide after mount.
+  const [onboarding, setOnboarding] = useState(false);
+  useEffect(() => {
+    if (!onboarding_flag.isComplete()) setOnboarding(true);
+  }, []);
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   // The composer's target. Defaults to the most-recent workspace once
@@ -215,6 +225,21 @@ export default function DesktopWelcomePage() {
       data-testid="desktop-welcome"
       className="flex h-svh w-full flex-col bg-background"
     >
+      {onboarding && (
+        <FirstRunOnboarding
+          onDone={(openedWorkspaceId) => {
+            setOnboarding(false);
+            // A folder opened during onboarding lives only in the wizard until
+            // now — pull it into this page's list and select it so the composer
+            // and recents reflect it immediately (not just on the next focus).
+            if (openedWorkspaceId) {
+              void refreshWorkspaces().then(() =>
+                setSelectedId(openedWorkspaceId)
+              );
+            }
+          }}
+        />
+      )}
       <TitleBar>
         <div className="ml-auto" style={TITLEBAR_NO_DRAG_STYLE}>
           <Button
