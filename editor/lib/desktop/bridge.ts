@@ -386,6 +386,22 @@ export namespace providers {
   }
 
   /**
+   * Is the user's `claude` CLI installed where the host can find it (issue
+   * #813 zero-config onboarding)? Cheap host-side filesystem probe — does NOT
+   * verify login (the first real run is the source of truth). On an old binary
+   * that predates the surface, returns `installed: true` so onboarding doesn't
+   * block a user who likely has Claude — the run path stays the real gate.
+   */
+  export async function detectClaude(): Promise<{
+    installed: boolean;
+    path?: string;
+  }> {
+    const bridge = getDesktopBridge()?.providers;
+    if (!bridge?.detect_claude) return { installed: true };
+    return await bridge.detect_claude();
+  }
+
+  /**
    * Reveal `endpoints.json` (the hand-editable config — `overrides` for
    * power users live there) in the OS file manager. Returns `false` when
    * the surface isn't available (old binary, or the web daemon bridge

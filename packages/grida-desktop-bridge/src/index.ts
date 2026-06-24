@@ -300,6 +300,10 @@ export type DesktopBridge = {
       source: "ollama" | "openai";
       models: ProbedEndpointModel[];
     }>;
+    /** Is the user's `claude` CLI resolvable on the host (issue #813)? Cheap
+     *  filesystem probe, NOT a login check (login surfaces on the first run).
+     *  Optional — older binaries lack it; renderers feature-detect. */
+    detect_claude?: () => Promise<{ installed: boolean; path?: string }>;
   };
   agent: {
     run: (

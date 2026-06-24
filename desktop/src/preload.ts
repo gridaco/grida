@@ -507,6 +507,7 @@ const bridge: DesktopBridge = {
     },
     info: () => agentClient.providers.info(),
     probe_endpoint: (baseUrl) => agentClient.providers.probe_endpoint(baseUrl),
+    detect_claude: () => agentClient.providers.detect_claude(),
   },
 
   agent: {

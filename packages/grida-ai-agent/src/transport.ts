@@ -440,6 +440,12 @@ export namespace AgentTransport {
         await this.postJson("/providers/endpoints/probe", {
           base_url: baseUrl,
         }),
+      /** Is the user's `claude` CLI resolvable on the host (issue #813)?
+       *  Cheap filesystem probe — NOT a login check. */
+      detect_claude: async (): Promise<{
+        installed: boolean;
+        path?: string;
+      }> => await this.postJson("/providers/claude/detect"),
     } as const;
 
     readonly sessions = {
