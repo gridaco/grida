@@ -416,6 +416,10 @@ type PendingInsertCommon = {
 class DomSurface implements Surface {
   private svg_root: SVGSVGElement | null = null;
   private hud_canvas: HTMLCanvasElement;
+  // Cached container ancestor CSS-transform scale (gridaco/grida#892), refreshed
+  // on every `sync_canvas_size`. Read from the camera hot path (pixel-grid
+  // transform) so it must not re-trigger a layout read there.
+  private ancestor_scale: { sx: number; sy: number } = { sx: 1, sy: 1 };
   private hud: HUDSurface;
   private teardown: Array<() => void> = [];
   private element_index = new Map<NodeId, SVGElement>();
@@ -934,6 +938,10 @@ class DomSurface implements Surface {
       position: "absolute",
       left: "0",
       top: "0",
+      // Pin the counter-scale applied in `sync_canvas_size` (gridaco/grida#892)
+      // to the top-left, so it cancels the ancestor transform about the same
+      // origin the chrome projection assumes (the container's top-left).
+      transformOrigin: "0 0",
       pointerEvents: "none",
     });
     container.appendChild(this.hud_canvas);
@@ -996,11 +1004,11 @@ class DomSurface implements Surface {
       resolve_bounds: (target) => this.resolve_world_bounds(target),
       initial: options.initial_camera,
     });
-    this.hud.setPixelGridTransform(this.camera.transform);
+    this.push_pixel_grid_transform();
     this.teardown.push(
       this.camera.subscribe(() => {
         this.apply_camera_transform();
-        this.hud.setPixelGridTransform(this.camera.transform);
+        this.push_pixel_grid_transform();
         // Multi-member envelope chrome stores a baked union rect in
         // container space — re-resolve it against the new CTM. The
         // flat-NodeId path (singleton / empty) is a near no-op here.
@@ -1716,10 +1724,79 @@ class DomSurface implements Surface {
   private sync_canvas_size() {
     const cr = this.container.getBoundingClientRect();
     this.hud.setSize(cr.width, cr.height);
+    // Counter the container's ancestor CSS-transform scale (gridaco/grida#892).
+    // The HUD canvas is a child of the container, so an ancestor `transform:
+    // scale(z)` would scale it a *second* time — the chrome is already
+    // projected into screen px via `getScreenCTM`, and so is the pointer path
+    // (`dispatch_pointer`). Counter-scaling by `1/z` keeps the canvas's drawing
+    // space 1:1 with screen px — the convention the whole surface assumes — so
+    // chrome tracks content instead of drifting toward the top-left at z².
+    // Identity (`""`) at 1:1, so this is a no-op for the common mount.
+    this.ancestor_scale = this.container_ancestor_scale(cr);
+    const { sx, sy } = this.ancestor_scale;
+    this.hud_canvas.style.transform =
+      sx === 1 && sy === 1 ? "" : `scale(${1 / sx}, ${1 / sy})`;
+    // The pixel grid is projected in the camera frame, not the screen-px frame
+    // the counter-scaled canvas now uses — re-fold the (possibly changed)
+    // ancestor scale into it so it stays aligned with content.
+    this.push_pixel_grid_transform();
     // Push viewport size to the camera so `camera.fit`, `bounds`, `center`
     // compute against the live container dimensions.
     this.camera._set_viewport_size(cr.width, cr.height);
     this.redraw();
+  }
+
+  /**
+   * Feed the pixel grid the camera transform folded with the container's
+   * ancestor scale (gridaco/grida#892).
+   *
+   * Unlike the selection chrome — projected to screen px via `getScreenCTM`,
+   * which the canvas's `1/z` counter-scale cancels — the pixel grid is drawn in
+   * the editor *camera* frame (container-local px, the frame the SVG content
+   * lives in). On the counter-scaled canvas that frame is no longer 1:1 with
+   * the rendered content, so without folding the ancestor scale back in the
+   * grid would drift from the content by `1/z`. Identity at 1:1. Uses the cached
+   * `ancestor_scale` so the per-camera-frame path stays off the layout-read path.
+   */
+  private push_pixel_grid_transform(): void {
+    const { sx, sy } = this.ancestor_scale;
+    this.hud.setPixelGridTransform(
+      fold_scale_into_transform(this.camera.transform, sx, sy)
+    );
+  }
+
+  /**
+   * The cumulative CSS-transform scale applied to the container by its
+   * ancestors (e.g. a zoom-UI wrapper carrying `transform: scale(z)`), as
+   * transformed-box ÷ layout-box. `1` when the editor is mounted at 1:1.
+   *
+   * `getBoundingClientRect()` reports the post-transform (screen) border box;
+   * `offsetWidth/Height` report the pre-transform (layout) border box, so
+   * their ratio isolates the ancestor scale independent of border/padding.
+   *
+   * `offsetWidth/Height` are integer-rounded while the rect is fractional, so a
+   * sub-pixel container size (the norm for flex/percentage panes) would yield a
+   * spurious ~1.00x ratio with no real ancestor transform. A box delta below
+   * 1px IS that rounding (always <0.5px), not a scale — it snaps to exactly 1,
+   * keeping the untransformed mount a true no-op (and the chrome pixel-sharp,
+   * rather than sub-pixel-blurred by a fractional counter-scale).
+   *
+   * Only re-derived on size sync. A host that *animates* an ancestor transform
+   * should drive zoom through the editor camera instead — an ancestor
+   * `transform` change does not fire `ResizeObserver`, so the counter-scale
+   * would otherwise go stale. (This is the embedding contract gridaco/grida#892
+   * raised; driving zoom via the camera is the recommended pattern regardless.)
+   */
+  private container_ancestor_scale(cr: DOMRect): { sx: number; sy: number } {
+    const snap = (rect: number, layout: number): number => {
+      if (!(layout > 0) || Math.abs(rect - layout) < 1) return 1;
+      const s = rect / layout;
+      return Number.isFinite(s) && s > 0 ? s : 1;
+    };
+    return {
+      sx: snap(cr.width, this.container.offsetWidth),
+      sy: snap(cr.height, this.container.offsetHeight),
+    };
   }
 
   /**
@@ -6082,6 +6159,27 @@ function sameTangentRefs(
  *
  * Exported for headless test coverage — pure function, no DOM types.
  */
+/**
+ * Pre-multiply a `cmath.Transform`'s output by an axis-aligned scale: row 0
+ * (output x) by `sx`, row 1 (output y) by `sy`. Equivalent to `scale(sx, sy) ∘
+ * t`. Used to fold the container's ancestor CSS scale into the camera-frame
+ * pixel-grid transform so it stays aligned on the counter-scaled HUD canvas
+ * (gridaco/grida#892). Returns `t` unchanged at unit scale.
+ *
+ * Pure function, no DOM types.
+ */
+export function fold_scale_into_transform(
+  t: cmath.Transform,
+  sx: number,
+  sy: number
+): cmath.Transform {
+  if (sx === 1 && sy === 1) return t;
+  return [
+    [t[0][0] * sx, t[0][1] * sx, t[0][2] * sx],
+    [t[1][0] * sy, t[1][1] * sy, t[1][2] * sy],
+  ];
+}
+
 export function project_point_through_ctm(
   px: number,
   py: number,
