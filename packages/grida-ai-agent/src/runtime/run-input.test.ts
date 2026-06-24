@@ -9,6 +9,7 @@ import {
   persistIncomingTail,
   type NormalizedMessage,
 } from "./run-input";
+import { buildModelMessages } from "./message-view";
 
 let tempDir: string;
 let opened: OpenedSessionsDb;
@@ -29,6 +30,46 @@ function userMsg(id: string, text: string): NormalizedMessage {
   return { id, role: "user", parts: [{ type: "text", text }] };
 }
 
+// Mimic the recorder writing a tool call at `input-available` (turn 1, before
+// the renderer resolves it) — the row `fillToolResult` later updates in place.
+async function recordPendingCall(
+  sessionId: string,
+  msgId: string,
+  tcid: string,
+  name: string,
+  index = 0
+) {
+  await store.appendMessageIfAbsent(sessionId, {
+    id: msgId,
+    role: "assistant",
+  });
+  await store.upsertPart(msgId, {
+    index,
+    type: `tool-${name}`,
+    data: {
+      type: `tool-${name}`,
+      tool_call_id: tcid,
+      tool_name: name,
+      state: "input-available",
+      input: {},
+    },
+    tool_call_id: tcid,
+    tool_state: "input-available",
+    session_id: sessionId,
+  });
+}
+
+// The shape the AI SDK client resends a resolved tool part in (camelCase).
+function clientTool(name: string, tcid: string, output: unknown) {
+  return {
+    type: `tool-${name}`,
+    toolCallId: tcid,
+    state: "output-available",
+    input: {},
+    output,
+  };
+}
+
 describe("persistIncomingTail", () => {
   it("persists user messages with their parts", async () => {
     const s = await store.create({ agent: "grida" });
@@ -39,12 +80,137 @@ describe("persistIncomingTail", () => {
     expect((messages[0].parts[0].data as { text: string }).text).toBe("hello");
   });
 
-  it("skips assistant messages (the recorder owns those)", async () => {
+  it("skips assistant text/reasoning (the recorder owns those)", async () => {
     const s = await store.create({ agent: "grida" });
     await persistIncomingTail(store, s.id, [
       { id: "a1", role: "assistant", parts: [{ type: "text", text: "hi" }] },
     ]);
     expect((await store.listMessages(s.id)).length).toBe(0);
+  });
+
+  it("fills a CLIENT-resolved tool result into the recorder's pending row", async () => {
+    // The desktop file-window single-file sidebar resolves fs tools in the
+    // renderer, so the result reaches the server only on the next request's
+    // assistant message. The recorder wrote the call at `input-available` on
+    // turn 1; the resend fills it in place. Without this it stays
+    // input-available and the run can't progress.
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "tc1", "list_files");
+    await persistIncomingTail(store, s.id, [
+      userMsg("u1", "what do you see"),
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [clientTool("list_files", "tc1", { files: ["/canvas.svg"] })],
+      },
+    ]);
+    const a1 = (await store.listMessages(s.id)).find((m) => m.id === "a1");
+    const toolPart = a1!.parts.find((p) => p.tool_call_id === "tc1");
+    expect(toolPart!.tool_state).toBe("output-available");
+    expect(
+      (toolPart!.data as { output?: { files?: string[] } }).output?.files
+    ).toEqual(["/canvas.svg"]);
+  });
+
+  it("makes a filled tool result visible to the model view", async () => {
+    // The fix is meaningless unless `buildModelMessages` (the server-
+    // authoritative model input) now SEES the result — otherwise it drops the
+    // call as incomplete and the turn stalls forever.
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "tc1", "list_files");
+    await persistIncomingTail(store, s.id, [
+      userMsg("u1", "what do you see"),
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [clientTool("list_files", "tc1", { files: ["/canvas.svg"] })],
+      },
+    ]);
+    const model = buildModelMessages(await store.listVisibleMessages(s.id));
+    const assistant = model.find((m) => m.role === "assistant");
+    const toolPart = assistant!.parts.find(
+      (p): p is { toolCallId: string; output: unknown } =>
+        typeof p === "object" &&
+        p !== null &&
+        (p as { toolCallId?: unknown }).toolCallId === "tc1"
+    );
+    expect(toolPart!.output).toEqual({ files: ["/canvas.svg"] });
+  });
+
+  it("does NOT 500 or overwrite when resending already-resolved tool rows (turn-2 workspace regression)", async () => {
+    // The bug: once decks became workspace-bound (server-side fs), turn 1
+    // produced MANY server-resolved tool parts; on turn 2 the client resent
+    // them and the old code re-`upsertPart`'d each at its CLIENT array index,
+    // which the tool-keyed UPDATE forced onto the existing row → collided with a
+    // sibling part's slot → `UNIQUE(message_id, index)` → 500. `fillToolResult`
+    // only touches `input-available` rows and never reindexes, so a resend of
+    // already-`output-available` rows is a clean no-op.
+    const s = await store.create({ agent: "grida", workspace_id: "w1" });
+    await store.appendMessageIfAbsent(s.id, { id: "a1", role: "assistant" });
+    const persisted = [
+      { index: 0, type: "text", data: { type: "text", text: "Let me look." } },
+      {
+        index: 1,
+        type: "tool-list_files",
+        data: {
+          type: "tool-list_files",
+          tool_call_id: "tc1",
+          state: "output-available",
+          input: {},
+          output: { files: [] },
+        },
+        tool_call_id: "tc1",
+        tool_state: "output-available",
+      },
+      {
+        index: 2,
+        type: "tool-read_file",
+        data: {
+          type: "tool-read_file",
+          tool_call_id: "tc2",
+          state: "output-available",
+          input: {},
+          output: { content: "x" },
+        },
+        tool_call_id: "tc2",
+        tool_state: "output-available",
+      },
+      { index: 3, type: "text", data: { type: "text", text: "done" } },
+    ];
+    for (const p of persisted) {
+      await store.upsertPart("a1", {
+        index: p.index,
+        type: p.type,
+        data: p.data,
+        tool_call_id: p.tool_call_id ?? null,
+        tool_state: p.tool_state ?? null,
+        session_id: s.id,
+      });
+    }
+    // Turn 2: the client resends the full history (same order) + a new message.
+    await expect(
+      persistIncomingTail(store, s.id, [
+        userMsg("u1", "what do you see"),
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [
+            { type: "text", text: "Let me look." },
+            clientTool("list_files", "tc1", { files: [] }),
+            clientTool("read_file", "tc2", { content: "x" }),
+            { type: "text", text: "done" },
+          ],
+        },
+        userMsg("u2", "edit slide 1"),
+      ])
+    ).resolves.toBeUndefined();
+    // Rows untouched (still terminal) and the model view rebuilds cleanly.
+    const a1 = (await store.listMessages(s.id)).find((m) => m.id === "a1");
+    expect(a1!.parts.find((p) => p.tool_call_id === "tc1")!.tool_state).toBe(
+      "output-available"
+    );
+    const model = buildModelMessages(await store.listVisibleMessages(s.id));
+    expect(model.map((m) => m.role)).toEqual(["assistant", "user", "user"]);
   });
 
   it("dedups a user id repeated within one request (no UNIQUE-constraint 500)", async () => {

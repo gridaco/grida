@@ -1,8 +1,10 @@
 import { nanoid } from "nanoid";
 import { AgentFs } from "@grida/agent/fs";
 import { OpfsBackend } from "@grida/agent/fs/backends/opfs";
+import { dotcanvas } from "dotcanvas";
 import type { SvgEditor } from "@grida/svg-editor";
 import { svgEditorBinding } from "../_ai/binding-svg";
+import { bundleFs, ManifestHidingBackend } from "./bundle-fs";
 import { svgToDataUri } from "./thumbnails";
 
 export type SvgDocSummary = {
@@ -20,14 +22,23 @@ export type SvgDocStoreOptions = {
   commitDebounceMs?: number;
 };
 
-type SidecarEntry = { id: string; name: string; createdAt: number };
-type SidecarState = {
-  version: 1;
-  docs: SidecarEntry[];
-  activeId: string | null;
-};
+/** The `.canvas` type this demo writes. Each document is one SVG slide. */
+const CANVAS_TYPE: dotcanvas.CanvasType = "svg-slides";
 
-const SIDECAR_PATH = "/index.json";
+/** App extension key under the manifest `ext` bag for demo view-state. */
+const APP_EXT_KEY = "co.grida.svg-demo";
+
+type AppExt = { activeId?: string };
+
+/** `<id>.svg` → `<id>` (the store's document identity is the filename stem). */
+function stemOf(src: string): string {
+  return src.replace(/\.svg$/i, "");
+}
+
+function readAppExt(ext: Record<string, unknown>): AppExt {
+  const v = ext[APP_EXT_KEY];
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as AppExt) : {};
+}
 
 function pickBackend(opfsBase: readonly string[]): AgentFs.Backend {
   if (OpfsBackend.isSupported()) return new OpfsBackend(opfsBase);
@@ -44,22 +55,26 @@ function idFromPath(path: string): string | null {
 }
 
 /**
- * Owns the multi-document state for one SVG demo route. Composes:
+ * Owns the multi-document state for one SVG demo route, persisted as a
+ * portable `.canvas` bundle (a `canvas.json` manifest + `<id>.svg` files)
+ * via `dotcanvas`. Composes:
  *
- *  - **Canvas `AgentFs`** — every doc persists as `/<id>.svg`. Hot-swaps
- *    a `LiveBinding` to the currently-active editor on `attachEditor` /
- *    `setActiveId`. This is the fs the AI agent operates on.
- *  - **Meta `AgentFs`** — a sibling AgentFs over a `_meta` scope holding
- *    a single `/index.json` (doc order + names + activeId). Kept separate
- *    so the agent's `list_files` never sees this metadata. Reuses AgentFs's
- *    debounced flush + dedup.
+ *  - **Bundle backend** — OPFS (or memory) holding `canvas.json` + every
+ *    `/<id>.svg`. The manifest (order + per-doc `name`/`createdAt` + the
+ *    active id in `ext`) is read with `dotcanvas.read` and rewritten with
+ *    `dotcanvas.write` on every mutation.
+ *  - **Agent `AgentFs`** — built over `ManifestHidingBackend(bundle)` so the
+ *    AI copilot sees only the `/<id>.svg` documents, never `canvas.json`.
+ *    Hot-swaps a `LiveBinding` to the active editor on `attachEditor` /
+ *    `setActiveId`. This is the fs returned by `getFs()`.
  */
 export class SvgDocStore {
   private readonly fs: AgentFs;
   private readonly canvasBackend: AgentFs.Backend;
-  private readonly metaFs: AgentFs;
   private readonly defaultSvg: string;
   private readonly commitDebounceMs: number;
+  /** Serializes manifest writes so the latest snapshot is the last to land. */
+  private manifestWriteChain: Promise<void> = Promise.resolve();
 
   private docs: SvgDocSummary[] = [];
   private activeId: string | null = null;
@@ -84,8 +99,9 @@ export class SvgDocStore {
 
   constructor(opts: SvgDocStoreOptions) {
     this.canvasBackend = pickBackend(opts.opfsBase);
-    this.fs = new AgentFs(this.canvasBackend);
-    this.metaFs = new AgentFs(pickBackend([...opts.opfsBase, "_meta"]));
+    // The agent fs is built over a manifest-hiding view: the copilot sees the
+    // `/<id>.svg` documents but never `canvas.json` (read/written separately).
+    this.fs = new AgentFs(new ManifestHidingBackend(this.canvasBackend));
     this.defaultSvg = opts.defaultSvg;
     this.commitDebounceMs = opts.commitDebounceMs ?? 250;
     // Reflect agent-driven fs mutations into the doc list. Events for the
@@ -106,9 +122,10 @@ export class SvgDocStore {
   }
 
   private async runHydrate(): Promise<void> {
-    await Promise.all([this.fs.hydrate(), this.metaFs.hydrate()]);
+    await this.fs.hydrate();
     if (this.disposed) return;
 
+    // Load every SVG document's bytes (the manifest is hidden from `this.fs`).
     for (const path of this.fs.list()) {
       const id = idFromPath(path);
       if (id == null) continue;
@@ -116,34 +133,50 @@ export class SvgDocStore {
       if (r) this.content.set(id, r.content);
     }
 
-    const persisted = this.readSidecar();
-    if (persisted && persisted.docs.length > 0) {
-      const survivors = persisted.docs.filter((d) => this.content.has(d.id));
-      if (survivors.length > 0) {
-        for (const d of survivors) this.createdAt.set(d.id, d.createdAt);
-        this.docs = survivors.map((d) => this.summarize(d.id, d.name));
-        this.activeId =
-          persisted.activeId &&
-          survivors.some((d) => d.id === persisted.activeId)
-            ? persisted.activeId
-            : survivors[0].id;
-      }
-    }
+    // Read the manifest. `dotcanvas.read` reconciles it against disk: it skips
+    // documents whose file is missing, appends on-disk SVGs the manifest omits,
+    // and derives the list from disk entirely when `canvas.json` is absent.
+    const resolved = await dotcanvas.read(bundleFs(this.canvasBackend));
+    if (this.disposed) return;
 
-    if (this.docs.length === 0 && this.content.size > 0) {
-      let n = 1;
+    // Tracks whether any on-disk document was skipped because its bytes didn't
+    // load (AgentFs.hydrate logs-and-continues on per-file read failures). When
+    // true we must NOT rewrite the manifest below, or a transiently-unreadable
+    // slide would be pruned from `canvas.json` permanently.
+    let skippedDocs = false;
+    if (resolved.documents.length > 0) {
       const now = Date.now();
-      for (const [id] of this.content) {
-        this.createdAt.set(id, now);
-        this.docs.push(this.summarize(id, `Document ${n++}`));
+      let n = 1;
+      for (const d of resolved.documents) {
+        const id = stemOf(d.src);
+        if (!this.content.has(id)) {
+          skippedDocs = true;
+          continue;
+        }
+        // The source manifest entry rides on the resolved doc as `meta`
+        // (undefined for a disk-appended slide) — read `createdAt`/`name` off it
+        // directly, no re-join against `resolved.manifest`.
+        const raw = d.meta;
+        const createdAt =
+          typeof raw?.createdAt === "number" ? raw.createdAt : now;
+        const name = typeof raw?.name === "string" ? raw.name : `Document ${n}`;
+        this.createdAt.set(id, createdAt);
+        this.docs.push(this.summarize(id, name));
+        n++;
       }
-      this.activeId = this.docs[0].id;
+      const { activeId } = readAppExt(resolved.ext);
+      this.activeId =
+        activeId && this.docs.some((d) => d.id === activeId)
+          ? activeId
+          : (this.docs[0]?.id ?? null);
     }
 
     if (this.docs.length === 0) this.seedFirstDoc();
 
     this.hydrated = true;
-    this.persistSidecar();
+    // Skip the normalizing rewrite when hydrate had partial read coverage —
+    // persisting now would drop the unreadable slide(s) from the manifest.
+    if (!skippedDocs) this.persistManifest();
     this.notify();
   }
 
@@ -156,7 +189,6 @@ export class SvgDocStore {
     }
     this.flushAndDetach();
     this.fs.dispose();
-    this.metaFs.dispose();
     this.listeners.clear();
   }
 
@@ -206,7 +238,7 @@ export class SvgDocStore {
     this.fs.write(pathOf(id), { content, expected_version: null });
     this.docs = [...this.docs, this.summarize(id, displayName)];
     this.switchActive(id);
-    this.persistSidecar();
+    this.persistManifest();
     this.notify();
     return id;
   }
@@ -234,7 +266,7 @@ export class SvgDocStore {
       const nextIdx = Math.max(0, idx - 1);
       this.activeId = this.docs[nextIdx].id;
     }
-    this.persistSidecar();
+    this.persistManifest();
     this.notify();
   }
 
@@ -247,7 +279,7 @@ export class SvgDocStore {
       return { ...d, name };
     });
     if (!changed) return;
-    this.persistSidecar();
+    this.persistManifest();
     this.notify();
   }
 
@@ -299,7 +331,7 @@ export class SvgDocStore {
     this.content.set(id, content);
     this.docs = [...this.docs, this.summarize(id, id)];
     this.switchActive(id);
-    this.persistSidecar();
+    this.persistManifest();
     this.notify();
   }
 
@@ -320,7 +352,7 @@ export class SvgDocStore {
     this.content.delete(id);
     this.createdAt.delete(id);
     this.docs = this.docs.filter((d) => d.id !== id);
-    this.persistSidecar();
+    this.persistManifest();
     this.notify();
   }
 
@@ -329,7 +361,7 @@ export class SvgDocStore {
     if (!this.docs.some((d) => d.id === id)) return;
     this.persistActive();
     this.switchActive(id);
-    this.persistSidecar();
+    this.persistManifest();
     this.notify();
   }
 
@@ -352,7 +384,7 @@ export class SvgDocStore {
     this.activeId = null;
 
     const id = this.seedFirstDoc(svg, name);
-    this.persistSidecar();
+    this.persistManifest();
     this.notify();
     return id;
   }
@@ -486,32 +518,35 @@ export class SvgDocStore {
     return id;
   }
 
-  private readSidecar(): SidecarState | null {
-    const r = this.metaFs.read(SIDECAR_PATH);
-    if (!r) return null;
-    try {
-      const parsed = JSON.parse(r.content) as SidecarState;
-      if (parsed?.version !== 1 || !Array.isArray(parsed.docs)) return null;
-      return parsed;
-    } catch (err) {
-      console.warn("[svg-doc-store] sidecar parse failed:", err);
-      return null;
-    }
-  }
-
-  private persistSidecar(): void {
-    const state: SidecarState = {
-      version: 1,
-      docs: this.docs.map((d) => ({
+  /** Rebuild `canvas.json` from authoritative in-memory state. */
+  private buildManifest(): dotcanvas.Manifest {
+    return {
+      type: CANVAS_TYPE,
+      documents: this.docs.map((d) => ({
+        src: `${d.id}.svg`,
         id: d.id,
         name: d.name,
         createdAt: this.createdAt.get(d.id) ?? Date.now(),
       })),
-      activeId: this.activeId,
+      ext: {
+        [APP_EXT_KEY]: {
+          activeId: this.activeId ?? undefined,
+        } satisfies AppExt,
+      },
     };
-    this.metaFs.write(SIDECAR_PATH, {
-      content: JSON.stringify(state),
-      expected_version: null,
-    });
+  }
+
+  /**
+   * Persist the manifest. Writes are chained so concurrent mutations land in
+   * call order (the latest snapshot is the last to hit disk). Best-effort,
+   * matching the store's fire-and-forget document writes.
+   */
+  private persistManifest(): void {
+    const manifest = this.buildManifest();
+    this.manifestWriteChain = this.manifestWriteChain
+      .then(() => dotcanvas.write(bundleFs(this.canvasBackend), manifest))
+      .catch((err) => {
+        console.warn("[svg-doc-store] manifest write failed:", err);
+      });
   }
 }

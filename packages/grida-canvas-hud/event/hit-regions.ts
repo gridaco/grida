@@ -306,6 +306,21 @@ export type OverlayAction =
     }
   | {
       /**
+       * Inner corner knob of a transform-box, emitted only when the host
+       * opts in via `TransformBoxInput.corner_role === "scale"`. Drag emits
+       * the `scale_corner` op (scale about the opposite corner). The outer
+       * surround of the same corner is a `transform_box_corner` (rotate)
+       * hit at a lower precedence, so the corner's center scales while its
+       * ring rotates — the standard design-tool corner. `base_angle` — see
+       * `transform_box_side`.
+       */
+      kind: "transform_box_corner_scale";
+      id: string;
+      corner: cmath.IntercardinalDirection;
+      base_angle: number;
+    }
+  | {
+      /**
        * Parametric handle knob — the user-facing element of a
        * `surface.setParametricHandles(...)` input. ONE region per
        * coincidence group (per `parametricHandleLayoutGroups`); when
@@ -386,15 +401,28 @@ export class HitRegions {
     this.regions.push(region);
   }
 
-  hitTest(point: cmath.Vector2): OverlayAction | null {
-    return this.hitTestRegion(point)?.action ?? null;
+  /**
+   * The winning action at `point`. `skip` (optional) excludes matching actions
+   * from the contest — used to resolve what lies UNDER a higher-priority
+   * overlay (e.g. the vector control beneath a transform-box handle, so a
+   * click can fall through to select it; gridaco/grida#881).
+   */
+  hitTest(
+    point: cmath.Vector2,
+    skip?: (action: OverlayAction) => boolean
+  ): OverlayAction | null {
+    return this.hitTestRegion(point, skip)?.action ?? null;
   }
 
   /** Returns the full region (label + priority) — used by tests and
    *  debug tooling that want to assert on `label`. `hitTest` delegates here. */
-  hitTestRegion(point: cmath.Vector2): HitRegion | null {
+  hitTestRegion(
+    point: cmath.Vector2,
+    skip?: (action: OverlayAction) => boolean
+  ): HitRegion | null {
     let best: HitRegion | null = null;
     for (const r of this.regions) {
+      if (skip && skip(r.action)) continue;
       const test_point = r.inverse_transform
         ? cmath.vector2.transform(point, r.inverse_transform)
         : point;

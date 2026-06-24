@@ -355,6 +355,7 @@ export type SurfaceGesture =
       op:
         | { type: "translate" }
         | { type: "scale_side"; side: cmath.RectangleSide }
+        | { type: "scale_corner"; corner: cmath.IntercardinalDirection }
         | { type: "rotate"; corner: cmath.IntercardinalDirection };
       /** Box size in doc-space units (frozen at gesture start). */
       size: cmath.Vector2;
@@ -365,11 +366,16 @@ export type SurfaceGesture =
       base_transform: AffineTransform;
       /** Pointer-down doc-space position. */
       start_doc: cmath.Vector2;
+      /** Pointer-down SCREEN position. The drag-threshold gate runs in screen
+       *  px (physical pointer movement), camera-invariant to the press moment. */
+      start_screen: cmath.Vector2;
       /** Most-recent doc-space pointer. */
       last_doc: cmath.Vector2;
       /** Most-recent reduced transform (used for the commit emit). */
       transform: AffineTransform;
-      /** Flips to `true` once `pointer_move` advances. Click-no-drag → no commit. */
+      /** Flips to `true` once the pointer crosses `DRAG_THRESHOLD_PX` from the
+       *  press. Sub-threshold movement is NOT a drag — click-no-drag → no
+       *  commit, and a deferred click-through select survives the jitter. */
       dragged: boolean;
     };
 

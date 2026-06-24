@@ -31,6 +31,7 @@ import {
   type SelectionGroup,
   type TapOutcome,
   type TextEditChromeInput,
+  type TransformBoxInput,
 } from "@grida/hud";
 import { cursors as hud_cursors } from "@grida/hud/cursors";
 import { measure, type Measurement } from "@grida/cmath/_measurement";
@@ -99,8 +100,13 @@ import {
   vector_revert,
   apply_subselection,
   validate_subselection,
+  delete_vector_subselection,
+  transform_vector_subselection,
+  subselection_transform_vertices,
+  subset_translation_delta,
   type SubSelectionSnapshot,
 } from "./core/vector-edit";
+import { policy_class } from "./core/policy-class";
 import type { RetypeRecord } from "./core/document";
 import type {
   InsertableTag,
@@ -178,6 +184,62 @@ const IS_MODIFIER_KEY: Record<string, true> = {
  *  surface skips render() during the in-flight mount and doesn't yank the
  *  live `<text>` element out from under the about-to-mount text surface. */
 const TEXT_EDIT_PENDING = { __pending: true } as const;
+
+/** A frozen empty vector sub-selection — the `after` state a deletion
+ *  replays so the cleared sub-selection is itself part of the undo step.
+ *  Shaped exactly like {@link VectorEditSession.snapshot_selection}'s
+ *  output so `restore_selection` consumes it verbatim. */
+const EMPTY_SUB_SELECTION: SubSelectionSnapshot = Object.freeze({
+  vertices: Object.freeze([] as number[]),
+  segments: Object.freeze([] as number[]),
+  tangents: Object.freeze([] as ReadonlyArray<readonly [number, 0 | 1]>),
+});
+
+/**
+ * Minimum container-px extent for the Vertex Transform Box (gridaco/grida#881).
+ * The box renders when the sub-selection bbox spans at least this on its
+ * LARGER axis; a degenerate (thin / axis-aligned-line) axis is padded to this
+ * width so the strip stays grabbable and supports rotation. When BOTH axes are
+ * below it (a point / coincident vertices) the box is suppressed and translate
+ * stays available by dragging the vertex knobs directly.
+ */
+const TRANSFORM_BOX_MIN_AXIS_PX = 6;
+
+/**
+ * Per-handle hit priorities for the Vertex Transform Box (gridaco/grida#881),
+ * lower wins. The box's resize / rotate handles must take precedence over the
+ * vector chrome underneath (tangent = 4, vertex = 5, ghost = 7, segment = 8)
+ * so a corner / edge grab is never stolen by a coincident control. `body`
+ * stays BELOW vertex / tangent (loses to them) so clicking an individual point
+ * to refine the sub-selection still works; it beats the segment strip + region
+ * so a body-drag translate isn't stolen by a segment crossing the interior.
+ */
+const TRANSFORM_BOX_PRIORITY = {
+  corner: 0,
+  side: 1,
+  rotate: 2,
+  body: 6,
+} as const;
+
+/**
+ * Persistent Vertex Transform Box frame (gridaco/grida#881), shared across
+ * gestures for the life of the current edit / sub-selection. See
+ * {@link Surface.transform_box_session}.
+ */
+type TransformBoxSession = {
+  node_id: NodeId;
+  /** Affected vertices the frame is bound to (selection identity). */
+  indices: readonly number[];
+  /** Geometry when the frame was established (accumulated === identity). */
+  baseline_model: PathModel;
+  /** Axis-aligned bbox of the baseline selected vertices, LOCAL space,
+   *  UNPADDED. Min-axis padding (degenerate-line strip) + point-suppression are
+   *  applied at projection time against the current CTM, so they stay correct
+   *  across zoom (see {@link pad_box_min_axis} / {@link transform_box_obb_frame}). */
+  base_aabb: cmath.Rectangle;
+  /** Accumulated LOCAL affine across gestures (identity at establishment). */
+  accumulated: cmath.Transform;
+};
 
 /**
  * Wire a web-font settle source to the editor's geometry channel.
@@ -530,7 +592,69 @@ class DomSurface implements Surface {
         baseline_tangent_abs: ReadonlyArray<readonly [number, number] | null>;
         session: Preview;
       }
+    | {
+        /**
+         * Vertex Transform Box translate / scale / rotate (gridaco/grida#881).
+         * One affine over the sub-selected vertices (and their tangents), driven
+         * by every HUD `transform_box` op (body / side / corner / ring) through
+         * the same path.
+         *
+         * The transform frame is SESSION state ({@link transform_box_session}),
+         * persisted across gestures for the life of the edit / sub-selection —
+         * so a rotate carries into the next scale (the handles stay where the
+         * user left them). The geometry baseline, affected `indices`, and the
+         * accumulated affine all live on the session (the source of truth);
+         * this per-gesture record holds ONLY what the single drag adds:
+         *
+         * - `gesture_start_d` — the `d` at gesture open; the undo target for
+         *   THIS gesture (each gesture is its own undo step).
+         * - `box` — the box frame FROZEN at gesture open (container px). It
+         *   carries the session's current rotation so a scale on a rotated box
+         *   scales along the rotated axes.
+         * - `box_transform` — the most recent box-relative affine the HUD
+         *   reduced; redraws between intent frames render the box under it.
+         */
+        kind: "vector_transform_selection";
+        node_id: NodeId;
+        promo: { token: RetypeRecord | null };
+        /** `d` at gesture open — this gesture's undo target. */
+        gesture_start_d: string;
+        before_selection: SubSelectionSnapshot;
+        preview_model: PathModel;
+        box: {
+          origin: readonly [number, number];
+          size: readonly [number, number];
+          rotation: number;
+        };
+        box_transform: cmath.Transform;
+        session: Preview;
+      }
     | null = null;
+
+  /**
+   * Persistent Vertex Transform Box frame (gridaco/grida#881), shared across
+   * gestures for the life of the current edit / sub-selection — NOT reset per
+   * gesture. The box is the oriented bbox of the sub-selection under
+   * `accumulated`; a rotate / scale folds into `accumulated` so the next
+   * gesture continues from the rotated frame. Held in LOCAL space (baseline +
+   * affine), so it survives camera pans / zooms and re-bakes drift-free from
+   * the baseline each commit.
+   *
+   * Reset to identity (a fresh axis-aligned box) when the sub-selection
+   * identity changes, the geometry is mutated by anything other than a box
+   * gesture (detected by comparing against the expected baseline∘accumulated;
+   * a uniform translation of the selection — e.g. a body-drag or nudge — is
+   * absorbed instead of resetting), or content-edit exits.
+   */
+  private transform_box_session: TransformBoxSession | null = null;
+
+  /**
+   * Whether a Vertex Transform Box (gridaco/grida#881) is currently pushed to
+   * the HUD. Lets {@link clear_transform_box} no-op when nothing is shown
+   * without re-pushing `null`. The frame itself is never mirrored here — a
+   * starting `transform_box` gesture recovers it from {@link transform_box_session}.
+   */
+  private transform_box_shown = false;
 
   /** Active text-edit session (null when not in edit-content mode). */
   private text_edit: TextEditor | null = null;
@@ -823,6 +947,10 @@ class DomSurface implements Surface {
       onTap: (t) => this.handle_tap(t),
       style: {
         chromeColor: editor.style.chrome_color,
+        // Vertex Transform Box (gridaco/grida#881) reads as selection chrome,
+        // not a muted boundary — stroke it in the highlight color rather than
+        // the HUD's neutral-gray default.
+        transformBoxStroke: editor.style.chrome_color,
         // v1 ships rotation: the chrome builder draws a rotation knob
         // outside each corner when this is on. The single-vs-multi gate
         // is lifted on the HUD side.
@@ -1097,6 +1225,13 @@ class DomSurface implements Surface {
       this.apply_vector_subselection_command(input, mode)
     );
     this.teardown.push(() => internal.set_vector_subselect_driver(null));
+
+    // Delete / Backspace in path-edit mode (gridaco/grida#880). Same
+    // surface-private-session routing as the sub-selection write above.
+    internal.set_vector_delete_driver(() =>
+      this.delete_vector_selection_command()
+    );
+    this.teardown.push(() => internal.set_vector_delete_driver(null));
 
     // Arrow-key nudge: in vector content-edit, route to the path sub-
     // selection (vertices / segments / tangents) instead of leaking to a
@@ -1707,6 +1842,10 @@ class DomSurface implements Surface {
 
   /** Single per-frame draw entry — merges host-fed extras with surface chrome. */
   private redraw(): void {
+    // Refresh the Vertex Transform Box (gridaco/grida#881) before each draw,
+    // the push-based mirror of the pull-based `vector_of` chrome — so the box
+    // tracks selection / camera / geometry changes uniformly.
+    this.sync_transform_box();
     this.hud.draw(
       merge_hud_draws(
         this.compute_measurement_extra(),
@@ -2496,16 +2635,30 @@ class DomSurface implements Surface {
   }
 
   /**
-   * Claim-then-act (mirrors the keydown claim doctrine: swallow when the
-   * gesture is aimed at the editor, not just when a handler consumed):
-   * a refused paste — junk text — still claims; the suppressed default is
-   * a no-op on a div anyway.
+   * Claim-then-act, gated on the presence of a `text/plain` payload:
+   * mirrors the keydown claim doctrine (swallow when the gesture is aimed
+   * at the editor, not just when a handler consumed) for the channel the
+   * editor actually transports. When the clipboard carries `text/plain`,
+   * the editor claims it even if the text is junk — a refused paste still
+   * `preventDefault()`s, and the suppressed default is a no-op on a div
+   * anyway.
+   *
+   * But when there is NO `text/plain` at all — e.g. an `image/*`-only paste
+   * — the editor has nothing to transport (it consumes SVG markup as text;
+   * raster-image paste is host-owned per the clipboard FRD and the
+   * image-insertion FRD § Transport). It must NOT `preventDefault()` there,
+   * or it would swallow a paste a host's own listener wants to handle (turn
+   * the blob into a resolvable href and call `commands.insert_image`). So
+   * the default is suppressed only when text was present to consider.
    */
   private on_paste(e: ClipboardEvent): void {
     if (!this.claims_clipboard("paste")) return;
-    e.preventDefault();
     const text = e.clipboardData?.getData("text/plain");
-    if (text) this.editor.commands.paste(text);
+    // No text payload (image-only paste, empty clipboard) → leave the
+    // event for the host. The editor transports text; it has nothing here.
+    if (!text) return;
+    e.preventDefault();
+    this.editor.commands.paste(text);
   }
 
   /**
@@ -3090,6 +3243,10 @@ class DomSurface implements Surface {
       }
       case "translate_vector_selection": {
         this.handle_translate_vector_selection(intent);
+        return;
+      }
+      case "transform_box": {
+        this.handle_transform_box(intent);
         return;
       }
       case "select_segment": {
@@ -4292,7 +4449,8 @@ class DomSurface implements Surface {
       (this.active_preview.kind === "vector_vertex_translate" ||
         this.active_preview.kind === "vector_set_tangent" ||
         this.active_preview.kind === "vector_bend_segment" ||
-        this.active_preview.kind === "vector_translate_selection")
+        this.active_preview.kind === "vector_translate_selection" ||
+        this.active_preview.kind === "vector_transform_selection")
     ) {
       this.active_preview.session.discard();
       this.active_preview = null;
@@ -4304,6 +4462,11 @@ class DomSurface implements Surface {
     // bypasses the per-gesture commit / cancel clears.
     this.point_snap_guide = undefined;
     this.hud.setVectorSelection(null);
+    // Tear down the Vertex Transform Box (gridaco/grida#881) — no session ⇒
+    // no sub-selection ⇒ no box. The persistent frame is bound to the edit
+    // session, so drop it here (exiting edit mode resets the rotation).
+    this.clear_transform_box();
+    this.transform_box_session = null;
     // Clear the public read channel too (gridaco/grida#790): no session ⇒
     // no sub-selection. Off the `version` stream.
     this.editor_internal().push_vector_subselection(null);
@@ -4459,6 +4622,263 @@ class DomSurface implements Surface {
     // Mirror to the editor's public read channel (gridaco/grida#790). Off the
     // `version` stream — `subscribe_vector_subselection` consumers only.
     this.editor_internal().push_vector_subselection(sel);
+  }
+
+  /**
+   * Push (or clear) the Vertex Transform Box on the HUD (gridaco/grida#881).
+   * Called from {@link redraw} every frame — the push-based counterpart to the
+   * pull-based {@link vector_of} chrome — so the box stays in lock-step with
+   * selection, camera, and geometry without per-site re-push.
+   *
+   * Two regimes:
+   *   - **scale / rotate in flight** (`vector_transform_selection` preview):
+   *     render the gesture's FROZEN frame under the live reduced
+   *     `box_transform`, so the box visually transforms with the drag while the
+   *     HUD reduces from its own frozen base.
+   *   - **otherwise** (idle / between gestures): derive the box from the
+   *     SESSION frame ({@link transform_box_session}) — the oriented bbox of
+   *     the sub-selection under the accumulated affine — so a prior rotate is
+   *     still shown (the handles stay where the last gesture left them).
+   *
+   * Suppressed (box cleared) unless we're in a vector-edit session whose
+   * source accepts `transform-vertices` and whose sub-selection resolves to a
+   * non-degenerate box (≥ 2 vertices; a line is rendered as a padded strip, a
+   * point is suppressed).
+   */
+  private sync_transform_box(): void {
+    const ses = this.vector_edit;
+    if (!ses) {
+      this.clear_transform_box();
+      return;
+    }
+    const id = `${ses.node_id}#vtx-transform`;
+
+    const ap = this.active_preview;
+    if (
+      ap &&
+      ap.kind === "vector_transform_selection" &&
+      ap.node_id === ses.node_id
+    ) {
+      // Scale / rotate in flight — render the frozen box under the live affine.
+      this.push_transform_box(id, {
+        origin: ap.box.origin,
+        size: ap.box.size,
+        rotation: ap.box.rotation,
+        transform: ap.box_transform,
+      });
+      return;
+    }
+
+    // Idle / between gestures — derive the box from the persistent session
+    // frame (keeps a prior rotation; only resets on selection / external-edit
+    // / exit; see `ensure_transform_box_session`).
+    const frame = this.idle_transform_box_frame(ses.node_id);
+    if (!frame) {
+      this.clear_transform_box();
+      return;
+    }
+    this.push_transform_box(id, {
+      origin: frame.origin,
+      size: frame.size,
+      rotation: frame.rotation,
+      transform: cmath.transform.identity,
+    });
+  }
+
+  /** Push one transform-box input to the HUD (shared by both regimes). */
+  private push_transform_box(
+    id: string,
+    frame: {
+      origin: readonly [number, number];
+      size: readonly [number, number];
+      rotation: number;
+      transform: cmath.Transform;
+    }
+  ): void {
+    const input: TransformBoxInput = {
+      id,
+      transform: frame.transform,
+      size: [frame.size[0], frame.size[1]],
+      origin: [frame.origin[0], frame.origin[1]],
+      rotation: frame.rotation,
+      corner_role: "scale",
+      priority: TRANSFORM_BOX_PRIORITY,
+    };
+    this.hud.setTransformBox(input);
+    this.transform_box_shown = true;
+  }
+
+  /** Clear the transform box if one is shown. Idempotent. Does NOT drop the
+   *  session frame — a transient empty selection (deselect) keeps the frame so
+   *  re-selecting the same points restores the rotated box. */
+  private clear_transform_box(): void {
+    if (!this.transform_box_shown) return;
+    this.hud.setTransformBox(null);
+    this.transform_box_shown = false;
+  }
+
+  /**
+   * The idle box frame `{ origin, size, rotation }` (container px) derived from
+   * the persistent {@link transform_box_session}: the session's baseline
+   * sub-selection bbox, transformed by the accumulated affine, projected and
+   * fit to an oriented bbox. `null` when no box should render (source rejects
+   * `transform-vertices`, < 2 vertices, a point, or no usable CTM).
+   */
+  private idle_transform_box_frame(node_id: NodeId): {
+    origin: [number, number];
+    size: [number, number];
+    rotation: number;
+  } | null {
+    const ses = this.vector_edit;
+    if (!ses || ses.node_id !== node_id) return null;
+    if (
+      !policy_class.accepts(
+        policy_class.of(ses.source.kind),
+        "transform-vertices"
+      )
+    ) {
+      return null;
+    }
+    // Cheap pre-parse guard: the box is a vertex tool and needs ≥ 2 selected
+    // vertices. Bail BEFORE parsing the path `d` (and reconciling the session)
+    // on every redraw frame when the selection can't produce a box — the common
+    // case (no selection, a single vertex, or a segment / tangent selection).
+    if (ses.selected_vertices.length < 2) return null;
+    const model = this.session_model();
+    if (!model) return null;
+    const indices = subselection_transform_vertices(ses, model);
+    const session = this.ensure_transform_box_session(node_id, model, indices);
+    if (!session) return null;
+    return this.transform_box_obb_frame(session);
+  }
+
+  /**
+   * Establish, keep, or reset the persistent transform-box session frame for
+   * the current sub-selection (gridaco/grida#881):
+   *
+   *   - < 2 movable vertices → no frame (`null`); the existing session is left
+   *     intact so a transient empty selection (deselect) doesn't drop a prior
+   *     rotation before the user re-selects.
+   *   - same node + same selection identity, geometry still equal to the
+   *     expected `baseline ∘ accumulated` → KEEP (the frame, with its rotation,
+   *     persists across gestures).
+   *   - same selection but the geometry moved by a UNIFORM translation of the
+   *     selection (a body-drag, a multi-vertex knob drag, a nudge) → absorb the
+   *     translation into `accumulated` (frame + rotation follow the points).
+   *   - otherwise (different selection, or a non-uniform external edit) →
+   *     re-establish a fresh identity-accumulated, axis-aligned frame.
+   */
+  private ensure_transform_box_session(
+    node_id: NodeId,
+    model: PathModel,
+    indices: ReadonlyArray<number>
+  ): TransformBoxSession | null {
+    if (indices.length < 2) return null;
+
+    const existing = this.transform_box_session;
+    if (
+      existing &&
+      existing.node_id === node_id &&
+      array_shallow_equal(existing.indices, indices)
+    ) {
+      const expected = existing.baseline_model.transformVertices(
+        existing.indices,
+        existing.accumulated
+      );
+      const delta = subset_translation_delta(expected, model, existing.indices);
+      if (delta) {
+        if (Math.hypot(delta[0], delta[1]) > 1e-6) {
+          existing.accumulated = cmath.transform.translate(
+            existing.accumulated,
+            delta
+          );
+        }
+        return existing;
+      }
+      // Non-uniform external edit (a curve/tangent change, a single-vertex
+      // drag, a delete) — fall through to re-establish.
+    }
+
+    const session = this.build_transform_box_session(node_id, model, indices);
+    this.transform_box_session = session;
+    return session;
+  }
+
+  /** Build a fresh identity-accumulated session frame, or `null` for a point
+   *  (both axes collapse below the grabbable minimum). The baseline bbox is
+   *  padded on a degenerate axis so a line renders as a grabbable, rotatable
+   *  strip. */
+  private build_transform_box_session(
+    node_id: NodeId,
+    model: PathModel,
+    indices: ReadonlyArray<number>
+  ): TransformBoxSession | null {
+    const verts = model.snapshot().vertices;
+    let minx = Infinity;
+    let miny = Infinity;
+    let maxx = -Infinity;
+    let maxy = -Infinity;
+    for (const i of indices) {
+      const v = verts[i];
+      if (v[0] < minx) minx = v[0];
+      if (v[1] < miny) miny = v[1];
+      if (v[0] > maxx) maxx = v[0];
+      if (v[1] > maxy) maxy = v[1];
+    }
+    if (!Number.isFinite(minx)) return null;
+
+    // Store the UNPADDED baseline bbox. Min-axis padding (degenerate-line
+    // strip) and point-suppression are applied at projection time against the
+    // CURRENT CTM in `transform_box_obb_frame`, so they stay correct across
+    // zoom rather than baking the establishment-zoom scale (gridaco/grida#881
+    // review). A point (both axes zero) still yields a session here, but
+    // projects to `null` — so no box renders.
+    return {
+      node_id,
+      indices: [...indices],
+      baseline_model: model,
+      base_aabb: { x: minx, y: miny, width: maxx - minx, height: maxy - miny },
+      accumulated: cmath.transform.identity,
+    };
+  }
+
+  /** Project the session's baseline bbox (under `accumulated`) to a container-px
+   *  oriented-bbox frame for the HUD. `null` without a usable CTM. */
+  private transform_box_obb_frame(session: TransformBoxSession): {
+    origin: [number, number];
+    size: [number, number];
+    rotation: number;
+  } | null {
+    const el = this.element_index.get(session.node_id);
+    if (!(el instanceof SVGGraphicsElement)) return null;
+    if (typeof el.getScreenCTM !== "function") return null;
+    const ctm = el.getScreenCTM();
+    if (!ctm) return null;
+    const offset = this.container_offset();
+    // Pad the unpadded baseline bbox against the CURRENT local→px scale, so a
+    // degenerate line stays a grabbable strip and a point suppresses (`null`)
+    // at any zoom (gridaco/grida#881 review). Done before `accumulated` so the
+    // strip rotates with a prior gesture's rotation.
+    const sx = Math.hypot(ctm.a, ctm.b) || 1;
+    const sy = Math.hypot(ctm.c, ctm.d) || 1;
+    const padded = pad_box_min_axis(
+      session.base_aabb,
+      sx,
+      sy,
+      TRANSFORM_BOX_MIN_AXIS_PX
+    );
+    if (!padded) return null;
+    const { x, y, width: w, height: h } = padded;
+    const m = session.accumulated;
+    const corner = (cx: number, cy: number): [number, number] => {
+      const [lx, ly] = cmath.vector2.transform([cx, cy], m);
+      return project_point_through_ctm(lx, ly, ctm, offset);
+    };
+    return obb_frame_from_corners({
+      nw: corner(x, y),
+      ne: corner(x + w, y),
+      sw: corner(x, y + h),
+    });
   }
 
   /**
@@ -4662,6 +5082,67 @@ class DomSurface implements Surface {
     return true;
   }
 
+  /**
+   * Driver behind `commands.delete_vector_selection` (gridaco/grida#880).
+   * Deletes the open session's vertex / segment / tangent sub-selection from
+   * the path under edit and writes the smaller geometry back as ONE undoable
+   * step (the same `vector_geometry_step` chokepoint every other vector edit
+   * routes through, so native-attr writeback and promote-to-`<path>` are
+   * handled uniformly). The policy gate + geometry live in the pure core
+   * (`delete_vector_subselection` / `PathModel.deleteSubSelection`); this is
+   * the thin surface shell that resolves the session, brackets history, and
+   * clears the now-stale sub-selection.
+   *
+   * Returns `false` (no-op) when no session is active, a gesture is in
+   * flight, the session has no `d`, nothing is sub-selected, or the policy
+   * verdict refuses (e.g. a triangle `<polygon>` would drop below 3
+   * vertices). On success the element survives and stays in edit mode.
+   *
+   * (see test/svg-editor-vector-delete.md)
+   */
+  private delete_vector_selection_command(): boolean {
+    if (!this.vector_edit) return false;
+    // Refuse mid-gesture: landing a history step inside an open preview drag
+    // or HUD marquee / lasso would break undo order — the same guard
+    // `apply_vector_subselection_command` applies.
+    if (this.active_preview || this.hud.gesture().kind !== "idle") return false;
+
+    const baseline_d = this.read_session_d();
+    if (baseline_d === null) return false;
+    const model = PathModel.fromSvgPathD(baseline_d);
+    const outcome = delete_vector_subselection(
+      this.vector_edit,
+      model,
+      this.vector_edit.source.kind
+    );
+    if (outcome.kind !== "deleted") return false;
+
+    const node_id = this.vector_edit.node_id;
+    const before_selection = this.vector_edit.snapshot_selection();
+    // Deletion invalidates the old indices — clear the sub-selection. The
+    // geometry step's `apply()` replays this empty selection (and `revert()`
+    // the pre-delete one), so undo restores both geometry AND selection.
+    const after_selection = EMPTY_SUB_SELECTION;
+    // One-shot edit → local promotion-token holder (no active_preview); same
+    // preview() + set() + commit() shape `handle_split_segment` uses.
+    const promo: { token: RetypeRecord | null } = { token: null };
+    const internal = this.editor_internal();
+    const delete_session = internal.history.preview("vector/delete");
+    delete_session.set(
+      this.vector_geometry_step(
+        node_id,
+        outcome.d,
+        baseline_d,
+        promo,
+        after_selection,
+        before_selection
+      )
+    );
+    delete_session.commit();
+    this.redraw();
+    return true;
+  }
+
   /** Resolve the in-flight `PathModel` for the named node id when a
    *  vector-preview is active; null otherwise. */
   private active_preview_model_for(id: NodeId): PathModel | null {
@@ -4675,6 +5156,8 @@ class DomSurface implements Surface {
       case "vector_bend_segment":
         return ap.node_id === id ? ap.preview_model : null;
       case "vector_translate_selection":
+        return ap.node_id === id ? ap.preview_model : null;
+      case "vector_transform_selection":
         return ap.node_id === id ? ap.preview_model : null;
       default:
         return null;
@@ -5005,6 +5488,166 @@ class DomSurface implements Surface {
           target_d,
           baseline_d,
           this.active_preview.promo,
+          null,
+          null
+        )
+      );
+    }
+  }
+
+  /**
+   * Vertex Transform Box (gridaco/grida#881). The HUD has already reduced the
+   * box gesture to a box-relative affine; this maps it into the element's
+   * path-local space and bakes it onto the sub-selected vertices as ONE
+   * undoable `vector_geometry_step` (the same chokepoint every vector edit
+   * routes through, so native-attr writeback + promote-to-`<path>` are
+   * uniform).
+   *
+   * All three ops (body translate, edge / corner scale, ring rotate) run
+   * through the SAME path: the reduced affine maps to a local delta via
+   * {@link box_transform_to_local_affine}, composes onto the SESSION's
+   * accumulated frame, and re-bakes the geometry from the session baseline.
+   * Because the frame is session-persistent (not gesture-local), a scale /
+   * rotate composes onto a prior rotation — the box's rotated axes are honored
+   * (the box's `rotation` feeds the affine mapping).
+   *
+   * The transform preserves vertex count + indices, so the commit replays the
+   * SAME sub-selection; one undo restores geometry + selection (and the session
+   * frame self-corrects on the next idle sync — see
+   * {@link ensure_transform_box_session}). Re-derives the in-flight model from
+   * the FROZEN session baseline + accumulated-onto-start each frame
+   * (replay-not-accumulate) for byte-identical chrome / document.
+   */
+  private handle_transform_box(
+    intent: Intent & { kind: "transform_box" }
+  ): void {
+    if (!this.vector_edit) return;
+    const node_id = this.vector_edit.node_id;
+    if (intent.id !== `${node_id}#vtx-transform`) return;
+
+    const el = this.element_index.get(node_id);
+    const ctm =
+      el instanceof SVGGraphicsElement && typeof el.getScreenCTM === "function"
+        ? el.getScreenCTM()
+        : null;
+    if (!ctm) return;
+    if (ctm.a * ctm.d - ctm.c * ctm.b === 0) return; // singular — can't unmap
+    const internal = this.editor_internal();
+
+    // Open / refresh the per-gesture preview — re-open when the previous
+    // preview was a different gesture or aimed elsewhere.
+    if (
+      !this.active_preview ||
+      this.active_preview.kind !== "vector_transform_selection" ||
+      this.active_preview.node_id !== node_id
+    ) {
+      if (this.active_preview && "session" in this.active_preview) {
+        this.active_preview.session.discard();
+      }
+      const gesture_start_d = this.read_session_d();
+      if (gesture_start_d === null) return;
+      const start_model = PathModel.fromSvgPathD(gesture_start_d);
+      const indices = subselection_transform_vertices(
+        this.vector_edit,
+        start_model
+      );
+      // Bind to the persistent session frame (rotation carried from prior
+      // gestures); the box's frozen frame comes from it.
+      const session = this.ensure_transform_box_session(
+        node_id,
+        start_model,
+        indices
+      );
+      if (!session) return;
+      const frame = this.transform_box_obb_frame(session);
+      if (!frame) return;
+      this.active_preview = {
+        kind: "vector_transform_selection",
+        node_id,
+        promo: { token: null },
+        gesture_start_d,
+        before_selection: this.vector_edit.snapshot_selection(),
+        preview_model: start_model,
+        box: frame,
+        box_transform: intent.transform,
+        session: internal.history.preview("vector/transform-selection"),
+      };
+    }
+
+    const ap = this.active_preview;
+    // The persistent session frame is the source of truth for the geometry
+    // baseline, affected indices, and the accumulated affine to reduce ONTO
+    // (it stays stable through the gesture — `ensure_transform_box_session`
+    // only runs on idle frames, never while this preview is active).
+    const session = this.transform_box_session;
+    if (!session || session.node_id !== node_id) {
+      ap.session.discard();
+      this.active_preview = null;
+      return;
+    }
+    // Keep the rendered box in sync with the live reduction (sync_transform_box
+    // reads this between intent frames).
+    ap.box_transform = intent.transform;
+
+    const ctm_full = ctm_to_container_transform(ctm, this.container_offset());
+    // Box-relative reduction → local delta (honoring the box's rotation) →
+    // composed onto the session's accumulated frame (frozen until commit).
+    const w_local = box_transform_to_local_affine(
+      intent.transform,
+      ap.box.origin,
+      ap.box.size,
+      ctm_full,
+      ap.box.rotation
+    );
+    const accumulated_live = cmath.transform.multiply(
+      w_local,
+      session.accumulated
+    );
+    const outcome = transform_vector_subselection(
+      this.vector_edit,
+      session.baseline_model,
+      accumulated_live,
+      this.vector_edit.source.kind
+    );
+    const baseline_d = ap.gesture_start_d;
+    let target_d: string;
+    if (outcome.kind === "transformed") {
+      // Reuse the model the core already built — no re-parse of `d`.
+      target_d = outcome.d;
+      ap.preview_model = outcome.model;
+    } else {
+      // `noop` / `refused` (rare) → render the gesture-start geometry (no write).
+      target_d = baseline_d;
+      ap.preview_model = PathModel.fromSvgPathD(baseline_d);
+    }
+
+    if (intent.phase === "commit") {
+      // Persist the new accumulated frame so the next gesture continues from
+      // the rotated / scaled box (the handles stay where the user left them).
+      session.accumulated = accumulated_live;
+      const before_selection = ap.before_selection;
+      // Transform preserves vertex count + indices, so the after-selection is
+      // the same one — undo restores geometry AND the sub-selection.
+      const after_selection = this.vector_edit.snapshot_selection();
+      ap.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          ap.promo,
+          after_selection,
+          before_selection
+        )
+      );
+      ap.session.commit();
+      this.active_preview = null;
+    } else {
+      ap.session.set(
+        this.vector_geometry_step(
+          node_id,
+          target_d,
+          baseline_d,
+          ap.promo,
           null,
           null
         )
@@ -5494,6 +6137,140 @@ export function project_delta_inverse_ctm(
     [ctm.b, ctm.d, 0],
   ]);
   return cmath.vector2.transform([dx, dy], inv);
+}
+
+/**
+ * Map a transform-box reduced affine (box-relative, as emitted by the HUD
+ * `transform_box` intent) into the element's path-LOCAL coordinate space,
+ * ready to feed {@link PathModel.transformVertices} (Vertex Transform Box,
+ * gridaco/grida#881).
+ *
+ * The transform box lives in container CSS-px: a rect at `box_origin` of
+ * dimensions `box_size`, rotated by `box_rotation` degrees (CCW) about
+ * `box_origin` — the box's own frame, which may be non-axis-aligned once the
+ * session has rotated it. The HUD reports its gesture as a box-relative 2×3
+ * whose translation column is normalized to `[0..1]` against `box_size` (see
+ * `@grida/hud` transform-box). The mapping composes three stages — right-to-
+ * left, so a local point is taken to container space first:
+ *
+ *     M_local = CTM⁻¹ · ( B · P · B⁻¹ ) · CTM,   B = T(o) · R(box_rotation)
+ *
+ *   - `CTM` = `local_to_container` (the element's CTM folded with the
+ *     container offset; see {@link ctm_to_container_transform}).
+ *   - `P` = `box_transform` with its translation de-normalized back to
+ *     container-px (`tx·w`, `ty·h`) — the box's transform in its own un-rotated
+ *     "box pixel" space (origin at the box's `[0,0]`).
+ *   - `B` re-anchors that box-pixel transform to the box's placement in
+ *     container space: translate to `box_origin`, rotated by `box_rotation`.
+ *     The HUD de-rotates the cursor by `-box_rotation` before reducing, so a
+ *     scale on a rotated box scales along the box's rotated axes.
+ *
+ * The result is the world→local round-trip of the box affine, so a rotate /
+ * scale composes correctly into local geometry through a scaled, rotated, or
+ * y-flipped element CTM. Pure, no DOM types. A zero-`box_size` axis is harmless
+ * (its translation contribution is `0`); guarding the gesture against a
+ * collapsed axis is the caller's job. `local_to_container` must be non-singular
+ * (any visible element's CTM is).
+ */
+export function box_transform_to_local_affine(
+  box_transform: cmath.Transform,
+  box_origin: readonly [number, number],
+  box_size: readonly [number, number],
+  local_to_container: cmath.Transform,
+  box_rotation: number = 0
+): cmath.Transform {
+  const [w, h] = box_size;
+  // De-normalize the box-relative translation back to box-pixel space.
+  const p: cmath.Transform = [
+    [box_transform[0][0], box_transform[0][1], box_transform[0][2] * w],
+    [box_transform[1][0], box_transform[1][1], box_transform[1][2] * h],
+  ];
+  // B = T(origin) · R(box_rotation) — box-pixel → container-px.
+  const rad = (box_rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const b: cmath.Transform = [
+    [cos, -sin, box_origin[0]],
+    [sin, cos, box_origin[1]],
+  ];
+  const w_px = cmath.transform.multiply(
+    cmath.transform.multiply(b, p),
+    cmath.transform.invert(b)
+  );
+  const inv = cmath.transform.invert(local_to_container);
+  return cmath.transform.multiply(
+    cmath.transform.multiply(inv, w_px),
+    local_to_container
+  );
+}
+
+/**
+ * Derive an oriented-bbox frame `{ origin, size, rotation }` (HUD transform-box
+ * shape; `rotation` in degrees CCW) from a rectangle's four container-px
+ * corners, given in `[nw, ne, se, sw]` order (Vertex Transform Box,
+ * gridaco/grida#881). The box's width axis is `ne − nw` and its height axis is
+ * `sw − nw`; assumes a (near-)rectangular quad — true under a similarity CTM,
+ * an approximation under a sheared one. Pure, no DOM types.
+ */
+export function obb_frame_from_corners(corners: {
+  nw: readonly [number, number];
+  ne: readonly [number, number];
+  sw: readonly [number, number];
+}): {
+  origin: [number, number];
+  size: [number, number];
+  rotation: number;
+} {
+  const wvec: [number, number] = [
+    corners.ne[0] - corners.nw[0],
+    corners.ne[1] - corners.nw[1],
+  ];
+  const hvec: [number, number] = [
+    corners.sw[0] - corners.nw[0],
+    corners.sw[1] - corners.nw[1],
+  ];
+  return {
+    origin: [corners.nw[0], corners.nw[1]],
+    size: [Math.hypot(wvec[0], wvec[1]), Math.hypot(hvec[0], hvec[1])],
+    rotation: (Math.atan2(wvec[1], wvec[0]) * 180) / Math.PI,
+  };
+}
+
+/**
+ * Grow a baseline (local-space) bbox so each axis spans at least `min_px`
+ * container pixels, given the current local→container per-axis scale. A
+ * degenerate axis (a line, where one axis collapses) becomes a grabbable,
+ * rotatable strip; padding is centered so the strip stays on the points.
+ *
+ * Returns `null` when BOTH axes are below `min_px` (a point — no box).
+ *
+ * Pure, and evaluated against the CURRENT scale at projection time (NOT baked
+ * into the persisted session), so a line box stays a stable container-px strip
+ * across zoom / CTM changes rather than going stale at the establishment zoom
+ * (gridaco/grida#881 review).
+ */
+export function pad_box_min_axis(
+  bbox: cmath.Rectangle,
+  scale_x: number,
+  scale_y: number,
+  min_px: number
+): cmath.Rectangle | null {
+  let { x, y, width: w, height: h } = bbox;
+  const thin_x = w * scale_x < min_px;
+  const thin_y = h * scale_y < min_px;
+  // Point — both axes collapse at this zoom; no box.
+  if (thin_x && thin_y) return null;
+  if (thin_x) {
+    const pad = min_px / scale_x;
+    x = x - (pad - w) / 2;
+    w = pad;
+  }
+  if (thin_y) {
+    const pad = min_px / scale_y;
+    y = y - (pad - h) / 2;
+    h = pad;
+  }
+  return { x, y, width: w, height: h };
 }
 
 /**

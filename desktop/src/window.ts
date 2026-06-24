@@ -279,6 +279,10 @@ export function open_welcome_window({
  * mechanics: each open document is its own BrowserWindow with its
  * own renderer process, addressed by `docId` (not by absolute path —
  * the agent server owns the path registry).
+ *
+ * Lands on the shared `/desktop/file` window in single-file (docId) mode; the
+ * same route serves `.canvas` decks in bundle (`?id=`) mode (see
+ * {@link open_canvas_window}).
  */
 export function open_document_window({
   app,
@@ -291,7 +295,7 @@ export function open_document_window({
 }) {
   return create_main_window({
     base_url: baseUrl,
-    urlPath: `/desktop/svg?docId=${encodeURIComponent(docId)}`,
+    urlPath: `/desktop/file?docId=${encodeURIComponent(docId)}`,
     additionalArguments: buildDesktopArguments({ app }),
   });
 }
@@ -353,6 +357,33 @@ export function open_workspace_window({
   return create_main_window({
     base_url: baseUrl,
     urlPath: `/desktop/workspace?id=${encodeURIComponent(workspaceId)}${session}`,
+    additionalArguments: buildDesktopArguments({ app }),
+  });
+}
+
+/**
+ * Opens the `.canvas` slides editor for a folder registered as `workspaceId`.
+ * Same workspace substrate as {@link open_workspace_window} (the renderer reads
+ * the bundle through the workspace bridge fs), but a deck surface instead of the
+ * file workbench — the caller routes a folder here when it contains a
+ * `canvas.json`. Dedup is the caller's job (focus an existing
+ * `/desktop/file?id=` window for this id, else spawn).
+ *
+ * Lands on the shared `/desktop/file` window in bundle (`?id=`) mode — the same
+ * route serves single files in docId mode (see {@link open_document_window}).
+ */
+export function open_canvas_window({
+  app,
+  base_url: baseUrl,
+  workspace_id: workspaceId,
+}: {
+  app: App;
+  base_url: string;
+  workspace_id: string;
+}) {
+  return create_main_window({
+    base_url: baseUrl,
+    urlPath: `/desktop/file?id=${encodeURIComponent(workspaceId)}`,
     additionalArguments: buildDesktopArguments({ app }),
   });
 }

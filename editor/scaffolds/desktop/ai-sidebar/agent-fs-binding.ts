@@ -1,13 +1,9 @@
 /**
- * `useAgentFsBinding(editor)` — gives the desktop AI sidebar an
- * `AgentFs` mounted to a single virtual canvas path bound to the live
- * `SvgEditor`.
+ * `bindEditor(editor)` — the `AgentFs.LiveBinding` that ties a single
+ * virtual canvas path to a live `SvgEditor`.
  *
- * Mirrors `editor/app/(canvas)/svg/_ai/binding-svg.ts` (the web
- * `/svg` route's binding) shape-for-shape; the only difference is
- * lifecycle. The web route owns a multi-document `SvgDocStore` and
- * mounts paths per document; the desktop window is one-doc-per-window
- * (Recipe 4), so a single `/canvas.svg` mount is enough.
+ * Mirrors `editor/app/(canvas)/svg/_ai/binding-svg.ts` (the web `/svg`
+ * route's binding) shape-for-shape:
  *
  *   serialize → pretty-printed SVG (stable for the model's
  *               match-and-replace `edit_file`)
@@ -18,70 +14,33 @@
  *               agent's writes as stale between read and edit
  *   subscribe  → wires editor emissions into the fs's auto-flush
  *
- * The `AgentFs` here uses a `MemoryBackend` — there's no persistence
- * concern. The actual file on disk is managed by the agent sidecar via
- * `bridge.files.write` on Cmd+S; the AgentFs is a renderer-only
- * scratch surface the agent uses to read/edit the working canvas
- * during a turn.
+ * The owning `AgentFs` (built once per file window in
+ * {@link ./../file/active-editor-agent-fs}) uses a `MemoryBackend` — there's
+ * no persistence concern here. The file on disk is written by the surface's
+ * own Cmd+S path; this `AgentFs` is a renderer-only scratch surface the agent
+ * reads/edits during a turn. The mount is **re-pointed** at whichever editor
+ * is active (the single document, or the active slide), so this binding is
+ * intentionally per-editor and cheap to reconstruct.
  */
 
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { AgentFs } from "@grida/agent/fs";
+import type { AgentFs } from "@grida/agent/fs";
 import type { SvgEditor } from "@grida/svg-editor";
-import { useSvgEditor } from "@grida/svg-editor/react";
 // Pure helper, no AI/billing imports — safe under the desktop ESLint
 // boundary. Kept in the canvas-web folder because pretty-printing is
 // SVG-specific and the original lives there; moving it to a shared
 // package is a follow-up if a third caller appears.
 import { formatSvg } from "@/app/(canvas)/svg/_ai/format-svg";
 
-const CANVAS_PATH = "/canvas.svg" as const;
+/** The single virtual path the active editor is mounted at. */
+export const CANVAS_PATH = "/canvas.svg" as const;
 
-function bindEditor(editor: SvgEditor): AgentFs.LiveBinding {
+export function bindEditor(editor: SvgEditor): AgentFs.LiveBinding {
   return {
     serialize: () => formatSvg(editor.serialize()),
     load: (content) => editor.load(content),
     getVersion: () => editor.state.content_version,
     subscribe: (cb) => editor.subscribe(cb),
   };
-}
-
-export type AgentFsHandle = {
-  fs: AgentFs;
-  /** The virtual path the editor is mounted at. */
-  canvasPath: string;
-};
-
-/**
- * Construct an `AgentFs` bound to the current editor instance for the
- * lifetime of the hook. The returned `fs` and `canvasPath` are stable
- * across renders (re-created only when the underlying editor changes,
- * which it doesn't within a `SvgEditorProvider`).
- */
-export function useAgentFsBinding(): AgentFsHandle {
-  const editor = useSvgEditor();
-
-  // One AgentFs + binding per editor identity. `SvgEditorProvider`
-  // doesn't swap the editor mid-session, so this materializes once.
-  const handle = useMemo<AgentFsHandle>(() => {
-    const fs = new AgentFs(new AgentFs.MemoryBackend());
-    fs.mount(CANVAS_PATH, bindEditor(editor));
-    return { fs, canvasPath: CANVAS_PATH };
-  }, [editor]);
-
-  // Track the latest handle so the unmount cleanup disposes the
-  // correct instance even if React re-runs the effect across editor
-  // swaps (defensive — a remount is the realistic path).
-  const handleRef = useRef(handle);
-  handleRef.current = handle;
-
-  useEffect(() => {
-    return () => {
-      handleRef.current.fs.dispose();
-    };
-  }, []);
-
-  return handle;
 }

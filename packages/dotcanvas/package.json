@@ -1,0 +1,59 @@
+{
+  "name": "dotcanvas",
+  "version": "0.1.0",
+  "description": "Tolerant, zero-dependency reader/writer for the .canvas format — a portable directory of standalone SVG-slide documents plus a canvas.json manifest (order, 2D layout, skip, self-heal). ESM-only.",
+  "keywords": [
+    "bundle",
+    "canvas",
+    "container-format",
+    "deck",
+    "dotcanvas",
+    "file-format",
+    "grida",
+    "manifest",
+    "portable",
+    "presentation",
+    "reader",
+    "slides",
+    "svg",
+    "svg-slides",
+    "writer"
+  ],
+  "homepage": "https://grida.co/docs/packages/dotcanvas",
+  "bugs": "https://github.com/gridaco/grida/issues",
+  "license": "MIT",
+  "author": "Grida",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gridaco/grida.git",
+    "directory": "packages/dotcanvas"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prepack": "tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.1"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "documents": [
+    {
+      "id": "intro",
+      "name": "Title",
+      "src": "001.svg"
+    },
+    {
+      "id": "chart",
+      "layout": {
+        "h": 1080,
+        "w": 1920,
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "name": "Chart",
+      "src": "002.svg"
+    },
+    {
+      "id": "thanks",
+      "name": "Thanks",
+      "src": "003.svg"
+    }
+  ],
+  "ext": {
+    "co.grida.svg-demo": {
+      "activeId": "intro"
+    }
+  },
+  "type": "svg-slides",
+  "version": "1"
+}

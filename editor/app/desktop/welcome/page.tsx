@@ -50,6 +50,7 @@ import {
 import { welcome_handoff } from "@/lib/desktop/welcome-handoff";
 import { onboarding_flag } from "@/lib/desktop/onboarding-flag";
 import { FirstRunOnboarding } from "@/scaffolds/desktop/onboarding/first-run-onboarding";
+import { dotcanvas } from "dotcanvas";
 import {
   TitleBar,
   TITLEBAR_NO_DRAG_STYLE,
@@ -112,6 +113,37 @@ export default function DesktopWelcomePage() {
         ? cur
         : (workspaces[0]?.id ?? null)
     );
+  }, [workspaces]);
+
+  // Auto-detect `.canvas` decks among the recents: a folder containing
+  // `canvas.json` opens the file window in deck mode (`/desktop/file?id=`)
+  // instead of the file workbench. Probed via the bridge once per list (the main
+  // process does the same fs sniff for the File-menu "Open…" path).
+  const [canvasIds, setCanvasIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const ids = await Promise.all(
+        workspaces.map(async (w) => {
+          try {
+            const entries = await workspacesNs.readdir(w.id);
+            return entries.some(
+              (e) => e.rel_path === dotcanvas.MANIFEST_FILENAME
+            )
+              ? w.id
+              : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      if (!cancelled) {
+        setCanvasIds(new Set(ids.filter((x): x is string => x !== null)));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [workspaces]);
 
   // Composer catalog (`@` file refs + `/` skills) for the selected
@@ -311,7 +343,11 @@ export default function DesktopWelcomePage() {
                   className="group flex items-center gap-2 rounded-md transition-colors hover:bg-accent"
                 >
                   <Link
-                    href={workspaceWorkbenchHref(w)}
+                    href={
+                      canvasIds.has(w.id)
+                        ? `/desktop/file?id=${encodeURIComponent(w.id)}`
+                        : workspaceWorkbenchHref(w)
+                    }
                     prefetch={false}
                     className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5"
                   >

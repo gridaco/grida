@@ -547,6 +547,63 @@ export type Commands = {
     initial: Readonly<Record<string, string>>,
     opts?: { parent?: NodeId; index?: number }
   ): InsertPreviewSession;
+  /**
+   * Insert one `<image>` from a **resolvable href** — a designed,
+   * synchronous, headless image-insertion command. Design:
+   * `docs/wg/feat-svg-editor/image-insertion.md`.
+   *
+   * A "resolvable href" is a reference the rendering context can already
+   * fetch as-is: a remote URL, a `data:` URI, or a host-served URL. The
+   * editor authors the element, places it, sizes it, selects it, and
+   * records ONE history step — it NEVER reads a `File`, decodes bytes, or
+   * fetches the href. Turning a local file into a URL, and decoding it to
+   * learn an intrinsic size, is host-owned I/O (P2); the host does that
+   * first and hands the result here.
+   *
+   * Distinct from {@link insert} (the generic tag + attrs primitive) by
+   * design (FRD § The insertion contract): the href is a first-class,
+   * named argument (it is the payload, not an opaque attr); the size has a
+   * defined answer (R3); and the href-form decision (SVG 2 `href`, no
+   * forced `xmlns:xlink`) is the command's to own, not the caller's.
+   *
+   * Behavior:
+   *  - **SVG 2 `href`** is authored, never `xlink:href` — so no
+   *    `xmlns:xlink` is forced onto the root (R4). `xlink:href` on a
+   *    pre-existing image is still preserved on edit; it is just never
+   *    AUTHORED for a new one.
+   *  - **Explicit `width`/`height` always** (R3). `opts.width`/`height`
+   *    when supplied; otherwise a named placeholder
+   *    (`insertions.DEFAULT_IMAGE_SIZE`, explicitly NOT intrinsic) so the
+   *    node is immediately selectable / resizable. The fallback is
+   *    deliberate, not a refusal — insertion corrupts nothing.
+   *  - **Placement** centers the element on `opts.at` (an `<image>`'s
+   *    `x`/`y` are top-left, so top-left = `at − size/2`); with no `at`
+   *    the element anchors at the document origin (top-left at `(0, 0)`).
+   *  - **No content policy** (R6): the href is written and round-trips
+   *    verbatim — no length cap on a `data:` URI, no scheme filter, no
+   *    fetch-to-validate (P1 — content is sovereign).
+   *
+   * `opts.parent` defaults to root; `opts.index` defaults to append;
+   * `opts.select` defaults to `true`. Returns the new node id. One undo
+   * step (undo restores byte-equal; redo re-inserts and re-selects).
+   *
+   * The pointer-driven "place an already-chosen image by clicking the
+   * canvas" tool, an async intrinsic-size resolver provider, and a drop
+   * observation channel are all NAMED DEFERRALS (FRD § Out of scope) —
+   * every v1 flow (drop, paste, programmatic) drives this command directly
+   * with its own point and size.
+   */
+  insert_image(
+    href: string,
+    opts?: {
+      at?: Vec2;
+      width?: number;
+      height?: number;
+      parent?: NodeId;
+      index?: number;
+      select?: boolean;
+    }
+  ): NodeId;
   // content
   set_text(value: string): void;
   /**
@@ -568,6 +625,21 @@ export type Commands = {
     input: VectorSubSelectionInput,
     mode?: SelectMode
   ): boolean;
+  /**
+   * Delete the current vertex / segment / tangent sub-selection from the
+   * open vector content-edit session (gridaco/grida#880). Removes only the
+   * sub-selected geometry from the path under edit and rewrites its `d` (or
+   * native attrs) as one undoable step; the element survives and stays in
+   * edit mode, and the sub-selection is cleared. Returns `true` when a
+   * deletion was applied, `false` (no-op) when no vector session is active,
+   * no DOM surface is attached, nothing is sub-selected, or the policy-class
+   * `delete-vertex` verdict refuses it (e.g. dropping a triangle `<polygon>`
+   * below 3 vertices under the `restrict` policy).
+   *
+   * The session is surface-owned, so this routes through the surface driver
+   * (symmetric to {@link Commands.set_vector_selection}).
+   */
+  delete_vector_selection(): boolean;
   // file
   load_svg(svg: string): void;
   serialize_svg(): string;
@@ -2116,6 +2188,43 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   /**
+   * Designed `<image>` insertion — contract in {@link Commands.insert_image}
+   * (design: `docs/wg/feat-svg-editor/image-insertion.md`).
+   *
+   * Synchronous and headless: no byte read, no decode, no fetch. The href
+   * is the payload; the host supplies the intrinsic size (or the named
+   * placeholder is written). Composes the atomic `insert` primitive so it
+   * inherits the one-history-step / select / undo-redo-byte-equal semantics
+   * — this command's own job is purely to author the clean attr set
+   * (`insertions.image_attrs`: SVG 2 `href`, explicit size, center-on-point
+   * placement). `<image>` carries no default paint
+   * (`default_paint_attrs_for` returns `{}` for it), so what lands is
+   * exactly the authored attrs and nothing else (R4 — one-element delta).
+   */
+  function insert_image(
+    href: string,
+    opts?: {
+      at?: Vec2;
+      width?: number;
+      height?: number;
+      parent?: NodeId;
+      index?: number;
+      select?: boolean;
+    }
+  ): NodeId {
+    const attrs = insertions.image_attrs(href, {
+      at: opts?.at,
+      width: opts?.width,
+      height: opts?.height,
+    });
+    return insert("image", attrs, {
+      parent: opts?.parent,
+      index: opts?.index,
+      select: opts?.select,
+    });
+  }
+
+  /**
    * Atomic fragment insertion — contract in {@link Commands.insert_fragment}.
    * Parses + adopts via `doc.create_fragment` (subtrees registered but
    * detached, like `create_element` — history.redo finds them via
@@ -2508,6 +2617,10 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   let vector_subselect_driver:
     | ((input: VectorSubSelectionInput, mode?: SelectMode) => boolean)
     | null = null;
+  // Editor → surface driver for vector sub-selection DELETION (#880). Same
+  // rationale as `vector_subselect_driver`: the session is surface-owned, so
+  // `commands.delete_vector_selection` reaches it only through this slot.
+  let vector_delete_driver: (() => boolean) | null = null;
   let computed_resolver: DomComputedResolver | null = null;
 
   function dom_computed_property(id: NodeId, name: string): string | null {
@@ -2597,6 +2710,14 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     return vector_subselect_driver(input, mode);
   }
 
+  function delete_vector_selection(): boolean {
+    // Same surface-owned-session routing as `set_vector_selection`: no driver
+    // ⇒ no session ⇒ no-op. The driver owns the policy gate, the geometry
+    // write, and the undoable history step.
+    if (!vector_delete_driver) return false;
+    return vector_delete_driver();
+  }
+
   function load_svg(svg: string) {
     // End open preview sessions BEFORE the document swap: their reverts
     // must run against the old document (the parser reuses NodeIds per
@@ -2669,8 +2790,10 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     insert,
     insert_fragment,
     insert_preview,
+    insert_image,
     set_text,
     set_vector_selection,
+    delete_vector_selection,
     load_svg,
     serialize_svg,
     undo,
@@ -3003,6 +3126,9 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
           | null
       ) {
         vector_subselect_driver = fn;
+      },
+      set_vector_delete_driver(fn: (() => boolean) | null) {
+        vector_delete_driver = fn;
       },
       push_vector_subselection(sel: VectorSubSelection | null) {
         _set_current_vector_subselection(sel);

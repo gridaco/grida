@@ -341,6 +341,71 @@ export class PathModel {
     return new PathModel(vne.value, this._meta);
   }
 
+  /**
+   * Apply a single affine `matrix` (2×3, doc-space) to a set of vertices,
+   * returning a new model. The mathematical heart of the Vertex Transform
+   * Box (gridaco/grida#881): a multi-vertex sub-selection is treated as a
+   * transformable object — one affine over the selected positions, the rest
+   * untouched.
+   *
+   * Two parts of the matrix act on two kinds of data:
+   *   - **Vertex positions** get the full affine (linear part + translation):
+   *     `v' = M · v`.
+   *   - **Tangents** of a selected vertex get only the **linear part**
+   *     (translation dropped): `t' = L · t`. Tangents are stored relative to
+   *     their owning vertex, so they must rotate / scale / shear with the
+   *     vertex but not be displaced by the translation column (the owning
+   *     vertex already carries that). A tangent is transformed iff its owning
+   *     endpoint is in `indices` — a segment with one selected endpoint keeps
+   *     its other handle fixed, deforming the curve, which is the honest
+   *     result of transforming a partial sub-selection.
+   *
+   * Verb metadata is preserved verbatim, exactly like {@link translateVertices}
+   * and {@link translateVertex}: the emitter's geometry-honesty checks demote
+   * at serialization time when the transform breaks a recorded verb (a scaled
+   * arc group whose tangents no longer match its baseline demotes to `C`; an
+   * `H` whose endpoint leaves its row demotes to `L`). Count- and type-
+   * preserving for the policy's purposes — no vertex is added or removed, and
+   * a zero-tangent vertex-chain (`polyline` / `polygon`) stays expressible in
+   * native attrs after the transform (scale / rotate of positions keeps
+   * tangents zero).
+   *
+   * Atomic — input is validated up-front (duplicates are tolerated; each
+   * vertex moves exactly once). A degenerate `matrix` (zero determinant)
+   * collapses the selected geometry but never throws or produces `NaN`;
+   * guarding the gesture against collapse is the surface's job.
+   */
+  transformVertices(
+    indices: ReadonlyArray<VertexId>,
+    matrix: cmath.Transform
+  ): PathModel {
+    if (indices.length === 0) return this;
+    const moving = new Set<VertexId>();
+    for (const v of indices) {
+      if (v < 0 || v >= this._network.vertices.length) {
+        throw new Error(`PathModel.transformVertices: invalid vertex ${v}`);
+      }
+      moving.add(v);
+    }
+    // Linear part only (translation dropped) — for tangent offsets.
+    const linear: cmath.Transform = [
+      [matrix[0][0], matrix[0][1], 0],
+      [matrix[1][0], matrix[1][1], 0],
+    ];
+    const next_network = cloneNetwork(this._network);
+    for (const v of moving) {
+      next_network.vertices[v] = cmath.vector2.transform(
+        next_network.vertices[v],
+        matrix
+      );
+    }
+    for (const seg of next_network.segments) {
+      if (moving.has(seg.a)) seg.ta = cmath.vector2.transform(seg.ta, linear);
+      if (moving.has(seg.b)) seg.tb = cmath.vector2.transform(seg.tb, linear);
+    }
+    return new PathModel(next_network, this._meta);
+  }
+
   /** Translate one segment by `delta` — moves both endpoints, dragging
    *  their tangents along (tangents are stored relative to vertices, so
    *  this is automatic). Other segments connected to the moved endpoints
@@ -528,6 +593,102 @@ export class PathModel {
       model: canonical_model,
       new_vertex: canonical_new_vertex,
     };
+  }
+
+  /**
+   * Remove the sub-selected tangents, segments, and vertices, returning a
+   * new model. Mirrors the main canvas editor's path-edit deletion
+   * (`__self_delete_vector_network_selection` in
+   * `editor/grida-canvas/reducers/document.reducer.ts`) — the established
+   * reference for this op — and applies the three tracks in the same order:
+   *
+   *   1. **tangents** — zero each selected tangent (`ta` for side `0`, `tb`
+   *      for side `1`) on every segment that owns it. A curve whose tangents
+   *      both go to zero demotes to a line at emit time (verb honesty), so
+   *      this is geometry-only, not a topology change.
+   *   2. **segments** — drop each selected segment, descending so an earlier
+   *      splice never shifts a not-yet-deleted index.
+   *   3. **vertices** — drop each selected vertex, descending for the same
+   *      reason. `vn`'s `deleteVertex` also drops every segment that
+   *      referenced the vertex and reindexes the rest; it does NOT reconnect
+   *      the neighbours (matching the main editor), so deleting an interior
+   *      vertex can leave an isolated neighbour that simply doesn't emit.
+   *
+   * Verb-metadata handling depends on whether the topology changed:
+   *
+   *   - **Tangent-only delete** (no segment / vertex removed) — the segment
+   *     array keeps its shape, so the original meta is preserved verbatim.
+   *     Untouched segments keep their authored verbs (`A` / `H` / `V` / `Z`);
+   *     the edited tangent's owning segment (or arc group) auto-invalidates at
+   *     emit time via the geometry-honesty checks (zeroed tangents → `L`; a
+   *     mutated arc group demotes to `C`). This honors the minimal-mutation
+   *     contract — deleting a tangent must not re-serialize unrelated segments.
+   *   - **Topology change** (a segment or vertex removed) — `vn` filters /
+   *     reindexes the segment array, so the result keeps fresh (verb-less)
+   *     meta and every surviving segment re-derives its verb from geometry at
+   *     emit time. The same pragmatic choice {@link splitSegment} makes when
+   *     it drops arc-group identity.
+   *
+   * Either way the `segments.length === meta.length` invariant holds.
+   *
+   * Indices are interpreted in THIS model's index space. Callers that
+   * re-derive a model from the live `d` each frame (the surface) should
+   * build it from the current session-d so the sub-selection indices line
+   * up. Out-of-range indices are skipped defensively rather than throwing.
+   */
+  deleteSubSelection(sel: SubSelection): PathModel {
+    const next_network = cloneNetwork(this._network);
+    const vne = new vn.VectorNetworkEditor(next_network);
+
+    // 1. tangents — zero the owning control on every segment touching the vertex.
+    for (const [vertex_idx, side] of sel.tangents) {
+      const point = side === 0 ? "a" : "b";
+      const control = side === 0 ? "ta" : "tb";
+      for (const seg_idx of vne.findSegments(vertex_idx, point)) {
+        vne.deleteTangent(seg_idx, control);
+      }
+    }
+
+    // Track whether the segment array's shape changed. A segment / vertex
+    // removal filters and reindexes it (meta can no longer align); a
+    // tangent-only edit leaves it structurally identical (meta stays aligned).
+    let topology_changed = false;
+
+    // 2. segments — dedupe, then descending so a splice never shifts a later
+    //    index. Dedupe matters: a repeated index would, after the first
+    //    splice reindexes the rest, delete a DIFFERENT segment on its second
+    //    visit (over-delete) — and diverge from the policy gate's unique-count
+    //    reasoning in `delete_vector_subselection`.
+    for (const seg_idx of Array.from(new Set(sel.segments)).sort(
+      (a, b) => b - a
+    )) {
+      if (seg_idx >= 0 && seg_idx < vne.value.segments.length) {
+        vne.deleteSegment(seg_idx);
+        topology_changed = true;
+      }
+    }
+
+    // 3. vertices — dedupe, then descending (deleteVertex reindexes higher
+    //    vertices on splice; same over-delete hazard as segments above).
+    for (const vertex_idx of Array.from(new Set(sel.vertices)).sort(
+      (a, b) => b - a
+    )) {
+      if (vertex_idx >= 0 && vertex_idx < vne.value.vertices.length) {
+        vne.deleteVertex(vertex_idx);
+        topology_changed = true;
+      }
+    }
+
+    // `next_network` is this method's own clone — hand it to PathModel
+    // directly (no second clone), matching the sibling mutators
+    // (`translateVertex`, `splitSegment`, …). Preserve the original meta when
+    // only tangents changed (the segment array is unchanged, so untouched
+    // verbs survive); reset to fresh verb-less meta when the topology changed
+    // (the array was filtered / reindexed — see the doc comment).
+    const meta: ReadonlyArray<SegmentMeta> = topology_changed
+      ? vne.value.segments.map(() => ({}))
+      : this._meta;
+    return new PathModel(vne.value, meta);
   }
 
   // ─── Math reads (POJO-only return values) ────────────────────────────────

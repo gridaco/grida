@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0a" />
+      <stop offset="100%" stop-color="#1a1a2e" />
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#aaaacc" />
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bg)" />
+  <!-- Subtle grid lines -->
+  <line x1="0" y1="360" x2="1920" y2="360" stroke="#ffffff" stroke-width="1" stroke-opacity="0.05" />
+  <line x1="0" y1="720" x2="1920" y2="720" stroke="#ffffff" stroke-width="1" stroke-opacity="0.05" />
+  <line x1="640" y1="0" x2="640" y2="1080" stroke="#ffffff" stroke-width="1" stroke-opacity="0.05" />
+  <line x1="1280" y1="0" x2="1280" y2="1080" stroke="#ffffff" stroke-width="1" stroke-opacity="0.05" />
+  <!-- Accent dot -->
+  <circle cx="960" cy="380" r="200" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.08" />
+  <circle cx="960" cy="380" r="120" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.12" />
+  <!-- Main label -->
+  <text x="960" y="630" font-family="ui-monospace, monospace" font-size="200" font-weight="700" text-anchor="middle" fill="url(#textGrad)" letter-spacing="-4">.canvas</text>
+  <!-- Tagline -->
+  <text x="960" y="720" font-family="ui-monospace, monospace" font-size="40" text-anchor="middle" fill="#ffffff" fill-opacity="0.3" letter-spacing="8">SVG SLIDES</text>
+</svg>

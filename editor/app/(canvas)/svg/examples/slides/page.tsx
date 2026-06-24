@@ -24,7 +24,9 @@ import { EMPTY_SLIDE_SVG } from "./_components/types";
 import { SvgRouteShell, useSvgDocStore } from "../../_storage";
 import { useSvgAgentHydrated } from "../../_ai/provider";
 
-const OPFS_BASE = ["grida-svg-demo", "v2", "slides"] as const;
+// v3: persistence moved from the `_meta/index.json` sidecar to a `.canvas`
+// bundle (canvas.json + <id>.svg) via dotcanvas. Old data is dropped.
+const OPFS_BASE = ["grida-svg-demo", "v3", "slides"] as const;
 
 export default function SlidesCanvasPage() {
   return (

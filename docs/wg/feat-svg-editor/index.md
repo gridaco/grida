@@ -65,6 +65,14 @@ preserving the author's source on round-trip.
   (byte-equal until the first re-typing edit), a single `<path>` target,
   and a cubic-Bézier conic representation, with the round-trip invariants
   that keep the conversion honest.
+- [`vertex-transform-box.md`](./vertex-transform-box.md) — treating a
+  multi-vertex sub-selection as a single transformable object
+  (translate / scale / rotate via one affine), with the same handles and
+  modifiers as the element transform box. Covers the click-vs-drag
+  routing (a click selects the point underneath, a drag transforms), the
+  session-persistent frame (rotation carries across gestures and
+  reconciles to the geometry), the `transform-vertices` policy, and the
+  degenerate point / line cases.
 - [`clipboard.md`](./clipboard.md) — FRD for copy/cut/paste. The
   payload is a standalone SVG document, not a private format. Names two
   extraction operations (standalone payload vs in-document clone) and
@@ -74,6 +82,15 @@ preserving the author's source on round-trip.
   rather than hidden. Also: command/history semantics, in-place
   appended placement, transport ownership and the engine floor for
   native clipboard events, and the paste-is-load trust model.
+- [`image-insertion.md`](./image-insertion.md) — FRD for inserting
+  `<image>` elements. The editor accepts an insertion at a point given a
+  _resolvable_ href (remote URL, `data:` URI, host-served URL) and a
+  host-supplied intrinsic size; turning a local file into a usable URL,
+  and loading bytes to learn a natural size, are host-owned I/O — the
+  same seam clipboard draws for transport. Covers the insertion contract
+  (why it is a dedicated command, not a drag-to-size tag), placement,
+  SVG 2 `href` authoring, the no-content-policy round-trip, and the
+  deferred resolver-provider / drop-observation seams.
 - [`durable-node-identity.md`](./durable-node-identity.md) — the open
   problem behind #775: `NodeId` is parse-ephemeral, so no reference
   survives a `load()`, let alone an external rewrite of the file. Frames

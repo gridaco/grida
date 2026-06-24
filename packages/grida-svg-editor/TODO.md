@@ -46,6 +46,30 @@ alpha.10. Open items:
   different stickiness, different size, different keymap letters), a
   preset graduates — same shape as `keynote` graduated from the camera
   system. Not in v1.
+- **Image insertion follow-ups.** `commands.insert_image(href, opts?)`
+  shipped (synchronous + headless: SVG 2 `href`, explicit size with the
+  `insertions.DEFAULT_IMAGE_SIZE` fallback, center-on-`at` placement, one
+  history step). Design:
+  [`docs/wg/feat-svg-editor/image-insertion.md`](../../docs/wg/feat-svg-editor/image-insertion.md).
+  Named deferrals from the FRD § Out of scope (each ships only when a
+  second consumer pins its shape — P6):
+  - **Image resolver provider.** A host-owned `href → intrinsic size`
+    resolver (mirroring the font resolver) that would let the editor
+    _orchestrate_ resolution from a bare href and `await` the size. The
+    promotion path for editor-orchestrated sizing; deferred because it has
+    one prospective consumer and drags asynchrony into an otherwise
+    synchronous command. v1 keeps the host supplying the size.
+  - **Pointer-driven place tool.** A canvas tool where the user, having
+    chosen an image, clicks to drop it at intrinsic size (the mirror of
+    the click-to-place text tool). Deferred: every v1 flow (drop, paste,
+    programmatic) drives `insert_image` directly with its own point.
+  - **Drop observation channel.** A passive `subscribe`-style channel that
+    reports a drop's items + document-space point for the host to resolve
+    and insert (the mirror of `subscribe_pick`). Deferred; note the FRD's
+    open asymmetry — a drop carries a default action that must be
+    suppressed to accept it, so it is not _purely_ passive the way a tap
+    is. Editor-side ingestion of `File` / `image/*` blobs is **permanently
+    host-owned** (FRD R1), not a deferral.
 
 ### HUD routing migration (defer until N≥2 insertion tools)
 

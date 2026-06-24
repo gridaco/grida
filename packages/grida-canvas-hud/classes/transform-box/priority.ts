@@ -14,6 +14,20 @@ export const TRANSFORM_BOX_CORNER_PRIORITY = 13;
 export const TRANSFORM_BOX_SIDE_PRIORITY = 14;
 
 /**
+ * 15 — the outer rotate ring emitted only when `corner_role === "scale"`
+ * (so corners scale and rotation lives just outside / around the corner,
+ * the Figma model). Loses to the inner scale-corner knob (13) so the
+ * corner's center scales while its surround rotates; wins over corner-
+ * radius (15)'s peers below. Hosts can override per-handle via
+ * `TransformBoxInput.priority`.
+ */
+export const TRANSFORM_BOX_ROTATE_RING_PRIORITY = 15;
+
+/** Screen-px size of the outer rotate ring (a square centered on the
+ *  corner, larger than the inner scale knob so its surround is grabbable). */
+export const TRANSFORM_BOX_ROTATE_RING_HIT_SIZE = 32;
+
+/**
  * 38 — body translate beats marquee start (40) and selection-translate
  * body (40); loses to padding-region (35), every resize control (30/31),
  * and every other handle.

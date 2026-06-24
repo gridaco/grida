@@ -125,6 +125,31 @@ filesystem was not hydrated. For design-agent workspace runs, `@grida/agent`
 must create `AgentFs(NodeFsBackend(root))` and call `await fs.hydrate()`
 before tool calls.
 
+An agent that sees SOME files but is **missing whole subtrees** (a `.canvas`
+deck, or most of the repo) is almost always **hydrate-scan truncation**, not a
+bug in those files. The walk stops at `SCAN_MAX_FILES` (10k) / `SCAN_MAX_DEPTH`
+and warns `[agent-fs] … hydrate scan hit a cap … truncated` (sidecar stderr).
+The usual cause is a large `workspace_root` containing heavy dirs that are NOT
+in `IGNORED_SCAN_DIRS` — vendored toolchains / **git submodules** (e.g. `emsdk`)
+or `.claude/worktrees` (full repo copies). `.gitignore` is NOT consulted, so a
+submodule slips through. Fixes: scope the workspace to the real project subdir,
+or add the offender to `IGNORED_SCAN_DIRS` in `workspaces/scan.ts`.
+
+A **client-resolved** tool call that hangs at `input-available` (the turn just
+ends with no result; the assistant never continues) is the **server-authoritative
+model view** dropping it. The runtime rebuilds the model's input from the
+PERSISTED messages (`buildModelMessages` over `listVisibleMessages`), NOT the
+client's array — and it drops any tool call without a terminal result. For a
+**workspace-less session** (the desktop file-window sidebar, which resolves fs
+tools in the renderer over the live editor), the result lives only on the
+client's next-request assistant message. `persistIncomingTail` must persist
+those terminal tool-result parts (it does, as of the file-window sidebar fix) or
+the call stays `input-available` forever and the model never sees the answer.
+Diagnostic tell: workspace sessions show `tool_state=output-available` parts in
+`sessions.db`; a no-workspace session stuck at `input-available` for EVERY tool
+call is this class, not a tool bug. (Server-resolved tools are unaffected — the
+recorder writes their result straight from the stream.)
+
 Broken desktop agent calls can still be package bugs. Check whether the same
 operation fails through `AgentTransport.Client` or package tests before
 debugging Electron.
@@ -136,6 +161,30 @@ values.
 If a change adds host-specific behavior, define the strict host capability
 contract first. Do not let Node, Electron, or renderer-only imports leak into
 neutral package entrypoints.
+
+---
+
+## Live state on disk (inspecting a real session)
+
+You CAN inspect a real running session — the host persists agent state under
+**`~/.grida/agent/`**, separate from Electron's `userData` (the desktop
+supervisor passes it to the sidecar as `--user-data`; see `home.join("agent")`
+in `desktop/src/main/agent-sidecar-supervisor.ts`):
+
+- `sessions.db` — SQLite (WAL): `chat_sessions` (incl. **`workspace_root`**,
+  `mode`, `parent_id`), `chat_messages`, `chat_parts`. Schema in
+  `src/session/schema.ts`.
+- `workspaces.json` — the workspace registry (id → root).
+- `auth.json`, `recent.json`.
+
+Read it **read-only** (don't perturb the live WAL). The first thing to check for
+"why can't the agent see X" is `workspace_root` — the agent only sees files
+under it (and only up to the hydrate cap, above):
+
+```sh
+sqlite3 "file:$HOME/.grida/agent/sessions.db?mode=ro" \
+  "SELECT id, workspace_root, mode FROM chat_sessions WHERE id='ses_…';"
+```
 
 ---
 
@@ -189,6 +238,9 @@ checks from the `desktop` skill.
 - Sessions: `packages/grida-ai-agent/src/session/`
 - Workspaces/files: `packages/grida-ai-agent/src/workspaces.ts`,
   `packages/grida-ai-agent/src/files/`, `packages/grida-ai-agent/src/fs/`
+- Hydrate-scan policy (ignored dirs + caps): `packages/grida-ai-agent/src/workspaces/scan.ts`
+- Live on-disk state (real sessions/workspaces): `~/.grida/agent/`
+  (`sessions.db`, `workspaces.json`) — see "Live state on disk" above
 - Providers/secrets: `packages/grida-ai-agent/src/providers/`,
   `packages/grida-ai-agent/src/secrets.ts`
 - Skills/prompts/tools: `packages/grida-ai-agent/src/skills/`,

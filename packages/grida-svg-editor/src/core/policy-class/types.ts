@@ -61,6 +61,9 @@ export const ALL_POLICY_CLASSES: readonly PolicyClass[] = [
  * them at the capability gate.
  *
  *   - `translate-vertex`       — move one addressable vertex
+ *   - `transform-vertices`     — apply a single affine (translate / scale /
+ *                                rotate) to a multi-vertex sub-selection via
+ *                                the Vertex Transform Box (gridaco/grida#881)
  *   - `insert-vertex`          — insert a vertex along a segment
  *   - `delete-vertex`          — remove an addressable vertex
  *   - `close-shape`            — close an open chain (polyline → polygon, path Z)
@@ -79,6 +82,7 @@ export type Intent =
   | "rotate"
   | "enter-vector-edit"
   | "translate-vertex"
+  | "transform-vertices"
   | "insert-vertex"
   | "delete-vertex"
   | "close-shape"
@@ -107,6 +111,7 @@ export const TOP_LEVEL_INTENTS: readonly Intent[] = [
  */
 export const VECTOR_EDIT_SUB_INTENTS: readonly Intent[] = [
   "translate-vertex",
+  "transform-vertices",
   "insert-vertex",
   "delete-vertex",
   "close-shape",
