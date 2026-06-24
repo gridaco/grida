@@ -48,6 +48,8 @@ import {
   type Workspace,
 } from "@/lib/desktop/bridge";
 import { welcome_handoff } from "@/lib/desktop/welcome-handoff";
+import { onboarding_flag } from "@/lib/desktop/onboarding-flag";
+import { FirstRunOnboarding } from "@/scaffolds/desktop/onboarding/first-run-onboarding";
 import {
   TitleBar,
   TITLEBAR_NO_DRAG_STYLE,
@@ -68,6 +70,12 @@ export default function DesktopWelcomePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // First-run onboarding (issue #813): zero-config Claude detection. Lazily
+  // seeded from the persisted flag so a returning user never sees it; the
+  // localStorage read is client-only, which is fine on this desktop-only page.
+  const [onboarding, setOnboarding] = useState(
+    () => !onboarding_flag.isComplete()
+  );
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   // The composer's target. Defaults to the most-recent workspace once
@@ -183,6 +191,7 @@ export default function DesktopWelcomePage() {
       data-testid="desktop-welcome"
       className="flex h-svh w-full flex-col bg-background"
     >
+      {onboarding && <FirstRunOnboarding onDone={() => setOnboarding(false)} />}
       <TitleBar>
         <div className="ml-auto" style={TITLEBAR_NO_DRAG_STYLE}>
           <Button
