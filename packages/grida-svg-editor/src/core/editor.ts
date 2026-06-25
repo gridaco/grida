@@ -343,6 +343,29 @@ export type Commands = {
     direction: AlignDirection,
     opts?: { ids?: ReadonlyArray<NodeId> }
   ): boolean;
+  /**
+   * Justify the selected `<text>` block(s) to the `start` / `middle` / `end`
+   * anchor as ONE atomic history step, preserving each block's rendered
+   * bbox — the Figma semantic "lines re-justify, the box stays put",
+   * expressed in a format with no text box.
+   *
+   * Sets `text-anchor` on each target `<text>` and re-anchors every line's
+   * `x` to the block's left / center / right edge
+   * (`x = block.left + F·block.width`, with `F = {start: 0, middle: .5, end:
+   * 1}`). Per-line widths come from the attached geometry provider, so a
+   * block whose lines carry *different* `x` (manual indent) re-justifies
+   * correctly — not only the shared-`x` deck shape a single block translate
+   * handles. A "line" is a `<tspan>` descendant carrying its own `x`; a
+   * `<text>` with no such tspans is itself the single line. A selected
+   * `<tspan>` resolves to its enclosing `<text>`.
+   *
+   * Refuses (returns `false`, no history step) on empty selection, when no
+   * `<text>` is in range, when `geometry_provider` is null (no surface
+   * attached), or when every target already has the requested anchor. A
+   * block is left untouched (not half-justified) when a line uses a
+   * per-glyph `x` list or a `<tspan>` overrides `text-anchor`.
+   */
+  text_align(value: "start" | "middle" | "end"): boolean;
   // structure
   reorder(direction: ReorderDirection): void;
   remove(): void;
@@ -1843,6 +1866,162 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     return true;
   }
 
+  /** Coerce a resolved `text-anchor` to one of the three justification
+   *  values; anything else (unset, `inherit`, a bad string) is the SVG
+   *  default `start`. */
+  function normalize_text_anchor(
+    declared: string | null
+  ): "start" | "middle" | "end" {
+    const v = declared?.trim();
+    return v === "middle" || v === "end" ? v : "start";
+  }
+
+  /** Parse a line's `x` for re-anchoring. Absent `x` is the SVG default
+   *  `0`. A per-glyph list (`x="10 20 30"`) or a non-finite value returns
+   *  `null` — the caller leaves that block untouched rather than collapse a
+   *  per-glyph run to one position. */
+  function parse_line_x(v: string | null): number | null {
+    if (v === null || v.trim() === "") return 0;
+    const tokens = v.trim().split(/[\s,]+/);
+    if (tokens.length !== 1) return null;
+    const n = parseFloat(tokens[0]);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /** `<tspan>` descendants of a `<text>` that carry their own `x` — the
+   *  deck shape's per-line anchors — or the `<text>` itself when it has none
+   *  (a flat single-line block). Always non-empty. */
+  function line_anchor_nodes(text_id: NodeId): NodeId[] {
+    const lines = doc.find_by_tag(text_id, "tspan").filter((id) => {
+      const xa = doc.get_attr(id, "x");
+      return xa !== null && xa.trim() !== "";
+    });
+    return lines.length > 0 ? lines : [text_id];
+  }
+
+  function text_align(value: "start" | "middle" | "end"): boolean {
+    const F: Record<string, number> = { start: 0, middle: 0.5, end: 1 };
+    if (!(value in F)) return false;
+    if (selection.length === 0) return false;
+    // Per-line widths come from rendered geometry — there is no honest
+    // re-justification without a surface attached (mirrors `align`).
+    if (!geometry_provider) return false;
+
+    // Resolve each selection member up to its enclosing `<text>`; dedupe so
+    // selecting a block and one of its tspans targets the block once.
+    const blocks = new Set<NodeId>();
+    for (const id of selection) {
+      let cur: NodeId | null = id;
+      while (cur !== null && doc.tag_of(cur) !== "text")
+        cur = doc.parent_of(cur);
+      if (cur !== null) blocks.add(cur);
+    }
+    if (blocks.size === 0) return false;
+
+    // One plan across every block → one undo step for the whole gesture.
+    type XWrite = { id: NodeId; before: string | null; after: string };
+    type AnchorWrite = {
+      id: NodeId;
+      before_attr: string | null;
+      before_style: string | null;
+    };
+    const x_writes: XWrite[] = [];
+    const anchor_writes: AnchorWrite[] = [];
+
+    for (const text_id of blocks) {
+      const current = normalize_text_anchor(
+        properties.resolve_declared(doc, text_id, "text-anchor").declared
+      );
+      if (current === value) continue; // already justified — nothing to do
+      const block = geometry_provider.bounds_of(text_id);
+      if (!block) continue;
+
+      const line_ids = line_anchor_nodes(text_id);
+      const f_old = F[current];
+      const x_target = block.x + F[value] * block.width;
+
+      // Plan every line first; only commit the block when ALL lines
+      // re-anchor cleanly. A per-glyph `x` list, a missing per-line bbox, or
+      // a `<tspan>`-level `text-anchor` override (which would not inherit the
+      // block's new anchor, so the width math would be wrong) aborts the
+      // whole block rather than half-justifying it.
+      const planned: XWrite[] = [];
+      let aborted = false;
+      for (const line_id of line_ids) {
+        if (
+          line_id !== text_id &&
+          (doc.get_attr(line_id, "text-anchor") !== null ||
+            doc.get_style(line_id, "text-anchor") !== null)
+        ) {
+          aborted = true;
+          break;
+        }
+        const x_attr = doc.get_attr(line_id, "x");
+        const x_now = parse_line_x(x_attr);
+        if (x_now === null) {
+          aborted = true;
+          break;
+        }
+        // Flat block: the sole line IS the text node — reuse its bbox
+        // rather than measure it twice.
+        const b =
+          line_id === text_id ? block : geometry_provider.bounds_of(line_id);
+        if (!b) {
+          aborted = true;
+          break;
+        }
+        // Move this line's anchor (its `x`, in world) to the block edge.
+        // The delta is world-space; re-express it in the line's own frame
+        // so a scaled / nested-viewport ancestor lands exactly (same
+        // projection `align` uses). Identity for flat docs.
+        const world_anchor = b.x + f_old * b.width;
+        const dx_local = project_world_delta(line_id, {
+          x: x_target - world_anchor,
+          y: 0,
+        }).x;
+        planned.push({
+          id: line_id,
+          before: x_attr,
+          after: String(x_now + dx_local),
+        });
+      }
+      if (aborted) continue;
+
+      x_writes.push(...planned);
+      anchor_writes.push({
+        id: text_id,
+        before_attr: doc.get_attr(text_id, "text-anchor"),
+        before_style: doc.get_style(text_id, "text-anchor"),
+      });
+    }
+
+    if (anchor_writes.length === 0) return false;
+
+    const apply = () => {
+      // Anchor first, then `x` — order is irrelevant to the result (both are
+      // plain attr writes), but keeps the revert a clean mirror.
+      for (const w of anchor_writes) write_property(w.id, "text-anchor", value);
+      for (const w of x_writes) doc.set_attr(w.id, "x", w.after);
+      emit();
+    };
+    const revert = () => {
+      for (const w of x_writes) doc.set_attr(w.id, "x", w.before);
+      // Restore both carriers exactly like `set_property`: the write may
+      // have landed on either, and the pre-gesture state owns both.
+      for (const w of anchor_writes) {
+        doc.set_style(w.id, "text-anchor", w.before_style);
+        doc.set_attr(w.id, "text-anchor", w.before_attr);
+      }
+      emit();
+    };
+
+    apply();
+    history.atomic("text-align", (tx) => {
+      tx.push({ providerId: PROVIDER_ID, apply, revert });
+    });
+    return true;
+  }
+
   function select_all(): boolean {
     const parent = scope ?? doc.root;
     const children = doc.element_children_of(parent);
@@ -2779,6 +2958,7 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     transform: apply_transform,
     flatten_transform,
     align,
+    text_align,
     reorder,
     remove,
     copy,
