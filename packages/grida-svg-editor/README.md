@@ -676,6 +676,13 @@ editor.commands.{
   // alignment (operates on selection of ≥2 nodes against their union bbox)
   align(direction: AlignDirection): void;
 
+  // text justification — sets text-anchor AND re-anchors each line's x to the
+  // block's left/center/right edge in ONE history step, preserving the block's
+  // rendered bbox (Figma "lines re-justify, box stays put"). Per-line widths
+  // come from the geometry provider, so manual-indent (varying-x) blocks
+  // re-justify correctly, not just the shared-x deck shape.
+  text_align(value: "start" | "middle" | "end"): boolean;
+
   // structure
   reorder(direction: "bring_forward" | "send_backward" | "bring_to_front" | "send_to_back"): void;
   group(): void;                      // wrap selection in a new <g>
