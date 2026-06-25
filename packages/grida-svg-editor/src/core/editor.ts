@@ -365,7 +365,8 @@ export type Commands = {
    * block is left untouched (not half-justified) when a line uses a per-glyph
    * `x` list or a unit / percentage `x` (`10px`, `50%`), when a `<tspan>`
    * overrides `text-anchor`, when the block also holds its own direct text run
-   * alongside line-tspans, or when its frame is rotated / skewed.
+   * alongside line-tspans, or when its frame is rotated, skewed, x-reflected
+   * (negative scale), or carries an inline CSS `transform`.
    */
   text_align(value: "start" | "middle" | "end"): boolean;
   // structure
@@ -1907,29 +1908,46 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
   }
 
   /** True when `id`'s rendering frame — its own `transform` plus every
-   *  ancestor's up to the root — carries no rotation or skew (only translate /
-   *  scale / flip / nested-viewport). Re-justification preserves the bbox by
-   *  re-anchoring along world-x, which holds under axis-aligned frames but
-   *  drifts glyphs off the baseline under rotation / skew. A present-but-
-   *  unparseable `transform` is treated as unsafe. */
+   *  ancestor's up to the root — preserves the world-x axis: only translate,
+   *  positive (non-reflecting) scale, and nested viewports. Re-justification
+   *  preserves the bbox by re-anchoring along world-x assuming `start` sits at
+   *  `bbox.left`; rotation / skew drift glyphs off the baseline, and a
+   *  reflected (negative cumulative x-scale) frame swaps left↔right so the
+   *  delta moves the wrong way. A present-but-unparseable `transform`, or any
+   *  non-`none` inline CSS `transform` (which the attr-only parse can't see),
+   *  is treated as unsafe. */
   function frame_is_axis_aligned(id: NodeId): boolean {
     let cur: NodeId | null = id;
+    // Cumulative x-scale sign across the chain; a net reflection flips
+    // start↔end, and a zero collapses width — both refuse below.
+    let sx_sign = 1;
     while (cur !== null) {
+      const css = doc.get_style(cur, "transform");
+      if (css !== null && css.trim() !== "" && css.trim() !== "none")
+        return false;
       const ops = transform.parse(doc.get_attr(cur, "transform"));
       if (ops === null) return false;
       for (const op of ops) {
         if (op.type === "rotate" || op.type === "skewX" || op.type === "skewY")
           return false;
-        if (op.type === "matrix" && (op.b !== 0 || op.c !== 0)) return false;
+        if (op.type === "matrix") {
+          if (op.b !== 0 || op.c !== 0) return false;
+          sx_sign *= Math.sign(op.a);
+        } else if (op.type === "scale") {
+          sx_sign *= Math.sign(op.sx);
+        }
       }
       cur = doc.parent_of(cur);
     }
-    return true;
+    return sx_sign > 0;
   }
 
   function text_align(value: "start" | "middle" | "end"): boolean {
-    const F: Record<string, number> = { start: 0, middle: 0.5, end: 1 };
-    if (!(value in F)) return false;
+    const F = { start: 0, middle: 0.5, end: 1 } as const;
+    // Own-key guard: `value in F` would also accept inherited keys
+    // (`toString`, `__proto__`) from an untyped JS caller, and `F[value]`
+    // would then be `undefined` → NaN anchor math.
+    if (!Object.hasOwn(F, value)) return false;
     if (selection.length === 0) return false;
     // Per-line widths come from rendered geometry — there is no honest
     // re-justification without a surface attached (mirrors `align`).

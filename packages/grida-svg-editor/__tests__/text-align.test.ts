@@ -163,6 +163,16 @@ describe("editor.commands.text_align — refusals", () => {
     editor.commands.select(ids.get("t")!);
     expect(editor.commands.text_align("left" as never)).toBe(false);
   });
+
+  it("ignores inherited Object keys (no NaN anchor math)", () => {
+    const { editor, ids, x } = setup(FLAT);
+    editor.commands.select(ids.get("t")!);
+    for (const key of ["toString", "constructor", "__proto__"]) {
+      expect(editor.commands.text_align(key as never)).toBe(false);
+    }
+    expect(x("t")).toBe("0"); // untouched — no NaN written
+    expect(editor.state.can_undo).toBe(false);
+  });
 });
 
 describe("editor.commands.text_align — flat text", () => {
@@ -322,6 +332,35 @@ describe("editor.commands.text_align — transformed frame", () => {
     editor.commands.select(ids.get("t")!);
     expect(editor.commands.text_align("end")).toBe(true);
     expect(x("t")).toBe("60");
+  });
+
+  for (const reflect of ["scale(-1,1)", "matrix(-1 0 0 1 0 0)"]) {
+    it(`refuses an x-reflected frame (${reflect})`, () => {
+      const { editor, ids, x } = setup(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><g transform="${reflect}"><text id="t" x="0" y="20" data-w="60">hi</text></g></svg>`
+      );
+      editor.commands.select(ids.get("t")!);
+      expect(editor.commands.text_align("end")).toBe(false);
+      expect(x("t")).toBe("0");
+    });
+  }
+
+  it("allows a doubly-reflected frame (net positive x-scale)", () => {
+    const { editor, ids, x } = setup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><g transform="scale(-1,1)"><g transform="scale(-1,1)"><text id="t" x="0" y="20" data-w="60">hi</text></g></g></svg>`
+    );
+    editor.commands.select(ids.get("t")!);
+    expect(editor.commands.text_align("end")).toBe(true);
+    expect(x("t")).toBe("60");
+  });
+
+  it("refuses a frame carrying an inline CSS transform", () => {
+    const { editor, ids, x } = setup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><text id="t" style="transform:rotate(10deg)" x="0" y="20" data-w="60">hi</text></svg>`
+    );
+    editor.commands.select(ids.get("t")!);
+    expect(editor.commands.text_align("end")).toBe(false);
+    expect(x("t")).toBe("0");
   });
 });
 
