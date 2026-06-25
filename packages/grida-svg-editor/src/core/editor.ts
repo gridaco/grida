@@ -362,8 +362,10 @@ export type Commands = {
    * Refuses (returns `false`, no history step) on empty selection, when no
    * `<text>` is in range, when `geometry_provider` is null (no surface
    * attached), or when every target already has the requested anchor. A
-   * block is left untouched (not half-justified) when a line uses a
-   * per-glyph `x` list or a `<tspan>` overrides `text-anchor`.
+   * block is left untouched (not half-justified) when a line uses a per-glyph
+   * `x` list or a unit / percentage `x` (`10px`, `50%`), when a `<tspan>`
+   * overrides `text-anchor`, when the block also holds its own direct text run
+   * alongside line-tspans, or when its frame is rotated / skewed.
    */
   text_align(value: "start" | "middle" | "end"): boolean;
   // structure
@@ -1876,15 +1878,20 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     return v === "middle" || v === "end" ? v : "start";
   }
 
-  /** Parse a line's `x` for re-anchoring. Absent `x` is the SVG default
-   *  `0`. A per-glyph list (`x="10 20 30"`) or a non-finite value returns
-   *  `null` — the caller leaves that block untouched rather than collapse a
-   *  per-glyph run to one position. */
+  /** Parse a line's `x` for re-anchoring. Absent `x` is the SVG default `0`.
+   *  Returns `null` — leaving the block untouched rather than corrupting it —
+   *  for a per-glyph list (`x="10 20 30"`), or a unit / percentage value
+   *  (`10px`, `50%`, `2em`): re-anchoring writes back a bare user-unit number,
+   *  which would silently drop the unit and move the line. (Resolving SVG
+   *  lengths against the viewport / font is out of scope.) */
   function parse_line_x(v: string | null): number | null {
     if (v === null || v.trim() === "") return 0;
     const tokens = v.trim().split(/[\s,]+/);
     if (tokens.length !== 1) return null;
-    const n = parseFloat(tokens[0]);
+    // Bare number only (optional sign, decimal, exponent) — no unit suffix.
+    if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(tokens[0]))
+      return null;
+    const n = Number(tokens[0]);
     return Number.isFinite(n) ? n : null;
   }
 
@@ -1897,6 +1904,27 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
       return xa !== null && xa.trim() !== "";
     });
     return lines.length > 0 ? lines : [text_id];
+  }
+
+  /** True when `id`'s rendering frame — its own `transform` plus every
+   *  ancestor's up to the root — carries no rotation or skew (only translate /
+   *  scale / flip / nested-viewport). Re-justification preserves the bbox by
+   *  re-anchoring along world-x, which holds under axis-aligned frames but
+   *  drifts glyphs off the baseline under rotation / skew. A present-but-
+   *  unparseable `transform` is treated as unsafe. */
+  function frame_is_axis_aligned(id: NodeId): boolean {
+    let cur: NodeId | null = id;
+    while (cur !== null) {
+      const ops = transform.parse(doc.get_attr(cur, "transform"));
+      if (ops === null) return false;
+      for (const op of ops) {
+        if (op.type === "rotate" || op.type === "skewX" || op.type === "skewY")
+          return false;
+        if (op.type === "matrix" && (op.b !== 0 || op.c !== 0)) return false;
+      }
+      cur = doc.parent_of(cur);
+    }
+    return true;
   }
 
   function text_align(value: "start" | "middle" | "end"): boolean {
@@ -1918,6 +1946,12 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
     }
     if (blocks.size === 0) return false;
 
+    // A discrete write supersedes any in-flight `text-anchor` preview (mirrors
+    // `set_property`): we re-justify from — and snapshot for undo — the
+    // committed pre-gesture state, not a previewed value. Done before the
+    // geometry reads so bounds reflect the committed anchor.
+    supersede_property_preview("text-anchor");
+
     // One plan across every block → one undo step for the whole gesture.
     type XWrite = { id: NodeId; before: string | null; after: string };
     type AnchorWrite = {
@@ -1933,10 +1967,20 @@ function _create_svg_editor_internal(opts: CreateSvgEditorOptions) {
         properties.resolve_declared(doc, text_id, "text-anchor").declared
       );
       if (current === value) continue; // already justified — nothing to do
+      // Rotation / skew breaks the world-x re-anchoring premise — refuse the
+      // block rather than drift its glyphs.
+      if (!frame_is_axis_aligned(text_id)) continue;
       const block = geometry_provider.bounds_of(text_id);
       if (!block) continue;
 
       const line_ids = line_anchor_nodes(text_id);
+      // Mixed block — line-tspans AND the `<text>`'s own direct text run (e.g.
+      // `<text x>Title<tspan x>Sub</tspan></text>`): the direct run is a line
+      // too, but its width can't be isolated from the block bbox, so
+      // re-anchoring only the tspans would shift it and break bbox
+      // preservation. Refuse. (`line_ids[0] !== text_id` ⇔ using tspans.)
+      if (line_ids[0] !== text_id && doc.text_of(text_id).trim() !== "")
+        continue;
       const f_old = F[current];
       const x_target = block.x + F[value] * block.width;
 

@@ -276,3 +276,68 @@ describe("editor.commands.text_align — atomic history", () => {
     expect(editor.state.can_undo).toBe(false);
   });
 });
+
+describe("editor.commands.text_align — unit / percentage x", () => {
+  for (const unit of ["10px", "50%", "2em"]) {
+    it(`leaves a block untouched when x is "${unit}" (no unit coercion)`, () => {
+      const { editor, ids, x } = setup(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><text id="t" x="${unit}" y="20" data-w="60">hi</text></svg>`
+      );
+      editor.commands.select(ids.get("t")!);
+      expect(editor.commands.text_align("end")).toBe(false);
+      expect(x("t")).toBe(unit); // unit preserved, not rewritten to a number
+      expect(editor.state.can_undo).toBe(false);
+    });
+  }
+});
+
+describe("editor.commands.text_align — mixed direct text + tspan lines", () => {
+  it("refuses a <text> that has both a direct run and line-tspans", () => {
+    const { editor, ids, x } = setup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><text id="t" x="0" y="20" data-w="40">Title<tspan id="l1" x="0" dy="20" data-w="60">Sub</tspan></text></svg>`
+    );
+    editor.commands.select(ids.get("t")!);
+    expect(editor.commands.text_align("end")).toBe(false);
+    expect(x("t")).toBe("0");
+    expect(x("l1")).toBe("0");
+    expect(editor.state.can_undo).toBe(false);
+  });
+});
+
+describe("editor.commands.text_align — transformed frame", () => {
+  it("refuses a block under a rotated ancestor", () => {
+    const { editor, ids, x } = setup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><g transform="rotate(30)"><text id="t" x="0" y="20" data-w="60">hi</text></g></svg>`
+    );
+    editor.commands.select(ids.get("t")!);
+    expect(editor.commands.text_align("end")).toBe(false);
+    expect(x("t")).toBe("0");
+    expect(editor.document.get_attr(ids.get("t")!, "text-anchor")).toBe(null);
+  });
+
+  it("allows a block under a (axis-aligned) scaled ancestor", () => {
+    const { editor, ids, x } = setup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><g transform="scale(2)"><text id="t" x="0" y="20" data-w="60">hi</text></g></svg>`
+    );
+    editor.commands.select(ids.get("t")!);
+    expect(editor.commands.text_align("end")).toBe(true);
+    expect(x("t")).toBe("60");
+  });
+});
+
+describe("editor.commands.text_align — preview supersession", () => {
+  it("supersedes a live text-anchor preview and computes from committed state", () => {
+    const { editor, ids, x } = setup(FLAT);
+    editor.commands.select(ids.get("t")!);
+    const session = editor.commands.preview_property("text-anchor");
+    session.update("middle"); // previews middle on the block
+    expect(session.live).toBe(true);
+
+    expect(editor.commands.text_align("end")).toBe(true);
+    expect(session.live).toBe(false); // discrete write superseded the preview
+    expect(editor.document.get_attr(ids.get("t")!, "text-anchor")).toBe("end");
+    // Computed from committed (start) state → 60. Had the preview leaked,
+    // f_old would be 0.5 and x would land at 30.
+    expect(x("t")).toBe("60");
+  });
+});
