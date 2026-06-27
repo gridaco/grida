@@ -50,6 +50,14 @@ export type ServerOptions = {
   sandbox_enforced?: boolean;
   /** GRIDA-SEC-004 — explicit unsandboxed-shell opt-in (CLI/dev). */
   allow_unsandboxed_shell?: boolean;
+  /**
+   * Whether a human UI is bound to this host — i.e. the locked `question`
+   * tool can pause and be answered by a person. Default (undefined/false) is
+   * FAIL-CLOSED headless: the `question` tool refuses with a fixed tool error
+   * instead of pausing forever (RFC `tools` §question). The desktop sidecar
+   * sets this true; the CLI and hosted/batch paths leave it false.
+   */
+  interactive?: boolean;
 };
 
 /**
@@ -178,6 +186,9 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     // added to the srt deny_read policy — the host itself reads auth.json.
     secrets_root: opts.user_data_path,
     shell_execution_allowed: shellExecutionAllowed,
+    // Whether the locked `question` tool pauses for a human (interactive) or
+    // refuses with a fixed tool error (headless). Fail-closed headless.
+    interactive: opts.interactive === true,
   });
   if (opts.capabilities.agent) registerAgentRoutes(app, runtime);
   if (opts.capabilities.sessions)

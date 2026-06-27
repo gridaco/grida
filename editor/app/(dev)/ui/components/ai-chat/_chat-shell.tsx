@@ -16,6 +16,9 @@ import {
   ChatMessageView,
   CompactingIndicator,
   PendingTurnIndicator,
+  QuestionCard,
+  findPendingQuestion,
+  type AnswerQuestionHandler,
   type ChatMessage,
   type ChatMessageActions,
 } from "@/kits/agent-chat";
@@ -29,6 +32,7 @@ export function DemoChatShell({
   onDismissError,
   className,
   actions,
+  onAnswerQuestion,
 }: {
   messages: ChatMessage[];
   isStreaming: boolean;
@@ -41,11 +45,16 @@ export function DemoChatShell({
   className?: string;
   /** Per-turn rewind/branch affordances under user bubbles (demo). */
   actions?: ChatMessageActions;
+  /** Commit a `question` answer (demo wires this to `chat.addToolResult`). */
+  onAnswerQuestion?: AnswerQuestionHandler;
 }) {
   // Mirrors the desktop surfaces: a turn is streaming but no assistant turn has
   // begun. The `pending` prop forces it for the static showcase scenario.
   const pendingTurn =
     pending || (isStreaming && messages.at(-1)?.role !== "assistant");
+  // The agent's open question is session-global — pinned above the composer
+  // slot, not rendered in the transcript (mirrors the desktop surfaces).
+  const pendingQuestion = findPendingQuestion(messages);
   return (
     <div
       data-testid="demo-ai-chat-shell"
@@ -69,6 +78,12 @@ export function DemoChatShell({
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
+
+      {pendingQuestion && onAnswerQuestion && (
+        <div className="shrink-0 border-t p-3">
+          <QuestionCard entry={pendingQuestion} onAnswer={onAnswerQuestion} />
+        </div>
+      )}
 
       {error && (
         <div className="flex items-start gap-2 border-t bg-destructive/10 px-3 py-2 text-xs text-destructive">

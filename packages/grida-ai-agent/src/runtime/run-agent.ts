@@ -148,7 +148,13 @@ function toMessageUsage(u: SdkStepUsage): MessageUsage {
 export async function runAgent(
   provider: ResolvedProvider,
   req: AgentRunRequest,
-  deps: { workspace_registry: WorkspaceRegistry }
+  deps: {
+    workspace_registry: WorkspaceRegistry;
+    /** Host-level: gates the `question` tool (pause vs fixed-refusal). The
+     * runtime threads it down via `runDeps`; `createWorkspaceAgentBindings`
+     * ignores it (it reads only workspace/secret/shell fields). */
+    interactive?: boolean;
+  }
 ): Promise<Response> {
   // Wire bindings only when the request carries workspace context.
   // The "no-bindings" mode preserves the existing SVG-editor flow
@@ -174,6 +180,10 @@ export async function runAgent(
     skill_cache: req.skill_cache,
     skill_load_body: req.skill_index ? nodeSkillBodyLoader : undefined,
     project_instructions: req.project_instructions,
+    // Host-level: whether the `question` tool pauses for a human or refuses
+    // headless. Independent of workspace bindings (a person can answer a
+    // standalone-doc session too).
+    interactive: deps.interactive,
   });
 
   return await createAgentUIStreamResponse({

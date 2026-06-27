@@ -283,6 +283,33 @@ export async function persistIncomingTail(
  * tool_state = 'input-available'` guard); it cannot inject or rewrite anything
  * else.
  */
+/**
+ * Fill any CLIENT-resolved tool results carried on the incoming tail's
+ * assistant messages — the in-place fill from {@link persistResolvedToolResults}
+ * applied across the whole batch.
+ *
+ * Called BEFORE the pending-human-input guard (`runtime/index.ts`): a
+ * client-resolved answer rides the message tail (unlike a supervised approval,
+ * which arrives as an explicit `approval_answer` body field applied even
+ * earlier). The locked `question` tool is the case that needs this — its answer
+ * is a terminal `output-available` part in the tail, and it must clear the
+ * session's human-input block BEFORE the guard, or the very POST that carries
+ * the answer would be refused by the guard it resolves. Idempotent: the later
+ * {@link persistIncomingTail} re-runs the same fill (a no-op once the row is
+ * already terminal) and still appends any new user message.
+ */
+export async function fillIncomingToolResults(
+  store: SessionsStore,
+  sessionId: string,
+  incoming: NormalizedMessage[]
+): Promise<void> {
+  for (const m of incoming) {
+    if (m.role === "assistant") {
+      await persistResolvedToolResults(store, sessionId, m);
+    }
+  }
+}
+
 async function persistResolvedToolResults(
   store: SessionsStore,
   sessionId: string,

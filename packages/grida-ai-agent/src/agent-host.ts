@@ -66,6 +66,14 @@ export type AgentHostOptions = {
    * shell child has no kernel-level fs/network containment.
    */
   allow_unsandboxed_shell?: boolean;
+  /**
+   * Whether a human UI is bound to this host (RFC `tools` §question). When
+   * true, the locked `question` tool pauses for the user's answer; when
+   * false/undefined (fail-closed headless) it refuses with a fixed tool error.
+   * The desktop sidecar sets this true; the CLI leaves it false. Carried into
+   * {@link ServerOptions} by the `...opts` spread below.
+   */
+  interactive?: boolean;
 };
 
 export class AgentHost {

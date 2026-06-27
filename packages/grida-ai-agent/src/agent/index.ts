@@ -114,6 +114,13 @@ export type CreateAgentOptions = {
    * concatenated AGENTS.md / CLAUDE.md, injected eagerly into the prompt.
    */
   project_instructions?: string;
+  /**
+   * Whether a human UI is bound (RFC `tools` §question). When true the locked
+   * `question` tool is client-resolved (pauses for the user's answer); when
+   * false/undefined it ships with a fixed-refusal `execute` for headless hosts.
+   * The tool is always registered either way (it is locked).
+   */
+  interactive?: boolean;
 };
 
 /**
@@ -135,6 +142,7 @@ export function createAgent(opts: CreateAgentOptions) {
     todos: opts.todos,
     vision: opts.vision,
     command: opts.command,
+    interactive: opts.interactive,
     skill:
       opts.skill_index && opts.skill_load_body
         ? {
