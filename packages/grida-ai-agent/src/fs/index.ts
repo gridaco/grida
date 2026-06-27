@@ -390,6 +390,18 @@ export class AgentFs {
   }
 
   /**
+   * Whether this fs can actually serve raw bytes — i.e. its backend implements
+   * the optional {@link AgentFs.Backend.readBytes}. Injectors check this before
+   * wiring the `view_image` capability (`../vision`): advertising perception
+   * over a backend that can't read bytes would degrade every call to
+   * `not_found`. `AgentFs` always *has* `readBytes`, so a structural check would
+   * lie — this asks the backend.
+   */
+  get bytesReadable(): boolean {
+    return typeof this.backend.readBytes === "function";
+  }
+
+  /**
    * Full-content upsert. See {@link AgentFs.WriteArgs} for the
    * `expected_version` semantics (version-checked vs permissive).
    */

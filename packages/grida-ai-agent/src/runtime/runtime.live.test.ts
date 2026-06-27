@@ -321,12 +321,15 @@ async function setupVisionWorkspace(baseDir: string): Promise<string> {
   return ws.root;
 }
 
-async function calledViewImage(
+async function countViewImageCalls(
   store: SessionsStore,
   sessionId: string
-): Promise<boolean> {
+): Promise<number> {
   const msgs = await store.listVisibleMessages(sessionId);
-  return msgs.some((m) => m.parts.some((p) => p.type === "tool-view_image"));
+  return msgs.reduce(
+    (n, m) => n + m.parts.filter((p) => p.type === "tool-view_image").length,
+    0
+  );
 }
 
 liveDescribe("LIVE — view_image perception (by path)", () => {
@@ -384,7 +387,7 @@ liveDescribe("LIVE — view_image perception (by path)", () => {
         .join(" ");
       expect(text).toContain("red");
       // It came through the perception tool, not a text read of the bytes.
-      expect(await calledViewImage(host.store, sessionId)).toBe(true);
+      expect(await countViewImageCalls(host.store, sessionId)).toBe(1);
     },
     TIMEOUT_MS
   );
@@ -414,6 +417,7 @@ liveDescribe("LIVE — view_image perception (by path)", () => {
       });
       expect(t1.status).toBe(200);
       const sessionId = sessionIdFromSse(await t1.text());
+      expect(await countViewImageCalls(host.store, sessionId)).toBe(1);
 
       // Turn 2 — the prior view_image result has left the live window (K=1) and
       // lowered to a descriptor. Asking again forces a FRESH view_image call,
@@ -441,6 +445,9 @@ liveDescribe("LIVE — view_image perception (by path)", () => {
       expect(t2.status).toBe(200);
       const text = assistantTextFromSse(await t2.text()).toLowerCase();
       expect(text).toContain("red");
+      // A SECOND view_image call proves the stale image was actually re-viewed,
+      // not answered from leftover context.
+      expect(await countViewImageCalls(host.store, sessionId)).toBe(2);
     },
     TIMEOUT_MS
   );

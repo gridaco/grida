@@ -161,6 +161,16 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       );
       return new Uint8Array(Buffer.from(base64, "base64"));
     } catch (err) {
+      // An oversize file is NOT absent — surface it so view_image returns the
+      // typed too_large refusal rather than a misleading not_found. Checked
+      // before isAbsentForRead (which folds file-too-large into null).
+      if (isWorkspaceFsCode(err, "file-too-large")) {
+        const size =
+          err instanceof workspaceFs.Exception
+            ? (err.detail as { size?: number }).size
+            : undefined;
+        throw new AgentVision.OversizeError(size);
+      }
       if (isAbsentForRead(err)) return null;
       throw err;
     }

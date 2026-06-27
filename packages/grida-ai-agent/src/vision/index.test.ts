@@ -70,6 +70,17 @@ describe("AgentVision.sniff", () => {
     expect(AgentVision.sniff(new TextEncoder().encode("<svg/>"))).toBeNull();
     expect(AgentVision.sniff(new Uint8Array([0, 1, 2, 3]))).toBeNull();
   });
+
+  it("rejects a partial PNG/GIF prefix (full header required)", () => {
+    // PNG with the right first 4 bytes but a corrupt rest of the signature.
+    const fakePng = png(8, 8);
+    fakePng[6] = 0x00; // break the 89 50 4E 47 0D 0A 1A 0A signature
+    expect(AgentVision.sniff(fakePng)).toBeNull();
+    // "GIF" + wrong version block.
+    const fakeGif = gif(4, 4);
+    fakeGif[3] = 0x00; // not '8'
+    expect(AgentVision.sniff(fakeGif)).toBeNull();
+  });
 });
 
 describe("AgentVision.resolveToolCall", () => {
@@ -85,6 +96,38 @@ describe("AgentVision.resolveToolCall", () => {
   it("not_found when the byte source has no such path", async () => {
     const out = await AgentVision.resolveToolCall(reader(null), call());
     expect(out).toMatchObject({ ok: false, reason: "not_found" });
+  });
+
+  it("invalid_input for a malformed call (missing/empty/null path)", async () => {
+    for (const input of [null, {}, { path: "" }, { path: 5 }]) {
+      const out = await AgentVision.resolveToolCall(reader(png(1, 1)), {
+        tool_name: "view_image",
+        input,
+      });
+      expect(out).toMatchObject({ ok: false, reason: "invalid_input" });
+    }
+  });
+
+  it("too_large when the reader throws OversizeError (no not_found mask)", async () => {
+    const reader = {
+      readBytes: async () => {
+        throw new AgentVision.OversizeError(9_000_000);
+      },
+    };
+    const out = await AgentVision.resolveToolCall(reader, call());
+    expect(out).toMatchObject({ ok: false, reason: "too_large" });
+    expect((out as AgentVision.ViewImageErr).message).toContain("9000000");
+  });
+
+  it("rethrows a non-oversize read error", async () => {
+    const reader = {
+      readBytes: async () => {
+        throw new Error("disk on fire");
+      },
+    };
+    await expect(AgentVision.resolveToolCall(reader, call())).rejects.toThrow(
+      /disk on fire/
+    );
   });
 
   it("too_large past the byte cap", async () => {

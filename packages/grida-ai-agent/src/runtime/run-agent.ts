@@ -161,10 +161,11 @@ export async function runAgent(
     skills: bindings ? req.skills : undefined,
     fs: bindings?.fs,
     todos: bindings?.todos,
-    // AgentFs satisfies AgentVision.ByteReader (it exposes `readBytes`), so the
-    // workspace agent can SEE images by path. Server-resolved against the same
-    // workspace fs / read scope as read_file.
-    vision: bindings?.fs,
+    // AgentFs satisfies AgentVision.ByteReader, so the workspace agent can SEE
+    // images by path (server-resolved against the same read scope as read_file).
+    // Only wire it when the backend can actually read bytes — otherwise
+    // view_image would be advertised but degrade every call to not_found.
+    vision: bindings?.fs.bytesReadable ? bindings.fs : undefined,
     command: bindings?.command,
     // RFC skills + project instructions are session-static context the
     // runtime discovered once and threads through every turn. The body

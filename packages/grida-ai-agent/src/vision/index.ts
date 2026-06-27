@@ -44,6 +44,20 @@ export namespace AgentVision {
   }
 
   /**
+   * A `ByteReader` MAY throw this when the source exists but is larger than it
+   * is willing to read — distinct from returning `null` (genuinely absent). It
+   * lets a reader that knows the size up front (e.g. one that stats before
+   * reading) refuse without loading the bytes, and `resolveToolCall` turns it
+   * into the typed `too_large` refusal instead of a misleading `not_found`.
+   */
+  export class OversizeError extends Error {
+    constructor(readonly byteLength?: number) {
+      super("source exceeds the readable size limit");
+      this.name = "OversizeError";
+    }
+  }
+
+  /**
    * Decoded-byte ceiling. Mirrors the inline-attachment backstop
    * (`MAX_INLINE_FILE_BYTES`, runtime/run-input.ts) so a path-loaded image and
    * a pasted image obey the same limit. Host-tunable later; a constant for now.
@@ -74,6 +88,16 @@ export namespace AgentVision {
     "Examples: `/icon.png`, `/shots/before.jpg`.";
 
   /**
+   * Input contract. Shared between the tool schema (which the AI SDK validates
+   * before `execute`) and `resolveToolCall` (the client-resolved path, where the
+   * SDK is not in the loop) so a malformed call returns a typed `invalid_input`
+   * refusal instead of throwing on a `null`/missing path.
+   */
+  const VIEW_IMAGE_INPUT = z.object({
+    path: z.string().min(1).describe(PATH_DESCRIPTION),
+  });
+
+  /**
    * Success output. `data` is the base64 payload `toModelOutput` lowers to a
    * `media` block — it is NOT meant for the model to read as JSON (the lowering
    * overrides the default serialization). It is OPTIONAL because the retention
@@ -92,7 +116,12 @@ export namespace AgentVision {
 
   const VIEW_IMAGE_ERR = z.object({
     ok: z.literal(false),
-    reason: z.enum(["not_found", "unsupported_type", "too_large"]),
+    reason: z.enum([
+      "invalid_input",
+      "not_found",
+      "unsupported_type",
+      "too_large",
+    ]),
     message: z.string(),
   });
   export type ViewImageErr = z.infer<typeof VIEW_IMAGE_ERR>;
@@ -108,9 +137,7 @@ export namespace AgentVision {
         "read_file when you want a file's text. After you've described an " +
         "image, it may be dropped from later context to save tokens — call " +
         "view_image again to re-view it.",
-      inputSchema: z.object({
-        path: z.string().describe(PATH_DESCRIPTION),
-      }),
+      inputSchema: VIEW_IMAGE_INPUT,
       outputSchema: z.union([VIEW_IMAGE_OK, VIEW_IMAGE_ERR]),
       // The seam that makes the model SEE pixels instead of reading the output
       // as JSON. Re-applied on every rebuild from persisted parts, so the
@@ -164,8 +191,6 @@ export namespace AgentVision {
   // Dispatcher
   // -------------------------------------------------------------------------
 
-  type ViewImageInput = { path: string };
-
   /**
    * Resolve a `view_image` call against a `ByteReader`. Async (the read is),
    * unlike `AgentFs.resolveToolCall` (in-memory). Returns `undefined` for any
@@ -180,8 +205,34 @@ export namespace AgentVision {
     if (toolCall.dynamic) return undefined;
     if (toolCall.tool_name !== TOOL_NAMES.view_image) return undefined;
 
-    const { path } = toolCall.input as ViewImageInput;
-    const bytes = await reader.readBytes(path);
+    // Validate here too — the SDK checks `inputSchema` before `execute`, but the
+    // client-resolved path calls this directly, so a malformed call must return
+    // a typed refusal rather than throw on a missing/`null` path.
+    const parsed = VIEW_IMAGE_INPUT.safeParse(toolCall.input);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        reason: "invalid_input",
+        message: "view_image requires an absolute `path` string.",
+      };
+    }
+    const { path } = parsed.data;
+
+    let bytes: Uint8Array | null;
+    try {
+      bytes = await reader.readBytes(path);
+    } catch (err) {
+      // A reader that knows the size up front refuses oversize via OversizeError
+      // (vs. null = absent) so we keep the honest too_large signal.
+      if (err instanceof OversizeError) {
+        return {
+          ok: false,
+          reason: "too_large",
+          message: `Image at ${path}${err.byteLength ? ` is ${err.byteLength} bytes` : ""}; the limit is ${MAX_BYTES} bytes.`,
+        };
+      }
+      throw err;
+    }
     if (bytes === null) {
       return {
         ok: false,
@@ -193,7 +244,7 @@ export namespace AgentVision {
       return {
         ok: false,
         reason: "too_large",
-        message: `Image at ${path} is ${bytes.byteLength} bytes; the limit is ${MAX_BYTES}.`,
+        message: `Image at ${path} is ${bytes.byteLength} bytes; the limit is ${MAX_BYTES} bytes.`,
       };
     }
     const sniffed = sniff(bytes);
@@ -230,13 +281,23 @@ export namespace AgentVision {
    * mime is what the provider needs; dims are descriptor sugar.
    */
   export function sniff(b: Uint8Array): Sniffed | null {
-    // PNG: 89 50 4E 47 0D 0A 1A 0A, IHDR width/height at bytes 16..24 (BE).
+    // PNG: full 8-byte signature 89 50 4E 47 0D 0A 1A 0A + "IHDR" at 12..16;
+    // width/height at bytes 16..24 (BE). Check the whole header so a truncated
+    // or look-alike file isn't mistaken for a valid PNG.
     if (
       b.length >= 24 &&
       b[0] === 0x89 &&
       b[1] === 0x50 &&
       b[2] === 0x4e &&
-      b[3] === 0x47
+      b[3] === 0x47 &&
+      b[4] === 0x0d &&
+      b[5] === 0x0a &&
+      b[6] === 0x1a &&
+      b[7] === 0x0a &&
+      b[12] === 0x49 &&
+      b[13] === 0x48 &&
+      b[14] === 0x44 &&
+      b[15] === 0x52
     ) {
       return {
         mime: "image/png",
@@ -244,8 +305,16 @@ export namespace AgentVision {
         height: readU32BE(b, 20),
       };
     }
-    // GIF: "GIF87a"/"GIF89a", logical-screen width/height at 6..10 (LE).
-    if (b.length >= 10 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) {
+    // GIF: full "GIF87a"/"GIF89a" header; logical-screen width/height at 6..10 (LE).
+    if (
+      b.length >= 10 &&
+      b[0] === 0x47 &&
+      b[1] === 0x49 &&
+      b[2] === 0x46 &&
+      b[3] === 0x38 &&
+      (b[4] === 0x37 || b[4] === 0x39) &&
+      b[5] === 0x61
+    ) {
       return {
         mime: "image/gif",
         width: b[6] | (b[7] << 8),
