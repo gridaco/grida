@@ -312,14 +312,14 @@ entity into the compositor.
 The compositor MUST handle, at minimum, the following attachment
 classes:
 
-| Class          | Default treatment                                                                       |
-| -------------- | --------------------------------------------------------------------------------------- |
-| Text           | Inlined as text part if small (< host threshold); path-ref otherwise.                   |
-| Image          | Multi-modal part if the provider supports it; descriptor + `read_image` path otherwise. |
-| PDF            | Multi-modal part if supported; PDF-to-text tool route otherwise.                        |
-| Audio          | Multi-modal where supported; transcription tool route otherwise.                        |
-| Video          | Multi-modal where supported; descriptor + frame-extractor tool otherwise.               |
-| Binary unknown | Always a path-ref or descriptor, never inlined. The model sees a name, mime, size.      |
+| Class          | Default treatment                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Text           | Inlined as text part if small (< host threshold); path-ref otherwise.                                               |
+| Image          | Multi-modal part if the provider supports it; descriptor + a [`view_image`](./vision.md) perception path otherwise. |
+| PDF            | Multi-modal part if supported; PDF-to-text tool route otherwise.                                                    |
+| Audio          | Multi-modal where supported; transcription tool route otherwise.                                                    |
+| Video          | Multi-modal where supported; descriptor + frame-extractor tool otherwise.                                           |
+| Binary unknown | Always a path-ref or descriptor, never inlined. The model sees a name, mime, size.                                  |
 
 The agent always has a fallback path. Any attachment the model
 cannot read directly SHOULD still be reachable through `read` or
@@ -425,7 +425,7 @@ prompts the same model can act on consistently. An implementor MAY
 substitute when:
 
 - A target provider has no native multimodal: lower images to
-  descriptors with a `read_image` tool path.
+  descriptors with a [`view_image`](./vision.md) perception-tool path.
 - An editor surface has a richer convention the agent's manifest
   declares: the manifest's tool catalog can include a custom
   lowering function as long as the persisted part shape stays

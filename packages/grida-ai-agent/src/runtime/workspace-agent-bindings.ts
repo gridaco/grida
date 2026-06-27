@@ -10,6 +10,7 @@ import { AgentFs } from "../fs";
 import { isProtectedWrite } from "../fs/scope";
 import { isReadOnlyCommand } from "../permissions";
 import { AgentTodos } from "../todos";
+import { AgentVision } from "../vision";
 import type { SkillId } from "../agent";
 import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
 import { createAgentCommandBackend } from "./command-backend";
@@ -140,6 +141,36 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       // codes for content we deliberately don't serve as text (a directory,
       // an oversized file, or a binary/non-utf8 file). Policy violations
       // (path escapes, etc.) still throw.
+      if (isAbsentForRead(err)) return null;
+      throw err;
+    }
+  }
+
+  async readBytes(path: string): Promise<Uint8Array | null> {
+    try {
+      // `readFileBytes` is the containment-checked raw-bytes read (built for
+      // the workspace image viewer); it serves binary that `read` refuses.
+      // Read up to the vision tool's own cap (not the viewer's 1 MiB default),
+      // so an ordinary 1–8 MiB workspace screenshot is actually viewable rather
+      // than being rejected and surfacing as not_found. The vision layer applies
+      // the final size gate; anything past the cap surfaces as absent here.
+      const { base64 } = await workspaceFs.readFileBytes(
+        this.workspace,
+        this.toRel(path),
+        { max_bytes: AgentVision.MAX_BYTES }
+      );
+      return new Uint8Array(Buffer.from(base64, "base64"));
+    } catch (err) {
+      // An oversize file is NOT absent — surface it so view_image returns the
+      // typed too_large refusal rather than a misleading not_found. Checked
+      // before isAbsentForRead (which folds file-too-large into null).
+      if (isWorkspaceFsCode(err, "file-too-large")) {
+        const size =
+          err instanceof workspaceFs.Exception
+            ? (err.detail as { size?: number }).size
+            : undefined;
+        throw new AgentVision.OversizeError(size);
+      }
       if (isAbsentForRead(err)) return null;
       throw err;
     }

@@ -106,6 +106,16 @@
         "types": "./dist/todos/index.d.ts",
         "default": "./dist/todos/index.js"
       }
+    },
+    "./vision": {
+      "import": {
+        "types": "./dist/vision/index.d.mts",
+        "default": "./dist/vision/index.mjs"
+      },
+      "require": {
+        "types": "./dist/vision/index.d.ts",
+        "default": "./dist/vision/index.js"
+      }
     }
   },
   "scripts": {

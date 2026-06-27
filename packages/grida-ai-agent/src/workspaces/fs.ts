@@ -241,8 +241,13 @@ export namespace workspaceFs {
    */
   export async function readFileBytes(
     workspace: Workspace,
-    relPath: string
+    relPath: string,
+    opts?: { max_bytes?: number }
   ): Promise<{ base64: string; size: number; mtime: number }> {
+    // The 1 MiB default suits the source-file viewer; callers that legitimately
+    // serve larger binaries (e.g. the agent's `view_image`, up to its own
+    // perception cap) raise it so a valid image isn't rejected as too-large.
+    const maxBytes = opts?.max_bytes ?? MAX_FILE_BYTES;
     const abs = await resolveInside(workspace, relPath, { must_exist: true });
     const stat = await fs.stat(abs);
     if (!stat.isFile()) {
@@ -252,7 +257,7 @@ export namespace workspaceFs {
         rel_path: relPath,
       });
     }
-    if (stat.size > MAX_FILE_BYTES) {
+    if (stat.size > maxBytes) {
       throw new Exception({
         code: "file-too-large",
         workspace_id: workspace.id,

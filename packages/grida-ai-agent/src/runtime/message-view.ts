@@ -33,6 +33,7 @@
 
 import type { ChatMessageWithParts } from "../session/rows";
 import { compactionBoundary } from "../session/boundary";
+import { AgentVision } from "../vision";
 
 export type ModelUIMessage = {
   id: string;
@@ -72,10 +73,20 @@ export function buildModelMessages(
     working = [...tail, ...after];
   }
 
+  // Image retention (context budget): a perceived image (a `view_image` result
+  // or an inline image attachment) is large. The model view is rebuilt every
+  // turn, so without a bound the same pixels re-encode into every future
+  // prompt. Keep image bytes live only inside the most recent IMAGE_LIVE_TURNS
+  // user-turn window; older ones lower to a cheap text descriptor. The bytes
+  // stay durable in `chat_parts` — this only changes what the model sees this
+  // turn — and the model can re-call `view_image` to bring pixels back.
+  const liveStart = imageLiveStartIndex(working);
+
   const out: ModelUIMessage[] = [];
   let pendingSummary: string | null = leadingSummary;
 
-  for (const m of working) {
+  for (let i = 0; i < working.length; i++) {
+    const m = working[i];
     // An older/structural compaction marker that survived into the window is
     // not model input — fold its text forward like a summary, never emit it.
     const compaction = findCompactionSummary(m);
@@ -83,7 +94,7 @@ export function buildModelMessages(
       pendingSummary = pendingSummary ?? compaction;
       continue;
     }
-    const parts = lowerParts(m.parts);
+    const parts = lowerParts(m.parts, { elideImages: i < liveStart });
     if (m.role === "user" && pendingSummary !== null) {
       parts.unshift({
         type: "text",
@@ -106,6 +117,28 @@ export function buildModelMessages(
   return out;
 }
 
+/**
+ * How many trailing user-turn windows keep their images live (full pixels).
+ * Default 1: only the latest user turn (the current request + the assistant
+ * work answering it) shows pixels; everything earlier lowers to descriptors.
+ * Small on purpose — vision tokens are the most expensive thing in context.
+ */
+const IMAGE_LIVE_TURNS = 1;
+
+/**
+ * Index in `working` at/after which image bytes stay live. Everything before it
+ * gets its images elided. The window starts at the IMAGE_LIVE_TURNS-th-from-last
+ * user message (a user message opens a turn); fewer user turns → keep all.
+ */
+function imageLiveStartIndex(working: ChatMessageWithParts[]): number {
+  const userIdxs: number[] = [];
+  for (let i = 0; i < working.length; i++) {
+    if (working[i].role === "user") userIdxs.push(i);
+  }
+  if (userIdxs.length <= IMAGE_LIVE_TURNS) return 0;
+  return userIdxs[userIdxs.length - IMAGE_LIVE_TURNS];
+}
+
 function wrapSummary(summary: string): string {
   return `<conversation_summary>\nThe earlier part of this conversation was summarized to save context:\n\n${summary}\n</conversation_summary>`;
 }
@@ -121,7 +154,10 @@ function findCompactionSummary(m: ChatMessageWithParts): string | null {
   return null;
 }
 
-function lowerParts(parts: ChatMessageWithParts["parts"]): unknown[] {
+function lowerParts(
+  parts: ChatMessageWithParts["parts"],
+  opts: { elideImages: boolean } = { elideImages: false }
+): unknown[] {
   const out: unknown[] = [];
   for (const p of parts) {
     const data = p.data as Record<string, unknown> | null;
@@ -136,6 +172,11 @@ function lowerParts(parts: ChatMessageWithParts["parts"]): unknown[] {
       type === "source-url" ||
       type === "source-document"
     ) {
+      // Inline attachments are NOT auto-elided: unlike a `view_image` result,
+      // a pasted image has no re-view affordance (no path, no tool to re-call),
+      // so dropping it is lossy and irreversible. They stay durable across the
+      // rebuild (see agent.test.ts "DB-rebuild durability"); only re-viewable
+      // perceptions are evicted below.
       out.push(data);
       continue;
     }
@@ -173,12 +214,47 @@ function lowerParts(parts: ChatMessageWithParts["parts"]): unknown[] {
       // poisoned/legacy row degrades gracefully instead of failing the run.
       const input = (data as { input?: unknown }).input;
       if (typeof input !== "object" || input === null) continue;
-      out.push(toSdkToolPart(data, p.tool_call_id));
+      // Retention: a stale `view_image` result keeps its tool-call/result pair
+      // (so the turn stays valid) but drops the base64 `output.data`. The tool's
+      // `toModelOutput` then degrades to a text descriptor instead of re-sending
+      // the image — the bytes remain in the persisted row for re-view.
+      out.push(
+        toSdkToolPart(
+          maybeElideImageTool(data, type, opts.elideImages),
+          p.tool_call_id
+        )
+      );
       continue;
     }
     // Other data-* parts are UI-only — not model-relevant. Drop.
   }
   return out;
+}
+
+/**
+ * The persisted part type of a `view_image` result. Derived from the canonical
+ * tool name (not a bare literal) so a rename of the tool propagates here — the
+ * same derive-don't-duplicate discipline `tools/names.ts` uses.
+ */
+const VIEW_IMAGE_PART_TYPE = `tool-${AgentVision.TOOL_NAMES.view_image}`;
+
+/**
+ * Strip the heavy base64 payload from a stale `view_image` tool result so it
+ * lowers to a descriptor (the tool's `toModelOutput` sees no `output.data` and
+ * emits text — that contract is locked by message-view.test.ts). A no-op for
+ * any other tool, any non-elided turn, or a result with no `output.data`. Never
+ * mutates the input row — clones.
+ */
+function maybeElideImageTool(
+  data: Record<string, unknown>,
+  type: string,
+  elide: boolean
+): Record<string, unknown> {
+  if (!elide || type !== VIEW_IMAGE_PART_TYPE) return data;
+  const output = data.output as Record<string, unknown> | undefined;
+  if (!output || typeof output.data !== "string") return data;
+  const { data: _dropped, ...rest } = output;
+  return { ...data, output: rest };
 }
 
 function toSdkToolPart(

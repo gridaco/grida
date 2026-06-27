@@ -34,6 +34,7 @@
 import { tool } from "ai";
 import { AgentFs } from "../fs";
 import { AgentTodos } from "../todos";
+import { AgentVision } from "../vision";
 import { createSkillTool, SKILL_TOOL_NAME } from "../skills/skill-tool";
 import type {
   SkillBodyCache,
@@ -58,6 +59,12 @@ export type ToolsetCapabilities = {
   fs?: AgentFs;
   /** Server-side AgentTodos binding. Same pattern as `fs`. */
   todos?: AgentTodos;
+  /** Inject a byte source for `view_image` (visual perception). Without it
+   * the tool is NOT in the registry — advertising a perception tool with no
+   * way to resolve it would hang the model on an unanswerable call. `AgentFs`
+   * satisfies `AgentVision.ByteReader`, so the workspace path passes its fs
+   * here; the model SEES an image only where a host can hand back its bytes. */
+  vision?: AgentVision.ByteReader;
   /** Inject command execution. Without this entry the `run_command` tool is
    * NOT in the registry — the LLM cannot call something we can't
    * execute. */
@@ -132,7 +139,22 @@ export function createToolset(caps: ToolsetCapabilities = {}) {
           }),
         }
       : withCommand;
-  return withSkill;
+  // view_image joins only when a byte source is wired. `wrapWithResolver`
+  // preserves the tool's `toModelOutput` (it spreads the base config and only
+  // overrides `execute`), so the resolved bytes still lower to a media block.
+  const visionBinding = caps.vision;
+  const withVision = visionBinding
+    ? {
+        ...withSkill,
+        ...wrapWithResolver(AgentVision.tools, (name, input) =>
+          AgentVision.resolveToolCall(visionBinding, {
+            tool_name: name,
+            input,
+          })
+        ),
+      }
+    : withSkill;
+  return withVision;
 }
 
 /**

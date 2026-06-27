@@ -181,6 +181,46 @@ sandbox boundary. Grida's desktop binding wraps the agent host process
 under the reference sandbox (`srt`); see
 [`../agent/srt.md`](../agent/srt.md).
 
+### `view_image` (Grida extension)
+
+Grida's binding of the RFC [`visual perception`](../agent/vision.md)
+contract — the visual twin of `read_file`. `read_file` returns text and
+**stays** text-only; `view_image` returns a raster image the model sees as
+pixels.
+
+```ts
+view_image({ path }) →
+  | { ok: true, mime, width?, height?, bytes, data /* base64 */ }
+  | { ok: false, reason: "not_found" | "unsupported_type" | "too_large", message }
+```
+
+Binding facts as Grida currently ships them:
+
+- **v1 = raster bitmaps** (`png` / `jpeg` / `webp` / `gif`), identified by
+  magic bytes (never the extension). Rendering non-bitmap sources
+  (svg / text / code → pixels) is the planned next step under this same
+  tool name; the contract is shaped to absorb it without a rename.
+- **Result-to-image lowering uses Strategy 1** ([`vision / lowering`](../agent/vision.md#result-to-image-lowering)):
+  the tool result carries the base64 payload and the tool declares a
+  model-output lowering to a media block, so the perception reproduces from
+  the persisted result on every rebuild — no bespoke replay path.
+- **Retention.** A stale `view_image` result drops its payload (lowering
+  degrades to a naming descriptor); the bytes stay durable and the model
+  re-views by calling the tool again. Pasted inline images are NOT
+  auto-evicted (no re-view reference) — see
+  [`vision / retention`](../agent/vision.md#retention-keep-recent-elide-old).
+- **Capability.** Needs only `fs.read` over the path — the same read scope
+  as `read_file`; `view_image` joins the registry only when the host wires a
+  byte source. Grida's workspace agent passes its filesystem (it exposes a
+  raw-bytes read), so the tool sees workspace images by path.
+- **Known v1 gap.** A binary image is not yet surfaced by `list_files`
+  (the text-hydrate skips it), so the agent perceives images the user
+  **names by path**; autonomous discovery is a tracked follow-up.
+
+It lives alongside the other fundamentals (the perception module is a
+sibling of the fs tools, not part of `tools-image.md`, which is image
+**generation** — a different verb).
+
 ### `tool_search` (proposed)
 
 As the toolkit grows — fs + todos + canvas (15+) + future env tools
@@ -250,6 +290,7 @@ Process:
 ## See also
 
 - [Agent RFC / Tools](../agent/tools.md) — the locked-set contract this page binds.
+- [Agent RFC / Visual perception](../agent/vision.md) — the read/view split `view_image` binds.
 - [Agent RFC / Environments](../agent/environments.md) — which capabilities each environment exposes.
 - [Canvas Tools](./tools-canvas.md) — canvas-only tool surface.
 - [Image Tools](./tools-image.md) — image-generation tool surface.
