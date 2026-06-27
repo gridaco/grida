@@ -145,6 +145,23 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     }
   }
 
+  async readBytes(path: string): Promise<Uint8Array | null> {
+    try {
+      // `readFileBytes` is the containment-checked raw-bytes read (built for
+      // the workspace image viewer); it serves binary that `read` refuses.
+      // Caps at workspaceFs.MAX_FILE_BYTES — an oversized image surfaces as
+      // "absent" here (→ view_image not_found), same as the text `read` path.
+      const { base64 } = await workspaceFs.readFileBytes(
+        this.workspace,
+        this.toRel(path)
+      );
+      return new Uint8Array(Buffer.from(base64, "base64"));
+    } catch (err) {
+      if (isAbsentForRead(err)) return null;
+      throw err;
+    }
+  }
+
   async write(path: string, content: string): Promise<void> {
     await workspaceFs.writeFile(this.workspace, this.toRel(path), content);
   }

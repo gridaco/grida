@@ -37,11 +37,19 @@ This page is a **glossary and reference**: the routes an agent takes
 to make binary attachments useful, the format matrix that drives the
 choice, the scratch-space pattern for archive extraction, and the
 line between what the protocol fixes and what the implementor
-chooses. For the entry-point handling (the `file-attachment` part,
-the descriptor fallback, the storage threshold), see
-[`compositor / attachments`](./compositor.md#attachments-the-long-tail).
-For the broader skill discovery and loading flow, see
-[`skills`](./skills.md).
+chooses.
+
+> **Not the same as [`visual perception`](./vision.md).** This page is
+> about content the model **cannot read at all** (a `.psd`, a `.zip`).
+> Perception is about a source the model _could_ read as text but where
+> the agent wants the **rendering** — an svg, a code file as a
+> screenshot — reached by path through the `view_image` tool. A raster
+> bitmap is the overlap: handled here as a native-multimodal attachment,
+> reached there by path on demand. For the entry-point handling (the `file-attachment` part,
+> the descriptor fallback, the storage threshold), see
+> [`compositor / attachments`](./compositor.md#attachments-the-long-tail).
+> For the broader skill discovery and loading flow, see
+> [`skills`](./skills.md).
 
 ## The three resolution paths
 
@@ -296,6 +304,8 @@ A conforming implementation SHOULD:
   pattern is the same machinery applied to binary handling.
 - [Tools / bash](./tools.md) — the capability that backs
   shell-based conversion.
+- [Visual perception](./vision.md) — the adjacent problem: perceiving a
+  path-resident or text-shaped source as pixels via `view_image`.
 - [Environments](./environments.md) — which environments offer
   writable scratch, and how the sandbox bounds it.
 - [`anthropics/skills`](https://github.com/anthropics/skills/tree/main/skills) —

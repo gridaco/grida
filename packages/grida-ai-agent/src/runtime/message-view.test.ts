@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { tool, validateUIMessages } from "ai";
 import { z } from "zod";
 import { buildModelMessages, type ModelUIMessage } from "./message-view";
+import { AgentVision } from "../vision";
 import type { ChatMessageWithParts, ChatPartRow } from "../session/rows";
 
 // The runtime feeds buildModelMessages output into the AI SDK's
@@ -15,7 +16,37 @@ const TOOLS = {
     description: "",
     inputSchema: z.object({ path: z.string() }),
   }),
+  view_image: AgentVision.tools.view_image,
 };
+
+/** A completed `view_image` tool part carrying base64 `data`. */
+function viewImagePart(tcId: string): ChatPartRow {
+  return part(
+    "tool-view_image",
+    {
+      type: "tool-view_image",
+      tool_call_id: tcId,
+      state: "output-available",
+      input: { path: "/icon.png" },
+      output: {
+        ok: true,
+        mime: "image/png",
+        width: 8,
+        height: 8,
+        bytes: 24,
+        data: "iVBORw0KGgo=",
+      },
+    },
+    { tool_call_id: tcId, tool_state: "output-available" }
+  );
+}
+
+function viewImageOutput(m: ModelUIMessage): Record<string, unknown> {
+  const p = m.parts.find(
+    (x) => (x as { type?: string }).type === "tool-view_image"
+  ) as { output?: Record<string, unknown> } | undefined;
+  return p?.output ?? {};
+}
 function validateView(out: unknown[]) {
   // Cast the whole options once: validateUIMessages's UI_MESSAGE generic ties
   // `messages` to the typed `tools`, over-constraining the call. The real
@@ -326,5 +357,60 @@ describe("buildModelMessages", () => {
       ]),
     ]);
     expect(out.map((m) => m.id)).toEqual(["m1"]);
+  });
+});
+
+describe("buildModelMessages — view_image retention", () => {
+  it("replay: a view_image result in the current turn keeps its pixels (output.data)", async () => {
+    // Only one user turn → the view_image result is inside the live window.
+    // This is the crux: the perception survives the rebuild with data intact,
+    // so convertToModelMessages({tools}) re-applies toModelOutput → media block.
+    const out = buildModelMessages([
+      msg("m1", "user", [
+        part("text", { type: "text", text: "what do you see in /icon.png?" }),
+      ]),
+      msg("m2", "assistant", [viewImagePart("tc1")]),
+    ]);
+    expect(viewImageOutput(out[1]).data).toBe("iVBORw0KGgo=");
+    // still a valid, paired tool part
+    expect((out[1].parts[0] as { input?: unknown }).input).toEqual({
+      path: "/icon.png",
+    });
+    await expect(validateView(out)).resolves.toBeDefined();
+  });
+
+  it("retention: a view_image result before the latest user turn drops its pixels", async () => {
+    // A later user turn pushes the view_image out of the live window (K=1).
+    const out = buildModelMessages([
+      msg("m1", "user", [
+        part("text", { type: "text", text: "what do you see in /icon.png?" }),
+      ]),
+      msg("m2", "assistant", [viewImagePart("tc1")]),
+      msg("m3", "user", [part("text", { type: "text", text: "thanks" })]),
+    ]);
+    const output = viewImageOutput(out[1]);
+    // bytes gone (context not wasted), descriptor metadata retained...
+    expect(output.data).toBeUndefined();
+    expect(output).toMatchObject({ ok: true, mime: "image/png" });
+    // ...and the tool-call/result pairing is still intact (turn stays valid).
+    expect((out[1].parts[0] as { input?: unknown }).input).toEqual({
+      path: "/icon.png",
+    });
+    await expect(validateView(out)).resolves.toBeDefined();
+  });
+
+  it("retention does NOT touch the durable persisted row — only the view", () => {
+    const rows = [
+      msg("m1", "user", [
+        part("text", { type: "text", text: "see /icon.png" }),
+      ]),
+      msg("m2", "assistant", [viewImagePart("tc1")]),
+      msg("m3", "user", [part("text", { type: "text", text: "thanks" })]),
+    ];
+    buildModelMessages(rows);
+    const persisted = rows[1].parts[0].data as {
+      output: { data?: string };
+    };
+    expect(persisted.output.data).toBe("iVBORw0KGgo=");
   });
 });

@@ -94,6 +94,18 @@ export class OpfsBackend implements AgentFs.Backend {
     }
   }
 
+  async readBytes(p: string): Promise<Uint8Array | null> {
+    try {
+      const { dir, name } = await this.resolveDir(p, false);
+      const fh = await dir.getFileHandle(name);
+      const f = await fh.getFile();
+      return new Uint8Array(await f.arrayBuffer());
+    } catch (err) {
+      if (isNotFound(err)) return null;
+      throw err;
+    }
+  }
+
   async write(p: string, content: string): Promise<void> {
     const { dir, name } = await this.resolveDir(p, true);
     const fh = await dir.getFileHandle(name, { create: true });

@@ -42,6 +42,7 @@ import {
   type ToolsetCapabilities,
 } from "../tools";
 import { renderSkillIndex } from "../skills/skill-tool";
+import { AgentVision } from "../vision";
 import type {
   SkillBodyCache,
   SkillBodyLoader,
@@ -91,6 +92,9 @@ export type CreateAgentOptions = {
   fs?: ToolsetCapabilities["fs"];
   /** Server-side `AgentTodos` binding. Same shape as `fs`. */
   todos?: ToolsetCapabilities["todos"];
+  /** Byte source for `view_image`. Without it the perception tool is not
+   * registered. `AgentFs` satisfies it — the workspace path passes its fs. */
+  vision?: ToolsetCapabilities["vision"];
   /** Command-execution capability. Without it, the `run_command` tool is
    * not registered and the LLM cannot call it. */
   command?: ToolsetCapabilities["command"];
@@ -129,6 +133,7 @@ export function createAgent(opts: CreateAgentOptions) {
   const tools = createToolset({
     fs: opts.fs,
     todos: opts.todos,
+    vision: opts.vision,
     command: opts.command,
     skill:
       opts.skill_index && opts.skill_load_body
@@ -193,6 +198,9 @@ function buildCapabilityHints(opts: CreateAgentOptions): string[] {
         opts.command.default_workdir
       )
     );
+  }
+  if (opts.vision) {
+    hints.push(prompts.vision_capability(AgentVision.TOOL_NAMES.view_image));
   }
   return hints;
 }

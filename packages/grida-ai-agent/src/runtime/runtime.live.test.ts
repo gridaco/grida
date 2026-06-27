@@ -302,31 +302,164 @@ liveDescribe("LIVE — inline image perception + durability", () => {
 });
 
 /**
- * Deferred image-input capabilities — NOT yet implemented (see the plan's
- * "Deferred" list and docs/wg/ai/agent/compositor.md `file-ref`). These are
- * intentional, always-visible `todo` markers (no env gate — `it.todo` never
- * runs) so the gaps aren't forgotten. When a capability lands, replace its
- * `todo` with a real gated live case that mirrors the inline cases above:
- * write a known-content image, drive `AgentRuntime.run`, assert the model
- * names it.
+ * LIVE — `view_image` perception BY PATH. The complement to the inline cases:
+ * an image that lives in the workspace (not in the request payload) is seen
+ * only when the agent calls `view_image`, because `read_file` returns text.
+ * A RED-square asset + "name the dominant color" is unguessable from the path,
+ * so a correct "red" is proof the pixels reached the model via the tool.
  *
- * The common thread: today an image only reaches the model as INLINE bytes
- * (a base64 `file` part). A path/reference does not — `file-ref` lowers to a
- * text path and there is no `read_image` tool, so the agent gets a string it
- * cannot open (`read_file` returns text, not pixels).
+ * Needs a WORKSPACE-bound session (that is where fs + vision are wired); the
+ * inline block above runs workspace-less.
  */
-describe("inline image — deferred capabilities (not yet implemented)", () => {
-  // User references an image by PATH (@-mention / file-ref) with NO inline
-  // attachment. Needs a `read_image` tool (server-execute + toModelOutput
-  // returning image content) OR file-ref → provider-native image-block lowering.
-  it.todo(
-    "perceives a file-ref / @-mention image via read_image (no inline attachment)"
+async function setupVisionWorkspace(baseDir: string): Promise<string> {
+  const wsDir = await fs.mkdtemp(path.join(baseDir, "ws-"));
+  // Neutral filename: "red.png" would let the model answer from the path.
+  const b64 = solidPngDataUrl(RED).split(",")[1];
+  await fs.writeFile(path.join(wsDir, "asset.png"), Buffer.from(b64, "base64"));
+  // Register the workspace so the runtime's registry (same baseDir) resolves it.
+  const ws = await new WorkspaceRegistry(baseDir).open(wsDir);
+  return ws.root;
+}
+
+async function calledViewImage(
+  store: SessionsStore,
+  sessionId: string
+): Promise<boolean> {
+  const msgs = await store.listVisibleMessages(sessionId);
+  return msgs.some((m) => m.parts.some((p) => p.type === "tool-view_image"));
+}
+
+liveDescribe("LIVE — view_image perception (by path)", () => {
+  let baseDir: string;
+  let host: Host;
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-agent-live-vi-"));
+    await setKey(baseDir);
+    host = buildHost(baseDir);
+  });
+
+  afterEach(async () => {
+    host.runtime.dispose();
+    host.store.close();
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  it(
+    "(a) what do you see: the model views a workspace image and names its color",
+    async () => {
+      const workspace_root = await setupVisionWorkspace(baseDir);
+      const res = await host.app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          model_id: MODEL_ID,
+          workspace_root,
+          messages: [
+            {
+              id: "u1",
+              role: "user",
+              parts: [
+                {
+                  type: "text",
+                  text: "Use view_image to look at /asset.png, then reply with ONLY its single dominant color word.",
+                },
+              ],
+            },
+          ],
+        }),
+      });
+      expect(res.status).toBe(200);
+      const sessionId = sessionIdFromSse(await res.text());
+      expect(sessionId).toBeTruthy();
+      // Re-fetch the assistant text from the persisted session (the SSE body was
+      // already consumed by sessionIdFromSse).
+      const msgs = await host.store.listVisibleMessages(sessionId);
+      const text = msgs
+        .flatMap((m) =>
+          m.parts.map(
+            (p) =>
+              (p.data as { text?: string } | null)?.text?.toLowerCase() ?? ""
+          )
+        )
+        .join(" ");
+      expect(text).toContain("red");
+      // It came through the perception tool, not a text read of the bytes.
+      expect(await calledViewImage(host.store, sessionId)).toBe(true);
+    },
+    TIMEOUT_MS
   );
 
-  // User drops a FOLDER of images; the agent lists it and pulls individual
-  // images into context by choice. Needs read_image + a read-scope for the
-  // dropped directory (scratch/fs).
-  it.todo("views images from a dropped folder selectively (read_image)");
+  it(
+    "(b) retention: a re-view brings the image back after it leaves the live window",
+    async () => {
+      const workspace_root = await setupVisionWorkspace(baseDir);
+      const t1 = await host.app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          model_id: MODEL_ID,
+          workspace_root,
+          messages: [
+            {
+              id: "u1",
+              role: "user",
+              parts: [
+                {
+                  type: "text",
+                  text: "Use view_image to look at /asset.png and acknowledge in one word.",
+                },
+              ],
+            },
+          ],
+        }),
+      });
+      expect(t1.status).toBe(200);
+      const sessionId = sessionIdFromSse(await t1.text());
+
+      // Turn 2 — the prior view_image result has left the live window (K=1) and
+      // lowered to a descriptor. Asking again forces a FRESH view_image call,
+      // which is the whole point of the read/view split + durable persistence.
+      const t2 = await host.app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          model_id: MODEL_ID,
+          session_id: sessionId,
+          workspace_root,
+          messages: [
+            {
+              id: "u2",
+              role: "user",
+              parts: [
+                {
+                  type: "text",
+                  text: "Look at /asset.png again and reply with ONLY its dominant color word.",
+                },
+              ],
+            },
+          ],
+        }),
+      });
+      expect(t2.status).toBe(200);
+      const text = assistantTextFromSse(await t2.text()).toLowerCase();
+      expect(text).toContain("red");
+    },
+    TIMEOUT_MS
+  );
+});
+
+/**
+ * Still-deferred image capabilities — intentional, always-visible `todo`
+ * markers (no env gate — `it.todo` never runs) so the gaps aren't forgotten.
+ * `view_image` (above) closes the "perceive an image by path" gap for raster
+ * bitmaps; what remains:
+ */
+describe("image input — still-deferred capabilities (not yet implemented)", () => {
+  // Render a NON-bitmap source (svg / text / code) to pixels via view_image —
+  // needs a rasterizer backend, not just a byte read.
+  it.todo("views a rendered SVG / text source via view_image (render path)");
+
+  // The agent DISCOVERS images on its own: list_files surfaces binary files so
+  // the agent can pick one to view without the user naming the path.
+  it.todo("discovers and views a workspace image without being given the path");
 
   // A pasted/dropped image becomes OPERABLE ("convert this to .gif"): staged to
   // scratch → file-ref so the agent has a path + shell, not just pixels.

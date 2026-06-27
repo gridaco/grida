@@ -155,6 +155,23 @@ When you produce SVG:
     ].join("\n"),
 
   /**
+   * Visual-perception capability hint. Appended by `buildCapabilityHints`
+   * (`agent/index.ts`) only when a byte source for `view_image` is wired.
+   * Teaches the read/view split: text via read_file, pixels via view_image.
+   */
+  vision_capability: (view_image_name: string): string =>
+    [
+      '<capability name="vision">',
+      `You can SEE image files with the \`${view_image_name}\` tool — it`,
+      "returns the pixels of a raster image (png, jpeg, webp, gif) at a path.",
+      `\`read_file\` returns TEXT only; reach for \`${view_image_name}\` whenever`,
+      "you need to perceive what an image actually looks like. An image you",
+      "viewed may be dropped from later context to save tokens — call the tool",
+      "again to re-view it.",
+      "</capability>",
+    ].join("\n"),
+
+  /**
    * Agent-provider / ACP system prompt (issue #813). APPENDED to Claude Code's
    * preset (never replaces — a replacement strips its tool-use instructions).
    * Consumed by `agent-provider/config.ts` (`acp_config.system_prompt`).

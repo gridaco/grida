@@ -28,6 +28,7 @@ export default defineConfig([
       "src/fs/index.ts",
       "src/fs/backends/opfs.ts",
       "src/todos/index.ts",
+      "src/vision/index.ts",
     ],
     platform: "neutral",
   },

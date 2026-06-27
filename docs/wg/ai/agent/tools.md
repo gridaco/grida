@@ -90,9 +90,14 @@ standardized, but a recurring catalog includes:
 | `apply_patch`        | Apply a unified-diff patch atomically across multiple files.                         |
 | `lsp`                | Surface language-server features (definitions, references, diagnostics).             |
 | `plan` / `plan_exit` | The plan/build opinionated workflow's exit hook (see [`subagents`](./subagents.md)). |
+| `view_image`         | SEE a source as pixels — the visual twin of `read` (see [`vision`](./vision.md)).    |
 
 These are deliberately out of the lock because they are domain
-(code-agent) tools, not universal. A design-agent or document-agent
+(code-agent) tools, not universal. `view_image` is the exception that
+proves the rule: it is near-universal but stays out of the lock because
+the locked read tool is deliberately **text-only** — perception is a
+separate modality, not a richer `read`. See
+[`visual perception`](./vision.md) for the read/view split. A design-agent or document-agent
 host can ship its own equivalents without colliding.
 
 ### The `question` tool

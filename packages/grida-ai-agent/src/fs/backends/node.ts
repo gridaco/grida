@@ -59,6 +59,17 @@ export class NodeFsBackend implements AgentFs.Backend {
     }
   }
 
+  async readBytes(p: string): Promise<Uint8Array | null> {
+    try {
+      // No encoding → a Buffer (a Uint8Array subclass). The size cap is the
+      // caller's concern (see `AgentVision`); the backend stays dumb.
+      return await fs.readFile(this.resolve(p));
+    } catch (err: unknown) {
+      if (isNotFound(err)) return null;
+      throw err;
+    }
+  }
+
   async write(p: string, content: string): Promise<void> {
     const full = this.resolve(p);
     await fs.mkdir(path.dirname(full), { recursive: true });

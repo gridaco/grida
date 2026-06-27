@@ -375,6 +375,21 @@ export class AgentFs {
   }
 
   /**
+   * Read the RAW bytes at `path` straight from the backend — bypassing the
+   * hydrated text cache (`read`) and any live binding, because an image must
+   * never round-trip through a string. Returns `null` when the path is
+   * absent OR the backend has no byte view. This is the seam `view_image`
+   * (see `../vision`) resolves against; `AgentFs` satisfies
+   * `AgentVision.ByteReader` by exposing exactly this method.
+   *
+   * NOT counted as a `read()` for the freshness/edit contract — perceiving
+   * pixels is not the same as reading text you intend to edit.
+   */
+  async readBytes(path: string): Promise<Uint8Array | null> {
+    return (await this.backend.readBytes?.(path)) ?? null;
+  }
+
+  /**
    * Full-content upsert. See {@link AgentFs.WriteArgs} for the
    * `expected_version` semantics (version-checked vs permissive).
    */
@@ -742,6 +757,15 @@ export namespace AgentFs {
 
     /** Read the bytes at `path`, or `null` if no such file. */
     read(path: string): Promise<string | null>;
+
+    /**
+     * Read the RAW bytes at `path` (no text decode), or `null` if no such
+     * file. Optional: a backend that has no byte view (or stores only text)
+     * MAY omit it, in which case byte-level consumers (e.g. `view_image`,
+     * see `../vision`) treat the path as unreadable. Distinct from `read`,
+     * which decodes UTF-8 — an image must never round-trip through a string.
+     */
+    readBytes?(path: string): Promise<Uint8Array | null>;
 
     /**
      * Write `content` to `path`, overwriting any prior content. Backends
@@ -1201,6 +1225,23 @@ export namespace AgentFs {
 
     async read(path: string): Promise<string | null> {
       return this.files.has(path) ? (this.files.get(path) as string) : null;
+    }
+
+    async readBytes(path: string): Promise<Uint8Array | null> {
+      // Memory holds text only — hand back its UTF-8 bytes. Useful for
+      // text-shaped sources (svg, code); a true bitmap belongs on a disk
+      // backend (NodeFs/OPFS), not here. `TextEncoder` is universal (Node +
+      // browser); reached via globalThis so the neutral build needs no lib dom.
+      const s = this.files.get(path);
+      if (s === undefined) return null;
+      const TE = (
+        globalThis as {
+          TextEncoder?: new () => { encode(s: string): Uint8Array };
+        }
+      ).TextEncoder;
+      return TE
+        ? new TE().encode(s)
+        : Uint8Array.from(s, (c) => c.charCodeAt(0) & 0xff);
     }
 
     async write(path: string, content: string): Promise<void> {
