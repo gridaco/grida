@@ -10,6 +10,7 @@ import { AgentFs } from "../fs";
 import { isProtectedWrite } from "../fs/scope";
 import { isReadOnlyCommand } from "../permissions";
 import { AgentTodos } from "../todos";
+import { AgentVision } from "../vision";
 import type { SkillId } from "../agent";
 import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
 import { createAgentCommandBackend } from "./command-backend";
@@ -149,11 +150,14 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     try {
       // `readFileBytes` is the containment-checked raw-bytes read (built for
       // the workspace image viewer); it serves binary that `read` refuses.
-      // Caps at workspaceFs.MAX_FILE_BYTES — an oversized image surfaces as
-      // "absent" here (→ view_image not_found), same as the text `read` path.
+      // Read up to the vision tool's own cap (not the viewer's 1 MiB default),
+      // so an ordinary 1–8 MiB workspace screenshot is actually viewable rather
+      // than being rejected and surfacing as not_found. The vision layer applies
+      // the final size gate; anything past the cap surfaces as absent here.
       const { base64 } = await workspaceFs.readFileBytes(
         this.workspace,
-        this.toRel(path)
+        this.toRel(path),
+        { max_bytes: AgentVision.MAX_BYTES }
       );
       return new Uint8Array(Buffer.from(base64, "base64"));
     } catch (err) {
