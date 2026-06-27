@@ -102,6 +102,7 @@ export { composeSystemPrompt } from "./agent/prompts";
 export {
   createToolset,
   RUN_COMMAND_TOOL_NAME,
+  QUESTION_TOOL_NAME,
   type AgentToolName,
   type RunCommandOutcome,
   type ToolsetCapabilities,

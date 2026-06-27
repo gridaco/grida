@@ -24,11 +24,12 @@
  * response. The session is genuinely idle through the cooldown, so the
  * Stop/Send control reads Send and the UI paints Stop→Send→Stop. A hard error
  * PAUSES the drain (queued rows wait for the next fired turn). A turn BLOCKED
- * awaiting a user decision (a pending supervised approval) pauses it the same
- * way: an approval-request finishes the run cleanly so the session reads idle,
- * but it is not a completed turn — the fire-gate consults
- * {@link SessionSchedulerDeps.has_pending_approval} and holds the queue until
- * the user answers and the turn continues to a true finish.
+ * awaiting a user decision (a pending supervised approval, or an unanswered
+ * `question`) pauses it the same way: the blocking request finishes the run
+ * cleanly so the session reads idle, but it is not a completed turn — the
+ * fire-gate consults {@link SessionSchedulerDeps.has_pending_human_input} and
+ * holds the queue until the user answers and the turn continues to a true
+ * finish.
  *
  * Re-entrancy: `onFinish` runs inside the registry's `finish()`; the drain it
  * schedules runs on a fresh task (a timer), never inline inside `finish()`, so
@@ -58,15 +59,16 @@ export type SessionSchedulerDeps = {
    */
   drain: (sessionId: string, messageId: string) => Promise<void>;
   /**
-   * Is this session's current turn BLOCKED awaiting a user decision (an
-   * unanswered supervised approval)? A blocked turn is NOT a completed turn:
-   * the drain stays paused until the user resolves it — like a hard error
-   * pauses it (RFC `queue` § drain-pause). Consulted at the drain fire-gate
-   * against the AUTHORITATIVE persisted approval state (restart-durable, unlike
-   * an in-memory flag). Required so a scheduler cannot silently forget the
-   * block and fire a queued turn before the user answers.
+   * Is this session's current turn BLOCKED awaiting a user decision — an
+   * unanswered supervised approval, OR a human-input tool (e.g. `question`)
+   * paused for the user's answer? A blocked turn is NOT a completed turn: the
+   * drain stays paused until the user resolves it — like a hard error pauses it
+   * (RFC `queue` § drain-pause). Consulted at the drain fire-gate against the
+   * AUTHORITATIVE persisted state (restart-durable, unlike an in-memory flag).
+   * Required so a scheduler cannot silently forget the block and fire a queued
+   * turn before the user answers.
    */
-  has_pending_approval: (sessionId: string) => Promise<boolean>;
+  has_pending_human_input: (sessionId: string) => Promise<boolean>;
   /** Inter-turn settle delay before a drained turn fires (ms). */
   drain_cooldown_ms?: number;
 };
@@ -177,15 +179,15 @@ export class SessionScheduler {
     this.setDrainTimer(sessionId, this.cooldown_ms, async () => {
       if (this.getStatus(sessionId).state !== "idle") return;
       // A turn BLOCKED awaiting a user decision (an unanswered supervised
-      // approval) is not ready for the next turn: pause the drain until the
-      // user resolves it (RFC `queue` § drain-pause — the same class as a hard
-      // error pausing the drain). The session reads `idle` through the pause —
-      // an approval-request finishes the run cleanly — so idle alone is NOT a
-      // sufficient drainability predicate. Checked against the authoritative
-      // persisted approval state. Fail closed: never drain over an unconfirmed
-      // block.
+      // approval, or a `question` paused for the user's answer) is not ready
+      // for the next turn: pause the drain until the user resolves it (RFC
+      // `queue` § drain-pause — the same class as a hard error pausing the
+      // drain). The session reads `idle` through the pause — the blocking
+      // request finishes the run cleanly — so idle alone is NOT a sufficient
+      // drainability predicate. Checked against the authoritative persisted
+      // state. Fail closed: never drain over an unconfirmed block.
       try {
-        if (await this.deps.has_pending_approval(sessionId)) return;
+        if (await this.deps.has_pending_human_input(sessionId)) return;
       } catch {
         return;
       }

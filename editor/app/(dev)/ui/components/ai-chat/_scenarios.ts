@@ -342,6 +342,140 @@ export const SCENARIOS: Scenario[] = [
     }),
   },
 
+  // --- Question (ask-user survey) ---
+  // The locked `question` tool's interactive card. At `input-available` the run
+  // is paused on the user, so the survey form renders; submit/skip in the demo
+  // calls `chat.addToolResult`, flipping the part to `output-available` (the
+  // read-only summary). Pure UI surface — no model call.
+  {
+    id: "question-single",
+    label: "Single choice",
+    group: "Question",
+    chunks: toolCall({
+      toolCallId: "q1",
+      toolName: "question",
+      state: "input-available",
+      input: {
+        questions: [
+          {
+            question: "Which color scheme should I use for the poster?",
+            header: "Color scheme",
+            options: [
+              {
+                label: "Warm",
+                description: "Reds, oranges, yellows — energetic.",
+              },
+              { label: "Cool", description: "Blues, greens, purples — calm." },
+              { label: "Monochrome", description: "One hue or black & white." },
+            ],
+          },
+        ],
+      },
+    }),
+  },
+  {
+    id: "question-multi",
+    label: "Multi-select",
+    group: "Question",
+    chunks: toolCall({
+      toolCallId: "q1",
+      toolName: "question",
+      state: "input-available",
+      input: {
+        questions: [
+          {
+            question: "Which sections should the landing page include?",
+            header: "Sections",
+            multi_select: true,
+            options: [
+              { label: "Hero" },
+              { label: "Features" },
+              { label: "Pricing" },
+              { label: "Testimonials" },
+              { label: "FAQ" },
+            ],
+          },
+        ],
+      },
+    }),
+  },
+  {
+    id: "question-freetext",
+    label: "Free text only",
+    group: "Question",
+    chunks: toolCall({
+      toolCallId: "q1",
+      toolName: "question",
+      state: "input-available",
+      input: { questions: [{ question: "What should the headline say?" }] },
+    }),
+  },
+  {
+    id: "question-survey",
+    label: "Survey (multiple questions)",
+    group: "Question",
+    chunks: toolCall({
+      toolCallId: "q1",
+      toolName: "question",
+      state: "input-available",
+      input: {
+        questions: [
+          {
+            question: "Which color scheme?",
+            header: "Color",
+            options: [
+              { label: "Warm" },
+              { label: "Cool" },
+              { label: "Monochrome" },
+            ],
+          },
+          {
+            question: "Which sections to include?",
+            header: "Sections",
+            multi_select: true,
+            options: [
+              { label: "Hero" },
+              { label: "Features" },
+              { label: "Pricing" },
+            ],
+          },
+          { question: "Any other requirements?" },
+        ],
+      },
+    }),
+  },
+  {
+    id: "question-answered",
+    label: "Answered (summary)",
+    group: "Question",
+    chunks: toolCall({
+      toolCallId: "q1",
+      toolName: "question",
+      state: "output-available",
+      input: {
+        questions: [
+          {
+            question: "Which color scheme?",
+            options: [{ label: "Warm" }, { label: "Cool" }],
+          },
+        ],
+      },
+      output: { answers: [["Cool"]] },
+    }),
+  },
+  {
+    id: "question-skipped",
+    label: "Skipped",
+    group: "Question",
+    chunks: toolCall({
+      toolCallId: "q1",
+      toolName: "question",
+      state: "output-available",
+      input: { questions: [{ question: "Which color scheme?" }] },
+      output: { answers: [], skipped: true },
+    }),
+  },
+
   // --- C. Grouping ---
   {
     id: "group-reads",

@@ -33,21 +33,21 @@ execution. The divergence is recorded here, not endorsed — a future
 RFC item should reconcile (see [Adding a new fundamental
 tool](#adding-a-new-fundamental-tool)).
 
-| RFC id        | Grida id                   | Notes                                                                      |
-| ------------- | -------------------------- | -------------------------------------------------------------------------- |
-| `read`        | `read_file`                | Same shape; Grida's name is more specific.                                 |
-| `write`       | `write_file`               | Same shape; Grida adds an optional `version` for stale-check.              |
-| `edit`        | `edit_file`                | Same shape; Grida adds a strict ambiguity rule on multi-match.             |
-| `glob`        | `list_files`               | Today a flat enumerate; promote to glob-shape when needed.                 |
-| `grep`        | `grep_files`               | Same shape; literal substring search (regex is not shipped).               |
-| `bash`        | `run_command`              | Honest name — Grida's host does not always launch a shell.                 |
-| `todo`        | `todo_write`               | Same shape; replace-all semantics.                                         |
-| `task`        | _not yet shipped_          | Subagent spawn surfaced behind editor flows; expose as `task` once stable. |
-| `question`    | _not yet shipped_          | Host-blocking prompt; not yet exposed to agents.                           |
-| `web_search`  | _not yet shipped_          | Host-bound provider; out of scope for the first cut.                       |
-| `web_fetch`   | _not yet shipped_          | As above.                                                                  |
-| `skill`       | _not yet shipped_          | Discovery layer pending.                                                   |
-| `tool_search` | `tool_search` _(proposed)_ | Two-level (literal + semantic) proposed below; not yet implemented.        |
+| RFC id        | Grida id                   | Notes                                                                                                                                                           |
+| ------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read`        | `read_file`                | Same shape; Grida's name is more specific.                                                                                                                      |
+| `write`       | `write_file`               | Same shape; Grida adds an optional `version` for stale-check.                                                                                                   |
+| `edit`        | `edit_file`                | Same shape; Grida adds a strict ambiguity rule on multi-match.                                                                                                  |
+| `glob`        | `list_files`               | Today a flat enumerate; promote to glob-shape when needed.                                                                                                      |
+| `grep`        | `grep_files`               | Same shape; literal substring search (regex is not shipped).                                                                                                    |
+| `bash`        | `run_command`              | Honest name — Grida's host does not always launch a shell.                                                                                                      |
+| `todo`        | `todo_write`               | Same shape; replace-all semantics.                                                                                                                              |
+| `task`        | _not yet shipped_          | Subagent spawn surfaced behind editor flows; expose as `task` once stable.                                                                                      |
+| `question`    | `question`                 | Shipped. Pauses the run on a human (client-resolved survey card); interactive hosts (desktop, `serve` daemon) answer it, headless hosts return a fixed refusal. |
+| `web_search`  | _not yet shipped_          | Host-bound provider; out of scope for the first cut.                                                                                                            |
+| `web_fetch`   | _not yet shipped_          | As above.                                                                                                                                                       |
+| `skill`       | _not yet shipped_          | Discovery layer pending.                                                                                                                                        |
+| `tool_search` | `tool_search` _(proposed)_ | Two-level (literal + semantic) proposed below; not yet implemented.                                                                                             |
 
 ## Backends
 

@@ -225,12 +225,13 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     expect(body.code).toBe("run_in_flight");
   });
 
-  it("POST /agent/run is refused 409 approval-pending while a supervised approval is unanswered (RFC `permission modes`)", async () => {
+  it("POST /agent/run is refused 409 human-input-pending while a supervised approval is unanswered (RFC `permission modes`)", async () => {
     // A session whose last assistant turn left an unanswered approval-requested
     // tool part — the exact state the scheduler's drain refuses to run over
-    // (`session-scheduler.ts` `has_pending_approval`). The HTTP path must refuse
+    // (`session-scheduler.ts` `has_pending_human_input`). The HTTP path must refuse
     // too, or `buildModelMessages` drops the unanswered part and the next message
-    // runs ahead of the blocked command (orphaning the approval).
+    // runs ahead of the blocked command (orphaning the approval). The 409 code is
+    // generalized: the same guard now covers an unanswered `question`.
     const created = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });
     const asst = await sessionsStore.appendMessage(created.id, {
       role: "assistant",
@@ -258,7 +259,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     });
     expect(blocked.status).toBe(409);
     expect(((await blocked.json()) as { code?: string }).code).toBe(
-      "approval-pending"
+      "human-input-pending"
     );
     // No turn started; the typed-ahead follow-up was NOT persisted; the approval
     // is still pending and actionable (not orphaned).
@@ -298,6 +299,56 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       );
       expect(hasHi).toBe(true);
     });
+  });
+
+  it("RESUMES a paused `question` when the answer rides the assistant tail (clears the block BEFORE the 409 guard)", async () => {
+    // Regression for the live-daemon resume 409: unlike an approval (a body
+    // field applied before the guard), a `question` answer is a terminal tool
+    // result in the assistant tail. `fillIncomingToolResults` must clear the
+    // human-input block BEFORE `hasPendingHumanInput`, or the very POST carrying
+    // the answer is refused by the guard it resolves.
+    const created = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });
+    const asst = await sessionsStore.appendMessage(created.id, {
+      role: "assistant",
+    });
+    await sessionsStore.upsertPart(asst.id, {
+      index: 0,
+      type: "tool-question",
+      data: {
+        type: "tool-question",
+        state: "input-available",
+        input: { questions: [{ question: "Which color?" }] },
+      },
+      tool_call_id: "q1",
+      tool_state: "input-available",
+    });
+    expect(await sessionsStore.hasPendingHumanInput(created.id)).toBe(true);
+
+    // The resume carries the answer as an output-available tool part in the tail.
+    const resumed = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        session_id: created.id,
+        messages: [
+          {
+            id: asst.id,
+            role: "assistant",
+            parts: [
+              {
+                type: "tool-question",
+                toolCallId: "q1",
+                state: "output-available",
+                input: { questions: [{ question: "Which color?" }] },
+                output: { answers: [["Cool"]] },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(resumed.status).toBe(200); // NOT 409 — the answer cleared the block
+    await resumed.text();
+    expect(await sessionsStore.hasPendingHumanInput(created.id)).toBe(false);
   });
 
   it("the CORE drains a queue on a clean idle edge — serial, FIFO, no client re-send (RFC `queue`)", async () => {

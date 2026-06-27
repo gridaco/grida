@@ -56,7 +56,10 @@ import {
   CompactingIndicator,
   ForkedNotice,
   PendingTurnIndicator,
+  QuestionCard,
+  findPendingQuestion,
   type ChatMessageActions,
+  type AnswerQuestionHandler,
 } from "@/kits/agent-chat";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
 import {
@@ -420,6 +423,20 @@ export function AISidebarChat({
     [onCompact, onForkCommand]
   );
 
+  // Commit a `question` (ask-user) answer: the human's answer becomes the tool
+  // result and `sendAutomaticallyWhen` resumes the paused run. Reads `chatRef`
+  // (not `chat`) so it stays stable across the per-session Chat rebuild.
+  const onAnswerQuestion = useCallback<AnswerQuestionHandler>(
+    (toolCallId, output) => {
+      void chatRef.current?.addToolResult({
+        tool: "question",
+        toolCallId,
+        output,
+      });
+    },
+    []
+  );
+
   // Settled history renders independently of the streaming row, so
   // per-chunk updates that touch only `state.streaming` don't
   // re-render these.
@@ -434,6 +451,15 @@ export function AISidebarChat({
         />
       )),
     [messages, isStreaming, messageActions]
+  );
+
+  // The agent ASKS: a pending `question` is a session-global prompt pinned above
+  // the composer (the same model as the supervised-approval bar), not a card in
+  // the transcript. One open question per session. Memoized on `messages` like
+  // the approval bar's `findPendingApproval` — it only changes when they do.
+  const pendingQuestion = useMemo(
+    () => findPendingQuestion(messages),
+    [messages]
   );
 
   const isEmpty = messages.length === 0;
@@ -494,6 +520,17 @@ export function AISidebarChat({
       <QueuedMessages queued={queued} onCancel={cancelQueued} />
 
       <ModelToolCallNotice model_id={modelId} endpoints={endpoints} />
+
+      {/* The agent is asking — session-global prompt above the composer. */}
+      {pendingQuestion && (
+        <div className="shrink-0 border-t p-3">
+          <QuestionCard
+            entry={pendingQuestion}
+            onAnswer={onAnswerQuestion}
+            disabled={busy}
+          />
+        </div>
+      )}
 
       <div className="shrink-0 border-t p-3">
         <AgentComposerInput

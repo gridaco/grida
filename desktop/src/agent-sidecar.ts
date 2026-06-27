@@ -102,6 +102,9 @@ async function main() {
     // srt actually confines this process tree. On platforms srt can't wrap
     // (Windows), this is false and the agent gets fs/todos/skills but no shell.
     sandbox_enforced: sandboxEnforced,
+    // A human is at the keyboard — the locked `question` tool pauses for their
+    // answer (RFC `tools` §question) instead of returning the headless refusal.
+    interactive: true,
   });
 
   try {

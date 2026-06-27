@@ -169,6 +169,17 @@ export default function AiChatDemoPage() {
               onFork: (id) => console.log("[demo] fork", id),
               disabled: isStreaming,
             }}
+            onAnswerQuestion={(toolCallId, output) => {
+              // Commit the answer into the mock Chat — the `question` part flips
+              // to `output-available` and the card swaps to its read-only
+              // summary. No model call (no sendAutomaticallyWhen on this Chat).
+              console.log("[demo] question answer", toolCallId, output);
+              void chat.addToolResult({
+                tool: "question",
+                toolCallId,
+                output,
+              });
+            }}
           />
         </ComponentDemo>
       </div>

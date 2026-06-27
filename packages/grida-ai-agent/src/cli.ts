@@ -153,7 +153,9 @@ async function serveCommand(args: string[]): Promise<void> {
       config.user_data_path
     );
   }
-  const host = await createHost(config, flags);
+  // A `serve` daemon is the host the desktop-from-web bridge drives — a human
+  // is present, so the `question` tool pauses for their answer (interactive).
+  const host = await createHost(config, flags, true);
   await host.start();
   process.stdout.write(`PORT=${host.port}\n`);
   process.stderr.write(
@@ -419,7 +421,13 @@ export function parseRunArgs(args: string[]): {
 
 async function createHost(
   config: CliConfig,
-  flags?: Pick<ServeFlags, "allow_origins" | "allow_referer_paths">
+  flags?: Pick<ServeFlags, "allow_origins" | "allow_referer_paths">,
+  // Whether this host serves a human UI (RFC `tools` §question). A long-lived
+  // `serve` daemon is driven by a human client (the desktop-from-web bridge),
+  // so the locked `question` tool pauses for their answer. The throwaway
+  // embedded host behind a one-shot `run` has no client UI → stays headless and
+  // the tool returns the fixed refusal.
+  interactive = false
 ): Promise<AgentHost> {
   const { AgentHost } = await import("./server");
   return new AgentHost({
@@ -439,6 +447,10 @@ async function createHost(
     // deliberately opts into the shell rather than fail-closed. The desktop
     // host, by contrast, only enables shell when srt actually wraps it.
     allow_unsandboxed_shell: true,
+    // The locked `question` tool pauses for a human only when this host serves
+    // a UI (the `serve` daemon driven by the desktop-from-web bridge). A
+    // throwaway embedded host (one-shot `run`) is headless → fixed refusal.
+    interactive,
   });
 }
 
