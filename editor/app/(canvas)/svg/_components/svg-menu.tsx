@@ -127,18 +127,24 @@ export function SvgMenuContent({
           Examples
         </DropdownMenuSubTrigger>
         <DropdownMenuSubContent className="min-w-40">
-          <Link href="/svg/examples/default">
-            <DropdownMenuItem className="text-xs">
+          <DropdownMenuItem className="text-xs" asChild>
+            <Link href="/svg/examples/default">
               <OpenInNewWindowIcon className="size-3.5" />
               Free-form
-            </DropdownMenuItem>
-          </Link>
-          <Link href="/svg/examples/slides">
-            <DropdownMenuItem className="text-xs">
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem className="text-xs" asChild>
+            <Link href="/svg/examples/slides">
               <OpenInNewWindowIcon className="size-3.5" />
               Slides
-            </DropdownMenuItem>
-          </Link>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem className="text-xs" asChild>
+            <Link href="/svg/examples/board">
+              <OpenInNewWindowIcon className="size-3.5" />
+              Board
+            </Link>
+          </DropdownMenuItem>
         </DropdownMenuSubContent>
       </DropdownMenuSub>
       <DropdownMenuSeparator />

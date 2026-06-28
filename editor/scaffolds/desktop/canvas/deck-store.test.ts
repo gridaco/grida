@@ -47,17 +47,17 @@ class FakeWorkspace implements WorkspaceDeckClient {
     this.files.delete(relPath);
   }
   manifest(): dotcanvas.Manifest {
-    return JSON.parse(this.files.get("canvas.json") ?? "{}");
+    return JSON.parse(this.files.get(".canvas.json") ?? "{}");
   }
 }
 
 describe("workspaceBundleFs — bridge → dotcanvas port", () => {
   it("addresses files with bare paths (no leading-slash translation)", async () => {
     const ws = new FakeWorkspace();
-    await dotcanvas.write(workspaceBundleFs("w", ws), { type: "svg-slides" });
-    expect(ws.files.has("canvas.json")).toBe(true);
+    await dotcanvas.write(workspaceBundleFs("w", ws), { editor: "slides" });
+    expect(ws.files.has(".canvas.json")).toBe(true);
     const c = await dotcanvas.read(workspaceBundleFs("w", ws));
-    expect(c.type).toBe("svg-slides");
+    expect(c.editor).toBe("slides");
   });
 
   it("read returns null for an absent file (→ implicit mode)", async () => {
@@ -71,15 +71,15 @@ describe("workspaceBundleFs — bridge → dotcanvas port", () => {
     const ws = new FakeWorkspace({ "decks/d.canvas/001.svg": "<svg/>" });
     const fs = workspaceBundleFs("w", ws, "decks/d.canvas");
     expect(await fs.list()).toEqual(["001.svg"]); // stripped to bundle-relative
-    await fs.write("canvas.json", "{}");
-    expect(ws.files.has("decks/d.canvas/canvas.json")).toBe(true); // prefixed
+    await fs.write(".canvas.json", "{}");
+    expect(ws.files.has("decks/d.canvas/.canvas.json")).toBe(true); // prefixed
     expect(await fs.read("001.svg")).toBe("<svg/>");
   });
 
   it("list() walks subdirectories so a nested src resolves (not missing_src)", async () => {
     const ws = new FakeWorkspace({
-      "canvas.json": JSON.stringify({
-        type: "svg-slides",
+      ".canvas.json": JSON.stringify({
+        editor: "slides",
         documents: [{ src: "slides/001.svg" }],
       }),
       "slides/001.svg": "<svg/>",
@@ -95,8 +95,8 @@ describe("workspaceBundleFs — bridge → dotcanvas port", () => {
 describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () => {
   it("load reflects manifest order", async () => {
     const ws = new FakeWorkspace({
-      "canvas.json": JSON.stringify({
-        type: "svg-slides",
+      ".canvas.json": JSON.stringify({
+        editor: "slides",
         documents: [
           { src: "b.svg", id: "b" },
           { src: "a.svg", id: "a" },
@@ -110,9 +110,9 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
     expect(deck.getSlides().map((s) => s.src)).toEqual(["b.svg", "a.svg"]);
   });
 
-  it("addSlide writes the SVG file and appends it to canvas.json (via dotcanvas.add)", async () => {
+  it("addSlide writes the SVG file and appends it to .canvas.json (via dotcanvas.add)", async () => {
     const ws = new FakeWorkspace({
-      "canvas.json": JSON.stringify({ type: "svg-slides", documents: [] }),
+      ".canvas.json": JSON.stringify({ editor: "slides", documents: [] }),
     });
     const deck = new CanvasDeck("w", ws);
     await deck.load();
@@ -123,10 +123,10 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
     expect(ws.manifest().documents?.map((d) => d.src)).toEqual([`${id}.svg`]);
   });
 
-  it("reorder permutes the slides view and canvas.json", async () => {
+  it("reorder permutes the slides view and .canvas.json", async () => {
     const ws = new FakeWorkspace({
-      "canvas.json": JSON.stringify({
-        type: "svg-slides",
+      ".canvas.json": JSON.stringify({
+        editor: "slides",
         documents: [
           { src: "a.svg", id: "a" },
           { src: "b.svg", id: "b" },
@@ -146,10 +146,10 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
     ]);
   });
 
-  it("removeSlide trashes the file and drops it from canvas.json", async () => {
+  it("removeSlide trashes the file and drops it from .canvas.json", async () => {
     const ws = new FakeWorkspace({
-      "canvas.json": JSON.stringify({
-        type: "svg-slides",
+      ".canvas.json": JSON.stringify({
+        editor: "slides",
         documents: [
           { src: "a.svg", id: "a" },
           { src: "b.svg", id: "b" },
@@ -169,8 +169,8 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
 
   it("preserves a web-authored per-slide name through reorder", async () => {
     const ws = new FakeWorkspace({
-      "canvas.json": JSON.stringify({
-        type: "svg-slides",
+      ".canvas.json": JSON.stringify({
+        editor: "slides",
         documents: [
           { src: "a.svg", id: "a", name: "Intro" },
           { src: "b.svg", id: "b" },
@@ -190,8 +190,8 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
 
   it("reconciles against disk on load: drops missing slides, appends disk-only ones", async () => {
     const ws = new FakeWorkspace({
-      "canvas.json": JSON.stringify({
-        type: "svg-slides",
+      ".canvas.json": JSON.stringify({
+        editor: "slides",
         documents: [
           { src: "a.svg", id: "a", name: "Intro" },
           { src: "missing.svg", id: "gone" }, // declared but absent on disk
@@ -221,8 +221,8 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
 
   it("operates on a `.canvas` nested at basePath, not the workspace root", async () => {
     const ws = new FakeWorkspace({
-      "decks/intro.canvas/canvas.json": JSON.stringify({
-        type: "svg-slides",
+      "decks/intro.canvas/.canvas.json": JSON.stringify({
+        editor: "slides",
         documents: [{ src: "001.svg", id: "a" }],
       }),
       "decks/intro.canvas/001.svg": "<svg/>",
@@ -237,9 +237,9 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
     // The new slide file lands under the bundle dir, not the workspace root.
     expect(ws.files.has(`decks/intro.canvas/${id}.svg`)).toBe(true);
     expect(ws.files.has(`${id}.svg`)).toBe(false);
-    // canvas.json under the bundle dir; its `src` stays bundle-relative (portable).
+    // .canvas.json under the bundle dir; its `src` stays bundle-relative (portable).
     const manifest = JSON.parse(
-      ws.files.get("decks/intro.canvas/canvas.json")!
+      ws.files.get("decks/intro.canvas/.canvas.json")!
     ) as dotcanvas.Manifest;
     expect(manifest.documents?.map((d) => d.src)).toEqual([
       "001.svg",

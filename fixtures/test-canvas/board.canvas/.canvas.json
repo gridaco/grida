@@ -1,0 +1,28 @@
+{
+  "$schema": "https://grida.co/schema/dotcanvas/v1.json",
+  "documents": [
+    {
+      "id": "notes",
+      "layout": { "h": 180, "w": 280, "x": 40, "y": 40, "z": 0 },
+      "src": "001.svg"
+    },
+    {
+      "id": "tasks",
+      "layout": { "h": 220, "w": 240, "x": 360, "y": 40, "z": 0 },
+      "src": "002.svg"
+    },
+    {
+      "id": "palette",
+      "layout": { "h": 160, "w": 220, "x": 140, "y": 200, "z": 1 },
+      "src": "003.svg"
+    },
+    {
+      "id": "metric",
+      "layout": { "h": 140, "w": 280, "x": 420, "y": 300, "z": 2 },
+      "src": "004.svg"
+    }
+  ],
+  "files": ["*.svg"],
+  "editor": "board",
+  "version": "1"
+}

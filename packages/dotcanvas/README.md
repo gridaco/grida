@@ -1,15 +1,16 @@
 # `dotcanvas`
 
-> **v0.1.x — published, still pre-1.0.** **ESM-only**, **zero runtime deps**. The
+> **v0.2.x — published, still pre-1.0.** **ESM-only**, **zero runtime deps**. The
 > surface is shaped by its consumers and may change in a minor until 1.0 — pin a
 > minor (`pnpm add dotcanvas`).
 
 Reader/writer for the **`.canvas`** format: a _portable directory_ holding one
-or more standalone documents (V1: SVG slides) plus a single `canvas.json`
+or more standalone documents (SVG by default) plus a single `.canvas.json`
 manifest. It is a _container_ format one layer above
 [`.grida`](https://github.com/gridaco/grida/tree/main/format) and SVG — a folder
 of documents with an order and an optional 2D placement.
 
+Reference page: [grida.co/dotcanvas](https://grida.co/dotcanvas) ·
 Spec: [`docs/wg/format/canvas.md`](https://github.com/gridaco/grida/blob/main/docs/wg/format/canvas.md).
 
 ## Install
@@ -29,8 +30,11 @@ load-bearing rule:
 > **The manifest is authoritative for _order_ and _placement_; disk is
 > authoritative for _existence_.**
 
-`canvas.json` + the files on disk are the source of truth. The resolved view
+`.canvas.json` + the files on disk are the source of truth. The resolved view
 this package returns is rebuilt on every `read` — never a cache.
+
+The marker file is **`.canvas.json`** — hidden and JSON-typed (so editor tooling
+and `$schema` still apply), distinct from JSONCanvas's `*.canvas`.
 
 ## Usage
 
@@ -42,7 +46,8 @@ import { dotcanvas } from "dotcanvas";
 const canvas = await dotcanvas.read(fs);
 
 canvas.mode; //=> "declared" | "implicit"
-canvas.type; //=> "svg-slides" | "unknown"
+canvas.editor; //=> "slides" | "board" | "unknown"  (the EDITOR axis)
+canvas.files; //=> document globs, e.g. ["*.svg"]  (the CONTENT axis)
 canvas.documents; //=> reconciled, ordered ResolvedDocument[]  (the slides view)
 canvas.thumbnail; //=> resolved path | null
 canvas.warnings; //=> non-fatal observations (it never throws on a bad bundle)
@@ -111,6 +116,18 @@ transforms round-trip but never interpret. A human **label/title** specifically
 is the document content's job — for an SVG slide, its `<title>` element — not a
 manifest field.
 
+### Editor vs. content (`editor` vs. `files`)
+
+Two orthogonal axes, deliberately not fused (so any editor holds any content kind):
+
+- **`editor`** — which editor opens the bundle (à la Figma's `editorType`):
+  `"slides"` (linear deck, order is primary) or `"board"` (freeform canvas,
+  `layout` is primary). `"unknown"` makes no assumption. It says how to
+  _read/present_ the documents, not what they are.
+- **`files`** — the _content_: the glob patterns whose matches are documents,
+  e.g. `["*.svg"]` (the default). This drives disk-derivation and tells a host
+  which editor to open (`*.svg` → an SVG editor). An explicit `[]` derives nothing.
+
 ### The two views from one list
 
 - **Slides view** = the _order_ of `documents` (a document with `skip: true` is
@@ -125,7 +142,7 @@ One list, two projections. A deck with no `layout` anywhere is still valid.
   it never rasterizes SVG or lays out a deck.
 - **Not a validator that rejects.** Failure is nature — it degrades and warns,
   never throws on a partial or malformed bundle.
-- **Not a private IR or cache.** `canvas.json` + the files are the truth;
+- **Not a private IR or cache.** `.canvas.json` + the files are the truth;
   `ResolvedCanvas` is rebuilt every read.
 - **Not a filesystem / not a watcher.** It operates over an injected port — no
   `node:fs`, no path traversal, no change subscription.
@@ -142,7 +159,7 @@ One list, two projections. A deck with no `layout` anywhere is still valid.
 | export                          | kind  | what                                                              |
 | ------------------------------- | ----- | ----------------------------------------------------------------- |
 | `read(fs)`                      | IO    | load a bundle → `ResolvedCanvas`                                  |
-| `write(fs, manifest)`           | IO    | serialize + persist `canvas.json`                                 |
+| `write(fs, manifest)`           | IO    | serialize + persist `.canvas.json`                                |
 | `resolve(m, entries)`           | pure  | reconcile a manifest against a listing → read view (the heart)    |
 | `heal(m, entries)`              | pure  | reconcile a manifest against a listing → **writable** manifest    |
 | `serialize(manifest)`           | pure  | stable JSON (sorted keys, trailing newline)                       |
@@ -151,7 +168,7 @@ One list, two projections. A deck with no `layout` anywhere is still valid.
 | `reorder(m, orderedKeys)`       | pure  | permute by identity; named first, unnamed keep order at the end   |
 | `setLayout(m, idOrSrc, layout)` | pure  | set placement; `null`/empty clears it; absent key → no-op         |
 | `setSkip(m, idOrSrc, skip)`     | pure  | skip in the slides view; `false` clears the field; absent → no-op |
-| `MANIFEST_FILENAME`             | const | `"canvas.json"`                                                   |
+| `MANIFEST_FILENAME`             | const | the marker filename — `".canvas.json"`                            |
 | `THUMBNAIL_NAMES`               | const | thumbnail filenames in precedence order                           |
 | _types_                         | —     | `Manifest`, `ResolvedCanvas`, `ReadableFs`, `WritableFs`, …       |
 

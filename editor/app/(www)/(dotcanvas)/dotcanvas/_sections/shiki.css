@@ -1,0 +1,25 @@
+/* Shiki output styling for the /dotcanvas spec page.
+ * The surrounding card provides the background, so Shiki's own bg is dropped;
+ * in dark mode each token swaps to its `--shiki-dark` variant. */
+
+.shiki {
+  background-color: transparent !important;
+  margin: 0;
+  white-space: pre;
+  font-family: var(
+    --font-geist-mono,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace
+  );
+}
+
+.shiki code {
+  display: block;
+}
+
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark) !important;
+}

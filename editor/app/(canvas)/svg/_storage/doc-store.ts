@@ -22,8 +22,9 @@ export type SvgDocStoreOptions = {
   commitDebounceMs?: number;
 };
 
-/** The `.canvas` type this demo writes. Each document is one SVG slide. */
-const CANVAS_TYPE: dotcanvas.CanvasType = "svg-slides";
+/** The `.canvas` editor this demo writes — a linear deck of SVG slides. The
+ *  SVG content kind is carried by the manifest's `files` (default `["*.svg"]`). */
+const EDITOR: dotcanvas.EditorType = "slides";
 
 /** App extension key under the manifest `ext` bag for demo view-state. */
 const APP_EXT_KEY = "co.grida.svg-demo";
@@ -56,15 +57,15 @@ function idFromPath(path: string): string | null {
 
 /**
  * Owns the multi-document state for one SVG demo route, persisted as a
- * portable `.canvas` bundle (a `canvas.json` manifest + `<id>.svg` files)
+ * portable `.canvas` bundle (a `.canvas.json` manifest + `<id>.svg` files)
  * via `dotcanvas`. Composes:
  *
- *  - **Bundle backend** — OPFS (or memory) holding `canvas.json` + every
+ *  - **Bundle backend** — OPFS (or memory) holding `.canvas.json` + every
  *    `/<id>.svg`. The manifest (order + per-doc `name`/`createdAt` + the
  *    active id in `ext`) is read with `dotcanvas.read` and rewritten with
  *    `dotcanvas.write` on every mutation.
  *  - **Agent `AgentFs`** — built over `ManifestHidingBackend(bundle)` so the
- *    AI copilot sees only the `/<id>.svg` documents, never `canvas.json`.
+ *    AI copilot sees only the `/<id>.svg` documents, never `.canvas.json`.
  *    Hot-swaps a `LiveBinding` to the active editor on `attachEditor` /
  *    `setActiveId`. This is the fs returned by `getFs()`.
  */
@@ -100,7 +101,7 @@ export class SvgDocStore {
   constructor(opts: SvgDocStoreOptions) {
     this.canvasBackend = pickBackend(opts.opfsBase);
     // The agent fs is built over a manifest-hiding view: the copilot sees the
-    // `/<id>.svg` documents but never `canvas.json` (read/written separately).
+    // `/<id>.svg` documents but never `.canvas.json` (read/written separately).
     this.fs = new AgentFs(new ManifestHidingBackend(this.canvasBackend));
     this.defaultSvg = opts.defaultSvg;
     this.commitDebounceMs = opts.commitDebounceMs ?? 250;
@@ -135,14 +136,14 @@ export class SvgDocStore {
 
     // Read the manifest. `dotcanvas.read` reconciles it against disk: it skips
     // documents whose file is missing, appends on-disk SVGs the manifest omits,
-    // and derives the list from disk entirely when `canvas.json` is absent.
+    // and derives the list from disk entirely when `.canvas.json` is absent.
     const resolved = await dotcanvas.read(bundleFs(this.canvasBackend));
     if (this.disposed) return;
 
     // Tracks whether any on-disk document was skipped because its bytes didn't
     // load (AgentFs.hydrate logs-and-continues on per-file read failures). When
     // true we must NOT rewrite the manifest below, or a transiently-unreadable
-    // slide would be pruned from `canvas.json` permanently.
+    // slide would be pruned from `.canvas.json` permanently.
     let skippedDocs = false;
     if (resolved.documents.length > 0) {
       const now = Date.now();
@@ -518,10 +519,10 @@ export class SvgDocStore {
     return id;
   }
 
-  /** Rebuild `canvas.json` from authoritative in-memory state. */
+  /** Rebuild `.canvas.json` from authoritative in-memory state. */
   private buildManifest(): dotcanvas.Manifest {
     return {
-      type: CANVAS_TYPE,
+      editor: EDITOR,
       documents: this.docs.map((d) => ({
         src: `${d.id}.svg`,
         id: d.id,

@@ -33,6 +33,7 @@ const GITHUB_URL =
 const RELATED: { href: string; label: string }[] = [
   { href: "/svg/examples/default", label: "Full editor" },
   { href: "/svg/examples/slides", label: "Slides example" },
+  { href: "/svg/examples/board", label: "Board example" },
   { href: "/packages/@grida/hud", label: "@grida/hud" },
 ];
 

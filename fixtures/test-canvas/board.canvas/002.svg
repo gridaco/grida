@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 220" width="240" height="220">
+  <rect width="240" height="220" rx="8" fill="#ffffff" stroke="#e5e7eb" />
+  <text x="20" y="40" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="700" fill="#111827">This sprint</text>
+  <rect x="20" y="62" width="16" height="16" rx="3" fill="#22c55e" />
+  <text x="46" y="75" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#9ca3af">Split the type axis</text>
+  <rect x="20" y="92" width="16" height="16" rx="3" fill="#ffffff" stroke="#d1d5db" />
+  <text x="46" y="105" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#111827">Add board fixture</text>
+  <rect x="20" y="122" width="16" height="16" rx="3" fill="#ffffff" stroke="#d1d5db" />
+  <text x="46" y="135" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#111827">Publish schema</text>
+  <rect x="20" y="152" width="16" height="16" rx="3" fill="#ffffff" stroke="#d1d5db" />
+  <text x="46" y="165" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#111827">Write the docs</text>
+</svg>

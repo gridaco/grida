@@ -24,10 +24,10 @@ class MemFs implements dotcanvas.WritableFs {
 }
 
 describe("read", () => {
-  it("read a fixture bundle (canvas.json + 001.svg/002.svg + thumbnail.png)", async () => {
+  it("read a fixture bundle (.canvas.json + 001.svg/002.svg + thumbnail.png)", async () => {
     const fs = new MemFs({
-      "canvas.json": JSON.stringify({
-        type: "svg-slides",
+      ".canvas.json": JSON.stringify({
+        editor: "slides",
         documents: [
           { src: "001.svg" },
           { src: "002.svg", layout: { x: 10, y: 20, w: 1920, h: 1080, z: 1 } },
@@ -40,7 +40,7 @@ describe("read", () => {
 
     const c = await read(fs);
     expect(c.mode).toBe("declared");
-    expect(c.type).toBe("svg-slides");
+    expect(c.editor).toBe("slides");
     expect(c.documents.map((d) => d.src)).toEqual(["001.svg", "002.svg"]);
     expect(c.documents.every((d) => d.origin === "manifest")).toBe(true);
     expect(c.documents[1].layout).toEqual({
@@ -54,28 +54,32 @@ describe("read", () => {
     expect(c.warnings).toEqual([]);
   });
 
-  it("missing canvas.json → implicit mode, no warning", async () => {
+  it("missing marker → implicit mode, no warning", async () => {
     const fs = new MemFs({ "001.svg": "<svg/>" });
     const c = await read(fs);
     expect(c.mode).toBe("implicit");
-    expect(c.type).toBe("unknown");
+    expect(c.editor).toBe("unknown");
     expect(c.documents.map((d) => [d.src, d.origin])).toEqual([
       ["001.svg", "disk"],
     ]);
     expect(c.warnings).toEqual([]);
   });
 
-  it("malformed canvas.json → implicit mode + manifest_malformed", async () => {
-    const fs = new MemFs({ "canvas.json": "{ not json", "001.svg": "<svg/>" });
+  it("malformed .canvas.json → implicit mode + manifest_malformed", async () => {
+    const fs = new MemFs({
+      ".canvas.json": "{ not json",
+      "001.svg": "<svg/>",
+    });
     const c = await read(fs);
     expect(c.mode).toBe("implicit");
     expect(c.warnings[0].code).toBe("manifest_malformed");
+    expect(c.warnings[0].path).toBe(".canvas.json");
     // Still degrades to a disk-derived deck.
     expect(c.documents.map((d) => d.src)).toEqual(["001.svg"]);
   });
 
-  it("canvas.json that is valid JSON but not an object → malformed", async () => {
-    const fs = new MemFs({ "canvas.json": "[1,2,3]" });
+  it(".canvas.json that is valid JSON but not an object → malformed", async () => {
+    const fs = new MemFs({ ".canvas.json": "[1,2,3]" });
     const c = await read(fs);
     expect(c.mode).toBe("implicit");
     expect(c.warnings[0].code).toBe("manifest_malformed");
@@ -85,14 +89,14 @@ describe("read", () => {
 describe("write", () => {
   it("write then read round-trips order + layout + ext", async () => {
     const manifest: dotcanvas.Manifest = {
-      type: "svg-slides",
+      editor: "slides",
       documents: [{ src: "b.svg", layout: { x: 1, y: 2 } }, { src: "a.svg" }],
       ext: { vendor: { k: 1 } },
     };
     const fs = new MemFs({ "a.svg": "x", "b.svg": "y" });
 
     await write(fs, manifest);
-    expect(fs.raw("canvas.json")?.endsWith("\n")).toBe(true);
+    expect(fs.raw(".canvas.json")?.endsWith("\n")).toBe(true);
 
     const c = await read(fs);
     expect(c.documents.map((d) => d.src)).toEqual(["b.svg", "a.svg"]);
@@ -105,11 +109,11 @@ describe("write", () => {
 
 describe("heal — self-heal through write/read", () => {
   it("write(fs, heal(parsed, entries)) is consistent with disk", async () => {
-    // canvas.json lists a missing slide and omits a real one; a vendor ext and
+    // .canvas.json lists a missing slide and omits a real one; a vendor ext and
     // an unknown top-level field must survive the heal.
     const fs = new MemFs({
-      "canvas.json": JSON.stringify({
-        type: "svg-slides",
+      ".canvas.json": JSON.stringify({
+        editor: "slides",
         foo: "keep",
         documents: [
           { src: "a.svg", id: "n_a", name: "Intro" },
@@ -125,7 +129,7 @@ describe("heal — self-heal through write/read", () => {
     await write(fs, heal(before.manifest, await fs.list()));
 
     const after = await read(fs);
-    // canvas.json now agrees with disk: missing dropped, disk-only appended.
+    // .canvas.json now agrees with disk: missing dropped, disk-only appended.
     expect(after.documents.map((d) => d.src)).toEqual(["a.svg", "b.svg"]);
     expect(after.warnings).toEqual([]); // no more missing_src
     // Per-document, top-level, and ext data all survived the round-trip.
@@ -140,7 +144,7 @@ describe("generic ext typing (R1)", () => {
     type MyExt = { vendor: { version: number } };
 
     const fs = new MemFs({
-      "canvas.json": JSON.stringify({
+      ".canvas.json": JSON.stringify({
         documents: [{ src: "a.svg" }],
         ext: { vendor: { version: 3 } },
       }),
