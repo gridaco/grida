@@ -45,7 +45,8 @@ describe("desktop bridge client contract", () => {
 
   it("uses producer-owned BYOK provider metadata for settings", () => {
     expect(secrets.byokProviderMetadata()).toBe(BYOK_PROVIDER_METADATA);
-    expect(secrets.byokProviders()).toEqual(["openrouter", "vercel"]);
+    // fal joined the BYOK set for image/video generation (#908).
+    expect(secrets.byokProviders()).toEqual(["openrouter", "vercel", "fal"]);
   });
 
   it("rejects empty keys before calling the bridge", async () => {

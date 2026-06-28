@@ -162,7 +162,7 @@ describe("FalVideoModel.doGenerate", () => {
 });
 
 describe("OpenRouterVideoModel.doGenerate", () => {
-  it("submits, polls, downloads the clip with auth, and returns base64", async () => {
+  it("submits, polls, downloads the unsigned clip WITHOUT the key, returns base64", async () => {
     const MP4 = new Uint8Array([0, 0, 0, 24]);
     let submit: Record<string, unknown> = {};
     let downloadAuth: string | undefined;
@@ -209,8 +209,8 @@ describe("OpenRouterVideoModel.doGenerate", () => {
       duration: 8,
     });
     expect(polls).toBe(2);
-    // downloaded with the key, returned as base64 bytes (not a remote url)
-    expect(downloadAuth).toBe("Bearer sk");
+    // GRIDA-SEC-004: unsigned (public) URL is fetched WITHOUT the key.
+    expect(downloadAuth).toBeUndefined();
     expect(result.videos).toEqual([
       {
         type: "base64",
@@ -218,6 +218,40 @@ describe("OpenRouterVideoModel.doGenerate", () => {
         mediaType: "video/mp4",
       },
     ]);
+  });
+
+  it("falls back to the authed /content endpoint WITH the key when no unsigned url", async () => {
+    let contentAuth: string | undefined;
+    let polls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: MockInit = {}) => {
+        if (url === "https://openrouter.ai/api/v1/videos")
+          return new Response(
+            JSON.stringify({
+              id: "job_1",
+              polling_url: "https://openrouter.ai/api/v1/videos/job_1",
+            }),
+            { status: 200 }
+          );
+        if (url.includes("/content")) {
+          contentAuth = init.headers?.authorization;
+          return new Response(new Uint8Array([1, 2]), {
+            status: 200,
+            headers: { "content-type": "video/mp4" },
+          });
+        }
+        polls++;
+        // completed, but NO unsigned_urls → must use the authed /content path
+        return new Response(JSON.stringify({ status: "completed" }), {
+          status: 200,
+        });
+      })
+    );
+    const model = new OpenRouterVideoModel("sk", "google/veo-3.1");
+    await model.doGenerate(callOptions());
+    expect(polls).toBe(1);
+    expect(contentAuth).toBe("Bearer sk");
   });
 
   it("throws when OpenRouter reports a failed job", async () => {

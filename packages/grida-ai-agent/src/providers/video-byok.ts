@@ -278,16 +278,19 @@ export class OpenRouterVideoModel implements VideoModelV3 {
       },
       abortSignal
     );
+    const unsignedUrl = poll.unsigned_urls?.[0];
     const url =
-      poll.unsigned_urls?.[0] ??
-      `${OPENROUTER_VIDEO_URL}/${submit.id}/content?index=0`;
+      unsignedUrl ?? `${OPENROUTER_VIDEO_URL}/${submit.id}/content?index=0`;
 
-    // Download in the sidecar (with the key) and return bytes — the URL is the
-    // authed OpenRouter content endpoint, which the renderer can neither auth
-    // nor reach under the desktop CSP. The route turns these bytes into a
-    // `data:` URL the <video> can play.
+    // Download in the sidecar and return bytes — the renderer can't reach the
+    // content endpoint under the desktop CSP; the route turns these bytes into
+    // a `data:` URL the <video> plays.
+    //
+    // GRIDA-SEC-004: `unsigned_urls` are pre-signed public CDN links — fetch
+    // them WITHOUT the key, or the BYOK secret leaks to a third-party CDN host.
+    // Only the authed `/content` fallback gets the Authorization header.
     const dl = await fetch(url, {
-      headers: { authorization: `Bearer ${this.apiKey}` },
+      headers: unsignedUrl ? {} : { authorization: `Bearer ${this.apiKey}` },
       signal: abortSignal,
     });
     if (!dl.ok) {
