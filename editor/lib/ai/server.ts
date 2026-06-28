@@ -35,9 +35,10 @@ import type {
   ImageModelMiddleware,
   ImageModel,
 } from "ai";
-import { wrapProvider } from "ai";
+import { embed, wrapProvider } from "ai";
 import Replicate from "replicate";
 import OpenAI from "openai";
+import aimodels from "@grida/ai-models";
 import { createLibraryClient } from "@/lib/supabase/server";
 import { requireOrganizationId } from "@/lib/auth/organization";
 import {
@@ -462,6 +463,113 @@ export const grida: GridaProvider = gridaFn;
  */
 export function model(tier: ModelTier) {
   return grida(catalog[tiers[tier]].id);
+}
+
+// ===========================================================================
+// Embeddings (Grida Library retrieval)
+// ===========================================================================
+//
+// The query side of the Library retrieval pipeline. The worker (document
+// side, sibling repo) embeds asset image + text with the SAME model/dim/
+// normalization recorded on the `@grida/ai-models` embedding card — that
+// card is the single source of the consistency invariant.
+
+const LIBRARY_EMBEDDING_MODEL_ID =
+  aimodels.embedding.LIBRARY_EMBEDDING_MODEL_ID;
+const LIBRARY_EMBEDDING_DIMENSIONS =
+  aimodels.embedding.LIBRARY_EMBEDDING_DIMENSIONS;
+
+/**
+ * Provider exposing text-embedding models, following the same BYOK
+ * precedence as the language path: local dev with `BYOK_OPENROUTER_API_KEY`
+ * → OpenRouter; prod → the attributed Vercel AI Gateway. Both serve the
+ * same model id, so callers never branch on provider.
+ */
+const embeddingProvider = byok ?? gateway;
+
+/**
+ * Reduce a (possibly native-3072) Matryoshka embedding to the configured
+ * dim and L2-normalize. Truncation = take the first N dims (valid for MRL
+ * models); re-normalize so cosine distance is well-defined and query and
+ * document vectors are comparable. Provider-agnostic — no dependence on a
+ * provider-specific `outputDimensionality` option.
+ */
+function toLibraryVector(embedding: number[]): number[] {
+  if (embedding.length < LIBRARY_EMBEDDING_DIMENSIONS) {
+    throw new Error(
+      `embedding dim ${embedding.length} < required ${LIBRARY_EMBEDDING_DIMENSIONS}`
+    );
+  }
+  const sliced = embedding.slice(0, LIBRARY_EMBEDDING_DIMENSIONS);
+  let sum = 0;
+  for (const x of sliced) sum += x * x;
+  const norm = Math.sqrt(sum);
+  if (norm === 0) return sliced;
+  return sliced.map((x) => x / norm);
+}
+
+function normalizeQuery(query: string): string {
+  return query.trim().toLowerCase();
+}
+
+// Process-local cache: library search queries are short and highly
+// repetitive, so even an in-process cache absorbs most calls. Bounded with
+// simple FIFO eviction so a long-lived server can't grow it without limit
+// (each entry is ~12KB). Prod should back this with a shared store (KV);
+// route-level rate-limiting is the route's job, not the seam's.
+const LIBRARY_QUERY_CACHE_MAX = 5000;
+const _libraryQueryEmbeddingCache = new Map<string, number[]>();
+
+/**
+ * PUBLIC / UNBILLED query embedding for the Library web search.
+ *
+ * GRIDA-SEC-003: a system/internal feature with NO org context — mirrors
+ * {@link methods.listOpenAiModels} (a non-billable passthrough kept in this
+ * file so the provider import stays contained). It does not pass through
+ * gate→ingest: there is no org to bill and the call is a fraction of a cent
+ * and cached. Cost/abuse is bounded by the query cache + a route-level rate
+ * limit (see the library search route).
+ */
+export async function embedLibraryQuery(query: string): Promise<number[]> {
+  const key = normalizeQuery(query);
+  const cached = _libraryQueryEmbeddingCache.get(key);
+  if (cached) return cached;
+  const { embedding } = await embed({
+    model: embeddingProvider.textEmbeddingModel(LIBRARY_EMBEDDING_MODEL_ID),
+    value: key,
+  });
+  const vec = toLibraryVector(embedding);
+  if (_libraryQueryEmbeddingCache.size >= LIBRARY_QUERY_CACHE_MAX) {
+    _libraryQueryEmbeddingCache.delete(
+      _libraryQueryEmbeddingCache.keys().next().value!
+    );
+  }
+  _libraryQueryEmbeddingCache.set(key, vec);
+  return vec;
+}
+
+/**
+ * AUTHENTICATED / BILLED query embedding for the future agent caller.
+ * Routes through the billing seam (gate → ingest) like every org-scoped
+ * call; pass a verified `organizationId`.
+ */
+export async function embedQueryBilled(
+  ctx: { organizationId: number; feature: string; transactionId?: string },
+  query: string
+): Promise<number[]> {
+  return withTransaction(
+    { ...ctx, model_id: LIBRARY_EMBEDDING_MODEL_ID },
+    async () => {
+      const { embedding, usage } = await embed({
+        model: embeddingProvider.textEmbeddingModel(LIBRARY_EMBEDDING_MODEL_ID),
+        value: normalizeQuery(query),
+      });
+      const card = aimodels.embedding.modelCardById(LIBRARY_EMBEDDING_MODEL_ID);
+      const usd =
+        ((usage?.tokens ?? 0) / 1_000_000) * (card?.pricing.input ?? 0);
+      return { result: toLibraryVector(embedding), costMills: ai.toMills(usd) };
+    }
+  );
 }
 
 // ===========================================================================

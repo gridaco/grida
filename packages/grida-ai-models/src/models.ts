@@ -1390,6 +1390,113 @@ export namespace models {
       },
     } as const;
   }
+
+  // ── models.embedding ──────────────────────────────────────────────
+
+  /**
+   * Embedding-model catalogue.
+   *
+   * Powers the Grida Library retrieval pipeline: a single multimodal
+   * model embeds both an asset's image (`__image` vector) and its text
+   * (`__text` vector), and the editor embeds the search query — all into
+   * one shared space so similarity (image↔image) and semantic search
+   * (text↔text, with a cross-modal floor) are comparable.
+   *
+   * This card is the SINGLE SOURCE OF THE CONSISTENCY INVARIANT: the
+   * worker (document side) and the editor (query side) MUST use the same
+   * `id`, `dimensions`, and normalization. Drift makes the stored vectors
+   * and query vectors incomparable and silently breaks retrieval.
+   *
+   * Provider routing is a runtime concern (prod = Vercel AI Gateway,
+   * local prep = OpenRouter via BYOK precedence); the `id` is identical
+   * across both, so the catalogue carries no provider binding.
+   */
+  export namespace embedding {
+    export type EmbeddingModelId = "google/gemini-embedding-2";
+
+    export type EmbeddingModelCategory = "embedding/multimodal";
+
+    /**
+     * Per-input-token pricing (USD per 1M tokens). Embeddings are
+     * input-only — there is no output charge.
+     */
+    export type PerTokenInputPricing = {
+      type: "per_token_input";
+      input: number;
+    };
+
+    export type EmbeddingModelCard = {
+      id: EmbeddingModelId;
+      label: string;
+      deprecated: boolean;
+      short_description: string;
+      vendor: Vendor;
+      category: EmbeddingModelCategory;
+      /**
+       * Configured output dimensionality for the Grida pipeline. MUST equal
+       * the DB `vector(N)` column dim and the worker's configured dim.
+       * Gemini Embedding 2 is natively 3072 and Matryoshka-truncatable to
+       * 1536 / 768; the library pipeline uses 1536 (largest dim indexable
+       * under pgvector's HNSW 2000-dim cap).
+       */
+      dimensions: number;
+      /**
+       * Whether output vectors are unit-normalized (cosine-ready). The
+       * pipeline L2-normalizes after MRL truncation regardless; this
+       * records the contract both sides rely on.
+       */
+      normalized: boolean;
+      /** Accepts image AND text inputs into one shared space. */
+      multimodal: boolean;
+      pricing: PerTokenInputPricing;
+      /**
+       * Coarse per-call budget estimate in USD (rate-limiter only, not
+       * displayed). A search query is a handful of tokens, so this is
+       * negligible.
+       */
+      avg_cost_usd: number;
+      /** Public model page. */
+      url: string;
+    };
+
+    export const models: Record<EmbeddingModelId, EmbeddingModelCard> = {
+      "google/gemini-embedding-2": {
+        id: "google/gemini-embedding-2",
+        label: "Gemini Embedding 2",
+        deprecated: false,
+        short_description:
+          "Natively multimodal embedding (text + image into one space); 3072-d, MRL-truncatable.",
+        vendor: "google",
+        category: "embedding/multimodal",
+        dimensions: 1536,
+        normalized: true,
+        multimodal: true,
+        // VERIFY before prod: models.dev lists no per-1M price for
+        // gemini-embedding-2 yet; using the gemini-embedding-001 family
+        // input rate ($0.15 / 1M) as a conservative stand-in.
+        pricing: { type: "per_token_input", input: 0.15 },
+        avg_cost_usd: 0.00002,
+        url: "https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2-preview",
+      },
+    } as const;
+
+    export const embedding_model_ids = Object.keys(
+      models
+    ) as EmbeddingModelId[];
+
+    export function modelCardById(id: string): EmbeddingModelCard | undefined {
+      return (models as Record<string, EmbeddingModelCard>)[id];
+    }
+
+    /**
+     * Canonical model id + dim used by BOTH the editor query embedder and
+     * the worker. Import these rather than hard-coding to keep the two
+     * sides in lock-step.
+     */
+    export const LIBRARY_EMBEDDING_MODEL_ID: EmbeddingModelId =
+      "google/gemini-embedding-2";
+    export const LIBRARY_EMBEDDING_DIMENSIONS = 1536;
+  }
 }
 
 export default models;
