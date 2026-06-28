@@ -314,12 +314,13 @@ export function resolve<TExt = Record<string, unknown>>(
   const mode: ResolvedCanvas["mode"] = manifest ? "declared" : "implicit";
   const editor = resolveEditor(manifest?.editor, warnings);
 
-  // A root-level thumbnail is the bundle COVER, not a slide. Exclude the
-  // convention names (and an explicit `thumbnail` target) from the SVGs that get
-  // derived/appended as documents — otherwise a `thumbnail.svg` would surface as
-  // both the cover and a phantom slide. A manifest that lists the file as a
-  // `src` is still honored (the author meant it); only the disk-side
-  // derive/append is filtered.
+  // Reserved root files are NEVER disk-derived documents: the bundle thumbnail
+  // (the COVER, not a slide) and the `.canvas.json` marker (the godfile).
+  // Without this, a `thumbnail.svg` would surface as both cover and phantom
+  // slide, and a broad `files` glob (`["*"]`, `["*.json"]`) would surface the
+  // manifest itself as a document — which `heal()` would then persist. A
+  // manifest that lists such a file as an explicit `src` is still honored (the
+  // author meant it); only the disk-side derive/append is filtered.
   const explicitThumb =
     typeof manifest?.thumbnail === "string" && manifest.thumbnail
       ? norm(manifest.thumbnail)
@@ -330,7 +331,9 @@ export function resolve<TExt = Record<string, unknown>>(
       (THUMBNAIL_NAMES as readonly string[]).includes(n) || n === explicitThumb
     );
   };
-  const derivable = diskRootDocs.filter((name) => !isReservedThumbnail(name));
+  const derivable = diskRootDocs.filter(
+    (name) => name !== MANIFEST_FILENAME && !isReservedThumbnail(name)
+  );
 
   const documents = resolveDocuments(
     manifest?.documents,

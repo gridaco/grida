@@ -269,6 +269,28 @@ describe("resolve — files (content axis)", () => {
     expect(healed.files).toEqual(["*.svg"]);
     expect(JSON.parse(serialize(healed)).files).toEqual(["*.svg"]);
   });
+
+  it("a broad files glob never derives the `.canvas.json` marker (resolve + heal)", () => {
+    // `["*.json"]` matches the marker itself; the godfile is reserved and must
+    // never surface as a document — nor be persisted by heal().
+    const entries = [".canvas.json", "data.json"];
+    expect(
+      resolve({ files: ["*.json"] }, entries).documents.map((d) => d.src)
+    ).toEqual(["data.json"]);
+    expect(
+      heal({ files: ["*.json"] }, entries).documents?.map((d) => d.src)
+    ).toEqual(["data.json"]);
+  });
+
+  it('`files: ["*"]` still excludes the marker and the reserved thumbnail', () => {
+    const c = resolve({ files: ["*"] }, [
+      ".canvas.json",
+      "thumbnail.png",
+      "a.svg",
+    ]);
+    expect(c.documents.map((d) => d.src)).toEqual(["a.svg"]);
+    expect(c.thumbnail).toBe("thumbnail.png");
+  });
 });
 
 describe("serialize — stable, lossless (RFD §8)", () => {
