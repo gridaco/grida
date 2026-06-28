@@ -14,11 +14,14 @@ import {
   CardTitle,
 } from "@app/ui/components/card";
 import { Skeleton } from "@app/ui/components/skeleton";
+import { models } from "@grida/ai-models";
 import {
   BYOK_PROVIDER_LABELS,
   DesktopBridgeMissingError,
   OLLAMA_ENDPOINT_PRESET,
   app,
+  images,
+  video,
   mergeProbedModels,
   providers,
   resolveEndpointModel,
@@ -27,6 +30,7 @@ import {
   type EndpointModelEntry,
   type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
+import Link from "next/link";
 import {
   DesktopPageContent,
   DesktopPageShell,
@@ -59,6 +63,8 @@ export default function DesktopSettingsPage() {
         </header>
 
         <ByokSection />
+        <ImageModelsSection />
+        <VideoModelsSection />
         <LocalModelsSection />
         <AboutSection />
       </DesktopPageContent>
@@ -282,6 +288,147 @@ function StatusPill({ kind }: { kind: "loading" | "empty" | "configured" }) {
       />
       Not configured
     </span>
+  );
+}
+
+/* ───────────────────────────── Models ───────────────────────────── */
+
+/** Image providers, by precedence — one connected key serves the whole list. */
+const IMAGE_PROVIDER_IDS: ByokProviderId[] = ["openrouter", "vercel", "fal"];
+
+/**
+ * Image-generation models (#908). Shows the curated, provider-agnostic list and
+ * a readiness line. Provider is hidden by design — connecting any one image
+ * provider key (above) unlocks every model here. The agent host resolves the
+ * provider per request; the renderer never sees the key (GRIDA-SEC-004).
+ */
+function ImageModelsSection() {
+  const [ready, setReady] = useState<boolean | null>(null);
+  const supported = images.isSupported();
+  const listed = models.image.listed_models();
+
+  useEffect(() => {
+    if (!supported) return;
+    let live = true;
+    (async () => {
+      const present = await Promise.all(
+        IMAGE_PROVIDER_IDS.map((id) => secrets.hasKey(id).catch(() => false))
+      );
+      if (live) setReady(present.some(Boolean));
+    })();
+    return () => {
+      live = false;
+    };
+  }, [supported]);
+
+  if (!supported) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Image models</CardTitle>
+        <CardDescription>
+          {ready === null
+            ? "Checking your connected providers…"
+            : ready
+              ? "Ready — you can generate images with any model below."
+              : "Connect one provider key above (OpenRouter, Vercel, or fal) to use these."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {listed.map((card) => (
+          <div
+            key={card.id}
+            className="flex items-center justify-between gap-4 text-sm"
+          >
+            <div className="flex min-w-0 flex-col">
+              <span className="font-medium">{card.label}</span>
+              <span className="truncate text-xs text-muted-foreground">
+                {card.short_description}
+              </span>
+            </div>
+            {ready && (
+              <Button asChild variant="outline" size="sm" className="shrink-0">
+                <Link
+                  href={`/desktop/images?model=${encodeURIComponent(card.id)}`}
+                >
+                  Try this model
+                </Link>
+              </Button>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Video providers, by precedence. OpenRouter serves Veo + Seedance; Vercel
+ *  serves every listed model; fal serves a subset (image-to-video). */
+const VIDEO_PROVIDER_IDS: ByokProviderId[] = ["openrouter", "vercel", "fal"];
+
+/**
+ * Video-generation models (#908). Same provider-hidden treatment as image —
+ * connecting a provider key above (Vercel covers every model) unlocks the list.
+ */
+function VideoModelsSection() {
+  const [ready, setReady] = useState<boolean | null>(null);
+  const supported = video.isSupported();
+  const listed = models.video.listed_models();
+
+  useEffect(() => {
+    if (!supported) return;
+    let live = true;
+    (async () => {
+      const present = await Promise.all(
+        VIDEO_PROVIDER_IDS.map((id) => secrets.hasKey(id).catch(() => false))
+      );
+      if (live) setReady(present.some(Boolean));
+    })();
+    return () => {
+      live = false;
+    };
+  }, [supported]);
+
+  if (!supported) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Video models</CardTitle>
+        <CardDescription>
+          {ready === null
+            ? "Checking your connected providers…"
+            : ready
+              ? "Ready — you can generate video with the models below."
+              : "Connect an OpenRouter, Vercel, or fal key above to use these."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {listed.map((card) => (
+          <div
+            key={card.id}
+            className="flex items-center justify-between gap-4 text-sm"
+          >
+            <div className="flex min-w-0 flex-col">
+              <span className="font-medium">{card.label}</span>
+              <span className="truncate text-xs text-muted-foreground">
+                {card.short_description}
+              </span>
+            </div>
+            {ready && (
+              <Button asChild variant="outline" size="sm" className="shrink-0">
+                <Link
+                  href={`/desktop/video?model=${encodeURIComponent(card.id)}`}
+                >
+                  Try this model
+                </Link>
+              </Button>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 

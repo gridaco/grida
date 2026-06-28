@@ -5,11 +5,25 @@
 export {
   BYOK_PROVIDER_METADATA,
   BYOK_PROVIDER_IDS,
+  byokProvidersFor,
   isByokProviderId,
+  type ByokModality,
   type ByokProviderMetadata,
   type ByokProviderId,
   type ProviderId,
 } from "./protocol/provider-ids";
+export type {
+  ImageGenProvider,
+  ImageGenerateRequest,
+  ImageGeneratedImage,
+  ImageGenerateResult,
+} from "./protocol/images";
+export type {
+  VideoGenProvider,
+  VideoGenerateRequest,
+  GeneratedVideo,
+  VideoGenerateResult,
+} from "./protocol/video";
 export {
   OLLAMA_ENDPOINT_PRESET,
   isValidEndpointProviderId,

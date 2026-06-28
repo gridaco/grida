@@ -17,6 +17,14 @@ import {
   type AgentLifecycleEvent,
 } from "./protocol/events";
 import type { AgentServerHandshakeResponse } from "./protocol/handshake";
+import type {
+  ImageGenerateRequest,
+  ImageGenerateResult,
+} from "./protocol/images";
+import type {
+  VideoGenerateRequest,
+  VideoGenerateResult,
+} from "./protocol/video";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type {
   ChatMessageWithParts,
@@ -446,6 +454,24 @@ export namespace AgentTransport {
         installed: boolean;
         path?: string;
       }> => await this.postJson("/providers/claude/detect"),
+    } as const;
+
+    /** BYOK image generation (#908). Desktop-only; gated by the `images`
+     *  capability. Returns base64 bytes — never the user's key. */
+    readonly images = {
+      generate: async (
+        req: ImageGenerateRequest
+      ): Promise<ImageGenerateResult> =>
+        await this.postJson<ImageGenerateResult>("/images/generate", req),
+    } as const;
+
+    /** BYOK video generation (#908). Desktop-only; gated by the `video`
+     *  capability. Returns a provider URL (or base64) — never the user's key. */
+    readonly video = {
+      generate: async (
+        req: VideoGenerateRequest
+      ): Promise<VideoGenerateResult> =>
+        await this.postJson<VideoGenerateResult>("/video/generate", req),
     } as const;
 
     readonly sessions = {

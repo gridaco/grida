@@ -133,6 +133,7 @@
     "@agentclientprotocol/sdk": "0.25.0",
     "@ai-sdk/gateway": "3.0.125",
     "@ai-sdk/openai-compatible": "2.0.48",
+    "@ai-sdk/provider": "3.0.10",
     "@grida/ai-models": "workspace:*",
     "@grida/home": "workspace:*",
     "@hono/node-server": "^1.13.7",

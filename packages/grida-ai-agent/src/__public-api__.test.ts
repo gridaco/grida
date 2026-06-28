@@ -110,10 +110,23 @@ describe("@grida/agent public API", () => {
     });
 
     it("exposes BYOK provider identity, wire vocab, tiers, and session-row types", () => {
-      expect(BYOK_PROVIDER_IDS).toEqual(["openrouter", "vercel"]);
+      // fal is image-only BYOK (#908) — present for key storage + image
+      // routing, excluded from the text resolver via its `modalities` marker.
+      expect(BYOK_PROVIDER_IDS).toEqual(["openrouter", "vercel", "fal"]);
       expect(BYOK_PROVIDER_METADATA.map((provider) => provider.label)).toEqual([
         "OpenRouter",
         "Vercel",
+        "fal",
+      ]);
+      // The modality matrix drives image/video resolver routing (via
+      // byokProvidersFor) — pin it so a bad metadata edit can't silently
+      // re-route provider selection.
+      expect(
+        BYOK_PROVIDER_METADATA.map(({ id, modalities }) => ({ id, modalities }))
+      ).toEqual([
+        { id: "openrouter", modalities: ["text", "image", "video"] },
+        { id: "vercel", modalities: ["text", "image", "video"] },
+        { id: "fal", modalities: ["image", "video"] },
       ]);
       const byok: ByokProviderId = "vercel";
       const metadata: ByokProviderMetadata = BYOK_PROVIDER_METADATA[0];
@@ -233,6 +246,10 @@ describe("@grida/agent public API", () => {
         home: "/Users/example",
       });
       expect(policy.network.allowed_domains).toContain("openrouter.ai");
+      // BYOK image provider fal (#908): queue API + media CDN must be reachable.
+      expect(policy.network.allowed_domains).toEqual(
+        expect.arrayContaining(["*.fal.run", "fal.media", "*.fal.media"])
+      );
       // Agent-provider class (issue #813): the external agent's vendor backend
       // must be reachable through the srt allowlist. Pin the full host set so a
       // dropped domain fails here, not at runtime egress.
