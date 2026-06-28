@@ -10,17 +10,16 @@
  * calls `chat.addToolResult({ tool: "question", toolCallId, output })`. The
  * transcript only shows a passive record of what was asked/answered.
  *
- * Per the RFC (`tools` §question) the tool is text-only: each question offers
- * options to pick (single via radio, many via checkbox when `multi_select`) and
- * ALWAYS a free-text write-in, so the user can answer in their own words. "Skip"
- * dismisses the survey with a sentinel result so the model knows it was declined
- * (distinct from the headless refusal). Answers are `string[][]` — one array per
- * question.
+ * This file is a THIN VIEW. All form logic — per-question selections, write-ins,
+ * per-question skip, the wizard step, answer-building, and validation — lives in
+ * the React-free {@link QuestionSurvey} core (`question-survey.ts`), which is
+ * unit-tested on its own. The component holds one survey in state and swaps it
+ * for the next on each transition.
  */
 
 "use client";
 
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { getToolName } from "ai";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
@@ -29,12 +28,13 @@ import { Label } from "@app/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@app/ui/components/radio-group";
 import { Textarea } from "@app/ui/components/textarea";
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+import {
+  parseQuestions,
+  QuestionSurvey,
+  type QuestionAnswerOutput,
+} from "./question-survey";
 
-/** The `question` tool's result shape (mirrors the package `outputSchema`). */
-export type QuestionAnswerOutput = {
-  answers: string[][];
-  skipped?: boolean;
-};
+export type { QuestionAnswerOutput };
 
 /**
  * Commit an answer to the open `question`. The surface wires this to
@@ -45,14 +45,6 @@ export type AnswerQuestionHandler = (
   toolCallId: string,
   output: QuestionAnswerOutput
 ) => void;
-
-type QuestionOption = { label: string; description?: string };
-type QuestionSpec = {
-  question: string;
-  header?: string;
-  options?: QuestionOption[];
-  multi_select?: boolean;
-};
 
 // The locked tool name is producer-owned vocabulary (`@grida/agent`'s
 // `QUESTION_TOOL_NAME`). It is mirrored here as a one-char-cheap string rather
@@ -72,6 +64,10 @@ export function isQuestionEntry(entry: ToolCallEntry): boolean {
 function toolCallIdOf(entry: ToolCallEntry): string {
   const e = entry as { toolCallId?: string; tool_call_id?: string };
   return e.toolCallId ?? e.tool_call_id ?? "";
+}
+
+function inputOf(entry: ToolCallEntry): unknown {
+  return "input" in entry ? entry.input : undefined;
 }
 
 /**
@@ -105,34 +101,11 @@ export function findPendingQuestion(
   return null;
 }
 
-function readQuestions(entry: ToolCallEntry): QuestionSpec[] {
-  const input = "input" in entry ? entry.input : undefined;
-  const questions = (input as { questions?: unknown })?.questions;
-  if (!Array.isArray(questions)) return [];
-  return questions
-    .filter((q): q is QuestionSpec => Boolean(q) && typeof q === "object")
-    .map((q) => ({
-      question: String(q.question ?? ""),
-      header: typeof q.header === "string" ? q.header : undefined,
-      options: Array.isArray(q.options)
-        ? q.options
-            .filter(
-              (o): o is QuestionOption => Boolean(o) && typeof o === "object"
-            )
-            .map((o) => ({
-              label: String(o.label ?? ""),
-              description:
-                typeof o.description === "string" ? o.description : undefined,
-            }))
-        : undefined,
-      multi_select: Boolean(q.multi_select),
-    }));
-}
-
 /**
- * The interactive survey form. Rendered while the `question` part is
- * `input-available` (the run is paused on the user). On submit/skip it calls
- * `onAnswer(toolCallId, output)`; the host wires that to `addToolResult`.
+ * The interactive survey form — a thin view over {@link QuestionSurvey}. Rendered
+ * while the `question` part is `input-available` (the run is paused on the user).
+ * On submit/skip it calls `onAnswer(toolCallId, output)`; the host wires that to
+ * `addToolResult`.
  */
 export function QuestionCard({
   entry,
@@ -140,123 +113,62 @@ export function QuestionCard({
   disabled,
 }: {
   entry: ToolCallEntry;
-  onAnswer: (toolCallId: string, output: QuestionAnswerOutput) => void;
+  onAnswer: AnswerQuestionHandler;
   disabled?: boolean;
 }) {
-  const questions = useMemo(() => readQuestions(entry), [entry]);
-  // Stable prefix for `<label>`/`aria-labelledby` ids tying each write-in to its
-  // question text (the form gives screen readers no other accessible name).
+  // Stable prefix for `aria-labelledby` ids tying each write-in to its question
+  // text (the form gives screen readers no other accessible name).
   const labelId = useId();
-  // Per question: picked option labels + a free-text write-in.
-  const [picked, setPicked] = useState<string[][]>(() =>
-    questions.map(() => [])
-  );
-  const [writeIns, setWriteIns] = useState<string[]>(() =>
-    questions.map(() => "")
+  const [survey, setSurvey] = useState(() =>
+    QuestionSurvey.from(inputOf(entry))
   );
   const [submitted, setSubmitted] = useState(false);
-  // A survey of >1 question is a one-at-a-time wizard: step through with
-  // Back/Next, Submit on the last. A single question shows no stepper.
-  const [step, setStep] = useState(0);
 
-  // Reset all in-progress state when the pending tool call changes. A surface
-  // may reuse this instance for a NEW question without unmounting (e.g. two
-  // questions back-to-back in one turn, where `pendingQuestion` goes Q1→Q2
-  // without passing through null), and stale selections / disabled state must
-  // not carry into the next answer. React's guarded "adjust state during render"
-  // pattern — runs once per id change, not every render.
+  // Reset when the pending tool call changes — a surface may reuse this instance
+  // for a NEW question without unmounting (two questions back-to-back in one
+  // turn). React's guarded "adjust state during render" pattern.
   const toolCallId = toolCallIdOf(entry);
   const seenToolCallId = useRef(toolCallId);
   if (seenToolCallId.current !== toolCallId) {
     seenToolCallId.current = toolCallId;
-    setPicked(questions.map(() => []));
-    setWriteIns(questions.map(() => ""));
+    setSurvey(QuestionSurvey.from(inputOf(entry)));
     setSubmitted(false);
-    setStep(0);
   }
 
-  const answers = useMemo(
-    () =>
-      questions.map((q, i) => {
-        const wi = (writeIns[i] ?? "").trim();
-        if (q.multi_select) {
-          return [...(picked[i] ?? []), ...(wi ? [wi] : [])];
-        }
-        // Single-select: a write-in (the user's own words) wins over a pick.
-        if (wi) return [wi];
-        return (picked[i] ?? []).slice(0, 1);
-      }),
-    [questions, picked, writeIns]
-  );
-
-  const canSubmit =
-    questions.length > 0 && answers.every((a) => a.length > 0) && !disabled;
-
-  const submit = () => {
-    if (!canSubmit) return;
-    setSubmitted(true);
-    onAnswer(toolCallId, { answers });
-  };
-
-  const skip = () => {
-    if (disabled) return;
-    setSubmitted(true);
-    onAnswer(toolCallId, { answers: [], skipped: true });
-  };
-
-  const togglePick = (qi: number, label: string, multi: boolean) => {
-    setPicked((prev) => {
-      const next = prev.map((row) => [...row]);
-      if (multi) {
-        const row = next[qi] ?? [];
-        next[qi] = row.includes(label)
-          ? row.filter((l) => l !== label)
-          : [...row, label];
-      } else {
-        next[qi] = [label];
-      }
-      return next;
-    });
-    // Picking an option and writing your own are mutually exclusive — picking
-    // clears the custom text so the option wins.
-    setWriteIns((prev) =>
-      prev[qi] ? prev.map((v, i) => (i === qi ? "" : v)) : prev
-    );
-  };
-
-  // The custom write-in is exclusive: focusing or typing it makes it THE answer
-  // and deselects any picked option(s) for that question ("when custom, it's
-  // always custom"). No-op once the picks are already empty.
-  const selectCustom = (qi: number) => {
-    setPicked((prev) =>
-      (prev[qi] ?? []).length
-        ? prev.map((row, i) => (i === qi ? [] : row))
-        : prev
-    );
-  };
-
-  if (questions.length === 0) return null;
+  if (survey.count === 0) return null;
 
   const busy = disabled || submitted;
-  const multiStep = questions.length > 1;
-  const isLast = step === questions.length - 1;
-  // The current step's question must be answered before advancing; on the last
-  // step Submit additionally requires every question answered (`canSubmit`).
-  const currentAnswered = (answers[step] ?? []).length > 0;
+  const qi = survey.multiStep ? survey.step : 0;
+  const q = survey.questions[qi];
+  if (!q) return null;
+  const questionId = `${labelId}-q${qi}`;
+  const hasOptions = (q.options?.length ?? 0) > 0;
+  const writeIn = survey.writeInFor(qi);
 
-  const renderQuestion = (qi: number) => {
-    const q = questions[qi];
-    const questionId = `${labelId}-q${qi}`;
-    return (
+  const finalize = (s: QuestionSurvey) => {
+    setSubmitted(true);
+    onAnswer(toolCallId, s.buildOutput());
+  };
+  // Skip is PER QUESTION: skip the current one (its answer becomes empty) and
+  // advance, or finalize if it's the last/only question.
+  const onSkip = () => {
+    if (busy) return;
+    const skipped = survey.skipCurrent();
+    if (survey.multiStep && !survey.isLast) setSurvey(skipped.next());
+    else finalize(skipped);
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        {(q.header || multiStep) && (
+        {(q.header || survey.multiStep) && (
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               {q.header}
             </span>
-            {multiStep && (
+            {survey.multiStep && (
               <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                Question {step + 1} of {questions.length}
+                Question {survey.step + 1} of {survey.count}
               </span>
             )}
           </div>
@@ -265,14 +177,14 @@ export function QuestionCard({
           {q.question}
         </p>
 
-        {q.options && q.options.length > 0 && !q.multi_select && (
+        {hasOptions && !q.multi_select && (
           <RadioGroup
-            value={(picked[qi] ?? [])[0] ?? ""}
-            onValueChange={(label) => togglePick(qi, label, false)}
+            value={survey.pickedFor(qi)[0] ?? ""}
+            onValueChange={(label) => setSurvey(survey.togglePick(qi, label))}
             disabled={busy}
             className="gap-1.5"
           >
-            {q.options.map((opt, oi) => (
+            {q.options!.map((opt, oi) => (
               <Label
                 key={oi}
                 className="flex cursor-pointer items-start gap-2 text-sm font-normal"
@@ -291,16 +203,18 @@ export function QuestionCard({
           </RadioGroup>
         )}
 
-        {q.options && q.options.length > 0 && q.multi_select && (
+        {hasOptions && q.multi_select && (
           <div className="flex flex-col gap-1.5">
-            {q.options.map((opt, oi) => (
+            {q.options!.map((opt, oi) => (
               <Label
                 key={oi}
                 className="flex cursor-pointer items-start gap-2 text-sm font-normal"
               >
                 <Checkbox
-                  checked={(picked[qi] ?? []).includes(opt.label)}
-                  onCheckedChange={() => togglePick(qi, opt.label, true)}
+                  checked={survey.pickedFor(qi).includes(opt.label)}
+                  onCheckedChange={() =>
+                    setSurvey(survey.togglePick(qi, opt.label))
+                  }
                   disabled={busy}
                   className="mt-0.5"
                 />
@@ -319,45 +233,30 @@ export function QuestionCard({
 
         <Textarea
           aria-labelledby={questionId}
-          value={writeIns[qi] ?? ""}
-          onFocus={() => selectCustom(qi)}
-          onChange={(e) => {
-            selectCustom(qi);
-            setWriteIns((prev) => {
-              const next = [...prev];
-              next[qi] = e.target.value;
-              return next;
-            });
-          }}
+          value={writeIn}
+          onFocus={() => setSurvey(survey.selectCustom(qi))}
+          onChange={(e) => setSurvey(survey.setWriteIn(qi, e.target.value))}
           disabled={busy}
           rows={2}
           placeholder={
-            q.options && q.options.length > 0
-              ? "Or write your own answer…"
-              : "Type your answer…"
+            hasOptions ? "Or write your own answer…" : "Type your answer…"
           }
-          // Highlight the custom field while it holds the answer (its picks are
+          // Highlight the custom field while it holds the answer (its options are
           // cleared), so "custom is selected" reads visually.
           className={cn(
             "text-sm",
-            (writeIns[qi] ?? "").trim().length > 0 && "ring-1 ring-ring"
+            writeIn.trim().length > 0 && "ring-1 ring-ring"
           )}
         />
       </div>
-    );
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      {renderQuestion(multiStep ? step : 0)}
 
       <div className="flex items-center gap-2">
-        {multiStep && step > 0 && (
+        {survey.multiStep && survey.step > 0 && (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
+            onClick={() => setSurvey(survey.back())}
             disabled={busy}
           >
             Back
@@ -368,19 +267,17 @@ export function QuestionCard({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={skip}
+          onClick={onSkip}
           disabled={busy}
         >
           Skip
         </Button>
-        {multiStep && !isLast ? (
+        {survey.multiStep && !survey.isLast ? (
           <Button
             type="button"
             size="sm"
-            onClick={() =>
-              setStep((s) => Math.min(questions.length - 1, s + 1))
-            }
-            disabled={!currentAnswered || busy}
+            onClick={() => setSurvey(survey.next())}
+            disabled={!survey.currentAnswered || busy}
           >
             Next
           </Button>
@@ -388,8 +285,8 @@ export function QuestionCard({
           <Button
             type="button"
             size="sm"
-            onClick={submit}
-            disabled={!canSubmit || submitted}
+            onClick={() => finalize(survey)}
+            disabled={!survey.canSubmit || submitted}
           >
             Submit
           </Button>
@@ -400,12 +297,14 @@ export function QuestionCard({
 }
 
 /**
- * Read-only echo of an answered (or skipped) survey — rendered once the
- * `question` part is terminal (`output-available`), so the transcript shows what
- * was asked and how the user answered.
+ * Read-only echo of an answered survey — rendered once the `question` part is
+ * terminal (`output-available`), so the transcript shows what was asked and how
+ * the user answered. Per-question: an answered question shows its answer; a
+ * skipped one shows "Skipped". The `skipped` sentinel (the user declined the
+ * WHOLE survey) shows a single line.
  */
 export function AnsweredQuestionSummary({ entry }: { entry: ToolCallEntry }) {
-  const questions = readQuestions(entry);
+  const questions = parseQuestions(inputOf(entry));
   const output = ("output" in entry ? entry.output : undefined) as
     | QuestionAnswerOutput
     | undefined;
@@ -413,12 +312,8 @@ export function AnsweredQuestionSummary({ entry }: { entry: ToolCallEntry }) {
 
   if (output?.skipped) {
     return (
-      <div
-        className={cn(
-          "mt-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground"
-        )}
-      >
-        You skipped this question.
+      <div className="mt-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+        You skipped this.
       </div>
     );
   }
@@ -426,14 +321,22 @@ export function AnsweredQuestionSummary({ entry }: { entry: ToolCallEntry }) {
   const answers = output?.answers ?? [];
   return (
     <div className="mt-2 flex flex-col gap-2 rounded-md border bg-muted/40 p-3">
-      {questions.map((q, qi) => (
-        <div key={qi} className="flex flex-col gap-0.5">
-          <span className="text-xs text-muted-foreground">{q.question}</span>
-          <span className="text-sm font-medium">
-            {(answers[qi] ?? []).join(", ") || "—"}
-          </span>
-        </div>
-      ))}
+      {questions.map((q, qi) => {
+        const a = answers[qi] ?? [];
+        return (
+          <div key={qi} className="flex flex-col gap-0.5">
+            <span className="text-xs text-muted-foreground">{q.question}</span>
+            <span
+              className={cn(
+                "text-sm font-medium",
+                a.length === 0 && "text-muted-foreground italic"
+              )}
+            >
+              {a.length ? a.join(", ") : "Skipped"}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
