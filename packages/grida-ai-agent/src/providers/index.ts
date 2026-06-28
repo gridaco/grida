@@ -26,7 +26,7 @@ import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
 import type { SecretsStore } from "../secrets";
 import {
-  BYOK_PROVIDER_METADATA,
+  byokProvidersFor,
   isByokProviderId,
   type ByokProviderId,
 } from "../protocol/provider-ids";
@@ -119,7 +119,10 @@ export async function resolveProvider(
     return await resolveExplicit(options.explicit, deps);
   }
 
-  for (const provider of BYOK_PROVIDER_METADATA) {
+  // Text path: only text-capable BYOK providers. An image-only provider
+  // (fal) may have a stored key, but it serves no chat models — skip it so a
+  // fal-only user falls through to endpoints rather than erroring.
+  for (const provider of byokProvidersFor("text")) {
     const key = await deps.secrets._getKey(provider.id);
     if (key) {
       return makeResolvedByok(provider.id, key);
@@ -168,6 +171,11 @@ function makeResolvedByok(
         kind: "byok",
         model_factory: makeVercelFactory(key.trim()),
       };
+    case "fal":
+      // fal is an image-only BYOK provider — it has no text/chat factory.
+      // The text precedence loop already skips it (see `byokProvidersFor`);
+      // this guards an explicit text pick of `fal`.
+      throw new ProviderUnavailableError(providerId);
   }
   const _exhaustive: never = providerId;
   throw new ProviderUnavailableError(_exhaustive);

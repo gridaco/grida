@@ -381,6 +381,10 @@ export namespace models {
       | "bfl/flux-kontext-max"
       | "bfl/flux-kontext-pro"
       | "bfl/flux-pro-1.1"
+      // ByteDance
+      | "bytedance/seedream-4.5"
+      // Recraft
+      | "recraft/recraft-v3"
       | (string & {});
 
     export type AspectRatioString = `${number}:${number}`;
@@ -478,6 +482,43 @@ export namespace models {
       | PerImageFlatPricing
       | PerTokenPricing;
 
+    // ── Providers ───────────────────────────────────────────────────
+
+    /**
+     * A provider that can serve an image model. Distinct from the top-level
+     * {@link models.Provider} because the same flagship proprietary model is
+     * now multi-homed: fal, OpenRouter, and the Vercel gateway each serve it
+     * under a different id (and sometimes a different meter). Mirrors
+     * {@link video.VideoProvider}.
+     */
+    export type ImageProvider = "vercel" | "fal" | "openrouter";
+
+    /**
+     * How one provider serves an image model: the id you actually call on that
+     * provider, plus that provider's own meter. The unit of provider-selection.
+     * Keyed by {@link ImageProvider} in {@link ImageModelCard.providers}, so
+     * `provider` here must equal that key. Mirrors {@link video.VideoProviderBinding}.
+     */
+    export type ImageProviderBinding = {
+      provider: ImageProvider;
+      /**
+       * Provider-specific call id. Format varies — `openai/gpt-image-2` (Vercel),
+       * `fal-ai/gpt-image-2` (fal), `openai/gpt-image-2` (OpenRouter).
+       */
+      id: string;
+      /** Real upstream pricing for **this** provider — meters differ across providers. */
+      pricing: ImageModelPricing;
+      /**
+       * Coarse provider cost per invocation in USD. For budget estimation;
+       * not for display.
+       */
+      avg_cost_usd: number;
+      /** Per-binding deprecation (a provider may retire a route independently). */
+      deprecated?: boolean;
+      /** Provider's page for this binding; UI falls back to the card. */
+      url?: string;
+    };
+
     // ── Size constraints ────────────────────────────────────────────
 
     /**
@@ -545,7 +586,28 @@ export namespace models {
       deprecated: boolean;
       short_description: string;
       vendor: Vendor;
+      /**
+       * Primary/default provider for legacy single-provider readers (the web
+       * Grida-billed path). Equals one of the keys in {@link providers}. Kept
+       * alongside {@link providers} so existing consumers compile unchanged.
+       */
       provider: Provider;
+      /**
+       * Whether this model is surfaced in the curated, user-facing list.
+       * Curation rule: proprietary · SOTA · **universal** (served by every
+       * supported provider, so one BYOK key serves the whole list). Models that
+       * fail the rule stay in the catalog (resolvable by id) but are hidden from
+       * the default picker. See {@link listed_reason}.
+       */
+      listed: boolean;
+      /** Why a card is `listed: false` (legacy, superseded, or not universal). */
+      listed_reason?: string;
+      /**
+       * Providers that serve this model, keyed by provider. **No implied
+       * preference** — default-provider selection is deferred to the runtime
+       * resolver. Mirrors {@link video.VideoModelCard.providers}.
+       */
+      providers: Partial<Record<ImageProvider, ImageProviderBinding>>;
       styles: string[] | null;
       speed_label: SpeedLabel;
       speed_max: string;
@@ -597,6 +659,37 @@ export namespace models {
           "State-of-the-art image generation and editing with flexible resolutions",
         vendor: "openai",
         provider: "vercel",
+        listed: true,
+        // ids/prices verified 2026-06-29, see github.com/gridaco/grida/issues/908
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "openai/gpt-image-2",
+            pricing: { type: "per_token", input: 5.0, output: 30.0 },
+            avg_cost_usd: 0.053,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "openai/gpt-image-2",
+            pricing: { type: "per_token", input: 8.0, output: 8.0 },
+            avg_cost_usd: 0.05,
+            url: "https://openrouter.ai/openai/gpt-image-2",
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/gpt-image-2",
+            pricing: {
+              type: "per_image_tiered",
+              tiers: {
+                "low/1024x1024": 0.006,
+                "medium/1024x1024": 0.053,
+                "high/1024x1024": 0.211,
+              },
+            },
+            avg_cost_usd: 0.053,
+            url: "https://fal.ai/models/openai/gpt-image-2",
+          },
+        },
         speed_label: "medium",
         speed_max: "1m",
         styles: null,
@@ -650,6 +743,16 @@ export namespace models {
           "Previous-generation image model. Superseded by GPT Image 2.",
         vendor: "openai",
         provider: "vercel",
+        listed: false,
+        listed_reason: "Previous-generation model, superseded by GPT Image 2.",
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "openai/gpt-image-1.5",
+            pricing: { type: "per_token", input: 5.0, output: 32.0 },
+            avg_cost_usd: 0.034,
+          },
+        },
         speed_label: "medium",
         speed_max: "1m",
         styles: null,
@@ -697,6 +800,17 @@ export namespace models {
         short_description: "Cost-efficient image generation model",
         vendor: "openai",
         provider: "vercel",
+        listed: false,
+        listed_reason:
+          "Cost-tier model, not part of the curated flagship/SOTA list.",
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "openai/gpt-image-1-mini",
+            pricing: { type: "per_token", input: 2.0, output: 8.0 },
+            avg_cost_usd: 0.011,
+          },
+        },
         speed_label: "slow",
         speed_max: "1m",
         styles: null,
@@ -749,6 +863,30 @@ export namespace models {
           "Fast, efficient multimodal model with native image generation",
         vendor: "google",
         provider: "vercel",
+        listed: true,
+        // "Nano Banana 2"; ids/prices verified 2026-06-29, see issues/908
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "google/gemini-3.1-flash-image-preview",
+            pricing: { type: "per_token", input: 0.5, output: 3.0 },
+            avg_cost_usd: 0.004,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "google/gemini-3.1-flash-image",
+            pricing: { type: "per_token", input: 0.5, output: 3.0 },
+            avg_cost_usd: 0.004,
+            url: "https://openrouter.ai/google/gemini-3.1-flash-image",
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/gemini-3.1-flash-image-preview",
+            pricing: { type: "per_image_flat", usd: 0.08 },
+            avg_cost_usd: 0.08,
+            url: "https://fal.ai/models/fal-ai/gemini-3.1-flash-image-preview",
+          },
+        },
         speed_label: "fast",
         speed_max: "15s",
         styles: null,
@@ -772,6 +910,30 @@ export namespace models {
           "High-quality multimodal model with native image generation",
         vendor: "google",
         provider: "vercel",
+        listed: true,
+        // "Nano Banana Pro"; ids/prices verified 2026-06-29, see issues/908
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "google/gemini-3-pro-image",
+            pricing: { type: "per_token", input: 2.0, output: 12.0 },
+            avg_cost_usd: 0.015,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "google/gemini-3-pro-image-preview",
+            pricing: { type: "per_token", input: 2.0, output: 12.0 },
+            avg_cost_usd: 0.015,
+            url: "https://openrouter.ai/google/gemini-3-pro-image-preview",
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/nano-banana-pro",
+            pricing: { type: "per_image_flat", usd: 0.15 },
+            avg_cost_usd: 0.15,
+            url: "https://fal.ai/models/fal-ai/nano-banana-pro",
+          },
+        },
         speed_label: "medium",
         speed_max: "30s",
         styles: null,
@@ -798,6 +960,31 @@ export namespace models {
           "Latest Flux model with best-in-class image quality and prompt adherence",
         vendor: "black-forest-labs",
         provider: "vercel",
+        listed: true,
+        // ids/prices verified 2026-06-29, see issues/908. OR/fal meter per-MP
+        // (~$0.03 first MP); represented as flat at the 1MP baseline.
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "bfl/flux-2-pro",
+            pricing: { type: "per_image_flat", usd: 0.06 },
+            avg_cost_usd: 0.06,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "black-forest-labs/flux.2-pro",
+            pricing: { type: "per_image_flat", usd: 0.03 },
+            avg_cost_usd: 0.03,
+            url: "https://openrouter.ai/black-forest-labs/flux.2-pro",
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/flux-2-pro",
+            pricing: { type: "per_image_flat", usd: 0.03 },
+            avg_cost_usd: 0.03,
+            url: "https://fal.ai/models/fal-ai/flux-2-pro",
+          },
+        },
         speed_label: "medium",
         speed_max: "30s",
         styles: null,
@@ -819,6 +1006,24 @@ export namespace models {
           "Highest quality Flux model for context-aware image generation and editing",
         vendor: "black-forest-labs",
         provider: "vercel",
+        listed: false,
+        listed_reason:
+          "Image-editing model; not on OpenRouter, so not universal (one-key) coverage.",
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "bfl/flux-kontext-max",
+            pricing: { type: "per_image_flat", usd: 0.08 },
+            avg_cost_usd: 0.08,
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/flux-pro/kontext/max",
+            pricing: { type: "per_image_flat", usd: 0.08 },
+            avg_cost_usd: 0.08,
+            url: "https://fal.ai/models/fal-ai/flux-pro/kontext/max",
+          },
+        },
         speed_label: "slow",
         speed_max: "30s",
         styles: null,
@@ -839,6 +1044,17 @@ export namespace models {
         short_description: "Fast context-aware image generation and editing",
         vendor: "black-forest-labs",
         provider: "vercel",
+        listed: false,
+        listed_reason:
+          "Image-editing model; superseded by Flux 2 and not universal.",
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "bfl/flux-kontext-pro",
+            pricing: { type: "per_image_flat", usd: 0.05 },
+            avg_cost_usd: 0.05,
+          },
+        },
         speed_label: "medium",
         speed_max: "20s",
         styles: null,
@@ -860,11 +1076,119 @@ export namespace models {
           "Faster, better FLUX Pro. Text-to-image model with excellent image quality and output diversity.",
         vendor: "black-forest-labs",
         provider: "vercel",
+        listed: false,
+        listed_reason: "Superseded by Flux 2 Pro; not universal.",
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "bfl/flux-pro-1.1",
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+          },
+        },
         speed_label: "slow",
         speed_max: "30s",
         styles: null,
         sizes: null,
         constraints: { min_edge: 256, max_edge: 1440 },
+        pricing: { type: "per_image_flat", usd: 0.04 },
+        avg_cost_usd: 0.04,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
+      // ByteDance — Seedream 4.5
+      // -----------------------------------------------------------------
+      // Universal: $0.04/img identical on all three providers (verified
+      // 2026-06-29, see github.com/gridaco/grida/issues/908).
+      "bytedance/seedream-4.5": {
+        id: "bytedance/seedream-4.5",
+        label: "Seedream 4.5",
+        deprecated: false,
+        short_description:
+          "ByteDance's unified image generation and editing model.",
+        vendor: "bytedance",
+        provider: "vercel",
+        listed: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "bytedance/seedream-4.5",
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "bytedance-seed/seedream-4.5",
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+            url: "https://openrouter.ai/bytedance-seed/seedream-4.5",
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/bytedance/seedream/v4.5/text-to-image",
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+            url: "https://fal.ai/models/fal-ai/bytedance/seedream/v4.5/text-to-image",
+          },
+        },
+        speed_label: "fast",
+        speed_max: "15s",
+        styles: null,
+        sizes: null,
+        constraints: { max_edge: 4096 },
+        pricing: { type: "per_image_flat", usd: 0.04 },
+        avg_cost_usd: 0.04,
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // -----------------------------------------------------------------
+      // Recraft — V3
+      // -----------------------------------------------------------------
+      // Universal: ~$0.04/img across providers (verified 2026-06-29, see
+      // issues/908). OpenRouter org slug is `recraft`, not `recraft-ai`.
+      "recraft/recraft-v3": {
+        id: "recraft/recraft-v3",
+        label: "Recraft V3",
+        deprecated: false,
+        short_description:
+          "Design-grade image model with strong text rendering and vector styles.",
+        vendor: "recraft-ai",
+        provider: "vercel",
+        listed: true,
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "recraft/recraft-v3",
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "recraft/recraft-v3",
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+            url: "https://openrouter.ai/recraft/recraft-v3",
+          },
+          fal: {
+            provider: "fal",
+            id: "fal-ai/recraft/v3/text-to-image",
+            pricing: { type: "per_image_flat", usd: 0.04 },
+            avg_cost_usd: 0.04,
+            url: "https://fal.ai/models/fal-ai/recraft/v3/text-to-image",
+          },
+        },
+        speed_label: "medium",
+        speed_max: "30s",
+        styles: null,
+        sizes: null,
+        constraints: { max_edge: 2048 },
         pricing: { type: "per_image_flat", usd: 0.04 },
         avg_cost_usd: 0.04,
         default: {
@@ -904,6 +1228,25 @@ export namespace models {
       }
       return null;
     }
+
+    /**
+     * The binding for a specific provider, or `null` if that provider does
+     * not serve this model. Mirrors {@link video.binding}.
+     */
+    export function binding(
+      card: ImageModelCard,
+      provider: ImageProvider
+    ): ImageProviderBinding | null {
+      return card.providers[provider] ?? null;
+    }
+
+    let _listed: ImageModelCard[] | null = null;
+    /** Cards in the curated user-facing list (`listed: true`). Computed once —
+     *  the catalog is static, so callers (pickers, settings) can call freely. */
+    export const listed_models = (): ImageModelCard[] =>
+      (_listed ??= Object.values(models).filter(
+        (card): card is ImageModelCard => !!card && card.listed
+      ));
   }
 
   // ── models.audio ──────────────────────────────────────────────────
@@ -1121,6 +1464,16 @@ export namespace models {
       deprecated: boolean;
       short_description: string;
       vendor: Vendor;
+      /**
+       * Whether this model is surfaced in the curated, user-facing list.
+       * Unlike image (where `listed` also implies universal coverage), the
+       * video provider ecosystem is fragmented — no model is on every provider
+       * — so `listed` here means proprietary · SOTA only. The runtime resolver
+       * still gates per-model on which provider the user actually connected.
+       */
+      listed: boolean;
+      /** Why a card is `listed: false` (legacy or superseded). */
+      listed_reason?: string;
       /** Supported aspect ratios. */
       aspect_ratios: image.AspectRatioString[];
       /** Inclusive output-duration bounds, in seconds. */
@@ -1157,6 +1510,7 @@ export namespace models {
         short_description:
           "Google's flagship video model — strong prompt adherence with native, synchronized audio.",
         vendor: "google",
+        listed: true,
         aspect_ratios: ["16:9", "9:16"],
         min_duration: 4,
         max_duration: 8,
@@ -1205,9 +1559,22 @@ export namespace models {
             avg_cost_usd: 3.2, // 1080p audio × 8s default
             url: "https://fal.ai/models/fal-ai/veo3.1/image-to-video",
           },
-          // OpenRouter also serves it as `google/veo-3.1`, but its API surfaces
-          // only token pricing ($0/MTok) for video — no usable per-second
-          // meter confirmed. Add a binding once a real rate is verified.
+          // OpenRouter — async `/api/v1/videos` (job → poll → unsigned url).
+          // Text-to-video + image-to-video; native audio. "from $0.40/s"
+          // (verified 2026-06-29, https://openrouter.ai/google/veo-3.1).
+          openrouter: {
+            provider: "openrouter",
+            id: "google/veo-3.1",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "720p": { audio: 0.4 },
+                "1080p": { audio: 0.4 },
+              },
+            },
+            avg_cost_usd: 3.2, // 1080p audio × 8s default
+            url: "https://openrouter.ai/google/veo-3.1",
+          },
         },
       },
       // -----------------------------------------------------------------
@@ -1220,6 +1587,7 @@ export namespace models {
         short_description:
           "ByteDance's state-of-the-art video model — top-tier image-to-video with reference and editing modes.",
         vendor: "bytedance",
+        listed: true,
         aspect_ratios: ["16:9", "9:16", "1:1"],
         min_duration: 5,
         max_duration: 15,
@@ -1250,6 +1618,23 @@ export namespace models {
             },
             avg_cost_usd: 1.0, // 720p audio × 5s default (≈ $0.995)
           },
+          // OpenRouter — async `/api/v1/videos`. Flat $0.06726/s (verified
+          // 2026-06-29, https://openrouter.ai/bytedance/seedance-2.0) — far
+          // below Vercel's per-resolution rate (the proprietary-pricing-
+          // diverges finding, #908). No separate silent meter surfaced.
+          openrouter: {
+            provider: "openrouter",
+            id: "bytedance/seedance-2.0",
+            pricing: {
+              type: "per_second",
+              usd_per_second: {
+                "480p": { audio: 0.06726 },
+                "720p": { audio: 0.06726 },
+              },
+            },
+            avg_cost_usd: 0.34, // 720p audio × 5s default
+            url: "https://openrouter.ai/bytedance/seedance-2.0",
+          },
           // Also served by fal.ai and Replicate — add those bindings once
           // their per-second rates are verified.
         },
@@ -1269,6 +1654,7 @@ export namespace models {
         short_description:
           "xAI's image-to-video model — animates a still into cinematic video with native, lip-synced audio.",
         vendor: "xai",
+        listed: true,
         aspect_ratios: ["16:9", "9:16"],
         min_duration: 5,
         max_duration: 15,
@@ -1328,6 +1714,14 @@ export namespace models {
     ): VideoProviderBinding | null {
       return card.providers[provider] ?? null;
     }
+
+    let _listed: VideoModelCard[] | null = null;
+    /** Cards in the curated user-facing list (`listed: true`). Computed once —
+     *  the catalog is static, so callers (pickers, settings) can call freely. */
+    export const listed_models = (): VideoModelCard[] =>
+      (_listed ??= Object.values(models).filter(
+        (card): card is VideoModelCard => !!card && card.listed
+      ));
   }
 
   // ── models.image_tools ────────────────────────────────────────────

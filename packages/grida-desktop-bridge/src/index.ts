@@ -14,6 +14,10 @@ import type {
   ProviderId,
   EndpointProviderConfig,
   ProbedEndpointModel,
+  ImageGenerateRequest,
+  ImageGenerateResult,
+  VideoGenerateRequest,
+  VideoGenerateResult,
   ChatMessageWithParts,
   ChatSessionRow,
   CreateSessionOptions,
@@ -304,6 +308,23 @@ export type DesktopBridge = {
      *  filesystem probe, NOT a login check (login surfaces on the first run).
      *  Optional — older binaries lack it; renderers feature-detect. */
     detect_claude?: () => Promise<{ installed: boolean; path?: string }>;
+  };
+  /**
+   * BYOK image generation (#908). Desktop-only: the request resolves the
+   * user's connected provider key inside the sidecar and returns base64 image
+   * bytes — never the key. Optional — older binaries lack it; renderers
+   * feature-detect and hide the surface when absent.
+   */
+  images?: {
+    generate: (req: ImageGenerateRequest) => Promise<ImageGenerateResult>;
+  };
+  /**
+   * BYOK video generation (#908). Desktop-only; resolves the user's key in the
+   * sidecar and returns a provider URL (or base64) — never the key. Optional —
+   * older binaries lack it; renderers feature-detect.
+   */
+  video?: {
+    generate: (req: VideoGenerateRequest) => Promise<VideoGenerateResult>;
   };
   agent: {
     run: (

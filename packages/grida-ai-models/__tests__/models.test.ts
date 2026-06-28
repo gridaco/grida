@@ -59,6 +59,58 @@ describe("models.image catalogue invariants", () => {
   });
 });
 
+describe("models.image provider-binding invariants", () => {
+  it("every card has at least one provider binding", () => {
+    for (const card of Object.values(models.image.models)) {
+      if (!card) continue;
+      expect(Object.keys(card.providers).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("each binding's provider field matches its key", () => {
+    for (const card of Object.values(models.image.models)) {
+      if (!card) continue;
+      for (const [key, b] of Object.entries(card.providers)) {
+        if (!b) continue;
+        expect(b.provider).toBe(key);
+      }
+    }
+  });
+
+  it("the card's primary provider has a matching binding", () => {
+    for (const card of Object.values(models.image.models)) {
+      if (!card) continue;
+      expect(card.providers[card.provider]).toBeDefined();
+    }
+  });
+
+  it("listed cards are universal (served by every supported provider)", () => {
+    // The one-key promise: a single connected provider serves every listed
+    // card. If a listed card loses a binding, this fails loudly.
+    const ALL: models.image.ImageProvider[] = ["vercel", "fal", "openrouter"];
+    for (const card of models.image.listed_models()) {
+      for (const p of ALL) {
+        expect(models.image.binding(card, p)).not.toBeNull();
+      }
+    }
+  });
+
+  it("binding() resolves a present provider and nulls an absent one", () => {
+    const kontext = models.image.models["bfl/flux-kontext-max"]!;
+    expect(models.image.binding(kontext, "fal")?.id).toBe(
+      "fal-ai/flux-pro/kontext/max"
+    );
+    // Not on OpenRouter → no binding (why it is not listed).
+    expect(models.image.binding(kontext, "openrouter")).toBeNull();
+  });
+
+  it("listed_models returns only listed cards", () => {
+    for (const card of models.image.listed_models()) {
+      expect(card.listed).toBe(true);
+    }
+  });
+});
+
 describe("models.video catalogue invariants", () => {
   it("every dict key resolves to a defined card", () => {
     for (const id of Object.keys(models.video.models)) {
@@ -109,13 +161,26 @@ describe("models.video catalogue invariants", () => {
     expect(models.video.binding(veo, "vercel")?.id).toBe(
       "google/veo-3.1-generate-001"
     );
-    // OpenRouter has no verified per-second meter yet → no binding.
-    expect(models.video.binding(veo, "openrouter")).toBeNull();
+    // OpenRouter serves Veo + Seedance (verified rates).
+    expect(models.video.binding(veo, "openrouter")?.id).toBe("google/veo-3.1");
 
     const grok = models.video.models["xai/grok-imagine-video-1.5"]!;
     expect(models.video.binding(grok, "fal")?.id).toBe(
       "xai/grok-imagine-video/v1.5/image-to-video"
     );
+    // Grok 1.5 is NOT on OpenRouter (only 1.0) — correctly absent.
+    expect(models.video.binding(grok, "openrouter")).toBeNull();
+  });
+
+  it("listed video models are curated and each has at least one binding", () => {
+    const listed = models.video.listed_models();
+    expect(listed.length).toBeGreaterThan(0);
+    for (const card of listed) {
+      expect(card.listed).toBe(true);
+      // Video is fragmented (no universality guarantee) — only require that a
+      // listed model is servable by SOME provider.
+      expect(Object.keys(card.providers).length).toBeGreaterThan(0);
+    }
   });
 });
 

@@ -112,6 +112,16 @@ Image pricing is a discriminated union:
 Audio models currently use flat per-run pricing. Image tools use flat
 per-invocation pricing.
 
+Image cards are multi-homed like video: each card holds a `providers` record of
+bindings — one per serving provider (`vercel` / `fal` / `openrouter`), each with
+that provider's own call `id` and pricing — alongside a top-level `provider` +
+`pricing` that name the **primary/default** binding (kept for the legacy
+single-provider readers). Resolve a route with
+`models.image.binding(card, provider)`. A `listed` boolean marks the curated,
+user-facing set (proprietary · SOTA · **universal**, so one BYOK key serves the
+whole list); non-universal/legacy cards stay in the catalog with `listed: false`
+and a `listed_reason`. `models.image.listed_models()` returns the curated set.
+
 Video is different: the provider ecosystem is fragmented, so a video card is
 **canonical** (provider-agnostic `vendor/model` id + intrinsic specs) and holds a
 `providers` record of bindings — one per serving provider (`vercel` / `fal` /

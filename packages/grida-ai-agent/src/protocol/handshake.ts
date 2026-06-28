@@ -17,6 +17,18 @@ export type AgentServerCapabilities = {
    * clients treat a missing flag as "not served".
    */
   providers?: boolean;
+  /**
+   * `/images/generate` — BYOK image generation (#908). Optional so older
+   * host-supplied capability shapes stay valid; clients treat a missing flag
+   * as "not served" and hide the image-generation UI.
+   */
+  images?: boolean;
+  /**
+   * `/video/generate` — BYOK video generation (#908). Optional so older
+   * host-supplied capability shapes stay valid; clients treat a missing flag
+   * as "not served" and hide the video-generation UI.
+   */
+  video?: boolean;
   /** Reserved for future `/shell/*` route group; always `false` in V1. */
   shell: boolean;
 };
@@ -31,6 +43,8 @@ export const AGENT_SERVER_DEFAULT_CAPABILITIES: AgentServerCapabilities = {
   workspaces: true,
   sessions: true,
   providers: true,
+  images: true,
+  video: true,
   shell: false,
 };
 

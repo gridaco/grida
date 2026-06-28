@@ -5,14 +5,31 @@
  * contract consumers can compile against and render from.
  */
 
+/**
+ * Which generation modalities a BYOK provider serves. A provider may serve
+ * several: OpenRouter does text + image; Vercel does text + image + video; fal
+ * does image + video (its catalog bindings are image-to-video). The marker
+ * keeps each resolver from ever picking a provider that can't serve its
+ * modality, while the secrets store + settings UI still list every provider so
+ * its key can be stored.
+ */
+export type ByokModality = "text" | "image" | "video";
+
 export const BYOK_PROVIDER_METADATA = [
   {
     id: "openrouter",
     label: "OpenRouter",
+    modalities: ["text", "image", "video"],
   },
   {
     id: "vercel",
     label: "Vercel",
+    modalities: ["text", "image", "video"],
+  },
+  {
+    id: "fal",
+    label: "fal",
+    modalities: ["image", "video"],
   },
 ] as const;
 
@@ -26,6 +43,15 @@ export const BYOK_PROVIDER_IDS = BYOK_PROVIDER_METADATA.map(
 
 export function isByokProviderId(id: string): id is ByokProviderId {
   return (BYOK_PROVIDER_IDS as readonly string[]).includes(id);
+}
+
+/** BYOK providers that serve `modality`, in precedence (metadata) order. */
+export function byokProvidersFor(
+  modality: ByokModality
+): readonly ByokProviderMetadata[] {
+  return BYOK_PROVIDER_METADATA.filter((p) =>
+    (p.modalities as readonly string[]).includes(modality)
+  );
 }
 
 /**

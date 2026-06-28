@@ -13,6 +13,8 @@ import { registerFilesRoutes } from "./routes/files";
 import { registerRecentRoutes } from "./routes/recent";
 import { registerSecretsRoutes } from "./routes/secrets";
 import { registerProvidersRoutes } from "./routes/providers";
+import { registerImagesRoutes } from "./routes/images";
+import { registerVideoRoutes } from "./routes/video";
 import { registerAgentRoutes } from "./routes/agent";
 import { registerWorkspacesRoutes } from "./routes/workspaces";
 import { registerSessionsRoutes } from "./routes/sessions";
@@ -156,6 +158,12 @@ export function buildServer(opts: ServerOptions): BuiltServer {
       endpoints: endpointsStore,
       secrets: secretsStore,
     });
+  }
+  if (opts.capabilities.images) {
+    registerImagesRoutes(app, { secrets: secretsStore });
+  }
+  if (opts.capabilities.video) {
+    registerVideoRoutes(app, { secrets: secretsStore });
   }
   // Agent runtime owns the run loop + the in-flight stream registry.
   // `opts.streamRegistry` is undefined for direct callers (the runtime
