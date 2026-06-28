@@ -132,6 +132,11 @@ export async function pollQueue<T>(
     if (Date.now() >= deadline) {
       throw new Error(`${opts.label} timed out after ${opts.timeoutMs}ms`);
     }
-    await delay(opts.intervalMs, abortSignal);
+    // Clamp the inter-poll sleep to the remaining budget so the loop can't
+    // overshoot `timeoutMs` by up to one interval.
+    await delay(
+      Math.min(opts.intervalMs, Math.max(0, deadline - Date.now())),
+      abortSignal
+    );
   }
 }

@@ -19,6 +19,15 @@ const DESKTOP_CSP_SCRIPT_TAIL = IS_DEV
 
 const DESKTOP_CSP_PREFIX = `default-src 'self'; script-src 'self' 'nonce-`;
 
+//   connect-src allows:
+//   - 'self'              — grida.co (prod) / localhost:3000 (dev)
+//   - http://127.0.0.1:*  — the agent sidecar
+//   - localhost/ws(s)     — Next.js dev HMR ONLY; gated out of prod so a
+//                          renderer/XSS bug can't probe arbitrary local services
+const DESKTOP_CSP_CONNECT_SRC = IS_DEV
+  ? `connect-src 'self' http://127.0.0.1:* http://localhost:* ws://localhost:* wss://localhost:*; `
+  : `connect-src 'self' http://127.0.0.1:*; `;
+
 const DESKTOP_CSP_SUFFIX =
   `${DESKTOP_CSP_SCRIPT_TAIL}; ` +
   // Tailwind's runtime classes still flow through `<style>` tags Next.js emits
@@ -31,12 +40,7 @@ const DESKTOP_CSP_SUFFIX =
   // external origin (same trust level as img-src; no provider hosts added).
   `media-src 'self' data: blob:; ` +
   `font-src 'self' data:; ` +
-  //   connect-src allows:
-  //   - 'self'              — grida.co (prod) / localhost:3000 (dev)
-  //   - http://127.0.0.1:*  — the agent sidecar
-  //   - ws: http: localhost — Next.js dev HMR (harmless in prod, no
-  //                          localhost service to attack)
-  `connect-src 'self' http://127.0.0.1:* http://localhost:* ws://localhost:* wss://localhost:*; ` +
+  DESKTOP_CSP_CONNECT_SRC +
   `frame-ancestors 'none'; ` +
   `object-src 'none'; ` +
   `base-uri 'self'; ` +

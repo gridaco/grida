@@ -95,19 +95,19 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     try {
       generation = await resolved.model.doGenerate(callOptions);
     } catch (e) {
-      // Upstream body stays in the sidecar log only — never echoed to the
-      // renderer (provider diagnostics / prompt content).
+      // Detail (which can include upstream body text — fal adapters embed
+      // safeText(res) in their thrown messages) stays in the sidecar log only;
+      // the renderer gets a generic message.
       const detail = e instanceof Error ? e.message : String(e);
       const upstream = (e as { responseBody?: unknown })?.responseBody;
-      const message = `video generation failed: ${detail}`;
       console.error(
-        `[agent-host-video] failed provider=${resolved.provider_id} model=${d.model_id}: ${message}${
+        `[agent-host-video] failed provider=${resolved.provider_id} model=${d.model_id}: ${detail}${
           upstream ? ` — ${String(upstream).slice(0, 300)}` : ""
         }`
       );
       return c.json(
         {
-          error: message,
+          error: "video generation failed",
           model_id: d.model_id,
           provider_id: resolved.provider_id,
         },

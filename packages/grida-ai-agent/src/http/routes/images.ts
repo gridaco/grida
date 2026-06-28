@@ -106,19 +106,22 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
         ...(providerOptions ? { providerOptions } : {}),
       });
     } catch (e) {
-      // Keep the raw upstream body (AI SDK APICallError.responseBody) in the
-      // sidecar log ONLY — never echo provider diagnostics / prompt content back
-      // across the bridge to the renderer.
+      // Detail (e.message can include upstream body text — the fal/OpenRouter
+      // adapters embed safeText(res)) + the raw responseBody stay in the sidecar
+      // log ONLY; the renderer gets a generic message.
       const detail = e instanceof Error ? e.message : String(e);
       const upstreamBody = (e as { responseBody?: unknown })?.responseBody;
-      const message = `image generation failed: ${detail}`;
       console.error(
-        `[agent-host-images] failed provider=${resolved.provider_id} model=${model_id}: ${message}${
+        `[agent-host-images] failed provider=${resolved.provider_id} model=${model_id}: ${detail}${
           upstreamBody ? ` — ${String(upstreamBody).slice(0, 300)}` : ""
         }`
       );
       return c.json(
-        { error: message, model_id, provider_id: resolved.provider_id },
+        {
+          error: "image generation failed",
+          model_id,
+          provider_id: resolved.provider_id,
+        },
         502
       );
     }

@@ -62,4 +62,10 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
   it("connect-src reaches the loopback agent sidecar", () => {
     expect(directive("connect-src")).toContain("http://127.0.0.1:*");
   });
+
+  it("connect-src does NOT allow localhost in prod (dev-HMR only)", () => {
+    // Tests run with NODE_ENV !== "development" → the production CSP. A
+    // renderer/XSS bug must not be able to probe arbitrary localhost services.
+    expect(directive("connect-src")).not.toContain("localhost");
+  });
 });
