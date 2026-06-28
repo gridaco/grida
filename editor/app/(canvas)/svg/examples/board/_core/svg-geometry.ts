@@ -26,8 +26,9 @@ export type SvgElement = {
 };
 
 export type SvgGeometry = {
-  /** viewBox size = the SVG's local coordinate space. */
-  viewBox: { width: number; height: number };
+  /** viewBox = the SVG's local coordinate space (origin + size). A non-zero
+   *  origin (e.g. `viewBox="-100 -100 200 200"`) shifts every coordinate. */
+  viewBox: { x: number; y: number; width: number; height: number };
   elements: SvgElement[];
 };
 
@@ -181,17 +182,48 @@ function rectContains(r: Rect, p: Point): boolean {
   );
 }
 
+/** Sum the translate() offsets in a `transform` attribute — the only transform
+ *  this toy engine injects (via {@link applyElementTranslate}) and understands.
+ *  Scale / rotate / matrix are ignored (the spike's documented approximation). */
+function translateOf(attrs: string): Point {
+  const t = attr(attrs, "transform");
+  if (!t) return { x: 0, y: 0 };
+  const re =
+    /translate\(\s*(-?\d*\.?\d+(?:e[+-]?\d+)?)(?:\s*[,\s]\s*(-?\d*\.?\d+(?:e[+-]?\d+)?))?\s*\)/gi;
+  let x = 0;
+  let y = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(t)) !== null) {
+    x += Number(m[1]) || 0;
+    y += Number(m[2] ?? 0) || 0;
+  }
+  return { x, y };
+}
+
 /** Parse a standalone SVG string into a pickable geometry model. */
 export function parseSvgElements(svg: string): SvgGeometry {
   const elements: SvgElement[] = [];
   for (const e of scanElements(svg)) {
     const bbox = bboxFor(e.tag, e.attrs, e.content);
-    if (bbox) elements.push({ key: e.index, tag: e.tag, bbox });
+    if (!bbox) continue;
+    // Offset by the element's injected translate() so a post-drag reparse uses
+    // the MOVED bounds — otherwise hit-test + chrome would track the pre-drag box.
+    const t = translateOf(e.attrs);
+    elements.push({
+      key: e.index,
+      tag: e.tag,
+      bbox: { ...bbox, x: bbox.x + t.x, y: bbox.y + t.y },
+    });
   }
   return { viewBox: parseViewBox(svg), elements };
 }
 
-function parseViewBox(svg: string): { width: number; height: number } {
+function parseViewBox(svg: string): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
   const vb = svg.match(/viewBox\s*=\s*"([^"]*)"/);
   if (vb) {
     const p = vb[1]
@@ -199,12 +231,17 @@ function parseViewBox(svg: string): { width: number; height: number } {
       .split(/[\s,]+/)
       .map(Number);
     if (p.length === 4 && p[2] > 0 && p[3] > 0) {
-      return { width: p[2], height: p[3] };
+      return { x: p[0], y: p[1], width: p[2], height: p[3] };
     }
   }
-  // fall back to the root <svg width/height>
+  // fall back to the root <svg width/height> (origin 0,0)
   const head = svg.slice(0, svg.indexOf(">") + 1);
-  return { width: num(head, "width", 0), height: num(head, "height", 0) };
+  return {
+    x: 0,
+    y: 0,
+    width: num(head, "width", 0),
+    height: num(head, "height", 0),
+  };
 }
 
 /** Topmost element (last in document order) whose bbox contains the local point. */

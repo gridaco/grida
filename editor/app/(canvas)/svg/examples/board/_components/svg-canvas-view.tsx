@@ -393,6 +393,7 @@ export function SvgCanvasView({ className }: { className?: string }) {
           frame's screen rect; the editor's own camera supplies the zoom. */}
       {activeFrame && (
         <ActiveFrame
+          key={activeFrame.id}
           frame={activeFrame}
           screenRect={store.worldRectToScreen(activeFrame.rect)}
           zoom={camera.zoom}

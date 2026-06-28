@@ -70,14 +70,22 @@ export function ActiveFrame({
     handleRef.current = handle;
     onEditorRef.current?.(editor);
     return () => {
+      // Only serialize() may be swallowed on teardown; a write-back failure must
+      // NOT be hidden (it would silently drop the edit), so let it surface — but
+      // still tear the editor down in `finally`.
+      let svg: string | null = null;
       try {
-        onCommitRef.current(frame.id, editor.serialize());
+        svg = editor.serialize();
       } catch {
         // ignore serialize failures on teardown
       }
-      onEditorRef.current?.(null);
-      handle.detach();
-      editor.dispose();
+      try {
+        if (svg !== null) onCommitRef.current(frame.id, svg);
+      } finally {
+        onEditorRef.current?.(null);
+        handle.detach();
+        editor.dispose();
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

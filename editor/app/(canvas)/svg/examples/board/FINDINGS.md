@@ -11,11 +11,9 @@ ownership, or whether it's already-by-design — that's the maintainer's job. So
 wishes are big, some may be wrong-layer or already exist; surfacing beats
 self-censoring. Detail is intentionally light.
 
-Code: `editor/app/(canvas)/svg/examples/board/` (`_core/svg-canvas.ts`
-
-- `_core/svg-geometry.ts` + `_components/` + `_fixture/`). Route: `/svg/examples/board`.
-  Architecture: a transformed world layer renders N SVGs as `<img data:>`; the one
-  _active_ frame becomes a live `@grida/svg-editor`.
+Code: `editor/app/(canvas)/svg/examples/board/` (`_core/svg-canvas.ts` + `_core/svg-geometry.ts` + `_components/` + `_fixture/`). Route: `/svg/examples/board`.
+Architecture: a transformed world layer renders N SVGs as `<img data:>`; the one
+_active_ frame becomes a live `@grida/svg-editor`.
 
 ---
 

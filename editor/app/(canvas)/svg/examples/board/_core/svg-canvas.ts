@@ -218,15 +218,20 @@ export class SvgCanvas {
   /** A world point → the frame's own (viewBox) coordinate space. */
   worldToFrameLocal(f: Frame, w: Point): Point {
     const s = this.scaleOf(f);
-    return { x: (w.x - f.rect.x) / s.sx, y: (w.y - f.rect.y) / s.sy };
+    const vb = f.geom.viewBox;
+    return {
+      x: vb.x + (w.x - f.rect.x) / s.sx,
+      y: vb.y + (w.y - f.rect.y) / s.sy,
+    };
   }
 
   /** A frame-local (viewBox) Rect → world space (for chrome). */
   frameLocalRectToWorld(f: Frame, r: Rect): Rect {
     const s = this.scaleOf(f);
+    const vb = f.geom.viewBox;
     return {
-      x: f.rect.x + r.x * s.sx,
-      y: f.rect.y + r.y * s.sy,
+      x: f.rect.x + (r.x - vb.x) * s.sx,
+      y: f.rect.y + (r.y - vb.y) * s.sy,
       width: r.width * s.sx,
       height: r.height * s.sy,
     };
@@ -349,13 +354,22 @@ export class SvgCanvas {
   // picking via its toy geometry engine, chrome via a host overlay that spans
   // frames (see the view). One unified-history step on drop.
 
-  /** Topmost element under a screen point, across whichever frame is on top. */
+  /** Topmost element under a screen point. Picks the highest-`z` frame that has
+   *  an actual element hit — so a transparent/empty area of an upper SVG falls
+   *  through to an element in an overlapping lower frame, not just the top rect. */
   elementAtScreen(sx: number, sy: number): ElementRef | null {
-    const frame = this.frameAtScreen(sx, sy);
-    if (!frame) return null;
-    const local = this.worldToFrameLocal(frame, this.screenToWorld(sx, sy));
-    const el = elementAtPoint(frame.geom, local);
-    return el ? { frameId: frame.id, key: el.key } : null;
+    const world = this.screenToWorld(sx, sy);
+    let hit: ElementRef | null = null;
+    let hitZ = -Infinity;
+    for (const f of this._state.frames) {
+      if (f.z < hitZ || !rectContains(f.rect, world)) continue;
+      const el = elementAtPoint(f.geom, this.worldToFrameLocal(f, world));
+      if (el) {
+        hit = { frameId: f.id, key: el.key };
+        hitZ = f.z;
+      }
+    }
+    return hit;
   }
 
   private hasElement(ref: ElementRef): boolean {
