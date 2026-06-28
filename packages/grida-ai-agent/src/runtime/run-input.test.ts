@@ -282,6 +282,25 @@ describe("parseRunBody", () => {
     });
   });
 
+  it("parses the per-run `interactive` flag (boolean only; else absent)", async () => {
+    // The client declares whether it can answer `question` (a `cli run` sets
+    // false; a UI client true). Only an explicit boolean counts — anything else
+    // is absent so the host's interactive default applies downstream.
+    const msgs = [{ role: "user", parts: [{ type: "text", text: "hi" }] }];
+    const asReq = async (interactive: unknown) => {
+      const p = await parseRunBody(
+        { messages: msgs, interactive },
+        deps as never
+      );
+      if (p instanceof Response) throw new Error("unexpected 400");
+      return p;
+    };
+    expect((await asReq(false)).interactive).toBe(false);
+    expect((await asReq(true)).interactive).toBe(true);
+    expect((await asReq(undefined)).interactive).toBeUndefined();
+    expect((await asReq("yes")).interactive).toBeUndefined();
+  });
+
   it("rejects untyped message parts at the HTTP boundary", async () => {
     const parsed = await parseRunBody(
       {

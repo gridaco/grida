@@ -76,6 +76,13 @@ export type AgentRunRequest = {
    */
   mode?: AgentMode;
   /**
+   * Per-run client UI capability for the `question` tool (RFC `tools`
+   * §question). When set it WINS over the host-level `interactive` deps below
+   * (a `cli run` against an interactive daemon declares `false` to stay
+   * headless). Absent ⇒ the host default applies.
+   */
+  interactive?: boolean;
+  /**
    * Discovered RFC skills (names + descriptions advertised; bodies loaded
    * via the `skill` tool). Session-static — the runtime discovers once and
    * passes the same index every turn.
@@ -180,10 +187,12 @@ export async function runAgent(
     skill_cache: req.skill_cache,
     skill_load_body: req.skill_index ? nodeSkillBodyLoader : undefined,
     project_instructions: req.project_instructions,
-    // Host-level: whether the `question` tool pauses for a human or refuses
-    // headless. Independent of workspace bindings (a person can answer a
-    // standalone-doc session too).
-    interactive: deps.interactive,
+    // Whether the `question` tool pauses for a human or refuses headless. The
+    // per-run client capability (`req.interactive`) WINS over the host default
+    // (`deps.interactive`) — one daemon serves both an interactive web client
+    // and a headless `cli run`. Independent of workspace bindings (a person can
+    // answer a standalone-doc session too).
+    interactive: req.interactive ?? deps.interactive,
   });
 
   return await createAgentUIStreamResponse({

@@ -33,6 +33,15 @@ export type DesktopAgentTransportOptions = Partial<
    * panel keeps whatever it hydrated from the DB.
    */
   onResumeStart?: () => void;
+  /**
+   * Live renderer run-context (current `model_id` / `provider_id` / `mode`),
+   * read FRESH on every send — crucially the AI SDK's **body-less** tool/approval
+   * auto-resubmit (`addToolResult` → `sendAutomaticallyWhen`). Without it, answering
+   * a client-resolved tool (e.g. `question`) resumes with no model/mode and the
+   * server clobbers the session's model + posture with defaults. The explicit
+   * per-send `body` still wins; this only backfills what a body-less send omits.
+   */
+  runContext?: () => Partial<Omit<AgentRunOptions, "messages">>;
 };
 
 export namespace desktopAgentTransport {
@@ -55,8 +64,13 @@ export namespace desktopAgentTransport {
       async sendMessages(options) {
         const body = readBodyOptions(options.body);
         if (body.session_id) liveSessionId = body.session_id;
+        // Backfill the live renderer context (model/provider/mode) so a body-less
+        // auto-resubmit still carries them; the explicit `body` overrides it.
+        const { runContext, ...restDefaults } = defaults;
+        const context = runContext?.() ?? {};
         return streamFromBridge({
-          ...defaults,
+          ...restDefaults,
+          ...context,
           ...body,
           // A body-less send (the AI SDK's approval/tool auto-resubmit calls
           // `makeRequest` with no body) would otherwise fall back to the

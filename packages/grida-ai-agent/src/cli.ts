@@ -323,7 +323,15 @@ export async function runCommand(
     throw new Error('usage: grida-agent run [--session <id>] "message"');
   }
   const handle = await client.agent.run(
-    { messages: [{ role: "user", content: message }], session_id: sessionId },
+    {
+      messages: [{ role: "user", content: message }],
+      session_id: sessionId,
+      // A one-shot `run` has no UI to answer the `question` tool — and it may
+      // target a daemon that IS interactive for a web client. Declare headless
+      // per-run so `question` returns its fixed refusal instead of pausing this
+      // run forever (and leaving the session stuck on `human-input-pending`).
+      interactive: false,
+    },
     (chunk) => writeTextDelta(chunk, out)
   );
   await handle.done;

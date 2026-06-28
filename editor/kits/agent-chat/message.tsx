@@ -656,6 +656,10 @@ function QuestionToolView({ entry }: { entry: ToolCallEntry }) {
     : description.title;
   if (entry.state === "input-streaming") return null;
   const pending = entry.state === "input-available";
+  // A `question` part can be `output-error` — a headless host's fixed refusal
+  // (RFC §question), or any tool error. Surface its text rather than the empty
+  // answered summary, so the refusal/error isn't silently swallowed.
+  const errored = entry.state === "output-error";
   return (
     <div className="w-full">
       <div className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -666,6 +670,8 @@ function QuestionToolView({ entry }: { entry: ToolCallEntry }) {
         <p className="mt-1 text-xs text-muted-foreground/80">
           Awaiting your answer below.
         </p>
+      ) : errored ? (
+        <ToolOutput output={undefined} errorText={entry.errorText} />
       ) : (
         <AnsweredQuestionSummary entry={entry} />
       )}

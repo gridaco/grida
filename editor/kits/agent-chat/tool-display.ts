@@ -137,6 +137,7 @@ export namespace toolDisplay {
     pushClause(clauses, counts, "list", "listed");
     pushClause(clauses, counts, "command", "ran");
     pushClause(clauses, counts, "plan", "updated", "plan update");
+    pushClause(clauses, counts, "question", "asked");
     pushClause(clauses, counts, "tool", "used");
 
     return capitalize(clauses.join(", "));

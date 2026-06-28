@@ -46,6 +46,7 @@ import { Button } from "@app/ui/components/button";
 import {
   AGENT_SESSION_AGENT,
   sessions as bridgeSessions,
+  type AgentRunOptions,
   type Workspace,
 } from "@/lib/desktop/bridge";
 import {
@@ -231,6 +232,11 @@ function AgentPaneContent({
   // ("No tool invocation found"), the run never renders, and the approval bar
   // never clears until a hard refresh re-hydrates from the DB.
   const chatRef = useRef<Chat<UIMessage> | null>(null);
+  // Live run-context (current model/provider/mode) the transport backfills onto
+  // body-less sends — the question/tool auto-resubmit — so a resume keeps the
+  // session's model + posture instead of resetting them. Assigned below once the
+  // pickers resolve; read fresh per send via the getter.
+  const runContextRef = useRef<Partial<Omit<AgentRunOptions, "messages">>>({});
   const chat = useMemo(
     () =>
       new Chat<UIMessage>({
@@ -239,6 +245,7 @@ function AgentPaneContent({
         transport: desktopAgentTransport.create({
           workspace_id: workspace.id,
           session_id: chatSession.current_id ?? undefined,
+          runContext: () => runContextRef.current,
           onSessionId: (resolvedId) => {
             chatSession.apply_resolved_session_id(resolvedId);
           },
@@ -422,6 +429,12 @@ function AgentPaneContent({
   // Endpoint provider pin for the active model (issue #806) — rides every
   // run-entering body: normal sends AND approval resumes below.
   const providerId = registered_models.providerIdForModel(modelId, endpoints);
+  // Keep the transport's body-less backfill (above) in step with the pickers.
+  runContextRef.current = {
+    model_id: modelId,
+    mode,
+    ...(providerId ? { provider_id: providerId } : {}),
+  };
 
   const {
     queued,

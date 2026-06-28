@@ -1077,6 +1077,22 @@ describe("hasPendingHumanInput (drain-pause trait gate)", () => {
     await recordToolPart(s.id, "tc_q", "question", "output-available", msgId);
     expect(await store.hasPendingHumanInput(s.id)).toBe(false);
   });
+
+  it("ignores a rewound (hidden) block — a hidden pending question does not deadlock the gate", async () => {
+    // rewind() only marks `hidden_at`; it does NOT delete the parts. Without a
+    // visibility scope the gate would keep a rewound-past prompt "pending"
+    // forever, returning human-input-pending for a prompt the user can't see.
+    const s = await store.create({ agent: "grida" });
+    // A user turn to rewind back to, then a later assistant turn that pauses.
+    const anchor = await store.appendMessage(s.id, { role: "user" });
+    await recordToolPart(s.id, "tc_q", "question", "input-available");
+    expect(await store.hasPendingHumanInput(s.id)).toBe(true);
+
+    // Rewinding to the anchor hides the assistant question message → no longer
+    // pending, even though its `input-available` part still exists in the DB.
+    await store.rewind(s.id, anchor.id);
+    expect(await store.hasPendingHumanInput(s.id)).toBe(false);
+  });
 });
 
 function delay(ms: number): Promise<void> {

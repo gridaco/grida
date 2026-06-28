@@ -36,6 +36,7 @@ import type { ComposerCatalog } from "@/kits/composer";
 import {
   AGENT_SESSION_AGENT,
   sessions as bridgeSessions,
+  type AgentRunOptions,
 } from "@/lib/desktop/bridge";
 import {
   buildAgentSend,
@@ -128,6 +129,11 @@ export function AISidebarChat({
   // callback mutate the chat's messages once a resume is happening — it can't
   // close over `chat`, which doesn't exist yet at closure-construction time.
   const chatRef = useRef<Chat<UIMessage> | null>(null);
+  // Live run-context (current model/provider) the transport backfills onto
+  // body-less sends — the fs/todos/question auto-resubmit — so a resume keeps
+  // the session's model instead of resetting it. Assigned once the picker
+  // resolves; read fresh per send via the getter.
+  const runContextRef = useRef<Partial<Omit<AgentRunOptions, "messages">>>({});
   const chat = useMemo(() => {
     const todos = new AgentTodos();
     const chat = new Chat<UIMessage>({
@@ -136,6 +142,7 @@ export function AISidebarChat({
       transport: desktopAgentTransport.create({
         workspace_id: workspaceId,
         session_id: chatSession.current_id ?? undefined,
+        runContext: () => runContextRef.current,
         onSessionId: (resolvedId) => {
           chatSession.apply_resolved_session_id(resolvedId);
         },
@@ -283,6 +290,15 @@ export function AISidebarChat({
     sessions: chatSession.sessions,
     endpoints,
   });
+  // Keep the transport's body-less backfill (above) in step with the picker.
+  // The single-file/deck agent has no permission-mode picker, so no `mode`.
+  {
+    const providerId = registered_models.providerIdForModel(modelId, endpoints);
+    runContextRef.current = {
+      model_id: modelId,
+      ...(providerId ? { provider_id: providerId } : {}),
+    };
+  }
 
   // Whether the active model accepts image input — memoized so the
   // registry lookup doesn't re-scan on every render (only when the model

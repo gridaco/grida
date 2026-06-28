@@ -1304,14 +1304,22 @@ export class SessionsStore {
    * `input-available` for the moment between the stream finishing and the
    * renderer filling its result, and must NOT pause the drain). Read-only
    * existence check; reads no input/output/args/content.
+   *
+   * Scoped to VISIBLE messages (`hidden_at IS NULL`): a rewind only hides
+   * messages, it does not delete their parts. Without this join, rewinding past
+   * a paused approval/question would leave the block "pending" forever — the
+   * gate would keep returning `human-input-pending` for a prompt the user can no
+   * longer see (the same visibility rule as `listVisibleMessages`).
    */
   async hasPendingHumanInput(sessionId: string): Promise<boolean> {
     const rows = await this.db
       .select({ id: chatParts.id })
       .from(chatParts)
+      .innerJoin(chatMessages, eq(chatMessages.id, chatParts.message_id))
       .where(
         and(
           eq(chatParts.session_id, sessionId),
+          isNull(chatMessages.hidden_at),
           or(
             eq(chatParts.tool_state, "approval-requested"),
             and(

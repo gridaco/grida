@@ -243,6 +243,9 @@ type StartTurnOptions = {
   workspace_root?: string;
   skills?: RunRequest["skills"];
   mode: RunRequest["mode"];
+  /** Whether the requesting client can answer the `question` tool (per-run;
+   *  absent ⇒ the host `interactive` default). A core drain leaves it absent. */
+  interactive?: RunRequest["interactive"];
   /**
    * The user message this turn fires — the fired-message identity the
    * turn-lifecycle wire carries (RFC `turn-authority`; emitted on the
@@ -759,6 +762,9 @@ export class AgentRuntime {
         workspace_root: workspaceRoot,
         skills,
         mode,
+        // Per-run client UI capability (the desktop-from-web bridge sets true; a
+        // headless `cli run` sets false). Absent ⇒ host default downstream.
+        interactive: req.interactive,
         // The fired message of a direct run is the incoming tail's user
         // message (the client resends history; the tail is the new one). An
         // approval-answer resume continues the PRIOR turn's tool call — it
@@ -808,6 +814,7 @@ export class AgentRuntime {
       workspace_root: workspaceRoot,
       skills,
       mode,
+      interactive,
     } = opts;
 
     // Reserve the registry entry; its `modelAbort.signal` (not the request
@@ -950,6 +957,7 @@ export class AgentRuntime {
             workspace_root: workspaceRoot,
             skills,
             mode,
+            interactive,
             skill_index: ctx.skill_index,
             skill_cache: ctx.skill_cache,
             project_instructions: ctx.project_instructions,

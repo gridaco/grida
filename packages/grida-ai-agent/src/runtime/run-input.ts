@@ -54,6 +54,9 @@ export type RunRequest = {
   skills?: SkillId[];
   /** Permission/supervision posture; defaults to `accept-edits` when absent. */
   mode: AgentMode;
+  /** Whether the requesting client has a human UI for the `question` tool
+   *  (RFC `tools` §question). Absent ⇒ inherit the host's `interactive` default. */
+  interactive?: boolean;
   /** Resume answer for a paused supervised approval; absent on a normal turn. */
   approval_answer?: ApprovalAnswer;
   session_id?: string;
@@ -79,6 +82,7 @@ export async function parseRunBody(
     workspace_id?: unknown;
     skills?: unknown;
     mode?: unknown;
+    interactive?: unknown;
     approval_answer?: unknown;
     session_id?: unknown;
   };
@@ -163,6 +167,9 @@ export async function parseRunBody(
     // string is treated as absent rather than rejected — the supervision
     // posture should fail safe, not 400 the whole turn.
     mode: asAgentMode(b.mode) ?? AGENT_DEFAULT_MODE,
+    // Only an explicit boolean counts; anything else leaves it absent so the
+    // host's `interactive` default applies (the client didn't declare a UI).
+    interactive: typeof b.interactive === "boolean" ? b.interactive : undefined,
     // A malformed approval answer is treated as absent (no resume), never a
     // 400 — and `store.answerApproval` re-validates it against the persisted
     // pending approval regardless, so a forged answer is a no-op.

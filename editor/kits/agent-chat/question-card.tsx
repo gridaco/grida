@@ -20,7 +20,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { getToolName } from "ai";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
@@ -144,6 +144,9 @@ export function QuestionCard({
   disabled?: boolean;
 }) {
   const questions = useMemo(() => readQuestions(entry), [entry]);
+  // Stable prefix for `<label>`/`aria-labelledby` ids tying each write-in to its
+  // question text (the form gives screen readers no other accessible name).
+  const labelId = useId();
   // Per question: picked option labels + a free-text write-in.
   const [picked, setPicked] = useState<string[][]>(() =>
     questions.map(() => [])
@@ -155,6 +158,22 @@ export function QuestionCard({
   // A survey of >1 question is a one-at-a-time wizard: step through with
   // Back/Next, Submit on the last. A single question shows no stepper.
   const [step, setStep] = useState(0);
+
+  // Reset all in-progress state when the pending tool call changes. A surface
+  // may reuse this instance for a NEW question without unmounting (e.g. two
+  // questions back-to-back in one turn, where `pendingQuestion` goes Q1→Q2
+  // without passing through null), and stale selections / disabled state must
+  // not carry into the next answer. React's guarded "adjust state during render"
+  // pattern — runs once per id change, not every render.
+  const toolCallId = toolCallIdOf(entry);
+  const seenToolCallId = useRef(toolCallId);
+  if (seenToolCallId.current !== toolCallId) {
+    seenToolCallId.current = toolCallId;
+    setPicked(questions.map(() => []));
+    setWriteIns(questions.map(() => ""));
+    setSubmitted(false);
+    setStep(0);
+  }
 
   const answers = useMemo(
     () =>
@@ -176,13 +195,13 @@ export function QuestionCard({
   const submit = () => {
     if (!canSubmit) return;
     setSubmitted(true);
-    onAnswer(toolCallIdOf(entry), { answers });
+    onAnswer(toolCallId, { answers });
   };
 
   const skip = () => {
     if (disabled) return;
     setSubmitted(true);
-    onAnswer(toolCallIdOf(entry), { answers: [], skipped: true });
+    onAnswer(toolCallId, { answers: [], skipped: true });
   };
 
   const togglePick = (qi: number, label: string, multi: boolean) => {
@@ -211,6 +230,7 @@ export function QuestionCard({
 
   const renderQuestion = (qi: number) => {
     const q = questions[qi];
+    const questionId = `${labelId}-q${qi}`;
     return (
       <div className="flex flex-col gap-2">
         {q.header && (
@@ -218,7 +238,9 @@ export function QuestionCard({
             {q.header}
           </span>
         )}
-        <p className="text-sm font-medium">{q.question}</p>
+        <p id={questionId} className="text-sm font-medium">
+          {q.question}
+        </p>
 
         {q.options && q.options.length > 0 && !q.multi_select && (
           <RadioGroup
@@ -273,6 +295,7 @@ export function QuestionCard({
         )}
 
         <Textarea
+          aria-labelledby={questionId}
           value={writeIns[qi] ?? ""}
           onChange={(e) =>
             setWriteIns((prev) => {
