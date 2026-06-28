@@ -33,23 +33,25 @@ export default function Hero() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Link
-                href={sitemap.links.npm_dotcanvas}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button className="gap-1.5">
+              <Button asChild className="gap-1.5">
+                <Link
+                  href={sitemap.links.npm_dotcanvas}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   View on npm
                   <ArrowUpRight className="size-4" />
-                </Button>
-              </Link>
-              <Link
-                href={sitemap.links.github_dotcanvas}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline">GitHub</Button>
-              </Link>
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link
+                  href={sitemap.links.github_dotcanvas}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  GitHub
+                </Link>
+              </Button>
             </div>
           </div>
         </div>

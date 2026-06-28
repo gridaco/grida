@@ -36,8 +36,10 @@ in `files`.
 3. **The directory has no required shape.** Humans and agents author it however they
    like. The spec constrains _one file_ and nothing else.
 4. **The manifest is the only authority.** `.canvas.json` (the _godfile_) is the single
-   must-be-parseable contract. Every other file is **taste** — opaque to the format,
-   never required, never validated.
+   authored contract — the only file the reader parses. When it is present and parseable
+   the reader follows it; absent or malformed, the reader degrades to implicit mode (§5),
+   it does not reject. Every other file is **taste** — opaque to the format, never
+   required, never validated.
 5. **100% portable.** It is a folder of files with relative references. Copy it, zip it,
    email the folder, check it into git. No database, no absolute paths, no host coupling.
 

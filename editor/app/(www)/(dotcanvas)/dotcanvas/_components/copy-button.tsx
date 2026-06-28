@@ -15,10 +15,16 @@ export function CopyButton({
   const [copied, setCopied] = React.useState(false);
 
   const onCopy = React.useCallback(() => {
-    void navigator.clipboard.writeText(value).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    });
+    // `navigator.clipboard` is absent over plain HTTP / older browsers, and
+    // writeText() can reject when permission is blocked — fail silently rather
+    // than dead-end the CTA.
+    void navigator.clipboard?.writeText(value).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      },
+      () => {}
+    );
   }, [value]);
 
   return (

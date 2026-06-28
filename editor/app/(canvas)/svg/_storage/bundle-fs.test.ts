@@ -33,10 +33,11 @@ describe("ManifestHidingBackend — copilot view", () => {
     const hidden = new ManifestHidingBackend(backend);
     expect(await hidden.list()).toEqual(["/001.svg"]); // no /.canvas.json
     expect(await hidden.read("/.canvas.json")).toBeNull();
+    const manifestBefore = await backend.read("/.canvas.json");
 
     await hidden.write("/.canvas.json", "tampered");
-    // The real manifest is untouched — the agent can't clobber it.
-    expect(await backend.read("/.canvas.json")).not.toBe("tampered");
+    // The real manifest is untouched — the agent can't clobber OR delete it.
+    expect(await backend.read("/.canvas.json")).toBe(manifestBefore);
   });
 
   it("passes SVG documents through untouched", async () => {

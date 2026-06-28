@@ -758,15 +758,17 @@ function rootName(path: string): string | null {
 }
 
 /**
- * Compile a V1 `files` glob to an anchored, case-insensitive RegExp. `*` (any
+ * Compile a V1 `files` glob to an anchored, **case-sensitive** RegExp. `*` (any
  * run, including empty) is the only wildcard — enough for `*.svg`, `slide-*.svg`,
  * `*`; everything else matches literally. Compiled once per resolve, then reused
- * across all root entries.
+ * across all root entries. Case-sensitive to stay consistent with the exact
+ * path-membership used for `documents[].src` existence and the `.canvas.json`
+ * marker check — otherwise a file could be derived by a glob yet read as
+ * "missing" when referenced with different casing on a case-sensitive fs.
  */
 function globToRegExp(pattern: string): RegExp {
   return new RegExp(
-    "^" + pattern.split("*").map(escapeRegExp).join(".*") + "$",
-    "i"
+    "^" + pattern.split("*").map(escapeRegExp).join(".*") + "$"
   );
 }
 
