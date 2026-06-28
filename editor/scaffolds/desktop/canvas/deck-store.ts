@@ -55,11 +55,11 @@ function slidesFromManifest(m: dotcanvas.Manifest): Slide[] {
  *
  * The manifest is the truth; `slides` is derived from it. Each mutation pairs a
  * transform with the matching file op (write / trash the `<src>` SVG), then
- * persists `canvas.json`. Framework-agnostic + DI-friendly so it's unit-tested
+ * persists `.canvas.json`. Framework-agnostic + DI-friendly so it's unit-tested
  * over a fake bridge with no React or Electron.
  */
 export class CanvasDeck {
-  private manifest: dotcanvas.Manifest = { type: "svg-slides", documents: [] };
+  private manifest: dotcanvas.Manifest = { editor: "slides", documents: [] };
   private slides: Slide[] = [];
   private readonly fs: dotcanvas.WritableFs;
   private readonly listeners = new Set<() => void>();
@@ -75,7 +75,7 @@ export class CanvasDeck {
   }
 
   /** Map a bundle-relative `src` to its workspace-relative path. Refuses a
-   *  non-bundle-local `src` so a hostile/garbled `canvas.json` can't drive a
+   *  non-bundle-local `src` so a hostile/garbled `.canvas.json` can't drive a
    *  file op (notably `trashEntry`) outside the bundle — spec §2: paths are
    *  bundle-root-relative; `..` escape and absolute paths are out of scope. */
   private abs(src: string): string {
@@ -96,7 +96,7 @@ export class CanvasDeck {
 
   // ── lifecycle ──────────────────────────────────────────────────────
 
-  /** Read `canvas.json` and reconcile it against the on-disk SVGs. */
+  /** Read `.canvas.json` and reconcile it against the on-disk SVGs. */
   async load(): Promise<void> {
     const resolved = await dotcanvas.read(this.fs);
     // Carry the RECONCILED manifest (not the raw one) as the round-trip source:
@@ -106,13 +106,13 @@ export class CanvasDeck {
     // to a manifest via each doc's `meta` (its source entry; a disk-appended doc
     // has none → minimal `{ src, id }`). Reuses the `resolved` we already hold,
     // so no second `fs.list()` and no risk of reconciling against a newer disk
-    // snapshot than the one we render. `type` is defaulted to svg-slides only for
-    // an implicit (no canvas.json) bundle.
+    // snapshot than the one we render. `editor` is defaulted to "slides" only for
+    // an implicit (no .canvas.json) bundle.
     const documents = resolved.documents.map(
       (d) => d.meta ?? { src: d.src, id: d.id }
     );
     this.manifest = {
-      ...(resolved.manifest ?? { type: "svg-slides" }),
+      ...(resolved.manifest ?? { editor: "slides" }),
       documents,
     };
     this.slides = slidesFromManifest(this.manifest);
@@ -152,7 +152,7 @@ export class CanvasDeck {
 
   // ── internals ──────────────────────────────────────────────────────
 
-  /** Re-derive slides, notify subscribers, and persist `canvas.json`. */
+  /** Re-derive slides, notify subscribers, and persist `.canvas.json`. */
   private commit(): void {
     this.slides = slidesFromManifest(this.manifest);
     this.notify();

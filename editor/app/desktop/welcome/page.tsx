@@ -118,7 +118,7 @@ export default function DesktopWelcomePage() {
   }, [workspaces]);
 
   // Auto-detect `.canvas` decks among the recents: a folder containing
-  // `canvas.json` opens the file window in deck mode (`/desktop/file?id=`)
+  // `.canvas.json` opens the file window in deck mode (`/desktop/file?id=`)
   // instead of the file workbench. Probed via the bridge once per list (the main
   // process does the same fs sniff for the File-menu "Open…" path).
   const [canvasIds, setCanvasIds] = useState<Set<string>>(new Set());

@@ -33,6 +33,12 @@ export namespace sitemap {
     svg_editor: "/svg/examples/default",
     svg_editor_docs: "/packages/@grida/svg-editor",
     npm_svg_editor: "https://www.npmjs.com/package/@grida/svg-editor",
+    dotcanvas: "/dotcanvas",
+    npm_dotcanvas: "https://www.npmjs.com/package/dotcanvas",
+    github_dotcanvas: "https://github.com/gridaco/grida/tree/main/packages/dotcanvas",
+    dotcanvas_spec:
+      "https://github.com/gridaco/grida/blob/main/docs/wg/format/canvas.md",
+    schema_dotcanvas_v1: "https://grida.co/schema/dotcanvas/v1.json",
     west: "/west",
     cookies: "/cookies-policy",
     signin: "/sign-in",

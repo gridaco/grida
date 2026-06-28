@@ -98,7 +98,7 @@ type AISidebarChatProps = { className?: string } & (
       /**
        * WORKSPACE-bound: the session + run target this workspace, and the agent
        * gets a server-side fs over its directory — for a `.canvas` deck it sees
-       * `canvas.json` + every slide, resolved server-side. Mirrors
+       * `.canvas.json` + every slide, resolved server-side. Mirrors
        * `workbench/agent-pane`.
        */
       workspaceId?: string;

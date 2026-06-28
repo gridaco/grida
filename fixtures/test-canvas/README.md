@@ -1,17 +1,17 @@
 # `test-canvas` fixtures
 
 On-disk [`.canvas`](../../docs/wg/format/canvas.md) bundles — a portable
-directory of standalone SVG documents plus a `canvas.json` manifest. Consumed by
-`dotcanvas` and openable directly in the desktop app's slides editor.
+directory of standalone SVG documents plus a `.canvas.json` manifest. Consumed by
+`dotcanvas`. Two bundles cover the two editors: a `slides` deck and a `board`.
 
-## `demo.canvas/`
+## `slides.canvas/`
 
-The default happy-path deck. A valid `type: "svg-slides"` bundle exercising the
-load-bearing parts of the contract:
+The default happy-path deck. A valid `editor: "slides"` + `files: ["*.svg"]` bundle
+exercising the load-bearing parts of the contract:
 
 ```text
-demo.canvas/
-├── canvas.json     # manifest: order + ids + per-slide names + one layout + ext
+slides.canvas/
+├── .canvas.json    # manifest: order + ids + per-slide names + one layout + ext
 ├── 001.svg         # Slide 1 — Title   (id "intro")
 ├── 002.svg         # Slide 2 — Chart   (id "chart", has a canvas-view layout)
 ├── 003.svg         # Slide 3 — Thanks  (id "thanks")
@@ -35,9 +35,37 @@ What it covers:
 The SVGs are minimal and high-contrast (white/black + the slide label) so the
 deck is legible as thumbnails and in a presenter view.
 
-### Using it
+## `board.canvas/`
 
-- **Desktop:** open the `demo.canvas/` folder — it routes to the slides editor
-  (the app auto-detects `canvas.json`).
-- **Tests:** read it through any `dotcanvas.ReadableFs` (e.g. a `node:fs`
+The `board` counterpart — a valid `editor: "board"` + `files: ["*.svg"]` bundle,
+the **freeform** surface where placement (not order) is primary:
+
+```text
+board.canvas/
+├── .canvas.json    # manifest: 4 cards, each with a layout; z-ordered; no thumbnail
+├── 001.svg         # "Kickoff notes"  (id "notes")
+├── 002.svg         # "This sprint"    (id "tasks")
+├── 003.svg         # "Palette"        (id "palette", z 1 — over notes)
+└── 004.svg         # "Active boards"  (id "metric",  z 2 — on top)
+```
+
+What it covers (and where it differs from `slides.canvas`):
+
+- **Editor = `board`** — exercises the second `editor`; the canvas view (`layout`)
+  is the primary projection, not the slides order.
+- **Layout on every document** — unlike the deck (where most slides have no
+  `layout`), here all four cards are placed on a 2D plane.
+- **z-order** — `palette` (z 1) and `metric` (z 2) overlap the cards beneath
+  them; paint order is authored, not derived.
+- **No thumbnail** — resolves to `thumbnail: null` (the deck has a cover; this
+  one deliberately doesn't, covering the absent-thumbnail path).
+
+The same list still has an order, so a viewer _could_ present it as slides — the
+two views are projections of one list; `editor` only names which is primary.
+
+## Using these
+
+- **Tests:** read either through any `dotcanvas.ReadableFs` (e.g. a `node:fs`
   adapter). See `packages/dotcanvas/src/fixture.test.ts`.
+- **Desktop:** open the folder — the app auto-detects `.canvas.json` and routes
+  by `editor` (a deck opens as slides; a board as a freeform canvas).

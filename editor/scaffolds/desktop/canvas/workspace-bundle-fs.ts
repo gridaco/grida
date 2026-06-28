@@ -3,10 +3,10 @@ import type { dotcanvas } from "dotcanvas";
 
 // Adapts the desktop workspace bridge fs to `dotcanvas`'s `WritableFs`
 // port. Unlike the web OPFS path, the bridge already addresses files with
-// BARE, root-relative paths (`canvas.json`, `001.svg`) — the same convention
+// BARE, root-relative paths (`.canvas.json`, `001.svg`) — the same convention
 // dotcanvas uses — so there is NO leading-slash translation here.
 //
-// dotcanvas reads `canvas.json` and enumerates the bundle through this port; the
+// dotcanvas reads `.canvas.json` and enumerates the bundle through this port; the
 // per-slide SVG bytes are read/written by the editor surface directly (with
 // mtime-conflict handling), not through here.
 
@@ -41,7 +41,7 @@ export interface WorkspaceFsClient {
  * contract). Grida's own decks are flat (root-level `nnn.svg` / `<id>.svg`), so
  * in practice no subdirectory is walked; symlinks are not followed (bundles are
  * self-contained — this also avoids cycles). `read()` returns `null` when the
- * file is absent (a missing `canvas.json` → implicit mode).
+ * file is absent (a missing `.canvas.json` → implicit mode).
  */
 export function workspaceBundleFs(
   workspaceId: string,
@@ -50,7 +50,7 @@ export function workspaceBundleFs(
 ): dotcanvas.WritableFs {
   // A `.canvas` is NOT always the workspace root — it can live at `basePath`
   // inside a larger workspace (a projects folder opened in the workbench). The
-  // bundle's own paths stay relative to the `.canvas` dir (`canvas.json`,
+  // bundle's own paths stay relative to the `.canvas` dir (`.canvas.json`,
   // `001.svg`); this adapter maps them to/from the workspace-relative paths the
   // bridge speaks. `basePath` is "" when the `.canvas` itself is the workspace.
   const base = basePath.replace(/\/+$/, "");

@@ -1,6 +1,6 @@
 // `.canvas` — IO shell.
 //
-// A thin wire over the injected filesystem port: it reads `canvas.json` + the
+// A thin wire over the injected filesystem port: it reads `.canvas.json` + the
 // directory listing and hands them to the pure core, or serializes a manifest
 // and writes it. All decisions live in `./canvas`; this file holds none.
 
@@ -19,8 +19,8 @@ import {
 /**
  * Read a `.canvas` bundle into its resolved projection.
  *
- * - `canvas.json` missing → implicit mode, no warning (a normal state).
- * - `canvas.json` malformed → implicit mode + a `manifest_malformed` warning.
+ * - `.canvas.json` missing → implicit mode, no warning (a normal state).
+ * - `.canvas.json` malformed → implicit mode + a `manifest_malformed` warning.
  */
 export async function read<TExt = Record<string, unknown>>(
   fs: ReadableFs
@@ -46,8 +46,9 @@ export async function read<TExt = Record<string, unknown>>(
 }
 
 /**
- * Persist a manifest to `canvas.json`. The caller owns the manifest object
- * (including any unknown fields it read in); `write` only serializes it.
+ * Persist a manifest to `.canvas.json` ({@link MANIFEST_FILENAME}). The caller
+ * owns the manifest object (including any unknown fields it read in); `write`
+ * only serializes it.
  */
 export async function write<TExt = Record<string, unknown>>(
   fs: WritableFs,

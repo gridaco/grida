@@ -68,7 +68,7 @@ export type ManifestDocument = {
   [key: string]: unknown;
 };
 
-/** `canvas.json` as authored. The minimal valid manifest is `{}`. Unknown
+/** `.canvas.json` as authored. The minimal valid manifest is `{}`. Unknown
  *  top-level fields are retained so a newer writer's data survives round-trip.
  *
  *  `TExt` lets a consumer type the vendor bag it owns (`ext`). The default
@@ -79,7 +79,21 @@ export type ManifestDocument = {
 export type Manifest<TExt = Record<string, unknown>> = {
   version?: string;
   $schema?: string;
-  type?: string;
+  /** The **editor** axis — which editor/viewer opens the bundle (à la Figma's
+   *  `editorType`): `"slides"` (linear deck) | `"board"` (freeform canvas) |
+   *  `"unknown"`. A *hint* for how to read/present the documents, orthogonal to
+   *  {@link Manifest.files} (the content kind). Tolerant: any other string →
+   *  `"unknown"`. See {@link resolveEditor}. */
+  editor?: string;
+  /** The **content** axis (orthogonal to {@link editor}): the glob
+   *  patterns selecting which root files are documents — the reader's only use of
+   *  `files` (disk-derivation). They also signal the document content kind, which
+   *  a host MAY use to pick an editor (`*.svg` → an SVG editor) — a host
+   *  convention, not enforced here. Absent ⇒ the reader assumes `["*.svg"]` (V1
+   *  back-compat). An explicit `[]` derives nothing (rely on `documents[]`).
+   *  Patterns match root basenames; `*` is the only wildcard in V1. Tolerant:
+   *  junk entries just match nothing, never an error. */
+  files?: string[];
   thumbnail?: string;
   documents?: ManifestDocument[];
   ext?: TExt;
@@ -90,14 +104,27 @@ export type Manifest<TExt = Record<string, unknown>> = {
 // Resolved (read-side projection) types
 // ──────────────────────────────────────────────────────────────────────────
 
-export type CanvasType = "svg-slides" | "unknown";
+/**
+ * The **editor** a `.canvas` opens in — the application axis (à la Figma's
+ * `editorType`), deliberately orthogonal to *content* (which lives in
+ * {@link Manifest.files}). A `slides` deck and a `board` are the same
+ * one-list-two-projections substrate; `editor` only hints which projection is
+ * primary (order vs. 2D placement) — i.e. how to read/present the documents.
+ *
+ * - `"slides"` — a linear deck; `documents[]` order is the running order.
+ * - `"board"`  — a freeform infinite canvas; each document's `layout` is primary.
+ * - `"unknown"`— no assumption (default for missing/unrecognized + implicit mode).
+ *
+ * Content lives separately in `files`. See {@link resolveEditor}.
+ */
+export type EditorType = "slides" | "board" | "unknown";
 
 export type WarningCode =
   | "manifest_malformed"
   | "missing_src"
   | "duplicate_identity"
   | "thumbnail_ambiguous"
-  | "unknown_type";
+  | "unknown_editor";
 
 /** A non-fatal observation. Readers degrade and warn; they never hard-fail. */
 export type Warning = { code: WarningCode; message: string; path?: string };
@@ -128,9 +155,15 @@ export type ResolvedDocument = {
  *  carried `manifest`); it defaults to the untyped bag and is trusted, not
  *  validated. */
 export type ResolvedCanvas<TExt = Record<string, unknown>> = {
-  /** `declared` = `canvas.json` parsed OK; `implicit` = absent or malformed. */
+  /** `declared` = `.canvas.json` parsed OK; `implicit` = absent or malformed. */
   mode: "declared" | "implicit";
-  type: CanvasType;
+  /** The resolved editor/surface hint — see {@link EditorType}. */
+  editor: EditorType;
+  /** Effective document-membership globs (the content axis) — the authored
+   *  {@link Manifest.files}, or `["*.svg"]` when unauthored. Always concrete:
+   *  this is what drove disk-derivation; a host MAY also read it to pick an editor
+   *  (a host convention, not part of the reader's contract). */
+  files: string[];
   version: string | null;
   /** Resolved thumbnail path, or `null`. */
   thumbnail: string | null;
@@ -148,8 +181,16 @@ export type ResolvedCanvas<TExt = Record<string, unknown>> = {
 // Constants
 // ──────────────────────────────────────────────────────────────────────────
 
-/** The marker file whose presence declares a directory a `.canvas`. */
-export const MANIFEST_FILENAME = "canvas.json";
+/**
+ * The marker file whose presence declares a directory a `.canvas`. Hidden and
+ * JSON-typed (so editor tooling and `$schema` apply), and distinct from
+ * JSONCanvas's single-file `*.canvas`.
+ */
+export const MANIFEST_FILENAME = ".canvas.json";
+
+/** The V1 default content globs — assumed when a manifest omits `files`. SVG is
+ *  the default document kind, so an SVG `.canvas` needs no `files` field. */
+const DEFAULT_FILES = ["*.svg"] as const;
 
 /**
  * The directory-name extension (leading dot included) that names a `.canvas`
@@ -198,7 +239,7 @@ export function parse(text: string): {
       manifest: null,
       warning: {
         code: "manifest_malformed",
-        message: "canvas.json is not valid JSON",
+        message: `${MANIFEST_FILENAME} is not valid JSON`,
         path: MANIFEST_FILENAME,
       },
     };
@@ -208,7 +249,7 @@ export function parse(text: string): {
       manifest: null,
       warning: {
         code: "manifest_malformed",
-        message: "canvas.json must be a JSON object",
+        message: `${MANIFEST_FILENAME} must be a JSON object`,
         path: MANIFEST_FILENAME,
       },
     };
@@ -232,8 +273,9 @@ export function parse(text: string): {
  * Containment is the **host's** job. This checks existence only (`diskAll.has`);
  * it does NOT reject a `..`-traversal or absolute `src`. A consumer that maps a
  * `src` to a real file MUST guard containment itself before any file op — never
- * trust `resolve` for safety. Ordering is fixed: `documents` order, then
- * disk-only SVGs appended lexically; there is no auto-renumber, and there won't be.
+ * trust `resolve` for safety. Ordering is fixed: `documents` order, then disk-only
+ * documents (root files matching `files`) appended lexically; there is no
+ * auto-renumber, and there won't be.
  *
  * Skipped documents (`skip: true`) are **not** dropped — `skip` is advisory
  * view-state that rides through on each document's `meta`; honoring it in a
@@ -248,21 +290,29 @@ export function resolve<TExt = Record<string, unknown>>(
 ): ResolvedCanvas<TExt> {
   const warnings: Warning[] = [];
 
+  // The content axis: which root files count as documents. `["*.svg"]` by
+  // default (V1 back-compat), so a `.canvas` of SVGs needs no `files` field.
+  const files = resolveFiles(manifest?.files);
+  // Compile the membership globs ONCE — not once per (entry × glob) in the loop.
+  const fileMatchers = files.map(globToRegExp);
+
   // Disk views: a set of all normalized paths (for existence) and the sorted
-  // list of root-level SVGs (for derivation / appension).
+  // list of root-level DOCUMENTS — files matching `files` — for derivation /
+  // appension. (Was hardcoded to `.svg`; now driven by `files`.)
   const diskAll = new Set<string>();
-  const diskRootSvgs: string[] = [];
+  const diskRootDocs: string[] = [];
   for (const entry of rootEntries) {
     const n = norm(entry);
     if (n.length === 0) continue;
     diskAll.add(n);
     const root = rootName(entry);
-    if (root && isSvg(root)) diskRootSvgs.push(root);
+    if (root && fileMatchers.some((rx) => rx.test(root)))
+      diskRootDocs.push(root);
   }
-  diskRootSvgs.sort(); // lexical by filename (the `nnn.svg` convention, 1-based)
+  diskRootDocs.sort(); // lexical by filename (the `nnn.svg` convention, 1-based)
 
   const mode: ResolvedCanvas["mode"] = manifest ? "declared" : "implicit";
-  const type = resolveType(manifest?.type, warnings);
+  const editor = resolveEditor(manifest?.editor, warnings);
 
   // A root-level thumbnail is the bundle COVER, not a slide. Exclude the
   // convention names (and an explicit `thumbnail` target) from the SVGs that get
@@ -280,18 +330,19 @@ export function resolve<TExt = Record<string, unknown>>(
       (THUMBNAIL_NAMES as readonly string[]).includes(n) || n === explicitThumb
     );
   };
-  const slideSvgs = diskRootSvgs.filter((name) => !isReservedThumbnail(name));
+  const derivable = diskRootDocs.filter((name) => !isReservedThumbnail(name));
 
   const documents = resolveDocuments(
     manifest?.documents,
     diskAll,
-    slideSvgs,
+    derivable,
     warnings
   );
 
   return {
     mode,
-    type,
+    editor,
+    files,
     version: typeof manifest?.version === "string" ? manifest.version : null,
     thumbnail: resolveThumbnail(manifest, diskAll, warnings),
     documents,
@@ -303,35 +354,50 @@ export function resolve<TExt = Record<string, unknown>>(
   };
 }
 
-function resolveType(
-  rawType: string | undefined,
+function resolveEditor(
+  rawEditor: string | undefined,
   warnings: Warning[]
-): CanvasType {
-  if (rawType === "svg-slides") return "svg-slides";
-  // Unrecognized non-empty type → treated as "unknown", never an error.
-  if (
-    typeof rawType === "string" &&
-    rawType.length > 0 &&
-    rawType !== "unknown"
-  ) {
+): EditorType {
+  switch (rawEditor) {
+    case "slides":
+      return "slides";
+    case "board":
+      return "board";
+  }
+  // Unrecognized non-empty value → treated as "unknown", never an error.
+  if (rawEditor && rawEditor !== "unknown") {
     warnings.push({
-      code: "unknown_type",
-      message: `unrecognized type "${rawType}"; treated as "unknown"`,
+      code: "unknown_editor",
+      message: `unrecognized editor "${rawEditor}"; treated as "unknown"`,
     });
   }
   return "unknown";
 }
 
+/**
+ * The effective document-membership globs. An authored `files` array wins
+ * (filtered to non-empty strings — so `[]` and junk derive nothing); absent or
+ * non-array degrades to the V1 default `["*.svg"]`. Tolerant by construction.
+ */
+function resolveFiles(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter(
+      (g): g is string => typeof g === "string" && g.length > 0
+    );
+  }
+  return [...DEFAULT_FILES];
+}
+
 function resolveDocuments(
   entries: ManifestDocument[] | undefined,
   diskAll: Set<string>,
-  diskRootSvgs: string[],
+  derivable: string[],
   warnings: Warning[]
 ): ResolvedDocument[] {
   // documents absent → derive entirely from disk, lexical order. Disk is
   // authoritative for both existence and order in this branch.
   if (!Array.isArray(entries)) {
-    return diskRootSvgs.map((name) => ({
+    return derivable.map((name) => ({
       src: name,
       id: name,
       layout: null,
@@ -387,9 +453,9 @@ function resolveDocuments(
     });
   }
 
-  // Disk wins for existence: root SVGs not named by the manifest are appended
-  // after the listed ones (manifest order is preserved, disk-only is additive).
-  for (const name of diskRootSvgs) {
+  // Disk wins for existence: root documents not named by the manifest are
+  // appended after the listed ones (manifest order preserved, disk-only additive).
+  for (const name of derivable) {
     if (referencedSrc.has(norm(name)) || seenIdentity.has(name)) continue;
     seenIdentity.add(name);
     documents.push({
@@ -453,7 +519,8 @@ export function serialize<TExt = Record<string, unknown>>(
  * the one-line self-heal is `await write(fs, heal(parsed, entries))`.
  *
  * It drops documents whose `src` is missing on disk, appends disk-only root
- * SVGs, and preserves every surviving entry's `id`/`layout`/unknown fields, plus
+ * documents (files matching `files`), and preserves every surviving entry's
+ * `id`/`layout`/unknown fields, plus
  * every unknown top-level field and `ext` — because membership and order come
  * from {@link resolve}'s reconciled view while each entry's fields come from its
  * carried source (`ResolvedDocument.meta`). Disk-appended documents enter as
@@ -473,8 +540,8 @@ export function heal<TExt = Record<string, unknown>>(
   const documents: ManifestDocument[] = resolved.documents.map(
     (d) => d.meta ?? { src: d.src, id: d.id }
   );
-  // Preserve every top-level field (version/$schema/type/thumbnail/ext and any
-  // unknowns); replace only `documents` with the reconciled, disk-true set.
+  // Preserve every top-level field (version/$schema/editor/files/thumbnail/ext
+  // and any unknowns); replace only `documents` with the reconciled, disk-true set.
   // Spreading `null` is a no-op, so no `?? {}` fallback is needed.
   return { ...manifest, documents } as Manifest<TExt>;
 }
@@ -687,8 +754,21 @@ function rootName(path: string): string | null {
   return p;
 }
 
-function isSvg(name: string): boolean {
-  return name.toLowerCase().endsWith(".svg");
+/**
+ * Compile a V1 `files` glob to an anchored, case-insensitive RegExp. `*` (any
+ * run, including empty) is the only wildcard — enough for `*.svg`, `slide-*.svg`,
+ * `*`; everything else matches literally. Compiled once per resolve, then reused
+ * across all root entries.
+ */
+function globToRegExp(pattern: string): RegExp {
+  return new RegExp(
+    "^" + pattern.split("*").map(escapeRegExp).join(".*") + "$",
+    "i"
+  );
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** Keep only finite numeric layout fields; drop empty layouts to `null`. */

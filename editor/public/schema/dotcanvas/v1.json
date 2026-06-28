@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://grida.co/schema/dotcanvas/v1.json",
+  "title": ".canvas manifest (.canvas.json)",
+  "description": "The single manifest of a `.canvas` bundle — a portable directory of standalone documents plus order and optional 2D placement. The reader is tolerant by construction: every field is optional and the minimal valid manifest is `{}`. Spec: https://github.com/gridaco/grida/blob/main/docs/wg/format/canvas.md",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Editor-tooling hint only; ignored by readers."
+    },
+    "version": {
+      "type": "string",
+      "description": "Spec version this manifest targets. Missing → reader assumes current.",
+      "examples": ["1"]
+    },
+    "editor": {
+      "type": "string",
+      "description": "The EDITOR that opens the bundle (à la Figma's editorType — how the documents are read/presented), orthogonal to `files` (the content). Known values: \"slides\" (a linear deck — `documents[]` order is primary), \"board\" (a freeform canvas — each document's `layout` is primary), \"unknown\". Tolerant: any other string is read as \"unknown\", never an error.",
+      "examples": ["slides", "board", "unknown"]
+    },
+    "files": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "The CONTENT axis: glob patterns selecting which root files are documents — the reader's sole use of `files` (disk-derivation). They also signal the document content kind, which a host MAY use to pick an editor (`*.svg` → an SVG editor); that dispatch is a host convention, not enforced by the reader. Missing → [\"*.svg\"]. An explicit [] derives nothing (membership comes only from `documents`). Patterns match root basenames; `*` (any run) is the only wildcard.",
+      "examples": [["*.svg"]]
+    },
+    "thumbnail": {
+      "type": "string",
+      "description": "Explicit thumbnail path; overrides the filename convention (thumbnail.png > .svg > .jpg > .jpeg)."
+    },
+    "documents": {
+      "type": "array",
+      "description": "The ordered set of documents. Array order IS the slides view; each entry's `layout` is the canvas view. Absent → the reader derives the list from disk: root files matching `files`, excluding any reserved thumbnail cover (thumbnail.png/svg/jpg/jpeg).",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["src"],
+        "properties": {
+          "src": {
+            "type": "string",
+            "description": "Bundle-root-relative path to the document. The only per-document field that carries meaning by itself."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identity; absent → `src` is the identity."
+          },
+          "layout": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Canvas-view 2D placement. Absent → no canvas position.",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "w": { "type": "number" },
+              "h": { "type": "number" },
+              "z": { "type": "number" }
+            }
+          },
+          "skip": {
+            "type": "boolean",
+            "description": "Omit this document from the linear slides view's running order. It still exists and shows in the canvas view. Advisory — the reader round-trips it but never drops the document."
+          }
+        }
+      }
+    },
+    "ext": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Vendor/app extension bag. Readers ignore keys they don't own and SHOULD round-trip them."
+    }
+  }
+}

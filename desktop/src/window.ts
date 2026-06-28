@@ -366,7 +366,7 @@ export function open_workspace_window({
  * Same workspace substrate as {@link open_workspace_window} (the renderer reads
  * the bundle through the workspace bridge fs), but a deck surface instead of the
  * file workbench — the caller routes a folder here when it contains a
- * `canvas.json`. Dedup is the caller's job (focus an existing
+ * `.canvas.json`. Dedup is the caller's job (focus an existing
  * `/desktop/file?id=` window for this id, else spawn).
  *
  * Lands on the shared `/desktop/file` window in bundle (`?id=`) mode — the same

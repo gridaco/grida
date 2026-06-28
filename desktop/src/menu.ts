@@ -37,7 +37,7 @@ function open_or_focus_settings(app: App) {
 /**
  * "Open…" menu handler. Drives the native open panel from main. The
  * picker accepts **both** a folder (opened as a workspace, or as a
- * `.canvas` deck when it contains `canvas.json`) and a single supported
+ * `.canvas` deck when it contains `.canvas.json`) and a single supported
  * file (`.svg` / `.grida`, opened in its own document window). The
  * file branch is delegated to `onOpenFile` — the same handler the OS
  * file-open path uses — so document dedup + the dirty-close prompt are
@@ -107,14 +107,16 @@ async function open_picker_and_register(
   }
 
   let workspaceId: string;
-  // Auto-detect: a folder that contains `canvas.json` opens the `.canvas`
-  // slides editor; anything else opens the file workbench. Sniff the RESOLVED
-  // root (the agent server may expand the picked path to a containing repo).
+  // Auto-detect: a folder that contains the bundle marker (`.canvas.json`)
+  // opens the `.canvas` slides editor; anything else opens the file workbench.
+  // Sniff the RESOLVED root (the agent server may expand the picked path to a
+  // containing repo). This process has no `dotcanvas` import by design — keep the
+  // marker name in sync with `dotcanvas.MANIFEST_FILENAME`.
   let isCanvas = false;
   try {
     const workspace = await agentSidecarClient.openWorkspace(picked);
     workspaceId = workspace.id;
-    isCanvas = existsSync(join(workspace.root, "canvas.json"));
+    isCanvas = existsSync(join(workspace.root, ".canvas.json"));
   } catch (err) {
     console.error("[grida] open workspace failed:", err);
     dialog.showErrorBox(

@@ -139,6 +139,12 @@ export function SvgMenuContent({
               Slides
             </DropdownMenuItem>
           </Link>
+          <Link href="/svg/examples/board">
+            <DropdownMenuItem className="text-xs">
+              <OpenInNewWindowIcon className="size-3.5" />
+              Board
+            </DropdownMenuItem>
+          </Link>
         </DropdownMenuSubContent>
       </DropdownMenuSub>
       <DropdownMenuSeparator />

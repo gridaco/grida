@@ -1,7 +1,7 @@
 /**
  * Desktop `.canvas` slides editor. The folder is registered as a workspace, so
  * this reads/writes through the `workspaces` bridge fs. The deck's order +
- * structure live in `canvas.json` (mutated via the `dotcanvas`
+ * structure live in `.canvas.json` (mutated via the `dotcanvas`
  * transforms in {@link CanvasDeck}); each slide is one `<src>.svg` edited with
  * the keynote camera + mtime-safe save.
  *
@@ -65,7 +65,7 @@ export function DesktopCanvasShell({
   }, [deck]);
 
   // Reflect external edits to the manifest — the workspace agent adding,
-  // removing, or reordering slides writes `canvas.json`, and so does anything
+  // removing, or reordering slides writes `.canvas.json`, and so does anything
   // else editing the bundle on disk. Re-read the deck so the strip updates.
   // Slide *content* edits reflect via each slide surface's own mtime watch.
   // Needs a `WorkspaceChangesProvider` ancestor (the file window's deck mode and

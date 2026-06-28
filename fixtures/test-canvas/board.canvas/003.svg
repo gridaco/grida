@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 160" width="220" height="160">
+  <rect width="220" height="160" rx="8" fill="#0f172a" />
+  <text x="18" y="34" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="600" fill="#cbd5e1">Palette</text>
+  <rect x="18" y="50" width="44" height="44" rx="6" fill="#ef4444" />
+  <rect x="70" y="50" width="44" height="44" rx="6" fill="#f59e0b" />
+  <rect x="122" y="50" width="44" height="44" rx="6" fill="#22c55e" />
+  <rect x="174" y="50" width="28" height="44" rx="6" fill="#3b82f6" />
+  <text x="18" y="128" font-family="ui-monospace, monospace" font-size="12" fill="#64748b">#EF4444 · #F59E0B · #22C55E</text>
+</svg>

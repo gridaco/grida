@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 140" width="280" height="140">
+  <rect width="280" height="140" rx="10" fill="#1e1b4b" />
+  <text x="22" y="44" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600" fill="#a5b4fc" letter-spacing="1">ACTIVE BOARDS</text>
+  <text x="22" y="104" font-family="ui-sans-serif, system-ui, sans-serif" font-size="56" font-weight="800" fill="#ffffff">1,204</text>
+  <text x="206" y="104" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="600" fill="#34d399">▲ 8%</text>
+</svg>

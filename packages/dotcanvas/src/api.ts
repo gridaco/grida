@@ -7,7 +7,7 @@
 // re-implemented the same reconcile fold (see README "Public surface").
 
 export type {
-  CanvasType,
+  EditorType,
   Layout,
   Manifest,
   ManifestDocument,

@@ -14,7 +14,13 @@ describe("isBundlePath — `.canvas` package suffix", () => {
   it("rejects non-bundle paths", () => {
     expect(dotcanvas.isBundlePath("deck.svg")).toBe(false);
     expect(dotcanvas.isBundlePath("canvas")).toBe(false);
-    expect(dotcanvas.isBundlePath("a/canvas.json")).toBe(false);
+    expect(dotcanvas.isBundlePath("a/.canvas.json")).toBe(false);
+  });
+});
+
+describe("manifest marker", () => {
+  it("the canonical marker is `.canvas.json`", () => {
+    expect(dotcanvas.MANIFEST_FILENAME).toBe(".canvas.json");
   });
 });
 
@@ -22,7 +28,8 @@ describe("resolve — RFD §5 reconcile", () => {
   it("minimal valid manifest {} → empty declared deck", () => {
     const c = resolve({}, []);
     expect(c.mode).toBe("declared");
-    expect(c.type).toBe("unknown");
+    expect(c.editor).toBe("unknown");
+    expect(c.files).toEqual(["*.svg"]); // content axis defaults to SVG (V1)
     expect(c.documents).toEqual([]);
     expect(c.thumbnail).toBeNull();
     expect(c.ext).toEqual({});
@@ -95,21 +102,27 @@ describe("resolve — RFD §5 reconcile", () => {
     expect(c.documents.map((d) => d.id)).toEqual(["n_a1b2", "002.svg"]);
   });
 
-  it("unrecognized type → unknown (+ warning); unknown top-level + ext preserved", () => {
+  it("unrecognized editor → unknown (+ warning); unknown top-level + ext preserved", () => {
     const c = resolve(
-      { type: "mind-map", foo: "bar", ext: { vendor: { a: 1 } } },
+      { editor: "mind-map", foo: "bar", ext: { vendor: { a: 1 } } },
       []
     );
-    expect(c.type).toBe("unknown");
-    expect(c.warnings.map((w) => w.code)).toEqual(["unknown_type"]);
+    expect(c.editor).toBe("unknown");
+    expect(c.warnings.map((w) => w.code)).toEqual(["unknown_editor"]);
     expect(c.ext).toEqual({ vendor: { a: 1 } });
     // The raw manifest is carried verbatim for round-trip.
     expect(c.manifest?.foo).toBe("bar");
   });
 
-  it('recognized type "svg-slides" resolves without warning', () => {
-    const c = resolve({ type: "svg-slides" }, []);
-    expect(c.type).toBe("svg-slides");
+  it('recognized editor "slides" resolves without warning', () => {
+    const c = resolve({ editor: "slides" }, []);
+    expect(c.editor).toBe("slides");
+    expect(c.warnings).toEqual([]);
+  });
+
+  it('recognized editor "board" resolves without warning', () => {
+    const c = resolve({ editor: "board" }, []);
+    expect(c.editor).toBe("board");
     expect(c.warnings).toEqual([]);
   });
 
@@ -211,10 +224,57 @@ describe("resolve — tolerance", () => {
   });
 });
 
+describe("resolve — files (content axis)", () => {
+  it('files defaults to ["*.svg"] when unauthored (declared + implicit)', () => {
+    expect(resolve({}, []).files).toEqual(["*.svg"]);
+    expect(resolve(null, []).files).toEqual(["*.svg"]);
+  });
+
+  it("authored files wins and is carried through verbatim", () => {
+    expect(resolve({ files: ["*.png", "*.svg"] }, []).files).toEqual([
+      "*.png",
+      "*.svg",
+    ]);
+  });
+
+  it("files drives disk-derivation (not hardcoded to .svg)", () => {
+    // a board of PNGs: documents absent, files declares *.png → derive the PNGs
+    // in lexical order and ignore the stray .svg.
+    const c = resolve({ editor: "board", files: ["*.png"] }, [
+      "b.png",
+      "a.png",
+      "note.svg",
+    ]);
+    expect(c.documents.map((d) => d.src)).toEqual(["a.png", "b.png"]);
+  });
+
+  it("explicit empty files derives nothing (rely on documents[])", () => {
+    expect(resolve({ files: [] }, ["a.svg", "b.svg"]).documents).toEqual([]);
+  });
+
+  it("a leading-wildcard glob (slide-*.svg) matches by basename", () => {
+    const c = resolve({ files: ["slide-*.svg"] }, [
+      "slide-1.svg",
+      "slide-2.svg",
+      "other.svg",
+    ]);
+    expect(c.documents.map((d) => d.src)).toEqual([
+      "slide-1.svg",
+      "slide-2.svg",
+    ]);
+  });
+
+  it("files round-trips through serialize/heal", () => {
+    const healed = heal({ editor: "board", files: ["*.svg"] }, ["a.svg"]);
+    expect(healed.files).toEqual(["*.svg"]);
+    expect(JSON.parse(serialize(healed)).files).toEqual(["*.svg"]);
+  });
+});
+
 describe("serialize — stable, lossless (RFD §8)", () => {
   it("serialize preserves ext + unknown fields; stable (sorted keys, trailing newline)", () => {
     const manifest: dotcanvas.Manifest = {
-      type: "svg-slides",
+      editor: "slides",
       version: "1",
       zzz: "keep",
       documents: [{ src: "b.svg" }, { src: "a.svg" }],
@@ -228,9 +288,9 @@ describe("serialize — stable, lossless (RFD §8)", () => {
 
     // Top-level keys are sorted.
     const at = (k: string) => out.indexOf(`"${k}"`);
-    expect(at("documents")).toBeLessThan(at("ext"));
-    expect(at("ext")).toBeLessThan(at("type"));
-    expect(at("type")).toBeLessThan(at("version"));
+    expect(at("documents")).toBeLessThan(at("editor"));
+    expect(at("editor")).toBeLessThan(at("ext"));
+    expect(at("ext")).toBeLessThan(at("version"));
     expect(at("version")).toBeLessThan(at("zzz"));
 
     // Array order (documents) is preserved, not sorted.
@@ -245,7 +305,7 @@ describe("serialize — stable, lossless (RFD §8)", () => {
 describe("heal — read→writable reconcile (R3)", () => {
   it("heal drops missing src, appends disk-only SVGs, preserves id/layout/skip/unknown per-doc fields", () => {
     const manifest: dotcanvas.Manifest = {
-      type: "svg-slides",
+      editor: "slides",
       documents: [
         {
           src: "a.svg",
@@ -274,14 +334,14 @@ describe("heal — read→writable reconcile (R3)", () => {
 
   it("heal preserves unknown top-level fields and ext", () => {
     const manifest: dotcanvas.Manifest = {
-      type: "svg-slides",
+      editor: "slides",
       version: "1",
       foo: "keep",
       ext: { vendor: { a: 1 } },
       documents: [{ src: "a.svg" }],
     };
     const healed = heal(manifest, ["a.svg"]);
-    expect(healed.type).toBe("svg-slides");
+    expect(healed.editor).toBe("slides");
     expect(healed.version).toBe("1");
     expect(healed.foo).toBe("keep");
     expect(healed.ext).toEqual({ vendor: { a: 1 } });
@@ -440,7 +500,7 @@ describe("edit — pure manifest transforms", () => {
 
   it("add/remove/reorder/setLayout preserve the top-level unknown bag and ext", () => {
     const base: dotcanvas.Manifest = {
-      type: "svg-slides",
+      editor: "slides",
       foo: "keep",
       ext: { vendor: { a: 1 } },
       documents: [{ src: "a.svg" }, { src: "b.svg", id: "n_b" }],

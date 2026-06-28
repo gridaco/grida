@@ -23,7 +23,7 @@ function abs(path: string): string {
 /**
  * Adapt an `AgentFs.Backend` to the `dotcanvas` fs port. dotcanvas
  * addresses files root-relative *without* a leading slash (it reads/writes
- * `canvas.json`), while `AgentFs.Backend` (e.g. `OpfsBackend`) requires a
+ * `.canvas.json`), while `AgentFs.Backend` (e.g. `OpfsBackend`) requires a
  * leading slash. This bridges the two path conventions.
  */
 export function bundleFs(backend: AgentFs.Backend): dotcanvas.WritableFs {
@@ -35,7 +35,7 @@ export function bundleFs(backend: AgentFs.Backend): dotcanvas.WritableFs {
 }
 
 /**
- * Wrap a bundle backend so the `.canvas` manifest (`canvas.json`) is invisible
+ * Wrap a bundle backend so the `.canvas` manifest (`.canvas.json`) is invisible
  * to whatever `AgentFs` is built on top. The AI copilot operates on the SVG
  * documents only and must never see — or clobber — the manifest. The store
  * reads/writes the manifest directly via {@link bundleFs}, bypassing this view.

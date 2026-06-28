@@ -1,8 +1,9 @@
 {
   "name": "dotcanvas",
-  "version": "0.1.0",
-  "description": "Tolerant, zero-dependency reader/writer for the .canvas format — a portable directory of standalone SVG-slide documents plus a canvas.json manifest (order, 2D layout, skip, self-heal). ESM-only.",
+  "version": "0.2.0",
+  "description": "Tolerant, zero-dependency reader/writer for the .canvas format — a portable directory of standalone documents (SVG slides or a freeform board) plus a .canvas.json manifest (order, 2D layout, skip, self-heal). ESM-only.",
   "keywords": [
+    "board",
     "bundle",
     "canvas",
     "container-format",
@@ -16,10 +17,9 @@
     "reader",
     "slides",
     "svg",
-    "svg-slides",
     "writer"
   ],
-  "homepage": "https://grida.co/docs/packages/dotcanvas",
+  "homepage": "https://grida.co/dotcanvas",
   "bugs": "https://github.com/gridaco/grida/issues",
   "license": "MIT",
   "author": "Grida",
