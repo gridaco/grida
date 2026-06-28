@@ -39,6 +39,10 @@ const DESKTOP_CSP_SUFFIX =
   // tightening style-src is a separate change.
   `style-src 'self' 'unsafe-inline'; ` +
   `img-src 'self' data: blob:; ` +
+  // media-src for BYOK video (#908): clips are downloaded by the sidecar and
+  // handed to the renderer as base64 `data:`/`blob:` — never streamed from an
+  // external origin (same trust level as img-src; no provider hosts added).
+  `media-src 'self' data: blob:; ` +
   `font-src 'self' data:; ` +
   //   connect-src allows:
   //   - 'self'              — grida.co (prod) / localhost:3000 (dev)
@@ -51,7 +55,11 @@ const DESKTOP_CSP_SUFFIX =
   `base-uri 'self'; ` +
   `form-action 'self'`;
 
-function buildDesktopCsp(nonce: string): string {
+// Exported for the CSP contract test (proxy.test.ts). The test pins the
+// directive set so a new renderer-loaded resource type (e.g. another media
+// modality) can't silently fall back to `default-src` and break at runtime —
+// the way video did before `media-src` was added (#908).
+export function buildDesktopCsp(nonce: string): string {
   return DESKTOP_CSP_PREFIX + nonce + DESKTOP_CSP_SUFFIX;
 }
 

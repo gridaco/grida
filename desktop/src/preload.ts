@@ -510,6 +510,14 @@ const bridge: DesktopBridge = {
     detect_claude: () => agentClient.providers.detect_claude(),
   },
 
+  images: {
+    generate: (req) => agentClient.images.generate(req),
+  },
+
+  video: {
+    generate: (req) => agentClient.video.generate(req),
+  },
+
   agent: {
     run: (opts, onChunk) =>
       // Fresh runs always return a stream (only `reconnect` may return

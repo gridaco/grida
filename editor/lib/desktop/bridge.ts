@@ -38,6 +38,10 @@ import {
   type EndpointModelSpec,
   type EndpointProviderConfig,
   type ProbedEndpointModel,
+  type ImageGenerateRequest,
+  type ImageGenerateResult,
+  type VideoGenerateRequest,
+  type VideoGenerateResult,
   type PatchSessionOptions,
   type RewindResult,
   type SessionListFilter,
@@ -78,6 +82,12 @@ export {
   type EndpointModelSpec,
   type EndpointProviderConfig,
   type ProbedEndpointModel,
+  type ImageGenProvider,
+  type ImageGenerateRequest,
+  type ImageGenerateResult,
+  type VideoGenProvider,
+  type VideoGenerateRequest,
+  type VideoGenerateResult,
   type AgentMode,
   type AgentUIMessageChunk,
   type AgentRunOptions,
@@ -435,6 +445,50 @@ export namespace providers {
       cancel_id: 1,
     });
     return choice === 0;
+  }
+}
+
+/* ─────────────────────── images namespace ───────────────────── */
+
+/**
+ * BYOK image generation (#908). Desktop-only: the request resolves the user's
+ * connected provider key inside the agent sidecar and returns base64 image
+ * bytes — the key never crosses the bridge (GRIDA-SEC-004). Feature-detect
+ * with {@link isSupported}; old binaries lack the surface.
+ */
+export namespace images {
+  export function isSupported(): boolean {
+    return getDesktopBridge()?.images != null;
+  }
+
+  export async function generate(
+    req: ImageGenerateRequest
+  ): Promise<ImageGenerateResult> {
+    const bridge = bridgeOrThrow().images;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    return await bridge.generate(req);
+  }
+}
+
+/* ─────────────────────── video namespace ────────────────────── */
+
+/**
+ * BYOK video generation (#908). Same posture as {@link images}: the request
+ * resolves the user's key in the sidecar and returns a provider URL (or base64)
+ * — the key never crosses the bridge (GRIDA-SEC-004). Feature-detect with
+ * {@link isSupported}.
+ */
+export namespace video {
+  export function isSupported(): boolean {
+    return getDesktopBridge()?.video != null;
+  }
+
+  export async function generate(
+    req: VideoGenerateRequest
+  ): Promise<VideoGenerateResult> {
+    const bridge = bridgeOrThrow().video;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    return await bridge.generate(req);
   }
 }
 
