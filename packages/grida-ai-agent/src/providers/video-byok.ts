@@ -112,6 +112,7 @@ export class FalVideoModel implements VideoModelV3 {
       aspectRatio,
       resolution,
       duration,
+      fps,
       seed,
       image,
       providerOptions,
@@ -129,6 +130,7 @@ export class FalVideoModel implements VideoModelV3 {
         ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
         ...(resolution ? { resolution } : {}),
         ...(duration !== undefined ? { duration } : {}),
+        ...(fps !== undefined ? { fps } : {}),
         ...(seed !== undefined ? { seed } : {}),
         // image-to-video: fal takes the start frame as `image_url`.
         ...(image ? { image_url: fileToUrl(image) } : {}),
@@ -246,6 +248,7 @@ export class OpenRouterVideoModel implements VideoModelV3 {
       aspectRatio,
       resolution,
       duration,
+      fps,
       seed,
       image,
       providerOptions,
@@ -267,6 +270,7 @@ export class OpenRouterVideoModel implements VideoModelV3 {
         // (its `resolution` field is a label like "720p").
         ...(resolution ? { size: resolution } : {}),
         ...(duration !== undefined ? { duration } : {}),
+        ...(fps !== undefined ? { fps } : {}),
         ...(seed !== undefined ? { seed } : {}),
         ...(image?.type === "url" ? { input_references: [image.url] } : {}),
         ...orExtra,
