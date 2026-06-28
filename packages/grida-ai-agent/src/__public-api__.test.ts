@@ -118,6 +118,16 @@ describe("@grida/agent public API", () => {
         "Vercel",
         "fal",
       ]);
+      // The modality matrix drives image/video resolver routing (via
+      // byokProvidersFor) — pin it so a bad metadata edit can't silently
+      // re-route provider selection.
+      expect(
+        BYOK_PROVIDER_METADATA.map(({ id, modalities }) => ({ id, modalities }))
+      ).toEqual([
+        { id: "openrouter", modalities: ["text", "image", "video"] },
+        { id: "vercel", modalities: ["text", "image", "video"] },
+        { id: "fal", modalities: ["image", "video"] },
+      ]);
       const byok: ByokProviderId = "vercel";
       const metadata: ByokProviderMetadata = BYOK_PROVIDER_METADATA[0];
       expect(byok).toBe("vercel");

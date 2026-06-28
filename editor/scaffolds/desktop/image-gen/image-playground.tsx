@@ -108,12 +108,27 @@ function supportsQuality(
   return card?.pricing.type === "per_image_tiered";
 }
 
+/** File extension for a download, from the returned media type. */
+function imageExtension(mediaType?: string): string {
+  switch (mediaType) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    default:
+      return "png";
+  }
+}
+
 type Tile = {
   id: string;
   prompt: string;
   model_id: string;
   status: "generating" | "done" | "error";
   src?: string;
+  media_type?: string;
   error?: string;
 };
 
@@ -176,7 +191,7 @@ export function DesktopImagePlayground({
         prev.map((t) =>
           t.id === id
             ? src
-              ? { ...t, status: "done", src }
+              ? { ...t, status: "done", src, media_type: first?.media_type }
               : { ...t, status: "error", error: "No image returned" }
             : t
         )
@@ -246,7 +261,16 @@ export function DesktopImagePlayground({
                   quality={quality}
                   onQuality={setQuality}
                 />
-                <ImageModelPicker value={modelId} onValueChange={setModelId} />
+                <ImageModelPicker
+                  value={modelId}
+                  onValueChange={(next) => {
+                    // Reset model-scoped options — a size/quality the new model
+                    // doesn't expose would otherwise be sent and rejected.
+                    setModelId(next);
+                    setSize(AUTO_SIZE);
+                    setQuality("auto");
+                  }}
+                />
               </PromptInputTools>
               <PromptInputSubmit />
             </PromptInputFooter>
@@ -451,7 +475,7 @@ function GalleryCell({
       <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition group-hover:opacity-100">
         <a
           href={tile.src}
-          download={`grida-image-${tile.id}.png`}
+          download={`grida-image-${tile.id}.${imageExtension(tile.media_type)}`}
           onClick={(e) => e.stopPropagation()}
           aria-label="Download"
           title="Download"

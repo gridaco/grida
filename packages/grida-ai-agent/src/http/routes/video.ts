@@ -30,6 +30,7 @@ import {
   VideoModelUnavailableError,
   resolveVideoModel,
 } from "../../providers/resolve-video";
+import { assertHttpsUrl } from "../../providers/fetch-helpers";
 import { body, v } from "../validate";
 
 const VIDEO_PROVIDERS = ["vercel", "fal", "openrouter"] as const;
@@ -46,12 +47,16 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
       model_id: v.string,
       prompt: v.string,
       provider: v.optional(v.oneOf(VIDEO_PROVIDERS)),
-      aspect_ratio: v.optional(v.string),
-      resolution: v.optional(v.string),
+      // Reject malformed option strings at the boundary (400) instead of
+      // letting them reach the provider and bounce back as a 502.
+      aspect_ratio: v.optional(v.matching(/^\d+:\d+$/, 'must be "<w>:<h>"')),
+      resolution: v.optional(v.matching(/^\d+x\d+$/, 'must be "<w>x<h>"')),
       duration: v.optional(v.number),
       fps: v.optional(v.number),
       seed: v.optional(v.number),
-      image_url: v.optional(v.string),
+      image_url: v.optional(
+        v.matching(/^https:\/\/.+/i, "must be an https url")
+      ),
     });
     if (!r.ok) return r.res;
     const d = r.data;
@@ -90,13 +95,15 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     try {
       generation = await resolved.model.doGenerate(callOptions);
     } catch (e) {
+      // Upstream body stays in the sidecar log only — never echoed to the
+      // renderer (provider diagnostics / prompt content).
       const detail = e instanceof Error ? e.message : String(e);
       const upstream = (e as { responseBody?: unknown })?.responseBody;
-      const message = `video generation failed: ${detail}${
-        upstream ? ` — ${String(upstream).slice(0, 300)}` : ""
-      }`;
+      const message = `video generation failed: ${detail}`;
       console.error(
-        `[agent-host-video] failed provider=${resolved.provider_id} model=${d.model_id}: ${message}`
+        `[agent-host-video] failed provider=${resolved.provider_id} model=${d.model_id}: ${message}${
+          upstream ? ` — ${String(upstream).slice(0, 300)}` : ""
+        }`
       );
       return c.json(
         {
@@ -125,6 +132,12 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
               media_type: vid.mediaType,
             };
           // type === "url": public CDN (fal/vercel) — download in the sidecar.
+          // Require HTTPS here; host-level egress control is enforced by the
+          // OS sandbox allowlist (sandbox/policy.ts), the primary SSRF defense.
+          assertHttpsUrl(
+            vid.url,
+            `[agent-host-video] ${resolved.provider_id} url`
+          );
           const dl = await fetch(vid.url);
           if (!dl.ok) throw new Error(`download failed (${dl.status})`);
           return {

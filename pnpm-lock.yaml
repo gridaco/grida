@@ -1077,7 +1077,7 @@ importers:
         specifier: 2.0.48
         version: 2.0.48(zod@4.3.6)
       '@ai-sdk/provider':
-        specifier: ^3.0.0
+        specifier: 3.0.10
         version: 3.0.10
       '@grida/ai-models':
         specifier: workspace:*

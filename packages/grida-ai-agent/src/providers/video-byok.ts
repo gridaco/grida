@@ -21,6 +21,8 @@ import type {
 } from "@ai-sdk/provider";
 import type { models } from "@grida/ai-models";
 import {
+  assertAllowedUrl,
+  assertHttpsUrl,
   falQueueOutcome,
   pollQueue,
   safeText,
@@ -64,6 +66,10 @@ export function makeVideoModelFor(
 // ── fal adapter ─────────────────────────────────────────────────────
 
 const FAL_QUEUE_BASE = "https://queue.fal.run";
+/** Hosts fal/OpenRouter responses may point us at. Key-bearing fetches are
+ *  pinned to these so a hostile response can't exfil the key (GRIDA-SEC-004). */
+const FAL_HOSTS = ["*.fal.run", "fal.run", "fal.media", "*.fal.media"] as const;
+const OPENROUTER_HOSTS = ["openrouter.ai", "*.openrouter.ai"] as const;
 /** Video jobs are slower than image — allow a longer bounded poll budget. */
 const FAL_POLL_TIMEOUT_MS = 300_000;
 const FAL_POLL_INTERVAL_MS = 2_000;
@@ -135,6 +141,14 @@ export class FalVideoModel implements VideoModelV3 {
       );
     }
     const submit = (await submitRes.json()) as FalSubmitResponse;
+
+    // GRIDA-SEC-004: pin key-bearing fetches to fal hosts.
+    assertAllowedUrl(submit.status_url, FAL_HOSTS, "[fal] video status_url");
+    assertAllowedUrl(
+      submit.response_url,
+      FAL_HOSTS,
+      "[fal] video response_url"
+    );
 
     await pollQueue<{ status: FalStatus }>(
       submit.status_url,
@@ -266,6 +280,12 @@ export class OpenRouterVideoModel implements VideoModelV3 {
     const submit = (await submitRes.json()) as OrSubmitResponse;
     const pollUrl =
       submit.polling_url ?? `${OPENROUTER_VIDEO_URL}/${submit.id}`;
+    // GRIDA-SEC-004: the poll fetch carries the key — pin it to OpenRouter.
+    assertAllowedUrl(
+      pollUrl,
+      OPENROUTER_HOSTS,
+      "[openrouter] video polling_url"
+    );
 
     const poll = await pollQueue<OrPollResponse>(
       pollUrl,
@@ -287,8 +307,14 @@ export class OpenRouterVideoModel implements VideoModelV3 {
     // a `data:` URL the <video> plays.
     //
     // GRIDA-SEC-004: `unsigned_urls` are pre-signed public CDN links — fetch
-    // them WITHOUT the key, or the BYOK secret leaks to a third-party CDN host.
-    // Only the authed `/content` fallback gets the Authorization header.
+    // them WITHOUT the key (or the secret leaks to a third-party host), and
+    // require HTTPS. The authed `/content` fallback is pinned to OpenRouter and
+    // gets the Authorization header.
+    if (unsignedUrl) {
+      assertHttpsUrl(unsignedUrl, "[openrouter] video url");
+    } else {
+      assertAllowedUrl(url, OPENROUTER_HOSTS, "[openrouter] video content");
+    }
     const dl = await fetch(url, {
       headers: unsignedUrl ? {} : { authorization: `Bearer ${this.apiKey}` },
       signal: abortSignal,

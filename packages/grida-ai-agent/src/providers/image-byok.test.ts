@@ -74,13 +74,16 @@ describe("FalImageModel.doGenerate", () => {
           return new Response(
             JSON.stringify({
               images: [
-                { url: "https://cdn.fal/i.png", content_type: "image/png" },
+                {
+                  url: "https://v3.fal.media/i.png",
+                  content_type: "image/png",
+                },
               ],
             }),
             { status: 200 }
           );
         }
-        if (url === "https://cdn.fal/i.png") {
+        if (url === "https://v3.fal.media/i.png") {
           return new Response(PNG, { status: 200 });
         }
         return new Response("not found", { status: 404 });

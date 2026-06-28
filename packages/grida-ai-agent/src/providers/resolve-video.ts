@@ -86,7 +86,7 @@ export async function resolveVideoModel(
       provider_id: provider,
       model_id: modelId,
       binding_id: binding.id,
-      model: makeVideoModelFor(provider, key, binding.id),
+      model: makeVideoModelFor(provider, key.trim(), binding.id),
     };
   }
 

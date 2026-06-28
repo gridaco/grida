@@ -106,15 +106,16 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
         ...(providerOptions ? { providerOptions } : {}),
       });
     } catch (e) {
-      // Surface a useful message: the SDK's message plus any upstream response
-      // body (AI SDK APICallError carries `responseBody`/`statusCode`).
+      // Keep the raw upstream body (AI SDK APICallError.responseBody) in the
+      // sidecar log ONLY — never echo provider diagnostics / prompt content back
+      // across the bridge to the renderer.
       const detail = e instanceof Error ? e.message : String(e);
-      const body = (e as { responseBody?: unknown })?.responseBody;
-      const message = `image generation failed: ${detail}${
-        body ? ` — ${String(body).slice(0, 300)}` : ""
-      }`;
+      const upstreamBody = (e as { responseBody?: unknown })?.responseBody;
+      const message = `image generation failed: ${detail}`;
       console.error(
-        `[agent-host-images] failed provider=${resolved.provider_id} model=${model_id}: ${message}`
+        `[agent-host-images] failed provider=${resolved.provider_id} model=${model_id}: ${message}${
+          upstreamBody ? ` — ${String(upstreamBody).slice(0, 300)}` : ""
+        }`
       );
       return c.json(
         { error: message, model_id, provider_id: resolved.provider_id },

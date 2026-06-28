@@ -14,6 +14,7 @@ import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
 import { TenantMiddleware } from "./lib/tenant/middleware";
 import { updateSession } from "./lib/supabase/proxy";
+import { buildDesktopCsp } from "./lib/desktop/csp";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -24,44 +25,9 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
   );
 }
 
-// GRIDA-SEC-004 — desktop CSP template, hoisted so we only interpolate the
-// per-request nonce (one concat) instead of rebuilding a 10-directive array
-// on every `/desktop/*` request. The `'unsafe-eval'` tail is dev-only —
-// pinned at module load so it's not recomputed per request either.
-const DESKTOP_CSP_SCRIPT_TAIL = IS_DEV
-  ? "' 'strict-dynamic' 'wasm-unsafe-eval' 'unsafe-eval'"
-  : "' 'strict-dynamic' 'wasm-unsafe-eval'";
-const DESKTOP_CSP_PREFIX = `default-src 'self'; script-src 'self' 'nonce-`;
-const DESKTOP_CSP_SUFFIX =
-  `${DESKTOP_CSP_SCRIPT_TAIL}; ` +
-  // Tailwind's runtime classes still flow through `<style>` tags
-  // Next.js emits at build/SSR — keep `'unsafe-inline'` for now;
-  // tightening style-src is a separate change.
-  `style-src 'self' 'unsafe-inline'; ` +
-  `img-src 'self' data: blob:; ` +
-  // media-src for BYOK video (#908): clips are downloaded by the sidecar and
-  // handed to the renderer as base64 `data:`/`blob:` — never streamed from an
-  // external origin (same trust level as img-src; no provider hosts added).
-  `media-src 'self' data: blob:; ` +
-  `font-src 'self' data:; ` +
-  //   connect-src allows:
-  //   - 'self'              — grida.co (prod) / localhost:3000 (dev)
-  //   - http://127.0.0.1:*  — the agent sidecar
-  //   - ws: http: localhost — Next.js dev HMR (harmless in prod, no
-  //                          localhost service to attack)
-  `connect-src 'self' http://127.0.0.1:* http://localhost:* ws://localhost:* wss://localhost:*; ` +
-  `frame-ancestors 'none'; ` +
-  `object-src 'none'; ` +
-  `base-uri 'self'; ` +
-  `form-action 'self'`;
-
-// Exported for the CSP contract test (proxy.test.ts). The test pins the
-// directive set so a new renderer-loaded resource type (e.g. another media
-// modality) can't silently fall back to `default-src` and break at runtime —
-// the way video did before `media-src` was added (#908).
-export function buildDesktopCsp(nonce: string): string {
-  return DESKTOP_CSP_PREFIX + nonce + DESKTOP_CSP_SUFFIX;
-}
+// GRIDA-SEC-004 — desktop CSP lives in ./lib/desktop/csp (Next.js 16 forbids
+// extra exports from this proxy entrypoint). `buildDesktopCsp` interpolates the
+// per-request nonce into a hoisted template.
 
 type DesktopHeaderState = {
   isDesktop: boolean;

@@ -89,12 +89,25 @@ function durationOptionsFor(
   return opts;
 }
 
+/** File extension for a download, from the returned media type. */
+function videoExtension(mediaType?: string): string {
+  switch (mediaType) {
+    case "video/webm":
+      return "webm";
+    case "video/quicktime":
+      return "mov";
+    default:
+      return "mp4";
+  }
+}
+
 type Tile = {
   id: string;
   prompt: string;
   model_id: string;
   status: "generating" | "done" | "error";
   src?: string;
+  media_type?: string;
   error?: string;
 };
 
@@ -152,13 +165,13 @@ export function DesktopVideoPlayground({
       });
       const first = res.videos[0];
       const src = first
-        ? (first.url ?? `data:${first.media_type};base64,${first.base64 ?? ""}`)
+        ? `data:${first.media_type};base64,${first.base64}`
         : undefined;
       setTiles((prev) =>
         prev.map((t) =>
           t.id === id
             ? src
-              ? { ...t, status: "done", src }
+              ? { ...t, status: "done", src, media_type: first?.media_type }
               : { ...t, status: "error", error: "No video returned" }
             : t
         )
@@ -220,7 +233,16 @@ export function DesktopVideoPlayground({
                   duration={duration}
                   onDuration={setDuration}
                 />
-                <VideoModelPicker value={modelId} onValueChange={setModelId} />
+                <VideoModelPicker
+                  value={modelId}
+                  onValueChange={(next) => {
+                    // Model-scoped options don't carry over — a stale aspect
+                    // ratio / duration the new model doesn't offer would fail.
+                    setModelId(next);
+                    setAspect(AUTO);
+                    setDuration({ label: AUTO });
+                  }}
+                />
               </PromptInputTools>
               <PromptInputSubmit />
             </PromptInputFooter>
@@ -418,7 +440,7 @@ function GalleryCell({
       <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition group-hover:opacity-100">
         <a
           href={tile.src}
-          download={`grida-video-${tile.id}.mp4`}
+          download={`grida-video-${tile.id}.${videoExtension(tile.media_type)}`}
           onClick={(e) => e.stopPropagation()}
           aria-label="Download"
           title="Download"

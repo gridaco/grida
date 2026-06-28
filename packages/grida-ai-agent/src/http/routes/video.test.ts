@@ -108,8 +108,13 @@ describe("POST /video/generate", () => {
   });
 
   it("never leaks the api key in the response", async () => {
-    const res = await post(appWith({}), { model_id: VEO, prompt: "x" });
-    expect(await res.text()).not.toContain("sk-");
+    // A real secret is present so a regression that echoes connected keys would
+    // actually fail this assertion (an empty store could never leak).
+    const res = await post(appWith({ fal: "sk-secret-123" }), {
+      model_id: "no/pe",
+      prompt: "x",
+    });
+    expect(await res.text()).not.toContain("sk-secret-123");
   });
 });
 

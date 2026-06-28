@@ -29,11 +29,10 @@ export type GeneratedVideo = {
   /**
    * Base64-encoded video bytes. The route always returns bytes (the sidecar
    * downloads provider CDN/authed URLs) so the renderer can play a `data:` URL
-   * under the desktop CSP without reaching an external origin.
+   * under the desktop CSP without reaching an external origin. Required — the
+   * v1 contract never returns a bare URL.
    */
-  base64?: string;
-  /** Reserved: a directly-playable URL, if a future path returns one. */
-  url?: string;
+  base64: string;
   media_type: string;
 };
 

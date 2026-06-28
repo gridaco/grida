@@ -1240,12 +1240,15 @@ export namespace models {
       return card.providers[provider] ?? null;
     }
 
-    let _listed: ImageModelCard[] | null = null;
-    /** Cards in the curated user-facing list (`listed: true`). Computed once —
-     *  the catalog is static, so callers (pickers, settings) can call freely. */
-    export const listed_models = (): ImageModelCard[] =>
-      (_listed ??= Object.values(models).filter(
-        (card): card is ImageModelCard => !!card && card.listed
+    let _listed: readonly ImageModelCard[] | null = null;
+    /** Cards in the curated user-facing list (`listed: true`). Computed once and
+     *  frozen — the catalog is static, so callers can call freely without
+     *  risking mutation of the shared view. */
+    export const listed_models = (): readonly ImageModelCard[] =>
+      (_listed ??= Object.freeze(
+        Object.values(models).filter(
+          (card): card is ImageModelCard => !!card && card.listed
+        )
       ));
   }
 
@@ -1715,12 +1718,15 @@ export namespace models {
       return card.providers[provider] ?? null;
     }
 
-    let _listed: VideoModelCard[] | null = null;
-    /** Cards in the curated user-facing list (`listed: true`). Computed once —
-     *  the catalog is static, so callers (pickers, settings) can call freely. */
-    export const listed_models = (): VideoModelCard[] =>
-      (_listed ??= Object.values(models).filter(
-        (card): card is VideoModelCard => !!card && card.listed
+    let _listed: readonly VideoModelCard[] | null = null;
+    /** Cards in the curated user-facing list (`listed: true`). Computed once and
+     *  frozen — the catalog is static, so callers can call freely without
+     *  risking mutation of the shared view. */
+    export const listed_models = (): readonly VideoModelCard[] =>
+      (_listed ??= Object.freeze(
+        Object.values(models).filter(
+          (card): card is VideoModelCard => !!card && card.listed
+        )
       ));
   }
 

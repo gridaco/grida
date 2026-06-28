@@ -4,6 +4,45 @@
  * truncation or abort handling.
  */
 
+/**
+ * Throw unless `url` is HTTPS and its host is allow-listed. Defends BYOK
+ * key-bearing fetches (queue submit/poll, authed downloads) against SSRF and
+ * credential exfil via a malicious or misbehaving provider response — a host
+ * entry is either an exact host or a `*.suffix` wildcard.
+ */
+export function assertAllowedUrl(
+  url: string,
+  allowedHosts: readonly string[],
+  label: string
+): void {
+  const u = assertHttpsUrl(url, label);
+  const host = u.hostname;
+  const ok = allowedHosts.some((h) =>
+    h.startsWith("*.")
+      ? host === h.slice(2) || host.endsWith(h.slice(1))
+      : host === h
+  );
+  if (!ok) throw new Error(`${label} returned a disallowed host: ${host}`);
+}
+
+/**
+ * Throw unless `url` is a valid HTTPS url; return the parsed `URL`. For public,
+ * non-credential downloads (e.g. a provider's pre-signed CDN link) where the
+ * host legitimately varies but a plaintext/relative url must still be refused.
+ */
+export function assertHttpsUrl(url: string, label: string): URL {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new Error(`${label} returned an invalid url`);
+  }
+  if (u.protocol !== "https:") {
+    throw new Error(`${label} returned a non-https url`);
+  }
+  return u;
+}
+
 /** Read a response body for an error message, bounded and never throwing. */
 export async function safeText(res: Response): Promise<string> {
   try {
@@ -68,10 +107,17 @@ export async function pollQueue<T>(
   const deadline = Date.now() + opts.timeoutMs;
   for (;;) {
     if (abortSignal?.aborted) throw abortError();
-    const res = await fetch(url, {
-      headers: opts.headers,
-      signal: abortSignal,
-    });
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      throw new Error(`${opts.label} timed out after ${opts.timeoutMs}ms`);
+    }
+    // Bound each request to the remaining budget so a stalled status endpoint
+    // can't hang the poll past `timeoutMs` even if no external abort fires.
+    const signal = AbortSignal.any([
+      ...(abortSignal ? [abortSignal] : []),
+      AbortSignal.timeout(remaining),
+    ]);
+    const res = await fetch(url, { headers: opts.headers, signal });
     if (!res.ok) {
       throw new Error(
         `${opts.label} poll failed (${res.status}): ${await safeText(res)}`

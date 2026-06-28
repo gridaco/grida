@@ -59,6 +59,14 @@ export namespace v {
     };
   }
 
+  /** Non-empty string that matches `re`; `hint` is the user-facing error. */
+  export function matching(re: RegExp, hint: string): Validator<string> {
+    return (raw) =>
+      typeof raw === "string" && re.test(raw)
+        ? { ok: true, value: raw }
+        : { ok: false, error: hint };
+  }
+
   export function optional<T>(inner: Validator<T>): Validator<T | undefined> {
     return (raw) => {
       if (raw === undefined) return { ok: true, value: undefined };

@@ -17,7 +17,12 @@
 import { createGateway } from "@ai-sdk/gateway";
 import type { ImageModelV3, ImageModelV3CallOptions } from "@ai-sdk/provider";
 import type { models } from "@grida/ai-models";
-import { falQueueOutcome, pollQueue, safeText } from "./fetch-helpers";
+import {
+  assertAllowedUrl,
+  falQueueOutcome,
+  pollQueue,
+  safeText,
+} from "./fetch-helpers";
 
 type ImageProvider = models.image.ImageProvider;
 
@@ -131,6 +136,9 @@ export class OpenRouterImageModel implements ImageModelV3 {
 // ── fal adapter ─────────────────────────────────────────────────────
 
 const FAL_QUEUE_BASE = "https://queue.fal.run";
+/** Hosts fal responses may point us at (queue + media CDN). A response that
+ *  redirects elsewhere must not receive the key or a sidecar fetch. */
+const FAL_HOSTS = ["*.fal.run", "fal.run", "fal.media", "*.fal.media"] as const;
 /** Total poll budget. fal image jobs are typically seconds; cap to stay bounded. */
 const FAL_POLL_TIMEOUT_MS = 120_000;
 const FAL_POLL_INTERVAL_MS = 1_000;
@@ -198,6 +206,12 @@ export class FalImageModel implements ImageModelV3 {
     }
     const submit = (await submitRes.json()) as FalSubmitResponse;
 
+    // GRIDA-SEC-004: the key-bearing poll/result fetches use URLs from the
+    // response body — pin them to fal hosts so a hostile response can't exfil
+    // the key or drive the sidecar to an arbitrary origin.
+    assertAllowedUrl(submit.status_url, FAL_HOSTS, "[fal] status_url");
+    assertAllowedUrl(submit.response_url, FAL_HOSTS, "[fal] response_url");
+
     // 2. poll until COMPLETED (bounded, abort-aware)
     await pollQueue<{ status: FalStatus }>(
       submit.status_url,
@@ -225,8 +239,14 @@ export class FalImageModel implements ImageModelV3 {
       images?: Array<{ url?: string; content_type?: string }>;
     };
     const entries = result.images ?? [];
+    if (entries.length === 0) {
+      throw new Error("[fal] response contained no image");
+    }
     const images = await Promise.all(
-      entries.map((img) => downloadToBytes(img.url, abortSignal))
+      entries.map((img) => {
+        assertAllowedUrl(img.url ?? "", FAL_HOSTS, "[fal] image url");
+        return downloadToBytes(img.url, abortSignal);
+      })
     );
 
     return {

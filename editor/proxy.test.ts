@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDesktopCsp } from "./proxy";
+import { buildDesktopCsp } from "./lib/desktop/csp";
 
 /**
  * GRIDA-SEC-004 — desktop CSP contract.

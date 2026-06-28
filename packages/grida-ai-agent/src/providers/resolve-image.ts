@@ -99,7 +99,7 @@ export async function resolveImageModel(
       provider_id: provider,
       model_id: modelId,
       binding_id: binding.id,
-      model: makeImageModelFor(provider, key, binding.id),
+      model: makeImageModelFor(provider, key.trim(), binding.id),
     };
   }
 
