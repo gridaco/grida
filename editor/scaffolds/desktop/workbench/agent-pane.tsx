@@ -32,7 +32,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Chat, useChat } from "@ai-sdk/react";
-import type { UIMessage } from "ai";
+import {
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type UIMessage,
+} from "ai";
 import {
   Conversation,
   ConversationContent,
@@ -43,6 +46,7 @@ import { Button } from "@app/ui/components/button";
 import {
   AGENT_SESSION_AGENT,
   sessions as bridgeSessions,
+  type AgentRunOptions,
   type Workspace,
 } from "@/lib/desktop/bridge";
 import {
@@ -69,7 +73,10 @@ import {
   CompactingIndicator,
   ForkedNotice,
   PendingTurnIndicator,
+  QuestionCard,
+  findPendingQuestion,
   type ChatMessageActions,
+  type AnswerQuestionHandler,
 } from "@/kits/agent-chat";
 import { QueuedMessages } from "../shared/queued-messages";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
@@ -225,6 +232,11 @@ function AgentPaneContent({
   // ("No tool invocation found"), the run never renders, and the approval bar
   // never clears until a hard refresh re-hydrates from the DB.
   const chatRef = useRef<Chat<UIMessage> | null>(null);
+  // Live run-context (current model/provider/mode) the transport backfills onto
+  // body-less sends — the question/tool auto-resubmit — so a resume keeps the
+  // session's model + posture instead of resetting them. Assigned below once the
+  // pickers resolve; read fresh per send via the getter.
+  const runContextRef = useRef<Partial<Omit<AgentRunOptions, "messages">>>({});
   const chat = useMemo(
     () =>
       new Chat<UIMessage>({
@@ -233,6 +245,7 @@ function AgentPaneContent({
         transport: desktopAgentTransport.create({
           workspace_id: workspace.id,
           session_id: chatSession.current_id ?? undefined,
+          runContext: () => runContextRef.current,
           onSessionId: (resolvedId) => {
             chatSession.apply_resolved_session_id(resolvedId);
           },
@@ -248,6 +261,14 @@ function AgentPaneContent({
             }
           },
         }),
+        // Resume after a CLIENT-resolved tool result lands. fs/todos/command are
+        // server-resolved (the sidecar completes the loop in-stream, ending on
+        // text — never a dangling tool call), so this fires ONLY for the locked
+        // `question` tool: once the user answers (the card calls addToolResult),
+        // the message becomes complete-with-tool-calls and the paused run
+        // resumes. Approval pauses are NOT affected (an approval-requested call
+        // has no result, so it's never "complete").
+        sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
       }),
     // Rebuild ONLY on a real session switch / new chat (or workspace change)
     // — signalled by `initialMessages` changing (hydration). `currentId` is
@@ -408,6 +429,12 @@ function AgentPaneContent({
   // Endpoint provider pin for the active model (issue #806) — rides every
   // run-entering body: normal sends AND approval resumes below.
   const providerId = registered_models.providerIdForModel(modelId, endpoints);
+  // Keep the transport's body-less backfill (above) in step with the pickers.
+  runContextRef.current = {
+    model_id: modelId,
+    mode,
+    ...(providerId ? { provider_id: providerId } : {}),
+  };
 
   const {
     queued,
@@ -575,6 +602,22 @@ function AgentPaneContent({
     [messages]
   );
 
+  // Commit a `question` (ask-user) answer: the human's answer becomes the tool
+  // result and `sendAutomaticallyWhen` resumes the paused run. Unlike the
+  // approval resume (which must use the live `chat` to merge into an in-flight
+  // message), this fires on a click against an already-settled card, so the
+  // post-commit `chatRef` mirror is the right (stable) instance.
+  const onAnswerQuestion = useCallback<AnswerQuestionHandler>(
+    (toolCallId, output) => {
+      void chatRef.current?.addToolResult({
+        tool: "question",
+        toolCallId,
+        output,
+      });
+    },
+    []
+  );
+
   const settledList = useMemo(
     () =>
       messages.map((m, index) => (
@@ -586,6 +629,14 @@ function AgentPaneContent({
         />
       )),
     [messages, isStreaming, messageActions]
+  );
+
+  // The agent ASKS: a pending `question` is a session-global prompt pinned above
+  // the composer (same model as the approval bar), not a transcript card.
+  // Memoized on `messages` to match `pendingApproval` above.
+  const pendingQuestion = useMemo(
+    () => findPendingQuestion(messages),
+    [messages]
   );
 
   // Pre-first-token "Thinking" indicator: a turn is streaming through this
@@ -640,6 +691,17 @@ function AgentPaneContent({
           feedback, no optimistic message mutation needed. */}
       {pendingApproval && !busy && (
         <AgentApprovalBar pending={pendingApproval} onApprove={onApprove} />
+      )}
+
+      {/* The agent is asking — session-global prompt above the composer. */}
+      {pendingQuestion && (
+        <div className="shrink-0 border-t p-3">
+          <QuestionCard
+            entry={pendingQuestion}
+            onAnswer={onAnswerQuestion}
+            disabled={busy}
+          />
+        </div>
       )}
 
       <div className="shrink-0 border-t p-3">

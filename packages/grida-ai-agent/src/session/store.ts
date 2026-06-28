@@ -14,10 +14,23 @@
  * result that arrives long after the input-start can find the same row.
  */
 
-import { and, asc, desc, eq, gt, isNull, like, lt, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  like,
+  lt,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { OpenedSessionsDb } from "./db";
 import { chatMessages, chatParts, chatSessions } from "./schema";
 import { asAgentMode, type AgentMode } from "../protocol/mode";
+import { HUMAN_INPUT_PART_TYPES } from "../tools/names";
 import { newMessageId, newPartId, newSessionId } from "./ids";
 import { session_title } from "./title";
 import { compactionBoundary } from "./boundary";
@@ -1270,6 +1283,50 @@ export class SessionsStore {
         and(
           eq(chatParts.session_id, sessionId),
           eq(chatParts.tool_state, "approval-requested")
+        )
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  /**
+   * Does this session have an UNANSWERED human-in-the-loop block? True iff a
+   * persisted tool part is awaiting a person — either a supervised approval
+   * (`approval-requested`) OR a human-input tool (e.g. `question`) paused at
+   * `input-available`. This is the authoritative drain-pause predicate (RFC
+   * `queue` § drain-pause): the queue waits while ANY such block is open, so a
+   * later turn never fires ahead of the user's pending decision.
+   *
+   * The `input-available` leg is keyed on the {@link HUMAN_INPUT_TOOL_NAMES}
+   * *trait*, NOT a literal name — a future richer human-block tool joins by
+   * being added to that set. The trait clause is REQUIRED to distinguish a real
+   * human block from a *transient* client-resolved fs call (which also sits at
+   * `input-available` for the moment between the stream finishing and the
+   * renderer filling its result, and must NOT pause the drain). Read-only
+   * existence check; reads no input/output/args/content.
+   *
+   * Scoped to VISIBLE messages (`hidden_at IS NULL`): a rewind only hides
+   * messages, it does not delete their parts. Without this join, rewinding past
+   * a paused approval/question would leave the block "pending" forever — the
+   * gate would keep returning `human-input-pending` for a prompt the user can no
+   * longer see (the same visibility rule as `listVisibleMessages`).
+   */
+  async hasPendingHumanInput(sessionId: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: chatParts.id })
+      .from(chatParts)
+      .innerJoin(chatMessages, eq(chatMessages.id, chatParts.message_id))
+      .where(
+        and(
+          eq(chatParts.session_id, sessionId),
+          isNull(chatMessages.hidden_at),
+          or(
+            eq(chatParts.tool_state, "approval-requested"),
+            and(
+              eq(chatParts.tool_state, "input-available"),
+              inArray(chatParts.type, HUMAN_INPUT_PART_TYPES)
+            )
+          )
         )
       )
       .limit(1);

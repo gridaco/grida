@@ -11,6 +11,7 @@ export type ToolDisplayAction =
   | "search"
   | "plan"
   | "command"
+  | "question"
   | "tool";
 
 export type ToolDisplayTone = "running" | "ok" | "warn" | "error";
@@ -91,6 +92,14 @@ export namespace toolDisplay {
           tone,
         };
 
+      case "question":
+        return {
+          action: "question",
+          title: isActive(entry) ? "Asking you" : "Asked you",
+          detail: describeQuestionDetail(entry),
+          tone,
+        };
+
       default:
         return {
           action: "tool",
@@ -128,6 +137,7 @@ export namespace toolDisplay {
     pushClause(clauses, counts, "list", "listed");
     pushClause(clauses, counts, "command", "ran");
     pushClause(clauses, counts, "plan", "updated", "plan update");
+    pushClause(clauses, counts, "question", "asked");
     pushClause(clauses, counts, "tool", "used");
 
     return capitalize(clauses.join(", "));
@@ -165,6 +175,8 @@ function nounForAction(action: ToolDisplayAction): string {
       return "command";
     case "plan":
       return "plan update";
+    case "question":
+      return "question";
     case "tool":
       return "tool call";
   }
@@ -222,6 +234,15 @@ function describeTodosDetail(entry: ToolCallEntry): string | undefined {
     numberValue(result.count) ?? resultTodos?.length ?? argsTodos?.length;
   if (count === undefined) return undefined;
   return `${count} ${pluralize("item", count)}`;
+}
+
+function describeQuestionDetail(entry: ToolCallEntry): string | undefined {
+  const questions = asArray(asRecord(readToolInput(entry)).questions);
+  if (!questions || questions.length === 0) return undefined;
+  if (questions.length === 1) {
+    return stringValue(asRecord(questions[0]).question);
+  }
+  return `${questions.length} questions`;
 }
 
 function describeCommandDetail(entry: ToolCallEntry): string | undefined {

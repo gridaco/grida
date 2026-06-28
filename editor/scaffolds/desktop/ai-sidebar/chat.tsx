@@ -36,6 +36,7 @@ import type { ComposerCatalog } from "@/kits/composer";
 import {
   AGENT_SESSION_AGENT,
   sessions as bridgeSessions,
+  type AgentRunOptions,
 } from "@/lib/desktop/bridge";
 import {
   buildAgentSend,
@@ -56,7 +57,10 @@ import {
   CompactingIndicator,
   ForkedNotice,
   PendingTurnIndicator,
+  QuestionCard,
+  findPendingQuestion,
   type ChatMessageActions,
+  type AnswerQuestionHandler,
 } from "@/kits/agent-chat";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
 import {
@@ -125,6 +129,11 @@ export function AISidebarChat({
   // callback mutate the chat's messages once a resume is happening — it can't
   // close over `chat`, which doesn't exist yet at closure-construction time.
   const chatRef = useRef<Chat<UIMessage> | null>(null);
+  // Live run-context (current model/provider) the transport backfills onto
+  // body-less sends — the fs/todos/question auto-resubmit — so a resume keeps
+  // the session's model instead of resetting it. Assigned once the picker
+  // resolves; read fresh per send via the getter.
+  const runContextRef = useRef<Partial<Omit<AgentRunOptions, "messages">>>({});
   const chat = useMemo(() => {
     const todos = new AgentTodos();
     const chat = new Chat<UIMessage>({
@@ -133,6 +142,7 @@ export function AISidebarChat({
       transport: desktopAgentTransport.create({
         workspace_id: workspaceId,
         session_id: chatSession.current_id ?? undefined,
+        runContext: () => runContextRef.current,
         onSessionId: (resolvedId) => {
           chatSession.apply_resolved_session_id(resolvedId);
         },
@@ -280,6 +290,15 @@ export function AISidebarChat({
     sessions: chatSession.sessions,
     endpoints,
   });
+  // Keep the transport's body-less backfill (above) in step with the picker.
+  // The single-file/deck agent has no permission-mode picker, so no `mode`.
+  {
+    const providerId = registered_models.providerIdForModel(modelId, endpoints);
+    runContextRef.current = {
+      model_id: modelId,
+      ...(providerId ? { provider_id: providerId } : {}),
+    };
+  }
 
   // Whether the active model accepts image input — memoized so the
   // registry lookup doesn't re-scan on every render (only when the model
@@ -420,6 +439,20 @@ export function AISidebarChat({
     [onCompact, onForkCommand]
   );
 
+  // Commit a `question` (ask-user) answer: the human's answer becomes the tool
+  // result and `sendAutomaticallyWhen` resumes the paused run. Reads `chatRef`
+  // (not `chat`) so it stays stable across the per-session Chat rebuild.
+  const onAnswerQuestion = useCallback<AnswerQuestionHandler>(
+    (toolCallId, output) => {
+      void chatRef.current?.addToolResult({
+        tool: "question",
+        toolCallId,
+        output,
+      });
+    },
+    []
+  );
+
   // Settled history renders independently of the streaming row, so
   // per-chunk updates that touch only `state.streaming` don't
   // re-render these.
@@ -434,6 +467,15 @@ export function AISidebarChat({
         />
       )),
     [messages, isStreaming, messageActions]
+  );
+
+  // The agent ASKS: a pending `question` is a session-global prompt pinned above
+  // the composer (the same model as the supervised-approval bar), not a card in
+  // the transcript. One open question per session. Memoized on `messages` like
+  // the approval bar's `findPendingApproval` — it only changes when they do.
+  const pendingQuestion = useMemo(
+    () => findPendingQuestion(messages),
+    [messages]
   );
 
   const isEmpty = messages.length === 0;
@@ -494,6 +536,17 @@ export function AISidebarChat({
       <QueuedMessages queued={queued} onCancel={cancelQueued} />
 
       <ModelToolCallNotice model_id={modelId} endpoints={endpoints} />
+
+      {/* The agent is asking — session-global prompt above the composer. */}
+      {pendingQuestion && (
+        <div className="shrink-0 border-t p-3">
+          <QuestionCard
+            entry={pendingQuestion}
+            onAnswer={onAnswerQuestion}
+            disabled={busy}
+          />
+        </div>
+      )}
 
       <div className="shrink-0 border-t p-3">
         <AgentComposerInput

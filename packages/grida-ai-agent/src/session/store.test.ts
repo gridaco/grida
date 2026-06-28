@@ -1005,6 +1005,96 @@ describe("answerApproval — supervised approval boundary (GRIDA-SEC-004)", () =
   });
 });
 
+describe("hasPendingHumanInput (drain-pause trait gate)", () => {
+  // Write/advance one tool part for a session at a given tool name + state,
+  // mimicking what the recorder persists mid-turn. Reuses `msgId` so a later
+  // call advances the SAME row in place (state migrates by tool_call_id) — the
+  // way `fillToolResult` flips input-available → output-available, not a new row.
+  async function recordToolPart(
+    sessionId: string,
+    tcid: string,
+    name: string,
+    state: string,
+    msgId: string = newMessageId()
+  ): Promise<string> {
+    await store.appendMessageIfAbsent(sessionId, {
+      id: msgId,
+      role: "assistant",
+    });
+    await store.upsertPart(msgId, {
+      index: 0,
+      type: `tool-${name}`,
+      data: {
+        type: `tool-${name}`,
+        tool_call_id: tcid,
+        tool_name: name,
+        state,
+        input: {},
+      },
+      tool_call_id: tcid,
+      tool_state: state,
+      session_id: sessionId,
+    });
+    return msgId;
+  }
+
+  it("is false for a session with no pending block", async () => {
+    const s = await store.create({ agent: "grida" });
+    expect(await store.hasPendingHumanInput(s.id)).toBe(false);
+  });
+
+  it("is true while a supervised approval is unanswered", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordToolPart(s.id, "tc_a", "run_command", "approval-requested");
+    expect(await store.hasPendingHumanInput(s.id)).toBe(true);
+  });
+
+  it("is true while a `question` is paused at input-available", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordToolPart(s.id, "tc_q", "question", "input-available");
+    expect(await store.hasPendingHumanInput(s.id)).toBe(true);
+  });
+
+  it("is FALSE for a transient client-fs call at input-available (the trait discriminator)", async () => {
+    // A client-resolved `read_file` sits at `input-available` for the moment
+    // between stream-finish and the renderer filling its result. It is NOT a
+    // human block — the drain must NOT pause on it. This is exactly why the
+    // gate keys on the HUMAN_INPUT_TOOL_NAMES trait, not bare `input-available`.
+    const s = await store.create({ agent: "grida" });
+    await recordToolPart(s.id, "tc_r", "read_file", "input-available");
+    expect(await store.hasPendingHumanInput(s.id)).toBe(false);
+  });
+
+  it("is false once the question is answered (output-available)", async () => {
+    const s = await store.create({ agent: "grida" });
+    const msgId = await recordToolPart(
+      s.id,
+      "tc_q",
+      "question",
+      "input-available"
+    );
+    // Answer arrives → the SAME row advances to output-available (in place).
+    await recordToolPart(s.id, "tc_q", "question", "output-available", msgId);
+    expect(await store.hasPendingHumanInput(s.id)).toBe(false);
+  });
+
+  it("ignores a rewound (hidden) block — a hidden pending question does not deadlock the gate", async () => {
+    // rewind() only marks `hidden_at`; it does NOT delete the parts. Without a
+    // visibility scope the gate would keep a rewound-past prompt "pending"
+    // forever, returning human-input-pending for a prompt the user can't see.
+    const s = await store.create({ agent: "grida" });
+    // A user turn to rewind back to, then a later assistant turn that pauses.
+    const anchor = await store.appendMessage(s.id, { role: "user" });
+    await recordToolPart(s.id, "tc_q", "question", "input-available");
+    expect(await store.hasPendingHumanInput(s.id)).toBe(true);
+
+    // Rewinding to the anchor hides the assistant question message → no longer
+    // pending, even though its `input-available` part still exists in the DB.
+    await store.rewind(s.id, anchor.id);
+    expect(await store.hasPendingHumanInput(s.id)).toBe(false);
+  });
+});
+
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }

@@ -44,6 +44,7 @@ let captured: CapturedTurn[];
 /** When the incoming prompt's last user text contains this, the mock
  *  emits a `skill` tool call instead of plain text. */
 const SKILL_TRIGGER = "USE_ALPHA_SKILL";
+const QUESTION_TRIGGER = "ASK_THE_USER";
 
 const FINISH_USAGE = {
   type: "finish" as const,
@@ -111,6 +112,31 @@ function makeMockModel(): MockLanguageModelV3 {
                 toolCallId: "tc_skill",
                 toolName: "skill",
                 input: JSON.stringify({ name: "alpha" }),
+              },
+              FINISH_USAGE,
+            ],
+          }),
+        };
+      }
+      const wantsQuestion =
+        lastUserText(prompt).includes(QUESTION_TRIGGER) && call === 1;
+      if (wantsQuestion) {
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: "stream-start", warnings: [] },
+              {
+                type: "tool-call",
+                toolCallId: "tc_question",
+                toolName: "question",
+                input: JSON.stringify({
+                  questions: [
+                    {
+                      question: "Pick one",
+                      options: [{ label: "A" }, { label: "B" }],
+                    },
+                  ],
+                }),
               },
               FINISH_USAGE,
             ],
@@ -323,6 +349,22 @@ describe("agent system e2e (skills · rewind · fork · compaction)", () => {
       .content;
     expect(content).toContain('<skill_content name="alpha">');
     expect(content).toContain("Step 1: do alpha");
+  });
+
+  it("headless `question`: the tool refuses cleanly (output-error, stream not crashed)", async () => {
+    // This runtime is built WITHOUT `interactive`, so the locked `question`
+    // tool is headless: its `execute` throws the fixed refusal. The flagged
+    // risk is whether a thrown tool execute lowers to a model-readable
+    // output-error or crashes the stream. runTurn asserts status 200 (the
+    // stream completed); we then confirm the persisted question part is a
+    // terminal output-error carrying the refusal — the model can read it and
+    // continue (it does: call 2 returns "done").
+    const sessionId = await runTurn({ text: `please ${QUESTION_TRIGGER}` });
+    const parts = (await store.listMessages(sessionId)).flatMap((m) => m.parts);
+    const questionPart = parts.find((p) => p.type === "tool-question");
+    expect(questionPart).toBeTruthy();
+    expect(questionPart!.tool_state).toBe("output-error");
+    expect(JSON.stringify(questionPart!.data)).toContain("interactive user");
   });
 
   it("is server-authoritative: turn 2 sees turn 1 from the DB, not the client array", async () => {

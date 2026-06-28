@@ -52,11 +52,11 @@ function delay(ms: number): Promise<void> {
 }
 
 /** A scheduler wired to the real store with an overridable `drain`. The
- *  `has_pending_approval` gate defaults to "never blocked" so the existing
- *  drain tests are unaffected; the approval-pause test passes a real flag. */
+ *  `has_pending_human_input` gate defaults to "never blocked" so the existing
+ *  drain tests are unaffected; the block-pause tests pass a real flag. */
 function makeScheduler(
   drain?: SessionSchedulerDeps["drain"],
-  hasPendingApproval?: SessionSchedulerDeps["has_pending_approval"]
+  hasPendingHumanInput?: SessionSchedulerDeps["has_pending_human_input"]
 ): {
   scheduler: SessionScheduler;
   calls: string[];
@@ -71,7 +71,7 @@ function makeScheduler(
     list_queued: (sid) => store.listQueuedMessages(sid),
     dequeue: (id) => store.dequeueMessage(id),
     drain: drain ?? defaultDrain,
-    has_pending_approval: hasPendingApproval ?? (async () => false),
+    has_pending_human_input: hasPendingHumanInput ?? (async () => false),
     drain_cooldown_ms: COOLDOWN,
   });
   live.push(scheduler);
@@ -162,8 +162,8 @@ describe("SessionScheduler drain", () => {
     // (RFC queue § drain-pause). An approval-request finishes the run cleanly,
     // so the session reads idle through the pause — but the queued message must
     // NOT fire until the approval resolves. Without the fire-gate's
-    // has_pending_approval check, the cooldown drain would fire `q1` during the
-    // wait (the reported B1 bug): drop that check and this assertion fails.
+    // has_pending_human_input check, the cooldown drain would fire `q1` during
+    // the wait (the reported B1 bug): drop that check and this assertion fails.
     let pendingApproval = true;
     const { scheduler, calls } = makeScheduler(
       undefined,
@@ -207,7 +207,7 @@ describe("SessionScheduler drain", () => {
       list_queued: (sid) => store.listQueuedMessages(sid),
       dequeue: (id) => store.dequeueMessage(id),
       drain,
-      has_pending_approval: async () => false,
+      has_pending_human_input: async () => false,
       drain_cooldown_ms: COOLDOWN,
     });
     live.push(scheduler);
@@ -245,7 +245,7 @@ describe("SessionScheduler drain", () => {
       list_queued: (sid) => store.listQueuedMessages(sid),
       dequeue: (id) => store.dequeueMessage(id),
       drain,
-      has_pending_approval: async () => false,
+      has_pending_human_input: async () => false,
       drain_cooldown_ms: COOLDOWN,
     });
     live.push(scheduler);

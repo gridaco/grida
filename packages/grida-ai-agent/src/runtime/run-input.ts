@@ -54,6 +54,9 @@ export type RunRequest = {
   skills?: SkillId[];
   /** Permission/supervision posture; defaults to `accept-edits` when absent. */
   mode: AgentMode;
+  /** Whether the requesting client has a human UI for the `question` tool
+   *  (RFC `tools` §question). Absent ⇒ inherit the host's `interactive` default. */
+  interactive?: boolean;
   /** Resume answer for a paused supervised approval; absent on a normal turn. */
   approval_answer?: ApprovalAnswer;
   session_id?: string;
@@ -79,6 +82,7 @@ export async function parseRunBody(
     workspace_id?: unknown;
     skills?: unknown;
     mode?: unknown;
+    interactive?: unknown;
     approval_answer?: unknown;
     session_id?: unknown;
   };
@@ -163,6 +167,9 @@ export async function parseRunBody(
     // string is treated as absent rather than rejected — the supervision
     // posture should fail safe, not 400 the whole turn.
     mode: asAgentMode(b.mode) ?? AGENT_DEFAULT_MODE,
+    // Only an explicit boolean counts; anything else leaves it absent so the
+    // host's `interactive` default applies (the client didn't declare a UI).
+    interactive: typeof b.interactive === "boolean" ? b.interactive : undefined,
     // A malformed approval answer is treated as absent (no resume), never a
     // 400 — and `store.answerApproval` re-validates it against the persisted
     // pending approval regardless, so a forged answer is a no-op.
@@ -283,6 +290,33 @@ export async function persistIncomingTail(
  * tool_state = 'input-available'` guard); it cannot inject or rewrite anything
  * else.
  */
+/**
+ * Fill any CLIENT-resolved tool results carried on the incoming tail's
+ * assistant messages — the in-place fill from {@link persistResolvedToolResults}
+ * applied across the whole batch.
+ *
+ * Called BEFORE the pending-human-input guard (`runtime/index.ts`): a
+ * client-resolved answer rides the message tail (unlike a supervised approval,
+ * which arrives as an explicit `approval_answer` body field applied even
+ * earlier). The locked `question` tool is the case that needs this — its answer
+ * is a terminal `output-available` part in the tail, and it must clear the
+ * session's human-input block BEFORE the guard, or the very POST that carries
+ * the answer would be refused by the guard it resolves. Idempotent: the later
+ * {@link persistIncomingTail} re-runs the same fill (a no-op once the row is
+ * already terminal) and still appends any new user message.
+ */
+export async function fillIncomingToolResults(
+  store: SessionsStore,
+  sessionId: string,
+  incoming: NormalizedMessage[]
+): Promise<void> {
+  for (const m of incoming) {
+    if (m.role === "assistant") {
+      await persistResolvedToolResults(store, sessionId, m);
+    }
+  }
+}
+
 async function persistResolvedToolResults(
   store: SessionsStore,
   sessionId: string,

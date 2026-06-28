@@ -175,8 +175,13 @@ user resolves the block and the turn continues to a **true finish**.
 `idle` alone is therefore not a sufficient drainability test — the
 drain fires only when the session is genuinely ready for a _new_ turn,
 which a blocked turn is not. The block state is authoritative session
-state (a persisted pending approval), so every consumer — a second
-window, a hosted runner, the CLI — honors the pause identically.
+state (a persisted pending approval, or an unanswered
+[`question`](./tools.md#the-question-tool) tool call still at
+`input-available`), so every consumer — a second window, a hosted
+runner, the CLI — honors the pause identically. The drainability
+predicate keys on the _class_ of block, not a single tool: a future
+human-input tool joins the pause by being recognized as one, not by a
+new gate.
 
 ### Stopping with a queue
 

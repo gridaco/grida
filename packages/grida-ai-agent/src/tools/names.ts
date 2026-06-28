@@ -12,6 +12,9 @@ import type { SKILL_TOOL_NAME } from "../skills/skill-tool";
 
 export const RUN_COMMAND_TOOL_NAME = "run_command" as const;
 
+/** The locked `question` (ask-user) tool — RFC `tools` §question. */
+export const QUESTION_TOOL_NAME = "question" as const;
+
 /**
  * Every tool the agent may emit, regardless of which capabilities a
  * given callsite happens to wire. The *maximal* union: the client must
@@ -24,4 +27,31 @@ export type AgentToolName =
   | AgentTodos.ToolName
   | AgentVision.ToolName
   | typeof RUN_COMMAND_TOOL_NAME
+  | typeof QUESTION_TOOL_NAME
   | typeof SKILL_TOOL_NAME;
+
+/**
+ * Tools that **block the turn on a human** — they pause at `input-available`
+ * until a person resolves them (RFC `queue` § drain-pause). This is the
+ * *trait* the drain-pause gate keys on, NOT the literal tool name: the gate
+ * (`store.hasPendingHumanInput`) treats any `input-available` part whose tool
+ * is in this set as a pending human block, so the queue waits exactly as it
+ * does for a supervised approval. A future richer human-block tool (e.g. a
+ * "pick a generated idea" picker) joins the contract by being added here —
+ * no change to the gate. Distinct from a *transient* client-resolved fs call
+ * at `input-available` (which a renderer fills in milliseconds), which must
+ * NOT pause the drain.
+ */
+export const HUMAN_INPUT_TOOL_NAMES = [QUESTION_TOOL_NAME] as const;
+
+/**
+ * Persisted/streamed part `type` values for the {@link HUMAN_INPUT_TOOL_NAMES}
+ * tools. The AI SDK UI-message convention encodes the tool name into the part
+ * type as `tool-<name>`, and the persisted `chat_parts.type` column carries it
+ * verbatim — so the drain-pause gate (`store.hasPendingHumanInput`) filters on
+ * these values. Derived from the name set so adding a human-block tool there
+ * propagates here automatically.
+ */
+export const HUMAN_INPUT_PART_TYPES = HUMAN_INPUT_TOOL_NAMES.map(
+  (name) => `tool-${name}` as const
+);

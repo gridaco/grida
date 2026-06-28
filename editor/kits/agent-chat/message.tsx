@@ -42,6 +42,7 @@ import {
   FolderTreeIcon,
   GitBranchIcon,
   ListTodoIcon,
+  MessageCircleQuestionIcon,
   RotateCcwIcon,
   SearchIcon,
   SquareTerminalIcon,
@@ -76,6 +77,7 @@ import {
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
 import { groupMessageParts } from "./group-parts";
+import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 
 export type { ChatMessage, ToolCallEntry };
 
@@ -590,6 +592,13 @@ function approvalOf(entry: ToolCallEntry) {
 }
 
 function ToolCallView({ entry }: { entry: ToolCallEntry }) {
+  // The `question` tool's INTERACTIVE prompt is session-global (pinned above the
+  // composer by the surface — see `findPendingQuestion` / `QuestionCard`). In
+  // the transcript it's only a passive record of what was asked / answered.
+  if (isQuestionEntry(entry)) {
+    return <QuestionToolView entry={entry} />;
+  }
+
   const description = toolDisplay.describe(entry);
   const title = description.detail
     ? `${description.title} · ${description.detail}`
@@ -635,6 +644,41 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   );
 }
 
+// The `question` tool's PASSIVE transcript record. The interactive prompt is
+// session-global (the surface pins `QuestionCard` above its composer), so here
+// we only show what was asked — a one-line header — and, once answered, the
+// read-only echo of the answer. While the run is paused on the user the header
+// points them at the prompt; `input-streaming` (partial input) shows nothing.
+function QuestionToolView({ entry }: { entry: ToolCallEntry }) {
+  const description = toolDisplay.describe(entry);
+  const title = description.detail
+    ? `${description.title} · ${description.detail}`
+    : description.title;
+  if (entry.state === "input-streaming") return null;
+  const pending = entry.state === "input-available";
+  // A `question` part can be `output-error` — a headless host's fixed refusal
+  // (RFC §question), or any tool error. Surface its text rather than the empty
+  // answered summary, so the refusal/error isn't silently swallowed.
+  const errored = entry.state === "output-error";
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 text-muted-foreground text-xs">
+        <MessageCircleQuestionIcon className="size-3.5 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+      </div>
+      {pending ? (
+        <p className="mt-1 text-xs text-muted-foreground/80">
+          Awaiting your answer below.
+        </p>
+      ) : errored ? (
+        <ToolOutput output={undefined} errorText={entry.errorText} />
+      ) : (
+        <AnsweredQuestionSummary entry={entry} />
+      )}
+    </div>
+  );
+}
+
 // `TaskTrigger` renders `children ?? <default SearchIcon row>`, so a custom
 // child swaps the action-agnostic search glyph for a per-action icon. Must
 // be a single element (the trigger is `asChild`), not a component instance.
@@ -664,6 +708,8 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return ListTodoIcon;
     case "command":
       return SquareTerminalIcon;
+    case "question":
+      return MessageCircleQuestionIcon;
     case "tool":
       return WrenchIcon;
   }

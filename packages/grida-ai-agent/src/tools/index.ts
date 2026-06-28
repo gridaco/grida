@@ -41,14 +41,19 @@ import type {
   SkillBodyLoader,
   SkillIndex,
 } from "../skills/types";
-import { RUN_COMMAND_TOOL_NAME, type AgentToolName } from "./names";
+import {
+  RUN_COMMAND_TOOL_NAME,
+  QUESTION_TOOL_NAME,
+  type AgentToolName,
+} from "./names";
 import {
   createRunCommandTool,
   type RunCommandBackend,
   type RunCommandOutcome,
 } from "./run-command";
+import { createQuestionTool } from "./question";
 
-export { RUN_COMMAND_TOOL_NAME, SKILL_TOOL_NAME };
+export { RUN_COMMAND_TOOL_NAME, QUESTION_TOOL_NAME, SKILL_TOOL_NAME };
 export type { AgentToolName, RunCommandBackend, RunCommandOutcome };
 
 export type ToolsetCapabilities = {
@@ -90,6 +95,15 @@ export type ToolsetCapabilities = {
     /** Body reader (server injects `nodeSkillBodyLoader`). */
     load_body: SkillBodyLoader;
   };
+  /**
+   * Whether a human UI is bound (RFC `tools` §question). The locked `question`
+   * tool is ALWAYS registered — when `interactive` is true it is client-resolved
+   * (no `execute`, pauses for the user's answer); when false/undefined it ships
+   * with a fixed-refusal `execute` so a headless host returns a tool error
+   * instead of hanging forever. Unlike the other capabilities, absence does not
+   * drop the tool — the lock guarantees every host advertises it.
+   */
+  interactive?: boolean;
 };
 
 /**
@@ -119,6 +133,12 @@ export function createToolset(caps: ToolsetCapabilities = {}) {
   const base = {
     ...fsTools,
     ...todosTools,
+    // The locked `question` tool is unconditional (every host advertises it).
+    // `interactive` only decides whether it pauses for a human (no execute) or
+    // refuses headless (a fixed-error execute) — see `createQuestionTool`.
+    [QUESTION_TOOL_NAME]: createQuestionTool({
+      interactive: caps.interactive === true,
+    }),
   };
   // Conditional spreads keep each capability's precise tool type in the
   // inferred return (used by `createAgent`'s `ToolLoopAgent<…, typeof

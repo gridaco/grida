@@ -153,7 +153,9 @@ async function serveCommand(args: string[]): Promise<void> {
       config.user_data_path
     );
   }
-  const host = await createHost(config, flags);
+  // A `serve` daemon is the host the desktop-from-web bridge drives — a human
+  // is present, so the `question` tool pauses for their answer (interactive).
+  const host = await createHost(config, flags, true);
   await host.start();
   process.stdout.write(`PORT=${host.port}\n`);
   process.stderr.write(
@@ -321,7 +323,15 @@ export async function runCommand(
     throw new Error('usage: grida-agent run [--session <id>] "message"');
   }
   const handle = await client.agent.run(
-    { messages: [{ role: "user", content: message }], session_id: sessionId },
+    {
+      messages: [{ role: "user", content: message }],
+      session_id: sessionId,
+      // A one-shot `run` has no UI to answer the `question` tool — and it may
+      // target a daemon that IS interactive for a web client. Declare headless
+      // per-run so `question` returns its fixed refusal instead of pausing this
+      // run forever (and leaving the session stuck on `human-input-pending`).
+      interactive: false,
+    },
     (chunk) => writeTextDelta(chunk, out)
   );
   await handle.done;
@@ -419,7 +429,13 @@ export function parseRunArgs(args: string[]): {
 
 async function createHost(
   config: CliConfig,
-  flags?: Pick<ServeFlags, "allow_origins" | "allow_referer_paths">
+  flags?: Pick<ServeFlags, "allow_origins" | "allow_referer_paths">,
+  // Whether this host serves a human UI (RFC `tools` §question). A long-lived
+  // `serve` daemon is driven by a human client (the desktop-from-web bridge),
+  // so the locked `question` tool pauses for their answer. The throwaway
+  // embedded host behind a one-shot `run` has no client UI → stays headless and
+  // the tool returns the fixed refusal.
+  interactive = false
 ): Promise<AgentHost> {
   const { AgentHost } = await import("./server");
   return new AgentHost({
@@ -439,6 +455,10 @@ async function createHost(
     // deliberately opts into the shell rather than fail-closed. The desktop
     // host, by contrast, only enables shell when srt actually wraps it.
     allow_unsandboxed_shell: true,
+    // The locked `question` tool pauses for a human only when this host serves
+    // a UI (the `serve` daemon driven by the desktop-from-web bridge). A
+    // throwaway embedded host (one-shot `run`) is headless → fixed refusal.
+    interactive,
   });
 }
 

@@ -69,6 +69,7 @@ import {
   extractFirstUserText,
   extractLastUserText,
   extractLastUserMessageId,
+  fillIncomingToolResults,
   parseRunBody,
   persistIncomingTail,
   type RunRequest,
@@ -173,6 +174,13 @@ export type AgentRuntimeDeps = ResolveDeps & {
    */
   shell_execution_allowed?: boolean;
   /**
+   * Whether a human UI is bound — gates the locked `question` tool. When true
+   * the tool is client-resolved (pauses for the user's answer); when
+   * false/undefined (fail-closed headless) the tool refuses with a fixed tool
+   * error. Threaded from the HTTP-server boundary down to `createToolset`.
+   */
+  interactive?: boolean;
+  /**
    * Optional injected registry — the smoke + tests pre-populate entries.
    * Omit to let AgentRuntime allocate its own.
    */
@@ -235,6 +243,9 @@ type StartTurnOptions = {
   workspace_root?: string;
   skills?: RunRequest["skills"];
   mode: RunRequest["mode"];
+  /** Whether the requesting client can answer the `question` tool (per-run;
+   *  absent ⇒ the host `interactive` default). A core drain leaves it absent. */
+  interactive?: RunRequest["interactive"];
   /**
    * The user message this turn fires — the fired-message identity the
    * turn-lifecycle wire carries (RFC `turn-authority`; emitted on the
@@ -309,8 +320,8 @@ export class AgentRuntime {
       dequeue: (messageId) =>
         this.deps.sessions_store.dequeueMessage(messageId),
       drain: (sessionId, messageId) => this.drainTurn(sessionId, messageId),
-      has_pending_approval: (sessionId) =>
-        this.deps.sessions_store.hasPendingApproval(sessionId),
+      has_pending_human_input: (sessionId) =>
+        this.deps.sessions_store.hasPendingHumanInput(sessionId),
       drain_cooldown_ms: deps.drain_cooldown_ms,
     });
     // Both observers are detached in dispose(): the registry can be
@@ -682,22 +693,34 @@ export class AgentRuntime {
       );
     }
 
-    // Fail closed on an unanswered supervised approval — the SAME invariant the
-    // scheduler's drain enforces (`session-scheduler.ts` `has_pending_approval`):
-    // never start a NEW turn while an approval is pending. `buildModelMessages`
-    // drops the unanswered `approval-requested` part, so a turn started here would
-    // orphan the blocked command and run the next message ahead of it. A valid
-    // `approval_answer` above clears the block; a missing / forged / stale one
-    // leaves it pending. The client normally queues sends while an approval is
-    // pending (it never POSTs here), so this is the server-authoritative guard for
-    // a direct or forged send. We bail BEFORE persisting the incoming tail so a
-    // typed-ahead follow-up isn't recorded against a refused turn.
-    if (await this.deps.sessions_store.hasPendingApproval(sessionId)) {
+    // Clear a CLIENT-resolved answer that rides the incoming tail BEFORE the
+    // pending-block guard below. A `question` answer is a terminal tool result
+    // on the assistant tail (not a body field like an approval), so without
+    // this the very POST carrying the answer would trip the guard it resolves
+    // (the live-daemon resume 409). Idempotent vs. the later persistIncomingTail.
+    await fillIncomingToolResults(
+      this.deps.sessions_store,
+      sessionId,
+      messages
+    );
+
+    // Fail closed on an unanswered human-in-the-loop block (a supervised
+    // approval, or a `question` paused for the user) — the SAME invariant the
+    // scheduler's drain enforces (`session-scheduler.ts` `has_pending_human_input`):
+    // never start a NEW turn while one is pending. `buildModelMessages` drops the
+    // unanswered blocking part, so a turn started here would orphan the block and
+    // run the next message ahead of it. A valid `approval_answer` above clears an
+    // approval; a question clears when its answer is filled. The client normally
+    // queues sends while a block is pending (it never POSTs here), so this is the
+    // server-authoritative guard for a direct or forged send. We bail BEFORE
+    // persisting the incoming tail so a typed-ahead follow-up isn't recorded
+    // against a refused turn.
+    if (await this.deps.sessions_store.hasPendingHumanInput(sessionId)) {
       return Response.json(
         {
           error:
-            "a supervised approval is pending; resolve it before starting a new turn",
-          code: "approval-pending",
+            "a human-input block (approval or question) is pending; resolve it before starting a new turn",
+          code: "human-input-pending",
           session_id: sessionId,
         },
         { status: 409 }
@@ -739,6 +762,9 @@ export class AgentRuntime {
         workspace_root: workspaceRoot,
         skills,
         mode,
+        // Per-run client UI capability (the desktop-from-web bridge sets true; a
+        // headless `cli run` sets false). Absent ⇒ host default downstream.
+        interactive: req.interactive,
         // The fired message of a direct run is the incoming tail's user
         // message (the client resends history; the tail is the new one). An
         // approval-answer resume continues the PRIOR turn's tool call — it
@@ -788,6 +814,7 @@ export class AgentRuntime {
       workspace_root: workspaceRoot,
       skills,
       mode,
+      interactive,
     } = opts;
 
     // Reserve the registry entry; its `modelAbort.signal` (not the request
@@ -839,6 +866,8 @@ export class AgentRuntime {
       workspace_registry: workspaceRegistry,
       secrets_root: secretsRoot,
       shell_execution_allowed: shellExecutionAllowed,
+      // Host-level: gates the `question` tool's execute-or-pause in createAgent.
+      interactive: this.deps.interactive === true,
     };
     // Pump: open the upstream model call, forward each SSE frame into the
     // registry. Doesn't block the caller; a client attaches as another
@@ -928,6 +957,7 @@ export class AgentRuntime {
             workspace_root: workspaceRoot,
             skills,
             mode,
+            interactive,
             skill_index: ctx.skill_index,
             skill_cache: ctx.skill_cache,
             project_instructions: ctx.project_instructions,
