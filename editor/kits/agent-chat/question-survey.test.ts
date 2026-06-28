@@ -162,4 +162,12 @@ describe("QuestionSurvey — validation & stepping", () => {
     expect(QuestionSurvey.from(SINGLE).multiStep).toBe(false);
     expect(QuestionSurvey.from(SURVEY).multiStep).toBe(true);
   });
+
+  it("an empty survey (defensive parse) keeps step in range and isLast false", () => {
+    const s = QuestionSurvey.from({ questions: "nope" });
+    expect(s.count).toBe(0);
+    expect(s.isLast).toBe(false);
+    expect(s.next().step).toBe(0); // not -1
+    expect(s.next().isLast).toBe(false);
+  });
 });

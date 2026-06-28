@@ -146,6 +146,7 @@ export function QuestionCard({
   const writeIn = survey.writeInFor(qi);
 
   const finalize = (s: QuestionSurvey) => {
+    if (busy) return;
     setSubmitted(true);
     onAnswer(toolCallId, s.buildOutput());
   };
@@ -179,6 +180,7 @@ export function QuestionCard({
 
         {hasOptions && !q.multi_select && (
           <RadioGroup
+            aria-labelledby={questionId}
             value={survey.pickedFor(qi)[0] ?? ""}
             onValueChange={(label) => setSurvey(survey.togglePick(qi, label))}
             disabled={busy}
@@ -204,7 +206,11 @@ export function QuestionCard({
         )}
 
         {hasOptions && q.multi_select && (
-          <div className="flex flex-col gap-1.5">
+          <div
+            role="group"
+            aria-labelledby={questionId}
+            className="flex flex-col gap-1.5"
+          >
             {q.options!.map((opt, oi) => (
               <Label
                 key={oi}
@@ -286,7 +292,7 @@ export function QuestionCard({
             type="button"
             size="sm"
             onClick={() => finalize(survey)}
-            disabled={!survey.canSubmit || submitted}
+            disabled={!survey.canSubmit || busy}
           >
             Submit
           </Button>

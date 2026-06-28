@@ -64,7 +64,7 @@ export class QuestionSurvey {
     return this.count > 1;
   }
   get isLast(): boolean {
-    return this.step === this.count - 1;
+    return this.count > 0 && this.step === this.count - 1;
   }
 
   pickedFor(qi: number): readonly string[] {
@@ -154,6 +154,9 @@ export class QuestionSurvey {
   }
 
   next(): QuestionSurvey {
+    // Guard the defensive-parse empty case so `step` never goes below 0
+    // (`Math.min(-1, …)` would otherwise produce -1 and corrupt `isLast`).
+    if (this.count === 0) return this;
     return this.withStep(Math.min(this.count - 1, this.step + 1));
   }
   back(): QuestionSurvey {
