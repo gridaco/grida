@@ -217,6 +217,22 @@ export function QuestionCard({
       }
       return next;
     });
+    // Picking an option and writing your own are mutually exclusive — picking
+    // clears the custom text so the option wins.
+    setWriteIns((prev) =>
+      prev[qi] ? prev.map((v, i) => (i === qi ? "" : v)) : prev
+    );
+  };
+
+  // The custom write-in is exclusive: focusing or typing it makes it THE answer
+  // and deselects any picked option(s) for that question ("when custom, it's
+  // always custom"). No-op once the picks are already empty.
+  const selectCustom = (qi: number) => {
+    setPicked((prev) =>
+      (prev[qi] ?? []).length
+        ? prev.map((row, i) => (i === qi ? [] : row))
+        : prev
+    );
   };
 
   if (questions.length === 0) return null;
@@ -233,10 +249,17 @@ export function QuestionCard({
     const questionId = `${labelId}-q${qi}`;
     return (
       <div className="flex flex-col gap-2">
-        {q.header && (
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            {q.header}
-          </span>
+        {(q.header || multiStep) && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              {q.header}
+            </span>
+            {multiStep && (
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                Question {step + 1} of {questions.length}
+              </span>
+            )}
+          </div>
         )}
         <p id={questionId} className="text-sm font-medium">
           {q.question}
@@ -297,13 +320,15 @@ export function QuestionCard({
         <Textarea
           aria-labelledby={questionId}
           value={writeIns[qi] ?? ""}
-          onChange={(e) =>
+          onFocus={() => selectCustom(qi)}
+          onChange={(e) => {
+            selectCustom(qi);
             setWriteIns((prev) => {
               const next = [...prev];
               next[qi] = e.target.value;
               return next;
-            })
-          }
+            });
+          }}
           disabled={busy}
           rows={2}
           placeholder={
@@ -311,7 +336,12 @@ export function QuestionCard({
               ? "Or write your own answer…"
               : "Type your answer…"
           }
-          className="text-sm"
+          // Highlight the custom field while it holds the answer (its picks are
+          // cleared), so "custom is selected" reads visually.
+          className={cn(
+            "text-sm",
+            (writeIns[qi] ?? "").trim().length > 0 && "ring-1 ring-ring"
+          )}
         />
       </div>
     );
@@ -322,21 +352,6 @@ export function QuestionCard({
       {renderQuestion(multiStep ? step : 0)}
 
       <div className="flex items-center gap-2">
-        {multiStep && (
-          <span className="text-xs text-muted-foreground tabular-nums">
-            Question {step + 1} of {questions.length}
-          </span>
-        )}
-        <div className="flex-1" />
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={skip}
-          disabled={busy}
-        >
-          Skip
-        </Button>
         {multiStep && step > 0 && (
           <Button
             type="button"
@@ -348,6 +363,16 @@ export function QuestionCard({
             Back
           </Button>
         )}
+        <div className="flex-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={skip}
+          disabled={busy}
+        >
+          Skip
+        </Button>
         {multiStep && !isLast ? (
           <Button
             type="button"
