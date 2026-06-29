@@ -14,6 +14,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { WorkspaceRegistry } from "../workspaces";
+import type { SecretsStore } from "../secrets";
 import {
   WorkspaceAgentFsBackend,
   createWorkspaceAgentBindings,
@@ -343,5 +344,93 @@ describe("createWorkspaceAgentBindings — scratch reach", () => {
     // The backend returns a structured failure (not a spawn result) when the
     // cwd is out of bounds.
     expect(result).toMatchObject({ ok: false, code: "cwd-not-in-workspace" });
+  });
+});
+
+/**
+ * WG `scratch.md` S3 — `generate_image` binding gating. The generator is wired
+ * only when ALL of: the host enabled image gen, a scratch sink exists, and the
+ * user actually holds a provider key (the vision-style "don't advertise an
+ * unanswerable capability" gate). Generation itself is exercised by the live
+ * test; here we pin the presence/absence of the binding, no provider call.
+ */
+describe("createWorkspaceAgentBindings — image_gen gating", () => {
+  let baseDir: string;
+  let workspaceRoot: string;
+  let scratchRoot: string;
+  let registry: WorkspaceRegistry;
+
+  /** Fake SecretsStore exposing only the `_getKey` the gate reads. */
+  function fakeSecrets(keys: Record<string, string>): SecretsStore {
+    return {
+      _getKey: async (id: string) => keys[id] ?? null,
+    } as unknown as SecretsStore;
+  }
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-imggen-gate-"));
+    const wsDir = path.join(baseDir, "ws");
+    const scDir = path.join(baseDir, "scratch");
+    await fs.mkdir(wsDir);
+    await fs.mkdir(scDir);
+    workspaceRoot = await fs.realpath(wsDir);
+    scratchRoot = await fs.realpath(scDir);
+    registry = new WorkspaceRegistry(path.join(baseDir, "ud"));
+    await registry.open(workspaceRoot);
+  });
+
+  afterEach(async () => {
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  async function build(deps: {
+    secrets?: SecretsStore;
+    image_gen_enabled?: boolean;
+    scratch_dir?: string;
+  }) {
+    return createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "auto" },
+      {
+        workspace_registry: registry,
+        shell_execution_allowed: true,
+        ...deps,
+      }
+    );
+  }
+
+  it("wires generate_image when enabled, a scratch sink exists, and a key is present", async () => {
+    const bindings = await build({
+      secrets: fakeSecrets({ fal: "sk-fal" }),
+      image_gen_enabled: true,
+      scratch_dir: scratchRoot,
+    });
+    expect(bindings?.image_gen).toBeDefined();
+  });
+
+  it("no provider key ⇒ no image_gen binding", async () => {
+    const bindings = await build({
+      secrets: fakeSecrets({}),
+      image_gen_enabled: true,
+      scratch_dir: scratchRoot,
+    });
+    expect(bindings?.image_gen).toBeUndefined();
+  });
+
+  it("image gen disabled by the host ⇒ no binding even with a key", async () => {
+    const bindings = await build({
+      secrets: fakeSecrets({ fal: "sk-fal" }),
+      image_gen_enabled: false,
+      scratch_dir: scratchRoot,
+    });
+    expect(bindings?.image_gen).toBeUndefined();
+  });
+
+  it("no scratch sink ⇒ no binding (produced bytes have nowhere to land)", async () => {
+    const bindings = await build({
+      secrets: fakeSecrets({ fal: "sk-fal" }),
+      image_gen_enabled: true,
+      // no scratch_dir
+    });
+    expect(bindings?.image_gen).toBeUndefined();
   });
 });

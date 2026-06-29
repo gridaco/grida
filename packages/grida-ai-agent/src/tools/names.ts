@@ -8,6 +8,7 @@
 import type { AgentFs } from "../fs";
 import type { AgentTodos } from "../todos";
 import type { AgentVision } from "../vision";
+import type { AgentGen } from "../gen";
 import type { SKILL_TOOL_NAME } from "../skills/skill-tool";
 
 export const RUN_COMMAND_TOOL_NAME = "run_command" as const;
@@ -26,6 +27,7 @@ export type AgentToolName =
   | AgentFs.ToolName
   | AgentTodos.ToolName
   | AgentVision.ToolName
+  | AgentGen.ToolName
   | typeof RUN_COMMAND_TOOL_NAME
   | typeof QUESTION_TOOL_NAME
   | typeof SKILL_TOOL_NAME;

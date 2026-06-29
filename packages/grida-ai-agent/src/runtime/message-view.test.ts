@@ -3,6 +3,7 @@ import { tool, validateUIMessages } from "ai";
 import { z } from "zod";
 import { buildModelMessages, type ModelUIMessage } from "./message-view";
 import { AgentVision } from "../vision";
+import { AgentGen } from "../gen";
 import type { ChatMessageWithParts, ChatPartRow } from "../session/rows";
 
 // The runtime feeds buildModelMessages output into the AI SDK's
@@ -17,6 +18,7 @@ const TOOLS = {
     inputSchema: z.object({ path: z.string() }),
   }),
   view_image: AgentVision.tools.view_image,
+  generate_image: AgentGen.tools.generate_image,
 };
 
 /** A completed `view_image` tool part carrying base64 `data`. */
@@ -412,5 +414,71 @@ describe("buildModelMessages — view_image retention", () => {
       output: { data?: string };
     };
     expect(persisted.output.data).toBe("iVBORw0KGgo=");
+  });
+});
+
+/** A completed `generate_image` tool part carrying produced base64 `data`. */
+function genImagePart(tcId: string): ChatPartRow {
+  return part(
+    "tool-generate_image",
+    {
+      type: "tool-generate_image",
+      tool_call_id: tcId,
+      state: "output-available",
+      input: { prompt: "a red circle" },
+      output: {
+        ok: true,
+        path: "/tmp/grida-agent/sessions/ses_x/scratch/image-1.png",
+        mime: "image/png",
+        width: 8,
+        height: 8,
+        bytes: 24,
+        data: "iVBORw0KGgo=",
+      },
+    },
+    { tool_call_id: tcId, tool_state: "output-available" }
+  );
+}
+
+function genImageOutput(m: ModelUIMessage): Record<string, unknown> {
+  const p = m.parts.find(
+    (x) => (x as { type?: string }).type === "tool-generate_image"
+  ) as { output?: Record<string, unknown> } | undefined;
+  return p?.output ?? {};
+}
+
+describe("buildModelMessages — generate_image retention", () => {
+  it("replay: a generate_image result in the current turn keeps its pixels (output.data)", async () => {
+    // Same window as view_image: a produced image in the live turn survives the
+    // rebuild with data intact, so toModelOutput re-applies → media block.
+    const out = buildModelMessages([
+      msg("m1", "user", [
+        part("text", { type: "text", text: "make a red circle" }),
+      ]),
+      msg("m2", "assistant", [genImagePart("tc1")]),
+    ]);
+    expect(genImageOutput(out[1]).data).toBe("iVBORw0KGgo=");
+    await expect(validateView(out)).resolves.toBeDefined();
+  });
+
+  it("retention: a stale generate_image result drops its base64 payload", async () => {
+    // A later user turn pushes the produced image out of the live window (K=1):
+    // bytes are dropped (context not wasted) but the path/descriptor stays, so
+    // the model can still promote the file after the pixels are gone.
+    const out = buildModelMessages([
+      msg("m1", "user", [
+        part("text", { type: "text", text: "make a red circle" }),
+      ]),
+      msg("m2", "assistant", [genImagePart("tc1")]),
+      msg("m3", "user", [part("text", { type: "text", text: "thanks" })]),
+    ]);
+    const output = genImageOutput(out[1]);
+    expect(output.data).toBeUndefined();
+    expect(output).toMatchObject({
+      ok: true,
+      mime: "image/png",
+      path: "/tmp/grida-agent/sessions/ses_x/scratch/image-1.png",
+    });
+    await expect(validateView(out)).resolves.toBeDefined();
   });
 });

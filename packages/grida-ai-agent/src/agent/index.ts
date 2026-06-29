@@ -43,6 +43,7 @@ import {
 } from "../tools";
 import { renderSkillIndex } from "../skills/skill-tool";
 import { AgentVision } from "../vision";
+import { AgentGen } from "../gen";
 import type {
   SkillBodyCache,
   SkillBodyLoader,
@@ -95,6 +96,9 @@ export type CreateAgentOptions = {
   /** Byte source for `view_image`. Without it the perception tool is not
    * registered. `AgentFs` satisfies it — the workspace path passes its fs. */
   vision?: ToolsetCapabilities["vision"];
+  /** Image-generation capability. Without it the `generate_image` tool is not
+   * registered. The host builds the generator (provider key + scratch sink). */
+  image_gen?: ToolsetCapabilities["image_gen"];
   /** Command-execution capability. Without it, the `run_command` tool is
    * not registered and the LLM cannot call it. */
   command?: ToolsetCapabilities["command"];
@@ -141,6 +145,7 @@ export function createAgent(opts: CreateAgentOptions) {
     fs: opts.fs,
     todos: opts.todos,
     vision: opts.vision,
+    image_gen: opts.image_gen,
     command: opts.command,
     interactive: opts.interactive,
     skill:
@@ -222,6 +227,17 @@ export function buildCapabilityHints(opts: CreateAgentOptions): string[] {
   }
   if (opts.vision) {
     hints.push(prompts.vision_capability(AgentVision.TOOL_NAMES.view_image));
+  }
+  // Image generation rides scratch (its produced files sink there), so it is
+  // advertised only when the generator AND a scratch path are wired — the same
+  // gating that builds the generator binding in the first place.
+  if (opts.image_gen && opts.command?.scratch_dir) {
+    hints.push(
+      prompts.image_gen_capability(
+        AgentGen.TOOL_NAMES.generate_image,
+        opts.command.scratch_dir
+      )
+    );
   }
   return hints;
 }

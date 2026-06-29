@@ -16,6 +16,7 @@ import {
   removeScratch,
   scratchRootFor,
   sweepScratch,
+  writeScratchFile,
 } from "./scratch";
 import { containsPath } from "../path-contains";
 
@@ -135,6 +136,42 @@ describe("scratch I/O helpers", () => {
     );
     // Nothing was created under the real secret dir.
     expect(await fs.readdir(secrets)).toEqual([]);
+  });
+
+  it("writeScratchFile lands bytes in scratch and returns the absolute path (S3)", async () => {
+    const root = scratchRootFor(base, "ses_write");
+    await ensureScratch(root);
+    const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const out = await writeScratchFile(root, "image-1.png", bytes);
+    expect(out).toBe(path.join(root, "image-1.png"));
+    expect(new Uint8Array(await fs.readFile(out))).toEqual(bytes);
+  });
+
+  it("writeScratchFile writes the produced file owner-only (0600)", async () => {
+    // Shared-machine reasoning, same as the dir mode. Skip on Windows (no POSIX
+    // mode bits).
+    if (process.platform === "win32") return;
+    const root = scratchRootFor(base, "ses_write_mode");
+    await ensureScratch(root);
+    const out = await writeScratchFile(
+      root,
+      "a.png",
+      new Uint8Array([1, 2, 3])
+    );
+    expect((await fs.stat(out)).mode & 0o777).toBe(0o600);
+  });
+
+  it("writeScratchFile rejects a filename that escapes the scratch dir (S1)", async () => {
+    const root = scratchRootFor(base, "ses_escape");
+    await ensureScratch(root);
+    const bytes = new Uint8Array([1, 2, 3]);
+    await expect(writeScratchFile(root, "../evil.png", bytes)).rejects.toThrow(
+      /unsafe/
+    );
+    await expect(writeScratchFile(root, "a/b.png", bytes)).rejects.toThrow(
+      /unsafe/
+    );
+    await expect(writeScratchFile(root, "..", bytes)).rejects.toThrow(/unsafe/);
   });
 
   it("removeScratch is recursive and idempotent (S2)", async () => {

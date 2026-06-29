@@ -34,6 +34,7 @@
 import type { ChatMessageWithParts } from "../session/rows";
 import { compactionBoundary } from "../session/boundary";
 import { AgentVision } from "../vision";
+import { AgentGen } from "../gen";
 
 export type ModelUIMessage = {
   id: string;
@@ -214,10 +215,11 @@ function lowerParts(
       // poisoned/legacy row degrades gracefully instead of failing the run.
       const input = (data as { input?: unknown }).input;
       if (typeof input !== "object" || input === null) continue;
-      // Retention: a stale `view_image` result keeps its tool-call/result pair
-      // (so the turn stays valid) but drops the base64 `output.data`. The tool's
-      // `toModelOutput` then degrades to a text descriptor instead of re-sending
-      // the image — the bytes remain in the persisted row for re-view.
+      // Retention: a stale image-bearing tool result (`view_image`,
+      // `generate_image`) keeps its tool-call/result pair (so the turn stays
+      // valid) but drops the base64 `output.data`. The tool's `toModelOutput`
+      // then degrades to a text descriptor instead of re-sending the image — the
+      // bytes remain in the persisted row for re-view.
       out.push(
         toSdkToolPart(
           maybeElideImageTool(data, type, opts.elideImages),
@@ -232,14 +234,19 @@ function lowerParts(
 }
 
 /**
- * The persisted part type of a `view_image` result. Derived from the canonical
- * tool name (not a bare literal) so a rename of the tool propagates here — the
+ * The persisted part types of image-bearing tool results — the ones whose
+ * `output.data` is a heavy base64 payload `toModelOutput` lowers to a media
+ * block: `view_image` (perceived) and `generate_image` (produced). Derived from
+ * the canonical tool names (not bare literals) so a rename propagates here — the
  * same derive-don't-duplicate discipline `tools/names.ts` uses.
  */
-const VIEW_IMAGE_PART_TYPE = `tool-${AgentVision.TOOL_NAMES.view_image}`;
+const IMAGE_BEARING_PART_TYPES = new Set<string>([
+  `tool-${AgentVision.TOOL_NAMES.view_image}`,
+  `tool-${AgentGen.TOOL_NAMES.generate_image}`,
+]);
 
 /**
- * Strip the heavy base64 payload from a stale `view_image` tool result so it
+ * Strip the heavy base64 payload from a stale image-bearing tool result so it
  * lowers to a descriptor (the tool's `toModelOutput` sees no `output.data` and
  * emits text — that contract is locked by message-view.test.ts). A no-op for
  * any other tool, any non-elided turn, or a result with no `output.data`. Never
@@ -250,7 +257,7 @@ function maybeElideImageTool(
   type: string,
   elide: boolean
 ): Record<string, unknown> {
-  if (!elide || type !== VIEW_IMAGE_PART_TYPE) return data;
+  if (!elide || !IMAGE_BEARING_PART_TYPES.has(type)) return data;
   const output = data.output as Record<string, unknown> | undefined;
   if (!output || typeof output.data !== "string") return data;
   const { data: _dropped, ...rest } = output;

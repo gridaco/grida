@@ -35,6 +35,7 @@ import { tool } from "ai";
 import { AgentFs } from "../fs";
 import { AgentTodos } from "../todos";
 import { AgentVision } from "../vision";
+import { AgentGen } from "../gen";
 import { createSkillTool, SKILL_TOOL_NAME } from "../skills/skill-tool";
 import type {
   SkillBodyCache,
@@ -70,6 +71,12 @@ export type ToolsetCapabilities = {
    * satisfies `AgentVision.ByteReader`, so the workspace path passes its fs
    * here; the model SEES an image only where a host can hand back its bytes. */
   vision?: AgentVision.ByteReader;
+  /** Inject image generation. Without it the `generate_image` tool is NOT in
+   * the registry — advertising a producer with no provider/sink to resolve it
+   * would refuse every call. The host builds the generator from its
+   * `SecretsStore` + the session scratch dir (node-only); this package only
+   * sees the narrow `generate()` outcome. */
+  image_gen?: AgentGen.ImageGenerator;
   /** Inject command execution. Without this entry the `run_command` tool is
    * NOT in the registry — the LLM cannot call something we can't
    * execute. */
@@ -179,7 +186,19 @@ export function createToolset(caps: ToolsetCapabilities = {}) {
         ),
       }
     : withSkill;
-  return withVision;
+  // generate_image joins only when a generator is wired (provider key + scratch
+  // sink present). `wrapWithResolver` preserves the tool's `toModelOutput`, so a
+  // produced image still lowers to a media block the model sees.
+  const imageGen = caps.image_gen;
+  const withImageGen = imageGen
+    ? {
+        ...withVision,
+        ...wrapWithResolver(AgentGen.tools, (name, input) =>
+          AgentGen.resolveToolCall(imageGen, { tool_name: name, input })
+        ),
+      }
+    : withVision;
+  return withImageGen;
 }
 
 /**

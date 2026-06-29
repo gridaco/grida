@@ -216,6 +216,9 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     secrets_root: opts.user_data_path,
     scratch_base: scratchBase,
     shell_execution_allowed: shellExecutionAllowed,
+    // Image generation rides the same capability flag as the `/images/generate`
+    // route. The bindings still require a scratch sink + a provider key.
+    image_gen_enabled: opts.capabilities.images === true,
     // Whether the locked `question` tool pauses for a human (interactive) or
     // refuses with a fixed tool error (headless). Fail-closed headless.
     interactive: opts.interactive === true,

@@ -178,6 +178,28 @@ When you produce SVG:
     ].join("\n"),
 
   /**
+   * Image-generation capability hint (WG `scratch.md` S3 — produced files sink
+   * to scratch). Appended by `buildCapabilityHints` (`agent/index.ts`) only when
+   * an image generator is wired. Tells the model the tool exists, that output
+   * lands in scratch (ephemeral; promote to keep), and that it SEES the result.
+   */
+  image_gen_capability: (
+    generate_image_name: string,
+    scratch_dir: string
+  ): string =>
+    [
+      '<capability name="image-generation">',
+      `You can GENERATE images with the \`${generate_image_name}\` tool — give`,
+      "it a prompt and it returns the generated picture so you can SEE the",
+      "result and iterate.",
+      `Each image is saved into your scratch directory (\`${scratch_dir}\`),`,
+      "which is ephemeral and system-managed. To KEEP an image, promote it: move",
+      "or copy the file into the workspace (or another location the user names).",
+      "An image left only in scratch has not been saved.",
+      "</capability>",
+    ].join("\n"),
+
+  /**
    * Visual-perception capability hint. Appended by `buildCapabilityHints`
    * (`agent/index.ts`) only when a byte source for `view_image` is wired.
    * Teaches the read/view split: text via read_file, pixels via view_image.

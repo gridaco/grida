@@ -188,6 +188,14 @@ export type AgentRuntimeDeps = ResolveDeps & {
    */
   scratch_base?: string;
   /**
+   * Whether the host enables image generation (its `images` server capability).
+   * Threaded to `createWorkspaceAgentBindings`, which builds the
+   * `generate_image` binding only when this is set AND a scratch sink + provider
+   * key exist. Off ⇒ the tool is never advertised. Mirrors how the HTTP image
+   * route is gated by the same capability.
+   */
+  image_gen_enabled?: boolean;
+  /**
    * Whether a human UI is bound — gates the locked `question` tool. When true
    * the tool is client-resolved (pauses for the user's answer); when
    * false/undefined (fail-closed headless) the tool refuses with a fixed tool
@@ -890,6 +898,11 @@ export class AgentRuntime {
       secrets_root: secretsRoot,
       shell_execution_allowed: shellExecutionAllowed,
       scratch_dir: scratchDir,
+      // BYOK keys + the host's image-modality switch — together with scratchDir
+      // they let `createWorkspaceAgentBindings` build the `generate_image`
+      // binding (the produced bytes sink to scratch).
+      secrets: this.deps.secrets,
+      image_gen_enabled: this.deps.image_gen_enabled === true,
       // Host-level: gates the `question` tool's execute-or-pause in createAgent.
       interactive: this.deps.interactive === true,
     };

@@ -6,13 +6,23 @@
  * module only adapts contracts.
  */
 
+import { generateImage } from "ai";
 import { AgentFs } from "../fs";
 import { isProtectedWrite } from "../fs/scope";
 import { isReadOnlyCommand } from "../permissions";
 import { AgentTodos } from "../todos";
 import { AgentVision } from "../vision";
+import { AgentGen } from "../gen";
 import type { SkillId } from "../agent";
 import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
+import type { SecretsStore } from "../secrets";
+import {
+  defaultImageModelId,
+  hasUsableImageProvider,
+  ImageModelUnavailableError,
+  resolveImageModel,
+} from "../providers/resolve-image";
+import { writeScratchFile } from "../session/scratch";
 import { createAgentCommandBackend } from "./command-backend";
 import { workspaceFs } from "../workspaces/fs";
 import {
@@ -57,6 +67,18 @@ export async function createWorkspaceAgentBindings(
      * its path. Absent ⇒ no scratch reach (the command stays workspace-only).
      */
     scratch_dir?: string;
+    /**
+     * The host's `SecretsStore` (BYOK keys). Needed to build the image
+     * generator (`generate_image`); credentials never leave the package. Absent
+     * on paths that don't generate media.
+     */
+    secrets?: SecretsStore;
+    /**
+     * Whether the host enables image generation (its `images` server
+     * capability). With it off, no `generate_image` binding is built — the host
+     * decides the modality is available, exactly as it gates the HTTP route.
+     */
+    image_gen_enabled?: boolean;
   }
 ): Promise<{
   fs: AgentFs;
@@ -69,6 +91,9 @@ export async function createWorkspaceAgentBindings(
     scratch_dir?: string;
     needs_approval?: (input: { command: string; args: string[] }) => boolean;
   };
+  /** Image generator backing `generate_image`, when a provider key + scratch
+   *  sink are available (S3: produced files land in scratch). */
+  image_gen?: AgentGen.ImageGenerator;
 } | null> {
   if (!req.workspace_root) return null;
   const workspace = await deps.workspace_registry.findByRoot(
@@ -114,7 +139,144 @@ export async function createWorkspaceAgentBindings(
             : undefined,
       }
     : undefined;
-  return { fs, todos, command };
+  // Image generation (`generate_image`): wired only when the host enabled the
+  // modality, a scratch sink exists (produced bytes land there — S3), and the
+  // user actually holds a provider key. The last check mirrors vision's
+  // `bytesReadable` gate — never advertise a producer that would refuse every
+  // call. The async key probe is cheap (a file read of auth.json).
+  let image_gen: AgentGen.ImageGenerator | undefined;
+  if (deps.image_gen_enabled && deps.secrets && deps.scratch_dir) {
+    const secrets = deps.secrets;
+    const scratchDir = deps.scratch_dir;
+    if (await hasUsableImageProvider({ secrets })) {
+      image_gen = createImageGenerator(secrets, scratchDir);
+    }
+  }
+  return { fs, todos, command, image_gen };
+}
+
+/** File extension for a produced image's media type (best-effort). */
+function extForMime(mime: string): string {
+  switch (mime) {
+    case "image/png":
+      return "png";
+    case "image/jpeg":
+      return "jpg";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    default:
+      return "img";
+  }
+}
+
+/**
+ * Build the node-only image generator the `generate_image` tool resolves
+ * against (`AgentGen.ImageGenerator`). It resolves the user's provider for the
+ * model, calls the AI SDK, writes the bytes into scratch (the default sink), and
+ * returns the path + base64 so the tool can both promote the file and lower the
+ * pixels to a media block. Expected failures (no key, provider error) come back
+ * as the typed `ok: false` — never thrown into the agent loop.
+ *
+ * NB billing (#908): like `/images/generate`, this calls `generateImage` WITHOUT
+ * `providerOptions.grida`, so the user's own key pays the provider and no Grida
+ * credit is metered. Do not add `providerOptions.grida` here.
+ */
+function createImageGenerator(
+  secrets: SecretsStore,
+  scratchDir: string
+): AgentGen.ImageGenerator {
+  return {
+    async generate(input) {
+      const modelId = input.model_id ?? defaultImageModelId();
+      if (!modelId) {
+        return {
+          ok: false,
+          reason: "unavailable",
+          message: "No image model is available.",
+        };
+      }
+      let resolved;
+      try {
+        resolved = await resolveImageModel(
+          { secrets },
+          modelId,
+          input.provider ? { explicit: input.provider } : {}
+        );
+      } catch (e) {
+        if (e instanceof ImageModelUnavailableError) {
+          return {
+            ok: false,
+            reason: "unavailable",
+            message: `No connected provider can generate "${modelId}". Ask the user to connect an image-provider key in settings.`,
+          };
+        }
+        throw e;
+      }
+      let generation;
+      try {
+        generation = await generateImage({
+          model: resolved.model,
+          prompt: input.prompt,
+          n: 1,
+          ...(input.size ? { size: input.size as `${number}x${number}` } : {}),
+          ...(input.aspect_ratio
+            ? { aspectRatio: input.aspect_ratio as `${number}:${number}` }
+            : {}),
+          ...(input.seed !== undefined ? { seed: input.seed } : {}),
+        });
+      } catch (e) {
+        // Upstream detail (may embed provider body text) stays in the sidecar
+        // log only; the model gets a generic, actionable message.
+        const detail = e instanceof Error ? e.message : String(e);
+        console.error(
+          `[agent-host-image-gen] generation failed provider=${resolved.provider_id} model=${modelId}: ${detail}`
+        );
+        return {
+          ok: false,
+          reason: "generation_failed",
+          message: "Image generation failed — the provider returned an error.",
+        };
+      }
+      const file = generation.images[0];
+      if (!file) {
+        return {
+          ok: false,
+          reason: "generation_failed",
+          message: "The provider returned no image.",
+        };
+      }
+      const bytes = file.uint8Array;
+      // Sniff for the honest mime + dimensions; fall back to the provider's
+      // declared media type when the format isn't one we parse.
+      const sniffed = AgentVision.sniff(bytes);
+      const mime = sniffed?.mime ?? file.mediaType;
+      const filename =
+        input.filename ?? `image-${Date.now()}.${extForMime(mime)}`;
+      let savedPath: string;
+      try {
+        savedPath = await writeScratchFile(scratchDir, filename, bytes);
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e);
+        console.error(`[agent-host-image-gen] scratch write failed: ${detail}`);
+        return {
+          ok: false,
+          reason: "generation_failed",
+          message: "Could not save the generated image to scratch.",
+        };
+      }
+      return {
+        ok: true,
+        path: savedPath,
+        mime,
+        ...(sniffed?.width ? { width: sniffed.width } : {}),
+        ...(sniffed?.height ? { height: sniffed.height } : {}),
+        bytes: bytes.byteLength,
+        data: file.base64,
+      };
+    },
+  };
 }
 
 export class WorkspaceAgentFsBackend implements AgentFs.Backend {
