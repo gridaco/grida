@@ -51,6 +51,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { WorkspaceRegistry } from "../workspaces";
+import { containsPath } from "../path-contains";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_BUFFER_BYTES = 1 * 1024 * 1024; // 1 MiB combined
@@ -191,14 +192,6 @@ export async function validateShellRequest(
       timeout_ms: req.timeout_ms,
     },
   };
-}
-
-/** `path.sep`-terminated prefix containment — same discipline as
- *  {@link WorkspaceRegistry.containsPath}, so a sibling like
- *  `${userData}-backup` never counts as inside `${userData}`. */
-function containsPath(root: string, candidate: string): boolean {
-  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
-  return candidate === root || candidate.startsWith(prefix);
 }
 
 /** Realpath each root so the comparison is symlink-stable (used for both the

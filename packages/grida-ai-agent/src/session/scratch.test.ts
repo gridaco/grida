@@ -74,26 +74,36 @@ describe("scratch I/O helpers", () => {
   });
 
   it("ensureScratch creates the dir lazily and is idempotent (S1)", async () => {
-    const root = await ensureScratch(base, "ses_one");
+    const root = scratchRootFor(base, "ses_one");
+    await ensureScratch(root);
     const stat = await fs.stat(root);
     expect(stat.isDirectory()).toBe(true);
-    expect(root).toBe(scratchRootFor(base, "ses_one"));
     // Second call is a no-op, not an error.
-    await expect(ensureScratch(base, "ses_one")).resolves.toBe(root);
+    await expect(ensureScratch(root)).resolves.toBeUndefined();
   });
 
-  it("ensureScratch refuses a base nested in the secret root (S4)", async () => {
+  it("ensureScratch creates the scratch dir owner-only (0700)", async () => {
+    // Other local accounts must not read produced/extracted artifacts on a
+    // shared machine (`<os.tmpdir()>` can resolve under a world-traversable
+    // `/tmp`). Skip on Windows, which has no POSIX mode bits.
+    if (process.platform === "win32") return;
+    const root = scratchRootFor(base, "ses_mode");
+    await ensureScratch(root);
+    const stat = await fs.stat(root);
+    expect(stat.mode & 0o777).toBe(0o700);
+  });
+
+  it("ensureScratch refuses a scratch dir nested in the secret root (S4)", async () => {
     // A misconfigured base that would put scratch inside `userData` fails loudly
     // before any dir is created.
     const secrets = base;
-    const badBase = path.join(base, "nested");
-    await expect(ensureScratch(badBase, "ses_x", secrets)).rejects.toThrow(
-      /secret root/
-    );
+    const badDir = scratchRootFor(path.join(base, "nested"), "ses_x");
+    await expect(ensureScratch(badDir, secrets)).rejects.toThrow(/secret root/);
   });
 
   it("removeScratch is recursive and idempotent (S2)", async () => {
-    const root = await ensureScratch(base, "ses_rm");
+    const root = scratchRootFor(base, "ses_rm");
+    await ensureScratch(root);
     await fs.writeFile(path.join(root, "artifact.txt"), "produced");
     await fs.mkdir(path.join(root, "extracted"), { recursive: true });
     await removeScratch(base, "ses_rm");
@@ -103,14 +113,13 @@ describe("scratch I/O helpers", () => {
   });
 
   it("sweepScratch reclaims every session dir; a missing base is a no-op (S2)", async () => {
-    await ensureScratch(base, "ses_a");
-    await ensureScratch(base, "ses_b");
-    await sweepScratch(base);
-    await expect(fs.readdir(path.join(base, "sessions"))).resolves.toEqual([]);
+    await ensureScratch(scratchRootFor(base, "ses_a"));
+    await ensureScratch(scratchRootFor(base, "ses_b"));
+    // Synchronous — the host calls it before serving runs (no race).
+    sweepScratch(base);
+    expect(await fs.readdir(path.join(base, "sessions"))).toEqual([]);
     // A base that was never used (fresh host) sweeps without error.
-    await expect(
-      sweepScratch(path.join(base, "does-not-exist"))
-    ).resolves.toBeUndefined();
+    expect(() => sweepScratch(path.join(base, "does-not-exist"))).not.toThrow();
   });
 });
 

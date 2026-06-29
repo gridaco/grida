@@ -962,11 +962,11 @@ export class AgentRuntime {
         const preparedMessages = buildModelMessages(visible);
 
         // Create the session scratch dir on disk before the turn so a command
-        // the agent runs can `cd`/write into it (WG `scratch.md` S1). Derivation
-        // already happened (scratchDir); ensureScratch mkdir's it and re-asserts
-        // it sits outside the secret root (S4). Skipped when scratch is unwired.
-        if (scratchDir && scratchBase) {
-          await ensureScratch(scratchBase, sessionId, secretsRoot);
+        // the agent runs can `cd`/write into it (WG `scratch.md` S1). The path
+        // was already derived (scratchDir); ensureScratch mkdir's it owner-only
+        // and re-asserts it sits outside the secret root (S4). Unwired ⇒ skip.
+        if (scratchDir) {
+          await ensureScratch(scratchDir, secretsRoot);
         }
 
         // Session-static skills + project instructions (discovered once).

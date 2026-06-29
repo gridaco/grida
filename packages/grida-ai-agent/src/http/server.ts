@@ -196,8 +196,11 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   // adapter boundary, never in the runtime core. Sweep stale session dirs once
   // at host start — a single-instance daemon's prior in-flight scratch is dead
   // after a restart, so this bounds scratch's lifetime even across a crash (S2).
+  // SYNCHRONOUS and BEFORE the runtime is built / serving begins, so a resumed
+  // session's scratch can't be deleted underneath a running command by a still-
+  // in-flight async sweep.
   const scratchBase = opts.scratch_base ?? defaultScratchBase();
-  void sweepScratch(scratchBase);
+  sweepScratch(scratchBase);
   const runtime = new AgentRuntime({
     secrets: secretsStore,
     endpoints: endpointsStore,

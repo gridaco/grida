@@ -22,14 +22,25 @@
  * is both outside the secret root and naturally ephemeral.
  */
 
-import { mkdir, rm, readdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
+import { readdirSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { containsPath } from "../path-contains";
 
 /** Where every session's scratch dir lives under a `base`. */
 const SESSIONS_DIRNAME = "sessions";
 const SCRATCH_DIRNAME = "scratch";
 const SCRATCH_NAMESPACE = "grida-agent";
+
+/**
+ * Owner-only (`rwx------`) mode for every scratch dir we create. On a shared
+ * Unix machine the default base (`<os.tmpdir()>/grida-agent`) can resolve under
+ * a world-traversable `/tmp`, so without this another local account could list
+ * the sessions tree and read produced/extracted artifacts. `mkdir` applies this
+ * to each level it creates (subject to umask, which only removes bits).
+ */
+const SCRATCH_DIR_MODE = 0o700;
 
 /**
  * Default base directory for session scratch areas when the host injects none.
@@ -66,29 +77,19 @@ export function scratchRootFor(base: string, sessionId: string): string {
   return path.join(base, SESSIONS_DIRNAME, sessionId, SCRATCH_DIRNAME);
 }
 
-/** The per-session parent of `scratch` (`<base>/sessions/<id>`) — what cleanup
- *  removes so no empty session dir is left behind. */
-function sessionDirFor(base: string, sessionId: string): string {
-  assertSafeSessionId(sessionId);
-  return path.join(base, SESSIONS_DIRNAME, sessionId);
-}
-
 /**
  * Assert a scratch root is NOT inside the host's secret root (S4 containment).
- * PURE. Uses the same `path.sep`-terminated prefix discipline as the shell
- * runner's `containsPath`, so a sibling like `${secretsRoot}-x` never counts as
- * inside. Throws when the invariant is violated — a misconfigured base that
- * nests scratch in `userData` is a programming error, not a runtime condition.
+ * PURE. Reuses the shared `path.sep`-prefix {@link containsPath}, so a sibling
+ * like `${secretsRoot}-x` never counts as inside. Throws when the invariant is
+ * violated — a misconfigured base that nests scratch in `userData` is a
+ * programming error, not a runtime condition.
  */
 export function assertOutsideSecretsRoot(
   scratchRoot: string,
   secretsRoot: string | undefined
 ): void {
   if (!secretsRoot) return;
-  const root = path.resolve(secretsRoot);
-  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
-  const candidate = path.resolve(scratchRoot);
-  if (candidate === root || candidate.startsWith(prefix)) {
+  if (containsPath(path.resolve(secretsRoot), path.resolve(scratchRoot))) {
     throw new Error(
       `scratch root must not be inside the secret root (GRIDA-SEC-004): ${scratchRoot}`
     );
@@ -96,57 +97,62 @@ export function assertOutsideSecretsRoot(
 }
 
 /**
- * Create a session's scratch dir on demand (`mkdir -p`). Idempotent. Returns the
- * resolved scratch root so the caller can hand it to the agent.
+ * Create a scratch dir on demand (`mkdir -p`, owner-only). Idempotent. Takes the
+ * already-derived dir (from {@link scratchRootFor}) so the path isn't computed
+ * twice — the caller holds it for the agent binding anyway.
  *
  * `secretsRoot`, when given, is asserted against before any I/O — a base that
  * would nest scratch in the secret root fails loudly rather than silently
  * creating an unreachable dir.
  */
 export async function ensureScratch(
-  base: string,
-  sessionId: string,
+  scratchDir: string,
   secretsRoot?: string
-): Promise<string> {
-  const root = scratchRootFor(base, sessionId);
-  assertOutsideSecretsRoot(root, secretsRoot);
-  await mkdir(root, { recursive: true });
-  return root;
+): Promise<void> {
+  assertOutsideSecretsRoot(scratchDir, secretsRoot);
+  await mkdir(scratchDir, { recursive: true, mode: SCRATCH_DIR_MODE });
 }
 
 /**
- * Remove a session's scratch subtree (the whole `<base>/sessions/<id>`).
- * Recursive and idempotent — removing a session that never allocated scratch is
- * a no-op. Used on session delete (S2: durability is by promotion, so reclaiming
- * scratch never loses value).
+ * Remove a session's scratch subtree (the whole `<base>/sessions/<id>`, so no
+ * empty session dir lingers). Recursive and idempotent — removing a session that
+ * never allocated scratch is a no-op. Used on session delete (S2: durability is
+ * by promotion, so reclaiming scratch never loses value).
  */
 export async function removeScratch(
   base: string,
   sessionId: string
 ): Promise<void> {
-  await rm(sessionDirFor(base, sessionId), { recursive: true, force: true });
+  assertSafeSessionId(sessionId);
+  await rm(path.join(base, SESSIONS_DIRNAME, sessionId), {
+    recursive: true,
+    force: true,
+  });
 }
 
 /**
- * Reclaim ALL session scratch dirs under `base` (`<base>/sessions/*`). Called
- * once at host start: a single-instance daemon's prior in-flight scratch is dead
- * after a restart, so sweeping bounds scratch's lifetime even across a crash
- * (S2). Best-effort — a missing base is a no-op; an unreadable entry is skipped.
+ * Reclaim ALL session scratch dirs under `base` (`<base>/sessions/*`).
+ * SYNCHRONOUS by design: the host calls it at start BEFORE it begins serving
+ * runs, so a freshly resumed session's `ensureScratch` can't race a still-running
+ * async sweep that would delete the dir underneath it. A single-instance daemon's
+ * prior in-flight scratch is dead after a restart, so this bounds scratch's
+ * lifetime even across a crash (S2). Best-effort — a missing base is a no-op; an
+ * unreadable entry is skipped.
  */
-export async function sweepScratch(base: string): Promise<void> {
+export function sweepScratch(base: string): void {
   const sessionsDir = path.join(base, SESSIONS_DIRNAME);
   let entries: string[];
   try {
-    entries = await readdir(sessionsDir);
+    entries = readdirSync(sessionsDir);
   } catch {
     // No base yet (fresh host) — nothing to reclaim.
     return;
   }
-  await Promise.all(
-    entries.map((name) =>
-      rm(path.join(sessionsDir, name), { recursive: true, force: true }).catch(
-        () => undefined
-      )
-    )
-  );
+  for (const name of entries) {
+    try {
+      rmSync(path.join(sessionsDir, name), { recursive: true, force: true });
+    } catch {
+      // Skip an entry we can't remove; the next sweep retries.
+    }
+  }
 }

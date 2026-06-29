@@ -166,7 +166,7 @@ When you produce SVG:
       `You have a scratch directory at \`${scratch_dir}\`. It is an ephemeral,`,
       "system-managed working area, separate from the user's workspace.",
       `Use it through the \`${run_command_name}\` tool — you may \`cd\` into it`,
-      "and freely read, write, move, and copy files there without asking.",
+      "and read, write, move, and copy files there.",
       "It is the default place for files you PRODUCE or for intermediates",
       "(extracted archives, downloads, conversions): keep throwaway output out",
       "of the user's project.",
