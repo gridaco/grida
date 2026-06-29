@@ -35,7 +35,7 @@ import type {
   ImageModelMiddleware,
   ImageModel,
 } from "ai";
-import { wrapProvider } from "ai";
+import { embed, wrapProvider } from "ai";
 import Replicate from "replicate";
 import OpenAI from "openai";
 import { createLibraryClient } from "@/lib/supabase/server";
@@ -462,6 +462,40 @@ export const grida: GridaProvider = gridaFn;
  */
 export function model(tier: ModelTier) {
   return grida(catalog[tiers[tier]].id);
+}
+
+// ===========================================================================
+// Text embedding (generic provider primitive)
+// ===========================================================================
+//
+// Generic text-embedding access through the seam's attributed provider.
+// FEATURE-SPECIFIC concerns — model choice, dimensionality / normalization,
+// caching, rate-limiting — belong to the calling feature, NOT here. E.g. the
+// Library composes its query embedding in `@/lib/library/embedding`, which
+// owns the model id + 1536-d truncation + cache and calls this primitive.
+
+const embeddingProvider = byok ?? gateway;
+
+/**
+ * UNBILLED text embedding through the attributed provider (BYOK precedence:
+ * OpenRouter in dev, Vercel AI Gateway in prod). Returns the RAW provider
+ * embedding — the caller applies any model-specific post-processing.
+ *
+ * GRIDA-SEC-003: a system/internal, non-billable passthrough kept in this
+ * file so the provider import stays contained (mirrors
+ * {@link methods.listOpenAiModels}). It does NOT pass through gate→ingest —
+ * there is no org context. A caller reaching this from a PUBLIC surface MUST
+ * add its own abuse controls (rate limit + cache).
+ */
+export async function embedTextUnbilled(
+  modelId: string,
+  value: string
+): Promise<number[]> {
+  const { embedding } = await embed({
+    model: embeddingProvider.textEmbeddingModel(modelId),
+    value,
+  });
+  return embedding;
 }
 
 // ===========================================================================

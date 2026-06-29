@@ -163,15 +163,26 @@ CREATE INDEX object_search_idx ON grida_library.object USING GIN (search_tsv);
 
 
 ---------------------------------------------------------------------
--- [Embedding - Vision Support - amazon.titan-embed-image-v1] --
+-- [Embedding] --
+--
+-- gemini_embedding_2__image / __text: Gemini Embedding 2 (1536-d, cosine),
+--   single-modality, never fused. Image powers similar(); text powers
+--   search() (with a cross-modal image floor). __text is NULLABLE (only
+--   described objects).
+-- embedding: LEGACY amazon.titan-embed-image-v1 (1024-d). Retained during
+--   migration; dropped in a later cutover migration.
 ---------------------------------------------------------------------
 create table grida_library.object_embedding (
   object_id uuid primary key references grida_library.object(id) on delete cascade,
-  embedding vector(1024),
+  embedding vector(1024),                      -- legacy (Titan); to be dropped
+  gemini_embedding_2__image vector(1536),
+  gemini_embedding_2__text vector(1536),       -- nullable: described objects only
   created_at timestamptz default now()
 );
 
-CREATE INDEX object_embedding_ivfflat_idx ON grida_library.object_embedding USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
+CREATE INDEX object_embedding_ivfflat_idx ON grida_library.object_embedding USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);  -- legacy
+CREATE INDEX object_embedding_gemini_image_hnsw_idx ON grida_library.object_embedding USING hnsw (gemini_embedding_2__image vector_cosine_ops);
+CREATE INDEX object_embedding_gemini_text_hnsw_idx ON grida_library.object_embedding USING hnsw (gemini_embedding_2__text vector_cosine_ops) WHERE gemini_embedding_2__text IS NOT NULL;
 ALTER TABLE grida_library.object_embedding ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read" ON grida_library.object_embedding FOR SELECT TO public USING (true);
 
@@ -228,6 +239,9 @@ $$ LANGUAGE plpgsql STABLE;
 
 ---------------------------------------------------------------------
 -- [similar rpc] --
+-- Still on the legacy Titan `embedding`. Repointed to the gemini image
+-- vector by a separate cutover migration applied AFTER the backfill (so
+-- it never returns empty against an un-backfilled column).
 ---------------------------------------------------------------------
 create or replace function grida_library.similar(
   ref_id uuid
@@ -249,3 +263,54 @@ BEGIN
     order by e.embedding <#> r.embedding;
 END;
 $$ language plpgsql stable;
+
+
+---------------------------------------------------------------------
+-- [search rpc] --
+-- Semantic text search. Two ordered tiers, never score-blended:
+--   tier 1: described objects, text<->text (gemini_embedding_2__text)
+--   tier 2: undescribed objects, cross-modal text-query<->image floor
+---------------------------------------------------------------------
+create or replace function grida_library.search(
+  query_embedding vector(1536),
+  match_count int default 60,
+  match_offset int default 0,
+  match_category text default null
+)
+returns setof grida_library.object
+language sql
+stable
+as $$
+  with ranked as (
+    -- each tier bounds its own vector scan (ORDER BY ... LIMIT offset+count)
+    -- so the HNSW index limits the work; union is merged + paginated after.
+    select object_id, tier, dist from (
+      select e.object_id, 1 as tier,
+             (e.gemini_embedding_2__text <=> query_embedding) as dist
+      from grida_library.object_embedding e
+      join grida_library.object o on o.id = e.object_id
+      where e.gemini_embedding_2__text is not null
+        and (match_category is null or o.category = match_category)
+      order by e.gemini_embedding_2__text <=> query_embedding
+      limit match_count + match_offset
+    ) tier1
+    union all
+    select object_id, tier, dist from (
+      select e.object_id, 2 as tier,
+             (e.gemini_embedding_2__image <=> query_embedding) as dist
+      from grida_library.object_embedding e
+      join grida_library.object o on o.id = e.object_id
+      where e.gemini_embedding_2__text is null
+        and e.gemini_embedding_2__image is not null
+        and (match_category is null or o.category = match_category)
+      order by e.gemini_embedding_2__image <=> query_embedding
+      limit match_count + match_offset
+    ) tier2
+    order by tier asc, dist asc
+    limit match_count offset match_offset
+  )
+  select o.*
+  from grida_library.object o
+  join ranked on ranked.object_id = o.id
+  order by ranked.tier asc, ranked.dist asc, o.id asc;
+$$;

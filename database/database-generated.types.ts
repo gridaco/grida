@@ -2553,16 +2553,22 @@ export type Database = {
         Row: {
           created_at: string | null
           embedding: string | null
+          gemini_embedding_2__image: string | null
+          gemini_embedding_2__text: string | null
           object_id: string
         }
         Insert: {
           created_at?: string | null
           embedding?: string | null
+          gemini_embedding_2__image?: string | null
+          gemini_embedding_2__text?: string | null
           object_id: string
         }
         Update: {
           created_at?: string | null
           embedding?: string | null
+          gemini_embedding_2__image?: string | null
+          gemini_embedding_2__text?: string | null
           object_id?: string
         }
         Relationships: [
@@ -2582,6 +2588,59 @@ export type Database = {
     Functions: {
       random: {
         Args: { p_limit?: number }
+        Returns: {
+          alt: string | null
+          author_id: string | null
+          background: string | null
+          bytes: number
+          categories: unknown[]
+          category: string
+          color: string | null
+          colors: unknown[]
+          created_at: string
+          description: string | null
+          entropy: number | null
+          fill: string | null
+          generator: string | null
+          gravity_x: number | null
+          gravity_y: number | null
+          height: number
+          id: string
+          keywords: string[]
+          lang: string | null
+          license: string
+          mimetype: string
+          objects: string[]
+          orientation: Database["grida_library"]["Enums"]["orientation"] | null
+          path: string
+          path_tokens: string[] | null
+          priority: number | null
+          prompt: string | null
+          public_domain: boolean
+          score: number | null
+          search_tsv: unknown
+          sys_annotations: string[]
+          title: string | null
+          transparency: boolean
+          updated_at: string
+          version: number
+          width: number
+          year: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "object"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      search: {
+        Args: {
+          match_category?: string
+          match_count?: number
+          match_offset?: number
+          query_embedding: string
+        }
         Returns: {
           alt: string | null
           author_id: string | null
@@ -4792,6 +4851,10 @@ export type Database = {
           stripe_subscription_id: string
         }[]
       }
+      fn_billing_get_ai_credit_processed: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
       fn_billing_get_catalogue: {
         Args: { p_id: string }
         Returns: {
@@ -4869,6 +4932,10 @@ export type Database = {
           stripe_price_id: string
           stripe_product_id: string
         }[]
+      }
+      fn_billing_stamp_ai_credit_processed: {
+        Args: { p_event_id: string; p_event_type: string }
+        Returns: undefined
       }
       fn_billing_stamp_failure: {
         Args: { p_event_id: string; p_event_type: string; p_reason: string }

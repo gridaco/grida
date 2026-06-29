@@ -156,6 +156,11 @@ ai:
   permalink: /ai
   description: Assistant tools, model-facing operations, and AI UX.
 
+library:
+  label: Library
+  permalink: /library
+  description: The Grida Library — curated open visual asset corpus, indexing, and retrieval (similarity & semantic search).
+
 collaboration:
   label: Collaboration
   permalink: /collaboration
