@@ -19,7 +19,6 @@ import {
   TooltipTrigger,
 } from "@app/ui/components/tooltip";
 import dynamic from "next/dynamic";
-import { motion } from "motion/react";
 import { Spinner } from "@app/ui/components/spinner";
 
 const Masonry: ComponentType<MasonryProps<ObjectDetail>> = dynamic(
@@ -138,12 +137,11 @@ function ImageCard({
     object.description || object.alt || object.title || object.prompt;
 
   return (
-    <motion.figure
-      initial={{ opacity: 0 }}
-      whileInView={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-      viewport={{ once: true }}
+    // No entrance animation: Masonic virtualizes (unmounts/remounts cards as
+    // they scroll through the viewport), so a viewport-gated `whileInView`
+    // fade left remounted-but-already-visible cards stuck at opacity 0. A
+    // plain figure renders reliably regardless of scroll position.
+    <figure
       className="group relative overflow-hidden rounded-lg"
       itemScope
       itemType="http://schema.org/ImageObject"
@@ -247,6 +245,6 @@ function ImageCard({
           </div>
         </div>
       </div>
-    </motion.figure>
+    </figure>
   );
 }
