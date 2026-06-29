@@ -72,28 +72,39 @@ language sql
 stable
 as $$
   with ranked as (
-    -- tier 1: described objects, same-modality text<->text
-    select
-      e.object_id,
-      1 as tier,
-      (e.gemini_embedding_2__text <=> query_embedding) as dist
-    from grida_library.object_embedding e
-    join grida_library.object o on o.id = e.object_id
-    where e.gemini_embedding_2__text is not null
-      and (match_category is null or o.category = match_category)
+    -- Each tier bounds its own vector scan with ORDER BY ... LIMIT
+    -- (offset+count) so the HNSW index limits the nearest-neighbour work;
+    -- the union is then merged + paginated. Tier 1 (described, text<->text)
+    -- always outranks tier 2 (undescribed, cross-modal image floor) — the
+    -- two distances are never compared to each other.
+    select object_id, tier, dist from (
+      select
+        e.object_id,
+        1 as tier,
+        (e.gemini_embedding_2__text <=> query_embedding) as dist
+      from grida_library.object_embedding e
+      join grida_library.object o on o.id = e.object_id
+      where e.gemini_embedding_2__text is not null
+        and (match_category is null or o.category = match_category)
+      order by e.gemini_embedding_2__text <=> query_embedding
+      limit match_count + match_offset
+    ) tier1
 
     union all
 
-    -- tier 2: undescribed objects only, cross-modal floor (text query <-> image)
-    select
-      e.object_id,
-      2 as tier,
-      (e.gemini_embedding_2__image <=> query_embedding) as dist
-    from grida_library.object_embedding e
-    join grida_library.object o on o.id = e.object_id
-    where e.gemini_embedding_2__text is null
-      and e.gemini_embedding_2__image is not null
-      and (match_category is null or o.category = match_category)
+    select object_id, tier, dist from (
+      select
+        e.object_id,
+        2 as tier,
+        (e.gemini_embedding_2__image <=> query_embedding) as dist
+      from grida_library.object_embedding e
+      join grida_library.object o on o.id = e.object_id
+      where e.gemini_embedding_2__text is null
+        and e.gemini_embedding_2__image is not null
+        and (match_category is null or o.category = match_category)
+      order by e.gemini_embedding_2__image <=> query_embedding
+      limit match_count + match_offset
+    ) tier2
 
     order by tier asc, dist asc
     limit match_count offset match_offset

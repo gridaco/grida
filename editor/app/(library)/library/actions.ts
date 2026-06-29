@@ -251,15 +251,21 @@ export async function search({
   }
 
   // The RPC paginates internally, so its row count is only the current
-  // window. Use the candidate universe (objects in the category) as the
-  // gallery total so the infinite loader can page through all results.
-  // Independent of the embedding → run concurrently.
-  const totalQuery = category
-    ? client
-        .from("object")
-        .select("id", { count: "estimated", head: true })
-        .eq("category", category)
-    : client.from("object").select("id", { count: "estimated", head: true });
+  // window. Use the RPC's candidate universe as the gallery total so the
+  // infinite loader pages through exactly the rows that can be returned —
+  // i.e. objects that actually have a gemini image embedding (the union of
+  // both tiers), not every object in the category. Independent of the
+  // embedding → run concurrently.
+  let totalQuery = client
+    .from("object")
+    .select("id, object_embedding!inner(object_id)", {
+      count: "estimated",
+      head: true,
+    })
+    .not("object_embedding.gemini_embedding_2__image", "is", null);
+  if (category) {
+    totalQuery = totalQuery.eq("category", category);
+  }
 
   const [query_embedding, totalRes] = await Promise.all([
     embedLibraryQuery(text),
@@ -279,6 +285,9 @@ export async function search({
 
   if (error) {
     throw error;
+  }
+  if (totalRes.error) {
+    throw totalRes.error;
   }
 
   return {

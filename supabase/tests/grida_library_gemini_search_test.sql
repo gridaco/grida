@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(4);
+SELECT plan(6);
 
 -- ===================================================================
 -- grida_library Gemini embedding RPC: search()
@@ -23,6 +23,21 @@ SELECT has_function(
   'grida_library', 'similar',
   ARRAY['uuid'],
   'grida_library.similar(uuid) exists'
+);
+
+-- ── index contract: gemini vector indexes are HNSW + cosine ────────
+-- Guards against a regression to the legacy ivfflat/vector_l2_ops shape.
+SELECT ok(
+  pg_get_indexdef(
+    'grida_library.object_embedding_gemini_image_hnsw_idx'::regclass
+  ) ~* 'using hnsw .*vector_cosine_ops',
+  'gemini image index is HNSW cosine'
+);
+SELECT ok(
+  pg_get_indexdef(
+    'grida_library.object_embedding_gemini_text_hnsw_idx'::regclass
+  ) ~* 'using hnsw .*vector_cosine_ops',
+  'gemini text index is HNSW cosine (partial)'
 );
 
 -- ── fixtures (self-contained; rolled back) ─────────────────────────
