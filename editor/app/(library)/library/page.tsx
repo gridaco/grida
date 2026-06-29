@@ -15,7 +15,10 @@ export default async function LibraryHomePage(props: {
   // almost everything (the API route /library/search already searches
   // globally). So only apply the category when NOT searching.
   const category = "textures";
-  const search_category = q_search ? undefined : category;
+  // Trim-aware: search() treats a whitespace-only query as browse mode, so a
+  // blank query must keep the default category (not fall through to unscoped).
+  const has_search_query = !!q_search?.trim();
+  const search_category = has_search_query ? undefined : category;
   const objects = await search({
     category: search_category,
     text: q_search,
