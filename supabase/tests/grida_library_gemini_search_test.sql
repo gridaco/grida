@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(6);
+SELECT plan(7);
 
 -- ===================================================================
 -- grida_library Gemini embedding RPC: search()
@@ -9,8 +9,8 @@ SELECT plan(6);
 --   cross-modal image floor, even when the floor's distance is smaller.
 --   The two cosine distances are NEVER blended.
 --
--- (similar() is repointed to the gemini image vector by a separate cutover
--- migration applied after backfill; its test ships with that migration.)
+-- Also pins similar(): image<->image over the gemini image vector after the
+-- Titan cutover (the legacy `embedding` column is dropped).
 -- ===================================================================
 
 -- ── function existence ────────────────────────────────────────────
@@ -94,7 +94,18 @@ SELECT results_eq(
   'search(e1): tier-1 A then B; undescribed C last despite identical image'
 );
 
--- ── 2. category filter ─────────────────────────────────────────────
+-- ── 2. similar(): image<->image cosine over the gemini vector ──────
+-- Cutover pins similar() to gemini_embedding_2__image. similar(A) (image e1)
+-- ranks C (image e1, identical → distance 0) before B (image eclose),
+-- excluding A itself. Proves the legacy `embedding` path is gone.
+SELECT results_eq(
+  $$ SELECT id::text FROM grida_library.similar('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') $$,
+  $$ VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc'::text),
+            ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::text) $$,
+  'similar(A): gemini image cosine ranks identical C before near B, excludes A'
+);
+
+-- ── 3. category filter ─────────────────────────────────────────────
 -- A non-matching category returns nothing (all fixtures are testgem).
 SELECT is_empty(
   format(
