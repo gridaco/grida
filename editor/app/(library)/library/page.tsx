@@ -10,16 +10,24 @@ export default async function LibraryHomePage(props: {
 }) {
   const searchParams = await props.searchParams;
   const q_search = searchParams?.search;
+  // "textures" is the default browse showcase for the library home. A search
+  // query, however, is global — scoping it to the browse category would hide
+  // almost everything (the API route /library/search already searches
+  // globally). So only apply the category when NOT searching.
   const category = "textures";
+  // Trim-aware: search() treats a whitespace-only query as browse mode, so a
+  // blank query must keep the default category (not fall through to unscoped).
+  const has_search_query = !!q_search?.trim();
+  const search_category = has_search_query ? undefined : category;
   const objects = await search({
-    category: category,
+    category: search_category,
     text: q_search,
   });
 
   const next = async (range: [number, number]) => {
     "use server";
     const objects = await search({
-      category: category,
+      category: search_category,
       text: q_search,
       range,
     });
