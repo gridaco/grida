@@ -193,11 +193,13 @@ export function createAgent(opts: CreateAgentOptions) {
 /**
  * Free-form capability hints appended to the composed prompt.
  *
- * Today: just command execution, when wired. The blurb tells the LLM the tool
- * exists, what defaults apply, and what enforcement to expect — kept
- * to a few lines so it doesn't crowd the per-skill blocks.
+ * Today: command execution + the session scratch dir (gated on the command,
+ * since scratch reach rides the shell) + vision. The blurb tells the LLM the
+ * tool exists, what defaults apply, and what enforcement to expect — kept to a
+ * few lines so it doesn't crowd the per-skill blocks. Exported (module-level,
+ * not at the package root) so the gating is unit-pinned without driving a model.
  */
-function buildCapabilityHints(opts: CreateAgentOptions): string[] {
+export function buildCapabilityHints(opts: CreateAgentOptions): string[] {
   const hints: string[] = [];
   if (opts.command) {
     hints.push(
@@ -206,6 +208,17 @@ function buildCapabilityHints(opts: CreateAgentOptions): string[] {
         opts.command.default_workdir
       )
     );
+    // Scratch reach rides the shell, so it is advertised only alongside the
+    // command capability. Promote to a standalone hint if structured-fs or
+    // perception reach for scratch lands later (WG `scratch.md`).
+    if (opts.command.scratch_dir) {
+      hints.push(
+        prompts.scratch_capability(
+          RUN_COMMAND_TOOL_NAME,
+          opts.command.scratch_dir
+        )
+      );
+    }
   }
   if (opts.vision) {
     hints.push(prompts.vision_capability(AgentVision.TOOL_NAMES.view_image));

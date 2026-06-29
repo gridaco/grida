@@ -43,6 +43,7 @@ export default async function setup(project: TestProject) {
   const harness = new AgentHost({
     password,
     user_data_path: harnessDir,
+    scratch_base: `${harnessDir}-scratch`,
     http_access: {
       allowed_origins: BROWSER_HARNESS_ORIGINS,
       // The vitest page paths are an implementation detail of the runner;
@@ -53,6 +54,7 @@ export default async function setup(project: TestProject) {
   const foreign = new AgentHost({
     password,
     user_data_path: foreignDir,
+    scratch_base: `${foreignDir}-scratch`,
     http_access: {
       allowed_origins: ["https://allowlisted.example"],
       allowed_referer_paths: ["/"],

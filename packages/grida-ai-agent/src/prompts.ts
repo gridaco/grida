@@ -155,6 +155,29 @@ When you produce SVG:
     ].join("\n"),
 
   /**
+   * Session-scratch capability hint (WG `scratch.md`). Built per-run (the
+   * scratch path is per-session runtime state) and appended by
+   * `buildCapabilityHints` (`agent/index.ts`) only when scratch is wired
+   * alongside command execution — the agent reaches scratch through the shell.
+   */
+  scratch_capability: (run_command_name: string, scratch_dir: string): string =>
+    [
+      '<capability name="scratch">',
+      `You have a scratch directory at \`${scratch_dir}\`. It is an ephemeral,`,
+      "system-managed working area, separate from the user's workspace.",
+      `Use it through the \`${run_command_name}\` tool — you may \`cd\` into it`,
+      "and freely read, write, move, and copy files there without asking.",
+      "It is the default place for files you PRODUCE or for intermediates",
+      "(extracted archives, downloads, conversions): keep throwaway output out",
+      "of the user's project.",
+      "Scratch is ephemeral and may be cleared when the session ends — nothing",
+      "there is durable. To KEEP a file, promote it: move or copy it into the",
+      "workspace (or another location the user names). A file left only in",
+      "scratch has not been saved.",
+      "</capability>",
+    ].join("\n"),
+
+  /**
    * Visual-perception capability hint. Appended by `buildCapabilityHints`
    * (`agent/index.ts`) only when a byte source for `view_image` is wired.
    * Teaches the read/view split: text via read_file, pixels via view_image.

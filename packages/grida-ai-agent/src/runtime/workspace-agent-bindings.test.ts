@@ -229,3 +229,119 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
     expect(bindings?.command).toBeUndefined();
   });
 });
+
+/**
+ * WG `scratch.md` — the session scratch dir is reachable through the shell. This
+ * drives the REAL command backend (actual `child_process.spawn`) against a real
+ * scratch dir to prove the deliverable's chain without a model: a command runs
+ * with cwd INSIDE scratch and writes there (the extract-into-scratch shape, S4),
+ * and a produced file is PROMOTED out into the workspace (S2). The scratch dir
+ * lives in its own temp dir, outside both the workspace and the secret root.
+ */
+describe("createWorkspaceAgentBindings — scratch reach", () => {
+  let baseDir: string;
+  let workspaceRoot: string;
+  let secretsRoot: string;
+  let scratchRoot: string;
+  let registry: WorkspaceRegistry;
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-scratch-reach-"));
+    const wsDir = path.join(baseDir, "ws");
+    const udDir = path.join(baseDir, "ud");
+    const scDir = path.join(baseDir, "scratch");
+    await fs.mkdir(wsDir);
+    await fs.mkdir(udDir);
+    await fs.mkdir(scDir);
+    workspaceRoot = await fs.realpath(wsDir);
+    secretsRoot = await fs.realpath(udDir);
+    scratchRoot = await fs.realpath(scDir);
+    registry = new WorkspaceRegistry(udDir);
+    await registry.open(workspaceRoot);
+  });
+
+  afterEach(async () => {
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  it("surfaces the scratch dir on the command binding; default_workdir stays the workspace (S5)", async () => {
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "auto" },
+      {
+        workspace_registry: registry,
+        shell_execution_allowed: true,
+        secrets_root: secretsRoot,
+        scratch_dir: scratchRoot,
+      }
+    );
+    expect(bindings?.command?.scratch_dir).toBe(scratchRoot);
+    // Scratch is NOT the default cwd — producing goes to scratch by choice, but
+    // the agent's default shell context is still the user's project.
+    expect(bindings?.command?.default_workdir).toBe(workspaceRoot);
+  });
+
+  it("runs a command with cwd inside scratch and writes there, then promotes it out (S4 + S2)", async () => {
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "auto" },
+      {
+        workspace_registry: registry,
+        shell_execution_allowed: true,
+        secrets_root: secretsRoot,
+        scratch_dir: scratchRoot,
+      }
+    );
+    const backend = bindings!.command!.backend;
+    // A "produced" file in the workspace stands in for an archive's contents.
+    await fs.writeFile(
+      path.join(workspaceRoot, "archive-contents.txt"),
+      "extracted payload"
+    );
+
+    // Extract-into-scratch shape: cwd is scratch (only reachable via the
+    // additional-allowed-root), the output lands in scratch.
+    const extract = await backend({
+      command: "cp",
+      description: "extract into scratch",
+      args: [path.join(workspaceRoot, "archive-contents.txt"), "extracted.txt"],
+      workdir: scratchRoot,
+    });
+    expect("exit_code" in extract && extract.exit_code).toBe(0);
+    expect(
+      await fs.readFile(path.join(scratchRoot, "extracted.txt"), "utf8")
+    ).toBe("extracted payload");
+
+    // Promotion: move the produced file out of scratch into the workspace.
+    const promote = await backend({
+      command: "cp",
+      description: "promote out of scratch",
+      args: ["extracted.txt", path.join(workspaceRoot, "kept.txt")],
+      workdir: scratchRoot,
+    });
+    expect("exit_code" in promote && promote.exit_code).toBe(0);
+    expect(
+      await fs.readFile(path.join(workspaceRoot, "kept.txt"), "utf8")
+    ).toBe("extracted payload");
+  });
+
+  it("rejects a cwd in scratch when no scratch is wired (scratch is not a workspace)", async () => {
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "auto" },
+      {
+        workspace_registry: registry,
+        shell_execution_allowed: true,
+        secrets_root: secretsRoot,
+        // no scratch_dir
+      }
+    );
+    expect(bindings?.command?.scratch_dir).toBeUndefined();
+    const result = await bindings!.command!.backend({
+      command: "pwd",
+      description: "probe scratch cwd",
+      args: [],
+      workdir: scratchRoot,
+    });
+    // The backend returns a structured failure (not a spawn result) when the
+    // cwd is out of bounds.
+    expect(result).toMatchObject({ ok: false, code: "cwd-not-in-workspace" });
+  });
+});

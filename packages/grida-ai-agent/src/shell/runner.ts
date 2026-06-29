@@ -18,8 +18,10 @@
  * the two STRUCTURAL gates that hold in every mode:
  *
  *   1. cwd must be `realpath`-resolvable AND contained by a
- *      currently-registered workspace. Without an opened workspace
- *      the call fails.
+ *      currently-registered workspace OR by one of the caller-supplied
+ *      `additionalAllowedRoots` (the session's scratch dir — a sanctioned
+ *      ephemeral working area outside the workspace; see WG `scratch.md`).
+ *      Without an opened workspace and no allowed root, the call fails.
  *   2. No arg may resolve to a path inside a protected-secret root
  *      (the agent host's own `userData`, where BYOK `auth.json` and
  *      the sessions db live). The srt outer policy can't deny that
@@ -90,6 +92,14 @@ export type ShellRunError =
 export type ProtectedReadRoots = readonly string[];
 
 /**
+ * Absolute roots — beyond the registered workspaces — a cwd is allowed to sit
+ * inside. The session's scratch dir (WG `scratch.md`): a sanctioned ephemeral
+ * working area the agent may `cd`/write into without it being a workspace.
+ * Realpath'd here for symlink stability, same as the protected roots.
+ */
+export type AdditionalAllowedRoots = readonly string[];
+
+/**
  * Validates a shell-run request against the workspace registry and the
  * protected-secret roots (the two structural gates; command identity is gated
  * upstream by mode — see the module header). Returns either `{ok, request}`
@@ -99,11 +109,13 @@ export type ProtectedReadRoots = readonly string[];
  * `protectedReadRoots` are absolute secret roots (the agent host's
  * `userData`) the shell child must not read through any arg — see the
  * module header's gate (2). Omit for the no-bindings path.
+ * `additionalAllowedRoots` are extra cwd roots (the session scratch dir).
  */
 export async function validateShellRequest(
   req: ShellRunRequest,
   registry: WorkspaceRegistry,
-  protectedReadRoots: ProtectedReadRoots = []
+  protectedReadRoots: ProtectedReadRoots = [],
+  additionalAllowedRoots: AdditionalAllowedRoots = []
 ): Promise<
   { ok: true; request: ShellRunRequest } | { ok: false; error: ShellRunError }
 > {
@@ -140,7 +152,18 @@ export async function validateShellRequest(
   // `registry.list()` upstream so this is usually warm, but the sync
   // `containsPath` requires it.
   await registry.list();
-  if (!registry.containsPath(realCwd)) {
+  // cwd is allowed inside a registered workspace OR a caller-supplied extra
+  // root (the session scratch dir). Scratch is NOT a workspace (WG `scratch.md`
+  // S5), so it goes through this separate allowance — keeping the workspace
+  // registry and its semantics untouched.
+  const inWorkspace = registry.containsPath(realCwd);
+  const inAllowedRoot =
+    !inWorkspace &&
+    additionalAllowedRoots.length > 0 &&
+    (await realpathRoots(additionalAllowedRoots)).some((r) =>
+      containsPath(r, realCwd)
+    );
+  if (!inWorkspace && !inAllowedRoot) {
     return {
       ok: false,
       error: { code: "cwd-not-in-workspace", cwd: realCwd },
@@ -151,7 +174,7 @@ export async function validateShellRequest(
   // lands inside a protected root. Realpathing the nearest existing
   // ancestor mirrors the cwd discipline so a symlink can't bypass it.
   if (protectedReadRoots.length > 0) {
-    const roots = await resolveProtectedRoots(protectedReadRoots);
+    const roots = await realpathRoots(protectedReadRoots);
     for (const arg of req.args) {
       const resolved = await resolveArgPath(arg, realCwd);
       if (resolved !== null && roots.some((r) => containsPath(r, resolved))) {
@@ -178,11 +201,10 @@ function containsPath(root: string, candidate: string): boolean {
   return candidate === root || candidate.startsWith(prefix);
 }
 
-/** Realpath each protected root so the comparison is symlink-stable.
- *  A root that doesn't exist yet is kept as-is (still a valid prefix). */
-async function resolveProtectedRoots(
-  roots: ProtectedReadRoots
-): Promise<string[]> {
+/** Realpath each root so the comparison is symlink-stable (used for both the
+ *  protected-secret roots and the additional-allowed roots). A root that
+ *  doesn't exist yet is kept as-is (still a valid prefix). */
+async function realpathRoots(roots: readonly string[]): Promise<string[]> {
   return await Promise.all(
     roots.map(async (root) => {
       try {

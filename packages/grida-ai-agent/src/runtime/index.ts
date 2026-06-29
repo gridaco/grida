@@ -75,6 +75,11 @@ import {
   type RunRequest,
 } from "./run-input";
 import { runAgent, type AgentStepUsage } from "./run-agent";
+import {
+  scratchRootFor,
+  ensureScratch,
+  removeScratch,
+} from "../session/scratch";
 import { buildModelMessages } from "./message-view";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
@@ -173,6 +178,15 @@ export type AgentRuntimeDeps = ResolveDeps & {
    * `createWorkspaceAgentBindings`. No sandbox (or no opt-in) ⇒ no shell.
    */
   shell_execution_allowed?: boolean;
+  /**
+   * Base directory for per-session scratch areas (WG `scratch.md`). The host
+   * injects it (filesystem location is host-owned I/O); the default is resolved
+   * at the server boundary via `defaultScratchBase`. The runtime derives each
+   * session's `<base>/sessions/<id>/scratch` under it, creates it on demand, and
+   * tells the agent its path. Omit to disable scratch (no scratch reach is
+   * wired — the command stays workspace-only).
+   */
+  scratch_base?: string;
   /**
    * Whether a human UI is bound — gates the locked `question` tool. When true
    * the tool is client-resolved (pauses for the user's answer); when
@@ -857,15 +871,25 @@ export class AgentRuntime {
       sessions_store: sessionsStore,
       secrets_root: secretsRoot,
       shell_execution_allowed: shellExecutionAllowed,
+      scratch_base: scratchBase,
     } = this.deps;
+    // Per-session scratch dir (WG `scratch.md`). Derived (pure) here so it can
+    // ride `runDeps`; the dir is created on disk just before the model turn
+    // (below). Only meaningful when the shell is wired and a workspace is bound
+    // — scratch reach rides the command capability — so it is gated the same way.
+    const scratchDir =
+      scratchBase && workspaceRoot && shellExecutionAllowed
+        ? scratchRootFor(scratchBase, sessionId)
+        : undefined;
     // Bindings deps for the run. Typed (not an inline literal) so the
-    // GRIDA-SEC-004 `secrets_root` + `shell_execution_allowed` thread through
-    // `runAgent`'s narrower `{ workspace_registry }` param into
+    // GRIDA-SEC-004 `secrets_root` + `shell_execution_allowed` (and `scratch_dir`)
+    // thread through `runAgent`'s narrower `{ workspace_registry }` param into
     // `createWorkspaceAgentBindings`.
     const runDeps = {
       workspace_registry: workspaceRegistry,
       secrets_root: secretsRoot,
       shell_execution_allowed: shellExecutionAllowed,
+      scratch_dir: scratchDir,
       // Host-level: gates the `question` tool's execute-or-pause in createAgent.
       interactive: this.deps.interactive === true,
     };
@@ -936,6 +960,14 @@ export class AgentRuntime {
         // rows drop out; the summary folds into the next user turn).
         const visible = await sessionsStore.listVisibleMessages(sessionId);
         const preparedMessages = buildModelMessages(visible);
+
+        // Create the session scratch dir on disk before the turn so a command
+        // the agent runs can `cd`/write into it (WG `scratch.md` S1). Derivation
+        // already happened (scratchDir); ensureScratch mkdir's it and re-asserts
+        // it sits outside the secret root (S4). Skipped when scratch is unwired.
+        if (scratchDir && scratchBase) {
+          await ensureScratch(scratchBase, sessionId, secretsRoot);
+        }
 
         // Session-static skills + project instructions (discovered once).
         const ctx = await this.sessionContext(sessionId, workspaceRoot);
@@ -1292,6 +1324,22 @@ export class AgentRuntime {
     this.session_contexts.delete(sessionId);
     this.scheduler.forget(sessionId);
     this.fired_messages.delete(sessionId);
+  }
+
+  /**
+   * Reclaim a session's scratch subtree (WG `scratch.md` S2). Best-effort: a
+   * session that never allocated scratch, or a host with scratch disabled, is a
+   * no-op. Called on session delete; durability is by promotion, so removing
+   * scratch never loses value. Never throws — cleanup must not fail a delete.
+   */
+  async removeSessionScratch(sessionId: string): Promise<void> {
+    const base = this.deps.scratch_base;
+    if (!base) return;
+    try {
+      await removeScratch(base, sessionId);
+    } catch (err) {
+      console.warn(`[agent] scratch cleanup failed for ${sessionId}:`, err);
+    }
   }
 }
 

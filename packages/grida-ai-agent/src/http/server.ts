@@ -28,6 +28,7 @@ import { openSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
 import { AgentRuntime } from "../runtime";
 import type { StreamRegistry } from "../runtime/stream-registry";
+import { defaultScratchBase, sweepScratch } from "../session/scratch";
 
 export type ServerOptions = {
   password: string;
@@ -38,6 +39,15 @@ export type ServerOptions = {
    * `auth.json`, and `sessions.db`.
    */
   user_data_path: string;
+  /**
+   * Base directory for per-session scratch areas (WG `scratch.md`). Defaults to
+   * {@link defaultScratchBase} (`<os.tmpdir()>/grida-agent`) when omitted —
+   * filesystem location is host-owned I/O, so the default lives here at the
+   * adapter boundary, not in the runtime core. MUST be outside `user_data_path`
+   * (the secret root) or the runtime's containment assert rejects it. A future
+   * host with a different filesystem reality (a cloud sandbox) injects its own.
+   */
+  scratch_base?: string;
   /** Host/client HTTP perimeter policy for CORS + Referer checks. */
   http_access: AgentServerHttpAccess;
   /**
@@ -182,6 +192,12 @@ export function buildServer(opts: ServerOptions): BuiltServer {
         "fs/network containment — only the in-process allowlist + arg checks."
     );
   }
+  // Per-session scratch base (WG `scratch.md`). Host-injected; default at this
+  // adapter boundary, never in the runtime core. Sweep stale session dirs once
+  // at host start — a single-instance daemon's prior in-flight scratch is dead
+  // after a restart, so this bounds scratch's lifetime even across a crash (S2).
+  const scratchBase = opts.scratch_base ?? defaultScratchBase();
+  void sweepScratch(scratchBase);
   const runtime = new AgentRuntime({
     secrets: secretsStore,
     endpoints: endpointsStore,
@@ -193,6 +209,7 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     // agent's `run_command` cannot read it back into the transcript. NOT
     // added to the srt deny_read policy — the host itself reads auth.json.
     secrets_root: opts.user_data_path,
+    scratch_base: scratchBase,
     shell_execution_allowed: shellExecutionAllowed,
     // Whether the locked `question` tool pauses for a human (interactive) or
     // refuses with a fixed tool error (headless). Fail-closed headless.
