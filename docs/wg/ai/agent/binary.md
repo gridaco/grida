@@ -200,6 +200,11 @@ flags which formats _typically_ benefit from shell.
 
 ## Scratch space for extraction
 
+> The scratch concept — per-session, ephemeral, host-owned, distinct from the
+> workspace — is specified in [`scratch`](./scratch.md). This section is its
+> **archive-extraction application**: the location and contract notes below are
+> that page's bindings seen from the extraction use case.
+
 Archives, multi-part documents, and conversion intermediates need
 **writable scratch space**: somewhere on disk the agent can unpack
 into and read from, distinct from the user's workspace.
@@ -216,13 +221,15 @@ the host's filesystem MUST provide:
   ([`environments`](./environments.md), [`srt`](./srt.md)). Writes
   outside it fail with the sandbox's usual `EPERM`.
 
-Three reasonable locations, each with trade-offs:
+Two reasonable locations, each with trade-offs (the
+[`scratch` bindings](./scratch.md#bindings) seen from the extraction case —
+note neither is workspace-resident: that would violate scratch's
+[S2 / S5](./scratch.md#the-scratch-contract)):
 
-| Location                       | Where                                                    | Pros                                                             | Cons                                                                               |
-| ------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| OS tempdir                     | `$TMPDIR` / `/tmp/agent-<session>/`                      | Standard, OS-managed lifetime, never confused with workspace.    | Cleaned up by the OS at unpredictable intervals; multi-session caching is fragile. |
-| Workspace-resident scratch dir | `<workspace>/.agent-scratch/` (or similar dotfile-named) | Visible to the user, easy to inspect or share, survives reboots. | Risk of polluting git or the user's workspace. Mandatory `.gitignore` discipline.  |
-| Sandbox-provided scratch       | A tmpfs mount the sandbox primitive supplies             | Fully isolated; cleanup tied to sandbox lifecycle.               | Requires sandbox cooperation; opaque to the user when debugging.                   |
+| Location                 | Where                                        | Pros                                                          | Cons                                                                               |
+| ------------------------ | -------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| OS tempdir               | `$TMPDIR` / `/tmp/agent-<session>/`          | Standard, OS-managed lifetime, never confused with workspace. | Cleaned up by the OS at unpredictable intervals; multi-session caching is fragile. |
+| Sandbox-provided scratch | A tmpfs mount the sandbox primitive supplies | Fully isolated; cleanup tied to sandbox lifecycle.            | Requires sandbox cooperation; opaque to the user when debugging.                   |
 
 A conforming implementation MAY pick any of these. The agent does
 not need to know which: it asks the runtime for a scratch path

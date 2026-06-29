@@ -128,8 +128,8 @@ Two conforming strategies:
    message — the perception reproduces on every rebuild with no bespoke
    replay path. This is the cleanest fit when the substrate supports a
    media-typed tool output.
-2. **Stage-and-reattach.** The tool writes the image to scratch and the
-   runtime re-injects it as a normal attachment through the proven
+2. **Stage-and-reattach.** The tool writes the image to [scratch](./scratch.md)
+   and the runtime re-injects it as a normal attachment through the proven
    attachment-lowering path; the tool result itself stays a small descriptor.
    Use this when the substrate cannot carry media in a tool output.
 
