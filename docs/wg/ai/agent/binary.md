@@ -200,6 +200,11 @@ flags which formats _typically_ benefit from shell.
 
 ## Scratch space for extraction
 
+> The scratch concept — per-session, ephemeral, host-owned, distinct from the
+> workspace — is specified in [`scratch`](./scratch.md). This section is its
+> **archive-extraction application**: the location and contract notes below are
+> that page's bindings seen from the extraction use case.
+
 Archives, multi-part documents, and conversion intermediates need
 **writable scratch space**: somewhere on disk the agent can unpack
 into and read from, distinct from the user's workspace.
