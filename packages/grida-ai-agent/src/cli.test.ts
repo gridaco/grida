@@ -338,4 +338,28 @@ describe("CLI — parseRunArgs", () => {
     expect(r.session_id).toBeUndefined();
     expect(r.message).toBe("just a message");
   });
+
+  it("threads --workspace/-w, --mode, and --model; the rest is the message", () => {
+    const r = parseRunArgs([
+      "--workspace",
+      "/proj",
+      "--mode",
+      "auto",
+      "--model",
+      "anthropic/claude-sonnet-4.6",
+      "draw",
+      "a",
+      "cat",
+    ]);
+    expect(r.workspace).toBe("/proj");
+    expect(r.mode).toBe("auto");
+    expect(r.model_id).toBe("anthropic/claude-sonnet-4.6");
+    expect(r.message).toBe("draw a cat");
+    // The -w alias works too.
+    expect(parseRunArgs(["-w", "/p", "hi"]).workspace).toBe("/p");
+  });
+
+  it("rejects an invalid --mode value", () => {
+    expect(() => parseRunArgs(["--mode", "yolo", "x"])).toThrow(/--mode/);
+  });
 });
