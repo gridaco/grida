@@ -22,7 +22,7 @@
  * is both outside the secret root and naturally ephemeral.
  */
 
-import { mkdir, rm, realpath } from "node:fs/promises";
+import { chmod, mkdir, rm, realpath } from "node:fs/promises";
 import { readdirSync, rmSync } from "node:fs";
 import crypto from "node:crypto";
 import os from "node:os";
@@ -158,6 +158,13 @@ export async function ensureScratch(
     }
   }
   await mkdir(scratchDir, { recursive: true, mode: SCRATCH_DIR_MODE });
+  // `mkdir`'s mode only applies to dirs it CREATES — a pre-existing (possibly
+  // world-readable, attacker-pre-created) scratch or session dir keeps its mode.
+  // Force owner-only on both, and FAIL CLOSED: a dir we can't restrict (e.g. one
+  // we don't own → EPERM) must throw rather than silently serve artifacts to
+  // other local accounts. The session dir is `path.dirname(scratchDir)`.
+  await chmod(scratchDir, SCRATCH_DIR_MODE);
+  await chmod(path.dirname(scratchDir), SCRATCH_DIR_MODE);
 }
 
 /**

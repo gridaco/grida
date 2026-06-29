@@ -101,6 +101,19 @@ describe("scratch I/O helpers", () => {
     await expect(ensureScratch(badDir, secrets)).rejects.toThrow(/secret root/);
   });
 
+  it("ensureScratch tightens a pre-existing permissive scratch dir to 0700", async () => {
+    // `mkdir` won't change an existing dir's mode, so an attacker-pre-created
+    // world-readable scratch dir would otherwise keep leaking. Skip on Windows.
+    if (process.platform === "win32") return;
+    const root = scratchRootFor(base, "ses_pre");
+    await fs.mkdir(root, { recursive: true, mode: 0o755 });
+    expect((await fs.stat(root)).mode & 0o777).toBe(0o755);
+    await ensureScratch(root);
+    expect((await fs.stat(root)).mode & 0o777).toBe(0o700);
+    // The session dir (parent) is tightened too.
+    expect((await fs.stat(path.dirname(root))).mode & 0o777).toBe(0o700);
+  });
+
   it("ensureScratch refuses a SYMLINKED base that resolves into the secret root (S4)", async () => {
     // A purely lexical check passes here — `<link>/…` is not textually inside
     // `<secrets>` — but the physical path resolves back into the secret root.
