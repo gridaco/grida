@@ -22,7 +22,7 @@
  * is both outside the secret root and naturally ephemeral.
  */
 
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, realpath } from "node:fs/promises";
 import { readdirSync, rmSync } from "node:fs";
 import crypto from "node:crypto";
 import os from "node:os";
@@ -110,19 +110,53 @@ export function assertOutsideSecretsRoot(
 }
 
 /**
+ * Realpath `p` if it exists, otherwise realpath its nearest existing ancestor
+ * and re-join the missing tail — so a symlinked ancestor resolves to its real
+ * target even when the leaf doesn't exist yet. Mirrors the shell runner's cwd
+ * discipline (`realpathNearest` there).
+ */
+async function realpathNearest(p: string): Promise<string> {
+  let current = path.resolve(p);
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      const real = await realpath(current);
+      return tail.length ? path.join(real, ...tail.reverse()) : real;
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) return path.resolve(p);
+      tail.push(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+/**
  * Create a scratch dir on demand (`mkdir -p`, owner-only). Idempotent. Takes the
  * already-derived dir (from {@link scratchRootFor}) so the path isn't computed
  * twice — the caller holds it for the agent binding anyway.
  *
- * `secretsRoot`, when given, is asserted against before any I/O — a base that
- * would nest scratch in the secret root fails loudly rather than silently
- * creating an unreachable dir.
+ * Containment (GRIDA-SEC-004) is checked in TWO layers: a cheap lexical
+ * pre-check ({@link assertOutsideSecretsRoot}), then an AUTHORITATIVE physical
+ * check — realpath the nearest existing ancestor of both paths before creating
+ * anything, so a SYMLINKED base that resolves back inside the secret root is
+ * rejected (a lexical check alone is bypassable, and the shell later realpaths
+ * this dir when accepting it as a cwd). Nothing is created when the check fails.
  */
 export async function ensureScratch(
   scratchDir: string,
   secretsRoot?: string
 ): Promise<void> {
   assertOutsideSecretsRoot(scratchDir, secretsRoot);
+  if (secretsRoot) {
+    const realScratch = await realpathNearest(scratchDir);
+    const realSecrets = await realpathNearest(secretsRoot);
+    if (containsPath(realSecrets, realScratch)) {
+      throw new Error(
+        `scratch root resolves inside the secret root (GRIDA-SEC-004): ${scratchDir}`
+      );
+    }
+  }
   await mkdir(scratchDir, { recursive: true, mode: SCRATCH_DIR_MODE });
 }
 

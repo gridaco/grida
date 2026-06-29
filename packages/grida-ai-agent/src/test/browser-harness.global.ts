@@ -65,6 +65,10 @@ export default async function setup(project: TestProject) {
     await foreign.stop();
     await fs.rm(harnessDir, { recursive: true, force: true });
     await fs.rm(foreignDir, { recursive: true, force: true });
+    // Also reclaim the per-host scratch bases (never created today since these
+    // hosts run no turns, but keep teardown leak-free if that changes).
+    await fs.rm(`${harnessDir}-scratch`, { recursive: true, force: true });
+    await fs.rm(`${foreignDir}-scratch`, { recursive: true, force: true });
   };
 
   // Partial startup (e.g. the second host failing to bind) must not

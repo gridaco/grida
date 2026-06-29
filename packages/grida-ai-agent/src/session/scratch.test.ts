@@ -101,6 +101,23 @@ describe("scratch I/O helpers", () => {
     await expect(ensureScratch(badDir, secrets)).rejects.toThrow(/secret root/);
   });
 
+  it("ensureScratch refuses a SYMLINKED base that resolves into the secret root (S4)", async () => {
+    // A purely lexical check passes here — `<link>/…` is not textually inside
+    // `<secrets>` — but the physical path resolves back into the secret root.
+    // Skip on Windows (no POSIX symlinks without elevation).
+    if (process.platform === "win32") return;
+    const secrets = path.join(base, "secret");
+    await fs.mkdir(secrets);
+    const link = path.join(base, "link"); // symlink → the secret dir
+    await fs.symlink(secrets, link);
+    const scratchDir = scratchRootFor(link, "ses_sym");
+    await expect(ensureScratch(scratchDir, secrets)).rejects.toThrow(
+      /secret root/
+    );
+    // Nothing was created under the real secret dir.
+    expect(await fs.readdir(secrets)).toEqual([]);
+  });
+
   it("removeScratch is recursive and idempotent (S2)", async () => {
     const root = scratchRootFor(base, "ses_rm");
     await ensureScratch(root);
