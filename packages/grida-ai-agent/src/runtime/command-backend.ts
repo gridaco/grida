@@ -21,6 +21,7 @@ import {
   validateShellRequest,
   runShell,
   type ProtectedReadRoots,
+  type AdditionalAllowedRoots,
   type ShellRunError,
 } from "../shell/runner";
 
@@ -28,6 +29,9 @@ import {
  * @param protectedReadRoots Secret roots (the agent host's `userData`) the
  *   shell child must not read through an arg (GRIDA-SEC-004). Threaded down
  *   from the runtime; empty for the no-bindings/standalone path.
+ * @param additionalAllowedRoots Roots — beyond the registered workspaces — a
+ *   cwd may sit inside (the session scratch dir, WG `scratch.md`). Empty when no
+ *   scratch is wired.
  * @param beforeRun Optional hook awaited just before a command spawns — used to
  *   flush the agent fs's pending (debounced) writes to disk, so a command that
  *   reads the workspace sees files the agent just wrote via the fs tools.
@@ -35,6 +39,7 @@ import {
 export function createAgentCommandBackend(
   registry: WorkspaceRegistry,
   protectedReadRoots: ProtectedReadRoots = [],
+  additionalAllowedRoots: AdditionalAllowedRoots = [],
   beforeRun?: () => Promise<void>
 ): RunCommandBackend {
   return async ({ command, args, workdir, timeout_ms: timeoutMs }) => {
@@ -45,7 +50,8 @@ export function createAgentCommandBackend(
     const validation = await validateShellRequest(
       { cmd: command, args, cwd: workdir, timeout_ms: timeoutMs },
       registry,
-      protectedReadRoots
+      protectedReadRoots,
+      additionalAllowedRoots
     );
     if (!validation.ok) {
       return {

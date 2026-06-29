@@ -51,6 +51,10 @@ async function makeHost(
     password: PASSWORD,
     capabilities,
     user_data_path: baseDir,
+    // Isolate the per-host scratch sweep onto a unique sibling so it never
+    // touches the shared default (or a live dev daemon's scratch). Never
+    // created here — these tests run no agent turns.
+    scratch_base: `${baseDir}-scratch`,
     http_access: HTTP_ACCESS,
     port: 0,
   });

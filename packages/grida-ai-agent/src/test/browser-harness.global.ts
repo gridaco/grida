@@ -43,6 +43,7 @@ export default async function setup(project: TestProject) {
   const harness = new AgentHost({
     password,
     user_data_path: harnessDir,
+    scratch_base: `${harnessDir}-scratch`,
     http_access: {
       allowed_origins: BROWSER_HARNESS_ORIGINS,
       // The vitest page paths are an implementation detail of the runner;
@@ -53,6 +54,7 @@ export default async function setup(project: TestProject) {
   const foreign = new AgentHost({
     password,
     user_data_path: foreignDir,
+    scratch_base: `${foreignDir}-scratch`,
     http_access: {
       allowed_origins: ["https://allowlisted.example"],
       allowed_referer_paths: ["/"],
@@ -63,6 +65,10 @@ export default async function setup(project: TestProject) {
     await foreign.stop();
     await fs.rm(harnessDir, { recursive: true, force: true });
     await fs.rm(foreignDir, { recursive: true, force: true });
+    // Also reclaim the per-host scratch bases (never created today since these
+    // hosts run no turns, but keep teardown leak-free if that changes).
+    await fs.rm(`${harnessDir}-scratch`, { recursive: true, force: true });
+    await fs.rm(`${foreignDir}-scratch`, { recursive: true, force: true });
   };
 
   // Partial startup (e.g. the second host failing to bind) must not

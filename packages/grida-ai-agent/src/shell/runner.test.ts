@@ -209,6 +209,68 @@ describe("validateShellRequest — protected secret roots", () => {
   });
 });
 
+/* ───────────── additional allowed roots (session scratch) ──────── */
+
+/**
+ * WG `scratch.md` S4: the session scratch dir is a sanctioned cwd root even
+ * though it is NOT a registered workspace (S5). It is supplied via
+ * `additionalAllowedRoots`; without it, a cwd in scratch is rejected exactly
+ * like any other out-of-workspace path. The scratch dir lives in its own temp
+ * dir here (outside both the workspace and the secrets root).
+ */
+describe("validateShellRequest — additional allowed roots (scratch)", () => {
+  let fixture: Awaited<ReturnType<typeof makeFixture>>;
+  let scratchRoot: string;
+  beforeEach(async () => {
+    fixture = await makeFixture();
+    scratchRoot = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), "grida-scratch-allowed-"))
+    );
+  });
+  afterEach(async () => {
+    await fixture.cleanup();
+    await fs.rm(scratchRoot, { recursive: true, force: true });
+  });
+
+  it("cwd inside scratch passes when scratch is an allowed root (S4)", async () => {
+    const result = await validateShellRequest(
+      { cmd: "ls", args: [], cwd: scratchRoot },
+      fixture.registry,
+      [],
+      [scratchRoot]
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.request.cwd).toBe(scratchRoot);
+  });
+
+  it("cwd inside scratch fails when scratch is not an allowed root", async () => {
+    const result = await validateShellRequest(
+      { cmd: "ls", args: [], cwd: scratchRoot },
+      fixture.registry
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("cwd-not-in-workspace");
+  });
+
+  it("an arg pointing into scratch is not flagged protected (scratch ∉ secrets root)", async () => {
+    // unzip-style: cwd is the workspace, the extraction target is scratch.
+    const secretsRoot = await fs.realpath(
+      path.join(path.dirname(fixture.workspace_root), "userdata")
+    );
+    const result = await validateShellRequest(
+      {
+        cmd: "unzip",
+        args: ["a.zip", "-d", path.join(scratchRoot, "out")],
+        cwd: fixture.workspace_root,
+      },
+      fixture.registry,
+      [secretsRoot],
+      [scratchRoot]
+    );
+    expect(result.ok).toBe(true);
+  });
+});
+
 /* ─────────────────────────── runShell ──────────────────────────── */
 
 describe("runShell", () => {

@@ -359,6 +359,7 @@ describe("Daemon probe against a real AgentHost", () => {
     host = new AgentHost({
       password: credential,
       user_data_path: userData,
+      scratch_base: `${userData}-scratch`,
       http_access: {
         allowed_origins: [Daemon.LOCAL_CLIENT_ORIGIN],
         allowed_referer_paths: [Daemon.LOCAL_CLIENT_REFERER_PATH],
@@ -393,6 +394,7 @@ describe("Daemon probe against a real AgentHost", () => {
     host = new AgentHost({
       password: "the-real-secret",
       user_data_path: userData,
+      scratch_base: `${userData}-scratch`,
       http_access: {
         allowed_origins: [Daemon.LOCAL_CLIENT_ORIGIN],
         allowed_referer_paths: [Daemon.LOCAL_CLIENT_REFERER_PATH],

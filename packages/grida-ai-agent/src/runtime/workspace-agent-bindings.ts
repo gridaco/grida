@@ -49,6 +49,14 @@ export async function createWorkspaceAgentBindings(
      * explicitly opted into an unsandboxed shell. "No containment ⇒ no shell."
      */
     shell_execution_allowed?: boolean;
+    /**
+     * The session's scratch dir (WG `scratch.md`): a per-session ephemeral
+     * working area the shell may `cd`/write into though it is NOT a workspace
+     * (S5). Threaded onto the command backend as an additional allowed cwd root
+     * and surfaced on the returned `command` binding so the agent can be told
+     * its path. Absent ⇒ no scratch reach (the command stays workspace-only).
+     */
+    scratch_dir?: string;
   }
 ): Promise<{
   fs: AgentFs;
@@ -56,6 +64,9 @@ export async function createWorkspaceAgentBindings(
   command?: {
     backend: ReturnType<typeof createAgentCommandBackend>;
     default_workdir: string;
+    /** Real path of the session scratch dir, when wired — the agent reaches it
+     *  via the shell and is told it through the scratch capability hint. */
+    scratch_dir?: string;
     needs_approval?: (input: { command: string; args: string[] }) => boolean;
   };
 } | null> {
@@ -83,12 +94,15 @@ export async function createWorkspaceAgentBindings(
         backend: createAgentCommandBackend(
           deps.workspace_registry,
           deps.secrets_root ? [deps.secrets_root] : [],
+          // Scratch is a sanctioned cwd root though it is not a workspace (S5).
+          deps.scratch_dir ? [deps.scratch_dir] : [],
           // Flush the agent fs's pending writes before a command runs, so a
           // script the agent just wrote via write_file is on disk when the
           // shell reads it (closes the debounced-write vs immediate-read race).
           () => fs.flush()
         ),
         default_workdir: req.workspace_root,
+        scratch_dir: deps.scratch_dir,
         // Supervised gate (RFC `permission modes`, Phase 2). In `accept-edits`
         // a non-read-only command pauses for Allow/Deny (the tool's
         // `needsApproval`); a read-only inspection command still auto-runs. In

@@ -79,6 +79,11 @@ export type ToolsetCapabilities = {
      * for verifying the workdir is inside the workspace — this is just
      * the default. */
     default_workdir: string;
+    /** Real path of the session scratch dir (WG `scratch.md`), when wired. The
+     * backend allows it as a cwd root and the prompt tells the agent about it;
+     * `run_command` itself reads only `backend`/`default_workdir`/`needs_approval`,
+     * so this is carried for the capability hint, not consumed by the tool. */
+    scratch_dir?: string;
     /** Supervised-approval gate (RFC `permission modes`, Phase 2). Passed
      * straight to `createRunCommandTool` → the tool's `needsApproval`. The
      * host computes it from the session mode + `isReadOnlyCommand`; absent in

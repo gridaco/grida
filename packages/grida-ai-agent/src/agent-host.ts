@@ -44,6 +44,14 @@ export type AgentHostOptions = {
   capabilities?: Partial<AgentServerCapabilities>;
   /** Host-provided data directory for agent host persistent state. */
   user_data_path: string;
+  /**
+   * Base directory for per-session scratch areas (WG `scratch.md`). Forwarded to
+   * {@link ServerOptions} by the `...opts` spread; defaults to
+   * `<os.tmpdir()>/grida-agent` at the server boundary when omitted. MUST be
+   * outside `user_data_path`. Tests inject an isolated base so the startup sweep
+   * stays hermetic.
+   */
+  scratch_base?: string;
   /** Host/client HTTP perimeter policy for CORS + Referer checks. */
   http_access: AgentHostHttpAccess;
   /** Loopback host to bind. Default `127.0.0.1`. */
