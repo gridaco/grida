@@ -107,7 +107,12 @@ describe("scratch I/O helpers", () => {
     // world-readable scratch dir would otherwise keep leaking. Skip on Windows.
     if (process.platform === "win32") return;
     const root = scratchRootFor(base, "ses_pre");
-    await fs.mkdir(root, { recursive: true, mode: 0o755 });
+    await fs.mkdir(root, { recursive: true });
+    // Force a permissive starting mode regardless of the runner's umask (which
+    // could otherwise mask mkdir's mode down to 0700 and skip the tightening
+    // path this test exists to exercise).
+    await fs.chmod(path.dirname(root), 0o755);
+    await fs.chmod(root, 0o755);
     expect((await fs.stat(root)).mode & 0o777).toBe(0o755);
     await ensureScratch(root);
     expect((await fs.stat(root)).mode & 0o777).toBe(0o700);
