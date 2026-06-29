@@ -29,10 +29,15 @@ SELECT has_function(
 -- Three assets A, B, C backed by storage objects + a throwaway category.
 INSERT INTO grida_library.category (id, name) VALUES ('testgem', 'Test');
 
+-- Self-contained bucket: the (newer) storage.prefixes trigger FK-references
+-- storage.buckets, so the bucket must exist. Don't depend on seed data.
+INSERT INTO storage.buckets (id, name) VALUES ('testgembucket', 'testgembucket')
+  ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO storage.objects (id, bucket_id, name) VALUES
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'library', 'testgem/a.png'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'library', 'testgem/b.png'),
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'library', 'testgem/c.png');
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'testgembucket', 'testgem/a.png'),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'testgembucket', 'testgem/b.png'),
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'testgembucket', 'testgem/c.png');
 
 INSERT INTO grida_library.object
   (id, path, category, mimetype, width, height, bytes, transparency) VALUES
