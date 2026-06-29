@@ -41,11 +41,12 @@ export type ServerOptions = {
   user_data_path: string;
   /**
    * Base directory for per-session scratch areas (WG `scratch.md`). Defaults to
-   * {@link defaultScratchBase} (`<os.tmpdir()>/grida-agent`) when omitted —
-   * filesystem location is host-owned I/O, so the default lives here at the
-   * adapter boundary, not in the runtime core. MUST be outside `user_data_path`
-   * (the secret root) or the runtime's containment assert rejects it. A future
-   * host with a different filesystem reality (a cloud sandbox) injects its own.
+   * {@link defaultScratchBase} (`<os.tmpdir()>/grida-agent-<host-tag>`, namespaced
+   * per host by `user_data_path`) when omitted — filesystem location is host-owned
+   * I/O, so the default lives here at the adapter boundary, not in the runtime
+   * core. MUST be outside `user_data_path` (the secret root) or the runtime's
+   * containment assert rejects it. A future host with a different filesystem
+   * reality (a cloud sandbox) injects its own.
    */
   scratch_base?: string;
   /** Host/client HTTP perimeter policy for CORS + Referer checks. */
@@ -199,7 +200,8 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   // SYNCHRONOUS and BEFORE the runtime is built / serving begins, so a resumed
   // session's scratch can't be deleted underneath a running command by a still-
   // in-flight async sweep.
-  const scratchBase = opts.scratch_base ?? defaultScratchBase();
+  const scratchBase =
+    opts.scratch_base ?? defaultScratchBase(opts.user_data_path);
   sweepScratch(scratchBase);
   const runtime = new AgentRuntime({
     secrets: secretsStore,

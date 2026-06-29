@@ -24,6 +24,7 @@
 
 import { mkdir, rm } from "node:fs/promises";
 import { readdirSync, rmSync } from "node:fs";
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { containsPath } from "../path-contains";
@@ -44,12 +45,24 @@ const SCRATCH_DIR_MODE = 0o700;
 
 /**
  * Default base directory for session scratch areas when the host injects none.
- * `<os.tmpdir()>/grida-agent`. Resolved at the host/server boundary (the thin
- * adapter shell), so the runtime core never names a temp path itself — a future
- * host with a different filesystem reality (a cloud sandbox) injects its own.
+ * `<os.tmpdir()>/grida-agent-<host-tag>`, where the tag is a short hash of the
+ * host's `userData` dir. Resolved at the host/server boundary (the thin adapter
+ * shell), so the runtime core never names a temp path itself — a future host
+ * with a different filesystem reality (a cloud sandbox) injects its own.
+ *
+ * Namespaced PER HOST so two default-configured hosts on the same machine (e.g.
+ * a desktop sidecar and a `cli serve`) don't share a base — otherwise one host's
+ * start-time {@link sweepScratch} would wipe the other's live session scratch.
+ * The tag is stable across restarts of the same host (same `userData`), so the
+ * sweep still reclaims that host's prior-run scratch.
  */
-export function defaultScratchBase(): string {
-  return path.join(os.tmpdir(), SCRATCH_NAMESPACE);
+export function defaultScratchBase(userDataPath: string): string {
+  const tag = crypto
+    .createHash("sha256")
+    .update(path.resolve(userDataPath))
+    .digest("hex")
+    .slice(0, 16);
+  return path.join(os.tmpdir(), `${SCRATCH_NAMESPACE}-${tag}`);
 }
 
 /**

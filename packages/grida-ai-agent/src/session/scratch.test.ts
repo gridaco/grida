@@ -125,8 +125,17 @@ describe("scratch I/O helpers", () => {
 
 describe("defaultScratchBase", () => {
   it("is under the OS temp area (host-owned location, outside any secret root)", () => {
-    const b = defaultScratchBase();
+    const b = defaultScratchBase("/home/u/.grida/agent");
     expect(b.startsWith(os.tmpdir())).toBe(true);
-    expect(b.endsWith("grida-agent")).toBe(true);
+    expect(path.basename(b)).toMatch(/^grida-agent-[0-9a-f]{16}$/);
+  });
+
+  it("namespaces per host so two hosts don't share a base (sweep isolation)", () => {
+    // Different userData → different base → one host's start sweep can't wipe
+    // the other's live session scratch. Same userData → stable across restarts.
+    const a = defaultScratchBase("/home/u/.grida/agent");
+    const b = defaultScratchBase("/home/u/.grida/cli");
+    expect(a).not.toBe(b);
+    expect(defaultScratchBase("/home/u/.grida/agent")).toBe(a);
   });
 });
