@@ -36,8 +36,8 @@ SELECT ok(
 SELECT ok(
   pg_get_indexdef(
     'grida_library.object_embedding_gemini_text_hnsw_idx'::regclass
-  ) ~* 'using hnsw .*vector_cosine_ops',
-  'gemini text index is HNSW cosine (partial)'
+  ) ~* 'using hnsw .*vector_cosine_ops.*where .*gemini_embedding_2__text is not null',
+  'gemini text index is HNSW cosine + NULL-filtered partial'
 );
 
 -- ── fixtures (self-contained; rolled back) ─────────────────────────
