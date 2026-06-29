@@ -119,6 +119,33 @@ export type ToolsetCapabilities = {
 };
 
 /**
+ * TOOL-DESIGN — read before adding or widening a tool. The discipline that
+ * keeps this surface small (learned the hard way: `generate_image` shipped as a
+ * 7-arg mirror of the HTTP route — the most complex tool here — and was cut to a
+ * single `prompt`; see `../gen`).
+ *
+ * Build tools FOR AGENTS, not as API mirrors. The shape is what an agent needs
+ * to express intent — not the provider's full parameter surface.
+ *
+ *  1. Minimal by default. Fewest args that let the agent express the intent.
+ *     Prefer ONE natural-language arg over many typed knobs (a `prompt` with
+ *     "wide 16:9 …" in the prose beats `aspect_ratio` + `size` + `seed`).
+ *  2. Host config is NOT an agent arg. Model, provider, credentials, locale,
+ *     paths — inject at construction (see `image_model_id`, `secrets`), never
+ *     expose them as tool inputs.
+ *  3. Don't expose a knob the agent can't GROUND (e.g. ids it can't enumerate)
+ *     or one that doesn't reliably WORK — verify against the real provider
+ *     first; a no-op param is a lie the model will trust (the dropped
+ *     `aspect_ratio` was silently ignored by seedream/OpenRouter).
+ *  4. Honest results. The output says what the tool actually did; don't promise
+ *     a capability the wire format can't deliver (a tool result can't carry an
+ *     image to an openai-compatible model — `generate_image` is generate-only).
+ *
+ * When in doubt, cut the arg. A tool you can't retract (the model learns to
+ * depend on it) is more expensive than one you grow later.
+ *
+ * ---
+ *
  * Build the toolset record fed to `ToolLoopAgent({ tools })`. The
  * baseline (fs + todos) is unconditional; whether they carry
  * `execute()` depends on which bindings the caller injects.

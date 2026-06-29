@@ -1,14 +1,20 @@
 /**
  * `@grida/agent/gen` — the agent's **media generation** surface.
  *
- * `view_image` lets the model SEE a file; `generate_image` lets it MAKE one.
- * The tool is the producer twin of vision: it takes a prompt, generates a
- * raster image with the user's connected provider, writes the bytes into the
- * session **scratch** dir (WG `scratch.md` — the default sink for produced
- * files, ephemeral; the model promotes it into the workspace to keep it), and
- * lowers the result to a provider-native `media` block so the model perceives
- * what it just produced. The same multimodal lowering `view_image` uses, so a
- * generated image survives across turns without a bespoke replay branch.
+ * `view_image` lets the model SEE a file; `generate_image` lets it MAKE one. It
+ * is a PRODUCER, not a perception tool: it takes a `prompt`, generates a raster
+ * image with the user's connected model, writes the bytes into the session
+ * **scratch** dir (WG `scratch.md` — the default sink for produced files;
+ * ephemeral, copy into the workspace to keep), and returns the saved PATH +
+ * metadata. It does NOT hand the model the pixels — a tool result can't deliver
+ * an image on the openai-compatible wire format (OpenRouter/Ollama stringify a
+ * tool message's content), so an inlined image would arrive as undecodable
+ * base64 text and blow the context. Perceiving an image is `view_image`'s job.
+ *
+ * This tool is the worked example of the TOOL-DESIGN doctrine in
+ * `../tools/index.ts` (build for agents, minimal, host config off the args): it
+ * started as a 7-arg mirror of the HTTP route and was cut to a single `prompt`.
+ * The model id is host config (`image_model_id`), not an agent arg.
  *
  * Like `AgentVision`, the surface is a single neutral `AgentGen` namespace: the
  * tool table, the narrow generator contract it resolves against, the
