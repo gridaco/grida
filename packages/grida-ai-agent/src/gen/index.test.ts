@@ -43,7 +43,29 @@ describe("AgentGen.toModelOutput", () => {
     if (lowered.type !== "text") throw new Error("unreachable");
     // No pixels re-sent, but the path survives so promotion is still possible.
     expect(lowered.value).toContain(OK.path);
-    expect(lowered.value.toLowerCase()).toContain("view_image");
+    expect(lowered.value.toLowerCase()).toContain("scratch");
+  });
+
+  it("omits the media block when data exceeds the perception cap (model-context safety)", () => {
+    // A multi-MB image (e.g. gpt-image-2) would blow the model's context if sent
+    // inline; above the cap the tool lowers to a path descriptor instead — the
+    // run stays safe, the file is still promotable.
+    const huge = {
+      ...OK,
+      data: "A".repeat(AgentGen.PERCEPTION_MAX_BASE64 + 1),
+    };
+    const lowered = AgentGen.toModelOutput(huge);
+    expect(lowered.type).toBe("text");
+    if (lowered.type !== "text") throw new Error("unreachable");
+    expect(lowered.value).toContain(OK.path);
+    // Crucially, the megabytes are NOT in the model-facing output.
+    expect(lowered.value.length).toBeLessThan(2000);
+  });
+
+  it("keeps the media block when data is at/under the perception cap", () => {
+    const ok = { ...OK, data: "A".repeat(1024) };
+    const lowered = AgentGen.toModelOutput(ok);
+    expect(lowered.type).toBe("content");
   });
 
   it("toModelOutput surfaces an error as plain text", () => {

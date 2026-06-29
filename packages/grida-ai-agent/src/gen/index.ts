@@ -68,6 +68,21 @@ export namespace AgentGen {
   export type ImageGenOutput = ImageGenOk | ImageGenErr;
 
   /**
+   * Max base64 length we inline as a media block for the MODEL to perceive. The
+   * produced image is ALWAYS written to scratch at full resolution and ALWAYS
+   * persisted/streamed to the client — this bounds only what rides into the
+   * model's context. A multi-MB image sent as a data-URL can blow the context
+   * window: gpt-image-2's ~4 MB PNG ≈ ~1M base64 tokens overran OpenRouter's
+   * 1M-token guard and failed the turn *after* the image was already produced.
+   * Above this, `toModelOutput` lowers to a text descriptor (path + dims): the
+   * run stays safe and the file is still promotable; the model just doesn't see
+   * the pixels. ~1.5 MiB (≈ 390k tokens) clears typical images while bounding
+   * the worst case. Perceiving large art needs a DOWNSCALED preview — the
+   * follow-up (this is the robust floor, not the final perception story).
+   */
+  export const PERCEPTION_MAX_BASE64 = 1.5 * 1024 * 1024;
+
+  /**
    * The narrow outcome the tool resolves against. The host builds it from the
    * package-owned `SecretsStore` + the per-session scratch dir; this module
    * never names either. Implementations MUST NOT throw for an expected failure
@@ -178,10 +193,12 @@ export namespace AgentGen {
 
   /**
    * Lower a `generate_image` output to what the model consumes:
-   *  - success WITH bytes  → a text line naming the saved path + a `media` block
-   *    (the model sees the image AND knows where it landed, so it can promote).
-   *  - success WITHOUT bytes (retention-elided) → a text descriptor that still
-   *    names the path so promotion is possible after the pixels are dropped.
+   *  - success WITH bytes UNDER the perception cap → a text line naming the
+   *    saved path + a `media` block (the model sees the image AND knows where it
+   *    landed, so it can promote it).
+   *  - success WITHOUT bytes (retention-elided) OR over the perception cap (a
+   *    multi-MB image that would blow the model context) → a text descriptor
+   *    that still names the path so promotion works without the pixels.
    *  - error → the error text.
    */
   export function toModelOutput(output: ImageGenOutput): ToolContent {
@@ -190,22 +207,23 @@ export namespace AgentGen {
     }
     const dims =
       output.width && output.height ? ` ${output.width}×${output.height}` : "";
-    if (output.data) {
+    if (output.data && output.data.length <= PERCEPTION_MAX_BASE64) {
       return {
         type: "content",
         value: [
           {
             type: "text",
-            text: `Generated image saved to ${output.path} (${output.mime}${dims}). Shown below. To keep it, promote it into the workspace.`,
+            text: `Generated image saved to ${output.path} (${output.mime}${dims}). Shown below. To keep it, copy it into the workspace.`,
           },
           { type: "media", mediaType: output.mime, data: output.data },
         ],
       };
     }
-    // Elided by the retention pass — name it (and its path), don't re-send it.
+    // No inline pixels — retention-elided, or too large to send to the model.
+    // Name the path so the model can still copy the file into the workspace.
     return {
       type: "text",
-      value: `[generated image saved to ${output.path} (${output.mime}${dims}) — call view_image to re-view]`,
+      value: `[generated image saved to ${output.path} (${output.mime}${dims}); it is in your scratch dir — copy it into the workspace to keep it]`,
     };
   }
 
