@@ -14,8 +14,14 @@
 -- migration applied only after the new columns are backfilled & verified.
 ---------------------------------------------------------------------
 
--- `vector` type already installed in schema `extensions` (on search_path);
--- referenced bare, matching the existing library migrations.
+-- pgvector's `vector` type, `vector_cosine_ops` opclass, and `<=>` operator
+-- live in the `extensions` schema. That schema is NOT on the search_path that
+-- `supabase db push` uses on the hosted project, so bare references fail with
+-- `type "vector" does not exist`. Put `extensions` on the path for this
+-- migration so the bare references below resolve. (pg_catalog stays implicitly
+-- first; the qualified `grida_library.*` references are unaffected.)
+set search_path = extensions, public;
+
 ALTER TABLE grida_library.object_embedding
   ADD COLUMN gemini_embedding_2__image vector(1536),  -- NOT NULL deferred to post-backfill
   ADD COLUMN gemini_embedding_2__text  vector(1536);  -- NULLABLE: only described objects

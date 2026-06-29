@@ -2552,21 +2552,18 @@ export type Database = {
       object_embedding: {
         Row: {
           created_at: string | null
-          embedding: string | null
           gemini_embedding_2__image: string | null
           gemini_embedding_2__text: string | null
           object_id: string
         }
         Insert: {
           created_at?: string | null
-          embedding?: string | null
           gemini_embedding_2__image?: string | null
           gemini_embedding_2__text?: string | null
           object_id: string
         }
         Update: {
           created_at?: string | null
-          embedding?: string | null
           gemini_embedding_2__image?: string | null
           gemini_embedding_2__text?: string | null
           object_id?: string
