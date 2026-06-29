@@ -1,7 +1,7 @@
 "use server";
 import type { Library } from "@/lib/library";
 import { createLibraryClient } from "@/lib/supabase/server";
-import { embedLibraryQuery } from "@/lib/ai/server";
+import { embedLibraryQuery } from "@/lib/library/embedding";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
