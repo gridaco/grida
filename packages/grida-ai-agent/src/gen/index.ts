@@ -32,10 +32,6 @@ export namespace AgentGen {
   // Contract
   // -------------------------------------------------------------------------
 
-  /** Image providers a generate call may target (mirrors the catalog union). */
-  export const IMAGE_PROVIDERS = ["vercel", "fal", "openrouter"] as const;
-  export type ImageProvider = (typeof IMAGE_PROVIDERS)[number];
-
   /**
    * The validated `generate_image` input. The generator impl consumes this
    * shape (the host's node-only binding), so it is exported.
@@ -93,39 +89,25 @@ export namespace AgentGen {
 
   export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 
+  // PROMPT-ONLY by design. The tool exposes a single argument — what to make,
+  // in natural language (the agent puts composition cues like "wide 16:9" in the
+  // prose). Everything else is deliberately NOT a parameter:
+  //   - model / provider: the user's connected choice (settings), not the
+  //     agent's — and the agent has no way to enumerate valid ids.
+  //   - size / aspect_ratio: silently ineffective on the primary BYOK path
+  //     (verified — seedream on OpenRouter returns square regardless of the
+  //     param), so a knob that lies; aspect rides the prose, best-effort.
+  //   - seed / filename: technicalities; the output path is auto-named + returned.
+  // This keeps the tool at view_image-level simplicity (one arg) instead of the
+  // 7-arg sprawl that made it the most complex tool in the package.
   const GEN_IMAGE_INPUT = z.object({
     prompt: z
       .string()
       .min(1)
-      .describe("What to generate. Be specific and descriptive."),
-    model_id: z
-      .string()
-      .optional()
       .describe(
-        "Catalog model id (e.g. an image model from the connected provider). " +
-          "Omit to use a sensible default the user has a key for."
-      ),
-    provider: z
-      .enum(IMAGE_PROVIDERS)
-      .optional()
-      .describe("Force a specific provider. Omit to auto-pick by precedence."),
-    aspect_ratio: z
-      .string()
-      .regex(/^\d+:\d+$/)
-      .optional()
-      .describe('Aspect ratio as "<w>:<h>", e.g. "16:9".'),
-    size: z
-      .string()
-      .regex(/^\d+x\d+$/)
-      .optional()
-      .describe('Exact pixel size as "<w>x<h>", e.g. "1024x1024".'),
-    seed: z.number().int().optional().describe("Deterministic seed."),
-    filename: z
-      .string()
-      .optional()
-      .describe(
-        "Basename to save as in your scratch dir (no path separators). " +
-          "Omit to get an auto name. The result returns the full path."
+        "What to create, in natural language — be vivid and specific. " +
+          'Include any composition cues in the text itself (e.g. "a wide 16:9 ' +
+          'landscape of …", "a portrait of …").'
       ),
   });
 
@@ -147,11 +129,11 @@ export namespace AgentGen {
     [TOOL_NAMES.generate_image]: tool({
       description:
         "GENERATE a raster image from a text prompt using the user's " +
-        "connected image provider, saving it into your scratch directory. " +
-        "This tool PRODUCES a file — it does NOT show you the image; the " +
-        "result is the saved path and its dimensions. To keep the image, copy " +
-        "it from scratch into the workspace. Call again to iterate (a new " +
-        "prompt, seed, or size).",
+        "connected image model, saving it into your scratch directory. This " +
+        "tool PRODUCES a file — it does NOT show you the image; the result is " +
+        "the saved path and its dimensions. To keep the image, copy it from " +
+        "scratch into the workspace. Call again with a refined prompt to " +
+        "iterate.",
       inputSchema: GEN_IMAGE_INPUT,
       outputSchema: z.union([GEN_IMAGE_OK, GEN_IMAGE_ERR]),
       toModelOutput: ({ output }) => toModelOutput(output as ImageGenOutput),

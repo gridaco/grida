@@ -49,6 +49,12 @@ export type ServerOptions = {
    * reality (a cloud sandbox) injects its own.
    */
   scratch_base?: string;
+  /**
+   * Catalog model id the agent's `generate_image` tool produces with — the
+   * user's selected image model (host config). The tool is prompt-only, so the
+   * model is not an agent argument. Omit to use the catalog default.
+   */
+  image_model_id?: string;
   /** Host/client HTTP perimeter policy for CORS + Referer checks. */
   http_access: AgentServerHttpAccess;
   /**
@@ -219,6 +225,8 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     // Image generation rides the same capability flag as the `/images/generate`
     // route. The bindings still require a scratch sink + a provider key.
     image_gen_enabled: opts.capabilities.images === true,
+    // The user's selected image model (host config); the tool is prompt-only.
+    image_model_id: opts.image_model_id,
     // Whether the locked `question` tool pauses for a human (interactive) or
     // refuses with a fixed tool error (headless). Fail-closed headless.
     interactive: opts.interactive === true,

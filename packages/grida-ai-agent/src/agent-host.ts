@@ -52,6 +52,13 @@ export type AgentHostOptions = {
    * stays hermetic.
    */
   scratch_base?: string;
+  /**
+   * Catalog model id the agent's `generate_image` tool produces with — the
+   * user's selected image model. The tool is prompt-only (model is host config,
+   * not an agent argument). Forwarded to {@link ServerOptions} by the `...opts`
+   * spread; defaults to the catalog default when omitted.
+   */
+  image_model_id?: string;
   /** Host/client HTTP perimeter policy for CORS + Referer checks. */
   http_access: AgentHostHttpAccess;
   /** Loopback host to bind. Default `127.0.0.1`. */

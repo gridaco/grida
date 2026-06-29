@@ -79,6 +79,12 @@ export async function createWorkspaceAgentBindings(
      * decides the modality is available, exactly as it gates the HTTP route.
      */
     image_gen_enabled?: boolean;
+    /**
+     * The catalog model id `generate_image` produces with — the USER's selected
+     * image model (settings), host-owned config, NOT an agent argument (the tool
+     * is prompt-only). Omit to use the catalog default ({@link defaultImageModelId}).
+     */
+    image_model_id?: string;
   }
 ): Promise<{
   fs: AgentFs;
@@ -149,7 +155,11 @@ export async function createWorkspaceAgentBindings(
     const secrets = deps.secrets;
     const scratchDir = deps.scratch_dir;
     if (await hasUsableImageProvider({ secrets })) {
-      image_gen = createImageGenerator(secrets, scratchDir);
+      image_gen = createImageGenerator(
+        secrets,
+        scratchDir,
+        deps.image_model_id
+      );
     }
   }
   return { fs, todos, command, image_gen };
@@ -185,11 +195,14 @@ function extForMime(mime: string): string {
  */
 function createImageGenerator(
   secrets: SecretsStore,
-  scratchDir: string
+  scratchDir: string,
+  imageModelId?: string
 ): AgentGen.ImageGenerator {
   return {
     async generate(input) {
-      const modelId = input.model_id ?? defaultImageModelId();
+      // The user's connected model (settings), not the agent's concern. The
+      // tool is prompt-only — no model/provider/size/aspect/seed knobs.
+      const modelId = imageModelId ?? defaultImageModelId();
       if (!modelId) {
         return {
           ok: false,
@@ -199,11 +212,7 @@ function createImageGenerator(
       }
       let resolved;
       try {
-        resolved = await resolveImageModel(
-          { secrets },
-          modelId,
-          input.provider ? { explicit: input.provider } : {}
-        );
+        resolved = await resolveImageModel({ secrets }, modelId);
       } catch (e) {
         if (e instanceof ImageModelUnavailableError) {
           return {
@@ -220,11 +229,6 @@ function createImageGenerator(
           model: resolved.model,
           prompt: input.prompt,
           n: 1,
-          ...(input.size ? { size: input.size as `${number}x${number}` } : {}),
-          ...(input.aspect_ratio
-            ? { aspectRatio: input.aspect_ratio as `${number}:${number}` }
-            : {}),
-          ...(input.seed !== undefined ? { seed: input.seed } : {}),
         });
       } catch (e) {
         // Upstream detail (may embed provider body text) stays in the sidecar
@@ -252,8 +256,7 @@ function createImageGenerator(
       // declared media type when the format isn't one we parse.
       const sniffed = AgentVision.sniff(bytes);
       const mime = sniffed?.mime ?? file.mediaType;
-      const filename =
-        input.filename ?? `image-${Date.now()}.${extForMime(mime)}`;
+      const filename = `image-${Date.now()}.${extForMime(mime)}`;
       let savedPath: string;
       try {
         savedPath = await writeScratchFile(scratchDir, filename, bytes);

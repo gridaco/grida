@@ -42,8 +42,9 @@ const PROVIDER_ID = (process.env.GRIDA_BYOK_PROVIDER ?? "openrouter") as
   | "vercel"
   | "fal";
 const MODEL_ID = process.env.GRIDA_LIVE_MODEL ?? "anthropic/claude-sonnet-4.6";
-// Catalog image-model id (resolver maps it to the provider's binding id). The
-// default is real on the OpenRouter /v1/images API today; override per provider.
+// The image model is HOST config (the user's selection), not an agent arg — the
+// tool is prompt-only. Inject a fast, reliable one for the test (seedream) via
+// the runtime's `image_model_id`, overridable per provider.
 const IMAGE_MODEL_ID =
   process.env.GRIDA_LIVE_IMAGE_MODEL ?? "bytedance/seedream-4.5";
 const TIMEOUT_MS = 240_000;
@@ -134,6 +135,7 @@ function buildHost(
     scratch_base: scratchBase,
     shell_execution_allowed: true,
     image_gen_enabled: true,
+    image_model_id: IMAGE_MODEL_ID,
     drain_cooldown_ms: 20,
   });
   registerAgentRoutes(app, runtime);
@@ -141,8 +143,7 @@ function buildHost(
 }
 
 const TASK_TEXT =
-  `Generate an image of a single solid red circle on a white background, ` +
-  `using the image model \`${IMAGE_MODEL_ID}\`.\n\n` +
+  `Generate an image of a single solid red circle on a white background.\n\n` +
   `1. The generated image goes into your SCRATCH directory automatically.\n` +
   `2. Then copy that image from scratch into the project workspace root so I can keep it.`;
 
