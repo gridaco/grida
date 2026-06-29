@@ -1,16 +1,16 @@
 BEGIN;
-SELECT plan(5);
+SELECT plan(4);
 
 -- ===================================================================
--- grida_library Gemini embedding RPCs: search() + similar()
+-- grida_library Gemini embedding RPC: search()
 --
--- Pins the two load-bearing invariants of the new retrieval design:
---   1. tier dominance — described (text<->text) results always outrank
---      the cross-modal image floor, even when the floor's distance is
---      smaller. The two cosine distances are NEVER blended.
---   2. cosine opclass/operator match — similar() ranks by `<=>` over the
---      cosine HNSW index (guards against a regression to the legacy
---      `<#>`/vector_l2_ops mismatch).
+-- Pins the load-bearing invariant of the new semantic search:
+--   tier dominance — described (text<->text) results always outrank the
+--   cross-modal image floor, even when the floor's distance is smaller.
+--   The two cosine distances are NEVER blended.
+--
+-- (similar() is repointed to the gemini image vector by a separate cutover
+-- migration applied after backfill; its test ships with that migration.)
 -- ===================================================================
 
 -- ── function existence ────────────────────────────────────────────
@@ -87,17 +87,6 @@ SELECT is_empty(
     '[1' || repeat(',0', 1535) || ']'
   ),
   'search(): match_category filters out non-matching assets'
-);
-
--- ── 3. similar() image cosine ordering ─────────────────────────────
--- similar(A): rank others by image distance to A.image (e1). B.image is
--- near e1, C.image is identical → C should actually be closest. Assert the
--- closer image ranks first and A itself is excluded.
-SELECT results_eq(
-  $$ SELECT id::text FROM grida_library.similar('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') $$,
-  $$ VALUES ('cccccccc-cccc-cccc-cccc-cccccccccccc'::text),
-            ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::text) $$,
-  'similar(A): image cosine order (C identical, then B near); A excluded'
 );
 
 SELECT * FROM finish();

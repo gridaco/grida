@@ -239,29 +239,30 @@ $$ LANGUAGE plpgsql STABLE;
 
 ---------------------------------------------------------------------
 -- [similar rpc] --
--- image<->image over gemini_embedding_2__image (cosine).
+-- Still on the legacy Titan `embedding`. Repointed to the gemini image
+-- vector by a separate cutover migration applied AFTER the backfill (so
+-- it never returns empty against an un-backfilled column).
 ---------------------------------------------------------------------
 create or replace function grida_library.similar(
   ref_id uuid
 )
 returns setof grida_library.object
-language sql
-stable
 as $$
-  with reference as (
-    select gemini_embedding_2__image as v
-    from grida_library.object_embedding
-    where object_id = ref_id
-  )
-  select o.*
-  from grida_library.object o
-  join grida_library.object_embedding e on e.object_id = o.id,
-       reference r
-  where o.id <> ref_id
-    and e.gemini_embedding_2__image is not null
-    and r.v is not null
-  order by e.gemini_embedding_2__image <=> r.v, o.id asc;
-$$;
+BEGIN
+  RETURN QUERY
+    with reference as (
+      select embedding
+      from grida_library.object_embedding
+      where object_id = ref_id
+    )
+    select o.*
+    from grida_library.object o
+    join grida_library.object_embedding e on e.object_id = o.id,
+         reference r
+    where o.id <> ref_id and e.embedding is not null
+    order by e.embedding <#> r.embedding;
+END;
+$$ language plpgsql stable;
 
 
 ---------------------------------------------------------------------

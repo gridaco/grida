@@ -2,7 +2,38 @@
 import type { Library } from "@/lib/library";
 import { createLibraryClient } from "@/lib/supabase/server";
 import { embedLibraryQuery } from "@/lib/ai/server";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+import { headers } from "next/headers";
 import { cache } from "react";
+
+// Public/unbilled semantic search hits a paid embedding provider, so gate it
+// per-IP. Upstash sliding window when configured; in unconfigured envs (local
+// dev) it fails open and the seam's query-hash cache is the backstop.
+let _searchLimiter: Ratelimit | null | undefined;
+function semanticSearchLimiter(): Ratelimit | null {
+  if (_searchLimiter !== undefined) return _searchLimiter;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  _searchLimiter =
+    url && token
+      ? new Ratelimit({
+          redis: new Redis({ url, token }),
+          limiter: Ratelimit.slidingWindow(30, "60 s"),
+          prefix: "rl:library-semantic-search",
+        })
+      : null;
+  return _searchLimiter;
+}
+
+async function allowSemanticSearch(): Promise<boolean> {
+  const limiter = semanticSearchLimiter();
+  if (!limiter) return true;
+  const ip =
+    (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "anon";
+  const { success } = await limiter.limit(ip);
+  return success;
+}
 
 type ObjectWithAuthor = Library.Object & {
   author: Library.Author | null;
@@ -213,20 +244,37 @@ export async function search({
   // Semantic search: embed the query (text↔text, with a cross-modal image
   // floor handled inside the `search` RPC). Pagination is done inside the
   // RPC via match_count/match_offset — do NOT also chain `.range()`.
-  const query_embedding = await embedLibraryQuery(text);
+
+  // Gate the public/unbilled embedding call before paying the provider.
+  if (!(await allowSemanticSearch())) {
+    return { data: [], count: 0 };
+  }
+
+  // The RPC paginates internally, so its row count is only the current
+  // window. Use the candidate universe (objects in the category) as the
+  // gallery total so the infinite loader can page through all results.
+  // Independent of the embedding → run concurrently.
+  const totalQuery = category
+    ? client
+        .from("object")
+        .select("id", { count: "estimated", head: true })
+        .eq("category", category)
+    : client.from("object").select("id", { count: "estimated", head: true });
+
+  const [query_embedding, totalRes] = await Promise.all([
+    embedLibraryQuery(text),
+    totalQuery,
+  ]);
+
   // NOTE: POST (not `get: true`) — the 1536-d vector arg would overflow the
   // URL as a GET query string ("URI too long").
-  const { data, error, count } = await client
-    .rpc(
-      "search",
-      {
-        query_embedding: query_embedding as unknown as string,
-        match_count: range[1] - range[0] + 1,
-        match_offset: range[0],
-        match_category: category ?? undefined,
-      },
-      { count: "estimated" }
-    )
+  const { data, error } = await client
+    .rpc("search", {
+      query_embedding: query_embedding as unknown as string,
+      match_count: range[1] - range[0] + 1,
+      match_offset: range[0],
+      match_category: category ?? undefined,
+    })
     .select(__select_object_with_author);
 
   if (error) {
@@ -238,6 +286,6 @@ export async function search({
       client,
       (data as unknown as ObjectWithAuthor[]) ?? []
     ),
-    count: count ?? 0,
+    count: totalRes.count ?? undefined,
   };
 }
