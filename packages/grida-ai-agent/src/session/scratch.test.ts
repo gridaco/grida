@@ -17,6 +17,7 @@ import {
   scratchRootFor,
   sweepScratch,
 } from "./scratch";
+import { containsPath } from "../path-contains";
 
 describe("scratchRootFor (pure derivation)", () => {
   it("isolates per session under base (S1)", () => {
@@ -156,7 +157,9 @@ describe("scratch I/O helpers", () => {
 describe("defaultScratchBase", () => {
   it("is under the OS temp area (host-owned location, outside any secret root)", () => {
     const b = defaultScratchBase("/home/u/.grida/agent");
-    expect(b.startsWith(os.tmpdir())).toBe(true);
+    // Real containment, not a string prefix — a sibling like `${tmpdir}-evil`
+    // must NOT satisfy this (uses the same primitive as the runtime gates).
+    expect(containsPath(os.tmpdir(), b)).toBe(true);
     expect(path.basename(b)).toMatch(/^grida-agent-[0-9a-f]{16}$/);
   });
 
