@@ -1,5 +1,5 @@
 ---
-title: Grida Library (library)
+title: Grida Library (WG)
 tags:
   - internal
   - wg
