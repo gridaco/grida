@@ -119,10 +119,10 @@ export type ToolsetCapabilities = {
 };
 
 /**
- * TOOL-DESIGN — read before adding or widening a tool. The discipline that
- * keeps this surface small (learned the hard way: `generate_image` shipped as a
- * 7-arg mirror of the HTTP route — the most complex tool here — and was cut to a
- * single `prompt`; see `../gen`).
+ * TOOL-DESIGN (gridaco/grida#921) — read before adding or widening a tool. The
+ * discipline that keeps this surface small (learned the hard way: `generate_image`
+ * shipped as a 7-arg mirror of the HTTP route — the most complex tool here — and
+ * was cut to a single `prompt`; see `../gen`).
  *
  * Build tools FOR AGENTS, not as API mirrors. The shape is what an agent needs
  * to express intent — not the provider's full parameter surface.
