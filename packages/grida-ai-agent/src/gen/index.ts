@@ -43,12 +43,18 @@ export namespace AgentGen {
   export type ImageGenInput = z.infer<typeof GEN_IMAGE_INPUT>;
 
   /**
-   * What the host's generator returns. Success carries the absolute scratch
-   * `path` (so the model can promote the file), the `data` base64 payload that
-   * `toModelOutput` lowers to a `media` block (NOT for the model to read as
-   * JSON), and descriptor metadata. `data` is optional because the retention
-   * pass (message-view) strips it from stale turns — when absent the tool
-   * lowers to a text descriptor that still names the path.
+   * What the host's generator returns. `generate_image` is a PRODUCER, not a
+   * perception tool (SDK-design D3 — render vs. perceive are separate surfaces):
+   * it returns the absolute scratch `path` (so the agent can copy the file out)
+   * plus descriptor metadata. It deliberately does NOT carry the image bytes for
+   * the model to "see" — a tool result cannot deliver pixels on the OpenAI-
+   * compatible wire format (OpenRouter/Ollama): `@ai-sdk/openai-compatible`
+   * `JSON.stringify`s a `role:"tool"` content output, so an inlined image would
+   * arrive as undecodable base64 TEXT (the model hallucinates, and a multi-MB
+   * image blows the context window). Perceiving an image is `view_image`'s job,
+   * and even that only works where the provider's tool-result format carries
+   * images (Anthropic-native), NOT on openai-compatible. So generate stays
+   * honest: it makes a file and names it; it never claims the model saw it.
    */
   export type ImageGenOk = {
     ok: true;
@@ -58,7 +64,6 @@ export namespace AgentGen {
     width?: number;
     height?: number;
     bytes: number;
-    data?: string;
   };
   export type ImageGenErr = {
     ok: false;
@@ -66,21 +71,6 @@ export namespace AgentGen {
     message: string;
   };
   export type ImageGenOutput = ImageGenOk | ImageGenErr;
-
-  /**
-   * Max base64 length we inline as a media block for the MODEL to perceive. The
-   * produced image is ALWAYS written to scratch at full resolution and ALWAYS
-   * persisted/streamed to the client — this bounds only what rides into the
-   * model's context. A multi-MB image sent as a data-URL can blow the context
-   * window: gpt-image-2's ~4 MB PNG ≈ ~1M base64 tokens overran OpenRouter's
-   * 1M-token guard and failed the turn *after* the image was already produced.
-   * Above this, `toModelOutput` lowers to a text descriptor (path + dims): the
-   * run stays safe and the file is still promotable; the model just doesn't see
-   * the pixels. ~1.5 MiB (≈ 390k tokens) clears typical images while bounding
-   * the worst case. Perceiving large art needs a DOWNSCALED preview — the
-   * follow-up (this is the robust floor, not the final perception story).
-   */
-  export const PERCEPTION_MAX_BASE64 = 1.5 * 1024 * 1024;
 
   /**
    * The narrow outcome the tool resolves against. The host builds it from the
@@ -139,9 +129,6 @@ export namespace AgentGen {
       ),
   });
 
-  // Output is described to the model as a flat union; the real payload is
-  // produced by the host generator and `toModelOutput` overrides how it's
-  // lowered (the model never reads `data` as JSON).
   const GEN_IMAGE_OK = z.object({
     ok: z.literal(true),
     path: z.string(),
@@ -149,7 +136,6 @@ export namespace AgentGen {
     width: z.number().int().optional(),
     height: z.number().int().optional(),
     bytes: z.number().int(),
-    data: z.string().optional(),
   });
   const GEN_IMAGE_ERR = z.object({
     ok: z.literal(false),
@@ -161,16 +147,13 @@ export namespace AgentGen {
     [TOOL_NAMES.generate_image]: tool({
       description:
         "GENERATE a raster image from a text prompt using the user's " +
-        "connected image provider. The image is saved into your scratch " +
-        "directory and shown to you so you can see the result. To keep it, " +
-        "promote it: move or copy the file into the workspace. Call again to " +
-        "iterate (a new prompt, seed, or size).",
+        "connected image provider, saving it into your scratch directory. " +
+        "This tool PRODUCES a file — it does NOT show you the image; the " +
+        "result is the saved path and its dimensions. To keep the image, copy " +
+        "it from scratch into the workspace. Call again to iterate (a new " +
+        "prompt, seed, or size).",
       inputSchema: GEN_IMAGE_INPUT,
       outputSchema: z.union([GEN_IMAGE_OK, GEN_IMAGE_ERR]),
-      // The seam that makes the model SEE the produced pixels (and learn the
-      // path) instead of reading the output as JSON. Re-applied on every
-      // rebuild from persisted parts, so the perception is durable across turns
-      // (matches AgentVision; the retention pass elides `data` when stale).
       toModelOutput: ({ output }) => toModelOutput(output as ImageGenOutput),
     }),
   } as const;
@@ -181,25 +164,15 @@ export namespace AgentGen {
   // Model-output lowering
   // -------------------------------------------------------------------------
 
-  type ToolContent =
-    | { type: "text"; value: string }
-    | {
-        type: "content";
-        value: (
-          | { type: "text"; text: string }
-          | { type: "media"; mediaType: string; data: string }
-        )[];
-      };
+  type ToolContent = { type: "text"; value: string };
 
   /**
-   * Lower a `generate_image` output to what the model consumes:
-   *  - success WITH bytes UNDER the perception cap → a text line naming the
-   *    saved path + a `media` block (the model sees the image AND knows where it
-   *    landed, so it can promote it).
-   *  - success WITHOUT bytes (retention-elided) OR over the perception cap (a
-   *    multi-MB image that would blow the model context) → a text descriptor
-   *    that still names the path so promotion works without the pixels.
-   *  - error → the error text.
+   * Lower a `generate_image` output to what the model consumes — a TEXT
+   * descriptor, always. generate_image is a producer, not a perception tool
+   * (see {@link ImageGenOk}): it names the saved path + dimensions so the agent
+   * can copy the file out; it never inlines the bytes (a tool result can't
+   * deliver pixels on the openai-compatible wire format — it would arrive as
+   * undecodable base64 text and blow the context). Error → the error text.
    */
   export function toModelOutput(output: ImageGenOutput): ToolContent {
     if (!output.ok) {
@@ -207,23 +180,9 @@ export namespace AgentGen {
     }
     const dims =
       output.width && output.height ? ` ${output.width}×${output.height}` : "";
-    if (output.data && output.data.length <= PERCEPTION_MAX_BASE64) {
-      return {
-        type: "content",
-        value: [
-          {
-            type: "text",
-            text: `Generated image saved to ${output.path} (${output.mime}${dims}). Shown below. To keep it, copy it into the workspace.`,
-          },
-          { type: "media", mediaType: output.mime, data: output.data },
-        ],
-      };
-    }
-    // No inline pixels — retention-elided, or too large to send to the model.
-    // Name the path so the model can still copy the file into the workspace.
     return {
       type: "text",
-      value: `[generated image saved to ${output.path} (${output.mime}${dims}); it is in your scratch dir — copy it into the workspace to keep it]`,
+      value: `Generated image saved to ${output.path} (${output.mime}${dims}). It is in your scratch dir — copy it into the workspace to keep it.`,
     };
   }
 

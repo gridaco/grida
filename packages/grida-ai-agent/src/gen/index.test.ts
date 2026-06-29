@@ -14,58 +14,21 @@ const OK: AgentGen.ImageGenOk = {
   width: 1024,
   height: 1024,
   bytes: 42,
-  data: "iVBORw0KGgo=",
 };
 
 describe("AgentGen.toModelOutput", () => {
-  it("generate_image lowers a produced image to a media block (model sees its output)", () => {
+  it("is generate-only: returns a text path descriptor, never inlines the image", () => {
+    // generate_image is a producer, not a perception tool — a tool result can't
+    // deliver pixels on the openai-compatible wire format (it would arrive as
+    // base64 TEXT the model can't decode and would blow the context). So the
+    // model-facing output is always a text descriptor naming the saved path.
     const lowered = AgentGen.toModelOutput(OK);
-    expect(lowered.type).toBe("content");
-    if (lowered.type !== "content") throw new Error("unreachable");
-    // A media block carries the pixels...
-    const media = lowered.value.find((v) => v.type === "media");
-    expect(media).toEqual({
-      type: "media",
-      mediaType: "image/png",
-      data: "iVBORw0KGgo=",
-    });
-    // ...and a text line names the saved path so the model can promote it.
-    const text = lowered.value.find((v) => v.type === "text") as
-      | { type: "text"; text: string }
-      | undefined;
-    expect(text?.text).toContain(OK.path);
-  });
-
-  it("toModelOutput names the path when data is elided (retention)", () => {
-    const { data: _dropped, ...elided } = OK;
-    const lowered = AgentGen.toModelOutput(elided);
     expect(lowered.type).toBe("text");
-    if (lowered.type !== "text") throw new Error("unreachable");
-    // No pixels re-sent, but the path survives so promotion is still possible.
     expect(lowered.value).toContain(OK.path);
     expect(lowered.value.toLowerCase()).toContain("scratch");
-  });
-
-  it("omits the media block when data exceeds the perception cap (model-context safety)", () => {
-    // A multi-MB image (e.g. gpt-image-2) would blow the model's context if sent
-    // inline; above the cap the tool lowers to a path descriptor instead — the
-    // run stays safe, the file is still promotable.
-    const huge = {
-      ...OK,
-      data: "A".repeat(AgentGen.PERCEPTION_MAX_BASE64 + 1),
-    };
-    const lowered = AgentGen.toModelOutput(huge);
-    expect(lowered.type).toBe("text");
-    if (lowered.type !== "text") throw new Error("unreachable");
-    expect(lowered.value).toContain(OK.path);
-    // Crucially, the megabytes are NOT in the model-facing output.
+    // No base64 / media payload of any kind.
     expect(lowered.value.length).toBeLessThan(2000);
-  });
-
-  it("keeps the media block when data is at/under the perception cap", () => {
-    const ok = { ...OK, data: "A".repeat(1024) };
-    const lowered = AgentGen.toModelOutput(ok);
-    expect(lowered.type).toBe("content");
+    expect(JSON.stringify(lowered)).not.toContain("media");
   });
 
   it("toModelOutput surfaces an error as plain text", () => {

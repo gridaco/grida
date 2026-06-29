@@ -190,12 +190,13 @@ When you produce SVG:
     [
       '<capability name="image-generation">',
       `You can GENERATE images with the \`${generate_image_name}\` tool — give`,
-      "it a prompt and it returns the generated picture so you can SEE the",
-      "result and iterate.",
+      "it a prompt and it PRODUCES an image file. It does not show you the",
+      "image; the result is the saved path and dimensions. Describe what you",
+      "asked for, not what you can see.",
       `Each image is saved into your scratch directory (\`${scratch_dir}\`),`,
-      "which is ephemeral and system-managed. To KEEP an image, promote it: move",
-      "or copy the file into the workspace (or another location the user names).",
-      "An image left only in scratch has not been saved.",
+      "which is ephemeral and system-managed. To KEEP an image, copy the file",
+      "into the workspace (or another location the user names). An image left",
+      "only in scratch has not been saved.",
       "</capability>",
     ].join("\n"),
 

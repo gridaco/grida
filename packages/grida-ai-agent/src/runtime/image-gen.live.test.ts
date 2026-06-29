@@ -2,10 +2,11 @@
  * LIVE end-to-end — `generate_image` (WG `scratch.md` S3: produced media sinks
  * to scratch). Real driving model, real image provider, real shell, real
  * scratch dir. Proves the SYSTEM works (the agent can generate an image, the
- * bytes land in the per-session scratch dir, and the produced image is handed
- * back to the model as a media block) AND that the model — told only the
+ * bytes land in the per-session scratch dir) AND that the model — told only the
  * capability — USES it as intended: generate into scratch, then PROMOTE the
- * file into the workspace to keep it. The gen-tool analogue of the zip test.
+ * file into the workspace to keep it. generate_image is GENERATE-ONLY: the tool
+ * result is the saved path + metadata, never the image bytes (a tool result
+ * can't deliver pixels on the openai-compatible wire format — see AgentGen).
  *
  * Mirrors the shipped macOS desktop: `image_gen_enabled` + `shell_execution_
  * allowed` TRUE, mode `auto`, `scratch_base` wired. The same BYOK key drives the
@@ -143,8 +144,7 @@ const TASK_TEXT =
   `Generate an image of a single solid red circle on a white background, ` +
   `using the image model \`${IMAGE_MODEL_ID}\`.\n\n` +
   `1. The generated image goes into your SCRATCH directory automatically.\n` +
-  `2. Briefly describe what you see in the image you generated.\n` +
-  `3. Then copy that image from scratch into the project workspace root so I can keep it.`;
+  `2. Then copy that image from scratch into the project workspace root so I can keep it.`;
 
 liveDescribe("LIVE — generate_image (produce into scratch + promotion)", () => {
   let baseDir: string;
@@ -176,7 +176,7 @@ liveDescribe("LIVE — generate_image (produce into scratch + promotion)", () =>
   });
 
   it(
-    "the agent generates an image into scratch, perceives it, and promotes it into the workspace",
+    "the agent generates an image into scratch and promotes it into the workspace",
     async () => {
       const res = await host.app.request("/agent/run", {
         method: "POST",
@@ -231,7 +231,6 @@ liveDescribe("LIVE — generate_image (produce into scratch + promotion)", () =>
       const genOut = genCalls[0].output as {
         ok?: boolean;
         path?: string;
-        data?: string;
         mime?: string;
       };
       expect(genOut?.ok).toBe(true);
@@ -242,10 +241,10 @@ liveDescribe("LIVE — generate_image (produce into scratch + promotion)", () =>
       const producedBytes = await fs.readFile(genOut.path!);
       expect(producedBytes.byteLength).toBeGreaterThan(0);
 
-      // PERCEPTION: the tool handed the model a base64 payload (lowered to a
-      // media block by toModelOutput) — it SAW what it produced.
-      expect(typeof genOut.data).toBe("string");
-      expect(genOut.data!.length).toBeGreaterThan(0);
+      // GENERATE-ONLY contract: the tool output carries the path + metadata,
+      // NOT the image bytes (a tool result can't deliver pixels on the
+      // openai-compatible wire format — see AgentGen). Perception is not folded.
+      expect(genOut).not.toHaveProperty("data");
 
       // No command was rejected by the shell gate (scratch cwd/args allowed).
       const rejected = t.tools

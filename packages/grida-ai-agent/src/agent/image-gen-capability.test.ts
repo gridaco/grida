@@ -49,9 +49,10 @@ describe("buildCapabilityHints — image generation", () => {
     expect(hint).toBeDefined();
     expect(hint).toContain("generate_image");
     expect(hint).toContain(SCRATCH);
-    // Promotion + ephemerality are the load-bearing scratch contract.
+    // Honest contract: ephemeral scratch + keep-by-copying, and NO claim that
+    // the model can see the produced image (it's a producer, not a perceiver).
     expect(hint!.toLowerCase()).toContain("ephemeral");
-    expect(hint!.toLowerCase()).toContain("promote");
+    expect(hint!.toLowerCase()).toContain("does not show you");
   });
 
   it("omits the hint when no generator is wired (no provider key)", () => {

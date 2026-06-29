@@ -266,6 +266,9 @@ function createImageGenerator(
           message: "Could not save the generated image to scratch.",
         };
       }
+      // Producer, not perceiver: return the path + metadata, never the bytes.
+      // The file lives in scratch; the model can't be handed pixels through a
+      // tool result on the openai-compatible wire format anyway (see AgentGen).
       return {
         ok: true,
         path: savedPath,
@@ -273,7 +276,6 @@ function createImageGenerator(
         ...(sniffed?.width ? { width: sniffed.width } : {}),
         ...(sniffed?.height ? { height: sniffed.height } : {}),
         bytes: bytes.byteLength,
-        data: file.base64,
       };
     },
   };
