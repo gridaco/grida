@@ -65,7 +65,9 @@ Hooks (`message.user`, `model.resolve`) MAY automate the swap. Two
 conformant implementations MAY ship different plan/build pairs and
 both be conformant.
 
-See: [`subagents / plan-build-mode`](./subagents.md#plan--build-mode),
+See: [`mode-plan`](./mode-plan.md) — the dedicated treatment of this
+pattern and its transition contract;
+[`subagents / plan-build-mode`](./subagents.md#plan--build-mode);
 [`persistency / chat_messages`](./persistency.md#chat_messages) for
 the override field.
 
@@ -97,6 +99,32 @@ See: [`subagents / plan-build-mode`](./subagents.md#plan--build-mode),
 [`compositor`](./compositor.md) for user-view vs model-view,
 [`triggers`](./triggers.md) for what does and does not qualify as a
 trigger.
+
+#### Can the agent put itself into — or take itself out of — plan mode?
+
+No. The agent MAY **propose** a transition; it MUST NOT **effect** one. An
+agent in plan mode cannot promote itself to writing, and an agent in build
+mode cannot move itself into plan unilaterally — the agent proposes, the
+host disposes, and a human gates. "It switched to planning when I asked for
+a plan" is one of two host-owned paths: the agent **proposed** the switch
+and the user confirmed, or a host **router** set the regime before the turn
+ran. Neither is the model flipping its own mode; a design that let it would
+dissolve the read-only guarantee.
+
+See: [`mode-plan / who-may-initiate-a-transition`](./mode-plan.md#who-may-initiate-a-transition),
+[`mode-plan / the-transition-contract`](./mode-plan.md#the-transition-contract).
+
+#### Is "plan mode" a state the model holds?
+
+No — mode is **conversation context the host owns**, not model state. The
+agent reads which regime is active from injected instruction, re-asserted
+while the regime holds; it has no mode flag of its own to set. Plainly:
+**mode is a message, not a flag.** Every transition is therefore a fresh
+host-injected message that re-scopes the agent and announces the change,
+carried as the [per-message agent override](./persistency.md#chat_messages).
+
+See: [`mode-plan`](./mode-plan.md),
+[`mode-plan / what-a-mode-is`](./mode-plan.md#what-a-mode-is).
 
 #### When the agent asks me to pick from options (and I may add free-text follow-up), how does the pick come back?
 
