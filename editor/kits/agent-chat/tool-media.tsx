@@ -1,13 +1,9 @@
 /**
- * Per-tool OUTPUT rendering for the agent chat — the cases where a tool's
- * result is better shown as media than as the default JSON dump.
- *
- * Today that's `view_image`: its result carries the base64 image bytes, so we
- * render the actual image instead of pretty-printed JSON (which would otherwise
- * splat a multi-MB base64 string into the transcript). Kept OUT of the shared
- * `@app/ui` `ToolOutput` primitive — that stays tool-agnostic; the editor owns
- * the agent's tool vocabulary. `ToolOutput` renders a valid React element as-is,
- * so `ToolCallView` hands the element returned here straight through.
+ * Dedicated rendering for the `view_image` tool result. Its input/output shape
+ * is known and fixed, so it gets its OWN compact UI — the path, then the image
+ * — instead of the generic `ToolInput`/`ToolOutput` JSON view (which would splat
+ * a multi-MB base64 string into the transcript). Kept in the editor kit (which
+ * owns the agent's tool vocabulary), not in the shared `@app/ui` primitives.
  */
 
 import type { ReactNode } from "react";
@@ -15,37 +11,87 @@ import { getToolName } from "ai";
 import { AgentVision } from "@grida/agent/vision";
 import type { ToolCallEntry } from "@/lib/agent-chat";
 
+export function isViewImageEntry(entry: ToolCallEntry): boolean {
+  return getToolName(entry) === AgentVision.TOOL_NAMES.view_image;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+/** The file the call viewed (from the tool input). */
+export function viewImagePath(entry: ToolCallEntry): string | undefined {
+  const path = asRecord("input" in entry ? entry.input : undefined).path;
+  return typeof path === "string" && path.length > 0 ? path : undefined;
+}
+
 /**
- * The image element for an image-bearing tool result, or `null` to fall back to
- * the default JSON view. The bytes are the result's base64 `data` — present on
- * the client transcript even though the model-facing view elides it on stale
- * turns (retention, server-side). Matches the user-pasted-image `<img>` look so
- * every image in the chat shares one style.
+ * The `data:` URL for the viewed image, or undefined when there's nothing to
+ * show (an error result, or bytes absent). The base64 `data` is on the client
+ * transcript even though the model-facing view elides it on stale turns
+ * (retention is server-side).
  */
-export function toolOutputMedia(entry: ToolCallEntry): ReactNode | null {
-  if (getToolName(entry) !== AgentVision.TOOL_NAMES.view_image) return null;
-  const output = "output" in entry ? entry.output : undefined;
-  if (!output || typeof output !== "object") return null;
-  const { ok, mime, data } = output as {
-    ok?: boolean;
-    mime?: unknown;
-    data?: unknown;
-  };
-  if (ok !== true || typeof mime !== "string" || typeof data !== "string") {
-    return null;
+export function viewImageSrc(entry: ToolCallEntry): string | undefined {
+  const out = asRecord("output" in entry ? entry.output : undefined);
+  if (out.ok !== true) return undefined;
+  const { mime, data } = out;
+  if (
+    typeof mime !== "string" ||
+    typeof data !== "string" ||
+    data.length === 0
+  ) {
+    return undefined;
   }
-  if (data.length === 0) return null;
+  return `data:${mime};base64,${data}`;
+}
+
+/** The refusal message for an error result (`ok: false`), if any. */
+export function viewImageError(entry: ToolCallEntry): string | undefined {
+  const out = asRecord("output" in entry ? entry.output : undefined);
+  if (out.ok !== false) return undefined;
+  return typeof out.message === "string" ? out.message : undefined;
+}
+
+/**
+ * The whole `view_image` call body: the path, then the image below it. No JSON.
+ * On an error result the path is shown with the refusal message instead of an
+ * image; while the call is still running (no output yet) only the path shows.
+ */
+export function ViewImageContent({
+  entry,
+}: {
+  entry: ToolCallEntry;
+}): ReactNode {
+  const path = viewImagePath(entry);
+  const src = viewImageSrc(entry);
+  const error = viewImageError(entry);
   return (
-    // A base64 data: URL of agent-produced bytes — `next/image` adds nothing
-    // here (no remote optimization, dynamic dims). Matches the user-image
-    // `<img>` in `message.tsx`, which disables the same rule for the same reason.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`data:${mime};base64,${data}`}
-      alt="viewed image"
-      loading="lazy"
-      decoding="async"
-      className="max-h-96 max-w-full rounded-md border object-contain"
-    />
+    <div className="space-y-2 p-4">
+      {path && (
+        <div
+          className="truncate font-mono text-muted-foreground text-xs"
+          title={path}
+        >
+          {path}
+        </div>
+      )}
+      {src ? (
+        // A base64 data: URL of agent-read bytes — `next/image` adds nothing
+        // (no remote optimization, dynamic dims). Same as the user-image
+        // `<img>` in `message.tsx`.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={path ?? "viewed image"}
+          loading="lazy"
+          decoding="async"
+          className="max-h-96 max-w-full rounded-md border object-contain"
+        />
+      ) : error ? (
+        <div className="text-muted-foreground text-xs">{error}</div>
+      ) : null}
+    </div>
   );
 }
