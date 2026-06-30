@@ -568,8 +568,15 @@ function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
         {triggerRow(groupIcon(entries), summary)}
       </TaskTrigger>
       <TaskContent>
-        {entries.map((entry) => (
-          <ToolCallView key={entry.toolCallId} entry={entry} />
+        {entries.map((entry, index) => (
+          // `toolCallId` is the natural identity, but it can be absent mid-stream
+          // (a tool part before its id is assigned) — which made keys collide on
+          // `undefined`. The index disambiguates; the group is append-only so it
+          // stays stable for a given entry.
+          <ToolCallView
+            key={`${entry.toolCallId ?? "tool"}-${index}`}
+            entry={entry}
+          />
         ))}
       </TaskContent>
     </Task>
