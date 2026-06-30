@@ -362,4 +362,15 @@ describe("CLI — parseRunArgs", () => {
   it("rejects an invalid --mode value", () => {
     expect(() => parseRunArgs(["--mode", "yolo", "x"])).toThrow(/--mode/);
   });
+
+  it("rejects a value flag whose operand is missing or another flag", () => {
+    // `--workspace` swallowing `--mode` would silently mis-parse the workspace.
+    expect(() => parseRunArgs(["--workspace", "--mode", "auto"])).toThrow(
+      /--workspace requires a value/
+    );
+    // A trailing value flag with no operand at all.
+    expect(() => parseRunArgs(["hi", "--model"])).toThrow(
+      /--model requires a value/
+    );
+  });
 });

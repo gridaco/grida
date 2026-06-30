@@ -22,8 +22,8 @@
  * is both outside the secret root and naturally ephemeral.
  */
 
-import { chmod, mkdir, rm, realpath, writeFile } from "node:fs/promises";
-import { readdirSync, rmSync } from "node:fs";
+import { chmod, mkdir, rm, realpath, open } from "node:fs/promises";
+import { readdirSync, rmSync, constants as fsConstants } from "node:fs";
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
@@ -199,6 +199,13 @@ function assertSafeFilename(filename: string): void {
  * directly inside `scratchDir` as a belt-and-braces guard. Used by the host's
  * media-generation binding (`generate_image`) to land produced bytes in the
  * default sink (S3).
+ *
+ * The write is `O_NOFOLLOW`: if the final path component is already a symlink
+ * (e.g. one planted by an auto-approved `run_command` whose cwd is scratch),
+ * the open fails with `ELOOP` rather than following it and writing the bytes
+ * outside the session tree — a TOCTOU that the lexical checks above can't catch
+ * (#920 review). `O_NOFOLLOW` is POSIX-only; on Windows it is absent (the `?? 0`
+ * fallback), where scratch's owner-only model is already a no-op.
  */
 export async function writeScratchFile(
   scratchDir: string,
@@ -210,7 +217,19 @@ export async function writeScratchFile(
   if (path.dirname(path.resolve(full)) !== path.resolve(scratchDir)) {
     throw new Error(`scratch filename escapes the scratch dir: ${filename}`);
   }
-  await writeFile(full, bytes, { mode: SCRATCH_FILE_MODE });
+  const handle = await open(
+    full,
+    fsConstants.O_WRONLY |
+      fsConstants.O_CREAT |
+      fsConstants.O_TRUNC |
+      (fsConstants.O_NOFOLLOW ?? 0),
+    SCRATCH_FILE_MODE
+  );
+  try {
+    await handle.write(bytes);
+  } finally {
+    await handle.close();
+  }
   return full;
 }
 

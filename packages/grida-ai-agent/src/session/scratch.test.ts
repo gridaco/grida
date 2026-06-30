@@ -174,6 +174,21 @@ describe("scratch I/O helpers", () => {
     await expect(writeScratchFile(root, "..", bytes)).rejects.toThrow(/unsafe/);
   });
 
+  it("writeScratchFile refuses to follow a planted symlink at the basename (#920)", async () => {
+    // Skip on Windows (no POSIX symlinks / O_NOFOLLOW without elevation).
+    if (process.platform === "win32") return;
+    const root = scratchRootFor(base, "ses_symlink");
+    await ensureScratch(root);
+    // A target OUTSIDE the scratch tree the symlink would redirect the write to.
+    const outside = path.join(base, "outside.png");
+    await fs.symlink(outside, path.join(root, "image.png"));
+    await expect(
+      writeScratchFile(root, "image.png", new Uint8Array([1, 2, 3]))
+    ).rejects.toThrow(/ELOOP/);
+    // The escape target was never created — the write did not follow the link.
+    await expect(fs.stat(outside)).rejects.toThrow(/ENOENT/);
+  });
+
   it("removeScratch is recursive and idempotent (S2)", async () => {
     const root = scratchRootFor(base, "ses_rm");
     await ensureScratch(root);

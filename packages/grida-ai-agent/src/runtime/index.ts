@@ -889,10 +889,13 @@ export class AgentRuntime {
     } = this.deps;
     // Per-session scratch dir (WG `scratch.md`). Derived (pure) here so it can
     // ride `runDeps`; the dir is created on disk just before the model turn
-    // (below). Only meaningful when the shell is wired and a workspace is bound
-    // — scratch reach rides the command capability — so it is gated the same way.
+    // (below). Scratch is the sink for the shell (an allowed cwd root) AND for
+    // `generate_image` (its output dir), so derive it when EITHER is enabled —
+    // an images-only host that keeps the shell off still needs it (#920 review).
     const scratchDir =
-      scratchBase && workspaceRoot && shellExecutionAllowed
+      scratchBase &&
+      workspaceRoot &&
+      (shellExecutionAllowed || this.deps.image_gen_enabled === true)
         ? scratchRootFor(scratchBase, sessionId)
         : undefined;
     // Bindings deps for the run. Typed (not an inline literal) so the

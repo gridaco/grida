@@ -453,14 +453,34 @@ export function parseRunArgs(args: string[]): {
   let mode: AgentMode | undefined;
   let modelId: string | undefined;
   const rest: string[] = [];
-  for (let i = 0; i < args.length; i += 1) {
+  const optionTokens = new Set([
+    "--session",
+    "-s",
+    "--workspace",
+    "-w",
+    "--mode",
+    "--model",
+  ]);
+  let i = 0;
+  // Consume a value flag's operand, rejecting a missing one or another known
+  // flag — so `run --workspace --mode auto` can't silently treat `--mode` as
+  // the workspace path.
+  const readValue = (flag: string): string => {
+    const value = args[i + 1];
+    if (value === undefined || optionTokens.has(value)) {
+      throw new Error(`${flag} requires a value`);
+    }
+    i += 1;
+    return value;
+  };
+  for (; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--session" || arg === "-s") {
-      sessionId = args[++i];
+      sessionId = readValue(arg);
     } else if (arg === "--workspace" || arg === "-w") {
-      workspace = args[++i];
+      workspace = readValue(arg);
     } else if (arg === "--mode") {
-      const value = args[++i];
+      const value = readValue(arg);
       if (value !== "auto" && value !== "accept-edits") {
         throw new Error(
           `--mode must be "auto" or "accept-edits", got ${value}`
@@ -468,7 +488,7 @@ export function parseRunArgs(args: string[]): {
       }
       mode = value;
     } else if (arg === "--model") {
-      modelId = args[++i];
+      modelId = readValue(arg);
     } else {
       rest.push(arg);
     }
