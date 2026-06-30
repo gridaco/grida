@@ -24,7 +24,7 @@ tags:
 
 [`ai-sdk`](https://ai-sdk.dev/) is the chunk-shape substrate this
 guide pins. The reason the pin exists, and what the SDK provides for
-free, is named in [`foundations`](./foundations.md#streaming-substrate-ai-sdk-v6).
+free, is named in [`foundations`](../foundations.md#streaming-substrate-ai-sdk-v6).
 
 This page is the **implementor's annex** to AI SDK's own docs. The
 SDK's documentation already covers usage end-to-end; only the
@@ -35,7 +35,7 @@ concept, do not re-document it; link out.
 ## Token usage — the cache normalization rule
 
 The guide's per-turn token breakdown
-([`session / context-window tracking`](./session.md#context-window-tracking))
+([`session / context-window tracking`](../session.md#context-window-tracking))
 records five components: `input`, `output`, `reasoning`,
 `cache_read`, `cache_write`. The AI SDK's `usage` object surfaces
 these via `inputTokens`, `outputTokens`, `reasoningTokens`,
@@ -76,7 +76,7 @@ the normalization on each step's usage delta.
 AI SDK ships an opinionated tool-loop primitive — see
 [`ai-sdk-core / tool-loop-agent`](https://ai-sdk.dev/docs/reference/ai-sdk-core/tool-loop-agent).
 Implementors taking the **adapter path** (per
-[`foundations / native vs adapter path`](./foundations.md#native-vs-adapter-path))
+[`foundations / native vs adapter path`](../foundations.md#native-vs-adapter-path))
 can lean on it directly: it handles tool calls, stop conditions,
 multi-step continuations.
 
@@ -92,26 +92,37 @@ A few load-bearing decisions the SDK is deliberately silent on:
 
 - **Persistence.** AI SDK has no opinion on storage. The RFC pins
   the three-table SQLite shape — see
-  [`persistency`](./persistency.md).
+  [`persistency`](../persistency.md).
 - **Compaction.** AI SDK does not auto-compact. The RFC's overflow
   / tail / prune machinery lives in
-  [`session / compaction`](./session.md#compaction).
+  [`session / compaction`](../session.md#compaction).
 - **Subagents.** AI SDK's tool layer does not include a `task` tool.
-  The RFC adds it — see [`subagents`](./subagents.md).
+  The RFC adds it — see [`subagents`](../subagents.md).
 - **ACP outward wire.** AI SDK is host-internal. The RFC's outward
-  wire is ACP — see [`acp`](./acp.md).
+  wire is ACP — see [`acp`](../acp.md).
 - **Skills, MCP, watchdog, sandbox.** All RFC additions on top of
   the substrate.
 
 When in doubt: AI SDK is the **wire vocabulary**; the RFC is the
 **runtime contract** that uses it.
 
+## SDK-specific implementor notes
+
+Workarounds that exist only because we **consume** the SDK rather than
+own the provider wire. These are not part of the neutral RFC — they are
+the price of the adapter path.
+
+- [Visual perception lowering](./vision-lowering.md) — why a tool-result
+  image must be hoisted to a user-message image part at `prepareStep` on
+  the OpenAI-compatible wire, and how that composes with the neutral
+  [`vision`](../vision.md) retention contract.
+
 ## See also
 
-- [Foundations / streaming substrate](./foundations.md#streaming-substrate-ai-sdk-v6) —
+- [Foundations / streaming substrate](../foundations.md#streaming-substrate-ai-sdk-v6) —
   why AI SDK v6 is pinned, what its chunk vocabulary is, what the
   SDK provides for free.
-- [Session / context-window tracking](./session.md#context-window-tracking) —
+- [Session / context-window tracking](../session.md#context-window-tracking) —
   where the normalized token values land.
 - [`ai-sdk.dev`](https://ai-sdk.dev/) — the SDK's own documentation
   (canonical for usage; this page is implementor's annex).

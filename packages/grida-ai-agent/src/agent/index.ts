@@ -32,6 +32,7 @@ import {
   type LanguageModel,
 } from "ai";
 import { composeSystemPrompt } from "./prompts";
+import { hoistToolResultImages } from "./hoist-tool-result-images";
 import { prompts } from "../prompts";
 import type { AgentModelId } from "../protocol/run";
 import type { SkillId } from "../protocol/skills";
@@ -191,6 +192,14 @@ export function createAgent(opts: CreateAgentOptions) {
         });
       }
     },
+    // Deliver tool-produced images as a user-message image part rather than a
+    // tool-result media block — the latter is stringified to base64 text on
+    // the openai-compatible wire and the model never sees pixels (#923). One
+    // transform covers both cross-turn and same-turn perception because
+    // `prepareStep` sees the rebuilt history plus the in-loop steps together.
+    prepareStep: ({ messages }) => ({
+      messages: hoistToolResultImages(messages),
+    }),
     stopWhen: stepCountIs(8),
   });
 }

@@ -119,19 +119,30 @@ the **persisted** record every turn (see [`session`](./session.md),
 not from the live return value. So the lowering must be reproducible from
 what was stored.
 
-Two conforming strategies:
+Two conforming strategies — **which one is viable depends on the wire
+format**, not on taste:
 
-1. **Tool-output media (recommended).** The tool result carries the image
-   payload, and the tool declares a model-output lowering that turns that
-   payload into a media block. Because the lowering is a property of the
-   tool — re-applied whenever the persisted result is converted to a model
-   message — the perception reproduces on every rebuild with no bespoke
-   replay path. This is the cleanest fit when the substrate supports a
-   media-typed tool output.
-2. **Stage-and-reattach.** The tool writes the image to [scratch](./scratch.md)
-   and the runtime re-injects it as a normal attachment through the proven
-   attachment-lowering path; the tool result itself stays a small descriptor.
-   Use this when the substrate cannot carry media in a tool output.
+1. **Tool-output media.** The tool result carries the image payload, and the
+   tool declares a model-output lowering that turns that payload into a media
+   block. Because the lowering is a property of the tool — re-applied
+   whenever the persisted result is converted to a model message — the
+   perception reproduces on every rebuild with no bespoke replay path. This
+   is the cleanest fit, **but only on a substrate whose tool output can carry
+   structured media** — the OpenAI Responses API (`function_call_output`
+   content items) and Anthropic-native (`tool_result` image blocks). It does
+   **not** work on the OpenAI Chat Completions / openai-compatible wire,
+   where a `role:"tool"` message is text-only: the media block is stringified
+   to undecodable base64 text and the model sees nothing (and the text-token
+   count overflows context). Do not assume this strategy works just because
+   the unit test sees a media block — that is one layer above the provider
+   conversion that breaks it.
+2. **Stage-and-reattach.** The runtime re-injects the image as a normal
+   user-message attachment through the proven attachment-lowering path; the
+   tool result itself stays a small descriptor. **Required** when the
+   substrate cannot carry media in a tool output (Chat Completions /
+   openai-compatible), and always correct since a user-message image is the
+   universal vision input. For the AI SDK realization (a `prepareStep`
+   hoist), see [`ai-sdk / vision-lowering`](./ai-sdk/vision-lowering.md).
 
 Either way the **persisted result is the durable record** and the lowering
 is derived from it — never a side effect that only happened during the live
@@ -182,6 +193,11 @@ A conforming implementation SHOULD:
   bound.
 - Lower a perception so it reproduces from the **persisted** result, not just
   the live return.
+- Choose the lowering strategy by **wire format**: tool-output media only on
+  substrates that carry structured media in a tool output (Responses API,
+  Anthropic-native); stage-and-reattach on Chat Completions / openai-compatible.
+  Verify perception **end-to-end through a real provider**, not just the
+  media-block shape.
 - Evict stale **re-viewable** perceptions to a naming descriptor; leave
   non-re-viewable images (pasted attachments) intact.
 - Declare only a read capability for bitmap perception; gate the rendered
