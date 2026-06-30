@@ -150,6 +150,9 @@ holds no business logic.
 
 ## See also
 
+- [Resource loading](./resource-loading.md) — the sibling renderer↔host
+  channel: streaming host-owned resource bytes into media elements, not
+  invoking capabilities.
 - [Process model](./process-model.md) — the agent server the bridge talks to.
 - [Security](./agent-security.md) — the five GRIDA-SEC-004 layers.
 - [`GRIDA-SEC-004`](https://github.com/gridaco/grida/blob/main/SECURITY.md)
