@@ -76,6 +76,7 @@ import {
 // this renderer's own label/summary formatting, colocated in the kit.
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
+import { toolOutputMedia } from "./tool-media";
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 
@@ -637,7 +638,10 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
               </ConfirmationRejected>
             </Confirmation>
           )}
-          <ToolOutput output={entry.output} errorText={entry.errorText} />
+          <ToolOutput
+            output={toolOutputMedia(entry) ?? entry.output}
+            errorText={entry.errorText}
+          />
         </TaskContent>
       )}
     </Task>
