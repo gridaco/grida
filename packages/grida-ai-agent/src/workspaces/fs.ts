@@ -8,7 +8,7 @@
 
 import fs from "node:fs/promises";
 import {
-  createReadStream as nodeCreateReadStream,
+  constants as fsConstants,
   type ReadStream as NodeReadStream,
 } from "node:fs";
 import path from "node:path";
@@ -289,20 +289,28 @@ export namespace workspaceFs {
   }
 
   /**
-   * Open a regular file inside the workspace for streamed reads (#924).
-   * Resolves containment ONCE (one `realpath`) and returns the file's
-   * `size`/`mtime` plus a `createReadStream` factory bound to the already-
-   * validated absolute path. The media route needs the size up front (to
-   * validate a Range header and set Content-Length/Content-Range) and then a
-   * byte stream — folding both into one call avoids a second containment
-   * resolve per request, which matters because a seeking `<video>` fires a
-   * Range request per skip.
+   * Open a regular file inside the workspace for streamed reads (#924),
+   * pinned to a contained file descriptor. Resolves containment ONCE
+   * (one `realpath`), opens an `O_NOFOLLOW` handle, and returns the file's
+   * `size`/`mtime` (from `fstat` on THAT handle) plus a `stream` factory over
+   * the same handle. The media route needs the size up front (to validate a
+   * Range header and set Content-Length/Content-Range) and then a byte stream
+   * — folding both into one handle avoids a second containment resolve per
+   * request (a seeking `<video>` fires a Range request per skip) AND closes the
+   * realpath→read TOCTOU: `resolveInside` validates the path, but a local
+   * writer could then swap the regular file for a symlink to an outside target.
+   * Opening `O_NOFOLLOW` refuses a final-component symlink planted after the
+   * check (same defense as scratch writes), and we fstat + stream from the held
+   * handle, so the bytes come from the exact inode we validated — not whatever
+   * now lives at the path. This matters more here than on the 1 MiB buffered
+   * readers because the stream is uncapped.
    *
    * The factory's `start`/`end` are INCLUSIVE byte offsets (Node
    * `createReadStream` semantics); the route owns Range math and clamps them
-   * against `size`. Streaming never buffers the whole file, so — unlike
-   * {@link readFile} / {@link readFileBytes} — there is NO size cap here.
-   * Throws `not-a-file` for non-regular targets.
+   * against `size`. The returned stream's `autoClose` (default) closes the
+   * handle on end/error/abort; a caller that takes `size`/`mtime` but never
+   * streams (e.g. an empty file, or a 416) MUST call `close()`. Throws
+   * `not-a-file` for non-regular targets.
    */
   export async function openFile(
     workspace: workspaceFs.Scope,
@@ -310,26 +318,37 @@ export namespace workspaceFs {
   ): Promise<{
     size: number;
     mtime: number;
-    createReadStream: (opts?: {
-      start?: number;
-      end?: number;
-    }) => NodeReadStream;
+    stream: (opts?: { start?: number; end?: number }) => NodeReadStream;
+    close: () => Promise<void>;
   }> {
     const abs = await resolveInside(workspace, relPath, { must_exist: true });
-    const stat = await fs.stat(abs);
-    if (!stat.isFile()) {
-      throw new Exception({
-        code: "not-a-file",
-        workspace_id: workspace.id,
-        rel_path: relPath,
-      });
+    // O_NOFOLLOW (0 where unsupported, e.g. Windows) → a final-component symlink
+    // swapped in after `resolveInside` fails the open with ELOOP instead of
+    // following out of the workspace.
+    const handle = await fs.open(
+      abs,
+      fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0)
+    );
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile()) {
+        throw new Exception({
+          code: "not-a-file",
+          workspace_id: workspace.id,
+          rel_path: relPath,
+        });
+      }
+      return {
+        size: stat.size,
+        mtime: stat.mtimeMs,
+        stream: (opts) =>
+          handle.createReadStream({ start: opts?.start, end: opts?.end }),
+        close: () => handle.close(),
+      };
+    } catch (err) {
+      await handle.close();
+      throw err;
     }
-    return {
-      size: stat.size,
-      mtime: stat.mtimeMs,
-      createReadStream: (opts) =>
-        nodeCreateReadStream(abs, { start: opts?.start, end: opts?.end }),
-    };
   }
 
   /**

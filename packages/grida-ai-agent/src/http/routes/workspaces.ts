@@ -169,39 +169,49 @@ export function registerWorkspacesRoutes(
     } catch (err) {
       return mapFsError(err, c);
     }
-    const { size } = file;
 
-    const range = parseRange(c.req.header("range"), size);
-    if (range === "unsatisfiable") {
-      return c.body(null, 416, {
-        "content-range": `bytes */${size}`,
+    // `file` holds an open descriptor: the streaming path hands it to a stream
+    // that auto-closes on end/abort; every other exit MUST close it explicitly.
+    try {
+      const { size } = file;
+      const range = parseRange(c.req.header("range"), size);
+      if (range === "unsatisfiable") {
+        await file.close();
+        return c.body(null, 416, {
+          "content-range": `bytes */${size}`,
+          "accept-ranges": "bytes",
+        });
+      }
+
+      // Normalize: a full read is just the whole-file span.
+      const { start, end } = range ?? {
+        start: 0,
+        end: size === 0 ? 0 : size - 1,
+      };
+      const headers: Record<string, string> = {
+        "content-type": contentTypeFor(relPath),
         "accept-ranges": "bytes",
-      });
+        // Workspace files can change on disk under the viewer; don't let a
+        // privileged-scheme response get cached stale.
+        "cache-control": "no-store",
+        "content-length": String(size === 0 ? 0 : end - start + 1),
+      };
+      if (range) headers["content-range"] = `bytes ${start}-${end}/${size}`;
+
+      // Empty file: an empty stream would try to read 1 byte of a 0-byte file,
+      // so send a null body — and close the handle the stream would have owned.
+      if (size === 0) {
+        await file.close();
+        return new Response(null, { status: range ? 206 : 200, headers });
+      }
+      const webBody = Readable.toWeb(
+        file.stream({ start, end })
+      ) as unknown as ReadableStream;
+      return new Response(webBody, { status: range ? 206 : 200, headers });
+    } catch (err) {
+      await file.close();
+      return mapFsError(err, c);
     }
-
-    // Normalize: a full read is just the whole-file span. The empty-file case
-    // sends a null body (an empty stream would read 1 byte of a 0-byte file).
-    const { start, end } = range ?? {
-      start: 0,
-      end: size === 0 ? 0 : size - 1,
-    };
-    const headers: Record<string, string> = {
-      "content-type": contentTypeFor(relPath),
-      "accept-ranges": "bytes",
-      // Workspace files can change on disk under the viewer; don't let a
-      // privileged-scheme response get cached stale.
-      "cache-control": "no-store",
-      "content-length": String(size === 0 ? 0 : end - start + 1),
-    };
-    if (range) headers["content-range"] = `bytes ${start}-${end}/${size}`;
-
-    const webBody =
-      size === 0
-        ? null
-        : (Readable.toWeb(
-            file.createReadStream({ start, end })
-          ) as unknown as ReadableStream);
-    return new Response(webBody, { status: range ? 206 : 200, headers });
   });
 
   // POST /workspaces/writefile
@@ -263,6 +273,9 @@ function mapFsError(err: unknown, c: Context) {
       return c.json({ error: "not found", code: "enoent" }, 404);
     if (nodeErr.code === "EACCES" || nodeErr.code === "EPERM")
       return c.json({ error: "permission denied", code: nodeErr.code }, 403);
+    // O_NOFOLLOW open of a (race-)swapped symlink target — treat as an escape.
+    if (nodeErr.code === "ELOOP")
+      return c.json({ error: "symlink not allowed", code: "eloop" }, 403);
     if (nodeErr.code === "ENOTDIR")
       return c.json({ error: "not a directory", code: "enotdir" }, 400);
     if (nodeErr.code === "EISDIR")

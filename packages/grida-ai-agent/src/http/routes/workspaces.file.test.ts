@@ -1,3 +1,4 @@
+/* eslint-disable jest/no-standalone-expect */
 /**
  * Contract pins — streamed media route `GET /workspaces/file` (#924,
  * GRIDA-SEC-004).
@@ -14,6 +15,8 @@
  * of scope here — this pins the route's own behavior.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { Hono } from "hono";
 import {
   createAgentHostFixture,
@@ -21,6 +24,8 @@ import {
 } from "../../test/agent-host-fixture";
 import { workspaceFs } from "../../workspaces/fs";
 import { registerWorkspacesRoutes } from "./workspaces";
+
+const symlinkIt = process.platform === "win32" ? it.skip : it;
 
 describe("GET /workspaces/file (#924)", () => {
   let fixture: AgentHostFixture;
@@ -107,6 +112,37 @@ describe("GET /workspaces/file (#924)", () => {
     const res = await app.request(url("../escape.txt"));
     expect(res.status).toBe(403);
   });
+
+  symlinkIt(
+    "rejects a symlink whose target escapes the workspace",
+    async () => {
+      // resolveInside realpaths the link before opening — an escaping target is a
+      // containment failure, never served.
+      const outside = path.join(fixture.base_dir, "secret.txt");
+      await fs.writeFile(outside, "top secret");
+      await fs.symlink(outside, path.join(fixture.workspace_root, "leak.png"));
+
+      const res = await app.request(url("leak.png"));
+      expect(res.status).toBe(403);
+    }
+  );
+
+  symlinkIt(
+    "streams through a symlink that stays inside the workspace",
+    async () => {
+      // The realpath'd target is a regular file, so the O_NOFOLLOW open of it
+      // succeeds — the hardening rejects swapped links, not legitimate ones.
+      await fixture.write_workspace_file("real/pic.png", "PNGBYTES");
+      await fs.symlink(
+        path.join(fixture.workspace_root, "real/pic.png"),
+        path.join(fixture.workspace_root, "alias.png")
+      );
+
+      const res = await app.request(url("alias.png"));
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("PNGBYTES");
+    }
+  );
 
   it("is NOT subject to the 1 MiB base64 cap — streams a large file", async () => {
     // A file well past MAX_FILE_BYTES (the buffered readers' cap) streams fine,
