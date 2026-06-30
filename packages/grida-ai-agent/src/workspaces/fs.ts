@@ -9,7 +9,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { atomicWrite } from "../storage/atomic-write";
-import type { Workspace } from "../workspaces";
 
 // ─────────────────────────── workspace fs ───────────────────────────
 /**
@@ -44,6 +43,18 @@ export namespace workspaceFs {
    * 1 MiB is plenty for that, and binary blobs (PNGs, fonts, etc.) get
    * sensibly rejected as a side effect. */
   export const MAX_FILE_BYTES = 1_048_576; // 1 MiB
+
+  /**
+   * A containment scope for the agent's file I/O: a real directory `root` plus
+   * an `id` used only in error detail. This module is "containment-checked I/O
+   * over a root" — NOT tied to the workspace registry. A registered
+   * `Workspace` is one scope (the user's project); the per-session scratch dir
+   * is another. Modeling reach as a scope (not a Workspace) is what lets the
+   * fs tools and the shell share ONE notion of where the agent may read/write,
+   * instead of each defining it separately (the bug this generalization fixes:
+   * scratch was reachable by the shell but invisible to read_file/view_image).
+   */
+  export type Scope = { id: string; root: string };
 
   export type ErrorCode =
     | "workspace-not-found"
@@ -113,7 +124,7 @@ export namespace workspaceFs {
    * open.
    */
   export async function readDir(
-    workspace: Workspace,
+    workspace: workspaceFs.Scope,
     relPath: string
   ): Promise<Entry[]> {
     const abs = await resolveInside(workspace, relPath, { must_exist: true });
@@ -169,7 +180,7 @@ export namespace workspaceFs {
    * a different affordance, not display gibberish.
    */
   export async function readFile(
-    workspace: Workspace,
+    workspace: workspaceFs.Scope,
     relPath: string
   ): Promise<{ content: string; mtime: number }> {
     const abs = await resolveInside(workspace, relPath, { must_exist: true });
@@ -240,7 +251,7 @@ export namespace workspaceFs {
    * viewer the client dispatches based on extension.
    */
   export async function readFileBytes(
-    workspace: Workspace,
+    workspace: workspaceFs.Scope,
     relPath: string,
     opts?: { max_bytes?: number }
   ): Promise<{ base64: string; size: number; mtime: number }> {
@@ -299,7 +310,7 @@ export namespace workspaceFs {
    * problem to silently truncate.
    */
   export async function writeFile(
-    workspace: Workspace,
+    workspace: workspaceFs.Scope,
     relPath: string,
     content: string,
     options: { expected_mtime?: number } = {}
@@ -358,7 +369,7 @@ export namespace workspaceFs {
    * rejected before `rm`.
    */
   export async function deleteFile(
-    workspace: Workspace,
+    workspace: workspaceFs.Scope,
     relPath: string
   ): Promise<void> {
     const abs = await resolveInside(workspace, relPath, { must_exist: true });
@@ -389,7 +400,7 @@ export namespace workspaceFs {
  * so the prefix comparison is canonical-to-canonical.
  */
 async function resolveInside(
-  workspace: Workspace,
+  workspace: workspaceFs.Scope,
   relPath: string,
   opts: { must_exist: boolean }
 ): Promise<string> {
@@ -433,14 +444,14 @@ async function resolveInside(
   return candidate;
 }
 
-function workspacePrefix(workspace: Workspace): string {
+function workspacePrefix(workspace: workspaceFs.Scope): string {
   return workspace.root.endsWith(path.sep)
     ? workspace.root
     : workspace.root + path.sep;
 }
 
 function assertInsideWorkspace(
-  workspace: Workspace,
+  workspace: workspaceFs.Scope,
   absPath: string,
   relPath: string
 ): void {
@@ -460,7 +471,7 @@ function assertInsideWorkspace(
  * component points outside it.
  */
 async function resolveWritableParent(
-  workspace: Workspace,
+  workspace: workspaceFs.Scope,
   absPath: string,
   relPath: string
 ): Promise<string> {

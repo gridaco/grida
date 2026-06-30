@@ -281,6 +281,43 @@ describe("createWorkspaceAgentBindings — scratch reach", () => {
     expect(bindings?.command?.default_workdir).toBe(workspaceRoot);
   });
 
+  it("wires scratch into the vision byte-reader — bindings.fs.readBytes reaches a scratch image (not shell-only)", async () => {
+    // The fundamental fix: the same scratch_dir reaches the fs layer, so
+    // view_image (readBytes, on-demand) sees scratch images. This pins the
+    // WIRING (scratch_dir → fs backend), the gap behind the real session that
+    // couldn't view what it generated into scratch.
+    //
+    // Pass scratch via a SYMLINK whose realpath differs (reproducing macOS
+    // `/var`→`/private/var` portably): without realpath-normalizing the wired
+    // root, `workspaceFs`'s realpath containment rejects every scratch path as
+    // an escape — the exact live failure. The bindings must normalize the root.
+    const realScratch = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), "grida-realscratch-"))
+    );
+    const linkScratch = path.join(baseDir, "scratch-link");
+    await fs.symlink(realScratch, linkScratch);
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "auto" },
+      {
+        workspace_registry: registry,
+        shell_execution_allowed: true,
+        secrets_root: secretsRoot,
+        scratch_dir: linkScratch, // raw, symlinked — realpath ≠ this
+      }
+    );
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    await fs.writeFile(path.join(realScratch, "produced.png"), png);
+    // The wired command binding exposes the normalized (real) scratch path —
+    // that's the path the agent is told and uses.
+    expect(bindings?.command?.scratch_dir).toBe(realScratch);
+    const bytes = await bindings!.fs.readBytes(
+      path.join(realScratch, "produced.png")
+    );
+    expect(bytes).not.toBeNull();
+    expect(Buffer.from(bytes!)).toEqual(png);
+    await fs.rm(realScratch, { recursive: true, force: true });
+  });
+
   it("runs a command with cwd inside scratch and writes there, then promotes it out (S4 + S2)", async () => {
     const bindings = await createWorkspaceAgentBindings(
       { workspace_root: workspaceRoot, mode: "auto" },
@@ -432,5 +469,90 @@ describe("createWorkspaceAgentBindings — image_gen gating", () => {
       // no scratch_dir
     });
     expect(bindings?.image_gen).toBeUndefined();
+  });
+});
+
+/**
+ * Fundamental reach model (gridaco/grida#921 etiology): the agent's filesystem
+ * reach is ONE notion shared by the fs tools and the shell — an absolute path
+ * inside any sanctioned root (the workspace OR an additional root like scratch)
+ * resolves within that root. Before this, scratch was reachable by the shell
+ * but invisible to read_file/write_file/view_image (the bug a real session hit:
+ * the agent couldn't view what it generated into scratch). These pin that the
+ * structured fs backend reaches an additional root, while the logical "/" space
+ * still defaults to the workspace.
+ */
+describe("WorkspaceAgentFsBackend — additional reachable roots (scratch)", () => {
+  let baseDir: string;
+  let workspaceRoot: string;
+  let scratchRoot: string;
+  let backend: WorkspaceAgentFsBackend;
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-reach-"));
+    const wsDir = path.join(baseDir, "ws");
+    const scDir = path.join(baseDir, "scratch"); // sibling, OUTSIDE the workspace
+    await fs.mkdir(wsDir);
+    await fs.mkdir(scDir);
+    workspaceRoot = await fs.realpath(wsDir);
+    scratchRoot = await fs.realpath(scDir);
+    const registry = new WorkspaceRegistry(path.join(baseDir, "ud"));
+    const ws = await registry.open(workspaceRoot);
+    backend = new WorkspaceAgentFsBackend(ws, [
+      { id: "scratch", root: scratchRoot },
+    ]);
+  });
+
+  afterEach(async () => {
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  it("reads + writes an absolute path inside the scratch root (not the workspace)", async () => {
+    const p = path.join(scratchRoot, "note.txt");
+    await backend.write(p, "from scratch");
+    // The file lands in scratch, NOT under the workspace.
+    expect(await fs.readFile(path.join(scratchRoot, "note.txt"), "utf8")).toBe(
+      "from scratch"
+    );
+    await expect(
+      fs.access(path.join(workspaceRoot, "note.txt"))
+    ).rejects.toBeDefined();
+    // And reads back through the same scope.
+    expect(await backend.read(p)).toBe("from scratch");
+  });
+
+  it("view_image (readBytes) can perceive an image sitting in scratch", async () => {
+    // 1x1 PNG.
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      "base64"
+    );
+    await fs.writeFile(path.join(scratchRoot, "pixel.png"), png);
+    const bytes = await backend.readBytes(path.join(scratchRoot, "pixel.png"));
+    expect(bytes).not.toBeNull();
+    expect(Buffer.from(bytes!)).toEqual(png);
+  });
+
+  it("a logical '/'-rooted path still maps to the WORKSPACE, not scratch", async () => {
+    await backend.write("/in-ws.txt", "logical");
+    expect(
+      await fs.readFile(path.join(workspaceRoot, "in-ws.txt"), "utf8")
+    ).toBe("logical");
+    await expect(
+      fs.access(path.join(scratchRoot, "in-ws.txt"))
+    ).rejects.toBeDefined();
+  });
+
+  it("an absolute path under NO reachable root does not escape (reinterpreted workspace-relative)", async () => {
+    // A path outside every reachable root is treated as workspace-relative — it
+    // lands at <workspace>/etc/passwd, NOT the real system file. Safe (contained
+    // to the workspace), and the same fallback the workspace-only mapping had.
+    await backend.write("/etc/passwd", "x");
+    expect(
+      await fs.readFile(path.join(workspaceRoot, "etc/passwd"), "utf8")
+    ).toBe("x");
+    // The real system file is untouched.
+    const realPasswd = await fs.readFile("/etc/passwd", "utf8");
+    expect(realPasswd).not.toBe("x");
   });
 });

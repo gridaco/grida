@@ -6,8 +6,11 @@
  * module only adapts contracts.
  */
 
+import path from "node:path";
+import { realpath } from "node:fs/promises";
 import { generateImage } from "ai";
 import { AgentFs } from "../fs";
+import { containsPath } from "../path-contains";
 import { isProtectedWrite } from "../fs/scope";
 import { isReadOnlyCommand } from "../permissions";
 import { AgentTodos } from "../todos";
@@ -108,12 +111,32 @@ export async function createWorkspaceAgentBindings(
   if (!workspace) {
     throw new Error(`workspace not found for root: ${req.workspace_root}`);
   }
+  // Normalize the scratch root to its REAL path ONCE, here, so every surface
+  // (fs reach, shell allowed-roots, the capability hint) agrees with the
+  // realpath-based containment `workspaceFs` enforces. `workspace.root` is
+  // already realpath'd by the registry; the runtime-derived scratch dir is NOT,
+  // so on a platform where the temp dir is symlinked (macOS `/var`→`/private/var`)
+  // a raw scratch root makes `workspaceFs`'s realpath check reject every scratch
+  // path as an escape — the bug a live run surfaced (`path-escapes-workspace`).
+  // The dir exists by now (the runtime ensures it before the turn); fall back to
+  // the raw path if realpath can't resolve it.
+  const scratchDir = deps.scratch_dir
+    ? await realpath(deps.scratch_dir).catch(() => deps.scratch_dir!)
+    : undefined;
   // GRIDA-SEC-004 — the workspace-bound agent fs refuses no-clobber writes
   // (`.git`, lockfiles, rc files, …). The standalone/client-resolved fs gets no
   // guard, so its behavior is unchanged.
-  const fs = new AgentFs(new WorkspaceAgentFsBackend(workspace), {
-    write_guard: isProtectedWrite,
-  });
+  // Scratch is reachable by the fs tools (read_file/write_file/view_image),
+  // NOT just the shell — the same scratch root the command backend gets below
+  // (one source of truth for reach). So the agent can view/read what it
+  // generated into scratch without first promoting it to the workspace.
+  const fs = new AgentFs(
+    new WorkspaceAgentFsBackend(
+      workspace,
+      scratchDir ? [{ id: "scratch", root: scratchDir }] : []
+    ),
+    { write_guard: isProtectedWrite }
+  );
   await fs.hydrate();
   const todos = new AgentTodos();
   // GRIDA-SEC-004 fail-closed: only wire shell execution when the host
@@ -126,14 +149,14 @@ export async function createWorkspaceAgentBindings(
           deps.workspace_registry,
           deps.secrets_root ? [deps.secrets_root] : [],
           // Scratch is a sanctioned cwd root though it is not a workspace (S5).
-          deps.scratch_dir ? [deps.scratch_dir] : [],
+          scratchDir ? [scratchDir] : [],
           // Flush the agent fs's pending writes before a command runs, so a
           // script the agent just wrote via write_file is on disk when the
           // shell reads it (closes the debounced-write vs immediate-read race).
           () => fs.flush()
         ),
         default_workdir: req.workspace_root,
-        scratch_dir: deps.scratch_dir,
+        scratch_dir: scratchDir,
         // Supervised gate (RFC `permission modes`, Phase 2). In `accept-edits`
         // a non-read-only command pauses for Allow/Deny (the tool's
         // `needsApproval`); a read-only inspection command still auto-runs. In
@@ -151,9 +174,8 @@ export async function createWorkspaceAgentBindings(
   // `bytesReadable` gate — never advertise a producer that would refuse every
   // call. The async key probe is cheap (a file read of auth.json).
   let image_gen: AgentGen.ImageGenerator | undefined;
-  if (deps.image_gen_enabled && deps.secrets && deps.scratch_dir) {
+  if (deps.image_gen_enabled && deps.secrets && scratchDir) {
     const secrets = deps.secrets;
-    const scratchDir = deps.scratch_dir;
     if (await hasUsableImageProvider({ secrets })) {
       image_gen = createImageGenerator(
         secrets,
@@ -285,7 +307,18 @@ function createImageGenerator(
 }
 
 export class WorkspaceAgentFsBackend implements AgentFs.Backend {
-  constructor(private readonly workspace: Workspace) {}
+  constructor(
+    private readonly workspace: Workspace,
+    /**
+     * Additional sanctioned roots the agent may read/write through the fs tools
+     * — the session scratch dir today. This is the SAME reach the shell is
+     * granted (`additionalAllowedRoots`), so `read_file` / `view_image` /
+     * `write_file` see scratch exactly as `run_command` does. Without it, scratch
+     * was reachable by the shell but invisible to the structured fs tools — the
+     * reach-fragmentation bug this fixes.
+     */
+    private readonly additionalRoots: ReadonlyArray<workspaceFs.Scope> = []
+  ) {}
 
   /**
    * Enumerate the workspace tree for hydration (issue #786). The scan is
@@ -311,10 +344,8 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
 
   async read(path: string): Promise<string | null> {
     try {
-      const result = await workspaceFs.readFile(
-        this.workspace,
-        this.toRel(path)
-      );
+      const { scope, rel } = this.scopeFor(path);
+      const result = await workspaceFs.readFile(scope, rel);
       return result.content;
     } catch (err) {
       // The AgentFs.Backend contract is "null when there's no readable text
@@ -335,11 +366,10 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       // so an ordinary 1–8 MiB workspace screenshot is actually viewable rather
       // than being rejected and surfacing as not_found. The vision layer applies
       // the final size gate; anything past the cap surfaces as absent here.
-      const { base64 } = await workspaceFs.readFileBytes(
-        this.workspace,
-        this.toRel(path),
-        { max_bytes: AgentVision.MAX_BYTES }
-      );
+      const { scope, rel } = this.scopeFor(path);
+      const { base64 } = await workspaceFs.readFileBytes(scope, rel, {
+        max_bytes: AgentVision.MAX_BYTES,
+      });
       return new Uint8Array(Buffer.from(base64, "base64"));
     } catch (err) {
       // An oversize file is NOT absent — surface it so view_image returns the
@@ -358,12 +388,14 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   }
 
   async write(path: string, content: string): Promise<void> {
-    await workspaceFs.writeFile(this.workspace, this.toRel(path), content);
+    const { scope, rel } = this.scopeFor(path);
+    await workspaceFs.writeFile(scope, rel, content);
   }
 
   async delete(path: string): Promise<void> {
     try {
-      await workspaceFs.deleteFile(this.workspace, this.toRel(path));
+      const { scope, rel } = this.scopeFor(path);
+      await workspaceFs.deleteFile(scope, rel);
     } catch (err) {
       // Deleting something that isn't a deletable file (missing, or a
       // directory) is a no-op for the backend contract; policy violations
@@ -374,25 +406,28 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   }
 
   /**
-   * Map an agent-fs path to a workspace-relative path. The agent mixes two
-   * path spaces: the fs tools' logical "/"-rooted form (where "/" is the
-   * workspace root, e.g. `/chart.svg`) AND — once it can see the shell's cwd —
-   * the REAL absolute path inside the workspace (`<root>/chart.svg`). Both must
-   * resolve to the same file, or a `write_file(<abs>)` followed by a shell
-   * `python3 chart.py` reads from a different place than it was written (the
-   * file would otherwise land under a doubled `<root>/<root>/…` path). The
-   * downstream `workspaceFs` containment check still rejects anything that
-   * escapes the root.
+   * Resolve an agent-fs path to the containment SCOPE it belongs to + the path
+   * relative to that scope's root. The agent mixes path spaces: the fs tools'
+   * logical "/"-rooted form (where "/" is the workspace, e.g. `/chart.svg`) AND
+   * the REAL absolute path it sees from the shell cwd (`<root>/chart.svg`, or a
+   * scratch path `<scratch>/img.png`). An absolute path inside ANY reachable
+   * root (workspace or an additional root like scratch) resolves within THAT
+   * root — decided by the same `containsPath` primitive the shell's gate uses,
+   * so the two surfaces agree on reach. A logical "/"-rooted path that isn't an
+   * on-disk path under a reachable root is workspace-relative (the default
+   * space). `workspaceFs`'s own realpath containment still rejects escapes.
    */
-  private toRel(p: string): string {
+  private scopeFor(p: string): { scope: workspaceFs.Scope; rel: string } {
     if (!p.startsWith("/")) {
       throw new Error(`agent-fs path must start with "/": ${p}`);
     }
-    const root = this.workspace.root;
-    if (p === root) return "";
-    if (p.startsWith(root + "/")) return p.slice(root.length + 1);
-    // Logical "/"-rooted path, relative to the workspace root.
-    return p.slice(1);
+    for (const scope of [this.workspace, ...this.additionalRoots]) {
+      if (p === scope.root) return { scope, rel: "" };
+      if (containsPath(scope.root, p)) {
+        return { scope, rel: path.relative(scope.root, p) };
+      }
+    }
+    return { scope: this.workspace, rel: p.slice(1) };
   }
 
   /**
