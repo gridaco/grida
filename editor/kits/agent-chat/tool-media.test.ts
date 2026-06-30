@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isGenerateImageEntry,
+  isMediaPending,
   isMediaToolEntry,
   isViewImageEntry,
   mediaError,
@@ -95,5 +96,21 @@ describe("tool-media — generate_image", () => {
     expect(mediaImageSrc(noData)).toBeUndefined();
     expect(mediaPrompt(noData)).toBe("x");
     expect(mediaPath(noData)).toBe("/tmp/scratch/y.png");
+  });
+
+  it("is pending while in flight (args sent, no result) — drives the skeleton", () => {
+    const inflight = {
+      type: "tool-generate_image",
+      toolCallId: "1",
+      input: { prompt: "a slow render" },
+      state: "input-available",
+    } as ToolCallEntry;
+    expect(isMediaPending(inflight)).toBe(true);
+    // The prompt is available to show in the placeholder while waiting.
+    expect(mediaPrompt(inflight)).toBe("a slow render");
+    // A settled result is not pending.
+    expect(
+      isMediaPending(result("generate_image", { prompt: "x" }, { ok: true }))
+    ).toBe(false);
   });
 });
