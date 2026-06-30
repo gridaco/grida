@@ -291,9 +291,11 @@ function createImageGenerator(
           message: "Could not save the generated image to scratch.",
         };
       }
-      // Producer, not perceiver: return the path + metadata, never the bytes.
-      // The file lives in scratch; the model can't be handed pixels through a
-      // tool result on the openai-compatible wire format anyway (see AgentGen).
+      // The path + metadata + the base64 `data` for the CLIENT to render the
+      // produced image. `data` is NOT lowered to the model — `AgentGen`'s
+      // `toModelOutput` is text-only (the model can't be handed pixels through a
+      // tool result on the openai-compatible wire format, and doesn't need to
+      // "see" what it produced to place it). See the `AgentGen.ImageGenOk` doc.
       return {
         ok: true,
         path: savedPath,
@@ -301,6 +303,7 @@ function createImageGenerator(
         ...(sniffed?.width ? { width: sniffed.width } : {}),
         ...(sniffed?.height ? { height: sniffed.height } : {}),
         bytes: bytes.byteLength,
+        data: file.base64,
       };
     },
   };

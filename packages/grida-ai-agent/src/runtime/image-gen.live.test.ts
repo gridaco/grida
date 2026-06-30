@@ -233,6 +233,7 @@ liveDescribe("LIVE — generate_image (produce into scratch + promotion)", () =>
         ok?: boolean;
         path?: string;
         mime?: string;
+        data?: string;
       };
       expect(genOut?.ok).toBe(true);
 
@@ -242,10 +243,11 @@ liveDescribe("LIVE — generate_image (produce into scratch + promotion)", () =>
       const producedBytes = await fs.readFile(genOut.path!);
       expect(producedBytes.byteLength).toBeGreaterThan(0);
 
-      // GENERATE-ONLY contract: the tool output carries the path + metadata,
-      // NOT the image bytes (a tool result can't deliver pixels on the
-      // openai-compatible wire format — see AgentGen). Perception is not folded.
-      expect(genOut).not.toHaveProperty("data");
+      // The output carries base64 `data` for the CLIENT to render the produced
+      // image — but it is NOT lowered to the model (toModelOutput is text-only;
+      // pinned in gen/index.test.ts). The model stays generate-only.
+      expect(typeof genOut.data).toBe("string");
+      expect(genOut.data!.length).toBeGreaterThan(0);
 
       // No command was rejected by the shell gate (scratch cwd/args allowed).
       const rejected = t.tools

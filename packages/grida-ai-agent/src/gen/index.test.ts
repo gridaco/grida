@@ -14,19 +14,22 @@ const OK: AgentGen.ImageGenOk = {
   width: 1024,
   height: 1024,
   bytes: 42,
+  // The output carries the bytes for the CLIENT renderer...
+  data: "QUJDQUJDQUJD".repeat(50),
 };
 
 describe("AgentGen.toModelOutput", () => {
-  it("is generate-only: returns a text path descriptor, never inlines the image", () => {
-    // generate_image is a producer, not a perception tool — a tool result can't
+  it("projects the MODEL view to a text path descriptor — the base64 `data` is never lowered", () => {
+    // ...but the model-facing projection stays path-only: a tool result can't
     // deliver pixels on the openai-compatible wire format (it would arrive as
-    // base64 TEXT the model can't decode and would blow the context). So the
-    // model-facing output is always a text descriptor naming the saved path.
+    // base64 TEXT the model can't decode and would blow the context). The output
+    // having `data` (for the UI) must NOT leak the base64 into the model view.
     const lowered = AgentGen.toModelOutput(OK);
     expect(lowered.type).toBe("text");
     expect(lowered.value).toContain(OK.path);
     expect(lowered.value.toLowerCase()).toContain("scratch");
-    // No base64 / media payload of any kind.
+    // The megabytes of base64 are NOT in the model-facing output.
+    expect(lowered.value).not.toContain(OK.data);
     expect(lowered.value.length).toBeLessThan(2000);
     expect(JSON.stringify(lowered)).not.toContain("media");
   });

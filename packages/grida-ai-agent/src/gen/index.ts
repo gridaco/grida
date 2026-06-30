@@ -47,16 +47,18 @@ export namespace AgentGen {
   /**
    * What the host's generator returns. `generate_image` is a PRODUCER, not a
    * perception tool (SDK-design D3 — render vs. perceive are separate surfaces):
-   * it returns the absolute scratch `path` (so the agent can copy the file out)
-   * plus descriptor metadata. It deliberately does NOT carry the image bytes for
-   * the model to "see" — a tool result cannot deliver pixels on the OpenAI-
-   * compatible wire format (OpenRouter/Ollama): `@ai-sdk/openai-compatible`
-   * `JSON.stringify`s a `role:"tool"` content output, so an inlined image would
-   * arrive as undecodable base64 TEXT (the model hallucinates, and a multi-MB
-   * image blows the context window). Perceiving an image is `view_image`'s job,
-   * and even that only works where the provider's tool-result format carries
-   * images (Anthropic-native), NOT on openai-compatible. So generate stays
-   * honest: it makes a file and names it; it never claims the model saw it.
+   * the absolute scratch `path` (so the agent can copy the file out) + descriptor
+   * metadata, and the base64 `data` for the CLIENT to render the produced image.
+   *
+   * Crucially, `data` is for the human UI, NOT the model: {@link toModelOutput}
+   * lowers the result to a TEXT descriptor (path + dims) and never inlines the
+   * bytes. A tool result can't deliver pixels to the model on the OpenAI-
+   * compatible wire format (OpenRouter/Ollama `JSON.stringify` a `role:"tool"`
+   * content output → undecodable base64 TEXT that bloats the context); and the
+   * model doesn't need to "see" what it generated to place it. So the output is
+   * the full record (bytes included, for display/persistence), while the
+   * model-facing projection stays path-only. (Perceiving an image is
+   * `view_image`'s job — and even that only works on Anthropic-native.)
    */
   export type ImageGenOk = {
     ok: true;
@@ -66,6 +68,9 @@ export namespace AgentGen {
     width?: number;
     height?: number;
     bytes: number;
+    /** Base64 image bytes — for the CLIENT to render the result. NEVER lowered
+     *  to the model (see the type doc + {@link toModelOutput}). */
+    data?: string;
   };
   export type ImageGenErr = {
     ok: false;
@@ -124,6 +129,9 @@ export namespace AgentGen {
     width: z.number().int().optional(),
     height: z.number().int().optional(),
     bytes: z.number().int(),
+    // For the CLIENT to render the produced image; never lowered to the model
+    // (`toModelOutput` is text-only). See the `ImageGenOk` doc.
+    data: z.string().optional(),
   });
   const GEN_IMAGE_ERR = z.object({
     ok: z.literal(false),

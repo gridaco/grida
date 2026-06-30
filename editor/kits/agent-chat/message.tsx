@@ -76,7 +76,7 @@ import {
 // this renderer's own label/summary formatting, colocated in the kit.
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
-import { isViewImageEntry, ViewImageContent } from "./tool-media";
+import { isMediaToolEntry, MediaToolContent } from "./tool-media";
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 
@@ -604,10 +604,11 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   const title = description.detail
     ? `${description.title} · ${description.detail}`
     : description.title;
-  // `view_image` has a known shape, so it gets a dedicated body (path + image,
-  // no JSON) and opens by default — the point is to SEE the image, not unfold a
-  // tool row. Other tools keep the generic input/approval/output view.
-  const viewImage = isViewImageEntry(entry);
+  // The image tools (view_image, generate_image) have known shapes, so they get
+  // a dedicated body (prompt/path + image, no JSON) and open by default — the
+  // point is to SEE the image, not unfold a tool row. Other tools keep the
+  // generic input/approval/output view.
+  const mediaTool = isMediaToolEntry(entry);
   const hasInput = entry.input !== undefined;
   const hasOutput = entry.output !== undefined || Boolean(entry.errorText);
   // The Allow/Deny ACTION lives in the session-global approval bar above the
@@ -616,13 +617,13 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   const approval = approvalOf(entry);
 
   return (
-    <Task defaultOpen={viewImage} className="w-full">
+    <Task defaultOpen={mediaTool} className="w-full">
       <TaskTrigger title={title}>
         {triggerRow(iconForAction(description.action), title)}
       </TaskTrigger>
-      {viewImage ? (
+      {mediaTool ? (
         <TaskContent>
-          <ViewImageContent entry={entry} />
+          <MediaToolContent entry={entry} />
         </TaskContent>
       ) : (
         (hasInput || hasOutput || approval) && (

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  isGenerateImageEntry,
+  isMediaToolEntry,
   isViewImageEntry,
-  viewImageError,
-  viewImagePath,
-  viewImageSrc,
+  mediaError,
+  mediaImageSrc,
+  mediaPath,
+  mediaPrompt,
 } from "./tool-media";
 import type { ToolCallEntry } from "@/lib/agent-chat";
 
@@ -22,54 +25,75 @@ function result(
   } as ToolCallEntry;
 }
 
-const okOut = {
-  ok: true,
-  mime: "image/png",
-  width: 8,
-  height: 8,
-  bytes: 3,
-  data: "AAAA",
-};
+describe("tool-media — recognition", () => {
+  it("recognizes the image tools, and only those", () => {
+    const v = result("view_image", { path: "/x.png" }, { ok: true });
+    const g = result("generate_image", { prompt: "a cat" }, { ok: true });
+    const r = result("read_file", { path: "/x" }, { ok: true });
+    expect([isViewImageEntry(v), isGenerateImageEntry(g)]).toEqual([
+      true,
+      true,
+    ]);
+    expect([
+      isMediaToolEntry(v),
+      isMediaToolEntry(g),
+      isMediaToolEntry(r),
+    ]).toEqual([true, true, false]);
+  });
+});
 
-describe("tool-media (view_image)", () => {
-  it("recognizes a view_image entry, and only that", () => {
-    expect(isViewImageEntry(result("view_image", {}, okOut))).toBe(true);
-    expect(isViewImageEntry(result("read_file", {}, { ok: true }))).toBe(false);
+describe("tool-media — view_image", () => {
+  const ok = result(
+    "view_image",
+    { path: "/shots/a.png" },
+    { ok: true, mime: "image/png", width: 8, height: 8, bytes: 3, data: "AAAA" }
+  );
+
+  it("path is the viewed input file; src is the data: URL; no prompt", () => {
+    expect(mediaPath(ok)).toBe("/shots/a.png");
+    expect(mediaImageSrc(ok)).toBe("data:image/png;base64,AAAA");
+    expect(mediaPrompt(ok)).toBeUndefined();
   });
 
-  it("derives the data: URL from an ok result with bytes", () => {
-    expect(viewImageSrc(result("view_image", { path: "/x.png" }, okOut))).toBe(
-      "data:image/png;base64,AAAA"
-    );
-  });
-
-  it("derives the viewed path from the input", () => {
-    expect(
-      viewImagePath(result("view_image", { path: "/shots/a.png" }, okOut))
-    ).toBe("/shots/a.png");
-  });
-
-  it("has no src for an error result, but surfaces its message (never JSON)", () => {
+  it("error result: no src, surfaces the message (never JSON), path still shows", () => {
     const err = result(
       "view_image",
       { path: "/missing.png" },
-      {
-        ok: false,
-        reason: "not_found",
-        message: "No file at /missing.png.",
-      }
+      { ok: false, reason: "not_found", message: "No file at /missing.png." }
     );
-    expect(viewImageSrc(err)).toBeUndefined();
-    expect(viewImageError(err)).toBe("No file at /missing.png.");
-    // The path still renders (so the row isn't empty) ...
-    expect(viewImagePath(err)).toBe("/missing.png");
+    expect(mediaImageSrc(err)).toBeUndefined();
+    expect(mediaError(err)).toBe("No file at /missing.png.");
+    expect(mediaPath(err)).toBe("/missing.png");
+  });
+});
+
+describe("tool-media — generate_image", () => {
+  const ok = result(
+    "generate_image",
+    { prompt: "a wide lighthouse at dusk" },
+    {
+      ok: true,
+      path: "/tmp/scratch/image-1.png",
+      mime: "image/jpeg",
+      bytes: 9,
+      data: "BBBB",
+    }
+  );
+
+  it("shows the prompt (input), the SAVED path (output), and the image", () => {
+    expect(mediaPrompt(ok)).toBe("a wide lighthouse at dusk");
+    expect(mediaPath(ok)).toBe("/tmp/scratch/image-1.png"); // from OUTPUT, not input
+    expect(mediaImageSrc(ok)).toBe("data:image/jpeg;base64,BBBB");
   });
 
-  it("has no src when bytes were elided (ok but no data) — path still shows", () => {
-    const { data: _dropped, ...noData } = okOut;
-    const stale = result("view_image", { path: "/x.png" }, noData);
-    expect(viewImageSrc(stale)).toBeUndefined();
-    expect(viewImageError(stale)).toBeUndefined();
-    expect(viewImagePath(stale)).toBe("/x.png");
+  it("no src when bytes absent (model-only path) — prompt + path still show", () => {
+    const noData = result(
+      "generate_image",
+      { prompt: "x" },
+      { ok: true, path: "/tmp/scratch/y.png", mime: "image/png", bytes: 9 }
+    );
+    expect(mediaImageSrc(noData)).toBeUndefined();
+    expect(mediaPrompt(noData)).toBe("x");
+    expect(mediaPath(noData)).toBe("/tmp/scratch/y.png");
   });
 });
