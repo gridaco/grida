@@ -125,6 +125,22 @@ export namespace agentSidecarClient {
   ): Promise<{ done: Promise<void> }> {
     return await client().events.subscribe(onEvent, init);
   }
+
+  /**
+   * Low-level authenticated fetch against the sidecar from the main process —
+   * same Basic-Auth + forged Origin/Referer as every call above, returning the
+   * raw `Response` so the caller can stream the body straight through. Used by
+   * the `grida-workspace://` media protocol handler (#924) to proxy the
+   * streamed `GET /workspaces/file` route (forwarding the renderer's Range
+   * header) WITHOUT the renderer ever holding the credential. Throws
+   * {@link AgentSidecarNotReadyError} before the sidecar is up.
+   */
+  export async function fetch(
+    path: string,
+    init?: RequestInit
+  ): Promise<Response> {
+    return await client().fetch(path, init);
+  }
 }
 
 // Per-launch Authorization header is fixed; cache it alongside the

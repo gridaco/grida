@@ -399,6 +399,17 @@ const bridge: DesktopBridge = {
       agentClient.workspaces.read_file(workspaceId, relPath),
     read_file_bytes: (workspaceId, relPath) =>
       agentClient.workspaces.read_file_bytes(workspaceId, relPath),
+    // #924 — the streamable media `src` for the read-only viewer. Pure string
+    // build: a `grida-workspace://` URL the main-process protocol handler
+    // resolves by proxying to the sidecar's streamed `/workspaces/file` route.
+    // No credentials cross into the renderer (GRIDA-SEC-004). Constant host +
+    // both ids in the path so host canonicalization can't lowercase the id;
+    // keep in lockstep with `main/workspace-media-protocol.ts`.
+    media_url: (workspaceId, relPath) =>
+      `grida-workspace://workspace/${encodeURIComponent(workspaceId)}/${relPath
+        .split("/")
+        .map(encodeURIComponent)
+        .join("/")}`,
     write_file: (workspaceId, relPath, content, expectedMtime) =>
       agentClient.workspaces.write_file(
         workspaceId,

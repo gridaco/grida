@@ -34,11 +34,16 @@ const DESKTOP_CSP_SUFFIX =
   // at build/SSR — keep `'unsafe-inline'` for now; tightening style-src is a
   // separate change.
   `style-src 'self' 'unsafe-inline'; ` +
-  `img-src 'self' data: blob:; ` +
+  // `grida-workspace:` is the privileged streaming scheme for workspace media
+  // (#924): the main process serves it by proxying to the sidecar's
+  // `/workspaces/file` route (Range-capable, no 1 MiB base64 cap). It's a local
+  // privileged origin, NOT an external host — keep it scoped to img/media-src.
+  `img-src 'self' data: blob: grida-workspace:; ` +
   // media-src for BYOK video (#908): clips are downloaded by the sidecar and
   // handed to the renderer as base64 `data:`/`blob:` — never streamed from an
   // external origin (same trust level as img-src; no provider hosts added).
-  `media-src 'self' data: blob:; ` +
+  // `grida-workspace:` (#924) additionally streams local workspace media.
+  `media-src 'self' data: blob: grida-workspace:; ` +
   `font-src 'self' data:; ` +
   DESKTOP_CSP_CONNECT_SRC +
   `frame-ancestors 'none'; ` +

@@ -19,6 +19,10 @@ import { registerIpcHandlers } from "./main/ipc-handlers";
 import { disposeAllTerminals } from "./main/terminal-host";
 import { disposeAllWorkspaceWatches } from "./main/workspace-watcher-host";
 import { agentSidecarClient } from "./main/agent-sidecar-client";
+import {
+  registerWorkspaceMediaScheme,
+  handleWorkspaceMediaProtocol,
+} from "./main/workspace-media-protocol";
 import { startAgentNotifications } from "./main/agent-notifications";
 import { routeDeepLink } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
@@ -67,6 +71,12 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 
 app.setName(RUNTIME_APP_NAME);
 app.setAsDefaultProtocolClient("grida");
+
+// GRIDA-SEC-004 — register the `grida-workspace://` privileged media scheme
+// (#924). `registerSchemesAsPrivileged` MUST run before `app.whenReady()`; the
+// matching `protocol.handle` is installed in the `ready` handler once the
+// sidecar is up. See `main/workspace-media-protocol.ts`.
+registerWorkspaceMediaScheme();
 
 // `onOpenFile` lets the File ▸ Open… picker route a chosen single file
 // through the same handler the OS file-open path uses (dedup + dirty-close
@@ -349,6 +359,9 @@ app.on("ready", async () => {
     // `events.md` §the first consumer). Main-owned so a turn with no
     // renderer attached (queue drain, closed window) still notifies.
     startAgentNotifications();
+    // Now that the sidecar is up, serve `grida-workspace://` media requests by
+    // proxying to its streamed `/workspaces/file` route (#924).
+    handleWorkspaceMediaProtocol();
   } catch (err) {
     console.error("[grida] agent sidecar failed to start:", err);
     dialog.showErrorBox(

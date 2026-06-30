@@ -206,6 +206,20 @@ export type DesktopBridge = {
       relPath: string
     ) => Promise<WorkspaceReadFileBytesResult>;
     /**
+     * Resolve a streamable media `src` URL for `relPath`, for the read-only
+     * image/video viewer (#924). Synchronous and pure — it builds a URL the
+     * host can serve, no I/O. On desktop this is a `grida-workspace://`
+     * privileged-scheme URL backed by a streamed, Range-capable file route, so
+     * the viewer is size-independent (no 1 MiB base64 cap) and video seeking
+     * works.
+     *
+     * OPTIONAL: a host that can't serve a streaming scheme (e.g. the
+     * web-daemon dev bridge running in a plain browser) omits this; the viewer
+     * falls back to {@link read_file_bytes}. Gate on its presence, not on
+     * `caps`.
+     */
+    media_url?: (workspaceId: string, relPath: string) => string;
+    /**
      * Write `content` to `relPath`. `expectedMtime` is the optimistic-
      * concurrency token (issue #805): the mtime the renderer last
      * observed for this file. When supplied and the file on disk has

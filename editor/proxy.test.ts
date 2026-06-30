@@ -50,6 +50,16 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
     }
   );
 
+  // #924 — workspace media streams over the `grida-workspace:` privileged
+  // scheme (proxied to the sidecar, no 1 MiB base64 cap). Pin it on both img and
+  // media so dropping it silently reverts the viewer to the base64 fallback.
+  it.each(["img-src", "media-src"])(
+    "%s allows the grida-workspace: streaming scheme (#924)",
+    (name) => {
+      expect(directive(name)).toContain("grida-workspace:");
+    }
+  );
+
   it("does NOT allowlist external provider media origins", () => {
     // Generated media never streams from a provider CDN — it's bytes from the
     // sidecar. If someone adds a provider host here, this is the wrong fix.
