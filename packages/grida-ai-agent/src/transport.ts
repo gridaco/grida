@@ -747,7 +747,18 @@ export namespace AgentTransport {
 
   export type FrameHandler = (event: string, data: string) => void;
 
-  const MAX_FRAME_BYTES = 1_048_576;
+  /**
+   * Ceiling on a single UN-TERMINATED SSE frame's tail — a stall detector (an
+   * upstream that streams forever without a `\n\n` boundary). It must clear the
+   * LARGEST LEGITIMATE single frame: an image-bearing tool result
+   * (`view_image`, `generate_image`) carries the image as base64 in ONE frame,
+   * up to `AgentVision.MAX_BYTES` (8 MiB) of source → ~11 MiB base64 + the JSON
+   * envelope. 16 MiB leaves headroom while still bounding a real stall. If the
+   * image ceiling rises, this must too — pinned by a contract test in
+   * `transport.test.ts` (`MAX_FRAME_BYTES > base64(AgentVision.MAX_BYTES)`).
+   * Exported so that test can assert the relationship directly.
+   */
+  export const MAX_FRAME_BYTES = 16 * 1024 * 1024;
 
   export async function readFrames(
     body: ReadableStream<Uint8Array>,

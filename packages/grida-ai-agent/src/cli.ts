@@ -13,7 +13,8 @@
  *   start                                        connect-or-spawn the daemon; print URL
  *   status                                       probe the registered daemon
  *   stop                                         stop the registered daemon
- *   run [--session <id>] "message"               one turn; echoes the session id
+ *   run [--session <id>] [--workspace <path>]    one turn; echoes the session id
+ *       [--mode <auto|accept-edits>] [--model <id>] "message"
  *   sessions                                     list sessions
  *   messages <sessionId>                         print the linear transcript
  *   compact <sessionId>                          fire compaction; print the result
@@ -40,6 +41,7 @@ import { home } from "@grida/home";
 import { Daemon } from "./daemon";
 import { AgentTransport } from "./transport";
 import type { AgentHost } from "./agent-host";
+import type { AgentMode } from "./protocol/mode";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { ChatMessageWithParts, ChatSessionRow } from "./session/rows";
 
@@ -318,21 +320,49 @@ export async function runCommand(
   args: string[],
   out: CliWriter
 ): Promise<void> {
-  const { session_id: sessionId, message } = parseRunArgs(args);
+  const {
+    session_id: sessionId,
+    workspace,
+    mode,
+    model_id: modelId,
+    message,
+  } = parseRunArgs(args);
   if (!message) {
-    throw new Error('usage: grida-agent run [--session <id>] "message"');
+    throw new Error(
+      'usage: grida-agent run [--session <id>] [--workspace <path>] [--mode <auto|accept-edits>] [--model <id>] "message"'
+    );
   }
+  // Bind a workspace when asked: open it (idempotent) and pass its id, so this
+  // run gets the server-side fs / command / scratch / image-gen bindings — the
+  // only way to exercise any workspace tool from the CLI. Without it the run is
+  // the bare client-resolved mode (no server tools). The workspace shell tools
+  // need scratch, which the runtime derives only for a workspace-bound run.
+  const workspaceId = workspace
+    ? (await client.workspaces.open(workspace)).id
+    : undefined;
   const handle = await client.agent.run(
     {
       messages: [{ role: "user", content: message }],
       session_id: sessionId,
+      workspace_id: workspaceId,
+      // A headless one-shot `run` has no UI to answer a supervised approval, so
+      // a workspace-bound run defaults to `auto` (every command runs) — matching
+      // the CLI's unsandboxed-shell stance that the operator IS the user.
+      // `--mode accept-edits` is honored for callers that drive approvals.
+      mode: workspaceId ? (mode ?? "auto") : mode,
+      ...(modelId ? { model_id: modelId } : {}),
       // A one-shot `run` has no UI to answer the `question` tool — and it may
       // target a daemon that IS interactive for a web client. Declare headless
       // per-run so `question` returns its fixed refusal instead of pausing this
       // run forever (and leaving the session stuck on `human-input-pending`).
       interactive: false,
     },
-    (chunk) => writeTextDelta(chunk, out)
+    (chunk) => {
+      writeTextDelta(chunk, out);
+      // Surface tool activity on stderr so a CLI run is self-evidencing (which
+      // tool fired) without polluting the stdout transcript.
+      writeToolTrace(chunk);
+    }
   );
   await handle.done;
   out.write("\n");
@@ -408,23 +438,68 @@ export async function forkCommand(
   out.write(`${row.id}\t${row.title}\n`);
 }
 
-/** Pull `--session <id>` / `-s <id>` out of `run`'s args; the remainder is the
- *  message text. Exported for unit testing. */
+/** Pull the value-flags (`--session`/`-s`, `--workspace`/`-w`, `--mode`,
+ *  `--model`) out of `run`'s args; the remainder joins as the message text.
+ *  Exported for unit testing. */
 export function parseRunArgs(args: string[]): {
   session_id?: string;
+  workspace?: string;
+  mode?: AgentMode;
+  model_id?: string;
   message: string;
 } {
   let sessionId: string | undefined;
+  let workspace: string | undefined;
+  let mode: AgentMode | undefined;
+  let modelId: string | undefined;
   const rest: string[] = [];
-  for (let i = 0; i < args.length; i += 1) {
-    if (args[i] === "--session" || args[i] === "-s") {
-      sessionId = args[i + 1];
-      i += 1;
+  const optionTokens = new Set([
+    "--session",
+    "-s",
+    "--workspace",
+    "-w",
+    "--mode",
+    "--model",
+  ]);
+  let i = 0;
+  // Consume a value flag's operand, rejecting a missing one or another known
+  // flag — so `run --workspace --mode auto` can't silently treat `--mode` as
+  // the workspace path.
+  const readValue = (flag: string): string => {
+    const value = args[i + 1];
+    if (value === undefined || optionTokens.has(value)) {
+      throw new Error(`${flag} requires a value`);
+    }
+    i += 1;
+    return value;
+  };
+  for (; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--session" || arg === "-s") {
+      sessionId = readValue(arg);
+    } else if (arg === "--workspace" || arg === "-w") {
+      workspace = readValue(arg);
+    } else if (arg === "--mode") {
+      const value = readValue(arg);
+      if (value !== "auto" && value !== "accept-edits") {
+        throw new Error(
+          `--mode must be "auto" or "accept-edits", got ${value}`
+        );
+      }
+      mode = value;
+    } else if (arg === "--model") {
+      modelId = readValue(arg);
     } else {
-      rest.push(args[i]);
+      rest.push(arg);
     }
   }
-  return { session_id: sessionId, message: rest.join(" ").trim() };
+  return {
+    session_id: sessionId,
+    workspace,
+    mode,
+    model_id: modelId,
+    message: rest.join(" ").trim(),
+  };
 }
 
 async function createHost(
@@ -567,6 +642,21 @@ function writeTextDelta(chunk: AgentUIMessageChunk, out: CliWriter): void {
   if (text) out.write(text);
 }
 
+/**
+ * Echo tool activity to STDERR (not the stdout transcript) so a `run` is
+ * self-evidencing — you can see `generate_image` / `run_command` fire. The
+ * UI-message stream names a tool on its `tool-input-available` chunk.
+ */
+function writeToolTrace(chunk: AgentUIMessageChunk): void {
+  const data = chunk as { type?: string; toolName?: unknown };
+  if (
+    data.type === "tool-input-available" &&
+    typeof data.toolName === "string"
+  ) {
+    process.stderr.write(`  [tool] ${data.toolName}\n`);
+  }
+}
+
 function printSessions(items: ChatSessionRow[], out: CliWriter): void {
   if (items.length === 0) {
     out.write("No sessions\n");
@@ -613,7 +703,7 @@ Usage:
   grida-agent status
   grida-agent stop
   grida-agent acp
-  grida-agent run [--session <id>] "message"
+  grida-agent run [--session <id>] [--workspace <path>] [--mode <auto|accept-edits>] [--model <id>] "message"
   grida-agent sessions
   grida-agent messages <sessionId>
   grida-agent compact <sessionId>

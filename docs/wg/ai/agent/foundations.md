@@ -75,7 +75,7 @@ paths run the same downstream code.
 Implementor notes that live outside AI SDK's own documentation — the
 token-usage cache normalization rule, where the SDK's tool-loop
 helper fits, what the RFC adds on top of the substrate — are
-collected in [`ai-sdk`](./ai-sdk.md).
+collected in [`ai-sdk`](./ai-sdk/index.md).
 
 ### Outward wire vs internal stream
 

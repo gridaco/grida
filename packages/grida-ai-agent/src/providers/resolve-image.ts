@@ -72,6 +72,32 @@ export type ResolveImageOptions = {
   explicit?: ImageProvider;
 };
 
+/**
+ * The default catalog model id for a caller that doesn't pick one (e.g. a bare
+ * `generate_image({prompt})`). The first curated `listed` card; because the
+ * list is universal (every listed card binds every provider), one connected key
+ * serves it. `undefined` only if the catalog ships no listed image card.
+ */
+export function defaultImageModelId(): string | undefined {
+  return models.image.listed_models()[0]?.id;
+}
+
+/**
+ * Whether the user has a key for ANY image provider — the cheap presence gate
+ * the host uses to decide whether to advertise the `generate_image` tool at all
+ * (mirrors vision's `bytesReadable`: don't offer a capability that would refuse
+ * every call). Reuses the same precedence source as {@link resolveImageModel}.
+ */
+export async function hasUsableImageProvider(
+  deps: ResolveImageDeps
+): Promise<boolean> {
+  for (const p of byokProvidersFor("image")) {
+    if (!isImageProvider(p.id)) continue;
+    if (await deps.secrets._getKey(p.id)) return true;
+  }
+  return false;
+}
+
 export async function resolveImageModel(
   deps: ResolveImageDeps,
   modelId: string,

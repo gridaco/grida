@@ -188,6 +188,20 @@ export type AgentRuntimeDeps = ResolveDeps & {
    */
   scratch_base?: string;
   /**
+   * Whether the host enables image generation (its `images` server capability).
+   * Threaded to `createWorkspaceAgentBindings`, which builds the
+   * `generate_image` binding only when this is set AND a scratch sink + provider
+   * key exist. Off ⇒ the tool is never advertised. Mirrors how the HTTP image
+   * route is gated by the same capability.
+   */
+  image_gen_enabled?: boolean;
+  /**
+   * The catalog model id `generate_image` produces with — the user's selected
+   * image model (host-owned config). The tool is prompt-only, so the model is
+   * NOT an agent argument. Omit to use the catalog default.
+   */
+  image_model_id?: string;
+  /**
    * Whether a human UI is bound — gates the locked `question` tool. When true
    * the tool is client-resolved (pauses for the user's answer); when
    * false/undefined (fail-closed headless) the tool refuses with a fixed tool
@@ -875,10 +889,13 @@ export class AgentRuntime {
     } = this.deps;
     // Per-session scratch dir (WG `scratch.md`). Derived (pure) here so it can
     // ride `runDeps`; the dir is created on disk just before the model turn
-    // (below). Only meaningful when the shell is wired and a workspace is bound
-    // — scratch reach rides the command capability — so it is gated the same way.
+    // (below). Scratch is the sink for the shell (an allowed cwd root) AND for
+    // `generate_image` (its output dir), so derive it when EITHER is enabled —
+    // an images-only host that keeps the shell off still needs it (#920 review).
     const scratchDir =
-      scratchBase && workspaceRoot && shellExecutionAllowed
+      scratchBase &&
+      workspaceRoot &&
+      (shellExecutionAllowed || this.deps.image_gen_enabled === true)
         ? scratchRootFor(scratchBase, sessionId)
         : undefined;
     // Bindings deps for the run. Typed (not an inline literal) so the
@@ -890,6 +907,12 @@ export class AgentRuntime {
       secrets_root: secretsRoot,
       shell_execution_allowed: shellExecutionAllowed,
       scratch_dir: scratchDir,
+      // BYOK keys + the host's image-modality switch — together with scratchDir
+      // they let `createWorkspaceAgentBindings` build the `generate_image`
+      // binding (the produced bytes sink to scratch).
+      secrets: this.deps.secrets,
+      image_gen_enabled: this.deps.image_gen_enabled === true,
+      image_model_id: this.deps.image_model_id,
       // Host-level: gates the `question` tool's execute-or-pause in createAgent.
       interactive: this.deps.interactive === true,
     };

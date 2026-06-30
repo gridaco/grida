@@ -179,6 +179,9 @@ export async function runAgent(
     // Only wire it when the backend can actually read bytes — otherwise
     // view_image would be advertised but degrade every call to not_found.
     vision: bindings?.fs.bytesReadable ? bindings.fs : undefined,
+    // Image generation (`generate_image`) — built by the bindings only when the
+    // host enabled it, a scratch sink exists, and a provider key is present.
+    image_gen: bindings?.image_gen,
     command: bindings?.command,
     // RFC skills + project instructions are session-static context the
     // runtime discovered once and threads through every turn. The body

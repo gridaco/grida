@@ -102,7 +102,7 @@ The SDK's `inputTokens` field already **includes** the cache-read
 and cache-write counts. The recorder MUST subtract them out before
 persisting `prompt_tokens`, or the cache columns get double-counted
 in the session rollup. See
-[`ai-sdk / token usage`](./ai-sdk.md#token-usage-the-cache-normalization-rule)
+[`ai-sdk / token usage`](./ai-sdk/index.md#token-usage-the-cache-normalization-rule)
 for the exact formula and the per-component mapping.
 
 ### Cost

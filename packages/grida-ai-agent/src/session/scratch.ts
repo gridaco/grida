@@ -22,8 +22,8 @@
  * is both outside the secret root and naturally ephemeral.
  */
 
-import { chmod, mkdir, rm, realpath } from "node:fs/promises";
-import { readdirSync, rmSync } from "node:fs";
+import { chmod, mkdir, rm, realpath, open } from "node:fs/promises";
+import { readdirSync, rmSync, constants as fsConstants } from "node:fs";
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
@@ -42,6 +42,10 @@ const SCRATCH_NAMESPACE = "grida-agent";
  * to each level it creates (subject to umask, which only removes bits).
  */
 const SCRATCH_DIR_MODE = 0o700;
+
+/** Owner-only (`rw-------`) mode for files we write into scratch — same
+ *  shared-machine reasoning as {@link SCRATCH_DIR_MODE}. */
+const SCRATCH_FILE_MODE = 0o600;
 
 /**
  * Default base directory for session scratch areas when the host injects none.
@@ -165,6 +169,68 @@ export async function ensureScratch(
   // other local accounts. The session dir is `path.dirname(scratchDir)`.
   await chmod(scratchDir, SCRATCH_DIR_MODE);
   await chmod(path.dirname(scratchDir), SCRATCH_DIR_MODE);
+}
+
+/**
+ * Reject a filename that is not a single safe path segment. A produced-file
+ * name (e.g. from `generate_image`'s `filename` arg) is partly model-/client-
+ * controlled, so a separator or traversal segment could otherwise write outside
+ * the session's own scratch subtree (the S1 isolation invariant, at the write
+ * point). Anything with a separator, NUL, or a bare `.`/`..` is rejected.
+ */
+function assertSafeFilename(filename: string): void {
+  if (
+    filename === "" ||
+    filename === "." ||
+    filename === ".." ||
+    /[/\\]/.test(filename) ||
+    filename.includes("\0")
+  ) {
+    throw new Error(`unsafe scratch filename: ${JSON.stringify(filename)}`);
+  }
+}
+
+/**
+ * Write bytes into a session's scratch dir as a single file and return its
+ * absolute path. THIN I/O — assumes {@link ensureScratch} already created the
+ * dir (the runtime does, before the turn). The file is owner-only
+ * ({@link SCRATCH_FILE_MODE}); `filename` must be one safe segment
+ * ({@link assertSafeFilename}), and the joined path is re-checked to sit
+ * directly inside `scratchDir` as a belt-and-braces guard. Used by the host's
+ * media-generation binding (`generate_image`) to land produced bytes in the
+ * default sink (S3).
+ *
+ * The write is `O_NOFOLLOW`: if the final path component is already a symlink
+ * (e.g. one planted by an auto-approved `run_command` whose cwd is scratch),
+ * the open fails with `ELOOP` rather than following it and writing the bytes
+ * outside the session tree — a TOCTOU that the lexical checks above can't catch
+ * (#920 review). `O_NOFOLLOW` is POSIX-only; on Windows it is absent (the `?? 0`
+ * fallback), where scratch's owner-only model is already a no-op.
+ */
+export async function writeScratchFile(
+  scratchDir: string,
+  filename: string,
+  bytes: Uint8Array
+): Promise<string> {
+  assertSafeFilename(filename);
+  const full = path.join(scratchDir, filename);
+  if (path.dirname(path.resolve(full)) !== path.resolve(scratchDir)) {
+    throw new Error(`scratch filename escapes the scratch dir: ${filename}`);
+  }
+  const handle = await open(
+    full,
+    fsConstants.O_WRONLY |
+      fsConstants.O_CREAT |
+      fsConstants.O_TRUNC |
+      (fsConstants.O_NOFOLLOW ?? 0),
+    SCRATCH_FILE_MODE
+  );
+  try {
+    await handle.write(bytes);
+  } finally {
+    await handle.close();
+  }
+  return full;
 }
 
 /**

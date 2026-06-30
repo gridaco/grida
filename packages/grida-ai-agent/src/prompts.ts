@@ -165,8 +165,10 @@ When you produce SVG:
       '<capability name="scratch">',
       `You have a scratch directory at \`${scratch_dir}\`. It is an ephemeral,`,
       "system-managed working area, separate from the user's workspace.",
-      `Use it through the \`${run_command_name}\` tool — you may \`cd\` into it`,
-      "and read, write, move, and copy files there.",
+      "It is readable and writable. Use `view_image` on its absolute paths to",
+      "SEE images you produced there, and the",
+      `\`${run_command_name}\` tool to read, list, move, copy, or extract files`,
+      "(you may `cd` into it).",
       "It is the default place for files you PRODUCE or for intermediates",
       "(extracted archives, downloads, conversions): keep throwaway output out",
       "of the user's project.",
@@ -174,6 +176,29 @@ When you produce SVG:
       "there is durable. To KEEP a file, promote it: move or copy it into the",
       "workspace (or another location the user names). A file left only in",
       "scratch has not been saved.",
+      "</capability>",
+    ].join("\n"),
+
+  /**
+   * Image-generation capability hint (WG `scratch.md` S3 — produced files sink
+   * to scratch). Appended by `buildCapabilityHints` (`agent/index.ts`) only when
+   * an image generator is wired. Tells the model the tool exists, that output
+   * lands in scratch (ephemeral; promote to keep), and that it SEES the result.
+   */
+  image_gen_capability: (
+    generate_image_name: string,
+    scratch_dir: string
+  ): string =>
+    [
+      '<capability name="image-generation">',
+      `You can GENERATE images with the \`${generate_image_name}\` tool — give`,
+      "it a prompt and it PRODUCES an image file. It does not show you the",
+      "image; the result is the saved path and dimensions. Describe what you",
+      "asked for, not what you can see.",
+      `Each image is saved into your scratch directory (\`${scratch_dir}\`),`,
+      "which is ephemeral and system-managed. To KEEP an image, copy the file",
+      "into the workspace (or another location the user names). An image left",
+      "only in scratch has not been saved.",
       "</capability>",
     ].join("\n"),
 

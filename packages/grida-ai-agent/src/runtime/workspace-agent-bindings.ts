@@ -6,13 +6,26 @@
  * module only adapts contracts.
  */
 
+import path from "node:path";
+import { realpath } from "node:fs/promises";
+import { generateImage } from "ai";
 import { AgentFs } from "../fs";
+import { containsPath } from "../path-contains";
 import { isProtectedWrite } from "../fs/scope";
 import { isReadOnlyCommand } from "../permissions";
 import { AgentTodos } from "../todos";
 import { AgentVision } from "../vision";
+import { AgentGen } from "../gen";
 import type { SkillId } from "../agent";
 import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
+import type { SecretsStore } from "../secrets";
+import {
+  defaultImageModelId,
+  hasUsableImageProvider,
+  ImageModelUnavailableError,
+  resolveImageModel,
+} from "../providers/resolve-image";
+import { writeScratchFile } from "../session/scratch";
 import { createAgentCommandBackend } from "./command-backend";
 import { workspaceFs } from "../workspaces/fs";
 import {
@@ -57,6 +70,24 @@ export async function createWorkspaceAgentBindings(
      * its path. Absent ⇒ no scratch reach (the command stays workspace-only).
      */
     scratch_dir?: string;
+    /**
+     * The host's `SecretsStore` (BYOK keys). Needed to build the image
+     * generator (`generate_image`); credentials never leave the package. Absent
+     * on paths that don't generate media.
+     */
+    secrets?: SecretsStore;
+    /**
+     * Whether the host enables image generation (its `images` server
+     * capability). With it off, no `generate_image` binding is built — the host
+     * decides the modality is available, exactly as it gates the HTTP route.
+     */
+    image_gen_enabled?: boolean;
+    /**
+     * The catalog model id `generate_image` produces with — the USER's selected
+     * image model (settings), host-owned config, NOT an agent argument (the tool
+     * is prompt-only). Omit to use the catalog default ({@link defaultImageModelId}).
+     */
+    image_model_id?: string;
   }
 ): Promise<{
   fs: AgentFs;
@@ -69,6 +100,9 @@ export async function createWorkspaceAgentBindings(
     scratch_dir?: string;
     needs_approval?: (input: { command: string; args: string[] }) => boolean;
   };
+  /** Image generator backing `generate_image`, when a provider key + scratch
+   *  sink are available (S3: produced files land in scratch). */
+  image_gen?: AgentGen.ImageGenerator;
 } | null> {
   if (!req.workspace_root) return null;
   const workspace = await deps.workspace_registry.findByRoot(
@@ -77,12 +111,32 @@ export async function createWorkspaceAgentBindings(
   if (!workspace) {
     throw new Error(`workspace not found for root: ${req.workspace_root}`);
   }
+  // Normalize the scratch root to its REAL path ONCE, here, so every surface
+  // (fs reach, shell allowed-roots, the capability hint) agrees with the
+  // realpath-based containment `workspaceFs` enforces. `workspace.root` is
+  // already realpath'd by the registry; the runtime-derived scratch dir is NOT,
+  // so on a platform where the temp dir is symlinked (macOS `/var`→`/private/var`)
+  // a raw scratch root makes `workspaceFs`'s realpath check reject every scratch
+  // path as an escape — the bug a live run surfaced (`path-escapes-workspace`).
+  // The dir exists by now (the runtime ensures it before the turn); fall back to
+  // the raw path if realpath can't resolve it.
+  const scratchDir = deps.scratch_dir
+    ? await realpath(deps.scratch_dir).catch(() => deps.scratch_dir!)
+    : undefined;
   // GRIDA-SEC-004 — the workspace-bound agent fs refuses no-clobber writes
   // (`.git`, lockfiles, rc files, …). The standalone/client-resolved fs gets no
   // guard, so its behavior is unchanged.
-  const fs = new AgentFs(new WorkspaceAgentFsBackend(workspace), {
-    write_guard: isProtectedWrite,
-  });
+  // Scratch is reachable by the fs tools (read_file/write_file/view_image),
+  // NOT just the shell — the same scratch root the command backend gets below
+  // (one source of truth for reach). So the agent can view/read what it
+  // generated into scratch without first promoting it to the workspace.
+  const fs = new AgentFs(
+    new WorkspaceAgentFsBackend(
+      workspace,
+      scratchDir ? [{ id: "scratch", root: scratchDir }] : []
+    ),
+    { write_guard: isProtectedWrite }
+  );
   await fs.hydrate();
   const todos = new AgentTodos();
   // GRIDA-SEC-004 fail-closed: only wire shell execution when the host
@@ -95,14 +149,14 @@ export async function createWorkspaceAgentBindings(
           deps.workspace_registry,
           deps.secrets_root ? [deps.secrets_root] : [],
           // Scratch is a sanctioned cwd root though it is not a workspace (S5).
-          deps.scratch_dir ? [deps.scratch_dir] : [],
+          scratchDir ? [scratchDir] : [],
           // Flush the agent fs's pending writes before a command runs, so a
           // script the agent just wrote via write_file is on disk when the
           // shell reads it (closes the debounced-write vs immediate-read race).
           () => fs.flush()
         ),
         default_workdir: req.workspace_root,
-        scratch_dir: deps.scratch_dir,
+        scratch_dir: scratchDir,
         // Supervised gate (RFC `permission modes`, Phase 2). In `accept-edits`
         // a non-read-only command pauses for Allow/Deny (the tool's
         // `needsApproval`); a read-only inspection command still auto-runs. In
@@ -114,11 +168,160 @@ export async function createWorkspaceAgentBindings(
             : undefined,
       }
     : undefined;
-  return { fs, todos, command };
+  // Image generation (`generate_image`): wired only when the host enabled the
+  // modality, a scratch sink exists (produced bytes land there — S3), and the
+  // user actually holds a provider key. The last check mirrors vision's
+  // `bytesReadable` gate — never advertise a producer that would refuse every
+  // call. The async key probe is cheap (a file read of auth.json).
+  let image_gen: AgentGen.ImageGenerator | undefined;
+  if (deps.image_gen_enabled && deps.secrets && scratchDir) {
+    const secrets = deps.secrets;
+    if (await hasUsableImageProvider({ secrets })) {
+      image_gen = createImageGenerator(
+        secrets,
+        scratchDir,
+        deps.image_model_id
+      );
+    }
+  }
+  return { fs, todos, command, image_gen };
+}
+
+/** File extension for a produced image's media type (best-effort). */
+function extForMime(mime: string): string {
+  switch (mime) {
+    case "image/png":
+      return "png";
+    case "image/jpeg":
+      return "jpg";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    default:
+      return "img";
+  }
+}
+
+/**
+ * Build the node-only image generator the `generate_image` tool resolves
+ * against (`AgentGen.ImageGenerator`). It resolves the user's provider for the
+ * model, calls the AI SDK, writes the bytes into scratch (the default sink), and
+ * returns the path + base64 so the tool can both promote the file and lower the
+ * pixels to a media block. Expected failures (no key, provider error) come back
+ * as the typed `ok: false` — never thrown into the agent loop.
+ *
+ * NB billing (#908): like `/images/generate`, this calls `generateImage` WITHOUT
+ * `providerOptions.grida`, so the user's own key pays the provider and no Grida
+ * credit is metered. Do not add `providerOptions.grida` here.
+ */
+function createImageGenerator(
+  secrets: SecretsStore,
+  scratchDir: string,
+  imageModelId?: string
+): AgentGen.ImageGenerator {
+  return {
+    async generate(input) {
+      // The user's connected model (settings), not the agent's concern. The
+      // tool is prompt-only — no model/provider/size/aspect/seed knobs.
+      const modelId = imageModelId ?? defaultImageModelId();
+      if (!modelId) {
+        return {
+          ok: false,
+          reason: "unavailable",
+          message: "No image model is available.",
+        };
+      }
+      let resolved;
+      try {
+        resolved = await resolveImageModel({ secrets }, modelId);
+      } catch (e) {
+        if (e instanceof ImageModelUnavailableError) {
+          return {
+            ok: false,
+            reason: "unavailable",
+            message: `No connected provider can generate "${modelId}". Ask the user to connect an image-provider key in settings.`,
+          };
+        }
+        throw e;
+      }
+      let generation;
+      try {
+        generation = await generateImage({
+          model: resolved.model,
+          prompt: input.prompt,
+          n: 1,
+        });
+      } catch (e) {
+        // Upstream detail (may embed provider body text) stays in the sidecar
+        // log only; the model gets a generic, actionable message.
+        const detail = e instanceof Error ? e.message : String(e);
+        console.error(
+          `[agent-host-image-gen] generation failed provider=${resolved.provider_id} model=${modelId}: ${detail}`
+        );
+        return {
+          ok: false,
+          reason: "generation_failed",
+          message: "Image generation failed — the provider returned an error.",
+        };
+      }
+      const file = generation.images[0];
+      if (!file) {
+        return {
+          ok: false,
+          reason: "generation_failed",
+          message: "The provider returned no image.",
+        };
+      }
+      const bytes = file.uint8Array;
+      // Sniff for the honest mime + dimensions; fall back to the provider's
+      // declared media type when the format isn't one we parse.
+      const sniffed = AgentVision.sniff(bytes);
+      const mime = sniffed?.mime ?? file.mediaType;
+      const filename = `image-${Date.now()}.${extForMime(mime)}`;
+      let savedPath: string;
+      try {
+        savedPath = await writeScratchFile(scratchDir, filename, bytes);
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e);
+        console.error(`[agent-host-image-gen] scratch write failed: ${detail}`);
+        return {
+          ok: false,
+          reason: "generation_failed",
+          message: "Could not save the generated image to scratch.",
+        };
+      }
+      // The path + metadata + the base64 `data` for the CLIENT to render the
+      // produced image. `data` is NOT lowered to the model — `AgentGen`'s
+      // `toModelOutput` is text-only (the model can't be handed pixels through a
+      // tool result on the openai-compatible wire format, and doesn't need to
+      // "see" what it produced to place it). See the `AgentGen.ImageGenOk` doc.
+      return {
+        ok: true,
+        path: savedPath,
+        mime,
+        ...(sniffed?.width ? { width: sniffed.width } : {}),
+        ...(sniffed?.height ? { height: sniffed.height } : {}),
+        bytes: bytes.byteLength,
+        data: file.base64,
+      };
+    },
+  };
 }
 
 export class WorkspaceAgentFsBackend implements AgentFs.Backend {
-  constructor(private readonly workspace: Workspace) {}
+  constructor(
+    private readonly workspace: Workspace,
+    /**
+     * Additional sanctioned roots the agent may read/write through the fs tools
+     * — the session scratch dir today. This is the SAME reach the shell is
+     * granted (`additionalAllowedRoots`), so `read_file` / `view_image` /
+     * `write_file` see scratch exactly as `run_command` does. Without it, scratch
+     * was reachable by the shell but invisible to the structured fs tools — the
+     * reach-fragmentation bug this fixes.
+     */
+    private readonly additionalRoots: ReadonlyArray<workspaceFs.Scope> = []
+  ) {}
 
   /**
    * Enumerate the workspace tree for hydration (issue #786). The scan is
@@ -144,10 +347,8 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
 
   async read(path: string): Promise<string | null> {
     try {
-      const result = await workspaceFs.readFile(
-        this.workspace,
-        this.toRel(path)
-      );
+      const { scope, rel } = this.scopeFor(path);
+      const result = await workspaceFs.readFile(scope, rel);
       return result.content;
     } catch (err) {
       // The AgentFs.Backend contract is "null when there's no readable text
@@ -168,11 +369,10 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       // so an ordinary 1–8 MiB workspace screenshot is actually viewable rather
       // than being rejected and surfacing as not_found. The vision layer applies
       // the final size gate; anything past the cap surfaces as absent here.
-      const { base64 } = await workspaceFs.readFileBytes(
-        this.workspace,
-        this.toRel(path),
-        { max_bytes: AgentVision.MAX_BYTES }
-      );
+      const { scope, rel } = this.scopeFor(path);
+      const { base64 } = await workspaceFs.readFileBytes(scope, rel, {
+        max_bytes: AgentVision.MAX_BYTES,
+      });
       return new Uint8Array(Buffer.from(base64, "base64"));
     } catch (err) {
       // An oversize file is NOT absent — surface it so view_image returns the
@@ -191,12 +391,14 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   }
 
   async write(path: string, content: string): Promise<void> {
-    await workspaceFs.writeFile(this.workspace, this.toRel(path), content);
+    const { scope, rel } = this.scopeFor(path);
+    await workspaceFs.writeFile(scope, rel, content);
   }
 
   async delete(path: string): Promise<void> {
     try {
-      await workspaceFs.deleteFile(this.workspace, this.toRel(path));
+      const { scope, rel } = this.scopeFor(path);
+      await workspaceFs.deleteFile(scope, rel);
     } catch (err) {
       // Deleting something that isn't a deletable file (missing, or a
       // directory) is a no-op for the backend contract; policy violations
@@ -207,25 +409,28 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   }
 
   /**
-   * Map an agent-fs path to a workspace-relative path. The agent mixes two
-   * path spaces: the fs tools' logical "/"-rooted form (where "/" is the
-   * workspace root, e.g. `/chart.svg`) AND — once it can see the shell's cwd —
-   * the REAL absolute path inside the workspace (`<root>/chart.svg`). Both must
-   * resolve to the same file, or a `write_file(<abs>)` followed by a shell
-   * `python3 chart.py` reads from a different place than it was written (the
-   * file would otherwise land under a doubled `<root>/<root>/…` path). The
-   * downstream `workspaceFs` containment check still rejects anything that
-   * escapes the root.
+   * Resolve an agent-fs path to the containment SCOPE it belongs to + the path
+   * relative to that scope's root. The agent mixes path spaces: the fs tools'
+   * logical "/"-rooted form (where "/" is the workspace, e.g. `/chart.svg`) AND
+   * the REAL absolute path it sees from the shell cwd (`<root>/chart.svg`, or a
+   * scratch path `<scratch>/img.png`). An absolute path inside ANY reachable
+   * root (workspace or an additional root like scratch) resolves within THAT
+   * root — decided by the same `containsPath` primitive the shell's gate uses,
+   * so the two surfaces agree on reach. A logical "/"-rooted path that isn't an
+   * on-disk path under a reachable root is workspace-relative (the default
+   * space). `workspaceFs`'s own realpath containment still rejects escapes.
    */
-  private toRel(p: string): string {
+  private scopeFor(p: string): { scope: workspaceFs.Scope; rel: string } {
     if (!p.startsWith("/")) {
       throw new Error(`agent-fs path must start with "/": ${p}`);
     }
-    const root = this.workspace.root;
-    if (p === root) return "";
-    if (p.startsWith(root + "/")) return p.slice(root.length + 1);
-    // Logical "/"-rooted path, relative to the workspace root.
-    return p.slice(1);
+    for (const scope of [this.workspace, ...this.additionalRoots]) {
+      if (p === scope.root) return { scope, rel: "" };
+      if (containsPath(scope.root, p)) {
+        return { scope, rel: path.relative(scope.root, p) };
+      }
+    }
+    return { scope: this.workspace, rel: p.slice(1) };
   }
 
   /**

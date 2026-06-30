@@ -234,7 +234,8 @@ function lowerParts(
 /**
  * The persisted part type of a `view_image` result. Derived from the canonical
  * tool name (not a bare literal) so a rename of the tool propagates here — the
- * same derive-don't-duplicate discipline `tools/names.ts` uses.
+ * same derive-don't-duplicate discipline `tools/names.ts` uses. (`generate_image`
+ * is a producer and carries no image bytes, so it is not image-bearing here.)
  */
 const VIEW_IMAGE_PART_TYPE = `tool-${AgentVision.TOOL_NAMES.view_image}`;
 

@@ -76,6 +76,7 @@ import {
 // this renderer's own label/summary formatting, colocated in the kit.
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
+import { isMediaToolEntry, MediaToolContent } from "./tool-media";
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 
@@ -567,8 +568,15 @@ function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
         {triggerRow(groupIcon(entries), summary)}
       </TaskTrigger>
       <TaskContent>
-        {entries.map((entry) => (
-          <ToolCallView key={entry.toolCallId} entry={entry} />
+        {entries.map((entry, index) => (
+          // `toolCallId` is the natural identity, but it can be absent mid-stream
+          // (a tool part before its id is assigned) — which made keys collide on
+          // `undefined`. The index disambiguates; the group is append-only so it
+          // stays stable for a given entry.
+          <ToolCallView
+            key={`${entry.toolCallId ?? "tool"}-${index}`}
+            entry={entry}
+          />
         ))}
       </TaskContent>
     </Task>
@@ -603,6 +611,11 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   const title = description.detail
     ? `${description.title} · ${description.detail}`
     : description.title;
+  // The image tools (view_image, generate_image) have known shapes, so they get
+  // a dedicated body (prompt/path + image, no JSON) and open by default — the
+  // point is to SEE the image, not unfold a tool row. Other tools keep the
+  // generic input/approval/output view.
+  const mediaTool = isMediaToolEntry(entry);
   const hasInput = entry.input !== undefined;
   const hasOutput = entry.output !== undefined || Boolean(entry.errorText);
   // The Allow/Deny ACTION lives in the session-global approval bar above the
@@ -611,34 +624,40 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   const approval = approvalOf(entry);
 
   return (
-    <Task defaultOpen={false} className="w-full">
+    <Task defaultOpen={mediaTool} className="w-full">
       <TaskTrigger title={title}>
         {triggerRow(iconForAction(description.action), title)}
       </TaskTrigger>
-      {(hasInput || hasOutput || approval) && (
+      {mediaTool ? (
         <TaskContent>
-          {hasInput && <ToolInput input={entry.input} />}
-          {approval && (
-            <Confirmation
-              approval={approval}
-              state={entry.state}
-              className="mt-2"
-            >
-              <ConfirmationRequest>
-                <ConfirmationTitle>
-                  Awaiting your approval (see the prompt above the composer).
-                </ConfirmationTitle>
-              </ConfirmationRequest>
-              <ConfirmationAccepted>
-                <ConfirmationTitle>Approved.</ConfirmationTitle>
-              </ConfirmationAccepted>
-              <ConfirmationRejected>
-                <ConfirmationTitle>Denied — not run.</ConfirmationTitle>
-              </ConfirmationRejected>
-            </Confirmation>
-          )}
-          <ToolOutput output={entry.output} errorText={entry.errorText} />
+          <MediaToolContent entry={entry} />
         </TaskContent>
+      ) : (
+        (hasInput || hasOutput || approval) && (
+          <TaskContent>
+            {hasInput && <ToolInput input={entry.input} />}
+            {approval && (
+              <Confirmation
+                approval={approval}
+                state={entry.state}
+                className="mt-2"
+              >
+                <ConfirmationRequest>
+                  <ConfirmationTitle>
+                    Awaiting your approval (see the prompt above the composer).
+                  </ConfirmationTitle>
+                </ConfirmationRequest>
+                <ConfirmationAccepted>
+                  <ConfirmationTitle>Approved.</ConfirmationTitle>
+                </ConfirmationAccepted>
+                <ConfirmationRejected>
+                  <ConfirmationTitle>Denied — not run.</ConfirmationTitle>
+                </ConfirmationRejected>
+              </Confirmation>
+            )}
+            <ToolOutput output={entry.output} errorText={entry.errorText} />
+          </TaskContent>
+        )
       )}
     </Task>
   );

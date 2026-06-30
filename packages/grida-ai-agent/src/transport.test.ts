@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentTransport } from "./transport";
+import { AgentVision } from "./vision";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 
 function json(data: unknown, init?: ResponseInit): Response {
@@ -95,10 +96,33 @@ describe("AgentTransport.readFrames", () => {
   });
 
   it("still trips the cap on a single un-terminated mega-frame", async () => {
-    const huge = `data: ${"x".repeat(1_100_000)}`; // no "\n\n" terminator
+    const huge = `data: ${"x".repeat(AgentTransport.MAX_FRAME_BYTES + 1024)}`; // no "\n\n"
     await expect(
       AgentTransport.readFrames(byteStream(huge), () => {})
     ).rejects.toThrow(/upstream stalled/);
+  });
+
+  it("delivers a single image-sized frame (base64 up to AgentVision.MAX_BYTES) without tripping", async () => {
+    // generate_image / view_image emit the produced/viewed image as base64 in
+    // ONE tool-output frame. The stall cap MUST clear the largest legitimate
+    // such frame, or a real image stalls the stream (the bug gpt-image-2's
+    // ~844 KB PNG → ~1.1 MB base64 exposed under the old 1 MiB cap).
+    const b64Len = Math.ceil(AgentVision.MAX_BYTES / 3) * 4; // ~11.18 MiB
+    const payload = "x".repeat(b64Len);
+    let got = "";
+    await AgentTransport.readFrames(
+      byteStream(`data: ${payload}\n\n`),
+      (_event, data) => {
+        got = data;
+      }
+    );
+    expect(got.length).toBe(b64Len);
+  });
+
+  it("the frame cap clears a base64-encoded image at the vision ceiling (no drift)", () => {
+    // Contract: if AgentVision.MAX_BYTES rises, MAX_FRAME_BYTES must too.
+    const maxImageBase64 = Math.ceil(AgentVision.MAX_BYTES / 3) * 4;
+    expect(AgentTransport.MAX_FRAME_BYTES).toBeGreaterThan(maxImageBase64);
   });
 });
 
