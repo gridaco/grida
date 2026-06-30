@@ -578,6 +578,24 @@ policy. Security-sensitive runtime deps are reviewed as part of the
 desktop release checklist; do not treat broad semver ranges as acceptable
 for code running inside this boundary without an explicit review note.
 
+**Workspace media streaming (#924).** The desktop media viewer renders
+workspace images/videos from a custom privileged scheme,
+`grida-workspace://workspace/<workspaceId>/<relPath>`, instead of inlining
+bytes as base64 (which capped the viewer at 1 MiB). This adds a new
+renderer-reachable file-read **origin**, so it is recorded here. The trust
+model keeps the boundary intact: the Electron main-process handler
+(`desktop/src/main/workspace-media-protocol.ts`) gains **no** filesystem
+authority of its own — it only **proxies** the request to the sidecar's
+streamed `GET /workspaces/file` route, injecting the same Basic-Auth the
+renderer never sees and forwarding the `Range` header. Path containment is the
+sidecar's existing `workspaceFs.resolveInside` realpath check, identical to
+every other workspace read; the scheme is a transport for an already-exposed
+capability, not a new reachable root. The renderer builds the URL as a pure
+string (no credential crosses into it), and CSP scopes the scheme to
+`img-src`/`media-src` only — it is **not** registered `bypassCSP`. A constant
+host (`workspace`) carries no data so standard-URL host canonicalization can't
+corrupt the id; both ids live in the path.
+
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 Today:
 
@@ -595,7 +613,9 @@ Today:
 - [packages/grida-ai-agent/src/runtime/run-input.ts](packages/grida-ai-agent/src/runtime/run-input.ts) — wire-message normalization + `coerceApprovalAnswer`/`applyApprovalAnswer` (shape-gates the explicit `approval_answer` body field and routes it to `store.answerApproval`).
 - [packages/grida-ai-agent/src/session/store.ts](packages/grida-ai-agent/src/session/store.ts) — sessions store; `answerApproval` is the server-authoritative supervised-approval gate (answers only a real pending approval, never forges a call).
 - [packages/grida-ai-agent/src/workspaces.ts](packages/grida-ai-agent/src/workspaces.ts) — opened workspace registry and root canonicalization.
-- [packages/grida-ai-agent/src/workspaces/fs.ts](packages/grida-ai-agent/src/workspaces/fs.ts) — guarded file operations over a containment **scope** (a `{ id, root }`: the workspace, or the session scratch dir — NOT tied to the workspace registry). Every read/write realpath-checks containment to that scope's root, so a symlink escaping the scope is rejected regardless of which scope it is.
+- [packages/grida-ai-agent/src/workspaces/fs.ts](packages/grida-ai-agent/src/workspaces/fs.ts) — guarded file operations over a containment **scope** (a `{ id, root }`: the workspace, or the session scratch dir — NOT tied to the workspace registry). Every read/write realpath-checks containment to that scope's root, so a symlink escaping the scope is rejected regardless of which scope it is. The streamed-media export (`openFile`, #924) goes through the same `resolveInside` containment (resolved once per request); it is deliberately uncapped because streaming has constant memory (the 1 MiB cap exists only to bound the buffered text/base64 readers).
+- [packages/grida-ai-agent/src/http/routes/workspaces.ts](packages/grida-ai-agent/src/http/routes/workspaces.ts) — `/workspaces/*` registry + fs routes, including the streamed, Range-aware `GET /workspaces/file` (#924) that the `grida-workspace://` scheme proxies to. Same Auth/Origin/Referer guards as the base64 readers; containment via `workspaceFs`.
+- [desktop/src/main/workspace-media-protocol.ts](desktop/src/main/workspace-media-protocol.ts) — the `grida-workspace://` privileged-scheme handler (#924): proxies to the sidecar's `/workspaces/file` with main-held Basic-Auth + forwarded Range; no independent fs authority; 503 before the sidecar is up.
 - `desktop/src/preload.ts` — path-scoped `contextBridge`; password fetched through guarded IPC and held in closure.
 - [packages/grida-desktop-bridge/src/index.ts](packages/grida-desktop-bridge/src/index.ts) — renderer-safe bridge protocol and DTO vocabulary.
 - `desktop/src/bridge/contract.ts` — Desktop-local IPC channel vocabulary plus re-export of the renderer-safe bridge contract.

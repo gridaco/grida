@@ -7,6 +7,10 @@
  */
 
 import fs from "node:fs/promises";
+import {
+  createReadStream as nodeCreateReadStream,
+  type ReadStream as NodeReadStream,
+} from "node:fs";
 import path from "node:path";
 import { atomicWrite } from "../storage/atomic-write";
 
@@ -281,6 +285,50 @@ export namespace workspaceFs {
       base64: buf.toString("base64"),
       size: stat.size,
       mtime: stat.mtimeMs,
+    };
+  }
+
+  /**
+   * Open a regular file inside the workspace for streamed reads (#924).
+   * Resolves containment ONCE (one `realpath`) and returns the file's
+   * `size`/`mtime` plus a `createReadStream` factory bound to the already-
+   * validated absolute path. The media route needs the size up front (to
+   * validate a Range header and set Content-Length/Content-Range) and then a
+   * byte stream — folding both into one call avoids a second containment
+   * resolve per request, which matters because a seeking `<video>` fires a
+   * Range request per skip.
+   *
+   * The factory's `start`/`end` are INCLUSIVE byte offsets (Node
+   * `createReadStream` semantics); the route owns Range math and clamps them
+   * against `size`. Streaming never buffers the whole file, so — unlike
+   * {@link readFile} / {@link readFileBytes} — there is NO size cap here.
+   * Throws `not-a-file` for non-regular targets.
+   */
+  export async function openFile(
+    workspace: workspaceFs.Scope,
+    relPath: string
+  ): Promise<{
+    size: number;
+    mtime: number;
+    createReadStream: (opts?: {
+      start?: number;
+      end?: number;
+    }) => NodeReadStream;
+  }> {
+    const abs = await resolveInside(workspace, relPath, { must_exist: true });
+    const stat = await fs.stat(abs);
+    if (!stat.isFile()) {
+      throw new Exception({
+        code: "not-a-file",
+        workspace_id: workspace.id,
+        rel_path: relPath,
+      });
+    }
+    return {
+      size: stat.size,
+      mtime: stat.mtimeMs,
+      createReadStream: (opts) =>
+        nodeCreateReadStream(abs, { start: opts?.start, end: opts?.end }),
     };
   }
 

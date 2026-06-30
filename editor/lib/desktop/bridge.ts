@@ -846,6 +846,20 @@ export namespace workspaces {
     );
   }
   /**
+   * Streamable media `src` for the read-only image/video viewer (#924), or
+   * `undefined` when the host can't serve a streaming scheme (web-daemon dev
+   * bridge) — the viewer then falls back to {@link readFileBytes}. Synchronous
+   * passthrough; see the bridge contract for the URL shape. Returns `undefined`
+   * (rather than throwing) when no desktop bridge is present, so the viewer can
+   * branch on it directly.
+   */
+  export function mediaUrl(
+    workspaceId: string,
+    relPath: string
+  ): string | undefined {
+    return getDesktopBridge()?.workspaces.media_url?.(workspaceId, relPath);
+  }
+  /**
    * Atomic write via tmpfile + rename inside the workspace. Creates
    * parent directories.
    *
