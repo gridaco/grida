@@ -24,6 +24,10 @@ import { protocol } from "electron";
 import { agentSidecarClient } from "./agent-sidecar-client";
 
 const SCHEME = "grida-workspace";
+// The authority is a fixed, data-less literal — both ids live in the path (see
+// the preload, which builds `grida-workspace://workspace/<id>/<relPath>`). The
+// parser rejects any other host so a malformed URL can't masquerade as a read.
+const MEDIA_HOST = "workspace";
 
 /**
  * Privilege registration MUST run before `app.whenReady()`. `stream` lets the
@@ -97,6 +101,16 @@ export function parseWorkspaceMediaUrl(
     return null;
   }
   if (url.protocol !== `${SCHEME}:`) return null;
+  // Authority is fixed + data-less: a non-`workspace` host, or any userinfo/port,
+  // means a malformed URL that must not resolve to a workspace read.
+  if (
+    url.hostname !== MEDIA_HOST ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.port !== ""
+  ) {
+    return null;
+  }
   const segments = url.pathname.replace(/^\/+/, "").split("/");
   const rawWorkspaceId = segments.shift();
   if (!rawWorkspaceId) return null;

@@ -50,6 +50,18 @@ describe("parseWorkspaceMediaUrl (#924)", () => {
     expect(parseWorkspaceMediaUrl("https://workspace/ws/x.png")).toBeNull();
   });
 
+  it("rejects a non-`workspace` host or any userinfo/port", () => {
+    expect(
+      parseWorkspaceMediaUrl("grida-workspace://evil/ws/x.png")
+    ).toBeNull();
+    expect(
+      parseWorkspaceMediaUrl("grida-workspace://workspace:8080/ws/x.png")
+    ).toBeNull();
+    expect(
+      parseWorkspaceMediaUrl("grida-workspace://u:p@workspace/ws/x.png")
+    ).toBeNull();
+  });
+
   it("rejects a missing relPath", () => {
     expect(parseWorkspaceMediaUrl("grida-workspace://workspace/ws")).toBeNull();
     expect(

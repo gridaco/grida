@@ -527,11 +527,21 @@ function Base64ImageViewer({
   relPath: string;
 }) {
   const state = useFileBytes(workspaceId, relPath);
+  const src =
+    state.kind === "ready"
+      ? `data:${inferMime(relPath)};base64,${state.base64}`
+      : "";
+  // Surface a browser decode failure (bytes read fine, but not a valid image) —
+  // otherwise ZoomableImage just paints nothing.
+  const [errored, onError] = useMediaLoadError(src);
   if (state.kind === "loading") return <LoadingState relPath={relPath} />;
   if (state.kind === "error")
     return <ErrorState message={state.message} hint={SIDECAR_CAP_HINT} />;
-  const src = `data:${inferMime(relPath)};base64,${state.base64}`;
-  return <ZoomableImage src={src} alt={relPath} />;
+  if (errored)
+    return (
+      <ErrorState message="Couldn't load this file." hint={SIDECAR_CAP_HINT} />
+    );
+  return <ZoomableImage src={src} alt={relPath} onError={onError} />;
 }
 
 export function VideoViewer({
@@ -574,10 +584,18 @@ function Base64VideoViewer({
   relPath: string;
 }) {
   const state = useFileBytes(workspaceId, relPath);
+  const src =
+    state.kind === "ready"
+      ? `data:${inferMime(relPath)};base64,${state.base64}`
+      : "";
+  const [errored, onError] = useMediaLoadError(src);
   if (state.kind === "loading") return <LoadingState relPath={relPath} />;
   if (state.kind === "error")
     return <ErrorState message={state.message} hint={SIDECAR_CAP_HINT} />;
-  const src = `data:${inferMime(relPath)};base64,${state.base64}`;
+  if (errored)
+    return (
+      <ErrorState message="Couldn't load this file." hint={SIDECAR_CAP_HINT} />
+    );
   return (
     <MediaContainer>
       <video
@@ -586,6 +604,7 @@ function Base64VideoViewer({
         playsInline
         preload="metadata"
         className="max-h-full max-w-full object-contain"
+        onError={onError}
       />
     </MediaContainer>
   );
@@ -604,7 +623,8 @@ export function TextViewer({
 }) {
   const state = useFileText(workspaceId, relPath);
   if (state.kind === "loading") return <LoadingState relPath={relPath} />;
-  if (state.kind === "error") return <ErrorState message={state.message} />;
+  if (state.kind === "error")
+    return <ErrorState message={state.message} hint={SIDECAR_CAP_HINT} />;
   return <ShikiBlock code={state.content} language={language} />;
 }
 

@@ -99,6 +99,19 @@ describe("GET /workspaces/file (#924)", () => {
     expect(res.headers.get("content-range")).toBe("bytes */10");
   });
 
+  it("serves a zero-byte file as 200 with an empty body", async () => {
+    // The route has a dedicated size===0 branch (an empty stream would try to
+    // read 1 byte of a 0-byte file) — pin it.
+    await fixture.write_workspace_file("empty.png", "");
+
+    const res = await app.request(url("empty.png"));
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(res.headers.get("content-length")).toBe("0");
+    expect((await res.arrayBuffer()).byteLength).toBe(0);
+  });
+
   it("infers application/octet-stream for unknown extensions", async () => {
     await fixture.write_workspace_file("data.xyz", "abc");
 
