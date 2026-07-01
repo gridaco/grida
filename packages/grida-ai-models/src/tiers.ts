@@ -38,7 +38,7 @@ export type ModelTier = "nano" | "mini" | "pro" | "max";
 export const TIER_MODEL_IDS = {
   nano: "openai/gpt-5.4-nano",
   mini: "openai/gpt-5.4-mini",
-  pro: "anthropic/claude-sonnet-4.6",
+  pro: "anthropic/claude-sonnet-5",
   max: "anthropic/claude-opus-4.8",
 } as const satisfies Record<ModelTier, models.text.CatalogId>;
 

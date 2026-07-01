@@ -146,6 +146,20 @@ export namespace models {
         outputLimit: 128_000,
         cost: { input: 30, output: 180 },
       },
+      // Standard rates stored as canonical (identical to Sonnet 4.6).
+      // Anthropic ran an introductory discount ($2 in / $10 out / $0.20
+      // cacheRead / $2.50 cacheWrite) through 2026-08-31; not modelled — the
+      // catalogue holds steady-state provider pricing.
+      "anthropic/claude-sonnet-5": {
+        id: "anthropic/claude-sonnet-5",
+        label: "Claude Sonnet 5",
+        short_label: "Sonnet 5",
+        multimodal: true,
+        tool_call: true,
+        contextWindow: 1_000_000,
+        outputLimit: 128_000,
+        cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+      },
       "anthropic/claude-sonnet-4.6": {
         id: "anthropic/claude-sonnet-4.6",
         label: "Claude Sonnet 4.6",
@@ -155,6 +169,7 @@ export namespace models {
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+        deprecated: true,
       },
       "anthropic/claude-opus-4.8": {
         id: "anthropic/claude-opus-4.8",
@@ -375,6 +390,7 @@ export namespace models {
       | "openai/gpt-image-1-mini"
       // Google (multimodal LLMs with image output)
       | "google/gemini-3.1-flash-image-preview"
+      | "google/gemini-3.1-flash-lite-image"
       | "google/gemini-3-pro-image"
       // Black Forest Labs
       | "bfl/flux-2-pro"
@@ -965,6 +981,55 @@ export namespace models {
         constraints: { max_edge: 1536 },
         pricing: { type: "per_token", input: 2.0, output: 12.0 },
         avg_cost_usd: 0.015, // conservative per-image estimate for budget
+        default: {
+          width: 1024,
+          height: 1024,
+          aspect_ratio: "1:1",
+        },
+      },
+      // "Nano Banana 2 Lite" — GA 2026-06-30. The cost/speed tier of the 3.1
+      // Flash family: ~half of Nano Banana 2's meter, and 1K-only output
+      // (2K/4K unsupported — the differentiator). Vercel + OpenRouter both
+      // meter it at $0.25/$1.50 (verified 2026-07-01); fal id not verified,
+      // so left out. OpenRouter doesn't advertise input_references for the
+      // Lite (t2i only per its model page), so no `references` (TOOL-DESIGN:
+      // no unverified capability).
+      "google/gemini-3.1-flash-lite-image": {
+        id: "google/gemini-3.1-flash-lite-image",
+        label: "Gemini 3.1 Flash Lite Image",
+        deprecated: false,
+        short_description:
+          "Fastest, most cost-efficient Gemini image model; 1K output only.",
+        vendor: "google",
+        provider: "vercel",
+        listed: false,
+        listed_reason:
+          "Cost-tier model, not part of the curated flagship/SOTA list.",
+        providers: {
+          vercel: {
+            provider: "vercel",
+            id: "google/gemini-3.1-flash-lite-image",
+            pricing: { type: "per_token", input: 0.25, output: 1.5 },
+            avg_cost_usd: 0.034,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "google/gemini-3.1-flash-lite-image",
+            pricing: { type: "per_token", input: 0.25, output: 1.5 },
+            avg_cost_usd: 0.034,
+            url: "https://openrouter.ai/google/gemini-3.1-flash-lite-image",
+          },
+        },
+        speed_label: "fastest",
+        speed_max: "10s",
+        styles: null,
+        sizes: null,
+        constraints: { max_edge: 1024 },
+        pricing: { type: "per_token", input: 0.25, output: 1.5 },
+        // Published 1K per-image cost (the card default): $0.034 = 1120 tokens
+        // × $30/1M image-output (Google/Vercel changelog, 2026-07-01). The
+        // budget meter charges this per image, so it must be the real cost.
+        avg_cost_usd: 0.034,
         default: {
           width: 1024,
           height: 1024,
