@@ -75,6 +75,7 @@ use crate::cg::prelude::*;
 use crate::node::schema::NodeId;
 use crate::painter::paint;
 use crate::runtime::font_repository::FontRepository;
+use crate::runtime::render_policy::RenderIntent;
 use crate::text::text_style::textstyle;
 use skia_safe::textlayout;
 use std::cell::RefCell;
@@ -474,8 +475,12 @@ impl ParagraphCache {
 
         // Build the paragraph with paint applied (for rendering)
         let fill_paint = if !fills.is_empty() {
-            // Use sk_paint_stack for all paint types (solid, gradient, image, multiple fills)
-            paint::sk_paint_stack(fills, layout_size, images, true)
+            // Use sk_paint_stack for all paint types (solid, gradient, image, multiple fills).
+            // The paragraph (with paint baked in) is cached and reused across frames and
+            // clients, so it cannot carry a live render intent. Text with an *image* fill is
+            // an edge case; always render it best-quality (`Render`) rather than key the
+            // paragraph cache on intent.
+            paint::sk_paint_stack(fills, layout_size, images, true, RenderIntent::Render)
         } else {
             None
         };

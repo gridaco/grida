@@ -1,6 +1,7 @@
 use crate::cg::prelude::*;
 use crate::painter::paint;
 use crate::runtime::image_repository::ImageRepository;
+use crate::runtime::render_policy::RenderIntent;
 use crate::shape::build_corner_radius_path;
 use crate::shape::stroke::stroke_geometry;
 use crate::shape::stroke_varwidth::create_variable_width_stroke_from_geometry;
@@ -28,6 +29,7 @@ pub struct StrokeOptions {
 pub struct VNPainter<'a> {
     canvas: &'a Canvas,
     images: Option<&'a ImageRepository>,
+    intent: RenderIntent,
 }
 
 impl<'a> VNPainter<'a> {
@@ -36,14 +38,23 @@ impl<'a> VNPainter<'a> {
         Self {
             canvas,
             images: None,
+            intent: RenderIntent::Design,
         }
     }
 
     /// Create a new painter with an image repository for image paints.
-    pub fn new_with_images(canvas: &'a Canvas, images: &'a ImageRepository) -> Self {
+    ///
+    /// `intent` is the render client (design canvas vs export/refig); it drives
+    /// image-fill sampling for any image paints on the vector network.
+    pub fn new_with_images(
+        canvas: &'a Canvas,
+        images: &'a ImageRepository,
+        intent: RenderIntent,
+    ) -> Self {
         Self {
             canvas,
             images: Some(images),
+            intent,
         }
     }
 
@@ -259,7 +270,8 @@ impl<'a> VNPainter<'a> {
         let size = (bounds.width(), bounds.height());
 
         if let Some(images) = self.images {
-            if let Some(mut paint) = paint::sk_paint_stack(paints, size, images, true) {
+            if let Some(mut paint) = paint::sk_paint_stack(paints, size, images, true, self.intent)
+            {
                 paint.set_style(PaintStyle::Fill);
                 self.canvas.draw_path(path, &paint);
             }
@@ -356,7 +368,7 @@ mod tests {
         let canvas = surface.canvas();
         canvas.clear(Color::WHITE);
 
-        let painter = VNPainter::new_with_images(canvas, &repo);
+        let painter = VNPainter::new_with_images(canvas, &repo, RenderIntent::Design);
         painter.draw(&vn, &[], None, 0.0);
 
         let snapshot = surface.image_snapshot();
@@ -397,7 +409,7 @@ mod tests {
         let canvas = surface.canvas();
         canvas.clear(Color::WHITE);
 
-        let painter = VNPainter::new_with_images(canvas, &repo);
+        let painter = VNPainter::new_with_images(canvas, &repo, RenderIntent::Design);
         let stroke = StrokeOptions {
             stroke_width: 4.0,
             stroke_align: StrokeAlign::Center,

@@ -1,4 +1,5 @@
 use super::{gradient, image};
+use crate::runtime::render_policy::RenderIntent;
 use crate::{cg::prelude::*, runtime::image_repository::ImageRepository};
 use skia_safe::{self, shaders, Color, Shader};
 
@@ -31,6 +32,7 @@ pub fn sk_paint_stack(
     size: (f32, f32),
     images: &ImageRepository,
     aa: bool,
+    intent: RenderIntent,
 ) -> Option<skia_safe::Paint> {
     // Fast path: single solid fill — set color directly on the paint,
     // avoiding shader object allocation and giving Skia's GPU backend
@@ -58,9 +60,9 @@ pub fn sk_paint_stack(
     // Track the base (bottom-most) paint's blend mode so it can apply
     // against the canvas backdrop when the composed paint is drawn.
     let base_blend_mode = first.blend_mode();
-    let mut shader = shader_from_paint(first, size, Some(images))?;
+    let mut shader = shader_from_paint(first, size, Some(images), intent)?;
     for p in iter {
-        if let Some(s) = shader_from_paint(p, size, Some(images)) {
+        if let Some(s) = shader_from_paint(p, size, Some(images), intent) {
             // Compose current paint (src) over the accumulated shader (dst)
             shader = shaders::blend(p.blend_mode(), shader, s);
         }
@@ -108,9 +110,12 @@ pub fn sk_paint_stack_without_images(
     let mut iter = paints.iter();
     let first = iter.next()?;
     let base_blend_mode = first.blend_mode();
-    let mut shader = shader_from_paint(first, size, None)?;
+    // No image repository → image paints resolve to `None`, so the intent never
+    // reaches `image_shader`; any value is fine.
+    let intent = RenderIntent::Design;
+    let mut shader = shader_from_paint(first, size, None, intent)?;
     for p in iter {
-        if let Some(s) = shader_from_paint(p, size, None) {
+        if let Some(s) = shader_from_paint(p, size, None, intent) {
             // Compose current paint (src) over the accumulated shader (dst)
             shader = shaders::blend(p.blend_mode(), shader, s);
         }
@@ -128,6 +133,7 @@ pub fn shader_from_paint(
     paint: &Paint,
     size: (f32, f32),
     images: Option<&ImageRepository>,
+    intent: RenderIntent,
 ) -> Option<Shader> {
     match paint {
         Paint::Solid(solid) => {
@@ -147,7 +153,7 @@ pub fn shader_from_paint(
             // Skia's built-in mipmaps handle LOD selection at rasterization
             // time based on the final canvas transform. No zoom needed here.
             let skia_image = repo.get(key)?;
-            image::image_shader(img, skia_image, size)
+            image::image_shader(img, skia_image, size, intent)
         }
     }
 }

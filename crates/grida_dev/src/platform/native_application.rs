@@ -171,6 +171,8 @@ fn handle_key_pressed(
                     "=" => ApplicationCommand::ZoomIn,
                     "-" => ApplicationCommand::ZoomOut,
                     "i" => ApplicationCommand::ToggleDebugMode,
+                    "r" => ApplicationCommand::ToggleRenderIntent,
+                    "p" => ApplicationCommand::CyclePixelPreview,
                     "a" => ApplicationCommand::SelectAll,
                     _ => ApplicationCommand::None,
                 }

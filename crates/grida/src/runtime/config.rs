@@ -41,6 +41,13 @@ pub struct RuntimeRendererConfig {
     /// Pixel preview strategy (stability policy).
     pub pixel_preview_strategy: PixelPreviewStrategy,
     /// Render policy describing how content/effects/compositing should be rendered.
+    ///
+    /// This is the **root/default home** for the render client
+    /// ([`RenderIntent`](super::render_policy::RenderIntent)): the instance's
+    /// `render_policy.render_intent` is the default the interactive canvas
+    /// renders with (`Design`). The export pipeline overrides it per-pass to
+    /// `Render`. Because it is a required field on the policy, no render path
+    /// can silently drop it.
     pub render_policy: super::render_policy::RenderPolicy,
     /// When true, `load_scene` skips the Taffy layout computation and instead
     /// derives each node's layout directly from its schema position and size.

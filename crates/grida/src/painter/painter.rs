@@ -1013,6 +1013,7 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
             self.policy.anti_alias(),
+            self.policy.render_intent,
         ) {
             shape.draw_on_canvas(self.canvas, &paint);
         }
@@ -1033,6 +1034,7 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
             self.policy.anti_alias(),
+            self.policy.render_intent,
         ) {
             self.draw_shape_at_offset(shape, &paint, tx, ty);
         }
@@ -1056,6 +1058,7 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
             self.policy.anti_alias(),
+            self.policy.render_intent,
         ) {
             paint.set_alpha_f(paint.alpha_f() * opacity);
             self.draw_shape_at_offset(shape, &paint, tx, ty);
@@ -1125,6 +1128,7 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
             self.policy.anti_alias(),
+            self.policy.render_intent,
         ) {
             paint.set_alpha_f(paint.alpha_f() * opacity);
             shape.draw_on_canvas(self.canvas, &paint);
@@ -1152,6 +1156,7 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
             self.policy.anti_alias(),
+            self.policy.render_intent,
         ) {
             paint.set_alpha_f(paint.alpha_f() * opacity);
             self.canvas.draw_path(path, &paint);
@@ -1198,6 +1203,7 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
             self.policy.anti_alias(),
+            self.policy.render_intent,
         ) {
             self.canvas.draw_path(stroke_path, &paint);
         }
@@ -1220,6 +1226,7 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
             self.policy.anti_alias(),
+            self.policy.render_intent,
         ) {
             paint.set_alpha_f(paint.alpha_f() * opacity);
             self.canvas.draw_path(stroke_path, &paint);
@@ -1243,6 +1250,7 @@ impl<'a> Painter<'a> {
             (shape.rect.width(), shape.rect.height()),
             self.images,
             self.policy.anti_alias(),
+            self.policy.render_intent,
         ) {
             crate::shape::marker::draw_endpoint_decorations(
                 self.canvas,
@@ -1392,6 +1400,7 @@ impl<'a> Painter<'a> {
         if stroke_width > 0.0 && !strokes.is_empty() && matches!(stroke_align, StrokeAlign::Outside)
         {
             let images = self.images;
+            let intent = self.policy.render_intent;
             paragraph.borrow_mut().visit(|_, info| {
                 if let Some(info) = info {
                     text_stroke::draw_text_stroke_outside_fast_pre(
@@ -1404,6 +1413,7 @@ impl<'a> Painter<'a> {
                         stroke_width,
                         layout_size,
                         images,
+                        intent,
                     );
                 }
             });
@@ -1419,6 +1429,7 @@ impl<'a> Painter<'a> {
             && !matches!(stroke_align, StrokeAlign::Outside)
         {
             let images = self.images;
+            let intent = self.policy.render_intent;
             paragraph.borrow_mut().visit(|_, info| {
                 if let Some(info) = info {
                     text_stroke::draw_text_stroke(
@@ -1431,6 +1442,7 @@ impl<'a> Painter<'a> {
                         stroke_width,
                         *stroke_align,
                         images,
+                        intent,
                     );
                 }
             });
@@ -2016,6 +2028,7 @@ impl<'a> Painter<'a> {
                                     crate::vectornetwork::vn_painter::VNPainter::new_with_images(
                                         self.canvas,
                                         self.images,
+                                        self.policy.render_intent,
                                     );
 
                                 if self.policy.render_fills() {
@@ -2121,6 +2134,7 @@ impl<'a> Painter<'a> {
                                                 (shape.rect.width(), shape.rect.height()),
                                                 self.images,
                                                 self.policy.anti_alias(),
+                                                self.policy.render_intent,
                                             ) {
                                                 crate::shape::marker::draw_endpoint_decorations(
                                                     self.canvas,
@@ -2340,6 +2354,7 @@ impl<'a> Painter<'a> {
                     let vn_painter = crate::vectornetwork::vn_painter::VNPainter::new_with_images(
                         self.canvas,
                         self.images,
+                        self.policy.render_intent,
                     );
 
                     let stroke_options = StrokeOptions {

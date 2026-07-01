@@ -1,6 +1,7 @@
 use crate::cg::types::{Paint, StrokeAlign, StrokeCap, StrokeJoin, StrokeMiterLimit};
 use crate::painter::paint;
 use crate::runtime::image_repository::ImageRepository;
+use crate::runtime::render_policy::RenderIntent;
 use crate::shape::stroke::stroke_geometry;
 use skia_safe::{self, Canvas, Font, GlyphId, Matrix, PaintStyle, PathBuilder, Point};
 
@@ -19,6 +20,7 @@ pub fn draw_text_stroke(
     stroke_width: f32,
     stroke_align: StrokeAlign,
     images: &ImageRepository,
+    intent: RenderIntent,
 ) {
     if glyphs.is_empty() || strokes.is_empty() {
         return;
@@ -60,7 +62,7 @@ pub fn draw_text_stroke(
     // Prepare paint for filling the stroke geometry.
     let bounds = stroke_path.compute_tight_bounds();
     let size = (bounds.width(), bounds.height());
-    let Some(mut sk_paint) = paint::sk_paint_stack(strokes, size, images, true) else {
+    let Some(mut sk_paint) = paint::sk_paint_stack(strokes, size, images, true, intent) else {
         return;
     };
     sk_paint.set_style(PaintStyle::Fill);
@@ -103,6 +105,7 @@ pub fn draw_text_stroke_outside_fast_pre(
     stroke_width: f32,
     layout_size: (f32, f32),
     images: &ImageRepository,
+    intent: RenderIntent,
 ) {
     if glyphs.is_empty() || strokes.is_empty() {
         return;
@@ -123,7 +126,8 @@ pub fn draw_text_stroke_outside_fast_pre(
     // Prepare a stroke paint. We double the stroke width so that when the
     // paragraph is painted afterwards, it covers the inner half leaving only
     // the "outside" portion visible.
-    let Some(mut sk_paint) = paint::sk_paint_stack(strokes, layout_size, images, true) else {
+    let Some(mut sk_paint) = paint::sk_paint_stack(strokes, layout_size, images, true, intent)
+    else {
         return;
     };
     sk_paint.set_style(PaintStyle::Stroke);

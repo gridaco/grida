@@ -55,6 +55,66 @@ pub enum EffectQuality {
     Reduced,
 }
 
+/// Which client the frame is being rendered for.
+///
+/// This governs quality-vs-fidelity tradeoffs that do **not** change *what* is
+/// drawn, only *how* faithfully or expensively. It is a global, per-render-pass
+/// decision carried on the render policy — never a per-image property.
+///
+/// - `Design`: the interactive canvas while editing. Faithful to the source and
+///   independent of zoom — it must never trade image fidelity for pan/zoom
+///   performance. (See-raw-pixels is a separate, orthogonal feature: pixel
+///   preview, which affects *all* content, not just images.)
+/// - `Render`: output — export (PNG/JPEG/WEBP/PDF/SVG) and headless `refig`.
+///   Produces the best possible result regardless of cost.
+///
+/// `refig` and the export pipeline are always `Render`; the design canvas is
+/// `Design` while editing and switches to `Render` on export.
+///
+/// # Where it lives (and why it can't be silently dropped)
+///
+/// The intent is a **required field on [`RenderPolicy`]**, whose default value
+/// is owned by the root instance config ([`RuntimeRendererConfig::render_policy`]).
+/// It is deliberately *not* an `Option` and *not* a builder opt-in: every
+/// `RenderPolicy` value — including any future render path that constructs one —
+/// is forced by the compiler to choose an intent, so a new call site cannot
+/// forget it and silently fall back to a hidden default.
+///
+/// It lives on `RenderPolicy` (next to `effect_quality`, the sibling "how, not
+/// what" knob) rather than as a bare instance flag because it is baked into the
+/// recorded picture — so it must participate in the policy's `variant_key`, or
+/// the picture cache would serve `Design` texels to a `Render` export. See
+/// [`RenderPolicy::is_effect_only_variant`].
+///
+/// The **single mutation surface** is [`Renderer::set_render_intent`]; the
+/// export pipeline overrides per-pass with [`RenderPolicy::with_render_intent`].
+///
+/// # One deliberate asymmetry
+///
+/// Image fills on **cached text** (paragraphs) always sample as `Render`,
+/// regardless of the active intent — a baked, shared paragraph cache cannot
+/// carry a live per-pass intent, and image-on-text is a rare edge case not
+/// worth keying the paragraph cache on. So toggling `Design`/`Render` visibly
+/// changes an image-filled *rectangle* but not image-filled *text*. See
+/// `cache/paragraph.rs` and `text/attributed_paragraph.rs`.
+///
+/// [`RuntimeRendererConfig::render_policy`]: crate::runtime::config::RuntimeRendererConfig::render_policy
+/// [`Renderer::set_render_intent`]: crate::runtime::scene::Renderer::set_render_intent
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum RenderIntent {
+    /// Interactive design canvas — faithful, zoom-independent.
+    ///
+    /// Image fills are sampled `Nearest` (actual source texels). See
+    /// `sampling_for_intent` in `painter/image.rs` for the mapping and the
+    /// rationale for why `Nearest` (not a smoothing filter) is the design view.
+    #[default]
+    Design,
+    /// Output / export (and refig) — best possible quality.
+    ///
+    /// Image fills are sampled with a high-quality cubic (Mitchell).
+    Render,
+}
+
 /// Whether compositing state (opacity, blend modes, clip/masks) is applied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CompositingPolicy {
@@ -90,6 +150,7 @@ impl Hash for OutlineStyle {
 /// - `effects`: controls whether effects are applied.
 /// - `compositing`: controls whether opacity/blend/masks/clips are applied.
 /// - `effect_quality`: controls the fidelity of expensive GPU effects.
+/// - `render_intent`: which client is rendering (design canvas vs output).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RenderPolicy {
     pub content: ContentPolicy,
@@ -105,6 +166,10 @@ pub struct RenderPolicy {
     /// When true, all paint operations use `set_anti_alias(false)`.
     /// For benchmarking AA cost at different zoom levels.
     pub force_no_aa: bool,
+    /// Which client is rendering — governs image sampling quality (see
+    /// [`RenderIntent`]). Participates in `variant_key` so the picture cache
+    /// keeps `Design` and `Render` samplings in separate namespaces.
+    pub render_intent: RenderIntent,
 }
 
 impl RenderPolicy {
@@ -119,6 +184,7 @@ impl RenderPolicy {
         ignore_clips_content: false,
         effect_quality: EffectQuality::Full,
         force_no_aa: false,
+        render_intent: RenderIntent::Design,
     };
 
     /// Convenience preset used by the editor feature \"Show outlines\".
@@ -133,6 +199,7 @@ impl RenderPolicy {
         ignore_clips_content: true,
         effect_quality: EffectQuality::Full,
         force_no_aa: false,
+        render_intent: RenderIntent::Design,
     };
 
     #[inline]
@@ -145,6 +212,15 @@ impl RenderPolicy {
     #[inline]
     pub fn with_reduced_effects(mut self) -> Self {
         self.effect_quality = EffectQuality::Reduced;
+        self
+    }
+
+    /// Return a copy of this policy with the given render intent.
+    /// Used by the export pipeline to force `Render` regardless of the
+    /// instance default.
+    #[inline]
+    pub fn with_render_intent(mut self, intent: RenderIntent) -> Self {
+        self.render_intent = intent;
         self
     }
 
@@ -170,6 +246,10 @@ impl RenderPolicy {
         ) && self.compositing == CompositingPolicy::Enabled
             && !self.ignore_clips_content
             && !self.force_no_aa
+            // Render intent changes image sampling, which IS baked into the
+            // recorded picture — a `Render`-intent policy must not unify with
+            // the default (`Design`) key-0 namespace.
+            && self.render_intent == RenderIntent::Design
     }
 
     /// True only for the default renderer behavior (full fills/strokes + effects + compositing).
@@ -346,6 +426,9 @@ impl RenderPolicy {
             ignore_clips_content,
             effect_quality: EffectQuality::Full,
             force_no_aa,
+            // Intent is not carried in the policy flags; the design canvas is
+            // the default client. Export forces `Render` at its entry points.
+            render_intent: RenderIntent::Design,
         }
     }
 

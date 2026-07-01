@@ -120,7 +120,12 @@ fn draw_rectangular_stroke(canvas: &Canvas, config: &DemoConfig, align: StrokeAl
 
     // Get shader from paint
     let size = (config.rect.width(), config.rect.height());
-    if let Some(shader) = shader_from_paint(&config.stroke_paint, size, None) {
+    if let Some(shader) = shader_from_paint(
+        &config.stroke_paint,
+        size,
+        None,
+        grida::runtime::render_policy::RenderIntent::Render,
+    ) {
         let mut skia_paint = Paint::default();
         skia_paint.set_anti_alias(true);
         skia_paint.set_style(PaintStyle::Fill);
@@ -180,7 +185,12 @@ fn draw_fill(canvas: &Canvas, config: &DemoConfig, align: StrokeAlign) {
     });
 
     let size = (fill_rect.width(), fill_rect.height());
-    if let Some(shader) = shader_from_paint(&fill_paint, size, None) {
+    if let Some(shader) = shader_from_paint(
+        &fill_paint,
+        size,
+        None,
+        grida::runtime::render_policy::RenderIntent::Render,
+    ) {
         let mut skia_paint = Paint::default();
         skia_paint.set_anti_alias(true);
         skia_paint.set_style(PaintStyle::Fill);

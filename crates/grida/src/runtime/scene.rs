@@ -6,7 +6,7 @@ use crate::runtime::camera::CameraChangeKind;
 use crate::runtime::counter::FrameCounter;
 use crate::runtime::frame_strategy::FrameRenderStrategy;
 use crate::runtime::invalidation::GlobalFlag;
-use crate::runtime::render_policy::RenderPolicy;
+use crate::runtime::render_policy::{RenderIntent, RenderPolicy};
 use crate::{
     cache,
     resources::{self, ByteStore, Resources},
@@ -475,7 +475,11 @@ impl Renderer {
 
         // 1. Stage background.
         if let Some(ref ctx) = iso_ctx {
-            ctx.draw_stage_background(canvas, &self.images);
+            ctx.draw_stage_background(
+                canvas,
+                &self.images,
+                self.config.render_policy.render_intent,
+            );
         }
 
         // 2. Layer content.
@@ -495,7 +499,11 @@ impl Renderer {
 
         // 3. Stage foreground.
         if let Some(ref ctx) = iso_ctx {
-            ctx.draw_stage_foreground(canvas, &self.images);
+            ctx.draw_stage_foreground(
+                canvas,
+                &self.images,
+                self.config.render_policy.render_intent,
+            );
         }
 
         // 4. Viewport dim overlay.
@@ -1141,6 +1149,11 @@ impl Renderer {
         };
     }
 
+    /// Current pixel-preview scale (0 = off, 1 = 1x, 2 = 2x).
+    pub fn pixel_preview_scale(&self) -> u8 {
+        self.config.pixel_preview_scale
+    }
+
     pub fn set_pixel_preview_strategy(&mut self, strategy: PixelPreviewStrategy) {
         self.config.pixel_preview_strategy = strategy;
     }
@@ -1165,6 +1178,18 @@ impl Renderer {
     /// Configure the renderer render policy (standard vs wireframe presets, etc).
     pub fn set_render_policy(&mut self, policy: RenderPolicy) {
         self.config.render_policy = policy;
+    }
+
+    /// Set the render client (design canvas vs output/export). Governs image
+    /// sampling quality. The interactive canvas is `Design`; the export
+    /// pipeline and refig are `Render`.
+    pub fn set_render_intent(&mut self, intent: RenderIntent) {
+        self.config.render_policy.render_intent = intent;
+    }
+
+    /// Current render client (see [`set_render_intent`](Self::set_render_intent)).
+    pub fn render_intent(&self) -> RenderIntent {
+        self.config.render_policy.render_intent
     }
 
     /// Enable or disable layout computation during `load_scene`.
@@ -3109,12 +3134,14 @@ impl Renderer {
             crate::painter::layer::LayerList::from_node(node_id, &scene.graph, cache, 1.0);
 
         // Draw using the existing warm scene cache (pictures, paragraphs, paths).
+        // Export is output — force `Render` intent (best image sampling) regardless
+        // of the instance default.
         let painter = Painter::new_with_scene_cache(
             canvas,
             &self.fonts,
             &self.images,
             cache,
-            RenderPolicy::default(),
+            RenderPolicy::default().with_render_intent(RenderIntent::Render),
         );
         painter.draw_layer_list(&subtree_layers);
 

@@ -2,6 +2,7 @@ use crate::cg::prelude::*;
 use crate::painter::paint as paint_util;
 use crate::runtime::font_repository::FontRepository;
 use crate::runtime::image_repository::ImageRepository;
+use crate::runtime::render_policy::RenderIntent;
 use crate::text::text_style::textstyle;
 use crate::text::text_transform;
 use skia_safe::textlayout;
@@ -41,7 +42,9 @@ fn resolve_fill_paint(
     images: Option<&ImageRepository>,
 ) -> Option<skia_safe::Paint> {
     if let Some(images) = images {
-        paint_util::sk_paint_stack(fills, size, images, true)
+        // Attributed paragraphs are cached with paint baked in, so they cannot carry a
+        // live render intent. Image fills on text are an edge case; render best-quality.
+        paint_util::sk_paint_stack(fills, size, images, true, RenderIntent::Render)
     } else {
         paint_util::sk_paint_stack_without_images(fills, size, true)
     }
