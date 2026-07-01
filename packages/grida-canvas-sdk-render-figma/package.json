@@ -62,7 +62,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@grida/canvas-wasm": "0.91.0-canary.17",
+    "@grida/canvas-wasm": "0.91.0-canary.22",
     "commander": "^12.1.0"
   },
   "devDependencies": {
