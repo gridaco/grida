@@ -1010,13 +1010,13 @@ export namespace models {
             provider: "vercel",
             id: "google/gemini-3.1-flash-lite-image",
             pricing: { type: "per_token", input: 0.25, output: 1.5 },
-            avg_cost_usd: 0.002,
+            avg_cost_usd: 0.034,
           },
           openrouter: {
             provider: "openrouter",
             id: "google/gemini-3.1-flash-lite-image",
             pricing: { type: "per_token", input: 0.25, output: 1.5 },
-            avg_cost_usd: 0.002,
+            avg_cost_usd: 0.034,
             url: "https://openrouter.ai/google/gemini-3.1-flash-lite-image",
           },
         },
@@ -1026,7 +1026,10 @@ export namespace models {
         sizes: null,
         constraints: { max_edge: 1024 },
         pricing: { type: "per_token", input: 0.25, output: 1.5 },
-        avg_cost_usd: 0.002, // conservative per-image estimate for budget
+        // Published 1K per-image cost (the card default): $0.034 = 1120 tokens
+        // × $30/1M image-output (Google/Vercel changelog, 2026-07-01). The
+        // budget meter charges this per image, so it must be the real cost.
+        avg_cost_usd: 0.034,
         default: {
           width: 1024,
           height: 1024,
