@@ -404,6 +404,12 @@ impl ApplicationApi for UnknownTargetApplication {
                     RenderIntent::Render => RenderIntent::Design,
                 };
                 self.renderer.set_render_intent(next);
+                // Intent is baked into cached pictures AND compositor/atlas
+                // layer images; only the picture cache is keyed by intent, so
+                // force a full config invalidation to refresh promoted (shadow/
+                // blur) image layers too — same as the wasm host setters below.
+                self.renderer
+                    .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
                 println!("[grida] render intent → {next:?}");
                 self.queue();
                 return true;
@@ -415,6 +421,8 @@ impl ApplicationApi for UnknownTargetApplication {
                     _ => 0,
                 };
                 self.renderer.set_pixel_preview_scale(next);
+                self.renderer
+                    .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
                 println!("[grida] pixel preview scale → {next}");
                 self.queue();
                 return true;
