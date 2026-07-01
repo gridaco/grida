@@ -119,6 +119,9 @@ export function DesktopBoardShell({
         origY: number;
         w: number;
         h: number;
+        // Preserved across the move: `setLayout` replaces the whole layout, so a
+        // drag that omitted `z` would silently reset the pin's stacking order.
+        z: number | undefined;
       }
     | null
   >(null);
@@ -192,6 +195,7 @@ export function DesktopBoardShell({
             origY: r.y,
             w: r.w,
             h: r.h,
+            z: f?.layout?.z,
           };
       } else {
         setSelected(null);
@@ -241,7 +245,13 @@ export function DesktopBoardShell({
       // screen delta → world delta (divide by zoom), commit the new placement.
       const nx = g.origX + dragPreview.dx / camera.zoom;
       const ny = g.origY + dragPreview.dy / camera.zoom;
-      void board.setLayout(g.id, { x: nx, y: ny, w: g.w, h: g.h });
+      void board.setLayout(g.id, {
+        x: nx,
+        y: ny,
+        w: g.w,
+        h: g.h,
+        ...(g.z !== undefined ? { z: g.z } : {}),
+      });
     }
     setDragPreview(null);
   }, [board, camera.zoom, dragPreview]);
