@@ -256,10 +256,13 @@ export function buildCapabilityHints(opts: CreateAgentOptions): string[] {
       )
     );
   }
-  // The reference-first artwork recipe — gather (design_search) then build. Tells
-  // the agent the picks auto-condition generation only when generate_image is also
-  // wired (the picks ride into it as i2i references).
-  if (opts.library) {
+  // The reference-first artwork recipe — gather (design_search) then build. Only
+  // advertised when BOTH library and interactive are on: `createToolset` wires
+  // `design_search` as a usable pick tool only in interactive mode (headless gets
+  // a fixed refusal), so hinting it headless would nudge the agent into a
+  // guaranteed tool error. Tells the agent the picks auto-condition generation
+  // only when generate_image is also wired (the picks ride into it as i2i refs).
+  if (opts.library && opts.interactive) {
     hints.push(
       prompts.design_search_capability(
         DESIGN_SEARCH_TOOL_NAME,

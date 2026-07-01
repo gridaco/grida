@@ -284,21 +284,19 @@ infinite canvas. Prefer working on a \`.canvas\` board for visual/design tasks.
       `Library and PICKS the ones that fit — their picks (returned as image urls)`,
       `are the visual brief. Prefer gathering references before generating: image`,
       `models are far better with reference images than from text alone.`,
-      generate_image_name
-        ? `Then call \`${generate_image_name}\` and pass the picked urls as`
-        : "",
-      generate_image_name
-        ? `\`references\` so the result is conditioned on them. To iterate on an`
-        : "",
-      generate_image_name
-        ? `image you already made (or one the user gave you), pass that file's`
-        : "",
-      generate_image_name
-        ? `workspace path as a \`references\` entry instead. Call`
-        : "",
-      generate_image_name
-        ? `\`${design_search_name}\` again to gather a different direction.`
-        : `Call \`${design_search_name}\` again to gather a different direction.`,
+      // The build step differs only by whether generate_image is wired: switch
+      // once, not per line, so the two variants can't desync on a future edit.
+      ...(generate_image_name
+        ? [
+            `Then call \`${generate_image_name}\` and pass the picked urls as`,
+            `\`references\` so the result is conditioned on them. To iterate on an`,
+            `image you already made (or one the user gave you), pass that file's`,
+            `workspace path as a \`references\` entry instead. Call`,
+            `\`${design_search_name}\` again to gather a different direction.`,
+          ]
+        : [
+            `Call \`${design_search_name}\` again to gather a different direction.`,
+          ]),
       "</capability>",
     ]
       .filter(Boolean)

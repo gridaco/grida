@@ -38,10 +38,12 @@ describe("AgentDesignSearch.toModelOutput", () => {
       ],
     });
     expect(out.type).toBe("text");
-    expect(out.value).toContain("[a1] Warm gradient");
-    // the url is the payload the agent passes to generate_image's `references`
-    expect(out.value).toContain("https://x/a1.jpg");
+    // id-tagged url — the url is the payload the agent passes to
+    // generate_image's `references`. Library-supplied titles are NOT lowered
+    // (asset metadata must not steer the agent).
+    expect(out.value).toContain("[a1] https://x/a1.jpg");
     expect(out.value).toContain("https://x/b2.jpg");
+    expect(out.value).not.toContain("Warm gradient");
     // and the text tells it to do exactly that
     expect(out.value).toMatch(/references/i);
   });

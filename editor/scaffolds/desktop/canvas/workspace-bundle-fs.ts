@@ -34,6 +34,27 @@ export interface WorkspaceFsClient {
 }
 
 /**
+ * Refuse a document `src` that isn't bundle-local. Per the `.canvas` contract
+ * (§2) every bundle-file path is relative to the bundle root; `..` traversal and
+ * absolute paths are out of scope. Enforcing it at the point a `src` becomes a
+ * workspace-relative path keeps a hostile or garbled manifest from steering a
+ * file op (`trashEntry`, `media_url`) outside the bundle. Shared by both stores
+ * (`CanvasDeck.abs` / `CanvasBoard.bundlePath`); URI srcs are handled by the
+ * caller and never reach here.
+ */
+export function assertBundleLocalSrc(src: string): void {
+  const normalized = src.replaceAll("\\", "/");
+  if (
+    normalized.length === 0 ||
+    normalized.startsWith("/") ||
+    /^[a-zA-Z]:/.test(normalized) || // drive-letter absolute (Windows)
+    normalized.split("/").includes("..")
+  ) {
+    throw new Error(`.canvas: non-bundle-local document src rejected: ${src}`);
+  }
+}
+
+/**
  * An `dotcanvas.WritableFs` bound to one workspace. `list()` enumerates the
  * bundle's files **recursively** — descending into subdirectories itself, since
  * the bridge `readdir` lists immediate children only — so a nested `src` such as

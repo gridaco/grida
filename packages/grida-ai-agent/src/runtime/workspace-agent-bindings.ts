@@ -359,11 +359,18 @@ export class ReferenceResolveError extends Error {}
 /**
  * Resolve one image-to-image reference to a provider-ingestible URL. The caller
  * passes a dumb input — a file path, an https URL, or a data URL — and gets back
- * something a provider accepts: URLs pass straight through; a path is read via
- * the shared vision {@link AgentVision.ByteReader} (same scoping + size cap as
- * `view_image`) and inlined as a base64 data URL. Throws
- * {@link ReferenceResolveError} with an agent-readable message when a reference
- * can't be resolved (empty, not found, too large, or not an image).
+ * something a provider accepts:
+ *   - an **https** URL passes straight through (the provider fetches it). `http`
+ *     is rejected: the contract is https-only, and the string is serialized
+ *     verbatim into the provider request, so we don't let it induce a plaintext
+ *     fetch.
+ *   - a **data:** URL is decoded and validated exactly like a file (size cap +
+ *     image sniff), then re-emitted canonically — so a non-image or oversized
+ *     data URL can't skip the checks a path gets and reach `generateImage()`.
+ *   - a **path** is read via the shared vision {@link AgentVision.ByteReader}
+ *     (same scoping + size cap as `view_image`) and inlined as a base64 data URL.
+ * Throws {@link ReferenceResolveError} with an agent-readable message when a
+ * reference can't be resolved (empty, not found, too large, or not an image).
  */
 export async function resolveReference(
   ref: string,
@@ -371,23 +378,34 @@ export async function resolveReference(
 ): Promise<string> {
   const r = ref.trim();
   if (!r) throw new ReferenceResolveError("a reference is empty.");
-  if (/^https?:\/\//i.test(r) || /^data:/i.test(r)) return r;
-  // Otherwise a path — read it through the same reader `view_image` uses.
+  if (/^https:\/\//i.test(r)) return r;
+
+  // A data: URL and a workspace path both resolve to raw bytes that go through
+  // the SAME size + image-sniff validation before a provider ever sees them.
   let bytes: Uint8Array | null;
-  try {
-    bytes = await reader.readBytes(r);
-  } catch (e) {
-    if (e instanceof AgentVision.OversizeError) {
+  if (/^data:/i.test(r)) {
+    bytes = decodeDataUrl(r);
+    if (!bytes) {
       throw new ReferenceResolveError(
-        `reference "${r}" is too large (limit ${AgentVision.MAX_BYTES} bytes).`
+        `reference "${r}" is not a valid data URL.`
       );
     }
-    throw new ReferenceResolveError(`reference "${r}" could not be read.`);
-  }
-  if (!bytes) {
-    throw new ReferenceResolveError(
-      `reference "${r}" was not found — pass a workspace file path, an https URL, or a data URL.`
-    );
+  } else {
+    try {
+      bytes = await reader.readBytes(r);
+    } catch (e) {
+      if (e instanceof AgentVision.OversizeError) {
+        throw new ReferenceResolveError(
+          `reference "${r}" is too large (limit ${AgentVision.MAX_BYTES} bytes).`
+        );
+      }
+      throw new ReferenceResolveError(`reference "${r}" could not be read.`);
+    }
+    if (!bytes) {
+      throw new ReferenceResolveError(
+        `reference "${r}" was not found — pass a workspace file path, an https URL, or a data URL.`
+      );
+    }
   }
   if (bytes.byteLength > AgentVision.MAX_BYTES) {
     throw new ReferenceResolveError(
@@ -401,6 +419,20 @@ export async function resolveReference(
     );
   }
   return `data:${sniffed.mime};base64,${Buffer.from(bytes).toString("base64")}`;
+}
+
+/** Decode a `data:` URL's payload to bytes, or null if malformed. Handles both
+ *  `;base64` and percent-encoded payloads. */
+function decodeDataUrl(url: string): Uint8Array | null {
+  const m = /^data:([^,]*),(.*)$/is.exec(url);
+  if (!m) return null;
+  try {
+    return /;base64/i.test(m[1])
+      ? new Uint8Array(Buffer.from(m[2], "base64"))
+      : new Uint8Array(Buffer.from(decodeURIComponent(m[2])));
+  } catch {
+    return null;
+  }
 }
 
 export class WorkspaceAgentFsBackend implements AgentFs.Backend {

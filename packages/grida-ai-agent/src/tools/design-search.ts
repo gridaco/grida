@@ -28,6 +28,7 @@ export namespace AgentDesignSearch {
   const INPUT = z.object({
     query: z
       .string()
+      .trim()
       .min(1)
       .describe(
         "What kind of reference to gather, in natural language — describe the " +
@@ -103,11 +104,13 @@ export namespace AgentDesignSearch {
   type ToolContent = { type: "text"; value: string };
 
   /**
-   * Lower the picks to TEXT for the model — an id-tagged list WITH each pin's
-   * url, never image bytes (the human saw the thumbnails). The urls are the
-   * payload the agent needs: to build on a pick, it passes that url as a
-   * `references` entry to `generate_image`. Turning picks into references is the
-   * agent's job — this tool just reports what was chosen.
+   * Lower the picks to TEXT for the model — an id-tagged list of each pin's URL,
+   * never image bytes (the human saw the thumbnails) and never the Library
+   * `title`. The url is the only payload the agent needs (to build on a pick it
+   * passes that url as a `references` entry to `generate_image`); the title is
+   * asset-supplied metadata, so keeping it out of model-visible text avoids
+   * letting a Library object's caption steer the agent. Turning picks into
+   * references is the agent's job — this tool just reports what was chosen.
    */
   export function toModelOutput(output: DesignSearchOutput): ToolContent {
     if (output.skipped || output.picked.length === 0) {
@@ -118,9 +121,7 @@ export namespace AgentDesignSearch {
           "search again with a different description.",
       };
     }
-    const lines = output.picked.map(
-      (r, i) => `${i + 1}. [${r.id}] ${r.title} — ${r.url}`
-    );
+    const lines = output.picked.map((r, i) => `${i + 1}. [${r.id}] ${r.url}`);
     return {
       type: "text",
       value:

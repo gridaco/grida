@@ -9,6 +9,7 @@
  * Run: `GRIDA_LIVE_BYOK=1 pnpm exec vitest run src/providers/image-byok.live.test.ts`
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { generateImage } from "ai";
@@ -95,9 +96,10 @@ describe.skipIf(!LIVE || !KEY)("LIVE OpenRouter image generation", () => {
     const img = result.images[0];
     expect(img).toBeTruthy();
     expect(img.uint8Array.length).toBeGreaterThan(1000);
-    fs.writeFileSync("/tmp/grida-live-or-i2i.png", img.uint8Array);
+    const out = path.join(os.tmpdir(), "grida-live-or-i2i.png");
+    fs.writeFileSync(out, img.uint8Array);
     console.log(
-      `[live] ✅ i2i binding=${edit.binding_id} cap=${edit.references_max} bytes=${img.uint8Array.length} → /tmp/grida-live-or-i2i.png`
+      `[live] ✅ i2i binding=${edit.binding_id} cap=${edit.references_max} bytes=${img.uint8Array.length} → ${out}`
     );
   }, 180_000);
 });

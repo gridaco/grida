@@ -1,11 +1,16 @@
 import { nanoid } from "nanoid";
 import { dotcanvas } from "dotcanvas";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
-import { isUriSrc } from "./board-store";
 import {
+  assertBundleLocalSrc,
   workspaceBundleFs,
   type WorkspaceFsClient,
 } from "./workspace-bundle-fs";
+
+// The URI-vs-file predicate is owned by `dotcanvas` (the format). Import it
+// straight from the package, not through the sibling `board-store`, so the two
+// stores stay independent siblings with no cross-dependency.
+const { isUriSrc } = dotcanvas;
 
 /** One slide as the deck UI sees it. `id` is the **dotcanvas identity** (the
  *  doc's `id`, else its `src`) — the key the transforms (`reorder`/`remove`)
@@ -16,24 +21,6 @@ export type Slide = { id: string; src: string; name?: string };
 /** `WorkspaceFsClient` plus the trash capability `removeSlide` needs. */
 export interface WorkspaceDeckClient extends WorkspaceFsClient {
   trashEntry(workspaceId: string, relPath: string): Promise<void>;
-}
-
-/**
- * Refuse a document `src` that isn't bundle-local. Per the `.canvas` contract
- * (§2) every path is relative to the bundle root; `..` traversal and absolute
- * paths are out of scope for V1. Enforcing it here keeps a hostile or garbled
- * manifest from steering a file op (e.g. `trashEntry`) outside the bundle.
- */
-function assertBundleLocalSrc(src: string): void {
-  const normalized = src.replaceAll("\\", "/");
-  if (
-    normalized.length === 0 ||
-    normalized.startsWith("/") ||
-    /^[a-zA-Z]:/.test(normalized) || // drive-letter absolute (Windows)
-    normalized.split("/").includes("..")
-  ) {
-    throw new Error(`.canvas: non-bundle-local document src rejected: ${src}`);
-  }
 }
 
 function slidesFromManifest(m: dotcanvas.Manifest): Slide[] {

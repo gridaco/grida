@@ -177,6 +177,7 @@ export function DesignSearchPickCard({
                 key={pin.id}
                 type="button"
                 disabled={busy}
+                aria-pressed={on}
                 onClick={() => toggle(pin.id)}
                 title={pin.title}
                 className={cn(

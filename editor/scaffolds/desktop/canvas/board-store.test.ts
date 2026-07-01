@@ -101,4 +101,18 @@ describe("CanvasBoard", () => {
     expect(board.getFrames()).toEqual([]);
     expect(ws.files.has("outputs/hero.png")).toBe(true); // not trashed
   });
+
+  it("bundlePath rejects a traversal src but passes URIs and bundle-local files", () => {
+    const board = new CanvasBoard("w", new FakeWorkspace(), "designs.canvas");
+    // A hostile/garbled manifest src must not resolve outside the bundle root.
+    expect(() => board.bundlePath("../../secrets.env")).toThrow(
+      /non-bundle-local/
+    );
+    expect(() => board.bundlePath("/etc/passwd")).toThrow(/non-bundle-local/);
+    // Legit inputs still resolve: a URI passes through, a file gets basePath.
+    expect(board.bundlePath(URL)).toBe(URL);
+    expect(board.bundlePath("outputs/hero.png")).toBe(
+      "designs.canvas/outputs/hero.png"
+    );
+  });
 });

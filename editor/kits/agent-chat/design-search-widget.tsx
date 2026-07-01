@@ -55,6 +55,14 @@ export function DesignSearchContent({ entry }: { entry: ToolCallEntry }) {
     );
   }
 
+  // A real failure (e.g. the headless-host refusal) must read as an error, not
+  // be collapsed into the "no references picked" skip message below.
+  if (entry.errorText) {
+    return (
+      <p className="py-2 text-xs text-destructive">{String(entry.errorText)}</p>
+    );
+  }
+
   const picked = pickedPins(entry);
   if (picked.length === 0) {
     return (

@@ -85,7 +85,11 @@ export class OpenRouterImageModel implements ImageModelV3 {
   ): Promise<Awaited<ReturnType<ImageModelV3["doGenerate"]>>> {
     const { prompt, n, size, aspectRatio, seed, providerOptions, abortSignal } =
       options;
-    const orExtra =
+    // Drop any caller-supplied `input_references` from the passthrough extras:
+    // the sanitized, capped list built from our internal `grida` namespace below
+    // is authoritative, so a raw `openrouter.input_references` must NOT override
+    // it (createImageGenerator/resolveImageModel already resolved + trimmed them).
+    const { input_references: _ignoredRefs, ...orExtra } =
       (providerOptions?.openrouter as Record<string, unknown> | undefined) ??
       {};
     // Image-to-image: OpenRouter's Unified Image API conditions on
@@ -112,8 +116,9 @@ export class OpenRouterImageModel implements ImageModelV3 {
         ...(size ? { size } : {}),
         ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
         ...(seed !== undefined ? { seed } : {}),
-        ...(input_references ? { input_references } : {}),
         ...orExtra,
+        // Our sanitized refs win over any passthrough extras (spread last).
+        ...(input_references ? { input_references } : {}),
       }),
     });
     if (!res.ok) {

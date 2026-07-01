@@ -74,6 +74,7 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
     <button
       type="button"
       disabled={disabled}
+      aria-pressed={on}
       onClick={() => toggle(pin.id)}
       title={pin.title}
       style={{ width, height }}
@@ -116,6 +117,11 @@ export function EditorPaneDesignSearch({
   const [submitted, setSubmitted] = useState(false);
 
   const loadingRef = useRef(false);
+  // Monotonic epoch bumped every time the pending pick/query changes. Both the
+  // seed and the paginated loads capture it and drop their results if it moved
+  // while they were in flight — so a late page from tool call/query A can't merge
+  // into B's grid (the seed's `live` flag alone doesn't cover the loader).
+  const epochRef = useRef(0);
 
   // Append a page, de-duped by id (a relevance window can repeat across ranges).
   const appendPage = useCallback((page: Pin[]) => {
@@ -129,7 +135,8 @@ export function EditorPaneDesignSearch({
   // masonic's loader can't pull page 0 (nothing renders from an empty grid), so
   // we fetch it; the loader pages from there.
   useEffect(() => {
-    let live = true;
+    const epoch = ++epochRef.current;
+    const fresh = () => epochRef.current === epoch;
     setItems([]);
     setCount(undefined);
     setSeeded(false);
@@ -139,19 +146,21 @@ export function EditorPaneDesignSearch({
     loadingRef.current = true;
     void resolveDesignSearchPage(query, [0, DESIGN_SEARCH_PAGE - 1])
       .then(({ items: page, count: total }) => {
-        if (!live) return;
+        if (!fresh()) return;
         setCount(total);
         appendPage(page);
       })
       .catch(() => {
-        if (live) setError(true);
+        if (fresh()) setError(true);
       })
       .finally(() => {
-        if (live) setSeeded(true);
-        loadingRef.current = false;
+        if (fresh()) {
+          setSeeded(true);
+          loadingRef.current = false;
+        }
       });
     return () => {
-      live = false;
+      // A newer seed bumps the epoch; nothing else to tear down.
     };
   }, [toolCallId, query, appendPage]);
 
@@ -160,6 +169,7 @@ export function EditorPaneDesignSearch({
   const maybeLoadMore = useInfiniteLoader<Pin, LoadMoreItemsCallback<Pin>>(
     async (startIndex, stopIndex) => {
       if (loadingRef.current) return;
+      const epoch = epochRef.current;
       loadingRef.current = true;
       setLoadingMore(true);
       try {
@@ -167,13 +177,16 @@ export function EditorPaneDesignSearch({
           query,
           [startIndex, stopIndex - 1]
         );
+        if (epochRef.current !== epoch) return; // pick/query changed — drop it
         setCount(total);
         appendPage(page);
       } catch {
         /* a transient page error just stops paging; the seed/grid stay. */
       } finally {
-        loadingRef.current = false;
-        setLoadingMore(false);
+        if (epochRef.current === epoch) {
+          loadingRef.current = false;
+          setLoadingMore(false);
+        }
       }
     },
     {

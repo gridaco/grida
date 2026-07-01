@@ -40,24 +40,37 @@ const DESKTOP_CSP_CONNECT_SRC = IS_DEV
  * excluded (pinned by `proxy.test.ts`). Derived from env at module load; empty
  * (omitted) when unset — a malformed value can't widen the policy.
  */
-const LIBRARY_IMG_ORIGIN = (() => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) return "";
+/**
+ * Reduce an arbitrary string to a single bare `scheme://host[:port]` origin, or
+ * "" if it isn't a valid absolute URL. This is the ONLY way a value reaches the
+ * `img-src` carve-out — so a caller (or a malformed env) can never smuggle in
+ * multiple sources or extra CSP directives (`; script-src …`): a value with a
+ * space or `;` fails `new URL()` or is stripped down to just its origin.
+ */
+function normalizeLibraryImgOrigin(value: string): string {
+  if (!value) return "";
   try {
-    return new URL(url).origin;
+    const origin = new URL(value).origin;
+    return origin === "null" ? "" : origin;
   } catch {
     return "";
   }
-})();
+}
 
-/** `img-src` with the first-party library origin appended when present. */
+const LIBRARY_IMG_ORIGIN = normalizeLibraryImgOrigin(
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+);
+
+/** `img-src` with the first-party library origin appended when present. The
+ *  origin is re-normalized here so the directive is safe regardless of caller. */
 function imgSrcDirective(libraryImgOrigin: string): string {
   // `grida-workspace:` is the privileged streaming scheme for workspace media
   // (#924): the main process serves it by proxying to the sidecar's
   // `/workspaces/file` route (Range-capable, no 1 MiB base64 cap). It's a local
   // privileged origin, NOT an external host.
   const base = "img-src 'self' data: blob: grida-workspace:";
-  return libraryImgOrigin ? `${base} ${libraryImgOrigin}` : base;
+  const origin = normalizeLibraryImgOrigin(libraryImgOrigin);
+  return origin ? `${base} ${origin}` : base;
 }
 
 /**

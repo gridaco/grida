@@ -28,9 +28,27 @@ describe("resolveReference", () => {
     );
   });
 
-  it("passes a data URL straight through", async () => {
-    const u = "data:image/png;base64,Zm9v";
-    expect(await resolveReference(u, NO_READER)).toBe(u);
+  it("validates a data URL and re-emits it canonically (sniffed mime)", async () => {
+    const b64 = Buffer.from(JPEG).toString("base64");
+    // mislabeled png that is really jpeg → re-emitted with the sniffed mime.
+    const url = await resolveReference(
+      `data:image/png;base64,${b64}`,
+      NO_READER
+    );
+    expect(url).toBe(`data:image/jpeg;base64,${b64}`);
+  });
+
+  it("rejects a data URL whose payload is not an image", async () => {
+    await expect(
+      resolveReference("data:image/png;base64,Zm9v", NO_READER)
+    ).rejects.toThrowError(/not a supported image/i);
+  });
+
+  it("rejects a non-https URL (http is not passed through)", async () => {
+    // http:// is not an https pass-through and not a readable path → not found.
+    await expect(
+      resolveReference("http://x/y.png", NO_READER)
+    ).rejects.toThrowError(/not found/i);
   });
 
   it("reads a path and inlines it as a base64 data URL", async () => {

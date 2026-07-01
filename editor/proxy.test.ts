@@ -99,6 +99,29 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
         "img-src 'self' data: blob: grida-workspace:"
       );
     });
+
+    it("reduces the override to a bare origin (path/query stripped)", () => {
+      const src = buildDesktopCsp(
+        "n",
+        "https://proj-all.supabase.co/storage/x"
+      );
+      expect(directiveOf(src, "img-src")).toContain(
+        "https://proj-all.supabase.co"
+      );
+      expect(directiveOf(src, "img-src")).not.toContain("/storage/x");
+    });
+
+    it("drops a malformed override that tries to smuggle extra directives", () => {
+      // A value with a space/`;` can't be a valid URL origin, so it's dropped —
+      // it can neither add a second source nor inject a `; script-src …` clause.
+      const evil = "https://evil.example.com; script-src 'unsafe-inline'";
+      const src = buildDesktopCsp("n", evil);
+      expect(directiveOf(src, "img-src")).toBe(
+        "img-src 'self' data: blob: grida-workspace:"
+      );
+      // and no injected directive leaked into the header
+      expect(src).not.toContain("evil.example.com");
+    });
   });
 
   it("connect-src reaches the loopback agent sidecar", () => {

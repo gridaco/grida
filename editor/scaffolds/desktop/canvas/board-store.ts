@@ -1,6 +1,7 @@
 import { dotcanvas } from "dotcanvas";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import {
+  assertBundleLocalSrc,
   workspaceBundleFs,
   type WorkspaceFsClient,
 } from "./workspace-bundle-fs";
@@ -147,8 +148,13 @@ export class CanvasBoard {
   }
 
   /** The workspace-relative path for a bundle-local `src` (for media_url). A URI
-   *  src has no bundle path — callers render it directly. */
+   *  src has no bundle path — callers render it directly. A non-URI `src` is
+   *  validated (same guard as `CanvasDeck.abs`) so a hostile/garbled manifest
+   *  can't drive `media_url` at a path outside the bundle root — this is the one
+   *  chokepoint (`addFrame`/`load` don't validate `src`). */
   bundlePath(src: string): string {
+    if (dotcanvas.isUriSrc(src)) return src; // defensive: callers check first
+    assertBundleLocalSrc(src);
     return this.basePath ? `${this.basePath}/${src}` : src;
   }
 }

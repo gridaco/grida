@@ -45,6 +45,7 @@ function placedRect(frame: Frame, index: number) {
       y: l.y ?? 0,
       w: l.w ?? UNPLACED.w,
       h: l.h ?? UNPLACED.h,
+      z: l.z ?? 0,
     };
   }
   // unplaced → cascade
@@ -53,6 +54,7 @@ function placedRect(frame: Frame, index: number) {
     y: index * UNPLACED.step,
     w: UNPLACED.w,
     h: UNPLACED.h,
+    z: 0,
   };
 }
 
@@ -293,6 +295,9 @@ export function DesktopBoardShell({
                   top: r.y + dy,
                   width: r.w,
                   height: r.h,
+                  // Honor the persisted stacking order so authored boards
+                  // round-trip visually (a dragged pin also lifts to the top).
+                  zIndex: dragging ? 9999 : r.z,
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}

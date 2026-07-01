@@ -137,6 +137,12 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
     group.getSnapshot,
     group.getSnapshot
   );
+  // The active tab can now be the picker's VIRTUAL id (`virtual://…`), which is
+  // not a workspace file. The filesystem shortcuts (reveal / copy path / trash)
+  // must never be handed that sentinel, so derive a file-only active path they
+  // key on — null when the active tab is virtual.
+  const activeFileRelPath =
+    activeRelPath && !isVirtualTab(activeRelPath) ? activeRelPath : null;
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   // The live `design_search` pick, lifted from the agent pane so the editor
   // pane can host the picker as a virtual tab (the agent pane owns the chat +
@@ -256,16 +262,16 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
       // predictable. The shortcut "did nothing" rather than reloading
       // the renderer.
       e.preventDefault();
-      if (!activeRelPath) return;
+      if (!activeFileRelPath) return;
       switch (action) {
         case "reveal":
-          void revealInFinder(workspace, activeRelPath);
+          void revealInFinder(workspace, activeFileRelPath);
           return;
         case "copy-path":
-          void copyAbsolutePath(workspace, activeRelPath);
+          void copyAbsolutePath(workspace, activeFileRelPath);
           return;
         case "copy-relative-path":
-          void copyRelativePath(activeRelPath);
+          void copyRelativePath(activeFileRelPath);
           return;
         case "trash":
           // Confirms via a native dialog, then drops the tab + refreshes
@@ -273,9 +279,9 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
           // first and stops propagation so folders can be targeted by the
           // tree's focused-node selection. This window-level fallback targets
           // the active editor tab only.
-          void confirmAndTrashEntry(workspace, activeRelPath, false).then(
+          void confirmAndTrashEntry(workspace, activeFileRelPath, false).then(
             (trashed) => {
-              if (trashed) handleEntryTrashed(activeRelPath, false);
+              if (trashed) handleEntryTrashed(activeFileRelPath, false);
             }
           );
           return;
@@ -285,7 +291,7 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [
     toggleTree,
-    activeRelPath,
+    activeFileRelPath,
     workspace,
     handleEntryTrashed,
     supportsTerminal,
