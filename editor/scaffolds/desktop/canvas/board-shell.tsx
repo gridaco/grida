@@ -59,10 +59,17 @@ function placedRect(frame: Frame, index: number) {
 }
 
 /** The render URL for a pin: a URI is used as-is; a bundle file streams via
- *  `grida-workspace://` (`media_url`). */
+ *  `grida-workspace://` (`media_url`). A src the bundle guard rejects (a
+ *  hostile/garbled manifest) degrades to an empty URL — a broken `<img>`, not a
+ *  render-phase throw that takes down the whole board (`bundlePath` stays the
+ *  throwing chokepoint for actual file ops). */
 function pinSrc(board: CanvasBoard, workspaceId: string, src: string): string {
   if (isUriSrc(src)) return src;
-  return workspacesNs.mediaUrl(workspaceId, board.bundlePath(src)) ?? "";
+  try {
+    return workspacesNs.mediaUrl(workspaceId, board.bundlePath(src)) ?? "";
+  } catch {
+    return "";
+  }
 }
 
 export function DesktopBoardShell({

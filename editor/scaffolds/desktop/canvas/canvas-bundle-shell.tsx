@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { dotcanvas } from "dotcanvas";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import { useWorkspaceChanges } from "../workbench/workspace-changes";
@@ -39,22 +39,32 @@ export function DesktopCanvasBundleShell({
   // read failure we only fall back to "unknown" when we have no editor yet — a
   // transient failure after a good read keeps the current surface rather than
   // flipping it out from under the user.
+  //
+  // A monotonic request id makes only the LATEST read authoritative: two reads
+  // in flight (rapid manifest flips, or a change firing while the mount read is
+  // pending) resolve in promise order, not issue order, so without this an older
+  // read could `setEditor` last and settle the surface on a stale editor. The
+  // mount effect's cleanup bumps the counter too, cancelling any in-flight read
+  // on unmount / dep change.
+  const reqRef = useRef(0);
   const readEditor = useCallback(() => {
-    let live = true;
+    const id = ++reqRef.current;
     void dotcanvas
       .read(workspaceBundleFs(workspaceId, workspacesNs, basePath))
       .then((c) => {
-        if (live) setEditor(c.editor);
+        if (id === reqRef.current) setEditor(c.editor);
       })
       .catch(() => {
-        if (live) setEditor((prev) => prev ?? "unknown");
+        if (id === reqRef.current) setEditor((prev) => prev ?? "unknown");
       });
-    return () => {
-      live = false;
-    };
   }, [workspaceId, basePath]);
 
-  useEffect(() => readEditor(), [readEditor]);
+  useEffect(() => {
+    readEditor();
+    return () => {
+      reqRef.current++;
+    };
+  }, [readEditor]);
 
   const manifestRel = basePath
     ? `${basePath}/${dotcanvas.MANIFEST_FILENAME}`

@@ -135,6 +135,20 @@ describe("FalImageModel.doGenerate", () => {
     await expect(model.doGenerate(callOptions())).rejects.toThrow(/FAILED/);
   });
 
+  it("throws (never silently drops) when i2i references arrive on the fal route", async () => {
+    // The catalog ships no fal `references` binding, so resolveImageModel never
+    // routes i2i here — but if it ever did, degrading to t2i would be worse than
+    // an error. Guard fires BEFORE any fetch (no network mock needed).
+    const model = new FalImageModel("sk", "fal-ai/x");
+    await expect(
+      model.doGenerate(
+        callOptions({
+          providerOptions: { grida: { references: ["https://x/y.png"] } },
+        })
+      )
+    ).rejects.toThrow(/image-to-image references are not supported/i);
+  });
+
   it("propagates an aborted signal", async () => {
     vi.stubGlobal(
       "fetch",

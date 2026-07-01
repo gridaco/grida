@@ -59,15 +59,39 @@ export class ImageModelUnavailableError extends Error {
   readonly code = "image_model_unavailable" as const;
   constructor(
     public readonly model_id: string,
-    public readonly provider_id?: string
+    public readonly provider_id?: string,
+    /** Set when the failed resolution was for image-to-image (references). The
+     *  agent-visible message then names WHY (needs a reference-capable route)
+     *  and, when known, which providers serve it — so the agent can tell the
+     *  user which key to connect instead of a bare "unavailable". */
+    references?: { capable_providers: readonly string[] }
   ) {
     super(
-      provider_id
-        ? `[agent-host-images] explicit provider not available: ${provider_id} for ${model_id}`
-        : `[agent-host-images] no provider available for ${model_id}`
+      references
+        ? `[agent-host-images] no connected provider can generate ${model_id} with reference images (image-to-image)` +
+            (references.capable_providers.length > 0
+              ? ` — connect a key for: ${references.capable_providers.join(", ")}`
+              : "")
+        : provider_id
+          ? `[agent-host-images] explicit provider not available: ${provider_id} for ${model_id}`
+          : `[agent-host-images] no provider available for ${model_id}`
     );
     this.name = "ImageModelUnavailableError";
   }
+}
+
+/**
+ * The providers whose binding serves the image-to-image (references) route for
+ * `card` — the set a user could connect a key for to unlock i2i. Today only
+ * OpenRouter carries `references` bindings (verified live 2026-07-01), but this
+ * reads the catalog so the error message stays honest as bindings are added.
+ */
+function referenceCapableProviders(
+  card: models.image.ImageModelCard
+): ImageProvider[] {
+  return IMAGE_PROVIDERS.filter(
+    (p) => models.image.binding(card, p)?.references
+  );
 }
 
 export type ResolveImageDeps = {
@@ -158,5 +182,15 @@ export async function resolveImageModel(
     };
   }
 
-  throw new ImageModelUnavailableError(modelId, options.explicit);
+  // No connected provider served the resolution. For an image-to-image call the
+  // usual cause is that i2i rides a narrower set of providers than t2i (the tool
+  // is offered on any image key, but references need a reference-capable route),
+  // so name that set — otherwise the agent only learns "unavailable".
+  throw new ImageModelUnavailableError(
+    modelId,
+    options.explicit,
+    options.references
+      ? { capable_providers: referenceCapableProviders(card) }
+      : undefined
+  );
 }
