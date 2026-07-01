@@ -125,7 +125,11 @@ function isCanvasContext(relPath: string): boolean {
     .some((seg) => seg.toLowerCase().endsWith(".canvas"));
 }
 
-function skillsForActiveTab(relPath: string | null): string[] | undefined {
+/** The canonical skill-id type, derived from the run options so the literals
+ *  below are compile-checked against the real skill vocabulary. */
+type SkillId = NonNullable<AgentRunOptions["skills"]>[number];
+
+function skillsForActiveTab(relPath: string | null): SkillId[] | undefined {
   if (relPath === null) return undefined;
   // TODO(skill-system): replace this extension heuristic with a real workspace
   // skill picker/registry.
@@ -459,16 +463,22 @@ function AgentPaneContent({
   // CORE fires queued items serially on a clean idle edge (the drain is core
   // state — not this client). `useTurnQueueController` owns the submit gate +
   // the optimistic mirror, shared with `ai-sidebar/chat.tsx`. Skills ride the
-  // live `send` from the active tab; a core-drained turn uses the session's
-  // discovered skills (no per-send subset — the renderer has no tab there).
+  // active tab: both the live `send` (below) AND the transport's body-less
+  // backfill — so a human-input resume (a `question` answer or a `design_search`
+  // pick, issued via `addToolResult` + `sendAutomaticallyWhen`, which carries no
+  // body) still lands the active tab's skill block instead of dropping it. A
+  // core-drained turn uses the session's discovered skills (the renderer has no
+  // tab there).
   // Endpoint provider pin for the active model (issue #806) — rides every
   // run-entering body: normal sends AND approval resumes below.
   const providerId = registered_models.providerIdForModel(modelId, endpoints);
+  const activeSkills = skillsForActiveTab(activeRelPath);
   // Keep the transport's body-less backfill (above) in step with the pickers.
   runContextRef.current = {
     model_id: modelId,
     mode,
     ...(providerId ? { provider_id: providerId } : {}),
+    ...(activeSkills ? { skills: activeSkills } : {}),
   };
 
   const {
@@ -486,7 +496,7 @@ function AgentPaneContent({
       modelId,
       providerId,
       mode,
-      skills: skillsForActiveTab(activeRelPath),
+      skills: activeSkills,
     }),
   });
 
