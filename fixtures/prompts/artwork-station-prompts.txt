@@ -1,0 +1,25 @@
+// Artwork-station (reference-first) test prompts.
+// These are written to make the agent open with a `design_search` (library
+// gather) tool call WITHOUT clarifying ping-pong: each names a concrete subject
+// + style (so there's nothing to ask) and invites reference-gathering, which
+// maps onto the gather -> user-picks -> build loop. After the pick card, the
+// agent should `generate_image` conditioned on the picks (image-to-image).
+
+// --- direct "gather references first" (strongest nudge) ---
+make a promo poster for a cozy autumn coffee shop — warm earthy tones, vintage editorial feel. pull reference images from the library first so i can pick the direction.
+find me library references for a bold retro concert poster — neon, 80s, high contrast.
+i'm designing an instagram ad for a minimalist skincare brand — soft neutrals, clean studio look. gather some reference pins so i can choose the vibe.
+gather a moodboard for a moody film-noir movie poster — deep shadows, single key light.
+pull references for a playful kids' birthday flyer — bright primary colors, hand-drawn feel.
+
+// --- create-intent without naming the tool (recipe should still gather first) ---
+design a social post for a summer music festival — sunset gradients, energetic.
+make a thumbnail for a cooking youtube channel — rustic, appetizing, bold title space.
+i need a launch banner for a sci-fi indie game — chrome, dark, cinematic.
+create a poster for a yoga studio's morning class — calm, airy, pastel.
+make marketing art for an artisanal chocolate bar — luxe, deep browns, gold accents.
+
+// --- "more like this" (re-gather a new direction after a first board) ---
+less vintage, more modern and graphic — search again.
+show me warmer, cozier references than these.
+same idea but bolder typography-driven references.

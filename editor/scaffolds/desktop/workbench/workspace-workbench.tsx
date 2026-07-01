@@ -28,7 +28,13 @@
  */
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   FolderIcon,
   PanelRightCloseIcon,
@@ -64,6 +70,13 @@ import { WorkspaceOpenInMenu } from "./workspace-open-in-menu";
 import { AgentPane } from "./agent-pane";
 import { TerminalPane } from "./terminal-pane";
 import { WorkspaceChangesProvider } from "./workspace-changes";
+import { EditorGroup } from "./editor-group";
+import {
+  DESIGN_SEARCH_TAB_ID,
+  isVirtualTab,
+  pickToolCallId,
+  type DesignSearchSession,
+} from "./design-search-tab";
 
 /**
  * Pane sizing, matching the file window's shell conventions:
@@ -110,14 +123,28 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
-  // Tab state lives in the workbench so the file tree pane can highlight the
-  // active tab and the agent pane could later open files into tabs
-  // too. Order matters: `openTabs` is the visible left-to-right
-  // strip. `activeRelPath === null` means "no tabs open"; otherwise
-  // it's always one of `openTabs`.
-  const [openTabs, setOpenTabs] = useState<string[]>([]);
-  const [activeRelPath, setActiveRelPath] = useState<string | null>(null);
+  // The editor group (VSCode's tab model) owns all tab state + rules — open
+  // order, the active-tab-on-close neighbor rule, reopen-closed history, and the
+  // picker's preview-tab lifecycle — as a plain, unit-tested class. React is a
+  // wire: `useSyncExternalStore` mirrors its snapshot, and the handlers below are
+  // one-line calls into it. `active === null` means no tabs open; otherwise it's
+  // always one of `tabs`. (Per the `code-react` doctrine: load-bearing UX logic
+  // lives where it's testable, not smeared across effects + refs + nested
+  // setState updaters.)
+  const group = useMemo(() => new EditorGroup(isVirtualTab), []);
+  const { tabs: openTabs, active: activeRelPath } = useSyncExternalStore(
+    group.subscribe,
+    group.getSnapshot,
+    group.getSnapshot
+  );
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
+  // The live `design_search` pick, lifted from the agent pane so the editor
+  // pane can host the picker as a virtual tab (the agent pane owns the chat +
+  // `addToolResult`; it pushes the session up via `onDesignSearchChange`). null
+  // when no pick is pending.
+  const [designSearch, setDesignSearch] = useState<DesignSearchSession | null>(
+    null
+  );
   // File tree pane visibility. VSCode convention: ⌘B / Ctrl+B
   // toggles, and the TitleBar carries the persistent toggle button.
   // Conditional render (not `display: none`) so the resizable-panel
@@ -155,17 +182,6 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
     setTerminalOpen(false);
   }, []);
 
-  // Recently-closed tabs for "reopen closed tab" (Cmd/Ctrl+Shift+T),
-  // most-recent last. A ref, not state — nothing renders from it, so
-  // keeping it off the render path avoids churn. Bounded so a long
-  // editing session can't grow it without limit.
-  const closedTabsRef = useRef<string[]>([]);
-  // Latest `openTabs`, mirrored so `reopenClosedTab` reads the live set
-  // without taking `openTabs` as a dep (which would rebuild the
-  // otherwise-stable callback on every tab change).
-  const openTabsRef = useRef(openTabs);
-  openTabsRef.current = openTabs;
-
   const bumpTreeRefresh = useCallback(() => {
     setTreeRefreshKey((k) => k + 1);
   }, []);
@@ -183,26 +199,17 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   // effect that references it (its dep array is read at render).
   const handleEntryTrashed = useCallback(
     (relPath: string, isDirectory: boolean) => {
-      const affected = (tab: string) =>
+      // A trashed file closes its own tab; a trashed folder closes its whole
+      // subtree. The group focuses the nearest surviving tab and (being a trash,
+      // not a close) never records them for reopen.
+      group.closeMatching((tab) =>
         isDirectory
           ? tab === relPath || tab.startsWith(`${relPath}/`)
-          : tab === relPath;
-      setOpenTabs((prev) => {
-        if (!prev.some(affected)) return prev;
-        const next = prev.filter((t) => !affected(t));
-        setActiveRelPath((current) => {
-          if (current === null || !affected(current)) return current;
-          const activeIdx = prev.indexOf(current);
-          for (let i = activeIdx - 1; i >= 0; i--) {
-            if (!affected(prev[i])) return prev[i];
-          }
-          return next[0] ?? null;
-        });
-        return next;
-      });
+          : tab === relPath
+      );
       bumpTreeRefresh();
     },
-    [bumpTreeRefresh]
+    [group, bumpTreeRefresh]
   );
 
   // ⌘B / Ctrl+B toggles the file tree pane. We intentionally don't
@@ -285,50 +292,36 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
     toggleTerminal,
   ]);
 
-  const openFile = useCallback((relPath: string) => {
-    setOpenTabs((prev) => (prev.includes(relPath) ? prev : [...prev, relPath]));
-    setActiveRelPath(relPath);
-  }, []);
+  const openFile = useCallback(
+    (relPath: string) => group.open(relPath),
+    [group]
+  );
+  const activateTab = useCallback(
+    (relPath: string) => group.activate(relPath),
+    [group]
+  );
+  const closeTab = useCallback(
+    (relPath: string) => group.close(relPath),
+    [group]
+  );
+  const reopenClosedTab = useCallback(() => group.reopenClosed(), [group]);
 
-  // Closing the active tab activates the neighbour to its left
-  // (VSCode behaviour) — falls back to the right neighbour if it
-  // was the first tab, or null if it was the only tab.
-  const closeTab = useCallback((relPath: string) => {
-    setOpenTabs((prev) => {
-      const idx = prev.indexOf(relPath);
-      if (idx < 0) return prev;
-      const next = prev.filter((_, i) => i !== idx);
-      setActiveRelPath((current) => {
-        if (current !== relPath) return current;
-        // Compute the survivor from the pre-filter `prev` (left, then
-        // right, then null) so it doesn't rely on the post-filter index
-        // shift — matches `handleEntryTrashed` and the comment above.
-        return prev[idx - 1] ?? prev[idx + 1] ?? null;
-      });
-      return next;
-    });
-    // Record for "reopen closed tab". Pushed here, outside the updater
-    // above, so React's dev double-invoke of reducers can't double-push.
-    // Bounded to the last 25 closes.
-    const stack = closedTabsRef.current;
-    stack.push(relPath);
-    if (stack.length > 25) stack.shift();
-  }, []);
+  // Reopen/focus the picker for the current pending pick (the agent-pane note's
+  // affordance after a manual close). Only meaningful while a pick is pending.
+  const focusDesignSearchTab = useCallback(() => {
+    if (designSearch) group.open(DESIGN_SEARCH_TAB_ID);
+  }, [group, designSearch]);
 
-  // Reopen the most-recently closed tab (Cmd/Ctrl+Shift+T). Skips entries
-  // that are already open again (closed, then reopened by hand) so the
-  // shortcut always brings back a genuinely-closed file rather than
-  // re-focusing a live one — matching VSCode.
-  const reopenClosedTab = useCallback(() => {
-    const stack = closedTabsRef.current;
-    while (stack.length > 0) {
-      const relPath = stack.pop();
-      if (relPath === undefined) return;
-      if (openTabsRef.current.includes(relPath)) continue;
-      openFile(relPath);
-      return;
-    }
-  }, [openFile]);
+  // Wire the lifted pick session into the group's ephemeral (preview) tab: a new
+  // pending pick opens + focuses it, resolving it (session → null) closes it. All
+  // the rising-edge / neighbor-restore logic lives in EditorGroup (tested); this
+  // is a pure wire.
+  useEffect(() => {
+    group.syncEphemeral(
+      DESIGN_SEARCH_TAB_ID,
+      designSearch ? pickToolCallId(designSearch.entry) : null
+    );
+  }, [group, designSearch]);
 
   return (
     <WorkspaceChangesProvider workspaceId={workspace.id}>
@@ -415,6 +408,8 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
                     workspace={workspace}
                     activeRelPath={activeRelPath}
                     onMaybeMutated={bumpTreeRefresh}
+                    onDesignSearchChange={setDesignSearch}
+                    onOpenPicker={focusDesignSearchTab}
                   />
                 </ResizablePanel>
                 <ResizableHandle />
@@ -423,11 +418,12 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
                     workspace={workspace}
                     openTabs={openTabs}
                     activeRelPath={activeRelPath}
-                    onSelectTab={setActiveRelPath}
+                    onSelectTab={activateTab}
                     onCloseTab={closeTab}
                     onReopenClosedTab={reopenClosedTab}
                     onSaved={bumpTreeRefresh}
                     onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
+                    designSearch={designSearch}
                   />
                 </ResizablePanel>
                 {showTree && (

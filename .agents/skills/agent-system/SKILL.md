@@ -245,5 +245,10 @@ checks from the `desktop` skill.
   `packages/grida-ai-agent/src/secrets.ts`
 - Skills/prompts/tools: `packages/grida-ai-agent/src/skills/`,
   `packages/grida-ai-agent/src/agent/`, `packages/grida-ai-agent/src/tools/`
+- Tool-design doctrine (read before adding/widening a tool — minimal surface,
+  host-config off the args, grounded/honest knobs, auto-resolved inputs,
+  context economy, clear typed failures, tool-vs-connector-vs-skill):
+  `docs/wg/ai/agent/tool-design.md`; in-code checklist is the `TOOL-DESIGN`
+  block in `src/tools/index.ts`
 - Desktop sidecar adapter: `desktop/src/agent-sidecar.ts`
 - Renderer agent chat transport: `editor/lib/agent-chat/`

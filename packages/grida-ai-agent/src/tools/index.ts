@@ -45,6 +45,7 @@ import type {
 import {
   RUN_COMMAND_TOOL_NAME,
   QUESTION_TOOL_NAME,
+  DESIGN_SEARCH_TOOL_NAME,
   type AgentToolName,
 } from "./names";
 import {
@@ -53,8 +54,14 @@ import {
   type RunCommandOutcome,
 } from "./run-command";
 import { createQuestionTool } from "./question";
+import { AgentDesignSearch } from "./design-search";
 
-export { RUN_COMMAND_TOOL_NAME, QUESTION_TOOL_NAME, SKILL_TOOL_NAME };
+export {
+  RUN_COMMAND_TOOL_NAME,
+  QUESTION_TOOL_NAME,
+  DESIGN_SEARCH_TOOL_NAME,
+  SKILL_TOOL_NAME,
+};
 export type { AgentToolName, RunCommandBackend, RunCommandOutcome };
 
 export type ToolsetCapabilities = {
@@ -116,13 +123,25 @@ export type ToolsetCapabilities = {
    * drop the tool — the lock guarantees every host advertises it.
    */
   interactive?: boolean;
+  /**
+   * Whether the host can resolve a Grida Library search (the artwork-station
+   * gather step). When true the `design_search` tool joins the registry; like
+   * the fs tools it is CLIENT-resolved (the renderer holds the library session),
+   * so it ships without `execute` when {@link interactive} and the renderer's
+   * `onToolCall` supplies the result. Without this entry the tool is absent — a
+   * host with no library reach must not advertise it. `interactive: false` +
+   * `library: true` ships a fixed-refusal `execute` (no renderer to resolve).
+   */
+  library?: boolean;
 };
 
 /**
- * TOOL-DESIGN (gridaco/grida#921) — read before adding or widening a tool. The
- * discipline that keeps this surface small (learned the hard way: `generate_image`
- * shipped as a 7-arg mirror of the HTTP route — the most complex tool here — and
- * was cut to a single `prompt`; see `../gen`).
+ * TOOL-DESIGN (gridaco/grida#921) — read before adding or widening a tool.
+ * Full doctrine (the why, the five lenses, tool-vs-connector-vs-skill):
+ * docs/wg/ai/agent/tool-design.md. This is the concrete checklist + the
+ * worked instance (`generate_image` shipped as a 7-arg mirror of the HTTP
+ * route — the most complex tool here — and was cut to a single `prompt`;
+ * see `../gen`).
  *
  * Build tools FOR AGENTS, not as API mirrors. The shape is what an agent needs
  * to express intent — not the provider's full parameter surface.
@@ -140,6 +159,13 @@ export type ToolsetCapabilities = {
  *  4. Honest results. The output says what the tool actually did; don't promise
  *     a capability the wire format can't deliver (a tool result can't carry an
  *     image to an openai-compatible model — `generate_image` is generate-only).
+ *  5. Auto-resolve simple inputs. Let the agent pass the dumbest sufficient
+ *     thing and resolve the rest in the host — `generate_image` references take
+ *     a path / URL / data URL; the host reads + inlines. Don't make the agent
+ *     pre-encode a blob.
+ *  6. Clear, typed failures. A bad call returns a reason the agent can act on
+ *     (`invalid_input` naming the offending input), never a throw that ends the
+ *     run.
  *
  * When in doubt, cut the arg. A tool you can't retract (the model learns to
  * depend on it) is more expensive than one you grow later.
@@ -220,12 +246,28 @@ export function createToolset(caps: ToolsetCapabilities = {}) {
   const withImageGen = imageGen
     ? {
         ...withVision,
+        // generate_image carries its own `references` (image-to-image inputs the
+        // agent names); the resolver forwards the validated input to the
+        // generator, which resolves each path/URL.
         ...wrapWithResolver(AgentGen.tools, (name, input) =>
           AgentGen.resolveToolCall(imageGen, { tool_name: name, input })
         ),
       }
     : withVision;
-  return withImageGen;
+  // design_search joins only when the host can resolve a library search. Unlike
+  // the server-resolved capabilities above it is CLIENT-resolved (the renderer
+  // owns the library session): when interactive it ships bare (no execute) and
+  // the renderer's onToolCall supplies the result; a non-interactive host with
+  // library:true gets a fixed-refusal execute (no renderer to fill it in).
+  const withLibrary = caps.library
+    ? {
+        ...withImageGen,
+        [DESIGN_SEARCH_TOOL_NAME]: AgentDesignSearch.createTool({
+          interactive: caps.interactive === true,
+        }),
+      }
+    : withImageGen;
+  return withLibrary;
 }
 
 /**

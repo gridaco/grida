@@ -89,6 +89,13 @@ export type AgentHostOptions = {
    * {@link ServerOptions} by the `...opts` spread below.
    */
   interactive?: boolean;
+  /**
+   * Whether this host's clients can resolve a Grida Library search — gates the
+   * `design_search` tool (client-resolved, like fs). The desktop sidecar sets
+   * this true (its renderer wires the resolver); CLI/headless leave it false.
+   * Carried into {@link ServerOptions} by the `...opts` spread.
+   */
+  library?: boolean;
 };
 
 export class AgentHost {

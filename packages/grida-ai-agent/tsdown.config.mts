@@ -29,6 +29,9 @@ export default defineConfig([
       "src/fs/backends/opfs.ts",
       "src/todos/index.ts",
       "src/vision/index.ts",
+      // Web-safe: the renderer resolves `design_search` client-side, so it needs
+      // the tool's name + result types (only `ai` + zod, no node).
+      "src/tools/design-search.ts",
     ],
     platform: "neutral",
   },

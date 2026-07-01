@@ -17,4 +17,15 @@ describe("composeSystemPrompt", () => {
     expect(base).not.toContain('<skill name="svg">');
     expect(svg).toContain('<skill name="svg">');
   });
+
+  it("loads the dotcanvas skill only when requested", () => {
+    const base = composeSystemPrompt({});
+    const dotcanvas = composeSystemPrompt({ skills: ["dotcanvas"] });
+
+    expect(base).not.toContain('<skill name="dotcanvas">');
+    expect(dotcanvas).toContain('<skill name="dotcanvas">');
+    // opinionated working-pattern content the board host relies on
+    expect(dotcanvas).toContain('editor: "board"');
+    expect(dotcanvas).toContain(".canvas.json");
+  });
 });

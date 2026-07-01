@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { dotcanvas } from "dotcanvas";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
+import { isUriSrc } from "./board-store";
 import {
   workspaceBundleFs,
   type WorkspaceFsClient,
@@ -36,14 +37,21 @@ function assertBundleLocalSrc(src: string): void {
 }
 
 function slidesFromManifest(m: dotcanvas.Manifest): Slide[] {
-  return (m.documents ?? [])
-    .filter((d) => typeof d?.src === "string" && d.src.length > 0)
-    .map((d) => ({
-      // Identity, matching dotcanvas: explicit id, else src.
-      id: typeof d.id === "string" && d.id ? d.id : d.src,
-      src: d.src,
-      name: typeof d.name === "string" ? d.name : undefined,
-    }));
+  return (
+    (m.documents ?? [])
+      .filter((d) => typeof d?.src === "string" && d.src.length > 0)
+      // A slide is an in-bundle SVG file. A URI `src` (a board's library pin) is
+      // NOT a slide — it stays in the manifest (round-trips on persist) but is
+      // excluded from the deck view so the slide loader never tries to `readfile`
+      // a URL as a bundle path (the `coffee-promo.canvas/https://…` ENOENT).
+      .filter((d) => !isUriSrc(d.src as string))
+      .map((d) => ({
+        // Identity, matching dotcanvas: explicit id, else src.
+        id: typeof d.id === "string" && d.id ? d.id : d.src,
+        src: d.src,
+        name: typeof d.name === "string" ? d.name : undefined,
+      }))
+  );
 }
 
 /**

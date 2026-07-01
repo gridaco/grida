@@ -596,6 +596,20 @@ string (no credential crosses into it), and CSP scopes the scheme to
 host (`workspace`) carries no data so standard-URL host canonicalization can't
 corrupt the id; both ids live in the path.
 
+**First-party library images (reference-first artwork).** The artwork-station
+gather step (`design_search`) shows the user images from the Grida **Library** —
+the app's OWN Supabase storage bucket — and the picked references are kept as
+URLs and rendered directly (never downloaded). So the desktop CSP allowlists the
+**one first-party library origin** (`NEXT_PUBLIC_SUPABASE_URL`) in `img-src`,
+image-only. This is distinct from the generated-media rule above: generation
+provider CDNs (fal/openrouter/…) stay excluded — generated media is sidecar
+bytes via `data:`/`blob:`/`grida-workspace:`. The origin is derived from env at
+module load and omitted when unset (a malformed value cannot widen the policy);
+`proxy.test.ts` pins both the allow (library origin in `img-src` only) and the
+deny (provider CDNs still excluded). The alternative — proxying library images
+through `grida-workspace:` like generated media — was rejected: the library is
+first-party public read-only storage, and the product keeps its pins as URLs.
+
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 Today:
 
@@ -633,6 +647,7 @@ Today:
 - `packages/grida-ai-agent/src/secrets.ts` — `auth.json`-backed BYOK key store; exposes only `has`, `set`, and `delete` to routes.
 - `packages/grida-ai-agent/src/sandbox/policy.ts` — AgentHost sandbox policy intent.
 - [editor/proxy.ts](editor/proxy.ts) — Next.js 16 proxy that sets the CSP + `X-Robots-Tag` + `Referrer-Policy` + `X-Content-Type-Options` headers on every `/desktop/*` response.
+- [editor/lib/desktop/csp.ts](editor/lib/desktop/csp.ts) — the desktop CSP template (`buildDesktopCsp`), kept out of `proxy.ts` per Next.js 16 route-export rules. Owns the directive set, the `grida-workspace:` img/media scope (#924), and the first-party library `img-src` carve-out. Pinned by `proxy.test.ts`.
 - [editor/app/desktop/layout.tsx](editor/app/desktop/layout.tsx) — root layout for the desktop route group; gates all children through `DesktopBridgeGate`.
 - [editor/scaffolds/desktop/desktop-bridge-gate.tsx](editor/scaffolds/desktop/desktop-bridge-gate.tsx) — server-rendering-safe gate that renders children only when `window.grida` is present.
 - [editor/scaffolds/desktop/open-in-desktop-cta.tsx](editor/scaffolds/desktop/open-in-desktop-cta.tsx) — fallback shown to web visitors (capability boundary visible per doctrine rule 3).

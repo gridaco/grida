@@ -14,3 +14,12 @@ export type {
   AnswerQuestionHandler,
   QuestionAnswerOutput,
 } from "./question-card";
+export {
+  DesignSearchPickCard,
+  findPendingDesignSearch,
+  selectedPins,
+} from "./design-search-card";
+export type {
+  PickReferencesHandler,
+  FetchReferences,
+} from "./design-search-card";

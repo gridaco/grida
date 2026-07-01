@@ -116,6 +116,16 @@
         "types": "./dist/vision/index.d.ts",
         "default": "./dist/vision/index.js"
       }
+    },
+    "./tools/design-search": {
+      "import": {
+        "types": "./dist/tools/design-search.d.mts",
+        "default": "./dist/tools/design-search.mjs"
+      },
+      "require": {
+        "types": "./dist/tools/design-search.d.ts",
+        "default": "./dist/tools/design-search.js"
+      }
     }
   },
   "scripts": {

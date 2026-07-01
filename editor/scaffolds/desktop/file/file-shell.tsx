@@ -28,7 +28,7 @@ import {
 } from "@app/ui/components/resizable";
 import { AISidebarChat } from "../ai-sidebar/chat";
 import { TitleBar } from "../chrome/title-bar";
-import { DesktopCanvasShell } from "../canvas/canvas-shell";
+import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
 import { useActiveEditorAgentFs } from "./active-editor-agent-fs";
 import { SingleFileSvgSurface, type FileMeta } from "./single-file-svg-surface";
@@ -127,7 +127,8 @@ export function DesktopFileShell({
               // The provider lets the deck + slide surfaces react to the agent's
               // on-disk edits (manifest reload + per-slide external-change reload).
               <WorkspaceChangesProvider workspaceId={workspaceId!}>
-                <DesktopCanvasShell
+                {/* Branch on the manifest `editor`: slides deck vs board canvas. */}
+                <DesktopCanvasBundleShell
                   workspaceId={workspaceId!}
                   basePath={basePath}
                 />

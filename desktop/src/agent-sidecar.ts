@@ -105,6 +105,9 @@ async function main() {
     // A human is at the keyboard — the locked `question` tool pauses for their
     // answer (RFC `tools` §question) instead of returning the headless refusal.
     interactive: true,
+    // The desktop renderer holds the editor's library session, so it can resolve
+    // `design_search` (the artwork-station gather step) client-side.
+    library: true,
   });
 
   try {

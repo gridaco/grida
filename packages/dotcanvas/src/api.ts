@@ -24,6 +24,7 @@ export {
   MANIFEST_FILENAME,
   THUMBNAIL_NAMES,
   isBundlePath,
+  isUriSrc,
   add,
   heal,
   remove,

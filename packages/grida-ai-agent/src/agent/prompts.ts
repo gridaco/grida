@@ -49,6 +49,7 @@ export function composeSystemPrompt(opts: ComposeSystemPromptOptions): string {
   // owns the assembly order and injects the tool-name vocab into the builders.
   const SKILL_BLOCKS: Record<SkillId, string> = {
     svg: prompts.agent_svg_skill(AgentFs.TOOL_NAMES),
+    dotcanvas: prompts.agent_dotcanvas_skill(AgentFs.TOOL_NAMES),
   };
   const parts: string[] = [
     prompts.agent_core(AgentFs.TOOL_NAMES, AgentTodos.TOOL_NAMES),

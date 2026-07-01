@@ -33,7 +33,7 @@ import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { EditorPaneSvgEditor } from "./editor-pane-svg-editor";
 import { EditorPaneCodeEditor } from "./editor-pane-code-editor";
-import { DesktopCanvasShell } from "../canvas/canvas-shell";
+import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { ImageViewer, VideoViewer } from "./editor-pane-viewers";
 
 export type EditorPaneTabProps = {
@@ -143,11 +143,13 @@ function ModeBody({
         />
       );
     case "canvas":
-      // A `.canvas` directory opened as a slides deck, scoped to its subpath
-      // within this workspace. `active` gates the deck's Cmd+S (a hidden tab
-      // must not grab the save). The deck auto-persists, so no tab dirty state.
+      // A `.canvas` directory, scoped to its subpath within this workspace.
+      // Branch on the manifest `editor`: `board` → the infinite-canvas board
+      // host; `slides`/unknown → the slides deck. `active` gates the deck's
+      // Cmd+S (a hidden tab must not grab the save); both auto-persist, so no
+      // tab dirty state.
       return (
-        <DesktopCanvasShell
+        <DesktopCanvasBundleShell
           workspaceId={workspaceId}
           basePath={relPath}
           active={active}

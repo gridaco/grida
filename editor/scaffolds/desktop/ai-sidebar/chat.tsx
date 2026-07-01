@@ -20,6 +20,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat, useChat } from "@ai-sdk/react";
 import { AgentFs } from "@grida/agent/fs";
 import { AgentTodos } from "@grida/agent/todos";
+import { resolveDesignSearch } from "@/scaffolds/desktop/shared/design-search";
 import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type UIMessage,
@@ -59,8 +60,11 @@ import {
   PendingTurnIndicator,
   QuestionCard,
   findPendingQuestion,
+  DesignSearchPickCard,
+  findPendingDesignSearch,
   type ChatMessageActions,
   type AnswerQuestionHandler,
+  type PickReferencesHandler,
 } from "@/kits/agent-chat";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
 import {
@@ -161,6 +165,9 @@ export function AISidebarChat({
       }),
       sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
       onToolCall: ({ toolCall }) => {
+        // `design_search` is human-input (the user picks from the gallery via the
+        // pinned pick card → addToolResult), not auto-resolved here. fs/todos
+        // stay client-resolved below.
         const agentToolCall = {
           tool_name: toolCall.toolName,
           tool_call_id: toolCall.toolCallId,
@@ -478,6 +485,24 @@ export function AISidebarChat({
     [messages]
   );
 
+  // A pending `design_search` — the same session-global pattern: pick references
+  // from the gathered results while the run is paused on the user.
+  const pendingPick = useMemo(
+    () => findPendingDesignSearch(messages),
+    [messages]
+  );
+
+  const onPickReferences = useCallback<PickReferencesHandler>(
+    (toolCallId, output) => {
+      void chatRef.current?.addToolResult({
+        tool: "design_search",
+        toolCallId,
+        output,
+      });
+    },
+    []
+  );
+
   const isEmpty = messages.length === 0;
 
   // Pre-first-token "Thinking" indicator: a turn is streaming through this
@@ -543,6 +568,18 @@ export function AISidebarChat({
           <QuestionCard
             entry={pendingQuestion}
             onAnswer={onAnswerQuestion}
+            disabled={busy}
+          />
+        </div>
+      )}
+
+      {/* The agent gathered references — pick the ones that fit (the brief). */}
+      {pendingPick && (
+        <div className="shrink-0 border-t p-3">
+          <DesignSearchPickCard
+            entry={pendingPick}
+            onPick={onPickReferences}
+            fetchResults={resolveDesignSearch}
             disabled={busy}
           />
         </div>

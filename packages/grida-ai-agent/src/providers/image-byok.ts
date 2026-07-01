@@ -88,6 +88,15 @@ export class OpenRouterImageModel implements ImageModelV3 {
     const orExtra =
       (providerOptions?.openrouter as Record<string, unknown> | undefined) ??
       {};
+    // Image-to-image: OpenRouter's Unified Image API conditions on
+    // `input_references` (same endpoint as t2i). References arrive on our
+    // internal `grida` namespace (NEVER spread raw into the body). Each is an
+    // https or base64 data URL. Verified live 2026-07-01.
+    const refs = gridaReferences(providerOptions);
+    const input_references = refs?.map((url) => ({
+      type: "image_url" as const,
+      image_url: { url },
+    }));
 
     const res = await fetch(OPENROUTER_IMAGE_URL, {
       method: "POST",
@@ -103,6 +112,7 @@ export class OpenRouterImageModel implements ImageModelV3 {
         ...(size ? { size } : {}),
         ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
         ...(seed !== undefined ? { seed } : {}),
+        ...(input_references ? { input_references } : {}),
         ...orExtra,
       }),
     });
@@ -265,6 +275,26 @@ export class FalImageModel implements ImageModelV3 {
 }
 
 // ── helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Pull image-to-image reference URLs off our INTERNAL `grida` provider-options
+ * namespace. The host (`createImageGenerator`) puts the curated board's
+ * references here as https or base64 data URLs; adapters map them to each
+ * provider's own field (OpenRouter `input_references`). This namespace is never
+ * forwarded raw to a provider. Returns `undefined` when there are no usable
+ * references.
+ */
+function gridaReferences(
+  providerOptions: ImageModelV3CallOptions["providerOptions"]
+): string[] | undefined {
+  const raw = (providerOptions?.grida as Record<string, unknown> | undefined)
+    ?.references;
+  if (!Array.isArray(raw)) return undefined;
+  const urls = raw.filter(
+    (u): u is string => typeof u === "string" && u.length > 0
+  );
+  return urls.length > 0 ? urls : undefined;
+}
 
 function whFromSize(size: `${number}x${number}`): {
   width: number;

@@ -110,6 +110,31 @@ describe("CanvasDeck — stateless read-modify-write (dogfoods transforms)", () 
     expect(deck.getSlides().map((s) => s.src)).toEqual(["b.svg", "a.svg"]);
   });
 
+  it("excludes a URI doc from the slides view but keeps it in the manifest", async () => {
+    // A board's library pin (URL src) must NOT be read as a slide file (the
+    // `coffee-promo.canvas/https://…` ENOENT) — but it must survive a persist.
+    const ws = new FakeWorkspace({
+      ".canvas.json": JSON.stringify({
+        editor: "slides",
+        documents: [
+          { src: "https://cdn.example.com/ref.jpg", id: "ref" },
+          { src: "a.svg", id: "a" },
+        ],
+      }),
+      "a.svg": "<svg/>",
+    });
+    const deck = new CanvasDeck("w", ws);
+    await deck.load();
+    // view excludes the URL pin (would otherwise drive a readfile of a URL)
+    expect(deck.getSlides().map((s) => s.src)).toEqual(["a.svg"]);
+    // but a mutation persists the FULL manifest — the URL doc is not lost
+    await deck.addSlide("<svg id='new'/>");
+    await deck.flush();
+    expect(ws.manifest().documents?.map((d) => d.src)).toContain(
+      "https://cdn.example.com/ref.jpg"
+    );
+  });
+
   it("addSlide writes the SVG file and appends it to .canvas.json (via dotcanvas.add)", async () => {
     const ws = new FakeWorkspace({
       ".canvas.json": JSON.stringify({ editor: "slides", documents: [] }),

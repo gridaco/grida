@@ -21,6 +21,7 @@ import type { ImageModelV3 } from "@ai-sdk/provider";
 import type { SecretsStore } from "../secrets";
 import { byokProvidersFor } from "../protocol/provider-ids";
 import { makeImageModelFor } from "./image-byok";
+import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
 
 type ImageProvider = models.image.ImageProvider;
 
@@ -41,6 +42,12 @@ export type ResolvedImageModel = {
   /** Provider-specific call id actually handed to the SDK. */
   binding_id: string;
   model: ImageModelV3;
+  /**
+   * Max reference images the resolved (provider, route) accepts, when resolved
+   * for image-to-image (`options.references`). Absent for a text-to-image
+   * resolution. The caller trims references to this cap.
+   */
+  references_max?: number;
 };
 
 /**
@@ -70,15 +77,30 @@ export type ResolveImageDeps = {
 export type ResolveImageOptions = {
   /** Caller override. If set, precedence is skipped and only this provider is checked. */
   explicit?: ImageProvider;
+  /**
+   * Resolve for image-to-image. When true, only providers whose binding has a
+   * `references` capability are eligible, and the resolved `binding_id` is the
+   * edit route (`binding.references.id`). A reference-bearing call therefore
+   * never lands on a text-to-image-only route.
+   */
+  references?: boolean;
 };
 
 /**
- * The default catalog model id for a caller that doesn't pick one (e.g. a bare
- * `generate_image({prompt})`). The first curated `listed` card; because the
- * list is universal (every listed card binds every provider), one connected key
- * serves it. `undefined` only if the catalog ships no listed image card.
+ * The default image model for a caller that doesn't pick one (e.g. a bare
+ * `generate_image({prompt})`). An EXPLICIT, tracked pin — {@link
+ * DEFAULT_IMAGE_MODEL_ID} (see `./preferences`) — not "whatever the catalog
+ * lists first". Because the curated list is universal (every `listed` card binds
+ * every provider), one connected key serves it.
+ *
+ * Fallback to the first curated `listed` card guards catalog drift only: if the
+ * pin were ever dropped/unlisted, a connected key can still serve *some* default
+ * rather than 404. `undefined` only if the catalog ships no listed image card.
  */
 export function defaultImageModelId(): string | undefined {
+  if (models.image.models[DEFAULT_IMAGE_MODEL_ID]?.listed) {
+    return DEFAULT_IMAGE_MODEL_ID;
+  }
   return models.image.listed_models()[0]?.id;
 }
 
@@ -119,13 +141,20 @@ export async function resolveImageModel(
   for (const provider of order) {
     const binding = models.image.binding(card, provider);
     if (!binding) continue;
+    // For an image-to-image resolution, the provider must serve the edit route.
+    // Skip t2i-only bindings so references never land where they're ignored.
+    if (options.references && !binding.references) continue;
     const key = await deps.secrets._getKey(provider);
     if (!key) continue;
+    const binding_id = options.references ? binding.references!.id : binding.id;
     return {
       provider_id: provider,
       model_id: modelId,
-      binding_id: binding.id,
-      model: makeImageModelFor(provider, key.trim(), binding.id),
+      binding_id,
+      model: makeImageModelFor(provider, key.trim(), binding_id),
+      ...(options.references
+        ? { references_max: binding.references!.max }
+        : {}),
     };
   }
 

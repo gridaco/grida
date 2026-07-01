@@ -39,6 +39,7 @@ import type { SkillId } from "../protocol/skills";
 import {
   createToolset,
   RUN_COMMAND_TOOL_NAME,
+  DESIGN_SEARCH_TOOL_NAME,
   type RunCommandBackend,
   type ToolsetCapabilities,
 } from "../tools";
@@ -126,6 +127,12 @@ export type CreateAgentOptions = {
    * The tool is always registered either way (it is locked).
    */
   interactive?: boolean;
+  /**
+   * Whether the client can resolve a Grida Library search. When true the
+   * `design_search` tool joins the registry (client-resolved by the renderer);
+   * absent ⇒ not advertised. See {@link ToolsetCapabilities.library}.
+   */
+  library?: boolean;
 };
 
 /**
@@ -149,6 +156,7 @@ export function createAgent(opts: CreateAgentOptions) {
     image_gen: opts.image_gen,
     command: opts.command,
     interactive: opts.interactive,
+    library: opts.library,
     skill:
       opts.skill_index && opts.skill_load_body
         ? {
@@ -245,6 +253,17 @@ export function buildCapabilityHints(opts: CreateAgentOptions): string[] {
       prompts.image_gen_capability(
         AgentGen.TOOL_NAMES.generate_image,
         opts.command.scratch_dir
+      )
+    );
+  }
+  // The reference-first artwork recipe — gather (design_search) then build. Tells
+  // the agent the picks auto-condition generation only when generate_image is also
+  // wired (the picks ride into it as i2i references).
+  if (opts.library) {
+    hints.push(
+      prompts.design_search_capability(
+        DESIGN_SEARCH_TOOL_NAME,
+        opts.image_gen ? AgentGen.TOOL_NAMES.generate_image : undefined
       )
     );
   }
