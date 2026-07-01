@@ -987,11 +987,13 @@ export namespace models {
           aspect_ratio: "1:1",
         },
       },
-      // "Nano Banana 2 Lite" — GA on the Vercel gateway 2026-06-30. The
-      // cost/speed tier of the 3.1 Flash family: ~half of Nano Banana 2's
-      // meter, and 1K-only output (2K/4K unsupported — the differentiator).
-      // Vercel/OpenRouter/fal ids for the Lite aren't verified yet, so only
-      // the vercel binding is catalogued (TOOL-DESIGN: no unverified routes).
+      // "Nano Banana 2 Lite" — GA 2026-06-30. The cost/speed tier of the 3.1
+      // Flash family: ~half of Nano Banana 2's meter, and 1K-only output
+      // (2K/4K unsupported — the differentiator). Vercel + OpenRouter both
+      // meter it at $0.25/$1.50 (verified 2026-07-01); fal id not verified,
+      // so left out. OpenRouter doesn't advertise input_references for the
+      // Lite (t2i only per its model page), so no `references` (TOOL-DESIGN:
+      // no unverified capability).
       "google/gemini-3.1-flash-lite-image": {
         id: "google/gemini-3.1-flash-lite-image",
         label: "Gemini 3.1 Flash Lite Image",
@@ -1009,6 +1011,13 @@ export namespace models {
             id: "google/gemini-3.1-flash-lite-image",
             pricing: { type: "per_token", input: 0.25, output: 1.5 },
             avg_cost_usd: 0.002,
+          },
+          openrouter: {
+            provider: "openrouter",
+            id: "google/gemini-3.1-flash-lite-image",
+            pricing: { type: "per_token", input: 0.25, output: 1.5 },
+            avg_cost_usd: 0.002,
+            url: "https://openrouter.ai/google/gemini-3.1-flash-lite-image",
           },
         },
         speed_label: "fastest",
