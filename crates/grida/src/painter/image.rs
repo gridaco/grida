@@ -1,10 +1,30 @@
 use super::image_filters;
+use crate::runtime::render_policy::RenderIntent;
 use crate::{
     backends::skia as sk,
     cg::{alignment::Alignment, types::*},
 };
 use math2::transform::AffineTransform;
 use skia_safe::{self, shaders, Color, CubicResampler, SamplingOptions, Shader, TileMode};
+
+/// Map the render intent to the Skia sampling used for image fills.
+///
+/// This mapping is the design decision under review (grida #900): what does the
+/// **design** canvas show versus **export/refig**?
+///
+/// - `Render` (export, refig): high-quality cubic (Mitchell) — the best result
+///   across up- and down-scaling, matching Figma "detailed" / CSS smooth-default.
+/// - `Design` (interactive canvas): nearest-neighbor — the *actual* source
+///   texels, faithful and independent of zoom. Visibly distinct from the
+///   export path (a bilinear `Design` was tried but is indistinguishable from
+///   cubic on photos — see #900), which is the point: the designer sees the
+///   real pixels while editing.
+fn sampling_for_intent(intent: RenderIntent) -> SamplingOptions {
+    match intent {
+        RenderIntent::Render => SamplingOptions::from(CubicResampler::mitchell()),
+        RenderIntent::Design => SamplingOptions::from(skia_safe::FilterMode::Nearest),
+    }
+}
 
 fn tile_modes_for_repeat(repeat: ImageRepeat) -> (TileMode, TileMode) {
     match repeat {
@@ -30,22 +50,18 @@ pub fn image_shader(
     img: &ImagePaint,
     image: &skia_safe::Image,
     size: (f32, f32),
+    intent: RenderIntent,
 ) -> Option<Shader> {
     let matrix = sk::sk_matrix(image_paint_matrix(
         img,
         (image.width() as f32, image.height() as f32),
         size,
     ));
-    // High-quality cubic (Mitchell) resampling. Photographic and logo image
-    // fills are almost always displayed at a different size than their source
-    // (here, large source assets downscaled into small boxes), and the prior
-    // `Nearest`/`Nearest` default aliased badly on downscale even with the
-    // mipmap chain attached by `with_default_mipmaps()` in ImageRepository
-    // (nearest-LOD + nearest-texel). Mitchell gives smooth, sharp results
-    // across both up- and down-scaling and matches Figma/CSS smooth-by-default
-    // behavior. Pixel-art-style crisp upscaling (QR, checker) would need an
-    // explicit opt-in (cf. CSS `image-rendering: pixelated`).
-    let sampling = SamplingOptions::from(CubicResampler::mitchell());
+    // Sampling is a function of the render client — see `sampling_for_intent`.
+    // `Render` uses high-quality cubic (Mitchell); `Design` shows the actual
+    // source texels (Nearest). The mipmap chain attached by
+    // `with_default_mipmaps()` in ImageRepository backs the cubic path.
+    let sampling = sampling_for_intent(intent);
 
     // Extract repeat mode based on the fit variant
     let tile_modes = match &img.fit {
@@ -553,14 +569,12 @@ mod tests {
         assert!((matrix[1][2] - expected_translation_y).abs() < 1e-6);
     }
 
-    // Regression: image fills must be sampled smoothly (cubic), not nearest. A
-    // 4px [black,black,white,white] source stretched to 100px is rendered with
-    // `BoxFit::Fill`; smooth sampling produces a black→white ramp with
-    // intermediate grays around the boundary, whereas nearest-neighbor would
-    // emit only pure 0/255. We assert intermediate grays exist — robust to the
-    // exact Mitchell coefficients.
-    #[test]
-    fn image_shader_samples_smoothly_not_nearest() {
+    /// Render a 4px [black,black,white,white] source stretched to 100px with
+    /// `BoxFit::Fill` under the given intent, and count intermediate-gray pixels
+    /// along the middle row. Smooth sampling (cubic) produces a black→white ramp
+    /// with intermediate grays around the boundary; nearest-neighbor emits only
+    /// pure 0/255. The count is robust to the exact Mitchell coefficients.
+    fn intermediate_gray_count(intent: RenderIntent) -> usize {
         use skia_safe::{image::CachingHint, surfaces, Color, IPoint, Paint, Rect};
 
         // 4x1 source: left half black, right half white.
@@ -575,7 +589,7 @@ mod tests {
         let image = src.image_snapshot();
 
         let cfg = base_paint(ImagePaintFit::Fit(BoxFit::Fill), 0);
-        let shader = image_shader(&cfg, &image, (100.0, 10.0)).expect("shader");
+        let shader = image_shader(&cfg, &image, (100.0, 10.0), intent).expect("shader");
 
         let (w, h) = (100i32, 10i32);
         let mut dst = surfaces::raster_n32_premul((w, h)).expect("dst surface");
@@ -600,14 +614,36 @@ mod tests {
 
         // Middle row; R == G == B for grayscale so byte order is irrelevant.
         let y = (h / 2) as usize;
-        let intermediate = (0..w as usize)
+        (0..w as usize)
             .map(|x| raw[y * row_bytes + x * 4])
             .filter(|&g| g > 30 && g < 225)
-            .count();
+            .count()
+    }
+
+    // The `render` client (export / refig) smooths image fills (cubic): a
+    // stretched two-tone source yields a black→white ramp with intermediate
+    // grays around the boundary.
+    #[test]
+    fn image_shader_render_intent_samples_smoothly() {
+        let intermediate = intermediate_gray_count(RenderIntent::Render);
         assert!(
             intermediate > 0,
-            "expected a smooth black→white ramp (cubic); nearest-neighbor would \
-             yield only pure 0/255, found {intermediate} intermediate pixels"
+            "render intent expected a smooth black→white ramp (cubic); \
+             nearest-neighbor would yield only pure 0/255, found {intermediate} \
+             intermediate pixels"
+        );
+    }
+
+    // The `design` client shows the actual source texels (nearest): the same
+    // stretched two-tone source stays pure black/white with no intermediate
+    // grays.
+    #[test]
+    fn image_shader_design_intent_shows_pixels() {
+        let intermediate = intermediate_gray_count(RenderIntent::Design);
+        assert_eq!(
+            intermediate, 0,
+            "design intent expected pure 0/255 texels (nearest); found \
+             {intermediate} intermediate (smoothed) pixels"
         );
     }
 }

@@ -5,6 +5,7 @@ use crate::{
         camera::Camera2D,
         font_repository::FontRepository,
         image_repository::ImageRepository,
+        render_policy::RenderIntent,
         scene::{Backend, Renderer, RendererOptions},
     },
 };
@@ -89,6 +90,8 @@ fn export_pdf_document_inner(
     );
     renderer.fonts = fonts.clone();
     renderer.images = images.clone();
+    // Export is output — best image sampling (see `RenderIntent`).
+    renderer.set_render_intent(RenderIntent::Render);
     renderer.load_scene(scene.clone());
 
     // --- Build the PDF -------------------------------------------------------

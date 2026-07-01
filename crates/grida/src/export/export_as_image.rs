@@ -1,4 +1,5 @@
 use crate::node::schema::Size;
+use crate::runtime::render_policy::RenderIntent;
 use crate::{
     export::{ExportAsImage, ExportSize, Exported},
     node::schema::Scene,
@@ -68,6 +69,8 @@ pub fn export_node_as_image(
 
     r.fonts = fonts.clone();
     r.images = images.clone();
+    // Export is output — best image sampling (see `RenderIntent`).
+    r.set_render_intent(RenderIntent::Render);
     r.load_scene(scene.clone());
 
     // Render directly at target resolution - this ensures fonts work correctly

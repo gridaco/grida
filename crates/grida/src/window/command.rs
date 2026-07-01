@@ -13,6 +13,14 @@ pub enum ApplicationCommand {
         ty: f32,
     },
     ToggleDebugMode,
+    /// Toggle the render client between `Design` (interactive, see actual
+    /// texels) and `Render` (best quality, = export/refig). Dev-only aid for
+    /// verifying image-sampling behavior in the native window (grida #900).
+    ToggleRenderIntent,
+    /// Cycle pixel-preview scale 0 → 1 → 2 → 0 (off → 1x → 2x). Dev-only aid
+    /// for comparing pixel preview (#509, affects *all* content) against the
+    /// image-only render-intent sampling.
+    CyclePixelPreview,
     TryCopyAsPNG,
     SelectAll,
     DeselectAll,

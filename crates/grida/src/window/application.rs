@@ -397,6 +397,36 @@ impl ApplicationApi for UnknownTargetApplication {
                 self.queue();
                 return true;
             }
+            ApplicationCommand::ToggleRenderIntent => {
+                use crate::runtime::render_policy::RenderIntent;
+                let next = match self.renderer.render_intent() {
+                    RenderIntent::Design => RenderIntent::Render,
+                    RenderIntent::Render => RenderIntent::Design,
+                };
+                self.renderer.set_render_intent(next);
+                // Intent is baked into cached pictures AND compositor/atlas
+                // layer images; only the picture cache is keyed by intent, so
+                // force a full config invalidation to refresh promoted (shadow/
+                // blur) image layers too — same as the wasm host setters below.
+                self.renderer
+                    .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
+                println!("[grida] render intent → {next:?}");
+                self.queue();
+                return true;
+            }
+            ApplicationCommand::CyclePixelPreview => {
+                let next = match self.renderer.pixel_preview_scale() {
+                    0 => 1,
+                    1 => 2,
+                    _ => 0,
+                };
+                self.renderer.set_pixel_preview_scale(next);
+                self.renderer
+                    .mark_global(crate::runtime::invalidation::GlobalFlag::Config);
+                println!("[grida] pixel preview scale → {next}");
+                self.queue();
+                return true;
+            }
             ApplicationCommand::TryCopyAsPNG => {
                 // Export the first selected node as PNG.
                 if let Some(&internal_id) = self.surface.selection.as_slice().first() {
@@ -1824,9 +1854,18 @@ impl UnknownTargetApplication {
                 fps::FpsMeter::draw(canvas, self.clock.hz() as f32);
             }
             if self.devtools_rendering_show_stats {
-                if let Some(s) = self.last_stats.as_deref() {
-                    stats::StatsOverlay::draw(canvas, s, &self.clock);
-                }
+                // Append the live render-config states (image-sampling intent
+                // and pixel-preview scale) so they're visible alongside the
+                // frame stats. `StatsOverlay` splits on '|' into lines.
+                let intent = self.renderer.render_intent();
+                let pixel_preview = self.renderer.pixel_preview_scale();
+                let config_line =
+                    format!("render intent: {intent:?} | pixel preview: {pixel_preview}x");
+                let combined = match self.last_stats.as_deref() {
+                    Some(s) if !s.is_empty() => format!("{s} | {config_line}"),
+                    _ => config_line,
+                };
+                stats::StatsOverlay::draw(canvas, &combined, &self.clock);
             }
 
             if !self.highlight_strokes.is_empty() {

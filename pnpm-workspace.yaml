@@ -41,3 +41,5 @@ overrides:
   openai: "6.18.0"
   react: "19.2.5"
   react-dom: "19.2.5"
+minimumReleaseAgeExclude:
+  - "@grida/canvas-wasm@0.91.0-canary.22"

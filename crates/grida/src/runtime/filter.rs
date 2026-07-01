@@ -24,6 +24,7 @@ use crate::cg::color::CGColor;
 use crate::cg::fe::{FeShadow, FilterShadowEffect};
 use crate::cg::types::Paints;
 use crate::node::schema::NodeId;
+use crate::runtime::render_policy::RenderIntent;
 
 // ═══════════════════════════════════════════════════════════════════════
 // RenderFilter
@@ -301,6 +302,7 @@ impl IsolationDrawContext {
         &self,
         canvas: &skia_safe::Canvas,
         images: &crate::runtime::image_repository::ImageRepository,
+        intent: RenderIntent,
     ) {
         let style = match &self.stage {
             Some(s) => s,
@@ -340,6 +342,7 @@ impl IsolationDrawContext {
                     ),
                     images,
                     true,
+                    intent,
                 ) {
                     self.stage_shape.draw_on_canvas(canvas, &paint);
                 }
@@ -357,6 +360,7 @@ impl IsolationDrawContext {
         &self,
         canvas: &skia_safe::Canvas,
         images: &crate::runtime::image_repository::ImageRepository,
+        intent: RenderIntent,
     ) {
         let style = match &self.stage {
             Some(s) => s,
@@ -377,6 +381,7 @@ impl IsolationDrawContext {
                     ),
                     images,
                     true,
+                    intent,
                 ) {
                     paint.set_style(skia_safe::PaintStyle::Stroke);
                     paint.set_stroke_width(style.stroke_width.unwrap_or(1.0));
