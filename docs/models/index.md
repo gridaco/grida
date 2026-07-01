@@ -28,12 +28,12 @@ Models are organized into **tiers** based on capability and cost:
 
 ### Current Models
 
-| Tier   | Model                                             | Context | Max Output | Input (per 1M) | Output (per 1M) |
-| ------ | ------------------------------------------------- | ------- | ---------- | -------------- | --------------- |
-| `nano` | GPT-5.4 Nano (`openai/gpt-5.4-nano`)              | 400K    | 128K       | $0.20          | $1.25           |
-| `mini` | GPT-5.4 Mini (`openai/gpt-5.4-mini`)              | 400K    | 128K       | $0.75          | $4.50           |
-| `pro`  | Claude Sonnet 5 (`anthropic/claude-sonnet-5`)     | 1M      | 128K       | $3.00          | $15.00          |
-| `max`  | Claude Opus 4.8 (`anthropic/claude-opus-4.8`)     | 1M      | 128K       | $5.00          | $25.00          |
+| Tier   | Model                                         | Context | Max Output | Input (per 1M) | Output (per 1M) |
+| ------ | --------------------------------------------- | ------- | ---------- | -------------- | --------------- |
+| `nano` | GPT-5.4 Nano (`openai/gpt-5.4-nano`)          | 400K    | 128K       | $0.20          | $1.25           |
+| `mini` | GPT-5.4 Mini (`openai/gpt-5.4-mini`)          | 400K    | 128K       | $0.75          | $4.50           |
+| `pro`  | Claude Sonnet 5 (`anthropic/claude-sonnet-5`) | 1M      | 128K       | $3.00          | $15.00          |
+| `max`  | Claude Opus 4.8 (`anthropic/claude-opus-4.8`) | 1M      | 128K       | $5.00          | $25.00          |
 
 All tier models support **multimodal** inputs (text + images).
 
@@ -52,18 +52,18 @@ All tiers support prompt caching, which reduces cost for repeated context:
 
 Per 1M tokens.
 
-| Name                                                     | Input  | Cache Write | Cache Read | Output  |
-| -------------------------------------------------------- | ------ | ----------- | ---------- | ------- |
-| GPT-5.4 Nano (`openai/gpt-5.4-nano`)                     | $0.20  | —           | $0.02      | $1.25   |
-| GPT-5.4 Mini (`openai/gpt-5.4-mini`)                     | $0.75  | —           | $0.075     | $4.50   |
-| Claude Sonnet 5 (`anthropic/claude-sonnet-5`)            | $3.00  | $3.75       | $0.30      | $15.00  |
+| Name                                                         | Input  | Cache Write | Cache Read | Output  |
+| ------------------------------------------------------------ | ------ | ----------- | ---------- | ------- |
+| GPT-5.4 Nano (`openai/gpt-5.4-nano`)                         | $0.20  | —           | $0.02      | $1.25   |
+| GPT-5.4 Mini (`openai/gpt-5.4-mini`)                         | $0.75  | —           | $0.075     | $4.50   |
+| Claude Sonnet 5 (`anthropic/claude-sonnet-5`)                | $3.00  | $3.75       | $0.30      | $15.00  |
 | Claude Sonnet 4.6 (`anthropic/claude-sonnet-4.6`) _(legacy)_ | $3.00  | $3.75       | $0.30      | $15.00  |
-| Claude Opus 4.8 (`anthropic/claude-opus-4.8`)            | $5.00  | $6.25       | $0.50      | $25.00  |
-| Claude Opus 4.7 (`anthropic/claude-opus-4.7`) _(legacy)_ | $5.00  | $6.25       | $0.50      | $25.00  |
-| GPT-5.5 (`openai/gpt-5.5`)                               | $5.00  | —           | $0.50      | $30.00  |
-| GPT-5.5 Pro (`openai/gpt-5.5-pro`)                       | $30.00 | —           | —          | $180.00 |
-| Gemini 3.5 Flash (`google/gemini-3.5-flash`)             | $1.50  | —           | $0.15      | $9.00   |
-| Gemini 3.1 Pro Preview (`google/gemini-3.1-pro-preview`) | $2.00  | —           | $0.20      | $12.00  |
+| Claude Opus 4.8 (`anthropic/claude-opus-4.8`)                | $5.00  | $6.25       | $0.50      | $25.00  |
+| Claude Opus 4.7 (`anthropic/claude-opus-4.7`) _(legacy)_     | $5.00  | $6.25       | $0.50      | $25.00  |
+| GPT-5.5 (`openai/gpt-5.5`)                                   | $5.00  | —           | $0.50      | $30.00  |
+| GPT-5.5 Pro (`openai/gpt-5.5-pro`)                           | $30.00 | —           | —          | $180.00 |
+| Gemini 3.5 Flash (`google/gemini-3.5-flash`)                 | $1.50  | —           | $0.15      | $9.00   |
+| Gemini 3.1 Pro Preview (`google/gemini-3.1-pro-preview`)     | $2.00  | —           | $0.20      | $12.00  |
 
 ## Image Generation Models
 
@@ -109,11 +109,11 @@ Per 1M tokens: `text input $5.00 · text cached $1.25 · image input $8.00 · im
 
 Per-token pricing (same model as text, with image output).
 
-| Model                                                                | Input (per 1M) | Output (per 1M) |
-| -------------------------------------------------------------------- | -------------- | --------------- |
-| Gemini 3.1 Flash Image (`google/gemini-3.1-flash-image-preview`)     | $0.50          | $3.00           |
-| Gemini 3.1 Flash Lite Image (`google/gemini-3.1-flash-lite-image`)   | $0.25          | $1.50           |
-| Gemini 3 Pro Image (`google/gemini-3-pro-image`)                     | $2.00          | $12.00          |
+| Model                                                              | Input (per 1M) | Output (per 1M) |
+| ------------------------------------------------------------------ | -------------- | --------------- |
+| Gemini 3.1 Flash Image (`google/gemini-3.1-flash-image-preview`)   | $0.50          | $3.00           |
+| Gemini 3.1 Flash Lite Image (`google/gemini-3.1-flash-lite-image`) | $0.25          | $1.50           |
+| Gemini 3 Pro Image (`google/gemini-3-pro-image`)                   | $2.00          | $12.00          |
 
 ### Black Forest Labs
 
