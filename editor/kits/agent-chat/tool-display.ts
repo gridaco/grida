@@ -1,5 +1,6 @@
 import { AgentFs } from "@grida/agent/fs";
 import { AgentTodos } from "@grida/agent/todos";
+import { AgentDesignSearch } from "@grida/agent/tools/design-search";
 import { getToolName } from "ai";
 import type { ToolCallEntry } from "@/lib/agent-chat";
 
@@ -97,6 +98,14 @@ export namespace toolDisplay {
           action: "question",
           title: isActive(entry) ? "Asking you" : "Asked you",
           detail: describeQuestionDetail(entry),
+          tone,
+        };
+
+      case AgentDesignSearch.TOOL_NAME:
+        return {
+          action: "search",
+          title: isActive(entry) ? "Searching library" : "Searched library",
+          detail: stringValue(args.query),
           tone,
         };
 

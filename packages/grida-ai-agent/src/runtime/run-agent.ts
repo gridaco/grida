@@ -83,6 +83,12 @@ export type AgentRunRequest = {
    */
   interactive?: boolean;
   /**
+   * Per-run client capability to resolve a Grida Library search
+   * (`design_search`). Like {@link interactive} it WINS over the host-level
+   * `library` deps below. Absent ⇒ the host default applies.
+   */
+  library?: boolean;
+  /**
    * Discovered RFC skills (names + descriptions advertised; bodies loaded
    * via the `skill` tool). Session-static — the runtime discovers once and
    * passes the same index every turn.
@@ -161,6 +167,9 @@ export async function runAgent(
      * runtime threads it down via `runDeps`; `createWorkspaceAgentBindings`
      * ignores it (it reads only workspace/secret/shell fields). */
     interactive?: boolean;
+    /** Host-level default for the `design_search` (library) capability;
+     * overridden by the per-run `req.library`. */
+    library?: boolean;
   }
 ): Promise<Response> {
   // Wire bindings only when the request carries workspace context.
@@ -196,6 +205,10 @@ export async function runAgent(
     // and a headless `cli run`. Independent of workspace bindings (a person can
     // answer a standalone-doc session too).
     interactive: req.interactive ?? deps.interactive,
+    // design_search (library gather) — advertised only when the client declared
+    // it can resolve the search (renderer-owned, like fs). Per-run wins over the
+    // host default, mirroring `interactive`.
+    library: req.library ?? deps.library,
   });
 
   return await createAgentUIStreamResponse({

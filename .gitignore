@@ -243,3 +243,7 @@ CLAUDE.local.md
 
 # vitest browser-mode failure screenshots
 __screenshots__/
+
+# Generated artwork-station demo output (regenerable from
+# fixtures/prompts/artwork-station-prompts.txt) — heavy binaries, not a test fixture
+fixtures/test-canvas/artwork.canvas/outputs/

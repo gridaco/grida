@@ -191,18 +191,20 @@ A reader looks for a root file named **`thumbnail.png` / `thumbnail.svg` / `thum
 
 A conforming reader is tolerant by construction:
 
-| Situation                                         | Behavior                                                                                                                                                                                       |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.canvas.json` missing                            | Open in **implicit mode**, `editor: "unknown"`; MAY derive a document list from on-disk files.                                                                                                 |
-| `.canvas.json` is malformed JSON                  | **Degrade to implicit mode + surface a warning.** Do not hard-fail.                                                                                                                            |
-| Unknown top-level fields / unknown `editor`       | **Ignore** (and SHOULD preserve on write).                                                                                                                                                     |
-| `documents` absent                                | **Derive from disk:** list root files matching `files` (default `["*.svg"]`), **excluding any reserved thumbnail cover** (§4), order **lexically by filename** (the `nnn.svg` convention, §8). |
-| A `documents[].src` points at a missing file      | **Skip it with a warning.** Disk wins.                                                                                                                                                         |
-| Disk has matching files not listed in `documents` | Reader **MAY append** them after the listed ones (disk wins for _existence_; manifest wins for _order_).                                                                                       |
-| Two entries share an `id`/`src`                   | Linter warning; reader keeps the first.                                                                                                                                                        |
+| Situation                                         | Behavior                                                                                                                                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.canvas.json` missing                            | Open in **implicit mode**, `editor: "unknown"`; MAY derive a document list from on-disk files.                                                                                                                |
+| `.canvas.json` is malformed JSON                  | **Degrade to implicit mode + surface a warning.** Do not hard-fail.                                                                                                                                           |
+| Unknown top-level fields / unknown `editor`       | **Ignore** (and SHOULD preserve on write).                                                                                                                                                                    |
+| `documents` absent                                | **Derive from disk:** list root files matching `files` (default `["*.svg"]`), **excluding any reserved thumbnail cover** (§4), order **lexically by filename** (the `nnn.svg` convention, §8).                |
+| A `documents[].src` points at a missing **file**  | **Skip it with a warning.** Disk wins.                                                                                                                                                                        |
+| A `documents[].src` is a **URI** (`scheme://…`)   | **Include it as-is** — a pointable reference, used as written. It has no on-disk presence to check, so it is **always present** (no existence check, no warning). Disk-existence applies to _file_ srcs only. |
+| Disk has matching files not listed in `documents` | Reader **MAY append** them after the listed ones (disk wins for _existence_; manifest wins for _order_).                                                                                                      |
+| Two entries share an `id`/`src`                   | Linter warning; reader keeps the first.                                                                                                                                                                       |
 
 The reconcile rule in one line: **the manifest is authoritative for order and placement;
-disk is authoritative for existence.**
+disk is authoritative for the existence of _file_ srcs** (a URI src is a reference, present by
+definition).
 
 Ordering is exactly **`documents` order, then disk-only matches appended lexically** —
 there is no auto-renumber or re-sort mode (no "re-sequence to `nnn.svg`"), and there
@@ -237,7 +239,9 @@ Any file that isn't `.canvas.json` or a referenced document is **opaque to the f
 These are SHOULDs, offered so the format ages well — not gates:
 
 - **Preserve unknown fields** on round-trip (don't destroy a newer writer's data).
-- **Relative paths only**; keep the bundle self-contained.
+- **Relative paths for bundled documents**; keep the bundle self-contained where you can. A
+  **URI src** is allowed (an external reference, used as-is) — but it makes the bundle no longer
+  self-contained, so prefer a bundled file when portability-when-copied matters (see §9).
 - **Stable-ish serialization** (sorted keys, trailing newline) so `git` diffs stay
   legible — nice for local-first, not required.
 - Prefer convention (`nnn.svg`, `thumbnail.png`) when you have no reason to deviate, so
@@ -253,11 +257,15 @@ These are SHOULDs, offered so the format ages well — not gates:
 
 ## 9. Open questions (need an RFD before they're V2)
 
-- **External resources / links.** Does a `.canvas` support symlinks or references
-  _outside_ the bundle (shared asset libraries, linked sibling `.canvas`es)? Resolution
-  rules, containment, and portability-when-copied are all unresolved. **Deferred — needs
-  its own RFD.** This one is load-bearing for "100% portable": a `.canvas` that symlinks
-  out is no longer self-contained.
+- **External resources / links.** _Partially resolved._ A `documents[].src` MAY be a **URI**
+  (`scheme://…`) — a pointable reference used as-is, a first-class placed document alongside
+  bundled files (it skips the disk-existence check; §5). This is the deliberate stance that a
+  reference is a reference: the contract holds the link; resolving and rendering it (and any
+  host-side fetch policy) is the consumer's concern, not the format's. **Still open:** symlinks,
+  linked sibling `.canvas`es, and the **portability-when-copied** question — a bundle whose
+  documents point at URIs is no longer self-contained, so a future _pack/localize_ step (snapshot
+  external references into the bundle) is what "100% portable" needs. That packing step needs its
+  own RFD; the URI-`src` reference itself does not.
 - **Stable identity vs path identity.** V1 lets `src` be the identity. Once rename +
   canvas-view + reorder all compose, opaque `id`s may need to be promoted from optional to
   recommended (move a file and every `layout` entry dangles).

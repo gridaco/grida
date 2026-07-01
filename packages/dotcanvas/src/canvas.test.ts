@@ -140,6 +140,66 @@ describe("resolve — RFD §5 reconcile", () => {
   });
 });
 
+describe("resolve — URI src (external references, §9)", () => {
+  const URL = "https://cdn.example.com/library/poster.jpg";
+
+  it("a URI src resolves first-class — no disk presence, no warning", () => {
+    // The bundle has NO such file on disk; a URI src is a pointable reference,
+    // used as-is, so it is included (not dropped as missing_src).
+    const c = resolve({ documents: [{ src: URL }] }, []);
+    expect(c.documents.map((d) => d.src)).toEqual([URL]);
+    expect(c.documents[0]).toMatchObject({
+      src: URL,
+      id: URL,
+      origin: "manifest",
+      exists: true,
+    });
+    expect(c.warnings).toEqual([]);
+  });
+
+  it("a URI src is stored verbatim (not normalized) and carries layout", () => {
+    const c = resolve(
+      { documents: [{ src: URL, id: "hero", layout: { x: 10, y: 20 } }] },
+      []
+    );
+    expect(c.documents[0].src).toBe(URL); // `https://` not mangled to `https:/`
+    expect(c.documents[0].id).toBe("hero");
+    expect(c.documents[0].layout).toEqual({ x: 10, y: 20 });
+  });
+
+  it("mixes URI and file documents, preserving manifest order", () => {
+    const c = resolve({ documents: [{ src: URL }, { src: "a.svg" }] }, [
+      "a.svg",
+    ]);
+    expect(c.documents.map((d) => d.src)).toEqual([URL, "a.svg"]);
+    expect(c.warnings).toEqual([]);
+  });
+
+  it("a still-missing FILE src is unaffected (still warns)", () => {
+    const c = resolve({ documents: [{ src: "missing.svg" }] }, []);
+    expect(c.documents).toEqual([]);
+    expect(c.warnings[0]?.code).toBe("missing_src");
+  });
+
+  it("add / setLayout work by a URI identity", () => {
+    let m = add({}, { src: URL });
+    m = setLayout(m, URL, { x: 5, y: 6, w: 100, h: 80 });
+    const c = resolve(m, []);
+    expect(c.documents[0].src).toBe(URL);
+    expect(c.documents[0].layout).toEqual({ x: 5, y: 6, w: 100, h: 80 });
+  });
+
+  it("heal + serialize round-trip a URI src verbatim", () => {
+    const manifest = {
+      editor: "board",
+      documents: [{ src: URL, layout: { x: 1, y: 2 } }],
+    };
+    const healed = heal(manifest, []);
+    expect(healed.documents).toEqual([{ src: URL, layout: { x: 1, y: 2 } }]);
+    expect(serialize(healed)).toContain(URL); // exact string survives JSON
+  });
+});
+
 describe("resolve — thumbnail", () => {
   it("explicit field overrides the filename convention (no ambiguity warning)", () => {
     const c = resolve({ thumbnail: "cover.png" }, ["thumbnail.svg"]);

@@ -137,6 +137,66 @@ When you produce SVG:
 `.trim(),
 
   /**
+   * Model-provider `.canvas` (dotcanvas) skill block. Layered onto the core by
+   * `composeSystemPrompt({ skills: ['dotcanvas'] })` for design/board work.
+   * Opinionated: teaches the format AND the appreciated working pattern so the
+   * agent treats a `.canvas` like any other file (no special tools) — it edits
+   * `.canvas.json` and the document files with the normal fs/shell tools.
+   */
+  agent_dotcanvas_skill: (fs: FsNames): string =>
+    `
+<skill name="dotcanvas">
+A \`.canvas\` is a Grida design **board** — a directory bundle, not a single
+file. You work it like any other files: with ${fs.read_file} / ${fs.write_file}
+/ ${fs.edit_file} (no special canvas tool). It is the durable, spatial home for
+a piece of work: reference images, generated outputs, and notes, arranged on an
+infinite canvas. Prefer working on a \`.canvas\` board for visual/design tasks.
+
+<structure>
+- The bundle is a folder whose name ends in \`.canvas\` (e.g. \`poster.canvas/\`).
+- \`.canvas.json\` (the manifest) holds the STRUCTURE: which documents are on the
+  board, their placement, order, and the \`editor\` mode.
+- Each document's CONTENT is a separate file (or a URL) referenced by its \`src\`.
+- Manifest shape (only \`src\` is required per document):
+  \`\`\`json
+  {
+    "editor": "board",
+    "documents": [
+      { "src": "https://…/ref.jpg", "id": "ref1", "layout": { "x": 0, "y": 0, "w": 480, "h": 320 } },
+      { "src": "outputs/hero.png",  "id": "hero", "layout": { "x": 520, "y": 0, "w": 768, "h": 512 } }
+    ]
+  }
+  \`\`\`
+- \`editor: "board"\` = freeform infinite canvas (placement via \`layout\`).
+  \`editor: "slides"\` = linear deck (order). Use \`"board"\` for design work.
+- \`layout\` is \`{ x, y, w, h, z? }\` in world space (z = paint order, optional).
+  A document with no \`layout\` is **unplaced** — the host positions it; set a
+  \`layout\` to place it deliberately.
+</structure>
+
+<working-pattern>
+- To start, create or open a \`.canvas\` board, then ${fs.write_file} its
+  \`.canvas.json\`. To add to an existing board, ${fs.read_file} \`.canvas.json\`
+  first (preserve \`version\`/\`$schema\`/\`editor\` and any unknown fields), then
+  write the FULL updated manifest back.
+- A document's \`src\` may be a **URL** (a pointable reference — a picked library
+  image, used as-is, no download) OR a **file path inside the bundle**. Both are
+  first-class placed documents.
+- To place a **generated image** (or any produced file) on the board:
+  **materialize it into the bundle, then reference it.** Copy it from your
+  scratch dir into the bundle with the shell — e.g.
+  \`cp <scratch>/image-….png <board>.canvas/outputs/hero.png\` — then add a
+  document whose \`src\` is that bundle-relative path. (A \`src\` can point at any
+  file the host can read, but a file inside the bundle is the durable, portable
+  choice.)
+- To move / resize / reorder, edit the \`layout\` (and document order) in the
+  manifest. The human can also drag pins directly — re-read \`.canvas.json\`
+  before editing so you don't clobber their changes (last write per file wins).
+</working-pattern>
+</skill>
+`.trim(),
+
+  /**
    * Model-provider command-execution capability hint. Built per-run (the
    * workdir is runtime state) and appended to the composed prompt by
    * `buildCapabilityHints` (`agent/index.ts`) only when command exec is wired.
@@ -195,12 +255,52 @@ When you produce SVG:
       "it a prompt and it PRODUCES an image file. It does not show you the",
       "image; the result is the saved path and dimensions. Describe what you",
       "asked for, not what you can see.",
+      "For image-to-image, pass `references` — workspace file paths or image",
+      "urls to condition on; the system reads/fetches each for you.",
       `Each image is saved into your scratch directory (\`${scratch_dir}\`),`,
       "which is ephemeral and system-managed. To KEEP an image, copy the file",
       "into the workspace (or another location the user names). An image left",
       "only in scratch has not been saved.",
       "</capability>",
     ].join("\n"),
+
+  /**
+   * Artwork-station capability hint — the reference-first gather→build recipe.
+   * Appended by `buildCapabilityHints` only when the library (`design_search`)
+   * capability is wired. Teaches: gather references the user picks, then build
+   * by FORWARDING those picks' urls as `generate_image` references. Mentions
+   * `generate_image` only when it's wired.
+   */
+  design_search_capability: (
+    design_search_name: string,
+    generate_image_name?: string
+  ): string =>
+    [
+      '<capability name="reference-first-artwork">',
+      `When the user wants to CREATE visual art (a poster, social/marketing`,
+      `image, logo, etc.), start by gathering references with the`,
+      `\`${design_search_name}\` tool: propose a short natural-language description`,
+      `of the look you're after. The user is shown matching images from the Grida`,
+      `Library and PICKS the ones that fit — their picks (returned as image urls)`,
+      `are the visual brief. Prefer gathering references before generating: image`,
+      `models are far better with reference images than from text alone.`,
+      // The build step differs only by whether generate_image is wired: switch
+      // once, not per line, so the two variants can't desync on a future edit.
+      ...(generate_image_name
+        ? [
+            `Then call \`${generate_image_name}\` and pass the picked urls as`,
+            `\`references\` so the result is conditioned on them. To iterate on an`,
+            `image you already made (or one the user gave you), pass that file's`,
+            `workspace path as a \`references\` entry instead. Call`,
+            `\`${design_search_name}\` again to gather a different direction.`,
+          ]
+        : [
+            `Call \`${design_search_name}\` again to gather a different direction.`,
+          ]),
+      "</capability>",
+    ]
+      .filter(Boolean)
+      .join("\n"),
 
   /**
    * Visual-perception capability hint. Appended by `buildCapabilityHints`

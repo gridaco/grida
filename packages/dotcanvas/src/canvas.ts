@@ -211,6 +211,18 @@ export function isBundlePath(path: string): boolean {
   return path.toLowerCase().endsWith(BUNDLE_EXTENSION);
 }
 
+/**
+ * Does a document `src` point at an external resource (a URI) rather than a
+ * bundle-local file? The canonical URI-vs-file distinction for the `.canvas`
+ * format: a URI `src` is a first-class placed reference used as-is — it skips
+ * the disk-existence gate in {@link resolve} and is never the target of a local
+ * file op. Tested on the RAW `src` (before any path normalization, which would
+ * mangle `https://` → `https:/`). See docs/wg/format/canvas.md §9.
+ */
+export function isUriSrc(src: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(src);
+}
+
 /** Thumbnail filenames by convention, in precedence order (first wins). */
 export const THUMBNAIL_NAMES = [
   "thumbnail.png",
@@ -419,11 +431,15 @@ function resolveDocuments(
       continue; // junk entry with no usable src — skip (failure is nature)
     }
     const src = entry.src;
+    // A URI src is a first-class placed reference, used as-is: it skips the
+    // disk-existence gate below and is stored verbatim. See {@link isUriSrc}.
+    const isUri = isUriSrc(src);
     const nsrc = norm(src);
     const identity = typeof entry.id === "string" && entry.id ? entry.id : src;
 
-    // Disk wins for existence: a src pointing at a missing file is skipped.
-    if (!diskAll.has(nsrc)) {
+    // Disk wins for existence: a FILE src pointing at a missing file is skipped.
+    // A URI src has no disk presence to check — it always resolves.
+    if (!isUri && !diskAll.has(nsrc)) {
       warnings.push({
         code: "missing_src",
         message: `document "${src}" not found on disk; skipped`,

@@ -5,6 +5,6 @@
  * land here only after their prompt block and tool wiring exist.
  */
 
-export const AGENT_SKILL_IDS = ["svg"] as const;
+export const AGENT_SKILL_IDS = ["svg", "dotcanvas"] as const;
 
 export type SkillId = (typeof AGENT_SKILL_IDS)[number];

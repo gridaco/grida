@@ -517,6 +517,24 @@ export namespace models {
       deprecated?: boolean;
       /** Provider's page for this binding; UI falls back to the card. */
       url?: string;
+      /**
+       * Image-to-image (reference-conditioned generation) support for **this**
+       * provider's route. Absent ⇒ the provider serves text-to-image only for
+       * this model, so the resolver won't route a reference-bearing call here.
+       *
+       * - `id` — the endpoint to call when references are present. Equals
+       *   {@link id} where edit is the same endpoint plus an extra field
+       *   (OpenRouter: `input_references`); a **distinct** id where the provider
+       *   separates the routes (fal: `…/edit`). Carrying it explicitly keeps the
+       *   resolver honest instead of string-munging the t2i id.
+       * - `max` — the provider-advertised maximum number of reference images
+       *   (OpenRouter `supported_parameters.input_references.max`). One reference
+       *   = single-image edit; many = multi-reference composition.
+       *
+       * Populate only against a provider that has been verified to serve it (the
+       * TOOL-DESIGN doctrine: don't catalogue a capability that doesn't work).
+       */
+      references?: { id: string; max: number };
     };
 
     // ── Size constraints ────────────────────────────────────────────
@@ -674,6 +692,8 @@ export namespace models {
             pricing: { type: "per_token", input: 8.0, output: 8.0 },
             avg_cost_usd: 0.05,
             url: "https://openrouter.ai/openai/gpt-image-2",
+            // input_references advertised by OpenRouter (0–16), 2026-07-01.
+            references: { id: "openai/gpt-image-2", max: 16 },
           },
           fal: {
             provider: "fal",
@@ -878,6 +898,8 @@ export namespace models {
             pricing: { type: "per_token", input: 0.5, output: 3.0 },
             avg_cost_usd: 0.004,
             url: "https://openrouter.ai/google/gemini-3.1-flash-image",
+            // input_references advertised by OpenRouter (0–14), 2026-07-01.
+            references: { id: "google/gemini-3.1-flash-image", max: 14 },
           },
           fal: {
             provider: "fal",
@@ -925,6 +947,8 @@ export namespace models {
             pricing: { type: "per_token", input: 2.0, output: 12.0 },
             avg_cost_usd: 0.015,
             url: "https://openrouter.ai/google/gemini-3-pro-image-preview",
+            // input_references advertised by OpenRouter (0–14), 2026-07-01.
+            references: { id: "google/gemini-3-pro-image-preview", max: 14 },
           },
           fal: {
             provider: "fal",
@@ -976,6 +1000,8 @@ export namespace models {
             pricing: { type: "per_image_flat", usd: 0.03 },
             avg_cost_usd: 0.03,
             url: "https://openrouter.ai/black-forest-labs/flux.2-pro",
+            // input_references advertised by OpenRouter (0–8), 2026-07-01.
+            references: { id: "black-forest-labs/flux.2-pro", max: 8 },
           },
           fal: {
             provider: "fal",
@@ -1126,6 +1152,10 @@ export namespace models {
             pricing: { type: "per_image_flat", usd: 0.04 },
             avg_cost_usd: 0.04,
             url: "https://openrouter.ai/bytedance-seed/seedream-4.5",
+            // i2i verified live 2026-07-01 (OpenRouter /api/v1/images
+            // input_references; same endpoint as t2i). max from
+            // supported_parameters.input_references.
+            references: { id: "bytedance-seed/seedream-4.5", max: 14 },
           },
           fal: {
             provider: "fal",

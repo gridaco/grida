@@ -41,6 +41,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@app/ui/ai-elements/conversation";
+import { ImagesIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import {
@@ -75,9 +76,16 @@ import {
   PendingTurnIndicator,
   QuestionCard,
   findPendingQuestion,
+  findPendingDesignSearch,
   type ChatMessageActions,
   type AnswerQuestionHandler,
+  type PickReferencesHandler,
 } from "@/kits/agent-chat";
+import {
+  DESIGN_SEARCH_TAB_ID,
+  pickQuery,
+  type DesignSearchSession,
+} from "./design-search-tab";
 import { QueuedMessages } from "../shared/queued-messages";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
 import {
@@ -108,11 +116,30 @@ function getExtension(relPath: string): string {
   return name.slice(dot).toLowerCase();
 }
 
-function skillsForActiveTab(relPath: string | null): string[] | undefined {
+/** True for a `.canvas` bundle dir, a file inside one, or its `.canvas.json`. */
+function isCanvasContext(relPath: string): boolean {
+  if (relPath === ".canvas.json" || relPath.endsWith("/.canvas.json"))
+    return true;
+  return relPath
+    .split("/")
+    .some((seg) => seg.toLowerCase().endsWith(".canvas"));
+}
+
+/** The canonical skill-id type, derived from the run options so the literals
+ *  below are compile-checked against the real skill vocabulary. */
+type SkillId = NonNullable<AgentRunOptions["skills"]>[number];
+
+function skillsForActiveTab(relPath: string | null): SkillId[] | undefined {
   if (relPath === null) return undefined;
-  // TODO(skill-system): replace this extension heuristic with a real
-  // workspace skill picker/registry once format-specific skills exist
-  // beyond this SVG-only path.
+  // TODO(skill-system): replace this extension heuristic with a real workspace
+  // skill picker/registry.
+  // The design_search picker IS the artwork/library context — keep the
+  // `dotcanvas` skill alive while it's focused so a turn typed mid-pick (and the
+  // board-building that follows the picks) doesn't silently lose format
+  // knowledge. This also covers the "create a board from scratch" case the
+  // skill-system TODO above anticipated.
+  if (relPath === DESIGN_SEARCH_TAB_ID || isCanvasContext(relPath))
+    return ["dotcanvas"];
   if (SVG_EXTENSIONS.has(getExtension(relPath))) return ["svg"];
   return undefined;
 }
@@ -131,6 +158,12 @@ export type AgentPaneProps = {
    * turn. The file tree pane's re-load is cheap.
    */
   onMaybeMutated?: () => void;
+  /** Pushes the live `design_search` pick up to the workbench, which hosts the
+   * picker as a dedicated editor-pane tab. null when no pick is pending. */
+  onDesignSearchChange?: (session: DesignSearchSession | null) => void;
+  /** Reopen/focus the picker tab — the affordance behind the in-pane note when
+   * a pick is pending (e.g. after the user closed the tab). */
+  onOpenPicker?: () => void;
 };
 
 export function AgentPane({
@@ -138,6 +171,8 @@ export function AgentPane({
   activeRelPath = null,
   className,
   onMaybeMutated,
+  onDesignSearchChange,
+  onOpenPicker,
 }: AgentPaneProps) {
   return (
     <div className={cn("flex h-full flex-col bg-background", className)}>
@@ -145,6 +180,8 @@ export function AgentPane({
         workspace={workspace}
         activeRelPath={activeRelPath}
         onMaybeMutated={onMaybeMutated}
+        onDesignSearchChange={onDesignSearchChange}
+        onOpenPicker={onOpenPicker}
       />
     </div>
   );
@@ -156,6 +193,8 @@ function AgentPaneContent({
   workspace,
   activeRelPath = null,
   onMaybeMutated,
+  onDesignSearchChange,
+  onOpenPicker,
 }: AgentPaneContentProps) {
   // Prompt handed off from the welcome composer. Peeked once (cached in a
   // ref so it stays stable after we clear it) to decide a fresh-session
@@ -263,11 +302,11 @@ function AgentPaneContent({
         }),
         // Resume after a CLIENT-resolved tool result lands. fs/todos/command are
         // server-resolved (the sidecar completes the loop in-stream, ending on
-        // text — never a dangling tool call), so this fires ONLY for the locked
-        // `question` tool: once the user answers (the card calls addToolResult),
-        // the message becomes complete-with-tool-calls and the paused run
-        // resumes. Approval pauses are NOT affected (an approval-requested call
-        // has no result, so it's never "complete").
+        // text — never a dangling tool call), so this fires for the human-input
+        // tools answered via their pinned cards: `question` and `design_search`
+        // (the pick card). Once the result lands the message becomes
+        // complete-with-tool-calls and the paused run resumes. Approval pauses
+        // are NOT affected (an approval-requested call has no result).
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
       }),
     // Rebuild ONLY on a real session switch / new chat (or workspace change)
@@ -424,16 +463,22 @@ function AgentPaneContent({
   // CORE fires queued items serially on a clean idle edge (the drain is core
   // state — not this client). `useTurnQueueController` owns the submit gate +
   // the optimistic mirror, shared with `ai-sidebar/chat.tsx`. Skills ride the
-  // live `send` from the active tab; a core-drained turn uses the session's
-  // discovered skills (no per-send subset — the renderer has no tab there).
+  // active tab: both the live `send` (below) AND the transport's body-less
+  // backfill — so a human-input resume (a `question` answer or a `design_search`
+  // pick, issued via `addToolResult` + `sendAutomaticallyWhen`, which carries no
+  // body) still lands the active tab's skill block instead of dropping it. A
+  // core-drained turn uses the session's discovered skills (the renderer has no
+  // tab there).
   // Endpoint provider pin for the active model (issue #806) — rides every
   // run-entering body: normal sends AND approval resumes below.
   const providerId = registered_models.providerIdForModel(modelId, endpoints);
+  const activeSkills = skillsForActiveTab(activeRelPath);
   // Keep the transport's body-less backfill (above) in step with the pickers.
   runContextRef.current = {
     model_id: modelId,
     mode,
     ...(providerId ? { provider_id: providerId } : {}),
+    ...(activeSkills ? { skills: activeSkills } : {}),
   };
 
   const {
@@ -451,7 +496,7 @@ function AgentPaneContent({
       modelId,
       providerId,
       mode,
-      skills: skillsForActiveTab(activeRelPath),
+      skills: activeSkills,
     }),
   });
 
@@ -607,6 +652,21 @@ function AgentPaneContent({
   // approval resume (which must use the live `chat` to merge into an in-flight
   // message), this fires on a click against an already-settled card, so the
   // post-commit `chatRef` mirror is the right (stable) instance.
+  // Commit the user's design_search picks (the visual brief): the picks become
+  // the tool result and `sendAutomaticallyWhen` resumes the paused run, now
+  // conditioned on the picked references. Same stable-instance reasoning as
+  // `onAnswerQuestion`.
+  const onPickReferences = useCallback<PickReferencesHandler>(
+    (toolCallId, output) => {
+      void chatRef.current?.addToolResult({
+        tool: "design_search",
+        toolCallId,
+        output,
+      });
+    },
+    []
+  );
+
   const onAnswerQuestion = useCallback<AnswerQuestionHandler>(
     (toolCallId, output) => {
       void chatRef.current?.addToolResult({
@@ -638,6 +698,28 @@ function AgentPaneContent({
     () => findPendingQuestion(messages),
     [messages]
   );
+
+  // A pending `design_search` pauses the run on the user's selection. The pick
+  // surface itself is hosted by the editor pane (a dedicated virtual tab, room
+  // to browse a large staggered gallery), so we lift the live session up to the
+  // workbench rather than render the picker here.
+  const pendingPick = useMemo(
+    () => findPendingDesignSearch(messages),
+    [messages]
+  );
+
+  useEffect(() => {
+    onDesignSearchChange?.(
+      pendingPick
+        ? { entry: pendingPick, onPick: onPickReferences, busy }
+        : null
+    );
+  }, [pendingPick, busy, onPickReferences, onDesignSearchChange]);
+
+  // Clear the lifted session if this pane unmounts mid-pick (closes the tab).
+  useEffect(() => {
+    return () => onDesignSearchChange?.(null);
+  }, [onDesignSearchChange]);
 
   // Pre-first-token "Thinking" indicator: a turn is streaming through this
   // client, but the AI-SDK reducer hasn't created the assistant message yet (it
@@ -701,6 +783,28 @@ function AgentPaneContent({
             onAnswer={onAnswerQuestion}
             disabled={busy}
           />
+        </div>
+      )}
+
+      {/* The agent gathered references — the picker opens in the editor pane as
+          a dedicated tab. This note keeps the request visible here and reopens
+          the tab if the user closed it. */}
+      {pendingPick && (
+        <div className="shrink-0 border-t p-3">
+          <button
+            type="button"
+            onClick={() => onOpenPicker?.()}
+            className="flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs text-muted-foreground shadow-sm transition hover:border-foreground/20 hover:text-foreground"
+          >
+            <ImagesIcon className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              Pick references
+              {pickQuery(pendingPick)
+                ? ` for “${pickQuery(pendingPick)}”`
+                : ""}{" "}
+              — open the picker
+            </span>
+          </button>
         </div>
       )}
 

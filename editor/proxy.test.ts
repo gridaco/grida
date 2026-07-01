@@ -69,6 +69,62 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
     }
   });
 
+  // The first-party Grida Library (the app's own Supabase storage) IS allowed in
+  // img-src: reference pins are kept as URLs and rendered directly. It is one
+  // first-party origin, image-only — distinct from generation-provider CDNs.
+  describe("first-party library carve-out", () => {
+    const libOrigin = "https://proj-all.supabase.co";
+    const withLib = buildDesktopCsp("n", libOrigin);
+    const directiveOf = (src: string, name: string): string =>
+      src
+        .split(";")
+        .map((d) => d.trim())
+        .find((d) => d === name || d.startsWith(`${name} `))!;
+
+    it("allowlists the first-party library origin in img-src only", () => {
+      expect(directiveOf(withLib, "img-src")).toContain(libOrigin);
+      // image only — not media-src, not connect-src
+      expect(directiveOf(withLib, "media-src")).not.toContain(libOrigin);
+      expect(directiveOf(withLib, "connect-src")).not.toContain(libOrigin);
+    });
+
+    it("still excludes generation-provider CDNs with the library origin set", () => {
+      for (const host of ["fal.media", "openrouter.ai"]) {
+        expect(directiveOf(withLib, "img-src")).not.toContain(host);
+      }
+    });
+
+    it("omits the library origin when env is unset (no widening on empty)", () => {
+      expect(directiveOf(buildDesktopCsp("n", ""), "img-src")).toBe(
+        "img-src 'self' data: blob: grida-workspace:"
+      );
+    });
+
+    it("reduces the override to a bare origin (path/query stripped)", () => {
+      const src = buildDesktopCsp(
+        "n",
+        "https://proj-all.supabase.co/storage/x"
+      );
+      expect(directiveOf(src, "img-src")).toContain(
+        "https://proj-all.supabase.co"
+      );
+      expect(directiveOf(src, "img-src")).not.toContain("/storage/x");
+    });
+
+    it("drops a malformed override that tries to smuggle extra directives", () => {
+      // A value with a space/`;` can't be a valid URL origin, so it's dropped —
+      // it can neither add a second source nor inject a `; script-src …` clause.
+      const evil = "https://evil.example.com; script-src 'unsafe-inline'";
+      const src = buildDesktopCsp("n", evil);
+      expect(directiveOf(src, "img-src")).toBe(
+        "img-src 'self' data: blob: grida-workspace:"
+      );
+      // and no injected directive (host OR the smuggled clause) leaked in
+      expect(src).not.toContain("evil.example.com");
+      expect(src).not.toContain("script-src 'unsafe-inline'");
+    });
+  });
+
   it("connect-src reaches the loopback agent sidecar", () => {
     expect(directive("connect-src")).toContain("http://127.0.0.1:*");
   });

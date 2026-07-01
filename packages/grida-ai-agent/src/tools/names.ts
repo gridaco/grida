@@ -17,6 +17,17 @@ export const RUN_COMMAND_TOOL_NAME = "run_command" as const;
 export const QUESTION_TOOL_NAME = "question" as const;
 
 /**
+ * Semantic search over the Grida reference Library (the artwork-station gather
+ * step). Client-resolved: the renderer holds the library/web session, so it
+ * runs the search and fills the result in. It is a HUMAN-INPUT block (see
+ * {@link HUMAN_INPUT_TOOL_NAMES}): the turn pauses at `input-available` until the
+ * user submits their reference picks from the searched results — distinct from a
+ * transient client-resolved fs call that resolves in milliseconds without a
+ * person. See `design-search.ts`.
+ */
+export const DESIGN_SEARCH_TOOL_NAME = "design_search" as const;
+
+/**
  * Every tool the agent may emit, regardless of which capabilities a
  * given callsite happens to wire. The *maximal* union: the client must
  * be able to decode any tool name without first asking the agent host
@@ -30,6 +41,7 @@ export type AgentToolName =
   | AgentGen.ToolName
   | typeof RUN_COMMAND_TOOL_NAME
   | typeof QUESTION_TOOL_NAME
+  | typeof DESIGN_SEARCH_TOOL_NAME
   | typeof SKILL_TOOL_NAME;
 
 /**
@@ -44,7 +56,13 @@ export type AgentToolName =
  * at `input-available` (which a renderer fills in milliseconds), which must
  * NOT pause the drain.
  */
-export const HUMAN_INPUT_TOOL_NAMES = [QUESTION_TOOL_NAME] as const;
+export const HUMAN_INPUT_TOOL_NAMES = [
+  QUESTION_TOOL_NAME,
+  // `design_search` is the artwork-station "pick a reference" picker the comment
+  // above anticipated: it pauses at `input-available` until the user submits
+  // their picks from the searched results (resolved by the renderer's card).
+  DESIGN_SEARCH_TOOL_NAME,
+] as const;
 
 /**
  * Persisted/streamed part `type` values for the {@link HUMAN_INPUT_TOOL_NAMES}

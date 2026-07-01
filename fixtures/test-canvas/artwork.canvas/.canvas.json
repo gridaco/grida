@@ -1,0 +1,41 @@
+{
+  "$schema": "https://grida.co/schema/dotcanvas/v1.json",
+  "documents": [
+    {
+      "id": "golden-hour",
+      "layout": {
+        "h": 400,
+        "w": 600,
+        "x": 60,
+        "y": 60,
+        "z": 0
+      },
+      "src": "outputs/golden-hour.png"
+    },
+    {
+      "id": "desert-dunes",
+      "layout": {
+        "h": 400,
+        "w": 600,
+        "x": 720,
+        "y": 60,
+        "z": 1
+      },
+      "src": "outputs/desert-dunes.png"
+    },
+    {
+      "id": "skier-peak",
+      "layout": {
+        "h": 560,
+        "w": 292,
+        "x": 1380,
+        "y": 60,
+        "z": 2
+      },
+      "src": "outputs/skier-peak.png"
+    }
+  ],
+  "editor": "board",
+  "files": ["outputs/*.png"],
+  "version": "1"
+}

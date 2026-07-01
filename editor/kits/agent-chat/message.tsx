@@ -77,6 +77,10 @@ import {
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
 import { isMediaToolEntry, MediaToolContent } from "./tool-media";
+import {
+  isDesignSearchEntry,
+  DesignSearchContent,
+} from "./design-search-widget";
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 
@@ -611,6 +615,20 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   const title = description.detail
     ? `${description.title} · ${description.detail}`
     : description.title;
+  // design_search renders its result as a thumbnail gallery (the gather step),
+  // open by default — the point is to SEE the references, not unfold a JSON row.
+  if (isDesignSearchEntry(entry)) {
+    return (
+      <Task defaultOpen className="w-full">
+        <TaskTrigger title={title}>
+          {triggerRow(iconForAction(description.action), title)}
+        </TaskTrigger>
+        <TaskContent>
+          <DesignSearchContent entry={entry} />
+        </TaskContent>
+      </Task>
+    );
+  }
   // The image tools (view_image, generate_image) have known shapes, so they get
   // a dedicated body (prompt/path + image, no JSON) and open by default — the
   // point is to SEE the image, not unfold a tool row. Other tools keep the

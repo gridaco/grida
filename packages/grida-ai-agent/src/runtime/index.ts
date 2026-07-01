@@ -209,6 +209,12 @@ export type AgentRuntimeDeps = ResolveDeps & {
    */
   interactive?: boolean;
   /**
+   * Host-level default for the `design_search` (library) capability, overridden
+   * by the per-run `library` flag. Threaded down to `createToolset` like
+   * {@link interactive}.
+   */
+  library?: boolean;
+  /**
    * Optional injected registry — the smoke + tests pre-populate entries.
    * Omit to let AgentRuntime allocate its own.
    */
@@ -274,6 +280,9 @@ type StartTurnOptions = {
   /** Whether the requesting client can answer the `question` tool (per-run;
    *  absent ⇒ the host `interactive` default). A core drain leaves it absent. */
   interactive?: RunRequest["interactive"];
+  /** Whether the requesting client can resolve `design_search` (per-run; absent
+   *  ⇒ the host `library` default). */
+  library?: RunRequest["library"];
   /**
    * The user message this turn fires — the fired-message identity the
    * turn-lifecycle wire carries (RFC `turn-authority`; emitted on the
@@ -793,6 +802,8 @@ export class AgentRuntime {
         // Per-run client UI capability (the desktop-from-web bridge sets true; a
         // headless `cli run` sets false). Absent ⇒ host default downstream.
         interactive: req.interactive,
+        // Per-run library-search capability (renderer wires the resolver).
+        library: req.library,
         // The fired message of a direct run is the incoming tail's user
         // message (the client resends history; the tail is the new one). An
         // approval-answer resume continues the PRIOR turn's tool call — it
@@ -843,6 +854,7 @@ export class AgentRuntime {
       skills,
       mode,
       interactive,
+      library,
     } = opts;
 
     // Reserve the registry entry; its `modelAbort.signal` (not the request
@@ -915,6 +927,8 @@ export class AgentRuntime {
       image_model_id: this.deps.image_model_id,
       // Host-level: gates the `question` tool's execute-or-pause in createAgent.
       interactive: this.deps.interactive === true,
+      // Host-level default for design_search; per-run `req.library` overrides.
+      library: this.deps.library === true,
     };
     // Pump: open the upstream model call, forward each SSE frame into the
     // registry. Doesn't block the caller; a client attaches as another
@@ -1013,6 +1027,7 @@ export class AgentRuntime {
             skills,
             mode,
             interactive,
+            library,
             skill_index: ctx.skill_index,
             skill_cache: ctx.skill_cache,
             project_instructions: ctx.project_instructions,

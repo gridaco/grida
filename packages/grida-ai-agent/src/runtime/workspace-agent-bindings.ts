@@ -180,6 +180,9 @@ export async function createWorkspaceAgentBindings(
       image_gen = createImageGenerator(
         secrets,
         scratchDir,
+        // Same reader `view_image` uses — so an i2i reference path honors the
+        // identical scoping + size cap as perceiving that file.
+        fs,
         deps.image_model_id
       );
     }
@@ -218,6 +221,7 @@ function extForMime(mime: string): string {
 function createImageGenerator(
   secrets: SecretsStore,
   scratchDir: string,
+  reader: AgentVision.ByteReader,
   imageModelId?: string
 ): AgentGen.ImageGenerator {
   return {
@@ -232,25 +236,65 @@ function createImageGenerator(
           message: "No image model is available.",
         };
       }
+      // Image-to-image when the host supplied reference images (the curated
+      // board's pins). The model-facing tool stays prompt-only; references are
+      // resolved below and ride our internal `grida` provider-options namespace,
+      // which the BYOK adapter maps to the provider's own field.
+      const wantsRefs = (input.references?.length ?? 0) > 0;
       let resolved;
       try {
-        resolved = await resolveImageModel({ secrets }, modelId);
+        resolved = await resolveImageModel(
+          { secrets },
+          modelId,
+          wantsRefs ? { references: true } : {}
+        );
       } catch (e) {
         if (e instanceof ImageModelUnavailableError) {
           return {
             ok: false,
             reason: "unavailable",
-            message: `No connected provider can generate "${modelId}". Ask the user to connect an image-provider key in settings.`,
+            message: wantsRefs
+              ? `No connected provider can generate "${modelId}" with reference images (image-to-image). Ask the user to connect an image-provider key that supports it.`
+              : `No connected provider can generate "${modelId}". Ask the user to connect an image-provider key in settings.`,
           };
         }
         throw e;
       }
+      // Resolve each reference to something a provider can ingest. The caller
+      // passes dumb inputs — a workspace path, an https URL, or a data URL — and
+      // the host resolves them (a path is read + inlined; a URL passes through),
+      // trimmed to the route's advertised cap. An unresolvable reference fails
+      // fast with a clear, typed message instead of an opaque provider error.
+      let references: string[] | undefined;
+      if (wantsRefs) {
+        const capped = input.references!.slice(
+          0,
+          resolved.references_max ?? input.references!.length
+        );
+        try {
+          references = await Promise.all(
+            capped.map((ref) => resolveReference(ref, reader))
+          );
+        } catch (e) {
+          if (e instanceof ReferenceResolveError) {
+            return { ok: false, reason: "invalid_input", message: e.message };
+          }
+          throw e;
+        }
+      }
       let generation;
       try {
+        // TODO(image-quality): pin a `quality: "medium"` default for gpt-image-2
+        // instead of inheriting the provider default (OpenAI defaults to high/auto
+        // → pricier; the catalog's avg_cost_usd is the medium tier). Quality is an
+        // OpenAI-specific knob (low|medium|high|auto) and the resolved provider
+        // varies (vercel `openai` ns / openrouter `orExtra` / fal `falExtra`), so
+        // it must be threaded per-namespace. Track + add later.
         generation = await generateImage({
           model: resolved.model,
           prompt: input.prompt,
           n: 1,
+          ...(references ? { providerOptions: { grida: { references } } } : {}),
         });
       } catch (e) {
         // Upstream detail (may embed provider body text) stays in the sidecar
@@ -307,6 +351,100 @@ function createImageGenerator(
       };
     },
   };
+}
+
+/** A reference (path/URL) the host couldn't turn into provider-ingestible bytes. */
+export class ReferenceResolveError extends Error {}
+
+/**
+ * Resolve one image-to-image reference to a provider-ingestible URL. The caller
+ * passes a dumb input — a file path, an https URL, or a data URL — and gets back
+ * something a provider accepts:
+ *   - an **https** URL passes straight through (the provider fetches it). `http`
+ *     is rejected: the contract is https-only, and the string is serialized
+ *     verbatim into the provider request, so we don't let it induce a plaintext
+ *     fetch.
+ *   - a **data:** URL is decoded and validated exactly like a file (size cap +
+ *     image sniff), then re-emitted canonically — so a non-image or oversized
+ *     data URL can't skip the checks a path gets and reach `generateImage()`.
+ *   - a **path** is read via the shared vision {@link AgentVision.ByteReader}
+ *     (same scoping + size cap as `view_image`) and inlined as a base64 data URL.
+ * Throws {@link ReferenceResolveError} with an agent-readable message when a
+ * reference can't be resolved (empty, not found, too large, or not an image).
+ */
+export async function resolveReference(
+  ref: string,
+  reader: AgentVision.ByteReader
+): Promise<string> {
+  const r = ref.trim();
+  if (!r) throw new ReferenceResolveError("a reference is empty.");
+  if (/^https:\/\//i.test(r)) return r;
+
+  // A data: URL and a workspace path both resolve to raw bytes that go through
+  // the SAME size + image-sniff validation before a provider ever sees them.
+  // Every error below is returned to the AGENT, so never echo the raw ref — a
+  // `data:` URL is an inline base64 payload (KBs of noise / possible leak) and a
+  // long path bloats context. `label` is a safe, bounded summary.
+  const label = describeReference(r);
+  let bytes: Uint8Array | null;
+  if (/^data:/i.test(r)) {
+    bytes = decodeDataUrl(r);
+    if (!bytes) {
+      throw new ReferenceResolveError(
+        `reference ${label} is not a valid data URL.`
+      );
+    }
+  } else {
+    try {
+      bytes = await reader.readBytes(r);
+    } catch (e) {
+      if (e instanceof AgentVision.OversizeError) {
+        throw new ReferenceResolveError(
+          `reference ${label} is too large (limit ${AgentVision.MAX_BYTES} bytes).`
+        );
+      }
+      throw new ReferenceResolveError(`reference ${label} could not be read.`);
+    }
+    if (!bytes) {
+      throw new ReferenceResolveError(
+        `reference ${label} was not found — pass a workspace file path, an https URL, or a data URL.`
+      );
+    }
+  }
+  if (bytes.byteLength > AgentVision.MAX_BYTES) {
+    throw new ReferenceResolveError(
+      `reference ${label} is ${bytes.byteLength} bytes; the limit is ${AgentVision.MAX_BYTES}.`
+    );
+  }
+  const sniffed = AgentVision.sniff(bytes);
+  if (!sniffed) {
+    throw new ReferenceResolveError(
+      `reference ${label} is not a supported image (png, jpeg, webp, or gif).`
+    );
+  }
+  return `data:${sniffed.mime};base64,${Buffer.from(bytes).toString("base64")}`;
+}
+
+/** A safe, bounded label for a reference in an agent-visible error: a `data:`
+ *  URL collapses to `"data URL"` (never echo its inline payload), everything
+ *  else is quoted and truncated. */
+function describeReference(ref: string): string {
+  if (/^data:/i.test(ref)) return "a data URL";
+  return JSON.stringify(ref.length > 160 ? `${ref.slice(0, 157)}...` : ref);
+}
+
+/** Decode a `data:` URL's payload to bytes, or null if malformed. Handles both
+ *  `;base64` and percent-encoded payloads. */
+function decodeDataUrl(url: string): Uint8Array | null {
+  const m = /^data:([^,]*),(.*)$/is.exec(url);
+  if (!m) return null;
+  try {
+    return /;base64/i.test(m[1])
+      ? new Uint8Array(Buffer.from(m[2], "base64"))
+      : new Uint8Array(Buffer.from(decodeURIComponent(m[2])));
+  } catch {
+    return null;
+  }
 }
 
 export class WorkspaceAgentFsBackend implements AgentFs.Backend {

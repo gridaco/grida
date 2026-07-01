@@ -57,6 +57,9 @@ export type RunRequest = {
   /** Whether the requesting client has a human UI for the `question` tool
    *  (RFC `tools` §question). Absent ⇒ inherit the host's `interactive` default. */
   interactive?: boolean;
+  /** Whether the client can resolve a Grida Library search (`design_search`).
+   *  Absent ⇒ inherit the host's `library` default. */
+  library?: boolean;
   /** Resume answer for a paused supervised approval; absent on a normal turn. */
   approval_answer?: ApprovalAnswer;
   session_id?: string;
@@ -83,6 +86,7 @@ export async function parseRunBody(
     skills?: unknown;
     mode?: unknown;
     interactive?: unknown;
+    library?: unknown;
     approval_answer?: unknown;
     session_id?: unknown;
   };
@@ -170,6 +174,10 @@ export async function parseRunBody(
     // Only an explicit boolean counts; anything else leaves it absent so the
     // host's `interactive` default applies (the client didn't declare a UI).
     interactive: typeof b.interactive === "boolean" ? b.interactive : undefined,
+    // Whether the client can resolve a Grida Library search (`design_search`).
+    // Only a renderer that wired the resolver declares this true, so the tool is
+    // advertised exactly where it can be answered (client-resolved, like fs).
+    library: typeof b.library === "boolean" ? b.library : undefined,
     // A malformed approval answer is treated as absent (no resume), never a
     // 400 — and `store.answerApproval` re-validates it against the persisted
     // pending approval regardless, so a forged answer is a no-op.

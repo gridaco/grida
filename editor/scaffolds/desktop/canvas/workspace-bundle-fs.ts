@@ -1,5 +1,5 @@
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
-import type { dotcanvas } from "dotcanvas";
+import { dotcanvas } from "dotcanvas";
 
 // Adapts the desktop workspace bridge fs to `dotcanvas`'s `WritableFs`
 // port. Unlike the web OPFS path, the bridge already addresses files with
@@ -31,6 +31,30 @@ export interface WorkspaceFsClient {
     content: string,
     expectedMtime?: number
   ): Promise<{ mtime: number }>;
+}
+
+/**
+ * Refuse a document `src` that isn't bundle-local. Per the `.canvas` contract
+ * (§2) every bundle-file path is relative to the bundle root; `..` traversal and
+ * absolute paths are out of scope. Enforcing it at the point a `src` becomes a
+ * workspace-relative path keeps a hostile or garbled manifest from steering a
+ * file op (`trashEntry`, `media_url`) outside the bundle. Shared by both stores
+ * (`CanvasDeck.abs` / `CanvasBoard.bundlePath`). Callers filter URI srcs first,
+ * but the URI check is repeated here too so this guard stays file-only on its
+ * own — a caller that forgets the pre-check can't leak an `https://`/`file://`
+ * ref into a workspace file op.
+ */
+export function assertBundleLocalSrc(src: string): void {
+  const normalized = src.replaceAll("\\", "/");
+  if (
+    normalized.length === 0 ||
+    dotcanvas.isUriSrc(src) || // https://, file://, … — not bundle-local
+    normalized.startsWith("/") ||
+    /^[a-zA-Z]:/.test(normalized) || // drive-letter absolute (Windows)
+    normalized.split("/").includes("..")
+  ) {
+    throw new Error(`.canvas: non-bundle-local document src rejected: ${src}`);
+  }
 }
 
 /**

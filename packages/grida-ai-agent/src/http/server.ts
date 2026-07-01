@@ -77,6 +77,11 @@ export type ServerOptions = {
    * sets this true; the CLI and hosted/batch paths leave it false.
    */
   interactive?: boolean;
+  /**
+   * Whether clients can resolve a Grida Library search — gates the
+   * `design_search` tool (client-resolved). The desktop sidecar sets this true.
+   */
+  library?: boolean;
 };
 
 /**
@@ -230,6 +235,8 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     // Whether the locked `question` tool pauses for a human (interactive) or
     // refuses with a fixed tool error (headless). Fail-closed headless.
     interactive: opts.interactive === true,
+    // Host default for the `design_search` (library) capability.
+    library: opts.library === true,
   });
   if (opts.capabilities.agent) registerAgentRoutes(app, runtime);
   if (opts.capabilities.sessions)

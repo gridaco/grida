@@ -59,6 +59,50 @@ describe("AgentGen.resolveToolCall", () => {
     expect(out).toBe(OK);
   });
 
+  it("forwards model-supplied `references` (image-to-image) to the generator", async () => {
+    let received: AgentGen.ImageGenInput | undefined;
+    const capturingGen: AgentGen.ImageGenerator = {
+      async generate(input) {
+        received = input;
+        return OK;
+      },
+    };
+    await AgentGen.resolveToolCall(capturingGen, {
+      tool_name: "generate_image",
+      input: {
+        prompt: "make it autumn",
+        references: ["pins/a.png", "https://x/b.jpg"],
+      },
+    });
+    expect(received).toEqual({
+      prompt: "make it autumn",
+      references: ["pins/a.png", "https://x/b.jpg"],
+    });
+  });
+
+  it("omits references for a plain text-to-image call", async () => {
+    let received: AgentGen.ImageGenInput | undefined;
+    const capturingGen: AgentGen.ImageGenerator = {
+      async generate(input) {
+        received = input;
+        return OK;
+      },
+    };
+    await AgentGen.resolveToolCall(capturingGen, {
+      tool_name: "generate_image",
+      input: { prompt: "a red circle" },
+    });
+    expect(received?.references).toBeUndefined();
+  });
+
+  it("rejects a non-array `references` as typed invalid_input", async () => {
+    const out = await AgentGen.resolveToolCall(okGen, {
+      tool_name: "generate_image",
+      input: { prompt: "x", references: "not-an-array" },
+    });
+    expect(out).toMatchObject({ ok: false, reason: "invalid_input" });
+  });
+
   it("maps a missing prompt to a typed invalid_input refusal, not a throw", async () => {
     const out = await AgentGen.resolveToolCall(okGen, {
       tool_name: "generate_image",

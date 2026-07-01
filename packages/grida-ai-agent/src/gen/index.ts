@@ -39,10 +39,20 @@ export namespace AgentGen {
   // -------------------------------------------------------------------------
 
   /**
-   * The validated `generate_image` input. The generator impl consumes this
-   * shape (the host's node-only binding), so it is exported.
+   * What the host's generator consumes — the validated {@link GEN_IMAGE_INPUT}.
    */
-  export type ImageGenInput = z.infer<typeof GEN_IMAGE_INPUT>;
+  export type ImageGenInput = {
+    /** What to create, in natural language (the validated tool prompt). */
+    prompt: string;
+    /**
+     * Reference images to condition on (image-to-image), supplied by the agent.
+     * Each is a dumb input — a file path, an https URL, or a data URL — the host
+     * resolves automatically (a path is read + inlined; a URL passes through). An
+     * unresolvable reference comes back as a typed `invalid_input` with a clear
+     * message. Absent/empty ⇒ text-to-image.
+     */
+    references?: string[];
+  };
 
   /**
    * What the host's generator returns. `generate_image` is a PRODUCER, not a
@@ -100,17 +110,19 @@ export namespace AgentGen {
 
   export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 
-  // PROMPT-ONLY by design. The tool exposes a single argument — what to make,
-  // in natural language (the agent puts composition cues like "wide 16:9" in the
-  // prose). Everything else is deliberately NOT a parameter:
+  // Two arguments, both genuine agent intent. Everything else is deliberately
+  // NOT a parameter:
   //   - model / provider: the user's connected choice (settings), not the
   //     agent's — and the agent has no way to enumerate valid ids.
   //   - size / aspect_ratio: silently ineffective on the primary BYOK path
   //     (verified — seedream on OpenRouter returns square regardless of the
   //     param), so a knob that lies; aspect rides the prose, best-effort.
   //   - seed / filename: technicalities; the output path is auto-named + returned.
-  // This keeps the tool at view_image-level simplicity (one arg) instead of the
-  // 7-arg sprawl that made it the most complex tool in the package.
+  // `references` IS exposed (unlike the above) because it is intent the agent can
+  // GROUND and EXPRESS — a path it holds, a URL it gathered — and the system
+  // auto-resolves it (TOOL-DESIGN, Lens 5). The tool conditions on whatever it's
+  // given; deciding WHAT to reference (e.g. forwarding design_search picks) is the
+  // agent's job, a layer above this tool.
   const GEN_IMAGE_INPUT = z.object({
     prompt: z
       .string()
@@ -119,6 +131,15 @@ export namespace AgentGen {
         "What to create, in natural language — be vivid and specific. " +
           'Include any composition cues in the text itself (e.g. "a wide 16:9 ' +
           'landscape of …", "a portrait of …").'
+      ),
+    references: z
+      .array(z.string().min(1))
+      .optional()
+      .describe(
+        "Optional reference image(s) to condition on (image-to-image). Each is a " +
+          "workspace file path OR an image URL — the system reads/fetches it for " +
+          "you. Use this to build on gathered references or to iterate on a " +
+          "previous image (pass its path). Omit for plain text-to-image."
       ),
   });
 
@@ -208,6 +229,9 @@ export namespace AgentGen {
         message: "generate_image requires a non-empty `prompt` string.",
       };
     }
+    // `references` (image-to-image inputs) ride the validated model input; the
+    // generator resolves each path/URL. The tool does not know where they came
+    // from — that's the agent's orchestration (e.g. forwarding design_search picks).
     return generator.generate(parsed.data);
   }
 }

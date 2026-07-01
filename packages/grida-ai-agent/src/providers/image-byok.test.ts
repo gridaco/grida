@@ -135,6 +135,20 @@ describe("FalImageModel.doGenerate", () => {
     await expect(model.doGenerate(callOptions())).rejects.toThrow(/FAILED/);
   });
 
+  it("throws (never silently drops) when i2i references arrive on the fal route", async () => {
+    // The catalog ships no fal `references` binding, so resolveImageModel never
+    // routes i2i here — but if it ever did, degrading to t2i would be worse than
+    // an error. Guard fires BEFORE any fetch (no network mock needed).
+    const model = new FalImageModel("sk", "fal-ai/x");
+    await expect(
+      model.doGenerate(
+        callOptions({
+          providerOptions: { grida: { references: ["https://x/y.png"] } },
+        })
+      )
+    ).rejects.toThrow(/image-to-image references are not supported/i);
+  });
+
   it("propagates an aborted signal", async () => {
     vi.stubGlobal(
       "fetch",
@@ -194,6 +208,51 @@ describe("OpenRouterImageModel.doGenerate", () => {
     );
     const model = new OpenRouterImageModel("sk", "openai/does-not-exist");
     await expect(model.doGenerate(callOptions())).rejects.toThrow(/404/);
+  });
+
+  it("maps grida.references → input_references for image-to-image", async () => {
+    let body: Record<string, unknown> | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: MockInit = {}) => {
+        body = JSON.parse(init.body ?? "{}");
+        return new Response(JSON.stringify({ data: [{ b64_json: "AAAA" }] }), {
+          status: 200,
+        });
+      })
+    );
+    const model = new OpenRouterImageModel("sk", "bytedance-seed/seedream-4.5");
+    await model.doGenerate(
+      callOptions({
+        providerOptions: {
+          grida: {
+            references: ["data:image/png;base64,Zm9v", "https://x/y.png"],
+          },
+        },
+      })
+    );
+    expect(body?.input_references).toEqual([
+      { type: "image_url", image_url: { url: "data:image/png;base64,Zm9v" } },
+      { type: "image_url", image_url: { url: "https://x/y.png" } },
+    ]);
+    // the internal `grida` namespace is never forwarded raw to the provider
+    expect(body).not.toHaveProperty("grida");
+  });
+
+  it("omits input_references for a plain text-to-image call", async () => {
+    let body: Record<string, unknown> | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: MockInit = {}) => {
+        body = JSON.parse(init.body ?? "{}");
+        return new Response(JSON.stringify({ data: [{ b64_json: "AAAA" }] }), {
+          status: 200,
+        });
+      })
+    );
+    const model = new OpenRouterImageModel("sk", "bytedance-seed/seedream-4.5");
+    await model.doGenerate(callOptions());
+    expect(body).not.toHaveProperty("input_references");
   });
 });
 

@@ -69,6 +69,11 @@ const OPENROUTER_IMAGE_URL = "https://openrouter.ai/api/v1/images";
  * 404s there. The unified route normalizes `model`/`prompt`/`size`/
  * `aspect_ratio`/`seed` across all OpenRouter image models and returns base64 in
  * `data[].b64_json` (verified live 2026-06-29).
+ *
+ * NOTE: a thrown error may include a truncated provider response body (`safeText`)
+ * — it is NOT model-safe. The only caller, `createImageGenerator`, catches and
+ * downgrades it to a generic message before the model sees anything; a new caller
+ * that lets it propagate must not surface it to the agent verbatim.
  */
 export class OpenRouterImageModel implements ImageModelV3 {
   readonly specificationVersion = "v3" as const;
@@ -85,9 +90,22 @@ export class OpenRouterImageModel implements ImageModelV3 {
   ): Promise<Awaited<ReturnType<ImageModelV3["doGenerate"]>>> {
     const { prompt, n, size, aspectRatio, seed, providerOptions, abortSignal } =
       options;
-    const orExtra =
+    // Drop any caller-supplied `input_references` from the passthrough extras:
+    // the sanitized, capped list built from our internal `grida` namespace below
+    // is authoritative, so a raw `openrouter.input_references` must NOT override
+    // it (createImageGenerator/resolveImageModel already resolved + trimmed them).
+    const { input_references: _ignoredRefs, ...orExtra } =
       (providerOptions?.openrouter as Record<string, unknown> | undefined) ??
       {};
+    // Image-to-image: OpenRouter's Unified Image API conditions on
+    // `input_references` (same endpoint as t2i). References arrive on our
+    // internal `grida` namespace (NEVER spread raw into the body). Each is an
+    // https or base64 data URL. Verified live 2026-07-01.
+    const refs = gridaReferences(providerOptions);
+    const input_references = refs?.map((url) => ({
+      type: "image_url" as const,
+      image_url: { url },
+    }));
 
     const res = await fetch(OPENROUTER_IMAGE_URL, {
       method: "POST",
@@ -104,6 +122,8 @@ export class OpenRouterImageModel implements ImageModelV3 {
         ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
         ...(seed !== undefined ? { seed } : {}),
         ...orExtra,
+        // Our sanitized refs win over any passthrough extras (spread last).
+        ...(input_references ? { input_references } : {}),
       }),
     });
     if (!res.ok) {
@@ -156,6 +176,10 @@ type FalStatus = "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | (string & {});
  *
  * `modelId` is the fal endpoint id from the catalog binding, e.g.
  * `fal-ai/flux-2-pro` or `fal-ai/bytedance/seedream/v4.5/text-to-image`.
+ *
+ * NOTE: like {@link OpenRouterImageModel}, a thrown error may include a truncated
+ * provider response body — NOT model-safe. `createImageGenerator` catches and
+ * downgrades it; don't surface it to the agent verbatim from a new caller.
  */
 export class FalImageModel implements ImageModelV3 {
   readonly specificationVersion = "v3" as const;
@@ -184,6 +208,17 @@ export class FalImageModel implements ImageModelV3 {
     const image_size = size ? whFromSize(size) : undefined;
     const falExtra =
       (providerOptions?.fal as Record<string, unknown> | undefined) ?? {};
+
+    // Image-to-image is NOT wired on the fal route: the catalog ships no fal
+    // `references` binding, so resolveImageModel never routes an i2i call here.
+    // Guard that coupling — if references ever arrive (e.g. a fal edit binding is
+    // added without mapping them into fal's field), fail loudly rather than
+    // silently degrading to a t2i generation the caller didn't ask for.
+    if (gridaReferences(providerOptions)) {
+      throw new Error(
+        "[fal] image-to-image references are not supported on the fal route yet"
+      );
+    }
 
     // 1. submit
     const submitRes = await fetch(`${FAL_QUEUE_BASE}/${this.modelId}`, {
@@ -266,11 +301,34 @@ export class FalImageModel implements ImageModelV3 {
 
 // ── helpers ─────────────────────────────────────────────────────────
 
-function whFromSize(size: `${number}x${number}`): {
-  width: number;
-  height: number;
-} {
+/**
+ * Pull image-to-image reference URLs off our INTERNAL `grida` provider-options
+ * namespace. The host (`createImageGenerator`) puts the curated board's
+ * references here as https or base64 data URLs; adapters map them to each
+ * provider's own field (OpenRouter `input_references`). This namespace is never
+ * forwarded raw to a provider. Returns `undefined` when there are no usable
+ * references.
+ */
+function gridaReferences(
+  providerOptions: ImageModelV3CallOptions["providerOptions"]
+): string[] | undefined {
+  const raw = (providerOptions?.grida as Record<string, unknown> | undefined)
+    ?.references;
+  if (!Array.isArray(raw)) return undefined;
+  const urls = raw.filter(
+    (u): u is string => typeof u === "string" && u.length > 0
+  );
+  return urls.length > 0 ? urls : undefined;
+}
+
+function whFromSize(
+  size: `${number}x${number}`
+): { width: number; height: number } | undefined {
   const [w, h] = size.split("x").map(Number);
+  // `size` is typed `${number}x${number}` but reaches here from a runtime
+  // call-options value — a malformed one (`"auto"`, unicode `×`) yields NaN.
+  // Omit `image_size` rather than post NaN dimensions to fal.
+  if (!Number.isFinite(w) || !Number.isFinite(h)) return undefined;
   return { width: w, height: h };
 }
 
