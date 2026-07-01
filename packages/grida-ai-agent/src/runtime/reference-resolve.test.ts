@@ -44,6 +44,16 @@ describe("resolveReference", () => {
     ).rejects.toThrowError(/not a supported image/i);
   });
 
+  it("does NOT echo a data URL's payload into the agent-visible error", async () => {
+    const payload = "SECRETPAYLOADBASE64DATA";
+    await expect(
+      resolveReference(`data:image/png;base64,${payload}`, NO_READER)
+    ).rejects.toThrowError(/reference a data URL is not/i);
+    await expect(
+      resolveReference(`data:image/png;base64,${payload}`, NO_READER)
+    ).rejects.not.toThrowError(new RegExp(payload));
+  });
+
   it("rejects a non-https URL (http is not passed through)", async () => {
     // http:// is not an https pass-through and not a readable path → not found.
     await expect(

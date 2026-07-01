@@ -382,12 +382,16 @@ export async function resolveReference(
 
   // A data: URL and a workspace path both resolve to raw bytes that go through
   // the SAME size + image-sniff validation before a provider ever sees them.
+  // Every error below is returned to the AGENT, so never echo the raw ref — a
+  // `data:` URL is an inline base64 payload (KBs of noise / possible leak) and a
+  // long path bloats context. `label` is a safe, bounded summary.
+  const label = describeReference(r);
   let bytes: Uint8Array | null;
   if (/^data:/i.test(r)) {
     bytes = decodeDataUrl(r);
     if (!bytes) {
       throw new ReferenceResolveError(
-        `reference "${r}" is not a valid data URL.`
+        `reference ${label} is not a valid data URL.`
       );
     }
   } else {
@@ -396,29 +400,37 @@ export async function resolveReference(
     } catch (e) {
       if (e instanceof AgentVision.OversizeError) {
         throw new ReferenceResolveError(
-          `reference "${r}" is too large (limit ${AgentVision.MAX_BYTES} bytes).`
+          `reference ${label} is too large (limit ${AgentVision.MAX_BYTES} bytes).`
         );
       }
-      throw new ReferenceResolveError(`reference "${r}" could not be read.`);
+      throw new ReferenceResolveError(`reference ${label} could not be read.`);
     }
     if (!bytes) {
       throw new ReferenceResolveError(
-        `reference "${r}" was not found — pass a workspace file path, an https URL, or a data URL.`
+        `reference ${label} was not found — pass a workspace file path, an https URL, or a data URL.`
       );
     }
   }
   if (bytes.byteLength > AgentVision.MAX_BYTES) {
     throw new ReferenceResolveError(
-      `reference "${r}" is ${bytes.byteLength} bytes; the limit is ${AgentVision.MAX_BYTES}.`
+      `reference ${label} is ${bytes.byteLength} bytes; the limit is ${AgentVision.MAX_BYTES}.`
     );
   }
   const sniffed = AgentVision.sniff(bytes);
   if (!sniffed) {
     throw new ReferenceResolveError(
-      `reference "${r}" is not a supported image (png, jpeg, webp, or gif).`
+      `reference ${label} is not a supported image (png, jpeg, webp, or gif).`
     );
   }
   return `data:${sniffed.mime};base64,${Buffer.from(bytes).toString("base64")}`;
+}
+
+/** A safe, bounded label for a reference in an agent-visible error: a `data:`
+ *  URL collapses to `"data URL"` (never echo its inline payload), everything
+ *  else is quoted and truncated. */
+function describeReference(ref: string): string {
+  if (/^data:/i.test(ref)) return "a data URL";
+  return JSON.stringify(ref.length > 160 ? `${ref.slice(0, 157)}...` : ref);
 }
 
 /** Decode a `data:` URL's payload to bytes, or null if malformed. Handles both

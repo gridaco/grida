@@ -119,8 +119,9 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
       expect(directiveOf(src, "img-src")).toBe(
         "img-src 'self' data: blob: grida-workspace:"
       );
-      // and no injected directive leaked into the header
+      // and no injected directive (host OR the smuggled clause) leaked in
       expect(src).not.toContain("evil.example.com");
+      expect(src).not.toContain("script-src 'unsafe-inline'");
     });
   });
 
