@@ -3,19 +3,46 @@
 import { Env } from "@/env";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-type ContinueWithGoogleButtonProps = {
+type OAuthButtonProps = {
   skipBrowserRedirect?: boolean;
   next?: string;
   redirect_uri?: string;
   onSuccess?: () => void;
 };
 
-export function ContinueWithGoogleButton({
+/**
+ * Discriminated union: either a pre-built GoTrue authorize URL (plain-anchor
+ * mode) OR the supabase-js OAuth flow props — never both. Anchor mode is used
+ * by the desktop launch page (`/desktop-auth`), whose PKCE challenge belongs
+ * to the desktop app's cookie jar, not this browser (GRIDA-SEC-005); passing
+ * OAuth props alongside `authorize_url` is a type error rather than a silent
+ * no-op.
+ */
+type ContinueWithGoogleButtonProps =
+  | ({ authorize_url: string } & { [K in keyof OAuthButtonProps]?: never })
+  | ({ authorize_url?: undefined } & OAuthButtonProps);
+
+const BUTTON_CLASS =
+  "flex px-4 py-2 rounded-sm items-center justify-center gap-4 border shadow-sm hover:shadow-md transition-shadow";
+
+export function ContinueWithGoogleButton(props: ContinueWithGoogleButtonProps) {
+  if (props.authorize_url) {
+    return (
+      <a className={BUTTON_CLASS} href={props.authorize_url}>
+        <GoogleLogo />
+        Continue with Google
+      </a>
+    );
+  }
+  return <ContinueWithGoogleOAuthButton {...props} />;
+}
+
+function ContinueWithGoogleOAuthButton({
   skipBrowserRedirect,
   next,
   redirect_uri,
   onSuccess,
-}: ContinueWithGoogleButtonProps) {
+}: OAuthButtonProps) {
   const client = createBrowserClient();
 
   const url = new URL(`${Env.web.HOST}/auth/callback`);
@@ -30,7 +57,7 @@ export function ContinueWithGoogleButton({
 
   return (
     <button
-      className="flex px-4 py-2 rounded-sm items-center justify-center gap-4 border shadow-sm hover:shadow-md transition-shadow"
+      className={BUTTON_CLASS}
       onClick={() => {
         client.auth
           .signInWithOAuth({

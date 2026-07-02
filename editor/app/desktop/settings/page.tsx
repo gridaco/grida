@@ -58,10 +58,11 @@ export default function DesktopSettingsPage() {
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            AI provider keys, local models, and app info.
+            Account, AI provider keys, local models, and app info.
           </p>
         </header>
 
+        <AccountSection />
         <ByokSection />
         <ImageModelsSection />
         <VideoModelsSection />
@@ -69,6 +70,100 @@ export default function DesktopSettingsPage() {
         <AboutSection />
       </DesktopPageContent>
     </DesktopPageShell>
+  );
+}
+
+/* ───────────────────────────── Account ───────────────────────────── */
+
+type AccountState =
+  | { kind: "loading" }
+  | { kind: "signed-out" }
+  | { kind: "signed-in"; email: string | null }
+  | { kind: "signing-out" };
+
+/**
+ * The Grida account this app is signed in with. Session reads and sign-out
+ * go through the same-origin `/desktop/auth/*` routes — the desktop CSP
+ * blocks direct supabase-js calls, and navigating to the web `/sign-out`
+ * would be handed to the OS browser by the navigation guard (see
+ * GRIDA-SEC-005 in /SECURITY.md).
+ *
+ * The cookie jar is shared across all desktop windows, so signing out here
+ * signs out the whole app; other open windows keep their rendered state
+ * until their next navigation hits the welcome gate.
+ */
+function AccountSection() {
+  const [state, setState] = useState<AccountState>({ kind: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/desktop/auth/me")
+      .then((res) => res.json())
+      .then(({ user }: { user: { email: string | null } | null }) => {
+        if (cancelled) return;
+        setState(
+          user
+            ? { kind: "signed-in", email: user.email }
+            : { kind: "signed-out" }
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setState({ kind: "signed-out" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const signOut = async () => {
+    setState({ kind: "signing-out" });
+    try {
+      await fetch("/desktop/auth/sign-out", { method: "POST" });
+    } finally {
+      window.location.assign("/desktop/auth/sign-in");
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Account</CardTitle>
+        <CardDescription>
+          The Grida account this app is signed in with.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {state.kind === "loading" ? (
+          <Skeleton className="h-9 w-full" />
+        ) : state.kind === "signed-out" ? (
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm text-muted-foreground">Not signed in</span>
+            <Button
+              size="sm"
+              onClick={() => window.location.assign("/desktop/auth/sign-in")}
+            >
+              Sign in
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm">
+              {state.kind === "signed-in" && state.email
+                ? state.email
+                : "Signed in"}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={signOut}
+              disabled={state.kind === "signing-out"}
+            >
+              Sign out
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

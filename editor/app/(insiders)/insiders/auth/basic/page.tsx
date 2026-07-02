@@ -20,7 +20,24 @@ export const metadata: Metadata = {
 type SerachParams = {
   redirect_uri?: string;
   next?: string;
+  /**
+   * GRIDA-SEC-005 — desktop sign-in PKCE challenge, forwarded from
+   * `/desktop-auth`. When present, the sign-in route completes the
+   * desktop deep-link mint instead of the web redirect.
+   */
+  challenge?: string;
+  /** Error code the sign-in route redirects back with (e.g. a failed mint). */
+  error?: string;
 };
+
+function describeError(code: string): string {
+  switch (code) {
+    case "desktop_link_failed":
+      return "Signed in, but the desktop hand-off failed (is Mailpit running?). Try again.";
+    default:
+      return "Sign-in failed. Please try again.";
+  }
+}
 
 export default async function InsidersBasicAuthPage(props: {
   searchParams: Promise<SerachParams>;
@@ -55,6 +72,11 @@ function Form({ searchParams }: { searchParams: SerachParams }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {searchParams.error && (
+            <p className="mb-4 text-sm text-destructive">
+              {describeError(searchParams.error)}
+            </p>
+          )}
           <form method="post" action="/insiders/auth/basic/sign-in">
             <input
               type="hidden"
@@ -62,6 +84,11 @@ function Form({ searchParams }: { searchParams: SerachParams }) {
               value={searchParams.redirect_uri}
             />
             <input type="hidden" name="next" value={searchParams.next} />
+            <input
+              type="hidden"
+              name="challenge"
+              value={searchParams.challenge}
+            />
             <div className="grid gap-6">
               <div className="grid gap-6">
                 <FieldGroup className="gap-6">

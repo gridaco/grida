@@ -109,8 +109,11 @@ function get_window_constructor_options(): BaseWindowConstructorOptions {
  * decided at page-load time, so client-side nav to e.g. `/blog/foo`
  * would *leave* the bridge attached — unsafe. Block such navs.
  *
- * Whitelisted: same-origin `/desktop` and `/desktop/*` paths only.
- * OAuth handoff leaves the desktop window via `shell.openExternal`.
+ * Whitelisted: same-origin `/desktop` and `/desktop/*` paths only —
+ * enforced for user navigations (`will-navigate`), SPA navigations
+ * (`did-navigate-in-page`), and server redirects (`will-redirect`,
+ * GRIDA-SEC-005). OAuth handoff leaves the desktop window via
+ * `shell.openExternal`.
  */
 function register_window_hooks(
   window: BrowserWindow,
@@ -148,6 +151,24 @@ function register_window_hooks(
     }
   });
 
+  // GRIDA-SEC-005 — server 302s don't fire `will-navigate`, so without this
+  // hook a redirect chain could walk the window off `/desktop/*` with the
+  // bridge attached. Unlike `will-navigate`, a blocked redirect is NOT
+  // handed to the OS browser: the target was chosen by a server response,
+  // not by the user.
+  //
+  // Intentionally frame-agnostic (no `isMainFrame` filter): the desktop CSP
+  // (GRIDA-SEC-004) already forbids cross-origin frames, so any redirect off
+  // `/desktop/*` in ANY frame is unexpected and blocked. This is the stricter
+  // choice — narrowing to the main frame would let a subframe redirect
+  // off-surface.
+  window.webContents.on("will-redirect", (event, target) => {
+    if (!isAllowedNavigation(baseUrl, target)) {
+      event.preventDefault();
+      console.warn(`[grida] blocked redirect outside /desktop: ${target}`);
+    }
+  });
+
   window.webContents.on("did-navigate-in-page", (_event, target) => {
     if (isAllowedNavigation(baseUrl, target)) return;
     console.warn(
@@ -157,7 +178,7 @@ function register_window_hooks(
   });
 }
 
-function isAllowedNavigation(baseUrl: string, target: string): boolean {
+export function isAllowedNavigation(baseUrl: string, target: string): boolean {
   let url: URL;
   try {
     url = new URL(target);
