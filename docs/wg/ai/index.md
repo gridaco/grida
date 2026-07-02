@@ -25,7 +25,7 @@ Three siblings live here:
   host wires the locked-tool set.
 - **[`grida/architecture.md`](./grida/architecture.md)** — Grida's
   implementation blueprint. Names the orchestrator god class
-  (`AgentHost`), the package map, the host landings, the sequencing,
+  (`DaemonServer` + the agent tenant), the package map, the host landings, the sequencing,
   and the anti-goals. **Read this first if you're implementing.**
 
 ## Reading order

@@ -99,7 +99,7 @@ Desktop picks the RFC defaults.
 
 ## Multi-process safety
 
-WAL handles concurrent readers + one writer. Two `AgentHost` processes on
+WAL handles concurrent readers + one writer. Two daemon processes on
 the same `${userData}` is user error today (typically two Electron
 instances spawned by a packaging bug or a developer with a release +
 dev build open). The plan: take a process lock on `sessions.db` itself

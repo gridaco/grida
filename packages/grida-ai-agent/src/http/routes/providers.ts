@@ -27,8 +27,8 @@ import {
 import type { EndpointProvidersStore } from "../../providers/endpoints";
 import { probeEndpointModels } from "../../providers/probe";
 import { detectClaude } from "../../agent-provider/detect";
-import type { SecretsStore } from "../../secrets";
-import { body, v } from "../validate";
+import type { SecretsStore } from "@grida/daemon/server";
+import { body, v } from "@grida/daemon/server";
 
 export type ProvidersRoutesDeps = {
   endpoints: EndpointProvidersStore;

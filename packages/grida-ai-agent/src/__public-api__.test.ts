@@ -18,8 +18,6 @@ import * as root from ".";
 import {
   AGENT_SKILL_IDS,
   AGENT_DEFAULT_TIER,
-  AGENT_SERVER_DEFAULT_CAPABILITIES,
-  AGENT_SERVER_PROTOCOL,
   AGENT_SESSION_AGENT,
   AGENT_TIERS,
   BYOK_PROVIDER_METADATA,
@@ -31,8 +29,6 @@ import {
   type AgentRunMessage,
   type AgentRunMessagePart,
   type AgentRunOptions,
-  type AgentServerCapabilities,
-  type AgentServerHandshakeResponse,
   type AgentUIMessageChunk,
   type ByokProviderMetadata,
   type ByokProviderId,
@@ -42,24 +38,27 @@ import {
   type ChatPartRow,
   type ChatSessionRow,
   type CreateSessionOptions,
-  type FileReadResult,
   type ModelTier,
   type PatchSessionOptions,
-  type RecentEntry,
   type SessionListFilter,
   type SessionListPage,
   type SessionRunState,
   type SessionStatus,
   type SkillId,
-  type Workspace,
-  type WorkspaceCreateInput,
-  type WorkspaceFsEntry,
 } from ".";
 import {
-  AgentHost,
+  AGENT_DAEMON_DEFAULT_CAPABILITIES,
+  createAgentDaemon,
+  createAgentTenant,
   Daemon,
-  type AgentHostHttpAccess,
-  type AgentHostOptions,
+  DaemonServer,
+  DAEMON_PROTOCOL,
+  type AgentDaemonOptions,
+  type AgentTenantOptions,
+  type DaemonCapabilities,
+  type DaemonHandshakeResponse,
+  type DaemonHttpAccess,
+  type DaemonTenant,
 } from "./server";
 import {
   AcpAgentAdapter,
@@ -71,9 +70,9 @@ import {
   type AcpUpdateSink,
 } from "./acp";
 import {
-  buildAgentHostSandboxPolicy,
+  buildAgentDaemonSandboxPolicy,
   hostFromUrl,
-  type AgentHostSandboxPolicy,
+  type AgentDaemonSandboxPolicy,
 } from "./sandbox";
 import { AgentTransport } from "./transport";
 import { AgentFs } from "./fs";
@@ -83,19 +82,10 @@ import { OpfsBackend } from "./fs/backends/opfs";
 describe("@grida/agent public API", () => {
   describe("root protocol + runtime exports", () => {
     it("exposes client-safe protocol constants and types", () => {
-      const caps: AgentServerCapabilities = AGENT_SERVER_DEFAULT_CAPABILITIES;
-      const handshake: AgentServerHandshakeResponse = {
-        protocol: AGENT_SERVER_PROTOCOL,
-        supports: ["agent@1"],
-        capabilities: caps,
-      };
       const run: AgentRunOptions = {
         messages: [],
         feature: AGENT_SESSION_AGENT,
       };
-
-      expect(AGENT_SERVER_PROTOCOL).toBe(1);
-      expect(handshake.capabilities.sessions).toBe(true);
       expect(run.feature).toBe("grida");
 
       // Session status back-channel (RFC `session` / `queue`).
@@ -165,11 +155,6 @@ describe("@grida/agent public API", () => {
       type _LP = SessionListPage;
       type _CS = CreateSessionOptions;
       type _PS = PatchSessionOptions;
-      type _FR = FileReadResult;
-      type _RE = RecentEntry;
-      type _W = Workspace;
-      type _WCI = WorkspaceCreateInput;
-      type _WE = WorkspaceFsEntry;
       const row: ChatSessionRow = {
         id: "s",
         title: "t",
@@ -229,21 +214,51 @@ describe("@grida/agent public API", () => {
       expect("buildServer" in root).toBe(false);
       expect("resolveProvider" in root).toBe(false);
       expect(`${"Agent"}${"Chunk"}` in root).toBe(false);
+      // Daemon-owned DTOs (handshake, workspace/file resources) moved to
+      // `@grida/daemon` (#927) — the agent root must not re-grow them.
+      expect(`${"AGENT_SERVER"}_PROTOCOL` in root).toBe(false);
+      expect(`${"AGENT_SERVER"}_DEFAULT_CAPABILITIES` in root).toBe(false);
     });
   });
 
-  describe("server subpath", () => {
-    it("exposes AgentHost and package-owned sandbox policy intent", () => {
-      const HostCtor: new (opts: AgentHostOptions) => AgentHost = AgentHost;
-      const httpAccess: AgentHostHttpAccess = {
+  describe("server subpath (the agent tenant of @grida/daemon, #927)", () => {
+    it("exposes the composed agent-daemon factory and the tenant", () => {
+      // The composed default: every capability group on.
+      const caps: DaemonCapabilities = AGENT_DAEMON_DEFAULT_CAPABILITIES;
+      expect(caps.agent).toBe(true);
+      expect(caps.files).toBe(true);
+      expect(caps.shell).toBe(false);
+      const handshake: DaemonHandshakeResponse = {
+        protocol: DAEMON_PROTOCOL,
+        supports: ["agent@1"],
+        capabilities: caps,
+      };
+      expect(handshake.protocol).toBe(1);
+
+      const httpAccess: DaemonHttpAccess = {
         allowed_origins: ["https://client.example"],
         allowed_referer_paths: ["/client"],
       };
-      expect(httpAccess.allowed_referer_paths[0]).toBe("/client");
-      expect(typeof HostCtor).toBe("function");
+      const opts: AgentDaemonOptions = {
+        password: "pw",
+        user_data_path: "/tmp/grida",
+        http_access: httpAccess,
+      };
+      // Type-level: the factory returns the daemon's lifecycle class; the
+      // tenant conforms to the daemon's seam contract.
+      expectTypeOf(createAgentDaemon).returns.toEqualTypeOf<DaemonServer>();
+      const tenantOpts: AgentTenantOptions = { interactive: true };
+      const tenant: DaemonTenant = createAgentTenant(tenantOpts);
+      expect(typeof tenant.register).toBe("function");
+      expect(tenant.sse_query_token_paths?.length).toBe(2);
+      expect(typeof createAgentDaemon).toBe("function");
+      void opts;
+    });
+
+    it("exposes the package-owned sandbox policy intent", () => {
       expect(hostFromUrl("https://example.com/path")).toBe("example.com");
 
-      const policy: AgentHostSandboxPolicy = buildAgentHostSandboxPolicy({
+      const policy: AgentDaemonSandboxPolicy = buildAgentDaemonSandboxPolicy({
         user_data: "/tmp/grida",
         home: "/Users/example",
       });

@@ -39,12 +39,6 @@ export {
   type ProbeMergeResult,
 } from "./protocol/endpoints";
 export {
-  AGENT_SERVER_PROTOCOL,
-  AGENT_SERVER_DEFAULT_CAPABILITIES,
-  type AgentServerCapabilities,
-  type AgentServerHandshakeResponse,
-} from "./protocol/handshake";
-export {
   AGENT_SESSION_AGENT,
   type AgentModelId,
   type AgentRunMessage,
@@ -72,18 +66,8 @@ export {
   type AgentTurnStartedEvent,
 } from "./protocol/events";
 export type { AgentUIMessageChunk } from "./protocol/wire";
-export type {
-  FileRegisterResult,
-  FileReadResult,
-  FileWriteResult,
-  RecentEntry,
-  Workspace,
-  WorkspaceCreateInput,
-  WorkspaceFsEntry,
-  WorkspaceReadFileBytesResult,
-  WorkspaceReadFileResult,
-  WorkspaceWriteFileResult,
-} from "./protocol/resources";
+// Daemon handshake + local-resource DTOs moved to `@grida/daemon` (#927) —
+// import them from there.
 
 // Session-layer row contract (the persisted chat-history shapes).
 export type {

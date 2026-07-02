@@ -6,9 +6,9 @@ import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { AgentFs } from "../fs";
 import { AGENT_DEFAULT_TIER } from "../tiers";
 import {
-  createAgentHostFixture,
-  type AgentHostFixture,
-} from "../test/agent-host-fixture";
+  createDaemonFixture,
+  type DaemonFixture,
+} from "../test/daemon-fixture";
 import { runAgent, type AgentStepUsage } from "./run-agent";
 import {
   createWorkspaceAgentBindings,
@@ -18,10 +18,10 @@ import {
 const symlinkIt = process.platform === "win32" ? it.skip : it;
 
 describe("agent workspace bindings", () => {
-  let fixture: AgentHostFixture;
+  let fixture: DaemonFixture;
 
   beforeEach(async () => {
-    fixture = await createAgentHostFixture("grida-agent-agent-");
+    fixture = await createDaemonFixture("grida-agent-agent-");
   });
 
   afterEach(async () => {

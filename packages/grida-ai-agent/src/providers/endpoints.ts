@@ -25,7 +25,7 @@ import {
   type EndpointProviderConfig,
 } from "../protocol/endpoints";
 import { isByokProviderId } from "../protocol/provider-ids";
-import { atomicWrite } from "../storage/atomic-write";
+import { atomicWrite } from "@grida/daemon/server";
 
 const FILE_NAME = "endpoints.json";
 const MAX_ENTRIES = 16;

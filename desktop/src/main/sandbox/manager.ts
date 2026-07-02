@@ -22,7 +22,7 @@
  *      `docs/wg/desktop/agent-sandbox-wrap.md`.
  *
  * Why a wrapper and not direct calls in the supervisor: tests can
- * stub this surface while the policy intent lives in `@grida/agent`.
+ * stub this surface while the policy intent lives in `@grida/daemon` (+ the AI hosts in `@grida/agent/sandbox`).
  */
 import {
   SandboxManager,

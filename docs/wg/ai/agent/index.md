@@ -41,7 +41,7 @@ It answers one question: _what is an agent system that hosts a code
 agent, a design agent, or any other task-agnostic agent without
 rewriting the core?_
 
-The shape is host-agnostic: it holds for a local AgentHost, a cloud
+The shape is host-agnostic: it holds for a local daemon, a cloud
 sandbox runtime, a CLI, an IDE plugin, a hosted multi-tenant
 service. UX (window, panel, picker) is out of scope except where a
 UX requirement reaches back into the protocol.

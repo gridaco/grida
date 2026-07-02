@@ -15,7 +15,7 @@
 
 import { models } from "@grida/ai-models";
 import type { Experimental_VideoModelV3 as VideoModelV3 } from "@ai-sdk/provider";
-import type { SecretsStore } from "../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 import { byokProvidersFor } from "../protocol/provider-ids";
 import { makeVideoModelFor } from "./video-byok";
 

@@ -3,13 +3,12 @@
  *
  * This package carries only the `window.grida` contract that a URL-loaded
  * renderer may compile against. Electron IPC channel names and native
- * implementation details stay in the Desktop app; AgentHost HTTP stays in
- * `@grida/agent/transport`.
+ * implementation details stay in the Desktop app; daemon HTTP stays in
+ * `@grida/daemon/transport` + `@grida/agent/transport`.
  */
 
 import type {
   AgentRunOptions,
-  AgentServerHandshakeResponse,
   AgentUIMessageChunk,
   ProviderId,
   EndpointProviderConfig,
@@ -21,21 +20,24 @@ import type {
   ChatMessageWithParts,
   ChatSessionRow,
   CreateSessionOptions,
-  FileReadResult,
-  FileWriteResult,
   PatchSessionOptions,
-  RecentEntry,
   RewindResult,
   SessionListFilter,
   SessionListPage,
   SessionStatus,
+} from "@grida/agent";
+import type {
+  DaemonHandshakeResponse,
+  FileReadResult,
+  FileWriteResult,
+  RecentEntry,
   Workspace,
   WorkspaceCreateInput,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
   WorkspaceWriteFileResult,
-} from "@grida/agent";
+} from "@grida/daemon";
 
 export const DESKTOP_BRIDGE_PROTOCOL = 1 as const;
 
@@ -62,7 +64,7 @@ export type DesktopCapabilities = {
   native: DesktopNativeCapabilities;
 };
 
-export type HandshakeResponse = AgentServerHandshakeResponse;
+export type HandshakeResponse = DaemonHandshakeResponse;
 
 export type {
   FileReadResult,

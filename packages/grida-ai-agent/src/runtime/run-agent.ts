@@ -34,7 +34,7 @@ import type { AgentModelId } from "../protocol/run";
 import type { AgentMode } from "../protocol/mode";
 import { AGENT_DEFAULT_TIER, type ModelTier } from "../tiers";
 import type { ResolvedProvider } from "../providers";
-import type { WorkspaceRegistry } from "../workspaces";
+import type { WorkspaceRegistry } from "@grida/daemon/server";
 import { nodeSkillBodyLoader } from "../skills/discovery";
 import type { SkillBodyCache, SkillIndex } from "../skills/types";
 import { createWorkspaceAgentBindings } from "./workspace-agent-bindings";

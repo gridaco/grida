@@ -26,7 +26,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@grida/agent": "workspace:*"
+    "@grida/agent": "workspace:*",
+    "@grida/daemon": "workspace:*"
   },
   "devDependencies": {
     "tsdown": "^0.22.1",

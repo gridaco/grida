@@ -42,7 +42,7 @@ import { app } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
-import { buildAgentHostSandboxPolicy } from "@grida/agent/sandbox";
+import { buildAgentDaemonSandboxPolicy } from "@grida/agent/sandbox";
 import { home } from "@grida/home";
 import {
   ensureInitialized,
@@ -156,7 +156,7 @@ class AgentSidecarSupervisor {
       // (e.g. "bwrap not found in PATH"). Letting it throw means
       // one error path, not two.
     }
-    const policy = buildAgentHostSandboxPolicy({
+    const policy = buildAgentDaemonSandboxPolicy({
       user_data: this.user_data_path,
       home: app.getPath("home"),
     });

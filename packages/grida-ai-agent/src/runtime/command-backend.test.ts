@@ -24,7 +24,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createAgentCommandBackend } from "./command-backend";
-import { WorkspaceRegistry } from "../workspaces";
+import { WorkspaceRegistry } from "@grida/daemon/server";
 
 type Backend = ReturnType<typeof createAgentCommandBackend>;
 type DenyResult = { ok: false; code: string; message: string };

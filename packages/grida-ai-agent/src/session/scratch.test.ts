@@ -18,7 +18,7 @@ import {
   sweepScratch,
   writeScratchFile,
 } from "./scratch";
-import { containsPath } from "../path-contains";
+import { containsPath } from "@grida/daemon/server";
 
 describe("scratchRootFor (pure derivation)", () => {
   it("isolates per session under base (S1)", () => {

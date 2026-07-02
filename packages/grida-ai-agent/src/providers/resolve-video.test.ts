@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SecretsStore } from "../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 import { VideoModelUnavailableError, resolveVideoModel } from "./resolve-video";
 
 function fakeSecrets(keys: Record<string, string>): SecretsStore {

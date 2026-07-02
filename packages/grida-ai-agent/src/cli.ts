@@ -3,7 +3,7 @@
  * system.
  *
  * Source-of-truth rule: every agent feature lands HERE first. Desktop and any
- * other host are thin wrappers over the same `AgentHost` + `AgentTransport`
+ * other host are thin wrappers over the same `DaemonServer` + `AgentTransport`
  * this CLI drives — if a capability exists in the UI but not here, that's the
  * bug. Keeping the CLI complete is also what makes the core testable without
  * an Electron shell (see `cli.test.ts`).
@@ -38,9 +38,9 @@
 import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 import { home } from "@grida/home";
-import { Daemon } from "./daemon";
+import { Daemon } from "@grida/daemon/server";
 import { AgentTransport } from "./transport";
-import type { AgentHost } from "./agent-host";
+import type { DaemonServer } from "@grida/daemon/server";
 import type { AgentMode } from "./protocol/mode";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { ChatMessageWithParts, ChatSessionRow } from "./session/rows";
@@ -284,12 +284,12 @@ async function acpCommand(): Promise<void> {
 /**
  * Resolve a client against the best available host: a registered, healthy
  * daemon when one exists (shared sessions — issue #798), else a throwaway
- * embedded `AgentHost`. When `host` is non-null the caller owns its
+ * embedded `DaemonServer`. When `host` is non-null the caller owns its
  * lifecycle and must `stop()` it.
  */
 async function resolveClient(): Promise<{
   client: AgentTransport.Client;
-  host: AgentHost | null;
+  host: DaemonServer | null;
 }> {
   const config = readConfig();
   const daemon = await Daemon.connect(config.user_data_path);
@@ -511,9 +511,9 @@ async function createHost(
   // embedded host behind a one-shot `run` has no client UI → stays headless and
   // the tool returns the fixed refusal.
   interactive = false
-): Promise<AgentHost> {
-  const { AgentHost } = await import("./server");
-  return new AgentHost({
+): Promise<DaemonServer> {
+  const { createAgentDaemon } = await import("./server");
+  return createAgentDaemon({
     password: config.password,
     user_data_path: config.user_data_path,
     http_access: {
@@ -587,7 +587,7 @@ function readConfig(): CliConfig {
 }
 
 async function waitForShutdown(
-  host: AgentHost,
+  host: DaemonServer,
   daemon?: { state_dir: string; registration: Daemon.Registration }
 ): Promise<void> {
   await new Promise<void>((resolve) => {

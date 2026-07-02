@@ -53,7 +53,7 @@ import {
 import { discoverSkills } from "../skills/discovery";
 import { discoverProjectInstructions } from "../skills/project-instructions";
 import type { SkillBodyCache, SkillIndex } from "../skills/types";
-import type { WorkspaceRegistry } from "../workspaces";
+import type { WorkspaceRegistry } from "@grida/daemon/server";
 import {
   RunInFlightError,
   StreamRegistry,

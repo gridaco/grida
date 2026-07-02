@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
-import type { SecretsStore } from "../../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 import { registerImagesRoutes } from "./images";
 
 // Replace the `ai` SDK's generateImage so the route never drives a real model.

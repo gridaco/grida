@@ -14,6 +14,7 @@ on:
     paths:
       - "desktop/**"
       - "packages/grida-ai-agent/**"
+      - "packages/grida-daemon/**"
       - "packages/grida-ai-models/**"
       - "packages/grida-desktop-bridge/**"
       - "packages/grida-home/**"
@@ -60,6 +61,7 @@ jobs:
           pnpm turbo run build \
             --filter=@grida/desktop-bridge \
             --filter=@grida/agent \
+            --filter=@grida/daemon \
             --filter=@grida/ai-models \
             --filter=@grida/home
 

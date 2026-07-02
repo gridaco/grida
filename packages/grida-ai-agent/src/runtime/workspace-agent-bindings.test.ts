@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { WorkspaceRegistry } from "../workspaces";
-import type { SecretsStore } from "../secrets";
+import { WorkspaceRegistry } from "@grida/daemon/server";
+import type { SecretsStore } from "@grida/daemon/server";
 import {
   WorkspaceAgentFsBackend,
   createWorkspaceAgentBindings,

@@ -1,6 +1,6 @@
 ---
 title: Process model
-description: Why Grida Desktop runs a long-lived Node agent sidecar alongside Electron main, what it owns, and where the boundary sits. The three-process model and the AgentHost god class.
+description: Why Grida Desktop runs a long-lived Node agent sidecar alongside Electron main, what it owns, and where the boundary sits. The three-process model and the composed daemon.
 keywords:
   [desktop, AgentSidecar, electron, utility-process, agent-host, grida-sec-004]
 format: md
@@ -23,8 +23,8 @@ secrets, sessions, the agent loop, and the capability surface; an
 Electron shell that owns windows and the OS; and a URL-loaded renderer
 that reaches the host only through a typed bridge.
 
-Naming: the agent sidecar is `AgentSidecar`; the npm package is
-`@grida/agent`; the **class inside** is `AgentHost`. The name says
+Naming: the agent sidecar is `AgentSidecar`; the npm packages are
+`@grida/daemon` (host layer) + `@grida/agent` (agent tenant); the **class inside** is `DaemonServer`, composed via `createAgentDaemon`. The name says
 what owns lifecycle and capability policy. See [god class](#god-class)
 below.
 
@@ -51,7 +51,7 @@ to audit, and leaves room for a future CLI to share the same backend.
 │  windows, menus, dialogs, file-open, deep links, single-instance│
 │        │  spawn + supervise (AgentSidecarSupervisor)                  │
 │        ▼                                                         │
-│  ┌─ AgentSidecar — AgentHost (one class wiring the services) ─────┐  │
+│  ┌─ AgentSidecar — DaemonServer + agent tenant (createAgentDaemon) ─┐  │
 │  │  HTTP 127.0.0.1:<random>  Basic Auth + Referer guard      │  │
 │  │  sessions/  providers/  workspaces/  secrets/             │  │
 │  │  files/  shell/  runtime/  http/                          │  │
@@ -69,7 +69,7 @@ over stdin, and preload fetches the connection tuple through guarded IPC
 into closure scope. See [security](./agent-security.md) for the five-layer
 breakdown.
 
-## What AgentHost owns
+## What the daemon owns
 
 | Concern              | Why                                                                                                                                                                                        |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -81,13 +81,13 @@ breakdown.
 | Atomic file I/O      | Write-to-temp + rename; centralized so dirty tracking works.                                                                                                                               |
 | Recent files (canon) | Persisted; `addRecentDocument` is a mirror, not truth.                                                                                                                                     |
 
-## What AgentHost does _not_ own
+## What the daemon does _not_ own
 
 - Windows, menus, dialogs, deep links — Electron main.
 - File-association plumbing (`open-file`, argv, second-instance) —
-  Electron main. The agent server doesn't know how a path arrived; it only
+  Electron main. The daemon doesn't know how a path arrived; it only
   knows the path.
-- Editor state, rendering, dirty-flag UI — renderer. The agent server stores
+- Editor state, rendering, dirty-flag UI — renderer. The daemon stores
   bytes; the renderer decides what "dirty" means against its own
   snapshot.
 - Subscription billing checks and usage ingest — not shipped in V1.
@@ -95,16 +95,16 @@ breakdown.
   the local agent surface.
 - The agent loop's _protocol_ — locked tools, capability surface,
   session schema, AI SDK v6 chunk shape. Those are the
-  [agent RFC](../ai/agent/index.md); the agent server implements them, it
+  [agent RFC](../ai/agent/index.md); the daemon implements them, it
   doesn't define them.
 
 ## God class
 
-`AgentHost` (`packages/grida-ai-agent/src/agent-host.ts`) is the
+`DaemonServer` (`packages/grida-daemon/src/daemon-server.ts`, composed with the agent tenant via `@grida/agent/server`) is the
 one class that wires the services. Lifecycle:
 
 ```ts
-const host = new AgentHost({
+const host = createAgentDaemon({
   password,
   userDataPath,
   httpAccess,
@@ -134,15 +134,15 @@ failing loud beats silently degrading.
 
 **The shell's job.** Run one supervisor (`AgentSidecarSupervisor`). Forward
 Electron's `userData` path so `auth.json` lands in the right place. Keep
-agent server credentials inside preload closure. Validate IPC sender frames
+daemon credentials inside preload closure. Validate IPC sender frames
 against `EDITOR_BASE_URL + /desktop/*` on every native handler — the
 preload's path-scoping should make this redundant; doing it anyway is
 the right kind of paranoid. See [security](./agent-security.md).
 
 **The renderer's job.** Use `window.grida` as the _only_ path to the
-agent server. Start and abort agent streams through `window.grida.agent`.
+daemon. Start and abort agent streams through `window.grida.agent`.
 Surface BYOK key presence honestly and let provider-unavailable run errors
-come from the agent server. See [renderer-bridge](./renderer-bridge.md).
+come from the daemon. See [renderer-bridge](./renderer-bridge.md).
 
 ## What can change
 
@@ -155,7 +155,7 @@ come from the agent server. See [renderer-bridge](./renderer-bridge.md).
   (macOS/Linux) for OS-level access control is on the table; Windows
   stays on loopback.
 - **CLI consumer.** `grida-agent serve`, `run`, and `sessions` exercise
-  the same AgentHost/client path without Electron.
+  the same daemon/client path without Electron.
 
 ## See also
 
@@ -168,4 +168,4 @@ come from the agent server. See [renderer-bridge](./renderer-bridge.md).
 - [Grida Cloud Agent Runtime](../platform/grida-cloud-agent-runtime.md)
   — deferred hosted-provider design; not shipped in V1.
 - [opencode](https://github.com/sst/opencode) — reference architecture
-  for agent server split, provider registry, `auth.json` shape, agent-as-data.
+  for daemon split, provider registry, `auth.json` shape, agent-as-data.
