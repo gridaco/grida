@@ -20,6 +20,12 @@ export const metadata: Metadata = {
 type SerachParams = {
   redirect_uri?: string;
   next?: string;
+  /**
+   * GRIDA-SEC-005 — desktop sign-in PKCE challenge, forwarded from
+   * `/sign-in/desktop`. When present, the sign-in route completes the
+   * desktop deep-link mint instead of the web redirect.
+   */
+  challenge?: string;
 };
 
 export default async function InsidersBasicAuthPage(props: {
@@ -62,6 +68,11 @@ function Form({ searchParams }: { searchParams: SerachParams }) {
               value={searchParams.redirect_uri}
             />
             <input type="hidden" name="next" value={searchParams.next} />
+            <input
+              type="hidden"
+              name="challenge"
+              value={searchParams.challenge}
+            />
             <div className="grid gap-6">
               <div className="grid gap-6">
                 <FieldGroup className="gap-6">

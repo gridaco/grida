@@ -587,10 +587,14 @@ PTYs per window, and (d) kills every PTY on window close and app quit.
 A contract test (`desktop/src/main/terminal-host.test.ts`) fails if a
 terminal channel is ever registered outside `guarded()`.
 
-**No hosted auth in V1.** Desktop V1 ships no `/auth/*` route group, no
-PKCE handoff, no cloud session refresh, and no entitlement polling. Future
-hosted-provider work must re-register its callback and hosted-model files in
-this record before code lands.
+**Hosted auth (sign-in only).** The desktop signs the webview into a
+first-class Supabase cookie session via the system browser + PKCE +
+`grida://auth/callback` deep link — that flow is its own boundary,
+`GRIDA-SEC-005` below. Within THIS boundary the invariant is unchanged:
+the Electron main process and the AgentHost sidecar hold no cloud
+credentials, and there is still no entitlement polling and no
+hosted-model routing. Future hosted-provider work (sidecar-held tokens,
+metered AI) must re-register its files in this record before code lands.
 
 **Update channel.** Release builds must be signed/notarized by platform
 policy. Security-sensitive runtime deps are reviewed as part of the
@@ -680,7 +684,7 @@ Today:
 - `desktop/src/window.ts` — blocks exposed desktop windows from navigating outside `/desktop/*`; injects non-secret preload arguments.
 - `desktop/src/agent-sidecar.ts` — sidecar entrypoint; constructs the composed agent daemon (`createAgentDaemon`).
 - `desktop/src/main/agent-sidecar-supervisor.ts` — generates per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported (`srt` is not available on Windows yet).
-- `desktop/src/main/protocol-router.ts` — deep-link protocol guard; V1 has no cloud callback route.
+- `desktop/src/main/protocol-router.ts` — deep-link protocol guard; the auth callback arm is bound by GRIDA-SEC-005.
 - `desktop/src/main/ipc-handlers.ts` — validates every native IPC sender frame before executing OS capabilities.
 - `packages/grida-daemon/src/http/server.ts` — loopback HTTP app, daemon route registration, and the `DaemonTenant` seam behind shared guards; `packages/grida-ai-agent/src/server.ts` — the agent tenant that mounts the AI route groups through it.
 - `packages/grida-ai-agent/src/http/routes/secrets.ts` — BYOK key presence/set/delete route group; no key-read route.
@@ -709,13 +713,123 @@ daemon that binds `0.0.0.0`. An app that loads grida.co's
 non-`(desktop)` routes inside the desktop window without revoking the
 bridge first. Any IPC handler in Electron main that acts without
 checking `event.senderFrame.url`. A `grida://` deep-link handler that
-exchanges OAuth codes without daemon-held PKCE state.
+exchanges OAuth codes itself — the exchange belongs to the same-origin
+`/desktop/auth/callback` route against the webview-held PKCE verifier
+cookie (GRIDA-SEC-005).
+
+---
+
+### `GRIDA-SEC-005` — Desktop sign-in deep-link boundary
+
+**What it protects.** Desktop sign-in gives the Electron webview a
+first-class Supabase **cookie session** — the same session shape as a
+browser tab, so every existing cookie-gated route and middleware works
+unchanged. The ceremony runs in the system browser (RFC 8252; embedded
+webviews are blocked by providers) and returns through the
+`grida://auth/callback` deep link. The boundary is the rule that **a
+`grida://` deep link is untrusted, world-invokable input: it must never
+be able to create, steal, or redirect a session. The only thing a deep
+link may cause is a navigation of a desktop window to the fixed
+same-origin `/desktop/auth/callback` route.**
+
+**Vulnerable scenario (prevented).** Custom-protocol URLs are invokable
+by any webpage and any local process (`open "grida://…"`). Without the
+boundary: (a) login-CSRF — an attacker mints their OWN authorization
+code and fires `grida://auth/callback?code=<attacker-code>` at the
+victim's app, silently signing the victim into the attacker's account so
+later work is saved where the attacker can read it; (b) a phished or
+replayed single-use code is redeemed by a party other than the app that
+started the flow; (c) the deep link is used as a navigation primitive to
+walk the privileged (bridge-attached) window to an attacker-chosen URL.
+
+**Why it's specifically risky here.** The desktop window carries the
+`window.grida` bridge (GRIDA-SEC-004), so a navigation primitive fed by
+an unauthenticated OS-level input lands directly on the app's most
+privileged surface. And the repo is open source — the exact flow shape,
+paths, and params are public, so the design must not rely on obscurity.
+
+**How the code prevents it.**
+
+1. **PKCE verifier confined to the Electron cookie jar** —
+   [editor/app/desktop/auth/start/route.ts](editor/app/desktop/auth/start/route.ts)
+   mints the `@supabase/ssr` code-verifier cookie on a route-handler
+   response (the supabase/ssr#55-safe shape) and returns the same-origin
+   `/sign-in/desktop` launch-page URL carrying only the PUBLIC
+   `code_challenge`. The sign-in method is chosen on that web page
+   ([editor/app/(site)/sign-in/desktop/](<editor/app/(site)/sign-in/desktop/page.tsx>)),
+   and every method binds its GoTrue flow to the forwarded challenge
+   (`host/auth/desktop-auth-flow.ts`, pinned by its test) — so the
+   desktop never names a provider, and whatever the method, the
+   resulting `code` is
+   exchangeable ONLY with the jar-held verifier: an attacker-minted code
+   was issued against a different verifier, so GoTrue rejects the
+   exchange (closes login-CSRF); a phished victim code is single-use,
+   expires in 5 minutes, and is useless off-machine without the jar. A
+   forged or attacker-chosen `challenge` on the launch page yields codes
+   nobody can exchange (the matching verifier exists in no jar the
+   attacker can reach).
+2. **Stateless, fixed-target router** —
+   [desktop/src/main/protocol-router.ts](desktop/src/main/protocol-router.ts)
+   performs no code exchange and holds no auth state. It navigates a
+   desktop window to the constant `/desktop/auth/callback` path on the
+   configured editor origin, forwarding only the known
+   `code`/`error*` params; nothing else from the deep link crosses the
+   boundary, and every branch consumes the URL (no re-queue loop).
+3. **Exchange only at the same-origin callback route** —
+   [editor/app/desktop/auth/callback/route.ts](editor/app/desktop/auth/callback/route.ts)
+   runs `exchangeCodeForSession` with the cookie client (identical
+   mechanism to the web `(auth)/auth/callback`); success and failure
+   both redirect inside `/desktop/*`.
+4. **Redirect containment** — the `will-redirect` guard in
+   [desktop/src/window.ts](desktop/src/window.ts) holds server 302s to
+   the same same-origin `/desktop/*` allowlist as user navigations
+   (`will-navigate` does not fire for server redirects, so without the
+   hook a redirect chain could walk the bridge-attached window
+   off-surface). Blocked redirects are NOT handed to the OS browser.
+   Sign-out is the same-origin
+   [editor/app/desktop/auth/sign-out/route.ts](editor/app/desktop/auth/sign-out/route.ts):
+   navigating the webview to the web `/sign-out` would be blocked and
+   `shell.openExternal`'d — logging the user out of their OS browser.
+5. **Ceremony in the system browser only** — the launch URL travels
+   renderer → `shell.open_external` (http/https-validated IPC); the
+   webview never loads a provider page, and the `grida://auth/callback`
+   redirect is allowlisted in Supabase
+   ([supabase/config.toml](supabase/config.toml) locally; the hosted
+   project's dashboard in production).
+
+The Electron main process and the sidecar remain credential-free: the
+session lives in the webview's cookie jar and is refreshed by the same
+`@supabase/ssr` middleware machinery as the web app. The `/desktop/*`
+CSP keeps `connect-src` closed, so session reads go through the
+same-origin `/desktop/auth/me` route rather than direct supabase-js
+calls.
+
+**Files bound by this id.** Run `grep -rn GRIDA-SEC-005 .` to enumerate.
+Today:
+
+- [supabase/config.toml](supabase/config.toml) — `grida://auth/callback` redirect allowlist entry.
+- [editor/app/desktop/auth/start/route.ts](editor/app/desktop/auth/start/route.ts) — PKCE start; verifier cookie + launch-page URL (method-neutral; the desktop never names a provider).
+- [editor/app/(site)/sign-in/desktop/page.tsx](<editor/app/(site)/sign-in/desktop/page.tsx>) — the web launch page (a `/sign-in` sibling sharing the sign-in shell and Google button, `authorize_url` mode): validates the challenge, binds the offered method's GoTrue flow to it, and mirrors the web sign-in's insiders routing (`NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH` → redirect to the insiders page with the challenge forwarded).
+- [editor/host/auth/desktop-auth-flow.ts](editor/host/auth/desktop-auth-flow.ts) — the flow vocabulary shared by the launch page and the insiders route: challenge validation, challenge-bound authorize/OTP builders, verify-link extraction pinned to the Supabase origin (pinned by `desktop-auth-flow.test.ts`).
+- [editor/app/(insiders)/insiders/auth/basic/sign-in/route.ts](<editor/app/(insiders)/insiders/auth/basic/sign-in/route.ts>) (+ the hidden `challenge` passthrough in [basic/page.tsx](<editor/app/(insiders)/insiders/auth/basic/page.tsx>)) — the insiders **email+password** desktop branch: verifies the password exactly like the web insiders flow, then mints the challenge-bound code by firing the GoTrue OTP and consuming the emailed verify link straight from the local Mailpit capture, so the developer keeps email+password and still traverses the production verify → `grida://` → exchange path. A password grant alone can never produce a challenge-bound code (GoTrue returns sessions directly for passwords), which is why the mint rides the OTP-link machinery. Local-only by GRIDA-SEC-002 (`/insiders/*` 404s outside development), which is what makes the Mailpit coupling acceptable (pinned by its `route.test.ts`).
+- [editor/app/desktop/auth/callback/route.ts](editor/app/desktop/auth/callback/route.ts) — the only code-exchange point; `/desktop/*`-contained redirects (pinned by its `route.test.ts`).
+- [editor/app/desktop/auth/sign-out/route.ts](editor/app/desktop/auth/sign-out/route.ts) — same-origin sign-out (never the web `/sign-out`).
+- [desktop/src/main/protocol-router.ts](desktop/src/main/protocol-router.ts) — stateless fixed-target auth arm (pinned by `protocol-router.test.ts`).
+- [desktop/src/window.ts](desktop/src/window.ts) — `will-redirect` guard; `isAllowedNavigation` predicate (pinned by `window.test.ts`).
+
+**What does NOT belong here.** A code exchange in the Electron main
+process. A PKCE verifier carried on the deep link, the bridge, or argv.
+A router that navigates to a path taken from deep-link input, or that
+forwards params beyond `code`/`error*`. A desktop webview navigation to
+`(auth)` routes or the web `/sign-out`. Sidecar- or main-held session
+tokens — that is future hosted-provider work and must be registered
+here first.
 
 ---
 
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-005` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-006` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.
