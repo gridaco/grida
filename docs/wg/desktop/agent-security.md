@@ -31,8 +31,8 @@ This page is the desktop-specific landing.
 | --- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | 1   | Path-scoped `window.grida`     | Preload (`desktop/src/preload.ts`); exposed iff `location.pathname` is `/desktop` or starts with `/desktop/`; later navigation is blocked by preload history guards and `desktop/src/window.ts`. | XSS on any other `grida.co` page cannot reach the agent server — `window.grida` is `undefined` there.            |
 | 2   | CSP-strict `/desktop/*` routes | `editor/proxy.ts` and the desktop route group.                                                                                                                                                   | Third-party scripts and inline-script injection on privileged desktop pages.                                     |
-| 3   | Agent server HTTP perimeter    | `AgentHost` HTTP routes (`packages/grida-ai-agent/src/http/`).                                                                                                                                   | Cross-origin / cross-process callers without the per-spawn password, the right `Referer`, or the right `Origin`. |
-| 4   | OS-level outer sandbox (`srt`) | [`agent-sandbox-wrap`](./agent-sandbox-wrap.md). Wraps the `AgentHost` process tree.                                                                                                             | A compromised agent server reading SSH keys, writing shell rc files, calling arbitrary hosts.                    |
+| 3   | Agent server HTTP perimeter    | Daemon HTTP routes (`packages/grida-daemon/src/http/` + the agent tenant`s route groups in `packages/grida-ai-agent/src/http/routes/`).                                                          | Cross-origin / cross-process callers without the per-spawn password, the right `Referer`, or the right `Origin`. |
+| 4   | OS-level outer sandbox (`srt`) | [`agent-sandbox-wrap`](./agent-sandbox-wrap.md). Wraps the daemon process tree.                                                                                                                  | A compromised agent server reading SSH keys, writing shell rc files, calling arbitrary hosts.                    |
 | 5   | Secrets discipline             | `auth.json` at chmod `0o600`; preload holds the agent server password in closure; never on `window`.                                                                                             | A non-Grida process on the same machine reading the token file; a renderer script enumerating credentials.       |
 
 ## Layer 1 — Path-scoped `window.grida`
@@ -64,7 +64,7 @@ credentials.
 
 ## Layer 3 — Agent server HTTP perimeter
 
-`AgentHost` binds on `127.0.0.1:<random>`. Every request must:
+The daemon binds on `127.0.0.1:<random>`. Every request must:
 
 - Carry the per-spawn Basic Auth password (regenerated each agent host
   start; never persisted).
@@ -80,7 +80,7 @@ catches the worst filesystem/network blast radius if layer 1 fails.
 
 ## Layer 4 — OS-level outer sandbox
 
-`AgentHost` runs inside `srt` ([agent-sandbox-wrap](./agent-sandbox-wrap.md)) with the
+The daemon runs inside `srt` ([agent-sandbox-wrap](./agent-sandbox-wrap.md)) with the
 package-owned outer-wrap intent: network limited to an **enumerated allowlist**
 (BYOK provider hosts + a curated dev-network set — package registries, git
 hosts; `srt` forbids `*` / open patterns), secret-path read/write denies, and
@@ -99,7 +99,7 @@ host-configured policy, not srt.
 ## Layer 4b — Agent shell execution
 
 The `run_command` agent tool spawns child processes through the shell
-runner (`packages/grida-ai-agent/src/shell/runner.ts`) with `shell: false`.
+runner (`packages/grida-daemon/src/shell/runner.ts`) with `shell: false`.
 There is **no command allowlist** — a per-session **permission mode**
 (`protocol/mode.ts`) governs the surface: `accept-edits` (default — read-only
 inspection commands auto-run; a mutating/executing command **pauses for a
@@ -176,7 +176,7 @@ privileges.
 ## Reviewer checklist
 
 Before merging a PR that touches `/desktop/*` UI, the preload, the
-agent server's HTTP layer, `buildAgentHostSandboxPolicy()`, or any source file under
+agent server's HTTP layer, `buildAgentDaemonSandboxPolicy()`, or any source file under
 `packages/grida-ai-agent/`:
 
 1. **Layer 1 intact?** Preload path-scoping still fails closed. Window
@@ -185,7 +185,7 @@ agent server's HTTP layer, `buildAgentHostSandboxPolicy()`, or any source file u
    add third-party scripts.
 3. **Layer 3 intact?** Every new route handler runs the auth + Referer
    - Origin guards. No "internal" bypass.
-4. **Layer 4 intact?** `buildAgentHostSandboxPolicy()` paths/hosts cover what the new
+4. **Layer 4 intact?** `buildAgentDaemonSandboxPolicy()` paths/hosts cover what the new
    code reads / writes / fetches; mandatory deny set unmodified.
 5. **Layer 5 intact?** No new secrets placed on `window`; `auth.json`
    write path still uses `0o600`; logs still elide content.

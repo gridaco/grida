@@ -1,9 +1,10 @@
 /**
  * Agent sidecar entry point.
  *
- * Thin: argv parsing + AgentHost lifecycle + tidy shutdown. All HTTP
- * surface (files / secrets / agent / workspaces / shell)
- * lives in `@grida/agent/server`.
+ * Thin: argv parsing + daemon lifecycle + tidy shutdown. All HTTP
+ * surface lives in `@grida/daemon` (perimeter + files / workspaces /
+ * recents) with the agent tenant mounted by `@grida/agent/server`'s
+ * `createAgentDaemon` (agent / sessions / secrets / providers).
  *
  * Spawned by `desktop/src/main/agent-sidecar-supervisor.ts` as
  * `child_process.spawn(electron, [this script], { env: {
@@ -36,7 +37,7 @@
  * on the process tree. The server binds 127.0.0.1 only.
  */
 import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
-import { AgentHost } from "@grida/agent/server";
+import { createAgentDaemon } from "@grida/agent/server";
 
 // Route Node's built-in `fetch` (undici) through whatever proxy is in
 // `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`. Without this, undici v6+
@@ -95,7 +96,7 @@ async function main() {
   }
 
   const editorOrigin = new URL(runtimeEditorBaseUrl).origin;
-  const host = new AgentHost({
+  const host = createAgentDaemon({
     password,
     user_data_path: requiredUserDataPath,
     projects_root: projectsRoot,

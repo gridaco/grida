@@ -27,7 +27,7 @@ import { readdirSync, rmSync, constants as fsConstants } from "node:fs";
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { containsPath } from "../path-contains";
+import { containsPath } from "@grida/daemon/server";
 
 /** Where every session's scratch dir lives under a `base`. */
 const SESSIONS_DIRNAME = "sessions";

@@ -25,13 +25,13 @@
 
 import type { Hono } from "hono";
 import type { Experimental_VideoModelV3CallOptions as VideoModelV3CallOptions } from "@ai-sdk/provider";
-import type { SecretsStore } from "../../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 import {
   VideoModelUnavailableError,
   resolveVideoModel,
 } from "../../providers/resolve-video";
 import { assertHttpsUrl } from "../../providers/fetch-helpers";
-import { body, v } from "../validate";
+import { body, v } from "@grida/daemon/server";
 
 const VIDEO_PROVIDERS = ["vercel", "fal", "openrouter"] as const;
 

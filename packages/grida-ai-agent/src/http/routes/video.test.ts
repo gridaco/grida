@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
-import type { SecretsStore } from "../../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 import { registerVideoRoutes } from "./video";
 
 function fakeSecrets(keys: Record<string, string>): SecretsStore {

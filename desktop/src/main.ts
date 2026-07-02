@@ -122,7 +122,7 @@ let deepLinkDrainTimer: NodeJS.Timeout | null = null;
 // Live document windows, keyed by agent-server-assigned docId. Used so that
 // re-opening an already-open file focuses the existing window instead
 // of spawning a duplicate. (The agent server returns the same docId for the
-// same normalized path; see `@grida/agent`'s file registry.)
+// same normalized path; see `@grida/daemon`'s file registry.)
 const documentWindows = new Map<string, BrowserWindow>();
 
 /**

@@ -23,12 +23,12 @@
 
 import type { Hono } from "hono";
 import { generateImage } from "ai";
-import type { SecretsStore } from "../../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 import {
   ImageModelUnavailableError,
   resolveImageModel,
 } from "../../providers/resolve-image";
-import { body, v } from "../validate";
+import { body, v } from "@grida/daemon/server";
 
 const IMAGE_PROVIDERS = ["vercel", "fal", "openrouter"] as const;
 

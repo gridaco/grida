@@ -24,7 +24,7 @@
 import { TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models";
 import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
-import type { SecretsStore } from "../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 import {
   byokProvidersFor,
   isByokProviderId,

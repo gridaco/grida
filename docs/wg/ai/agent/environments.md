@@ -154,7 +154,7 @@ continue an interrupted session.
 
 ## Computer
 
-The agent runs on the user's own machine — as a long-lived AgentHost
+The agent runs on the user's own machine — as a long-lived local daemon
 process, an IDE plugin, a CLI invocation, or any local process.
 
 **Capabilities offered.**
@@ -213,12 +213,12 @@ filesystem-resident database
 
 **Recommended discipline.**
 
-- Run one AgentHost process per user; let it own all session state and
+- Run one daemon process per user; let it own all session state and
   secrets.
 - Generate a per-launch credential for the host's IPC perimeter (HTTP
   loopback / Unix socket / named pipe); do not expose the agent host to
   the network.
-- Apply the OS sandbox to the AgentHost process itself, not only to the
+- Apply the OS sandbox to the daemon process itself, not only to the
   shell calls it spawns.
 
 ## How a host picks

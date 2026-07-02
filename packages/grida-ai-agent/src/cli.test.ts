@@ -16,11 +16,11 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { Daemon } from "./daemon";
-import { AGENT_SERVER_PROTOCOL } from "./protocol/handshake";
-import { AuthStore } from "./auth/file";
-import { SecretsStore } from "./secrets";
-import { WorkspaceRegistry } from "./workspaces";
+import { Daemon } from "@grida/daemon/server";
+import { DAEMON_PROTOCOL } from "@grida/daemon";
+import { AuthStore } from "@grida/daemon/server";
+import { SecretsStore } from "@grida/daemon/server";
+import { WorkspaceRegistry } from "@grida/daemon/server";
 import { openSessionsDb } from "./session/db";
 import { SessionsStore } from "./session/store";
 import { AGENT_SESSION_AGENT } from "./protocol/run";
@@ -305,7 +305,7 @@ describe("CLI — serve --register daemon process (real spawn)", () => {
       if (!connection) {
         throw new Error(`daemon never published; stderr:\n${stderr.join("")}`);
       }
-      expect(connection.handshake.protocol).toBe(AGENT_SERVER_PROTOCOL);
+      expect(connection.handshake.protocol).toBe(DAEMON_PROTOCOL);
       expect(connection!.registration.pid).toBe(child.pid);
 
       // A second client resolves the SAME daemon (reuse, not respawn).

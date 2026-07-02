@@ -21,7 +21,7 @@ import {
 } from "../protocol/mode";
 import { AGENT_DEFAULT_TIER, AGENT_TIERS, type ModelTier } from "../tiers";
 import type { SessionsStore } from "../session/store";
-import type { WorkspaceRegistry } from "../workspaces";
+import type { WorkspaceRegistry } from "@grida/daemon/server";
 import {
   isKnownProviderId,
   type EndpointProvidersStore,

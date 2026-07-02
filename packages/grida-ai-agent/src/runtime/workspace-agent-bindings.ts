@@ -10,15 +10,15 @@ import path from "node:path";
 import { realpath } from "node:fs/promises";
 import { generateImage } from "ai";
 import { AgentFs } from "../fs";
-import { containsPath } from "../path-contains";
+import { containsPath } from "@grida/daemon/server";
 import { isProtectedWrite } from "../fs/scope";
-import { isReadOnlyCommand } from "../permissions";
+import { isReadOnlyCommand } from "@grida/daemon/server";
 import { AgentTodos } from "../todos";
 import { AgentVision } from "../vision";
 import { AgentGen } from "../gen";
 import type { SkillId } from "../agent";
 import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
-import type { SecretsStore } from "../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 import {
   defaultImageModelId,
   hasUsableImageProvider,
@@ -27,14 +27,14 @@ import {
 } from "../providers/resolve-image";
 import { writeScratchFile } from "../session/scratch";
 import { createAgentCommandBackend } from "./command-backend";
-import { workspaceFs } from "../workspaces/fs";
+import { workspaceFs } from "@grida/daemon/server";
 import {
   isIgnoredScanDir,
   isIgnoredScanFile,
   SCAN_MAX_DEPTH,
   SCAN_MAX_FILES,
-} from "../workspaces/scan";
-import type { Workspace, WorkspaceRegistry } from "../workspaces";
+} from "@grida/daemon/server";
+import type { Workspace, WorkspaceRegistry } from "@grida/daemon/server";
 
 export type WorkspaceAgentBindingRequest = {
   workspace_root?: string;

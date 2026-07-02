@@ -49,8 +49,10 @@ server) stops being the only way to observe the system.
 
 ## Vocabulary
 
-- **Daemon** — the agent server process when it runs long-lived
-  and published, rather than embedded in and private to one host.
+- **Daemon** — the local server process when it runs long-lived
+  and published, rather than embedded in and private to one host. The
+  daemon is a general host of capability route groups; the agent is one
+  tenant among them (files, recents, workspaces are host-owned).
 - **Registration** — the on-disk record announcing a live daemon:
   where it listens, who claims it, how to judge compatibility.
 - **Credential** — the shared secret a client must present on

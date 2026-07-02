@@ -22,7 +22,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { AgentHost } from "../agent-host";
+import { createAgentDaemon } from "../server";
 import { AgentTransport } from "../transport";
 import type { ChatMessageWithParts, ChatSessionRow } from "./rows";
 
@@ -128,7 +128,7 @@ async function main(): Promise<void> {
   await setBYOKAuth(userDataPath, key);
 
   const password = crypto.randomBytes(32).toString("base64url");
-  const host = new AgentHost({
+  const host = createAgentDaemon({
     password,
     user_data_path: userDataPath,
     http_access: {

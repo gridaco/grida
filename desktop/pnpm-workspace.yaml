@@ -38,6 +38,7 @@ overrides:
   # there. Keep this current when bumping Electron majors.
   node-abi: "^4.31.0"
   "@grida/agent": "link:../packages/grida-ai-agent"
+  "@grida/daemon": "link:../packages/grida-daemon"
   "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge"
   "@grida/ai-models": "link:../packages/grida-ai-models"
   "@grida/home": "link:../packages/grida-home"

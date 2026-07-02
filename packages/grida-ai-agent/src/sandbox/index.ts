@@ -1,20 +1,18 @@
 /**
- * `@grida/agent/sandbox` — package-owned sandbox policy intent.
+ * `@grida/agent/sandbox` — the composed agent-daemon sandbox policy.
  *
- * Un-bundled from `./server` (where it used to be re-exported) so a host
- * can compute its OS-sandbox wrap without importing the whole AgentHost
- * server entry. The host adapts this intent to its sandbox runtime
- * (macOS Seatbelt, etc.); see docs/sandbox-policy.md.
+ * Its own subpath (not bundled into `./server`) so a host can compute its
+ * OS-sandbox wrap without importing the whole server entry. The host
+ * adapts this intent to its sandbox runtime (macOS Seatbelt, etc.); see
+ * docs/sandbox-policy.md.
  *
- * Residual (deferred follow-up): `ALWAYS_ALLOWED_HOSTS` in `./policy`
- * still hardcodes model-provider hosts (openrouter.ai, ai-gateway.vercel.sh,
- * *.vercel-ai.com). Decoupling that — the host passing its own provider
- * hosts in — is the clean finish of provider extraction (the resolution
- * layer is BYOK-only in `../providers`); tracked as a separate task.
+ * The frame (secret-path denies, dev-network baseline) is
+ * `@grida/daemon/sandbox`; this module adds the AI upstream hosts only
+ * the agent tenant knows (BYOK providers, external-agent vendors).
  */
 
+export { hostFromUrl } from "@grida/daemon/sandbox";
 export {
-  buildAgentHostSandboxPolicy,
-  hostFromUrl,
-  type AgentHostSandboxPolicy,
+  buildAgentDaemonSandboxPolicy,
+  type AgentDaemonSandboxPolicy,
 } from "./policy";

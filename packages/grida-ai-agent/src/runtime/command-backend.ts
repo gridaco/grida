@@ -16,14 +16,14 @@
  */
 
 import type { RunCommandBackend } from "../agent";
-import type { WorkspaceRegistry } from "../workspaces";
+import type { WorkspaceRegistry } from "@grida/daemon/server";
 import {
   validateShellRequest,
   runShell,
   type ProtectedReadRoots,
   type AdditionalAllowedRoots,
   type ShellRunError,
-} from "../shell/runner";
+} from "@grida/daemon/server";
 
 /**
  * @param protectedReadRoots Secret roots (the agent host's `userData`) the

@@ -282,12 +282,12 @@ become public the moment they're shipped. Always go through
 
 ---
 
-### `GRIDA-SEC-004` — Desktop AgentHost trust boundary
+### `GRIDA-SEC-004` — Desktop daemon trust boundary
 
-**What it protects.** The Grida Desktop V1 ships a local AgentHost
+**What it protects.** The Grida Desktop V1 ships a local daemon
 sidecar (Node subprocess of the Electron app) that owns the user's BYOK
 keys (OpenRouter, Vercel AI Gateway), local file paths, chat sessions,
-and AI agent loops. The agent server listens
+and AI agent loops. The daemon listens
 on `127.0.0.1:<random-port>` and is the canonical local capability
 surface for the renderer. If anything other than the legitimate
 Electron renderer reaches it — another browser tab on grida.co, a
@@ -295,7 +295,19 @@ local malware process, a same-origin XSS payload — that party can
 exfiltrate secrets, read/write the user's files, and bill AI calls.
 The boundary is the rule that **only requests originating from the
 desktop's privileged renderer at a `/desktop/*` path, signed with
-the per-spawn Basic Auth token, may reach the agent server.**
+the per-spawn Basic Auth token, may reach the daemon.**
+
+**Package shape (#927).** The perimeter and the host capability routes
+(files, recents, workspaces, the secrets store) are owned by
+[`packages/grida-daemon`](packages/grida-daemon) (`@grida/daemon` —
+`DaemonServer`, `http/auth.ts`, `http/origin.ts`, `http/server.ts`).
+The AI surface (`/agent`, `/sessions`, `/secrets`, `/providers`,
+`/images`, `/video`, the run loop and tools) is a **tenant** —
+[`packages/grida-ai-agent`](packages/grida-ai-agent)'s
+`createAgentTenant` — mounted behind that perimeter through the typed
+`DaemonTenant` seam. Everything in this record applies to the composed
+server (`createAgentDaemon`) that desktop and the CLI actually run;
+the split moves code, not the wire contract.
 
 **Vulnerable scenario (prevented).** A stored XSS lands on a marketing
 page or blog post served from `grida.co`. The user has the desktop app
@@ -305,7 +317,7 @@ ships the key to an attacker-controlled host; or
 `fetch('http://127.0.0.1:<port>/files/read?docId=…')` and exfiltrates
 the user's design files. A parallel local-machine attack: an
 unprivileged malware process scans `127.0.0.1:49152-65535`, finds
-the agent server, and hits its endpoints (a non-browser client doesn't honor
+the daemon, and hits its endpoints (a non-browser client doesn't honor
 `Origin` checks). Both attacks defeat the "secrets in keychain"
 intuition because the local network is a trust shortcut.
 
@@ -362,13 +374,13 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    `Content-Security-Policy` header is present on the request. Inline
    `<script>` tags written by hand are your responsibility.
 
-3. **Per-request Basic Auth** — the agent server rejects any request without
+3. **Per-request Basic Auth** — the daemon rejects any request without
    `Authorization: Basic <base64("agent:<password>")>`. Password is a
    random 256-bit value generated per sidecar spawn. Electron main sends it
    to the sidecar over stdin and serves it to preload only through guarded IPC;
    it is never placed on argv, env, disk, or `window.grida`.
 
-   **Daemon mode (#798).** When the agent server runs as a registered local
+   **Daemon mode (#798).** When the daemon runs as a registered local
    daemon (`grida-agent serve --register`; WG spec
    [docs/wg/ai/agent/daemon.md](docs/wg/ai/agent/daemon.md)), the per-spawn
    password gives way to a **persistent** credential stored owner-only
@@ -376,14 +388,16 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    registration record (also 0600, atomic temp+rename write;
    `Daemon.read` refuses non-loopback URLs so a tampered record cannot
    redirect a credential-bearing client off-machine —
-   [packages/grida-ai-agent/src/daemon.ts](packages/grida-ai-agent/src/daemon.ts)).
+   [packages/grida-daemon/src/daemon.ts](packages/grida-daemon/src/daemon.ts)).
    Liveness probing is the **authenticated** `/handshake`; there is
    deliberately no unauthenticated health route for local malware to
    port-scan against. Two carriages, one credential: the
    `Authorization: Basic` header everywhere, plus an `auth_token` query
    parameter accepted ONLY on GET event-stream routes
    (`/agent/stream/:id`, `/sessions/:id/status`) for header-less
-   `EventSource` attach (`http/auth.ts`, allowlisted in `http/server.ts`).
+   `EventSource` attach (`@grida/daemon`'s `http/auth.ts`; the route set
+   is declared BY the agent tenant via `sse_query_token_paths` on the
+   `DaemonTenant` seam — `packages/grida-ai-agent/src/server.ts`).
    A present header always wins — a wrong header never falls back to the
    token — and the token is never accepted on mutating routes, so a URL
    leak (proxy logs, history) can at worst read stream frames for the
@@ -391,7 +405,7 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    secrets. CORS/Referer layers still apply unchanged to token-authed
    requests.
 
-4. **Defense-in-depth `Referer` check** — the agent server rejects any request
+4. **Defense-in-depth `Referer` check** — the daemon rejects any request
    whose `Referer` path is not under the host-declared desktop route root. Catches a same-origin
    XSS that somehow bypasses preload scoping (e.g. a future SPA-nav
    race condition).
@@ -402,7 +416,7 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    the BYOK provider; key material never returns to renderer. Closes
    the exfil path even if all four layers above were bypassed.
 
-**Endpoint providers (local LLMs, #806).** The agent host additionally
+**Endpoint providers (local LLMs, #806).** The agent tenant additionally
 serves `/providers/endpoints/*` — CRUD over user-configured
 OpenAI-compatible endpoints (Ollama preset, self-hosted gateways),
 persisted at `${userData}/endpoints.json`. The split that keeps layer 5
@@ -453,7 +467,7 @@ load `https://grida.co` while dev loads `http://localhost:3000`;
 every main-process IPC handler validates `event.senderFrame.url`.
 
 **Agent shell execution.** The `run_command` agent tool spawns child
-processes through `shell/runner.ts` with `shell: false` (no shell
+processes through `@grida/daemon`'s `shell/runner.ts` with `shell: false` (no shell
 interpolation). There is **no command allowlist** — the OS sandbox (`srt`,
 see the supervisor) is the structural boundary, and a per-session
 **permission mode** governs the surface (`protocol/mode.ts`):
@@ -503,13 +517,18 @@ the secret-dir guard below) does not exist yet and is the deferred hardening.
 - **Network (allow-only, enumerated).** `srt` denies all outbound except a
   host-set domain allowlist and **forbids `*` / broad patterns by design** —
   its structural sandbox is also its network sandbox, so there is no "open
-  network." The allowlist (`sandbox/policy.ts`) is the BYOK provider hosts plus
-  a curated dev-network set (package registries, git hosts) so the agent can
-  install deps and fetch code.
+  network." The allowlist is composed along the #927 seam: the daemon frame
+  contributes the curated dev-network set (package registries, git hosts —
+  `packages/grida-daemon/src/sandbox/policy.ts`) and the agent tenant
+  contributes the AI upstream hosts (BYOK providers + external-agent
+  vendors — `packages/grida-ai-agent/src/sandbox/policy.ts`,
+  `buildAgentDaemonSandboxPolicy`), so the agent can install deps, fetch
+  code, and reach its providers.
 
 - **Fail-closed exposure (no sandbox ⇒ no shell).** The shell tool is not
   registered at all unless the host affirms containment. The decision is
-  computed once at the HTTP-server boundary (`http/server.ts`) as
+  computed once at the tenant boundary (`createAgentTenant`,
+  `packages/grida-ai-agent/src/server.ts`) as
   `sandbox_enforced || allow_unsandboxed_shell` and threaded to the tool
   registry; the default is off. The desktop supervisor sets `sandbox_enforced`
   true only when it actually wrapped the sidecar spawn with `srt`, so on
@@ -520,7 +539,7 @@ the secret-dir guard below) does not exist yet and is the deferred hardening.
   same gate: a capability that needs containment is born behind this switch,
   so the system's default posture is "no containment, no capability."
 
-- **Secret-dir containment (in-process).** The agent host's own secret dir —
+- **Secret-dir containment (in-process).** The daemon's own secret dir —
   its `userData`, where BYOK `auth.json`, `workspaces.json`, `recent.json`,
   and the sessions db live — is deliberately **not** in the `srt`
   `deny_read` policy, because the host process itself must read `auth.json`
@@ -641,36 +660,36 @@ Today:
 - [editor/lib/supabase/server.ts](editor/lib/supabase/server.ts) — `createClientFromBearer` (bearer-auth shim for existing private editor routes that allow Desktop-originated calls without browser cookies).
 - [editor/app/(api)/private/ai/design/chat/route.ts](<editor/app/(api)/private/ai/design/chat/route.ts>) — legacy SVG/web whole-agent route; accepts bearer auth for existing Desktop SVG callers during migration.
 - [packages/grida-ai-agent/src/providers/index.ts](packages/grida-ai-agent/src/providers/index.ts) — BYOK-only provider resolver; never exposes credentials to the renderer.
-- [packages/grida-ai-agent/src/daemon.ts](packages/grida-ai-agent/src/daemon.ts) — daemon discovery contract: owner-only atomic registration + persistent credential, loopback-only records, authenticated probe.
+- [packages/grida-daemon/src/daemon.ts](packages/grida-daemon/src/daemon.ts) — daemon discovery contract: owner-only atomic registration + persistent credential, loopback-only records, authenticated probe.
 - [packages/grida-ai-agent/src/runtime/index.ts](packages/grida-ai-agent/src/runtime/index.ts) — agent run orchestration; owns run / stream / abort behavior.
 - [packages/grida-ai-agent/src/runtime/stream-registry.ts](packages/grida-ai-agent/src/runtime/stream-registry.ts) — in-flight run replay/abort registry.
 - [packages/grida-ai-agent/src/runtime/command-backend.ts](packages/grida-ai-agent/src/runtime/command-backend.ts) — agent `run_command` adapter through shell policy (structural gates only; the supervised mode gate is the tool's `needsApproval`).
 - [packages/grida-ai-agent/src/tools/run-command.ts](packages/grida-ai-agent/src/tools/run-command.ts) — the supervised-approval gate itself: the AI SDK `needsApproval` predicate that pauses a mutating command before `execute` in `accept-edits` (absent in `auto`). The decision lives on the tool, not the backend.
 - [packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts](packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts) — opened workspace to agent fs/todos/command bindings; wires the `accept-edits` supervised-approval predicate. The session scratch dir is wired as an additional sanctioned root for BOTH surfaces from one source (`deps.scratch_dir`): the shell's allowed cwd roots AND the fs backend's reachable roots (so `view_image`/`read_file`/`write_file` reach scratch, not just the shell). Containment is preserved per root — a path under no reachable root falls back contained to the workspace, and the secrets root is never a reachable root. Also builds the `generate_image` binding: it reads BYOK keys via `SecretsStore` to call the image provider in-process and returns the saved scratch path + metadata + base64 `data` (the bytes are for the CLIENT to render; `AgentGen.toModelOutput` is text-only, so they are NEVER lowered to the model — no context bloat, no perception claim). The complementary `view_image` perception path DOES deliver bytes to the model, but only ones already read under the agent's existing fs read capability: `agent/hoist-tool-result-images.ts` (wired at `agent/index.ts` `prepareStep`, #923) relocates an image tool-result into a synthetic user-message image part so the model can actually see it on the openai-compatible wire — a model-view lowering that moves bytes already inside the prompt, never persisted, with no new read, no new egress, and no boundary change. The key never leaves the host, and the call omits `providerOptions.grida` so it is BYOK-paid, never Grida-billed (mirrors the `/images/generate` route).
 - [packages/grida-ai-agent/src/session/scratch.ts](packages/grida-ai-agent/src/session/scratch.ts) — per-session ephemeral scratch dir (WG `scratch.md`): asserts the shell-writable scratch tree sits OUTSIDE `userData` (the secret root), creates it owner-only (`0700`), and reclaims it (per-session delete + synchronous host-start sweep). `writeScratchFile` lands produced bytes (e.g. `generate_image`) owner-only (`0600`) within the session tree, rejecting any filename that is not a single safe path segment AND opening `O_NOFOLLOW` so a symlink planted at the basename (e.g. by an auto-approved scratch-cwd `run_command`) fails the write instead of redirecting it outside the tree — closing the lexical-check TOCTOU.
-- [packages/grida-ai-agent/src/path-contains.ts](packages/grida-ai-agent/src/path-contains.ts) — shared `path.sep`-prefix containment used by the shell runner's workspace/secret-root gates, the scratch containment assert, and `createProject`'s managed-root assert (one source so the discipline can't drift).
+- [packages/grida-daemon/src/path-contains.ts](packages/grida-daemon/src/path-contains.ts) — shared `path.sep`-prefix containment used by the shell runner's workspace/secret-root gates, the scratch containment assert, and `createProject`'s managed-root assert (one source so the discipline can't drift).
 - [packages/grida-ai-agent/src/runtime/run-input.ts](packages/grida-ai-agent/src/runtime/run-input.ts) — wire-message normalization + `coerceApprovalAnswer`/`applyApprovalAnswer` (shape-gates the explicit `approval_answer` body field and routes it to `store.answerApproval`).
 - [packages/grida-ai-agent/src/session/store.ts](packages/grida-ai-agent/src/session/store.ts) — sessions store; `answerApproval` is the server-authoritative supervised-approval gate (answers only a real pending approval, never forges a call).
-- [packages/grida-ai-agent/src/workspaces.ts](packages/grida-ai-agent/src/workspaces.ts) — opened workspace registry and root canonicalization.
-- [packages/grida-ai-agent/src/workspaces/fs.ts](packages/grida-ai-agent/src/workspaces/fs.ts) — guarded file operations over a containment **scope** (a `{ id, root }`: the workspace, or the session scratch dir — NOT tied to the workspace registry). Every read/write realpath-checks containment to that scope's root, so a symlink escaping the scope is rejected regardless of which scope it is. The streamed-media export (`openFile`, #924) goes through the same `resolveInside` containment (resolved once per request) and then pins the read to a contained file descriptor: it opens the realpath'd target `O_NOFOLLOW` and fstat-streams from that handle, so a symlink swapped in after the check (the realpath→read TOCTOU) fails the open instead of escaping — the same defense as scratch writes. It is deliberately uncapped because streaming has constant memory (the 1 MiB cap exists only to bound the buffered text/base64 readers), which is also why the TOCTOU hardening matters more here.
-- [packages/grida-ai-agent/src/http/routes/workspaces.ts](packages/grida-ai-agent/src/http/routes/workspaces.ts) — `/workspaces/*` registry + fs routes, including the streamed, Range-aware `GET /workspaces/file` (#924) that the `grida-workspace://` scheme proxies to. Same Auth/Origin/Referer guards as the base64 readers; containment via `workspaceFs`.
+- [packages/grida-daemon/src/workspaces.ts](packages/grida-daemon/src/workspaces.ts) — opened workspace registry and root canonicalization.
+- [packages/grida-daemon/src/workspaces/fs.ts](packages/grida-daemon/src/workspaces/fs.ts) — guarded file operations over a containment **scope** (a `{ id, root }`: the workspace, or the session scratch dir — NOT tied to the workspace registry). Every read/write realpath-checks containment to that scope's root, so a symlink escaping the scope is rejected regardless of which scope it is. The streamed-media export (`openFile`, #924) goes through the same `resolveInside` containment (resolved once per request) and then pins the read to a contained file descriptor: it opens the realpath'd target `O_NOFOLLOW` and fstat-streams from that handle, so a symlink swapped in after the check (the realpath→read TOCTOU) fails the open instead of escaping — the same defense as scratch writes. It is deliberately uncapped because streaming has constant memory (the 1 MiB cap exists only to bound the buffered text/base64 readers), which is also why the TOCTOU hardening matters more here.
+- [packages/grida-daemon/src/http/routes/workspaces.ts](packages/grida-daemon/src/http/routes/workspaces.ts) — `/workspaces/*` registry + fs routes, including the streamed, Range-aware `GET /workspaces/file` (#924) that the `grida-workspace://` scheme proxies to. Same Auth/Origin/Referer guards as the base64 readers; containment via `workspaceFs`.
 - [desktop/src/main/workspace-media-protocol.ts](desktop/src/main/workspace-media-protocol.ts) — the `grida-workspace://` privileged-scheme handler (#924): proxies to the sidecar's `/workspaces/file` with main-held Basic-Auth + forwarded Range; no independent fs authority; 503 before the sidecar is up.
 - `desktop/src/preload.ts` — path-scoped `contextBridge`; password fetched through guarded IPC and held in closure.
 - [packages/grida-desktop-bridge/src/index.ts](packages/grida-desktop-bridge/src/index.ts) — renderer-safe bridge protocol and DTO vocabulary.
 - `desktop/src/bridge/contract.ts` — Desktop-local IPC channel vocabulary plus re-export of the renderer-safe bridge contract.
 - `desktop/src/window.ts` — blocks exposed desktop windows from navigating outside `/desktop/*`; injects non-secret preload arguments.
-- `desktop/src/agent-sidecar.ts` — sidecar entrypoint; constructs the BYOK-only AgentHost.
-- `desktop/src/main/agent-sidecar-supervisor.ts` — generates per-spawn password; spawns/supervises the AgentHost sidecar; initializes the OS sandbox wrapper when supported (`srt` is not available on Windows yet).
+- `desktop/src/agent-sidecar.ts` — sidecar entrypoint; constructs the composed agent daemon (`createAgentDaemon`).
+- `desktop/src/main/agent-sidecar-supervisor.ts` — generates per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported (`srt` is not available on Windows yet).
 - `desktop/src/main/protocol-router.ts` — deep-link protocol guard; V1 has no cloud callback route.
 - `desktop/src/main/ipc-handlers.ts` — validates every native IPC sender frame before executing OS capabilities.
-- `packages/grida-ai-agent/src/http/server.ts` — loopback HTTP app and route registration behind shared guards.
+- `packages/grida-daemon/src/http/server.ts` — loopback HTTP app, daemon route registration, and the `DaemonTenant` seam behind shared guards; `packages/grida-ai-agent/src/server.ts` — the agent tenant that mounts the AI route groups through it.
 - `packages/grida-ai-agent/src/http/routes/secrets.ts` — BYOK key presence/set/delete route group; no key-read route.
-- `packages/grida-ai-agent/src/transport.ts` — shared Basic Auth header/client transport helpers, AgentHost route methods, SSE parsing, stream resume headers, and typed HTTP errors.
-- `packages/grida-ai-agent/src/http/auth.ts` — Basic Auth middleware.
-- `packages/grida-ai-agent/src/http/origin.ts` — Origin allowlist and host-declared Referer-path guard.
-- `packages/grida-ai-agent/src/auth/file.ts` — `auth.json` chmod 0o600 read/write.
-- `packages/grida-ai-agent/src/secrets.ts` — `auth.json`-backed BYOK key store; exposes only `has`, `set`, and `delete` to routes.
-- `packages/grida-ai-agent/src/sandbox/policy.ts` — AgentHost sandbox policy intent.
+- `packages/grida-daemon/src/transport.ts` — Basic Auth signing, fetch/SSE plumbing, typed HTTP errors, and the daemon route methods; `packages/grida-ai-agent/src/transport.ts` — the agent tenant client extending it (run/stream/sessions/events, stream resume headers).
+- `packages/grida-daemon/src/http/auth.ts` — Basic Auth middleware.
+- `packages/grida-daemon/src/http/origin.ts` — Origin allowlist and host-declared Referer-path guard.
+- `packages/grida-daemon/src/auth/file.ts` — `auth.json` chmod 0o600 read/write.
+- `packages/grida-daemon/src/secrets.ts` — `auth.json`-backed BYOK key store; exposes only `has`, `set`, and `delete` to routes.
+- `packages/grida-daemon/src/sandbox/policy.ts` — daemon sandbox policy frame (secret-path denies, dev-network baseline); `packages/grida-ai-agent/src/sandbox/policy.ts` — the agent tenant's AI upstream hosts composed on top.
 - [editor/proxy.ts](editor/proxy.ts) — Next.js 16 proxy that sets the CSP + `X-Robots-Tag` + `Referrer-Policy` + `X-Content-Type-Options` headers on every `/desktop/*` response.
 - [editor/lib/desktop/csp.ts](editor/lib/desktop/csp.ts) — the desktop CSP template (`buildDesktopCsp`), kept out of `proxy.ts` per Next.js 16 route-export rules. Owns the directive set, the `grida-workspace:` img/media scope (#924), and the first-party library `img-src` carve-out. Pinned by `proxy.test.ts`.
 - [editor/app/desktop/layout.tsx](editor/app/desktop/layout.tsx) — root layout for the desktop route group; gates all children through `DesktopBridgeGate`.
@@ -686,11 +705,11 @@ Today:
 
 **What does NOT belong here.** A `secrets.get` method on the bridge.
 A bridge installed unconditionally (without `pathname` scoping). A
-agent server that binds `0.0.0.0`. An app that loads grida.co's
+daemon that binds `0.0.0.0`. An app that loads grida.co's
 non-`(desktop)` routes inside the desktop window without revoking the
 bridge first. Any IPC handler in Electron main that acts without
 checking `event.senderFrame.url`. A `grida://` deep-link handler that
-exchanges OAuth codes without agent-server-held PKCE state.
+exchanges OAuth codes without daemon-held PKCE state.
 
 ---
 

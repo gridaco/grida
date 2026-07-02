@@ -14,7 +14,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { generateImage } from "ai";
 import { resolveImageModel } from "./resolve-image";
-import type { SecretsStore } from "../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 
 function loadKey(): string | undefined {
   if (process.env.BYOK_OPENROUTER_API_KEY)

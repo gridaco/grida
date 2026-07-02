@@ -32,8 +32,8 @@ import {
   isKnownProviderId,
   type EndpointProvidersStore,
 } from "../../providers/endpoints";
-import type { SecretsStore } from "../../secrets";
-import { body, v } from "../validate";
+import type { SecretsStore } from "@grida/daemon/server";
+import { body, v } from "@grida/daemon/server";
 
 export type SecretsRoutesDeps = {
   store: SecretsStore;

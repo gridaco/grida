@@ -1,6 +1,6 @@
 ---
 title: Agent sandbox wrap
-description: How Grida Desktop adapts AgentHost sandbox policy to srt and supervises the AgentSidecar process.
+description: How Grida Desktop adapts agent-daemon sandbox policy to srt and supervises the AgentSidecar process.
 keywords: [desktop, agent-sidecar, sandbox, srt, grida-sec-004]
 format: md
 tags:
@@ -28,14 +28,14 @@ defense-in-depth) lives in the RFC. Read that first.
 
 What follows is delta:
 
-- The package-owned sandbox policy intent for an AgentHost outer-wrap.
+- The package-owned sandbox policy intent for an agent-daemon outer-wrap.
 - The inner per-call sub-policy spawn path Grida picked.
 - The Windows decision.
 - The four open implementation questions before V1 ships.
 
-## AgentHost Outer-Wrap Policy
+## Agent-Daemon Outer-Wrap Policy
 
-`buildAgentHostSandboxPolicy()` is exported from `@grida/agent/sandbox`.
+`buildAgentDaemonSandboxPolicy()` is exported from `@grida/agent/sandbox`.
 It returns package-owned policy intent: allowed network hosts, denied
 secret paths, and broad read/write shape. The desktop supervisor supplies
 host facts such as `userData` and `home`, then adapts the result to the
@@ -78,9 +78,9 @@ agent host reach external hosts.
 
 The supervisor (`desktop/src/main/agent-sidecar-supervisor.ts`) holds the
 host `child_process.spawn` primitive. It asks `@grida/agent/sandbox` for
-AgentHost policy intent, initializes `srt` through
+agent-daemon policy intent, initializes `srt` through
 `desktop/src/main/sandbox/manager.ts`, calls `wrap`, and the resulting child is
-the AgentHost sidecar running inside `srt`.
+the daemon sidecar running inside `srt`.
 
 Switching from `utilityProcess.fork` to `child_process.spawn` requires
 flipping the `RunAsNode` Electron fuse in `forge.config.ts`. Residual
@@ -244,7 +244,7 @@ enumerated dev-network allowlist (registries + git + provider), not open (see
 [Residual risks](#residual-risks-auto-mode)).
 
 ```
-┌─ AgentHost  (OS-sandboxed; outer wrap: host-runtime fs + provider net) ─┐
+┌─ Daemon (agent tenant mounted)  (OS-sandboxed; outer wrap: host-runtime fs + provider net) ─┐
 │                                                                         │
 │   run_command (auto mode):                                              │
 │   ┌─ per-call sub-policy (strictly tighter) → spawn ───────────────┐   │
@@ -301,7 +301,7 @@ allow.
 - **macOS.** The current V1 policy relies on broad host roots plus explicit
   secret-path denies. Narrow workspace/ad-hoc roots are a follow-up.
 - **Linux.** Paths are literal. A future narrowed policy will require `srt`
-  reset plus an AgentHost sidecar re-spawn when workspace roots change, which
+  reset plus a daemon sidecar re-spawn when workspace roots change, which
   drops in-flight agent streams.
 
 ## Windows
@@ -318,7 +318,7 @@ The Windows backend is **deferred**; tracked here so it isn't forgotten.
 
 ## Reviewer cross-link
 
-When adding a feature that touches `buildAgentHostSandboxPolicy()` or any
+When adding a feature that touches `buildAgentDaemonSandboxPolicy()` or any
 `ShellRunRequirement`, run the [security checklist](./agent-security.md#reviewer-checklist).
 Anything that weakens a srt layer (`enableWeakerNestedSandbox`,
 `enableWeakerNetworkIsolation`, an overly broad `allowed_domains`) is a

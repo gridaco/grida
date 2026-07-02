@@ -76,6 +76,7 @@ jobs:
           pnpm turbo run build \
             --filter=@grida/desktop-bridge \
             --filter=@grida/agent \
+            --filter=@grida/daemon \
             --filter=@grida/ai-models \
             --filter=@grida/home
 

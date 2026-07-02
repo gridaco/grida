@@ -6,8 +6,8 @@ description: >-
   path-scoped bridge security, Electron-only UI bugs, and CDP / Playwright
   verification. Use for `desktop/`, `editor/app/desktop/**`,
   `editor/scaffolds/desktop/**`, `editor/lib/desktop/**`, `/desktop/*` CSP,
-  and GRIDA-SEC-004. For AgentHost, sessions, tools, providers, or
-  `packages/grida-ai-agent/**`, use `agent-system`.
+  and GRIDA-SEC-004. For the daemon/agent-tenant packages, sessions, tools, providers, or
+  `packages/grida-daemon/**` / `packages/grida-ai-agent/**`, use `agent-system`.
 ---
 
 # Grida Desktop - Electron Shell
@@ -18,9 +18,9 @@ The renderer is still the editor's Next.js app under `editor/app/desktop/`;
 Electron URL-loads it from `http://localhost:3000/desktop/*` in dev and
 `https://grida.co/desktop/*` in prod.
 
-Use [`agent-system`](../agent-system/SKILL.md) for the AgentHost core,
+Use [`agent-system`](../agent-system/SKILL.md) for the daemon + agent-tenant core,
 sessions, workspaces, providers, tool execution, HTTP routes, and tests in
-`packages/grida-ai-agent`.
+`packages/grida-daemon` and `packages/grida-ai-agent`.
 
 > Adjacent: [`security`](../security/SKILL.md) for the GRIDA-SEC-004 trust
 > boundary, [`code-react`](../code-react/SKILL.md) for React code under
@@ -41,8 +41,8 @@ sessions, workspaces, providers, tool execution, HTTP routes, and tests in
 - Touching CSP or proxy behavior for `/desktop/*`.
 
 Skip this skill when the change is core agent behavior that can be tested
-without Electron. Use `agent-system` for `packages/grida-ai-agent/**`,
-AgentHost HTTP routes, sessions, files/workspaces, providers, tools, runtime,
+without Electron. Use `agent-system` for `packages/grida-daemon/**` / `packages/grida-ai-agent/**`,
+daemon HTTP routes, sessions, files/workspaces, providers, tools, runtime,
 skills, and BYOK/secrets.
 
 ---

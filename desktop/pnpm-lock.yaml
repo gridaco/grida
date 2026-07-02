@@ -7,6 +7,7 @@ settings:
 overrides:
   node-abi: ^4.31.0
   '@grida/agent': link:../packages/grida-ai-agent
+  '@grida/daemon': link:../packages/grida-daemon
   '@grida/desktop-bridge': link:../packages/grida-desktop-bridge
   '@grida/ai-models': link:../packages/grida-ai-models
   '@grida/home': link:../packages/grida-home
@@ -82,6 +83,9 @@ importers:
       '@grida/ai-models':
         specifier: link:../packages/grida-ai-models
         version: link:../packages/grida-ai-models
+      '@grida/daemon':
+        specifier: link:../packages/grida-daemon
+        version: link:../packages/grida-daemon
       '@grida/desktop-bridge':
         specifier: link:../packages/grida-desktop-bridge
         version: link:../packages/grida-desktop-bridge

@@ -89,11 +89,11 @@ The bridge type shape lives in `@grida/desktop-bridge`. Desktop preload
 and the editor-side typed client both consume that contract — single
 source of truth for what the renderer can see. The package is only the
 renderer-visible bridge protocol; Electron IPC channel names stay in Desktop
-source, and AgentHost HTTP stays in `@grida/agent/transport`.
+source, and daemon HTTP stays in `@grida/daemon/transport` + `@grida/agent/transport`.
 
 `window.grida.protocol` is currently `1`. `/desktop/*` routes must distinguish
 a missing bridge from an unsupported protocol before rendering agent UI. Native
-capabilities live under `bridge.caps.native`; AgentHost route capabilities come
+capabilities live under `bridge.caps.native`; daemon route capabilities come
 from `bridge.handshake()` so they are the real server capabilities, not a static
 Desktop guess.
 
@@ -115,8 +115,8 @@ renderer is under `/desktop/*`, never leaking agent server credentials onto
 — renderer asks, main answers.
 
 **`AgentSidecar`.** See [process-model](./process-model.md). Short version:
-secrets, state, agent loop. Desktop preload delegates AgentHost HTTP calls to
-`AgentTransport.Client`; it does not duplicate AgentHost route strings, SSE
+secrets, state, agent loop. Desktop preload delegates daemon HTTP calls to
+`AgentTransport.Client`; it does not duplicate daemon route strings, SSE
 parsing, or stream resume headers. The renderer holds no tokens; the shell
 holds no business logic.
 

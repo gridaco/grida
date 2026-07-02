@@ -17,8 +17,8 @@ import {
   validateEndpointProviderConfig,
   type EndpointProviderConfig,
 } from "../protocol/endpoints";
-import { AuthStore } from "../auth/file";
-import { SecretsStore } from "../secrets";
+import { AuthStore } from "@grida/daemon/server";
+import { SecretsStore } from "@grida/daemon/server";
 import { registerProvidersRoutes } from "../http/routes/providers";
 import { registerSecretsRoutes } from "../http/routes/secrets";
 import { EndpointProvidersStore } from "./endpoints";

@@ -173,7 +173,7 @@ The client advertises in return:
 | `fs.writeTextFile` | Same for `write` / `edit`.                                                          |
 | `terminal`         | The client provides `terminal/*`. The `bash` tool MAY delegate.                     |
 
-Delegation is **opt-in per host**. A local AgentHost with its own
+Delegation is **opt-in per host**. A local daemon with its own
 sandboxed filesystem ignores the client's offers. An
 editor-embedded host delegates so the editor's write-tracking and
 approval UI is the single source of truth. Both modes are
@@ -314,7 +314,7 @@ agent. The guide fills them in.
 ## Anti-goals
 
 - **ACP is not the only outward transport.** A host that ships a
-  CLI or a local AgentHost MAY not need ACP at all — the AI SDK v6 chunk
+  CLI or a local daemon MAY not need ACP at all — the AI SDK v6 chunk
   stream over the host's own transport (HTTP+SSE, IPC, in-memory)
   is fully conformant.
 - **ACP is not a replacement for AI SDK chunks internally.** The

@@ -43,8 +43,8 @@ For the user-facing app and the security boundary:
 
 ## God class
 
-The desktop's agent system is wired by **one class** — `AgentHost` in
-[`packages/grida-ai-agent/src/agent-host.ts`](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/agent-host.ts).
+The desktop's agent system is wired by **one composed server** — `createAgentDaemon` (`DaemonServer` + the agent tenant) in
+[`packages/grida-daemon/src/daemon-server.ts`](https://github.com/gridaco/grida/blob/main/packages/grida-daemon/src/daemon-server.ts).
 It owns the lifetime of every
 long-lived service: sessions store, stream registry, provider registry,
 workspace registry, secrets, files, shell, runtime. Public API:

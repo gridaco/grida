@@ -10,7 +10,7 @@
  * trashing entries inside an already-opened workspace, and never one that
  * the workspace's own symlinks happen to point at outside it.
  *
- * The containment policy mirrors `@grida/agent`'s `workspaces/fs.ts`
+ * The containment policy mirrors `@grida/daemon`'s `workspaces/fs.ts`
  * `resolveInside` (the canonical owner): reject a non-relative path, a
  * string-level `..` escape, and a symlink whose realpath leaves the
  * workspace. It additionally refuses the workspace root itself — trashing

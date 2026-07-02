@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SecretsStore } from "../secrets";
+import type { SecretsStore } from "@grida/daemon/server";
 import type { EndpointProviderConfig } from "../protocol/endpoints";
 import type { EndpointProvidersStore } from "./endpoints";
 import {

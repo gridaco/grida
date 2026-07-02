@@ -1,14 +1,19 @@
 # `@grida/agent`
 
 Grida's AI agent system in one package. Private, `workspace:*`, in
-active development.
+active development. The **agent tenant** of
+[`@grida/daemon`](../grida-daemon/README.md) (issue #927): the daemon
+owns the loopback perimeter and the host capability routes; this package
+depends on it and mounts everything AI behind it.
 
 It owns three agent-system concerns:
 
-- **AgentHost core.** The `AgentHost` that wires the long-lived
-  services behind the agent server HTTP perimeter — sessions, BYOK providers,
-  workspaces, secrets, files, shell, and the agent run loop. This is the
-  server lifecycle that a host may run headlessly. Node-only.
+- **The agent tenant.** `createAgentTenant` registers the AI route
+  groups (`/agent`, `/events`, `/sessions`, `/secrets`, `/providers`,
+  `/images`, `/video`) through the daemon's `DaemonTenant` seam, and
+  owns their state — the run loop, chat sessions (SQLite), BYOK
+  provider resolution, endpoint configs. `createAgentDaemon` is the
+  composed server hosts actually run. Node-only.
 - **The Grida agent.** Runtime-agnostic agent definition: system-prompt
   composition (`composeSystemPrompt` + skills), model tiers, and the
   AI-SDK UI-message stream contract. No Node, no DOM.
@@ -31,9 +36,9 @@ bundle.
 | `./fs`               | virtual fs + file tools ([README](./src/fs/README.md))                                                                                                         | neutral  |
 | `./fs/backends/opfs` | browser OPFS backend                                                                                                                                           | browser  |
 | `./todos`            | plan store + `todo_write` ([README](./src/todos/README.md))                                                                                                    | neutral  |
-| `./server`           | `AgentHost` + server capability contracts                                                                                                                      | Node     |
-| `./sandbox`          | sandbox policy intent (`buildAgentHostSandboxPolicy`, `hostFromUrl`)                                                                                           | Node     |
-| `./transport`        | `AgentTransport` namespace — Basic-Auth signing, fetch helpers, `AgentTransport.Client`                                                                        | neutral  |
+| `./server`           | `createAgentTenant` + `createAgentDaemon` (the composed daemon), daemon re-exports                                                                             | Node     |
+| `./sandbox`          | composed sandbox policy (`buildAgentDaemonSandboxPolicy` — daemon frame + AI upstream hosts)                                                                   | Node     |
+| `./transport`        | `AgentTransport` namespace — extends `DaemonTransport.Client` with the agent tenant's routes                                                                   | neutral  |
 
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
 public subpath; workspace bindings use it in-process.
@@ -61,9 +66,14 @@ crosses one of these is the wrong tool, not a missing feature.
   is no planner/router-of-agents.
 - **Not a UI framework.** The agent streams AI-SDK UI-message frames;
   rendering, transcript state, and history navigation are the client's job.
-- **Not a Desktop bridge package.** `@grida/agent/transport` owns the
-  AgentHost HTTP seam. Electron-specific window, dialog, shell, host-app, and
-  file-path capabilities stay in Desktop's bridge contract.
+- **Not a Desktop bridge package.** `@grida/daemon/transport` +
+  `@grida/agent/transport` own the daemon HTTP seam. Electron-specific
+  window, dialog, shell, host-app, and file-path capabilities stay in
+  Desktop's bridge contract.
+- **Not the host layer.** The loopback perimeter, daemon discovery, and
+  the host capability routes (files, recents, workspaces, the secrets
+  store) live in `@grida/daemon` (#927). A non-AI host capability never
+  lands here.
 - **Not a private chat-history IR.** The three session tables
   (session → messages → parts, in `session/rows.ts`) **are** the
   contract — hosts read and render them directly. There is no hidden
@@ -95,17 +105,17 @@ agent (`testing/fake-acp-agent.ts`, `agent-provider/jtbd.test.ts`); the gated
 Package docs are host-agnostic and describe the contracts exported by
 `@grida/agent`:
 
-- [AgentHost](./docs/agent-host.md) — lifecycle, ownership, and what hosts
-  must provide.
-- [HTTP access](./docs/http-access.md) — Basic Auth, CORS, and Referer policy
-  supplied by a host adapter.
-- [Sandbox policy](./docs/sandbox-policy.md) — package-owned sandbox intent
-  that hosts adapt to their sandbox runtime.
+- [DaemonServer](../grida-daemon/docs/daemon-server.md) — lifecycle,
+  ownership, and what hosts must provide (`@grida/daemon`).
+- [HTTP access](../grida-daemon/docs/http-access.md) — Basic Auth, CORS, and
+  Referer policy supplied by a host adapter (`@grida/daemon`).
+- [Sandbox policy](./docs/sandbox-policy.md) — the composed sandbox intent
+  (daemon frame + this tenant's AI upstream hosts).
 
 The wider architecture lives in the working-group docs:
 
 - [Desktop (WG)](../../docs/wg/desktop/index.md) — one host binding for
-  AgentHost, including renderer bridge, GRIDA-SEC-004, storage, and sandbox
+  the daemon, including renderer bridge, GRIDA-SEC-004, storage, and sandbox
   wrap details.
 - [Agent system RFC](../../docs/wg/ai/agent/index.md) — the abstract
   contract this implements (protocol, locked tools, sessions, capability
