@@ -124,5 +124,8 @@ the price of the adapter path.
   SDK provides for free.
 - [Session / context-window tracking](../session.md#context-window-tracking) —
   where the normalized token values land.
+- [Cost Optimization](../cost-optimization.md) — the doctrine the
+  normalized cache columns serve: a zero cache-hit rate on a
+  caching-capable provider is an alarm, not a statistic.
 - [`ai-sdk.dev`](https://ai-sdk.dev/) — the SDK's own documentation
   (canonical for usage; this page is implementor's annex).

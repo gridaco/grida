@@ -727,6 +727,10 @@ The default policy: save on every chunk. Detailed in
 - [Turn Queue](./queue.md) — the run-state machine that drives
   `SessionStatus`, and how turn-triggering messages are queued and
   drained.
+- [Cost Optimization](./cost-optimization.md) — the billing-side
+  doctrine: what compaction thresholds, pruning, and the usage
+  breakdown cost (or save) per step, and why window / threshold /
+  price tier are one decision.
 - [UX Patterns](./ux.md) — compositor, queued sends, sidecar,
   memory.
 - [Debugging](./debugging.md) — inspection format and DX checklist.
