@@ -47,6 +47,11 @@ function sanitizeLayout(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/** Upper bound on seeded documents — far above any real pick tray (the home
+ *  gallery tops out at a few hundred cards) while keeping a buggy or hostile
+ *  caller from inflating the manifest write (GRIDA-SEC-004 posture). */
+const MAX_SEED_DOCUMENTS = 500;
+
 /**
  * Field-constrained `seed` validator (GRIDA-SEC-004): reduces an arbitrary body
  * to a {@link ProjectSeed} of `{ src, layout? }` documents, silently dropping
@@ -60,6 +65,12 @@ const seedValidator: Validator<ProjectSeed> = (raw) => {
   const docs = (raw as { documents?: unknown }).documents;
   if (!Array.isArray(docs)) {
     return { ok: false, error: "must have a documents array" };
+  }
+  if (docs.length > MAX_SEED_DOCUMENTS) {
+    return {
+      ok: false,
+      error: `documents exceeds the ${MAX_SEED_DOCUMENTS}-entry cap`,
+    };
   }
   const documents: ProjectSeedDocument[] = [];
   for (const d of docs) {

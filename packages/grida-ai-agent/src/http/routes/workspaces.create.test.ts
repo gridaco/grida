@@ -93,6 +93,18 @@ describe("POST /workspaces/create (auto-create)", () => {
     expect(manifest.documents[0].thumbnail).toBeUndefined();
   });
 
+  it("rejects a seed with more documents than the cap", async () => {
+    const res = await post(app, {
+      name: "Flood",
+      seed: {
+        documents: Array.from({ length: 501 }, (_, i) => ({
+          src: `https://library.grida.co/${i}.png`,
+        })),
+      },
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("slugifies a traversal name so it stays inside the managed root", async () => {
     const res = await post(app, { name: "../../pwned" });
     expect(res.status).toBe(200);

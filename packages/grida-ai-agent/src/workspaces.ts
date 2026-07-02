@@ -227,16 +227,25 @@ export class WorkspaceRegistry {
       realDir,
       `${path.basename(realDir)}${BUNDLE_EXTENSION}`
     );
-    await fs.mkdir(bundleDir, { recursive: false });
-    await atomicWrite(
-      path.join(bundleDir, MANIFEST_FILENAME),
-      buildSeedManifest(opts.seed),
-      { mode: 0o644 }
-    );
-
-    // Register through `open` so the id (sha256(realpath)[:16]) and recents
-    // bookkeeping stay identical to a user-opened folder.
-    return this.open(realDir);
+    try {
+      await fs.mkdir(bundleDir, { recursive: false });
+      await atomicWrite(
+        path.join(bundleDir, MANIFEST_FILENAME),
+        buildSeedManifest(opts.seed),
+        { mode: 0o644 }
+      );
+      // Register through `open` so the id (sha256(realpath)[:16]) and recents
+      // bookkeeping stay identical to a user-opened folder.
+      return await this.open(realDir);
+    } catch (err) {
+      // Roll back the mint on any downstream failure (EACCES, disk full,
+      // persist error) — otherwise an orphaned half-project lingers on disk,
+      // unregistered, squatting the slug for the next create. Recursive rm is
+      // safe here: `realDir` is containment-asserted above and we created it
+      // fresh this call, so it holds nothing but our own partial seed.
+      await fs.rm(realDir, { recursive: true, force: true }).catch(() => {});
+      throw err;
+    }
   }
 
   /**

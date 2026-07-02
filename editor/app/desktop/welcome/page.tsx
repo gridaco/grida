@@ -161,6 +161,7 @@ export default function DesktopWelcomePage() {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && !e.metaKey && (e.key === "r" || e.key === "R")) {
         e.preventDefault();
+        if (e.repeat) return; // holding the key must not flicker the palette
         setCommandOpen((v) => !v);
       }
     };
@@ -170,13 +171,21 @@ export default function DesktopWelcomePage() {
 
   // Track the composer's natural (in-flow) height so the spacer can reserve it
   // when the composer detaches to float — otherwise the flow collapses and the
-  // gallery jumps up by the composer's height at the dock moment.
+  // gallery jumps up by the composer's height at the dock moment. Measurements
+  // are frozen WHILE docked: the floating card has its own padding/border, and
+  // adopting its height would skew the spacer. When the composer re-enters the
+  // flow its size changes, so the observer fires again and re-measures.
+  const dockedRef = useRef(docked);
+  dockedRef.current = docked;
   useEffect(() => {
     const el = composerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setHeroHeight(el.offsetHeight));
+    const measure = () => {
+      if (!dockedRef.current) setHeroHeight(el.offsetHeight);
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    setHeroHeight(el.offsetHeight);
+    measure();
     return () => ro.disconnect();
   }, []);
 
@@ -507,14 +516,19 @@ export default function DesktopWelcomePage() {
                     </Command>
                   </PopoverContent>
                 </Popover>
-                <button
-                  type="button"
-                  onClick={onStartBlank}
-                  disabled={busy}
-                  className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
-                >
-                  or start with a blank
-                </button>
+                {/* Hidden while references are picked: "blank" means blank, and
+                    rendering it would either silently drop the gathered picks or
+                    duplicate the tray's Start — the tray owns starting then. */}
+                {pickedRefs.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={onStartBlank}
+                    disabled={busy}
+                    className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
+                  >
+                    or start with a blank
+                  </button>
+                )}
               </div>
               {/* Picked-references tray — the gallery drops pins here so several
                   can be gathered before starting one board from all of them. A

@@ -15,7 +15,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { WorkspaceRegistry } from "./workspaces";
+import { WorkspaceRegistry, type Workspace } from "./workspaces";
 
 function expectedId(realRoot: string): string {
   return crypto
@@ -193,6 +193,27 @@ describe("Workspaces", () => {
       const registry = new WorkspaceRegistry(userDataDir, projectsRoot);
       const ws = await registry.createProject({ name: "Poster v2..." });
       expect(path.basename(ws.root)).toBe("Poster v2");
+    });
+
+    it("rolls back the minted directory when a downstream step fails", async () => {
+      // Force the last step (registration via `open`) to fail — the mint must
+      // be removed so no orphaned half-project squats the slug.
+      class FailingRegistry extends WorkspaceRegistry {
+        override async open(): Promise<Workspace> {
+          throw new Error("boom");
+        }
+      }
+      const registry = new FailingRegistry(userDataDir, projectsRoot);
+      await expect(registry.createProject({ name: "Poster" })).rejects.toThrow(
+        "boom"
+      );
+      await expect(
+        fs.stat(path.join(projectsRoot, "Poster"))
+      ).rejects.toMatchObject({ code: "ENOENT" });
+      // The slug is free again: a healthy registry mints "Poster", not "-2".
+      const healthy = new WorkspaceRegistry(userDataDir, projectsRoot);
+      const ws = await healthy.createProject({ name: "Poster" });
+      expect(path.basename(ws.root)).toBe("Poster");
     });
 
     it("throws projects-root-not-configured when no managed root is wired", async () => {

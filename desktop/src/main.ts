@@ -94,7 +94,13 @@ Menu.setApplicationMenu(menu);
 // which catches the auto-create flow (a project made via client-side nav never
 // spawns a new window the main process could hook).
 function refresh_recent_menu(): void {
-  void rebuild_application_menu(app, shell, { onOpenFile: handleFilePath });
+  // Swallow-and-log: a failed rebuild (e.g. menu construction throwing) must
+  // not become an unhandled rejection in main; the menu just stays stale until
+  // the next trigger. (A sidecar that isn't up yet already resolves to an
+  // empty recents list inside `rebuild_application_menu`.)
+  rebuild_application_menu(app, shell, { onOpenFile: handleFilePath }).catch(
+    (err) => console.error("[grida] open-recent menu rebuild failed:", err)
+  );
 }
 app.on("browser-window-focus", refresh_recent_menu);
 
