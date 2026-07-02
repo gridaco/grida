@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { SignInShell } from "./_components/shell";
+import { SignInShell } from "@/components/auth/sign-in-shell";
 
 type SearchParams = {
   redirect_uri?: string;

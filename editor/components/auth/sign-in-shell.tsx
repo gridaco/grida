@@ -3,10 +3,10 @@ import { ChatBubbleIcon } from "@radix-ui/react-icons";
 import { GridaLogo } from "@/components/grida-logo";
 import Link from "next/link";
 import Image from "next/image";
-import abstract_photo from "../../../../public/images/abstract-placeholder.jpg";
+import abstract_photo from "../../public/images/abstract-placeholder.jpg";
 
 /**
- * Shared page shell for the sign-in family (`/sign-in`, `/sign-in/desktop`).
+ * Shared page shell for the sign-in family (`/sign-in`, `/desktop-auth`).
  * Owns the chrome — top nav, two-column layout with the photo aside, and the
  * terms footer — parameterized only by the heading copy and the method list
  * (children). Behavior (redirect params, method mechanics, gating) stays in

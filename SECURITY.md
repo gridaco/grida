@@ -754,33 +754,46 @@ paths, and params are public, so the design must not rely on obscurity.
    [editor/app/desktop/auth/start/route.ts](editor/app/desktop/auth/start/route.ts)
    mints the `@supabase/ssr` code-verifier cookie on a route-handler
    response (the supabase/ssr#55-safe shape) and returns the same-origin
-   `/sign-in/desktop` launch-page URL carrying only the PUBLIC
-   `code_challenge`. The sign-in method is chosen on that web page
-   ([editor/app/(site)/sign-in/desktop/](<editor/app/(site)/sign-in/desktop/page.tsx>)),
+   `/desktop-auth` launch-page URL carrying the `code_challenge`. The
+   sign-in method is chosen on that web page
+   ([editor/app/(untracked)/desktop-auth/](<editor/app/(untracked)/desktop-auth/page.tsx>)),
    and every method binds its GoTrue flow to the forwarded challenge
    (`host/auth/desktop-auth-flow.ts`, pinned by its test) — so the
    desktop never names a provider, and whatever the method, the
-   resulting `code` is
-   exchangeable ONLY with the jar-held verifier: an attacker-minted code
-   was issued against a different verifier, so GoTrue rejects the
-   exchange (closes login-CSRF); a phished victim code is single-use,
-   expires in 5 minutes, and is useless off-machine without the jar. A
-   forged or attacker-chosen `challenge` on the launch page yields codes
-   nobody can exchange (the matching verifier exists in no jar the
-   attacker can reach).
-2. **Stateless, fixed-target router** —
+   resulting `code` is exchangeable ONLY with the jar-held verifier: a
+   code minted against a _different_ verifier is rejected by GoTrue
+   (closes the naive login-CSRF); a phished victim code is single-use,
+   expires in 5 minutes, and is useless off-machine without the jar.
+2. **The challenge is confidentiality-sensitive in transit** — in this
+   design the `code_challenge` doubles as the binding token between "the
+   desktop that started this flow" and an acceptable code: an attacker
+   who learns a victim's challenge can mint a code bound to it _for the
+   attacker's own account_ and fire the deep link at the victim, logging
+   the victim into the attacker's account (login-CSRF via challenge
+   replay — a _random_ attacker challenge is harmless, but the victim's
+   is not). It is unguessable (256-bit) and must not be disclosed, so the
+   launch page lives in the analytics-free `(untracked)` route group
+   ([editor/app/(untracked)/layout.tsx](<editor/app/(untracked)/layout.tsx>))
+   — no Google/Vercel pageview script ever sees its URL — with
+   `Referrer-Policy: no-referrer` so the challenge never leaks via a
+   `Referer` header either. The insiders redirect target is likewise
+   analytics-free (and dev-only). Address-bar / history exposure is
+   inherent to any browser OAuth handoff and bounded by the 5-min,
+   single-use code; the systematic third-party beacon is what is closed
+   here.
+3. **Stateless, fixed-target router** —
    [desktop/src/main/protocol-router.ts](desktop/src/main/protocol-router.ts)
    performs no code exchange and holds no auth state. It navigates a
    desktop window to the constant `/desktop/auth/callback` path on the
    configured editor origin, forwarding only the known
    `code`/`error*` params; nothing else from the deep link crosses the
    boundary, and every branch consumes the URL (no re-queue loop).
-3. **Exchange only at the same-origin callback route** —
+4. **Exchange only at the same-origin callback route** —
    [editor/app/desktop/auth/callback/route.ts](editor/app/desktop/auth/callback/route.ts)
    runs `exchangeCodeForSession` with the cookie client (identical
    mechanism to the web `(auth)/auth/callback`); success and failure
    both redirect inside `/desktop/*`.
-4. **Redirect containment** — the `will-redirect` guard in
+5. **Redirect containment** — the `will-redirect` guard in
    [desktop/src/window.ts](desktop/src/window.ts) holds server 302s to
    the same same-origin `/desktop/*` allowlist as user navigations
    (`will-navigate` does not fire for server redirects, so without the
@@ -790,7 +803,7 @@ paths, and params are public, so the design must not rely on obscurity.
    [editor/app/desktop/auth/sign-out/route.ts](editor/app/desktop/auth/sign-out/route.ts):
    navigating the webview to the web `/sign-out` would be blocked and
    `shell.openExternal`'d — logging the user out of their OS browser.
-5. **Ceremony in the system browser only** — the launch URL travels
+6. **Ceremony in the system browser only** — the launch URL travels
    renderer → `shell.open_external` (http/https-validated IPC); the
    webview never loads a provider page, and the `grida://auth/callback`
    redirect is allowlisted in Supabase
@@ -809,7 +822,7 @@ Today:
 
 - [supabase/config.toml](supabase/config.toml) — `grida://auth/callback` redirect allowlist entry.
 - [editor/app/desktop/auth/start/route.ts](editor/app/desktop/auth/start/route.ts) — PKCE start; verifier cookie + launch-page URL (method-neutral; the desktop never names a provider).
-- [editor/app/(site)/sign-in/desktop/page.tsx](<editor/app/(site)/sign-in/desktop/page.tsx>) — the web launch page (a `/sign-in` sibling sharing the sign-in shell and Google button, `authorize_url` mode): validates the challenge, binds the offered method's GoTrue flow to it, and mirrors the web sign-in's insiders routing (`NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH` → redirect to the insiders page with the challenge forwarded).
+- [editor/app/(untracked)/desktop-auth/page.tsx](<editor/app/(untracked)/desktop-auth/page.tsx>) + [editor/app/(untracked)/layout.tsx](<editor/app/(untracked)/layout.tsx>) — the web launch page and its analytics-free root layout. Shares the sign-in shell ([editor/components/auth/sign-in-shell.tsx](editor/components/auth/sign-in-shell.tsx)) and Google button (`authorize_url` mode); validates the challenge, binds the offered method's GoTrue flow to it, mirrors the web sign-in's insiders routing (`NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH` → redirect to the insiders page with the challenge forwarded). Deliberately NOT a `(site)` sibling: `(site)` loads Google/Vercel analytics that would beacon the challenge-bearing URL. The `(untracked)` group must never gain a URL-reporting script.
 - [editor/host/auth/desktop-auth-flow.ts](editor/host/auth/desktop-auth-flow.ts) — the flow vocabulary shared by the launch page and the insiders route: challenge validation, challenge-bound authorize/OTP builders, verify-link extraction pinned to the Supabase origin (pinned by `desktop-auth-flow.test.ts`).
 - [editor/app/(insiders)/insiders/auth/basic/sign-in/route.ts](<editor/app/(insiders)/insiders/auth/basic/sign-in/route.ts>) (+ the hidden `challenge` passthrough in [basic/page.tsx](<editor/app/(insiders)/insiders/auth/basic/page.tsx>)) — the insiders **email+password** desktop branch: verifies the password exactly like the web insiders flow, then mints the challenge-bound code by firing the GoTrue OTP and consuming the emailed verify link straight from the local Mailpit capture, so the developer keeps email+password and still traverses the production verify → `grida://` → exchange path. A password grant alone can never produce a challenge-bound code (GoTrue returns sessions directly for passwords), which is why the mint rides the OTP-link machinery. Local-only by GRIDA-SEC-002 (`/insiders/*` 404s outside development), which is what makes the Mailpit coupling acceptable (pinned by its `route.test.ts`).
 - [editor/app/desktop/auth/callback/route.ts](editor/app/desktop/auth/callback/route.ts) — the only code-exchange point; `/desktop/*`-contained redirects (pinned by its `route.test.ts`).
@@ -823,7 +836,9 @@ A router that navigates to a path taken from deep-link input, or that
 forwards params beyond `code`/`error*`. A desktop webview navigation to
 `(auth)` routes or the web `/sign-out`. Sidecar- or main-held session
 tokens — that is future hosted-provider work and must be registered
-here first.
+here first. The launch page in a route group that loads Google/Vercel
+analytics (or any URL-reporting script) — the challenge in its URL is
+confidentiality-sensitive, so it stays in `(untracked)`.
 
 ---
 

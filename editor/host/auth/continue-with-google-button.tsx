@@ -11,7 +11,7 @@ type ContinueWithGoogleButtonProps = {
   /**
    * Pre-built GoTrue authorize URL. When set, the button is a plain anchor
    * to it and the supabase-js flow below is skipped entirely — used by the
-   * desktop launch page (`/sign-in/desktop`), whose PKCE challenge belongs
+   * desktop launch page (`/desktop-auth`), whose PKCE challenge belongs
    * to the desktop app's cookie jar, not this browser (GRIDA-SEC-005).
    */
   authorize_url?: string;

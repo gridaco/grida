@@ -1,19 +1,25 @@
 /**
  * GRIDA-SEC-005 — desktop sign-in launch page (the ceremony's web side).
  *
- * The `/sign-in` sibling for the desktop app: opened in the SYSTEM browser
- * by the app's single "Sign in with browser" button, carrying only the
- * public PKCE `code_challenge`. The sign-in method is chosen HERE — the
- * desktop never names a provider — and every method binds its GoTrue flow
- * to the forwarded challenge (`@/host/auth/desktop-auth-flow`), returning
- * through the same `grida://auth/callback` deep link. Adding or changing
- * methods is a web deploy; the desktop is untouched.
+ * `/desktop-auth`, opened in the SYSTEM browser by the app's single
+ * "Sign in with browser" button, carrying the PKCE `code_challenge`. The
+ * sign-in method is chosen HERE — the desktop never names a provider — and
+ * every method binds its GoTrue flow to the forwarded challenge
+ * (`@/host/auth/desktop-auth-flow`), returning through the same
+ * `grida://auth/callback` deep link. Adding or changing methods is a web
+ * deploy; the desktop is untouched.
  *
- * Mirrors the web sign-in page's insiders routing exactly: when
+ * Lives in the `(untracked)` route group (analytics-free root layout) ON
+ * PURPOSE: the challenge in this page's URL is confidentiality-sensitive
+ * (knowing it lets an attacker mint a code bound to it and defeat the
+ * login-CSRF protection), so no third-party pageview script may see it. The
+ * `(site)` sign-in pages run analytics, so this page cannot be their sibling.
+ *
+ * Mirrors the web sign-in page's insiders routing: when
  * `NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH` is on, redirect to the insiders
  * email+password page with the challenge forwarded — its sign-in route
  * completes the desktop mint (see the insiders sign-in route's desktop
- * branch).
+ * branch). `(insiders)` also loads no analytics, and is dev-only.
  */
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -22,11 +28,10 @@ import {
   buildAuthorizeUrl,
   isValidChallenge,
 } from "@/host/auth/desktop-auth-flow";
-import { SignInShell } from "../_components/shell";
+import { SignInShell } from "@/components/auth/sign-in-shell";
 
 export const metadata: Metadata = {
   title: "Sign in to Grida Desktop",
-  robots: { index: false, follow: false },
 };
 
 const USE_INSIDERS_AUTH =

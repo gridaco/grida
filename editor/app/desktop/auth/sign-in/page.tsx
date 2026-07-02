@@ -4,7 +4,7 @@
  * Server component: reads the session (already signed in → straight to the
  * welcome surface) and threads the `auth_error` code from a failed PKCE
  * exchange (`../callback/route.ts`) into the card. The ceremony itself runs
- * in the SYSTEM browser on the `/sign-in/desktop` launch page — this page
+ * in the SYSTEM browser on the `/desktop-auth` launch page — this page
  * only starts the flow and waits; it never names a sign-in method.
  */
 import { redirect } from "next/navigation";

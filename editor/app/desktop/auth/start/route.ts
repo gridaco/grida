@@ -3,14 +3,15 @@
  *
  * Mints the PKCE code verifier as an `@supabase/ssr` cookie on THIS
  * response — i.e. into the Electron cookie jar — and returns the web
- * **launch page** URL (`/sign-in/desktop?challenge=…`) for the system
- * browser.
+ * **launch page** URL (`/desktop-auth?challenge=…`) for the system browser.
  * The desktop shows a single "Sign in with browser" button; the sign-in
  * METHOD is chosen on the web launch page, which builds its GoTrue flow
- * against the forwarded challenge. The challenge is public by design
- * (PKCE S256); the verifier never leaves this jar, so the `code` that any
- * method produces is only exchangeable by this webview
- * (see `../callback/route.ts`).
+ * against the forwarded challenge. The verifier never leaves this jar, so
+ * the `code` that any method produces is only exchangeable by this webview
+ * (see `../callback/route.ts`). The challenge, though, is confidentiality-
+ * sensitive in THIS design (knowing it lets an attacker mint a code bound
+ * to it — login-CSRF), which is why the launch page lives in the
+ * analytics-free `(untracked)` route group.
  *
  * Must stay a route handler returning `{ url }` (not a redirect): the
  * verifier cookie is only reliably set on a route-handler response
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "start_failed" }, { status: 500 });
   }
 
-  const launch = new URL("/sign-in/desktop", new URL(request.url).origin);
+  const launch = new URL("/desktop-auth", new URL(request.url).origin);
   launch.searchParams.set("challenge", challenge);
   return NextResponse.json({ url: launch.toString() });
 }

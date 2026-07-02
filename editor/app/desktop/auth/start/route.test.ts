@@ -1,7 +1,7 @@
 /**
  * GRIDA-SEC-005 — desktop PKCE start route.
  *
- * Pins: the route returns the same-origin `/sign-in/desktop` launch-page URL
+ * Pins: the route returns the same-origin `/desktop-auth` launch-page URL
  * carrying only the public challenge (never a provider URL, never a
  * redirect — the verifier cookie must land on a route-handler response and
  * the URL must open in the system browser), and the underlying PKCE flow is
@@ -47,7 +47,7 @@ describe("POST /desktop/auth/start", () => {
     const { url } = (await response.json()) as { url: string };
     const launch = new URL(url);
     expect(launch.origin).toBe("https://grida.test");
-    expect(launch.pathname).toBe("/sign-in/desktop");
+    expect(launch.pathname).toBe("/desktop-auth");
     expect(launch.searchParams.get("challenge")).toBe(CHALLENGE);
     // The verifier-minting flow is bound to the deep-link return.
     expect(signInWithOAuth).toHaveBeenCalledWith(

@@ -22,7 +22,7 @@ type SerachParams = {
   next?: string;
   /**
    * GRIDA-SEC-005 — desktop sign-in PKCE challenge, forwarded from
-   * `/sign-in/desktop`. When present, the sign-in route completes the
+   * `/desktop-auth`. When present, the sign-in route completes the
    * desktop deep-link mint instead of the web redirect.
    */
   challenge?: string;
