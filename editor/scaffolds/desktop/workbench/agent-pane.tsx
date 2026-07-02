@@ -522,13 +522,18 @@ function AgentPaneContent({
   // turn. Wait for the session list to settle (loading=false) so the
   // forced-new null session is in place, then consume + send. Ref-guarded
   // so re-renders — and the onSubmit identity change after the fresh
-  // session adopts its id — can't re-fire it.
+  // session adopts its id — can't re-fire it. An EMPTY prompt (the home's
+  // blank / references-only start) is still consumed — cleared without
+  // sending — otherwise the stale handoff would force a fresh session on
+  // every later mount of this workspace.
   const autoSentRef = useRef(false);
   useEffect(() => {
-    if (!handoffPrompt || autoSentRef.current || chatSession.loading) return;
+    if (handoffPrompt == null || autoSentRef.current || chatSession.loading) {
+      return;
+    }
     autoSentRef.current = true;
     welcome_handoff.clear(workspace.id);
-    void onSubmit(handoffPrompt);
+    if (handoffPrompt) void onSubmit(handoffPrompt);
   }, [handoffPrompt, chatSession.loading, onSubmit, workspace.id]);
 
   // Rewind: soft-truncate to the chosen user message, then re-hydrate.

@@ -349,10 +349,30 @@ export class WorkspaceRegistry {
 }
 
 /**
+ * Characters that cannot appear in a folder segment on EVERY platform we mint
+ * projects on. `/` and `\` are the traversal-relevant ones; the rest
+ * (`< > : " | ? *`) are Windows-invalid — the name comes from a free-form
+ * prompt ("Logo: coffee shop"), so ordinary punctuation must degrade to a
+ * space instead of failing the primary create flow with an `fs.mkdir` error.
+ */
+const SEGMENT_UNSAFE_CHARS = new Set([
+  "/",
+  "\\",
+  "<",
+  ">",
+  ":",
+  '"',
+  "|",
+  "?",
+  "*",
+]);
+
+/**
  * Reduce a user/prompt-supplied project name to a single, safe filesystem
- * segment. Strips control chars + NUL, turns path separators into spaces,
- * collapses whitespace, drops leading dots (so `.`/`..`/hidden names can't
- * form), and caps length. Empty result → "Untitled". The realpath-containment
+ * segment. Strips control chars + NUL, turns path separators and
+ * Windows-reserved punctuation into spaces, collapses whitespace, drops
+ * leading and trailing dots (`.`/`..`/hidden names; Windows rejects trailing
+ * dots), and caps length. Empty result → "Untitled". The realpath-containment
  * assert in {@link WorkspaceRegistry.createProject} is the backstop; this keeps
  * the common case readable AND the folder name never a traversal.
  */
@@ -363,15 +383,17 @@ function slugifyProjectName(name?: string): string {
   for (const ch of name ?? "") {
     const code = ch.codePointAt(0) ?? 0;
     if (code < 0x20 || code === 0x7f) continue; // control chars incl NUL
-    out += ch === "/" || ch === "\\" ? " " : ch;
+    out += SEGMENT_UNSAFE_CHARS.has(ch) ? " " : ch;
   }
   const cleaned = out
     .replace(/\s+/g, " ")
     .trim()
     .replace(/^\.+/, "") // no leading dots (., .., hidden names)
+    .replace(/\.+$/, "") // no trailing dots (Windows-invalid)
     .trim()
     .slice(0, 60)
-    .trim();
+    .trim()
+    .replace(/\.+$/, ""); // the length cap can re-expose a trailing dot
   return cleaned || "Untitled";
 }
 

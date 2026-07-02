@@ -179,6 +179,22 @@ describe("Workspaces", () => {
       ).rejects.toMatchObject({ code: "ENOENT" });
     });
 
+    it("degrades Windows-invalid punctuation to spaces instead of failing the create", async () => {
+      const registry = new WorkspaceRegistry(userDataDir, projectsRoot);
+      // `:` `?` `"` `<` `>` `|` `*` are invalid in a Windows path segment —
+      // an ordinary prompt-derived name must still mint a folder.
+      const ws = await registry.createProject({
+        name: 'Logo: "coffee shop"? <v2> *|final*',
+      });
+      expect(path.basename(ws.root)).toBe("Logo coffee shop v2 final");
+    });
+
+    it("strips trailing dots (Windows-invalid) from the folder name", async () => {
+      const registry = new WorkspaceRegistry(userDataDir, projectsRoot);
+      const ws = await registry.createProject({ name: "Poster v2..." });
+      expect(path.basename(ws.root)).toBe("Poster v2");
+    });
+
     it("throws projects-root-not-configured when no managed root is wired", async () => {
       const registry = new WorkspaceRegistry(userDataDir);
       await expect(registry.createProject({ name: "x" })).rejects.toThrow(
