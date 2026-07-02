@@ -1104,12 +1104,6 @@ importers:
         specifier: ^4
         version: 4.3.6
     devDependencies:
-      '@vitest/browser-playwright':
-        specifier: 4.0.18
-        version: 4.0.18(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(playwright@1.58.2)(vite@7.3.0(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0))(vitest@4.0.18)
-      playwright:
-        specifier: ^1.58.2
-        version: 1.58.2
       tsdown:
         specifier: ^0.22.1
         version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)

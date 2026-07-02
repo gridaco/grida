@@ -17,7 +17,6 @@
 import type { Hono } from "hono";
 import {
   DaemonServer,
-  DAEMON_DEFAULT_CAPABILITIES,
   type DaemonCapabilities,
   type DaemonHttpAccess,
   type DaemonServices,

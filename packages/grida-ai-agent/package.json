@@ -135,7 +135,6 @@
     "prepack": "tsdown",
     "smoke:sessions:live": "node --import tsx src/session/smoke.live.ts",
     "test": "vitest run",
-    "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json && tsc --noEmit -p tsconfig.browser-backends.json"
   },
@@ -154,8 +153,6 @@
     "zod": "^4"
   },
   "devDependencies": {
-    "@vitest/browser-playwright": "4.0.18",
-    "playwright": "^1.58.2",
     "tsdown": "^0.22.1",
     "typescript": "^6",
     "vitest": "^4"
