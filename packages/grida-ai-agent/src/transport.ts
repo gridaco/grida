@@ -41,6 +41,7 @@ import type {
   FileWriteResult,
   RecentEntry,
   Workspace,
+  WorkspaceCreateInput,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
@@ -355,6 +356,10 @@ export namespace AgentTransport {
         await this.postJson<Workspace[]>("/workspaces/list"),
       open: async (rootPath: string): Promise<Workspace> =>
         await this.postJson<Workspace>("/workspaces/open", { path: rootPath }),
+      // Auto-create a fresh project (managed root, seeded `.canvas` board) and
+      // register it. Powers the desktop home's "auto-create, ask nothing" flow.
+      create: async (input: WorkspaceCreateInput): Promise<Workspace> =>
+        await this.postJson<Workspace>("/workspaces/create", input),
       pin: async (id: string, pinned: boolean): Promise<void> => {
         await this.postJson<unknown>("/workspaces/pin", { id, pinned });
       },

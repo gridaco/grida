@@ -9,7 +9,7 @@
  * downloaded; a picked pin's url is fed straight into image-to-image.
  */
 
-import { search } from "@/app/(library)/library/actions";
+import { browse, search } from "@/app/(library)/library/actions";
 import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
 
 /** Host-fixed result count — not an agent knob (TOOL-DESIGN doctrine). */
@@ -60,5 +60,15 @@ export async function resolveDesignSearchPage(
   range: [number, number]
 ): Promise<DesignSearchPage> {
   const { data, count } = await search({ text: query, range });
+  return { items: data.map(toPin), count: count ?? undefined };
+}
+
+/** Cold-browse a page of the curated corpus (no query) — the home reference
+ *  gallery's fetch. Same {@link DesignSearchPage} shape as the query path so a
+ *  gallery can page through either identically. */
+export async function resolveDesignBrowsePage(
+  range: [number, number]
+): Promise<DesignSearchPage> {
+  const { data, count } = await browse({ range });
   return { items: data.map(toPin), count: count ?? undefined };
 }

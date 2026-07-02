@@ -30,6 +30,7 @@ import type {
   SessionListPage,
   SessionStatus,
   Workspace,
+  WorkspaceCreateInput,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
@@ -68,6 +69,7 @@ export type {
   FileWriteResult,
   RecentEntry,
   Workspace,
+  WorkspaceCreateInput,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
@@ -191,6 +193,12 @@ export type DesktopBridge = {
   workspaces: {
     list: () => Promise<Workspace[]>;
     open: (rootPath: string) => Promise<Workspace>;
+    /**
+     * Auto-create a fresh project (managed root, seeded `.canvas` board) and
+     * register it — the desktop home's "auto-create, ask nothing" flow. No OS
+     * folder dialog. Rejects when the host wired no managed root.
+     */
+    create: (input: WorkspaceCreateInput) => Promise<Workspace>;
     pin: (id: string, pinned: boolean) => Promise<void>;
     forget: (id: string) => Promise<void>;
     readdir: (

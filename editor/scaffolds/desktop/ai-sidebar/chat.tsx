@@ -20,6 +20,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat, useChat } from "@ai-sdk/react";
 import { AgentFs } from "@grida/agent/fs";
 import { AgentTodos } from "@grida/agent/todos";
+import type { SkillId } from "@grida/agent";
 import { resolveDesignSearch } from "@/scaffolds/desktop/shared/design-search";
 import {
   lastAssistantMessageIsCompleteWithToolCalls,
@@ -91,7 +92,17 @@ const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
  * and are MUTUALLY EXCLUSIVE — the type forbids passing both — so the component
  * is always bound to exactly one (or neither: the empty placeholder state).
  */
-type AISidebarChatProps = { className?: string } & (
+type AISidebarChatProps = {
+  className?: string;
+  /**
+   * Skills to prime every turn with (the file window has no editor-tab model to
+   * infer them from). The shell passes `["dotcanvas"]` for a `.canvas` bundle
+   * and `["svg"]` for a single SVG, so the agent carries the right format block
+   * — e.g. a board seeded from a picked reference gets the dotcanvas working
+   * pattern from turn one.
+   */
+  skills?: SkillId[];
+} & (
   | {
       /**
        * Renderer-resolved fs for SINGLE-FILE (in-memory) mode: the agent's fs
@@ -118,6 +129,7 @@ export function AISidebarChat({
   fs,
   workspaceId,
   className,
+  skills,
 }: AISidebarChatProps) {
   const isWorkspace = !!workspaceId;
   // Chat-session lifecycle: list, pick, hydrate. Scoped to `workspaceId` when
@@ -304,6 +316,7 @@ export function AISidebarChat({
     runContextRef.current = {
       model_id: modelId,
       ...(providerId ? { provider_id: providerId } : {}),
+      ...(skills?.length ? { skills } : {}),
     };
   }
 
@@ -347,6 +360,7 @@ export function AISidebarChat({
       sessionId: chatSession.current_id,
       modelId,
       providerId: registered_models.providerIdForModel(modelId, endpoints),
+      skills,
     }),
   });
 

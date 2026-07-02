@@ -387,6 +387,7 @@ const bridge: DesktopBridge = {
   workspaces: {
     list: () => agentClient.workspaces.list(),
     open: (rootPath) => agentClient.workspaces.open(rootPath),
+    create: (input) => agentClient.workspaces.create(input),
     pin: async (id, pinned) => {
       await agentClient.workspaces.pin(id, pinned);
     },

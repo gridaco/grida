@@ -204,6 +204,42 @@ export const listCategories = cache(_listCategories);
 
 const PAGE = 60;
 
+/**
+ * Cold browse — the curated corpus ordered by score, optionally filtered to a
+ * category. Powers the desktop home's reference gallery
+ * (scroll-and-pick-to-start): unlike {@link search}, which returns empty for an
+ * empty query, this lists the library best-first so the gallery has something
+ * to show before any keyword. Also the listing behind `search`'s category-only
+ * branch, so the curation-order query is defined once. Paginated by `range`
+ * with an estimated `count` for infinite scroll.
+ */
+export async function browse({
+  category,
+  range = [0, PAGE - 1],
+}: { category?: string; range?: [number, number] } = {}): Promise<{
+  data: Library.ObjectDetail[];
+  count: number | undefined;
+}> {
+  const client = await createLibraryClient();
+  const q = client
+    .from("object")
+    .select(__select_object_with_author, { count: "estimated" });
+  if (category) {
+    q.eq("category", category);
+  }
+  const { data, error, count } = await q
+    .order("score", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: true })
+    .range(range[0], range[1]);
+  if (error) {
+    throw error;
+  }
+  return {
+    data: __with_object_urls(client, data as unknown as ObjectWithAuthor[]),
+    count: count ?? undefined,
+  };
+}
+
 export async function search({
   text,
   category,
@@ -216,30 +252,13 @@ export async function search({
   if (!text && !category) {
     return { data: [], count: 0 };
   }
-  const client = await createLibraryClient();
 
-  // Category-only (no query text): a filtered listing, not a search. Keep
-  // the table browse ordered by curation score.
+  // Category-only (no query text): a filtered listing, not a search — the
+  // same curation-score browse the reference gallery uses.
   if (!text?.trim()) {
-    const q = client
-      .from("object")
-      .select(__select_object_with_author, { count: "estimated" });
-    if (category) {
-      q.eq("category", category);
-    }
-    q.order("score", { ascending: false, nullsFirst: false });
-    q.order("id", { ascending: true });
-    q.range(range[0], range[1]);
-
-    const { data, error, count } = await q;
-    if (error) {
-      throw error;
-    }
-    return {
-      data: __with_object_urls(client, data as unknown as ObjectWithAuthor[]),
-      count,
-    };
+    return browse({ category, range });
   }
+  const client = await createLibraryClient();
 
   // Semantic search: embed the query (text↔text, with a cross-modal image
   // floor handled inside the `search` RPC). Pagination is done inside the

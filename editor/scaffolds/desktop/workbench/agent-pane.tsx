@@ -472,7 +472,15 @@ function AgentPaneContent({
   // Endpoint provider pin for the active model (issue #806) — rides every
   // run-entering body: normal sends AND approval resumes below.
   const providerId = registered_models.providerIdForModel(modelId, endpoints);
-  const activeSkills = skillsForActiveTab(activeRelPath);
+  // The active tab dictates skills; ONLY when no tab is open at all (a freshly
+  // auto-created project lands with no tab) fall back to the skills the home
+  // primed on the handoff so the first turn still gets its format block. An
+  // open-but-unmapped tab means no skills — the tab took over, per the
+  // contract above.
+  const activeSkills =
+    activeRelPath === null
+      ? handoff?.skills
+      : skillsForActiveTab(activeRelPath);
   // Keep the transport's body-less backfill (above) in step with the pickers.
   runContextRef.current = {
     model_id: modelId,
@@ -519,13 +527,18 @@ function AgentPaneContent({
   // turn. Wait for the session list to settle (loading=false) so the
   // forced-new null session is in place, then consume + send. Ref-guarded
   // so re-renders — and the onSubmit identity change after the fresh
-  // session adopts its id — can't re-fire it.
+  // session adopts its id — can't re-fire it. An EMPTY prompt (the home's
+  // blank / references-only start) is still consumed — cleared without
+  // sending — otherwise the stale handoff would force a fresh session on
+  // every later mount of this workspace.
   const autoSentRef = useRef(false);
   useEffect(() => {
-    if (!handoffPrompt || autoSentRef.current || chatSession.loading) return;
+    if (handoffPrompt == null || autoSentRef.current || chatSession.loading) {
+      return;
+    }
     autoSentRef.current = true;
     welcome_handoff.clear(workspace.id);
-    void onSubmit(handoffPrompt);
+    if (handoffPrompt) void onSubmit(handoffPrompt);
   }, [handoffPrompt, chatSession.loading, onSubmit, workspace.id]);
 
   // Rewind: soft-truncate to the chosen user message, then re-hydrate.

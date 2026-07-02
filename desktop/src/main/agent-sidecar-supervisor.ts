@@ -200,6 +200,11 @@ class AgentSidecarSupervisor {
     const args = [
       scriptPath,
       `--user-data=${this.user_data_path}`,
+      // GRIDA-SEC-004 — host-injected managed root for the auto-create flow.
+      // A visible, Finder-navigable location (files stay visible); the sidecar
+      // may only mint project folders INSIDE this root. `documents` needs a
+      // ready app, which holds at spawn time (post `app.whenReady`).
+      `--projects-root=${path.join(app.getPath("documents"), "Grida")}`,
       `--editor-base-url=${EDITOR_BASE_URL}`,
       // GRIDA-SEC-004 — tell the sidecar whether srt wraps this spawn. Only
       // then does it expose the `run_command` shell tool (fail-closed). On
