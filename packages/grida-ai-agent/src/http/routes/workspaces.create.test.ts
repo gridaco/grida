@@ -93,16 +93,21 @@ describe("POST /workspaces/create (auto-create)", () => {
     expect(manifest.documents[0].thumbnail).toBeUndefined();
   });
 
-  it("rejects a seed with more documents than the cap", async () => {
-    const res = await post(app, {
-      name: "Flood",
-      seed: {
-        documents: Array.from({ length: 501 }, (_, i) => ({
-          src: `https://library.grida.co/${i}.png`,
-        })),
-      },
+  it("caps seed documents at 500: exactly 500 passes, 501 rejects", async () => {
+    const docs = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        src: `https://library.grida.co/${i}.png`,
+      }));
+    const atCap = await post(app, {
+      name: "AtCap",
+      seed: { documents: docs(500) },
     });
-    expect(res.status).toBe(400);
+    expect(atCap.status).toBe(200);
+    const overCap = await post(app, {
+      name: "Flood",
+      seed: { documents: docs(501) },
+    });
+    expect(overCap.status).toBe(400);
   });
 
   it("slugifies a traversal name so it stays inside the managed root", async () => {
