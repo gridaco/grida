@@ -367,5 +367,8 @@ A conforming tool implementation MUST:
 - [Subagents](./subagents.md) — the `task` tool's recursion model.
 - [Environments](./environments.md) — which capabilities each
   environment exposes.
+- [Cost Optimization](./cost-optimization.md) — why the result
+  envelope and the truncation contract are billing surfaces: every
+  byte a tool returns is re-billed on every subsequent step.
 - [ACP integration](./acp.md) — the `kind` taxonomy and the
   `session/request_permission` wire.

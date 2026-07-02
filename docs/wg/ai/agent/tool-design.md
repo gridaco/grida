@@ -133,6 +133,11 @@ tool spends that budget three ways, and all three are design choices:
   default. A perception that can be re-viewed SHOULD be evictable so it
   does not re-fill context every turn (see [Visual perception](./vision.md)).
 
+The rent is literal: everything a tool puts into the transcript is
+re-sent — and re-billed — on every remaining step of the session. The
+billing-side doctrine, including the measured cost of an envelope that
+echoes its input back, is [Cost Optimization](./cost-optimization.md).
+
 ### 4. Permission and security — a tool is a trust boundary
 
 A tool is the agent's reach into the world, and the place that reach is
