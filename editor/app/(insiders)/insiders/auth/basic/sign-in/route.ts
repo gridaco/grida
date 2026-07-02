@@ -40,7 +40,10 @@ async function mintDesktopVerifyUrl(
     email,
     challenge,
   });
-  const sent = await fetch(otp.url, otp.init);
+  const sent = await fetch(otp.url, {
+    ...otp.init,
+    signal: AbortSignal.timeout(2000),
+  });
   if (!sent.ok) {
     console.error("[INSIDER] desktop OTP send failed:", sent.status);
     return null;
@@ -53,7 +56,11 @@ async function mintDesktopVerifyUrl(
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
     try {
-      const list = await fetch(`${MAILPIT_URL}/api/v1/messages?limit=10`);
+      // Timeouts so a hung Mailpit fails fast into the retry loop instead of
+      // blocking the request handler indefinitely.
+      const list = await fetch(`${MAILPIT_URL}/api/v1/messages?limit=10`, {
+        signal: AbortSignal.timeout(2000),
+      });
       if (!list.ok) continue;
       const { messages } = (await list.json()) as {
         messages?: Array<{
@@ -69,7 +76,9 @@ async function mintDesktopVerifyUrl(
           ) && new Date(m.Created).getTime() >= since - 2000
       );
       if (!message) continue;
-      const full = await fetch(`${MAILPIT_URL}/api/v1/message/${message.ID}`);
+      const full = await fetch(`${MAILPIT_URL}/api/v1/message/${message.ID}`, {
+        signal: AbortSignal.timeout(2000),
+      });
       if (!full.ok) continue;
       const body = (await full.json()) as { Text?: string; HTML?: string };
       const verify = extractVerifyUrl(

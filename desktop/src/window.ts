@@ -156,6 +156,12 @@ function register_window_hooks(
   // bridge attached. Unlike `will-navigate`, a blocked redirect is NOT
   // handed to the OS browser: the target was chosen by a server response,
   // not by the user.
+  //
+  // Intentionally frame-agnostic (no `isMainFrame` filter): the desktop CSP
+  // (GRIDA-SEC-004) already forbids cross-origin frames, so any redirect off
+  // `/desktop/*` in ANY frame is unexpected and blocked. This is the stricter
+  // choice — narrowing to the main frame would let a subframe redirect
+  // off-surface.
   window.webContents.on("will-redirect", (event, target) => {
     if (!isAllowedNavigation(baseUrl, target)) {
       event.preventDefault();

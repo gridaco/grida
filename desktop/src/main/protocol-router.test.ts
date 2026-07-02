@@ -80,6 +80,15 @@ describe("routeDeepLink — auth/callback", () => {
     expect(window.focus).toHaveBeenCalled();
   });
 
+  it("matches a case-varied auth host (custom schemes aren't lowercased)", async () => {
+    const window = makeWindow("https://grida.test/desktop/auth/sign-in");
+    state.all = [window];
+    await routeDeepLink("grida://Auth/callback?code=abc-123");
+    expect(window.loadURL).toHaveBeenCalledWith(
+      "https://grida.test/desktop/auth/callback?code=abc-123"
+    );
+  });
+
   it("forwards only known params — attacker extras are dropped", async () => {
     const window = makeWindow("https://grida.test/desktop/auth/sign-in");
     state.all = [window];

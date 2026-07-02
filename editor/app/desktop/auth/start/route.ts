@@ -18,19 +18,9 @@
  * (supabase/ssr#55), and the URL must open in the SYSTEM browser
  * (`shell.open_external`), never in the webview.
  */
+import { DESKTOP_AUTH_REDIRECT } from "@/lib/desktop/auth-deeplink";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
-
-/**
- * Deep-link return target. Allowlisted in `supabase/config.toml` locally
- * and in the hosted project's dashboard for production. Deliberately a
- * local twin of `DESKTOP_AUTH_REDIRECT` in
- * `editor/host/auth/desktop-auth-flow.ts` — `app/desktop/**` is lint-barred
- * from importing `@/host/**` (GRIDA-SEC-004 renderer boundary), and one
- * duplicated line beats a hole in that boundary. Its test pins the value
- * against drift.
- */
-const DESKTOP_AUTH_REDIRECT = "grida://auth/callback";
 
 export async function POST(request: NextRequest) {
   const client = await createClient();

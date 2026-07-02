@@ -3,46 +3,38 @@
 import { Env } from "@/env";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-type ContinueWithGoogleButtonProps = {
+type OAuthButtonProps = {
   skipBrowserRedirect?: boolean;
   next?: string;
   redirect_uri?: string;
   onSuccess?: () => void;
-  /**
-   * Pre-built GoTrue authorize URL. When set, the button is a plain anchor
-   * to it and the supabase-js flow below is skipped entirely — used by the
-   * desktop launch page (`/desktop-auth`), whose PKCE challenge belongs
-   * to the desktop app's cookie jar, not this browser (GRIDA-SEC-005).
-   */
-  authorize_url?: string;
 };
+
+/**
+ * Discriminated union: either a pre-built GoTrue authorize URL (plain-anchor
+ * mode) OR the supabase-js OAuth flow props — never both. Anchor mode is used
+ * by the desktop launch page (`/desktop-auth`), whose PKCE challenge belongs
+ * to the desktop app's cookie jar, not this browser (GRIDA-SEC-005); passing
+ * OAuth props alongside `authorize_url` is a type error rather than a silent
+ * no-op.
+ */
+type ContinueWithGoogleButtonProps =
+  | ({ authorize_url: string } & { [K in keyof OAuthButtonProps]?: never })
+  | ({ authorize_url?: undefined } & OAuthButtonProps);
 
 const BUTTON_CLASS =
   "flex px-4 py-2 rounded-sm items-center justify-center gap-4 border shadow-sm hover:shadow-md transition-shadow";
 
-export function ContinueWithGoogleButton({
-  skipBrowserRedirect,
-  next,
-  redirect_uri,
-  onSuccess,
-  authorize_url,
-}: ContinueWithGoogleButtonProps) {
-  if (authorize_url) {
+export function ContinueWithGoogleButton(props: ContinueWithGoogleButtonProps) {
+  if (props.authorize_url) {
     return (
-      <a className={BUTTON_CLASS} href={authorize_url}>
+      <a className={BUTTON_CLASS} href={props.authorize_url}>
         <GoogleLogo />
         Continue with Google
       </a>
     );
   }
-  return (
-    <ContinueWithGoogleOAuthButton
-      skipBrowserRedirect={skipBrowserRedirect}
-      next={next}
-      redirect_uri={redirect_uri}
-      onSuccess={onSuccess}
-    />
-  );
+  return <ContinueWithGoogleOAuthButton {...props} />;
 }
 
 function ContinueWithGoogleOAuthButton({
@@ -50,7 +42,7 @@ function ContinueWithGoogleOAuthButton({
   next,
   redirect_uri,
   onSuccess,
-}: Omit<ContinueWithGoogleButtonProps, "authorize_url">) {
+}: OAuthButtonProps) {
   const client = createBrowserClient();
 
   const url = new URL(`${Env.web.HOST}/auth/callback`);

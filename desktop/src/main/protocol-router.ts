@@ -81,7 +81,10 @@ export async function routeDeepLink(url: string): Promise<boolean> {
     console.warn(`[grida] non-grida protocol, ignoring: ${parsed.protocol}`);
     return true;
   }
-  switch (parsed.hostname) {
+  // Custom-scheme hosts are NOT lowercased by the URL parser (unlike
+  // http(s)), so `grida://Auth/callback` from a case-varied invocation keeps
+  // its casing. Normalize so a valid callback is never silently dropped.
+  switch (parsed.hostname.toLowerCase()) {
     case "auth": {
       if (parsed.pathname !== "/callback") {
         console.warn(`[grida] unknown auth deep link: ${parsed.pathname}`);

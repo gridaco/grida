@@ -8,11 +8,11 @@
  * whatever the method, the resulting single-use `code` deep-links back to
  * the app and is exchangeable only against the app's verifier.
  *
- * Pure URL/request builders, no IO — pinned by `flow.test.ts`.
+ * Pure URL/request builders, no IO — pinned by `desktop-auth-flow.test.ts`.
  */
+import { DESKTOP_AUTH_REDIRECT } from "@/lib/desktop/auth-deeplink";
 
-/** Deep-link return target — must match the desktop start route. */
-export const DESKTOP_AUTH_REDIRECT = "grida://auth/callback";
+export { DESKTOP_AUTH_REDIRECT };
 
 /**
  * A PKCE S256 challenge is base64url. Bounds are generous (RFC 7636

@@ -43,9 +43,17 @@ export default async function DesktopSignInLaunchPage({
   searchParams: Promise<{ challenge?: string }>;
 }) {
   const { challenge } = await searchParams;
-  const valid = typeof challenge === "string" && isValidChallenge(challenge);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (!valid) {
+  // A missing challenge is a broken hand-off; a missing Supabase URL is a
+  // misconfigured deployment. Both degrade to the same inert shell rather
+  // than throwing (an unguarded `new URL(…, undefined)` would 500 this
+  // external-facing page).
+  if (
+    !supabaseUrl ||
+    typeof challenge !== "string" ||
+    !isValidChallenge(challenge)
+  ) {
     return (
       <SignInShell
         title={
@@ -79,7 +87,7 @@ export default async function DesktopSignInLaunchPage({
     >
       <ContinueWithGoogleButton
         authorize_url={buildAuthorizeUrl({
-          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          supabaseUrl,
           provider: "google",
           challenge,
         })}
