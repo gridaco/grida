@@ -114,11 +114,11 @@ seen from the billing side.
 differently depending on how it arrives:
 
 | Kind                 | Typical price (relative to uncached input) |
-| -------------------- | ------------------------------------------- |
-| Cache read           | ~0.1×                                       |
-| Uncached input       | 1×                                          |
-| Cache write          | ~1.25×                                      |
-| Long-context premium | ~2× on the portion above a threshold        |
+| -------------------- | ------------------------------------------ |
+| Cache read           | ~0.1×                                      |
+| Uncached input       | 1×                                         |
+| Cache write          | ~1.25×                                     |
+| Long-context premium | ~2× on the portion above a threshold       |
 
 The spread between the cheapest and the most expensive way to send the
 same prompt is roughly **20×**. An agent loop's dominant cost driver is
@@ -353,14 +353,14 @@ tier; the catalog turns tiers into money.
 The doctrine compressed to a decision rule — when spending effort on
 agent cost, spend it in this order:
 
-| Order | Measure                                                | Quality impact                       | Typical lever            |
+| Order | Measure                                                | Quality impact                       | Typical lever             |
 | ----- | ------------------------------------------------------ | ------------------------------------ | ------------------------- |
-| 1     | Prompt caching (breakpoints, stable prefix, cache key)  | None — identical bytes               | ~90% of input cost        |
-| 2     | Tool-result envelopes (no echo, ack not payload)        | None — removes unread bytes          | ~25% of transcript volume |
-| 3     | Output truncation with re-fetch handle                  | None — content moves behind a handle | Bounds the worst case     |
-| 4     | Stale-output pruning at compaction boundaries           | Near-none — removes stale bytes      | Grows with session length |
-| 5     | Window / threshold / tier as one decision               | Tradeoff — argued per product        | Avoids ~2× premium tier   |
-| 6     | Steering (edit-over-rewrite, baseline audit, tiering)   | None to positive                     | Task-shape dependent      |
+| 1     | Prompt caching (breakpoints, stable prefix, cache key) | None — identical bytes               | ~90% of input cost        |
+| 2     | Tool-result envelopes (no echo, ack not payload)       | None — removes unread bytes          | ~25% of transcript volume |
+| 3     | Output truncation with re-fetch handle                 | None — content moves behind a handle | Bounds the worst case     |
+| 4     | Stale-output pruning at compaction boundaries          | Near-none — removes stale bytes      | Grows with session length |
+| 5     | Window / threshold / tier as one decision              | Tradeoff — argued per product        | Avoids ~2× premium tier   |
+| 6     | Steering (edit-over-rewrite, baseline audit, tiering)  | None to positive                     | Task-shape dependent      |
 
 Model tiering — the cheapest sufficient model for auxiliary work — is
 already normative where it matters most
