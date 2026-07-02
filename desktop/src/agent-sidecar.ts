@@ -82,6 +82,10 @@ const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // disabled, so a future supervisor bug that drops the flag can't silently
 // expose an unsandboxed shell.
 const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
+// GRIDA-SEC-004 — host-injected managed root for auto-created projects
+// (`~/Documents/Grida`). The supervisor owns the path fact and forwards it;
+// absent (e.g. a future supervisor bug) means auto-create simply refuses.
+const projectsRoot = getCliArg("projects-root");
 
 async function main() {
   const password = await readPasswordFromStdin();
@@ -94,6 +98,7 @@ async function main() {
   const host = new AgentHost({
     password,
     user_data_path: requiredUserDataPath,
+    projects_root: projectsRoot,
     http_access: {
       allowed_origins: [editorOrigin],
       allowed_referer_paths: ["/desktop"],

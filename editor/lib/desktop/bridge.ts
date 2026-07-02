@@ -55,6 +55,7 @@ import type {
   NavigationState,
   Workspace,
   WorkspaceChangeEvent,
+  WorkspaceCreateInput,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,
@@ -801,12 +802,23 @@ export namespace workspaces {
   export async function openFolder(rootPath: string): Promise<Workspace> {
     return await bridgeOrThrow().workspaces.open(rootPath);
   }
+  /**
+   * Auto-create a fresh project — mint a managed-root folder, seed a `.canvas`
+   * board (optionally with placed reference documents), and register it. Powers
+   * the home's "auto-create, ask nothing" flow: no OS folder dialog. Rejects
+   * when the host wired no managed root (e.g. the web-daemon dev bridge).
+   */
+  export async function createProject(
+    input: WorkspaceCreateInput
+  ): Promise<Workspace> {
+    return await bridgeOrThrow().workspaces.create(input);
+  }
   export async function pin(id: string, pinned: boolean): Promise<void> {
     await bridgeOrThrow().workspaces.pin(id, pinned);
   }
-  export async function forget(id: string): Promise<void> {
-    await bridgeOrThrow().workspaces.forget(id);
-  }
+  // NOTE: `DesktopBridge.workspaces.forget` intentionally has no wrapper here —
+  // the home redesign dropped the per-row forget affordance, so nothing in the
+  // renderer calls it today. Re-add the wrapper with the next forget UI.
   /**
    * List immediate children of `relPath` (workspace root if omitted).
    * Empty array on an empty directory; throws on workspace-not-found,

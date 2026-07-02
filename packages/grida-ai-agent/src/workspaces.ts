@@ -30,6 +30,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { atomicWrite } from "./storage/atomic-write";
+import { containsPath } from "./path-contains";
 
 export type Workspace = {
   /** sha256(realRoot).slice(0,16) — stable across launches. */
@@ -42,16 +43,57 @@ export type Workspace = {
   pinned: boolean;
 };
 
+/**
+ * A field-constrained board seed for {@link WorkspaceRegistry.createProject}.
+ * Deliberately NOT a raw dotcanvas manifest — only a document's `src` (a
+ * bundle-relative path or an `https://` reference) and an optional layout box.
+ * Keeping the shape this narrow is what stops the `/workspaces/create` route
+ * from being a manifest-injection vector (GRIDA-SEC-004).
+ */
+export type ProjectSeedDocument = {
+  src: string;
+  layout?: { x?: number; y?: number; w?: number; h?: number; z?: number };
+};
+export type ProjectSeed = { documents: ProjectSeedDocument[] };
+
 const FILE_NAME = "workspaces.json";
 const MAX_ENTRIES = 100;
+
+/**
+ * The dotcanvas manifest filename (mirrors `dotcanvas.MANIFEST_FILENAME`).
+ * Inlined rather than imported so the sidecar doesn't pull in the whole
+ * `dotcanvas` package just to write a two-key seed — the shape below is the
+ * stable v1 contract the reader heals against.
+ */
+const MANIFEST_FILENAME = ".canvas.json";
+
+/**
+ * The dotcanvas bundle directory extension (mirrors `dotcanvas.BUNDLE_EXTENSION`).
+ * A bundle is a *directory* whose name ends with this — the macOS-package
+ * convention. Naming the seeded dir `<name>.canvas` is what makes the board
+ * RECOGNIZABLE: the file tree renders it as an openable bundle
+ * (`dotcanvas.isBundlePath`) and the workbench opens it as a board tab. A bare
+ * `.canvas.json` at the workspace root would just be a JSON file to the tree.
+ * Inlined (not imported) for the same reason as {@link MANIFEST_FILENAME}.
+ */
+const BUNDLE_EXTENSION = ".canvas";
 
 export class WorkspaceRegistry {
   private entries: Workspace[] = [];
   private loaded = false;
   private readonly file_path: string;
+  /**
+   * GRIDA-SEC-004 — the host-injected managed root under which
+   * {@link createProject} mints new project folders (desktop:
+   * `~/Documents/Grida`). Host-owned, NEVER derived from client input — the
+   * one writable root the auto-create path may touch. Undefined for hosts that
+   * don't wire it (the CLI/dev daemon), where `createProject` throws.
+   */
+  private readonly projects_root?: string;
 
-  constructor(userDataPath: string) {
+  constructor(userDataPath: string, projectsRoot?: string) {
     this.file_path = path.join(userDataPath, FILE_NAME);
+    this.projects_root = projectsRoot;
   }
 
   /**
@@ -129,6 +171,100 @@ export class WorkspaceRegistry {
     this.trim();
     await this.persist();
     return entry;
+  }
+
+  /**
+   * GRIDA-SEC-004 — auto-create a fresh project: mint a new directory under the
+   * host-injected {@link projects_root}, seed it with a real `.canvas` bundle
+   * (a `<name>.canvas` dir + manifest), and register it (via {@link open}, so id/name/persistence rules
+   * stay single-sourced). Powers the desktop home's "auto-create, ask nothing"
+   * flow — clicking a template or picking a reference lands the user in a board
+   * without ever choosing a folder.
+   *
+   * Safety (never trust the caller for a path):
+   *   - `name` is SLUGIFIED to a single filesystem segment — path separators,
+   *     `..`, NUL, and control chars can't survive, so it can never be a path.
+   *   - the created dir is `realpath`'d and asserted to sit under the (also
+   *     `realpath`'d) managed root; anything else is removed and rejected.
+   *   - the `seed` is field-constrained ({@link ProjectSeed}) — only `src` +
+   *     an optional layout box reach the manifest, never a raw manifest.
+   *
+   * Throws `projects-root-not-configured` on a host that didn't wire a root.
+   */
+  async createProject(opts: {
+    name?: string;
+    seed?: ProjectSeed;
+  }): Promise<Workspace> {
+    if (!this.projects_root) {
+      throw new Error("projects-root-not-configured");
+    }
+    await fs.mkdir(this.projects_root, { recursive: true });
+    const realRoot = await fs.realpath(this.projects_root);
+
+    const slug = slugifyProjectName(opts.name);
+    const dir = await this.mintProjectDir(realRoot, slug);
+
+    // Containment assert (the one new trust check): the minted dir's realpath
+    // MUST be STRICTLY under the managed root (`containsPath` also accepts
+    // root-equals-root, which here would mean the mint escaped). Same shared
+    // discipline as the shell runner's root gates and the scratch assert;
+    // catches a symlinked root or any residual escape.
+    const realDir = await fs.realpath(dir);
+    if (!containsPath(realRoot, realDir) || realDir === realRoot) {
+      await fs.rmdir(dir).catch(() => {});
+      throw new Error("project-path-escapes-root");
+    }
+
+    // The project is a plain workspace CONTAINER that holds a real dotcanvas
+    // BUNDLE — a `<name>.canvas` directory with the manifest inside it — NOT a
+    // loose `.canvas.json` at the root. That distinction is what makes the board
+    // recognizable: the file tree shows the `.canvas` dir as an openable bundle
+    // (`dotcanvas.isBundlePath`) and the workbench opens it as a board tab; a
+    // root-level manifest is just JSON to the tree. Keeping the manifest OUT of
+    // the workspace root also means the reopen path (menu/⌃R, which sniff root
+    // `.canvas.json`) lands on the workbench too, matching the create flow.
+    const bundleDir = path.join(
+      realDir,
+      `${path.basename(realDir)}${BUNDLE_EXTENSION}`
+    );
+    await fs.mkdir(bundleDir, { recursive: false });
+    await atomicWrite(
+      path.join(bundleDir, MANIFEST_FILENAME),
+      buildSeedManifest(opts.seed),
+      { mode: 0o644 }
+    );
+
+    // Register through `open` so the id (sha256(realpath)[:16]) and recents
+    // bookkeeping stay identical to a user-opened folder.
+    return this.open(realDir);
+  }
+
+  /**
+   * Create a uniquely-named directory under `realRoot`, suffixing `-2`, `-3`…
+   * on collision. `fs.mkdir({recursive:false})` is atomic create-or-fail, so
+   * two concurrent creates never hand back the same dir (no TOCTOU). Caps the
+   * probe and falls back to a random suffix so a pathological name can't spin.
+   */
+  private async mintProjectDir(
+    realRoot: string,
+    slug: string
+  ): Promise<string> {
+    for (let i = 1; i <= 50; i++) {
+      const name = i === 1 ? slug : `${slug}-${i}`;
+      const dir = path.join(realRoot, name);
+      try {
+        await fs.mkdir(dir, { recursive: false });
+        return dir;
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      }
+    }
+    const dir = path.join(
+      realRoot,
+      `${slug}-${crypto.randomBytes(4).toString("hex")}`
+    );
+    await fs.mkdir(dir, { recursive: false });
+    return dir;
   }
 
   /** Most-recent-first. Defensive copy — callers may mutate. */
@@ -210,6 +346,54 @@ export class WorkspaceRegistry {
       (a, b) => b.opened_at - a.opened_at
     );
   }
+}
+
+/**
+ * Reduce a user/prompt-supplied project name to a single, safe filesystem
+ * segment. Strips control chars + NUL, turns path separators into spaces,
+ * collapses whitespace, drops leading dots (so `.`/`..`/hidden names can't
+ * form), and caps length. Empty result → "Untitled". The realpath-containment
+ * assert in {@link WorkspaceRegistry.createProject} is the backstop; this keeps
+ * the common case readable AND the folder name never a traversal.
+ */
+function slugifyProjectName(name?: string): string {
+  // Filter char-by-char (no control-char regex) so path separators, NUL, and
+  // other control chars can never survive into a folder segment.
+  let out = "";
+  for (const ch of name ?? "") {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code < 0x20 || code === 0x7f) continue; // control chars incl NUL
+    out += ch === "/" || ch === "\\" ? " " : ch;
+  }
+  const cleaned = out
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\.+/, "") // no leading dots (., .., hidden names)
+    .trim()
+    .slice(0, 60)
+    .trim();
+  return cleaned || "Untitled";
+}
+
+/**
+ * Serialize a `.canvas` board manifest for a freshly-created project. Mirrors
+ * the dotcanvas v1 board shape (see `fixtures/test-canvas/board.canvas`): an
+ * `https://` `src` is a first-class placed reference (used as-is), a relative
+ * `src` is a bundle file. Only `src` + an optional layout box are emitted — the
+ * seed is field-constrained upstream, so nothing else can reach disk.
+ */
+function buildSeedManifest(seed?: ProjectSeed): string {
+  const documents = (seed?.documents ?? []).map((d) => ({
+    src: d.src,
+    ...(d.layout ? { layout: d.layout } : {}),
+  }));
+  const manifest = {
+    $schema: "https://grida.co/schema/dotcanvas/v1.json",
+    version: "1",
+    editor: "board",
+    documents,
+  };
+  return JSON.stringify(manifest, null, 2) + "\n";
 }
 
 // `workspaceFs` is NOT re-exported here (de-barreled): import it directly

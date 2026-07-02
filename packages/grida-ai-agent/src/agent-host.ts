@@ -53,6 +53,13 @@ export type AgentHostOptions = {
    */
   scratch_base?: string;
   /**
+   * GRIDA-SEC-004 — host-injected managed root for the auto-create flow
+   * (`POST /workspaces/create`). The desktop supervisor passes `~/Documents/Grida`;
+   * CLI/dev leave it unset (auto-create then refuses). Forwarded to
+   * {@link ServerOptions} by the `...opts` spread below.
+   */
+  projects_root?: string;
+  /**
    * Catalog model id the agent's `generate_image` tool produces with — the
    * user's selected image model. The tool is prompt-only (model is host config,
    * not an agent argument). Forwarded to {@link ServerOptions} by the `...opts`

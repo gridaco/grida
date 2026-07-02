@@ -1,7 +1,10 @@
 import { app, shell, BrowserWindow, Menu, dialog } from "electron";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
-import create_menu, { focus_or_open_canvas_window } from "./menu";
+import create_menu, {
+  focus_or_open_canvas_window,
+  rebuild_application_menu,
+} from "./menu";
 import { open_welcome_window, open_document_window } from "./window";
 import { EDITOR_BASE_URL } from "./env";
 import {
@@ -84,6 +87,16 @@ registerWorkspaceMediaScheme();
 // here even though it's defined further down.
 const menu = create_menu(app, shell, { onOpenFile: handleFilePath });
 Menu.setApplicationMenu(menu);
+
+// Keep File ▸ Open Recent in sync with the workspace list (the same recents the
+// renderer's ⌃R palette shows). Rebuilds are signature-guarded, so firing on
+// every window focus is cheap and only re-sets the menu when recents change —
+// which catches the auto-create flow (a project made via client-side nav never
+// spawns a new window the main process could hook).
+function refresh_recent_menu(): void {
+  void rebuild_application_menu(app, shell, { onOpenFile: handleFilePath });
+}
+app.on("browser-window-focus", refresh_recent_menu);
 
 // `grida://` deep-link router lives in `main/protocol-router.ts`.
 // Fire-and-forget from the event handlers below: the deep-link IO is
@@ -376,6 +389,10 @@ app.on("ready", async () => {
     app,
     base_url: EDITOR_BASE_URL,
   });
+
+  // Populate File ▸ Open Recent now that the sidecar can answer `workspaces.list`
+  // (the module-top menu was built before it was up).
+  refresh_recent_menu();
 
   // Drain anything that arrived before ready. `splice(0)` clears the
   // queue atomically so any `open-file` event firing during the drain

@@ -106,17 +106,9 @@ async function open_picker_and_register(
     return;
   }
 
-  let workspaceId: string;
-  // Auto-detect: a folder that contains the bundle marker (`.canvas.json`)
-  // opens the `.canvas` slides editor; anything else opens the file workbench.
-  // Sniff the RESOLVED root (the agent server may expand the picked path to a
-  // containing repo). This process has no `dotcanvas` import by design — keep the
-  // marker name in sync with `dotcanvas.MANIFEST_FILENAME`.
-  let isCanvas = false;
+  let workspace: { id: string; root: string };
   try {
-    const workspace = await agentSidecarClient.openWorkspace(picked);
-    workspaceId = workspace.id;
-    isCanvas = existsSync(join(workspace.root, ".canvas.json"));
+    workspace = await agentSidecarClient.openWorkspace(picked);
   } catch (err) {
     console.error("[grida] open workspace failed:", err);
     dialog.showErrorBox(
@@ -125,19 +117,7 @@ async function open_picker_and_register(
     );
     return;
   }
-  if (isCanvas) {
-    focus_or_open_canvas_window({
-      app,
-      agentSidecar,
-      workspace_id: workspaceId,
-    });
-  } else {
-    focus_or_open_workspace_window({
-      app,
-      agentSidecar,
-      workspace_id: workspaceId,
-    });
-  }
+  route_workspace_window(app, workspace);
   // Record the folder in Recents, matching the OS-open paths (`main.ts` adds
   // both files and directories). The file branch above already does this via
   // `onOpenFile`, so only the directory branch needs it here.
@@ -196,6 +176,104 @@ function focus_or_open_canvas_window({
 }
 
 export { focus_or_open_workspace_window, focus_or_open_canvas_window };
+
+/** How many recent projects to list under File ▸ Open Recent — enough to be
+ *  useful without turning the menu into the full ⌃R palette (which stays the
+ *  complete, searchable list). */
+const MAX_RECENT_MENU_ITEMS = 12;
+
+/**
+ * Route a registered workspace to its window: a root containing the bundle
+ * marker (`.canvas.json`) opens the `.canvas` board window, anything else the
+ * file workbench — with the shared focus-or-open dedup. The ONE main-process
+ * copy of this rule, used by the Open… flow and File ▸ Open Recent. Sniffs the
+ * RESOLVED root (the agent server may expand the picked path). This process has
+ * no `dotcanvas` import by design — keep the marker name in sync with
+ * `dotcanvas.MANIFEST_FILENAME`.
+ */
+function route_workspace_window(
+  app: App,
+  workspace: { id: string; root: string }
+) {
+  const agentSidecar = getAgentSidecarInfo();
+  if (!agentSidecar) return; // pre-ready / between restarts
+  const isCanvas = existsSync(join(workspace.root, ".canvas.json"));
+  if (isCanvas) {
+    focus_or_open_canvas_window({
+      app,
+      agentSidecar,
+      workspace_id: workspace.id,
+    });
+  } else {
+    focus_or_open_workspace_window({
+      app,
+      agentSidecar,
+      workspace_id: workspace.id,
+    });
+  }
+}
+
+/**
+ * The recent workspaces for File ▸ Open Recent — the SAME source the renderer's
+ * ⌃R "Recent projects" palette uses (`workspaces.list()`), so the two stay in
+ * lock-step. Empty when the sidecar isn't ready yet or nothing's been opened.
+ */
+async function list_recent_workspaces() {
+  try {
+    return (await agentSidecarClient.listWorkspaces()).slice(
+      0,
+      MAX_RECENT_MENU_ITEMS
+    );
+  } catch {
+    // Sidecar not ready / transient — an empty Open Recent (disabled placeholder).
+    return [];
+  }
+}
+
+// Last-built Open Recent signature (ordered workspace ids). `rebuild_application_menu`
+// skips re-setting the native menu when the recents are unchanged, so frequent
+// triggers (window focus) don't thrash it.
+let last_recent_signature: string | null = null;
+// Coalesce overlapping triggers (rapid focus flips): one fetch at a time, and
+// no out-of-order `Menu.setApplicationMenu` from a slow earlier fetch landing
+// after a fast later one.
+let rebuild_in_flight = false;
+
+/**
+ * Re-fetch recents and rebuild the whole application menu so File ▸ Open Recent
+ * reflects the current workspace list. Cheap and idempotent — it no-ops when the
+ * recents are unchanged (signature match), so it's safe to call on every window
+ * focus. Call once the sidecar is ready and whenever recents may have shifted.
+ */
+export async function rebuild_application_menu(
+  app: App,
+  shell: Shell,
+  opts?: { onOpenFile?: (filePath: string) => void }
+): Promise<void> {
+  if (rebuild_in_flight) return;
+  rebuild_in_flight = true;
+  try {
+    await rebuild_application_menu_locked(app, shell, opts);
+  } finally {
+    rebuild_in_flight = false;
+  }
+}
+
+async function rebuild_application_menu_locked(
+  app: App,
+  shell: Shell,
+  opts?: { onOpenFile?: (filePath: string) => void }
+): Promise<void> {
+  const recents = await list_recent_workspaces();
+  const signature = recents.map((w) => w.id).join(" ");
+  if (signature === last_recent_signature && Menu.getApplicationMenu()) return;
+  last_recent_signature = signature;
+  const recent: MenuItemConstructorOptions[] = recents.map((w) => ({
+    label: w.name || w.root,
+    click: () => route_workspace_window(app, w),
+  }));
+  Menu.setApplicationMenu(create_menu(app, shell, { ...opts, recent }));
+}
 
 function is_workspace_window(window: BrowserWindow): boolean {
   try {
@@ -385,7 +463,13 @@ export function create_default_menu(
 export default function create_menu(
   app: App,
   shell: Shell,
-  opts?: { onOpenFile?: (filePath: string) => void }
+  opts?: {
+    onOpenFile?: (filePath: string) => void;
+    /** Pre-fetched File ▸ Open Recent items (built by {@link rebuild_application_menu}).
+     *  Omitted on the initial synchronous build (sidecar not up yet) → the menu
+     *  shows a disabled "No Recent Projects" placeholder until the first rebuild. */
+    recent?: MenuItemConstructorOptions[];
+  }
 ) {
   const default_menu = create_default_menu(app, shell);
   // Minimal File menu. An extension-keyed registry (one entry per
@@ -442,6 +526,16 @@ export default function create_menu(
                 },
               },
             ]),
+        // Recent projects — the same list the renderer's ⌃R palette shows,
+        // kept fresh by `rebuild_application_menu`. Disabled placeholder until
+        // the sidecar is up and the first rebuild runs.
+        {
+          label: "Open Recent",
+          submenu:
+            opts?.recent && opts.recent.length > 0
+              ? opts.recent
+              : [{ label: "No Recent Projects", enabled: false }],
+        },
         // Cross-platform shortcut to Settings. macOS gets the same
         // entry under the app menu (above) per platform convention,
         // but Cmd/Ctrl+, is the universal expectation — keep it here

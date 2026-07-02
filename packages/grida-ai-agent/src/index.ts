@@ -78,6 +78,7 @@ export type {
   FileWriteResult,
   RecentEntry,
   Workspace,
+  WorkspaceCreateInput,
   WorkspaceFsEntry,
   WorkspaceReadFileBytesResult,
   WorkspaceReadFileResult,

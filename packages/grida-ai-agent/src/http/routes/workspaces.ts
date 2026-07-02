@@ -21,9 +21,56 @@
  */
 import { Readable } from "node:stream";
 import type { Context, Hono } from "hono";
-import type { Workspace, WorkspaceRegistry } from "../../workspaces";
+import type {
+  ProjectSeed,
+  ProjectSeedDocument,
+  Workspace,
+  WorkspaceRegistry,
+} from "../../workspaces";
 import { workspaceFs } from "../../workspaces/fs";
-import { body, v } from "../validate";
+import { body, v, type Validator } from "../validate";
+
+/**
+ * Keep only numeric x/y/w/h/z from a raw layout — drops anything else so a
+ * hostile body can't smuggle extra manifest fields through the seed.
+ */
+function sanitizeLayout(
+  raw: unknown
+): ProjectSeedDocument["layout"] | undefined {
+  if (raw === null || typeof raw !== "object") return undefined;
+  const src = raw as Record<string, unknown>;
+  const out: Record<string, number> = {};
+  for (const k of ["x", "y", "w", "h", "z"] as const) {
+    const val = src[k];
+    if (typeof val === "number" && Number.isFinite(val)) out[k] = val;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Field-constrained `seed` validator (GRIDA-SEC-004): reduces an arbitrary body
+ * to a {@link ProjectSeed} of `{ src, layout? }` documents, silently dropping
+ * malformed entries. This is the injection-vector gate — a raw dotcanvas
+ * manifest never reaches disk, only `src` (string) + a numeric layout box.
+ */
+const seedValidator: Validator<ProjectSeed> = (raw) => {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, error: "must be an object" };
+  }
+  const docs = (raw as { documents?: unknown }).documents;
+  if (!Array.isArray(docs)) {
+    return { ok: false, error: "must have a documents array" };
+  }
+  const documents: ProjectSeedDocument[] = [];
+  for (const d of docs) {
+    if (d === null || typeof d !== "object") continue;
+    const src = (d as { src?: unknown }).src;
+    if (typeof src !== "string" || src.length === 0) continue;
+    const layout = sanitizeLayout((d as { layout?: unknown }).layout);
+    documents.push(layout ? { src, layout } : { src });
+  }
+  return { ok: true, value: { documents } };
+};
 
 /**
  * Resolve a workspace by id, or return a 404 JSON response. Caller
@@ -57,6 +104,30 @@ export function registerWorkspacesRoutes(
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "couldn't open workspace";
+      return c.json({ error: message }, 400);
+    }
+  });
+
+  // POST /workspaces/create { name?, seed? } → Workspace | 400
+  // GRIDA-SEC-004 — auto-create a fresh project under the host's managed root.
+  // `name` is slugified and `seed` is field-constrained (see seedValidator);
+  // the registry mints + realpath-contains + registers. 400 on a host without
+  // a managed root wired (`projects-root-not-configured`).
+  app.post("/workspaces/create", async (c) => {
+    const r = await body(c, {
+      name: v.optional(v.string),
+      seed: v.optional(seedValidator),
+    });
+    if (!r.ok) return r.res;
+    try {
+      const workspace = await registry.createProject({
+        name: r.data.name,
+        seed: r.data.seed,
+      });
+      return c.json(workspace);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "couldn't create project";
       return c.json({ error: message }, 400);
     }
   });

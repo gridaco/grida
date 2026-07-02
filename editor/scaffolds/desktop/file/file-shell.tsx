@@ -108,9 +108,12 @@ export function DesktopFileShell({
                 the `.canvas` dir (sees the manifest + every slide). Single-file
                 mode resolves fs tools client-side against the in-memory editor. */}
             {mode === "deck" ? (
-              <AISidebarChat workspaceId={workspaceId} />
+              // A `.canvas` bundle (board or slides) — prime the dotcanvas
+              // format skill so a board seeded from a picked reference is
+              // understood from turn one.
+              <AISidebarChat workspaceId={workspaceId} skills={["dotcanvas"]} />
             ) : (
-              <AISidebarChat fs={fs} />
+              <AISidebarChat fs={fs} skills={["svg"]} />
             )}
           </aside>
         </ResizablePanel>

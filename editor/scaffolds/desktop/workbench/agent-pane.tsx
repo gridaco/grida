@@ -472,7 +472,10 @@ function AgentPaneContent({
   // Endpoint provider pin for the active model (issue #806) — rides every
   // run-entering body: normal sends AND approval resumes below.
   const providerId = registered_models.providerIdForModel(modelId, endpoints);
-  const activeSkills = skillsForActiveTab(activeRelPath);
+  // The active tab dictates skills; when none is open yet (a freshly
+  // auto-created project lands with no tab), fall back to the skills the home
+  // primed on the handoff so the first turn still gets its format block.
+  const activeSkills = skillsForActiveTab(activeRelPath) ?? handoff?.skills;
   // Keep the transport's body-less backfill (above) in step with the pickers.
   runContextRef.current = {
     model_id: modelId,

@@ -7,9 +7,9 @@ import path from "node:path";
  *
  * Both arguments must already be absolute (and ideally `realpath`'d by the
  * caller when symlink stability matters) — this is a pure string check, not a
- * filesystem op. Shared by the shell runner's workspace/secret-root gates and
- * the session scratch containment assert so the discipline can't drift between
- * copies.
+ * filesystem op. Shared by the shell runner's workspace/secret-root gates, the
+ * session scratch containment assert, and `WorkspaceRegistry.createProject`'s
+ * managed-root assert so the discipline can't drift between copies.
  */
 export function containsPath(root: string, candidate: string): boolean {
   const prefix = root.endsWith(path.sep) ? root : root + path.sep;

@@ -193,6 +193,9 @@ export function createWebDaemonBridge(
     workspaces: {
       list: () => client.workspaces.list(),
       open: (rootPath) => client.workspaces.open(rootPath),
+      // Auto-create needs a host-injected managed root, which the plain-browser
+      // daemon doesn't wire — the desktop app owns this capability.
+      create: () => unavailable("workspaces.create"),
       pin: (id, pinned) => client.workspaces.pin(id, pinned),
       forget: (id) => client.workspaces.forget(id),
       readdir: (workspaceId, relPath) =>

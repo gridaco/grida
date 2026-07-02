@@ -610,6 +610,31 @@ deny (provider CDNs still excluded). The alternative — proxying library images
 through `grida-workspace:` like generated media — was rejected: the library is
 first-party public read-only storage, and the product keeps its pins as URLs.
 
+**Auto-created projects (managed root).** The reference-first home lets a
+newcomer start without choosing a folder: it posts to `POST /workspaces/create`,
+which mints a new project directory and seeds a `.canvas` bundle (a
+`<name>.canvas` dir + manifest inside it). This adds a new
+renderer-reachable **write** authority (previously the renderer could only
+register a folder the user had already picked through the OS dialog), so it is
+recorded here. The boundary holds by four rules, none of which trust the caller
+for a path: (a) the managed root is **host-injected** — the supervisor passes
+`--projects-root=<~/Documents/Grida>` (`desktop/src/main/agent-sidecar-supervisor.ts`),
+never derived from the request; a host that wired no root refuses with a 400.
+(b) The request's `name` is **slugified to a single filesystem segment**
+(`WorkspaceRegistry.createProject` / `slugifyProjectName`): path separators,
+`..`, NUL, and control chars cannot survive, so it can never be a path. (c) The
+minted directory's realpath is **asserted strictly under the managed root** via
+the shared `containsPath` (`path-contains.ts` — the same prefix+sep discipline
+as the shell runner's root gates); an escape is removed and rejected. (d)
+The `seed` is **field-constrained** (`seedValidator` in
+`http/routes/workspaces.ts`) to `{ src, layout? }` documents — a raw dotcanvas
+manifest never reaches disk, so the route is not a manifest-injection vector.
+The sidecar's own `fs` writes are not srt-confined (srt wraps only the
+`run_command` shell child), and a created project registers as a workspace root
+the shell fs-policy already unions — so this adds no new reachable root for the
+sandboxed shell. `workspaces.create.test.ts` pins traversal-name containment,
+seed field-constraining, and the no-managed-root refusal.
+
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 Today:
 
@@ -623,7 +648,7 @@ Today:
 - [packages/grida-ai-agent/src/tools/run-command.ts](packages/grida-ai-agent/src/tools/run-command.ts) — the supervised-approval gate itself: the AI SDK `needsApproval` predicate that pauses a mutating command before `execute` in `accept-edits` (absent in `auto`). The decision lives on the tool, not the backend.
 - [packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts](packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts) — opened workspace to agent fs/todos/command bindings; wires the `accept-edits` supervised-approval predicate. The session scratch dir is wired as an additional sanctioned root for BOTH surfaces from one source (`deps.scratch_dir`): the shell's allowed cwd roots AND the fs backend's reachable roots (so `view_image`/`read_file`/`write_file` reach scratch, not just the shell). Containment is preserved per root — a path under no reachable root falls back contained to the workspace, and the secrets root is never a reachable root. Also builds the `generate_image` binding: it reads BYOK keys via `SecretsStore` to call the image provider in-process and returns the saved scratch path + metadata + base64 `data` (the bytes are for the CLIENT to render; `AgentGen.toModelOutput` is text-only, so they are NEVER lowered to the model — no context bloat, no perception claim). The complementary `view_image` perception path DOES deliver bytes to the model, but only ones already read under the agent's existing fs read capability: `agent/hoist-tool-result-images.ts` (wired at `agent/index.ts` `prepareStep`, #923) relocates an image tool-result into a synthetic user-message image part so the model can actually see it on the openai-compatible wire — a model-view lowering that moves bytes already inside the prompt, never persisted, with no new read, no new egress, and no boundary change. The key never leaves the host, and the call omits `providerOptions.grida` so it is BYOK-paid, never Grida-billed (mirrors the `/images/generate` route).
 - [packages/grida-ai-agent/src/session/scratch.ts](packages/grida-ai-agent/src/session/scratch.ts) — per-session ephemeral scratch dir (WG `scratch.md`): asserts the shell-writable scratch tree sits OUTSIDE `userData` (the secret root), creates it owner-only (`0700`), and reclaims it (per-session delete + synchronous host-start sweep). `writeScratchFile` lands produced bytes (e.g. `generate_image`) owner-only (`0600`) within the session tree, rejecting any filename that is not a single safe path segment AND opening `O_NOFOLLOW` so a symlink planted at the basename (e.g. by an auto-approved scratch-cwd `run_command`) fails the write instead of redirecting it outside the tree — closing the lexical-check TOCTOU.
-- [packages/grida-ai-agent/src/path-contains.ts](packages/grida-ai-agent/src/path-contains.ts) — shared `path.sep`-prefix containment used by the shell runner's workspace/secret-root gates and the scratch containment assert (one source so the discipline can't drift).
+- [packages/grida-ai-agent/src/path-contains.ts](packages/grida-ai-agent/src/path-contains.ts) — shared `path.sep`-prefix containment used by the shell runner's workspace/secret-root gates, the scratch containment assert, and `createProject`'s managed-root assert (one source so the discipline can't drift).
 - [packages/grida-ai-agent/src/runtime/run-input.ts](packages/grida-ai-agent/src/runtime/run-input.ts) — wire-message normalization + `coerceApprovalAnswer`/`applyApprovalAnswer` (shape-gates the explicit `approval_answer` body field and routes it to `store.answerApproval`).
 - [packages/grida-ai-agent/src/session/store.ts](packages/grida-ai-agent/src/session/store.ts) — sessions store; `answerApproval` is the server-authoritative supervised-approval gate (answers only a real pending approval, never forges a call).
 - [packages/grida-ai-agent/src/workspaces.ts](packages/grida-ai-agent/src/workspaces.ts) — opened workspace registry and root canonicalization.

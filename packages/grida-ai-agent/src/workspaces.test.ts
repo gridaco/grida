@@ -107,4 +107,83 @@ describe("Workspaces", () => {
 
   // Phase B+ coverage target once host sandbox policy compilation lands:
   // srt fs-policy unions workspace roots, ad-hoc docIds, and userData.
+
+  describe("createProject (auto-create)", () => {
+    let projectsRoot: string;
+    beforeEach(() => {
+      projectsRoot = path.join(baseDir, "Grida");
+    });
+
+    it("mints a folder holding a `<name>.canvas` bundle, seeds an empty board, and registers it", async () => {
+      const registry = new WorkspaceRegistry(userDataDir, projectsRoot);
+      const ws = await registry.createProject({ name: "Poster" });
+
+      // Folder lives under the managed root and is registered (recents).
+      const rootReal = await fs.realpath(projectsRoot);
+      expect(path.dirname(ws.root)).toBe(rootReal);
+      expect(ws.name).toBe("Poster");
+      expect(await registry.findById(ws.id)).not.toBeNull();
+
+      // The manifest lives INSIDE a `<name>.canvas` bundle dir (so the tree
+      // recognizes it as an openable board), NOT loose at the workspace root.
+      const bundleName = `${path.basename(ws.root)}.canvas`;
+      const rootEntries = await fs.readdir(ws.root);
+      expect(rootEntries).toContain(bundleName);
+      expect(rootEntries).not.toContain(".canvas.json"); // nothing loose at root
+      const manifest = JSON.parse(
+        await fs.readFile(
+          path.join(ws.root, bundleName, ".canvas.json"),
+          "utf8"
+        )
+      );
+      expect(manifest.editor).toBe("board");
+      expect(manifest.documents).toEqual([]);
+    });
+
+    it("seeds a picked reference as a first-class URI document", async () => {
+      const registry = new WorkspaceRegistry(userDataDir, projectsRoot);
+      const url = "https://library.grida.co/ref.png";
+      const ws = await registry.createProject({
+        name: "Sunset",
+        seed: { documents: [{ src: url }] },
+      });
+      const bundleName = `${path.basename(ws.root)}.canvas`;
+      const manifest = JSON.parse(
+        await fs.readFile(
+          path.join(ws.root, bundleName, ".canvas.json"),
+          "utf8"
+        )
+      );
+      expect(manifest.documents).toEqual([{ src: url }]);
+    });
+
+    it("suffixes -2, -3… on name collision (distinct folders + ids)", async () => {
+      const registry = new WorkspaceRegistry(userDataDir, projectsRoot);
+      const a = await registry.createProject({ name: "Poster" });
+      const b = await registry.createProject({ name: "Poster" });
+      expect(path.basename(a.root)).toBe("Poster");
+      expect(path.basename(b.root)).toBe("Poster-2");
+      expect(a.id).not.toBe(b.id);
+    });
+
+    it("slugifies a traversal name so it can never escape the managed root", async () => {
+      const registry = new WorkspaceRegistry(userDataDir, projectsRoot);
+      const ws = await registry.createProject({ name: "../../pwned" });
+      const rootReal = await fs.realpath(projectsRoot);
+      // The created folder is a single segment directly under the root — no
+      // separator survived, so nothing landed outside.
+      expect(path.dirname(await fs.realpath(ws.root))).toBe(rootReal);
+      // And no sibling of the managed root was created.
+      await expect(
+        fs.stat(path.join(path.dirname(rootReal), "pwned"))
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("throws projects-root-not-configured when no managed root is wired", async () => {
+      const registry = new WorkspaceRegistry(userDataDir);
+      await expect(registry.createProject({ name: "x" })).rejects.toThrow(
+        "projects-root-not-configured"
+      );
+    });
+  });
 });

@@ -50,6 +50,13 @@ export type ServerOptions = {
    */
   scratch_base?: string;
   /**
+   * GRIDA-SEC-004 — host-injected managed root under which the auto-create flow
+   * (`POST /workspaces/create`) mints new project folders (desktop:
+   * `~/Documents/Grida`). Host-owned, never client-derived. Omitted on hosts
+   * that don't wire it (CLI/dev), where `createProject` throws.
+   */
+  projects_root?: string;
+  /**
    * Catalog model id the agent's `generate_image` tool produces with — the
    * user's selected image model (host config). The tool is prompt-only, so the
    * model is not an agent argument. Omit to use the catalog default.
@@ -149,7 +156,10 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   // and resets on restart; recent.json / auth.json are on disk and persist).
   const registry = new FileRegistry();
   const recentStore = new RecentStore(opts.user_data_path);
-  const workspaceRegistry = new WorkspaceRegistry(opts.user_data_path);
+  const workspaceRegistry = new WorkspaceRegistry(
+    opts.user_data_path,
+    opts.projects_root
+  );
   const authStore = new AuthStore(opts.user_data_path);
   const secretsStore = new SecretsStore(authStore);
   // Endpoint provider configs (issue #806): plain config beside the

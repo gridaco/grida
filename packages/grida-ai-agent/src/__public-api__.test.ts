@@ -52,6 +52,7 @@ import {
   type SessionStatus,
   type SkillId,
   type Workspace,
+  type WorkspaceCreateInput,
   type WorkspaceFsEntry,
 } from ".";
 import {
@@ -167,6 +168,7 @@ describe("@grida/agent public API", () => {
       type _FR = FileReadResult;
       type _RE = RecentEntry;
       type _W = Workspace;
+      type _WCI = WorkspaceCreateInput;
       type _WE = WorkspaceFsEntry;
       const row: ChatSessionRow = {
         id: "s",
