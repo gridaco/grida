@@ -69,7 +69,8 @@ export class GridaGatewayImageModel implements ImageModelV3 {
   async doGenerate(
     options: ImageModelV3CallOptions
   ): Promise<Awaited<ReturnType<ImageModelV3["doGenerate"]>>> {
-    const { prompt, n, size, aspectRatio, seed, abortSignal } = options;
+    const { prompt, n, size, aspectRatio, seed, abortSignal, providerOptions } =
+      options;
     let width: number | undefined;
     let height: number | undefined;
     if (size) {
@@ -79,6 +80,11 @@ export class GridaGatewayImageModel implements ImageModelV3 {
         height = Number(match[2]);
       }
     }
+    // The desktop image route sets the picker's quality tier under
+    // `providerOptions.gg` (keyed by provider id); forward it so the hosted
+    // endpoint bills AND delivers the requested tier rather than dropping it.
+    const rawQuality = providerOptions?.gg?.quality;
+    const quality = typeof rawQuality === "string" ? rawQuality : undefined;
     const result = await postHosted<ImageGenerateResult>({
       session: this.session,
       url: joinApi(this.baseUrl, "/api/v1/ai/images/generations"),
@@ -91,6 +97,7 @@ export class GridaGatewayImageModel implements ImageModelV3 {
         width,
         height,
         aspect_ratio: aspectRatio,
+        quality,
         seed,
       },
     });

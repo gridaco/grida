@@ -78,6 +78,17 @@ export async function POST(request: Request) {
         ? (`${req.width}x${req.height}` as `${number}x${number}`)
         : undefined;
 
+    // Forward the requested quality tier to the ORIGIN provider so the
+    // tier we just billed (`computeImageCostMills`) is the tier actually
+    // delivered — otherwise a `per_image_tiered` card (e.g. gpt-image-*)
+    // charges "high" while the provider renders its default. The Vercel
+    // AI Gateway keys providerOptions by origin provider (`openai` for
+    // `openai/gpt-image-2`).
+    const slash = card.id.indexOf("/");
+    const originProvider = slash > 0 ? card.id.slice(0, slash) : undefined;
+    const quality =
+      req.quality && req.quality !== "auto" ? req.quality : undefined;
+
     const generation = await generateImage({
       model: resolved.model,
       prompt: req.prompt,
@@ -91,6 +102,7 @@ export async function POST(request: Request) {
           feature: "v1/ai/images",
           costMills,
         },
+        ...(originProvider && quality ? { [originProvider]: { quality } } : {}),
       },
     });
 

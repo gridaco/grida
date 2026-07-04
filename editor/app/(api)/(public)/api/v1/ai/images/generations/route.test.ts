@@ -149,6 +149,21 @@ describe("POST /api/v1/ai/images/generations", () => {
     expect(mockedIngest.mock.calls[0]![1]).toBe(expected);
   });
 
+  it("forwards the requested quality tier to the origin provider", async () => {
+    const { token } = await signGgToken("user-1", 7);
+    const res = await POST(
+      request({ model_id: CARD.id, prompt: "x", quality: "high" }, token)
+    );
+    expect(res.status).toBe(200);
+    // The billed tier must actually reach the provider (Vercel AI Gateway
+    // keys providerOptions by origin provider, e.g. `openai`).
+    const originProvider = CARD.id.slice(0, CARD.id.indexOf("/"));
+    const opts = h.lastOptions as {
+      providerOptions?: Record<string, Record<string, unknown>>;
+    };
+    expect(opts.providerOptions?.[originProvider]?.quality).toBe("high");
+  });
+
   it("401 without token; 404 for unknown models — provider untouched", async () => {
     expect(
       (await POST(request({ model_id: CARD.id, prompt: "x" }))).status
