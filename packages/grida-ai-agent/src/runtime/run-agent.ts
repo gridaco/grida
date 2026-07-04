@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — surface `gg_*` stream errors to the renderer (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — agent driver (`runAgent`).
  *
@@ -214,6 +215,23 @@ export async function runAgent(
   return await createAgentUIStreamResponse({
     agent,
     uiMessages: req.messages,
+    // GRIDA-SEC-006 — normalize the two ACTIONABLE hosted-AI failures to
+    // their bare literal codes: Electron's contextBridge strips custom
+    // error props, so the code-led message IS the renderer's detection
+    // contract (re-mint + retry / top-up CTA). Everything else keeps the
+    // SDK default's semantics (message pass-through, `getErrorMessage`
+    // shape) — tool refusals and provider errors surface exactly as
+    // before this hook existed.
+    onError: (error: unknown) => {
+      const code = (error as { code?: unknown })?.code;
+      if (code === "gg_token_expired" || code === "insufficient_credits") {
+        return String(code);
+      }
+      if (error == null) return "unknown error";
+      if (typeof error === "string") return error;
+      if (error instanceof Error) return error.message;
+      return JSON.stringify(error);
+    },
     // Advertise a stable assistant message id on every turn's stream. On a fresh
     // turn this mints a new id; on a supervised-approval RESUME the SDK reuses
     // the last assistant message's id from the rebuilt history (it continues

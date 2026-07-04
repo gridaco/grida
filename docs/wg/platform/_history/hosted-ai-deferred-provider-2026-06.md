@@ -1,18 +1,31 @@
 ---
-title: Deferred Grida Cloud Agent Provider
-description: Deferred architecture note for fitting grida-cloud into the local Desktop AgentHost provider contract.
+title: Deferred Grida Cloud Agent Provider (historical, 2026-06)
+description: Historical snapshot of the deferred hosted-provider design, superseded by the shipped Hosted AI architecture.
 keywords:
   - desktop
   - grida-cloud
   - agent host
   - ai
   - billing
-draft: true
+  - historical
+status: historical
+unlisted: true
 format: md
 tags:
   - internal
   - wg
+  - platform
+  - historical
 ---
+
+> **Historical.** This is the _deferred_ design that predates the shipped
+> hosted-AI provider. It describes a removed prototype (agent-server PKCE,
+> `auth.json` session storage, a `/private/ai/model` proxy) that is **not**
+> what shipped. The re-entry criteria below were met, but the realized
+> architecture differs materially (renderer-minted scoped token,
+> memory-only custody, an OpenAI-compatible gateway). For current truth
+> see [Hosted AI](../hosted-ai.md). Kept for the design lineage and the
+> "agent loop stays local" doctrine.
 
 # Deferred Grida Cloud Agent Provider
 

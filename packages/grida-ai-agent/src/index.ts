@@ -7,11 +7,21 @@ export {
   BYOK_PROVIDER_IDS,
   byokProvidersFor,
   isByokProviderId,
+  GG_PROVIDER_ID,
+  GG_PROVIDER_METADATA,
+  isGgProviderId,
   type ByokModality,
   type ByokProviderMetadata,
   type ByokProviderId,
   type ProviderId,
 } from "./protocol/provider-ids";
+// GRIDA-SEC-006 — hosted-session wire shapes (types only; the store is
+// internal daemon state).
+export type {
+  GridaGatewaySession,
+  GridaGatewaySessionStatus,
+  GridaGatewayOrganization,
+} from "./providers/gg-session";
 export type {
   ImageGenProvider,
   ImageGenerateRequest,

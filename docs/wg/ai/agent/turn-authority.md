@@ -107,8 +107,8 @@ and "reconstruct server state from local guesses" is a contract that
 
 Today the renderer is the only consumer. Tomorrow the same run-state
 lives behind a [cloud agent
-runtime](../../platform/grida-cloud-agent-runtime.md) and a
-`grida-agent` CLI. Each is a different process, with a different local
+runtime](../../platform/hosted-ai.md#scope-boundary-capacity-not-remote-execution)
+and a `grida-agent` CLI. Each is a different process, with a different local
 model of the queue, a different reconciliation cadence, a different
 notion of "the head of my mirror":
 
@@ -356,5 +356,6 @@ A conforming implementation MUST hold all of these:
   a wrong promotion corrupts.
 - [UX / queued sends](./ux.md#queued-sends) — the user-facing framing
   of the queue whose drain this governs.
-- [Deferred Grida Cloud Agent Provider](../../platform/grida-cloud-agent-runtime.md)
-  — one of the additional consumers this contract is written ahead of.
+- [Grida Gateway (GG)](../../platform/hosted-ai.md)
+  — hosted model capacity ships; a remote agent runtime remains a future
+  consumer this contract is written ahead of.

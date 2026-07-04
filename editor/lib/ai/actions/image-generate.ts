@@ -17,6 +17,7 @@ import mime from "mime-types";
 import imageSize from "image-size";
 import { service_role } from "@/lib/supabase/server";
 import ai from "@/lib/ai";
+import { computeImageCostMills } from "@/lib/ai/image-cost";
 import { methods, withAiAuth, type AiActionResult } from "@/lib/ai/server";
 
 export type GenerateAiImageInput = {
@@ -46,27 +47,6 @@ export type GenerateAiImageData = {
 
 export type GenerateAiImageResponse = AiActionResult<GenerateAiImageData>;
 
-function computeCostMills(
-  card: ai.image.ImageModelCard,
-  request: { n: number; width?: number; height?: number }
-): number {
-  const n = Math.max(1, request.n);
-  switch (card.pricing.type) {
-    case "per_image_flat":
-      return ai.toMills(card.pricing.usd * n);
-    case "per_image_tiered": {
-      const w = request.width;
-      const h = request.height;
-      const tierKey = w && h ? `medium/${w}x${h}` : undefined;
-      const perImage =
-        (tierKey && card.pricing.tiers[tierKey]) || card.avg_cost_usd;
-      return ai.toMills(perImage * n);
-    }
-    case "per_token":
-      return ai.toMills(card.avg_cost_usd * n);
-  }
-}
-
 export async function generateAiImage(
   input: GenerateAiImageInput
 ): Promise<GenerateAiImageResponse> {
@@ -84,7 +64,7 @@ export async function generateAiImage(
     "ai/image/generate",
     input.organizationId,
     async (organizationId) => {
-      const costMills = computeCostMills(model.card, {
+      const costMills = computeImageCostMills(model.card, {
         n: 1,
         width: input.width,
         height: input.height,

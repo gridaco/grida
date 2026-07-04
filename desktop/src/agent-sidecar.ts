@@ -1,3 +1,4 @@
+// GRIDA-GG: desktop — pass the GG base URL to the daemon (docs/wg/platform/hosted-ai.md)
 /**
  * Agent sidecar entry point.
  *
@@ -114,6 +115,10 @@ async function main() {
     // The desktop renderer holds the editor's library session, so it can resolve
     // `design_search` (the artwork-station gather step) client-side.
     library: true,
+    // GRIDA-SEC-006 — hosted "included" AI: the grida provider calls this
+    // origin (same editor base the perimeter already trusts); the renderer
+    // pushes the short-lived session token over /auth/gg/set.
+    gg_base_url: runtimeEditorBaseUrl,
   });
 
   try {

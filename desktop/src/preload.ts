@@ -1,3 +1,4 @@
+// GRIDA-GG: desktop — install the `gg` bridge namespace (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — Desktop agent-sidecar trust boundary (renderer side).
  *
@@ -520,6 +521,17 @@ const bridge: DesktopBridge = {
     info: () => agentClient.providers.info(),
     probe_endpoint: (baseUrl) => agentClient.providers.probe_endpoint(baseUrl),
     detect_claude: () => agentClient.providers.detect_claude(),
+  },
+
+  // GRIDA-SEC-006 — hosted-session custody push (renderer → sidecar).
+  gg: {
+    set_session: async (session) => {
+      await agentClient.gg.set_session(session);
+    },
+    clear_session: async () => {
+      await agentClient.gg.clear_session();
+    },
+    status: () => agentClient.gg.status(),
   },
 
   images: {

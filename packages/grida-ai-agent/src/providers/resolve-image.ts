@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — the `gg` image-provider arm (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — image-model provider resolver (in-package providers layer).
  *
@@ -19,8 +20,10 @@
 import { models } from "@grida/ai-models";
 import type { ImageModelV3 } from "@ai-sdk/provider";
 import type { SecretsStore } from "@grida/daemon/server";
-import { byokProvidersFor } from "../protocol/provider-ids";
+import { byokProvidersFor, GG_PROVIDER_ID } from "../protocol/provider-ids";
 import { makeImageModelFor } from "./image-byok";
+import { GridaGatewayImageModel } from "./gg-media";
+import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
 
 type ImageProvider = models.image.ImageProvider;
@@ -36,7 +39,8 @@ function isImageProvider(id: string): id is ImageProvider {
 }
 
 export type ResolvedImageModel = {
-  provider_id: ImageProvider;
+  /** A BYOK image provider, or the hosted `grida` provider (GRIDA-SEC-006). */
+  provider_id: ImageProvider | typeof GG_PROVIDER_ID;
   /** Canonical catalog id (our key). */
   model_id: string;
   /** Provider-specific call id actually handed to the SDK. */
@@ -96,11 +100,16 @@ function referenceCapableProviders(
 
 export type ResolveImageDeps = {
   secrets: SecretsStore;
+  /** Grida Cloud session (GRIDA-SEC-006) — optional; absent or token-less
+   *  ⇒ the hosted provider never resolves. */
+  gg?: GridaGatewaySessionStore;
+  /** Origin of the hosted endpoints; absent ⇒ hosted provider disabled. */
+  gg_base_url?: string;
 };
 
 export type ResolveImageOptions = {
   /** Caller override. If set, precedence is skipped and only this provider is checked. */
-  explicit?: ImageProvider;
+  explicit?: ImageProvider | typeof GG_PROVIDER_ID;
   /**
    * Resolve for image-to-image. When true, only providers whose binding has a
    * `references` capability are eligible, and the resolved `binding_id` is the
@@ -141,7 +150,26 @@ export async function hasUsableImageProvider(
     if (!isImageProvider(p.id)) continue;
     if (await deps.secrets._getKey(p.id)) return true;
   }
-  return false;
+  // Grida hosted (GRIDA-SEC-006): a live session serves the curated list
+  // too — a signed-in keyless user gets in-chat image generation.
+  return liveGgMediaDeps(deps) !== null;
+}
+
+/**
+ * Build the resolved hosted image model — shared by the explicit-pick and
+ * post-BYOK fallback arms, which produce the identical descriptor.
+ */
+function resolvedGgImage(
+  modelId: string,
+  card: models.image.ImageModelCard,
+  hosted: { session: GridaGatewaySessionStore; base_url: string }
+): ResolvedImageModel {
+  return {
+    provider_id: GG_PROVIDER_ID,
+    model_id: modelId,
+    binding_id: card.id,
+    model: new GridaGatewayImageModel(hosted.session, hosted.base_url, card.id),
+  };
 }
 
 export async function resolveImageModel(
@@ -156,8 +184,19 @@ export async function resolveImageModel(
     throw new ImageModelUnavailableError(modelId, options.explicit);
   }
 
+  // Explicit hosted pick — only grida is checked (mirrors the BYOK
+  // explicit path). Hosted image is text-to-image only in v1: the wire
+  // has no references field, so i2i must ride a BYOK route.
+  if (options.explicit === GG_PROVIDER_ID) {
+    const hosted = !options.references && liveGgMediaDeps(deps);
+    if (!hosted || !models.image.binding(card, "vercel")) {
+      throw new ImageModelUnavailableError(modelId, GG_PROVIDER_ID);
+    }
+    return resolvedGgImage(modelId, card, hosted);
+  }
+
   const order: ImageProvider[] = options.explicit
-    ? [options.explicit]
+    ? [options.explicit as ImageProvider]
     : byokProvidersFor("image")
         .map((p) => p.id)
         .filter(isImageProvider);
@@ -180,6 +219,15 @@ export async function resolveImageModel(
         ? { references_max: binding.references!.max }
         : {}),
     };
+  }
+
+  // Grida hosted (GRIDA-SEC-006) — after BYOK, before giving up. Serves
+  // any card the hosted gateway can (a vercel binding), t2i only.
+  if (!options.explicit && !options.references) {
+    const hosted = liveGgMediaDeps(deps);
+    if (hosted && models.image.binding(card, "vercel")) {
+      return resolvedGgImage(modelId, card, hosted);
+    }
   }
 
   // No connected provider served the resolution. For an image-to-image call the

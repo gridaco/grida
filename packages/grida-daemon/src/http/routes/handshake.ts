@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — advertise the `gg` capability tag (docs/wg/platform/hosted-ai.md)
 import type { Hono } from "hono";
 import type {
   DaemonCapabilities,
@@ -30,6 +31,7 @@ const SUPPORTS_TAGS: Record<keyof DaemonCapabilities, string> = {
   agent: "agent@1",
   workspaces: "workspaces@1",
   sessions: "sessions@1",
+  gg: "gg",
   providers: "providers@1",
   images: "images@1",
   video: "video@1",

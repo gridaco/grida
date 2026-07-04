@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — `gg` in the video provider union (docs/wg/platform/hosted-ai.md)
 /**
  * Video-generation wire protocol (#908). Client-safe: request/result shapes
  * for the `/video/generate` route, no provider SDK imports.
@@ -13,7 +14,7 @@ export type VideoGenerateRequest = {
   model_id: string;
   prompt: string;
   /** Optional explicit provider override; otherwise the resolver picks. */
-  provider?: VideoGenProvider;
+  provider?: VideoGenProvider | "gg";
   aspect_ratio?: string;
   /** `"{width}x{height}"`. */
   resolution?: string;
@@ -38,6 +39,6 @@ export type GeneratedVideo = {
 
 export type VideoGenerateResult = {
   model_id: string;
-  provider_id: VideoGenProvider;
+  provider_id: VideoGenProvider | "gg";
   videos: GeneratedVideo[];
 };

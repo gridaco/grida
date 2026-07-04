@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — `gg` in the image provider union (docs/wg/platform/hosted-ai.md)
 /**
  * Image-generation wire protocol (#908). Client-safe: request/result shapes
  * for the `/images/generate` route, no provider SDK imports.
@@ -13,7 +14,7 @@ export type ImageGenerateRequest = {
   model_id: string;
   prompt: string;
   /** Optional explicit provider override; otherwise the resolver picks. */
-  provider?: ImageGenProvider;
+  provider?: ImageGenProvider | "gg";
   width?: number;
   height?: number;
   aspect_ratio?: string;
@@ -38,6 +39,6 @@ export type ImageGeneratedImage = {
 export type ImageGenerateResult = {
   model_id: string;
   /** The provider that actually served the request. */
-  provider_id: ImageGenProvider;
+  provider_id: ImageGenProvider | "gg";
   images: ImageGeneratedImage[];
 };

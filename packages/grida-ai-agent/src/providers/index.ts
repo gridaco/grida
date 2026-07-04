@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — the `gg` provider resolution arm + precedence (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — provider resolver (in-package providers layer).
  *
@@ -28,8 +29,12 @@ import type { SecretsStore } from "@grida/daemon/server";
 import {
   byokProvidersFor,
   isByokProviderId,
+  isGgProviderId,
+  GG_PROVIDER_ID,
   type ByokProviderId,
 } from "../protocol/provider-ids";
+import { makeGridaGatewayFactory } from "./gg";
+import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import {
   endpointDefaultModelId,
   type EndpointProviderConfig,
@@ -50,12 +55,15 @@ export type ResolvedProvider = {
   /** A BYOK provider id, a configured endpoint id, or an agent-provider id. */
   provider_id: string;
   /**
-   * `byok`/`endpoint` are MODEL providers (the host owns the loop, calls
-   * `model_factory`). `agent-provider` is an EXTERNAL agent that owns its own
-   * loop (issue #813); `model_factory` is never called — the runtime branches
-   * on this kind and streams from the agent-provider consumer instead.
+   * `byok`/`grida`/`endpoint` are MODEL providers (the host owns the
+   * loop, calls `model_factory`). `grida` is the hosted "included"
+   * provider (GRIDA-SEC-006) — credential is the pushed session token,
+   * not a stored key. `agent-provider` is an EXTERNAL agent that owns
+   * its own loop (issue #813); `model_factory` is never called — the
+   * runtime branches on this kind and streams from the agent-provider
+   * consumer instead.
    */
-  kind: "byok" | "endpoint" | "agent-provider";
+  kind: "byok" | "gg" | "endpoint" | "agent-provider";
   model_factory: ModelFactory;
 };
 
@@ -101,6 +109,15 @@ export type ResolveDeps = {
   /** Endpoint provider configs. Optional so key-only hosts/tests need not
    *  wire a store; absent ⇒ no endpoint providers resolve. */
   endpoints?: EndpointProvidersStore;
+  /**
+   * Grida Cloud session (GRIDA-SEC-006). Optional like `endpoints`;
+   * absent — or holding no live token — ⇒ the grida provider never
+   * resolves. Resolves only when `gg_base_url` is ALSO configured.
+   */
+  gg?: GridaGatewaySessionStore;
+  /** Origin the grida provider calls (e.g. `https://grida.co`). Host-
+   *  injected; absent ⇒ the grida provider is disabled. */
+  gg_base_url?: string;
 };
 
 export type ResolveOptions = {
@@ -129,6 +146,13 @@ export async function resolveProvider(
     }
   }
 
+  // Grida hosted (GRIDA-SEC-006) — after BYOK (existing BYOK users keep
+  // exact behavior; explicit choice always wins), before endpoints
+  // (fresh signed-in users get included AI without configuring
+  // anything). Resolves only with a LIVE session token.
+  const gridaResolved = maybeResolveGg(deps);
+  if (gridaResolved) return gridaResolved;
+
   if (deps.endpoints) {
     for (const endpoint of await deps.endpoints.list()) {
       const resolved = await maybeResolveEndpoint(endpoint, deps);
@@ -143,6 +167,14 @@ async function resolveExplicit(
   providerId: string,
   deps: ResolveDeps
 ): Promise<ResolvedProvider> {
+  if (isGgProviderId(providerId)) {
+    // Without a live token the pick surfaces as the existing 409
+    // `provider_down` with `provider_id: "gg"` — the renderer maps
+    // that to "Sign in to use included AI".
+    const resolved = maybeResolveGg(deps);
+    if (!resolved) throw new ProviderUnavailableError(providerId);
+    return resolved;
+  }
   if (isByokProviderId(providerId)) {
     const key = await deps.secrets._getKey(providerId);
     if (!key) throw new ProviderUnavailableError(providerId);
@@ -152,6 +184,22 @@ async function resolveExplicit(
   const resolved = endpoint && (await maybeResolveEndpoint(endpoint, deps));
   if (!resolved) throw new ProviderUnavailableError(providerId);
   return resolved;
+}
+
+/**
+ * Grida hosted resolves only when the host configured a base URL AND
+ * the renderer has pushed a live (unexpired) session token. The token
+ * is re-read per request inside the factory's fetch — this check only
+ * gates resolution.
+ */
+function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
+  const hosted = liveGgMediaDeps(deps);
+  if (!hosted) return null;
+  return {
+    provider_id: GG_PROVIDER_ID,
+    kind: "gg",
+    model_factory: makeGridaGatewayFactory(hosted.session, hosted.base_url),
+  };
 }
 
 function makeResolvedByok(

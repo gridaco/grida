@@ -587,14 +587,24 @@ PTYs per window, and (d) kills every PTY on window close and app quit.
 A contract test (`desktop/src/main/terminal-host.test.ts`) fails if a
 terminal channel is ever registered outside `guarded()`.
 
-**Hosted auth (sign-in only).** The desktop signs the webview into a
+**Hosted auth + hosted AI.** The desktop signs the webview into a
 first-class Supabase cookie session via the system browser + PKCE +
 `grida://auth/callback` deep link — that flow is its own boundary,
-`GRIDA-SEC-005` below. Within THIS boundary the invariant is unchanged:
-the Electron main process and the AgentHost sidecar hold no cloud
-credentials, and there is still no entitlement polling and no
-hosted-model routing. Future hosted-provider work (sidecar-held tokens,
-metered AI) must re-register its files in this record before code lands.
+`GRIDA-SEC-005` below. The hosted "included" AI provider — **Grida
+Gateway (GG)**, the `gg` provider, GRIDA-SEC-006 — amends the old
+"sidecar holds no cloud credentials" invariant to its precise form:
+**the sidecar may hold ONLY the purpose-scoped, short-lived AI token**
+(memory-only, pushed by the renderer over `/auth/gg/set`, never
+`auth.json`, never a refresh token) — the durable session stays in the
+webview cookie jar. Files registered under this record for that work
+(all marked `GRIDA-GG`):
+`packages/grida-ai-agent/src/providers/{gg-session,gg,gg-media}.ts`,
+`src/http/routes/gg-auth.ts`, the `gg` arms in
+`src/providers/{index,resolve-image,resolve-video}.ts`, and the
+`gg_host` egress option in `src/sandbox/policy.ts` (the daemon
+may reach the configured editor origin — and nothing else new). The
+main process still holds no cloud credentials, and entitlement
+enforcement stays server-side (the hosted endpoints gate + meter).
 
 **Update channel.** Release builds must be signed/notarized by platform
 policy. Security-sensitive runtime deps are reviewed as part of the
@@ -810,9 +820,11 @@ paths, and params are public, so the design must not rely on obscurity.
    ([supabase/config.toml](supabase/config.toml) locally; the hosted
    project's dashboard in production).
 
-The Electron main process and the sidecar remain credential-free: the
-session lives in the webview's cookie jar and is refreshed by the same
-`@supabase/ssr` middleware machinery as the web app. The `/desktop/*`
+The Electron main process remains credential-free, and the sidecar
+holds at most the purpose-scoped, short-lived hosted-AI token
+(GRIDA-SEC-006 — memory-only, renderer-pushed, never a refresh token):
+the durable session lives in the webview's cookie jar and is refreshed
+by the same `@supabase/ssr` middleware machinery as the web app. The `/desktop/*`
 CSP keeps `connect-src` closed, so session reads go through the
 same-origin `/desktop/auth/me` route rather than direct supabase-js
 calls.
@@ -834,17 +846,124 @@ Today:
 process. A PKCE verifier carried on the deep link, the bridge, or argv.
 A router that navigates to a path taken from deep-link input, or that
 forwards params beyond `code`/`error*`. A desktop webview navigation to
-`(auth)` routes or the web `/sign-out`. Sidecar- or main-held session
-tokens — that is future hosted-provider work and must be registered
-here first. The launch page in a route group that loads Google/Vercel
+`(auth)` routes or the web `/sign-out`. Sidecar- or main-held SESSION
+tokens (the scoped hosted-AI token is the one sanctioned exception,
+registered under GRIDA-SEC-006 and the GRIDA-SEC-004 hosted-AI
+paragraph). The launch page in a route group that loads Google/Vercel
 analytics (or any URL-reporting script) — the challenge in its URL is
 confidentiality-sensitive, so it stays in `(untracked)`.
 
 ---
 
+### `GRIDA-SEC-006` — Hosted-AI scoped-token boundary
+
+> **Surface.** This is the **security half of Grida Gateway (GG)** — the
+> `token` surface. Every file here carries **both** `GRIDA-SEC-006` and
+> `GRIDA-GG: token`; touching it runs the [`security`](.agents/skills/security/SKILL.md)
+> review first, then the [`gg`](.agents/skills/gg/SKILL.md) surface skill.
+> The gateway endpoints, the `gg` client provider, and the desktop token
+> wiring are the other GG surfaces (`GRIDA-GG: gateway|provider|desktop`),
+> governed by the same skill. Domain spec:
+> [Hosted AI](https://grida.co/docs/wg/platform/hosted-ai).
+
+**What it protects.** The desktop app's hosted ("no-BYOK") AI calls are
+authenticated by a **purpose-scoped, short-lived, org-bound JWT** — and
+by nothing else. The `/api/v1/ai/*` endpoints never accept a Supabase
+access token, a cookie session, or an API key; the mint route
+(`/desktop/auth/token`) is the only place the token is created, and it
+requires a live cookie session with verified org membership. The
+boundary is the rule that **the credential a native process holds for
+AI must be worth at most 15 minutes of AI calls billed to an org the
+user was a member of — and nothing more.**
+
+**Vulnerable scenario (prevented).** A desktop process credential leaks
+— a log line, a crash dump, a local proxy, an exfiltrated memory
+snapshot. If that credential were the user's Supabase access token, the
+attacker gets the user's whole API surface: RLS-scoped database reads,
+storage, profile — the account, for up to an hour, renewable if the
+refresh token ever traveled with it. With the scoped token the blast
+radius is: AI calls, on one org's credit, for ≤15 minutes, and the
+token is structurally useless everywhere else (audience check) —
+Supabase never even sees it.
+
+**Why it's specifically risky here.** The sidecar is a long-lived local
+daemon that makes third-party network calls with credentials in memory;
+it is exactly the process class where credentials leak. And the desktop
+webview session (GRIDA-SEC-005) is a full first-class login — handing
+_that_ to the daemon would collapse two carefully separated trust
+levels into one.
+
+**How the code prevents it.**
+
+1. **Mint only from a live cookie session, same-origin** —
+   [editor/app/desktop/auth/token/route.ts](editor/app/desktop/auth/token/route.ts)
+   requires `auth.getUser()` and resolves the org through the
+   GRIDA-SEC-003 verified resolver (session fallback, or explicit
+   `org_id` through `requireOrganizationId` → `assertOrgMember`). The
+   route accepts no org header — no new org-id trust input. CSRF is
+   bounded by SameSite=Lax auth cookies + same-origin-only readability
+   (no CORS on `/desktop/*`).
+2. **Scope is cryptographic, not conventional** —
+   [editor/lib/auth/gg-token.ts](editor/lib/auth/gg-token.ts) signs
+   HS256 with a dedicated server-only secret (`GG_TOKEN_SECRET`),
+   pins `algorithms: ["HS256"]` (no alg-swap) and `aud: "gg:ai"`.
+   A Supabase token fails verification structurally (different keys),
+   and this token fails everywhere Supabase tokens are accepted.
+3. **15-minute expiry, 60s clock tolerance** — the token is the unit of
+   revocation; abandoning a leaked token requires no server state.
+4. **Fail-closed secret handling** — unset or <32-byte secret →
+   `not_configured` → 503. There is no fallback path to a weaker
+   credential. Rotation via `GG_TOKEN_SECRET_PREVIOUS`
+   (verify-only; signing always uses current; drop previous after
+   > 15 min).
+5. **Verification is local and exclusive** — every `/api/v1/ai/*`
+   handler authenticates via `verifyGgToken` only; none construct a
+   Supabase client from the bearer value (`createClientFromBearer` is
+   the _other_ pattern, for first-party Supabase tokens on
+   `/private/*` routes — grep-able invariant).
+6. **Custody doctrine (client half)** — the daemon holds the token in
+   memory only: never `auth.json`, never disk, never a refresh token.
+   The webview session remains the only durable credential
+   (GRIDA-SEC-005); the renderer re-mints and re-pushes. The sidecar
+   files implementing this register here when they land.
+7. **Mint rate limit** — `rl:v1-ai:mint` per-user sliding window
+   (fail-open when Upstash is unconfigured; the billing gate on the AI
+   endpoints is the actual spend control).
+
+**Residual risks (accepted, documented).** Org-membership revocation is
+not re-checked within a token's ≤15-minute lifetime. The mint rate
+limit fails open without Upstash. In-flight AI requests at sign-out
+complete on their token rather than being aborted — expiry is the
+revocation mechanism.
+
+**Files bound by this id.** Run `grep -rn GRIDA-SEC-006 .` to enumerate.
+Today:
+
+Every file below also carries the `GRIDA-GG` surface marker (`token` /
+`gateway` / `provider`); the [`gg`](.agents/skills/gg/SKILL.md) skill
+governs the surface, this record governs its security half.
+
+- [editor/lib/auth/gg-token.ts](editor/lib/auth/gg-token.ts) — sign/verify + secret handling (`GG_TOKEN_SECRET`; pinned by `gg-token.test.ts`).
+- [editor/app/desktop/auth/token/route.ts](editor/app/desktop/auth/token/route.ts) — the mint route (pinned by its `route.test.ts`).
+- `editor/app/(api)/(public)/api/v1/ai/**` — the hosted GG endpoints: OpenAI-compat chat/completions + models, Grida-native images/videos generations. Verify with `verifyGgToken` EXCLUSIVELY; billed through the seam (pinned by contract tests driving the real `@ai-sdk/openai-compatible` client).
+- [editor/lib/ai/openai-compat/](editor/lib/ai/openai-compat/codec.ts) — the wire codec + error envelope + allowlist + rate limits.
+- [packages/grida-ai-agent/src/providers/gg-session.ts](packages/grida-ai-agent/src/providers/gg-session.ts) — the daemon's in-memory custody (30s expiry slack; `status()` never returns the token; pinned by its test).
+- [packages/grida-ai-agent/src/http/routes/gg-auth.ts](packages/grida-ai-agent/src/http/routes/gg-auth.ts) — `/auth/gg/set|clear|status` behind the daemon perimeter; token never logged (pinned by its test).
+- [packages/grida-ai-agent/src/providers/gg.ts](packages/grida-ai-agent/src/providers/gg.ts) + [gg-media.ts](packages/grida-ai-agent/src/providers/gg-media.ts) — hosted text/image/video adapters: per-request token reads, editor-origin-only egress, code-led typed errors (401→`gg_token_expired`, 402→`insufficient_credits`), no upstream body text in thrown messages.
+- The `gg` resolver arms ([providers/index.ts](packages/grida-ai-agent/src/providers/index.ts), resolve-image, resolve-video) — precedence: explicit wins; implicit BYOK → `gg` → endpoints. The `/secrets/*` allowlist keeps REJECTING the `gg` id (no key may be stored under it; pinned by `gg-auth.test.ts`).
+- [packages/grida-ai-agent/src/sandbox/policy.ts](packages/grida-ai-agent/src/sandbox/policy.ts) — `gg_host` egress option (the ONLY new host a hosted-AI daemon may reach).
+
+**What does NOT belong here.** An AI endpoint that accepts Supabase
+access tokens or cookies. A mint path without a live session or without
+membership verification. The token (or a refresh token) persisted by
+the daemon, main process, or `auth.json`. A signing fallback when the
+secret is unset. A second minting location.
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-006` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-007` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — accept the `gg` provider id at the run gate (docs/wg/platform/hosted-ai.md)
 /**
  * Agent run request boundary.
  *
@@ -26,6 +27,7 @@ import {
   isKnownProviderId,
   type EndpointProvidersStore,
 } from "../providers/endpoints";
+import { isGgProviderId } from "../protocol/provider-ids";
 // Neutral (no node/SDK) import — just the synthetic-model-id contract.
 import { isAgentProviderModel } from "../agent-provider/types";
 
@@ -125,9 +127,15 @@ export async function parseRunBody(
   let explicit: string | undefined;
   if (b.provider_id !== undefined) {
     const providerId = typeof b.provider_id === "string" ? b.provider_id : "";
+    // `grida` is accepted HERE (a run may pick the hosted provider) but
+    // deliberately NOT in `isKnownProviderId` — that gate also guards
+    // the `/secrets/*` allowlist, and nobody may store a key under
+    // `grida` (GRIDA-SEC-006: its credential is the pushed session
+    // token, never a secret slot).
     const allowed =
       providerId.length > 0 &&
-      (await isKnownProviderId(providerId, deps.endpoints));
+      (isGgProviderId(providerId) ||
+        (await isKnownProviderId(providerId, deps.endpoints)));
     if (!allowed) {
       return Response.json(
         { error: `providerId not allowed: ${String(b.provider_id)}` },

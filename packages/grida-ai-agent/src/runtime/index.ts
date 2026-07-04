@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — thread the `gg` session deps into resolution (docs/wg/platform/hosted-ai.md)
 /**
  * AgentRuntime — the agent loop + the in-flight stream registry behind
  * one object. `AgentHost` owns an instance; the HTTP layer
@@ -923,6 +924,9 @@ export class AgentRuntime {
       // they let `createWorkspaceAgentBindings` build the `generate_image`
       // binding (the produced bytes sink to scratch).
       secrets: this.deps.secrets,
+      // GRIDA-SEC-006 — hosted-session deps for the generate_image gate.
+      gg: this.deps.gg,
+      gg_base_url: this.deps.gg_base_url,
       image_gen_enabled: this.deps.image_gen_enabled === true,
       image_model_id: this.deps.image_model_id,
       // Host-level: gates the `question` tool's execute-or-pause in createAgent.

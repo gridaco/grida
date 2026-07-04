@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — construct + wire the GG session store and routes (docs/wg/platform/hosted-ai.md)
 /**
  * `@grida/agent/server` — the agent TENANT of `@grida/daemon` (#927).
  *
@@ -28,7 +29,9 @@ import { registerImagesRoutes } from "./http/routes/images";
 import { registerVideoRoutes } from "./http/routes/video";
 import { registerAgentRoutes } from "./http/routes/agent";
 import { registerSessionsRoutes } from "./http/routes/sessions";
+import { registerGridaAuthRoutes } from "./http/routes/gg-auth";
 import { EndpointProvidersStore } from "./providers/endpoints";
+import { GridaGatewaySessionStore } from "./providers/gg-session";
 import { openSessionsDb } from "./session/db";
 import { SessionsStore } from "./session/store";
 import { AgentRuntime } from "./runtime";
@@ -125,6 +128,15 @@ export type AgentTenantOptions = {
    * `design_search` tool (client-resolved). The desktop sidecar sets this true.
    */
   library?: boolean;
+  /**
+   * GRIDA-SEC-006 — origin of the Grida hosted-AI endpoints (e.g.
+   * `https://grida.co`; the desktop supervisor passes its
+   * EDITOR_BASE_URL). Enables the `grida` "included" provider: the
+   * `/auth/gg/*` session routes mount, and the resolver may pick the
+   * hosted provider when the renderer has pushed a live token. Omit ⇒
+   * the provider is fully dormant (no routes, never resolves).
+   */
+  gg_base_url?: string;
 };
 
 /**
@@ -158,6 +170,17 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       const endpointsStore = new EndpointProvidersStore(
         services.user_data_path
       );
+      // Grida Cloud session (GRIDA-SEC-006): in-memory only, per launch.
+      // The whole hosted-provider surface keys off the host passing a
+      // base URL — without it, no routes, no resolution, fully dormant.
+      const gridaGatewayBaseUrl =
+        typeof opts.gg_base_url === "string" && opts.gg_base_url.length > 0
+          ? opts.gg_base_url
+          : undefined;
+      const gridaSession = new GridaGatewaySessionStore();
+      if (gridaGatewayBaseUrl) {
+        registerGridaAuthRoutes(app, { store: gridaSession });
+      }
       // Chat sessions: SQLite at ${userData}/sessions.db — agent-tenant
       // domain data (#927). Opened once per launch and closed via the
       // returned cleanup. WAL mode in sessions/db.ts lets a CLI inspector
@@ -184,10 +207,18 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         });
       }
       if (caps.images) {
-        registerImagesRoutes(app, { secrets: services.secrets });
+        registerImagesRoutes(app, {
+          secrets: services.secrets,
+          gg: gridaSession,
+          gg_base_url: gridaGatewayBaseUrl,
+        });
       }
       if (caps.video) {
-        registerVideoRoutes(app, { secrets: services.secrets });
+        registerVideoRoutes(app, {
+          secrets: services.secrets,
+          gg: gridaSession,
+          gg_base_url: gridaGatewayBaseUrl,
+        });
       }
       // GRIDA-SEC-004 — the single fail-closed shell decision. Shell execution
       // is off unless the host confirmed an OS sandbox confines the tree, or it
@@ -218,6 +249,10 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       const runtime = new AgentRuntime({
         secrets: services.secrets,
         endpoints: endpointsStore,
+        // GRIDA-SEC-006 — hosted provider deps; dormant when the base
+        // URL is absent (resolver never picks grida).
+        gg: gridaSession,
+        gg_base_url: gridaGatewayBaseUrl,
         workspace_registry: services.workspaces,
         sessions_store: sessionsStore,
         streams,
@@ -245,7 +280,9 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         registerSessionsRoutes(app, { store: sessionsStore, runtime });
 
       return {
-        capabilities: caps,
+        // `gg` reflects the feature actually being ON (base URL
+        // present) — clients feature-detect the hosted provider by it.
+        capabilities: { ...caps, gg: gridaGatewayBaseUrl !== undefined },
         // Abort in-flight runs (upstream model calls) BEFORE cleanup so a
         // recorder reacting to the abort can finalize its partial assistant
         // message against an open SQLite handle.
@@ -315,6 +352,9 @@ export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
         allow_unsandboxed_shell: opts.allow_unsandboxed_shell,
         interactive: opts.interactive,
         library: opts.library,
+        // GRIDA-SEC-006 — pinned by the composed-daemon e2e: forgetting
+        // this line silently ships the hosted provider dormant.
+        gg_base_url: opts.gg_base_url,
       }),
     ],
   });

@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — the `gg` hosted provider id + metadata (docs/wg/platform/hosted-ai.md)
 /**
  * BYOK provider identity + neutral metadata.
  *
@@ -55,9 +56,32 @@ export function byokProvidersFor(
 }
 
 /**
- * A provider id anywhere on the wire (run options, session rows, secrets):
- * a BYOK id or a configured endpoint id (issue #806). `string & {}` keeps
- * literal completion for the BYOK ids while admitting endpoint ids, which
- * are user-chosen slugs validated at the boundary.
+ * The Grida hosted ("included") provider — GRIDA-SEC-006. Deliberately
+ * NOT in {@link BYOK_PROVIDER_METADATA}: that list is honestly
+ * BYOK-labeled and drives the secrets UI + `/secrets/*` allowlist, and
+ * grida has no user key — its credential is the short-lived session
+ * token the renderer pushes (`/auth/gg/set`). The run-input gate
+ * accepts this id; the secrets routes must keep REJECTING it.
  */
-export type ProviderId = ByokProviderId | (string & {});
+export const GG_PROVIDER_ID = "gg" as const;
+
+export const GG_PROVIDER_METADATA = {
+  id: GG_PROVIDER_ID,
+  label: "Grida",
+  /** Picker affordance copy — one source of truth for the UI. */
+  included_label: "Grida — included",
+  modalities: ["text", "image", "video"],
+} as const;
+
+export function isGgProviderId(id: string): id is typeof GG_PROVIDER_ID {
+  return id === GG_PROVIDER_ID;
+}
+
+/**
+ * A provider id anywhere on the wire (run options, session rows, secrets):
+ * a BYOK id, the grida hosted id, or a configured endpoint id (issue
+ * #806). `string & {}` keeps literal completion for the known ids while
+ * admitting endpoint ids, which are user-chosen slugs validated at the
+ * boundary.
+ */
+export type ProviderId = ByokProviderId | typeof GG_PROVIDER_ID | (string & {});

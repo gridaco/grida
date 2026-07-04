@@ -39,6 +39,11 @@ const ALLOWLIST = [
   "lib/ai/models.ts",
   "grida-canvas-hosted/ai/agent/server-agent.ts",
   "app/(api)/private/ai/models/openai/route.ts",
+  // Contract tests for the hosted OpenAI-compat endpoint (GRIDA-SEC-006):
+  // value-import `@ai-sdk/openai-compatible` as the wire-contract driver
+  // (the desktop sidecar's actual client), not for billed calls.
+  "app/(api)/(public)/api/v1/ai/chat/completions/route.test.ts",
+  "app/(api)/(public)/api/v1/ai/chat/completions/route.byok.test.ts",
 ];
 
 /**

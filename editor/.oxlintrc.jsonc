@@ -120,6 +120,13 @@
         // Metadata endpoint — lists OpenAI's available models for the
         // model selector UI. Not a billed inference call.
         "app/(api)/private/ai/models/openai/route.ts",
+        // Contract tests for the hosted OpenAI-compat endpoint
+        // (GRIDA-SEC-006): they value-import `@ai-sdk/openai-compatible`
+        // as the WIRE-CONTRACT DRIVER (the desktop sidecar's actual
+        // client), not to make billed calls. Mirrored in
+        // editor/scripts/audit-ai-seam.ts ALLOWLIST.
+        "app/(api)/(public)/api/v1/ai/chat/completions/route.test.ts",
+        "app/(api)/(public)/api/v1/ai/chat/completions/route.byok.test.ts",
       ],
       "rules": {
         "no-restricted-imports": "off",

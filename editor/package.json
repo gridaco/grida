@@ -18,6 +18,7 @@
   "dependencies": {
     "@ai-sdk/openai": "3.0.0",
     "@ai-sdk/openai-compatible": "2.0.48",
+    "@ai-sdk/provider": "3.0.10",
     "@ai-sdk/react": "3.0.199",
     "@ai-sdk/replicate": "2.0.0",
     "@ai-sdk/rsc": "2.0.1",

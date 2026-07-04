@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — the `gg` hosted video arm (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — `/video/generate` route (BYOK video generation, #908).
  *
@@ -31,16 +32,20 @@ import {
   resolveVideoModel,
 } from "../../providers/resolve-video";
 import { assertHttpsUrl } from "../../providers/fetch-helpers";
+import { hostedGenerationError } from "./gg-media-errors";
 import { body, v } from "@grida/daemon/server";
 
-const VIDEO_PROVIDERS = ["vercel", "fal", "openrouter"] as const;
+const VIDEO_PROVIDERS = ["vercel", "fal", "openrouter", "gg"] as const;
 
 export type VideoRoutesDeps = {
   secrets: SecretsStore;
+  /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
+  gg?: import("../../providers/gg-session").GridaGatewaySessionStore;
+  gg_base_url?: string;
 };
 
 export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
-  const { secrets } = deps;
+  const { secrets, gg, gg_base_url } = deps;
 
   app.post("/video/generate", async (c) => {
     const r = await body(c, {
@@ -64,9 +69,14 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     let resolved;
     try {
       resolved = await resolveVideoModel(
-        { secrets },
+        { secrets, gg, gg_base_url },
         d.model_id,
-        d.provider ? { explicit: d.provider } : {}
+        // `image` skips the t2v-only hosted `gg` arm for i2v requests so the
+        // start frame isn't silently dropped — falls back to a BYOK route.
+        {
+          ...(d.provider ? { explicit: d.provider } : {}),
+          image: !!d.image_url,
+        }
       );
     } catch (e) {
       if (e instanceof VideoModelUnavailableError) {
@@ -95,24 +105,13 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     try {
       generation = await resolved.model.doGenerate(callOptions);
     } catch (e) {
-      // Detail (which can include upstream body text — fal adapters embed
-      // safeText(res) in their thrown messages) stays in the sidecar log only;
-      // the renderer gets a generic message.
-      const detail = e instanceof Error ? e.message : String(e);
-      const upstream = (e as { responseBody?: unknown })?.responseBody;
-      console.error(
-        `[agent-host-video] failed provider=${resolved.provider_id} model=${d.model_id}: ${detail}${
-          upstream ? ` — ${String(upstream).slice(0, 300)}` : ""
-        }`
-      );
-      return c.json(
-        {
-          error: "video generation failed",
-          model_id: d.model_id,
-          provider_id: resolved.provider_id,
-        },
-        502
-      );
+      return hostedGenerationError(c, {
+        error: e,
+        scope: "agent-host-video",
+        label: "video generation failed",
+        model_id: d.model_id,
+        provider_id: resolved.provider_id,
+      });
     }
 
     // Normalize every result to base64 bytes. Providers return large clips as

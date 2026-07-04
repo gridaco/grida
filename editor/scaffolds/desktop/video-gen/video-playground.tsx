@@ -1,4 +1,7 @@
 "use client";
+// GRIDA-GG: desktop — ensure a fresh GG token before generate (docs/wg/platform/hosted-ai.md)
+
+import * as gridaGateway from "@/lib/desktop/gg-session";
 
 import { useState } from "react";
 import { Check, Download, Sparkles, SlidersHorizontal, X } from "lucide-react";
@@ -148,6 +151,10 @@ export function DesktopVideoPlayground({
   };
 
   const runGenerate = async (rawPrompt: string) => {
+    // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh so a
+    // signed-in keyless user generates through the included provider.
+    // Never throws; BYOK runs are unaffected when it degrades.
+    await gridaGateway.ensureFresh();
     const prompt = rawPrompt.trim();
     if (!prompt) return;
     const id = crypto.randomUUID();

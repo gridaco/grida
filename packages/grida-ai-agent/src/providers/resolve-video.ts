@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — the `gg` video-provider arm (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — video-model provider resolver. The video counterpart of
  * {@link ./resolve-image.ts}.
@@ -16,8 +17,10 @@
 import { models } from "@grida/ai-models";
 import type { Experimental_VideoModelV3 as VideoModelV3 } from "@ai-sdk/provider";
 import type { SecretsStore } from "@grida/daemon/server";
-import { byokProvidersFor } from "../protocol/provider-ids";
+import { byokProvidersFor, GG_PROVIDER_ID } from "../protocol/provider-ids";
 import { makeVideoModelFor } from "./video-byok";
+import { GridaGatewayVideoModel } from "./gg-media";
+import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 
 type VideoProvider = models.video.VideoProvider;
 
@@ -32,7 +35,8 @@ function isVideoProvider(id: string): id is VideoProvider {
 }
 
 export type ResolvedVideoModel = {
-  provider_id: VideoProvider;
+  /** A BYOK video provider, or the hosted `grida` provider (GRIDA-SEC-006). */
+  provider_id: VideoProvider | typeof GG_PROVIDER_ID;
   model_id: string;
   binding_id: string;
   model: VideoModelV3;
@@ -55,11 +59,41 @@ export class VideoModelUnavailableError extends Error {
 
 export type ResolveVideoDeps = {
   secrets: SecretsStore;
+  /** Grida Cloud session (GRIDA-SEC-006) — optional; absent or token-less
+   *  ⇒ the hosted provider never resolves. */
+  gg?: GridaGatewaySessionStore;
+  /** Origin of the hosted endpoints; absent ⇒ hosted provider disabled. */
+  gg_base_url?: string;
 };
 
 export type ResolveVideoOptions = {
-  explicit?: VideoProvider;
+  explicit?: VideoProvider | typeof GG_PROVIDER_ID;
+  /**
+   * Image-to-video: the request carries a start frame. The hosted `gg`
+   * provider is text-to-video only and would drop the frame, so it is
+   * skipped (implicit) or rejected (explicit) here — the request falls back
+   * to a BYOK route that can honor the image instead of silently becoming
+   * text-to-video. Mirrors the image resolver's `references` guard.
+   */
+  image?: boolean;
 };
+
+/**
+ * Build the resolved hosted video model — shared by the explicit-pick and
+ * post-BYOK fallback arms, which produce the identical descriptor.
+ */
+function resolvedGgVideo(
+  modelId: string,
+  card: models.video.VideoModelCard,
+  hosted: { session: GridaGatewaySessionStore; base_url: string }
+): ResolvedVideoModel {
+  return {
+    provider_id: GG_PROVIDER_ID,
+    model_id: modelId,
+    binding_id: card.id,
+    model: new GridaGatewayVideoModel(hosted.session, hosted.base_url, card.id),
+  };
+}
 
 export async function resolveVideoModel(
   deps: ResolveVideoDeps,
@@ -71,8 +105,19 @@ export async function resolveVideoModel(
     throw new VideoModelUnavailableError(modelId, options.explicit);
   }
 
+  // Explicit hosted pick (GRIDA-SEC-006). Hosted video is
+  // text-to-video only in v1 — the route rejects image_url server-side.
+  if (options.explicit === GG_PROVIDER_ID) {
+    // t2v only — an image-to-video pick can't ride the hosted provider.
+    const hosted = !options.image && liveGgMediaDeps(deps);
+    if (!hosted || !models.video.binding(card, "vercel")) {
+      throw new VideoModelUnavailableError(modelId, GG_PROVIDER_ID);
+    }
+    return resolvedGgVideo(modelId, card, hosted);
+  }
+
   const order: VideoProvider[] = options.explicit
-    ? [options.explicit]
+    ? [options.explicit as VideoProvider]
     : byokProvidersFor("video")
         .map((p) => p.id)
         .filter(isVideoProvider);
@@ -88,6 +133,15 @@ export async function resolveVideoModel(
       binding_id: binding.id,
       model: makeVideoModelFor(provider, key.trim(), binding.id),
     };
+  }
+
+  // Grida hosted (GRIDA-SEC-006) — after BYOK, before giving up. Serves
+  // cards the hosted gateway can (a vercel binding).
+  if (!options.explicit && !options.image) {
+    const hosted = liveGgMediaDeps(deps);
+    if (hosted && models.video.binding(card, "vercel")) {
+      return resolvedGgVideo(modelId, card, hosted);
+    }
   }
 
   throw new VideoModelUnavailableError(modelId, options.explicit);

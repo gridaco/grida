@@ -1,4 +1,5 @@
 "use client";
+// GRIDA-GG: desktop — GG sign-out + BYOK precedence copy (docs/wg/platform/hosted-ai.md)
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
@@ -35,6 +36,8 @@ import {
   DesktopPageContent,
   DesktopPageShell,
 } from "@/scaffolds/desktop/chrome/page-shell";
+import * as gridaGateway from "@/lib/desktop/gg-session";
+import { CreditsSection } from "./_components/credits-section";
 
 /**
  * Desktop settings — BYOK key slots, version/platform.
@@ -58,11 +61,12 @@ export default function DesktopSettingsPage() {
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Account, AI provider keys, local models, and app info.
+            Account, credits, AI provider keys, local models, and app info.
           </p>
         </header>
 
         <AccountSection />
+        <CreditsSection />
         <ByokSection />
         <ImageModelsSection />
         <VideoModelsSection />
@@ -118,6 +122,9 @@ function AccountSection() {
   const signOut = async () => {
     setState({ kind: "signing-out" });
     try {
+      // GRIDA-SEC-006 — drop the sidecar's hosted-AI session first
+      // (best-effort; the token's 15-min expiry is the backstop).
+      await gridaGateway.clear();
       await fetch("/desktop/auth/sign-out", { method: "POST" });
     } finally {
       window.location.assign("/desktop/auth/sign-in");
@@ -177,7 +184,8 @@ function ByokSection() {
       <CardHeader>
         <CardTitle>AI Provider Keys</CardTitle>
         <CardDescription>
-          V1 agent runs require a BYOK key. Provider precedence: {precedence}.
+          Optional — when you&apos;re signed in, Grida-included AI is available
+          without a key. Keys you add here take precedence: {precedence}.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">

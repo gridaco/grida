@@ -1,3 +1,4 @@
+// GRIDA-GG: gateway — the generateVideo seam method the GG video route bills through (docs/wg/platform/hosted-ai.md)
 import "server-only";
 
 /**
@@ -35,7 +36,9 @@ import type {
   ImageModelMiddleware,
   ImageModel,
 } from "ai";
-import { embed, wrapProvider } from "ai";
+import { embed, experimental_generateVideo, wrapProvider } from "ai";
+import { models as ai_models } from "@grida/ai-models";
+import type { VideoGenerateRequest, VideoGenerateResult } from "@grida/agent";
 import Replicate from "replicate";
 import OpenAI from "openai";
 import { createLibraryClient } from "@/lib/supabase/server";
@@ -134,6 +137,21 @@ export class MissingOrgIdError extends Error {
   constructor(msg = "AI seam called without a verified organizationId.") {
     super(msg);
     this.name = "MissingOrgIdError";
+  }
+}
+
+/**
+ * Caller-shape failure from a seam method (unknown model, unsupported
+ * resolution, out-of-bounds duration, …). Routes map `code
+ * "invalid_request"` to a 400 — the message is safe for clients (it
+ * describes the request, never internals).
+ */
+export class InvalidAiRequestError extends Error {
+  readonly code = "invalid_request";
+  readonly status = 400;
+  constructor(msg: string) {
+    super(msg);
+    this.name = "InvalidAiRequestError";
   }
 }
 
@@ -746,7 +764,129 @@ export namespace methods {
     if (!card) return null;
     return { model: grida.imageModel(card.id), card };
   }
+
+  /**
+   * Hosted video generation — gate → `experimental_generateVideo` via
+   * the RAW gateway → ingest. Explicit `withTransaction` because
+   * `wrapProvider` has no video middleware (unlike text/image).
+   *
+   * Billing is **pre-priced by requested duration** against the vercel
+   * binding's `(resolution-label, audio-mode)` per-second rate — the
+   * same pre-computed-cost pattern as every Replicate/image call.
+   * Actual output duration may differ slightly (bounded by the card's
+   * max); documented approximation, reconcilable later. The pricing
+   * keys double as the provider's support matrix: an unpriced
+   * `(label, mode)` pair is an invalid request, not a $0 call.
+   */
+  export async function generateVideo(
+    organizationId: number,
+    req: VideoGenerateRequest
+  ): Promise<VideoGenerateResult> {
+    const card = ai_models.video.models[req.model_id];
+    if (!card || !card.listed) {
+      throw new InvalidAiRequestError(`unknown video model "${req.model_id}"`);
+    }
+    const binding = ai_models.video.binding(card, "vercel");
+    if (!binding) {
+      throw new InvalidAiRequestError(
+        `model "${card.id}" is not available on the hosted provider`
+      );
+    }
+
+    const aspect_ratio = req.aspect_ratio ?? card.default.aspect_ratio;
+    if (!(card.aspect_ratios as readonly string[]).includes(aspect_ratio)) {
+      throw new InvalidAiRequestError(
+        `unsupported aspect_ratio "${aspect_ratio}" (supported: ${card.aspect_ratios.join(", ")})`
+      );
+    }
+
+    const duration = req.duration ?? card.default.duration;
+    if (
+      !Number.isFinite(duration) ||
+      duration < card.min_duration ||
+      duration > card.max_duration
+    ) {
+      throw new InvalidAiRequestError(
+        `duration must be within [${card.min_duration}, ${card.max_duration}] seconds`
+      );
+    }
+
+    // Wire resolution is "{width}x{height}"; pricing is keyed by label.
+    // The short edge is the "p" line (1280x720 → 720p in either
+    // orientation). No resolution ⇒ provider default, priced at the
+    // card's default label.
+    let resolutionLabel = card.default.resolution;
+    if (req.resolution) {
+      const match = /^(\d+)x(\d+)$/.exec(req.resolution);
+      if (!match) {
+        throw new InvalidAiRequestError(
+          `resolution must be "{width}x{height}", got "${req.resolution}"`
+        );
+      }
+      const shortEdge = Math.min(Number(match[1]), Number(match[2]));
+      const label = VIDEO_RESOLUTION_LABEL_BY_SHORT_EDGE[shortEdge];
+      if (!label) {
+        throw new InvalidAiRequestError(
+          `unsupported resolution "${req.resolution}"`
+        );
+      }
+      resolutionLabel = label;
+    }
+
+    // The wire has no audio-mode field (protocol gap, accepted v1) —
+    // bill the card's default mode.
+    const audioMode = card.default.audio ? "audio" : "silent";
+    const rate = binding.pricing.usd_per_second[resolutionLabel]?.[audioMode];
+    if (rate === undefined) {
+      throw new InvalidAiRequestError(
+        `resolution "${resolutionLabel}" (${audioMode}) is not served for "${card.id}"`
+      );
+    }
+    const costMills = ai.toMills(rate * duration);
+
+    // Text-to-video only in v1 — the SDK's image input takes raw bytes
+    // (`DataContent`), and fetching a caller-supplied URL server-side
+    // would be SSRF surface. Mirrors the hosted image t2i-only
+    // decision; the sidecar resolver routes image-to-video to BYOK
+    // providers.
+    if (req.image_url) {
+      throw new InvalidAiRequestError(
+        "image-to-video is not supported on the hosted provider"
+      );
+    }
+
+    return withTransaction(
+      { organizationId, feature: "v1/ai/video", model_id: card.id },
+      async () => {
+        const generation = await experimental_generateVideo({
+          model: gateway.videoModel(binding.id),
+          prompt: req.prompt,
+          aspectRatio: aspect_ratio as `${number}:${number}`,
+          resolution: req.resolution as `${number}x${number}` | undefined,
+          duration,
+          fps: req.fps,
+          seed: req.seed,
+        });
+        const result: VideoGenerateResult = {
+          model_id: card.id,
+          provider_id: "vercel",
+          videos: generation.videos.map((file) => ({
+            base64: file.base64,
+            media_type: file.mediaType,
+          })),
+        };
+        return { result, costMills };
+      }
+    );
+  }
 }
+
+const VIDEO_RESOLUTION_LABEL_BY_SHORT_EDGE: Record<number, string> = {
+  480: "480p",
+  720: "720p",
+  1080: "1080p",
+  2160: "4k",
+};
 
 // ===========================================================================
 // Server-action helper
