@@ -512,7 +512,10 @@ export function parseRunArgs(args: string[]): {
 
 async function createHost(
   config: CliConfig,
-  flags?: Pick<ServeFlags, "allow_origins" | "allow_referer_paths">,
+  flags?: Pick<
+    ServeFlags,
+    "allow_origins" | "allow_referer_paths" | "editor_base_url"
+  >,
   // Whether this host serves a human UI (RFC `tools` §question). A long-lived
   // `serve` daemon is driven by a human client (the desktop-from-web bridge),
   // so the locked `question` tool pauses for their answer. The throwaway
@@ -547,7 +550,7 @@ async function createHost(
     // session — which is correct and free. Default from env so a
     // desktop-from-web bridge daemon serves hosted AI without a flag.
     gg_base_url:
-      (flags as ServeFlags | undefined)?.editor_base_url ??
+      flags?.editor_base_url ??
       process.env.GRIDA_EDITOR_BASE_URL ??
       "https://grida.co",
   });

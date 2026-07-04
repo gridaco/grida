@@ -36,26 +36,28 @@ import { NextResponse } from "next/server";
 const NO_STORE = { "cache-control": "no-store" } as const;
 
 export async function POST(request: Request) {
-  const client = await createClient();
-  const {
-    data: { user },
-  } = await client.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json(
-      { error: { code: "unauthorized" } },
-      { status: 401, headers: NO_STORE }
-    );
-  }
-
-  if (!(await allowGgTokenMint(user.id))) {
-    return NextResponse.json(
-      { error: { code: "rate_limited" } },
-      { status: 429, headers: NO_STORE }
-    );
-  }
-
   try {
+    // Inside the try so a throw from createClient / getUser / the Upstash
+    // limiter still yields the JSON no-store envelope, not Next's default 500.
+    const client = await createClient();
+    const {
+      data: { user },
+    } = await client.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: { code: "unauthorized" } },
+        { status: 401, headers: NO_STORE }
+      );
+    }
+
+    if (!(await allowGgTokenMint(user.id))) {
+      return NextResponse.json(
+        { error: { code: "rate_limited" } },
+        { status: 429, headers: NO_STORE }
+      );
+    }
+
     const org = await resolveMintOrganization(request, user.id, client);
     if (org === null) {
       return NextResponse.json(

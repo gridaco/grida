@@ -1,6 +1,6 @@
 ---
-id: TC-DESKTOP-HOSTED-AI-001
-title: Signed-in desktop runs AI without BYOK, billed to org credits (grida provider)
+id: TC-DESKTOP-AGENT-001
+title: Signed-in desktop runs AI without BYOK, billed to org credits (gg provider)
 module: desktop
 area: agent
 tags: [hosted-ai, no-byok, billing, credits, token, degraded-mode, sandbox]
@@ -10,11 +10,11 @@ date: 2026-07-03
 updated: 2026-07-03
 automatable: false
 covered_by:
-  - editor/lib/desktop/grida-cloud-session.test.ts
+  - editor/lib/desktop/gg-session.test.ts
   - editor/app/(api)/(public)/api/v1/ai/chat/completions/route.test.ts
-  - packages/grida-ai-agent/src/providers/grida-resolution.test.ts
-  - packages/grida-ai-agent/src/providers/grida.test.ts
-  - packages/grida-ai-agent/src/http/routes/grida-auth.test.ts
+  - packages/grida-ai-agent/src/providers/gg-resolution.test.ts
+  - packages/grida-ai-agent/src/providers/gg.test.ts
+  - packages/grida-ai-agent/src/http/routes/gg-auth.test.ts
 ---
 
 ## Behavior
@@ -25,9 +25,9 @@ and metered against their organization's AI credits (GRIDA-SEC-006).
 The renderer mints a 15-minute scoped token from the webview session
 (`POST /desktop/auth/token`) before every send and pushes it to the
 sidecar, which holds it **in memory only** and spends it as the Bearer
-credential of the `grida` provider against
+credential of the `gg` provider against
 `{origin}/api/v1/ai/*`. Provider precedence is: explicit pick wins;
-implicitly **BYOK keys → grida (signed in) → endpoints** — existing
+implicitly **BYOK keys → gg (signed in) → endpoints** — existing
 BYOK users keep exactly their current behavior.
 
 Failure states are actionable, never raw: a mid-run token lapse surfaces
@@ -47,12 +47,12 @@ backstop for anything in flight.
 2. In the workspace agent pane, pick a catalog model (e.g. GPT-5.4
    Mini — the model picker shows "Grida — included") and send a prompt.
 3. Expected: the reply streams; the sidecar log shows
-   `providerId=grida kind=grida`; the settings Credits card balance
+   `providerId=gg kind=gg`; the settings Credits card balance
    drops after the run.
 4. Add an OpenRouter key and send again. Expected: the run uses
    `providerId=openrouter` (BYOK wins implicitly).
 5. Remove the key; generate in the Images playground. Expected: hosted
-   generation succeeds keylessly (grida provider), billed.
+   generation succeeds keylessly (gg provider), billed.
 6. Drain the balance below $0.25 (insiders ingest) and send a chat.
    Expected: the out-of-credits banner with "add credits" → OS browser
    opens `/organizations/{slug}/settings/billing`; webview unchanged.
@@ -64,10 +64,10 @@ backstop for anything in flight.
    the run succeeds without re-signing-in.
 9. **Packaged (srt) build**: repeat step 2 in a packaged app against the
    configured editor origin — pins the sandbox egress allowlist
-   (`grida_cloud_host`), the one thing dev mode can't prove. Also
+   (`gg_host`), the one thing dev mode can't prove. Also
    verify dev (`localhost:3000`) egress under srt once.
 10. Old-binary posture: with a renderer newer than the installed binary
-    (no `bridge.cloud`), no hosted-AI affordances appear and everything
+    (no `bridge.gg`), no hosted-AI affordances appear and everything
     else behaves exactly as before.
 
 ## Notes

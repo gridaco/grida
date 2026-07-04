@@ -128,7 +128,7 @@ describe("decodeRequest", () => {
     expect(assistant.content[0]!.input).toBe("not-json{");
   });
 
-  it("decodes image parts: data URL → base64 file, http URL → URL", () => {
+  it("decodes a data: image part to base64", () => {
     const { callOptions } = decodeRequest(
       request({
         messages: [
@@ -139,10 +139,6 @@ describe("decodeRequest", () => {
               {
                 type: "image_url",
                 image_url: { url: "data:image/png;base64,QUJD" },
-              },
-              {
-                type: "image_url",
-                image_url: { url: "https://grida.test/a.png" },
               },
             ],
           },
@@ -155,11 +151,26 @@ describe("decodeRequest", () => {
       mediaType: "image/png",
       data: "QUJD",
     });
-    expect(user.content[2]).toEqual({
-      type: "file",
-      mediaType: "image/*",
-      data: new URL("https://grida.test/a.png"),
-    });
+  });
+
+  it("rejects a remote image_url (SSRF surface — data: only)", () => {
+    expect(() =>
+      decodeRequest(
+        request({
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image_url",
+                  image_url: { url: "https://grida.test/a.png" },
+                },
+              ],
+            },
+          ],
+        })
+      )
+    ).toThrow(/data:/);
   });
 
   it("rejects unsupported content parts", () => {

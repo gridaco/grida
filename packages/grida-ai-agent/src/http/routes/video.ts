@@ -71,7 +71,12 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
       resolved = await resolveVideoModel(
         { secrets, gg, gg_base_url },
         d.model_id,
-        d.provider ? { explicit: d.provider } : {}
+        // `image` skips the t2v-only hosted `gg` arm for i2v requests so the
+        // start frame isn't silently dropped — falls back to a BYOK route.
+        {
+          ...(d.provider ? { explicit: d.provider } : {}),
+          image: !!d.image_url,
+        }
       );
     } catch (e) {
       if (e instanceof VideoModelUnavailableError) {

@@ -34,6 +34,12 @@ const REFRESH_SLACK_MS = 5 * 60_000;
 
 let cached: GridaGatewaySessionState | null = null;
 let inflight: Promise<GridaGatewaySessionState> | null = null;
+/**
+ * Bumped by every `clear()` (sign-out). An in-flight `mintAndPush` captures
+ * the value at start and refuses to push / go `active` if it changed — so a
+ * mint that resolves AFTER sign-out can't resurrect the session.
+ */
+let epoch = 0;
 
 function ggBridge() {
   return getDesktopBridge()?.gg ?? null;
@@ -72,6 +78,7 @@ export async function forceRefresh(): Promise<GridaGatewaySessionState> {
 
 /** Best-effort daemon clear + cache drop. Called on sign-out; never throws. */
 export async function clear(): Promise<void> {
+  epoch++; // invalidate any in-flight mint — sign-out wins the race
   cached = isSupported() ? { kind: "signed_out" } : { kind: "unsupported" };
   try {
     await ggBridge()?.clear_session();
@@ -83,6 +90,7 @@ export async function clear(): Promise<void> {
 async function mintAndPush(
   bridge: NonNullable<ReturnType<typeof ggBridge>>
 ): Promise<GridaGatewaySessionState> {
+  const startedAt = epoch;
   try {
     const res = await fetch("/desktop/auth/token", { method: "POST" });
     if (res.status === 401) {
@@ -99,6 +107,9 @@ async function mintAndPush(
       expires_at: string;
       organization: { id: number; name: string };
     };
+    // A sign-out landed while we were minting: drop this token rather than
+    // pushing it and flipping the session back to `active` after logout.
+    if (epoch !== startedAt) return cached ?? { kind: "signed_out" };
     const expires_at = Date.parse(data.expires_at);
     await bridge.set_session({
       access_token: data.token,

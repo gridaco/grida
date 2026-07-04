@@ -39,7 +39,12 @@ const requestSchema = z.looseObject({
   prompt: z.string().min(1),
   width: z.number().int().positive().nullish(),
   height: z.number().int().positive().nullish(),
-  aspect_ratio: z.string().nullish(),
+  // Reject malformed ratios at the boundary — a bad value otherwise reaches
+  // the provider and comes back as an SDK warning + a fallback-rendered 200.
+  aspect_ratio: z
+    .string()
+    .regex(/^\d+:\d+$/, 'aspect_ratio must be "<w>:<h>"')
+    .nullish(),
   n: z.number().int().min(1).max(4).nullish(),
   seed: z.number().int().nullish(),
   quality: z.string().nullish(),

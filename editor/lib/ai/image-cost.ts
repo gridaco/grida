@@ -40,8 +40,11 @@ export function computeImageCostMills(
           : "medium";
       const tierKey =
         width && height ? `${quality}/${width}x${height}` : undefined;
-      const perImage =
-        (tierKey && card.pricing.tiers[tierKey]) || card.avg_cost_usd;
+      // Distinguish an ABSENT tier from a legitimately $0 tier: `|| avg`
+      // would bill a free tier at the average. Only fall back when the
+      // tier entry is truly missing.
+      const tierPrice = tierKey ? card.pricing.tiers[tierKey] : undefined;
+      const perImage = tierPrice !== undefined ? tierPrice : card.avg_cost_usd;
       return ai.toMills(perImage * n);
     }
     case "per_token":

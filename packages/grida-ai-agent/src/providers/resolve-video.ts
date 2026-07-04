@@ -68,6 +68,14 @@ export type ResolveVideoDeps = {
 
 export type ResolveVideoOptions = {
   explicit?: VideoProvider | typeof GG_PROVIDER_ID;
+  /**
+   * Image-to-video: the request carries a start frame. The hosted `gg`
+   * provider is text-to-video only and would drop the frame, so it is
+   * skipped (implicit) or rejected (explicit) here — the request falls back
+   * to a BYOK route that can honor the image instead of silently becoming
+   * text-to-video. Mirrors the image resolver's `references` guard.
+   */
+  image?: boolean;
 };
 
 /**
@@ -100,7 +108,8 @@ export async function resolveVideoModel(
   // Explicit hosted pick (GRIDA-SEC-006). Hosted video is
   // text-to-video only in v1 — the route rejects image_url server-side.
   if (options.explicit === GG_PROVIDER_ID) {
-    const hosted = liveGgMediaDeps(deps);
+    // t2v only — an image-to-video pick can't ride the hosted provider.
+    const hosted = !options.image && liveGgMediaDeps(deps);
     if (!hosted || !models.video.binding(card, "vercel")) {
       throw new VideoModelUnavailableError(modelId, GG_PROVIDER_ID);
     }
@@ -128,7 +137,7 @@ export async function resolveVideoModel(
 
   // Grida hosted (GRIDA-SEC-006) — after BYOK, before giving up. Serves
   // cards the hosted gateway can (a vercel binding).
-  if (!options.explicit) {
+  if (!options.explicit && !options.image) {
     const hosted = liveGgMediaDeps(deps);
     if (hosted && models.video.binding(card, "vercel")) {
       return resolvedGgVideo(modelId, card, hosted);

@@ -61,11 +61,16 @@ export function readGgToken(session: GridaGatewaySessionStore): string {
  * Map the two actionable hosted-response failures to typed, model-safe
  * errors — the single source for this contract, shared by the text factory
  * and the media adapters. Every other status is left to the caller. Never
- * embed upstream body text (GRIDA-SEC-004 posture).
+ * embed upstream body text (GRIDA-SEC-004 posture). Drains the unconsumed
+ * body before throwing so undici can return the socket to the pool
+ * (unconsumed bodies pin the connection).
  */
-export function throwOnGgHttpError(status: number): void {
-  if (status === 401) throw new GridaGatewayAuthError();
-  if (status === 402) throw new GridaGatewayCreditsError();
+export async function throwOnGgHttpError(res: Response): Promise<void> {
+  if (res.status === 401 || res.status === 402) {
+    await res.body?.cancel().catch(() => {});
+    if (res.status === 401) throw new GridaGatewayAuthError();
+    throw new GridaGatewayCreditsError();
+  }
 }
 
 export function makeGridaGatewayFactory(
@@ -84,7 +89,7 @@ export function makeGridaGatewayFactory(
       const response = await fetch(input, { ...init, headers });
       // 401/402 → typed errors; everything else passes through to the SDK's
       // own handling (already downgraded before reaching the renderer).
-      throwOnGgHttpError(response.status);
+      await throwOnGgHttpError(response);
       return response;
     }) as typeof fetch,
   });

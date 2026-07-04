@@ -32,9 +32,11 @@ export async function GET() {
   try {
     const summary = await getDesktopBillingSummary(user.id);
     return NextResponse.json(summary, { headers: NO_STORE });
-  } catch {
-    // Opaque on purpose — never leak Metronome/Postgres error text to the
-    // renderer.
+  } catch (err) {
+    // Opaque to the renderer — never leak Metronome/Postgres error text —
+    // but log server-side so a real regression is distinguishable from
+    // expected upstream flakiness.
+    console.error("[desktop/billing/summary] summary_failed", err);
     return NextResponse.json(
       { error: "summary_failed" },
       { status: 500, headers: NO_STORE }

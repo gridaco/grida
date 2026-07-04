@@ -122,6 +122,12 @@ export function fromUnknownError(err: unknown, scope: string): Response {
           type: "server_error",
           message: "Hosted AI is not configured on this deployment.",
         });
+      default: {
+        // Compile-time guard: a new GgTokenError code must be handled here
+        // rather than silently collapsing to the generic 500 below.
+        const _exhaustive: never = err.code;
+        return _exhaustive;
+      }
     }
   }
   if (err instanceof WireDecodeError) {

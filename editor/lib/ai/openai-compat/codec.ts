@@ -219,7 +219,7 @@ const DATA_URL = /^data:([^;,]+);base64,([\s\S]*)$/;
 
 function decodeImageUrl(url: string): {
   type: "file";
-  data: string | URL;
+  data: string;
   mediaType: string;
 } {
   const dataMatch = DATA_URL.exec(url);
@@ -230,16 +230,14 @@ function decodeImageUrl(url: string): {
       data: dataMatch[2]!,
     };
   }
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new WireDecodeError("image_url must be a data: URL or absolute URL");
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    throw new WireDecodeError("image_url must use http(s) or data:");
-  }
-  return { type: "file", mediaType: "image/*", data: parsed };
+  // Reject remote URLs. Passing one through as a file part lets the AI SDK
+  // fetch it SERVER-SIDE when the provider doesn't declare it supported — an
+  // SSRF surface behind this authenticated seam. v1 accepts inline `data:`
+  // images only (the desktop sidecar sends base64), mirroring the hosted
+  // video route's text-to-video-only posture.
+  throw new WireDecodeError(
+    "image_url must be a data: URL — remote URLs are not accepted"
+  );
 }
 
 /**

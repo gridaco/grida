@@ -47,9 +47,11 @@ async function postHosted<T>(args: {
     },
     body: JSON.stringify(args.body),
   });
-  throwOnGgHttpError(res.status);
+  await throwOnGgHttpError(res);
   if (!res.ok) {
-    // Model-safe by construction: status only, never the body.
+    // Model-safe by construction: status only, never the body. Drain the
+    // body first so undici releases the socket.
+    await res.body?.cancel().catch(() => {});
     throw new Error(`[${args.scope}] hosted request failed (${res.status})`);
   }
   return (await res.json()) as T;
