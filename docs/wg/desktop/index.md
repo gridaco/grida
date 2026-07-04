@@ -22,8 +22,9 @@ For the abstract contract:
   sessions, capability surface, sandbox placement.
 - [Grida bindings](../ai/grida/index.md) — how the locked tools, the
   filesystem backends, and the built-in subagents land in Grida.
-- [Grida Cloud Agent Runtime](../platform/grida-cloud-agent-runtime.md)
-  — deferred hosted-provider design; Desktop V1 ships BYOK only.
+- [Grida Gateway (GG)](../platform/hosted-ai.md)
+  — the shipped no-key AI path: scoped-token federation → metered
+  first-party gateway → org-credit spend. BYOK still bypasses it.
 
 For the user-facing app and the security boundary:
 

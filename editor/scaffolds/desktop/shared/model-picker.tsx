@@ -1,3 +1,4 @@
+// GRIDA-GG: desktop — the GG-included picker affordance (docs/wg/platform/hosted-ai.md)
 /**
  * Desktop model picker — every catalog model grouped by provider, plus
  * the Claude Code agent-provider options (issue #813) and any user-
@@ -39,6 +40,8 @@ import type {
   EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
 import { registered_models } from "./registered-models";
+import { GG_PROVIDER_METADATA } from "@grida/agent";
+import * as gridaGateway from "@/lib/desktop/gg-session";
 
 const catalog = _models.text.catalog;
 type CatalogId = _models.text.CatalogId;
@@ -132,6 +135,31 @@ export function DesktopModelPicker({
    *  (grouped under the endpoint's label). */
   endpoints?: readonly EndpointProviderConfig[];
 }) {
+  // GRIDA-SEC-006 — hosted-session affordance: a header line stating how
+  // the catalog is served (included via the Grida session, or a sign-in
+  // hint). Warm on mount so the label is accurate on first open; the
+  // catalog itself is NEVER hidden — BYOK keys can still serve it.
+  const [gridaGatewayState, setGridaGatewayState] = useState<
+    "active" | "signed_out" | "hidden"
+  >("hidden");
+  useEffect(() => {
+    if (!gridaGateway.isSupported()) return;
+    let cancelled = false;
+    void gridaGateway.ensureFresh().then((state) => {
+      if (cancelled) return;
+      setGridaGatewayState(
+        state.kind === "active"
+          ? "active"
+          : state.kind === "signed_out" || state.kind === "no_organization"
+            ? "signed_out"
+            : "hidden"
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <PromptInputSelect value={value} onValueChange={onValueChange}>
       <PromptInputSelectTrigger
@@ -152,6 +180,16 @@ export function DesktopModelPicker({
           ))}
         </SelectGroup>
         {/* Hosted catalog, grouped by provider (Anthropic first) */}
+        {gridaGatewayState !== "hidden" && (
+          <SelectGroup>
+            <SelectSeparator />
+            <SelectLabel className="text-[10px] font-normal text-muted-foreground">
+              {gridaGatewayState === "active"
+                ? GG_PROVIDER_METADATA.included_label
+                : "Sign in to use included AI"}
+            </SelectLabel>
+          </SelectGroup>
+        )}
         {CATALOG_GROUPS.map((group) => (
           <SelectGroup key={group.vendor}>
             <SelectSeparator />

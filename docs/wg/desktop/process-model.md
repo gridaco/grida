@@ -71,15 +71,15 @@ breakdown.
 
 ## What the daemon owns
 
-| Concern              | Why                                                                                                                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `auth.json`          | One secrets file, chmod 0o600, lifetime is the user. See [storage-layout](./agent-storage-layout.md).                                                                                      |
-| Provider registry    | Resolves the V1 BYOK providers: OpenRouter, then AI Gateway, then unavailable. See [grida-cloud-agent-runtime](../platform/grida-cloud-agent-runtime.md) for the deferred hosted provider. |
-| Agent loop           | Outlives the renderer; resumable by `sessionId`. RFC contract: [session lifecycle](../ai/agent/session.md).                                                                                |
-| Document registry    | `docId → {path, mtime}`; dedups windows on the same file.                                                                                                                                  |
-| Workspace registry   | Persisted to `workspaces.json`. RFC variable expansion: [tools / capability requirements](../ai/agent/tools.md#capability-requirements).                                                   |
-| Atomic file I/O      | Write-to-temp + rename; centralized so dirty tracking works.                                                                                                                               |
-| Recent files (canon) | Persisted; `addRecentDocument` is a mirror, not truth.                                                                                                                                     |
+| Concern              | Why                                                                                                                                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth.json`          | One secrets file, chmod 0o600, lifetime is the user. See [storage-layout](./agent-storage-layout.md).                                                                                                                   |
+| Provider registry    | Resolves providers by precedence — explicit choice, then BYOK (OpenRouter, then AI Gateway), then the hosted Grida provider, then unavailable. See [Grida Gateway (GG)](../platform/hosted-ai.md) for the no-BYOK path. |
+| Agent loop           | Outlives the renderer; resumable by `sessionId`. RFC contract: [session lifecycle](../ai/agent/session.md).                                                                                                             |
+| Document registry    | `docId → {path, mtime}`; dedups windows on the same file.                                                                                                                                                               |
+| Workspace registry   | Persisted to `workspaces.json`. RFC variable expansion: [tools / capability requirements](../ai/agent/tools.md#capability-requirements).                                                                                |
+| Atomic file I/O      | Write-to-temp + rename; centralized so dirty tracking works.                                                                                                                                                            |
+| Recent files (canon) | Persisted; `addRecentDocument` is a mirror, not truth.                                                                                                                                                                  |
 
 ## What the daemon does _not_ own
 
@@ -165,7 +165,7 @@ come from the daemon. See [renderer-bridge](./renderer-bridge.md).
 - [Storage layout](./agent-storage-layout.md) — `${userData}` file map.
 - [Agent system RFC / environments / computer](../ai/agent/environments.md#computer)
   — the abstract model this implements.
-- [Grida Cloud Agent Runtime](../platform/grida-cloud-agent-runtime.md)
-  — deferred hosted-provider design; not shipped in V1.
+- [Grida Gateway (GG)](../platform/hosted-ai.md)
+  — the shipped hosted model-capacity provider; the agent loop stays local.
 - [opencode](https://github.com/sst/opencode) — reference architecture
   for daemon split, provider registry, `auth.json` shape, agent-as-data.

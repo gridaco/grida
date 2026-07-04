@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — the `gg` client namespace (set/clear/status) (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — the agent tenant's HTTP transport.
  *
@@ -25,6 +26,12 @@ import type {
   ImageGenerateRequest,
   ImageGenerateResult,
 } from "./protocol/images";
+// Type-only (erased): the wire shapes of /auth/gg/* — the store class
+// itself never crosses to clients.
+import type {
+  GridaGatewaySession,
+  GridaGatewaySessionStatus,
+} from "./providers/gg-session";
 import type {
   VideoGenerateRequest,
   VideoGenerateResult,
@@ -167,6 +174,20 @@ export namespace AgentTransport {
         installed: boolean;
         path?: string;
       }> => await this.postJson("/providers/claude/detect"),
+    } as const;
+
+    /** Grida hosted ("included") AI session (GRIDA-SEC-006). Push-only
+     *  custody: the renderer mints and pushes the short-lived token;
+     *  `status` never returns it. Gated by the `gg` capability. */
+    readonly gg = {
+      set_session: async (session: GridaGatewaySession): Promise<void> => {
+        await this.postJson<unknown>("/auth/gg/set", session);
+      },
+      clear_session: async (): Promise<void> => {
+        await this.postJson<unknown>("/auth/gg/clear");
+      },
+      status: async (): Promise<GridaGatewaySessionStatus> =>
+        await this.postJson<GridaGatewaySessionStatus>("/auth/gg/status"),
     } as const;
 
     /** BYOK image generation (#908). Desktop-only; gated by the `images`

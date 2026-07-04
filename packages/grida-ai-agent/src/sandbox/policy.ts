@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — allow sandbox egress to the GG host (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — the agent-daemon's outer sandbox policy.
  *
@@ -60,9 +61,22 @@ const AGENT_NETWORK_HOSTS: readonly string[] = [
 export function buildAgentDaemonSandboxPolicy(opts: {
   user_data: string;
   home: string;
+  /**
+   * GRIDA-SEC-006 — host serving the Grida hosted-AI endpoints (e.g.
+   * `grida.co`, or `localhost` in dev). Without it a packaged
+   * (srt-wrapped) daemon's `grida` provider calls are 403'd by the
+   * egress allowlist. The apex AND its subdomains are allowed (srt
+   * `*.host` matches subdomains only, so both are listed).
+   */
+  gg_host?: string;
 }): AgentDaemonSandboxPolicy {
+  const hosts = [...AGENT_NETWORK_HOSTS];
+  if (opts.gg_host) {
+    hosts.push(opts.gg_host, `*.${opts.gg_host}`);
+  }
   return buildDaemonSandboxPolicy({
-    ...opts,
-    allowed_network_hosts: AGENT_NETWORK_HOSTS,
+    user_data: opts.user_data,
+    home: opts.home,
+    allowed_network_hosts: hosts,
   });
 }

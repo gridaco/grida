@@ -1,3 +1,4 @@
+// GRIDA-GG: desktop — the optional `gg` bridge namespace (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — renderer-visible Desktop bridge protocol.
  *
@@ -25,6 +26,8 @@ import type {
   SessionListFilter,
   SessionListPage,
   SessionStatus,
+  GridaGatewaySession,
+  GridaGatewaySessionStatus,
 } from "@grida/agent";
 import type {
   DaemonHandshakeResponse,
@@ -332,6 +335,19 @@ export type DesktopBridge = {
      *  filesystem probe, NOT a login check (login surfaces on the first run).
      *  Optional — older binaries lack it; renderers feature-detect. */
     detect_claude?: () => Promise<{ installed: boolean; path?: string }>;
+  };
+  /**
+   * Grida hosted ("included") AI session — GRIDA-SEC-006. Push-only
+   * custody: the renderer mints the short-lived scoped token from the
+   * webview session and pushes it to the sidecar; `status` reports
+   * presence/expiry/org and NEVER the token. Optional — older binaries
+   * lack it; renderers feature-detect and show no hosted-AI affordances
+   * when absent.
+   */
+  gg?: {
+    set_session: (session: GridaGatewaySession) => Promise<void>;
+    clear_session: () => Promise<void>;
+    status: () => Promise<GridaGatewaySessionStatus>;
   };
   /**
    * BYOK image generation (#908). Desktop-only: the request resolves the

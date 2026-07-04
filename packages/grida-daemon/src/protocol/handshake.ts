@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — the `gg` daemon capability flag (docs/wg/platform/hosted-ai.md)
 /**
  * Handshake protocol — capability negotiation a client performs against
  * the daemon. Client-safe: capability flags + the response shape, no
@@ -37,6 +38,15 @@ export type DaemonCapabilities = {
    * as "not served" and hide the video-generation UI.
    */
   video?: boolean;
+  /**
+   * `/auth/gg/*` — the Grida hosted ("included") AI session
+   * (GRIDA-SEC-006). True only when the host configured a hosted base
+   * URL. Optional so older host-supplied capability shapes stay valid;
+   * clients treat a missing flag as "not served" and show no hosted-AI
+   * affordances. Type-only from the daemon's perspective — the routes
+   * and store live in the agent tenant.
+   */
+  gg?: boolean;
   /** Reserved for future `/shell/*` route group; always `false` in V1. */
   shell: boolean;
 };

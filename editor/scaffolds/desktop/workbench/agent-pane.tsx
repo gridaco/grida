@@ -1,3 +1,4 @@
+// GRIDA-GG: desktop — GG token/credit error UX (docs/wg/platform/hosted-ai.md)
 /**
  * Workspace agent pane — the generic agent over the user's workspace.
  *
@@ -46,10 +47,12 @@ import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import {
   AGENT_SESSION_AGENT,
+  getDesktopBridge,
   sessions as bridgeSessions,
   type AgentRunOptions,
   type Workspace,
 } from "@/lib/desktop/bridge";
+import * as gridaGateway from "@/lib/desktop/gg-session";
 import {
   welcome_handoff,
   type WelcomeHandoff,
@@ -344,6 +347,15 @@ function AgentPaneContent({
     setMessages,
     resumeStream,
   } = useChat({ chat });
+
+  // GRIDA-SEC-006 — a mid-run `gg_token_expired` means the pushed
+  // session lapsed during a long turn: re-mint in the background so the
+  // retry (or the next send) rides a fresh token.
+  useEffect(() => {
+    if (error && gridaGateway.isGgTokenExpired(error)) {
+      void gridaGateway.forceRefresh();
+    }
+  }, [error]);
   // `isStreaming` = a turn is actively streaming THROUGH THIS CLIENT. Used
   // where that is the honest concept: the typing indicator, the Stop/Send
   // button, and "did I start this turn?" (vs. the core). It is the AI-SDK
@@ -766,7 +778,26 @@ function AgentPaneContent({
 
       {error && (
         <div className="flex items-start gap-2 border-t bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          <span className="flex-1">{error.message}</span>
+          {/* GRIDA-SEC-006 — the two hosted-AI codes cross the bridge as
+              bare code-led messages; translate to actionable copy. A
+              token-expired error also fires a background re-mint so the
+              user's next send just works. */}
+          <span className="flex-1">
+            {gridaGateway.isGgTokenExpired(error)
+              ? "Your Grida session needed a refresh — try sending again."
+              : gridaGateway.isGgInsufficientCredits(error)
+                ? "Your organization is out of AI credits."
+                : error.message}
+          </span>
+          {gridaGateway.isGgInsufficientCredits(error) && (
+            <button
+              type="button"
+              onClick={() => void openManageBilling()}
+              className="underline"
+            >
+              add credits
+            </button>
+          )}
           <button
             type="button"
             onClick={clearError}
@@ -974,3 +1005,23 @@ const ChatMessageMemo = memo(function ChatMessageMemo({
     />
   );
 });
+
+/**
+ * GRIDA-SEC-006 — "add credits" delegation: resolve the org's billing
+ * path from the same-origin summary route and open it in the OS browser
+ * (the Part-2a Manage-billing pattern; the webview never navigates).
+ */
+async function openManageBilling(): Promise<void> {
+  try {
+    const res = await fetch("/desktop/billing/summary");
+    const summary = (await res.json()) as { manage_path?: string };
+    const path = summary.manage_path ?? "/";
+    const bridge = getDesktopBridge();
+    if (!bridge) return;
+    await bridge.shell.open_external(
+      new URL(path, window.location.origin).toString()
+    );
+  } catch {
+    // Best-effort affordance; the settings Credits card is the fallback.
+  }
+}

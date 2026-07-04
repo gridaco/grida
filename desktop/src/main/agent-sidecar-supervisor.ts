@@ -1,3 +1,4 @@
+// GRIDA-GG: desktop — pass the GG host into the sandbox policy (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — AgentSidecar supervisor.
  *
@@ -159,6 +160,9 @@ class AgentSidecarSupervisor {
     const policy = buildAgentDaemonSandboxPolicy({
       user_data: this.user_data_path,
       home: app.getPath("home"),
+      // GRIDA-SEC-006 — without this, the srt egress allowlist 403s the
+      // grida hosted provider's calls to the editor origin.
+      gg_host: new URL(EDITOR_BASE_URL).hostname,
     });
     await ensureInitialized({
       network: {

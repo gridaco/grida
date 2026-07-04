@@ -17,9 +17,10 @@ This is the exposed contract for Grida's local agent system. The protocol
 itself is [the agent RFC](../agent/index.md); this page records how Grida
 binds it into `@grida/daemon`, `@grida/agent`, Desktop, and the editor bridge.
 
-V1 scope is deliberately narrow: the local daemon plus BYOK model providers.
-`grida-cloud` is deferred and documented separately as a future hosted provider
-that must fit this contract instead of shaping it.
+The local daemon runs BYOK model providers and — for signed-in users —
+[Grida Gateway (GG)](../../platform/hosted-ai.md), the first-party hosted
+provider. GG fit this contract instead of shaping it: it supplies model
+capacity only (the `gg` provider kind), while the agent loop stays local.
 
 **Host/tenant split (#927).** The local privileged process is a general
 **daemon** (`@grida/daemon`): the loopback HTTP server, the GRIDA-SEC-004
@@ -46,8 +47,8 @@ Sibling docs:
 - [Agent RFC](../agent/index.md) — the contract this realizes.
 - [Grida bindings](./index.md) — naming map, backends, built-in subagents.
 - [Desktop](../../desktop/index.md) — the desktop host landing.
-- [Deferred Grida Cloud Agent Provider](../../platform/grida-cloud-agent-runtime.md)
-  — preserved design notes for the removed hosted-provider prototype.
+- [Grida Gateway (GG)](../../platform/hosted-ai.md)
+  — the shipped hosted model-capacity provider; the agent loop stays local.
 - [Phase 3 agent contract cleanup](./agent-contract-cleanup.md) — seam
   decisions and refused alternatives after the BYOK-only cleanup.
 
@@ -301,5 +302,5 @@ describe("daemon/tenant seam (#927)", () => {
 - [Agent RFC](../agent/index.md)
 - [Grida bindings](./index.md)
 - [Desktop](../../desktop/index.md)
-- [Deferred Grida Cloud Agent Provider](../../platform/grida-cloud-agent-runtime.md)
+- [Grida Gateway (GG)](../../platform/hosted-ai.md)
 - [Built-in subagents](./agents-builtin.md)

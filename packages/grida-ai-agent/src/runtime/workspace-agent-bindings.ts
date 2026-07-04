@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — thread the `gg` session deps into image gen (docs/wg/platform/hosted-ai.md)
 /**
  * GRIDA-SEC-004 — workspace-bound agent bindings.
  *
@@ -76,6 +77,10 @@ export async function createWorkspaceAgentBindings(
      * on paths that don't generate media.
      */
     secrets?: SecretsStore;
+    /** GRIDA-SEC-006 — hosted-session deps; lets `generate_image` serve a
+     *  signed-in keyless user through the hosted provider. */
+    gg?: import("../providers/gg-session").GridaGatewaySessionStore;
+    gg_base_url?: string;
     /**
      * Whether the host enables image generation (its `images` server
      * capability). With it off, no `generate_image` binding is built — the host
@@ -176,9 +181,16 @@ export async function createWorkspaceAgentBindings(
   let image_gen: AgentGen.ImageGenerator | undefined;
   if (deps.image_gen_enabled && deps.secrets && scratchDir) {
     const secrets = deps.secrets;
-    if (await hasUsableImageProvider({ secrets })) {
+    // GRIDA-SEC-006: a live hosted session also satisfies the gate — a
+    // signed-in keyless user gets in-chat image generation.
+    const imageDeps = {
+      secrets,
+      gg: deps.gg,
+      gg_base_url: deps.gg_base_url,
+    };
+    if (await hasUsableImageProvider(imageDeps)) {
       image_gen = createImageGenerator(
-        secrets,
+        imageDeps,
         scratchDir,
         // Same reader `view_image` uses — so an i2i reference path honors the
         // identical scoping + size cap as perceiving that file.
@@ -219,7 +231,7 @@ function extForMime(mime: string): string {
  * credit is metered. Do not add `providerOptions.grida` here.
  */
 function createImageGenerator(
-  secrets: SecretsStore,
+  imageDeps: import("../providers/resolve-image").ResolveImageDeps,
   scratchDir: string,
   reader: AgentVision.ByteReader,
   imageModelId?: string
@@ -244,7 +256,7 @@ function createImageGenerator(
       let resolved;
       try {
         resolved = await resolveImageModel(
-          { secrets },
+          imageDeps,
           modelId,
           wantsRefs ? { references: true } : {}
         );

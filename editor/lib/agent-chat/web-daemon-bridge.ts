@@ -1,4 +1,5 @@
 "use client";
+// GRIDA-GG: desktop — the `gg` dev bridge mirror (docs/wg/platform/hosted-ai.md)
 
 /**
  * Web daemon bridge — a `DesktopBridge` implementation for a PLAIN BROWSER
@@ -240,6 +241,12 @@ export function createWebDaemonBridge(
       delete_endpoint: (id) => client.providers.delete_endpoint(id),
       info: () => client.providers.info(),
       probe_endpoint: (baseUrl) => client.providers.probe_endpoint(baseUrl),
+    },
+    // GRIDA-SEC-006 — hosted-session custody push (dev parity with preload).
+    gg: {
+      set_session: (session) => client.gg.set_session(session),
+      clear_session: () => client.gg.clear_session(),
+      status: () => client.gg.status(),
     },
 
     agent: {

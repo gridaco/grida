@@ -1,3 +1,4 @@
+// GRIDA-GG: provider — the `--editor-base-url` GG base URL flag (docs/wg/platform/hosted-ai.md)
 /**
  * grida-agent CLI — the canonical, host-agnostic entrypoint to the agent
  * system.
@@ -116,6 +117,8 @@ export type ServeFlags = {
   register: boolean;
   allow_origins: string[];
   allow_referer_paths: string[];
+  /** GRIDA-SEC-006 — hosted-AI origin; enables the `grida` provider. */
+  editor_base_url?: string;
 };
 
 /** Parse `serve`'s options. Exported for unit testing. */
@@ -129,12 +132,17 @@ export function parseServeArgs(args: string[]): ServeFlags {
     const arg = args[i];
     if (arg === "--register") {
       flags.register = true;
-    } else if (arg === "--allow-origin" || arg === "--allow-referer-path") {
+    } else if (
+      arg === "--allow-origin" ||
+      arg === "--allow-referer-path" ||
+      arg === "--editor-base-url"
+    ) {
       const value = args[i + 1];
       if (!value || value.startsWith("-")) {
         throw new Error(`${arg} requires a value`);
       }
       if (arg === "--allow-origin") flags.allow_origins.push(value);
+      else if (arg === "--editor-base-url") flags.editor_base_url = value;
       else flags.allow_referer_paths.push(value);
       i += 1;
     } else {
@@ -534,6 +542,14 @@ async function createHost(
     // a UI (the `serve` daemon driven by the desktop-from-web bridge). A
     // throwaway embedded host (one-shot `run`) is headless → fixed refusal.
     interactive,
+    // GRIDA-SEC-006 — hosted "included" AI. The CLI daemon has no webview
+    // to mint tokens, so this stays dormant unless a client pushes a
+    // session — which is correct and free. Default from env so a
+    // desktop-from-web bridge daemon serves hosted AI without a flag.
+    gg_base_url:
+      (flags as ServeFlags | undefined)?.editor_base_url ??
+      process.env.GRIDA_EDITOR_BASE_URL ??
+      "https://grida.co",
   });
 }
 

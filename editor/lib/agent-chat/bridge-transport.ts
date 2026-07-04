@@ -1,6 +1,8 @@
 "use client";
+// GRIDA-GG: desktop — re-mint the GG token before each send (docs/wg/platform/hosted-ai.md)
 
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
+import * as gridaGateway from "@/lib/desktop/gg-session";
 import {
   AGENT_SKILL_IDS,
   asAgentMode,
@@ -62,6 +64,12 @@ export namespace desktopAgentTransport {
     };
     return {
       async sendMessages(options) {
+        // GRIDA-SEC-006 — keep the sidecar's hosted-AI session fresh before
+        // every send (covers the agent pane, the ai-sidebar, and the AI
+        // SDK's body-less auto-resubmits in one place). Single-flight,
+        // one compare when fresh, and it NEVER throws — hosted AI
+        // degrading must never break a BYOK run.
+        await gridaGateway.ensureFresh();
         const body = readBodyOptions(options.body);
         if (body.session_id) liveSessionId = body.session_id;
         // Backfill the live renderer context (model/provider/mode) so a body-less
