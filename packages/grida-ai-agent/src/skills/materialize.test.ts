@@ -175,6 +175,10 @@ describe("createMaterializingSkillLoader", () => {
       await expect(
         createMaterializingSkillLoader(scratch)(skill)
       ).rejects.toThrow(SkillPathEscapeError);
+      // and nothing was copied into scratch before the check failed
+      await expect(
+        fs.stat(path.join(scratch, "skills", "foo"))
+      ).rejects.toThrow(/ENOENT/);
     } finally {
       await fs.rm(evilLayer, { recursive: true, force: true });
     }
