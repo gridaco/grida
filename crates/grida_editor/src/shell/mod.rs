@@ -22,6 +22,7 @@
 //! [`ApplicationCommands`]: grida::window::command::ApplicationCommand
 
 mod app;
+mod egui_panels;
 mod menubar;
 mod session;
 mod window;
@@ -50,16 +51,36 @@ const PANEL_WIDTH: f32 = 240.0;
 /// Fixed hierarchy-strip (layers tree) width, logical px.
 const HIER_WIDTH: f32 = 220.0;
 
-/// Toolbar strip's margin above the window's bottom edge, logical px.
-const TOOLBAR_MARGIN: f32 = 16.0;
+/// Register the editor's embedded **Geist** family as egui's default
+/// proportional/monospace font, so the chrome typography matches the
+/// canvas (which renders in Geist too). The bytes are already compiled
+/// into the binary (`grida::embedded_fonts`) — no new asset. Geist is
+/// inserted at the *front* of each family list, keeping egui's bundled
+/// Ubuntu/Noto/emoji fonts as fallbacks for glyphs Geist lacks (the
+/// panels use `▸ ▾ ✕ °`).
+fn install_egui_fonts(ctx: &egui::Context) {
+    use std::sync::Arc;
 
-/// Bottom-centered toolbar origin for a logical viewport size.
-fn toolbar_origin(width: f32, height: f32) -> (f32, f32) {
-    let (w, h) = crate::ui::toolbar::ToolbarPanel::size();
-    (
-        ((width - w) * 0.5).max(0.0),
-        (height - h - TOOLBAR_MARGIN).max(0.0),
-    )
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "Geist".to_owned(),
+        Arc::new(egui::FontData::from_static(
+            grida::embedded_fonts::geist::BYTES,
+        )),
+    );
+    fonts.font_data.insert(
+        "Geist Mono".to_owned(),
+        Arc::new(egui::FontData::from_static(
+            grida::embedded_fonts::geistmono::BYTES,
+        )),
+    );
+    if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+        family.insert(0, "Geist".to_owned());
+    }
+    if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
+        family.insert(0, "Geist Mono".to_owned());
+    }
+    ctx.set_fonts(fonts);
 }
 
 /// Shell startup error.
@@ -136,6 +157,7 @@ pub fn run_with(options: ShellOptions) -> Result<(), ShellError> {
         gl_surface,
         gl_context,
         scale_factor,
+        glow_context,
     } = window::create_window("grida_editor", width, height);
 
     let proxy = el.create_proxy();
@@ -183,36 +205,6 @@ pub fn run_with(options: ShellOptions) -> Result<(), ShellError> {
     bridge::flush(editor.document(), app.renderer_mut());
     editor.set_selection(Vec::new());
 
-    // The UI layers work in logical px; the paint pass scales by dpr.
-    // Two layers, one per panel strip: the right properties strip and
-    // the left hierarchy strip each own their widgets, focus, and
-    // capture (the properties panel mounts/unmounts wholesale on
-    // selection presence, so the strips cannot share one layer).
-    let mut ui = crate::ui::UiLayer::new(Size {
-        width: width as f32,
-        height: height as f32,
-    });
-    ui.fonts_mut().register_embedded_fonts();
-    let props = crate::ui::properties::PropertiesPanel::new(PANEL_WIDTH);
-    let mut hier_ui = crate::ui::UiLayer::new(Size {
-        width: width as f32,
-        height: height as f32,
-    });
-    hier_ui.fonts_mut().register_embedded_fonts();
-    let hier = crate::ui::hierarchy::HierarchyPanel::new(HIER_WIDTH);
-    let mut tool_ui = crate::ui::UiLayer::new(Size {
-        width: width as f32,
-        height: height as f32,
-    });
-    tool_ui.fonts_mut().register_embedded_fonts();
-    let toolbar =
-        crate::ui::toolbar::ToolbarPanel::new(toolbar_origin(width as f32, height as f32));
-    let mut menu_ui = crate::ui::UiLayer::new(Size {
-        width: width as f32,
-        height: height as f32,
-    });
-    menu_ui.fonts_mut().register_embedded_fonts();
-
     // Clock ticks (frame pacing) — the tick rate aims above the target
     // FPS, same as the grida_dev host.
     std::thread::spawn(move || {
@@ -222,12 +214,40 @@ pub fn run_with(options: ShellOptions) -> Result<(), ShellError> {
         }
     });
 
+    // egui spike state. Built here (before `window` moves into the
+    // struct) so `State::new` can read the window's display handle. The
+    // painter takes the shared glow context by value.
+    let egui_ctx = egui::Context::default();
+    // Follow the editor's light theme (canvas + panels are light), not
+    // egui's dark default.
+    egui_ctx.set_visuals(egui::Visuals::light());
+    // Match the chrome typography to the canvas: use the embedded Geist
+    // family (already compiled into the binary) instead of egui's default
+    // Ubuntu-Light.
+    install_egui_fonts(&egui_ctx);
+    let egui_winit = egui_winit::State::new(
+        egui_ctx.clone(),
+        egui::ViewportId::ROOT,
+        &window,
+        Some(scale_factor as f32),
+        None,
+        None,
+    );
+    let egui_painter = egui_glow::Painter::new(glow_context, "", None, false)
+        .expect("failed to create egui_glow painter");
+
     let mut shell = app::ShellApp {
         editor,
         app,
         gl_surface,
         gl_context,
         window,
+        egui_ctx,
+        egui_winit,
+        egui_painter,
+        egui_panels: egui_panels::EguiPanels::new(),
+        menu_open: None,
+        last_frame_ms: 0.0,
         modifiers: winit::keyboard::ModifiersState::default(),
         hud: crate::hud::Hud::new(),
         interp: crate::interpret::Interpreter::new(),
@@ -237,12 +257,6 @@ pub fn run_with(options: ShellOptions) -> Result<(), ShellError> {
             .map(|tf| skia_safe::Font::new(tf, 11.0)),
         pan_active: false,
         exiting: false,
-        ui,
-        props,
-        hier_ui,
-        hier,
-        tool_ui,
-        toolbar,
         tools: crate::tool::ToolMachine::new(),
         ruler: true,
         pixelgrid: true,
@@ -260,8 +274,6 @@ pub fn run_with(options: ShellOptions) -> Result<(), ShellError> {
         hold_pan: false,
         opacity_taps: crate::keys::OpacityTaps::default(),
         platform: crate::keys::Platform::current(),
-        menu_ui,
-        menu: crate::ui::menu::ContextMenu::new(crate::keys::Platform::current()),
         menu_bar: None,
         menu_selection: Vec::new(),
         menu_dirty: true,
@@ -338,6 +350,15 @@ fn demo_scene() -> (Scene, HashMap<NodeId, Id>) {
         graph.set_name(iid, stable.clone());
         id_map.insert(iid, stable);
     }
+
+    // A text node so the egui spike's font-size write (bind::apply) is
+    // exercisable — the factory default text is empty, so seed content.
+    let mut text = nf.create_text_span_node();
+    text.transform = AffineTransform::new(120.0, 300.0, 0.0);
+    text.text = "egui spike — edit my font size".to_string();
+    let tid = graph.append_child(Node::TextSpan(text), Parent::Root);
+    graph.set_name(tid, "text1".to_string());
+    id_map.insert(tid, "text1".to_string());
 
     let scene = Scene {
         name: "demo".to_string(),

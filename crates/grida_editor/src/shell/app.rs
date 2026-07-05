@@ -32,28 +32,16 @@
 //! per-site mirror/flush/redraw plumbing this replaces is the failure
 //! mode `FRAME-2` names.
 //!
-//! ## M3: UI layer wiring
+//! ## Chrome (egui)
 //!
-//! The shell hosts a [`crate::ui::UiLayer`] with the right-side
-//! properties strip ([`crate::ui::properties::PropertiesPanel`]).
-//! Input arbitration is UI-first (`SURF-1` panel → chrome → content,
-//! `UI-5`): pointer events over UI regions (or while a widget holds
-//! pointer capture) go to the UI layer and never reach the canvas;
-//! wheel over the UI scrolls it, elsewhere it pans the camera.
-//! Keyboard meaning flows through the binding table
-//! ([`crate::keys`], keybindings.md/routing.md): capture layers first
-//! (text session, widget focus under the `KEY-4` guard, the active
-//! edit mode), then the chord's command chain — the focus-legal
-//! primary-key rows dispatch ahead of the focused widget (`UI-3`
-//! command priority). UI emissions are applied through [`crate::ui::bind::apply`]
-//! (previews stay silent, one history entry per interaction); their
-//! pixels ride the damage ledger like everything else.
-//!
-//! Rendering: after the content flush (`app.redraw_requested()`), the
-//! UI scene's layer list is painted onto the **same** window canvas
-//! with the engine's `Painter` — the identical paint path canvas
-//! content uses (`UI-1`; see `crate::ui` module docs for the decision
-//! record).
+//! The shell's panels — properties, hierarchy, toolbar, context menu —
+//! are all egui-rendered ([`super::egui_panels`]), painted on the shared
+//! GL context as the last recomposition step (`paint_egui`). egui is the
+//! top input tier: every event is fed to it first in [`ShellApp::window_event`],
+//! and pointer/keyboard input it wants never reaches the HUD, tools, or
+//! canvas. Panel edits still flow through [`crate::ui::bind::apply`]
+//! (previews silent, one history entry per interaction) and reach pixels
+//! via the damage ledger like everything else.
 
 use glutin::{
     context::PossiblyCurrentContext,
@@ -62,8 +50,6 @@ use glutin::{
 };
 use grida::node::schema::Size;
 use grida::overlay::{Modifiers, PointerButton, SurfaceEvent};
-use grida::painter::Painter;
-use grida::runtime::render_policy::RenderPolicy;
 use grida::text_edit::session::KeyName;
 use grida::window::application::{ApplicationApi, HostEvent, UnknownTargetApplication};
 use grida::window::command::ApplicationCommand;
@@ -89,23 +75,7 @@ use crate::keys::{self, Command, KeyCode};
 use crate::mode::{EditMode, EnterDispatch, dispatch_enter};
 use crate::shell::session::SyncSession;
 use crate::tool::{Tool, ToolMachine, ToolOutcome};
-use crate::ui::hierarchy::HierarchyPanel;
-use crate::ui::menu::{ContextMenu, MenuKey, Outcome as MenuOutcome};
-use crate::ui::properties::PropertiesPanel;
-use crate::ui::toolbar::ToolbarPanel;
-use crate::ui::{UiInputResult, UiLayer, bind};
 use crate::vector::mode::{EscapeStep, VecMods, VectorMode, VectorTool as VecTool};
-
-/// Which UI layer a pointer event routes to (`SURF-1` arbitration).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum UiTarget {
-    /// The top toolbar strip.
-    Toolbar,
-    /// The left hierarchy strip.
-    Hierarchy,
-    /// The right properties strip.
-    Properties,
-}
 
 pub(crate) struct ShellApp {
     pub(crate) editor: Editor,
@@ -113,6 +83,27 @@ pub(crate) struct ShellApp {
     pub(crate) gl_surface: GlutinSurface<WindowSurface>,
     pub(crate) gl_context: PossiblyCurrentContext,
     pub(crate) window: Window,
+    // ── egui integration spike (golden-hopping-clock plan) ───────────
+    /// The egui context — the immediate-mode UI's retained backend
+    /// (fonts, memory, tessellation). Cheap `Arc` clone; cloned locally
+    /// each frame so the build closure can borrow `&mut self`.
+    pub(crate) egui_ctx: egui::Context,
+    /// winit↔egui bridge: translates window events into egui `RawInput`
+    /// and applies egui's platform output (cursor, clipboard).
+    pub(crate) egui_winit: egui_winit::State,
+    /// The egui_glow painter — draws egui's tessellated meshes on the
+    /// *same* GL context Skia renders on (`window.rs` glow handle).
+    pub(crate) egui_painter: egui_glow::Painter,
+    /// Last present's wall-clock cost (ms), shown in the egui panel for
+    /// the perf A/B. Set at the tail of the `RedrawRequested` arm.
+    pub(crate) last_frame_ms: f32,
+    /// The egui-rendered editor panels (the real migration off
+    /// `UiLayer`) — owns only transient view state (edit buffers).
+    pub(crate) egui_panels: super::egui_panels::EguiPanels,
+    /// The context menu, egui-rendered: its inventory + anchor (logical
+    /// px) while open, `None` when closed (the model — `crate::menu` —
+    /// is reused unchanged; only the view is egui).
+    pub(crate) menu_open: Option<(crate::menu::Menu, egui::Pos2)>,
     pub(crate) modifiers: winit::keyboard::ModifiersState,
     /// The HUD machine — canvas chrome + interaction
     /// (`crates/grida_editor/docs/hud.md`).
@@ -128,18 +119,6 @@ pub(crate) struct ShellApp {
     /// surface (camera is engine view state) until the button lifts.
     pub(crate) pan_active: bool,
     pub(crate) exiting: bool,
-    /// The right UI layer (logical-px coordinates).
-    pub(crate) ui: UiLayer,
-    /// The properties strip driving the right UI layer's rebuilds.
-    pub(crate) props: PropertiesPanel,
-    /// The left UI layer (hierarchy strip).
-    pub(crate) hier_ui: UiLayer,
-    /// The hierarchy panel driving the left UI layer.
-    pub(crate) hier: HierarchyPanel,
-    /// The toolbar UI layer.
-    pub(crate) tool_ui: UiLayer,
-    /// The toolbar panel driving it.
-    pub(crate) toolbar: ToolbarPanel,
     /// The authoring tool machine (`docs/wg/canvas/tool.md`).
     pub(crate) tools: ToolMachine,
     /// Ruler visibility (`docs/wg/canvas/ruler.md`): per-instance
@@ -149,9 +128,9 @@ pub(crate) struct ShellApp {
     /// per-instance view state, ⇧' (web parity). Independent of the
     /// snap-to-pixel-grid toggle (`PXG-5`).
     pub(crate) pixelgrid: bool,
-    /// Shell chrome visibility (keybindings.md, Mod+\): when false the
-    /// panels/toolbar/menu are neither painted nor pointer-targeted, so
-    /// the canvas stands alone. Per-instance view state.
+    /// Shell chrome visibility (keybindings.md, Mod+\): when false
+    /// `build_inspector` builds no egui, so the panels/toolbar/menu are
+    /// neither drawn nor input-claiming and the canvas stands alone.
     pub(crate) ui_visible: bool,
     /// Window scale factor (physical px = logical px × dpr).
     pub(crate) dpr: f32,
@@ -193,11 +172,6 @@ pub(crate) struct ShellApp {
     pub(crate) opacity_taps: keys::OpacityTaps,
     /// The platform the binding table resolves against (`KEY-3`).
     pub(crate) platform: keys::Platform,
-    /// The context menu's dedicated UI layer — painted last (topmost)
-    /// and, while the menu is open, routed first (the popup grab).
-    pub(crate) menu_ui: UiLayer,
-    /// The context-menu host (`crates/grida_editor/docs/menu.md`).
-    pub(crate) menu: ContextMenu,
     /// The native application menu bar (`menu.md` "The application
     /// menu", `MENU-*`). Built lazily on first resume and rebuilt when
     /// the state it reflects changes.
@@ -240,8 +214,8 @@ impl ShellApp {
     fn reflect_frame(&mut self) {
         let damage = self.editor.take_damage();
         if bridge::reflect(self.editor.document(), self.app.renderer_mut(), &damage) {
-            self.props.sync(&mut self.ui, &self.editor);
-            self.hier.sync(&mut self.hier_ui, &self.editor);
+            // All panels are egui now (properties, hierarchy, toolbar,
+            // menu) — read live each frame, nothing to sync here.
             self.window.request_redraw();
         }
         // The guides mirror-down (`RUL-9`, same shape as the
@@ -262,8 +236,8 @@ impl ShellApp {
         // strip, so it is overlay damage: the base repaints beneath.
         if self.hud.selection() != self.editor.selection() {
             self.hud.set_selection(self.editor.selection());
-            self.props.sync(&mut self.ui, &self.editor);
-            self.hier.sync(&mut self.hier_ui, &self.editor);
+            // The egui hierarchy reads the selection live and reveals on
+            // change itself (`HIER-4`) — no panel sync needed here.
             self.overlay_damaged();
         }
         // MODE-6 subject pinning: whatever this event did — an undo
@@ -791,9 +765,6 @@ impl ShellApp {
 
     fn deselect(&mut self) {
         self.editor.set_selection(Vec::new());
-        self.ui.blur();
-        self.hier_ui.blur();
-        // Blur is a UI-layer visual, not document damage.
         self.window.request_redraw();
     }
 
@@ -819,32 +790,6 @@ impl ShellApp {
             self.reconcile_text_session();
             return;
         }
-        // Open-menu modality (menu.md; routing.md's
-        // widget-focus capture layer in its modal form): the menu
-        // owns the keyboard while open — the navigation vocabulary
-        // resolves against it (Escape is its one ladder rung),
-        // everything else is suppressed.
-        if self.menu.is_open() {
-            let menu_key = match key {
-                Key::Named(NamedKey::Escape) => Some(MenuKey::Escape),
-                Key::Named(NamedKey::ArrowUp) => Some(MenuKey::Up),
-                Key::Named(NamedKey::ArrowDown) => Some(MenuKey::Down),
-                Key::Named(NamedKey::ArrowLeft) => Some(MenuKey::Left),
-                Key::Named(NamedKey::ArrowRight) => Some(MenuKey::Right),
-                Key::Named(NamedKey::Enter) => Some(MenuKey::Enter),
-                _ => None,
-            };
-            if let Some(menu_key) = menu_key
-                && let Some(outcome) = self.menu.key(&mut self.menu_ui, menu_key)
-            {
-                self.menu.close(&mut self.menu_ui);
-                if let MenuOutcome::Chosen(cmd) = outcome {
-                    self.command(cmd);
-                }
-            }
-            self.window.request_redraw();
-            return;
-        }
         // The table (`KEY-1`/`KEY-3`) is authored against base,
         // layout-independent keys plus explicit modifier Reqs; `code` is
         // already that base key (see the boundary derivation), so it
@@ -861,29 +806,9 @@ impl ShellApp {
             self.dispatch_chain(b);
             return;
         }
-        // Widget focus (UI-3): only a *focused* widget receives keys —
-        // an unfocused UI layer must not shadow the sheet (Tab is the
-        // traversal row until a widget holds focus). Everything the
-        // focused widget declines is suppressed (`KEY-4`) — a focused
-        // input never leaks a tool switch — except Escape, whose
-        // focus rung blurs (one ladder step; the next press walks the
-        // canvas ladder).
-        if self.ui.focused().is_some() {
-            if let Some(ui_key) = map_key(key) {
-                let modifiers = self.build_modifiers();
-                let result = self.ui.key(&ui_key, &modifiers);
-                let consumed = result.consumed;
-                self.process_ui(result);
-                if consumed {
-                    return;
-                }
-            }
-            if matches!(key, Key::Named(NamedKey::Escape)) {
-                self.ui.blur();
-                self.window.request_redraw();
-            }
-            return;
-        }
+        // Widget focus is now egui's (`egui_wants_keyboard_input` gates
+        // canvas keys upstream in `window_event`); the old UiLayer
+        // focused-widget routing is gone with the framework.
         // Edit-mode key capture (routing.md capture layer 1): the
         // active vector mode re-resolves keys first.
         if matches!(self.mode, EditMode::Vector(_)) && self.on_vector_mode_key(code) {
@@ -966,7 +891,7 @@ impl ShellApp {
     /// enablement are [`crate::menu`]'s (`SHELL-3`).
     fn open_context_menu(&mut self, canvas_point: [f32; 2], ui_point: [f32; 2]) {
         // Chrome hidden (Mod+\): the context menu is chrome too — do not
-        // open a menu that `draw_ui` would refuse to paint.
+        // open a menu that `build_inspector` would refuse to render.
         if !self.ui_visible {
             return;
         }
@@ -983,20 +908,10 @@ impl ShellApp {
             self.overlay_damaged();
         }
         let menu = crate::menu::canvas_menu(self.editor.document(), self.editor.selection());
-        self.menu.open(&mut self.menu_ui, menu, ui_point);
-        self.window.request_redraw();
-    }
-
-    /// Drain the open menu's outbox after a routed event: an outcome
-    /// closes the menu, and a chosen command dispatches through the
-    /// one registry switch (`MENU-1`).
-    fn drain_menu(&mut self) {
-        if let Some(outcome) = self.menu.drain(&mut self.menu_ui) {
-            self.menu.close(&mut self.menu_ui);
-            if let MenuOutcome::Chosen(cmd) = outcome {
-                self.command(cmd);
-            }
-        }
+        // egui context menu: stash the inventory + anchor; `build_inspector`
+        // renders it (native `egui::Popup`) and the shell dispatches the
+        // chosen command (`MENU-1`).
+        self.menu_open = Some((menu, egui::Pos2::new(ui_point[0], ui_point[1])));
         self.window.request_redraw();
     }
 
@@ -1261,16 +1176,13 @@ impl ShellApp {
                 true
             }
             // Chrome visibility (keybindings.md, Mod+\): hide the whole
-            // shell UI so the canvas stands alone. On hide we blur any
-            // focused widget — a hidden field must not keep swallowing
-            // keys — and, since panels never repaint themselves, a full
-            // redraw is what clears (and later restores) their pixels.
+            // shell UI so the canvas stands alone. `build_inspector`
+            // gates on `ui_visible`, so egui builds nothing and claims no
+            // input; we also drop any open context menu.
             Command::ToggleUi => {
                 self.ui_visible = !self.ui_visible;
                 if !self.ui_visible {
-                    self.ui.blur();
-                    self.hier_ui.blur();
-                    self.menu.close(&mut self.menu_ui);
+                    self.menu_open = None;
                 }
                 // The ruler L rides the hierarchy strip's edge (`RUL-8`);
                 // with the strip gone the corner moves to the window
@@ -1278,6 +1190,10 @@ impl ShellApp {
                 // hover-to-guide hit test.
                 let ruler_origin = self.ruler_origin();
                 self.hud.set_ruler_origin(ruler_origin);
+                // Reclaim / release the right strip: the camera inset
+                // now tracks `ui_visible`, so re-derive the viewport.
+                let size = self.window.inner_size();
+                self.apply_viewport(size.width, size.height);
                 eprintln!(
                     "grida_editor: ui: {}",
                     if self.ui_visible { "on" } else { "off" }
@@ -1365,7 +1281,7 @@ impl ShellApp {
         self.pen_pending = false;
         self.hand_sticky = false;
         self.tools.set_tool(tool);
-        self.toolbar.sync(&mut self.tool_ui, self.tools.tool());
+        // The egui toolbar reads the active tool live each frame — no sync.
         self.update_cursor_icon();
         // Arming/disarming flips chrome dormancy: overlay damage, not
         // just a redraw.
@@ -1913,79 +1829,11 @@ impl ShellApp {
         }
     }
 
-    // -- UI layer (M3) -----------------------------------------------------
+    // -- UI-space helpers --------------------------------------------------
 
-    /// Physical → logical (UI-space) point.
+    /// Physical → logical (UI-space) point. The HUD works in logical px.
     fn to_ui_point(&self, physical: [f32; 2]) -> [f32; 2] {
         [physical[0] / self.dpr, physical[1] / self.dpr]
-    }
-
-    /// Which UI layer the next pointer event belongs to, if any:
-    /// a widget holds capture, or the canvas is idle and the pointer
-    /// is over that layer's region (`SURF-1` panel-first). The left
-    /// (hierarchy) layer wins arbitration ties — the strips do not
-    /// overlap, so a tie only means neither contains the point.
-    fn ui_target(&self, ui_point: [f32; 2]) -> Option<UiTarget> {
-        // Chrome hidden (Mod+\): no layer is targetable, so every
-        // pointer event falls through to the canvas.
-        if !self.ui_visible {
-            return None;
-        }
-        // A tool press/drag in flight owns the pointer (SURF-1 tool
-        // rung) — UI regions must not steal it mid-sequence.
-        if self.tools.pointer_busy() {
-            return None;
-        }
-        if self.tool_ui.captured().is_some() {
-            return Some(UiTarget::Toolbar);
-        }
-        if self.hier_ui.captured().is_some() {
-            return Some(UiTarget::Hierarchy);
-        }
-        if self.ui.captured().is_some() {
-            return Some(UiTarget::Properties);
-        }
-        // A HUD gesture or pan in flight owns the pointer.
-        if self.hud.gesture_active() || self.pan_active {
-            return None;
-        }
-        if self.tool_ui.contains(ui_point) {
-            return Some(UiTarget::Toolbar);
-        }
-        if self.hier_ui.contains(ui_point) {
-            return Some(UiTarget::Hierarchy);
-        }
-        if self.ui.contains(ui_point) {
-            return Some(UiTarget::Properties);
-        }
-        None
-    }
-
-    /// Route a pointer event to a UI layer and apply its effects.
-    fn route_ui_pointer(&mut self, target: UiTarget, event: &SurfaceEvent) {
-        match target {
-            UiTarget::Properties => {
-                let result = self.ui.pointer(event);
-                self.process_ui(result);
-            }
-            UiTarget::Hierarchy => {
-                let result = self.hier_ui.pointer(event);
-                self.process_hier(result);
-            }
-            UiTarget::Toolbar => {
-                let result = self.tool_ui.pointer(event);
-                if let Some(tool) = self.toolbar.handle(&mut self.tool_ui) {
-                    self.tools.set_tool(tool);
-                    self.toolbar.sync(&mut self.tool_ui, self.tools.tool());
-                    self.update_cursor_icon();
-                    // Chrome dormancy flips with the tool.
-                    self.overlay_damaged();
-                }
-                if result.consumed {
-                    self.window.request_redraw();
-                }
-            }
-        }
     }
 
     // -- tool machine (docs/wg/canvas/tool.md) ---------------------------------
@@ -2008,7 +1856,7 @@ impl ShellApp {
             self.reflect_frame();
             self.enter_text_session(id);
         }
-        self.toolbar.sync(&mut self.tool_ui, self.tools.tool());
+        // The egui toolbar reads the active tool live each frame — no sync.
         self.update_cursor_icon();
         // An effective outcome can end the tool's pointer claim —
         // chrome dormancy may flip back: overlay damage.
@@ -2094,60 +1942,24 @@ impl ShellApp {
         }
     }
 
-    /// Apply a UI input result: emissions → editor (gesture-framed
-    /// previews/commits). Applied patches reach the renderer through
-    /// the damage ledger; the redraw here covers widget visuals
-    /// (hover, focus, drag states).
-    fn process_ui(&mut self, result: UiInputResult) {
-        if !result.emissions.is_empty() {
-            bind::apply(&mut self.editor, &result.emissions);
-        }
-        // The scene panel's clear-background button (pointer or
-        // keyboard activation): the panel only reports the click; the
-        // mutation is dispatched here (ARCH-3 — panels own no editing
-        // logic).
-        if self.props.take_clear_background(&mut self.ui) {
-            let _ = self.editor.dispatch(
-                vec![Mutation::SceneBackground { color: None }],
-                Origin::Local,
-                Recording::Record {
-                    label: Some("ui.scene.bg".to_string()),
-                },
-            );
-        }
-        // Re-sync the properties panel from UI state, not just on
-        // document damage: opening/closing the color-picker popover
-        // (a swatch click, an outside-press dismissal) mutates no
-        // document, yet must remount the panel. Idempotent — a no-op
-        // when nothing displayed changed (PROP-7).
-        self.props.sync(&mut self.ui, &self.editor);
-        if result.consumed || !result.emissions.is_empty() {
-            self.window.request_redraw();
-        }
-    }
-
-    /// Apply a hierarchy input result: drain the tree's outputs,
-    /// apply them through the editor, and push selection changes back
-    /// onto the surface. Structure changes reach the renderer through
-    /// the damage ledger.
-    fn process_hier(&mut self, result: UiInputResult) {
-        let applied = self.hier.handle(&mut self.hier_ui, &mut self.editor);
-        if result.consumed || applied.moved || applied.selection_changed {
-            self.window.request_redraw();
-        }
-    }
-
     /// Re-derive the canvas viewport (window minus the properties
-    /// strip, `SHELL-2` spirit) and the UI layers' logical viewports.
+    /// strip, `SHELL-2` spirit).
     ///
     /// The camera shrinks by the **right** strip only: the renderer
     /// paints content into `[0, camera_w]` with no viewport-origin
-    /// API, so the right panel exactly covers the unpainted remainder
-    /// while the left hierarchy strip *overlays* the canvas (opaque,
-    /// input-consuming — `UI-5` keeps events from falling through).
-    /// A true two-sided viewport inset needs engine support.
+    /// API, so the right (properties) panel exactly covers the unpainted
+    /// remainder, while the left hierarchy panel *overlays* the canvas
+    /// (egui paints it opaque and gates its input). A true two-sided
+    /// viewport inset needs engine support.
     pub(crate) fn apply_viewport(&mut self, width: u32, height: u32) {
-        let panel_physical = self.props.width * self.dpr;
+        // The right inset is the egui properties panel's width — but only
+        // while the chrome shows. Hidden (Mod+\), the canvas reclaims the
+        // full width (the panel is not painted, so nothing covers it).
+        let panel_physical = if self.ui_visible {
+            super::PANEL_WIDTH * self.dpr
+        } else {
+            0.0
+        };
         let content_w = (width as f32 - panel_physical).max(1.0);
         self.app.renderer_mut().camera.set_size(Size {
             width: content_w,
@@ -2156,26 +1968,9 @@ impl ShellApp {
         self.app
             .renderer_mut()
             .update_viewport_size(content_w, height as f32);
-        let logical = Size {
-            width: width as f32 / self.dpr,
-            height: height as f32 / self.dpr,
-        };
-        self.ui.set_viewport(logical);
-        self.props.invalidate();
-        self.props.sync(&mut self.ui, &self.editor);
-        self.hier_ui.set_viewport(logical);
-        self.hier.invalidate();
-        self.hier.sync(&mut self.hier_ui, &self.editor);
-        self.tool_ui.set_viewport(logical);
-        // Bottom-centered toolbar follows the viewport.
-        self.toolbar
-            .set_origin(super::toolbar_origin(logical.width, logical.height));
-        self.toolbar.invalidate();
-        self.toolbar.sync(&mut self.tool_ui, self.tools.tool());
-        self.menu_ui.set_viewport(logical);
-        // An open menu's placement is anchored to the old viewport —
-        // dismiss on resize (platform behavior).
-        self.menu.close(&mut self.menu_ui);
+        // An open context menu is anchored to the old viewport — dismiss
+        // on resize (platform behavior).
+        self.menu_open = None;
     }
 
     /// The measurement readout's subjects (measurement.md): A = the
@@ -2683,54 +2478,6 @@ impl ShellApp {
         }
     }
 
-    /// Paint the UI scenes onto the window canvas after the content
-    /// flush — the engine's own painter/LayerList path (`UI-1`).
-    fn draw_ui(&mut self) {
-        // Chrome hidden (Mod+\): paint no panel strip, toolbar, or menu.
-        if !self.ui_visible {
-            return;
-        }
-        if self.ui.is_empty()
-            && self.hier_ui.is_empty()
-            && self.tool_ui.is_empty()
-            && self.menu_ui.is_empty()
-        {
-            return;
-        }
-        // The skia surface lives *inside* `self.app`
-        // (`surface_mut_ptr()` is an interior pointer into the
-        // application struct), so the pointer is minted at use — a
-        // stored copy would dangle if the app struct ever moved.
-        // SAFETY: `self.app` is not moved and its surface is not
-        // replaced while `surface` is alive (this scope; the paint
-        // loop below only touches the disjoint UI-layer fields).
-        let surface = unsafe { &mut *self.app.surface_mut_ptr() };
-        let canvas = surface.canvas();
-        canvas.save();
-        canvas.scale((self.dpr, self.dpr));
-        // The menu layer paints last: the popover sits above every
-        // panel strip.
-        for layer in [&self.hier_ui, &self.ui, &self.tool_ui, &self.menu_ui] {
-            if layer.is_empty() {
-                continue;
-            }
-            let painter = Painter::new_with_scene_cache(
-                canvas,
-                layer.fonts(),
-                layer.images(),
-                layer.cache(),
-                RenderPolicy::default(),
-            );
-            painter.draw_layer_list(&layer.cache().layers);
-        }
-        canvas.restore();
-        if let Some(mut ctx) = surface.recording_context()
-            && let Some(mut direct) = ctx.as_direct_context()
-        {
-            direct.flush_and_submit();
-        }
-    }
-
     /// Pan/zoom translation for scroll + pinch, cribbed from grida_dev.
     fn scroll_command(&self, event: &WindowEvent) -> ApplicationCommand {
         match event {
@@ -2778,7 +2525,31 @@ impl ApplicationHandler<HostEvent> for ShellApp {
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
-        self.handle_window_event(event_loop, event);
+        // ── egui spike: UI-first arbitration (new top tier) ──────────
+        // Feed every event to egui, then gate the canvas: pointer /
+        // keyboard input egui is using must not also reach the HUD,
+        // tools, or the UiLayer strips. Non-input events (RedrawRequested,
+        // Resized, ModifiersChanged, Close) always pass through — they
+        // are not exclusive input.
+        let resp = self.egui_winit.on_window_event(&self.window, &event);
+        if resp.repaint {
+            self.window.request_redraw();
+        }
+        let gated = match &event {
+            WindowEvent::CursorMoved { .. }
+            | WindowEvent::MouseInput { .. }
+            | WindowEvent::MouseWheel { .. }
+            | WindowEvent::PinchGesture { .. } => {
+                resp.consumed || self.egui_ctx.egui_wants_pointer_input()
+            }
+            WindowEvent::KeyboardInput { .. } | WindowEvent::Ime(_) => {
+                resp.consumed || self.egui_ctx.egui_wants_keyboard_input()
+            }
+            _ => false,
+        };
+        if !gated {
+            self.handle_window_event(event_loop, event);
+        }
         // The frame choke point (FRAME-2): whatever the event did to
         // the document, it reaches pixels here — and only here.
         if !self.exiting {
@@ -2819,6 +2590,96 @@ impl ApplicationHandler<HostEvent> for ShellApp {
 }
 
 impl ShellApp {
+    /// egui spike present step (plan §5): run the immediate-mode UI,
+    /// paint its meshes on the shared GL context, then reset Ganesh's
+    /// cached GL state so the next frame's Skia ops start clean.
+    fn paint_egui(&mut self) {
+        use glow::HasContext as _;
+
+        let raw = self.egui_winit.take_egui_input(&self.window);
+        // Clone the Arc-backed context so the build closure can borrow
+        // `&mut self` — the handle we `run`/`tessellate` on is separate
+        // from `self.egui_ctx`.
+        let ctx = self.egui_ctx.clone();
+        // egui 0.35: `run_ui` hands the closure a root `&mut Ui` (was
+        // `run` → `&Context` pre-0.31); panels nest into that Ui.
+        let full = ctx.run_ui(raw, |ui| self.build_inspector(ui));
+        self.egui_winit
+            .handle_platform_output(&self.window, full.platform_output);
+        let prims = ctx.tessellate(full.shapes, full.pixels_per_point);
+        let (w, h): (u32, u32) = self.window.inner_size().into();
+        // Bind the window's default framebuffer (fbo 0, confirmed in
+        // window.rs) — the same target Skia drew into — so egui
+        // composites on top of the frame rather than into the void.
+        unsafe {
+            self.egui_painter
+                .gl()
+                .bind_framebuffer(glow::FRAMEBUFFER, None);
+        }
+        self.egui_painter.paint_and_update_textures(
+            [w, h],
+            full.pixels_per_point,
+            &prims,
+            &full.textures_delta,
+        );
+        // The Skia↔raw-GL reset dance: egui just issued raw GL, so
+        // Ganesh's cached state is stale. Force a full re-sync before
+        // the next frame's `surface.canvas().clear()`. If this proves
+        // insufficient (flicker/corruption), that is the signal to move
+        // to a Skia-native egui painter (plan Option B).
+        {
+            // SAFETY: same discipline as `draw_ui`.
+            let surface = unsafe { &mut *self.app.surface_mut_ptr() };
+            if let Some(mut rec) = surface.recording_context()
+                && let Some(mut direct) = rec.as_direct_context()
+            {
+                direct.reset(None);
+            }
+        }
+        // egui asked to animate (cursor blink, etc.) — schedule a frame.
+        if full
+            .viewport_output
+            .get(&egui::ViewportId::ROOT)
+            .is_some_and(|v| v.repaint_delay.is_zero())
+        {
+            self.window.request_redraw();
+        }
+    }
+
+    /// The egui-rendered inspector — delegates to the real properties
+    /// panel (`egui_panels`), which reads editor queries and writes
+    /// through `bind::apply`, exactly like the `UiLayer` panel it
+    /// replaces. Disjoint field borrows keep the borrow checker happy.
+    fn build_inspector(&mut self, ui: &mut egui::Ui) {
+        // Chrome visibility (Mod+\): the egui panels hide with the rest
+        // of the shell UI. Building nothing means egui claims no area,
+        // so `egui_wants_pointer_input` is false and the canvas stands
+        // alone — same contract the old UiLayer paint gate had.
+        if !self.ui_visible {
+            return;
+        }
+        self.egui_panels.hierarchy(ui, &mut self.editor);
+        self.egui_panels
+            .properties(ui, &mut self.editor, self.last_frame_ms);
+        if let Some(tool) = super::egui_panels::toolbar(ui, self.tools.tool()) {
+            self.select_tool(tool);
+        }
+        // Context menu (egui): take it out so the render can borrow
+        // `self`; put it back only while it stays open. A chosen command
+        // dispatches through the one registry switch (`MENU-1`).
+        if let Some((menu, pos)) = self.menu_open.take() {
+            match super::egui_panels::context_menu(ui, &menu, pos) {
+                super::egui_panels::ContextMenuResult::Open => {
+                    self.menu_open = Some((menu, pos));
+                }
+                super::egui_panels::ContextMenuResult::Close => {}
+                super::egui_panels::ContextMenuResult::Chosen(cmd) => {
+                    self.command(cmd);
+                }
+            }
+        }
+    }
+
     fn handle_window_event(&mut self, event_loop: &ActiveEventLoop, event: WindowEvent) {
         if let WindowEvent::RedrawRequested = &event {
             // ── The present: a FULL recomposition, every time (hud.md
@@ -2833,6 +2694,8 @@ impl ShellApp {
             // event tail before a redraw is ever delivered; reflect
             // again so a paint can never present a stale mirror.
             self.reflect_frame();
+            // egui spike: time the whole present for the perf A/B.
+            let egui_frame_start = std::time::Instant::now();
             // 0. Clear to transparent — the true bottom of the stack.
             //    The blit below composites an alpha snapshot with
             //    source-over: without this, regions the content
@@ -2879,14 +2742,15 @@ impl ShellApp {
             self.draw_pixel_grid();
             // 6. HUD chrome above content, beneath the panels (hud.md).
             self.draw_hud();
-            // 7. UI panels, same canvas.
-            self.draw_ui();
-            // 8. Ruler strips at the canvas viewport's edges
-            //    (ruler.md).
+            // 7. Ruler strips at the canvas viewport's edges (ruler.md).
             self.draw_ruler();
+            // 8. egui chrome (properties/hierarchy/toolbar/menu) —
+            //    topmost, on the shared GL context.
+            self.paint_egui();
             if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
                 eprintln!("error swapping buffers: {e:?}");
             }
+            self.last_frame_ms = egui_frame_start.elapsed().as_secs_f32() * 1000.0;
         }
 
         if let WindowEvent::CloseRequested = &event {
@@ -2948,17 +2812,6 @@ impl ShellApp {
                     }
                     return;
                 }
-                // Open-menu modality: the captured menu widget sees
-                // every move (hover, submenu intent).
-                if self.menu.is_open() {
-                    let ui_point = self.to_ui_point(screen_point);
-                    self.menu_ui.pointer(&SurfaceEvent::PointerMove {
-                        canvas_point: ui_point,
-                        screen_point: ui_point,
-                    });
-                    self.drain_menu();
-                    return;
-                }
                 // Middle-drag pan in flight: the engine surface owns
                 // the camera gesture.
                 if self.pan_active {
@@ -2976,18 +2829,8 @@ impl ShellApp {
                     }
                     return;
                 }
-                // UI-first arbitration (SURF-1, UI-5).
-                let ui_point = self.to_ui_point(screen_point);
-                if let Some(target) = self.ui_target(ui_point) {
-                    self.route_ui_pointer(
-                        target,
-                        &SurfaceEvent::PointerMove {
-                            canvas_point: ui_point,
-                            screen_point: ui_point,
-                        },
-                    );
-                    return;
-                }
+                // (egui claims pointer input over its panels upstream in
+                // `window_event`; anything reaching here is canvas-bound.)
                 // Edit-mode rung (edit-mode.md capture): an active
                 // vector mode owns content input above the tools.
                 if matches!(self.mode, EditMode::Vector(_)) {
@@ -3060,30 +2903,6 @@ impl ShellApp {
                     if response.needs_redraw {
                         self.window.request_redraw();
                     }
-                    return;
-                }
-                // Open-menu modality (menu.md): every press
-                // routes to the captured menu widget — inside chooses,
-                // outside dismisses and is swallowed. Nothing reaches
-                // the canvas while the menu is open.
-                if self.menu.is_open() {
-                    let ui_point = self.to_ui_point(screen_point);
-                    let ui_event = match state {
-                        ElementState::Pressed => SurfaceEvent::PointerDown {
-                            canvas_point: ui_point,
-                            screen_point: ui_point,
-                            button: pointer_button,
-                            modifiers,
-                        },
-                        ElementState::Released => SurfaceEvent::PointerUp {
-                            canvas_point: ui_point,
-                            screen_point: ui_point,
-                            button: pointer_button,
-                            modifiers,
-                        },
-                    };
-                    self.menu_ui.pointer(&ui_event);
-                    self.drain_menu();
                     return;
                 }
                 // Middle button: camera pan via the engine surface
@@ -3165,34 +2984,10 @@ impl ShellApp {
                     }
                     return;
                 }
-                // UI-first arbitration: over UI regions (or while a
-                // widget captures the pointer) the canvas never sees
-                // the event (UI-5).
+                // (egui claims pointer input over its panels upstream in
+                // `window_event`; anything reaching here is canvas-bound.)
+                // `ui_point` (logical px) still anchors a context-menu open.
                 let ui_point = self.to_ui_point(screen_point);
-                if let Some(target) = self.ui_target(ui_point) {
-                    let ui_event = match state {
-                        ElementState::Pressed => SurfaceEvent::PointerDown {
-                            canvas_point: ui_point,
-                            screen_point: ui_point,
-                            button: pointer_button,
-                            modifiers,
-                        },
-                        ElementState::Released => SurfaceEvent::PointerUp {
-                            canvas_point: ui_point,
-                            screen_point: ui_point,
-                            button: pointer_button,
-                            modifiers,
-                        },
-                    };
-                    self.route_ui_pointer(target, &ui_event);
-                    return;
-                }
-                if matches!(state, ElementState::Pressed) {
-                    // Pointer down on the canvas blurs UI focus.
-                    self.ui.blur();
-                    self.hier_ui.blur();
-                    self.tool_ui.blur();
-                }
                 // The pointer's command surface (menu.md): a
                 // secondary press on the canvas opens the menu —
                 // retarget first (`MENU-5`), then the inventory over
@@ -3342,7 +3137,7 @@ impl ShellApp {
             _ => {
                 // Open-menu modality: scroll and pinch are swallowed
                 // (the camera must not move under an anchored menu).
-                if self.menu.is_open()
+                if self.menu_open.is_some()
                     && matches!(
                         &event,
                         WindowEvent::MouseWheel { .. } | WindowEvent::PinchGesture { .. }
@@ -3350,34 +3145,8 @@ impl ShellApp {
                 {
                     return;
                 }
-                // Wheel over a UI region scrolls the UI (UI-6);
-                // elsewhere it pans/zooms the camera as before.
-                if let WindowEvent::MouseWheel { delta, .. } = &event
-                    && !self.primary_held()
-                {
-                    let ui_point = self.to_ui_point(self.app.input_cursor());
-                    let over_hier =
-                        self.hier_ui.captured().is_some() || self.hier_ui.contains(ui_point);
-                    if over_hier || self.ui.captured().is_some() || self.ui.contains(ui_point) {
-                        let dy = match delta {
-                            MouseScrollDelta::PixelDelta(d) => d.y as f32 / self.dpr,
-                            MouseScrollDelta::LineDelta(_, y) => *y * 16.0,
-                        };
-                        let consumed = if over_hier {
-                            let consumed = self.hier_ui.wheel(ui_point, -dy);
-                            // The tree windows its rows by the scroll
-                            // offset — re-sync after a scroll.
-                            self.hier.sync(&mut self.hier_ui, &self.editor);
-                            consumed
-                        } else {
-                            self.ui.wheel(ui_point, -dy)
-                        };
-                        if consumed {
-                            self.window.request_redraw();
-                        }
-                        return;
-                    }
-                }
+                // Wheel over an egui panel is claimed upstream in
+                // `window_event`; anything here pans/zooms the camera.
                 let cmd = self.scroll_command(&event);
                 if !matches!(cmd, ApplicationCommand::None) {
                     self.run_command(cmd);
@@ -3689,23 +3458,6 @@ fn map_text_key(key: &Key, code: Option<KeyCode>, shortcut: bool) -> Option<KeyN
             Some(KeyCode::Char(base)) => Some(KeyName::Letter(base)),
             _ => None,
         },
-        Key::Character(c) => Some(KeyName::Character(c.to_string())),
-        _ => None,
-    }
-}
-
-/// Map a winit logical key to the engine's platform-agnostic
-/// [`KeyName`] (the normalized vocabulary the UI layer speaks, `UI-7`).
-fn map_key(key: &Key) -> Option<KeyName> {
-    match key {
-        Key::Named(NamedKey::Tab) => Some(KeyName::Tab),
-        Key::Named(NamedKey::ArrowLeft) => Some(KeyName::ArrowLeft),
-        Key::Named(NamedKey::ArrowRight) => Some(KeyName::ArrowRight),
-        Key::Named(NamedKey::ArrowUp) => Some(KeyName::ArrowUp),
-        Key::Named(NamedKey::ArrowDown) => Some(KeyName::ArrowDown),
-        Key::Named(NamedKey::Enter) => Some(KeyName::Enter),
-        Key::Named(NamedKey::Space) => Some(KeyName::Space),
-        Key::Named(NamedKey::Escape) => Some(KeyName::Escape),
         Key::Character(c) => Some(KeyName::Character(c.to_string())),
         _ => None,
     }

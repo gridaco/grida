@@ -39,6 +39,15 @@ arboard = { version = "3", optional = true }
 # with the winit event loop via `raw-window-handle`. Shell-only.
 muda = { version = "0.19", optional = true }
 
+# egui integration spike (golden-hopping-clock plan): an immediate-mode
+# GUI hosted around the native Skia/GL canvas, sharing the one GL context
+# via egui_glow. Shell-only, spike-scoped. `glow` must match egui_glow's
+# glow so the shared `Arc<glow::Context>` types unify.
+egui = { version = "0.35", optional = true }
+egui-winit = { version = "0.35", optional = true, default-features = false }
+egui_glow = { version = "0.35", optional = true }
+glow = { version = "0.17", optional = true }
+
 [dev-dependencies]
 # Pixel readback in the frame conformance suite (FRAME-1/FRAME-3):
 # reading the headless raster surface the tests paint into. Version
@@ -65,6 +74,10 @@ shell = [
   "dep:futures",
   "dep:arboard",
   "dep:muda",
+  "dep:egui",
+  "dep:egui-winit",
+  "dep:egui_glow",
+  "dep:glow",
 ]
 
 [[bin]]

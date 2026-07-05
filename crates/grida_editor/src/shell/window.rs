@@ -31,6 +31,10 @@ pub(crate) struct WindowInit {
     pub(crate) gl_surface: GlutinSurface<WindowSurface>,
     pub(crate) gl_context: PossiblyCurrentContext,
     pub(crate) scale_factor: f64,
+    /// egui_glow's GL handle over the *same* context Skia renders on
+    /// (egui spike). Built from the identical `get_proc_address` loader
+    /// as the Skia interface below, so both painters share one context.
+    pub(crate) glow_context: std::sync::Arc<glow::Context>,
 }
 
 pub(crate) fn create_window(title: &str, width: i32, height: i32) -> WindowInit {
@@ -111,6 +115,12 @@ pub(crate) fn create_window(title: &str, width: i32, height: i32) -> WindowInit 
         gl_config.display().get_proc_address(cstr.as_c_str())
     });
 
+    // egui_glow's GL handle over the same context (spike). Same loader
+    // as the Skia interface below — one context, two painters.
+    let glow_context = std::sync::Arc::new(unsafe {
+        glow::Context::from_loader_function_cstr(|s| gl_config.display().get_proc_address(s))
+    });
+
     let interface = skia_safe::gpu::gl::Interface::new_load_with(|name| {
         if name == "eglGetCurrentDisplay" {
             return std::ptr::null();
@@ -161,5 +171,6 @@ pub(crate) fn create_window(title: &str, width: i32, height: i32) -> WindowInit 
         gl_surface,
         gl_context,
         scale_factor,
+        glow_context,
     }
 }

@@ -70,7 +70,7 @@
 //!   contracts): the context menu as data — the closed item taxonomy
 //!   (action / submenu / separator) over the registry, enablement
 //!   resolved at open time, and the `MENU-5` retarget rule. The
-//!   presenter lives in [`ui::menu`].
+//!   presenter is egui (`shell::egui_panels::context_menu`).
 //! - [`traverse`] — `docs/wg/canvas/traversal.md` (`TRAV-*`
 //!   contracts): pure keyboard selection traversal — down/up/across
 //!   the tree — plus the scope-relative select-all.

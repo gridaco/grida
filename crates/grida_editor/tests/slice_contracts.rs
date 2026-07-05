@@ -260,18 +260,6 @@ fn slice_marquee_selection() {
     selected.sort();
     assert_eq!(selected, vec!["A".to_string(), "B".to_string()]);
 
-    // The inspector works off the editor's selection: it mounts.
-    let mut ui = grida_editor::ui::UiLayer::new(Size {
-        width: 800.0,
-        height: 600.0,
-    });
-    let mut props = grida_editor::ui::properties::PropertiesPanel::new(240.0);
-    props.sync(&mut ui, &slice.editor);
-    assert!(
-        !ui.is_empty(),
-        "the properties panel mounts from a marquee selection"
-    );
-
     // Delete works off the editor's selection: one recorded batch
     // removes everything the marquee selected.
     let batch: Vec<grida_editor::document::Mutation> = slice

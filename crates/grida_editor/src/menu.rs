@@ -4,13 +4,15 @@
 //! context menu) and [`application_menu`] (the persistent top-level
 //! bar). Both return a [`Menu`] value — items that *reference* registry
 //! commands with enablement already resolved — presented natively (the
-//! application bar) or by [`crate::ui::menu`] (the context popover).
+//! application bar) or by egui (the context popover).
 //!
 //! ## Shape
 //!
 //! The module is pure and headless: given the working copy and the
 //! selection, the builders return the menu as a value. The shape
-//! follows the convergent design of the desktop platforms and the web:
+//! follows the convergent design of the desktop platforms and the web.
+//! The context popover is presented by egui
+//! (`shell::egui_panels::context_menu`); the application bar natively.
 //!
 //! - **Items reference commands, never carry behavior** (the
 //!   action-centric menus of the Qt lineage; AppKit's target/action).
@@ -26,8 +28,8 @@
 //!   a menu value is dead the moment the document moves.
 //! - **The open menu's entire output is one chosen command** (the
 //!   Win32 tracked-popup shape: the surface answers "which command?",
-//!   the host dispatches). The presenter ([`crate::ui::menu`]) emits
-//!   the choice; the shell's one registry switch runs it.
+//!   the host dispatches). The presenter (egui) emits the choice; the
+//!   shell's one registry switch runs it.
 //! - **The item-kind taxonomy is deliberately small** — action,
 //!   submenu, separator, and deferred — a subset of the web's menu
 //!   vocabulary (content/item/separator/sub trees). Checkable and radio
