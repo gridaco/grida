@@ -5,7 +5,7 @@
 //! Commands are *referenced* by every command surface and dispatched
 //! by exactly one host switch: the binding table ([`crate::keys`],
 //! `KEY-1` table–registry equality) and the context menu
-//! ([`crate::menu`], `CTX-1` command-surface equality) both bind rows
+//! ([`crate::menu`], `MENU-1` command-surface equality) both bind rows
 //! to members of this enum; neither carries behavior of its own. This
 //! is the action-centric shape the desktop platforms converged on —
 //! an item names a command, the command decides for itself whether it
@@ -18,7 +18,7 @@
 
 use crate::tool::Tool;
 
-/// The command registry's vocabulary (`KEY-1`/`CTX-1`, routing.md):
+/// The command registry's vocabulary (`KEY-1`/`MENU-1`, routing.md):
 /// every binding-table row and menu item dispatches one of these by
 /// name. Handlers live host-side (the shell's `command` switch) and
 /// decide for themselves whether they apply — consumed or declined, a
@@ -37,11 +37,11 @@ pub enum Command {
     Duplicate,
     Save,
     /// Copy the single selected node's name to the system clipboard —
-    /// a menu-only surface entry (context-menu.md reference
+    /// a menu-only surface entry (menu.md reference
     /// additions); declines unless exactly one named node is selected.
     CopyName,
     /// Copy the single selected node's stable id to the system
-    /// clipboard (context-menu.md reference additions).
+    /// clipboard (menu.md reference additions).
     CopyId,
     /// Vector edit's sub-selection delete — the first member of
     /// Delete's alternative chain (routing.md): declines outside the
@@ -101,6 +101,16 @@ pub enum Command {
     /// Distribute the selection's equal edge-to-edge gaps along an axis
     /// (`ALIGN-5`). Declines with fewer than three movable members.
     Distribute(crate::align::Distribute),
+    /// Wrap each selection partition in a plain group node — grouping.md's
+    /// per-partition rule (`GRP-1`). Declines on an empty selection.
+    Group,
+    /// Dissolve each selected group / boolean node, promoting its children
+    /// to the wrapper's slot with world position held (`GRP-4`). Declines
+    /// unless the selection holds a dissolvable node.
+    Ungroup,
+    /// Wrap each partition in a Container/Frame instead of a group
+    /// (`GRP-1`, [`crate::grouping::WrapKind::Container`]).
+    GroupWithContainer,
     ToggleVisible,
     /// Opacity digit (`KEY-6`): 1–9 → tenths, 0 → 100%, double-tap 0
     /// → 0% (the multi-tap window is [`crate::keys::OpacityTaps`]'
@@ -127,7 +137,7 @@ pub enum Command {
 }
 
 impl Command {
-    /// The registry name (`KEY-1`/`CTX-1` surface–registry equality is
+    /// The registry name (`KEY-1`/`MENU-1` surface–registry equality is
     /// checked against these).
     pub fn name(&self) -> &'static str {
         match self {
@@ -166,6 +176,9 @@ impl Command {
             Command::CreateOutlines => "create-outlines",
             Command::Align(_) => "align",
             Command::Distribute(_) => "distribute",
+            Command::Group => "group",
+            Command::Ungroup => "ungroup",
+            Command::GroupWithContainer => "group-with-container",
             Command::ToggleVisible => "toggle-visible",
             Command::Opacity(_) => "opacity",
             Command::ZoomIn => "zoom-in",

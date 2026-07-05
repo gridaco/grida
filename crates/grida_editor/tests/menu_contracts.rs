@@ -1,12 +1,17 @@
-//! Context-menu conformance (`CTX-*`) — `crates/grida_editor/docs/context-menu.md`
+//! Menu conformance (`MENU-*`) — `crates/grida_editor/docs/menu.md`
 //! — plus the presenter's popover behavior (`crate::ui::menu`:
 //! placement, popup grab, dismissal, activation, submenu, keyboard).
+//! Covers the shared model (`MENU-1`/`MENU-2`/`MENU-3`), the
+//! context-menu surface's deltas (`MENU-4`/`MENU-5`/`MENU-6`), and the
+//! application menu as data — its actionable rows (`MENU-1`) and
+//! deferred placeholders (`MENU-7`). Its native *presentation* is
+//! deferred with the host; the inventory value is tested here.
 //!
 //! Headless throughout: the inventory is pure resolution over the
 //! working copy ([`grida_editor::menu`]); the presenter is asserted
 //! on the UI layer's scene-state plane (harness.md) — no pixels.
-//! `CTX-3` (point-targeted paste) is deferred with the paste
-//! placement rule; `CTX-5` waits on the scene-row menu (the scene
+//! `MENU-4` (point-targeted paste) is deferred with the paste
+//! placement rule; `MENU-6` waits on the scene-row menu (the scene
 //! panel has no row menu host yet). Both stay named in TODO.md.
 
 use std::collections::HashMap;
@@ -20,12 +25,14 @@ use math2::transform::AffineTransform;
 use grida_editor::command::Command;
 use grida_editor::document::{Mutation, PropPatch, WorkingCopy};
 use grida_editor::editor::{Editor, Recording};
+use grida_editor::grouping::{self, WrapKind};
 use grida_editor::history::Origin;
 use grida_editor::keys;
 use grida_editor::menu::{self, Item, Menu};
 use grida_editor::ui::UiLayer;
 use grida_editor::ui::menu::{ContextMenu, MenuKey, Outcome, WIDGET_ID, item_offsets, place};
 use grida_editor::ui::widget::WidgetState;
+use math2::rect::Rectangle;
 
 /// Three named top-level rectangles, document order `[A, B, C]`.
 fn three_rect_editor() -> Editor {
@@ -63,14 +70,14 @@ fn find(menu: &Menu, cmd: Command) -> menu::Action {
         .clone()
 }
 
-// -- CTX-1 — command-surface equality ------------------------------------------
+// -- MENU-1 — command-surface equality ------------------------------------------
 
-/// CTX-1 — every menu item dispatches a registry command by name; no
+/// MENU-1 — every menu item dispatches a registry command by name; no
 /// menu-only behavior exists. The taxonomy makes behaviorful items
 /// unrepresentable; this enumerates the shipped inventory against the
 /// registry names across target states.
 #[test]
-fn ctx_1_every_item_is_a_registry_command() {
+fn menu_1_every_item_is_a_registry_command() {
     let editor = three_rect_editor();
     for selection in [vec![], s(&["B"]), s(&["A", "C"])] {
         let m = menu::canvas_menu(editor.document(), &selection);
@@ -93,13 +100,13 @@ fn ctx_1_every_item_is_a_registry_command() {
     }
 }
 
-// -- CTX-2 — enablement truth ----------------------------------------------------
+// -- MENU-2 — enablement truth ----------------------------------------------------
 
-/// CTX-2 — an enabled item's command succeeds on the current target;
+/// MENU-2 — an enabled item's command succeeds on the current target;
 /// a disabled item's would refuse. Empty canvas: paste is the only
 /// live clipboard verb.
 #[test]
-fn ctx_2_empty_selection_disables_target_commands() {
+fn menu_2_empty_selection_disables_target_commands() {
     let editor = three_rect_editor();
     let m = menu::canvas_menu(editor.document(), &[]);
     for cmd in [
@@ -109,6 +116,9 @@ fn ctx_2_empty_selection_disables_target_commands() {
         Command::CopyId,
         Command::BringToFront,
         Command::SendToBack,
+        Command::Group,
+        Command::Ungroup,
+        Command::GroupWithContainer,
         Command::Flatten,
         Command::ZoomSelection,
         Command::ToggleVisible,
@@ -122,12 +132,48 @@ fn ctx_2_empty_selection_disables_target_commands() {
     );
 }
 
-/// CTX-2 — arrange enablement is *exact* capability, dry-run through
+/// MENU-2 — ungroup enablement is exact capability, dry-run through the
+/// same resolver ([`grida_editor::grouping::ungroup`]): a selected group
+/// enables Ungroup; a plain node does not. Group / Group-with-container
+/// gate on a non-empty selection (covered above), so this pins the
+/// discriminating case.
+#[test]
+fn menu_2_ungroup_enablement_mirrors_the_resolver() {
+    let mut editor = three_rect_editor();
+    // Wrap {A, B} into a group `g1` so a dissolvable target exists.
+    let rect = Rectangle::from_points(&[[0.0, 0.0], [80.0, 0.0], [80.0, 80.0], [0.0, 80.0]]);
+    let mut n = 0;
+    let batch = grouping::group(
+        editor.document(),
+        &s(&["A", "B"]),
+        |_| Some(rect),
+        WrapKind::Group,
+        || {
+            n += 1;
+            format!("g{n}")
+        },
+    )
+    .expect("group resolves");
+    editor
+        .dispatch(batch, Origin::Local, Recording::Record { label: None })
+        .expect("applies");
+
+    // A selected group enables Ungroup; the enabled item's resolver runs.
+    let m = menu::canvas_menu(editor.document(), &s(&["g1"]));
+    assert!(find(&m, Command::Ungroup).enabled);
+    assert!(grouping::ungroup(editor.document(), &"g1".to_string()).is_some());
+    // A plain rectangle does not.
+    let m = menu::canvas_menu(editor.document(), &s(&["C"]));
+    assert!(!find(&m, Command::Ungroup).enabled);
+    assert!(grouping::ungroup(editor.document(), &"C".to_string()).is_none());
+}
+
+/// MENU-2 — arrange enablement is *exact* capability, dry-run through
 /// the same resolver the command dispatches ([`grida_editor::arrange`]):
 /// a middle node moves both ways (and the move actually applies); the
 /// frontmost node's Bring-to-front is disabled, not a live no-op.
 #[test]
-fn ctx_2_arrange_enablement_mirrors_the_resolver() {
+fn menu_2_arrange_enablement_mirrors_the_resolver() {
     let mut editor = three_rect_editor();
 
     let m = menu::canvas_menu(editor.document(), &s(&["B"]));
@@ -164,11 +210,11 @@ fn ctx_2_arrange_enablement_mirrors_the_resolver() {
     );
 }
 
-/// CTX-2 — flatten: enabled exactly when the command's own gates pass
+/// MENU-2 — flatten: enabled exactly when the command's own gates pass
 /// (single path-reducible selection), and the enabled command
 /// succeeds.
 #[test]
-fn ctx_2_flatten_enablement_mirrors_the_command() {
+fn menu_2_flatten_enablement_mirrors_the_command() {
     let mut editor = three_rect_editor();
     let mut counter = 0;
     let mut mint = || {
@@ -197,7 +243,7 @@ fn ctx_2_flatten_enablement_mirrors_the_command() {
         |_| None
     ));
 
-    // Empty selection: disabled, and the command declines (CTX-2).
+    // Empty selection: disabled, and the command declines (MENU-2).
     let m = menu::canvas_menu(editor.document(), &s(&[]));
     assert!(!find(&m, Command::Flatten).enabled);
     assert!(!grida_editor::mode::flatten_selection(
@@ -208,10 +254,10 @@ fn ctx_2_flatten_enablement_mirrors_the_command() {
     ));
 }
 
-/// CTX-2 — the reference additions: Copy name wants exactly one
+/// MENU-2 — the reference additions: Copy name wants exactly one
 /// *named* node; Copy ID wants exactly one node.
 #[test]
-fn ctx_2_copy_name_and_id_are_single_target() {
+fn menu_2_copy_name_and_id_are_single_target() {
     let editor = three_rect_editor();
     let m = menu::canvas_menu(editor.document(), &s(&["A"]));
     assert!(find(&m, Command::CopyName).enabled);
@@ -225,7 +271,7 @@ fn ctx_2_copy_name_and_id_are_single_target() {
 /// doctrine): a visible selection reads "Hide", an all-hidden one
 /// reads "Show" — one row, label-swapped, never a check mark.
 #[test]
-fn ctx_2_toggle_visible_presents_the_applicable_direction() {
+fn menu_2_toggle_visible_presents_the_applicable_direction() {
     let mut editor = three_rect_editor();
     let m = menu::canvas_menu(editor.document(), &s(&["B"]));
     let toggle = find(&m, Command::ToggleVisible);
@@ -253,7 +299,7 @@ fn ctx_2_toggle_visible_presents_the_applicable_direction() {
 /// A submenu's enablement is derived from its contents, never stored:
 /// "Copy as" is exactly as enabled as its PNG row.
 #[test]
-fn ctx_2_submenu_enablement_is_derived() {
+fn menu_2_submenu_enablement_is_derived() {
     let editor = three_rect_editor();
     let submenu = |selection: &[String]| {
         let m = menu::canvas_menu(editor.document(), selection);
@@ -269,13 +315,13 @@ fn ctx_2_submenu_enablement_is_derived() {
     assert!(!submenu(&[]));
 }
 
-// -- CTX-4 — retarget -------------------------------------------------------------
+// -- MENU-5 — retarget -------------------------------------------------------------
 
-/// CTX-4 — opening over an unselected node selects it; over a
+/// MENU-5 — opening over an unselected node selects it; over a
 /// selected node (any member) or empty space the selection is
 /// preserved.
 #[test]
-fn ctx_4_retarget() {
+fn menu_5_retarget() {
     let b = "B".to_string();
     let a = "A".to_string();
     // Unselected hit replaces.
@@ -286,6 +332,205 @@ fn ctx_4_retarget() {
     assert_eq!(menu::retarget(&s(&["A"]), None), None);
     // Empty selection + hit selects.
     assert_eq!(menu::retarget(&[], Some(&b)), Some(s(&["B"])));
+}
+
+// -- the application menu: MENU-1 (actionable) + MENU-7 (deferred) --------------
+
+/// Build the application menu over a two-node selection with history
+/// available and text mode off — the ordinary case.
+fn app_menu(editor: &Editor) -> Menu {
+    menu::application_menu(&menu::AppMenuContext {
+        doc: editor.document(),
+        selection: &s(&["A", "B"]),
+        text_mode: false,
+        can_undo: true,
+        can_redo: false,
+    })
+}
+
+/// Every item under a submenu, recursively (the bar is submenus).
+fn all_items(menu: &Menu) -> Vec<&Item> {
+    fn walk<'a>(items: &'a [Item], out: &mut Vec<&'a Item>) {
+        for item in items {
+            out.push(item);
+            if let Item::Submenu(sub) = item {
+                walk(&sub.items, out);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(&menu.items, &mut out);
+    out
+}
+
+/// MENU-1 — every *actionable* application-menu row dispatches a
+/// registry command by name; the bar carries no menu-only behavior.
+/// Deferred placeholders are exempt (they reference no command) — this
+/// is exactly the actionable/deferred split.
+#[test]
+fn menu_1_application_rows_are_registry_commands() {
+    let editor = three_rect_editor();
+    let m = app_menu(&editor);
+    let actions = m.actions();
+    assert!(!actions.is_empty(), "the bar ships live rows");
+    for a in &actions {
+        let name = a.command.name();
+        assert!(
+            !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'),
+            "registry name is kebab-case: {name}"
+        );
+    }
+    // The top level is entirely submenus (File, Edit, …) — the bar
+    // shape, never a bare action.
+    assert!(
+        m.items.iter().all(|it| matches!(it, Item::Submenu(_))),
+        "the application menu's top level is submenus"
+    );
+}
+
+/// MENU-1 (native routing) — `command_bindings` is the id→command
+/// contract a native host tags its items with: one id per actionable
+/// row, all unique, exactly the actions in order, and each id resolving
+/// to that row's command. Deferred rows contribute no id.
+#[test]
+fn menu_1_command_bindings_route_each_row() {
+    let editor = three_rect_editor();
+    let m = app_menu(&editor);
+    let bindings = m.command_bindings();
+    let actions = m.actions();
+
+    // One binding per actionable row, in the same order.
+    assert_eq!(bindings.len(), actions.len());
+    for ((id, cmd), action) in bindings.iter().zip(&actions) {
+        assert_eq!(*cmd, action.command, "binding {id} maps to its row");
+    }
+    // Ids are unique — a native lookup can never be ambiguous.
+    let mut ids: Vec<&str> = bindings.iter().map(|(id, _)| id.as_str()).collect();
+    let count = ids.len();
+    ids.sort_unstable();
+    ids.dedup();
+    assert_eq!(ids.len(), count, "every routing id is unique");
+
+    // Deferred rows are absent from the routing map (nothing to route).
+    let deferred_labels: Vec<&str> = all_items(&m)
+        .into_iter()
+        .filter_map(|it| match it {
+            Item::Deferred(d) => Some(d.label),
+            _ => None,
+        })
+        .collect();
+    assert!(!deferred_labels.is_empty());
+    let action_count_including_deferred = all_items(&m)
+        .into_iter()
+        .filter(|it| matches!(it, Item::Action(_) | Item::Deferred(_)))
+        .count();
+    assert!(
+        bindings.len() < action_count_including_deferred,
+        "deferred rows are not routed"
+    );
+}
+
+/// MENU-7 — a deferred placeholder references no command, is never an
+/// action, and never counts as enabled: the bar carries deferred rows
+/// (the enumerated backlog) yet `actions()` — the dispatch surface —
+/// omits them entirely.
+#[test]
+fn menu_7_deferred_rows_are_inert() {
+    let editor = three_rect_editor();
+    let m = app_menu(&editor);
+
+    let deferred: Vec<&Item> = all_items(&m)
+        .into_iter()
+        .filter(|it| matches!(it, Item::Deferred(_)))
+        .collect();
+    assert!(
+        !deferred.is_empty(),
+        "the bar shows deferred rows, not an omission"
+    );
+    // Each names the system it waits on (the dev annotation).
+    for it in &deferred {
+        if let Item::Deferred(d) = it {
+            assert!(!d.label.is_empty(), "a deferred row is labelled");
+            assert!(!d.awaiting.is_empty(), "a deferred row names its blocker");
+        }
+    }
+
+    // The dispatch surface (`actions()`) never includes a deferred row:
+    // there is no command to dispatch. A submenu of only-deferred rows
+    // (e.g. Settings) contributes nothing.
+    let action_labels: Vec<&str> = m.actions().iter().map(|a| a.label).collect();
+    for it in &deferred {
+        if let Item::Deferred(d) = it {
+            assert!(
+                !action_labels.contains(&d.label),
+                "deferred row `{}` must not surface as an action",
+                d.label
+            );
+        }
+    }
+
+    // A submenu whose children are all deferred derives as not-enabled
+    // (no dispatchable capability of its own) — Settings is the case.
+    let settings = m
+        .items
+        .iter()
+        .find_map(|it| match it {
+            Item::Submenu(sub) if sub.label == "Settings" => Some(sub),
+            _ => None,
+        })
+        .expect("Settings submenu ships");
+    assert!(
+        !settings.enabled(),
+        "an all-deferred submenu has no enabled row"
+    );
+}
+
+/// MENU-7 — the Text menu is a mode-gated surface: present only while a
+/// text content mode is active.
+#[test]
+fn menu_7_text_menu_is_mode_gated() {
+    let editor = three_rect_editor();
+    let has_text = |text_mode| {
+        menu::application_menu(&menu::AppMenuContext {
+            doc: editor.document(),
+            selection: &s(&["A"]),
+            text_mode,
+            can_undo: false,
+            can_redo: false,
+        })
+        .items
+        .iter()
+        .any(|it| matches!(it, Item::Submenu(sub) if sub.label == "Text"))
+    };
+    assert!(!has_text(false), "no Text menu outside a text mode");
+    assert!(has_text(true), "Text menu appears in a text mode");
+}
+
+/// MENU-2 (application) — history-gated rows mirror the supplied flags:
+/// Undo/Redo are enabled exactly when the shell says history offers
+/// them, so the bar shows no enabled-but-dead Undo.
+#[test]
+fn menu_2_application_undo_redo_track_history() {
+    let editor = three_rect_editor();
+    let bar = |can_undo, can_redo| {
+        menu::application_menu(&menu::AppMenuContext {
+            doc: editor.document(),
+            selection: &[],
+            text_mode: false,
+            can_undo,
+            can_redo,
+        })
+    };
+    let enabled = |m: &Menu, cmd: Command| find(m, cmd).enabled;
+    let m = bar(true, false);
+    assert!(enabled(&m, Command::Undo));
+    assert!(!enabled(&m, Command::Redo));
+    let m = bar(false, true);
+    assert!(!enabled(&m, Command::Undo));
+    assert!(enabled(&m, Command::Redo));
 }
 
 // -- displayed bindings are sheet-derived --------------------------------------
@@ -438,7 +683,7 @@ fn presenter_activates_on_release_over_an_enabled_row() {
 }
 
 /// A disabled row consumes and does nothing — the menu stays open
-/// (`CTX-2`'s presenter half: no enabled-looking dead rows, no
+/// (`MENU-2`'s presenter half: no enabled-looking dead rows, no
 /// disabled-row activation).
 #[test]
 fn presenter_disabled_rows_do_not_activate() {

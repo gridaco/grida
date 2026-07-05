@@ -62,7 +62,7 @@ is consulted:
 3. **Widget focus**: a focused panel widget receives keys first
    (UI-3); the table is suppressed except rows explicitly marked
    legal under form focus. An open popover (the
-   [context menu](./context-menu.md)) is this layer's _modal_ form:
+   [context menu](./menu.md)) is this layer's _modal_ form:
    it grabs pointer and keyboard together — its navigation
    vocabulary and Escape resolve against it, an outside press
    dismisses and is swallowed, and everything else is suppressed —

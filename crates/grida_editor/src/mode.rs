@@ -355,7 +355,7 @@ fn member_flatten_form(
 }
 
 /// Whether flattening `selection` would bake at least one member — the
-/// enablement gate for the multi-select flatten command (`CTX-2`:
+/// enablement gate for the multi-select flatten command (`MENU-2`:
 /// enabled iff the command has an effect). Unlike [`flattenable`] (the
 /// single-node, primitive-only mode-entry twin), this spans the whole
 /// selection and includes vector nodes.
@@ -367,7 +367,7 @@ pub fn can_flatten(doc: &crate::document::WorkingCopy, selection: &[Id]) -> bool
 }
 
 /// Whether the selection has a text node to outline — the enablement
-/// gate for the Create Outlines command (`CTX-2`).
+/// gate for the Create Outlines command (`MENU-2`).
 pub fn can_create_outlines(doc: &crate::document::WorkingCopy, selection: &[Id]) -> bool {
     selection
         .iter()
@@ -493,7 +493,7 @@ fn vertex_bbox_origin(net: &grida::vectornetwork::VectorNetwork) -> (f32, f32) {
 }
 
 /// Non-mutating capability twin of [`flatten_to_vector`] — the
-/// context menu's enablement predicate (`CTX-2`: an enabled item's
+/// context menu's enablement predicate (`MENU-2`: an enabled item's
 /// command succeeds; these are the same gates, asked without
 /// dispatching).
 pub fn flattenable(doc: &crate::document::WorkingCopy, id: &Id) -> bool {

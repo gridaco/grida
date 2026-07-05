@@ -49,7 +49,7 @@ canvas spec and specifies only the delta this implementation adds.
   — the control set and its closed taxonomy.
 - [`properties.md`](./properties.md) · [`properties-sheet.md`](./properties-sheet.md)
   — the inspector's semantics and its full property inventory.
-- [`context-menu.md`](./context-menu.md) — the right-click command
-  surface inventory.
+- [`menu.md`](./menu.md) — the menu surfaces over the command
+  registry: the application menu and the context menus.
 - [`devtools.md`](./devtools.md) — RFD: an inspector over scene
   content and the editor's own UI.

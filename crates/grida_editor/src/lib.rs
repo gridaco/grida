@@ -66,10 +66,10 @@
 //!   sheet as data — meaningful-modifier masks, the virtual primary
 //!   modifier, command chains over the registry vocabulary, and
 //!   enumeration-time table validation.
-//! - [`menu`]     — `crates/grida_editor/docs/context-menu.md` (`CTX-*`
+//! - [`menu`]     — `crates/grida_editor/docs/menu.md` (`MENU-*`
 //!   contracts): the context menu as data — the closed item taxonomy
 //!   (action / submenu / separator) over the registry, enablement
-//!   resolved at open time, and the `CTX-4` retarget rule. The
+//!   resolved at open time, and the `MENU-5` retarget rule. The
 //!   presenter lives in [`ui::menu`].
 //! - [`traverse`] — `docs/wg/canvas/traversal.md` (`TRAV-*`
 //!   contracts): pure keyboard selection traversal — down/up/across

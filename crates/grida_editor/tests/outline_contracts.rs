@@ -158,7 +158,7 @@ fn outl_3_declines_without_an_outline() {
 }
 
 // ---------------------------------------------------------------------------
-// CTX-2 — enablement mirrors the command
+// MENU-2 — enablement mirrors the command
 // ---------------------------------------------------------------------------
 
 #[test]

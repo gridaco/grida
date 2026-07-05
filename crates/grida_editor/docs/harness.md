@@ -45,7 +45,7 @@ Every numbered contract in this cluster (`ARCH-*`, `DOC-*`, `ED-*`,
 `HISB-*`, `SYNC-*`, `SURF-*`, `TGT-*`, `TOOL-*`, `TRL-*`, `VEC-*`,
 `MODE-*`,
 `SNAP-*`, `MEAS-*`, `RUL-*`, `PXG-*`, `TG-*`, `PART-*`, `KEY-*`, `ROUTE-*`, `TRAV-*`,
-`NUDGE-*`, `GRP-*`, `ALY-*`, `FLAT-*`, `OUTL-*`, `BOOL-*`, `ALIGN-*`, `CTX-*`,
+`NUDGE-*`, `GRP-*`, `ALY-*`, `FLAT-*`, `OUTL-*`, `BOOL-*`, `ALIGN-*`, `MENU-*`,
 `UI-*`, `WID-*`, `PROP-*`, `SHEET-*`, `HIER-*`,
 `IO-*`, `IOX-*`, `SHELL-*`) maps to at least one conformance test
 that cites its id. The suite is the spec's executable form: a contract without a

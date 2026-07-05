@@ -27,13 +27,15 @@
 //! the constraint into the physical mask and failing validation on a
 //! contradictory row.
 //!
-//! Sheet rows whose commands are not yet implemented (group, boolean,
-//! text style, outline mode, color picker, locked, remove fill/stroke)
-//! are **not shipped** — an unshippable row would be a
+//! Sheet rows whose commands are not yet implemented (auto-layout,
+//! boolean, text style, outline mode, color picker, locked, remove
+//! fill/stroke) are **not shipped** — an unshippable row would be a
 //! permanently-declining lie. The remaining rows are tracked in
 //! `TODO.md`; the reserved rows the spec mandates (flip-h/v, scale
 //! tool, lasso) ship as named no-ops. Align & distribute (Alt+A/D/W/S,
-//! Alt+H/V, Alt+Ctrl+H/V) ship live (`Command::Align`/`Distribute`).
+//! Alt+H/V, Alt+Ctrl+H/V) ship live (`Command::Align`/`Distribute`), as
+//! do the group rows (Mod+G / Mod+Shift+G / Mod+Alt+G →
+//! `Command::Group`/`Ungroup`/`GroupWithContainer`).
 
 use crate::tool::{ShapeKind, Tool};
 
@@ -318,6 +320,17 @@ const ALIGN: Mask = mask(Req::Absent, Req::Absent, Req::Held, Req::Absent);
 /// satisfiable; disjoint from the align rows on Ctrl.
 const DISTRIBUTE: Mask = mask(Req::Any, Req::Absent, Req::Held, Req::Held);
 
+/// Group masks (keybindings.md "Arrange", grouping.md): all three share
+/// base key `g`, held primary, and don't-care Ctrl — like [`cmd`], Ctrl
+/// stays `Any` so the virtual primary can merge onto physical Ctrl off-mac
+/// (a `Held` primary with an `Absent` Ctrl would contradict there). Alt is
+/// the discriminator (`Absent` vs `Held`) so the container row is disjoint
+/// from group, and Shift disjoins ungroup: `Mod+G` group, `Mod+Shift+G`
+/// ungroup, `Mod+Alt+G` group-with-container.
+const GROUP: Mask = mask(Req::Held, Req::Absent, Req::Absent, Req::Any);
+const UNGROUP: Mask = mask(Req::Held, Req::Held, Req::Absent, Req::Any);
+const CONTAIN: Mask = mask(Req::Held, Req::Absent, Req::Held, Req::Any);
+
 /// The empty-selection camera-pan step, screen px (`NUDGE-5`).
 pub const PAN_STEP_PX: f32 = 50.0;
 
@@ -599,6 +612,9 @@ pub const SHEET: &[Binding] = &[
     row(KeyCode::Char(']'), cmd(Req::Any), &[Command::BringForward]),
     row(KeyCode::Char('['), cmd(Req::Any), &[Command::SendBackward]),
     row(KeyCode::Char('e'), cmd(Req::Absent), &[Command::Flatten]),
+    row(KeyCode::Char('g'), GROUP, &[Command::Group]),
+    row(KeyCode::Char('g'), UNGROUP, &[Command::Ungroup]),
+    row(KeyCode::Char('g'), CONTAIN, &[Command::GroupWithContainer]),
     // -- Align & distribute (align.md) -------------------------------------------
     row(
         KeyCode::Char('a'),
@@ -802,7 +818,7 @@ impl OpacityTaps {
 
 /// The sheet-derived shortcut hint for a command — what a second
 /// command surface (the context menu's trailing hint,
-/// `crates/grida_editor/docs/context-menu.md`) displays beside an item.
+/// `crates/grida_editor/docs/menu.md`) displays beside an item.
 /// *Derived* from the table, never authored, so a displayed binding
 /// cannot drift from the sheet. `None` when no non-hold row binds the
 /// command; the first table row whose chain carries it wins (chains

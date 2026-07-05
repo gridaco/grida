@@ -479,6 +479,180 @@ fn grp_4_ungroup_restores_tree_and_geometry() {
 }
 
 #[test]
+fn grp_4_multi_group_ungroup_composes_in_descending_index() {
+    // Two sibling groups under root. The ungroup resolver is single-id;
+    // dissolving both in one batch is index-safe only when they are
+    // processed front-to-back in *descending* sibling index (an earlier,
+    // higher-index dissolve can't shift a later, lower-index target slot)
+    // — the shell's `ungroup_selection` ordering. This is that ordering's
+    // arbiter: the concatenated batch restores the tree and geometry.
+    let nf = NodeFactory::new();
+    let mut graph = SceneGraph::new();
+    let mut id_map = HashMap::new();
+    for (id, x) in [("A", 0.0), ("B", 20.0), ("C", 40.0), ("D", 60.0)] {
+        rect_child(
+            &nf,
+            &mut graph,
+            &mut id_map,
+            Parent::Root,
+            id,
+            x,
+            0.0,
+            10.0,
+            10.0,
+        );
+    }
+    let mut editor = editor_of(graph, id_map);
+    let sizes = [
+        ("A", 10.0, 10.0),
+        ("B", 10.0, 10.0),
+        ("C", 10.0, 10.0),
+        ("D", 10.0, 10.0),
+    ];
+    let before = oracle(editor.document(), &sizes);
+
+    // Two single-parent group calls sharing one minter → grp1 {A,B} at
+    // index 0, grp2 {C,D} at index 1.
+    let mut mint = minter();
+    let ob = oracle(editor.document(), &sizes);
+    let b1 = grouping::group(
+        editor.document(),
+        &ids(&["A", "B"]),
+        |id| ob.get(id).copied(),
+        WrapKind::Group,
+        &mut mint,
+    )
+    .expect("g1 resolves");
+    apply(&mut editor, b1);
+    let ob = oracle(editor.document(), &sizes);
+    let b2 = grouping::group(
+        editor.document(),
+        &ids(&["C", "D"]),
+        |id| ob.get(id).copied(),
+        WrapKind::Group,
+        &mut mint,
+    )
+    .expect("g2 resolves");
+    apply(&mut editor, b2);
+    assert_eq!(editor.document().children(None), ids(&["grp1", "grp2"]));
+
+    // Dissolve both, ordered descending by sibling index (grp2 before
+    // grp1), concatenated as one batch — the shell's composition.
+    let mut groups = ids(&["grp1", "grp2"]);
+    {
+        let doc = editor.document();
+        let sibs = doc.children(None);
+        groups.sort_by_key(|id| std::cmp::Reverse(sibs.iter().position(|s| s == id).unwrap_or(0)));
+    }
+    let mut batch = Vec::new();
+    for g in &groups {
+        batch.extend(grouping::ungroup(editor.document(), g).expect("ungroup resolves"));
+    }
+    apply(&mut editor, batch);
+
+    // Tree and every member's world position restored exactly.
+    assert_eq!(editor.document().children(None), ids(&["A", "B", "C", "D"]));
+    let after = oracle(editor.document(), &sizes);
+    for id in ["A", "B", "C", "D"] {
+        let b = before.get(id).unwrap();
+        let a = after.get(id).unwrap();
+        assert!(
+            near(a.x, b.x) && near(a.y, b.y),
+            "{id} world position restored"
+        );
+    }
+}
+
+#[test]
+fn grp_5_retarget_targets_are_resolver_derived() {
+    // GRP-5's selection retarget runs shell-side (`set_selection`); its
+    // *targets* are resolver-derived and asserted here: after a wrap the
+    // targets are the minted wrappers, after an ungroup they are the
+    // promoted children (now under the wrapper's old parent).
+    let nf = NodeFactory::new();
+    let mut graph = SceneGraph::new();
+    let mut id_map = HashMap::new();
+    // A, B at root; C inside a container F — a cross-parent selection so
+    // the wrap mints two wrappers.
+    rect_child(
+        &nf,
+        &mut graph,
+        &mut id_map,
+        Parent::Root,
+        "A",
+        0.0,
+        0.0,
+        10.0,
+        10.0,
+    );
+    rect_child(
+        &nf,
+        &mut graph,
+        &mut id_map,
+        Parent::Root,
+        "B",
+        20.0,
+        0.0,
+        10.0,
+        10.0,
+    );
+    let f = container_child(&nf, &mut graph, &mut id_map, Parent::Root, "F", 300.0, 0.0);
+    rect_child(
+        &nf,
+        &mut graph,
+        &mut id_map,
+        Parent::NodeId(f),
+        "C",
+        0.0,
+        0.0,
+        10.0,
+        10.0,
+    );
+    let mut editor = editor_of(graph, id_map);
+
+    let ob = oracle(
+        editor.document(),
+        &[("A", 10.0, 10.0), ("B", 10.0, 10.0), ("C", 10.0, 10.0)],
+    );
+    // The shell's capturing minter: it records exactly what it hands out
+    // (the wrap-retarget target set).
+    let mut n = 0;
+    let mut minted: Vec<Id> = Vec::new();
+    let batch = grouping::group(
+        editor.document(),
+        &ids(&["A", "B", "C"]),
+        |id| ob.get(id).copied(),
+        WrapKind::Group,
+        || {
+            n += 1;
+            let id = format!("grp{n}");
+            minted.push(id.clone());
+            id
+        },
+    )
+    .expect("group resolves");
+    apply(&mut editor, batch);
+    // GRP-5 (wrap): the retarget targets are exactly the new wrappers.
+    assert_eq!(minted, ids(&["grp1", "grp2"]));
+    for w in &minted {
+        assert!(editor.document().node_is_group(w), "{w} is a new wrapper");
+    }
+
+    // GRP-5 (ungroup): the targets are the wrapper's children, read before
+    // the dissolve, and they land under the wrapper's old parent (root).
+    let promoted = editor.document().children(Some(&"grp1".to_string()));
+    assert_eq!(promoted, ids(&["A", "B"]));
+    let batch =
+        grouping::ungroup(editor.document(), &"grp1".to_string()).expect("ungroup resolves");
+    apply(&mut editor, batch);
+    assert!(!editor.document().node_is_group(&"grp1".to_string()));
+    let root = editor.document().children(None);
+    for c in &promoted {
+        assert!(root.contains(c), "{c} promoted to the wrapper's parent");
+    }
+}
+
+#[test]
 fn grp_4_ungroup_declines_on_a_non_group() {
     // A plain rectangle is not a dissolvable wrapper.
     let nf = NodeFactory::new();

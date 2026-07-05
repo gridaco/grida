@@ -196,8 +196,18 @@ pub(crate) struct ShellApp {
     /// The context menu's dedicated UI layer — painted last (topmost)
     /// and, while the menu is open, routed first (the popup grab).
     pub(crate) menu_ui: UiLayer,
-    /// The context-menu host (`crates/grida_editor/docs/context-menu.md`).
+    /// The context-menu host (`crates/grida_editor/docs/menu.md`).
     pub(crate) menu: ContextMenu,
+    /// The native application menu bar (`menu.md` "The application
+    /// menu", `MENU-*`). Built lazily on first resume and rebuilt when
+    /// the state it reflects changes.
+    pub(crate) menu_bar: Option<crate::shell::menubar::MenuBar>,
+    /// The selection the live `menu_bar` was built against — a change
+    /// triggers a rebuild (enablement, paired-toggle labels).
+    pub(crate) menu_selection: Vec<crate::document::Id>,
+    /// A command ran or a mode changed: rebuild the menu bar next tick
+    /// (undo/redo availability, text-mode gating, toggle direction).
+    pub(crate) menu_dirty: bool,
 }
 
 /// The momentary (hold) virtual tools — keybindings.md's `(hold)`
@@ -531,7 +541,7 @@ impl ShellApp {
     }
 
     /// Offer plain text to the system clipboard (the copy-name /
-    /// copy-id commands — context-menu.md reference additions).
+    /// copy-id commands — menu.md reference additions).
     fn set_clipboard_text(&mut self, text: String) -> bool {
         let Some(clipboard) = self.clipboard.as_mut() else {
             return false;
@@ -816,7 +826,7 @@ impl ShellApp {
             self.reconcile_text_session();
             return;
         }
-        // Open-menu modality (context-menu.md; routing.md's
+        // Open-menu modality (menu.md; routing.md's
         // widget-focus capture layer in its modal form): the menu
         // owns the keyboard while open — the navigation vocabulary
         // resolves against it (Escape is its one ladder rung),
@@ -955,9 +965,9 @@ impl ShellApp {
         self.hand_sticky || self.hold == Some(HoldTool::Hand)
     }
 
-    // -- context menu (crates/grida_editor/docs/context-menu.md) ----------------------
+    // -- context menu (crates/grida_editor/docs/menu.md) ----------------------
 
-    /// A secondary press on the canvas: retarget (`CTX-4`), build the
+    /// A secondary press on the canvas: retarget (`MENU-5`), build the
     /// inventory over the current target, open at the point. The
     /// shell adds only the targeting context — the inventory and its
     /// enablement are [`crate::menu`]'s (`SHELL-3`).
@@ -986,7 +996,7 @@ impl ShellApp {
 
     /// Drain the open menu's outbox after a routed event: an outcome
     /// closes the menu, and a chosen command dispatches through the
-    /// one registry switch (`CTX-1`).
+    /// one registry switch (`MENU-1`).
     fn drain_menu(&mut self) {
         if let Some(outcome) = self.menu.drain(&mut self.menu_ui) {
             self.menu.close(&mut self.menu_ui);
@@ -1001,7 +1011,30 @@ impl ShellApp {
 
     /// Dispatch one registry command. Returns **consumed**; a
     /// declined command has made no state change (`ROUTE-2`).
+    /// Rebuild the native application menu bar from current editor
+    /// state (`menu.md`): enablement, paired-toggle direction, undo/redo
+    /// availability, and text-mode gating are all resolved here, once,
+    /// at build time — the same `MENU-2` discipline as the context menu.
+    fn rebuild_menu_bar(&mut self) {
+        let app_menu = crate::menu::application_menu(&crate::menu::AppMenuContext {
+            doc: self.editor.document(),
+            selection: self.editor.selection(),
+            text_mode: matches!(self.mode, EditMode::Text { .. }),
+            can_undo: self.editor.can_undo(),
+            can_redo: self.editor.can_redo(),
+        });
+        let bar = crate::shell::menubar::MenuBar::build(&app_menu);
+        bar.install();
+        self.menu_bar = Some(bar);
+        self.menu_selection = self.editor.selection().to_vec();
+        self.menu_dirty = false;
+    }
+
     fn command(&mut self, cmd: Command) -> bool {
+        // Any command may move the state the menu bar reflects
+        // (enablement, history, mode, toggle direction): rebuild it on
+        // the next tick.
+        self.menu_dirty = true;
         match cmd {
             Command::Undo => self.editor.undo(),
             Command::Redo => self.editor.redo(),
@@ -1037,7 +1070,7 @@ impl ShellApp {
                 true
             }
             // The context menu's reference additions: single-target
-            // clipboard affordances (`CTX-2`: the gates here are
+            // clipboard affordances (`MENU-2`: the gates here are
             // exactly the menu's enablement predicates).
             Command::CopyName => {
                 let [id] = self.editor.selection() else {
@@ -1198,6 +1231,11 @@ impl ShellApp {
             }
             Command::Align(op) => self.align_selection(op),
             Command::Distribute(op) => self.distribute_selection(op),
+            Command::Group => self.group_selection(crate::grouping::WrapKind::Group),
+            Command::GroupWithContainer => {
+                self.group_selection(crate::grouping::WrapKind::Container)
+            }
+            Command::Ungroup => self.ungroup_selection(),
             Command::ToggleVisible => self.toggle_visible(),
             Command::Opacity(digit) => self.set_selection_opacity(digit),
             Command::ZoomIn => self.run_command(ApplicationCommand::ZoomIn),
@@ -1513,7 +1551,7 @@ impl ShellApp {
                 op,
             )
         };
-        self.apply_align(batch, "align")
+        self.apply_batch(batch, "align")
     }
 
     /// Distribute rows (align.md): same shape as [`Self::align_selection`].
@@ -1531,11 +1569,12 @@ impl ShellApp {
                 op,
             )
         };
-        self.apply_align(batch, "distribute")
+        self.apply_batch(batch, "distribute")
     }
 
-    /// Apply a resolved align/distribute batch as one recorded entry.
-    fn apply_align(&mut self, batch: Option<Vec<Mutation>>, label: &str) -> bool {
+    /// Apply a resolved resolver batch (align / distribute / group /
+    /// ungroup) as one recorded history entry; `None` declines silently.
+    fn apply_batch(&mut self, batch: Option<Vec<Mutation>>, label: &str) -> bool {
         let Some(batch) = batch else {
             return false;
         };
@@ -1548,6 +1587,108 @@ impl ShellApp {
                 },
             )
             .is_ok()
+    }
+
+    /// Group rows (grouping.md): wrap each selection partition in one new
+    /// group / container (`GRP-1`). Pre-mint one wrapper id per partition
+    /// (the flatten pattern — the minter can't reborrow `editor` while the
+    /// resolver holds the document), resolve against the engine world
+    /// bounds, apply as one entry, then retarget the selection to the new
+    /// wrappers (`GRP-5`).
+    fn group_selection(&mut self, kind: crate::grouping::WrapKind) -> bool {
+        let selection = self.editor.selection().to_vec();
+        let n = self.editor.document().partition_selection(&selection).len();
+        let mut pool = (0..n)
+            .map(|_| self.tools.mint_id(&self.editor))
+            .collect::<Vec<_>>()
+            .into_iter();
+        // The minter records what it hands out so the retarget selects the
+        // wrappers actually created (a skipped partition mints nothing).
+        let mut minted: Vec<crate::document::Id> = Vec::new();
+        let batch = {
+            let scene = EngineScene {
+                app: &self.app,
+                doc: self.editor.document(),
+            };
+            crate::grouping::group(
+                self.editor.document(),
+                &selection,
+                |id| scene.world_bounds(id),
+                kind,
+                || {
+                    let id = pool.next().expect("one pre-minted id per partition");
+                    minted.push(id.clone());
+                    id
+                },
+            )
+        };
+        let label = match kind {
+            crate::grouping::WrapKind::Group => "group",
+            crate::grouping::WrapKind::Container => "group with container",
+        };
+        if self.apply_batch(batch, label) {
+            self.editor.set_selection(minted);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Ungroup row (grouping.md `GRP-4`): dissolve every dissolvable member
+    /// of the selection as one entry. The resolver is single-id; several
+    /// groups compose safely only when processed in **descending** document
+    /// index (an earlier, higher-index dissolve can't shift a later,
+    /// lower-index one's target slot). A dissolvable nested under another
+    /// selected dissolvable is skipped (that composition is deferred). The
+    /// promoted children become the new selection (`GRP-5`).
+    fn ungroup_selection(&mut self) -> bool {
+        let selection = self.editor.selection().to_vec();
+        let (batch, promoted) = {
+            let doc = self.editor.document();
+            let candidates: Vec<crate::document::Id> = selection
+                .iter()
+                .filter(|id| crate::grouping::ungroup(doc, id).is_some())
+                .cloned()
+                .collect();
+            let cand_set: std::collections::HashSet<crate::document::Id> =
+                candidates.iter().cloned().collect();
+            // Drop candidates that sit under another candidate (nested).
+            let mut dissolvable: Vec<crate::document::Id> = candidates
+                .iter()
+                .filter(|id| {
+                    let mut cur = doc.node_parent(id).flatten();
+                    while let Some(p) = cur {
+                        if cand_set.contains(&p) {
+                            return false;
+                        }
+                        cur = doc.node_parent(&p).flatten();
+                    }
+                    true
+                })
+                .cloned()
+                .collect();
+            // Descending sibling index for index-safe batch composition.
+            dissolvable.sort_by_key(|id| {
+                let parent = doc.node_parent(id).flatten();
+                let siblings = doc.children(parent.as_ref());
+                std::cmp::Reverse(siblings.iter().position(|s| s == id).unwrap_or(0))
+            });
+            let mut batch: Vec<Mutation> = Vec::new();
+            let mut promoted: Vec<crate::document::Id> = Vec::new();
+            for g in &dissolvable {
+                if let Some(muts) = crate::grouping::ungroup(doc, g) {
+                    promoted.extend(doc.children(Some(g)));
+                    batch.extend(muts);
+                }
+            }
+            ((!batch.is_empty()).then_some(batch), promoted)
+        };
+        if self.apply_batch(batch, "ungroup") {
+            self.editor.set_selection(promoted);
+            true
+        } else {
+            false
+        }
     }
 
     /// Mod+Shift+H: flip visibility on every selected member (the
@@ -2631,6 +2772,9 @@ impl ShellApp {
 
 impl ApplicationHandler<HostEvent> for ShellApp {
     fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
+        // Build the native menu bar now that the app is active (macOS
+        // wants a live NSApp before `init_for_nsapp`).
+        self.rebuild_menu_bar();
         self.window.request_redraw();
     }
 
@@ -2654,6 +2798,29 @@ impl ApplicationHandler<HostEvent> for ShellApp {
         }
         self.handle_user_event(event);
         self.reflect_frame();
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if self.exiting {
+            return;
+        }
+        // Drain native menu-bar activations. muda posts to a global
+        // channel; each id maps to exactly one registry command
+        // (`MENU-1`), dispatched through the shell's one switch — the
+        // same path a keybinding or context-menu choice takes.
+        while let Ok(ev) = muda::MenuEvent::receiver().try_recv() {
+            let cmd = self.menu_bar.as_ref().and_then(|b| b.command_for(&ev.id));
+            if let Some(cmd) = cmd {
+                self.command(cmd);
+                self.reflect_frame();
+            }
+        }
+        // Rebuild the bar when the state it mirrors changed — a command
+        // ran (`menu_dirty`) or the selection moved (pointer/keyboard).
+        // Cheap: the bar is small and never open at this point.
+        if self.menu_dirty || self.editor.selection() != self.menu_selection.as_slice() {
+            self.rebuild_menu_bar();
+        }
     }
 }
 
@@ -2901,7 +3068,7 @@ impl ShellApp {
                     }
                     return;
                 }
-                // Open-menu modality (context-menu.md): every press
+                // Open-menu modality (menu.md): every press
                 // routes to the captured menu widget — inside chooses,
                 // outside dismisses and is swallowed. Nothing reaches
                 // the canvas while the menu is open.
@@ -3032,9 +3199,9 @@ impl ShellApp {
                     self.hier_ui.blur();
                     self.tool_ui.blur();
                 }
-                // The pointer's command surface (context-menu.md): a
+                // The pointer's command surface (menu.md): a
                 // secondary press on the canvas opens the menu —
-                // retarget first (`CTX-4`), then the inventory over
+                // retarget first (`MENU-5`), then the inventory over
                 // the target. Secondary never reaches the tool/HUD
                 // rungs; in-mode menus are deferred (a secondary
                 // press inside vector edit is swallowed, named in

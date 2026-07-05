@@ -70,10 +70,11 @@ Geometry snap runs against a **session** frozen at gesture start:
 - **Agent** — the union bounds of the moving content, reduced to its
   nine points (four corners, four edge midpoints, center).
 - **Anchors** — the _neighborhood_: the parent's bounds and every
-  visible sibling's bounds (a group sibling contributes its own
-  bounds and its leaves), plus the scene's guides. With large anchor
-  counts, a proximity pre-filter and a spacing-snap cutoff (reference
-  limit 64) keep the per-move cost bounded.
+  visible sibling's bounds, plus the scene's guides. A sibling group
+  contributes its _contents_, not its own envelope — see
+  [Groups and derived parents](#groups-and-derived-parents). With
+  large anchor counts, a proximity pre-filter and a spacing-snap cutoff
+  (reference limit 64) keep the per-move cost bounded.
 
 Both are captured once and reused every pointer-move: mid-gesture
 document changes (the previews themselves) never feed back into the
@@ -113,6 +114,82 @@ Shared knobs:
   "disable snapping" configuration (ctrl in the web editor) bypasses
   the content snaps (geometry and space) live: hold to get raw values
   mid-gesture, release to re-engage (SURF-4 applies).
+
+## Groups and derived parents
+
+Snap targets are the scene's **rendered atoms** — the nodes that
+actually paint. That single rule decides how every composite node
+participates:
+
+- A **group** paints nothing of its own; it is a _derived parent_
+  whose frame is only the union of its children. It is not an atom, so
+  it is **not a target** — snapping descends through it to the atoms
+  inside. Its derived envelope never contributes candidates. The
+  envelope's edges coincide with the extremal atoms that define them —
+  those atoms already carry those edges — so the only alignment unique
+  to the envelope is its **center**, a derived point no atom occupies.
+  Dropping it is a deliberate trade: a group can no longer be
+  center-aligned _as a block_, only by the atoms inside it — the price
+  of never snapping to a boundary that nothing renders.
+- A node that renders as a **single composited result** — a boolean
+  operation, and likewise any node that flattens a subtree into one
+  painted result (an instance of a reusable definition, where the
+  editor has one) — _is_ an atom. Its own bounds is the target, and
+  snapping does **not** descend into the parts it composited away:
+  those parts are not independently rendered.
+- A **leaf** is an atom; its bounds is the target.
+
+Descent is recursive: a nested group is itself transparent, resolving
+to its own atoms, and terminates at the rendered leaves.
+
+**The rule is symmetric across a gesture** — it holds whether a group
+is a neighbor or is the thing being moved:
+
+- **As anchor** — a sibling group contributes each of its rendered
+  atoms, so aligning to a leaf _inside_ another group needs no
+  ungrouping.
+- **As agent** — dragging a group makes each of its atoms an agent
+  point, so an inner leaf can catch a neighbor. The group still moves
+  as a **rigid unit**: however many atoms participate, the winning
+  correction applies as a single delta to the group as a whole, and
+  the atoms keep their positions relative to one another.
+
+### What is a target, and what is excluded
+
+- **Rendered only.** A hidden node, and any node that paints nothing,
+  contributes no candidate; a non-painting container contributes only
+  through the atoms it renders. Visibility is not re-checked at each
+  descendant — descent begins from a rendered node, so any atom it
+  reaches already has a rendered ancestry.
+- **The dragged subtree cannot snap to itself.** When a group is the
+  agent, its entire subtree is removed from the anchor set: a leaf
+  inside the moving group is an agent, never also a target, so the
+  group cannot chase its own contents. This is the descent-side
+  reading of session freezing (SNAP-7).
+- **Degenerate bounds are dropped.** A node whose bounds have zero area
+  — most often an empty group — contributes nothing on either side;
+  otherwise its coincident edges would align to any neighbor near the
+  origin and yank the gesture there. A node degenerate on one axis only
+  (a straight horizontal or vertical line) still contributes on its
+  non-zero axis.
+
+### Caveats (engine limits, not group policy)
+
+Descent exposes more of these, but each is a property of axis-aligned
+bounds, not of grouping:
+
+- The bounds of a **rotated** atom are its axis-aligned box, so its
+  anchor corners are not the visible corners and can sit off the
+  rendered edge.
+- Bounds are the **geometric** extent: stroke, blur, and other paint
+  that draws past the edge are not counted, so a guide lands on the
+  geometric edge, not the painted one.
+
+The **neighborhood** is composed of atoms for every gesture — a resize
+snaps its moving edge against atom offsets too, never a group envelope.
+What is translate-specific is the **agent** side above: a resized
+group's agent is its moving edge (Moving edges, below), not a descended
+set of points.
 
 ## Moving edges (resize)
 
@@ -268,3 +345,18 @@ configurable quantum (sub-pixel grids).
   overlapping the agent on the counter axis project candidates, and
   the winning correction across geometry, guide, and space candidates
   is the strongest hit by magnitude.
+- **SNAP-12** Atoms are the targets: snap candidates are the scene's
+  rendered atoms. A group is not an atom — it contributes its atoms
+  (recursively) and never its own derived bounds, as both anchor and
+  agent. A node that renders a single composite (a boolean operation;
+  or an instance, where the editor has one) is an atom: its own bounds
+  is a candidate and it is not descended.
+- **SNAP-13** Group rigidity: while a group is the agent, one
+  correction per frame applies as a single delta to the group; its
+  atoms keep their relative positions (the group translates as a unit).
+- **SNAP-14** Self-exclusion: the full subtree of a dragged group is
+  excluded from that gesture's anchor set — no atom snaps to itself or
+  to a co-moving sibling (extends SNAP-7).
+- **SNAP-15** Degenerate rejection: a node with zero-area bounds
+  contributes no candidate on either side; a node non-zero on one axis
+  contributes on that axis only.

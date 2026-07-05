@@ -1,5 +1,5 @@
 //! `menu` — the context-menu presenter: anchored, modal panels over
-//! [`crate::menu`]'s data (`crates/grida_editor/docs/context-menu.md`), built
+//! [`crate::menu`]'s data (`crates/grida_editor/docs/menu.md`), built
 //! as plain engine nodes like every other widget (`UI-1`).
 //!
 //! The popover pattern, realized with what the layer already has:
@@ -18,7 +18,7 @@
 //! - **The output is one [`Outcome`]** — chosen command or dismissed
 //!   — queued in the retained [`MenuState`] and drained by the host
 //!   ([`ContextMenu::drain`]), the same outbox pattern as the button
-//!   and tree widgets. The menu never dispatches (`CTX-1`).
+//!   and tree widgets. The menu never dispatches (`MENU-1`).
 //! - **Keys are host-routed** ([`ContextMenu::key`]): the menu never
 //!   takes text focus; the shell forwards the navigation vocabulary
 //!   (arrows, Enter, Escape) while open and suppresses the rest —
@@ -156,7 +156,10 @@ fn hit_row(origin: [f32; 2], items: &[Item], point: [f32; 2]) -> Option<usize> {
     }
     let (offsets, _) = item_offsets(items);
     for (i, item) in items.iter().enumerate() {
-        if matches!(item, Item::Separator) {
+        // Separators and deferred placeholders are non-interactive
+        // (deferred rows appear on the native application menu only,
+        // never here — this arm keeps the presenter total).
+        if matches!(item, Item::Separator | Item::Deferred(_)) {
             continue;
         }
         let (y, h) = offsets[i];
@@ -306,7 +309,10 @@ impl Widget for MenuWidget {
                                 s.sub_hover = None;
                             }
                         }
-                        Item::Separator => {}
+                        // Deferred rows are inert and never reach this
+                        // presenter (application menu only); Separator is
+                        // non-interactive.
+                        Item::Separator | Item::Deferred(_) => {}
                     }
                 }
                 // Outside both panels: state holds (the pointer may
@@ -432,6 +438,13 @@ fn build_panel(
                 sub.enabled(),
                 hover == Some(i),
             ),
+            // Deferred placeholders live on the native application menu;
+            // if one ever reaches this presenter it degrades to a
+            // disabled "(deferred)" row (`MENU-7`), never interactive.
+            Item::Deferred(d) => {
+                let label = format!("{} (deferred)", d.label);
+                build_row(ctx, &nf, pnode, &label, None, false, hover == Some(i));
+            }
         }
     }
     pnode

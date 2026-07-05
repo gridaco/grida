@@ -29,9 +29,17 @@ window (or collapsing a panel) re-derives the viewport. Input
 arbitration follows SURF-1 (panel → chrome → content). A HUD status
 line (zoom, selection count, perf readout) may overlay the canvas.
 
+The shell also hosts the **application menu** — the native top-level
+menu bar — and the **context menu**, both specified as command-surface
+views in [menu.md](./menu.md). The shell owns their placement (native
+chrome) and dispatches their chosen commands through its one registry
+switch; the inventories and enablement are the menu layer's, adding no
+capability (SHELL-3, `MENU-1`).
+
 Dev-mode quality bar: fixed panel widths (user-resizable optional),
 hardcoded style, no popovers (the color picker renders inline in the
-panel), no menus beyond a context menu where specs require one.
+panel), no in-canvas menus beyond the context menu — the application
+menu is native chrome, not painted UI.
 
 ## Keybindings
 

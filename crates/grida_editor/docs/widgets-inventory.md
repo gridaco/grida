@@ -48,7 +48,7 @@ this inventory._
    preview/commit binding phases (UI-4). Verb-shaped controls —
    align/distribute, boolean ops, mask, select-by-color — reference
    the command registry, whose single dispatcher they share with
-   keys and menus (CTX-1). A widget never mutates the document
+   keys and menus (MENU-1). A widget never mutates the document
    directly.
 
 4. **Composites adapt values, not events.** A composite exists only
@@ -80,7 +80,7 @@ this inventory._
 | scroll    | clipping scroll container (UI-6)                                                                   |
 | popover   | the anchored overlay: placement (flip-then-clamp), input grab, dismissal — the WID-8 authority     |
 | tree      | specified in [hierarchy.md](../../../docs/wg/canvas/hierarchy.md)                                  |
-| menu      | specified in [context-menu.md](./context-menu.md); rides the popover                               |
+| menu      | specified in [menu.md](./menu.md); rides the popover                               |
 
 ## Tier 1 — atoms
 

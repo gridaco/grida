@@ -80,6 +80,16 @@ impl<M> History<M> {
         self.past.len()
     }
 
+    /// Whether an entry is available to undo / redo — the non-mutating
+    /// enablement gate for menu and HUD (`MENU-2`).
+    pub fn can_undo(&self) -> bool {
+        !self.past.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.future.is_empty()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.past.is_empty()
     }

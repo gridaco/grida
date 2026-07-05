@@ -147,6 +147,13 @@ fn key_1_sheet_rows_resolve() {
         (KeyCode::Char(']'), cmd, "bring-forward"),
         (KeyCode::Char('['), cmd, "send-backward"),
         (KeyCode::Char('e'), cmd, "flatten"),
+        (KeyCode::Char('g'), cmd, "group"),
+        (KeyCode::Char('g'), cmd_shift, "ungroup"),
+        (
+            KeyCode::Char('g'),
+            mods(false, true, false, true),
+            "group-with-container",
+        ),
         // Object & style.
         (KeyCode::Char('h'), cmd_shift, "toggle-visible"),
         (KeyCode::Char('5'), NONE, "opacity"),

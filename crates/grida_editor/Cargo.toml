@@ -34,6 +34,10 @@ futures = { version = "0.3", optional = true }
 # System clipboard (IO-5 cross-instance copy/paste) — shell-only, at
 # grida_dev's version.
 arboard = { version = "3", optional = true }
+# Native application menu bar (menu.md "The application menu",
+# `MENU-*`). The Tauri team's framework-agnostic menu crate; integrates
+# with the winit event loop via `raw-window-handle`. Shell-only.
+muda = { version = "0.19", optional = true }
 
 [dev-dependencies]
 # Pixel readback in the frame conformance suite (FRAME-1/FRAME-3):
@@ -60,6 +64,7 @@ shell = [
   "dep:skia-safe",
   "dep:futures",
   "dep:arboard",
+  "dep:muda",
 ]
 
 [[bin]]

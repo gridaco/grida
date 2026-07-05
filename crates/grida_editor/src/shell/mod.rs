@@ -22,6 +22,7 @@
 //! [`ApplicationCommands`]: grida::window::command::ApplicationCommand
 
 mod app;
+mod menubar;
 mod session;
 mod window;
 
@@ -261,6 +262,9 @@ pub fn run_with(options: ShellOptions) -> Result<(), ShellError> {
         platform: crate::keys::Platform::current(),
         menu_ui,
         menu: crate::ui::menu::ContextMenu::new(crate::keys::Platform::current()),
+        menu_bar: None,
+        menu_selection: Vec::new(),
+        menu_dirty: true,
     };
     // Wire the renderer's GL backend only now, *after* `app` reached
     // its final address inside `shell`: `surface_mut_ptr()` is an
