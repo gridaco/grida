@@ -14,7 +14,6 @@ import type {
   AgentRunMessagePart,
   ApprovalAnswer,
 } from "../protocol/run";
-import { AGENT_SKILL_IDS, type SkillId } from "../protocol/skills";
 import {
   AGENT_DEFAULT_MODE,
   asAgentMode,
@@ -34,7 +33,6 @@ import { isAgentProviderModel } from "../agent-provider/types";
 const ALLOWED_TIERS = new Set<string>(AGENT_TIERS);
 const CATALOG_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
 const ALLOWED_ROLES = new Set<string>(["user", "assistant", "system"]);
-const ALLOWED_SKILL_IDS = new Set<string>(AGENT_SKILL_IDS);
 
 export type NormalizedMessage = {
   id: string;
@@ -53,7 +51,6 @@ export type RunRequest = {
   feature?: string;
   workspace_id?: string;
   workspace_root?: string;
-  skills?: SkillId[];
   /** Permission/supervision posture; defaults to `accept-edits` when absent. */
   mode: AgentMode;
   /** Whether the requesting client has a human UI for the `question` tool
@@ -85,7 +82,6 @@ export async function parseRunBody(
     provider_id?: unknown;
     feature?: unknown;
     workspace_id?: unknown;
-    skills?: unknown;
     mode?: unknown;
     interactive?: unknown;
     library?: unknown;
@@ -174,7 +170,6 @@ export async function parseRunBody(
     feature: typeof b.feature === "string" ? b.feature : undefined,
     workspace_id: workspaceId,
     workspace_root: workspaceRoot,
-    skills: coerceSkills(b.skills),
     // Unknown/absent mode coerces to the conservative default. An invalid
     // string is treated as absent rather than rejected — the supervision
     // posture should fail safe, not 400 the whole turn.
@@ -497,15 +492,4 @@ function dataUrlDecodedBytes(dataUrl: string): number | null {
   if (len === 0) return 0;
   const padding = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
   return Math.max(0, Math.floor((len * 3) / 4) - padding);
-}
-
-function coerceSkills(raw: unknown): SkillId[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
-  const out: SkillId[] = [];
-  for (const s of raw) {
-    if (typeof s === "string" && ALLOWED_SKILL_IDS.has(s)) {
-      out.push(s as SkillId);
-    }
-  }
-  return out;
 }

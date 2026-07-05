@@ -16,6 +16,13 @@ export type DiscoveredSkill = {
   description: string;
   /** Absolute path to the SKILL.md file. */
   path: string;
+  /** Absolute path to the skill DIRECTORY (parent of SKILL.md) — the tree the
+   *  load step materializes. Undefined for a flat `<name>.md` skill, which has
+   *  a body but no companion files/scripts/assets. */
+  dir?: string;
+  /** Relative companion files (under {@link dir}) the load step inlines after
+   *  the body, from `metadata.also_in_load`. Empty/absent ⇒ none. */
+  also_in_load?: string[];
   source: SkillSource;
 };
 

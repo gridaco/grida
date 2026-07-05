@@ -961,6 +961,61 @@ secret is unset. A second minting location.
 
 ---
 
+### `GRIDA-SEC-007` — Agent skill filesystem boundary
+
+**What it protects.** The agent discovers skills by scanning directories
+that may be attacker-controlled — a checked-out repo's `.claude/skills` /
+`.agents/skills`, the user home, and the host-bundled `skills/` tree — and
+the `skill` tool then MATERIALIZES a chosen skill's directory into the
+per-session scratch so its files are reachable by the workspace-scoped fs and
+shell. The boundary is the rule that **a skill lookup or load can only ever
+touch files inside a skill directory it legitimately resolved, and can only
+ever write into the already-sanctioned scratch root — never anywhere else on
+disk, no matter what a hostile skill dir names or links to.**
+
+**Vulnerable scenario (prevented).** A user opens (or clones) a repo whose
+`.claude/skills/` contains a directory named to escape (`../../../etc`), or a
+skill dir that is a symlink to `/`, or a `SKILL.md` symlinked to
+`~/.ssh/id_rsa`, or a `metadata.also_in_load: ["../../../../etc/passwd"]`, or a
+skill tree with a symlink pointing at the user's home. Without the boundary,
+discovery or `load_skill` would read those files into the model's context, or
+the materialize copy would follow a link out of the tree and duplicate secrets
+into scratch (where the shell can then exfiltrate them).
+
+**How the code prevents it.**
+
+1. **Name validation before any path is built** —
+   [packages/grida-ai-agent/src/skills/discovery.ts](packages/grida-ai-agent/src/skills/discovery.ts)
+   rejects any directory/file entry whose basename is not
+   `/^[a-z][a-z0-9-]*$/` (the agentskills.io name grammar), so `..`, absolute
+   paths, and path separators never become a skill name.
+2. **Realpath containment on every resolved `SKILL.md`** — `isContained`
+   canonicalises the resolved path and the layer root and rejects anything that
+   escapes the root, so a symlinked skill dir/file that points outside its
+   layer is dropped from the listing (never read).
+3. **Materialize copies into scratch only, and never follows symlinks** —
+   [packages/grida-ai-agent/src/skills/materialize.ts](packages/grida-ai-agent/src/skills/materialize.ts)
+   copies into `<scratch>/skills/<name>/` (already the only sanctioned writable
+   root) and its `copyTree` handles ONLY regular files and directories —
+   symlinks, sockets, and fifos are skipped by omission, so a link inside a
+   skill tree cannot smuggle an out-of-tree file into scratch.
+4. **`also_in_load` companions are containment-checked** — a declared companion
+   path that resolves outside the materialized dir (`..`, absolute) is skipped,
+   not inlined.
+
+**Files bound by this id.**
+
+- [packages/grida-ai-agent/src/skills/discovery.ts](packages/grida-ai-agent/src/skills/discovery.ts)
+- [packages/grida-ai-agent/src/skills/materialize.ts](packages/grida-ai-agent/src/skills/materialize.ts)
+- [packages/grida-ai-agent/src/skills/skills-fs.test.ts](packages/grida-ai-agent/src/skills/skills-fs.test.ts)
+- [packages/grida-ai-agent/src/skills/materialize.test.ts](packages/grida-ai-agent/src/skills/materialize.test.ts)
+
+**What does NOT belong here.** Following a symlink out of a skill tree.
+Accepting a skill name with a path separator. Materializing anywhere but the
+session scratch. Reading a `SKILL.md` whose realpath escapes its layer root.
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
 1. Allocate the next sequential id (`GRIDA-SEC-007` for the next one).

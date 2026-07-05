@@ -64,30 +64,15 @@ describe("buildAgentSend", () => {
     );
   });
 
-  it("includes skills in the body only when provided", () => {
-    const withSkills = vi.fn<SendMessageFn>();
+  it("omits mode from the body when not provided", () => {
+    const sendMessage = vi.fn<SendMessageFn>();
     buildAgentSend({
-      sendMessage: withSkills,
-      sessionId: "s1",
-      modelId: "m1",
-      skills: ["a", "b"],
-    })("hi");
-    expect(withSkills).toHaveBeenCalledWith(
-      { text: "hi" },
-      { body: { session_id: "s1", model_id: "m1", skills: ["a", "b"] } }
-    );
-
-    const withoutSkills = vi.fn<SendMessageFn>();
-    buildAgentSend({
-      sendMessage: withoutSkills,
+      sendMessage,
       sessionId: "s1",
       modelId: "m1",
     })("hi");
-    expect(withoutSkills.mock.calls[0][1]).toEqual({
-      body: { session_id: "s1", model_id: "m1" },
-    });
     expect(
-      "skills" in (withoutSkills.mock.calls[0][1] as { body: object }).body
+      "mode" in (sendMessage.mock.calls[0][1] as { body: object }).body
     ).toBe(false);
   });
 });

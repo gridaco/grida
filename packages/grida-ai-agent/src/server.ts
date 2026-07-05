@@ -137,6 +137,14 @@ export type AgentTenantOptions = {
    * the provider is fully dormant (no routes, never resolves).
    */
   gg_base_url?: string;
+  /**
+   * The host-bundled skills directory (the repo-root `skills/` tree shipped
+   * with the app) — the lowest-precedence discovery layer that carries the
+   * built-in `svg`/`dotcanvas`/`slides` skills. The host resolves it (desktop
+   * = packaged resources; CLI = a flag/default). Omit ⇒ no built-in skills
+   * (only project/user skills discovered).
+   */
+  skills_root?: string;
 };
 
 /**
@@ -274,6 +282,18 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         interactive: opts.interactive === true,
         // Host default for the `design_search` (library) capability.
         library: opts.library === true,
+        // Skill discovery for the hosted agent. Sources = host-bundled
+        // (repo-root `skills/`, the built-in svg/dotcanvas/slides) + the
+        // workspace's own `.claude/skills` / `.agents/skills`. It deliberately
+        // does NOT inherit the machine's GLOBAL `~/.claude|.agents/skills` —
+        // those are the user's Claude Code toolbox, and a meta-skill there
+        // (e.g. `find-skills`) would mislead the Grida agent (it did: a slides
+        // task loaded `find-skills` instead of `slides`). Skills = shipped +
+        // per-project, never the developer's personal global set.
+        skill_discovery: {
+          bundled_dir: opts.skills_root,
+          include_user_scoped: false,
+        },
       });
       if (caps.agent) registerAgentRoutes(app, runtime);
       if (caps.sessions)
@@ -322,6 +342,38 @@ export type AgentDaemonOptions = AgentTenantOptions & {
  * tenant mounted. One import for the desktop sidecar, the CLI, and tests —
  * `start()` / `stop()` / `port` semantics are the daemon's.
  */
+/**
+ * Map the composed-daemon options to the agent tenant's options.
+ *
+ * `AgentDaemonOptions = AgentTenantOptions & <daemon-frame fields>`, so we peel
+ * off the closed set of daemon-only fields (declared just above) and let EVERY
+ * remaining field — i.e. every tenant option — ride through by spread. A tenant
+ * option added later flows automatically; it can no longer be silently dropped
+ * here (how `skills_root` once shipped disabled → empty skill index, and how
+ * `gg_base_url` would ship the hosted provider dormant). Still exported so a
+ * regression test can pin the behavior as a backstop.
+ */
+export function agentTenantOptionsFromDaemon(
+  opts: AgentDaemonOptions,
+  capabilities: DaemonCapabilities
+): AgentTenantOptions {
+  const {
+    // Daemon-frame fields — consumed by `DaemonServer`, not the tenant.
+    password: _password,
+    capabilities: _daemonCapabilities,
+    user_data_path: _userDataPath,
+    projects_root: _projectsRoot,
+    http_access: _httpAccess,
+    hostname: _hostname,
+    port: _port,
+    // …everything else is an AgentTenantOptions field.
+    ...tenant
+  } = opts;
+  // The tenant mounts its own route groups off the RESOLVED capabilities, not
+  // the host's partial override.
+  return { ...tenant, capabilities };
+}
+
 export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
   const capabilities: DaemonCapabilities = {
     ...AGENT_DAEMON_DEFAULT_CAPABILITIES,
@@ -344,18 +396,7 @@ export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
       shell: capabilities.shell,
     },
     tenants: [
-      createAgentTenant({
-        capabilities,
-        scratch_base: opts.scratch_base,
-        image_model_id: opts.image_model_id,
-        sandbox_enforced: opts.sandbox_enforced,
-        allow_unsandboxed_shell: opts.allow_unsandboxed_shell,
-        interactive: opts.interactive,
-        library: opts.library,
-        // GRIDA-SEC-006 — pinned by the composed-daemon e2e: forgetting
-        // this line silently ships the hosted provider dormant.
-        gg_base_url: opts.gg_base_url,
-      }),
+      createAgentTenant(agentTenantOptionsFromDaemon(opts, capabilities)),
     ],
   });
 }

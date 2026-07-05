@@ -55,7 +55,6 @@ export {
   type AgentRunMessagePart,
   type AgentRunOptions,
 } from "./protocol/run";
-export { AGENT_SKILL_IDS, type SkillId } from "./protocol/skills";
 export {
   AGENT_MODES,
   AGENT_DEFAULT_MODE,

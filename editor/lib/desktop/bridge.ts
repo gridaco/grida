@@ -14,7 +14,6 @@
 
 import { useSyncExternalStore } from "react";
 import {
-  AGENT_SKILL_IDS,
   AGENT_MODES,
   asAgentMode,
   BYOK_PROVIDER_IDS,
@@ -67,7 +66,6 @@ import {
 } from "@grida/desktop-bridge";
 
 export {
-  AGENT_SKILL_IDS,
   AGENT_MODES,
   asAgentMode,
   BYOK_PROVIDER_IDS,

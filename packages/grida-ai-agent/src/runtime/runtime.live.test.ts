@@ -26,6 +26,7 @@ import fs from "node:fs/promises";
 import { assistantTextFromSse, sessionIdFromSse } from "../testing/sse";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Hono } from "hono";
@@ -47,6 +48,12 @@ const PROVIDER_ID = (process.env.GRIDA_BYOK_PROVIDER ?? "openrouter") as
   | "vercel";
 const MODEL_ID = process.env.GRIDA_LIVE_MODEL ?? "anthropic/claude-sonnet-4.6";
 const TIMEOUT_MS = 90_000;
+
+// The shipped bundled skills tree (<repo>/skills), four levels up from here.
+const BUNDLED_SKILLS_DIR = path.resolve(
+  fileURLToPath(new URL(".", import.meta.url)),
+  "../../../../skills"
+);
 
 const liveDescribe = LIVE && PROVIDER_KEY ? describe : describe.skip;
 
@@ -92,23 +99,39 @@ type Host = {
   app: Hono;
   runtime: AgentRuntime;
   store: SessionsStore;
+  registry: WorkspaceRegistry;
 };
 
-function buildHost(baseDir: string): Host {
+function buildHost(
+  baseDir: string,
+  opts?: { bundled_dir?: string; registry?: WorkspaceRegistry }
+): Host {
   const auth = new AuthStore(baseDir);
   const secrets = new SecretsStore(auth);
   const db = openSessionsDb({ user_data_path: baseDir });
   const store = new SessionsStore(db);
   const app = new Hono();
+  // Share ONE registry with the workspace setup — a second instance would not
+  // resolve a workspace the first opened, so bindings would be null and every
+  // tool call would fall to client-resolution (which stalls a headless turn).
+  const registry = opts?.registry ?? new WorkspaceRegistry(baseDir);
   const runtime = new AgentRuntime({
     secrets,
-    workspace_registry: new WorkspaceRegistry(baseDir),
+    workspace_registry: registry,
     sessions_store: store,
     streams: new StreamRegistry(),
     drain_cooldown_ms: 20,
+    // Mirror the shipped desktop: per-session scratch + shell, so a workspace
+    // turn has the full toolset (a deck run writes files + may run the shell).
+    scratch_base: path.join(baseDir, "scratch"),
+    shell_execution_allowed: true,
+    // Wire the host-bundled skills tree so built-ins are discovered + advertised.
+    skill_discovery: opts?.bundled_dir
+      ? { bundled_dir: opts.bundled_dir, include_user_scoped: false }
+      : undefined,
   });
   registerAgentRoutes(app, runtime);
-  return { app, runtime, store };
+  return { app, runtime, store, registry };
 }
 
 async function setKey(baseDir: string): Promise<void> {
@@ -451,6 +474,119 @@ liveDescribe("LIVE — view_image perception (by path)", () => {
     },
     TIMEOUT_MS
   );
+});
+
+/**
+ * LIVE — the deck-on-board regression (`ses_f31da48f…` / `ses_f32098817…`).
+ * With the bundled `slides` skill discovered + advertised, a "create a slides
+ * deck" request into a freshly-seeded `editor: "board"` bundle must, WITHOUT any
+ * user correction: (a) load the `slides` skill on its own, (b) write SVG pages,
+ * and (c) reconcile the manifest to `editor: "slides"`. This is the model half
+ * of the oracle the deterministic `skills-bundled.test.ts` set up.
+ */
+async function setupDeckWorkspace(
+  baseDir: string,
+  registry: WorkspaceRegistry
+): Promise<{ id: string; root: string; manifestPath: string }> {
+  const wsDir = await fs.mkdtemp(path.join(baseDir, "deck-ws-"));
+  const bundleDir = path.join(wsDir, "deck.canvas");
+  await fs.mkdir(bundleDir, { recursive: true });
+  const manifestPath = path.join(bundleDir, ".canvas.json");
+  // Seeded EXACTLY like the auto-created project that failed: board, empty.
+  await fs.writeFile(
+    manifestPath,
+    JSON.stringify(
+      {
+        $schema: "https://grida.co/schema/dotcanvas/v1.json",
+        version: "1",
+        editor: "board",
+        documents: [],
+      },
+      null,
+      2
+    )
+  );
+  // The SAME registry the runtime uses, so the binding resolves the workspace.
+  const ws = await registry.open(wsDir);
+  return { id: ws.id, root: ws.root, manifestPath };
+}
+
+liveDescribe("LIVE — slides deck regression (editor:slides, not board)", () => {
+  let baseDir: string;
+  let host: Host;
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "grida-agent-live-deck-")
+    );
+    await setKey(baseDir);
+    host = buildHost(baseDir, { bundled_dir: BUNDLED_SKILLS_DIR });
+  });
+
+  afterEach(async () => {
+    host.runtime.dispose();
+    host.store.close();
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  it("loads the slides skill and reconciles the manifest to editor:slides with SVG pages", async () => {
+    const { id: workspaceId, manifestPath } = await setupDeckWorkspace(
+      baseDir,
+      host.registry
+    );
+    const res = await host.app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify({
+        model_id: MODEL_ID,
+        // workspace_id (not raw root): the HTTP API binds server-side fs/skills
+        // to the registered workspace; a raw root would run workspace-less.
+        workspace_id: workspaceId,
+        mode: "auto", // headless: no approval pauses
+        messages: [
+          {
+            id: "u1",
+            role: "user",
+            parts: [
+              {
+                type: "text",
+                text: "Create a 4-slide deck in the existing .canvas bundle: a title slide, two content slides, and a closing slide.",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const sessionId = sessionIdFromSse(await res.text());
+    expect(sessionId).toBeTruthy();
+
+    const msgs = await host.store.listVisibleMessages(sessionId);
+    const parts = msgs.flatMap((m) => m.parts);
+
+    // (a) it loaded the `slides` skill ON ITS OWN (advertise-then-load).
+    const loadedSlides = parts.some(
+      (p) =>
+        p.type === "tool-skill" &&
+        (p.data as { input?: { name?: string } } | null)?.input?.name ===
+          "slides"
+    );
+    expect(loadedSlides).toBe(true);
+
+    // (b) it authored at least one SVG page (not markdown, not HTML).
+    const wroteSvg = parts.some(
+      (p) =>
+        p.type === "tool-write_file" &&
+        String(
+          (p.data as { input?: { path?: string } } | null)?.input?.path ?? ""
+        ).endsWith(".svg")
+    );
+    expect(wroteSvg).toBe(true);
+
+    // (c) THE regression: the manifest is slides mode, not board — no user
+    // "it should be a slide" correction was needed.
+    const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    expect(manifest.editor).toBe("slides");
+  }, 240_000); // manifest) — give it more room than a single color-naming turn. // A whole deck is many model round-trips (skill load + N SVG writes +
 });
 
 /**

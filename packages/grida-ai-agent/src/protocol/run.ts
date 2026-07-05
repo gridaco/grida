@@ -5,7 +5,6 @@
 
 import type { models, ModelTier } from "@grida/ai-models";
 import type { ProviderId } from "./provider-ids";
-import type { SkillId } from "./skills";
 import type { AgentMode } from "./mode";
 
 export const AGENT_SESSION_AGENT = "grida" as const;
@@ -77,7 +76,6 @@ export type AgentRunOptions = {
   provider_id?: ProviderId;
   feature?: string;
   workspace_id?: string;
-  skills?: readonly SkillId[];
   /**
    * Permission/supervision posture for this turn (RFC `permission modes`).
    * Omitted ⇒ the host defaults to `accept-edits`. Persisted on the session so

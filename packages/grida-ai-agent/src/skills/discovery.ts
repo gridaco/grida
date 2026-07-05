@@ -24,7 +24,14 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { parseFrontmatter } from "./frontmatter";
+import { containsPath } from "@grida/daemon/server";
+import {
+  InvalidFrontmatterError,
+  MissingFrontmatterError,
+  parseFrontmatter,
+  parseSkillManifest,
+  SKILL_NAME_RE,
+} from "./frontmatter";
 import type {
   DiscoveredSkill,
   SkillBodyLoader,
@@ -54,6 +61,14 @@ export type DiscoverSkillsOptions = {
   home_dir?: string;
   /** Absolute skill directories from host/project config. */
   config_paths?: string[];
+  /**
+   * The host-bundled skills directory (the repo-root `skills/` tree, shipped
+   * with the app). Scanned as the LOWEST-precedence `bundled` layer, so a
+   * project/user skill of the same name shadows a built-in. Host-injected
+   * (desktop = packaged resources; a CLI = a flag/default) so the same model
+   * serves every host.
+   */
+  bundled_dir?: string;
   /** Pre-resolved skills the host ships (or remote-fetched + cached). */
   extra?: DiscoveredSkill[];
   /** Warning sink for duplicate-name collisions. Defaults to console.warn. */
@@ -71,9 +86,16 @@ export async function discoverSkills(
   const warn = opts.on_warn ?? ((m: string) => console.warn(m));
   const candidates: DiscoveredSkill[] = [];
 
-  // 1. Project — upward from workspaceRoot, nearest first.
+  // 1. Project — upward from workspaceRoot, nearest first. The HOME dir is
+  //    skipped here: `~/.claude/skills` / `~/.agents/skills` are the USER-scoped
+  //    source (§2, gated by `include_user_scoped`), NOT project skills. Without
+  //    this skip a workspace under `~` (e.g. `~/Documents/Grida/<project>`) would
+  //    climb through home and re-discover the user's global skills as "project"
+  //    ones — which is exactly how a `find-skills` meta-skill hijacked a deck task.
   if (opts.workspace_root) {
+    const home = path.resolve(opts.home_dir ?? os.homedir());
     for (const dir of walkUp(opts.workspace_root, opts.stop_at)) {
+      if (dir === home) continue;
       for (const skillsDirName of SKILL_DIR_NAMES) {
         candidates.push(
           ...(await readSkillsDir(path.join(dir, skillsDirName), "project"))
@@ -97,12 +119,17 @@ export async function discoverSkills(
     candidates.push(...(await readSkillsDir(dir, "config")));
   }
 
-  // 4. Host-bundled / remote-cached (already resolved by the caller).
+  // 4. Host-bundled tree (repo-root `skills/`) — lowest precedence, so a
+  //    project/user skill of the same name shadows a built-in.
+  if (opts.bundled_dir) {
+    candidates.push(...(await readSkillsDir(opts.bundled_dir, "bundled")));
+  }
+
+  // 5. Pre-resolved / remote-cached (already resolved by the caller).
   for (const s of opts.extra ?? []) candidates.push(s);
 
   // Fold: first definition wins; warn + skip later duplicates.
   const byName = new Map<string, DiscoveredSkill>();
-  const skills: DiscoveredSkill[] = [];
   for (const s of candidates) {
     if (byName.has(s.name)) {
       warn(
@@ -112,9 +139,10 @@ export async function discoverSkills(
       continue;
     }
     byName.set(s.name, s);
-    skills.push(s);
   }
-  return { skills, by_name: byName };
+  // `skills` is just the map's values in insertion order (Map preserves it) —
+  // no parallel array to keep in sync with `by_name`.
+  return { skills: Array.from(byName.values()), by_name: byName };
 }
 
 /** Yield `start`, its parent, grandparent, … up to (and including) `stopAt`. */
@@ -132,9 +160,10 @@ function* walkUp(start: string, stopAt?: string): Generator<string> {
 
 /**
  * Read one `.../skills` directory. Each immediate child `<name>/` with a
- * `SKILL.md` is a skill; a flat `<name>.md` is the fallback form. Missing
- * dirs and unreadable / frontmatter-less entries are skipped silently
- * (a directory that simply has no skills is not an error).
+ * `SKILL.md` is a skill; a flat `<name>.md` is the fallback (body-only) form.
+ * Missing dirs, non-conformant names, unreadable/malformed entries, and
+ * symlink escapes are skipped silently — a hostile or empty skills dir must
+ * not poison the whole listing (an explicit `resolve` would surface the error).
  */
 async function readSkillsDir(
   dir: string,
@@ -146,16 +175,30 @@ async function readSkillsDir(
   } catch {
     return [];
   }
+  const layerRoot = await safeRealpath(path.resolve(dir));
+  if (layerRoot == null) return [];
+
   const out: DiscoveredSkill[] = [];
   for (const entry of entries) {
-    let skillPath: string | null = null;
-    if (entry.isDirectory()) {
-      skillPath = path.join(dir, entry.name, "SKILL.md");
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
-      skillPath = path.join(dir, entry.name);
-    }
-    if (!skillPath) continue;
-    const skill = await readSkillManifest(skillPath, source);
+    // GRIDA-SEC-007: rule 1 — the entry basename becomes a path segment, so it
+    // must be a safe, agentskills.io-conformant name. Reject `..`, absolute
+    // paths, and separators without reading anything.
+    const base = entry.isFile() ? entry.name.replace(/\.md$/, "") : entry.name;
+    if (entry.isFile() && !entry.name.endsWith(".md")) continue;
+    if (!SKILL_NAME_RE.test(base)) continue;
+
+    const skillDir = entry.isDirectory()
+      ? path.join(dir, entry.name)
+      : undefined;
+    const skillPath = entry.isDirectory()
+      ? path.join(dir, entry.name, "SKILL.md")
+      : path.join(dir, entry.name);
+
+    // Symlink containment: the resolved SKILL.md must stay inside the layer
+    // root. A symlinked skill dir/file that escapes is dropped from the listing.
+    if (!(await isContained(layerRoot, skillPath))) continue;
+
+    const skill = await readSkillManifest(skillPath, skillDir, source);
     if (skill) out.push(skill);
   }
   // Deterministic order within a directory (readdir order is platform-dependent).
@@ -165,6 +208,7 @@ async function readSkillsDir(
 
 async function readSkillManifest(
   skillPath: string,
+  skillDir: string | undefined,
   source: SkillSource
 ): Promise<DiscoveredSkill | null> {
   let raw: string;
@@ -173,14 +217,59 @@ async function readSkillManifest(
   } catch {
     return null;
   }
-  const { fields } = parseFrontmatter(raw);
-  const name = fields.name?.trim();
-  const description = fields.description?.trim();
-  // A skill with no name or no description is invisible to the model
-  // (RFC: "A vague description … is invisible"). Skip — don't advertise
-  // a hook the model can't act on.
-  if (!name || !description) return null;
-  return { name, description, path: skillPath, source };
+  // Strict parse; a malformed manifest is invisible in a listing (skipped),
+  // not fatal. Extension fields (`metadata.also_in_load`) ride along.
+  let manifest;
+  try {
+    ({ manifest } = parseSkillManifest(raw));
+  } catch (err) {
+    if (
+      err instanceof MissingFrontmatterError ||
+      err instanceof InvalidFrontmatterError
+    ) {
+      return null;
+    }
+    throw err;
+  }
+  return {
+    name: manifest.name,
+    description: manifest.description,
+    path: skillPath,
+    dir: skillDir,
+    also_in_load: extractAlsoInLoad(manifest.metadata),
+    source,
+  };
+}
+
+/** Extract the `metadata.also_in_load` string list (relative companion paths),
+ *  ignoring any non-string entries. Absent ⇒ undefined. */
+function extractAlsoInLoad(
+  metadata: Record<string, unknown> | undefined
+): string[] | undefined {
+  const raw = metadata?.also_in_load;
+  if (!Array.isArray(raw)) return undefined;
+  const list = raw.filter((x): x is string => typeof x === "string");
+  return list.length > 0 ? list : undefined;
+}
+
+async function safeRealpath(p: string): Promise<string | null> {
+  try {
+    return await fs.realpath(p);
+  } catch {
+    return null;
+  }
+}
+
+/** GRIDA-SEC-007: rule 2 — true when `target` canonicalises (realpath) to a
+ *  path inside `realRoot` (already a realpath). A symlinked skill dir/file that
+ *  escapes its layer root is rejected here. Missing target ⇒ "not contained"
+ *  (skip), never an error. Containment itself is the shared `containsPath`
+ *  string-prefix gate (the same one the shell runner + scratch asserts use), so
+ *  the discipline can't drift between copies. See /SECURITY.md. */
+async function isContained(realRoot: string, target: string): Promise<boolean> {
+  const real = await safeRealpath(target);
+  if (real == null) return false;
+  return containsPath(realRoot, real);
 }
 
 /** Read the instructional body of a skill (frontmatter stripped). */

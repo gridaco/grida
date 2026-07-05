@@ -3,10 +3,10 @@
  * `(text, files?)` submit into a `useChat` `sendMessage` call with the run body.
  *
  * Both surfaces (the workspace `agent-pane.tsx` and the standalone-doc
- * `ai-sidebar/chat.tsx`) had near-identical inline send closures; they differ
- * only in whether a per-tab `skills` subset rides along. Centralizing it keeps
- * the two in lockstep and is the one spot that threads inline image `files`
- * (perceive-only `file` parts) onto the message.
+ * `ai-sidebar/chat.tsx`) had near-identical inline send closures. Centralizing
+ * it keeps the two in lockstep and is the one spot that threads inline image
+ * `files` (perceive-only `file` parts) onto the message. (Skills are no longer
+ * per-send: the agent discovers them from disk and advertises them itself.)
  */
 
 import type { FileUIPart } from "ai";
@@ -25,8 +25,6 @@ export type AgentSendBody = {
   provider_id?: string;
   /** Permission/supervision posture for the turn (RFC `permission modes`). */
   mode?: AgentMode;
-  /** Per-send skill subset (workspace tab); omitted on tab-less surfaces. */
-  skills?: string[];
 };
 
 /** Minimal `useChat` `sendMessage` surface this helper needs. */
@@ -42,9 +40,8 @@ export function buildAgentSend(opts: {
   /** Endpoint provider id serving `modelId`, when it's a registered model. */
   providerId?: string;
   mode?: AgentMode;
-  skills?: string[];
 }): (text: string, files?: FileUIPart[]) => void {
-  const { sendMessage, sessionId, modelId, providerId, mode, skills } = opts;
+  const { sendMessage, sessionId, modelId, providerId, mode } = opts;
   return (text, files) => {
     const body: AgentSendBody = {
       session_id: sessionId ?? undefined,
@@ -52,7 +49,6 @@ export function buildAgentSend(opts: {
     };
     if (providerId) body.provider_id = providerId;
     if (mode) body.mode = mode;
-    if (skills) body.skills = skills;
     void sendMessage(files && files.length > 0 ? { text, files } : { text }, {
       body,
     });

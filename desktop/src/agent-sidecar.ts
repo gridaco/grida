@@ -88,6 +88,9 @@ const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
 // (`~/Documents/Grida`). The supervisor owns the path fact and forwards it;
 // absent (e.g. a future supervisor bug) means auto-create simply refuses.
 const projectsRoot = getCliArg("projects-root");
+// The host-bundled skills dir (repo-root `skills/`), resolved by the supervisor
+// (dev = repo path; packaged = resources). Absent ⇒ no built-in skills.
+const skillsRoot = getCliArg("skills-root");
 
 async function main() {
   const password = await readPasswordFromStdin();
@@ -101,6 +104,7 @@ async function main() {
     password,
     user_data_path: requiredUserDataPath,
     projects_root: projectsRoot,
+    skills_root: skillsRoot,
     http_access: {
       allowed_origins: [editorOrigin],
       allowed_referer_paths: ["/desktop"],
