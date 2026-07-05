@@ -63,6 +63,24 @@ describe("parseSkillManifest", () => {
       parseSkillManifest("---\nname: a\ndescription: x\nmetadata: [1,2]\n---\n")
     ).toThrow(InvalidFrontmatterError);
   });
+
+  it("rejects wrong-typed license / compatibility / allowed-tools", () => {
+    const base = "name: a\ndescription: x";
+    // non-string license / compatibility
+    expect(() =>
+      parseSkillManifest(`---\n${base}\nlicense: 42\n---\n`)
+    ).toThrow(InvalidFrontmatterError);
+    expect(() =>
+      parseSkillManifest(`---\n${base}\ncompatibility: [1]\n---\n`)
+    ).toThrow(InvalidFrontmatterError);
+    // allowed-tools that isn't an array of strings
+    expect(() =>
+      parseSkillManifest(`---\n${base}\nallowed-tools: read_file\n---\n`)
+    ).toThrow(InvalidFrontmatterError);
+    expect(() =>
+      parseSkillManifest(`---\n${base}\nallowed-tools:\n  - 1\n  - 2\n---\n`)
+    ).toThrow(InvalidFrontmatterError);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -199,5 +217,25 @@ describe("discoverSkills — bundled layer", () => {
     } finally {
       await fs.rm(outside, { recursive: true, force: true });
     }
+  });
+
+  // GRIDA-SEC-007: rule 3 — discovery never follows a link, even one that
+  // resolves INSIDE the layer (a symlink dirent has neither isFile nor
+  // isDirectory, so the guard is what stops it becoming a phantom flat skill).
+  it("skips a symlinked skill entry even when it resolves inside the layer", async () => {
+    await writeManifest(
+      bundled,
+      "real",
+      "name: real\ndescription: a real skill"
+    );
+    await fs.symlink(
+      path.join(bundled, "real"),
+      path.join(bundled, "linked"),
+      "dir"
+    );
+    const index = await discoverSkills({ ...isolate, bundled_dir: bundled });
+    expect(index.by_name.has("real")).toBe(true);
+    expect(index.by_name.has("linked")).toBe(false);
+    expect(index.skills).toHaveLength(1);
   });
 });

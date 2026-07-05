@@ -1016,6 +1016,8 @@ into scratch (where the shell can then exfiltrate them).
 
 **Files bound by this id.**
 
+- [packages/grida-ai-agent/src/skills/frontmatter.ts](packages/grida-ai-agent/src/skills/frontmatter.ts)
+  — `SKILL_NAME_RE` (rule 1's name grammar), imported by discovery.
 - [packages/grida-ai-agent/src/skills/discovery.ts](packages/grida-ai-agent/src/skills/discovery.ts)
 - [packages/grida-ai-agent/src/skills/materialize.ts](packages/grida-ai-agent/src/skills/materialize.ts)
 - [packages/grida-ai-agent/src/skills/skills-fs.test.ts](packages/grida-ai-agent/src/skills/skills-fs.test.ts)
@@ -1029,7 +1031,7 @@ session scratch. Reading a `SKILL.md` whose realpath escapes its layer root.
 
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-007` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-008` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

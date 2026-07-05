@@ -180,6 +180,12 @@ async function readSkillsDir(
 
   const out: DiscoveredSkill[] = [];
   for (const entry of entries) {
+    // GRIDA-SEC-007: rule 3 — never admit a symlink into the listing. A symlink
+    // dirent reports neither isFile() nor isDirectory(), so without this it
+    // would slip past the `.md` gate below and be accepted as a flat skill (a
+    // contained link with an unexpected name). Matches copyTree's no-symlink
+    // policy — discovery never follows a link.
+    if (entry.isSymbolicLink()) continue;
     // GRIDA-SEC-007: rule 1 — the entry basename becomes a path segment, so it
     // must be a safe, agentskills.io-conformant name. Reject `..`, absolute
     // paths, and separators without reading anything.

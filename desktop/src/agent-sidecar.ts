@@ -91,6 +91,15 @@ const projectsRoot = getCliArg("projects-root");
 // The host-bundled skills dir (repo-root `skills/`), resolved by the supervisor
 // (dev = repo path; packaged = resources). Absent ⇒ no built-in skills.
 const skillsRoot = getCliArg("skills-root");
+if (!skillsRoot) {
+  // A silent undefined here is exactly how the built-ins first shipped dormant
+  // (see the `agentTenantOptionsFromDaemon` regression). Warn so a repeat —
+  // a dropped/misnamed flag from the supervisor — is visible at startup
+  // instead of only surfacing as "the agent knows no skills" in a live run.
+  console.warn(
+    "[agent-sidecar] --skills-root not provided; built-in skills (svg/dotcanvas/slides) will not be discovered."
+  );
+}
 
 async function main() {
   const password = await readPasswordFromStdin();

@@ -428,13 +428,7 @@ function AgentPaneContent({
   // Turn queue (RFC `queue`): a submit while the session is busy enqueues; the
   // CORE fires queued items serially on a clean idle edge (the drain is core
   // state — not this client). `useTurnQueueController` owns the submit gate +
-  // the optimistic mirror, shared with `ai-sidebar/chat.tsx`. Skills ride the
-  // active tab: both the live `send` (below) AND the transport's body-less
-  // backfill — so a human-input resume (a `question` answer or a `design_search`
-  // pick, issued via `addToolResult` + `sendAutomaticallyWhen`, which carries no
-  // body) still lands the active tab's skill block instead of dropping it. A
-  // core-drained turn uses the session's discovered skills (the renderer has no
-  // tab there).
+  // the optimistic mirror, shared with `ai-sidebar/chat.tsx`.
   // Endpoint provider pin for the active model (issue #806) — rides every
   // run-entering body: normal sends AND approval resumes below.
   const providerId = registered_models.providerIdForModel(modelId, endpoints);
