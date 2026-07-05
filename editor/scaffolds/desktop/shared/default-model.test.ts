@@ -37,14 +37,18 @@ describe("resolveDefaultModelId — the initial default for a new chat", () => {
     ).toBe(initial);
   });
 
-  it("ignores an unknown initial and falls through to the GG default", () => {
+  it("a provided-but-unknown initial falls back to the plain default, never the GG included model", () => {
+    // A caller `initial` that isn't known yet may be a late-loading endpoint
+    // model (issue #806). The GG default must NOT be substituted for it —
+    // that would silently override the caller's choice. Falls to the plain
+    // default instead (recovered once the registry loads, upstream).
     expect(
       resolveDefaultModelId({
-        initial: "bogus/model",
+        initial: "ollama/llama-3.3",
         ggActive: true,
         isKnownId: knows(),
       })
-    ).toBe(GG_INCLUDED_MODEL_ID);
+    ).toBe(DEFAULT_MODEL_ID);
   });
 
   it("the included tier is a catalog id distinct from the Claude-Code default", () => {
@@ -59,7 +63,7 @@ describe("shouldUpgradeToIncluded — the async GG-active guard", () => {
   const untouched = {
     current: DEFAULT_MODEL_ID,
     userPicked: false,
-    initialKnown: false,
+    hasInitial: false,
     storedSeeded: false,
   };
 
@@ -73,8 +77,8 @@ describe("shouldUpgradeToIncluded — the async GG-active guard", () => {
     );
   });
 
-  it("never overrides a caller-seeded initial", () => {
-    expect(shouldUpgradeToIncluded({ ...untouched, initialKnown: true })).toBe(
+  it("never overrides a caller-provided initial (even before it is known)", () => {
+    expect(shouldUpgradeToIncluded({ ...untouched, hasInitial: true })).toBe(
       false
     );
   });

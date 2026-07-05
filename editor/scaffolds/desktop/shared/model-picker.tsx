@@ -299,6 +299,13 @@ export function useModelPickerState({
     (typeof id === "string" &&
       (registeredIds.has(id) || AGENT_PROVIDER_IDS.has(id)));
 
+  // Whether a caller passed an `initial` at all — a stable mount-time fact
+  // (the prop never changes). The GG upgrade guards on THIS, not on whether
+  // `initial` is *known*: knownness depends on the async endpoint registry
+  // and would go stale in the mount-only effect below, letting a late-loading
+  // endpoint pick get overwritten.
+  const initialProvided = initial != null && initial !== "";
+
   const [modelId, setModelId] = useState<string>(() =>
     resolveDefaultModelId({
       initial,
@@ -349,9 +356,10 @@ export function useModelPickerState({
   // to the included hosted tier, so a fresh signed-in, no-BYOK user's first
   // run uses GG instead of hitting the Claude-Code provider's
   // `auth_required`. Session liveness resolves async, so this arrives after
-  // mount; `shouldUpgradeToIncluded` reads live refs so an explicit pick, a
-  // caller `initial`, or a stored-session seed always wins the race. The
-  // catalog itself is never hidden — BYOK can still serve any model.
+  // mount; `shouldUpgradeToIncluded` guards on live refs + the stable
+  // `initialProvided` so an explicit pick, a caller `initial`, or a
+  // stored-session seed always wins the race. The catalog itself is never
+  // hidden — BYOK can still serve any model.
   useEffect(() => {
     if (!gridaGateway.isSupported()) return;
     let cancelled = false;
@@ -361,7 +369,7 @@ export function useModelPickerState({
         shouldUpgradeToIncluded({
           current: prev,
           userPicked: userPickedRef.current,
-          initialKnown: isKnownId(initial),
+          hasInitial: initialProvided,
           storedSeeded: seededFor.current != null,
         })
           ? GG_INCLUDED_MODEL_ID

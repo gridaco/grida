@@ -50,7 +50,14 @@ export function resolveDefaultModelId(opts: {
   ggActive: boolean;
   isKnownId: (id: string | undefined | null) => boolean;
 }): string {
-  if (opts.isKnownId(opts.initial)) return opts.initial as string;
+  // A caller-provided `initial` is explicit intent: honor it when known,
+  // and NEVER substitute the GG default for it. An id that isn't known yet
+  // may be a late-loading endpoint model (issue #806) — falling back to the
+  // plain default is safe; silently swapping in the included model would
+  // override the caller's choice.
+  if (opts.initial != null && opts.initial !== "") {
+    return opts.isKnownId(opts.initial) ? opts.initial : DEFAULT_MODEL_ID;
+  }
   if (opts.ggActive) return GG_INCLUDED_MODEL_ID;
   return DEFAULT_MODEL_ID;
 }
@@ -59,16 +66,24 @@ export function resolveDefaultModelId(opts: {
  * Whether an async "Grida Gateway session is active" resolution should
  * replace the current selection with {@link GG_INCLUDED_MODEL_ID}. True
  * only for the *untouched fallback default* — it never overrides an
- * explicit user pick, a caller-seeded `initial`, or a stored-session seed.
+ * explicit user pick, a caller-provided `initial`, or a stored-session seed.
  */
 export function shouldUpgradeToIncluded(opts: {
   current: string;
   userPicked: boolean;
-  initialKnown: boolean;
+  /**
+   * Whether the caller provided an `initial` at all (explicit intent).
+   * Deliberately "was one provided", NOT "is it *known*": knownness depends
+   * on the async endpoint registry (issue #806) and would go stale in this
+   * mount-time effect, whereas whether an `initial` prop was passed is a
+   * stable fact. A provided-but-not-yet-known `initial` must still block the
+   * upgrade so an explicit pick is never overwritten.
+   */
+  hasInitial: boolean;
   storedSeeded: boolean;
 }): boolean {
   if (opts.userPicked) return false;
-  if (opts.initialKnown) return false;
+  if (opts.hasInitial) return false;
   if (opts.storedSeeded) return false;
   return opts.current === DEFAULT_MODEL_ID;
 }
