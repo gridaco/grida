@@ -163,10 +163,10 @@ fn trav_4_sibling_cycle() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "B".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     active: Some(false),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Record { label: None },
@@ -180,10 +180,10 @@ fn trav_4_sibling_cycle() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "A".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     active: Some(false),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Record { label: None },

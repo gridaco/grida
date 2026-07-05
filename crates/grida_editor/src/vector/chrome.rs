@@ -422,10 +422,10 @@ mod tests {
             .dispatch(
                 vec![Mutation::Patch {
                     id: "v".to_string(),
-                    set: crate::document::PropPatch {
+                    set: Box::new(crate::document::PropPatch {
                         vector_network: Some(net.clone()),
                         ..Default::default()
-                    },
+                    }),
                 }],
                 Origin::Local,
                 Recording::Record { label: None },

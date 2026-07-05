@@ -66,10 +66,10 @@ fn base_editor() -> Editor {
 fn patch(id: &str, x: f32, y: f32) -> Vec<Mutation> {
     vec![Mutation::Patch {
         id: id.to_string(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             position: Some((x, y)),
             ..Default::default()
-        },
+        }),
     }]
 }
 
@@ -280,10 +280,10 @@ fn sync1_convergence_under_interleaving() {
     hub.local_edit(patch("Y", 300.0, 40.0));
     c.local_edit(vec![Mutation::Patch {
         id: "Y".to_string(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             fill_solid: Some(CGColor::from_rgba(1, 2, 3, 255)),
             ..Default::default()
-        },
+        }),
     }]);
     // Partial delivery: B's edit reaches the authority before C even
     // submits; C receives the first commits mid-flight.

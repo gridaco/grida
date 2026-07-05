@@ -420,10 +420,10 @@ fn hier6_substitute_inactive_node_selectable_from_tree() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "B".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     active: Some(false),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,

@@ -110,10 +110,10 @@ pub fn group(
             if let Some((px, py)) = doc.node_position(m) {
                 muts.push(Mutation::Patch {
                     id: m.clone(),
-                    set: PropPatch {
+                    set: Box::new(PropPatch {
                         position: Some((px - wrapper_pos.0, py - wrapper_pos.1)),
                         ..Default::default()
-                    },
+                    }),
                 });
             }
         }
@@ -158,10 +158,10 @@ pub fn ungroup(doc: &WorkingCopy, id: &Id) -> Option<Vec<Mutation>> {
         if let Some((px, py)) = doc.node_position(c) {
             muts.push(Mutation::Patch {
                 id: c.clone(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     position: Some((px + gx, py + gy)),
                     ..Default::default()
-                },
+                }),
             });
         }
     }

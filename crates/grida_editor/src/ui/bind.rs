@@ -381,7 +381,7 @@ fn patch_batch(editor: &Editor, binding: &Binding, value: &BindingValue) -> Opti
             let set = patch_for(editor, id, binding.property, binding.entry, value)?;
             Some(Mutation::Patch {
                 id: id.clone(),
-                set,
+                set: Box::new(set),
             })
         })
         .collect();

@@ -121,19 +121,19 @@ fn doc3_wire_round_trip() {
         },
         Mutation::Patch {
             id: "A".to_string(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 opacity: Some(0.5),
                 position: Some((42.0, 43.0)),
                 fill_solid: Some(CGColor::from_rgba(1, 2, 3, 255)),
                 ..Default::default()
-            },
+            }),
         },
         // The general `fills` domain crosses the wire (a mixed multi-
         // paint stack) — distinct patch, since `fills` and `fill_solid`
         // are mutually exclusive in one patch.
         Mutation::Patch {
             id: "B".to_string(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 fills: Some(grida::cg::prelude::Paints::new([
                     grida::cg::prelude::Paint::Solid(grida::cg::prelude::SolidPaint::new_color(
                         CGColor::from_rgba(9, 8, 7, 200),
@@ -143,7 +143,7 @@ fn doc3_wire_round_trip() {
                     ),
                 ])),
                 ..Default::default()
-            },
+            }),
         },
         Mutation::Move {
             ids: vec!["B".to_string()],
@@ -223,14 +223,14 @@ fn io1_document_round_trip() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "A".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     opacity: Some(0.25),
                     position: Some((17.0, 23.0)),
                     size: Some((Some(120.0), Some(60.0))),
                     fill_solid: Some(CGColor::from_rgba(9, 8, 7, 255)),
                     active: Some(false),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,

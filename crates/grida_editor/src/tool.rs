@@ -246,10 +246,10 @@ impl ToolMachine {
                 points.push(local);
                 let batch = vec![Mutation::Patch {
                     id: id.clone(),
-                    set: PropPatch {
+                    set: Box::new(PropPatch {
                         vector_polyline: Some(points.clone()),
                         ..Default::default()
-                    },
+                    }),
                 }];
                 let _ = editor.dispatch(batch, Origin::Local, Recording::Silent);
                 self.phase = Phase::Stroking { anchor, id, points };
@@ -365,10 +365,10 @@ impl ToolMachine {
             if let Some(text) = final_text {
                 let batch = vec![Mutation::Patch {
                     id: id.clone(),
-                    set: PropPatch {
+                    set: Box::new(PropPatch {
                         text: Some(text),
                         ..Default::default()
-                    },
+                    }),
                 }];
                 let _ = editor.dispatch(batch, Origin::Local, Recording::Silent);
             }
@@ -473,7 +473,7 @@ impl ToolMachine {
         };
         vec![Mutation::Patch {
             id: id.clone(),
-            set,
+            set: Box::new(set),
         }]
     }
 
@@ -746,10 +746,10 @@ pub(crate) fn adoption_batch(editor: &Editor, container_id: &Id) -> Vec<Mutation
     for (id, (x, y)) in adopted {
         batch.push(Mutation::Patch {
             id,
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 position: Some((x - cx, y - cy)),
                 ..Default::default()
-            },
+            }),
         });
     }
     batch

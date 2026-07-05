@@ -208,10 +208,10 @@ fn frame_1_property_edit_paints_without_further_input() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "A".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     fill_solid: Some(blue()),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Record { label: None },
@@ -267,10 +267,10 @@ fn frame_1_container_position_edit_paints() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "K".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     position: Some((60.0, 10.0)),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Record { label: None },
@@ -394,11 +394,11 @@ fn frame_3_narrow_reflect_equals_wholesale_flush() {
 
     let batch = vec![Mutation::Patch {
         id: "A".to_string(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             position: Some((40.0, 30.0)),
             fill_solid: Some(blue()),
             ..Default::default()
-        },
+        }),
     }];
     for editor in [&mut editor_a, &mut editor_b] {
         editor

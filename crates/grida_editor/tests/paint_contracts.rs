@@ -41,10 +41,10 @@ fn editor_with_fills(fills: Vec<Paint>) -> Editor {
         .dispatch(
             vec![Mutation::Patch {
                 id: "r".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     fills: Some(Paints::new(fills)),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,

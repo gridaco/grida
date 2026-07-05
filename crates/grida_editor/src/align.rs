@@ -176,10 +176,10 @@ fn translate_mut(doc: &WorkingCopy, id: &Id, world_delta: (f32, f32)) -> Option<
     let (dx, dy) = parent_local_delta(doc, id, world_delta);
     Some(Mutation::Patch {
         id: id.clone(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             position: Some((px + dx, py + dy)),
             ..Default::default()
-        },
+        }),
     })
 }
 

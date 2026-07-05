@@ -996,7 +996,7 @@ pub fn encode_mutation(mutation: &Mutation) -> Result<WireMutation, WireError> {
         Mutation::Remove { id } => WireMutation::Remove { id: id.clone() },
         Mutation::Patch { id, set } => WireMutation::Patch {
             id: id.clone(),
-            set: set.into(),
+            set: set.as_ref().into(),
         },
         Mutation::Move { ids, parent, index } => WireMutation::Move {
             ids: ids.clone(),
@@ -1031,7 +1031,7 @@ pub fn decode_mutation(wire: &WireMutation) -> Mutation {
         WireMutation::Remove { id } => Mutation::Remove { id: id.clone() },
         WireMutation::Patch { id, set } => Mutation::Patch {
             id: id.clone(),
-            set: set.into(),
+            set: Box::new(set.into()),
         },
         WireMutation::Move { ids, parent, index } => Mutation::Move {
             ids: ids.clone(),

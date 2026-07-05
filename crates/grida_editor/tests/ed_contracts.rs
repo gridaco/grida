@@ -14,10 +14,10 @@ use grida_editor::history::Origin;
 fn opacity_patch(id: &str, opacity: f32) -> Vec<Mutation> {
     vec![Mutation::Patch {
         id: id.to_string(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             opacity: Some(opacity),
             ..Default::default()
-        },
+        }),
     }]
 }
 

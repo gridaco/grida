@@ -522,10 +522,10 @@ fn prop7_name_change_does_not_rebuild_slider() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "A".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     name: Some("renamed".to_string()),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Record { label: None },
@@ -985,7 +985,7 @@ fn document_wires_point_count_clip_align() {
     let a = "A".to_string();
     let patch = |set: PropPatch| Mutation::Patch {
         id: "A".to_string(),
-        set,
+        set: Box::new(set),
     };
 
     // point_count on a star.
@@ -1050,13 +1050,13 @@ fn fills_section_renders_rows_and_add_commits() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "A".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     fills: Some(Paints::new(vec![
                         Paint::Solid(SolidPaint::new_color(CGColor::from_rgba(10, 20, 30, 255))),
                         Paint::Solid(SolidPaint::new_color(CGColor::from_rgba(40, 50, 60, 255))),
                     ])),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,
@@ -1112,12 +1112,12 @@ fn strokes_and_scaffold_sections_render() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "A".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     strokes: Some(Paints::new(vec![Paint::Solid(SolidPaint::new_color(
                         CGColor::from_rgba(0, 0, 0, 255),
                     ))])),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,
@@ -1221,7 +1221,7 @@ fn effects_sections_render_for_an_effect_capable_kind() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "A".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     layer_blur: Some(Some(FeLayerBlur::from(6.0))),
                     shadows: Some(vec![FilterShadowEffect::DropShadow(FeShadow {
                         dx: 0.0,
@@ -1232,7 +1232,7 @@ fn effects_sections_render_for_an_effect_capable_kind() {
                         active: true,
                     })]),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,

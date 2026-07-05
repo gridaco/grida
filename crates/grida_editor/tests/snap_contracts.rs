@@ -401,10 +401,10 @@ fn snap_5_direct_values_commit_verbatim() {
     let mut editor = ab();
     let batch = vec![Mutation::Patch {
         id: "A".to_string(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             position: Some((10.37, 20.11)),
             ..Default::default()
-        },
+        }),
     }];
     editor
         .dispatch(batch, Origin::Local, Recording::Record { label: None })

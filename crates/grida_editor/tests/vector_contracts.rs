@@ -201,10 +201,10 @@ fn vec_3_refit_holds_world_positions_on_rotated_node() {
         .dispatch(
             vec![Mutation::Patch {
                 id: VEC.to_string(),
-                set: grida_editor::document::PropPatch {
+                set: Box::new(grida_editor::document::PropPatch {
                     rotation: Some(angle),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Record { label: None },

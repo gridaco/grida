@@ -350,7 +350,7 @@ impl VectorMode {
             let _ = editor.dispatch(
                 vec![Mutation::Patch {
                     id: node.clone(),
-                    set: patch,
+                    set: Box::new(patch),
                 }],
                 Origin::Local,
                 Recording::Record {
@@ -523,7 +523,7 @@ impl VectorMode {
         let _ = editor.dispatch(
             vec![Mutation::Patch {
                 id: self.node.clone(),
-                set: patch,
+                set: Box::new(patch),
             }],
             Origin::Local,
             Recording::Record {
@@ -556,7 +556,7 @@ impl VectorMode {
         let _ = editor.dispatch(
             vec![Mutation::Patch {
                 id: self.node.clone(),
-                set: patch,
+                set: Box::new(patch),
             }],
             Origin::Local,
             Recording::Record {
@@ -731,10 +731,10 @@ impl VectorMode {
                         let _ = editor.dispatch(
                             vec![Mutation::Patch {
                                 id: self.node.clone(),
-                                set: PropPatch {
+                                set: Box::new(PropPatch {
                                     vector_network: Some(net),
                                     ..Default::default()
-                                },
+                                }),
                             }],
                             Origin::Local,
                             Recording::Silent,
@@ -1024,10 +1024,10 @@ impl VectorMode {
             let _ = editor.dispatch(
                 vec![Mutation::Patch {
                     id: self.node.clone(),
-                    set: PropPatch {
+                    set: Box::new(PropPatch {
                         vector_network: Some(net.clone()),
                         ..Default::default()
-                    },
+                    }),
                 }],
                 Origin::Local,
                 Recording::Silent,
@@ -1189,10 +1189,10 @@ impl VectorMode {
         let _ = editor.dispatch(
             vec![Mutation::Patch {
                 id: self.node.clone(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     vector_network: Some(net),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,
@@ -1208,7 +1208,7 @@ impl VectorMode {
         let _ = editor.dispatch(
             vec![Mutation::Patch {
                 id: self.node.clone(),
-                set: patch,
+                set: Box::new(patch),
             }],
             Origin::Local,
             Recording::Silent,
@@ -1348,7 +1348,7 @@ impl VectorMode {
         let _ = editor.dispatch(
             vec![Mutation::Patch {
                 id: self.node.clone(),
-                set: patch,
+                set: Box::new(patch),
             }],
             Origin::Local,
             Recording::Record {
@@ -1362,10 +1362,10 @@ impl VectorMode {
         let _ = editor.dispatch(
             vec![Mutation::Patch {
                 id: self.node.clone(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     vector_network: Some(net),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,

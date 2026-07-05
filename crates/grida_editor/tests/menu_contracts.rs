@@ -281,10 +281,10 @@ fn menu_2_toggle_visible_presents_the_applicable_direction() {
         .dispatch(
             vec![Mutation::Patch {
                 id: "B".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     active: Some(false),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Record { label: None },

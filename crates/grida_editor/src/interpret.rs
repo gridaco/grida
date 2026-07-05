@@ -789,10 +789,10 @@ impl Interpreter {
                     .iter()
                     .map(|(id, m)| Mutation::Patch {
                         id: id.clone(),
-                        set: PropPatch {
+                        set: Box::new(PropPatch {
                             position: Some((m.pos.0 + delta[0], m.pos.1 + delta[1])),
                             ..Default::default()
-                        },
+                        }),
                     })
                     .collect();
                 let _ = editor.dispatch(batch, Origin::Local, Recording::Silent);
@@ -921,7 +921,7 @@ impl Interpreter {
                         let new_world_y = target.y + (b.world.y - initial_union.y) * sy;
                         Mutation::Patch {
                             id: id.clone(),
-                            set: PropPatch {
+                            set: Box::new(PropPatch {
                                 position: Some((
                                     b.pos.0 + (new_world_x - b.world.x),
                                     b.pos.1 + (new_world_y - b.world.y),
@@ -931,7 +931,7 @@ impl Interpreter {
                                     Some((b.size.1 * sy).max(1.0)),
                                 )),
                                 ..Default::default()
-                            },
+                            }),
                         }
                     })
                     .collect();
@@ -1007,11 +1007,11 @@ impl Interpreter {
                         };
                         Mutation::Patch {
                             id: id.clone(),
-                            set: PropPatch {
+                            set: Box::new(PropPatch {
                                 position: Some(position),
                                 rotation: Some(theta_new),
                                 ..Default::default()
-                            },
+                            }),
                         }
                     })
                     .collect();
@@ -1143,10 +1143,10 @@ impl Interpreter {
             .iter()
             .map(|(id, m)| Mutation::Patch {
                 id: id.clone(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     position: Some(m.pos),
                     ..Default::default()
-                },
+                }),
             })
             .collect();
         if !revert.is_empty() {
@@ -1306,10 +1306,10 @@ impl Interpreter {
             .filter_map(|id| {
                 editor.node_position(id).map(|(x, y)| Mutation::Patch {
                     id: id.clone(),
-                    set: PropPatch {
+                    set: Box::new(PropPatch {
                         position: Some((x + dx, y + dy)),
                         ..Default::default()
-                    },
+                    }),
                 })
             })
             .collect();
@@ -1345,10 +1345,10 @@ impl Interpreter {
             }
             batch.push(Mutation::Patch {
                 id: id.clone(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     size: Some((Some(nw), Some(nh))),
                     ..Default::default()
-                },
+                }),
             });
         }
         editor

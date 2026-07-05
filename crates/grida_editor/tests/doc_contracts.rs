@@ -55,7 +55,7 @@ fn doc_2_patch_roundtrip() {
 
     let batch = vec![Mutation::Patch {
         id: "r0".to_string(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             name: Some("renamed".to_string()),
             active: Some(false),
             opacity: Some(0.5),
@@ -64,7 +64,7 @@ fn doc_2_patch_roundtrip() {
             size: Some((Some(50.0), None)),
             rotation: Some(0.3),
             ..Default::default()
-        },
+        }),
     }];
     let applied = wc.apply(&batch).unwrap();
     assert!(
@@ -192,17 +192,17 @@ fn doc_4_invalid_mutation_rejects_whole_batch() {
         .apply(&[
             Mutation::Patch {
                 id: "r0".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     opacity: Some(0.25),
                     ..Default::default()
-                },
+                }),
             },
             Mutation::Patch {
                 id: "missing".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     opacity: Some(0.5),
                     ..Default::default()
-                },
+                }),
             },
         ])
         .unwrap_err();
@@ -279,17 +279,17 @@ fn doc_7_summary_node_set_equals_touched_set() {
         .apply(&[
             Mutation::Patch {
                 id: "r0".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     opacity: Some(0.5),
                     ..Default::default()
-                },
+                }),
             },
             Mutation::Patch {
                 id: "r2".to_string(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     position: Some((5.0, 5.0)),
                     ..Default::default()
-                },
+                }),
             },
         ])
         .unwrap();
@@ -382,10 +382,10 @@ fn doc_2_vector_network_patch_roundtrip() {
 
     let batch = vec![Mutation::Patch {
         id: "v0".to_string(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             vector_network: Some(curved_network()),
             ..Default::default()
-        },
+        }),
     }];
     let applied = wc.apply(&batch).unwrap();
     assert!(!wc.structure_eq(&baseline), "tangent change is visible");
@@ -408,10 +408,10 @@ fn vector_network_patch_requires_vector_node() {
     let err = wc
         .apply(&[Mutation::Patch {
             id: "r0".to_string(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 vector_network: Some(curved_network()),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap_err();
     assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
@@ -425,11 +425,11 @@ fn vector_network_and_polyline_are_mutually_exclusive() {
     let err = wc
         .apply(&[Mutation::Patch {
             id: "v0".to_string(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 vector_polyline: Some(vec![(0.0, 0.0), (1.0, 1.0)]),
                 vector_network: Some(curved_network()),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap_err();
     assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
@@ -485,11 +485,11 @@ fn doc_2_appearance_patch_roundtrips() {
     let applied = wc
         .apply(&[Mutation::Patch {
             id: id.clone(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 corner_radius: Some(6.0),
                 blend_mode: Some(LayerBlendMode::Blend(BlendMode::Multiply)),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap();
     assert_eq!(
@@ -544,10 +544,10 @@ fn doc_2_fills_patch_roundtrip() {
     let applied = wc
         .apply(&[Mutation::Patch {
             id: id.clone(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 fills: Some(stack.clone()),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap();
     assert_eq!(
@@ -585,10 +585,10 @@ fn fills_patch_requires_a_fill_bearing_node() {
     let err = wc
         .apply(&[Mutation::Patch {
             id: "g0".to_string(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 fills: Some(Paints::new([solid(1, 2, 3, 255)])),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap_err();
     assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
@@ -606,11 +606,11 @@ fn fill_solid_and_fills_are_mutually_exclusive() {
     let err = wc
         .apply(&[Mutation::Patch {
             id: "r0".to_string(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 fill_solid: Some(CGColor::from_rgba(1, 2, 3, 255)),
                 fills: Some(Paints::new([solid(4, 5, 6, 255)])),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap_err();
     assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
@@ -634,7 +634,7 @@ fn doc_2_stroke_geometry_roundtrip() {
     let applied = wc
         .apply(&[Mutation::Patch {
             id: id.clone(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 stroke_width: Some(4.0),
                 stroke_align: Some(StrokeAlign::Outside),
                 stroke_cap: Some(StrokeCap::Round),
@@ -642,7 +642,7 @@ fn doc_2_stroke_geometry_roundtrip() {
                 stroke_miter: Some(8.0),
                 stroke_dash: Some(vec![3.0]),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap();
     assert_eq!(wc.node_stroke_width(&id), Some(4.0));
@@ -670,19 +670,19 @@ fn stroke_dash_empty_clears_to_solid() {
     let id = "r0".to_string();
     wc.apply(&[Mutation::Patch {
         id: id.clone(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             stroke_dash: Some(vec![5.0, 2.0]),
             ..Default::default()
-        },
+        }),
     }])
     .unwrap();
     assert_eq!(wc.node_stroke_dash(&id), Some(vec![5.0, 2.0]));
     wc.apply(&[Mutation::Patch {
         id: id.clone(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             stroke_dash: Some(Vec::new()),
             ..Default::default()
-        },
+        }),
     }])
     .unwrap();
     assert_eq!(wc.node_stroke_dash(&id), Some(Vec::new()), "solid");
@@ -727,7 +727,7 @@ fn doc_2_typography_roundtrip() {
     let applied = wc
         .apply(&[Mutation::Patch {
             id: id.clone(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 font_size: Some(48.0),
                 font_weight: Some(700),
                 font_italic: Some(true),
@@ -735,7 +735,7 @@ fn doc_2_typography_roundtrip() {
                 letter_spacing: Some(TextLetterSpacing::Fixed(2.0)),
                 text_align_vertical: Some(TextAlignVertical::Center),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap();
     assert_eq!(wc.node_font_size(&id), Some(48.0));
@@ -770,10 +770,10 @@ fn line_height_inverse_restores_the_prior_variant() {
     let applied = wc
         .apply(&[Mutation::Patch {
             id: id.clone(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 line_height: Some(TextLineHeight::Factor(2.0)),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap();
     // The captured inverse is the prior `Normal`, not a Factor.
@@ -792,10 +792,10 @@ fn typography_requires_a_text_kind() {
     let err = wc
         .apply(&[Mutation::Patch {
             id: "r0".to_string(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 font_size: Some(24.0),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap_err();
     assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
@@ -823,11 +823,11 @@ fn doc_2_effects_roundtrip() {
     let applied = wc
         .apply(&[Mutation::Patch {
             id: id.clone(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 layer_blur: Some(Some(FeLayerBlur::from(8.0))),
                 shadows: Some(vec![shadow.clone()]),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap();
     let fx = wc.node_effects(&id).unwrap();
@@ -853,10 +853,10 @@ fn layer_blur_inverse_restores_the_prior_slot() {
     let applied = wc
         .apply(&[Mutation::Patch {
             id: id.clone(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 layer_blur: Some(Some(FeLayerBlur::from(4.0))),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap();
     let Mutation::Patch { set, .. } = &applied.inverse[0] else {
@@ -881,10 +881,10 @@ fn effects_require_an_effect_capable_kind() {
     let err = wc
         .apply(&[Mutation::Patch {
             id: "g0".to_string(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 layer_blur: Some(Some(FeLayerBlur::from(4.0))),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap_err();
     assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
@@ -905,10 +905,10 @@ fn stroke_width_requires_a_stroked_kind() {
     let err = wc
         .apply(&[Mutation::Patch {
             id: "g0".to_string(),
-            set: PropPatch {
+            set: Box::new(PropPatch {
                 stroke_width: Some(2.0),
                 ..Default::default()
-            },
+            }),
         }])
         .unwrap_err();
     assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));

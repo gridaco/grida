@@ -1700,10 +1700,10 @@ impl ShellApp {
                     .node_active(id)
                     .map(|active| Mutation::Patch {
                         id: id.clone(),
-                        set: PropPatch {
+                        set: Box::new(PropPatch {
                             active: Some(!active),
                             ..Default::default()
-                        },
+                        }),
                     })
             })
             .collect();
@@ -1734,10 +1734,10 @@ impl ShellApp {
             .iter()
             .map(|id| Mutation::Patch {
                 id: id.clone(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     opacity: Some(value),
                     ..Default::default()
-                },
+                }),
             })
             .collect();
         self.editor

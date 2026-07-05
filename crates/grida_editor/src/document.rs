@@ -213,8 +213,10 @@ pub enum Mutation {
     },
     /// Remove a node and its subtree.
     Remove { id: Id },
-    /// Set one or more properties on a node.
-    Patch { id: Id, set: PropPatch },
+    /// Set one or more properties on a node. `set` is boxed to keep the
+    /// `Mutation` variants size-balanced (`PropPatch` is far larger than
+    /// any other variant), like `Insert`'s fragment.
+    Patch { id: Id, set: Box<PropPatch> },
     /// Reparent/reorder nodes to `parent` at a **post-removal**
     /// document-order index (`DOC-5`).
     Move {
@@ -1797,7 +1799,7 @@ impl WorkingCopy {
 
         let inverse = vec![Mutation::Patch {
             id: id.clone(),
-            set: inverse,
+            set: Box::new(inverse),
         }];
         Ok((inverse, vec![(id.clone(), kind)]))
     }

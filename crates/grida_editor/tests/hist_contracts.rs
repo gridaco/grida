@@ -31,10 +31,10 @@ fn entry(label: Option<&str>, redo: Vec<i32>, undo: Vec<i32>, after_sel: &str) -
 fn opacity_patch(id: &str, opacity: f32) -> Vec<Mutation> {
     vec![Mutation::Patch {
         id: id.to_string(),
-        set: PropPatch {
+        set: Box::new(PropPatch {
             opacity: Some(opacity),
             ..Default::default()
-        },
+        }),
     }]
 }
 
@@ -487,10 +487,10 @@ fn hisb_coalesced_gesture_preserves_all_patch_fields() {
         .dispatch(
             vec![Mutation::Patch {
                 id: id.clone(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     position: Some((10.0, 10.0)),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,
@@ -500,11 +500,11 @@ fn hisb_coalesced_gesture_preserves_all_patch_fields() {
         .dispatch(
             vec![Mutation::Patch {
                 id: id.clone(),
-                set: PropPatch {
+                set: Box::new(PropPatch {
                     position: Some((20.0, 20.0)),
                     corner_radius: Some(8.0),
                     ..Default::default()
-                },
+                }),
             }],
             Origin::Local,
             Recording::Silent,
