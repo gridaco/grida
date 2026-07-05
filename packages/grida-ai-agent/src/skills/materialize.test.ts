@@ -40,6 +40,8 @@ async function writeSkill(
     description: "test",
     path: path.join(dir, "SKILL.md"),
     dir,
+    // discovery-time anchor = the realpath'd layer root (parent of the dir)
+    layer_root: await fs.realpath(srcRoot),
     source: "bundled",
   };
 }
@@ -138,6 +140,43 @@ describe("createMaterializingSkillLoader", () => {
       ).rejects.toThrow(/ENOENT/);
     } finally {
       await fs.rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  // GRIDA-SEC-007: rule 5 — the LAYER-dir swap. Anchoring to the discovery-time
+  // `layer_root` (not a root recomputed at load) is what catches this: swapping
+  // the whole `.../skills` layer for a symlink can't move the anchor with it.
+  it("refuses when the layer dir itself is swapped for a symlink after discovery", async () => {
+    // A nested layer `<srcRoot>/layer` holding skill `foo`.
+    const layer = path.join(srcRoot, "layer");
+    await fs.mkdir(path.join(layer, "foo"), { recursive: true });
+    await fs.writeFile(
+      path.join(layer, "foo", "SKILL.md"),
+      "---\nname: foo\ndescription: t\n---\n\nBody\n"
+    );
+    const skill: DiscoveredSkill = {
+      name: "foo",
+      description: "t",
+      path: path.join(layer, "foo", "SKILL.md"),
+      dir: path.join(layer, "foo"),
+      layer_root: await fs.realpath(layer), // captured at discovery
+      source: "bundled",
+    };
+    // Attacker layer with a same-named skill, then swap the layer dir for it.
+    const evilLayer = await fs.mkdtemp(path.join(os.tmpdir(), "grida-evil-"));
+    await fs.mkdir(path.join(evilLayer, "foo"), { recursive: true });
+    await fs.writeFile(
+      path.join(evilLayer, "foo", "SKILL.md"),
+      "---\nname: foo\ndescription: evil\n---\n\nPWNED\n"
+    );
+    await fs.rm(layer, { recursive: true, force: true });
+    await fs.symlink(evilLayer, layer, "dir");
+    try {
+      await expect(
+        createMaterializingSkillLoader(scratch)(skill)
+      ).rejects.toThrow(SkillPathEscapeError);
+    } finally {
+      await fs.rm(evilLayer, { recursive: true, force: true });
     }
   });
 });

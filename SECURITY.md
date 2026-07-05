@@ -1005,11 +1005,14 @@ into scratch (where the shell can then exfiltrate them).
 5. **Re-validation at LOAD time (discovery→load TOCTOU)** — rule 2 runs when
    the index is built, but the `skill` tool loads a body later, and the
    filesystem can change in between (a checkout or a shell command swaps
-   `.agents/skills/foo` for a symlink). `resolveSkillLoadPaths`
+   `.agents/skills/foo`, or the `.agents/skills` layer itself, for a symlink).
+   `resolveSkillLoadPaths`
    ([discovery.ts](packages/grida-ai-agent/src/skills/discovery.ts))
-   re-realpaths and re-contains the skill dir + its `SKILL.md` (or a flat
-   `<name>.md`) against the layer root at load time, throws
-   `SkillPathEscapeError` on escape, and returns the canonical paths to
+   re-realpaths the skill dir + its `SKILL.md` (or a flat `<name>.md`) and
+   re-contains them against the **discovery-time** layer root (`layer_root`,
+   captured + realpath'd when the index was built) — not a root recomputed at
+   load, which a layer-dir swap would move in lockstep with the target. Throws
+   `SkillPathEscapeError` on escape and returns the canonical paths to
    read/copy. BOTH load paths — the materializing loader and
    `nodeSkillBodyLoader` — go through it, so no loader trusts a stale
    discovered string path.

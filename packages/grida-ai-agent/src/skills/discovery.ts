@@ -204,7 +204,12 @@ async function readSkillsDir(
     // root. A symlinked skill dir/file that escapes is dropped from the listing.
     if (!(await isContained(layerRoot, skillPath))) continue;
 
-    const skill = await readSkillManifest(skillPath, skillDir, source);
+    const skill = await readSkillManifest(
+      skillPath,
+      skillDir,
+      layerRoot,
+      source
+    );
     if (skill) out.push(skill);
   }
   // Deterministic order within a directory (readdir order is platform-dependent).
@@ -215,6 +220,7 @@ async function readSkillsDir(
 async function readSkillManifest(
   skillPath: string,
   skillDir: string | undefined,
+  layerRoot: string,
   source: SkillSource
 ): Promise<DiscoveredSkill | null> {
   let raw: string;
@@ -243,6 +249,9 @@ async function readSkillManifest(
     path: skillPath,
     dir: skillDir,
     also_in_load: extractAlsoInLoad(manifest.metadata),
+    // The realpath'd layer root, captured now — the load-time anchor
+    // (GRIDA-SEC-007 rule 5) so a later layer-dir swap can't move it.
+    layer_root: layerRoot,
     source,
   };
 }
@@ -292,19 +301,24 @@ export class SkillPathEscapeError extends Error {
  * GRIDA-SEC-007: rule 5 — re-validate a discovered skill's on-disk paths at
  * LOAD time, closing the discovery→load TOCTOU. Discovery containment-checked
  * `<layer>/<name>` when the index was built, but the filesystem can change
- * underneath: a checkout or a shell command can replace the skill dir with a
- * symlink before the model calls the `skill` tool, and a blind `readdir`/read
- * of the stored string path would then follow the link out of the layer. Here
- * we re-realpath the dir + its `SKILL.md` (or the flat `<name>.md`) and
- * re-contain them in the skill's layer root, returning the canonical paths the
- * caller must read/copy from. Throws {@link SkillPathEscapeError} on escape.
+ * underneath: a checkout or a shell command can replace the skill dir (or the
+ * layer dir itself) with a symlink before the model calls the `skill` tool, and
+ * a blind `readdir`/read of the stored string path would then follow the link
+ * out of the layer. Here we re-realpath the dir + its `SKILL.md` (or the flat
+ * `<name>.md`) and re-contain them against the DISCOVERY-TIME layer root
+ * (`skill.layer_root`, captured + realpath'd when the index was built) — NOT a
+ * root recomputed now, which a layer-dir swap would move in lockstep with the
+ * target. Returns the canonical paths the caller must read/copy from. Throws
+ * {@link SkillPathEscapeError} on escape.
  */
 export async function resolveSkillLoadPaths(
-  skill: Pick<DiscoveredSkill, "dir" | "path">
+  skill: Pick<DiscoveredSkill, "dir" | "path" | "layer_root">
 ): Promise<{ dir: string | null; body_path: string }> {
   if (skill.dir) {
-    // Layer root = the `.../skills` dir that holds this entry.
-    const layerRoot = await safeRealpath(path.dirname(skill.dir));
+    // Anchor to the discovery-time layer root; fall back to a load-time
+    // dirname only for pre-resolved (`extra`) skills that carry no anchor.
+    const layerRoot =
+      skill.layer_root ?? (await safeRealpath(path.dirname(skill.dir)));
     const realDir = await safeRealpath(skill.dir);
     if (
       layerRoot == null ||
@@ -320,7 +334,8 @@ export async function resolveSkillLoadPaths(
     return { dir: realDir, body_path: realBody };
   }
   // Flat `<layer>/<name>.md` skill — no tree, just the body file.
-  const layerRoot = await safeRealpath(path.dirname(skill.path));
+  const layerRoot =
+    skill.layer_root ?? (await safeRealpath(path.dirname(skill.path)));
   const realBody = await safeRealpath(skill.path);
   if (
     layerRoot == null ||
