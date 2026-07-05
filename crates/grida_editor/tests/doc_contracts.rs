@@ -132,6 +132,31 @@ fn doc_2_move_roundtrip() {
 }
 
 #[test]
+fn doc_2_move_same_parent_block_roundtrip() {
+    // Regression: a contiguous same-parent block moved to a new index.
+    // The inverse must restore per-parent highest-original-index-first;
+    // ascending single-id moves would leave the block scrambled
+    // (e.g. `[r0,r1,r2,r3]` undone to `[r1,r0,r2,r3]`).
+    let mut wc = wc_with_rects(4);
+    let baseline = wc.clone();
+
+    let applied = wc
+        .apply(&[Mutation::Move {
+            ids: vec!["r1".to_string(), "r2".to_string()],
+            parent: None,
+            index: 0,
+        }])
+        .unwrap();
+    assert_eq!(ids(&wc.children(None)), ["r1", "r2", "r0", "r3"]);
+
+    wc.apply(&applied.inverse).unwrap();
+    assert!(
+        wc.structure_eq(&baseline),
+        "DOC-2: same-parent block move inverse restores the original order"
+    );
+}
+
+#[test]
 fn doc_2_move_reparent_roundtrip() {
     let mut wc = wc_with_rects(2);
     wc.apply(&[Mutation::Insert {

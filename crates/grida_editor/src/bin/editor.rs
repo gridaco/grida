@@ -12,7 +12,10 @@ fn main() {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--open" => options.open = args.next(),
+            "--open" => match args.next() {
+                Some(path) => options.open = Some(path),
+                None => usage("--open requires a path"),
+            },
             "--listen" => match args.next().and_then(|p| p.parse().ok()) {
                 Some(port) => options.listen = Some(port),
                 None => usage("--listen requires a port number"),

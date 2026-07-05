@@ -19,7 +19,7 @@ conformance contracts the harness enforces.
 
 A history entry is a pair of mutation batches plus context:
 
-```
+```text
 entry {
   redo:    mutation batch        // applies the change
   undo:    mutation batch        // the inverse (DOC-2)

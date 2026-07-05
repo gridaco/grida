@@ -17,7 +17,7 @@ capability it exposes exists below it; the shell arranges and binds.
 
 One window, one render surface ([ui.md](./ui.md)), three regions:
 
-```
+```text
 ┌───────────┬──────────────────────────┬─────────────┐
 │ hierarchy │        canvas view       │ properties  │
 │  (left)   │   (surface + HUD chrome) │   (right)   │

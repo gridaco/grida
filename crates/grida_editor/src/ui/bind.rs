@@ -1027,7 +1027,14 @@ fn convert_paint(paint: &Paint, kind: usize) -> Paint {
     let stops = paint_stops(paint);
     let first_color = stops.first().map(|s| s.color).unwrap_or(CGColor::BLACK);
     match kind {
-        0 => Paint::Solid(SolidPaint::new_color(first_color)),
+        0 => {
+            // Fold the source opacity into the solid's alpha — a solid
+            // paint has no separate opacity channel, so dropping it would
+            // silently make a translucent gradient fully opaque.
+            let mut color = first_color;
+            color.a = (color.a as f32 * opacity).round().clamp(0.0, 255.0) as u8;
+            Paint::Solid(SolidPaint::new_color(color))
+        }
         1 => Paint::LinearGradient(LinearGradientPaint {
             stops,
             opacity,

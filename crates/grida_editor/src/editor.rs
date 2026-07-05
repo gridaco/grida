@@ -275,7 +275,9 @@ impl Editor {
         self.selection = gesture.selection_before;
         self.prune_selection();
         self.history.abort();
-        if !summary.nodes.is_empty() {
+        // Guide/background-only rollbacks change no node yet must still
+        // reach observers — mirror `gesture_rollback`'s empty check.
+        if !summary.is_empty() {
             self.notify(&summary);
         }
     }

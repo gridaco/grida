@@ -1922,11 +1922,15 @@ impl WorkingCopy {
             .set_children(&tp, new_children)
             .expect("invariant: move was validated against the pre-state");
 
-        // Inverse: restore each id to its captured (parent, index),
-        // ascending by original index per parent so each single-id move
-        // sees exactly the post-removal environment it needs.
+        // Inverse: restore each id to its captured (parent, index), per
+        // parent from the highest original index to the lowest. Each
+        // single-id move re-inserts at its absolute original index; going
+        // high→low means every id lands after the still-misplaced,
+        // lower-index members are cleared out — descending is the order
+        // that reproduces the pre-move sequence for same-parent block
+        // moves (ascending leaves them scrambled).
         let mut order: Vec<usize> = (0..captured.len()).collect();
-        order.sort_by_key(|&i| (captured[i].2, captured[i].3));
+        order.sort_by_key(|&i| (captured[i].2, std::cmp::Reverse(captured[i].3)));
         let inverse: Vec<Mutation> = order
             .into_iter()
             .map(|i| {

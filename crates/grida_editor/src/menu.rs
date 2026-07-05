@@ -271,7 +271,7 @@ pub fn canvas_menu(doc: &WorkingCopy, selection: &[Id]) -> Menu {
             action(Command::Flatten, "Flatten", flatten),
             action(Command::CreateOutlines, "Create Outlines", create_outlines),
             Item::Separator,
-            action(Command::ZoomSelection, "Zoom to fit", some),
+            action(Command::ZoomSelection, "Zoom to selection", some),
             Item::Separator,
             action(Command::ToggleVisible, toggle_label, some),
             Item::Separator,

@@ -631,6 +631,19 @@ fn flattened_node(node: &Node) -> Option<Node> {
         _ => return None,
     };
 
+    // Carry the source's flex/auto-layout slot through the flatten, the
+    // same way `text_outline_node` does — otherwise a flattened primitive
+    // loses its layout placement and falls back to default positioning.
+    let layout_child = match node {
+        Node::Rectangle(n) => n.layout_child.clone(),
+        Node::Ellipse(n) => n.layout_child.clone(),
+        Node::Polygon(n) => n.layout_child.clone(),
+        Node::RegularPolygon(n) => n.layout_child.clone(),
+        Node::RegularStarPolygon(n) => n.layout_child.clone(),
+        Node::Line(n) => n.layout_child.clone(),
+        _ => None,
+    };
+
     Some(Node::Vector(grida::node::schema::VectorNodeRec {
         active: node.active(),
         opacity: node.opacity(),
@@ -651,7 +664,7 @@ fn flattened_node(node: &Node) -> Option<Node> {
         stroke_dash_array: style.stroke_dash_array,
         marker_start_shape: style.marker_start_shape,
         marker_end_shape: style.marker_end_shape,
-        layout_child: None,
+        layout_child,
     }))
 }
 

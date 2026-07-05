@@ -92,7 +92,7 @@ web parity target carries rows this crate has no concept of yet
 (components, sections); those join the taxonomy as their systems
 appear.
 
-#### File
+### File
 
 | Item           | Wired to · Awaiting                                   |
 | -------------- | ----------------------------------------------------- |
@@ -101,7 +101,7 @@ appear.
 | Import Image   | deferred → image-import command + native file dialog  |
 | Import Figma   | deferred → Figma import path                          |
 
-#### Edit
+### Edit
 
 | Item               | Wired to · Awaiting                       |
 | ------------------ | ----------------------------------------- |
@@ -112,7 +112,7 @@ appear.
 | Pick color         | deferred → eyedropper / color-pick system |
 | Duplicate / Delete | `Duplicate` / `DeleteSelection`           |
 
-#### Object
+### Object
 
 | Item                                             | Wired to · Awaiting                                              |
 | ------------------------------------------------ | ---------------------------------------------------------------- |
@@ -132,7 +132,7 @@ appear.
 | Create component · instance/main-component ops   | deferred → component system                                      |
 | Rasterize · Hide other layers · Collapse layers  | deferred → layer-panel ops                                       |
 
-#### Arrange
+### Arrange
 
 | Item                                            | Wired to · Awaiting               |
 | ----------------------------------------------- | --------------------------------- |
@@ -142,7 +142,7 @@ appear.
 | Round to pixel                                  | deferred → pixel-round op         |
 | Tidy up · Pack horizontal/vertical              | deferred → tidy/pack layout       |
 
-#### View
+### View
 
 | Item                             | Wired to · Awaiting                                            |
 | -------------------------------- | -------------------------------------------------------------- |
@@ -152,13 +152,13 @@ appear.
 | Snapping → pixel-grid / geometry | `ToggleSnapPixelGrid` / `ToggleSnapGeometry`                   |
 | Minimize UI                      | deferred → minimize-UI view state                              |
 
-#### Text — shown only while a text content mode is active
+### Text — shown only while a text content mode is active
 
 | Item                                                                           | Wired to · Awaiting                      |
 | ------------------------------------------------------------------------------ | ---------------------------------------- |
 | Bold/Italic/Underline/Strikethrough · link · lists · alignment · adjust · case | deferred → text-attribute command system |
 
-#### Settings
+### Settings
 
 | Item               | Wired to · Awaiting                                          |
 | ------------------ | ------------------------------------------------------------ |

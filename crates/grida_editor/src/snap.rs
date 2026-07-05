@@ -663,7 +663,11 @@ pub fn chrome(session: &Session, geo: &GeometrySnap) -> Vec<HudPrim> {
             .map(|p| (on(axis, p), on(counter(axis), p)))
             .unzip();
         let mut order: Vec<usize> = (0..points.len()).collect();
-        order.sort_by(|&a, &b| (main[a], cnt[a]).partial_cmp(&(main[b], cnt[b])).unwrap());
+        order.sort_by(|&a, &b| {
+            (main[a], cnt[a])
+                .partial_cmp(&(main[b], cnt[b]))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         let mut i = 0;
         while i < order.len() {
             let mut j = i + 1;
