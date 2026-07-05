@@ -42,6 +42,7 @@
 import { app } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { buildAgentDaemonSandboxPolicy } from "@grida/agent/sandbox";
 import { home } from "@grida/home";
@@ -191,6 +192,21 @@ class AgentSidecarSupervisor {
     return path.join(__dirname, "agent-sidecar.js");
   }
 
+  /**
+   * Resolve the host-bundled skills dir (repo-root `skills/`) — the lowest
+   * discovery layer that ships the built-in `svg`/`dotcanvas`/`slides` skills.
+   * Packaged: Forge `extraResource` copies `skills/` into `resourcesPath`. Dev:
+   * it sits beside the desktop package dir (`app.getAppPath()` = `desktop/`).
+   * Returns undefined if neither exists (the sidecar then ships no built-ins).
+   */
+  private skillsRootPath(): string | undefined {
+    const packaged = path.join(process.resourcesPath, "skills");
+    if (fs.existsSync(packaged)) return packaged;
+    const dev = path.join(app.getAppPath(), "..", "skills");
+    if (fs.existsSync(dev)) return dev;
+    return undefined;
+  }
+
   private async spawn(): Promise<AgentSidecarInfo> {
     const scriptPath = this.sidecarScriptPath();
     const password = crypto.randomBytes(32).toString("base64url");
@@ -201,9 +217,13 @@ class AgentSidecarSupervisor {
     // work under cmd.exe.
     const supportedSandbox = isSupportedPlatform();
 
+    const skillsRoot = this.skillsRootPath();
     const args = [
       scriptPath,
       `--user-data=${this.user_data_path}`,
+      // Host-bundled skills dir (repo-root `skills/`) — the built-in skills the
+      // agent advertises + loads on demand. Read-only; omitted if unresolved.
+      ...(skillsRoot ? [`--skills-root=${skillsRoot}`] : []),
       // GRIDA-SEC-004 — host-injected managed root for the auto-create flow.
       // A visible, Finder-navigable location (files stay visible); the sidecar
       // may only mint project folders INSIDE this root. `documents` needs a

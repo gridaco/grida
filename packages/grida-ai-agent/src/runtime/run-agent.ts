@@ -28,7 +28,7 @@
  */
 
 import { createAgentUIStreamResponse } from "ai";
-import { createAgent, type AgentMessage, type SkillId } from "../agent";
+import { createAgent, type AgentMessage } from "../agent";
 import { newMessageId } from "../session/ids";
 import type { MessageUsage } from "../session/rows";
 import type { AgentModelId } from "../protocol/run";
@@ -68,8 +68,6 @@ export type AgentRunRequest = {
    * (standalone-doc path).
    */
   workspace_root?: string;
-  /** Built-in prompt blocks (e.g. `'svg'`). Ignored when `workspaceRoot` is absent. */
-  skills?: readonly SkillId[];
   /**
    * Permission/supervision posture (RFC `permission modes`). Drives the shell
    * gate in the command backend; ignored when `workspaceRoot` is absent (no
@@ -181,7 +179,8 @@ export async function runAgent(
 
   const agent = createAgent({
     model_factory: provider.model_factory,
-    skills: bindings ? req.skills : undefined,
+    // No eager skill blocks on the workspace path — built-ins advertise-then-load
+    // from the bundled discovery layer via `skill_index` + the `skill` tool.
     fs: bindings?.fs,
     todos: bindings?.todos,
     // AgentFs satisfies AgentVision.ByteReader, so the workspace agent can SEE
@@ -194,11 +193,14 @@ export async function runAgent(
     image_gen: bindings?.image_gen,
     command: bindings?.command,
     // RFC skills + project instructions are session-static context the
-    // runtime discovered once and threads through every turn. The body
-    // loader is the node-fs reader (this path is server-only).
+    // runtime discovered once and threads through every turn. When scratch is
+    // wired (workspace path), the loader MATERIALIZES a loaded skill's tree into
+    // scratch so its files are reachable; otherwise it just reads the body.
     skill_index: req.skill_index,
     skill_cache: req.skill_cache,
-    skill_load_body: req.skill_index ? nodeSkillBodyLoader : undefined,
+    skill_load_body: req.skill_index
+      ? (bindings?.skill_load_body ?? nodeSkillBodyLoader)
+      : undefined,
     project_instructions: req.project_instructions,
     // Whether the `question` tool pauses for a human or refuses headless. The
     // per-run client capability (`req.interactive`) WINS over the host default

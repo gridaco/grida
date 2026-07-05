@@ -25,8 +25,6 @@
  * module rather than re-deriving the key.
  */
 
-import type { SkillId } from "@grida/agent";
-
 const KEY_PREFIX = "grida.welcome.pendingPrompt";
 
 function storageKey(workspaceId: string): string {
@@ -43,12 +41,6 @@ export type WelcomeHandoff = {
    * turn so the picker's choice survives the navigation; omitted when
    * the workspace chat should fall back to its own default. */
   model_id?: string;
-  /** Skills to prime the FIRST turn with when no editor tab is open yet — an
-   * auto-created project lands with no active tab, so the workbench can't infer
-   * the skill from a file extension. The home passes `["dotcanvas"]` so the
-   * artwork agent knows the `.canvas` board format from turn one. Once the user
-   * opens a tab, the active tab's skill takes over. */
-  skills?: SkillId[];
 };
 
 export namespace welcome_handoff {

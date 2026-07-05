@@ -17,7 +17,8 @@ import { isReadOnlyCommand } from "@grida/daemon/server";
 import { AgentTodos } from "../todos";
 import { AgentVision } from "../vision";
 import { AgentGen } from "../gen";
-import type { SkillId } from "../agent";
+import { createMaterializingSkillLoader } from "../skills/materialize";
+import type { SkillBodyLoader } from "../skills/types";
 import { AGENT_DEFAULT_MODE, type AgentMode } from "../protocol/mode";
 import type { SecretsStore } from "@grida/daemon/server";
 import {
@@ -39,7 +40,6 @@ import type { Workspace, WorkspaceRegistry } from "@grida/daemon/server";
 
 export type WorkspaceAgentBindingRequest = {
   workspace_root?: string;
-  skills?: readonly SkillId[];
   /** Permission/supervision posture; drives the shell gate in the command
    *  backend (RFC `permission modes`). Defaults to `accept-edits`. */
   mode?: AgentMode;
@@ -108,6 +108,9 @@ export async function createWorkspaceAgentBindings(
   /** Image generator backing `generate_image`, when a provider key + scratch
    *  sink are available (S3: produced files land in scratch). */
   image_gen?: AgentGen.ImageGenerator;
+  /** Materializing skill-body loader — copies a loaded skill's tree into
+   *  scratch so its files are reachable. Present only when scratch is wired. */
+  skill_load_body?: SkillBodyLoader;
 } | null> {
   if (!req.workspace_root) return null;
   const workspace = await deps.workspace_registry.findByRoot(
@@ -199,7 +202,14 @@ export async function createWorkspaceAgentBindings(
       );
     }
   }
-  return { fs, todos, command, image_gen };
+  // Materializing skill loader: when scratch exists, a loaded skill's tree is
+  // copied into `<scratch>/skills/<name>/` so its scripts/assets are real files
+  // the workspace-scoped fs + shell can reach. Without scratch, the caller falls
+  // back to the plain body reader (`nodeSkillBodyLoader`).
+  const skill_load_body = scratchDir
+    ? createMaterializingSkillLoader(scratchDir)
+    : undefined;
+  return { fs, todos, command, image_gen, skill_load_body };
 }
 
 /** File extension for a produced image's media type (best-effort). */

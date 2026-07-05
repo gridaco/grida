@@ -84,11 +84,7 @@ import {
   type AnswerQuestionHandler,
   type PickReferencesHandler,
 } from "@/kits/agent-chat";
-import {
-  DESIGN_SEARCH_TAB_ID,
-  pickQuery,
-  type DesignSearchSession,
-} from "./design-search-tab";
+import { pickQuery, type DesignSearchSession } from "./design-search-tab";
 import { QueuedMessages } from "../shared/queued-messages";
 import { ChatSessionPicker } from "../shared/chat-session-picker";
 import {
@@ -108,50 +104,9 @@ import {
 } from "../shared/agent-composer-input";
 import { useWorkspaceComposerCatalog } from "../shared/use-workspace-composer-catalog";
 
-/** Skill ids the workspace agent knows about. New ids land here when
- * their prompt block + tool wiring exist in `@grida/agent`. */
-const SVG_EXTENSIONS = new Set([".svg"]);
-
-function getExtension(relPath: string): string {
-  const name = relPath.split("/").pop() ?? relPath;
-  const dot = name.lastIndexOf(".");
-  if (dot <= 0) return "";
-  return name.slice(dot).toLowerCase();
-}
-
-/** True for a `.canvas` bundle dir, a file inside one, or its `.canvas.json`. */
-function isCanvasContext(relPath: string): boolean {
-  if (relPath === ".canvas.json" || relPath.endsWith("/.canvas.json"))
-    return true;
-  return relPath
-    .split("/")
-    .some((seg) => seg.toLowerCase().endsWith(".canvas"));
-}
-
-/** The canonical skill-id type, derived from the run options so the literals
- *  below are compile-checked against the real skill vocabulary. */
-type SkillId = NonNullable<AgentRunOptions["skills"]>[number];
-
-function skillsForActiveTab(relPath: string | null): SkillId[] | undefined {
-  if (relPath === null) return undefined;
-  // TODO(skill-system): replace this extension heuristic with a real workspace
-  // skill picker/registry.
-  // The design_search picker IS the artwork/library context — keep the
-  // `dotcanvas` skill alive while it's focused so a turn typed mid-pick (and the
-  // board-building that follows the picks) doesn't silently lose format
-  // knowledge. This also covers the "create a board from scratch" case the
-  // skill-system TODO above anticipated.
-  if (relPath === DESIGN_SEARCH_TAB_ID || isCanvasContext(relPath))
-    return ["dotcanvas"];
-  if (SVG_EXTENSIONS.has(getExtension(relPath))) return ["svg"];
-  return undefined;
-}
-
 export type AgentPaneProps = {
   workspace: Workspace;
-  /** The file currently in focus in the editor pane. Drives skill
-   * selection — when it changes, subsequent turns pick up the new
-   * skill set. */
+  /** The file currently in focus in the editor pane. */
   activeRelPath?: string | null;
   className?: string;
   /**
@@ -194,7 +149,6 @@ type AgentPaneContentProps = Omit<AgentPaneProps, "className">;
 
 function AgentPaneContent({
   workspace,
-  activeRelPath = null,
   onMaybeMutated,
   onDesignSearchChange,
   onOpenPicker,
@@ -474,31 +428,17 @@ function AgentPaneContent({
   // Turn queue (RFC `queue`): a submit while the session is busy enqueues; the
   // CORE fires queued items serially on a clean idle edge (the drain is core
   // state — not this client). `useTurnQueueController` owns the submit gate +
-  // the optimistic mirror, shared with `ai-sidebar/chat.tsx`. Skills ride the
-  // active tab: both the live `send` (below) AND the transport's body-less
-  // backfill — so a human-input resume (a `question` answer or a `design_search`
-  // pick, issued via `addToolResult` + `sendAutomaticallyWhen`, which carries no
-  // body) still lands the active tab's skill block instead of dropping it. A
-  // core-drained turn uses the session's discovered skills (the renderer has no
-  // tab there).
+  // the optimistic mirror, shared with `ai-sidebar/chat.tsx`.
   // Endpoint provider pin for the active model (issue #806) — rides every
   // run-entering body: normal sends AND approval resumes below.
   const providerId = registered_models.providerIdForModel(modelId, endpoints);
-  // The active tab dictates skills; ONLY when no tab is open at all (a freshly
-  // auto-created project lands with no tab) fall back to the skills the home
-  // primed on the handoff so the first turn still gets its format block. An
-  // open-but-unmapped tab means no skills — the tab took over, per the
-  // contract above.
-  const activeSkills =
-    activeRelPath === null
-      ? handoff?.skills
-      : skillsForActiveTab(activeRelPath);
   // Keep the transport's body-less backfill (above) in step with the pickers.
+  // (Skills are no longer per-tab: the agent discovers them from disk and
+  // advertises them itself, loading on demand via the `skill` tool.)
   runContextRef.current = {
     model_id: modelId,
     mode,
     ...(providerId ? { provider_id: providerId } : {}),
-    ...(activeSkills ? { skills: activeSkills } : {}),
   };
 
   const {
@@ -516,7 +456,6 @@ function AgentPaneContent({
       modelId,
       providerId,
       mode,
-      skills: activeSkills,
     }),
   });
 

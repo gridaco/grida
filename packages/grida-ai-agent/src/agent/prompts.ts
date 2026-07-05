@@ -1,25 +1,23 @@
 /**
- * Compose a system prompt from the core block, selected skills, and
- * caller-supplied capability hints.
+ * Compose a system prompt from the core block, an advertised skill index,
+ * caller-supplied eager skill blocks, and capability hints.
  *
- * Skills are a closed enum. Capabilities are free-form strings so the
- * caller can describe its runtime — "run_command available, workdir is
- * /foo", "active file is /logo.svg", workspace summary — without
- * forcing every variation through a registered skill.
+ * Built-in skills are discovered from disk (repo-root `skills/`) and
+ * advertise-then-load via the `skill` tool — their descriptions ride in
+ * `skill_index`, their bodies load on demand. `skill_blocks` is the narrow
+ * escape hatch for a host with NO discovery (the web SVG editor: no workspace,
+ * no bundled dir) that must eager-inject one unconditionally-relevant block.
+ * Capabilities are free-form runtime hints.
  *
- * The caller still owns its turn-level context; this helper produces
- * a static-per-session string. Per-turn context (current tab, recent
- * edits) goes into the message stream, not here.
+ * The caller still owns its turn-level context; this helper produces a
+ * static-per-session string. Per-turn context goes into the message stream.
  */
 
-import type { SkillId } from "../protocol/skills";
 import { prompts } from "../prompts";
 import { AgentFs } from "../fs";
 import { AgentTodos } from "../todos";
 
 export type ComposeSystemPromptOptions = {
-  /** Built-in prompt blocks (e.g. `'svg'`) layered eagerly onto the core. */
-  skills?: readonly SkillId[];
   /**
    * Project instructions — concatenated AGENTS.md / CLAUDE.md / CONTEXT.md
    * (RFC `skills / project instructions`). Injected eagerly, right after
@@ -32,6 +30,12 @@ export type ComposeSystemPromptOptions = {
    * bodies load on demand via the `skill` tool.
    */
   skill_index?: string;
+  /**
+   * Raw, pre-rendered skill blocks layered eagerly onto the core — for a host
+   * with no discovery layer (the web SVG editor). Prefer `skill_index` +
+   * on-demand load everywhere a bundled dir / workspace exists.
+   */
+  skill_blocks?: readonly string[];
   /** Free-form capability / environment hints. Appended last (before the
    * tool catalog the SDK assembles). Caller-owned content. */
   capabilities?: readonly string[];
@@ -40,17 +44,11 @@ export type ComposeSystemPromptOptions = {
 /**
  * Assemble the system prompt in the RFC's normative order
  * (`session / system prompt assembly`): manifest → project instructions
- * → skill index → built-in skill blocks → environment/capability hints.
+ * → skill index → eager skill blocks → environment/capability hints.
  * The tool catalog (§5) is appended by the AI SDK from the registered
  * tools, not here.
  */
 export function composeSystemPrompt(opts: ComposeSystemPromptOptions): string {
-  // Prompt text comes from the central registry (`../prompts`); this module
-  // owns the assembly order and injects the tool-name vocab into the builders.
-  const SKILL_BLOCKS: Record<SkillId, string> = {
-    svg: prompts.agent_svg_skill(AgentFs.TOOL_NAMES),
-    dotcanvas: prompts.agent_dotcanvas_skill(AgentFs.TOOL_NAMES),
-  };
   const parts: string[] = [
     prompts.agent_core(AgentFs.TOOL_NAMES, AgentTodos.TOOL_NAMES),
   ];
@@ -68,15 +66,8 @@ export function composeSystemPrompt(opts: ComposeSystemPromptOptions): string {
     parts.push(opts.skill_index.trim());
   }
 
-  for (const id of opts.skills ?? []) {
-    const block = SKILL_BLOCKS[id];
-    if (!block) {
-      // Closed enum — typed callers can't hit this, but JS callers
-      // could. Fail loudly so the consumer fixes the id rather than
-      // silently shipping a prompt missing the skill they intended.
-      throw new Error(`Unknown agent skill id: ${String(id)}`);
-    }
-    parts.push(block);
+  for (const block of opts.skill_blocks ?? []) {
+    if (block.trim().length > 0) parts.push(block.trim());
   }
 
   for (const cap of opts.capabilities ?? []) {

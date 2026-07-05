@@ -115,10 +115,16 @@ export function renderSkillIndex(index: SkillIndex): string {
   const lines = index.skills.map((s) => `- ${s.name}: ${s.description}`);
   return [
     "<skills>",
-    "You have access to the following skills. Each is loaded on demand " +
-      `via the \`${SKILL_TOOL_NAME}\` tool — call it with the skill name ` +
-      "when one is relevant to the task. Only the descriptions are shown " +
-      "here; the body loads when you ask for it.",
+    "You have access to the following skills, loaded on demand via the " +
+      `\`${SKILL_TOOL_NAME}\` tool. Only the descriptions are shown here; the ` +
+      "body loads when you ask for it.",
+    "",
+    "IMPORTANT: if a skill's description matches the task the user is asking " +
+      "for (e.g. building a slide deck, authoring a `.canvas`), load that " +
+      "skill with the `" +
+      SKILL_TOOL_NAME +
+      "` tool BEFORE you start — its instructions change HOW you must do the " +
+      "work, so acting first and reading later produces the wrong result.",
     "",
     ...lines,
     "</skills>",

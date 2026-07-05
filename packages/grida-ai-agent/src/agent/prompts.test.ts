@@ -10,22 +10,23 @@ describe("composeSystemPrompt", () => {
     expect(prompt).toContain("<filesystem>");
   });
 
-  it("loads the svg skill only when requested", () => {
+  it("injects raw eager skill blocks only when provided", () => {
     const base = composeSystemPrompt({});
-    const svg = composeSystemPrompt({ skills: ["svg"] });
+    const withBlock = composeSystemPrompt({
+      skill_blocks: ["<eager-block>hello</eager-block>"],
+    });
 
-    expect(base).not.toContain('<skill name="svg">');
-    expect(svg).toContain('<skill name="svg">');
+    expect(base).not.toContain("<eager-block>");
+    expect(withBlock).toContain("<eager-block>hello</eager-block>");
   });
 
-  it("loads the dotcanvas skill only when requested", () => {
-    const base = composeSystemPrompt({});
-    const dotcanvas = composeSystemPrompt({ skills: ["dotcanvas"] });
-
-    expect(base).not.toContain('<skill name="dotcanvas">');
-    expect(dotcanvas).toContain('<skill name="dotcanvas">');
-    // opinionated working-pattern content the board host relies on
-    expect(dotcanvas).toContain('editor: "board"');
-    expect(dotcanvas).toContain(".canvas.json");
+  it("renders the advertised skill index above eager blocks", () => {
+    const prompt = composeSystemPrompt({
+      skill_index: "<skills>\n- svg: edit svg\n</skills>",
+      skill_blocks: ["EAGER"],
+    });
+    // index (advertise-then-load) comes before eager blocks in assembly order
+    expect(prompt.indexOf("<skills>")).toBeGreaterThan(-1);
+    expect(prompt.indexOf("<skills>")).toBeLessThan(prompt.indexOf("EAGER"));
   });
 });

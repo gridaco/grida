@@ -35,7 +35,6 @@ import { composeSystemPrompt } from "./prompts";
 import { hoistToolResultImages } from "./hoist-tool-result-images";
 import { prompts } from "../prompts";
 import type { AgentModelId } from "../protocol/run";
-import type { SkillId } from "../protocol/skills";
 import {
   createToolset,
   RUN_COMMAND_TOOL_NAME,
@@ -53,7 +52,6 @@ import type {
 } from "../skills/types";
 import { AGENT_DEFAULT_TIER, type ModelTier } from "../tiers";
 
-export type { SkillId } from "../protocol/skills";
 export type { RunCommandBackend } from "../tools";
 
 export type AgentCallOptions = {
@@ -87,8 +85,10 @@ export type ModelFactory = (
 
 export type CreateAgentOptions = {
   model_factory: ModelFactory;
-  /** Built-in prompt blocks (e.g. `'svg'`) layered onto the core prompt. */
-  skills?: readonly SkillId[];
+  /** Raw eager skill blocks for a host with NO discovery (the web SVG editor).
+   *  Everywhere a bundled dir / workspace exists, skills advertise-then-load
+   *  via `skill_index` + the `skill` tool instead. */
+  skill_blocks?: readonly string[];
   /** Server-side `AgentFs` binding. When provided, fs tools resolve
    * in-process via `AgentFs.resolveToolCall`. When omitted, fs tools
    * are bare and the consumer resolves them externally. */
@@ -142,7 +142,7 @@ export type CreateAgentOptions = {
  */
 export function createAgent(opts: CreateAgentOptions) {
   const instructions = composeSystemPrompt({
-    skills: opts.skills,
+    skill_blocks: opts.skill_blocks,
     project_instructions: opts.project_instructions,
     skill_index: opts.skill_index
       ? renderSkillIndex(opts.skill_index)

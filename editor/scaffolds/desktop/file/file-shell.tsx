@@ -107,13 +107,13 @@ export function DesktopFileShell({
             {/* Deck mode is WORKSPACE-bound: the agent gets a server-side fs over
                 the `.canvas` dir (sees the manifest + every slide). Single-file
                 mode resolves fs tools client-side against the in-memory editor. */}
+            {/* The agent discovers skills from disk (repo-root `skills/` +
+                workspace `.claude/skills`) and advertises them itself — a
+                `.canvas` bundle loads the dotcanvas/slides skill on demand. */}
             {mode === "deck" ? (
-              // A `.canvas` bundle (board or slides) — prime the dotcanvas
-              // format skill so a board seeded from a picked reference is
-              // understood from turn one.
-              <AISidebarChat workspaceId={workspaceId} skills={["dotcanvas"]} />
+              <AISidebarChat workspaceId={workspaceId} />
             ) : (
-              <AISidebarChat fs={fs} skills={["svg"]} />
+              <AISidebarChat fs={fs} />
             )}
           </aside>
         </ResizablePanel>

@@ -175,7 +175,6 @@ describe("agent workspace bindings", () => {
         tier: AGENT_DEFAULT_TIER,
         signal: new AbortController().signal,
         workspace_root: fixture.workspace_root,
-        skills: ["svg"],
       },
       { workspace_registry: fixture.registry }
     );

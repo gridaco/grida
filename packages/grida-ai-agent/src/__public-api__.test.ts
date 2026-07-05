@@ -16,7 +16,6 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import * as root from ".";
 import {
-  AGENT_SKILL_IDS,
   AGENT_DEFAULT_TIER,
   AGENT_SESSION_AGENT,
   AGENT_TIERS,
@@ -44,7 +43,6 @@ import {
   type SessionListPage,
   type SessionRunState,
   type SessionStatus,
-  type SkillId,
 } from ".";
 import {
   AGENT_DAEMON_DEFAULT_CAPABILITIES,
@@ -128,10 +126,8 @@ describe("@grida/agent public API", () => {
       expect(AGENT_TIERS).toContain(AGENT_DEFAULT_TIER);
       const tier: ModelTier = AGENT_DEFAULT_TIER;
       const modelId: AgentModelId = "anthropic/claude-sonnet-4.6";
-      const skill: SkillId = AGENT_SKILL_IDS[0];
       expect(typeof tier).toBe("string");
       expect(modelId).toContain("/");
-      expect(skill).toBe("svg");
 
       // Wire vocab — the shipped stream contract is the AI-SDK frame alias.
       type _U = AgentUIMessageChunk;
@@ -142,7 +138,6 @@ describe("@grida/agent public API", () => {
         tier: "pro",
         provider_id: "openrouter",
         model_id: modelId,
-        skills: [skill],
       };
       expect(run.messages[0]?.role).toBe("user");
 

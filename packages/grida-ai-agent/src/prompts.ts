@@ -7,6 +7,9 @@
  * TEXT lives here so the whole surface is reviewable + editable at a glance.
  *
  * EXCEPTIONS — not here, by design:
+ *   - Skill bodies: real `SKILL.md` files on disk (the repo-root `skills/` tree
+ *     + workspace/user `.claude/skills`), discovered by `skills/discovery.ts`
+ *     and loaded on demand via the `skill` tool — never inlined here.
  *   - Tool descriptions: own-contracted, they live with their `tool({...})`
  *     definition (`fs/`, `todos/`, `tools/run-command.ts`, `skills/skill-tool.ts`).
  *   - The skill-index block (`skills/skill-tool.ts` `renderSkillIndex`): it is
@@ -105,95 +108,6 @@ Rules:
 - Use markdown formatting in your replies (lists, short paragraphs).
   Keep responses tight.
 </manners>
-`.trim(),
-
-  /**
-   * Model-provider SVG skill block. Layered onto the core by
-   * `composeSystemPrompt({ skills: ['svg'] })` when the active file is an SVG:
-   * live-binding semantics, output-style rules, parse-error recovery.
-   */
-  agent_svg_skill: (fs: FsNames): string =>
-    `
-<skill name="svg">
-When you operate on \`.svg\` files inside a Grida editor session:
-
-- Writes are reflected on the canvas instantly *if* the human is
-  currently viewing that document. Treat the canvas as a live render
-  of what you wrote.
-- You may create and edit non-SVG files (e.g. \`/notes/draft.md\`) for
-  your own scratch work — they persist across turns but do NOT render
-  on the canvas.
-- On ${fs.edit_file} reason="parse_error", your output broke the SVG.
-  Re-read and fix.
-
-<svg-style>
-When you produce SVG:
-- Keep \`xmlns="http://www.w3.org/2000/svg"\` on the root element.
-- Preserve existing \`viewBox\`, \`width\`, \`height\` unless asked.
-- Preserve unrelated nodes and attributes (ids, classes, transforms).
-- Match the existing formatting (one element per line, 2-space indent).
-</svg-style>
-</skill>
-`.trim(),
-
-  /**
-   * Model-provider `.canvas` (dotcanvas) skill block. Layered onto the core by
-   * `composeSystemPrompt({ skills: ['dotcanvas'] })` for design/board work.
-   * Opinionated: teaches the format AND the appreciated working pattern so the
-   * agent treats a `.canvas` like any other file (no special tools) — it edits
-   * `.canvas.json` and the document files with the normal fs/shell tools.
-   */
-  agent_dotcanvas_skill: (fs: FsNames): string =>
-    `
-<skill name="dotcanvas">
-A \`.canvas\` is a Grida design **board** — a directory bundle, not a single
-file. You work it like any other files: with ${fs.read_file} / ${fs.write_file}
-/ ${fs.edit_file} (no special canvas tool). It is the durable, spatial home for
-a piece of work: reference images, generated outputs, and notes, arranged on an
-infinite canvas. Prefer working on a \`.canvas\` board for visual/design tasks.
-
-<structure>
-- The bundle is a folder whose name ends in \`.canvas\` (e.g. \`poster.canvas/\`).
-- \`.canvas.json\` (the manifest) holds the STRUCTURE: which documents are on the
-  board, their placement, order, and the \`editor\` mode.
-- Each document's CONTENT is a separate file (or a URL) referenced by its \`src\`.
-- Manifest shape (only \`src\` is required per document):
-  \`\`\`json
-  {
-    "editor": "board",
-    "documents": [
-      { "src": "https://…/ref.jpg", "id": "ref1", "layout": { "x": 0, "y": 0, "w": 480, "h": 320 } },
-      { "src": "outputs/hero.png",  "id": "hero", "layout": { "x": 520, "y": 0, "w": 768, "h": 512 } }
-    ]
-  }
-  \`\`\`
-- \`editor: "board"\` = freeform infinite canvas (placement via \`layout\`).
-  \`editor: "slides"\` = linear deck (order). Use \`"board"\` for design work.
-- \`layout\` is \`{ x, y, w, h, z? }\` in world space (z = paint order, optional).
-  A document with no \`layout\` is **unplaced** — the host positions it; set a
-  \`layout\` to place it deliberately.
-</structure>
-
-<working-pattern>
-- To start, create or open a \`.canvas\` board, then ${fs.write_file} its
-  \`.canvas.json\`. To add to an existing board, ${fs.read_file} \`.canvas.json\`
-  first (preserve \`version\`/\`$schema\`/\`editor\` and any unknown fields), then
-  write the FULL updated manifest back.
-- A document's \`src\` may be a **URL** (a pointable reference — a picked library
-  image, used as-is, no download) OR a **file path inside the bundle**. Both are
-  first-class placed documents.
-- To place a **generated image** (or any produced file) on the board:
-  **materialize it into the bundle, then reference it.** Copy it from your
-  scratch dir into the bundle with the shell — e.g.
-  \`cp <scratch>/image-….png <board>.canvas/outputs/hero.png\` — then add a
-  document whose \`src\` is that bundle-relative path. (A \`src\` can point at any
-  file the host can read, but a file inside the bundle is the durable, portable
-  choice.)
-- To move / resize / reorder, edit the \`layout\` (and document order) in the
-  manifest. The human can also drag pins directly — re-read \`.canvas.json\`
-  before editing so you don't clobber their changes (last write per file wins).
-</working-pattern>
-</skill>
 `.trim(),
 
   /**

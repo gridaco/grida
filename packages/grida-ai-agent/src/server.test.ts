@@ -8,9 +8,45 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createAgentDaemon, type DaemonServer } from "./server";
+import {
+  createAgentDaemon,
+  agentTenantOptionsFromDaemon,
+  AGENT_DAEMON_DEFAULT_CAPABILITIES,
+  type DaemonServer,
+} from "./server";
 import { AgentTransport } from "./transport";
 import { AGENT_SESSION_AGENT } from "./protocol/run";
+
+describe("agentTenantOptionsFromDaemon — no host field is silently dropped", () => {
+  // Every host-supplied tenant field must ride from the composed daemon into
+  // the tenant. `skills_root` shipped disabled precisely because it was omitted
+  // here → the agent discovered ZERO built-in skills on the desktop.
+  it("forwards skills_root, gg_base_url, scratch_base, and the capability flags", () => {
+    const out = agentTenantOptionsFromDaemon(
+      {
+        password: "p",
+        user_data_path: "/tmp/ud",
+        http_access: { allowed_origins: [], allowed_referer_paths: [] },
+        skills_root: "/repo/skills",
+        gg_base_url: "https://grida.co",
+        scratch_base: "/tmp/scratch",
+        image_model_id: "img/model",
+        sandbox_enforced: true,
+        allow_unsandboxed_shell: false,
+        interactive: true,
+        library: true,
+      },
+      AGENT_DAEMON_DEFAULT_CAPABILITIES
+    );
+    expect(out.skills_root).toBe("/repo/skills");
+    expect(out.gg_base_url).toBe("https://grida.co");
+    expect(out.scratch_base).toBe("/tmp/scratch");
+    expect(out.image_model_id).toBe("img/model");
+    expect(out.sandbox_enforced).toBe(true);
+    expect(out.interactive).toBe(true);
+    expect(out.library).toBe(true);
+  });
+});
 
 const PASSWORD = "test-password-abc123";
 const VALID_REFERER = "https://client.example/client/doc";

@@ -123,7 +123,7 @@ describe("desktopAgentTransport", () => {
           { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
         ],
         abortSignal: undefined,
-        body: { skills: undefined },
+        body: {},
       });
     await stream.cancel();
 

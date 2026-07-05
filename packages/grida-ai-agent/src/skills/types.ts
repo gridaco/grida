@@ -16,6 +16,20 @@ export type DiscoveredSkill = {
   description: string;
   /** Absolute path to the SKILL.md file. */
   path: string;
+  /** Absolute path to the skill DIRECTORY (parent of SKILL.md) — the tree the
+   *  load step materializes. Undefined for a flat `<name>.md` skill, which has
+   *  a body but no companion files/scripts/assets. */
+  dir?: string;
+  /** Relative companion files (under {@link dir}) the load step inlines after
+   *  the body, from `metadata.also_in_load`. Empty/absent ⇒ none. */
+  also_in_load?: string[];
+  /** The realpath'd `.../skills` layer directory this entry was discovered
+   *  under, captured AT DISCOVERY time. Load-time re-validation
+   *  (GRIDA-SEC-007 rule 5) anchors containment to THIS root, not to a root
+   *  recomputed at load — so swapping the layer dir itself for a symlink after
+   *  discovery can't move the root and target together to pass the check.
+   *  Absent for pre-resolved (`extra`) skills, which are host-trusted. */
+  layer_root?: string;
   source: SkillSource;
 };
 

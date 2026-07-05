@@ -272,7 +272,6 @@ export default function DesktopWelcomePage() {
         // seed the workspace with the Claude-Code default as a false
         // explicit pick, and keyless users would hit `auth_required` (#942).
         ...(isUserPick ? { model_id: modelId } : {}),
-        skills: ["dotcanvas"],
       });
       router.push(workspaceWorkbenchHref(workspace));
     },

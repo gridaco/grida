@@ -4,7 +4,6 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import * as gridaGateway from "@/lib/desktop/gg-session";
 import {
-  AGENT_SKILL_IDS,
   asAgentMode,
   AGENT_TIERS,
   BYOK_PROVIDER_IDS,
@@ -160,7 +159,6 @@ function streamFromBridge(
             provider_id: opts.provider_id,
             feature: opts.feature,
             workspace_id: opts.workspace_id,
-            skills: opts.skills,
             session_id: opts.session_id,
             mode: opts.mode,
             approval_answer: opts.approval_answer,
@@ -290,13 +288,6 @@ function readBodyOptions(body: unknown): DesktopAgentTransportOptions {
         ...(typeof a.reason === "string" ? { reason: a.reason } : {}),
       };
     }
-  }
-  if (Array.isArray(obj.skills)) {
-    out.skills = obj.skills.filter(
-      (item): item is NonNullable<AgentRunOptions["skills"]>[number] =>
-        typeof item === "string" &&
-        (AGENT_SKILL_IDS as readonly string[]).includes(item)
-    );
   }
   return out;
 }

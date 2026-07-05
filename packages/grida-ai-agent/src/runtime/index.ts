@@ -244,6 +244,10 @@ export type AgentRuntimeDeps = ResolveDeps & {
   skill_discovery?: {
     include_user_scoped?: boolean;
     config_paths?: string[];
+    /** The host-bundled skills dir (repo-root `skills/`) — the lowest-precedence
+     *  layer that ships the built-in `svg`/`dotcanvas`/`slides` skills. Host
+     *  resolves it (desktop = packaged resources; CLI = flag/default). */
+    bundled_dir?: string;
     /** Stop the upward project + instruction walk here (inclusive). */
     stop_at?: string;
   };
@@ -276,7 +280,6 @@ type StartTurnOptions = {
   model_id?: RunRequest["model_id"];
   feature?: RunRequest["feature"];
   workspace_root?: string;
-  skills?: RunRequest["skills"];
   mode: RunRequest["mode"];
   /** Whether the requesting client can answer the `question` tool (per-run;
    *  absent ⇒ the host `interactive` default). A core drain leaves it absent. */
@@ -491,7 +494,6 @@ export class AgentRuntime {
       tier: session.model?.tier ?? AGENT_DEFAULT_TIER,
       model_id: session.model?.model_id,
       workspace_root: workspaceRoot,
-      skills: undefined,
       // Queued-turn posture comes from the persisted session, not a client
       // request (there is none here). Legacy rows (null mode) fall to default.
       mode: session.mode ?? AGENT_DEFAULT_MODE,
@@ -512,20 +514,28 @@ export class AgentRuntime {
     const cached = this.session_contexts.get(sessionId);
     if (cached) return cached;
     let ctx: SessionContext = { skill_cache: new Map() };
-    if (workspaceRoot) {
+    const scope = this.deps.skill_discovery;
+    // Discover when there's a workspace to walk OR host-bundled skills to
+    // advertise. A workspace-less session (the desktop single-file SVG/text
+    // window) still gets the built-in `svg`/`dotcanvas`/`slides` skills — they
+    // don't depend on a workspace — so a direct-opened SVG keeps its format
+    // guidance. Project instructions (`AGENTS.md` walk) stay workspace-only.
+    if (workspaceRoot || scope?.bundled_dir) {
       try {
-        const scope = this.deps.skill_discovery;
         const [skillIndex, instructions] = await Promise.all([
           discoverSkills({
             workspace_root: workspaceRoot,
             include_user_scoped: scope?.include_user_scoped,
             config_paths: scope?.config_paths,
+            bundled_dir: scope?.bundled_dir,
             stop_at: scope?.stop_at,
           }),
-          discoverProjectInstructions({
-            workspace_root: workspaceRoot,
-            stop_at: scope?.stop_at,
-          }),
+          workspaceRoot
+            ? discoverProjectInstructions({
+                workspace_root: workspaceRoot,
+                stop_at: scope?.stop_at,
+              })
+            : Promise.resolve({ text: "" }),
         ]);
         ctx = {
           skill_index: skillIndex,
@@ -711,7 +721,6 @@ export class AgentRuntime {
       model_id: modelId,
       feature,
       workspace_root: workspaceRoot,
-      skills,
       mode,
       approval_answer: approvalAnswer,
     } = req;
@@ -798,7 +807,6 @@ export class AgentRuntime {
         model_id: modelId,
         feature,
         workspace_root: workspaceRoot,
-        skills,
         mode,
         // Per-run client UI capability (the desktop-from-web bridge sets true; a
         // headless `cli run` sets false). Absent ⇒ host default downstream.
@@ -852,7 +860,6 @@ export class AgentRuntime {
       model_id: modelId,
       feature,
       workspace_root: workspaceRoot,
-      skills,
       mode,
       interactive,
       library,
@@ -1028,7 +1035,6 @@ export class AgentRuntime {
             run_id: runId,
             signal: entry.model_abort.signal,
             workspace_root: workspaceRoot,
-            skills,
             mode,
             interactive,
             library,

@@ -10,6 +10,22 @@ export {
   nodeSkillBodyLoader,
   type DiscoverSkillsOptions,
 } from "./discovery";
+export { createMaterializingSkillLoader } from "./materialize";
+export {
+  detectSlashTrigger,
+  fuzzyFilterSkills,
+  toMenuItem,
+  toMenuItems,
+  isSlashCommand,
+  buildHintPattern,
+  expandSlashCommand,
+  UnknownSkillError,
+  DEFAULT_ARGS_HINT,
+  SOURCE_LABELS,
+  type SlashTriggerDetection,
+  type SlashCommandMenuItem,
+  type SlashCommandExpansion,
+} from "./slash";
 export type {
   DiscoveredSkill,
   SkillBodyCache,
@@ -32,4 +48,13 @@ export {
   type CreateSkillToolOptions,
   type SkillToolName,
 } from "./skill-tool";
-export { parseFrontmatter, type Frontmatter } from "./frontmatter";
+export {
+  parseFrontmatter,
+  parseSkillManifest,
+  MissingFrontmatterError,
+  InvalidFrontmatterError,
+  SKILL_NAME_RE,
+  type Frontmatter,
+  type SkillManifest,
+  type ParsedSkillManifest,
+} from "./frontmatter";
