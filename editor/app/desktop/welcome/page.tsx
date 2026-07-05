@@ -248,7 +248,11 @@ export default function DesktopWelcomePage() {
   // Model selection for the composer. No sessions here (the welcome page never
   // loads a chat), so this just holds the user's pick; it rides the handoff so
   // the created project's first turn runs on the chosen model.
-  const { model_id: modelId, setModelId } = useModelPickerState({
+  const {
+    model_id: modelId,
+    setModelId,
+    is_user_pick: isUserPick,
+  } = useModelPickerState({
     current_id: null,
     sessions: [],
     endpoints,
@@ -261,12 +265,18 @@ export default function DesktopWelcomePage() {
     (workspace: Workspace, prompt: string) => {
       welcome_handoff.set(workspace.id, {
         prompt,
-        model_id: modelId,
+        // Carry the model only when the user deliberately picked one. An
+        // untouched default — or a GG upgrade that hasn't resolved yet — is
+        // left off so the workspace resolves its own (GG-aware) default;
+        // otherwise a fast submit before the async session settles would
+        // seed the workspace with the Claude-Code default as a false
+        // explicit pick, and keyless users would hit `auth_required` (#942).
+        ...(isUserPick ? { model_id: modelId } : {}),
         skills: ["dotcanvas"],
       });
       router.push(workspaceWorkbenchHref(workspace));
     },
-    [modelId, router]
+    [modelId, isUserPick, router]
   );
 
   const createAndGo = useCallback(

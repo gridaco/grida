@@ -280,7 +280,16 @@ export function useModelPickerState({
   /** Configured endpoint providers — their registered model ids count as
    *  known, so a session that ran on a local model re-seeds correctly. */
   endpoints?: readonly EndpointProviderConfig[];
-}): { model_id: string; setModelId: (id: string) => void } {
+}): {
+  model_id: string;
+  setModelId: (id: string) => void;
+  /** True once the user has explicitly picked a model in the UI (not a
+   *  default or a seed). A producer of a cross-navigation handoff (the
+   *  welcome composer) uses this to carry the model ONLY when it was a
+   *  deliberate choice — otherwise the destination resolves its own
+   *  default, so an unresolved default never masquerades as a pick. */
+  is_user_pick: boolean;
+} {
   const registeredIds = useMemo(
     () => new Set(registered_models.specs(endpoints).map((m) => m.id)),
     [endpoints]
@@ -291,7 +300,17 @@ export function useModelPickerState({
       (registeredIds.has(id) || AGENT_PROVIDER_IDS.has(id)));
 
   const [modelId, setModelId] = useState<string>(() =>
-    resolveDefaultModelId({ initial, ggActive: false, isKnownId })
+    resolveDefaultModelId({
+      initial,
+      // Synchronous cached GG state: when the session is already known
+      // active (warmed by an earlier `ensureFresh`), a keyless surface
+      // starts on the included model with no async gap — so an instant
+      // first submit can't capture the Claude-Code default before the
+      // effect below runs. `peek()` never does IO; the effect still
+      // covers a cold cache.
+      ggActive: gridaGateway.peek().kind === "active",
+      isKnownId,
+    })
   );
   // Flipped once the user picks a model in the UI, so the async Grida
   // Gateway upgrade below never clobbers a deliberate choice.
@@ -364,5 +383,9 @@ export function useModelPickerState({
     setModelId(id);
   }, []);
 
-  return { model_id: modelId, setModelId: pickModel };
+  return {
+    model_id: modelId,
+    setModelId: pickModel,
+    is_user_pick: userPickedRef.current,
+  };
 }
