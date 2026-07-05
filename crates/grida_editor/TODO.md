@@ -114,7 +114,7 @@ in `docs/wg/canvas/**, the feat-* studies, and this crate's docs/**` vs ids cite
 - [x] **snap** — [spec](../../docs/wg/canvas/snap.md) · `src/snap.rs`
       · `tests/snap_contracts.rs` (SNAP 11/11). Group-descent
       refinement newly specced (SNAP-12..15): snap targets are the
-      rendered *atoms* — descend groups to their contents, drop the
+      rendered _atoms_ — descend groups to their contents, drop the
       group's derived envelope (a behavior change from the current
       bbox+leaves neighborhood), keep opaque composites (boolean /
       instance) as leaves, rigidity / self-exclusion / degenerate
@@ -193,7 +193,7 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
       compose (`grp_contracts` multi-ungroup arbiter), skipping a
       dissolvable nested under another (deferred). GRP-5 selection
       retarget lands shell-side (wrap → the new wrappers, ungroup → the
-      promoted children); its resolver-derived *targets* are cited
+      promoted children); its resolver-derived _targets_ are cited
       (`grp_5_retarget_targets_are_resolver_derived`), the `set_selection`
       call itself is shell (like TRAV-5's split). Remaining: GRP-6 scene
       single-child refusal (needs the scene-constraints query), the
@@ -396,46 +396,45 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
       list domain → `Binding::entry` / bind-owned resolvers → atoms
       assembled in the panel → contract tests):
   - [~] **strokes** — paint list + geometry **shipped** (2026-07):
-        `PropPatch.strokes: Paints` (invert/serialize/validate,
-        `paint_contracts`) + `Editor::node_strokes`;
-        `BindingProperty::{Strokes, Stroke*}` sharing the fill resolvers;
-        a Strokes section built by the same `PaintTarget` code path as
-        Fills (swatch→picker, kind, active, add/remove). **Geometry**
-        now shipped: `PropPatch.{stroke_width,stroke_align,stroke_cap,
-        stroke_join,stroke_miter,stroke_dash}` (uniform weight normalized
-        across the 3 engine width reps; align/cap/join/miter/dash via
-        `stroke_style`) + `Editor::node_stroke_*` queries +
-        `STROKE_ALIGNS/CAPS/JOINS` bindings + panel rows (weight number,
-        align/cap/join segmented, miter number when join=miter, dash
-        number = 0-solid). Tests: `doc_contracts` geometry round-trip +
-        empty-dash-clears + unsupported-kind reject; `paint_contracts`
-        width/cap/dash bindings; `ui_contracts` geometry rows render.
-        Remaining (refine): per-side (rectangular) width; Line/Vector's
-        flattened geometry + **markers** (start/end shapes); dash
-        multi-segment sequence + solid/dashed class control.
+    `PropPatch.strokes: Paints` (invert/serialize/validate,
+    `paint_contracts`) + `Editor::node_strokes`;
+    `BindingProperty::{Strokes, Stroke*}` sharing the fill resolvers;
+    a Strokes section built by the same `PaintTarget` code path as
+    Fills (swatch→picker, kind, active, add/remove). **Geometry**
+    now shipped: `PropPatch.{stroke_width,stroke_align,stroke_cap,
+stroke_join,stroke_miter,stroke_dash}` (uniform weight normalized
+    across the 3 engine width reps; align/cap/join/miter/dash via
+    `stroke_style`) + `Editor::node_stroke_*` queries +
+    `STROKE_ALIGNS/CAPS/JOINS` bindings + panel rows (weight number,
+    align/cap/join segmented, miter number when join=miter, dash
+    number = 0-solid). Tests: `doc_contracts` geometry round-trip +
+    empty-dash-clears + unsupported-kind reject; `paint_contracts`
+    width/cap/dash bindings; `ui_contracts` geometry rows render.
+    Remaining (refine): per-side (rectangular) width; Line/Vector's
+    flattened geometry + **markers** (start/end shapes); dash
+    multi-segment sequence + solid/dashed class control.
   - [~] **text typography** — Slice A (core) **shipped** (2026-07):
-        `PropPatch.{text_align_vertical,font_size,font_weight,font_italic,
-        line_height,letter_spacing}` authored on the node-level style
-        (`node_text_style(_mut)` — the `stroke_style` pattern; text has no
-        `Node::text_style()` accessor) + `Editor::node_font_*` queries +
-        `FontSize/FontWeight/FontItalic/LineHeight/LetterSpacing/
-        TextAlignVertical` bindings + a **Text** section (size number,
-        weight select, italic toggle, line/letter numbers, horizontal +
-        vertical align segmented — the old inline align row folded in).
-        Enum-payload fields author one variant (line-height `Factor`,
-        letter-spacing `Fixed`); the inverse carries the whole prior enum
-        (exact undo). `node_signature` folds a `TextStyleSignature`
-        projection (`TextStyleRec` has no `PartialEq`). Tests:
-        `doc_contracts` typography round-trip + line-height variant-inverse
-        + non-text reject; `text_contracts` (10, the bind layer);
-        `ui_contracts` Text-section render. Remaining (later slices, named):
-        **B** — font family (host-gated catalog) + family-aware weight/
-        italic dropdown; **C** — text-details (transform, decoration line +
-        sub-details, truncation `max_lines`/`ellipsis`/`max_length`,
-        word-spacing, vertical trim); **D** — per-run `AttributedText`
-        rich text, variable-font axes + `font_features` + optical sizing,
-        line/letter/word Fixed⇄Factor mode toggle. Text color/stroke ride
-        the Fills/Strokes sections (text carries `fills`/`strokes`).
+    `PropPatch.{text_align_vertical,font_size,font_weight,font_italic,
+line_height,letter_spacing}` authored on the node-level style
+    (`node_text_style(_mut)` — the `stroke_style` pattern; text has no
+    `Node::text_style()` accessor) + `Editor::node_font_*` queries +
+    `FontSize/FontWeight/FontItalic/LineHeight/LetterSpacing/
+TextAlignVertical` bindings + a **Text** section (size number,
+    weight select, italic toggle, line/letter numbers, horizontal +
+    vertical align segmented — the old inline align row folded in).
+    Enum-payload fields author one variant (line-height `Factor`,
+    letter-spacing `Fixed`); the inverse carries the whole prior enum
+    (exact undo). `node_signature` folds a `TextStyleSignature`
+    projection (`TextStyleRec` has no `PartialEq`). Tests:
+    `doc_contracts` typography round-trip + line-height variant-inverse + non-text reject; `text_contracts` (10, the bind layer);
+    `ui_contracts` Text-section render. Remaining (later slices, named):
+    **B** — font family (host-gated catalog) + family-aware weight/
+    italic dropdown; **C** — text-details (transform, decoration line +
+    sub-details, truncation `max_lines`/`ellipsis`/`max_length`,
+    word-spacing, vertical trim); **D** — per-run `AttributedText`
+    rich text, variable-font axes + `font_features` + optical sizing,
+    line/letter/word Fixed⇄Factor mode toggle. Text color/stroke ride
+    the Fills/Strokes sections (text carries `fills`/`strokes`).
   - [ ] **gradient stop-track editor** — the missing Tier-2 composite
         (stop ramp: add / move / remove stops, per-stop offset + color);
         opens a paint **session** (MODE-5). Today gradients are
@@ -452,32 +451,30 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
         segmented + transform; today image fills render + reorder/toggle
         but their source is not authorable.
   - [~] **effects section** — Slice 1 **authorable** (2026-07): the
-        engine's `LayerEffects` is a structured bag (not a flat list), so
-        the panel gives **one section per slot, cardinality from the
-        spec** (not web's flat cascade). Shipped: **Layer blur** (single
-        `Option` slot — enable toggle / Gaussian radius / active) +
-        **Shadows** (multi `Vec` — add/list/remove, per-entry drop-vs-inner
-        kind, color picker, active, dx/dy/blur/spread). `PropPatch.
-        {layer_blur: Option<Option<FeLayerBlur>>, shadows:
-        Option<Vec<FilterShadowEffect>>}` + `node_effects_mut` per-kind
-        match (engine has `effects()` but no `effects_mut()`) +
-        `Editor::node_effects` + `BindingProperty::{LayerBlur*, Shadows,
-        Shadow*}` + wire mirrors (`WireBlur`/`WireLayerBlur`/`WireShadow`/
-        `WireShadowEffect` — effect types aren't `Serialize`). Enum-payload
-        author-one-variant, inverse-carries-whole-slot (blur v1 = Gaussian).
-        `node_signature` promoted from 12-tuple to named `NodeSignature`
-        struct (+`effects`). Tests: `effect_contracts` (14) + doc
-        round-trip/inverse/reject + ui render. **Deferred (Slices 2–4):**
-        backdrop blur (single, = layer-blur clone), noise (multi, coloring
-        + blend), glass (single, 6 params, rect-only), progressive blur.
+    engine's `LayerEffects` is a structured bag (not a flat list), so
+    the panel gives **one section per slot, cardinality from the
+    spec** (not web's flat cascade). Shipped: **Layer blur** (single
+    `Option` slot — enable toggle / Gaussian radius / active) +
+    **Shadows** (multi `Vec` — add/list/remove, per-entry drop-vs-inner
+    kind, color picker, active, dx/dy/blur/spread). `PropPatch.
+{layer_blur: Option<Option<FeLayerBlur>>, shadows:
+Option<Vec<FilterShadowEffect>>}` + `node_effects_mut` per-kind
+    match (engine has `effects()` but no `effects_mut()`) +
+    `Editor::node_effects` + `BindingProperty::{LayerBlur*, Shadows,
+Shadow*}` + wire mirrors (`WireBlur`/`WireLayerBlur`/`WireShadow`/
+    `WireShadowEffect` — effect types aren't `Serialize`). Enum-payload
+    author-one-variant, inverse-carries-whole-slot (blur v1 = Gaussian).
+    `node_signature` promoted from 12-tuple to named `NodeSignature`
+    struct (+`effects`). Tests: `effect_contracts` (14) + doc
+    round-trip/inverse/reject + ui render. **Deferred (Slices 2–4):**
+    backdrop blur (single, = layer-blur clone), noise (multi, coloring + blend), glass (single, 6 params, rect-only), progressive blur.
   - [~] **export section** — **introduced** scaffold (2026-07): a
-        present-but-deferred header + honest note (no authoring domain
-        yet). Remaining (refine): per-node export presets (format select
-        + scale number), the list machinery + `IO-7`.
+    present-but-deferred header + honest note (no authoring domain
+    yet). Remaining (refine): per-node export presets (format select + scale number), the list machinery + `IO-7`.
   - [~] **selection colors** — **introduced** read-only (2026-07): the
-        head node's distinct solid fill/stroke colors listed as hex.
-        Remaining (refine): aggregate across the whole selection,
-        live-update on recolor, recolor-all + select-by-color command.
+    head node's distinct solid fill/stroke colors listed as hex.
+    Remaining (refine): aggregate across the whole selection,
+    live-update on recolor, recolor-all + select-by-color command.
   - [ ] **mixed-value** (`PROP-2` / `WID-6`) — the paint list is
         editable only when all selected nodes have equal stacks
         (`PROP-6` guard); heterogeneous → a single mixed indicator.

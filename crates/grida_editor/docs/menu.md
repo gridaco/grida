@@ -48,7 +48,7 @@ invention.
   `MENU-2` is the contract, the tables are the checklist.
 - **The item-kind taxonomy is deliberately small** — action, submenu,
   separator, and **deferred**. Checkable and radio kinds are refused:
-  the paired toggles present the applicable *direction by label*, so
+  the paired toggles present the applicable _direction by label_, so
   check state has no owner here.
 - **A deferred item is an inert placeholder** (`MENU-7`): a labelled
   row that references **no** command, renders disabled with a
@@ -94,75 +94,75 @@ appear.
 
 #### File
 
-| Item             | Wired to · Awaiting                                          |
-| ---------------- | ----------------------------------------------------------- |
-| Open .grida      | deferred → file-open command + native file dialog           |
-| Save as .grida   | `Save` (save-as dialog awaits the native file dialog)       |
-| Import Image     | deferred → image-import command + native file dialog        |
-| Import Figma     | deferred → Figma import path                                |
+| Item           | Wired to · Awaiting                                   |
+| -------------- | ----------------------------------------------------- |
+| Open .grida    | deferred → file-open command + native file dialog     |
+| Save as .grida | `Save` (save-as dialog awaits the native file dialog) |
+| Import Image   | deferred → image-import command + native file dialog  |
+| Import Figma   | deferred → Figma import path                          |
 
 #### Edit
 
-| Item        | Wired to · Awaiting                        |
-| ----------- | ------------------------------------------ |
-| Undo / Redo | `Undo` / `Redo`                            |
-| Cut / Copy / Paste | `Cut` / `Copy` / `Paste`            |
-| Copy as PNG | `CopyAsPng`                                |
-| Copy as SVG | deferred → SVG export (io-external)         |
-| Pick color  | deferred → eyedropper / color-pick system  |
-| Duplicate / Delete | `Duplicate` / `DeleteSelection`     |
+| Item               | Wired to · Awaiting                       |
+| ------------------ | ----------------------------------------- |
+| Undo / Redo        | `Undo` / `Redo`                           |
+| Cut / Copy / Paste | `Cut` / `Copy` / `Paste`                  |
+| Copy as PNG        | `CopyAsPng`                               |
+| Copy as SVG        | deferred → SVG export (io-external)       |
+| Pick color         | deferred → eyedropper / color-pick system |
+| Duplicate / Delete | `Duplicate` / `DeleteSelection`           |
 
 #### Object
 
-| Item                                    | Wired to · Awaiting                          |
-| --------------------------------------- | -------------------------------------------- |
-| Container selection                     | `GroupWithContainer`                         |
-| Group / Ungroup                         | `Group` / `Ungroup`                          |
-| Bring to front / forward / backward / to back | `BringToFront` / `BringForward` / `SendBackward` / `SendToBack` |
-| Flatten                                 | `Flatten`                                    |
-| Show ⇄ Hide selection                   | `ToggleVisible`                              |
-| Boolean ops (union/subtract/intersect/exclude) | deferred → boolean-ops command family |
-| Use as mask ⇄ Remove mask               | deferred → mask system                       |
-| Flip H/V · Rotate 90°/180°              | deferred → quantized transform ops           |
-| Outline stroke                          | deferred → stroke→fill geometry              |
-| Remove fill / Remove stroke / Swap fill & stroke | deferred → paint-list mutations     |
-| Lock ⇄ Unlock                           | deferred → lock system (`locked` prop absent from the doc model) |
-| Wrap/Convert to section · Convert to container | deferred → section/frame system       |
-| Add layout · hug/fill · resize-to-fit   | deferred → layout system (feat-layout)       |
-| Create component · instance/main-component ops | deferred → component system           |
-| Rasterize · Hide other layers · Collapse layers | deferred → layer-panel ops          |
+| Item                                             | Wired to · Awaiting                                              |
+| ------------------------------------------------ | ---------------------------------------------------------------- |
+| Container selection                              | `GroupWithContainer`                                             |
+| Group / Ungroup                                  | `Group` / `Ungroup`                                              |
+| Bring to front / forward / backward / to back    | `BringToFront` / `BringForward` / `SendBackward` / `SendToBack`  |
+| Flatten                                          | `Flatten`                                                        |
+| Show ⇄ Hide selection                            | `ToggleVisible`                                                  |
+| Boolean ops (union/subtract/intersect/exclude)   | deferred → boolean-ops command family                            |
+| Use as mask ⇄ Remove mask                        | deferred → mask system                                           |
+| Flip H/V · Rotate 90°/180°                       | deferred → quantized transform ops                               |
+| Outline stroke                                   | deferred → stroke→fill geometry                                  |
+| Remove fill / Remove stroke / Swap fill & stroke | deferred → paint-list mutations                                  |
+| Lock ⇄ Unlock                                    | deferred → lock system (`locked` prop absent from the doc model) |
+| Wrap/Convert to section · Convert to container   | deferred → section/frame system                                  |
+| Add layout · hug/fill · resize-to-fit            | deferred → layout system (feat-layout)                           |
+| Create component · instance/main-component ops   | deferred → component system                                      |
+| Rasterize · Hide other layers · Collapse layers  | deferred → layer-panel ops                                       |
 
 #### Arrange
 
-| Item                                   | Wired to · Awaiting                     |
-| -------------------------------------- | --------------------------------------- |
-| Align (left/h-center/right/top/v-center/bottom) | `Align`                        |
-| Distribute horizontal / vertical spacing | `Distribute`                          |
-| Distribute left/right/top/bottom/centers | deferred → edge/center distribute      |
-| Round to pixel                         | deferred → pixel-round op               |
-| Tidy up · Pack horizontal/vertical     | deferred → tidy/pack layout             |
+| Item                                            | Wired to · Awaiting               |
+| ----------------------------------------------- | --------------------------------- |
+| Align (left/h-center/right/top/v-center/bottom) | `Align`                           |
+| Distribute horizontal / vertical spacing        | `Distribute`                      |
+| Distribute left/right/top/bottom/centers        | deferred → edge/center distribute |
+| Round to pixel                                  | deferred → pixel-round op         |
+| Tidy up · Pack horizontal/vertical              | deferred → tidy/pack layout       |
 
 #### View
 
-| Item                        | Wired to · Awaiting                                   |
-| --------------------------- | ----------------------------------------------------- |
-| Zoom in/out/100%/fit/selection | `ZoomIn` / `ZoomOut` / `Zoom100` / `ZoomFit` / `ZoomSelection` |
-| Pixel grid · Ruler          | `TogglePixelGrid` / `ToggleRuler`                     |
-| Show/Hide UI                | `ToggleUi`                                            |
-| Snapping → pixel-grid / geometry | `ToggleSnapPixelGrid` / `ToggleSnapGeometry`     |
-| Minimize UI                 | deferred → minimize-UI view state                     |
+| Item                             | Wired to · Awaiting                                            |
+| -------------------------------- | -------------------------------------------------------------- |
+| Zoom in/out/100%/fit/selection   | `ZoomIn` / `ZoomOut` / `Zoom100` / `ZoomFit` / `ZoomSelection` |
+| Pixel grid · Ruler               | `TogglePixelGrid` / `ToggleRuler`                              |
+| Show/Hide UI                     | `ToggleUi`                                                     |
+| Snapping → pixel-grid / geometry | `ToggleSnapPixelGrid` / `ToggleSnapGeometry`                   |
+| Minimize UI                      | deferred → minimize-UI view state                              |
 
 #### Text — shown only while a text content mode is active
 
-| Item                                                | Wired to · Awaiting                |
-| --------------------------------------------------- | ---------------------------------- |
+| Item                                                                           | Wired to · Awaiting                      |
+| ------------------------------------------------------------------------------ | ---------------------------------------- |
 | Bold/Italic/Underline/Strikethrough · link · lists · alignment · adjust · case | deferred → text-attribute command system |
 
 #### Settings
 
-| Item               | Wired to · Awaiting                            |
-| ------------------ | ---------------------------------------------- |
-| General            | deferred → settings dialog system              |
+| Item               | Wired to · Awaiting                                          |
+| ------------------ | ------------------------------------------------------------ |
+| General            | deferred → settings dialog system                            |
 | Keyboard shortcuts | deferred → keybinding settings UI (the sheet exists as data) |
 
 ## Context menus
@@ -245,7 +245,7 @@ omitted):
   **application menu** (live rows wired, deferred rows shown per
   `MENU-7`); the layer-row, scene-row, and ruler menus wait on their
   hosts. The application-menu inventory above is normative — its
-  deferred rows *are* the enumerated backlog (each names its blocking
+  deferred rows _are_ the enumerated backlog (each names its blocking
   system), not an omission.
 - **Point-targeted paste (MENU-4)** waits on the paste placement rule
   accepting a point.

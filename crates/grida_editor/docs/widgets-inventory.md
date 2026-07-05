@@ -80,7 +80,7 @@ this inventory._
 | scroll    | clipping scroll container (UI-6)                                                                   |
 | popover   | the anchored overlay: placement (flip-then-clamp), input grab, dismissal — the WID-8 authority     |
 | tree      | specified in [hierarchy.md](../../../docs/wg/canvas/hierarchy.md)                                  |
-| menu      | specified in [menu.md](./menu.md); rides the popover                               |
+| menu      | specified in [menu.md](./menu.md); rides the popover                                               |
 
 ## Tier 1 — atoms
 

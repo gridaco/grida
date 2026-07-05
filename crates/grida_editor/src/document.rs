@@ -636,6 +636,11 @@ impl WorkingCopy {
     /// `set` — the shared "is this node nested under one of these?" walk
     /// used both by root-of-selection detection and by ungroup's
     /// nested-candidate filter.
+    ///
+    /// Both callers live in the `shell` (`app.rs`), so without that
+    /// feature the method is unused — allow it there rather than gating a
+    /// general document query on the shell feature.
+    #[cfg_attr(not(feature = "shell"), allow(dead_code))]
     pub(crate) fn has_ancestor_in(&self, id: &Id, set: &std::collections::HashSet<Id>) -> bool {
         let mut cur = self.node_parent(id).flatten();
         while let Some(p) = cur {
