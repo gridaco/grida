@@ -19,7 +19,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import { readSkillBody } from "./discovery";
+import { readSkillBody, resolveSkillLoadPaths } from "./discovery";
 import type { DiscoveredSkill, SkillBodyLoader } from "./types";
 
 /**
@@ -31,13 +31,18 @@ export function createMaterializingSkillLoader(
   scratchDir: string
 ): SkillBodyLoader {
   return async (skill: DiscoveredSkill): Promise<string> => {
-    const body = await readSkillBody(skill.path);
+    // GRIDA-SEC-007 rule 5: re-realpath + re-contain the discovered paths on
+    // disk NOW, before any read/copy — the entry may have been swapped for a
+    // symlink since discovery. `dir`/`body_path` come back canonical, so what
+    // we read and copy is the validated tree, not the stored string path.
+    const { dir, body_path } = await resolveSkillLoadPaths(skill);
+    const body = await readSkillBody(body_path);
     // Flat, body-only skill (no directory) — nothing to materialize.
-    if (!skill.dir) return body;
+    if (!dir) return body;
 
     const destDir = path.join(scratchDir, "skills", skill.name);
     await fs.mkdir(destDir, { recursive: true });
-    await copyTree(skill.dir, destDir);
+    await copyTree(dir, destDir);
 
     const extras = await inlineCompanions(destDir, skill.also_in_load ?? []);
     return [

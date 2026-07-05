@@ -514,9 +514,14 @@ export class AgentRuntime {
     const cached = this.session_contexts.get(sessionId);
     if (cached) return cached;
     let ctx: SessionContext = { skill_cache: new Map() };
-    if (workspaceRoot) {
+    const scope = this.deps.skill_discovery;
+    // Discover when there's a workspace to walk OR host-bundled skills to
+    // advertise. A workspace-less session (the desktop single-file SVG/text
+    // window) still gets the built-in `svg`/`dotcanvas`/`slides` skills — they
+    // don't depend on a workspace — so a direct-opened SVG keeps its format
+    // guidance. Project instructions (`AGENTS.md` walk) stay workspace-only.
+    if (workspaceRoot || scope?.bundled_dir) {
       try {
-        const scope = this.deps.skill_discovery;
         const [skillIndex, instructions] = await Promise.all([
           discoverSkills({
             workspace_root: workspaceRoot,
@@ -525,10 +530,12 @@ export class AgentRuntime {
             bundled_dir: scope?.bundled_dir,
             stop_at: scope?.stop_at,
           }),
-          discoverProjectInstructions({
-            workspace_root: workspaceRoot,
-            stop_at: scope?.stop_at,
-          }),
+          workspaceRoot
+            ? discoverProjectInstructions({
+                workspace_root: workspaceRoot,
+                stop_at: scope?.stop_at,
+              })
+            : Promise.resolve({ text: "" }),
         ]);
         ctx = {
           skill_index: skillIndex,

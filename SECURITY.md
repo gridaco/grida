@@ -1002,6 +1002,17 @@ into scratch (where the shell can then exfiltrate them).
 4. **`also_in_load` companions are containment-checked** — a declared companion
    path that resolves outside the materialized dir (`..`, absolute) is skipped,
    not inlined.
+5. **Re-validation at LOAD time (discovery→load TOCTOU)** — rule 2 runs when
+   the index is built, but the `skill` tool loads a body later, and the
+   filesystem can change in between (a checkout or a shell command swaps
+   `.agents/skills/foo` for a symlink). `resolveSkillLoadPaths`
+   ([discovery.ts](packages/grida-ai-agent/src/skills/discovery.ts))
+   re-realpaths and re-contains the skill dir + its `SKILL.md` (or a flat
+   `<name>.md`) against the layer root at load time, throws
+   `SkillPathEscapeError` on escape, and returns the canonical paths to
+   read/copy. BOTH load paths — the materializing loader and
+   `nodeSkillBodyLoader` — go through it, so no loader trusts a stale
+   discovered string path.
 
 **Files bound by this id.**
 

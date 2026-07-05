@@ -272,6 +272,60 @@ async function isContained(realRoot: string, target: string): Promise<boolean> {
   return containsPath(realRoot, real);
 }
 
+/** GRIDA-SEC-007: rule 5 — a discovered skill path that no longer
+ *  canonicalises inside its layer at LOAD time (distinct from "not found").
+ *  Signals a post-discovery symlink swap; the load is refused. */
+export class SkillPathEscapeError extends Error {
+  constructor(public readonly skill_path: string) {
+    super(`[skills] skill path escaped its layer at load: ${skill_path}`);
+    this.name = "SkillPathEscapeError";
+  }
+}
+
+/**
+ * GRIDA-SEC-007: rule 5 — re-validate a discovered skill's on-disk paths at
+ * LOAD time, closing the discovery→load TOCTOU. Discovery containment-checked
+ * `<layer>/<name>` when the index was built, but the filesystem can change
+ * underneath: a checkout or a shell command can replace the skill dir with a
+ * symlink before the model calls the `skill` tool, and a blind `readdir`/read
+ * of the stored string path would then follow the link out of the layer. Here
+ * we re-realpath the dir + its `SKILL.md` (or the flat `<name>.md`) and
+ * re-contain them in the skill's layer root, returning the canonical paths the
+ * caller must read/copy from. Throws {@link SkillPathEscapeError} on escape.
+ */
+export async function resolveSkillLoadPaths(
+  skill: Pick<DiscoveredSkill, "dir" | "path">
+): Promise<{ dir: string | null; body_path: string }> {
+  if (skill.dir) {
+    // Layer root = the `.../skills` dir that holds this entry.
+    const layerRoot = await safeRealpath(path.dirname(skill.dir));
+    const realDir = await safeRealpath(skill.dir);
+    if (
+      layerRoot == null ||
+      realDir == null ||
+      !containsPath(layerRoot, realDir)
+    ) {
+      throw new SkillPathEscapeError(skill.dir);
+    }
+    const realBody = await safeRealpath(path.join(realDir, "SKILL.md"));
+    if (realBody == null || !containsPath(realDir, realBody)) {
+      throw new SkillPathEscapeError(path.join(skill.dir, "SKILL.md"));
+    }
+    return { dir: realDir, body_path: realBody };
+  }
+  // Flat `<layer>/<name>.md` skill — no tree, just the body file.
+  const layerRoot = await safeRealpath(path.dirname(skill.path));
+  const realBody = await safeRealpath(skill.path);
+  if (
+    layerRoot == null ||
+    realBody == null ||
+    !containsPath(layerRoot, realBody)
+  ) {
+    throw new SkillPathEscapeError(skill.path);
+  }
+  return { dir: null, body_path: realBody };
+}
+
 /** Read the instructional body of a skill (frontmatter stripped). */
 export async function readSkillBody(skillPath: string): Promise<string> {
   const raw = await fs.readFile(skillPath, "utf8");
@@ -280,7 +334,10 @@ export async function readSkillBody(skillPath: string): Promise<string> {
 
 /**
  * The node-fs {@link SkillBodyLoader} the server injects into the `skill`
- * tool. Reads each skill's body by its discovered absolute path.
+ * tool. Re-validates the discovered path at load time (GRIDA-SEC-007 rule 5)
+ * then reads the body from the canonical `SKILL.md`.
  */
-export const nodeSkillBodyLoader: SkillBodyLoader = (skill) =>
-  readSkillBody(skill.path);
+export const nodeSkillBodyLoader: SkillBodyLoader = async (skill) => {
+  const { body_path } = await resolveSkillLoadPaths(skill);
+  return readSkillBody(body_path);
+};

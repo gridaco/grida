@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createMaterializingSkillLoader } from "./materialize";
+import { SkillPathEscapeError } from "./discovery";
 import type { DiscoveredSkill } from "./types";
 
 let srcRoot: string;
@@ -108,6 +109,32 @@ describe("createMaterializingSkillLoader", () => {
       // the symlink was NOT copied into scratch
       await expect(
         fs.stat(path.join(scratch, "skills", "evil", "link.txt"))
+      ).rejects.toThrow(/ENOENT/);
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  // GRIDA-SEC-007: rule 5 — the discovery→load TOCTOU. A discovered skill dir
+  // is swapped for a symlink pointing OUT of its layer AFTER discovery accepted
+  // it; the load must re-validate on disk and refuse, not follow the link.
+  it("refuses a skill dir swapped for an escaping symlink after discovery", async () => {
+    const skill = await writeSkill("swapme", "Body.");
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), "grida-evil-"));
+    await fs.writeFile(
+      path.join(outside, "SKILL.md"),
+      "---\nname: x\ndescription: y\n---\n\nsecret\n"
+    );
+    // Replace the accepted dir with a symlink to the outside tree.
+    await fs.rm(skill.dir!, { recursive: true, force: true });
+    await fs.symlink(outside, skill.dir!, "dir");
+    try {
+      await expect(
+        createMaterializingSkillLoader(scratch)(skill)
+      ).rejects.toThrow(SkillPathEscapeError);
+      // nothing materialized into scratch
+      await expect(
+        fs.stat(path.join(scratch, "skills", "swapme"))
       ).rejects.toThrow(/ENOENT/);
     } finally {
       await fs.rm(outside, { recursive: true, force: true });
