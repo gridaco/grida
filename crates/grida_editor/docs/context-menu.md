@@ -21,14 +21,14 @@ popover primitive it needs — is a checklist, not an invention.
 
 - **An item is a command reference**: label, displayed binding, and
   an enablement predicate. No menu-only behavior exists. The
-  displayed binding is *derived* from the keybinding sheet, never
+  displayed binding is _derived_ from the keybinding sheet, never
   authored on the item — a menu cannot show a chord the sheet does
   not own.
 - **Enablement mirrors capability.** An item whose command cannot
   apply to the current target renders disabled, not hidden. The only
   label changes are **paired toggles** (Use as mask ⇄ Remove mask,
   Show ⇄ Hide, Lock ⇄ Unlock), which present the applicable direction.
-  Where a pure resolver exists, enablement is *exact* capability —
+  Where a pure resolver exists, enablement is _exact_ capability —
   Bring to front disables for an already-frontmost selection — which
   refines this inventory's coarser "selection non-empty" cells:
   CTX-2 is the contract, the table is the checklist.
@@ -48,30 +48,30 @@ popover primitive it needs — is a checklist, not an invention.
 Opened by right-click on the canvas — over content or empty space.
 Items in order, separators as rows:
 
-| Item | Enabled when |
-| --- | --- |
-| Copy | selection non-empty |
-| Paste | always (empty canvas paste is legal) |
-| Copy as → SVG / PNG | selection non-empty |
-| — | |
-| Bring to front | selection non-empty |
-| Send to back | selection non-empty |
-| — | |
-| Flatten | every selected node is flattenable |
+| Item                      | Enabled when                                                         |
+| ------------------------- | -------------------------------------------------------------------- |
+| Copy                      | selection non-empty                                                  |
+| Paste                     | always (empty canvas paste is legal)                                 |
+| Copy as → SVG / PNG       | selection non-empty                                                  |
+| —                         |                                                                      |
+| Bring to front            | selection non-empty                                                  |
+| Send to back              | selection non-empty                                                  |
+| —                         |                                                                      |
+| Flatten                   | every selected node is flattenable                                   |
 | Use as mask ⇄ Remove mask | mask: selection non-empty; unmask: selection is a single masked node |
-| Edit vector → Planarize | every selected node is a vector |
-| — | |
-| Group | selection non-empty |
-| Ungroup | selection contains a group or boolean node |
-| Group with container | selection non-empty |
-| Auto-layout | selection non-empty |
-| — | |
-| Zoom to fit | selection non-empty |
-| — | |
-| Show ⇄ Hide | selection non-empty |
-| Lock ⇄ Unlock | selection non-empty |
-| — | |
-| Delete | selection non-empty |
+| Edit vector → Planarize   | every selected node is a vector                                      |
+| —                         |                                                                      |
+| Group                     | selection non-empty                                                  |
+| Ungroup                   | selection contains a group or boolean node                           |
+| Group with container      | selection non-empty                                                  |
+| Auto-layout               | selection non-empty                                                  |
+| —                         |                                                                      |
+| Zoom to fit               | selection non-empty                                                  |
+| —                         |                                                                      |
+| Show ⇄ Hide               | selection non-empty                                                  |
+| Lock ⇄ Unlock             | selection non-empty                                                  |
+| —                         |                                                                      |
+| Delete                    | selection non-empty                                                  |
 
 The reference editor additionally ships **Copy name** and **Copy ID**
 after the clipboard group — single-target clipboard affordances

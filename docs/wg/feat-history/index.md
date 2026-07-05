@@ -67,7 +67,7 @@ step. Abort after abort must be idempotent.
 A committed entry is immutable: the stack never merges, rewrites, or
 absorbs entries after the fact. Where a burst of discrete edits should
 read as **one** step (typing a value, repeated nudges), that is
-achieved the same way a gesture is — by *framing*: the interaction
+achieved the same way a gesture is — by _framing_: the interaction
 layer keeps a transaction open across the burst and commits it on a
 boundary (a quiet-period dwell, a key change, focus loss, a mode
 change). The entry's endpoints (first pre-state, last post-state) fall
@@ -114,7 +114,7 @@ complexity.
 ### 7. Nested editing contexts commit atomically
 
 A sub-editor with its own fine-grained history (text editing is the
-canonical case: per-keystroke undo *inside* the session) is a nested
+canonical case: per-keystroke undo _inside_ the session) is a nested
 context. While active, undo/redo route to the nested context. On exit,
 the entire session commits as **one** entry in the document history —
 or, on cancel, as none. The nested context's fine-grained steps never
@@ -133,5 +133,5 @@ partial effect.
 The following never enter history, under any implementation: camera
 and viewport state, hover, active tool, in-flight gesture state,
 presence and collaboration ephemera, and configuration toggles.
-History records what the user did to the *document*, not what the user
-did with the *editor*.
+History records what the user did to the _document_, not what the user
+did with the _editor_.

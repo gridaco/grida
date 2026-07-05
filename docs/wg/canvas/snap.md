@@ -8,7 +8,7 @@ tags:
 format: md
 ---
 
-**Snap** adjusts what a gesture *means*: as content is dragged,
+**Snap** adjusts what a gesture _means_: as content is dragged,
 resized, or drawn, the interpreted values are corrected toward nearby
 alignments before they are applied. The family has three members:
 
@@ -17,7 +17,7 @@ alignments before they are applied. The family has three members:
    screen-space threshold. Applies to **translate** (the union's nine
    points) and to **resize** (the moving edges only — see below).
 2. **Snap to space** — equal-gap distribution: uniform gaps among
-   *direction-aligned* neighbors project candidate positions that
+   _direction-aligned_ neighbors project candidate positions that
    give the agent an equal-spacing slot to lock onto. Applies to
    **translate**.
 3. **Snap to pixel grid** — quantization: the result rounds to the
@@ -49,14 +49,14 @@ editor.
 
 Interpretation applies stages **in order**, per gesture kind:
 
-| Gesture | Stages |
-| --- | --- |
-| translate (drag) | axis-lock → geometry + space snap → quantize |
-| resize | axis/aspect constraints → geometry snap (moving edges only) → quantize (moving corner) |
-| insert (drag-out) | geometry snap → quantize |
-| guide drag | geometry snap → quantize ([ruler.md](./ruler.md)) |
-| nudge (arrows) | quantize only — never geometry snap |
-| rotate | angle quantize (modifier-held, 15° steps) |
+| Gesture           | Stages                                                                                 |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| translate (drag)  | axis-lock → geometry + space snap → quantize                                           |
+| resize            | axis/aspect constraints → geometry snap (moving edges only) → quantize (moving corner) |
+| insert (drag-out) | geometry snap → quantize                                                               |
+| guide drag        | geometry snap → quantize ([ruler.md](./ruler.md))                                      |
+| nudge (arrows)    | quantize only — never geometry snap                                                    |
+| rotate            | angle quantize (modifier-held, 15° steps)                                              |
 
 Order matters: the content snaps correct the value first,
 quantization rounds whatever survives. Nudge deliberately skips
@@ -69,7 +69,7 @@ Geometry snap runs against a **session** frozen at gesture start:
 
 - **Agent** — the union bounds of the moving content, reduced to its
   nine points (four corners, four edge midpoints, center).
-- **Anchors** — the *neighborhood*: the parent's bounds and every
+- **Anchors** — the _neighborhood_: the parent's bounds and every
   visible sibling's bounds (a group sibling contributes its own
   bounds and its leaves), plus the scene's guides. With large anchor
   counts, a proximity pre-filter and a spacing-snap cutoff (reference
@@ -82,19 +82,19 @@ anchor set, so a gesture cannot chase its own snapping.
 Per move, each axis snaps independently: the agent's nine points
 against the anchors' points, the strongest hit within threshold wins,
 and the corrected delta carries the hit indices so chrome can show
-*why*.
+_why_.
 
 **Space snap** extends the same per-axis pass with distribution
 geometry, and is deliberately narrower than geometry snap:
 
 - **Direction-aligned anchors only.** For an x-axis candidate, only
-  anchors whose *y ranges overlap the agent's* participate (and
+  anchors whose _y ranges overlap the agent's_ participate (and
   symmetrically for y): equal spacing is a claim about objects in a
   row, not about everything on the canvas. The overlap test uses the
   agent at its geometry-corrected position for the current move.
 - **Both sides.** Every uniform-gap pair among the aligned anchors
-  projects candidates on both flanks: the agent's *leading* edge
-  snaps to positions extending the run after the pair, the *trailing*
+  projects candidates on both flanks: the agent's _leading_ edge
+  snaps to positions extending the run after the pair, the _trailing_
   edge to positions extending it before, and cross-pair gaps forward
   onto each other so a chain of gaps offers each other's spacing.
 - **Center fit.** An agent narrower than a gap also gets the centered
@@ -154,7 +154,7 @@ anchored edge is not a gesture-produced value and never rounds, so
 resizing a fractionally-positioned rect leaves its anchored edge
 exactly where it was (the moving edge lands on the lattice; the size
 absorbs the fraction). Quantization is independent of the pixel
-grid's *visibility* (PXG-5), applies to gesture-produced values only
+grid's _visibility_ (PXG-5), applies to gesture-produced values only
 — a value typed into the properties panel is committed verbatim —
 and is on by default in the reference editor (hosts like the SVG
 editor default it off for source fidelity).
@@ -231,7 +231,7 @@ configurable quantum (sub-pixel grids).
   mid-gesture yields raw values for subsequent previews; releasing it
   re-engages — within one event of the change (binds SURF-4).
 - **SNAP-4** Quantization: with snap-to-pixel-grid on, every
-  gesture-committed *moving value* is an integer multiple of the
+  gesture-committed _moving value_ is an integer multiple of the
   quantum — the moved positions for a translate, the moving corner
   for a resize (a resize's anchored edge never rounds); the rounding
   anchor is fixed at gesture start (no drift across a gesture's
@@ -240,7 +240,7 @@ configurable quantum (sub-pixel grids).
   panel commits verbatim — quantization applies to gesture
   interpretation only.
 - **SNAP-6** Nudge exemption: a nudge is never geometry-snapped, at
-  any distance from any anchor. (A nudge that *lands* on an alignment
+  any distance from any anchor. (A nudge that _lands_ on an alignment
   may still raise an advisory guide — that reveals the alignment, it
   does not correct toward one; owned by [nudge.md](./nudge.md),
   NUDGE-6.)
@@ -255,7 +255,7 @@ configurable quantum (sub-pixel grids).
   nothing was corrected — feedback, not a snap; see [nudge.md](./nudge.md),
   NUDGE-6.)
 - **SNAP-9** Threshold zoom-invariance: the snap capture distance,
-  measured in *screen* pixels, is constant across zoom levels.
+  measured in _screen_ pixels, is constant across zoom levels.
 - **SNAP-10** Resize snaps moving edges only: a moving edge ending
   within threshold of a neighbor edge/center or a guide commits the
   aligned value while the gesture's anchor (the opposite edge — or

@@ -83,7 +83,7 @@ overlay damage only — a present, never a document frame
   owned by [snap.md](./snap.md), and is not conditioned on the grid
   being visible.
 - **Not the engine's pixel preview.** The engine's
-  `pixel_preview_scale` render intent rasterizes *content* at a
+  `pixel_preview_scale` render intent rasterizes _content_ at a
   coarser scale; it shares nothing with this overlay.
 - **Not a document grid.** Layout grids (columns, rows, per-frame
   grids) are document-attached and out of scope here.

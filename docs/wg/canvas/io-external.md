@@ -8,7 +8,7 @@ tags:
 format: md
 ---
 
-External intake is how *foreign* content enters the document: files
+External intake is how _foreign_ content enters the document: files
 dropped on the canvas and non-native clipboard payloads pasted into
 it. [io](./io.md) owns the native side (documents, fragments,
 export); this document owns the foreign matrix. Drop and paste are
@@ -21,14 +21,14 @@ Every file dropped on the canvas resolves through a type matrix.
 Detection is content-type first, extension fallback; resolution is
 per file, so a multi-file drop inserts one result per file.
 
-| Dropped | Result |
-| --- | --- |
-| Raster image (PNG, JPEG, GIF, WebP) | an image node at the image's natural size, centered on the drop point, named after the file |
-| SVG file | the parsed vector subtree at its intrinsic size, centered on the drop point, named after the file |
-| Plain text / markdown file | a text node with the content |
-| Native document (the editor's own format) | **refused with guidance** — a document opens, it is not inserted into another document |
-| Foreign design document (e.g. a peer editor's file format) | refused with guidance toward the import flow |
-| Anything else | refused, **loudly** — the user is told the type is unsupported; nothing silently disappears |
+| Dropped                                                    | Result                                                                                            |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Raster image (PNG, JPEG, GIF, WebP)                        | an image node at the image's natural size, centered on the drop point, named after the file       |
+| SVG file                                                   | the parsed vector subtree at its intrinsic size, centered on the drop point, named after the file |
+| Plain text / markdown file                                 | a text node with the content                                                                      |
+| Native document (the editor's own format)                  | **refused with guidance** — a document opens, it is not inserted into another document            |
+| Foreign design document (e.g. a peer editor's file format) | refused with guidance toward the import flow                                                      |
+| Anything else                                              | refused, **loudly** — the user is told the type is unsupported; nothing silently disappears       |
 
 Insertion behaviors shared by all accepted rows: the drop is one
 undoable entry per file (IO-2), the inserted nodes become the
@@ -92,7 +92,7 @@ The mirror direction, so external round-trips are honest:
   document scale: the committed appearance, rendered in isolation
   (the node's own opacity applies; ancestor opacity does not). A
   multi-node selection rasters as one image over its union bounds.
-- Ordinary copy always writes the native fragment *plus* fallback
+- Ordinary copy always writes the native fragment _plus_ fallback
   flavors, so external applications receive something useful and
   the editor itself receives the highest-fidelity row.
 

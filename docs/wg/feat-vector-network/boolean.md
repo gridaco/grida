@@ -11,7 +11,7 @@ format: md
 A **boolean node** combines the geometry of its children into one
 path — union, intersection, difference, or exclusion (xor) — while
 keeping the children alive. It is the non-destructive counterpart to
-flatten: the document stores *operands plus an operation*, and the
+flatten: the document stores _operands plus an operation_, and the
 result is computed, never persisted.
 
 ## The model

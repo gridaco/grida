@@ -12,8 +12,8 @@ A multi-node selection is not always one thing. When the selected
 nodes share a parent, they present and act as a single unit. When they
 span parents, the editor **partitions** the selection by parent and
 treats each partition as its own host: the surface draws N overlay
-boxes rather than one, and a class of commands is applied once *per
-partition*. This document defines the partition function, the
+boxes rather than one, and a class of commands is applied once _per
+partition_. This document defines the partition function, the
 presentation it drives, and the rule that decides which commands
 respect it — the shared substrate under
 [grouping](../grouping.md), [auto-layout](../auto-layout.md),
@@ -33,7 +33,7 @@ Formally: `partition(selection) = group members by (parent(m) ?? scene)`.
 Within a partition, members keep their **document sibling order** — the
 order a structural command will preserve when it adopts them.
 
-The partition is *derived*, never stored. It is recomputed from the
+The partition is _derived_, never stored. It is recomputed from the
 current selection and the current tree on every read, so it follows
 re-parenting, deletion, and selection change without its own state.
 
@@ -49,17 +49,17 @@ The surface renders the partition directly:
   group overlays**, each over its own partition's union bounds, each
   carrying that partition's bounds-relative affordances: resize
   handles, the gap/distribution overlay, and a click/drag target
-  scoped to *that partition's* members.
+  scoped to _that partition's_ members.
 
 The editor **never draws a single box spanning two partitions**. This
 is the observable heart of the concept: a cross-parent selection has no
 uniform bounding box, because there is no single parent frame such a
 box could belong to.
 
-**Relation to the union drag.** The plain *move* gesture still
+**Relation to the union drag.** The plain _move_ gesture still
 translates the whole selection together — translation is a
 union command (below), owned by [translate](../translate.md). The
-per-partition overlays own the *bounds-relative* operations (resize,
+per-partition overlays own the _bounds-relative_ operations (resize,
 gap, distribute) that only make sense within one frame. What
 [selection](./selection.md) calls the "selection group overlay" — the
 draggable multi-selection unit — is the **single-partition case** of
@@ -98,7 +98,7 @@ either its union bounds or a uniform delta — regardless of parent:
 - resize-nudge, scale — a uniform transform.
 
 Why the split is principled: a new parent can only adopt the children
-of *one* existing parent context without re-parenting, and the
+of _one_ existing parent context without re-parenting, and the
 structural commands deliberately do **not** re-parent across partitions
 (they preserve each member's place in the tree). So a structural
 command must run once per partition. A spatial command moves nodes in

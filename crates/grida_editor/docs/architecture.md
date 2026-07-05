@@ -54,7 +54,7 @@ without the layers above it.
   scrolling, and value binding. It depends on engine and editor core,
   never on specific panels.
 - **Panels** (properties, hierarchy) are compositions of widgets
-  bound to editor state. Panels contain *no editing logic* — every
+  bound to editor state. Panels contain _no editing logic_ — every
   edit a panel performs is a mutation or command any other caller
   could make.
 - **Shell** assembles everything into an application: one window, a

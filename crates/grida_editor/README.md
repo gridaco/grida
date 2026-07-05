@@ -33,10 +33,10 @@ How it died, reduced to root causes:
 - **Sync as architecture.** The HUD and the whole interaction layer
   lived web-only, so every feature paid the same tax: mutate JS state
   → sync the scene → query the new geometry → update everything
-  downstream. The reconciliation loop *was* the architecture.
+  downstream. The reconciliation loop _was_ the architecture.
 - **The write path was an afterthought.** As scenes grew, the real
   performance plumbing was not making the render fast — it was making
-  *mutation* fast. The split had no answer for that.
+  _mutation_ fast. The split had no answer for that.
 - **Death by accretion.** JS was the natural home for exploring UX —
   and the exploration hardened into the architecture. Both sides
   became unmanageable; every refactor got more painful and more
@@ -53,22 +53,22 @@ not aspirations — they are the merge bar.
 1. **One owner per concern.** Every piece of state has exactly one
    owner: the module that holds the capability to operate on it. If
    two sides need to own the same state, the boundary is in the wrong
-   place — move the boundary, never share the state. *(Negates: the
-   text-editor split.)* In-tree example: `ARCH-1` — editor core owns
+   place — move the boundary, never share the state. _(Negates: the
+   text-editor split.)_ In-tree example: `ARCH-1` — editor core owns
    document truth and runs its whole suite with no renderer.
 
 2. **Data flows one way.** Every feature must be expressible as
    one-directional flow through contracts: intents up, derived state
-   down. A design that must *write, then read back to learn what
-   happened* has misplaced ownership — that is the legacy sync loop
-   wearing a new name. *(Negates: mutate → sync → query → update.)*
+   down. A design that must _write, then read back to learn what
+   happened_ has misplaced ownership — that is the legacy sync loop
+   wearing a new name. _(Negates: mutate → sync → query → update.)_
    In-tree example: `HUD-3` — intents up, selection mirror down, same
    event.
 
 3. **The write path is a first-class surface.** Mutation cost,
    invertibility, history shape, and damage propagation are designed
    and budgeted with the same rigor as rendering — never bolted on.
-   *(Negates: render-first, mutation-someday.)* In-tree example: the
+   _(Negates: render-first, mutation-someday.)_ In-tree example: the
    damage ledger — no call site talks to the renderer about content;
    `FRAME-2` names the scattered per-site plumbing it forbids.
 
@@ -86,7 +86,7 @@ not aspirations — they are the merge bar.
    **Nothing is built on a non-golden contract.** If what you need
    isn't cleanly offered by a golden contract, the work is to fix the
    contract first — spec, then tests, then code — not to reach
-   around it. *(Negates: death by accretion.)* In-tree example: the
+   around it. _(Negates: death by accretion.)_ In-tree example: the
    UI kernel/policy seam — widgets emit an opaque `Emission` and have
    never heard of a document
    ([`src/ui/README.md`](src/ui/README.md)).
@@ -94,7 +94,7 @@ not aspirations — they are the merge bar.
 5. **"It works" is not an argument.** The legacy system was made
    entirely of working code. A change that works but blurs ownership,
    bends data flow, or leans on a non-golden contract is debt on the
-   day it lands — and this crate exists *because* that debt
+   day it lands — and this crate exists _because_ that debt
    compounds. Easy paths that "just make things work" are how the
    last system died.
 
@@ -117,10 +117,10 @@ Therefore:
   this crate carries zero authority in a design argument; only RFC
   clauses and their tests do.
 - **The checklist below applies inward.** Reorganizing or extending
-  *this* code is gated exactly like touching legacy code.
+  _this_ code is gated exactly like touching legacy code.
 - **Deviations resolve deliberately, never silently.** When code and
   spec disagree, either the code is wrong, or reality won — and then
-  the spec and its tests are amended *in the same change*. Silent
+  the spec and its tests are amended _in the same change_. Silent
   drift is the one outcome that is never acceptable.
 
 ## 4. The checklist — before any action
@@ -141,7 +141,7 @@ the step that matters.
 4. **Concept** — which spec concept owns this work? None → write the
    spec first, or don't build it.
 5. **The easy-path test** — is this shaped this way because it is
-   *right*, or because it was *expedient*? Would it survive the
+   _right_, or because it was _expedient_? Would it survive the
    review the legacy system failed?
 6. **Blast** — does this alter a contract others build on? Then spec,
    tests, and code amend in the same change — never code alone.
@@ -182,7 +182,7 @@ performant.
 **End state** — this crate is the backbone, re-exposed to the web
 through a wasm seam; likely a new package rather than
 `@grida/canvas-wasm`, since what it exposes is no longer a canvas but
-an *editor* (packaging and naming not yet decided).
+an _editor_ (packaging and naming not yet decided).
 
 ## 6. How a feature lands
 

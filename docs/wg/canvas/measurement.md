@@ -81,7 +81,7 @@ dismissing it accrue overlay damage only ([frame.md](https://github.com/gridaco/
 
 ## What it is not
 
-- **Not snapping.** Snap guides show where a *gesture* aligned;
+- **Not snapping.** Snap guides show where a _gesture_ aligned;
   measurement reads distances while nothing moves. They share line-
   and-label chrome primitives and nothing else.
 - **Not persistent.** Nothing is stored; release the modifier and it

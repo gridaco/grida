@@ -12,8 +12,8 @@ format: md
 one node a click means. **Selection dynamics** are the rules by which
 that target updates the selection under modifiers, clicks, and
 marquees. The golden [ux-surface](./) docs own
-the *routing* (which pointer-down becomes which intent, immediate vs
-deferred); this document materializes the *resolution* — the
+the _routing_ (which pointer-down becomes which intent, immediate vs
+deferred); this document materializes the _resolution_ — the
 mathematical rules the router calls into — so a second implementation
 can reproduce click-for-click behavior.
 
@@ -45,7 +45,7 @@ order:
 2. **`S = ∅`**: return the **shallowest** candidate — the top-level
    node under the pointer. An unfocused click never lands inside a
    subtree.
-3. **`S ≠ ∅`** — *lateral resolution*:
+3. **`S ≠ ∅`** — _lateral resolution_:
    - Filter `H` by the **no-climb rule**: remove every node that is a
      strict ancestor of any member of `S`. Clicking never climbs out
      of the depth the user has entered; a shared container never
@@ -73,8 +73,8 @@ Double-click **descends one level** toward the point:
   (unweighted) graph distance — i.e. the **next child on the path
   toward the leaf**, not the leaf itself.
 - Repeated double-clicks peel one level each: `container → group →
-  shape`.
-- When the resolved target *is already* the sole selection and the
+shape`.
+- When the resolved target _is already_ the sole selection and the
   node has an editable content mode (text, vector), the double-click
   enters that mode instead ([vector-edit](../../feat-vector-network/vector-edit.md), text
   editing). Descend-then-edit is one continuous idiom: double-clicks
@@ -86,16 +86,16 @@ Double-click **descends one level** toward the point:
 With the toggle modifier (shift) held, a click toggles the target's
 membership. Two structural rules:
 
-- **Grow on down, shrink on up.** A click that would *add* to the
-  selection commits on pointer-down; a click that would *remove* (or
+- **Grow on down, shrink on up.** A click that would _add_ to the
+  selection commits on pointer-down; a click that would _remove_ (or
   narrow to) an already-selected node is **deferred to pointer-up**
   and cancelled if a drag begins. This asymmetry is what lets a user
   grab one member of a multi-selection and drag the whole selection
   without destroying it.
 - **No parent–child co-selection.** The selection never contains a
   node and its ancestor simultaneously; the later selection wins and
-  the conflicting relative is dropped. Mixed *depths* are legal
-  (a node from one subtree plus a node from another); mixed *lineage*
+  the conflicting relative is dropped. Mixed _depths_ are legal
+  (a node from one subtree plus a node from another); mixed _lineage_
   is not.
 
 ## Marquee
@@ -103,7 +103,7 @@ membership. Two structural rules:
 A drag from empty space selects by rectangle. Resolution over the
 final (and every intermediate) rect `R`:
 
-1. **Predicate — intersection.** A candidate is *touched* when its
+1. **Predicate — intersection.** A candidate is _touched_ when its
    world AABB intersects `R`. Containment is not required.
 2. **Captured-parent rule (depth).** A nested node is selected only
    if its parent is also touched (or its parent is the scene root /
@@ -111,12 +111,12 @@ final (and every intermediate) rect `R`:
    default instead of spraying selection across deep descendants.
 3. **Containment suppression (the backdrop rule).** Order the touched
    candidates back-to-front. A candidate whose AABB **contains** `R`
-   is *suppressed* unless it is the front-most touched candidate.
+   is _suppressed_ unless it is the front-most touched candidate.
    Consequence: dragging a marquee inside a full-bleed background
    plate selects the foreground content on top of it, not the plate;
    the plate joins the selection only once the marquee crosses its
    edge (at which point it no longer contains `R`). The rule's
-   corollary is *escape*: shrinking the marquee back inside the plate
+   corollary is _escape_: shrinking the marquee back inside the plate
    releases it.
 4. **Additive**: with the toggle modifier, the result unions with the
    selection as it stood at drag start; without, it replaces.

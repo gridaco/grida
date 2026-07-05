@@ -59,7 +59,7 @@ declines rather than approximating):
   glyph. Flatten **delegates** a text member to the same conversion
   [Create Outlines](./create-outlines.md) uses; without a font backend
   a text member is left unflattened, not approximated.
-- **Boolean** bakes its *evaluated* result (the merged path), which
+- **Boolean** bakes its _evaluated_ result (the merged path), which
   needs path-boolean evaluation. It is the destructive exit named in
   [boolean](./boolean.md); the boolean's own paint carries to the
   vector.

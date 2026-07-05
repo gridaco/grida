@@ -22,7 +22,7 @@ The edited material is a **vector network**, not a path:
 
 - **Vertices** — points in the node's local space.
 - **Segments** — ordered pairs of vertex references with two tangent
-  vectors, one per endpoint, expressed *relative to that endpoint*.
+  vectors, one per endpoint, expressed _relative to that endpoint_.
   A segment is a cubic Bézier whose control points are
   `endpoint + tangent`; a segment with both tangents zero is a
   straight line, and its handles do not render.
@@ -31,8 +31,8 @@ The edited material is a **vector network**, not a path:
 
 A network is a graph: vertices may join more than two segments,
 subpaths may branch and merge. This is strictly more expressive than
-a path command sequence, and the difference drives the *reduced
-profile* at the end of this document. Model invariants that gestures
+a path command sequence, and the difference drives the _reduced
+profile_ at the end of this document. Model invariants that gestures
 rely on: splitting a segment at a parametric point preserves the
 curve's shape exactly (subdivision), and straight segments split into
 straight segments (zero tangents stay zero — no phantom handles).
@@ -47,13 +47,13 @@ Vector edit is a **content mode** in the editor's exclusive
   selected it edits that node; with none, the first placement creates
   a new vector node and enters the mode. Double-clicking a primitive
   shape flattens it to a vector first: entering the mode is a
-  commitment. (One dispatch exception: a shape carrying an *image
-  fill* double-clicks into the image paint session instead — the
+  commitment. (One dispatch exception: a shape carrying an _image
+  fill_ double-clicks into the image paint session instead — the
   [edit-mode](../canvas/edit-mode.md) dispatch table owns that priority.)
   The variable-width lens over the same node is the mode's **width
   facet**, specified there as well.
 - **Mode state**: the sub-selection (vertex indices, segment indices,
-  and *tangents* addressed as vertex + side), one hovered control at
+  and _tangents_ addressed as vertex + side), one hovered control at
   most, the pen's origin vertex and pending tangent (below), and the
   snapped cursor.
 - **Exit** follows the escape ladder (below), or a **double-click on
@@ -71,15 +71,15 @@ Lifecycle invariants:
   vertices dropped.
 - Exit with degenerate content (fewer than 2 vertices or 1 segment)
   **deletes the node**: empty authoring leaves no trace (the same
-  doctrine as TOOL-6/7). For a node the mode itself created, *no
-  trace* is literal — every entry of the authoring frame is rescinded
+  doctrine as TOOL-6/7). For a node the mode itself created, _no
+  trace_ is literal — every entry of the authoring frame is rescinded
   from history. A **pre-existing** node cannot vanish untraceably:
   the mode-era entries are rescinded and exactly one deletion entry
   survives, whose undo restores the original node — an unrecorded
   delete of pre-existing content would be data loss.
 - **Bounds refit**: after every mutation the network is re-anchored
   so the node's position and size hug the geometry — vertices stay in
-  a tight local box, and the geometry's *world* position never shifts
+  a tight local box, and the geometry's _world_ position never shifts
   as a side effect of the refit.
 
 ## Chrome and hover
@@ -95,7 +95,7 @@ chrome, owned by the mode while inside), and the pen's preview curve.
   zero tangents. Everything else stays clean — handle clutter is the
   mode's main legibility risk.
 - **Hover is exclusive and load-bearing**: at most one control
-  (vertex or segment) is hovered. Hovering a segment *arms*
+  (vertex or segment) is hovered. Hovering a segment _arms_
   projection: the nearest point on the curve (parametric `t`) is
   computed and shown as an insertion affordance. Vertex snapping uses
   a tighter threshold than segment projection and **suppresses** it —
@@ -117,12 +117,12 @@ chrome, owned by the mode while inside), and the pen's preview curve.
   select in bulk: vertices by point-in-region, segments by curve
   containment; tangent knobs are eligible only when their vertex is
   already in the selection neighbourhood. The sweep applies **live**:
-  the sub-selection tracks the rect as it grows *and shrinks* —
+  the sub-selection tracks the rect as it grows _and shrinks_ —
   additive sweeps union against the selection as it stood at sweep
   start. Release just lands the gesture; a mid-sweep abort restores
   the sweep-start selection.
 - **Delete** removes the sub-selection: deleting a vertex removes it
-  *and every incident segment* — incident segments are not bridged.
+  _and every incident segment_ — incident segments are not bridged.
   Deleting a segment keeps its vertices (orphans are cleaned at
   exit).
 
@@ -138,9 +138,9 @@ preview is an honest render of the segment a click would create.
 **Click** resolves by snap priority:
 
 1. **On a vertex** — if not projecting, adopt it as `A` (this is how
-   an open end is *continued*); if projecting, connect `A` to it.
+   an open end is _continued_); if projecting, connect `A` to it.
    Connecting to the current subpath's start **closes the loop** and
-   concludes the path (`A := null`) — unless the *keep-projecting*
+   concludes the path (`A := null`) — unless the _keep-projecting_
    modifier is held, in which case `A` moves to the landing vertex
    and drawing continues through it.
 2. **On a segment** — split it at the projected parametric point
@@ -150,14 +150,14 @@ preview is an honest render of the segment a click would create.
    its origin tangent; `A := new`.
 
 **Drag** shapes tangents at both ends of the flow — the pen can
-*start* with a drag and *end* with one:
+_start_ with a drag and _end_ with one:
 
 - **Pre-tangent**: pressing and dragging at a placement pulls a
-  tangent *before any segment exists* — the drag accumulates `T`, so
+  tangent _before any segment exists_ — the drag accumulates `T`, so
   the first segment leaves the first vertex already curved.
 - **Post-tangent**: dragging on a placement that completed a segment
   shapes that segment's end tangent live, and mirrors it into
-  `T := −tangent` — so the *next* segment departs smoothly. The
+  `T := −tangent` — so the _next_ segment departs smoothly. The
   mirror is why consecutive pen-drag placements produce a smooth
   spline by default.
 
@@ -227,7 +227,7 @@ The operation set splits cleanly:
 - **Authoring**: append, connect, split, close — everything that
   changes topology from the pen.
 
-A host whose document model is a *path command sequence* rather than
+A host whose document model is a _path command sequence_ rather than
 a network can implement the editing profile alone: moves re-emit the
 same commands with new coordinates, and curve-introducing edits
 lazily promote primitive shapes to path form on first commit. This

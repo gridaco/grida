@@ -11,7 +11,7 @@ format: md
 The **tool** is the editor's answer to "what does the next canvas
 pointer sequence mean?" With the cursor tool it means select/translate
 (the [surface](./surface.md) gestures); with an authoring tool it means
-*create content*. This document specifies the tool taxonomy, how tools
+_create content_. This document specifies the tool taxonomy, how tools
 are activated, and the per-tool interaction contracts — grounded in the
 production web editor's tool system, which is the semantic source of
 truth for what each tool feels like.
@@ -37,24 +37,24 @@ truth for what each tool feels like.
 ## Taxonomy
 
 Tools form a closed set. "Tool" is reserved for modes that change what
-content-directed pointer input *does*; affordances that merely change
+content-directed pointer input _does_; affordances that merely change
 navigation (hand, zoom) are **virtual tools** — cursor modes to the
 human, not tools in the taxonomy.
 
-| Tool | Key | Class | Produces |
-| --- | --- | --- | --- |
-| cursor | `V` | pointer | selection / surface gestures (the default) |
-| rectangle | `R` | insert | Rectangle node |
-| ellipse | `O` | insert | Ellipse node |
-| polygon | `Y` | insert | RegularPolygon node |
-| container | `A`, `F` | insert | Container node (+ adoption) |
-| tray | `Shift+F` | insert | Tray node (+ adoption) |
-| text | `T` | insert | TextSpan node + edit session |
-| line | `L` | draw | Line node |
-| arrow | `Shift+L` | draw | Line node with an end marker |
-| pencil | `Shift+P` | draw | Vector node (polyline network) |
-| pen | `P` | mode-scoped | vector network editing ([vector-edit](../feat-vector-network/vector-edit.md)) |
-| scale | `K` | deferred | parametric resize of the selection |
+| Tool      | Key       | Class       | Produces                                                                      |
+| --------- | --------- | ----------- | ----------------------------------------------------------------------------- |
+| cursor    | `V`       | pointer     | selection / surface gestures (the default)                                    |
+| rectangle | `R`       | insert      | Rectangle node                                                                |
+| ellipse   | `O`       | insert      | Ellipse node                                                                  |
+| polygon   | `Y`       | insert      | RegularPolygon node                                                           |
+| container | `A`, `F`  | insert      | Container node (+ adoption)                                                   |
+| tray      | `Shift+F` | insert      | Tray node (+ adoption)                                                        |
+| text      | `T`       | insert      | TextSpan node + edit session                                                  |
+| line      | `L`       | draw        | Line node                                                                     |
+| arrow     | `Shift+L` | draw        | Line node with an end marker                                                  |
+| pencil    | `Shift+P` | draw        | Vector node (polyline network)                                                |
+| pen       | `P`       | mode-scoped | vector network editing ([vector-edit](../feat-vector-network/vector-edit.md)) |
+| scale     | `K`       | deferred    | parametric resize of the selection                                            |
 
 Web-parity notes, decided here as spec:
 
@@ -155,7 +155,7 @@ The text tool composes insertion with the engine's text-edit session
   is not patched per keystroke. On exit-commit, the final text becomes
   one `Patch` — insert + typed text are **one history entry**
   (TOOL-6).
-- Exiting a *fresh* text node with no content aborts the whole frame:
+- Exiting a _fresh_ text node with no content aborts the whole frame:
   no node, no entry (TOOL-7's click-inserts-nothing spirit — empty
   authoring leaves no trace).
 - Entering edit mode on an existing text node (double-click with the
@@ -179,18 +179,18 @@ The text tool composes insertion with the engine's text-edit session
 
 Recorded so deferral is a decision, not a gap:
 
-- **Pen (`P`)** — *graduated*: specified in
+- **Pen (`P`)** — _graduated_: specified in
   [vector-edit.md](../feat-vector-network/vector-edit.md) (the mode, the pen state
   machine, bending, tangent mirroring, escape semantics) and
   implemented in the reference editor. It is **mode-scoped**, not a
   taxonomy member here: the pen lives in the vector content mode's
   legal tool set ([edit-mode](./edit-mode.md)), and `P` outside the
-  mode is the mode's *entry* (edit the selected vector, or create
+  mode is the mode's _entry_ (edit the selected vector, or create
   from scratch on the first placement) — never an armed document
   tool.
 - **Scale (`K`)** — selection-parametric resize: drags scale the
   selection proportionally (position and size together), tool stays
-  active. It is a *modifier of surface gestures* rather than an
+  active. It is a _modifier of surface gestures_ rather than an
   authoring tool; defer until the surface's resize gesture is bound
   through the editor.
 

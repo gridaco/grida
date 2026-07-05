@@ -18,8 +18,8 @@ elsewhere (Enter inside a text session, Tab across widgets).
 
 ## Down — Enter
 
-Enter binds the alternative chain *enter-content-edit →
-select-children*:
+Enter binds the alternative chain _enter-content-edit →
+select-children_:
 
 1. **Single editable leaf selected** (text, vector): enter its
    content mode per the [edit-mode](./edit-mode.md) dispatch table —

@@ -17,12 +17,12 @@ and it graduates to a spec.
 A browser-hosted editor gets an inspector for free: the DOM
 inspector shows every element, its computed style, its boxes, and
 lets you pick an element by clicking it. The engine-hosted editor
-gets **nothing** — and it has *more* to inspect, not less: the
+gets **nothing** — and it has _more_ to inspect, not less: the
 document scene graph, the HUD chrome, and — because the editor's own
 panels are engine scene subtrees ([ui](./ui.md)) — the entire UI.
 Today, debugging a widget layout or a stray HUD prim means printf
 and pixel-guessing. The headless harness proves contracts but does
-not let a human *explore* a live instance.
+not let a human _explore_ a live instance.
 
 The payoff of ui-as-engine-nodes cuts both ways here: because
 content and UI share one substrate, **one inspector serves both** —
@@ -103,5 +103,5 @@ instance without any UI.
 - Performance counters: surface the [harness](./harness.md) budgets
   (frame cost, hit-test cost) live in the detail view?
 - How much widget-layer internal state (retained state, focus path)
-  is *public observation* vs implementation detail the inspector
+  is _public observation_ vs implementation detail the inspector
   would freeze by exposing?

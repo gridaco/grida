@@ -26,7 +26,7 @@ platform input → surface event → routing → command / intent → state tran
 - **Routing** — a fixed priority order decides who consumes an event
   (see below).
 - **Command** — a named, parameterless-or-parameterized unit of editor
-  behavior. Commands are the *only* things keybindings bind to.
+  behavior. Commands are the _only_ things keybindings bind to.
 - **Intent** — a pointer interaction's declared meaning (select,
   translate, resize, rotate, enter content edit, …) with a
   preview/commit phase, produced by the surface's intent router. The
@@ -68,7 +68,7 @@ Bindings are structural, not timing-based:
 - The **primary modifier** is virtual: it resolves to the platform's
   conventional command modifier. Bindings are authored against the
   virtual modifier, never against a physical one.
-- A binding's modifier mask declares which modifiers are *meaningful*;
+- A binding's modifier mask declares which modifiers are _meaningful_;
   unmentioned modifiers default to "must be absent" unless the binding
   explicitly marks them "don't care". Ambiguity between two bindings
   on the same chord is a table error, not a runtime race.

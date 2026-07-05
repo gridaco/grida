@@ -10,7 +10,7 @@ format: md
 
 Align moves selected nodes so an edge or center coincides;
 distribute equalizes the spacing between them. The whole feature is
-one rule plus arithmetic — the rule is *what frame you align to*,
+one rule plus arithmetic — the rule is _what frame you align to_,
 and it flips on selection cardinality.
 
 ## The reference-frame rule
@@ -18,10 +18,10 @@ and it flips on selection cardinality.
 - **Two or more nodes**: the frame is the **selection's union
   bounds** (world-space AABB of all members). Align-left moves every
   member's left edge to the union's left edge; the union itself
-  never moves — alignment redistributes *within* the selection.
+  never moves — alignment redistributes _within_ the selection.
 - **One node**: the frame is the node's **parent container**, which
   stays fixed while the node moves — align-center centers the child
-  in its parent. A single *top-level* node has no meaningful frame
+  in its parent. A single _top-level_ node has no meaningful frame
   and the command declines.
 
 There is no modifier and no threshold: cardinality alone picks the
@@ -65,7 +65,7 @@ override any translated position. Such members are **excluded**:
 free members align, in-flow members stay, and an all-in-flow
 selection declines. This is the computed-vs-authored doctrine
 (properties PROP-5, [nudge](./nudge.md) NUDGE-4) applied to
-alignment — changing arrangement *inside* a flow is the container's
+alignment — changing arrangement _inside_ a flow is the container's
 alignment property, reachable in the [properties
 panel](https://github.com/gridaco/grida/blob/main/crates/grida_editor/docs/properties.md), not a geometric align.
 
@@ -85,7 +85,7 @@ history entry** — a multi-node align undoes in one step.
 - **ALIGN-1** Frame flip: with N≥2 the union's **aligned edge or
   center** is invariant — align-left preserves the union's left edge,
   align-center its center, etc. — and every member stays within the
-  original union (alignment redistributes *inside* the frame; the
+  original union (alignment redistributes _inside_ the frame; the
   union's extent along the aligned axis collapses, so the whole AABB is
   not preserved, only the reference edge). With N=1 the parent is
   untouched and the node lands on the parent-frame edge/center.

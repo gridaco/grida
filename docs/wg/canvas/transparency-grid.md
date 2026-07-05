@@ -10,7 +10,7 @@ format: md
 
 The **transparency grid** is the checkerboard at the very bottom of
 the canvas stack: it shows wherever the document leaves pixels
-uncovered, which is what makes transparency *visible* — an unpainted
+uncovered, which is what makes transparency _visible_ — an unpainted
 region and a white-filled region must not look the same. It is pure
 substrate: no toggle, no state, no behavior; a document with an
 opaque background simply covers it.
@@ -27,12 +27,12 @@ The substrate order, bottom to top — normative for every host:
 2. **solid background** — the scene's background color, when set
 3. **content** — the artwork
 4. **pixel grid** — the unit lattice render
-   ([pixel-grid.md](./pixel-grid.md)), *above* the content
+   ([pixel-grid.md](./pixel-grid.md)), _above_ the content
 5. chrome (snap guides, ruler guides, selection, panels, …)
 
 The two grids bracket the content deliberately: the transparency grid
-explains what is *not* painted, so it sits beneath everything; the
-pixel grid explains where painted things *land*, so it sits on top —
+explains what is _not_ painted, so it sits beneath everything; the
+pixel grid explains where painted things _land_, so it sits on top —
 rendering it behind the content would hide it exactly where it is
 consulted.
 
@@ -55,7 +55,7 @@ consulted.
 
 The renderer owns the surface clear (the scene background, or
 transparent when the scene has none), so the shell cannot paint
-beneath the content by painting *first* — the clear would erase it.
+beneath the content by painting _first_ — the clear would erase it.
 The reference shell composites the grid **after** the content pass
 with a destination-over blend: the cells, then the base, each landing
 beneath whatever is already on the surface. Same stack, reversed

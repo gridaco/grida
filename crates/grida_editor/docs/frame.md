@@ -17,7 +17,7 @@ when a frame is scheduled**. Mutating a mirrored scene does not
 repaint it; requesting a window redraw does not repaint it either —
 the renderer's flush is gated on its own frame queue. Presentation is
 therefore not a side effect of editing. It is a reconciliation that
-must be *orchestrated*, and this document names the orchestration.
+must be _orchestrated_, and this document names the orchestration.
 
 ## The failure this exists to prevent
 
@@ -25,8 +25,8 @@ Without a named frame concept, every mutation call site re-derives
 the same checklist by hand: mirror the change into the renderer
 (narrowly? wholesale?), invalidate the right caches, schedule a
 frame, re-sync the panels, request a host redraw. Call sites that get
-one step wrong produce the characteristic split-brain: *the document
-is right, the screen is stale* — a panel edit that appears only after
+one step wrong produce the characteristic split-brain: _the document
+is right, the screen is stale_ — a panel edit that appears only after
 the next hover, a drag preview that materializes only on pointer-up,
 while a remote peer (whose path happens to reload wholesale) repaints
 instantly. Per-call-site render plumbing is not an orchestration

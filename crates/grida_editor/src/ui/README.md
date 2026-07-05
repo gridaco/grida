@@ -10,7 +10,7 @@ about it is wrong: **this is not a general-purpose UI toolkit, and it
 is not on a path to becoming one.** It is a deliberately small,
 dev-only layer with two jobs, and it does exactly those two jobs.
 
-The *why* and the aspirational framing live in this crate's binding
+The _why_ and the aspirational framing live in this crate's binding
 specs — [`ui.md`](../../docs/ui.md), [`widgets.md`](../../docs/widgets.md),
 [`harness.md`](../../docs/harness.md). This README is
 the honest counterweight: what the code actually is today, and the size
@@ -22,13 +22,13 @@ of the gap between it and a real widget system.
    engine has none. This layer supplies it, cheaply, on the same
    surface as the canvas.
 2. **Be an adversarial test of the engine's node schema.** Every widget
-   is a question put to `crates/grida`: *can the schema express a
-   settings row? a scroll region? a color picker?* The panels are the
+   is a question put to `crates/grida`: _can the schema express a
+   settings row? a scroll region? a color picker?_ The panels are the
    cheapest place to find out. Much of this module's value is the
    evidence it accumulates about what the schema can and cannot express
    — not the widget code itself.
 
-Widget *looks* are explicitly out of scope. Crude is fine. The bar is
+Widget _looks_ are explicitly out of scope. Crude is fine. The bar is
 "correct, headlessly testable, and honest about engine capability," not
 "pretty."
 
@@ -51,14 +51,14 @@ something has gone wrong — that work belongs to the engine.
 
 ## How it works (the shape, honestly)
 
-- **UI-as-engine-nodes.** A widget's `build()` appends *plain* engine
+- **UI-as-engine-nodes.** A widget's `build()` appends _plain_ engine
   nodes (`Container` / `TextSpan` / `Rectangle`). There are no widget
   node kinds. A button is a container with a text span. The engine lays
   them out and paints them; the shell paints the UI scene with the
   identical `Painter` path canvas content uses, on the same surface.
 - **Rebuild, don't react.** There is no diff, no observer graph, no
   subscriptions. On any change the panel throws away widget configs and
-  rebuilds them; the engine's layout re-run *is* the diff. See
+  rebuilds them; the engine's layout re-run _is_ the diff. See
   [`mod.rs`](mod.rs) `rebuild_all` / `rebuild_widget`.
 - **Config is stateless; state is retained by identity.** A `Widget`
   ([`widget.rs`](widget.rs)) is a throwaway description. Its memory
@@ -107,7 +107,7 @@ This is the part newcomers miss. The limits are not all in this
 module — several are in the engine, which this layer only borrows:
 
 - **Layout is whole-scene and canvas-oriented.** `reflow` runs the
-  engine's full layout + geometry pass over the *entire* UI scene on
+  engine's full layout + geometry pass over the _entire_ UI scene on
   every rebuild — even the "granular" `rebuild_widget` path re-lays-out
   the whole scene. There is no incremental layout invalidation. A
   widget system at app scale needs partial/incremental layout, which
@@ -119,7 +119,7 @@ module — several are in the engine, which this layer only borrows:
   being awkward.
 - **No in-tree stacking / overlay model.** The painter flattens each
   top-level scene root independently, so every floating surface (menu,
-  popover, picker) must be its *own* scene root placed in world
+  popover, picker) must be its _own_ scene root placed in world
   coordinates by hand — see [`popover.rs`](popover.rs). A real UI needs
   stacking contexts / portals / z-layering within one tree.
 - **Input is the canvas surface vocabulary.** No hover/enter/leave, no
@@ -136,12 +136,12 @@ core as much as it redesigns this module.
 ## The one invariant worth protecting
 
 Even though a real toolkit would be a rewrite, one cheap discipline
-keeps that future *reachable* instead of foreclosed: **the widget
+keeps that future _reachable_ instead of foreclosed: **the widget
 kernel must never learn an editor concept.**
 
 - **Kernel** (document-blind, the reusable half): `widget.rs`,
   `mod.rs`, `field.rs`, `focus.rs`, `scroll.rs`, `popover.rs`, and the
-  atoms under `widgets/`. A `Widget` emits an *opaque* `Emission`; it
+  atoms under `widgets/`. A `Widget` emits an _opaque_ `Emission`; it
   has never heard of a node, a fill, or a property.
 - **Policy** (editor-specific): `properties.rs`, `hierarchy.rs`,
   `toolbar.rs`, `menu.rs`, and `bind.rs`'s `BindingProperty` /
@@ -154,16 +154,16 @@ future widget system would inherit.
 
 ## File map
 
-| file | role |
-| --- | --- |
-| `mod.rs` | `UiLayer` — owns the UI scene, caches, layout, registry, focus, capture; input routing; the rebuild engine. |
-| `widget.rs` | the `Widget` trait, `WidgetState`, `UiResponse`, `BuildCtx`. |
-| `bind.rs` | the binding vocabulary (`BindingProperty` / `BindingValue`) and `apply` — **policy**, editor-specific. |
-| `field.rs` | `Field<T>` — the value / mixed / empty display model. |
-| `focus.rs`, `scroll.rs` | focus ring; scroll viewport state + wheel routing. |
-| `popover.rs` | the one anchored-overlay primitive (placement, panel shell, dismissal). |
-| `menu.rs`, `properties.rs`, `hierarchy.rs`, `toolbar.rs` | the editor's panels — **policy**. |
-| `widgets/` | the atoms and composites (button, toggle, slider, number, text, select, segmented, swatch, color picker, quad, list section, tree, …). |
+| file                                                     | role                                                                                                                                   |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `mod.rs`                                                 | `UiLayer` — owns the UI scene, caches, layout, registry, focus, capture; input routing; the rebuild engine.                            |
+| `widget.rs`                                              | the `Widget` trait, `WidgetState`, `UiResponse`, `BuildCtx`.                                                                           |
+| `bind.rs`                                                | the binding vocabulary (`BindingProperty` / `BindingValue`) and `apply` — **policy**, editor-specific.                                 |
+| `field.rs`                                               | `Field<T>` — the value / mixed / empty display model.                                                                                  |
+| `focus.rs`, `scroll.rs`                                  | focus ring; scroll viewport state + wheel routing.                                                                                     |
+| `popover.rs`                                             | the one anchored-overlay primitive (placement, panel shell, dismissal).                                                                |
+| `menu.rs`, `properties.rs`, `hierarchy.rs`, `toolbar.rs` | the editor's panels — **policy**.                                                                                                      |
+| `widgets/`                                               | the atoms and composites (button, toggle, slider, number, text, select, segmented, swatch, color picker, quad, list section, tree, …). |
 
 ## Testing
 

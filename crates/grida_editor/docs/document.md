@@ -9,7 +9,7 @@ format: md
 ---
 
 The **document** is the material being edited: a set of scenes, each a
-tree of nodes with typed properties. What a node *is* — its types and
+tree of nodes with typed properties. What a node _is_ — its types and
 properties — is owned by the format/schema specifications; this
 document specifies the editor's relationship to it: the working copy
 and the mutation vocabulary.
@@ -28,14 +28,14 @@ All change flows through a **closed set of mutation operations**. The
 vocabulary is deliberately small; everything an editor feature does
 must compose from it:
 
-| Mutation | Meaning |
-| --- | --- |
-| `insert(parent, index, subtree)` | Insert a node subtree under a parent at a document-order index |
-| `remove(id)` | Remove a node and its subtree |
-| `patch(id, props)` | Set one or more properties on a node |
-| `move(ids, parent, index)` | Reparent/reorder nodes to a parent at a **post-removal** document-order index |
-| `scene(op)` | Add, remove, or reorder scenes; document-level fields |
-| `guide(op)` | Insert, remove, or reposition a per-scene guide — the [ruler](../../../docs/wg/canvas/ruler.md)'s delta to this vocabulary. Guide changes are non-structural for the renderer (chrome repaints, no scene rebuild) but carry every other rule below |
+| Mutation                         | Meaning                                                                                                                                                                                                                                            |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `insert(parent, index, subtree)` | Insert a node subtree under a parent at a document-order index                                                                                                                                                                                     |
+| `remove(id)`                     | Remove a node and its subtree                                                                                                                                                                                                                      |
+| `patch(id, props)`               | Set one or more properties on a node                                                                                                                                                                                                               |
+| `move(ids, parent, index)`       | Reparent/reorder nodes to a parent at a **post-removal** document-order index                                                                                                                                                                      |
+| `scene(op)`                      | Add, remove, or reorder scenes; document-level fields                                                                                                                                                                                              |
+| `guide(op)`                      | Insert, remove, or reposition a per-scene guide — the [ruler](../../../docs/wg/canvas/ruler.md)'s delta to this vocabulary. Guide changes are non-structural for the renderer (chrome repaints, no scene rebuild) but carry every other rule below |
 
 Rules that make the vocabulary load-bearing:
 

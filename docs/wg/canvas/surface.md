@@ -33,7 +33,7 @@ takes the content rung: panel → chrome → **tool** → content.
 
 The **editor owns selection** ([editor.md](https://github.com/gridaco/grida/blob/main/crates/grida_editor/docs/editor.md)); the surface
 holds only a **read-only mirror** the host pushes. Selection changes
-flow one way: the surface emits selection *intents* — `select`,
+flow one way: the surface emits selection _intents_ — `select`,
 `deselect_all`, and the marquee's per-move rect — and the host commits
 them into the editor **within the same dispatched event**; the host
 then pushes the editor's selection back into the mirror at the same
@@ -55,15 +55,15 @@ and continuously reconfigured by modifiers (per the golden
 [input spec](./input.md)). The reference editor
 implements this gesture set:
 
-| Gesture | Trigger | Effect |
-| --- | --- | --- |
-| pan | space-hold drag / middle drag / scroll | view state only |
-| marquee | drag from empty space | selection by intersection |
-| translate | drag selected content / tree-initiated | `move`/`patch` transforms |
-| resize | drag resize handle (8 regions) | size/position patch |
-| rotate | drag rotate corner regions | rotation patch |
-| corner-radius | drag radius knob | radius patch |
-| text-edit | double-click text node | enters nested editing context |
+| Gesture       | Trigger                                | Effect                        |
+| ------------- | -------------------------------------- | ----------------------------- |
+| pan           | space-hold drag / middle drag / scroll | view state only               |
+| marquee       | drag from empty space                  | selection by intersection     |
+| translate     | drag selected content / tree-initiated | `move`/`patch` transforms     |
+| resize        | drag resize handle (8 regions)         | size/position patch           |
+| rotate        | drag rotate corner regions             | rotation patch                |
+| corner-radius | drag radius knob                       | radius patch                  |
+| text-edit     | double-click text node                 | enters nested editing context |
 
 Deferred (specced, not required for the first conformance
 milestone): lasso, the vector/path editing gestures

@@ -42,10 +42,10 @@ way_. Spec-rich. It defines vocabulary, states constraints and
 invariants, and argues the design tradeoffs. It reads like a standards
 document, not like a code comment.
 
-- **A model, not an explanation.** The strongest specs are *models* — a
+- **A model, not an explanation.** The strongest specs are _models_ — a
   canonical vocabulary, a small generating rule or set of invariants,
   contract tables, and conformance clauses — the kind of thing a second
-  implementer runs in their head. A doc that *explains the code* has the
+  implementer runs in their head. A doc that _explains the code_ has the
   arrow backwards: the code conforms to the spec, never the reverse.
   Prose justifies the model; it does not substitute for it.
 - **Covers why and what.** The motivation, the requirements, the model,
@@ -77,7 +77,7 @@ When writing there, use [`research`](../research/SKILL.md) — it governs
 **Name the genre — and don't let one wear another's costume.** A cluster
 also collects legitimate non-spec artifacts: methodology, a decision
 record, an inventory, an RFD (a design proposal still under discussion).
-Each is fine — but it must *say what it is*. An inventory or a
+Each is fine — but it must _say what it is_. An inventory or a
 decision-memo dressed as a normative spec, numbered with "contracts" it
 cannot enforce, misleads everyone who tries to conform to it. If a doc is
 not a model, label it and drop the costume.

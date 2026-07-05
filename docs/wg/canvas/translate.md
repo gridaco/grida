@@ -9,7 +9,7 @@ format: md
 ---
 
 Translate is more than a position patch. Two behaviors turn the move
-gesture into a *structural* instrument: the clone modifier makes it
+gesture into a _structural_ instrument: the clone modifier makes it
 duplicate, and hierarchy change makes it re-parent. Both run inside
 the one exclusive gesture ([surface](./surface.md)), both are
 reconfigured **live** by their modifiers (golden input spec), and
@@ -35,7 +35,7 @@ State machine, driven by the modifier's live state:
   effect on the modifier edge itself — no pointer movement required.
 - **Modifier OFF** (mid-drag): the clones vanish; the originals
   resume following the pointer; the selection returns to them.
-  Toggling ON again mints *fresh* clones — abandoned clones are never
+  Toggling ON again mints _fresh_ clones — abandoned clones are never
   committed and never leak ids.
 - **Snapping retargets with the selection**: while cloning, the
   clones are the snap agents and the resting originals become
@@ -52,7 +52,7 @@ Commit and history:
 - A cloned commit with **zero net movement** is a duplicate-in-place,
   identical in outcome to the duplicate command.
 - **Repeat offset**: a cloned commit arms the duplicate command —
-  the next duplicate repeats the *measured* delta between origin and
+  the next duplicate repeats the _measured_ delta between origin and
   clone, so drag-clone followed by repeated duplicates produces a
   step-and-repeat series. Measured, not stored: however the clone
   was moved after the flip (drag, nudge, inspector), the repeat uses
@@ -61,8 +61,8 @@ Commit and history:
 ## Hierarchy change on translate
 
 While translating, the document tree follows the pointer: dragging a
-node over a container moves it *into* that container, dragging it out
-moves it *out*. This is the default behavior of translate, not a
+node over a container moves it _into_ that container, dragging it out
+moves it _out_. This is the default behavior of translate, not a
 special mode.
 
 **Drop-target resolution**, re-evaluated every gesture frame:
@@ -98,9 +98,9 @@ Across the parent change:
 
 **The drop-target overlay**: while the pointer's resolved target
 would leave a dragged node re-parented — relative to its
-*gesture-start* parent, since the structural move itself is live —
+_gesture-start_ parent, since the structural move itself is live —
 that container renders a highlight outline on the HUD — the one
-piece of chrome this behavior owns. It marks the *prospective*
+piece of chrome this behavior owns. It marks the _prospective_
 parent, updates as the pointer crosses container boundaries, and
 disappears at commit or when the target equals the gesture-start
 parent again; the scene root, having no bounds to outline, draws

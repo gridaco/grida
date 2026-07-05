@@ -46,7 +46,7 @@ batch (silently — an undo is not itself recorded) and restores the
   pre-state and post-state endpoints — not the concatenation of every
   intermediate preview. Endpoint minimality is the batch coalescer's
   job at commit time (patches to the same node/field collapse), which
-  operates strictly *inside* one entry.
+  operates strictly _inside_ one entry.
 - An open gesture can **roll back to a checkpoint** without closing:
   the frame applies the inverses of the previews past the mark and
   drops them, so a live structural toggle inside one gesture —
@@ -73,7 +73,7 @@ HISB-2 from day one.
 ## Contracts
 
 - **HISB-1** Undo/redo round-trip: for any recorded entry, undo then
-  redo restores document *and* authoring context to byte-equal state
+  redo restores document _and_ authoring context to byte-equal state
   (per DOC-2 equality plus context equality).
 - **HISB-2** One interaction, one entry: a scripted slider drag of N
   preview steps plus one commit yields exactly one history entry;
@@ -85,7 +85,7 @@ HISB-2 from day one.
   merges entries after commit.
 - **HISB-4** Abort leaves no trace: begin → previews → abort restores
   the pre-gesture state and history length is unchanged; a subsequent
-  undo undoes the entry *before* the gesture.
+  undo undoes the entry _before_ the gesture.
 - **HISB-5** Origin isolation: interleaving remote-origin dispatches
   between local entries changes neither the local stack's length nor
   what each local undo restores of the local change.

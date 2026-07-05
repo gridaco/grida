@@ -15,13 +15,13 @@ capture layer) — and Enter is the front door while Escape is the way
 out. The production editor models this slot as a flat union of six
 "content edit modes." This document specifies the slot's mechanics,
 and — because two of the six members are legacy or mislabeled —
-replaces the flat union with a taxonomy that says honestly *what each
-mode edits*.
+replaces the flat union with a taxonomy that says honestly _what each
+mode edits_.
 
 ## The slot
 
 - **Exclusive**: at most one mode at a time. Entering a mode ends the
-  previous one *through its normal exit* (cleanup runs; nothing is
+  previous one _through its normal exit_ (cleanup runs; nothing is
   abandoned).
 - **Domain**: the active mode is **authoring context** (golden
   [state model](./state.md)) — undoable, never persisted
@@ -41,7 +41,7 @@ to be entered:
 ### Content modes — the node's material
 
 **Text** and **vector** edit the node's content — the very thing the
-node *is*. They are what the name "content edit" honestly describes:
+node _is_. They are what the name "content edit" honestly describes:
 
 - Entered by the **enter idiom** — Enter on a single selected node or
   the double-click descent ([traversal](./traversal.md) TRAV-1,
@@ -63,7 +63,7 @@ node *is*. They are what the name "content edit" honestly describes:
 ### Facets — a lens inside a content mode
 
 The production union carries a **width** mode as a peer of text and
-vector. It is not a peer. Every fact about it says *nested*: it can
+vector. It is not a peer. Every fact about it says _nested_: it can
 only be entered from vector editing (its tool is illegal anywhere
 else), it operates on the same node and carries the vector context
 across, and — uniquely in the union — exiting it **returns to vector
@@ -75,14 +75,14 @@ This spec models it structurally: the vector content mode has a
 or `width` (the variable-width profile: stops at parametric
 positions along the curve, each with a radius). The width tool
 switches the facet; leaving the facet lands on `geometry` of the
-same mode, same node. A facet is *not* a second slot entry: Escape
+same mode, same node. A facet is _not_ a second slot entry: Escape
 from the width facet steps to the geometry facet, then the ordinary
 vector ladder continues. Future lenses over the same material (e.g.
 a paint-points facet) join as facets, not as new union members.
 
 ### Paint sessions — a property's value
 
-**Gradient** and **image** editing operate on a *paint* — one entry
+**Gradient** and **image** editing operate on a _paint_ — one entry
 of a fill/stroke paint list — not on the node's content. Calling
 them "content edit modes" is the squat this review removes. They are
 **paint sessions**:
@@ -115,13 +115,13 @@ this taxonomy.
 
 The enter idiom resolves by the subject, in this order:
 
-| Selected subject | Result |
-| --- | --- |
-| text node | text content mode |
-| shape/vector with an **image fill** | image paint session (user intent: "edit the image") |
-| vector node | vector content mode |
+| Selected subject                                                   | Result                                                                                                           |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| text node                                                          | text content mode                                                                                                |
+| shape/vector with an **image fill**                                | image paint session (user intent: "edit the image")                                                              |
+| vector node                                                        | vector content mode                                                                                              |
 | path-reducible primitive (rectangle, ellipse, polygon, star, line) | flatten, then vector content mode (entry is a commitment — [vector-edit](../feat-vector-network/vector-edit.md)) |
-| container / anything else | not enterable — Enter falls through to select-children (TRAV-1) |
+| container / anything else                                          | not enterable — Enter falls through to select-children (TRAV-1)                                                  |
 
 Gradient sessions have no row: they are reachable only from the
 paint control, because a gradient has no canvas-hit identity apart
@@ -132,12 +132,12 @@ from the node that carries it.
 Each mode declares its **legal tool set**; the slot and the tool
 system compose, never race:
 
-| Mode | Legal tools |
-| --- | --- |
-| text | (none — the session owns input) |
-| vector / geometry facet | cursor, pen, bend, lasso |
-| vector / width facet | width (the facet *is* the tool) |
-| paint sessions | cursor only |
+| Mode                    | Legal tools                     |
+| ----------------------- | ------------------------------- |
+| text                    | (none — the session owns input) |
+| vector / geometry facet | cursor, pen, bend, lasso        |
+| vector / width facet    | width (the facet _is_ the tool) |
+| paint sessions          | cursor only                     |
 
 Arming a tool outside its mode's legal set is refused
 ([tool](./tool.md) reserved-key discipline); arming a mode-scoped

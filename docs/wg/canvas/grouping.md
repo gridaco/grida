@@ -8,8 +8,8 @@ tags:
 format: md
 ---
 
-Grouping wraps the selection into a **new adopting parent**: a *group*
-(a logical, layout-free container) or a *container* (a frame). It is
+Grouping wraps the selection into a **new adopting parent**: a _group_
+(a logical, layout-free container) or a _container_ (a frame). It is
 the canonical [per-partition](./ux-surface/selection-partition.md)
 command — a cross-parent selection produces **one wrapper per
 partition**, never a single wrapper that re-parents across the tree.
@@ -26,7 +26,7 @@ different target kind. Given the selection's
 [partition](./ux-surface/selection-partition.md):
 
 - **Per partition, one wrapper.** Each partition is wrapped into one
-  new node of the chosen kind, adopting *that partition's* members.
+  new node of the chosen kind, adopting _that partition's_ members.
   Members from different parents never merge into one wrapper — the
   operation does not re-parent across partitions.
 - **World position preserved.** The wrapper is placed at the **union
@@ -38,7 +38,7 @@ different target kind. Given the selection's
   selection was, not on top of everything.
 - **Selection retargets** to the new wrapper(s).
 
-The two kinds differ only in what the wrapper *is*: a **group** carries
+The two kinds differ only in what the wrapper _is_: a **group** carries
 no layout and exists to move/organize its children as a unit; a
 **container** is a frame with its own bounds, clip, and layout
 capacity. Turning that container's layout on is [auto-layout](./auto-layout.md),

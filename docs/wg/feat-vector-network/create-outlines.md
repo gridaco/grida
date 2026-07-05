@@ -15,9 +15,9 @@ laid-out glyphs** — the operation a designer reaches for to bake type
 into art (to nudge a single letterform, or to hand off print-safe
 geometry that needs no font). It is the text twin of the single-node
 flatten ([`flatten_to_vector`](./flatten.md)): **per node, in place**,
-identity preserved. It is *not* [flatten](./flatten.md) (which *unions*
-a selection into one vector), and *not* outline mode (the wireframe
-*view*).
+identity preserved. It is _not_ [flatten](./flatten.md) (which _unions_
+a selection into one vector), and _not_ outline mode (the wireframe
+_view_).
 
 ## Why it is its own command
 
@@ -30,10 +30,10 @@ but leaves a standing TODO to split it into a separate api
   Outlining text requires **font shaping** — laying the string out into
   glyph runs, then taking each glyph's outline path. A pure-geometry
   path cannot do it.
-- **Different semantics.** Flatten *unions* the selection into one
+- **Different semantics.** Flatten _unions_ the selection into one
   vector. Create Outlines converts **each text node independently**,
   keeping it a separate object at its own position — you outline type to
-  then manipulate *its* letterforms, not to merge it with neighbors.
+  then manipulate _its_ letterforms, not to merge it with neighbors.
 - **Different intent.** "Create outlines" is a named act designers
   invoke deliberately on type; "flatten my text" is not how anyone
   thinks about it.

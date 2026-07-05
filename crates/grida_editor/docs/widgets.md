@@ -95,9 +95,9 @@ value and, on first edit, broadcasts the entered value.
   and dismissal restores focus and routing exactly. The dismissal
   rule is single and shared: a press dismisses only when it lands
   **outside the panel and outside the trigger** that opened it.
-  Excluding the trigger is what lets a popover open *beside* its
+  Excluding the trigger is what lets a popover open _beside_ its
   opener (a swatch opening the color picker) behave like one opened
-  *at* the cursor (a context menu) — the opening gesture grabs
+  _at_ the cursor (a context menu) — the opening gesture grabs
   capture mid-gesture and its residual press lands on the trigger, so
   a popover that dismissed on any outside press would close itself on
   the very gesture that opened it. No per-widget opening guard is

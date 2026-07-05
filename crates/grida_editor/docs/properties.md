@@ -55,7 +55,7 @@ mixed_value {
 
 - Controls bound to `MIXED` render the mixed state (WID-6).
 - **Editing broadcasts**: committing a value on a mixed property sets
-  it on *all* selected nodes that support it — one batch, one history
+  it on _all_ selected nodes that support it — one batch, one history
   entry (HISB-1 scope).
 - Relative edits (`delta`) apply per-node against each node's own
   current value.

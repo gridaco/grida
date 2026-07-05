@@ -23,8 +23,8 @@ clean, predictable, and enumerable.
 
 Four primitives:
 
-1. **Command registry** — id → handler. A handler *reads editor
-   state and decides for itself* whether it applies, returning
+1. **Command registry** — id → handler. A handler _reads editor
+   state and decides for itself_ whether it applies, returning
    **consumed** or **declined**. A declined handler must have no
    effect. Guards live in handlers, not in a declarative predicate
    language: the handler already speaks the state vocabulary, and a
@@ -36,19 +36,19 @@ Four primitives:
    command ids. The table is data: one place, enumerable, diffable.
 3. **Chain dispatch** — on key input: normalize the chord, look up
    its chain, invoke commands in declared order; the first
-   *consumed* wins and the rest are skipped. If every command
+   _consumed_ wins and the rest are skipped. If every command
    declines, the input falls through to the host (browser/OS)
    default. Dispatch is O(1) to the chain; there is no scanning of
    handlers that didn't bind the chord.
 4. **Claims vs dispatch** — `claims(input)` answers "is this chord
-   advertised?" *without running any handler*. The shell uses it to
+   advertised?" _without running any handler_. The shell uses it to
    suppress host defaults for advertised chords even when every
    handler declines — so a chord the editor owns never half-leaks to
    the host based on transient state.
 
 ## Capture layers
 
-The chain dispatch sits at the *bottom* of the golden input spec's
+The chain dispatch sits at the _bottom_ of the golden input spec's
 priority ladder; the layers above it capture input before the table
 is consulted:
 
@@ -62,15 +62,15 @@ is consulted:
 3. **Widget focus**: a focused panel widget receives keys first
    (UI-3); the table is suppressed except rows explicitly marked
    legal under form focus. An open popover (the
-   [context menu](./context-menu.md)) is this layer's *modal* form:
+   [context menu](./context-menu.md)) is this layer's _modal_ form:
    it grabs pointer and keyboard together — its navigation
    vocabulary and Escape resolve against it, an outside press
    dismisses and is swallowed, and everything else is suppressed —
    until it closes.
 4. **Attention gate**: keys route to the editor only while it is
-   *attended* — keyboard focus within it or pointer over its canvas.
+   _attended_ — keyboard focus within it or pointer over its canvas.
    Exception: with a gesture in flight, Escape routes to the gesture
-   regardless of attention, because an in-flight gesture *is* the
+   regardless of attention, because an in-flight gesture _is_ the
    attention.
 
 ## Overloading patterns
@@ -85,14 +85,14 @@ Two idioms cover every "same key, different meaning" case:
   `[delete-sub-selection, delete-selection]`: inside vector edit the
   first consumes; outside it declines and the node delete runs.
 - **Ladder command** — strictly ordered rungs where each press takes
-  exactly one step bind as a *single* command owning the ladder.
+  exactly one step bind as a _single_ command owning the ladder.
   Escape is the canonical ladder: (in vector edit) disconnect →
   revert tool → exit mode; (outside) revert tool → deselect. The
   ladder owns its ordering in one place; expressing it as a chain
   would smear the ordering across handler guards.
 
-The choice is semantic: alternatives are *exclusive by state*;
-ladder rungs are *sequential by repetition*.
+The choice is semantic: alternatives are _exclusive by state_;
+ladder rungs are _sequential by repetition_.
 
 ## The intent matrix
 

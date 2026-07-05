@@ -51,7 +51,7 @@ lacks:
    event vocabulary as the canvas are testable in the same headless
    harness, with assertions against the same scene and document state.
    An external toolkit forces a second, foreign testing model for
-   exactly the layer whose job is to *be* the spec harness.
+   exactly the layer whose job is to _be_ the spec harness.
 4. **The endgame is the point.** Grida aims to be a UI engine. The
    editor's own panels are the cheapest adversarial test of the node
    schema ("can it express a settings panel?"), and every hour spent
@@ -62,7 +62,7 @@ lacks:
 strongest candidate was evaluated in depth). It wins time-to-first-
 panel (~2–3 weeks to a working panel set) and has proven virtualized
 lists; it loses on double text stacks, foreign-renderer state
-reconciliation, a second testing paradigm, IME weakness, and — 
+reconciliation, a second testing paradigm, IME weakness, and —
 decisively — on the mission: for a project that intends to be a UI
 engine, external adoption is deferred work, not saved work.
 

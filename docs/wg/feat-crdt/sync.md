@@ -52,7 +52,7 @@ silently, never entering the local history stack, per the golden
 [history spec](../feat-history/index.md). Local undo of an entry
 whose target was remotely changed applies its inverse to whatever
 state exists (last-writer-wins at the property level); conflict
-*prevention* is out of scope by design.
+_prevention_ is out of scope by design.
 
 ## Session
 

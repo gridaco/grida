@@ -37,19 +37,19 @@ configuration value, not a second command).
 
 A drag shows [snap guides](./snap.md) live as it moves; a keyboard
 nudge has no such in-gesture feedback — the object jumps a unit and
-stops. So when a translate nudge *lands* flush with an alignment — an
+stops. So when a translate nudge _lands_ flush with an alignment — an
 edge or center level with a sibling or a guide — the editor flashes
 the snap guide that would have marked it, briefly, then clears it.
 
 This is **feedback, not snapping**. The nudge delta is still applied
 exactly (NUDGE-1 / [SNAP-6](./snap.md)): the guide reveals an
 alignment the motion happened to hit; it never corrects the value
-toward one. It answers *"did I just line these up?"* for a gesture
+toward one. It answers _"did I just line these up?"_ for a gesture
 that, unlike a drag, gave no running answer.
 
 - **Keyboard-only by nature.** A drag owns its live guides — hidden
   on release, since an aligned drag needs no afterimage. The advisory
-  guide exists precisely to give the *guideless* keyboard path the
+  guide exists precisely to give the _guideless_ keyboard path the
   confirmation the pointer path already has; it is not a general
   post-translate affordance. (A programmatic translate delta, having
   no live guide either, may ride the same mechanism, but the UX is
@@ -60,8 +60,8 @@ that, unlike a drag, gave no running answer.
   alive, then letting it fade once the keys stop.
 - **It reveals, it does not correct.** The affordance reuses snap's
   guide chrome and its detection (open a session, test the landed
-  position) but drives no delta — snap's guide-*rendering* and
-  value-*correction* halves are separable, and this uses only the
+  position) but drives no delta — snap's guide-_rendering_ and
+  value-_correction_ halves are separable, and this uses only the
   first ([snap.md](./snap.md), SNAP-8).
 
 ## In-flow reorder
@@ -82,13 +82,13 @@ height ±1; Shift applies the big-nudge factor. **Two chords bind it**,
 either firing the same command — **Mod+Arrow** (the one-hand chord,
 Cmd on macOS) and **Ctrl+Alt+Arrow** — so a platform that reserves one
 (Cmd+Arrow for caret motion, Ctrl+Alt+Arrow for screen rotate) leaves
-the other free. Neither is move: move nudge requires Mod *and* Ctrl
+the other free. Neither is move: move nudge requires Mod _and_ Ctrl
 absent ([keybindings](https://github.com/gridaco/grida/blob/main/crates/grida_editor/docs/keybindings.md), KEY-2). Semantics:
 
 - The **anchor is the node's origin** (top-left): position is fixed,
   the far edge moves — the keyboard twin of dragging the SE handle.
 - **Per-element, not a union resize**: a multi-selection grows each
-  member about *its own* origin — every node keeps its position and
+  member about _its own_ origin — every node keeps its position and
   takes the delta — rather than scaling the selection bounds as one
   box (the SE-handle drag resizes the union; this does not).
 - **All-or-nothing gate**: if any selected member is not resizable
@@ -112,7 +112,7 @@ With nothing selected and no content-edit mode active, arrows **pan
 the camera**: the viewport moves a fixed screen-space step (default
 50 px; Shift applies the big-nudge factor) in the arrow's direction.
 The step is screen-space — zoom does not change the felt distance.
-This is deliberate: arrows always do *something* spatial, and with no
+This is deliberate: arrows always do _something_ spatial, and with no
 object to move, the camera is the object. Camera panning is view
 state — no document mutation, no history entry.
 

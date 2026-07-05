@@ -16,7 +16,7 @@ members are already arranged. Like every wrap, it runs once per
 is `Shift+A` ([keybindings](https://github.com/gridaco/grida/blob/main/crates/grida_editor/docs/keybindings.md)).
 
 This document specifies the **command** — the wrap and the inference.
-The layout *model* it produces (flex, grid, anchors, sizing) is the
+The layout _model_ it produces (flex, grid, anchors, sizing) is the
 [layout study](../feat-layout/); this spec defers to it and does not
 restate it.
 
@@ -28,7 +28,7 @@ On a loose selection, for **each** partition:
   [grouping](./grouping.md) (world position preserved, order preserved,
   one container per partition) — auto-layout is that same wrap, not a
   second mechanism.
-- **Infer the layout** from the members' *parent-relative* rectangles:
+- **Infer the layout** from the members' _parent-relative_ rectangles:
   the flex **direction** (row vs column), the main-axis **gap**, and the
   main- and cross-axis **alignment** are guessed from their spacing and
   positions. The container **sizes to its content** and is inset at the
@@ -43,7 +43,7 @@ On a loose selection, for **each** partition:
 ## Apply in place (existing container)
 
 Applied to an **existing container** rather than a loose selection,
-auto-layout turns that container's layout *on* — inferring direction,
+auto-layout turns that container's layout _on_ — inferring direction,
 gaps, and alignment from its current children — **without wrapping**.
 This is a property change on one node: there is no partition and no
 fan-out. It is the same inference over an already-existing frame.

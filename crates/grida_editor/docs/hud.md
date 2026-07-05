@@ -29,7 +29,7 @@ The HUD's single content-bearing output is a stream of intents —
 `select`, `translate`, `resize`, `rotate`, `marquee`, `enter content
 edit`, `cancel`. It never mutates the document, never opens a history
 frame, never reads a node property, and never knows what an intent
-*means*. The host commits.
+_means_. The host commits.
 
 Rotation is the canonical demonstration. The document has no
 first-class rotation: "rotation" is a derived reading of a 2×3 affine,
@@ -49,11 +49,11 @@ chrome reusable and the interpretation auditable.
 The first reference shell drove interaction through the engine's
 built-in surface, and that machine predates the law:
 
-- **It owns a selection.** The host must run an *adoption* choke point
+- **It owns a selection.** The host must run an _adoption_ choke point
   after every dispatch to copy the machine's selection into the
   editor — authority inverted, reconciled by discipline.
 - **It emits nothing.** Gestures are internal state; the host
-  *scrapes* state transitions (diffing `prev_canvas` between events)
+  _scrapes_ state transitions (diffing `prev_canvas` between events)
   to reconstruct a translate delta. Resize and rotate handles are
   painted and hit-tested — and their drags reach no channel at all;
   the host cannot even learn they happened.
@@ -62,7 +62,7 @@ built-in surface, and that machine predates the law:
 
 Each of these is the same defect: interaction truth trapped inside a
 machine whose only outputs are pixels and state to scrape. The HUD
-inverts it — the machine's whole job is to *say what the user meant*.
+inverts it — the machine's whole job is to _say what the user meant_.
 
 ## The machine
 
@@ -83,7 +83,7 @@ input, not authority — the editor stays the only selection owner.
 - `shape_of(id) → Option<SelectionShape>` — a node's selection shape:
   an axis-aligned rect, or `local rect × matrix` for transformed nodes.
 
-**Emits**: intents, *returned* from dispatch rather than pushed
+**Emits**: intents, _returned_ from dispatch rather than pushed
 through a callback — the host drains them at the same event tail where
 it drains damage ([frame.md](./frame.md)); pull, not push, is this
 system's idiom.
@@ -102,16 +102,16 @@ would do.
 
 ## Intents
 
-| Intent | Payload | Phase |
-| --- | --- | --- |
-| `select` | ids, mode (`replace` / `toggle`) | — (instantaneous fact) |
-| `deselect_all` | — | — |
-| `marquee` | canvas rect, additive | preview·N → commit |
-| `translate` | ids, (dx, dy) from gesture anchor | preview·N → commit |
-| `resize` | ids, anchor direction, new shape | preview·N → commit |
-| `rotate` | ids, angle (radians) from gesture start | preview·N → commit |
-| `enter_content_edit` | id | — |
-| `cancel` | — | ends any phased stream |
+| Intent               | Payload                                 | Phase                  |
+| -------------------- | --------------------------------------- | ---------------------- |
+| `select`             | ids, mode (`replace` / `toggle`)        | — (instantaneous fact) |
+| `deselect_all`       | —                                       | —                      |
+| `marquee`            | canvas rect, additive                   | preview·N → commit     |
+| `translate`          | ids, (dx, dy) from gesture anchor       | preview·N → commit     |
+| `resize`             | ids, anchor direction, new shape        | preview·N → commit     |
+| `rotate`             | ids, angle (radians) from gesture start | preview·N → commit     |
+| `enter_content_edit` | id                                      | —                      |
+| `cancel`             | —                                       | ends any phased stream |
 
 Phase discipline: a mutating gesture emits zero or more `preview`
 intents followed by **exactly one** `commit` or **exactly one**
@@ -121,7 +121,7 @@ first preview opens the editor's gesture frame and captures baselines,
 every preview applies silent patches, commit closes the frame as one
 entry, cancel aborts it leaving nothing (HISB-2/4 by construction).
 
-Two payloads are deliberately *less* resolved than they could be:
+Two payloads are deliberately _less_ resolved than they could be:
 
 - **Marquee carries the rect, not ids.** Which nodes a rect selects is
   scene knowledge (z-order, containment policy); the host resolves it
@@ -139,12 +139,12 @@ disagree. The renderer optimizes for legibility (small, crisp chrome);
 the hit-tester optimizes for Fitts'-law reach (fat targets, virtual
 regions, priority ladders). Neither reads from the other.
 
-| Family | Visual | Hit region | v1 example |
-| --- | --- | --- | --- |
-| Paired | drawn shape | same shape, padded | corner resize knob |
-| Virtual | none | invisible reachable region | rotate halo, edge strip |
-| Decorative | drawn shape | none | hover outline, size badge |
-| Body-region | selection outline | interior claims translate | selected body |
+| Family      | Visual            | Hit region                 | v1 example                |
+| ----------- | ----------------- | -------------------------- | ------------------------- |
+| Paired      | drawn shape       | same shape, padded         | corner resize knob        |
+| Virtual     | none              | invisible reachable region | rotate halo, edge strip   |
+| Decorative  | drawn shape       | none                       | hover outline, size badge |
+| Body-region | selection outline | interior claims translate  | selected body             |
 
 Guidance carried over: decide hit geometry first, visual second; a
 virtual affordance omits render rather than drawing a stand-in; pad
@@ -157,7 +157,7 @@ nothing — content pick is tier 2, not a region).
 The v1 chrome inventory: hover outline, per-node selection outlines,
 the multi-select union box, 4 corner resize knobs + 4 virtual edge
 strips + 4 virtual rotate halos, the marquee rectangle, and a size
-badge. The HUD *builds* this as data — a draw list of dumb primitives
+badge. The HUD _builds_ this as data — a draw list of dumb primitives
 (doc-space rects/polylines, screen-sized rects anchored at doc points,
 label pills) — and the host paints it on the window canvas between
 content and panels. The HUD is not a renderer.
@@ -172,7 +172,7 @@ handles hide while a gesture is active.
 **Compositing rule — every present recomposes.** Chrome and panels
 composite over the content buffer; there is no separate overlay
 layer. And the window surface is a **double-buffered swapchain**: the
-buffer a frame draws into holds the frame from *two* presents ago,
+buffer a frame draws into holds the frame from _two_ presents ago,
 not the last one — so partial redraws ("only the panel changed",
 "opaque strips cover themselves") are unsound at the root; they
 alternate stale buffers into view. The rule that survives this:
@@ -184,10 +184,10 @@ overlay-bearing presents can blit it back instead of re-rendering the
 scene; with no cache, one synchronous plan-path frame stands in.
 Overlay changes (a marquee preview, a hover move, a selection change
 that re-shapes chrome or unmounts a panel, a tool switch flipping
-chrome dormancy) accrue no *document* damage — the frame ledger
+chrome dormancy) accrue no _document_ damage — the frame ledger
 ([frame.md](./frame.md)) rightly schedules nothing — they are
 **overlay damage**, and all they schedule is a present. One trap is
-named and forbidden: the present pass must never *queue* an engine
+named and forbidden: the present pass must never _queue_ an engine
 frame — a queue that finds nothing pending notifies the host to
 redraw, and a paint pass that queues re-triggers itself into a
 permanent repaint loop. Quiescence holds: no event, no damage, no
@@ -206,7 +206,7 @@ present.
   during editing; the HUD's part ends at `enter_content_edit`.
 - **Not the camera.** Pan/zoom are host view state; the HUD receives
   the transform.
-- **Not a snapping engine.** Snapping adjusts *interpretation*
+- **Not a snapping engine.** Snapping adjusts _interpretation_
   (host-side, gesture-time — [snap.md](../../../docs/wg/canvas/snap.md)); snap guides and
   the [measurement](../../../docs/wg/canvas/measurement.md) readout ride the draw list as
   host-fed extras, decorative only.

@@ -20,13 +20,13 @@ violations.
 
 ## The domains
 
-| Domain | Contents | Persisted | Undoable | Replicated | Scope |
-| --- | --- | --- | --- | --- | --- |
-| **Content** | The document: nodes, hierarchy, order, properties, scenes | yes | yes | yes (document sync) | document |
-| **Authoring context** | Selection, active scene, content-edit mode, isolation | no | yes | as presence only | editor |
-| **View** | Camera transform, zoom, viewport size | no | **never** | as presence only | per view |
-| **Interaction** | Active gesture, hover, marquee/lasso, active tool, pointer, modifier state | no | never | no | per view |
-| **Collaboration** | Remote cursors, remote selections, presence, ephemeral chat | no | never | remote-sourced | editor |
+| Domain                | Contents                                                                   | Persisted | Undoable  | Replicated          | Scope    |
+| --------------------- | -------------------------------------------------------------------------- | --------- | --------- | ------------------- | -------- |
+| **Content**           | The document: nodes, hierarchy, order, properties, scenes                  | yes       | yes       | yes (document sync) | document |
+| **Authoring context** | Selection, active scene, content-edit mode, isolation                      | no        | yes       | as presence only    | editor   |
+| **View**              | Camera transform, zoom, viewport size                                      | no        | **never** | as presence only    | per view |
+| **Interaction**       | Active gesture, hover, marquee/lasso, active tool, pointer, modifier state | no        | never     | no                  | per view |
+| **Collaboration**     | Remote cursors, remote selections, presence, ephemeral chat                | no        | never     | remote-sourced      | editor   |
 
 Two rows deserve emphasis:
 
@@ -37,7 +37,7 @@ Two rows deserve emphasis:
   of content or interaction.
 - **View state is never undoable.** Undo never moves the camera. If a
   host wants "zoom to the undone change," that is a view policy
-  applied *after* undo, not a property of history.
+  applied _after_ undo, not a property of history.
 
 ## Mutation authority
 

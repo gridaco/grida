@@ -20,7 +20,7 @@ Doctrine sources: the `ruler` primitive of
 (tick selection, marks, ranges, fade), the standalone `@grida/ruler`
 package, and the main editor's guide gesture (creation threshold,
 guide-drag snapping, document storage). The engine's built-in
-`overlay::widgets::Ruler` is a *devtools* full-viewport grid gated by
+`overlay::widgets::Ruler` is a _devtools_ full-viewport grid gated by
 a debug flag — a different tool that shares the name; the editor ruler
 specified here does not use it.
 
@@ -146,7 +146,7 @@ table by one row; the one law is unchanged.
   quantizes to the lattice **unconditionally**: a committed guide
   offset is an integer regardless of the pixel-grid snap toggle
   (guides are integer by construction, matching the web). Conversely,
-  guides are snap *anchors* for every other gesture
+  guides are snap _anchors_ for every other gesture
   ([snap.md](./snap.md)). The interpretation happens host-side, per
   the one law.
 

@@ -10,14 +10,13 @@ this file only tracks status.
 A box is checked when the concept is **specced, implemented, and its
 conformance suite is green**. Per
 [harness.md](./docs/harness.md), a contract without a
-citing test is *unverified*: those are tracked under
+citing test is _unverified_: those are tracked under
 [Contract coverage](#contract-coverage) rather than by unchecking a
 shipped concept.
 
 Suite status: **396 tests green** (core; 406 under `--features shell`)
 across 26 contract suites, plus a shell-gated raster suite
-(`tests/menu_render.rs`, run under `--features shell`) (2026-07-05;
-+`tests/align_contracts.rs`, ALIGN 7/7; +`tests/paint_contracts.rs`,
+(`tests/menu_render.rs`, run under `--features shell`) (2026-07-05; +`tests/align_contracts.rs`, ALIGN 7/7; +`tests/paint_contracts.rs`,
 the `fills` binding domain). Coverage numbers below are `grep`-derived: ids defined
 in `docs/wg/canvas/**, the feat-* studies, and this crate's docs/**` vs ids cited in `tests/**`.
 
@@ -223,7 +222,7 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
       `grida/tests/text_outline.rs` (shaping → non-empty glyph network
       with embedded fonts; empty → empty) + `outline_contracts.rs`
       (OUTL-1/3/4/5 + `can_create_outlines`). No keybinding (`Mod+Shift+O`
-      is outline *mode*). **Flatten delegates its text members to this
+      is outline _mode_). **Flatten delegates its text members to this
       same primitive** (↑). Remaining: OUTL-2 render-fidelity as a raster
       reftest; carry text effects / rich per-run fills (deferred tail).
 
@@ -274,7 +273,7 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
       probe (`tests/menu_render.rs`) proving the scene actually paints
       — rows flow inside a Flex panel and each panel is its own
       top-level scene root (the engine runs no layout for a `Normal`
-      container's children and lays out only the *first* absolute
+      container's children and lays out only the _first_ absolute
       child of a Flex parent — so per-row absolute placement painted
       only row 0, and a second panel sibling vanished). Remaining:
       CTX-3
@@ -311,13 +310,13 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
     (number), **paint** (kind select + swatch/picker + active toggle +
     remove — **wired** for fills, 2026-07; per-fill opacity slider +
     blend select still deferred), **effect** (kind select + numbers
-    + toggle), **export row** (format select + scale number). Each
-    sub-value commits independently, so they assemble in the panel —
-    no compound commit, no new primitive. `Button` grew an optional
-    `commit` binding so an add/remove button emits a `Fills`/`ListOp`
-    (the atoms table's "button → list add/remove" path); `Binding`
-    grew `entry` so a generic atom addresses `fills[i]`. Effect /
-    export wired when their sheet sections are built.
+    - toggle), **export row** (format select + scale number). Each
+      sub-value commits independently, so they assemble in the panel —
+      no compound commit, no new primitive. `Button` grew an optional
+      `commit` binding so an add/remove button emits a `Fills`/`ListOp`
+      (the atoms table's "button → list add/remove" path); `Binding`
+      grew `entry` so a generic atom addresses `fills[i]`. Effect /
+      export wired when their sheet sections are built.
   - still missing: **constraints** (bespoke 2D inset visual),
     **number-list** (dash pattern), **gradient editor** (stop track);
     section collapse / header-actions / capability gate; text IME
@@ -357,8 +356,7 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
   - [ ] **strokes** — `PropPatch.strokes: Paints` + stroke geometry
         (`stroke_width` uniform/rectangular, `stroke_align`,
         `stroke_cap`, `stroke_join`, `stroke_miter_limit`,
-        `stroke_dash_array`) as patch domains (invert/serialize/validate
-        + `doc_contracts`); `Editor::node_strokes` + stroke-prop
+        `stroke_dash_array`) as patch domains (invert/serialize/validate + `doc_contracts`); `Editor::node_strokes` + stroke-prop
         queries; `BindingProperty::{Strokes, Stroke*}`; a Strokes
         section (paint rows + width/align/cap/join/miter/dash controls).
         The **next slice**.

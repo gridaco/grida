@@ -2,7 +2,7 @@
 
 These documents are the **reference editor's own** specs: how this
 crate realizes the universal [canvas spec](../../../docs/wg/canvas/)
-in running Rust. They are deliberately *not* in `docs/wg` — they are
+in running Rust. They are deliberately _not_ in `docs/wg` — they are
 implementation-specific (they name this crate's architecture, its
 dev-only widget layer, its damage-ledger frame loop, its conformance
 harness), and `docs/wg` stays code-agnostic and universal.
@@ -37,8 +37,8 @@ canvas spec and specifies only the delta this implementation adds.
   intent-emitting interaction machine.
 - [`routing.md`](./routing.md) — this shell's key-dispatch chain,
   command registry, and the intent matrix.
-- [`keybindings.md`](./keybindings.md) — the default binding *table*
-  this shell ships (the binding *model* is
+- [`keybindings.md`](./keybindings.md) — the default binding _table_
+  this shell ships (the binding _model_ is
   [canvas/input](../../../docs/wg/canvas/input.md)).
 
 **Panels & the widget layer**

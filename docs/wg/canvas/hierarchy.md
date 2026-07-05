@@ -18,7 +18,7 @@ panel is a thin view over it.
 ## Presentation
 
 - **Order:** rows display front-on-top: visual top-to-bottom equals
-  document order *reversed*. The controller owns this reversal; at
+  document order _reversed_. The controller owns this reversal; at
   the mutation boundary everything is document order
   ([document.md](https://github.com/gridaco/grida/blob/main/crates/grida_editor/docs/document.md)).
 - **Root:** the scene root itself is hidden; its children are the
@@ -68,7 +68,7 @@ skipped by canvas picking but remain fully operable from the tree.
 ## Scale
 
 The tree must remain interactive on documents at the engine's scale
-target (≥100k nodes): row flattening is proportional to *visible*
+target (≥100k nodes): row flattening is proportional to _visible_
 (expanded) rows, and rendering is windowed to the viewport
 (virtualization) — a collapsed 100k-node document is as cheap as a
 100-row one.
