@@ -1100,3 +1100,176 @@ fn fills_section_renders_rows_and_add_commits() {
         "add appended a third paint to the head node's stack"
     );
 }
+
+/// The Strokes section renders per-stroke rows (reusing the fills
+/// machinery), and the read-only/scaffold sections — Effects, Selection
+/// colors, Export — are present for a paintable node.
+#[test]
+fn strokes_and_scaffold_sections_render() {
+    use grida::cg::prelude::{CGColor, Paint, Paints, SolidPaint};
+    let mut editor = one_rect_editor();
+    editor
+        .dispatch(
+            vec![Mutation::Patch {
+                id: "A".to_string(),
+                set: PropPatch {
+                    strokes: Some(Paints::new(vec![Paint::Solid(SolidPaint::new_color(
+                        CGColor::from_rgba(0, 0, 0, 255),
+                    ))])),
+                    ..Default::default()
+                },
+            }],
+            Origin::Local,
+            Recording::Silent,
+        )
+        .unwrap();
+
+    let mut ui = UiLayer::new(VIEWPORT);
+    let mut props = PropertiesPanel::new(240.0);
+    props.sync(&mut ui, &editor);
+
+    assert!(
+        ui.widget_root(&properties::stroke_swatch_id(0)).is_some(),
+        "the seeded stroke renders a swatch row"
+    );
+    assert!(
+        ui.widget_root(&properties::STROKES_ADD_ID.to_string())
+            .is_some(),
+        "the strokes add button mounted"
+    );
+    for header in [
+        properties::BLUR_HEADER_ID,
+        properties::SHADOWS_HEADER_ID,
+        properties::SELECTION_COLORS_HEADER_ID,
+        properties::EXPORT_HEADER_ID,
+    ] {
+        assert!(
+            ui.widget_root(&header.to_string()).is_some(),
+            "section {header} present"
+        );
+    }
+
+    // Stroke geometry rows render below the stroke paint (a Rectangle
+    // carries a stroke style, so weight/align/cap/join all show; miter
+    // shows because the default join is miter).
+    for id in [
+        properties::STROKE_WIDTH_ID,
+        properties::STROKE_ALIGN_ID,
+        properties::STROKE_CAP_ID,
+        properties::STROKE_JOIN_ID,
+        properties::STROKE_MITER_ID,
+    ] {
+        assert!(
+            ui.widget_root(&id.to_string()).is_some(),
+            "stroke geometry control {id} present"
+        );
+    }
+    // (Weight/cap/dash commit behaviour is covered in paint_contracts.)
+}
+
+/// The Text (typography) section renders its rows for a text kind — size,
+/// weight, italic, line, letter, horizontal + vertical align — and a font
+/// size edit commits through the panel wiring. The controls' full binding
+/// coverage is in `text_contracts`.
+#[test]
+fn text_section_renders_and_size_commits() {
+    let nf = NodeFactory::new();
+    let editor = editor_with(Node::TextSpan(nf.create_text_span_node()), "txt");
+
+    let mut ui = UiLayer::new(VIEWPORT);
+    let mut props = PropertiesPanel::new(240.0);
+    props.sync(&mut ui, &editor);
+
+    for id in [
+        properties::TEXT_HEADER_ID,
+        properties::TEXT_SIZE_ID,
+        properties::TEXT_WEIGHT_ID,
+        properties::TEXT_ITALIC_ID,
+        properties::TEXT_LINE_ID,
+        properties::TEXT_LETTER_ID,
+        properties::ALIGN_ID,
+        properties::TEXT_VALIGN_ID,
+    ] {
+        assert!(
+            ui.widget_root(&id.to_string()).is_some(),
+            "text control {id} present"
+        );
+    }
+
+    // A non-text node shows no Text section.
+    let mut ui2 = UiLayer::new(VIEWPORT);
+    let mut props2 = PropertiesPanel::new(240.0);
+    props2.sync(&mut ui2, &one_rect_editor());
+    assert!(
+        ui2.widget_root(&properties::TEXT_HEADER_ID.to_string())
+            .is_none(),
+        "a rectangle has no Text section"
+    );
+}
+
+/// The Effects sections render for an effect-capable kind: the Layer-blur
+/// header + enable toggle always, its radius/active rows once a blur
+/// exists, and the Shadows header + add, plus a seeded shadow's control
+/// row (kind/swatch) and parameter numbers. A kind with no effects (a
+/// Group) shows neither section. Binding behaviour is in `effect_contracts`.
+#[test]
+fn effects_sections_render_for_an_effect_capable_kind() {
+    use grida::cg::fe::{FeLayerBlur, FeShadow, FilterShadowEffect};
+
+    let mut editor = one_rect_editor();
+    editor
+        .dispatch(
+            vec![Mutation::Patch {
+                id: "A".to_string(),
+                set: PropPatch {
+                    layer_blur: Some(Some(FeLayerBlur::from(6.0))),
+                    shadows: Some(vec![FilterShadowEffect::DropShadow(FeShadow {
+                        dx: 0.0,
+                        dy: 2.0,
+                        blur: 4.0,
+                        spread: 0.0,
+                        color: grida::cg::prelude::CGColor::from_rgba(0, 0, 0, 128),
+                        active: true,
+                    })]),
+                    ..Default::default()
+                },
+            }],
+            Origin::Local,
+            Recording::Silent,
+        )
+        .unwrap();
+
+    let mut ui = UiLayer::new(VIEWPORT);
+    let mut props = PropertiesPanel::new(240.0);
+    props.sync(&mut ui, &editor);
+
+    for id in [
+        properties::BLUR_HEADER_ID.to_string(),
+        properties::BLUR_ENABLE_ID.to_string(),
+        properties::BLUR_RADIUS_ID.to_string(),
+        properties::BLUR_ACTIVE_ID.to_string(),
+        properties::SHADOWS_HEADER_ID.to_string(),
+        properties::SHADOWS_ADD_ID.to_string(),
+        properties::shadow_swatch_id(0),
+    ] {
+        assert!(ui.widget_root(&id).is_some(), "effect control {id} present");
+    }
+
+    // A kind with no effects (a Group) shows neither section.
+    let nf = NodeFactory::new();
+    let mut ui2 = UiLayer::new(VIEWPORT);
+    let mut props2 = PropertiesPanel::new(240.0);
+    props2.sync(
+        &mut ui2,
+        &editor_with(Node::Group(nf.create_group_node()), "g"),
+    );
+    for id in [
+        properties::BLUR_HEADER_ID.to_string(),
+        properties::SHADOWS_HEADER_ID.to_string(),
+    ] {
+        assert!(
+            ui2.widget_root(&id).is_none(),
+            "a group has no {id} section"
+        );
+    }
+}

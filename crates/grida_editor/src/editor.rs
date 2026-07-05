@@ -527,6 +527,50 @@ impl Editor {
         self.doc.node_fills(id)
     }
 
+    /// A node's whole stroke paint stack (bottom→top paint order), or
+    /// `None` for kinds that carry no strokes — the Strokes-section
+    /// capability gate and the `strokes` patch domain.
+    pub fn node_strokes(&self, id: &Id) -> Option<grida::cg::prelude::Paints> {
+        self.doc.node_strokes(id)
+    }
+
+    /// A node's whole layer-effects bag (clone), or `None` for kinds that
+    /// carry no effects — the Effects-section capability gate and the
+    /// effect patch domains' read side.
+    pub fn node_effects(&self, id: &Id) -> Option<grida::node::schema::LayerEffects> {
+        self.doc.node_effects(id)
+    }
+
+    /// A node's uniform stroke weight (px).
+    pub fn node_stroke_width(&self, id: &Id) -> Option<f32> {
+        self.doc.node_stroke_width(id)
+    }
+
+    /// A node's stroke alignment (`None` without a stroke style).
+    pub fn node_stroke_align(&self, id: &Id) -> Option<grida::cg::prelude::StrokeAlign> {
+        self.doc.node_stroke_align(id)
+    }
+
+    /// A node's stroke cap.
+    pub fn node_stroke_cap(&self, id: &Id) -> Option<grida::cg::prelude::StrokeCap> {
+        self.doc.node_stroke_cap(id)
+    }
+
+    /// A node's stroke join.
+    pub fn node_stroke_join(&self, id: &Id) -> Option<grida::cg::prelude::StrokeJoin> {
+        self.doc.node_stroke_join(id)
+    }
+
+    /// A node's miter limit.
+    pub fn node_stroke_miter(&self, id: &Id) -> Option<f32> {
+        self.doc.node_stroke_miter(id)
+    }
+
+    /// A node's dash pattern (empty = solid).
+    pub fn node_stroke_dash(&self, id: &Id) -> Option<Vec<f32>> {
+        self.doc.node_stroke_dash(id)
+    }
+
     /// A node's rotation in radians (transform-based kinds).
     pub fn node_rotation(&self, id: &Id) -> Option<f32> {
         self.doc.node_rotation(id)
@@ -562,6 +606,39 @@ impl Editor {
         self.doc.node_text(id)
     }
 
+    /// A node's vertical text alignment (`None` for non-text).
+    pub fn node_text_align_vertical(
+        &self,
+        id: &Id,
+    ) -> Option<grida::cg::prelude::TextAlignVertical> {
+        self.doc.node_text_align_vertical(id)
+    }
+
+    /// A node's font size in px (`None` for non-text).
+    pub fn node_font_size(&self, id: &Id) -> Option<f32> {
+        self.doc.node_font_size(id)
+    }
+
+    /// A node's font weight 1–1000 (`None` for non-text).
+    pub fn node_font_weight(&self, id: &Id) -> Option<u32> {
+        self.doc.node_font_weight(id)
+    }
+
+    /// A node's italic flag (`None` for non-text).
+    pub fn node_font_italic(&self, id: &Id) -> Option<bool> {
+        self.doc.node_font_italic(id)
+    }
+
+    /// A node's line-height authoring multiplier (`None` for non-text).
+    pub fn node_line_height(&self, id: &Id) -> Option<f32> {
+        self.doc.node_line_height(id)
+    }
+
+    /// A node's letter-spacing magnitude (`None` for non-text).
+    pub fn node_letter_spacing(&self, id: &Id) -> Option<f32> {
+        self.doc.node_letter_spacing(id)
+    }
+
     /// A Vector node's network as a polyline, when it is one.
     pub fn node_vector_polyline(&self, id: &Id) -> Option<Vec<(f32, f32)>> {
         self.doc.node_vector_polyline(id)
@@ -591,6 +668,16 @@ impl Editor {
     /// Number of undoable history entries.
     pub fn history_len(&self) -> usize {
         self.history.len()
+    }
+
+    /// Whether Undo / Redo would do something — the menu enablement
+    /// gate (`MENU-2`), mirroring [`Self::undo`]'s mid-gesture refusal.
+    pub fn can_undo(&self) -> bool {
+        self.gesture.is_none() && self.history.can_undo()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        self.gesture.is_none() && self.history.can_redo()
     }
 
     /// Read-only history access (for conformance tests).

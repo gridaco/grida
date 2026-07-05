@@ -18,9 +18,11 @@
 //! previews*, then exactly one `Commit` or `Revert`); `apply` is
 //! mechanical and does not police it.
 
+use grida::cg::fe::{FeBlur, FeGaussianBlur, FeLayerBlur, FeShadow, FilterShadowEffect};
 use grida::cg::prelude::{
     BlendMode, CGColor, DiamondGradientPaint, GradientStop, LayerBlendMode, LinearGradientPaint,
-    Paint, Paints, RadialGradientPaint, SolidPaint, SweepGradientPaint, TextAlign,
+    Paint, Paints, RadialGradientPaint, SolidPaint, StrokeAlign, StrokeCap, StrokeJoin,
+    SweepGradientPaint, TextAlign, TextAlignVertical, TextLetterSpacing, TextLineHeight,
 };
 
 use crate::document::{Id, Mutation, PropPatch};
@@ -33,6 +35,39 @@ pub const TEXT_ALIGNS: &[(&str, TextAlign)] = &[
     ("Right", TextAlign::Right),
     ("Justify", TextAlign::Justify),
 ];
+
+/// The vertical text-align options, in list order — the source of truth
+/// for the index the segmented control emits and reads back.
+pub const TEXT_ALIGN_VERTICALS: &[(&str, TextAlignVertical)] = &[
+    ("Top", TextAlignVertical::Top),
+    ("Middle", TextAlignVertical::Center),
+    ("Bottom", TextAlignVertical::Bottom),
+];
+
+/// The font-weight options the weight select offers, in list order — the
+/// named OpenType weights (`FontWeight` constants). A node whose weight
+/// is off-table (e.g. 600) maps to the nearest entry for display; the
+/// commit sets the exact table value.
+pub const FONT_WEIGHTS: &[(&str, u32)] = &[
+    ("Thin", 100),
+    ("Light", 300),
+    ("Regular", 400),
+    ("Medium", 500),
+    ("Bold", 700),
+];
+
+/// The [`FONT_WEIGHTS`] index nearest to a raw weight — the display
+/// direction of the weight select (a panel reads this to pick the shown
+/// option), symmetric with the `FontWeight` resolver's index→weight
+/// direction. Off-table weights (e.g. 600) map to the closest entry.
+pub fn font_weight_index(weight: u32) -> usize {
+    FONT_WEIGHTS
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, (_, v))| v.abs_diff(weight))
+        .map(|(i, _)| i)
+        .unwrap_or(2)
+}
 
 /// The blend-mode options the UI offers, in list order — the single
 /// source of truth for the index the select emits (`BlendMode`
@@ -76,6 +111,22 @@ pub enum BindingProperty {
     /// The active flag of the fill paint at `entry` (disable without
     /// removing).
     FillActive,
+    /// The stroke-paint counterparts of the `Fill*` domain — same
+    /// shapes, resolved against the node's `strokes` stack.
+    Strokes,
+    StrokeColor,
+    StrokeKind,
+    StrokeOpacity,
+    StrokeActive,
+    /// Stroke geometry (uniform weight px; align/cap/join by index into
+    /// [`STROKE_ALIGNS`]/[`STROKE_CAPS`]/[`STROKE_JOINS`]; miter limit;
+    /// dash length where 0 = solid).
+    StrokeWidth,
+    StrokeAlign,
+    StrokeCap,
+    StrokeJoin,
+    StrokeMiter,
+    StrokeDash,
     /// Display name.
     Name,
     /// Visibility (the node's `active` flag).
@@ -93,6 +144,37 @@ pub enum BindingProperty {
     ClipsContent,
     /// Horizontal text alignment, by index into [`TEXT_ALIGNS`].
     TextAlign,
+    /// Vertical text alignment, by index into [`TEXT_ALIGN_VERTICALS`].
+    TextAlignVertical,
+    /// Typography (text kinds), authored on the node-level style. Size in
+    /// px; weight by index into [`FONT_WEIGHTS`]; italic flag; line-height
+    /// multiplier (`Factor`); letter-spacing px (`Fixed`).
+    FontSize,
+    FontWeight,
+    FontItalic,
+    LineHeight,
+    LetterSpacing,
+    /// The layer-blur slot (single per layer). `LayerBlurEnabled` (Bool)
+    /// adds/removes the slot; `LayerBlurRadius` (number) authors the
+    /// Gaussian radius; `LayerBlurActive` (Bool) toggles it without
+    /// removing. Effect-capable node kinds only.
+    LayerBlurEnabled,
+    LayerBlurRadius,
+    LayerBlurActive,
+    /// A structural edit to the drop/inner shadow list (add / remove /
+    /// toggle-active / reorder), carried as a [`BindingValue::ListOp`] —
+    /// the multi-valued shadow counterpart of [`Fills`](Self::Fills).
+    Shadows,
+    /// Per-shadow sub-values addressed by the binding's `entry`: the
+    /// color, drop-vs-inner kind (index into [`SHADOW_KINDS`]), active
+    /// flag, offset (dx / dy), blur radius, and spread.
+    ShadowColor,
+    ShadowKind,
+    ShadowActive,
+    ShadowDx,
+    ShadowDy,
+    ShadowBlur,
+    ShadowSpread,
     /// Absolute translation x.
     PositionX,
     /// Absolute translation y.
@@ -168,12 +250,48 @@ pub struct Binding {
     pub entry: Option<usize>,
 }
 
+/// Stroke alignment options, in segmented-control order — the source
+/// of truth for the index `StrokeAlign` bindings emit and read back.
+pub const STROKE_ALIGNS: &[(&str, StrokeAlign)] = &[
+    ("Inside", StrokeAlign::Inside),
+    ("Center", StrokeAlign::Center),
+    ("Outside", StrokeAlign::Outside),
+];
+
+/// Stroke line-cap options, in order.
+pub const STROKE_CAPS: &[(&str, StrokeCap)] = &[
+    ("Butt", StrokeCap::Butt),
+    ("Round", StrokeCap::Round),
+    ("Square", StrokeCap::Square),
+];
+
+/// Stroke line-join options, in order.
+pub const STROKE_JOINS: &[(&str, StrokeJoin)] = &[
+    ("Miter", StrokeJoin::Miter),
+    ("Round", StrokeJoin::Round),
+    ("Bevel", StrokeJoin::Bevel),
+];
+
 /// The fill/stroke paint kinds the kind-select offers for authoring, in
 /// list order — the source of truth for the index [`BindingProperty::
 /// FillKind`] emits and the panel reads back. Image is intentionally
 /// absent: an image paint needs a host-provided source, so it is
 /// presented by its own panel row rather than authored by kind switch.
 pub const PAINT_KINDS: &[&str] = &["Solid", "Linear", "Radial", "Sweep", "Diamond"];
+
+/// The shadow kinds the kind-select offers, in list order — the source
+/// of truth for the index [`BindingProperty::ShadowKind`] emits and the
+/// panel reads back (0 = drop, 1 = inner).
+pub const SHADOW_KINDS: &[&str] = &["Drop", "Inner"];
+
+/// The list index of a shadow's drop-vs-inner kind, for the panel's kind
+/// select — the read direction of the `ShadowKind` index binding.
+pub fn shadow_kind_index(shadow: &FilterShadowEffect) -> usize {
+    match shadow {
+        FilterShadowEffect::DropShadow(_) => 0,
+        FilterShadowEffect::InnerShadow(_) => 1,
+    }
+}
 
 /// Interaction phase (`UI-4`).
 #[derive(Debug, Clone, PartialEq)]
@@ -287,31 +405,108 @@ fn patch_for(
         // Structure: read this target's own stack, apply the op, commit
         // the whole next stack (the editing logic lives here, not in the
         // panel — ARCH-3).
-        (BindingProperty::Fills, BindingValue::ListOp(op)) => {
-            let next = apply_paint_list_op(&editor.node_fills(id)?, *op);
-            Some(PropPatch {
-                fills: Some(next),
-                ..Default::default()
-            })
-        }
-        // Per-entry sub-values: edit `fills[entry]` in place, commit the
+        (BindingProperty::Fills, BindingValue::ListOp(op)) => Some(fill_patch(
+            apply_paint_list_op(&editor.node_fills(id)?, *op),
+        )),
+        (BindingProperty::Strokes, BindingValue::ListOp(op)) => Some(stroke_patch(
+            apply_paint_list_op(&editor.node_strokes(id)?, *op),
+        )),
+        // Per-entry sub-values: edit `paints[entry]` in place, commit the
         // whole next stack. Skip silently if the entry is out of range
         // (a stale binding after another edit shortened the list).
         (BindingProperty::FillColor, BindingValue::Color(c)) => {
-            edit_fill(editor, id, entry?, |p| set_paint_color(p, *c))
+            edit_paint_at(editor.node_fills(id)?, entry?, |p| set_paint_color(p, *c))
+                .map(fill_patch)
+        }
+        (BindingProperty::StrokeColor, BindingValue::Color(c)) => {
+            edit_paint_at(editor.node_strokes(id)?, entry?, |p| set_paint_color(p, *c))
+                .map(stroke_patch)
         }
         (BindingProperty::FillActive, BindingValue::Bool(active)) => {
-            edit_fill(editor, id, entry?, |p| set_paint_active(p, *active))
+            edit_paint_at(editor.node_fills(id)?, entry?, |p| {
+                set_paint_active(p, *active)
+            })
+            .map(fill_patch)
+        }
+        (BindingProperty::StrokeActive, BindingValue::Bool(active)) => {
+            edit_paint_at(editor.node_strokes(id)?, entry?, |p| {
+                set_paint_active(p, *active)
+            })
+            .map(stroke_patch)
         }
         (BindingProperty::FillKind, BindingValue::Index(kind)) => {
-            edit_fill(editor, id, entry?, |p| *p = convert_paint(p, *kind))
+            edit_paint_at(editor.node_fills(id)?, entry?, |p| {
+                *p = convert_paint(p, *kind)
+            })
+            .map(fill_patch)
+        }
+        (BindingProperty::StrokeKind, BindingValue::Index(kind)) => {
+            edit_paint_at(editor.node_strokes(id)?, entry?, |p| {
+                *p = convert_paint(p, *kind)
+            })
+            .map(stroke_patch)
         }
         (BindingProperty::FillOpacity, value) => {
             let entry = entry?;
-            let fills = editor.node_fills(id)?;
-            let current = fills.as_slice().get(entry)?.opacity();
+            let paints = editor.node_fills(id)?;
+            let current = paints.as_slice().get(entry)?.opacity();
             let next = resolve_number(value, current)?.clamp(0.0, 1.0);
-            edit_fill(editor, id, entry, |p| set_paint_opacity(p, next))
+            edit_paint_at(paints, entry, |p| set_paint_opacity(p, next)).map(fill_patch)
+        }
+        (BindingProperty::StrokeOpacity, value) => {
+            let entry = entry?;
+            let paints = editor.node_strokes(id)?;
+            let current = paints.as_slice().get(entry)?.opacity();
+            let next = resolve_number(value, current)?.clamp(0.0, 1.0);
+            edit_paint_at(paints, entry, |p| set_paint_opacity(p, next)).map(stroke_patch)
+        }
+        // ── Stroke geometry ───────────────────────────────────────────
+        (BindingProperty::StrokeWidth, value) => {
+            let current = editor.node_stroke_width(id)?;
+            Some(PropPatch {
+                stroke_width: Some(resolve_number(value, current)?.max(0.0)),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::StrokeAlign, BindingValue::Index(i)) => {
+            editor.node_stroke_align(id)?; // capability gate
+            let (_, align) = STROKE_ALIGNS.get(*i)?;
+            Some(PropPatch {
+                stroke_align: Some(*align),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::StrokeCap, BindingValue::Index(i)) => {
+            editor.node_stroke_cap(id)?;
+            let (_, cap) = STROKE_CAPS.get(*i)?;
+            Some(PropPatch {
+                stroke_cap: Some(*cap),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::StrokeJoin, BindingValue::Index(i)) => {
+            editor.node_stroke_join(id)?;
+            let (_, join) = STROKE_JOINS.get(*i)?;
+            Some(PropPatch {
+                stroke_join: Some(*join),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::StrokeMiter, value) => {
+            let current = editor.node_stroke_miter(id)?;
+            Some(PropPatch {
+                stroke_miter: Some(resolve_number(value, current)?.max(1.0)),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::StrokeDash, value) => {
+            // A single dash length: 0 clears (solid), > 0 sets `[n]`.
+            let current = editor.node_stroke_dash(id)?.first().copied().unwrap_or(0.0);
+            let n = resolve_number(value, current)?.max(0.0);
+            Some(PropPatch {
+                stroke_dash: Some(if n > 0.0 { vec![n] } else { Vec::new() }),
+                ..Default::default()
+            })
         }
         (BindingProperty::Opacity, BindingValue::Number(v)) => Some(PropPatch {
             opacity: Some(v.clamp(0.0, 1.0)),
@@ -376,6 +571,137 @@ fn patch_for(
                 ..Default::default()
             })
         }
+        // ── Typography ────────────────────────────────────────────────
+        (BindingProperty::TextAlignVertical, BindingValue::Index(i)) => {
+            editor.node_text_align_vertical(id)?; // skip non-text targets
+            let (_, v) = TEXT_ALIGN_VERTICALS.get(*i)?;
+            Some(PropPatch {
+                text_align_vertical: Some(*v),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::FontSize, value) => {
+            let current = editor.node_font_size(id)?;
+            Some(PropPatch {
+                font_size: Some(resolve_number(value, current)?.max(1.0)),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::FontWeight, BindingValue::Index(i)) => {
+            editor.node_font_weight(id)?; // capability gate
+            let (_, w) = FONT_WEIGHTS.get(*i)?;
+            Some(PropPatch {
+                font_weight: Some(*w),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::FontItalic, BindingValue::Bool(v)) => {
+            editor.node_font_italic(id)?;
+            Some(PropPatch {
+                font_italic: Some(*v),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::LineHeight, value) => {
+            // v1 authors the multiplier (`Factor`) variant.
+            let current = editor.node_line_height(id)?;
+            let n = resolve_number(value, current)?.max(0.0);
+            Some(PropPatch {
+                line_height: Some(TextLineHeight::Factor(n)),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::LetterSpacing, value) => {
+            // v1 authors the px (`Fixed`) variant; may go negative.
+            let current = editor.node_letter_spacing(id)?;
+            let n = resolve_number(value, current)?;
+            Some(PropPatch {
+                letter_spacing: Some(TextLetterSpacing::Fixed(n)),
+                ..Default::default()
+            })
+        }
+        // ── Layer blur (single slot) ──────────────────────────────────
+        (BindingProperty::LayerBlurEnabled, BindingValue::Bool(on)) => {
+            let fx = editor.node_effects(id)?; // capability gate
+            // Enable → create a default blur (or keep the existing one);
+            // disable → clear the slot.
+            let next = if *on {
+                Some(fx.blur.unwrap_or_else(default_layer_blur))
+            } else {
+                None
+            };
+            Some(PropPatch {
+                layer_blur: Some(next),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::LayerBlurRadius, value) => {
+            // Skip when the node has no blur to edit. v1 authors the
+            // Gaussian variant; the current is the projected radius.
+            let mut blur = editor.node_effects(id)?.blur?;
+            let current = blur_radius(&blur.blur);
+            let n = resolve_number(value, current)?.max(0.0);
+            blur.blur = FeBlur::Gaussian(FeGaussianBlur { radius: n });
+            Some(PropPatch {
+                layer_blur: Some(Some(blur)),
+                ..Default::default()
+            })
+        }
+        (BindingProperty::LayerBlurActive, BindingValue::Bool(active)) => {
+            let mut blur = editor.node_effects(id)?.blur?;
+            blur.active = *active;
+            Some(PropPatch {
+                layer_blur: Some(Some(blur)),
+                ..Default::default()
+            })
+        }
+        // ── Shadows (multi-valued list) ───────────────────────────────
+        // Structure: read this target's own list, apply the op, commit
+        // the whole next list (the editing logic lives here — ARCH-3).
+        (BindingProperty::Shadows, BindingValue::ListOp(op)) => Some(shadow_patch(
+            apply_shadow_list_op(&editor.node_effects(id)?.shadows, *op),
+        )),
+        (BindingProperty::ShadowColor, BindingValue::Color(c)) => {
+            edit_shadow_at(editor.node_effects(id)?.shadows, entry?, |s| s.color = *c)
+                .map(shadow_patch)
+        }
+        (BindingProperty::ShadowActive, BindingValue::Bool(active)) => {
+            edit_shadow_at(editor.node_effects(id)?.shadows, entry?, |s| {
+                s.active = *active
+            })
+            .map(shadow_patch)
+        }
+        (BindingProperty::ShadowKind, BindingValue::Index(kind)) => {
+            convert_shadow_at(editor.node_effects(id)?.shadows, entry?, *kind).map(shadow_patch)
+        }
+        (BindingProperty::ShadowDx, value) => {
+            let entry = entry?;
+            let shadows = editor.node_effects(id)?.shadows;
+            let current = shadow_params(shadows.get(entry)?).dx;
+            let n = resolve_number(value, current)?;
+            edit_shadow_at(shadows, entry, |s| s.dx = n).map(shadow_patch)
+        }
+        (BindingProperty::ShadowDy, value) => {
+            let entry = entry?;
+            let shadows = editor.node_effects(id)?.shadows;
+            let current = shadow_params(shadows.get(entry)?).dy;
+            let n = resolve_number(value, current)?;
+            edit_shadow_at(shadows, entry, |s| s.dy = n).map(shadow_patch)
+        }
+        (BindingProperty::ShadowBlur, value) => {
+            let entry = entry?;
+            let shadows = editor.node_effects(id)?.shadows;
+            let current = shadow_params(shadows.get(entry)?).blur;
+            let n = resolve_number(value, current)?.max(0.0);
+            edit_shadow_at(shadows, entry, |s| s.blur = n).map(shadow_patch)
+        }
+        (BindingProperty::ShadowSpread, value) => {
+            let entry = entry?;
+            let shadows = editor.node_effects(id)?.shadows;
+            let current = shadow_params(shadows.get(entry)?).spread;
+            let n = resolve_number(value, current)?;
+            edit_shadow_at(shadows, entry, |s| s.spread = n).map(shadow_patch)
+        }
         (BindingProperty::Rotation, value) => {
             // The UI authors degrees; the node stores radians. A delta
             // (scrub / arrow) is a degree delta applied to the node's
@@ -437,21 +763,31 @@ fn resolve_number(value: &BindingValue, current: f32) -> Option<f32> {
 // Paint editing (the fills-domain resolvers, owned here — ARCH-3)
 // ---------------------------------------------------------------------------
 
-/// Read a target's fill stack, mutate the paint at `entry` in place, and
-/// return the whole-stack patch. `None` (skipped) when the node carries
-/// no fills or `entry` is out of range.
-fn edit_fill(
-    editor: &Editor,
-    id: &Id,
-    entry: usize,
-    f: impl FnOnce(&mut Paint),
-) -> Option<PropPatch> {
-    let mut paints = editor.node_fills(id)?.as_slice().to_vec();
-    f(paints.get_mut(entry)?);
-    Some(PropPatch {
-        fills: Some(Paints::new(paints)),
+/// Mutate the paint at `entry` in place and return the next stack.
+/// `None` (skipped) when `entry` is out of range (a stale binding after
+/// another edit shortened the list). Target-agnostic — the caller wraps
+/// the result into the right patch field ([`fill_patch`] /
+/// [`stroke_patch`]).
+fn edit_paint_at(paints: Paints, entry: usize, f: impl FnOnce(&mut Paint)) -> Option<Paints> {
+    let mut v = paints.as_slice().to_vec();
+    f(v.get_mut(entry)?);
+    Some(Paints::new(v))
+}
+
+/// Wrap a next fill stack into a patch.
+fn fill_patch(fills: Paints) -> PropPatch {
+    PropPatch {
+        fills: Some(fills),
         ..Default::default()
-    })
+    }
+}
+
+/// Wrap a next stroke stack into a patch.
+fn stroke_patch(strokes: Paints) -> PropPatch {
+    PropPatch {
+        strokes: Some(strokes),
+        ..Default::default()
+    }
 }
 
 /// Apply a structural list op to a fill stack, returning the next stack.
@@ -487,6 +823,120 @@ fn apply_paint_list_op(current: &Paints, op: ListOp) -> Paints {
 fn default_fill_paint(first: bool) -> Paint {
     let a = if first { 255 } else { 128 };
     Paint::Solid(SolidPaint::new_color(CGColor::from_rgba(0, 0, 0, a)))
+}
+
+// ---------------------------------------------------------------------------
+// Effect editing (the layer-effects resolvers, owned here — ARCH-3)
+// ---------------------------------------------------------------------------
+
+/// The blur added by "enable layer blur": a Gaussian 4px, active.
+fn default_layer_blur() -> FeLayerBlur {
+    FeLayerBlur::from(4.0)
+}
+
+/// A blur's authoring radius (display projection): the Gaussian radius,
+/// or the progressive end radius. Lossy — the invertible truth is the
+/// whole prior slot carried in the patch (v1 authors Gaussian only).
+/// Shared by the resolver's delta base and the panel's radius display.
+pub fn blur_radius(blur: &FeBlur) -> f32 {
+    match blur {
+        FeBlur::Gaussian(g) => g.radius,
+        FeBlur::Progressive(p) => p.radius2,
+    }
+}
+
+/// The shadow appended by "add shadow": a soft drop shadow (0,4) blur 4,
+/// 25%-black, active.
+fn default_shadow() -> FilterShadowEffect {
+    FilterShadowEffect::DropShadow(FeShadow {
+        dx: 0.0,
+        dy: 4.0,
+        blur: 4.0,
+        spread: 0.0,
+        color: CGColor::from_rgba(0, 0, 0, 64),
+        active: true,
+    })
+}
+
+/// The inner [`FeShadow`] of a shadow effect, regardless of drop-vs-inner
+/// kind (both variants wrap one). Shared with the panel's per-shadow
+/// display.
+pub fn shadow_params(shadow: &FilterShadowEffect) -> &FeShadow {
+    match shadow {
+        FilterShadowEffect::DropShadow(s) | FilterShadowEffect::InnerShadow(s) => s,
+    }
+}
+
+/// Mutable [`shadow_params`].
+fn shadow_params_mut(shadow: &mut FilterShadowEffect) -> &mut FeShadow {
+    match shadow {
+        FilterShadowEffect::DropShadow(s) | FilterShadowEffect::InnerShadow(s) => s,
+    }
+}
+
+/// Mutate the shadow at `entry` in place and return the next list. `None`
+/// (skipped) when `entry` is out of range (a stale binding after another
+/// edit shortened the list) — the [`edit_paint_at`] pattern.
+fn edit_shadow_at(
+    mut shadows: Vec<FilterShadowEffect>,
+    entry: usize,
+    f: impl FnOnce(&mut FeShadow),
+) -> Option<Vec<FilterShadowEffect>> {
+    f(shadow_params_mut(shadows.get_mut(entry)?));
+    Some(shadows)
+}
+
+/// Convert the shadow at `entry` to the drop-vs-inner kind at index
+/// `kind` (into [`SHADOW_KINDS`]), carrying its parameters. `None` when
+/// out of range.
+fn convert_shadow_at(
+    mut shadows: Vec<FilterShadowEffect>,
+    entry: usize,
+    kind: usize,
+) -> Option<Vec<FilterShadowEffect>> {
+    let slot = shadows.get_mut(entry)?;
+    let params = *shadow_params(slot);
+    *slot = match kind {
+        1 => FilterShadowEffect::InnerShadow(params),
+        _ => FilterShadowEffect::DropShadow(params),
+    };
+    Some(shadows)
+}
+
+/// Apply a structural list op to a shadow list, returning the next list —
+/// the [`apply_paint_list_op`] counterpart. Out-of-range indices are
+/// no-ops.
+fn apply_shadow_list_op(current: &[FilterShadowEffect], op: ListOp) -> Vec<FilterShadowEffect> {
+    let mut v = current.to_vec();
+    match op {
+        ListOp::Add => v.push(default_shadow()),
+        ListOp::Remove(i) => {
+            if i < v.len() {
+                v.remove(i);
+            }
+        }
+        ListOp::ToggleEntry(i) => {
+            if let Some(s) = v.get_mut(i) {
+                let params = shadow_params_mut(s);
+                params.active = !params.active;
+            }
+        }
+        ListOp::Move { from, to } => {
+            if from < v.len() && to < v.len() {
+                let s = v.remove(from);
+                v.insert(to, s);
+            }
+        }
+    }
+    v
+}
+
+/// Wrap a next shadow list into a patch.
+fn shadow_patch(shadows: Vec<FilterShadowEffect>) -> PropPatch {
+    PropPatch {
+        shadows: Some(shadows),
+        ..Default::default()
+    }
 }
 
 /// Set a paint's active flag across every kind.

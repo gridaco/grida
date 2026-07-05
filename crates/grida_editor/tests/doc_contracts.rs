@@ -616,3 +616,301 @@ fn fill_solid_and_fills_are_mutually_exclusive() {
     assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
     assert!(wc.structure_eq(&baseline));
 }
+
+// ---------------------------------------------------------------------------
+// Stroke geometry (weight / align / cap / join / miter / dash)
+// ---------------------------------------------------------------------------
+
+/// DOC-2 — the six stroke-geometry scalars round-trip through
+/// apply/inverse on a `stroke_style` kind (a Rectangle), and the
+/// per-property queries reflect the write.
+#[test]
+fn doc_2_stroke_geometry_roundtrip() {
+    use grida::cg::prelude::{StrokeAlign, StrokeCap, StrokeJoin};
+    let mut wc = wc_with_rects(1);
+    let id = "r0".to_string();
+    let baseline = wc.clone();
+
+    let applied = wc
+        .apply(&[Mutation::Patch {
+            id: id.clone(),
+            set: PropPatch {
+                stroke_width: Some(4.0),
+                stroke_align: Some(StrokeAlign::Outside),
+                stroke_cap: Some(StrokeCap::Round),
+                stroke_join: Some(StrokeJoin::Bevel),
+                stroke_miter: Some(8.0),
+                stroke_dash: Some(vec![3.0]),
+                ..Default::default()
+            },
+        }])
+        .unwrap();
+    assert_eq!(wc.node_stroke_width(&id), Some(4.0));
+    assert_eq!(wc.node_stroke_align(&id), Some(StrokeAlign::Outside));
+    assert_eq!(wc.node_stroke_cap(&id), Some(StrokeCap::Round));
+    assert_eq!(wc.node_stroke_join(&id), Some(StrokeJoin::Bevel));
+    assert_eq!(wc.node_stroke_miter(&id), Some(8.0));
+    assert_eq!(wc.node_stroke_dash(&id), Some(vec![3.0]));
+    assert!(
+        !wc.structure_eq(&baseline),
+        "geometry changed the signature"
+    );
+
+    wc.apply(&applied.inverse).unwrap();
+    assert!(
+        wc.structure_eq(&baseline),
+        "DOC-2: stroke geometry inverse restores the prior state"
+    );
+}
+
+/// An empty dash vec clears the pattern (solid) and round-trips.
+#[test]
+fn stroke_dash_empty_clears_to_solid() {
+    let mut wc = wc_with_rects(1);
+    let id = "r0".to_string();
+    wc.apply(&[Mutation::Patch {
+        id: id.clone(),
+        set: PropPatch {
+            stroke_dash: Some(vec![5.0, 2.0]),
+            ..Default::default()
+        },
+    }])
+    .unwrap();
+    assert_eq!(wc.node_stroke_dash(&id), Some(vec![5.0, 2.0]));
+    wc.apply(&[Mutation::Patch {
+        id: id.clone(),
+        set: PropPatch {
+            stroke_dash: Some(Vec::new()),
+            ..Default::default()
+        },
+    }])
+    .unwrap();
+    assert_eq!(wc.node_stroke_dash(&id), Some(Vec::new()), "solid");
+}
+
+// ---------------------------------------------------------------------------
+// Typography (font size / weight / italic / line-height / letter-spacing /
+// vertical align) — the Text section's document domain (Slice A)
+// ---------------------------------------------------------------------------
+
+fn text_fragment(id: &str) -> Fragment {
+    let factory = NodeFactory::new();
+    Fragment {
+        id: id.to_string(),
+        name: Some(id.to_string()),
+        node: Node::TextSpan(factory.create_text_span_node()),
+        children: vec![],
+    }
+}
+
+/// A working copy with one root-level text node `t0`.
+fn wc_with_text() -> WorkingCopy {
+    let mut wc = WorkingCopy::new_empty("test");
+    wc.apply(&[Mutation::Insert {
+        parent: None,
+        index: 0,
+        fragment: Box::new(text_fragment("t0")),
+    }])
+    .unwrap();
+    wc
+}
+
+/// DOC-2 — the typography scalars round-trip through apply/inverse on a
+/// text kind, and the per-property queries reflect the write.
+#[test]
+fn doc_2_typography_roundtrip() {
+    use grida::cg::prelude::{TextAlignVertical, TextLetterSpacing, TextLineHeight};
+    let mut wc = wc_with_text();
+    let id = "t0".to_string();
+    let baseline = wc.clone();
+
+    let applied = wc
+        .apply(&[Mutation::Patch {
+            id: id.clone(),
+            set: PropPatch {
+                font_size: Some(48.0),
+                font_weight: Some(700),
+                font_italic: Some(true),
+                line_height: Some(TextLineHeight::Factor(1.5)),
+                letter_spacing: Some(TextLetterSpacing::Fixed(2.0)),
+                text_align_vertical: Some(TextAlignVertical::Center),
+                ..Default::default()
+            },
+        }])
+        .unwrap();
+    assert_eq!(wc.node_font_size(&id), Some(48.0));
+    assert_eq!(wc.node_font_weight(&id), Some(700));
+    assert_eq!(wc.node_font_italic(&id), Some(true));
+    assert_eq!(wc.node_line_height(&id), Some(1.5));
+    assert_eq!(wc.node_letter_spacing(&id), Some(2.0));
+    assert_eq!(
+        wc.node_text_align_vertical(&id),
+        Some(TextAlignVertical::Center)
+    );
+    assert!(
+        !wc.structure_eq(&baseline),
+        "typography changed the signature"
+    );
+
+    wc.apply(&applied.inverse).unwrap();
+    assert!(
+        wc.structure_eq(&baseline),
+        "DOC-2: typography inverse restores the exact prior style"
+    );
+}
+
+/// The line-height inverse restores the exact prior *variant* (Normal),
+/// not a normalized Factor — the patch carries the whole enum.
+#[test]
+fn line_height_inverse_restores_the_prior_variant() {
+    use grida::cg::prelude::TextLineHeight;
+    let mut wc = wc_with_text();
+    let id = "t0".to_string();
+    // The factory default is `Normal`.
+    let applied = wc
+        .apply(&[Mutation::Patch {
+            id: id.clone(),
+            set: PropPatch {
+                line_height: Some(TextLineHeight::Factor(2.0)),
+                ..Default::default()
+            },
+        }])
+        .unwrap();
+    // The captured inverse is the prior `Normal`, not a Factor.
+    let Mutation::Patch { set, .. } = &applied.inverse[0] else {
+        panic!("expected a patch inverse");
+    };
+    assert_eq!(set.line_height, Some(TextLineHeight::Normal));
+}
+
+/// DOC-4 — typography on a non-text kind (a Rectangle) is rejected and
+/// leaves the node untouched.
+#[test]
+fn typography_requires_a_text_kind() {
+    let mut wc = wc_with_rects(1);
+    let baseline = wc.clone();
+    let err = wc
+        .apply(&[Mutation::Patch {
+            id: "r0".to_string(),
+            set: PropPatch {
+                font_size: Some(24.0),
+                ..Default::default()
+            },
+        }])
+        .unwrap_err();
+    assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
+    assert!(wc.structure_eq(&baseline));
+}
+
+/// DOC-2 — the layer-blur slot and the shadow list round-trip through
+/// apply/inverse on an effect-capable kind (a Rectangle), and the whole
+/// bag is observable via `node_effects`.
+#[test]
+fn doc_2_effects_roundtrip() {
+    use grida::cg::fe::{FeLayerBlur, FeShadow, FilterShadowEffect};
+    let mut wc = wc_with_rects(1);
+    let id = "r0".to_string();
+    let baseline = wc.clone();
+    let shadow = FilterShadowEffect::DropShadow(FeShadow {
+        dx: 1.0,
+        dy: 2.0,
+        blur: 3.0,
+        spread: 4.0,
+        color: CGColor::from_rgba(0, 0, 0, 128),
+        active: true,
+    });
+
+    let applied = wc
+        .apply(&[Mutation::Patch {
+            id: id.clone(),
+            set: PropPatch {
+                layer_blur: Some(Some(FeLayerBlur::from(8.0))),
+                shadows: Some(vec![shadow.clone()]),
+                ..Default::default()
+            },
+        }])
+        .unwrap();
+    let fx = wc.node_effects(&id).unwrap();
+    assert!(fx.blur.is_some(), "the blur slot was filled");
+    assert_eq!(fx.shadows, vec![shadow], "the shadow list was written");
+    assert!(!wc.structure_eq(&baseline), "effects changed the signature");
+
+    wc.apply(&applied.inverse).unwrap();
+    assert!(
+        wc.structure_eq(&baseline),
+        "DOC-2: the effects inverse restores the exact prior bag"
+    );
+}
+
+/// The layer-blur inverse carries the whole prior *slot* (the empty
+/// `Some(None)`), so undo removes a freshly-added blur exactly.
+#[test]
+fn layer_blur_inverse_restores_the_prior_slot() {
+    use grida::cg::fe::FeLayerBlur;
+    let mut wc = wc_with_rects(1);
+    let id = "r0".to_string();
+    // A fresh Rectangle carries no blur.
+    let applied = wc
+        .apply(&[Mutation::Patch {
+            id: id.clone(),
+            set: PropPatch {
+                layer_blur: Some(Some(FeLayerBlur::from(4.0))),
+                ..Default::default()
+            },
+        }])
+        .unwrap();
+    let Mutation::Patch { set, .. } = &applied.inverse[0] else {
+        panic!("expected a patch inverse");
+    };
+    assert_eq!(set.layer_blur, Some(None));
+}
+
+/// DOC-4 — effects on a kind that carries none (a Group) are rejected and
+/// leave the node untouched.
+#[test]
+fn effects_require_an_effect_capable_kind() {
+    use grida::cg::fe::FeLayerBlur;
+    let mut wc = WorkingCopy::new_empty("test");
+    wc.apply(&[Mutation::Insert {
+        parent: None,
+        index: 0,
+        fragment: Box::new(group_fragment("g0", vec![])),
+    }])
+    .unwrap();
+    let baseline = wc.clone();
+    let err = wc
+        .apply(&[Mutation::Patch {
+            id: "g0".to_string(),
+            set: PropPatch {
+                layer_blur: Some(Some(FeLayerBlur::from(4.0))),
+                ..Default::default()
+            },
+        }])
+        .unwrap_err();
+    assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
+    assert!(wc.structure_eq(&baseline));
+}
+
+/// DOC-4 — stroke width on a kind with no stroke (a Group) is rejected.
+#[test]
+fn stroke_width_requires_a_stroked_kind() {
+    let mut wc = WorkingCopy::new_empty("test");
+    wc.apply(&[Mutation::Insert {
+        parent: None,
+        index: 0,
+        fragment: Box::new(group_fragment("g0", vec![])),
+    }])
+    .unwrap();
+    let baseline = wc.clone();
+    let err = wc
+        .apply(&[Mutation::Patch {
+            id: "g0".to_string(),
+            set: PropPatch {
+                stroke_width: Some(2.0),
+                ..Default::default()
+            },
+        }])
+        .unwrap_err();
+    assert!(matches!(err.reason, MutationErrorReason::Unsupported(_)));
+    assert!(wc.structure_eq(&baseline));
+}

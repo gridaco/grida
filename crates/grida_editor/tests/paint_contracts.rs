@@ -83,6 +83,50 @@ fn fills(editor: &Editor) -> Vec<Paint> {
 
 // ── Structure: add / remove / toggle-active (SHEET-3) ────────────────────
 
+fn strokes(editor: &Editor) -> Vec<Paint> {
+    editor
+        .node_strokes(&"r".to_string())
+        .map(|p| p.as_slice().to_vec())
+        .unwrap_or_default()
+}
+
+/// The stroke domain reuses the same paint machinery — one add and one
+/// per-entry recolor prove the `Stroke*` bindings resolve against the
+/// node's `strokes` stack (parallel to fills). A rectangle starts with
+/// an empty stroke stack.
+#[test]
+fn strokes_add_then_recolor() {
+    let mut editor = editor_with_fills(vec![solid(0, 0, 0, 255)]);
+    assert!(strokes(&editor).is_empty(), "rect starts with no strokes");
+
+    bind::apply(
+        &mut editor,
+        &commit(
+            BindingProperty::Strokes,
+            None,
+            BindingValue::ListOp(ListOp::Add),
+        ),
+    );
+    assert_eq!(strokes(&editor).len(), 1, "add appended a stroke paint");
+
+    let new = CGColor::from_rgba(12, 34, 56, 255);
+    bind::apply(
+        &mut editor,
+        &commit(
+            BindingProperty::StrokeColor,
+            Some(0),
+            BindingValue::Color(new),
+        ),
+    );
+    assert_eq!(
+        strokes(&editor)[0],
+        Paint::Solid(SolidPaint::new_color(new)),
+        "StrokeColor recolored the stroke paint, not a fill"
+    );
+    // Fills untouched by the stroke edits.
+    assert_eq!(fills(&editor), vec![solid(0, 0, 0, 255)]);
+}
+
 #[test]
 fn fills_add_appends_one_paint_in_one_entry() {
     let mut editor = editor_with_fills(vec![solid(0, 0, 0, 255)]);
@@ -264,5 +308,55 @@ fn fills_binding_skips_a_target_without_fills() {
         editor.history_len(),
         before,
         "a no-op commit over an unsupported target records nothing"
+    );
+}
+
+// ── Stroke geometry bindings ─────────────────────────────────────────────
+
+/// Weight (number) and cap (segmented index) resolve onto the node's
+/// stroke geometry — a Rectangle carries a stroke style.
+#[test]
+fn stroke_geometry_width_and_cap() {
+    use grida::cg::prelude::StrokeCap;
+    let mut editor = editor_with_fills(vec![solid(0, 0, 0, 255)]);
+
+    bind::apply(
+        &mut editor,
+        &commit(
+            BindingProperty::StrokeWidth,
+            None,
+            BindingValue::Number(4.0),
+        ),
+    );
+    assert_eq!(editor.node_stroke_width(&"r".to_string()), Some(4.0));
+
+    // Index 1 in STROKE_CAPS is "Round".
+    bind::apply(
+        &mut editor,
+        &commit(BindingProperty::StrokeCap, None, BindingValue::Index(1)),
+    );
+    assert_eq!(
+        editor.node_stroke_cap(&"r".to_string()),
+        Some(StrokeCap::Round)
+    );
+}
+
+/// The dash number: 0 = solid, > 0 = a single-length dash.
+#[test]
+fn stroke_dash_number_toggles_solid_dashed() {
+    let mut editor = editor_with_fills(vec![solid(0, 0, 0, 255)]);
+    bind::apply(
+        &mut editor,
+        &commit(BindingProperty::StrokeDash, None, BindingValue::Number(3.0)),
+    );
+    assert_eq!(editor.node_stroke_dash(&"r".to_string()), Some(vec![3.0]));
+    bind::apply(
+        &mut editor,
+        &commit(BindingProperty::StrokeDash, None, BindingValue::Number(0.0)),
+    );
+    assert_eq!(
+        editor.node_stroke_dash(&"r".to_string()),
+        Some(Vec::new()),
+        "0 clears to solid"
     );
 }

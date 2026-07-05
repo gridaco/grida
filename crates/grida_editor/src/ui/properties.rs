@@ -12,12 +12,16 @@
 //!
 //! M3 scope: the panel binds to the **first** selected node's values
 //! and broadcasts commits to the whole selection; the mixed-value
-//! model (`PROP-2`, `WID-6`) is a later task. The **Fills** section is
-//! the general paint-list domain (`fills`): a list of paint entries
-//! (`SHEET-3`) — add / remove / toggle-active, per-entry kind
-//! (solid / gradient) and color (through the picker). Image paints are
-//! shown but their source is host-gated; the gradient stop-track editor
-//! and stroke sections are named-and-deferred (fills-first slice).
+//! model (`PROP-2`, `WID-6`) is a later task. **Fills** and **Strokes**
+//! are the paint-list domains (`fills` / `strokes`): one code path
+//! ([`PaintTarget`]) building a list of paint entries (`SHEET-3`) — add
+//! / remove / toggle-active, per-entry kind (solid / gradient) and
+//! color (through the picker). Image paints are shown but their source
+//! is host-gated; the gradient stop-track editor and stroke *geometry*
+//! (width/align/cap/join/dash) are named-and-deferred. **Effects**,
+//! **Selection colors**, and **Export** are minimal introductions:
+//! effects and selection-colors are read-only summaries, export is a
+//! present-but-deferred scaffold (no authoring domain yet).
 //!
 //! [`sync`]: PropertiesPanel::sync
 
@@ -29,14 +33,16 @@ use crate::document::Id;
 use crate::editor::Editor;
 use crate::ui::UiLayer;
 use crate::ui::bind::{
-    BLEND_MODES, Binding, BindingProperty, BindingValue, ListOp, PAINT_KINDS, TEXT_ALIGNS,
+    BLEND_MODES, Binding, BindingProperty, BindingValue, FONT_WEIGHTS, ListOp, PAINT_KINDS,
+    SHADOW_KINDS, STROKE_ALIGNS, STROKE_CAPS, STROKE_JOINS, TEXT_ALIGN_VERTICALS, TEXT_ALIGNS,
+    blur_radius, font_weight_index, shadow_kind_index, shadow_params,
 };
 use crate::ui::field::Field;
 use crate::ui::widget::{Widget, WidgetState};
 use crate::ui::widgets::color_picker::PickerState;
 use crate::ui::widgets::{
-    Button, ColorPicker, Label, Number, Panel, Row, Segment, Segmented, Select, Slider, Swatch,
-    SwatchAction, Text, Toggle, ToggleLook,
+    Button, ColorPicker, Label, Number, Panel, Row, SectionHeader, Segment, Segmented, Select,
+    Slider, Swatch, SwatchAction, Text, Toggle, ToggleLook,
 };
 
 /// Widget identity slots (stable across value rebuilds — identity is
@@ -57,41 +63,181 @@ pub const CLIP_ID: &str = "props.clip";
 pub const CLIP_ROW_ID: &str = "props.clip.row";
 pub const ALIGN_ID: &str = "props.align";
 pub const ALIGN_ROW_ID: &str = "props.align.row";
+// Typography rows (the Text section — gated on a text kind).
+pub const TEXT_HEADER_ID: &str = "props.text.header";
+pub const TEXT_SIZE_ROW_ID: &str = "props.text.size.row";
+pub const TEXT_SIZE_ID: &str = "props.text.size";
+pub const TEXT_WEIGHT_ROW_ID: &str = "props.text.weight.row";
+pub const TEXT_WEIGHT_ID: &str = "props.text.weight";
+pub const TEXT_ITALIC_ROW_ID: &str = "props.text.italic.row";
+pub const TEXT_ITALIC_ID: &str = "props.text.italic";
+pub const TEXT_LINE_ROW_ID: &str = "props.text.line.row";
+pub const TEXT_LINE_ID: &str = "props.text.line";
+pub const TEXT_LETTER_ROW_ID: &str = "props.text.letter.row";
+pub const TEXT_LETTER_ID: &str = "props.text.letter";
+pub const TEXT_VALIGN_ROW_ID: &str = "props.text.valign.row";
+pub const TEXT_VALIGN_ID: &str = "props.text.valign";
 pub const BG_ROW_ID: &str = "props.scene.bg.row";
 pub const BG_ID: &str = "props.scene.bg";
 pub const BG_CLEAR_ID: &str = "props.scene.bg.clear";
 pub const OPACITY_ROW_ID: &str = "props.opacity.row";
 pub const OPACITY_ID: &str = "props.opacity";
-/// Fills section widget ids. The section is a list of paint entries
-/// (`SHEET-3`); per-entry sub-controls are addressed by their fill
-/// index so a generic atom edits `fills[i]` through its binding's
-/// `entry` (see [`Binding::entry`]).
+/// The two paint-list sections the panel builds identically (`SHEET-3`
+/// list of paint entries; per-entry sub-controls addressed by their
+/// index through the binding's `entry`). One code path, two targets;
+/// they differ only in which node field they read/write and their
+/// widget-id prefix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaintTarget {
+    Fill,
+    Stroke,
+}
+
+impl PaintTarget {
+    /// Section title.
+    fn title(self) -> &'static str {
+        match self {
+            PaintTarget::Fill => "Fills",
+            PaintTarget::Stroke => "Strokes",
+        }
+    }
+    /// Widget-id prefix for per-entry ids (`fill` / `stroke`).
+    fn entry_prefix(self) -> &'static str {
+        match self {
+            PaintTarget::Fill => "fill",
+            PaintTarget::Stroke => "stroke",
+        }
+    }
+    /// Widget-id prefix for the section header (`fills` / `strokes`).
+    fn section_prefix(self) -> &'static str {
+        match self {
+            PaintTarget::Fill => "fills",
+            PaintTarget::Stroke => "strokes",
+        }
+    }
+    /// The structural list property.
+    fn list_prop(self) -> BindingProperty {
+        match self {
+            PaintTarget::Fill => BindingProperty::Fills,
+            PaintTarget::Stroke => BindingProperty::Strokes,
+        }
+    }
+    /// The per-entry color property.
+    fn color_prop(self) -> BindingProperty {
+        match self {
+            PaintTarget::Fill => BindingProperty::FillColor,
+            PaintTarget::Stroke => BindingProperty::StrokeColor,
+        }
+    }
+    /// The per-entry kind property.
+    fn kind_prop(self) -> BindingProperty {
+        match self {
+            PaintTarget::Fill => BindingProperty::FillKind,
+            PaintTarget::Stroke => BindingProperty::StrokeKind,
+        }
+    }
+    /// The per-entry active property.
+    fn active_prop(self) -> BindingProperty {
+        match self {
+            PaintTarget::Fill => BindingProperty::FillActive,
+            PaintTarget::Stroke => BindingProperty::StrokeActive,
+        }
+    }
+    /// This target's stack in the snapshot.
+    fn stack(self, s: &Snapshot) -> &Option<Vec<Paint>> {
+        match self {
+            PaintTarget::Fill => &s.fills,
+            PaintTarget::Stroke => &s.strokes,
+        }
+    }
+}
+
 pub const FILLS_HEADER_ID: &str = "props.fills.header";
 pub const FILLS_ADD_ID: &str = "props.fills.add";
+pub const STROKES_HEADER_ID: &str = "props.strokes.header";
+pub const STROKES_ADD_ID: &str = "props.strokes.add";
 
-/// The row hosting fill entry `i`.
-pub fn fill_row_id(i: usize) -> String {
-    format!("props.fill.{i}.row")
+fn paint_add_id(t: PaintTarget) -> String {
+    format!("props.{}.add", t.section_prefix())
 }
-/// The color swatch of fill entry `i` (opens the picker).
+fn paint_header_id(t: PaintTarget) -> String {
+    format!("props.{}.header", t.section_prefix())
+}
+fn paint_row_id(t: PaintTarget, i: usize) -> String {
+    format!("props.{}.{i}.row", t.entry_prefix())
+}
+fn paint_swatch_id(t: PaintTarget, i: usize) -> String {
+    format!("props.{}.{i}.swatch", t.entry_prefix())
+}
+fn paint_kind_id(t: PaintTarget, i: usize) -> String {
+    format!("props.{}.{i}.kind", t.entry_prefix())
+}
+fn paint_active_id(t: PaintTarget, i: usize) -> String {
+    format!("props.{}.{i}.active", t.entry_prefix())
+}
+fn paint_remove_id(t: PaintTarget, i: usize) -> String {
+    format!("props.{}.{i}.remove", t.entry_prefix())
+}
+fn paint_label_id(t: PaintTarget, i: usize) -> String {
+    format!("props.{}.{i}.label", t.entry_prefix())
+}
+
+/// The fill swatch id (opens the picker) — public for the harness.
 pub fn fill_swatch_id(i: usize) -> String {
-    format!("props.fill.{i}.swatch")
+    paint_swatch_id(PaintTarget::Fill, i)
 }
-/// The kind select of fill entry `i`.
+/// The fill kind-select id — public for the harness.
 pub fn fill_kind_id(i: usize) -> String {
-    format!("props.fill.{i}.kind")
+    paint_kind_id(PaintTarget::Fill, i)
 }
-/// The active toggle of fill entry `i`.
-pub fn fill_active_id(i: usize) -> String {
-    format!("props.fill.{i}.active")
+/// The stroke swatch id — public for the harness.
+pub fn stroke_swatch_id(i: usize) -> String {
+    paint_swatch_id(PaintTarget::Stroke, i)
 }
-/// The remove button of fill entry `i`.
-pub fn fill_remove_id(i: usize) -> String {
-    format!("props.fill.{i}.remove")
+
+// Stroke geometry rows (inside the Strokes section, below the paints).
+pub const STROKE_WIDTH_ROW_ID: &str = "props.stroke.width.row";
+pub const STROKE_WIDTH_ID: &str = "props.stroke.width";
+pub const STROKE_ALIGN_ROW_ID: &str = "props.stroke.align.row";
+pub const STROKE_ALIGN_ID: &str = "props.stroke.align";
+pub const STROKE_CAP_ROW_ID: &str = "props.stroke.cap.row";
+pub const STROKE_CAP_ID: &str = "props.stroke.cap";
+pub const STROKE_JOIN_ROW_ID: &str = "props.stroke.join.row";
+pub const STROKE_JOIN_ID: &str = "props.stroke.join";
+pub const STROKE_MITER_ROW_ID: &str = "props.stroke.miter.row";
+pub const STROKE_MITER_ID: &str = "props.stroke.miter";
+pub const STROKE_DASH_ROW_ID: &str = "props.stroke.dash.row";
+pub const STROKE_DASH_ID: &str = "props.stroke.dash";
+
+// Effects sections. Slice 1 authors the single layer-blur slot and the
+// multi-valued shadow list (drop/inner); backdrop blur, glass, noise, and
+// progressive blur are later slices (`properties-sheet.md` Effects).
+pub const BLUR_HEADER_ID: &str = "props.blur.header";
+pub const BLUR_ENABLE_ID: &str = "props.blur.enable";
+pub const BLUR_RADIUS_ROW_ID: &str = "props.blur.radius.row";
+pub const BLUR_RADIUS_ID: &str = "props.blur.radius";
+pub const BLUR_ACTIVE_ROW_ID: &str = "props.blur.active.row";
+pub const BLUR_ACTIVE_ID: &str = "props.blur.active";
+pub const SHADOWS_HEADER_ID: &str = "props.shadows.header";
+pub const SHADOWS_ADD_ID: &str = "props.shadows.add";
+/// A per-shadow widget id: `props.shadow.{i}.{part}`. Row ids append
+/// `.row` to the control's part.
+fn shadow_part_id(i: usize, part: &str) -> String {
+    format!("props.shadow.{i}.{part}")
 }
-/// The "Image" label of an image fill entry `i`.
-pub fn fill_label_id(i: usize) -> String {
-    format!("props.fill.{i}.label")
+/// The shadow color-swatch id (opens the picker) — public for the
+/// harness.
+pub fn shadow_swatch_id(i: usize) -> String {
+    shadow_part_id(i, "swatch")
+}
+
+// Read-only / scaffold sections (Selection colors, Export) — minimal
+// introductions; authoring is a later slice.
+pub const SELECTION_COLORS_HEADER_ID: &str = "props.selcolors.header";
+pub const EXPORT_HEADER_ID: &str = "props.export.header";
+pub const EXPORT_NOTE_ID: &str = "props.export.note";
+fn selection_color_id(i: usize) -> String {
+    format!("props.selcolor.{i}.label")
 }
 pub const X_ID: &str = "props.x";
 pub const Y_ID: &str = "props.y";
@@ -127,6 +273,38 @@ struct Snapshot {
     /// panel displays top-most-first at build time; the stored order is
     /// document/paint order.
     fills: Option<Vec<Paint>>,
+    /// Head node's stroke paint stack, or `None` when the kind carries
+    /// no strokes (the Strokes-section capability gate).
+    strokes: Option<Vec<Paint>>,
+    /// Whether the head node carries effects at all (the Effects
+    /// sections' capability gate — the Layer-blur and Shadows section
+    /// headers render iff this is true).
+    effects_capable: bool,
+    /// The layer-blur slot: `(radius, active)` when a blur exists, else
+    /// `None`. Presence is a structure change (the radius/active rows
+    /// appear/vanish).
+    blur: Option<(f32, bool)>,
+    /// Edit buffer of the blur-radius number.
+    blur_buffer: Option<String>,
+    /// One entry per drop/inner shadow (bottom→top). Count is a structure
+    /// change (rows appear/vanish); per-entry value changes rebuild in
+    /// place.
+    shadows: Vec<ShadowSnapshot>,
+    /// Stroke geometry (present when the head node supports it): uniform
+    /// weight; align/cap/join as indices into the `STROKE_*` tables;
+    /// miter limit; dash length (0 = solid). Align/cap/join/miter/dash
+    /// are `None` for kinds without a stroke style (Line, Vector, text);
+    /// width is present for any stroked kind.
+    stroke_width: Option<f32>,
+    stroke_align: Option<usize>,
+    stroke_cap: Option<usize>,
+    stroke_join: Option<usize>,
+    stroke_miter: Option<f32>,
+    stroke_dash: Option<f32>,
+    /// Typed-entry buffers for the three stroke-geometry numbers.
+    stroke_width_buffer: Option<String>,
+    stroke_miter_buffer: Option<String>,
+    stroke_dash_buffer: Option<String>,
     /// Head node's position, when it has one.
     position: Option<(f32, f32)>,
     /// Head node's concrete size, when it has one.
@@ -139,6 +317,22 @@ struct Snapshot {
     clips_content: Option<bool>,
     /// Text alignment as an index into `TEXT_ALIGNS`.
     text_align: Option<usize>,
+    /// Typography (present when the head node is a text kind): font size
+    /// px; weight as the nearest index into `FONT_WEIGHTS`; italic flag;
+    /// line-height multiplier; letter-spacing px; vertical align as an
+    /// index into `TEXT_ALIGN_VERTICALS`. All present together (a text
+    /// kind carries the whole style) — the Text-section capability gate
+    /// keys on `font_size`.
+    font_size: Option<f32>,
+    font_weight: Option<usize>,
+    font_italic: Option<bool>,
+    line_height: Option<f32>,
+    letter_spacing: Option<f32>,
+    text_align_vertical: Option<usize>,
+    /// Typed-entry buffers for the three typography numbers.
+    font_size_buffer: Option<String>,
+    line_height_buffer: Option<String>,
+    letter_spacing_buffer: Option<String>,
     /// Typed-entry buffers of the X/Y/W/H inputs (retained widget
     /// state; part of the snapshot so a keystroke rebuilds the edited
     /// input's displayed text).
@@ -150,6 +344,26 @@ struct Snapshot {
     /// Edit buffers of the corner-radius and point-count numbers.
     corner_buffer: Option<String>,
     count_buffer: Option<String>,
+}
+
+/// One drop/inner shadow's displayed state — the per-entry projection the
+/// Shadows section diffs against. The four number edit buffers ride along
+/// so a keystroke rebuilds the edited input's text (the stroke/typography
+/// buffer pattern).
+#[derive(Debug, Clone, PartialEq)]
+struct ShadowSnapshot {
+    /// Drop (0) vs inner (1) — an index into `SHADOW_KINDS`.
+    kind: usize,
+    color: CGColor,
+    active: bool,
+    dx: f32,
+    dy: f32,
+    blur: f32,
+    spread: f32,
+    dx_buffer: Option<String>,
+    dy_buffer: Option<String>,
+    blur_buffer: Option<String>,
+    spread_buffer: Option<String>,
 }
 
 /// What the scene-mode panel (empty selection) was last built from.
@@ -167,6 +381,14 @@ fn optional_rows(s: &Snapshot) -> (bool, bool, bool, bool) {
         s.clips_content.is_some(),
         s.text_align.is_some(),
     )
+}
+
+/// The structural signature of the Effects sections: capability, whether
+/// the blur slot is filled (its rows render), and the shadow count. A
+/// change means a row appeared/vanished (a structure change → remount);
+/// per-shadow value edits (kind, color, params) are not shape changes.
+fn effects_shape(s: &Snapshot) -> (bool, bool, usize) {
+    (s.effects_capable, s.blur.is_some(), s.shadows.len())
 }
 
 /// A candidate swatch the picker may open from: `(widget id, bound
@@ -323,12 +545,6 @@ impl PropertiesPanel {
                 if prev.clips_content != snapshot.clips_content {
                     ui.rebuild_widget(&CLIP_ID.to_string(), Box::new(self.clip_toggle(&snapshot)));
                 }
-                if prev.text_align != snapshot.text_align {
-                    ui.rebuild_widget(
-                        &ALIGN_ID.to_string(),
-                        Box::new(self.align_segmented(&snapshot)),
-                    );
-                }
                 match (prev.position.is_some(), prev.size.is_some())
                     == (snapshot.position.is_some(), snapshot.size.is_some())
                 {
@@ -360,41 +576,32 @@ impl PropertiesPanel {
                         return;
                     }
                 }
-                // Fills: a structure change (entry count, or an entry's
-                // image-ness — its row shape) remounts the panel; a
-                // value-only change (recolor, solid⇄gradient kind swap,
-                // active) rebuilds just the changed entries' controls
-                // (PROP-7 for the fill list).
-                if fills_shape(prev) != fills_shape(&snapshot) {
+                // Paint lists (fills, strokes): a structure change
+                // (entry count, or an entry's image-ness — its row
+                // shape) remounts the panel; a value-only change
+                // (recolor, solid⇄gradient kind swap, active) rebuilds
+                // just the changed entries' controls (PROP-7 for the
+                // paint lists).
+                if paints_shape(prev, PaintTarget::Fill) != paints_shape(&snapshot, PaintTarget::Fill)
+                    || paints_shape(prev, PaintTarget::Stroke)
+                        != paints_shape(&snapshot, PaintTarget::Stroke)
+                    // Effects rows appearing/vanishing (capability, the
+                    // blur slot, or a shadow added/removed) is a structure
+                    // change → remount; per-entry value edits sync below.
+                    || effects_shape(prev) != effects_shape(&snapshot)
+                    // The miter row appears/vanishes with the join —
+                    // a structure change.
+                    || (prev.stroke_join == Some(0)) != (snapshot.stroke_join == Some(0))
+                {
                     ui.mount(vec![Box::new(self.panel(ui.viewport(), &snapshot))]);
                     self.snapshot = Some(snapshot);
                     return;
                 }
-                // Same shape (checked above): rebuild just the entries
-                // whose paint value changed (recolor / kind swap /
-                // active). Both are `Some` here — a `None`⇄`Some`
-                // difference is a shape change already handled above.
-                if let (Some(pf), Some(sf)) = (&prev.fills, &snapshot.fills) {
-                    for (i, paint) in sf.iter().enumerate() {
-                        if pf.get(i) == Some(paint) {
-                            continue;
-                        }
-                        if !matches!(paint, Paint::Image(_)) {
-                            ui.rebuild_widget(
-                                &fill_swatch_id(i),
-                                Box::new(self.fill_swatch(i, paint, &snapshot)),
-                            );
-                            ui.rebuild_widget(
-                                &fill_kind_id(i),
-                                Box::new(self.fill_kind(i, paint, &snapshot)),
-                            );
-                        }
-                        ui.rebuild_widget(
-                            &fill_active_id(i),
-                            Box::new(self.fill_active(i, paint, &snapshot)),
-                        );
-                    }
-                }
+                self.sync_paint_values(ui, PaintTarget::Fill, prev, &snapshot);
+                self.sync_paint_values(ui, PaintTarget::Stroke, prev, &snapshot);
+                self.sync_stroke_geometry(ui, prev, &snapshot);
+                self.sync_text(ui, prev, &snapshot);
+                self.sync_effects(ui, prev, &snapshot);
             }
             _ => {
                 let panel = self.panel(ui.viewport(), &snapshot);
@@ -425,6 +632,7 @@ impl PropertiesPanel {
             Some(WidgetState::Number(s)) => s.buffer.clone(),
             _ => None,
         };
+        let effects = editor.node_effects(head);
         Snapshot {
             name: editor.document().node_name(head).unwrap_or_default(),
             visible: editor.document().node_active(head).unwrap_or(true),
@@ -435,6 +643,55 @@ impl PropertiesPanel {
                 .unwrap_or(0),
             opacity: editor.node_opacity(head).unwrap_or(1.0),
             fills: editor.node_fills(head).map(|p| p.as_slice().to_vec()),
+            strokes: editor.node_strokes(head).map(|p| p.as_slice().to_vec()),
+            effects_capable: effects.is_some(),
+            blur: effects
+                .as_ref()
+                .and_then(|e| e.blur.as_ref())
+                .map(|b| (blur_radius(&b.blur), b.active)),
+            blur_buffer: number_buffer(BLUR_RADIUS_ID),
+            shadows: effects
+                .as_ref()
+                .map(|e| {
+                    e.shadows
+                        .iter()
+                        .enumerate()
+                        .map(|(i, s)| {
+                            let p = shadow_params(s);
+                            ShadowSnapshot {
+                                kind: shadow_kind_index(s),
+                                color: p.color,
+                                active: p.active,
+                                dx: p.dx,
+                                dy: p.dy,
+                                blur: p.blur,
+                                spread: p.spread,
+                                dx_buffer: number_buffer(&shadow_part_id(i, "dx")),
+                                dy_buffer: number_buffer(&shadow_part_id(i, "dy")),
+                                blur_buffer: number_buffer(&shadow_part_id(i, "blur")),
+                                spread_buffer: number_buffer(&shadow_part_id(i, "spread")),
+                            }
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            stroke_width: editor.node_stroke_width(head),
+            stroke_align: editor
+                .node_stroke_align(head)
+                .and_then(|a| STROKE_ALIGNS.iter().position(|(_, v)| *v == a)),
+            stroke_cap: editor
+                .node_stroke_cap(head)
+                .and_then(|c| STROKE_CAPS.iter().position(|(_, v)| *v == c)),
+            stroke_join: editor
+                .node_stroke_join(head)
+                .and_then(|j| STROKE_JOINS.iter().position(|(_, v)| *v == j)),
+            stroke_miter: editor.node_stroke_miter(head),
+            stroke_dash: editor
+                .node_stroke_dash(head)
+                .map(|d| d.first().copied().unwrap_or(0.0)),
+            stroke_width_buffer: number_buffer(STROKE_WIDTH_ID),
+            stroke_miter_buffer: number_buffer(STROKE_MITER_ID),
+            stroke_dash_buffer: number_buffer(STROKE_DASH_ID),
             position: editor.node_position(head),
             size: editor.node_size(head),
             corner_radius: editor.node_corner_radius(head),
@@ -443,6 +700,17 @@ impl PropertiesPanel {
             text_align: editor
                 .node_text_align(head)
                 .and_then(|a| TEXT_ALIGNS.iter().position(|(_, v)| *v == a)),
+            font_size: editor.node_font_size(head),
+            font_weight: editor.node_font_weight(head).map(font_weight_index),
+            font_italic: editor.node_font_italic(head),
+            line_height: editor.node_line_height(head),
+            letter_spacing: editor.node_letter_spacing(head),
+            text_align_vertical: editor
+                .node_text_align_vertical(head)
+                .and_then(|v| TEXT_ALIGN_VERTICALS.iter().position(|(_, x)| *x == v)),
+            font_size_buffer: number_buffer(TEXT_SIZE_ID),
+            line_height_buffer: number_buffer(TEXT_LINE_ID),
+            letter_spacing_buffer: number_buffer(TEXT_LETTER_ID),
             buffers,
             name_buffer,
             rotation_buffer,
@@ -470,20 +738,39 @@ impl PropertiesPanel {
         }
         // Candidate swatches, in priority order: each fill entry's
         // swatch (node selection), then the background swatch (scene).
-        // A fill swatch carries its entry index so the picker binds to
-        // `FillColor` at that paint.
+        // Each paint swatch (fills, then strokes) carries its entry
+        // index so the picker binds to that target's color property at
+        // that paint.
         let mut requests: Vec<SwatchRequest> = Vec::new();
-        if let Some(head) = editor.selection().first()
-            && let Some(fills) = editor.node_fills(head)
-        {
-            for i in 0..fills.as_slice().len() {
-                requests.push((
-                    fill_swatch_id(i),
-                    BindingProperty::FillColor,
-                    Some(i),
-                    editor.selection().to_vec(),
-                    "ui.fill.color".to_string(),
-                ));
+        if let Some(head) = editor.selection().first() {
+            for target in [PaintTarget::Fill, PaintTarget::Stroke] {
+                let stack = match target {
+                    PaintTarget::Fill => editor.node_fills(head),
+                    PaintTarget::Stroke => editor.node_strokes(head),
+                };
+                if let Some(paints) = stack {
+                    for i in 0..paints.as_slice().len() {
+                        requests.push((
+                            paint_swatch_id(target, i),
+                            target.color_prop(),
+                            Some(i),
+                            editor.selection().to_vec(),
+                            format!("ui.{}.color", target.entry_prefix()),
+                        ));
+                    }
+                }
+            }
+            // Each shadow entry's swatch opens the picker on its color.
+            if let Some(fx) = editor.node_effects(head) {
+                for i in 0..fx.shadows.len() {
+                    requests.push((
+                        shadow_swatch_id(i),
+                        BindingProperty::ShadowColor,
+                        Some(i),
+                        editor.selection().to_vec(),
+                        "ui.shadow.color".to_string(),
+                    ));
+                }
             }
         }
         requests.push((
@@ -567,11 +854,17 @@ impl PropertiesPanel {
         };
         let color = match open.property {
             BindingProperty::SceneBackground => editor.background_color(),
-            BindingProperty::FillColor => editor.selection().first().and_then(|id| {
-                let fills = editor.node_fills(id)?;
-                open.entry
-                    .and_then(|i| fills.as_slice().get(i).map(paint_swatch_color))
-            }),
+            BindingProperty::FillColor | BindingProperty::StrokeColor => {
+                editor.selection().first().and_then(|id| {
+                    let stack = if open.property == BindingProperty::StrokeColor {
+                        editor.node_strokes(id)?
+                    } else {
+                        editor.node_fills(id)?
+                    };
+                    open.entry
+                        .and_then(|i| stack.as_slice().get(i).map(paint_swatch_color))
+                })
+            }
             _ => editor
                 .selection()
                 .first()
@@ -718,16 +1011,14 @@ impl PropertiesPanel {
                 children: vec![Box::new(self.clip_toggle(snapshot))],
             }));
         }
-        if snapshot.text_align.is_some() {
-            children.push(Box::new(Row {
-                id: ALIGN_ROW_ID.to_string(),
-                label: "Align".to_string(),
-                width: self.width - 24.0,
-                height: 22.0,
-                children: vec![Box::new(self.align_segmented(snapshot))],
-            }));
-        }
-        self.push_fills(&mut children, snapshot);
+        self.push_text(&mut children, snapshot);
+        self.push_paints(&mut children, snapshot, PaintTarget::Fill);
+        self.push_paints(&mut children, snapshot, PaintTarget::Stroke);
+        self.push_stroke_geometry(&mut children, snapshot);
+        self.push_layer_blur(&mut children, snapshot);
+        self.push_shadows(&mut children, snapshot);
+        self.push_selection_colors(&mut children, snapshot);
+        self.push_export(&mut children);
         Panel {
             id: PANEL_ID.to_string(),
             title: "Properties".to_string(),
@@ -833,26 +1124,16 @@ impl PropertiesPanel {
         }
     }
 
-    /// Horizontal text alignment — a segmented control over
-    /// `TEXT_ALIGNS`, committing the chosen index.
+    /// Horizontal text alignment — a segmented control over `TEXT_ALIGNS`.
     fn align_segmented(&self, snapshot: &Snapshot) -> Segmented {
-        Segmented {
-            id: ALIGN_ID.to_string(),
-            options: TEXT_ALIGNS.iter().map(|(l, _)| Segment::new(*l)).collect(),
-            selected: snapshot
-                .text_align
-                .map(Field::Value)
-                .unwrap_or(Field::Mixed),
-            columns: 0,
-            width: self.width - 24.0 - 64.0 - 8.0,
-            height: 22.0,
-            binding: Binding {
-                property: BindingProperty::TextAlign,
-                targets: snapshot.selection.clone(),
-                label: "ui.align".to_string(),
-                entry: None,
-            },
-        }
+        self.enum_segmented(
+            snapshot,
+            ALIGN_ID,
+            TEXT_ALIGNS.iter().map(|(l, _)| *l).collect(),
+            snapshot.text_align,
+            BindingProperty::TextAlign,
+            "ui.align".to_string(),
+        )
     }
 
     /// Rotation — a scrubbable number in degrees (the binding converts
@@ -936,63 +1217,186 @@ impl PropertiesPanel {
         }
     }
 
-    /// The Fills section: a header (title + add) and one row per paint
-    /// in the stack (built top-most-first would reverse; the seed keeps
-    /// document order for now — the reversal is a later refinement).
-    /// Absent entirely when the head node carries no fills (`PROP-1`).
-    fn push_fills(&self, children: &mut Vec<Box<dyn Widget>>, snapshot: &Snapshot) {
-        let Some(fills) = &snapshot.fills else {
+    /// Rebuild just the paint entries whose value changed (same shape,
+    /// checked by the caller): recolor / kind swap / active. Both stacks
+    /// are `Some` here — a `None`⇄`Some` difference is a shape change
+    /// handled by a remount.
+    fn sync_paint_values(
+        &self,
+        ui: &mut UiLayer,
+        target: PaintTarget,
+        prev: &Snapshot,
+        snapshot: &Snapshot,
+    ) {
+        if let (Some(pf), Some(sf)) = (target.stack(prev), target.stack(snapshot)) {
+            for (i, paint) in sf.iter().enumerate() {
+                if pf.get(i) == Some(paint) {
+                    continue;
+                }
+                if !matches!(paint, Paint::Image(_)) {
+                    ui.rebuild_widget(
+                        &paint_swatch_id(target, i),
+                        Box::new(self.paint_swatch(target, i, paint, snapshot)),
+                    );
+                    ui.rebuild_widget(
+                        &paint_kind_id(target, i),
+                        Box::new(self.paint_kind(target, i, paint, snapshot)),
+                    );
+                }
+                ui.rebuild_widget(
+                    &paint_active_id(target, i),
+                    Box::new(self.paint_active(target, i, paint, snapshot)),
+                );
+            }
+        }
+    }
+
+    /// Rebuild the stroke-geometry widgets whose value changed (same
+    /// structure — miter presence checked by the caller). Numbers rebuild
+    /// on value *or* edit-buffer change (a keystroke); segmented on value.
+    fn sync_stroke_geometry(&self, ui: &mut UiLayer, prev: &Snapshot, snapshot: &Snapshot) {
+        if prev.stroke_width != snapshot.stroke_width
+            || prev.stroke_width_buffer != snapshot.stroke_width_buffer
+        {
+            ui.rebuild_widget(
+                &STROKE_WIDTH_ID.to_string(),
+                Box::new(self.number(
+                    snapshot,
+                    STROKE_WIDTH_ID,
+                    snapshot.stroke_width.unwrap_or(0.0),
+                    BindingProperty::StrokeWidth,
+                    Some(0.0),
+                )),
+            );
+        }
+        if prev.stroke_align != snapshot.stroke_align {
+            ui.rebuild_widget(
+                &STROKE_ALIGN_ID.to_string(),
+                Box::new(self.stroke_segmented(
+                    snapshot,
+                    STROKE_ALIGN_ID,
+                    STROKE_ALIGNS.iter().map(|(l, _)| *l).collect(),
+                    snapshot.stroke_align,
+                    BindingProperty::StrokeAlign,
+                    "align",
+                )),
+            );
+        }
+        if prev.stroke_cap != snapshot.stroke_cap {
+            ui.rebuild_widget(
+                &STROKE_CAP_ID.to_string(),
+                Box::new(self.stroke_segmented(
+                    snapshot,
+                    STROKE_CAP_ID,
+                    STROKE_CAPS.iter().map(|(l, _)| *l).collect(),
+                    snapshot.stroke_cap,
+                    BindingProperty::StrokeCap,
+                    "cap",
+                )),
+            );
+        }
+        if prev.stroke_join != snapshot.stroke_join {
+            ui.rebuild_widget(
+                &STROKE_JOIN_ID.to_string(),
+                Box::new(self.stroke_segmented(
+                    snapshot,
+                    STROKE_JOIN_ID,
+                    STROKE_JOINS.iter().map(|(l, _)| *l).collect(),
+                    snapshot.stroke_join,
+                    BindingProperty::StrokeJoin,
+                    "join",
+                )),
+            );
+        }
+        if snapshot.stroke_join == Some(0)
+            && (prev.stroke_miter != snapshot.stroke_miter
+                || prev.stroke_miter_buffer != snapshot.stroke_miter_buffer)
+        {
+            ui.rebuild_widget(
+                &STROKE_MITER_ID.to_string(),
+                Box::new(self.number(
+                    snapshot,
+                    STROKE_MITER_ID,
+                    snapshot.stroke_miter.unwrap_or(4.0),
+                    BindingProperty::StrokeMiter,
+                    Some(1.0),
+                )),
+            );
+        }
+        if prev.stroke_dash != snapshot.stroke_dash
+            || prev.stroke_dash_buffer != snapshot.stroke_dash_buffer
+        {
+            ui.rebuild_widget(
+                &STROKE_DASH_ID.to_string(),
+                Box::new(self.number(
+                    snapshot,
+                    STROKE_DASH_ID,
+                    snapshot.stroke_dash.unwrap_or(0.0),
+                    BindingProperty::StrokeDash,
+                    Some(0.0),
+                )),
+            );
+        }
+    }
+
+    /// A paint-list section (Fills or Strokes): a header (title + add)
+    /// and one row per paint in the stack. Absent entirely when the head
+    /// node carries no paints of this target (`PROP-1`). Document/paint
+    /// order for now — the top-most-first reversal is a later
+    /// refinement.
+    fn push_paints(
+        &self,
+        children: &mut Vec<Box<dyn Widget>>,
+        snapshot: &Snapshot,
+        target: PaintTarget,
+    ) {
+        let Some(paints) = target.stack(snapshot) else {
             return;
         };
         let add = Button {
-            id: FILLS_ADD_ID.to_string(),
+            id: paint_add_id(target),
             label: "＋".to_string(),
             active: false,
             width: 20.0,
             height: 16.0,
             commit: Some((
-                Binding {
-                    property: BindingProperty::Fills,
-                    targets: snapshot.selection.clone(),
-                    label: "ui.fill.add".to_string(),
-                    entry: None,
-                },
+                self.paint_binding(snapshot, target, target.list_prop(), None, "add"),
                 BindingValue::ListOp(ListOp::Add),
             )),
         };
-        children.push(Box::new(Row {
-            id: FILLS_HEADER_ID.to_string(),
-            label: "Fills".to_string(),
+        children.push(Box::new(SectionHeader {
+            id: paint_header_id(target),
+            label: target.title().to_string(),
             width: self.width - 24.0,
-            height: 20.0,
+            height: 22.0,
             children: vec![Box::new(add)],
         }));
-        for (i, paint) in fills.iter().enumerate() {
-            children.push(Box::new(self.fill_row(i, paint, snapshot)));
+        for (i, paint) in paints.iter().enumerate() {
+            children.push(Box::new(self.paint_row(target, i, paint, snapshot)));
         }
     }
 
-    /// One fill entry's row: solid/gradient paints show a swatch + kind
+    /// One paint entry's row: solid/gradient paints show a swatch + kind
     /// select; image paints show an "Image" label (source is
     /// host-gated). Both carry an active toggle and a remove button.
-    fn fill_row(&self, i: usize, paint: &Paint, snapshot: &Snapshot) -> Row {
+    fn paint_row(&self, target: PaintTarget, i: usize, paint: &Paint, snapshot: &Snapshot) -> Row {
         let mut kids: Vec<Box<dyn Widget>> = Vec::new();
         if matches!(paint, Paint::Image(_)) {
             kids.push(Box::new(Label {
-                id: fill_label_id(i),
+                id: paint_label_id(target, i),
                 text: "Image".to_string(),
                 width: 60.0,
                 height: 14.0,
                 font_size: 11.0,
             }));
         } else {
-            kids.push(Box::new(self.fill_swatch(i, paint, snapshot)));
-            kids.push(Box::new(self.fill_kind(i, paint, snapshot)));
+            kids.push(Box::new(self.paint_swatch(target, i, paint, snapshot)));
+            kids.push(Box::new(self.paint_kind(target, i, paint, snapshot)));
         }
-        kids.push(Box::new(self.fill_active(i, paint, snapshot)));
-        kids.push(Box::new(self.fill_remove(i, snapshot)));
+        kids.push(Box::new(self.paint_active(target, i, paint, snapshot)));
+        kids.push(Box::new(self.paint_remove(target, i, snapshot)));
         Row {
-            id: fill_row_id(i),
+            id: paint_row_id(target, i),
             label: String::new(),
             width: self.width - 24.0,
             height: 20.0,
@@ -1000,77 +1404,925 @@ impl PropertiesPanel {
         }
     }
 
-    /// The color swatch of fill `i` — its representative color (solid,
-    /// or the first gradient stop), opening the picker on the
-    /// `FillColor` binding at this entry.
-    fn fill_swatch(&self, i: usize, paint: &Paint, snapshot: &Snapshot) -> Swatch {
+    /// A binding for a paint control, with the shared `ui.<fill|stroke>`
+    /// history-label convention.
+    fn paint_binding(
+        &self,
+        snapshot: &Snapshot,
+        target: PaintTarget,
+        property: BindingProperty,
+        entry: Option<usize>,
+        verb: &str,
+    ) -> Binding {
+        Binding {
+            property,
+            targets: snapshot.selection.clone(),
+            label: format!("ui.{}.{verb}", target.entry_prefix()),
+            entry,
+        }
+    }
+
+    /// The color swatch of paint `i` — its representative color (solid,
+    /// or the first gradient stop), opening the picker on the target's
+    /// color binding at this entry.
+    fn paint_swatch(
+        &self,
+        target: PaintTarget,
+        i: usize,
+        paint: &Paint,
+        _snapshot: &Snapshot,
+    ) -> Swatch {
         Swatch {
-            id: fill_swatch_id(i),
+            id: paint_swatch_id(target, i),
             color: paint_swatch_color(paint),
             width: 20.0,
             height: 14.0,
             action: SwatchAction::OpenPicker,
-            binding: Binding {
-                property: BindingProperty::FillColor,
-                targets: snapshot.selection.clone(),
-                label: "ui.fill.color".to_string(),
-                entry: Some(i),
-            },
+            binding: self.paint_binding(_snapshot, target, target.color_prop(), Some(i), "color"),
         }
     }
 
-    /// The kind select of fill `i` (solid / the four gradients).
-    fn fill_kind(&self, i: usize, paint: &Paint, snapshot: &Snapshot) -> Select {
+    /// The kind select of paint `i` (solid / the four gradients).
+    fn paint_kind(
+        &self,
+        target: PaintTarget,
+        i: usize,
+        paint: &Paint,
+        _snapshot: &Snapshot,
+    ) -> Select {
         Select {
-            id: fill_kind_id(i),
+            id: paint_kind_id(target, i),
             options: PAINT_KINDS.iter().map(|k| k.to_string()).collect(),
             selected: Field::Value(paint_kind_index(paint)),
             width: 50.0,
             height: 20.0,
-            binding: Binding {
-                property: BindingProperty::FillKind,
-                targets: snapshot.selection.clone(),
-                label: "ui.fill.kind".to_string(),
-                entry: Some(i),
-            },
+            binding: self.paint_binding(_snapshot, target, target.kind_prop(), Some(i), "kind"),
         }
     }
 
-    /// The active toggle of fill `i` (disable without removing).
-    fn fill_active(&self, i: usize, paint: &Paint, snapshot: &Snapshot) -> Toggle {
+    /// The active toggle of paint `i` (disable without removing).
+    fn paint_active(
+        &self,
+        target: PaintTarget,
+        i: usize,
+        paint: &Paint,
+        _snapshot: &Snapshot,
+    ) -> Toggle {
         Toggle {
-            id: fill_active_id(i),
+            id: paint_active_id(target, i),
             value: Field::Value(paint.active()),
             look: ToggleLook::Check,
             size: 16.0,
-            binding: Binding {
-                property: BindingProperty::FillActive,
-                targets: snapshot.selection.clone(),
-                label: "ui.fill.active".to_string(),
-                entry: Some(i),
-            },
+            binding: self.paint_binding(_snapshot, target, target.active_prop(), Some(i), "active"),
         }
     }
 
-    /// The remove button of fill `i` — a commit-only `Fills`/`Remove`.
-    fn fill_remove(&self, i: usize, snapshot: &Snapshot) -> Button {
+    /// The remove button of paint `i` — a commit-only list `Remove`.
+    fn paint_remove(&self, target: PaintTarget, i: usize, _snapshot: &Snapshot) -> Button {
         Button {
-            id: fill_remove_id(i),
+            id: paint_remove_id(target, i),
             label: "✕".to_string(),
             active: false,
             width: 18.0,
             height: 16.0,
             commit: Some((
-                Binding {
-                    property: BindingProperty::Fills,
-                    targets: snapshot.selection.clone(),
-                    label: "ui.fill.remove".to_string(),
-                    entry: None,
-                },
+                self.paint_binding(_snapshot, target, target.list_prop(), None, "remove"),
                 BindingValue::ListOp(ListOp::Remove(i)),
             )),
         }
     }
+
+    /// Push a labeled single-control row — the section-builder idiom
+    /// shared by the Text and stroke-geometry sections.
+    fn push_row(
+        &self,
+        children: &mut Vec<Box<dyn Widget>>,
+        id: &str,
+        label: &str,
+        control: Box<dyn Widget>,
+        height: f32,
+    ) {
+        children.push(Box::new(Row {
+            id: id.to_string(),
+            label: label.to_string(),
+            width: self.width - 24.0,
+            height,
+            children: vec![control],
+        }));
+    }
+
+    /// The **Text** typography section (Slice A): font size / weight /
+    /// italic / line-height / letter-spacing / horizontal + vertical
+    /// align, authored on the node-level style. Absent for non-text
+    /// kinds (`PROP-1`; the gate keys on `font_size`). Font family,
+    /// decoration, transform, truncation, and per-run rich text are
+    /// later slices (named in TODO); text color/stroke ride the
+    /// Fills/Strokes sections.
+    fn push_text(&self, children: &mut Vec<Box<dyn Widget>>, snapshot: &Snapshot) {
+        let Some(size) = snapshot.font_size else {
+            return;
+        };
+        children.push(Box::new(SectionHeader {
+            id: TEXT_HEADER_ID.to_string(),
+            label: "Text".to_string(),
+            width: self.width - 24.0,
+            height: 22.0,
+            children: Vec::new(),
+        }));
+        self.push_row(
+            children,
+            TEXT_SIZE_ROW_ID,
+            "Size",
+            Box::new(self.number(
+                snapshot,
+                TEXT_SIZE_ID,
+                size,
+                BindingProperty::FontSize,
+                Some(1.0),
+            )),
+            20.0,
+        );
+        self.push_row(
+            children,
+            TEXT_WEIGHT_ROW_ID,
+            "Weight",
+            Box::new(self.font_weight_select(snapshot)),
+            20.0,
+        );
+        self.push_row(
+            children,
+            TEXT_ITALIC_ROW_ID,
+            "Italic",
+            Box::new(self.font_italic_toggle(snapshot)),
+            20.0,
+        );
+        self.push_row(
+            children,
+            TEXT_LINE_ROW_ID,
+            "Line",
+            Box::new(self.line_height_number(snapshot)),
+            20.0,
+        );
+        self.push_row(
+            children,
+            TEXT_LETTER_ROW_ID,
+            "Letter",
+            Box::new(self.letter_spacing_number(snapshot)),
+            20.0,
+        );
+        self.push_row(
+            children,
+            ALIGN_ROW_ID,
+            "Align",
+            Box::new(self.align_segmented(snapshot)),
+            22.0,
+        );
+        self.push_row(
+            children,
+            TEXT_VALIGN_ROW_ID,
+            "Vertical",
+            Box::new(self.valign_segmented(snapshot)),
+            22.0,
+        );
+    }
+
+    /// Font weight — a dropdown select over the named `FONT_WEIGHTS`.
+    fn font_weight_select(&self, snapshot: &Snapshot) -> Select {
+        Select {
+            id: TEXT_WEIGHT_ID.to_string(),
+            options: FONT_WEIGHTS.iter().map(|(l, _)| l.to_string()).collect(),
+            selected: snapshot
+                .font_weight
+                .map(Field::Value)
+                .unwrap_or(Field::Mixed),
+            width: self.width - 24.0 - 64.0 - 8.0,
+            height: 20.0,
+            binding: Binding {
+                property: BindingProperty::FontWeight,
+                targets: snapshot.selection.clone(),
+                label: "ui.text.weight".to_string(),
+                entry: None,
+            },
+        }
+    }
+
+    /// Italic — a checkbox toggle bound to `font_italic`.
+    fn font_italic_toggle(&self, snapshot: &Snapshot) -> Toggle {
+        Toggle {
+            id: TEXT_ITALIC_ID.to_string(),
+            value: Field::Value(snapshot.font_italic.unwrap_or(false)),
+            look: ToggleLook::Check,
+            size: 16.0,
+            binding: Binding {
+                property: BindingProperty::FontItalic,
+                targets: snapshot.selection.clone(),
+                label: "ui.text.italic".to_string(),
+                entry: None,
+            },
+        }
+    }
+
+    /// Line height — a scrubbable multiplier (`Factor`), ≥ 0, fine step.
+    fn line_height_number(&self, snapshot: &Snapshot) -> Number {
+        let mut n = self.number(
+            snapshot,
+            TEXT_LINE_ID,
+            snapshot.line_height.unwrap_or(1.0),
+            BindingProperty::LineHeight,
+            Some(0.0),
+        );
+        n.step = 0.1;
+        n
+    }
+
+    /// Letter spacing — a scrubbable px value (`Fixed`), may go negative.
+    fn letter_spacing_number(&self, snapshot: &Snapshot) -> Number {
+        let mut n = self.number(
+            snapshot,
+            TEXT_LETTER_ID,
+            snapshot.letter_spacing.unwrap_or(0.0),
+            BindingProperty::LetterSpacing,
+            None,
+        );
+        n.step = 0.1;
+        n
+    }
+
+    /// Vertical text alignment — a segmented control over
+    /// `TEXT_ALIGN_VERTICALS`.
+    fn valign_segmented(&self, snapshot: &Snapshot) -> Segmented {
+        self.enum_segmented(
+            snapshot,
+            TEXT_VALIGN_ID,
+            TEXT_ALIGN_VERTICALS.iter().map(|(l, _)| *l).collect(),
+            snapshot.text_align_vertical,
+            BindingProperty::TextAlignVertical,
+            "ui.text.valign".to_string(),
+        )
+    }
+
+    /// Rebuild the typography widgets whose value changed. Numbers rebuild
+    /// on value *or* edit-buffer change (a keystroke); select/segmented/
+    /// toggle on value.
+    fn sync_text(&self, ui: &mut UiLayer, prev: &Snapshot, snapshot: &Snapshot) {
+        if prev.text_align != snapshot.text_align {
+            ui.rebuild_widget(
+                &ALIGN_ID.to_string(),
+                Box::new(self.align_segmented(snapshot)),
+            );
+        }
+        if prev.font_size != snapshot.font_size
+            || prev.font_size_buffer != snapshot.font_size_buffer
+        {
+            ui.rebuild_widget(
+                &TEXT_SIZE_ID.to_string(),
+                Box::new(self.number(
+                    snapshot,
+                    TEXT_SIZE_ID,
+                    snapshot.font_size.unwrap_or(0.0),
+                    BindingProperty::FontSize,
+                    Some(1.0),
+                )),
+            );
+        }
+        if prev.font_weight != snapshot.font_weight {
+            ui.rebuild_widget(
+                &TEXT_WEIGHT_ID.to_string(),
+                Box::new(self.font_weight_select(snapshot)),
+            );
+        }
+        if prev.font_italic != snapshot.font_italic {
+            ui.rebuild_widget(
+                &TEXT_ITALIC_ID.to_string(),
+                Box::new(self.font_italic_toggle(snapshot)),
+            );
+        }
+        if prev.line_height != snapshot.line_height
+            || prev.line_height_buffer != snapshot.line_height_buffer
+        {
+            ui.rebuild_widget(
+                &TEXT_LINE_ID.to_string(),
+                Box::new(self.line_height_number(snapshot)),
+            );
+        }
+        if prev.letter_spacing != snapshot.letter_spacing
+            || prev.letter_spacing_buffer != snapshot.letter_spacing_buffer
+        {
+            ui.rebuild_widget(
+                &TEXT_LETTER_ID.to_string(),
+                Box::new(self.letter_spacing_number(snapshot)),
+            );
+        }
+        if prev.text_align_vertical != snapshot.text_align_vertical {
+            ui.rebuild_widget(
+                &TEXT_VALIGN_ID.to_string(),
+                Box::new(self.valign_segmented(snapshot)),
+            );
+        }
+    }
+
+    /// Stroke geometry rows (weight / align / cap / join / miter / dash),
+    /// appended below the Strokes paint rows when the head node has a
+    /// stroke. Align/cap/join/miter/dash render only for kinds with a
+    /// stroke style; miter only when the join is miter. Weight shows for
+    /// any stroked kind.
+    fn push_stroke_geometry(&self, children: &mut Vec<Box<dyn Widget>>, snapshot: &Snapshot) {
+        let has_stroke = snapshot.strokes.as_ref().is_some_and(|s| !s.is_empty());
+        if !has_stroke {
+            return;
+        }
+        if snapshot.stroke_width.is_some() {
+            self.push_row(
+                children,
+                STROKE_WIDTH_ROW_ID,
+                "Weight",
+                Box::new(self.number(
+                    snapshot,
+                    STROKE_WIDTH_ID,
+                    snapshot.stroke_width.unwrap_or(0.0),
+                    BindingProperty::StrokeWidth,
+                    Some(0.0),
+                )),
+                20.0,
+            );
+        }
+        if snapshot.stroke_align.is_some() {
+            self.push_row(
+                children,
+                STROKE_ALIGN_ROW_ID,
+                "Align",
+                Box::new(self.stroke_segmented(
+                    snapshot,
+                    STROKE_ALIGN_ID,
+                    STROKE_ALIGNS.iter().map(|(l, _)| *l).collect(),
+                    snapshot.stroke_align,
+                    BindingProperty::StrokeAlign,
+                    "align",
+                )),
+                22.0,
+            );
+        }
+        if snapshot.stroke_cap.is_some() {
+            self.push_row(
+                children,
+                STROKE_CAP_ROW_ID,
+                "Cap",
+                Box::new(self.stroke_segmented(
+                    snapshot,
+                    STROKE_CAP_ID,
+                    STROKE_CAPS.iter().map(|(l, _)| *l).collect(),
+                    snapshot.stroke_cap,
+                    BindingProperty::StrokeCap,
+                    "cap",
+                )),
+                22.0,
+            );
+        }
+        if snapshot.stroke_join.is_some() {
+            self.push_row(
+                children,
+                STROKE_JOIN_ROW_ID,
+                "Join",
+                Box::new(self.stroke_segmented(
+                    snapshot,
+                    STROKE_JOIN_ID,
+                    STROKE_JOINS.iter().map(|(l, _)| *l).collect(),
+                    snapshot.stroke_join,
+                    BindingProperty::StrokeJoin,
+                    "join",
+                )),
+                22.0,
+            );
+            // Miter limit only applies to the miter join (index 0).
+            if snapshot.stroke_join == Some(0) {
+                self.push_row(
+                    children,
+                    STROKE_MITER_ROW_ID,
+                    "Miter",
+                    Box::new(self.number(
+                        snapshot,
+                        STROKE_MITER_ID,
+                        snapshot.stroke_miter.unwrap_or(4.0),
+                        BindingProperty::StrokeMiter,
+                        Some(1.0),
+                    )),
+                    20.0,
+                );
+            }
+        }
+        if snapshot.stroke_dash.is_some() {
+            self.push_row(
+                children,
+                STROKE_DASH_ROW_ID,
+                "Dash",
+                Box::new(self.number(
+                    snapshot,
+                    STROKE_DASH_ID,
+                    snapshot.stroke_dash.unwrap_or(0.0),
+                    BindingProperty::StrokeDash,
+                    Some(0.0),
+                )),
+                20.0,
+            );
+        }
+    }
+
+    /// A single-select segmented control over an enum option table
+    /// (alignment, cap, join, …) — the shared builder the align / valign /
+    /// stroke controls delegate to.
+    fn enum_segmented(
+        &self,
+        snapshot: &Snapshot,
+        id: &str,
+        labels: Vec<&str>,
+        selected: Option<usize>,
+        property: BindingProperty,
+        label: String,
+    ) -> Segmented {
+        Segmented {
+            id: id.to_string(),
+            options: labels.into_iter().map(Segment::new).collect(),
+            selected: selected.map(Field::Value).unwrap_or(Field::Mixed),
+            columns: 0,
+            width: self.width - 24.0 - 64.0 - 8.0,
+            height: 22.0,
+            binding: Binding {
+                property,
+                targets: snapshot.selection.clone(),
+                label,
+                entry: None,
+            },
+        }
+    }
+
+    /// A stroke enum segmented control (align / cap / join).
+    fn stroke_segmented(
+        &self,
+        snapshot: &Snapshot,
+        id: &str,
+        labels: Vec<&str>,
+        selected: Option<usize>,
+        property: BindingProperty,
+        verb: &str,
+    ) -> Segmented {
+        self.enum_segmented(
+            snapshot,
+            id,
+            labels,
+            selected,
+            property,
+            format!("ui.stroke.{verb}"),
+        )
+    }
+
+    /// The **Layer blur** effect section (single slot): a header with an
+    /// enable toggle; when a blur exists, a Gaussian-radius number and an
+    /// active toggle. Absent for kinds that carry no effects (`PROP-1`).
+    /// Backdrop blur and progressive blur are later slices.
+    fn push_layer_blur(&self, children: &mut Vec<Box<dyn Widget>>, snapshot: &Snapshot) {
+        if !snapshot.effects_capable {
+            return;
+        }
+        children.push(Box::new(SectionHeader {
+            id: BLUR_HEADER_ID.to_string(),
+            label: "Layer blur".to_string(),
+            width: self.width - 24.0,
+            height: 22.0,
+            children: vec![Box::new(self.blur_enable_toggle(snapshot))],
+        }));
+        if let Some((radius, _)) = snapshot.blur {
+            self.push_row(
+                children,
+                BLUR_RADIUS_ROW_ID,
+                "Radius",
+                Box::new(self.blur_radius_number(snapshot, radius)),
+                20.0,
+            );
+            self.push_row(
+                children,
+                BLUR_ACTIVE_ROW_ID,
+                "On",
+                Box::new(self.blur_active_toggle(snapshot)),
+                20.0,
+            );
+        }
+    }
+
+    /// The blur enable toggle (in the section header) — presence of the
+    /// slot; flipping it adds a default blur or clears it.
+    fn blur_enable_toggle(&self, snapshot: &Snapshot) -> Toggle {
+        Toggle {
+            id: BLUR_ENABLE_ID.to_string(),
+            value: Field::Value(snapshot.blur.is_some()),
+            look: ToggleLook::Check,
+            size: 16.0,
+            binding: Binding {
+                property: BindingProperty::LayerBlurEnabled,
+                targets: snapshot.selection.clone(),
+                label: "ui.blur.enable".to_string(),
+                entry: None,
+            },
+        }
+    }
+
+    /// The blur Gaussian-radius number (≥ 0).
+    fn blur_radius_number(&self, snapshot: &Snapshot, radius: f32) -> Number {
+        self.number(
+            snapshot,
+            BLUR_RADIUS_ID,
+            radius,
+            BindingProperty::LayerBlurRadius,
+            Some(0.0),
+        )
+    }
+
+    /// The blur active toggle (disable without removing the slot).
+    fn blur_active_toggle(&self, snapshot: &Snapshot) -> Toggle {
+        Toggle {
+            id: BLUR_ACTIVE_ID.to_string(),
+            value: Field::Value(snapshot.blur.map(|(_, a)| a).unwrap_or(false)),
+            look: ToggleLook::Check,
+            size: 16.0,
+            binding: Binding {
+                property: BindingProperty::LayerBlurActive,
+                targets: snapshot.selection.clone(),
+                label: "ui.blur.active".to_string(),
+                entry: None,
+            },
+        }
+    }
+
+    /// The **Shadows** effect section (multi-valued): a header with an add
+    /// button and one entry per drop/inner shadow. Each entry is a control
+    /// row (kind select + color swatch + active toggle + remove) followed
+    /// by offset (X / Y), blur, and spread number rows. Absent for kinds
+    /// that carry no effects (`PROP-1`).
+    fn push_shadows(&self, children: &mut Vec<Box<dyn Widget>>, snapshot: &Snapshot) {
+        if !snapshot.effects_capable {
+            return;
+        }
+        let add = Button {
+            id: SHADOWS_ADD_ID.to_string(),
+            label: "＋".to_string(),
+            active: false,
+            width: 20.0,
+            height: 16.0,
+            commit: Some((
+                self.shadow_binding(snapshot, BindingProperty::Shadows, None, "add"),
+                BindingValue::ListOp(ListOp::Add),
+            )),
+        };
+        children.push(Box::new(SectionHeader {
+            id: SHADOWS_HEADER_ID.to_string(),
+            label: "Shadows".to_string(),
+            width: self.width - 24.0,
+            height: 22.0,
+            children: vec![Box::new(add)],
+        }));
+        for (i, shadow) in snapshot.shadows.iter().enumerate() {
+            self.push_shadow_entry(children, i, shadow, snapshot);
+        }
+    }
+
+    /// One shadow entry: a control row then its four parameter rows.
+    fn push_shadow_entry(
+        &self,
+        children: &mut Vec<Box<dyn Widget>>,
+        i: usize,
+        shadow: &ShadowSnapshot,
+        snapshot: &Snapshot,
+    ) {
+        children.push(Box::new(Row {
+            id: shadow_part_id(i, "row"),
+            label: String::new(),
+            width: self.width - 24.0,
+            height: 20.0,
+            children: vec![
+                Box::new(self.shadow_kind_select(i, shadow, snapshot)),
+                Box::new(self.shadow_swatch(i, shadow, snapshot)),
+                Box::new(self.shadow_active_toggle(i, shadow, snapshot)),
+                Box::new(self.shadow_remove(i, snapshot)),
+            ],
+        }));
+        self.push_row(
+            children,
+            &shadow_part_id(i, "dx.row"),
+            "X",
+            Box::new(self.shadow_number(
+                snapshot,
+                i,
+                "dx",
+                shadow.dx,
+                BindingProperty::ShadowDx,
+                None,
+            )),
+            20.0,
+        );
+        self.push_row(
+            children,
+            &shadow_part_id(i, "dy.row"),
+            "Y",
+            Box::new(self.shadow_number(
+                snapshot,
+                i,
+                "dy",
+                shadow.dy,
+                BindingProperty::ShadowDy,
+                None,
+            )),
+            20.0,
+        );
+        self.push_row(
+            children,
+            &shadow_part_id(i, "blur.row"),
+            "Blur",
+            Box::new(self.shadow_number(
+                snapshot,
+                i,
+                "blur",
+                shadow.blur,
+                BindingProperty::ShadowBlur,
+                Some(0.0),
+            )),
+            20.0,
+        );
+        self.push_row(
+            children,
+            &shadow_part_id(i, "spread.row"),
+            "Spread",
+            Box::new(self.shadow_number(
+                snapshot,
+                i,
+                "spread",
+                shadow.spread,
+                BindingProperty::ShadowSpread,
+                None,
+            )),
+            20.0,
+        );
+    }
+
+    /// A binding for a shadow control, with the shared `ui.shadow.<verb>`
+    /// history-label convention.
+    fn shadow_binding(
+        &self,
+        snapshot: &Snapshot,
+        property: BindingProperty,
+        entry: Option<usize>,
+        verb: &str,
+    ) -> Binding {
+        Binding {
+            property,
+            targets: snapshot.selection.clone(),
+            label: format!("ui.shadow.{verb}"),
+            entry,
+        }
+    }
+
+    /// The drop-vs-inner kind select of shadow `i`.
+    fn shadow_kind_select(&self, i: usize, shadow: &ShadowSnapshot, snapshot: &Snapshot) -> Select {
+        Select {
+            id: shadow_part_id(i, "kind"),
+            options: SHADOW_KINDS.iter().map(|k| k.to_string()).collect(),
+            selected: Field::Value(shadow.kind),
+            width: 50.0,
+            height: 20.0,
+            binding: self.shadow_binding(snapshot, BindingProperty::ShadowKind, Some(i), "kind"),
+        }
+    }
+
+    /// The color swatch of shadow `i`, opening the picker on its color.
+    fn shadow_swatch(&self, i: usize, shadow: &ShadowSnapshot, snapshot: &Snapshot) -> Swatch {
+        Swatch {
+            id: shadow_swatch_id(i),
+            color: shadow.color,
+            width: 20.0,
+            height: 14.0,
+            action: SwatchAction::OpenPicker,
+            binding: self.shadow_binding(snapshot, BindingProperty::ShadowColor, Some(i), "color"),
+        }
+    }
+
+    /// The active toggle of shadow `i` (disable without removing).
+    fn shadow_active_toggle(
+        &self,
+        i: usize,
+        shadow: &ShadowSnapshot,
+        snapshot: &Snapshot,
+    ) -> Toggle {
+        Toggle {
+            id: shadow_part_id(i, "active"),
+            value: Field::Value(shadow.active),
+            look: ToggleLook::Check,
+            size: 16.0,
+            binding: self.shadow_binding(
+                snapshot,
+                BindingProperty::ShadowActive,
+                Some(i),
+                "active",
+            ),
+        }
+    }
+
+    /// The remove button of shadow `i` — a commit-only list `Remove`.
+    fn shadow_remove(&self, i: usize, snapshot: &Snapshot) -> Button {
+        Button {
+            id: shadow_part_id(i, "remove"),
+            label: "✕".to_string(),
+            active: false,
+            width: 18.0,
+            height: 16.0,
+            commit: Some((
+                self.shadow_binding(snapshot, BindingProperty::Shadows, None, "remove"),
+                BindingValue::ListOp(ListOp::Remove(i)),
+            )),
+        }
+    }
+
+    /// An entry-addressed number for shadow `i`'s `part` (dx/dy/blur/
+    /// spread) — `self.number` with the binding pointed at `shadows[i]`.
+    fn shadow_number(
+        &self,
+        snapshot: &Snapshot,
+        i: usize,
+        part: &str,
+        value: f32,
+        property: BindingProperty,
+        min: Option<f32>,
+    ) -> Number {
+        let mut n = self.number(snapshot, &shadow_part_id(i, part), value, property, min);
+        n.binding.entry = Some(i);
+        n.binding.label = format!("ui.shadow.{part}");
+        n
+    }
+
+    /// Rebuild the effect widgets whose value changed (same structure —
+    /// blur presence and shadow count changes remounted via
+    /// `effects_shape`). Numbers rebuild on value *or* edit-buffer change
+    /// (a keystroke); select/swatch/toggle on value.
+    fn sync_effects(&self, ui: &mut UiLayer, prev: &Snapshot, snapshot: &Snapshot) {
+        if let Some((radius, active)) = snapshot.blur {
+            if prev.blur.map(|(r, _)| r) != Some(radius) || prev.blur_buffer != snapshot.blur_buffer
+            {
+                ui.rebuild_widget(
+                    &BLUR_RADIUS_ID.to_string(),
+                    Box::new(self.blur_radius_number(snapshot, radius)),
+                );
+            }
+            if prev.blur.map(|(_, a)| a) != Some(active) {
+                ui.rebuild_widget(
+                    &BLUR_ACTIVE_ID.to_string(),
+                    Box::new(self.blur_active_toggle(snapshot)),
+                );
+            }
+        }
+        for (i, s) in snapshot.shadows.iter().enumerate() {
+            let Some(p) = prev.shadows.get(i) else {
+                continue;
+            };
+            if p == s {
+                continue;
+            }
+            if p.kind != s.kind {
+                ui.rebuild_widget(
+                    &shadow_part_id(i, "kind"),
+                    Box::new(self.shadow_kind_select(i, s, snapshot)),
+                );
+            }
+            if p.color != s.color {
+                ui.rebuild_widget(
+                    &shadow_swatch_id(i),
+                    Box::new(self.shadow_swatch(i, s, snapshot)),
+                );
+            }
+            if p.active != s.active {
+                ui.rebuild_widget(
+                    &shadow_part_id(i, "active"),
+                    Box::new(self.shadow_active_toggle(i, s, snapshot)),
+                );
+            }
+            if p.dx != s.dx || p.dx_buffer != s.dx_buffer {
+                ui.rebuild_widget(
+                    &shadow_part_id(i, "dx"),
+                    Box::new(self.shadow_number(
+                        snapshot,
+                        i,
+                        "dx",
+                        s.dx,
+                        BindingProperty::ShadowDx,
+                        None,
+                    )),
+                );
+            }
+            if p.dy != s.dy || p.dy_buffer != s.dy_buffer {
+                ui.rebuild_widget(
+                    &shadow_part_id(i, "dy"),
+                    Box::new(self.shadow_number(
+                        snapshot,
+                        i,
+                        "dy",
+                        s.dy,
+                        BindingProperty::ShadowDy,
+                        None,
+                    )),
+                );
+            }
+            if p.blur != s.blur || p.blur_buffer != s.blur_buffer {
+                ui.rebuild_widget(
+                    &shadow_part_id(i, "blur"),
+                    Box::new(self.shadow_number(
+                        snapshot,
+                        i,
+                        "blur",
+                        s.blur,
+                        BindingProperty::ShadowBlur,
+                        Some(0.0),
+                    )),
+                );
+            }
+            if p.spread != s.spread || p.spread_buffer != s.spread_buffer {
+                ui.rebuild_widget(
+                    &shadow_part_id(i, "spread"),
+                    Box::new(self.shadow_number(
+                        snapshot,
+                        i,
+                        "spread",
+                        s.spread,
+                        BindingProperty::ShadowSpread,
+                        None,
+                    )),
+                );
+            }
+        }
+    }
+
+    /// The **Selection colors** section (read-only minimal
+    /// introduction): the distinct solid colors of the head node's
+    /// fills + strokes, listed as hex labels. The full spec aggregates
+    /// across the whole selection and offers recolor-all +
+    /// select-by-color — deferred. Reflects the last built (committed)
+    /// state; it does not live-update during an in-place recolor.
+    fn push_selection_colors(&self, children: &mut Vec<Box<dyn Widget>>, snapshot: &Snapshot) {
+        let mut hexes: Vec<String> = Vec::new();
+        for stack in [&snapshot.fills, &snapshot.strokes] {
+            for paint in stack.iter().flatten() {
+                if let Paint::Solid(p) = paint {
+                    let hex = color_hex(p.color);
+                    if !hexes.contains(&hex) {
+                        hexes.push(hex);
+                    }
+                }
+            }
+        }
+        if hexes.is_empty() {
+            return;
+        }
+        let cw = self.width - 24.0;
+        children.push(Box::new(SectionHeader {
+            id: SELECTION_COLORS_HEADER_ID.to_string(),
+            label: "Colors".to_string(),
+            width: cw,
+            height: 22.0,
+            children: Vec::new(),
+        }));
+        for (i, hex) in hexes.iter().enumerate() {
+            children.push(Box::new(Label {
+                id: selection_color_id(i),
+                text: hex.clone(),
+                width: cw,
+                height: 14.0,
+                font_size: 11.0,
+            }));
+        }
+    }
+
+    /// The **Export** section (scaffold minimal introduction): a header
+    /// and an honest note. Export presets have no document/editor domain
+    /// yet (format + scale, `IO-7`) — the section is present so it can
+    /// be prioritized, and names its own deferral rather than rendering
+    /// a control that does nothing.
+    fn push_export(&self, children: &mut Vec<Box<dyn Widget>>) {
+        let cw = self.width - 24.0;
+        children.push(Box::new(SectionHeader {
+            id: EXPORT_HEADER_ID.to_string(),
+            label: "Export".to_string(),
+            width: cw,
+            height: 22.0,
+            children: Vec::new(),
+        }));
+        children.push(Box::new(Label {
+            id: EXPORT_NOTE_ID.to_string(),
+            text: "No export presets".to_string(),
+            width: cw,
+            height: 14.0,
+            font_size: 11.0,
+        }));
+    }
+}
+
+/// `#RRGGBBAA` hex for a color (the selection-colors read-only list).
+fn color_hex(c: CGColor) -> String {
+    format!("#{:02X}{:02X}{:02X}{:02X}", c.r, c.g, c.b, c.a)
 }
 
 /// A fill entry's swatch color — the solid color, the first gradient
@@ -1106,14 +2358,14 @@ fn paint_kind_index(paint: &Paint) -> usize {
     }
 }
 
-/// The Fills section's *row-shape* signature: one flag per entry
-/// marking whether it is an image paint (image rows have a different
-/// control layout). A change here — count or image-ness — is a
-/// structure change that remounts the panel; recolor / kind-swap /
-/// active are value changes handled incrementally.
-fn fills_shape(snapshot: &Snapshot) -> Option<Vec<bool>> {
-    snapshot
-        .fills
+/// A paint section's *row-shape* signature: one flag per entry marking
+/// whether it is an image paint (image rows have a different control
+/// layout). A change here — count or image-ness — is a structure change
+/// that remounts the panel; recolor / kind-swap / active are value
+/// changes handled incrementally.
+fn paints_shape(snapshot: &Snapshot, target: PaintTarget) -> Option<Vec<bool>> {
+    target
+        .stack(snapshot)
         .as_ref()
         .map(|v| v.iter().map(|p| matches!(p, Paint::Image(_))).collect())
 }

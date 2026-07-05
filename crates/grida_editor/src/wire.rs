@@ -50,8 +50,12 @@
 
 use serde::{Deserialize, Serialize};
 
+use grida::cg::fe::{
+    FeBlur, FeGaussianBlur, FeLayerBlur, FeProgressiveBlur, FeShadow, FilterShadowEffect,
+};
 use grida::cg::prelude::{
-    BlendMode, CGColor, LayerBlendMode, Paints, StrokeMarkerPreset, TextAlign,
+    Alignment, BlendMode, CGColor, LayerBlendMode, Paints, StrokeAlign, StrokeCap, StrokeJoin,
+    StrokeMarkerPreset, TextAlign, TextAlignVertical, TextLetterSpacing, TextLineHeight,
 };
 use grida::node::factory::NodeFactory;
 use grida::node::schema::{Node, NodeTrait};
@@ -520,6 +524,24 @@ pub struct WirePatch {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fills: Option<Paints>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strokes: Option<Paints>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stroke_width: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stroke_align: Option<StrokeAlign>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stroke_cap: Option<StrokeCap>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stroke_join: Option<StrokeJoin>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stroke_miter: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stroke_dash: Option<Vec<f32>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layer_blur: Option<Option<WireLayerBlur>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shadows: Option<Vec<WireShadowEffect>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blend_mode: Option<WireBlendMode>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub corner_radius: Option<f32>,
@@ -529,6 +551,18 @@ pub struct WirePatch {
     pub clips_content: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_align: Option<TextAlign>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_align_vertical: Option<TextAlignVertical>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font_size: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font_weight: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font_italic: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line_height: Option<TextLineHeight>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub letter_spacing: Option<TextLetterSpacing>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position: Option<(f32, f32)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -555,11 +589,26 @@ impl From<&PropPatch> for WirePatch {
             opacity,
             fill_solid,
             fills,
+            strokes,
+            stroke_width,
+            stroke_align,
+            stroke_cap,
+            stroke_join,
+            stroke_miter,
+            stroke_dash,
+            layer_blur,
+            shadows,
             blend_mode,
             corner_radius,
             point_count,
             clips_content,
             text_align,
+            text_align_vertical,
+            font_size,
+            font_weight,
+            font_italic,
+            line_height,
+            letter_spacing,
             position,
             size,
             rotation,
@@ -573,11 +622,30 @@ impl From<&PropPatch> for WirePatch {
             opacity: *opacity,
             fill_solid: *fill_solid,
             fills: fills.clone(),
+            strokes: strokes.clone(),
+            stroke_width: *stroke_width,
+            stroke_align: *stroke_align,
+            stroke_cap: *stroke_cap,
+            stroke_join: *stroke_join,
+            stroke_miter: *stroke_miter,
+            stroke_dash: stroke_dash.clone(),
+            layer_blur: layer_blur
+                .as_ref()
+                .map(|slot| slot.as_ref().map(WireLayerBlur::from)),
+            shadows: shadows
+                .as_ref()
+                .map(|v| v.iter().map(WireShadowEffect::from).collect()),
             blend_mode: blend_mode.map(WireBlendMode::from),
             corner_radius: *corner_radius,
             point_count: *point_count,
             clips_content: *clips_content,
             text_align: *text_align,
+            text_align_vertical: *text_align_vertical,
+            font_size: *font_size,
+            font_weight: *font_weight,
+            font_italic: *font_italic,
+            line_height: line_height.clone(),
+            letter_spacing: *letter_spacing,
             position: *position,
             size: *size,
             rotation: *rotation,
@@ -598,11 +666,26 @@ impl From<&WirePatch> for PropPatch {
             opacity,
             fill_solid,
             fills,
+            strokes,
+            stroke_width,
+            stroke_align,
+            stroke_cap,
+            stroke_join,
+            stroke_miter,
+            stroke_dash,
+            layer_blur,
+            shadows,
             blend_mode,
             corner_radius,
             point_count,
             clips_content,
             text_align,
+            text_align_vertical,
+            font_size,
+            font_weight,
+            font_italic,
+            line_height,
+            letter_spacing,
             position,
             size,
             rotation,
@@ -616,11 +699,30 @@ impl From<&WirePatch> for PropPatch {
             opacity: *opacity,
             fill_solid: *fill_solid,
             fills: fills.clone(),
+            strokes: strokes.clone(),
+            stroke_width: *stroke_width,
+            stroke_align: *stroke_align,
+            stroke_cap: *stroke_cap,
+            stroke_join: *stroke_join,
+            stroke_miter: *stroke_miter,
+            stroke_dash: stroke_dash.clone(),
+            layer_blur: layer_blur
+                .as_ref()
+                .map(|slot| slot.as_ref().map(FeLayerBlur::from)),
+            shadows: shadows
+                .as_ref()
+                .map(|v| v.iter().map(FilterShadowEffect::from).collect()),
             blend_mode: blend_mode.map(Into::into),
             corner_radius: *corner_radius,
             point_count: *point_count,
             clips_content: *clips_content,
             text_align: *text_align,
+            text_align_vertical: *text_align_vertical,
+            font_size: *font_size,
+            font_weight: *font_weight,
+            font_italic: *font_italic,
+            line_height: line_height.clone(),
+            letter_spacing: *letter_spacing,
             position: *position,
             size: *size,
             rotation: *rotation,
@@ -672,6 +774,148 @@ impl From<WireBlendMode> for LayerBlendMode {
         match m {
             WireBlendMode::PassThrough => LayerBlendMode::PassThrough,
             WireBlendMode::Blend(b) => LayerBlendMode::Blend(b),
+        }
+    }
+}
+
+// -- Layer effects on the wire --------------------------------------------
+// The engine's effect types are not `Serialize` (the reason this module
+// exists), so the effect patch domains get explicit serializable mirrors
+// (`DOC-3`). `Alignment` / `CGColor` / `f32` are already `Serialize`, so
+// there is no encoding obstacle.
+
+/// [`FeBlur`] on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireBlur {
+    Gaussian {
+        radius: f32,
+    },
+    Progressive {
+        start: Alignment,
+        end: Alignment,
+        radius: f32,
+        radius2: f32,
+    },
+}
+
+impl From<&FeBlur> for WireBlur {
+    fn from(b: &FeBlur) -> Self {
+        match b {
+            FeBlur::Gaussian(g) => WireBlur::Gaussian { radius: g.radius },
+            FeBlur::Progressive(p) => WireBlur::Progressive {
+                start: p.start,
+                end: p.end,
+                radius: p.radius,
+                radius2: p.radius2,
+            },
+        }
+    }
+}
+
+impl From<&WireBlur> for FeBlur {
+    fn from(b: &WireBlur) -> Self {
+        match *b {
+            WireBlur::Gaussian { radius } => FeBlur::Gaussian(FeGaussianBlur { radius }),
+            WireBlur::Progressive {
+                start,
+                end,
+                radius,
+                radius2,
+            } => FeBlur::Progressive(FeProgressiveBlur {
+                start,
+                end,
+                radius,
+                radius2,
+            }),
+        }
+    }
+}
+
+/// [`FeLayerBlur`] on the wire (the layer-blur slot value).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct WireLayerBlur {
+    pub blur: WireBlur,
+    pub active: bool,
+}
+
+impl From<&FeLayerBlur> for WireLayerBlur {
+    fn from(b: &FeLayerBlur) -> Self {
+        Self {
+            blur: WireBlur::from(&b.blur),
+            active: b.active,
+        }
+    }
+}
+
+impl From<&WireLayerBlur> for FeLayerBlur {
+    fn from(b: &WireLayerBlur) -> Self {
+        Self {
+            blur: FeBlur::from(&b.blur),
+            active: b.active,
+        }
+    }
+}
+
+/// [`FeShadow`] on the wire — the drop/inner shadow parameters.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct WireShadow {
+    pub dx: f32,
+    pub dy: f32,
+    pub blur: f32,
+    pub spread: f32,
+    pub color: CGColor,
+    pub active: bool,
+}
+
+impl From<&FeShadow> for WireShadow {
+    fn from(s: &FeShadow) -> Self {
+        Self {
+            dx: s.dx,
+            dy: s.dy,
+            blur: s.blur,
+            spread: s.spread,
+            color: s.color,
+            active: s.active,
+        }
+    }
+}
+
+impl From<&WireShadow> for FeShadow {
+    fn from(s: &WireShadow) -> Self {
+        Self {
+            dx: s.dx,
+            dy: s.dy,
+            blur: s.blur,
+            spread: s.spread,
+            color: s.color,
+            active: s.active,
+        }
+    }
+}
+
+/// [`FilterShadowEffect`] on the wire (the drop-vs-inner discriminant).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireShadowEffect {
+    Drop(WireShadow),
+    Inner(WireShadow),
+}
+
+impl From<&FilterShadowEffect> for WireShadowEffect {
+    fn from(s: &FilterShadowEffect) -> Self {
+        match s {
+            FilterShadowEffect::DropShadow(sh) => WireShadowEffect::Drop(WireShadow::from(sh)),
+            FilterShadowEffect::InnerShadow(sh) => WireShadowEffect::Inner(WireShadow::from(sh)),
+        }
+    }
+}
+
+impl From<&WireShadowEffect> for FilterShadowEffect {
+    fn from(s: &WireShadowEffect) -> Self {
+        match s {
+            WireShadowEffect::Drop(sh) => FilterShadowEffect::DropShadow(FeShadow::from(sh)),
+            WireShadowEffect::Inner(sh) => FilterShadowEffect::InnerShadow(FeShadow::from(sh)),
         }
     }
 }

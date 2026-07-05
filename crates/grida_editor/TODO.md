@@ -14,10 +14,16 @@ citing test is _unverified_: those are tracked under
 [Contract coverage](#contract-coverage) rather than by unchecking a
 shipped concept.
 
-Suite status: **396 tests green** (core; 406 under `--features shell`)
-across 26 contract suites, plus a shell-gated raster suite
+Suite status: **443 tests green** (core; 453 under `--features shell`)
+across 28 contract suites, plus a shell-gated raster suite
 (`tests/menu_render.rs`, run under `--features shell`) (2026-07-05; +`tests/align_contracts.rs`, ALIGN 7/7; +`tests/paint_contracts.rs`,
-the `fills` binding domain). Coverage numbers below are `grep`-derived: ids defined
+the `fills` binding domain; +`tests/text_contracts.rs`, the typography
+binding domain; +`tests/effect_contracts.rs`, the layer-effects binding
+domain (Slice 1 — blur + shadows, 14/14); + grouping-wiring tests —
+`grp_contracts` multi-ungroup composition + GRP-5 retarget targets,
+`menu_contracts` ungroup enablement, `key_contracts` Mod+G/Shift+G/Alt+G
+resolve).
+Coverage numbers below are `grep`-derived: ids defined
 in `docs/wg/canvas/**, the feat-* studies, and this crate's docs/**` vs ids cited in `tests/**`.
 
 ## Milestones ([harness.md](./docs/harness.md))
@@ -106,7 +112,13 @@ in `docs/wg/canvas/**, the feat-* studies, and this crate's docs/**` vs ids cite
       nudge key capture. Deferred, named in `src/vector/mod.rs`:
       lasso tool, width facet, VSNAP, region derivation.
 - [x] **snap** — [spec](../../docs/wg/canvas/snap.md) · `src/snap.rs`
-      · `tests/snap_contracts.rs` (SNAP 11/11)
+      · `tests/snap_contracts.rs` (SNAP 11/11). Group-descent
+      refinement newly specced (SNAP-12..15): snap targets are the
+      rendered *atoms* — descend groups to their contents, drop the
+      group's derived envelope (a behavior change from the current
+      bbox+leaves neighborhood), keep opaque composites (boolean /
+      instance) as leaves, rigidity / self-exclusion / degenerate
+      rejection. Impl + tests pending.
 - [ ] **snap — vector** —
       [spec](../../docs/wg/feat-vector-network/snap-vector.md) is a placeholder
       (VSNAP reserved); blocked on the `math2` point-anchor snapping
@@ -134,9 +146,10 @@ in `docs/wg/canvas/**, the feat-* studies, and this crate's docs/**` vs ids cite
       behavior). The Arrange z-order rows resolve via `src/arrange.rs`
       (unit-tested). Sheet rows whose commands await their features
       are **not shipped** (named in `src/keys.rs` module docs):
-      group/ungroup/auto-layout, boolean, text style, outline mode,
+      auto-layout, boolean, text style, outline mode,
       color picker, toggle locked (no `locked` prop yet), remove
-      fill/stroke. Align & distribute now ship (see **align**).
+      fill/stroke. Align & distribute now ship (see **align**); group /
+      ungroup / group-with-container ship (see **grouping**).
 - [ ] **routing** — [spec](./docs/routing.md); chain
       dispatch, `claims`, and the capture-layer order are live
       (`src/keys.rs` + the shell's key routing; ROUTE-1/3 cited).
@@ -162,19 +175,31 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
 (each inserts one adopting parent per group). Spec-only; impl pending.
 
 - [ ] **grouping** — [spec](../../docs/wg/canvas/grouping.md)
-      (GRP-1..6) done; impl partial. The pure resolver
+      (GRP-1..6) done; impl substantial. The pure resolver
       (`src/grouping.rs` — `group`/`ungroup`, the align.rs pattern: over
       the working copy + world-bounds oracle + injected id minter → one
       history entry) ships with `tests/grp_contracts.rs` (GRP-1/2/3/4
       cited, incl. cross-parent per-partition wrap, world-position hold
       under a nested parent, frontmost-slot depth, ungroup round-trip,
-      container-wrap). Remaining: command-surface wiring
-      (`Command::Group`/`Ungroup`/`GroupWithContainer` + keys/shell
-      bounds oracle — the sheet's Arrange rows exist but dispatch
-      nothing yet), GRP-5 selection retarget (shell), GRP-6 scene
-      single-child refusal (needs the scene-constraints query).
-      v1 assumes pure-translation parent/wrapper (`frame_origin`
-      doctrine).
+      container-wrap). **Command wired** (2026-07): `Command::Group`/
+      `Ungroup`/`GroupWithContainer` dispatch from the sheet's Arrange
+      rows (`Mod+G` / `Mod+Shift+G` / `Mod+Alt+G`, `src/keys.rs`) and the
+      canvas context menu (`src/menu.rs`, Ungroup gated on a dissolvable
+      member). Shell handlers (`src/shell/app.rs`): `group_selection`
+      pre-mints one wrapper id per partition (the flatten pool pattern)
+      and resolves against the engine world bounds; `ungroup_selection`
+      dissolves every selected group as one entry, ordering them by
+      **descending** document index so the single-id resolver's batches
+      compose (`grp_contracts` multi-ungroup arbiter), skipping a
+      dissolvable nested under another (deferred). GRP-5 selection
+      retarget lands shell-side (wrap → the new wrappers, ungroup → the
+      promoted children); its resolver-derived *targets* are cited
+      (`grp_5_retarget_targets_are_resolver_derived`), the `set_selection`
+      call itself is shell (like TRAV-5's split). Remaining: GRP-6 scene
+      single-child refusal (needs the scene-constraints query), the
+      nested-selection ungroup edge, and auto-layout (`Shift+A`, its own
+      command family). v1 assumes pure-translation parent/wrapper
+      (`frame_origin` doctrine).
 - [ ] **auto-layout** — [spec](../../docs/wg/canvas/auto-layout.md)
       (ALY-1..5) done; impl pending. Wrap-and-infer flex container per
       partition (`Shift+A`) + apply-in-place on an existing container;
@@ -197,7 +222,7 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
       `src/shell/app.rs`) run `flatten_selection` over the whole
       selection with a pre-minted id pool; menu enablement widened to
       `mode::can_flatten` (multi-select + vectors), replacing the old
-      single-only gate; `ctx_contracts` CTX-2 updated to the widened
+      single-only gate; `menu_contracts` MENU-2 updated to the widened
       capability. **Text now flattens** via delegation: `flatten_selection`
       takes an injected `outline` closure and, for a text member, bakes it
       through the same primitive **create outlines** ↓ uses
@@ -259,7 +284,7 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
       host image store only: image nodes are outside the wire subset —
       sync/copy of one fails loudly — and `.grida` save falls back to
       an unknown-node slot).
-- [ ] **context menu** — [spec](./docs/context-menu.md)
+- [ ] **context menu** — [spec](./docs/menu.md)
       · canvas menu live: the menu-as-data surface (`src/menu.rs`
       over the `src/command.rs` registry — the closed action /
       submenu / separator taxonomy, enablement dry-run through the
@@ -267,18 +292,35 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
       (`src/ui/menu.rs`: flip-then-clamp placement, the
       `UiLayer::set_capture` popup grab, submenu, keyboard
       navigation, sheet-derived shortcut hints), shell wiring
-      (secondary press → CTX-4 retarget → open at point), and the
+      (secondary press → MENU-5 retarget → open at point), and the
       Copy name / Copy ID reference additions ·
-      `tests/ctx_contracts.rs` (CTX-1/2/4 cited) + a headless raster
+      `tests/menu_contracts.rs` (MENU-1/2/4 cited) + a headless raster
       probe (`tests/menu_render.rs`) proving the scene actually paints
       — rows flow inside a Flex panel and each panel is its own
       top-level scene root (the engine runs no layout for a `Normal`
       container's children and lays out only the _first_ absolute
       child of a Flex parent — so per-row absolute placement painted
       only row 0, and a second panel sibling vanished). Remaining:
-      CTX-3
-      point-targeted paste, the layer/scene/ruler-row menus (CTX-5
+      MENU-4
+      point-targeted paste, the layer/scene/ruler-row menus (MENU-6
       rides the scene-row menu), the in-mode (vector-edit) menu.
+- [ ] **application menu** — [spec](./docs/menu.md) "The application
+      menu" · inventory-as-data live: `menu::application_menu` builds
+      the File/Edit/Object/Arrange/View/(Text)/Settings bar over the
+      command registry, live rows wired + enablement dry-run, unbuilt
+      rows shown **deferred** (`MENU-7`: inert `Item::Deferred`
+      placeholders naming their blocking system — the bar is the
+      enumerated backlog). `tests/menu_contracts.rs` (MENU-1 actionable
+      / MENU-7 inert / MENU-2 undo-redo cited) + the native-routing
+      contract `Menu::command_bindings` (MENU-1). Native host wired:
+      `src/shell/menubar.rs` builds a **muda** menu bar from the value,
+      installed on macOS (`init_for_nsapp`), activations drained in
+      `about_to_wait` → registry command; the bar rebuilds on selection
+      / command change (`menu_dirty`). Remaining: accelerator display
+      (MENU-3 — held off to avoid double-dispatch with the winit
+      keybinding routing), the non-macOS install (per-window HWND/gtk),
+      and wiring the deferred systems (file dialogs, boolean ops, mask,
+      transforms, text attributes, layout, settings) as commands land.
 
 ### Panels & UI
 
@@ -353,13 +395,47 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
       remaining slices (each reuses the fills machinery — `PropPatch`
       list domain → `Binding::entry` / bind-owned resolvers → atoms
       assembled in the panel → contract tests):
-  - [ ] **strokes** — `PropPatch.strokes: Paints` + stroke geometry
-        (`stroke_width` uniform/rectangular, `stroke_align`,
-        `stroke_cap`, `stroke_join`, `stroke_miter_limit`,
-        `stroke_dash_array`) as patch domains (invert/serialize/validate + `doc_contracts`); `Editor::node_strokes` + stroke-prop
-        queries; `BindingProperty::{Strokes, Stroke*}`; a Strokes
-        section (paint rows + width/align/cap/join/miter/dash controls).
-        The **next slice**.
+  - [~] **strokes** — paint list + geometry **shipped** (2026-07):
+        `PropPatch.strokes: Paints` (invert/serialize/validate,
+        `paint_contracts`) + `Editor::node_strokes`;
+        `BindingProperty::{Strokes, Stroke*}` sharing the fill resolvers;
+        a Strokes section built by the same `PaintTarget` code path as
+        Fills (swatch→picker, kind, active, add/remove). **Geometry**
+        now shipped: `PropPatch.{stroke_width,stroke_align,stroke_cap,
+        stroke_join,stroke_miter,stroke_dash}` (uniform weight normalized
+        across the 3 engine width reps; align/cap/join/miter/dash via
+        `stroke_style`) + `Editor::node_stroke_*` queries +
+        `STROKE_ALIGNS/CAPS/JOINS` bindings + panel rows (weight number,
+        align/cap/join segmented, miter number when join=miter, dash
+        number = 0-solid). Tests: `doc_contracts` geometry round-trip +
+        empty-dash-clears + unsupported-kind reject; `paint_contracts`
+        width/cap/dash bindings; `ui_contracts` geometry rows render.
+        Remaining (refine): per-side (rectangular) width; Line/Vector's
+        flattened geometry + **markers** (start/end shapes); dash
+        multi-segment sequence + solid/dashed class control.
+  - [~] **text typography** — Slice A (core) **shipped** (2026-07):
+        `PropPatch.{text_align_vertical,font_size,font_weight,font_italic,
+        line_height,letter_spacing}` authored on the node-level style
+        (`node_text_style(_mut)` — the `stroke_style` pattern; text has no
+        `Node::text_style()` accessor) + `Editor::node_font_*` queries +
+        `FontSize/FontWeight/FontItalic/LineHeight/LetterSpacing/
+        TextAlignVertical` bindings + a **Text** section (size number,
+        weight select, italic toggle, line/letter numbers, horizontal +
+        vertical align segmented — the old inline align row folded in).
+        Enum-payload fields author one variant (line-height `Factor`,
+        letter-spacing `Fixed`); the inverse carries the whole prior enum
+        (exact undo). `node_signature` folds a `TextStyleSignature`
+        projection (`TextStyleRec` has no `PartialEq`). Tests:
+        `doc_contracts` typography round-trip + line-height variant-inverse
+        + non-text reject; `text_contracts` (10, the bind layer);
+        `ui_contracts` Text-section render. Remaining (later slices, named):
+        **B** — font family (host-gated catalog) + family-aware weight/
+        italic dropdown; **C** — text-details (transform, decoration line +
+        sub-details, truncation `max_lines`/`ellipsis`/`max_length`,
+        word-spacing, vertical trim); **D** — per-run `AttributedText`
+        rich text, variable-font axes + `font_features` + optical sizing,
+        line/letter/word Fixed⇄Factor mode toggle. Text color/stroke ride
+        the Fills/Strokes sections (text carries `fills`/`strokes`).
   - [ ] **gradient stop-track editor** — the missing Tier-2 composite
         (stop ramp: add / move / remove stops, per-stop offset + color);
         opens a paint **session** (MODE-5). Today gradients are
@@ -375,13 +451,33 @@ Per-partition commands over [selection partition](../../docs/wg/canvas/ux-surfac
         [io-external](../../docs/wg/canvas/io-external.md)) + fit
         segmented + transform; today image fills render + reorder/toggle
         but their source is not authorable.
-  - [ ] **effects section** — effect list (drop/inner shadow, layer /
-        backdrop blur, noise) — the effect composite over the same list
-        machinery.
-  - [ ] **export section** — per-node export presets (format select +
-        scale number), the list machinery + `IO-7`.
-  - [ ] **selection colors** — the aggregated distinct-paint list across
-        a multi-selection (recolor-all + select-by-color command).
+  - [~] **effects section** — Slice 1 **authorable** (2026-07): the
+        engine's `LayerEffects` is a structured bag (not a flat list), so
+        the panel gives **one section per slot, cardinality from the
+        spec** (not web's flat cascade). Shipped: **Layer blur** (single
+        `Option` slot — enable toggle / Gaussian radius / active) +
+        **Shadows** (multi `Vec` — add/list/remove, per-entry drop-vs-inner
+        kind, color picker, active, dx/dy/blur/spread). `PropPatch.
+        {layer_blur: Option<Option<FeLayerBlur>>, shadows:
+        Option<Vec<FilterShadowEffect>>}` + `node_effects_mut` per-kind
+        match (engine has `effects()` but no `effects_mut()`) +
+        `Editor::node_effects` + `BindingProperty::{LayerBlur*, Shadows,
+        Shadow*}` + wire mirrors (`WireBlur`/`WireLayerBlur`/`WireShadow`/
+        `WireShadowEffect` — effect types aren't `Serialize`). Enum-payload
+        author-one-variant, inverse-carries-whole-slot (blur v1 = Gaussian).
+        `node_signature` promoted from 12-tuple to named `NodeSignature`
+        struct (+`effects`). Tests: `effect_contracts` (14) + doc
+        round-trip/inverse/reject + ui render. **Deferred (Slices 2–4):**
+        backdrop blur (single, = layer-blur clone), noise (multi, coloring
+        + blend), glass (single, 6 params, rect-only), progressive blur.
+  - [~] **export section** — **introduced** scaffold (2026-07): a
+        present-but-deferred header + honest note (no authoring domain
+        yet). Remaining (refine): per-node export presets (format select
+        + scale number), the list machinery + `IO-7`.
+  - [~] **selection colors** — **introduced** read-only (2026-07): the
+        head node's distinct solid fill/stroke colors listed as hex.
+        Remaining (refine): aggregate across the whole selection,
+        live-update on recolor, recolor-all + select-by-color command.
   - [ ] **mixed-value** (`PROP-2` / `WID-6`) — the paint list is
         editable only when all selected nodes have equal stacks
         (`PROP-6` guard); heterogeneous → a single mixed indicator.
@@ -415,7 +511,7 @@ test cites them):
 - [ ] SURF-1, SURF-3, SURF-6
 - [ ] HUD-1
 - [ ] PXG-6
-- [ ] CTX-3, CTX-5 (with the pending menu hosts, above)
+- [ ] MENU-4, MENU-6 (with the pending menu hosts, above)
 - [ ] IO-2, IO-7
 - [ ] SHELL-1..4, PERF-1..5 (with their concepts, above)
 

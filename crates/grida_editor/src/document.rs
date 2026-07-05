@@ -111,6 +111,41 @@ pub struct PropPatch {
     /// mutually independent in one patch (both write `fills`, so a patch
     /// setting both is rejected).
     pub fills: Option<Paints>,
+    /// Replace the node's whole stroke paint stack — the general
+    /// stroke-paint domain (`properties-sheet.md` Strokes). Same shape
+    /// and invertibility as [`fills`](Self::fills); a different set of
+    /// node kinds carries it (includes Line and Image, which have no
+    /// fills).
+    pub strokes: Option<Paints>,
+    /// Uniform stroke weight (px). Normalized across the engine's three
+    /// width representations (`StrokeWidth` enum, `SingularStrokeWidth`,
+    /// plain `f32`) — the panel authors a single uniform value; per-side
+    /// widths are a later refinement.
+    pub stroke_width: Option<f32>,
+    /// Stroke alignment (inside / center / outside). Supported on the
+    /// `stroke_style` kinds (the common shapes).
+    pub stroke_align: Option<StrokeAlign>,
+    /// Stroke line cap (butt / round / square).
+    pub stroke_cap: Option<StrokeCap>,
+    /// Stroke line join (miter / round / bevel).
+    pub stroke_join: Option<StrokeJoin>,
+    /// Miter limit (applies when the join is miter).
+    pub stroke_miter: Option<f32>,
+    /// Dash pattern. An empty vec clears it (solid); a non-empty vec is
+    /// the dash/gap sequence.
+    pub stroke_dash: Option<Vec<f32>>,
+    /// The layer-blur effect slot (single per layer — `LayerEffects.blur`).
+    /// The outer `Option` says the patch touches the slot; the inner says
+    /// the new value (`Some(_)` sets/replaces the blur, `None` removes
+    /// it). The inverse carries the whole prior slot, so undo restores it
+    /// exactly. v1 authors the `Gaussian` variant; progressive blur is a
+    /// later refinement. Effect-capable node kinds only (`PROP-1`).
+    pub layer_blur: Option<Option<FeLayerBlur>>,
+    /// The node's whole drop/inner shadow list (bottom→top), replaced
+    /// wholesale — the multi-valued shadow domain (`properties-sheet.md`
+    /// Effects). Same replace-and-invert shape as [`fills`](Self::fills);
+    /// the inverse carries the prior list, so inversion is exact.
+    pub shadows: Option<Vec<FilterShadowEffect>>,
     /// Layer blend mode (compositing). Unsupported on `InitialContainer`
     /// and `Error`.
     pub blend_mode: Option<LayerBlendMode>,
@@ -122,6 +157,24 @@ pub struct PropPatch {
     pub clips_content: Option<bool>,
     /// Horizontal text alignment (text kinds).
     pub text_align: Option<TextAlign>,
+    /// Vertical text alignment within the text box (text kinds).
+    pub text_align_vertical: Option<TextAlignVertical>,
+    /// Font size in px (text kinds). Authored on the node-level style
+    /// (`TextSpan.text_style` / `AttributedText.default_style`); per-run
+    /// overrides are a later refinement.
+    pub font_size: Option<f32>,
+    /// Font weight (1–1000, text kinds).
+    pub font_weight: Option<u32>,
+    /// Italic flag (text kinds) — the engine's `font_style_italic`.
+    pub font_italic: Option<bool>,
+    /// Line height (text kinds). v1 authors the `Factor` (multiplier)
+    /// variant; the `Fixed`/`Normal` variants and the mode toggle are a
+    /// later refinement. The inverse carries the whole prior enum, so
+    /// undo restores the exact prior variant.
+    pub line_height: Option<TextLineHeight>,
+    /// Letter spacing (text kinds). v1 authors the `Fixed` (px) variant;
+    /// the `Factor` variant and the mode toggle are a later refinement.
+    pub letter_spacing: Option<TextLetterSpacing>,
     /// Absolute translation components (x, y).
     pub position: Option<(f32, f32)>,
     /// Size `(width, height)`; `None` per axis = leave that axis.
@@ -760,6 +813,128 @@ impl WorkingCopy {
             .and_then(|n| n.fills().cloned())
     }
 
+    /// The node's stroke paint stack (bottom→top), or `None` for kinds
+    /// that carry no strokes — the `strokes` patch domain and the
+    /// Strokes-section capability gate.
+    pub fn node_strokes(&self, id: &Id) -> Option<Paints> {
+        let iid = self.to_internal.get(id)?;
+        self.scene
+            .graph
+            .get_node(iid)
+            .ok()
+            .and_then(node_strokes_ref)
+            .cloned()
+    }
+
+    /// The node's uniform stroke weight (px), or `None` for kinds with
+    /// no stroke width.
+    pub fn node_stroke_width(&self, id: &Id) -> Option<f32> {
+        let iid = self.to_internal.get(id)?;
+        self.scene
+            .graph
+            .get_node(iid)
+            .ok()
+            .and_then(node_stroke_width_val)
+    }
+
+    /// The node's stroke alignment, or `None` for kinds without a
+    /// stroke style.
+    pub fn node_stroke_align(&self, id: &Id) -> Option<StrokeAlign> {
+        self.stroke_style(id).map(|s| s.stroke_align)
+    }
+
+    /// The node's stroke cap.
+    pub fn node_stroke_cap(&self, id: &Id) -> Option<StrokeCap> {
+        self.stroke_style(id).map(|s| s.stroke_cap)
+    }
+
+    /// The node's stroke join.
+    pub fn node_stroke_join(&self, id: &Id) -> Option<StrokeJoin> {
+        self.stroke_style(id).map(|s| s.stroke_join)
+    }
+
+    /// The node's miter limit.
+    pub fn node_stroke_miter(&self, id: &Id) -> Option<f32> {
+        self.stroke_style(id).map(|s| s.stroke_miter_limit.0)
+    }
+
+    /// The node's dash pattern (empty = solid), or `None` for kinds
+    /// without a stroke style.
+    pub fn node_stroke_dash(&self, id: &Id) -> Option<Vec<f32>> {
+        self.stroke_style(id).map(stroke_style_dash)
+    }
+
+    /// The node's stroke style, borrowed (internal helper for the
+    /// per-property stroke-geometry queries).
+    fn stroke_style(&self, id: &Id) -> Option<&StrokeStyle> {
+        let iid = self.to_internal.get(id)?;
+        self.scene
+            .graph
+            .get_node(iid)
+            .ok()
+            .and_then(node_stroke_style)
+    }
+
+    /// The node's vertical text alignment (`None` for non-text).
+    pub fn node_text_align_vertical(&self, id: &Id) -> Option<TextAlignVertical> {
+        let iid = self.to_internal.get(id)?;
+        node_text_align_vertical(self.scene.graph.get_node(iid).ok()?)
+    }
+
+    /// The node's font size in px (`None` for non-text).
+    pub fn node_font_size(&self, id: &Id) -> Option<f32> {
+        self.text_style(id).map(|s| s.font_size)
+    }
+
+    /// The node's font weight (`None` for non-text).
+    pub fn node_font_weight(&self, id: &Id) -> Option<u32> {
+        self.text_style(id).map(|s| s.font_weight.0)
+    }
+
+    /// The node's italic flag (`None` for non-text).
+    pub fn node_font_italic(&self, id: &Id) -> Option<bool> {
+        self.text_style(id).map(|s| s.font_style_italic)
+    }
+
+    /// The node's line height as an authoring multiplier (`None` for
+    /// non-text). Display projection — see [`line_height_multiplier`].
+    pub fn node_line_height(&self, id: &Id) -> Option<f32> {
+        self.text_style(id).map(line_height_multiplier)
+    }
+
+    /// The node's letter spacing magnitude (`None` for non-text).
+    /// Display projection — see [`letter_spacing_value`].
+    pub fn node_letter_spacing(&self, id: &Id) -> Option<f32> {
+        self.text_style(id)
+            .map(|s| letter_spacing_value(&s.letter_spacing))
+    }
+
+    /// The node's node-level text style, borrowed (internal helper for
+    /// the per-property typography queries).
+    fn text_style(&self, id: &Id) -> Option<&TextStyleRec> {
+        let iid = self.to_internal.get(id)?;
+        self.scene
+            .graph
+            .get_node(iid)
+            .ok()
+            .and_then(node_text_style)
+    }
+
+    /// The node's whole layer-effects bag (clone), or `None` for kinds
+    /// that carry no effects (`InitialContainer`, `Error`, `Group`,
+    /// `Tray`) — the effect patch domains' read side and the Effects
+    /// sections' capability gate (`PROP-1`). Bind resolvers read this and
+    /// reach into `.blur` / `.shadows`, mirroring how `node_fills` returns
+    /// the whole `Paints` stack.
+    pub fn node_effects(&self, id: &Id) -> Option<LayerEffects> {
+        let iid = self.to_internal.get(id)?;
+        self.scene
+            .graph
+            .get_node(iid)
+            .ok()
+            .and_then(|n| n.effects().cloned())
+    }
+
     // -- renderer boundary (see crate::bridge) --------------------------------
 
     /// Internal graph id for a stable id.
@@ -1230,6 +1405,73 @@ impl WorkingCopy {
             );
             kind = combine_kinds(kind, ChangeKind::Paint);
         }
+        if set.strokes.is_some() {
+            inverse.strokes = Some(
+                node_strokes_ref(node)
+                    .ok_or_else(|| {
+                        MutationErrorReason::Unsupported(
+                            "strokes is not supported for this node type".to_string(),
+                        )
+                    })?
+                    .clone(),
+            );
+            kind = combine_kinds(kind, ChangeKind::Paint);
+        }
+        // Stroke geometry (width/align/cap/join/miter/dash). Width is a
+        // bounds-affecting change; the others carried under `Full` too
+        // for simplicity (conservative — always correct).
+        if set.stroke_width.is_some() {
+            inverse.stroke_width = Some(node_stroke_width_val(node).ok_or_else(|| {
+                MutationErrorReason::Unsupported(
+                    "stroke_width is not supported for this node type".to_string(),
+                )
+            })?);
+            kind = combine_kinds(kind, ChangeKind::Full);
+        }
+        let stroke_style_err = || {
+            MutationErrorReason::Unsupported(
+                "stroke style is not supported for this node type".to_string(),
+            )
+        };
+        if set.stroke_align.is_some() {
+            inverse.stroke_align = Some(
+                node_stroke_style(node)
+                    .ok_or_else(stroke_style_err)?
+                    .stroke_align,
+            );
+            kind = combine_kinds(kind, ChangeKind::Full);
+        }
+        if set.stroke_cap.is_some() {
+            inverse.stroke_cap = Some(
+                node_stroke_style(node)
+                    .ok_or_else(stroke_style_err)?
+                    .stroke_cap,
+            );
+            kind = combine_kinds(kind, ChangeKind::Full);
+        }
+        if set.stroke_join.is_some() {
+            inverse.stroke_join = Some(
+                node_stroke_style(node)
+                    .ok_or_else(stroke_style_err)?
+                    .stroke_join,
+            );
+            kind = combine_kinds(kind, ChangeKind::Full);
+        }
+        if set.stroke_miter.is_some() {
+            inverse.stroke_miter = Some(
+                node_stroke_style(node)
+                    .ok_or_else(stroke_style_err)?
+                    .stroke_miter_limit
+                    .0,
+            );
+            kind = combine_kinds(kind, ChangeKind::Full);
+        }
+        if set.stroke_dash.is_some() {
+            inverse.stroke_dash = Some(stroke_style_dash(
+                node_stroke_style(node).ok_or_else(stroke_style_err)?,
+            ));
+            kind = combine_kinds(kind, ChangeKind::Full);
+        }
         if set.blend_mode.is_some() {
             if matches!(node, Node::InitialContainer(_) | Node::Error(_)) {
                 return Err(MutationErrorReason::Unsupported(
@@ -1269,6 +1511,73 @@ impl WorkingCopy {
                     "text_align is only supported on text nodes".to_string(),
                 )
             })?);
+            kind = combine_kinds(kind, ChangeKind::Full);
+        }
+        if set.text_align_vertical.is_some() {
+            inverse.text_align_vertical =
+                Some(node_text_align_vertical(node).ok_or_else(|| {
+                    MutationErrorReason::Unsupported(
+                        "text_align_vertical is only supported on text nodes".to_string(),
+                    )
+                })?);
+            kind = combine_kinds(kind, ChangeKind::Full);
+        }
+        // Typography (font size / weight / italic / line-height /
+        // letter-spacing) reads and writes the node-level text style.
+        // Text has no `Node::text_style()` accessor, so `node_text_style`
+        // owns the per-kind match — the `stroke_style` pattern one level
+        // up. Every field captures its exact prior for an invertible undo.
+        // All five typography fields live in one `TextStyleRec`, so a
+        // single lookup captures every requested prior (one graph
+        // traversal, not five).
+        let wants_text_style = set.font_size.is_some()
+            || set.font_weight.is_some()
+            || set.font_italic.is_some()
+            || set.line_height.is_some()
+            || set.letter_spacing.is_some();
+        if wants_text_style {
+            let style = node_text_style(node).ok_or_else(|| {
+                MutationErrorReason::Unsupported(
+                    "text style is only supported on text nodes".to_string(),
+                )
+            })?;
+            if set.font_size.is_some() {
+                inverse.font_size = Some(style.font_size);
+            }
+            if set.font_weight.is_some() {
+                inverse.font_weight = Some(style.font_weight.0);
+            }
+            if set.font_italic.is_some() {
+                inverse.font_italic = Some(style.font_style_italic);
+            }
+            if set.line_height.is_some() {
+                inverse.line_height = Some(style.line_height.clone());
+            }
+            if set.letter_spacing.is_some() {
+                inverse.letter_spacing = Some(style.letter_spacing);
+            }
+            kind = combine_kinds(kind, ChangeKind::Full);
+        }
+        // Layer effects (blur slot / shadow list). `Node::effects()` is
+        // the engine read accessor, but there is no `effects_mut()`, so
+        // the write side owns a per-kind match (`node_effects_mut`) — the
+        // `stroke_style` pattern. Both fields live in one `LayerEffects`,
+        // so a single lookup captures every requested prior. `Full`
+        // because shadows and blur extend the node's render bounds
+        // (conservative — always correct).
+        let wants_effects = set.layer_blur.is_some() || set.shadows.is_some();
+        if wants_effects {
+            let fx = node.effects().ok_or_else(|| {
+                MutationErrorReason::Unsupported(
+                    "effects are not supported for this node type".to_string(),
+                )
+            })?;
+            if set.layer_blur.is_some() {
+                inverse.layer_blur = Some(fx.blur.clone());
+            }
+            if set.shadows.is_some() {
+                inverse.shadows = Some(fx.shadows.clone());
+            }
             kind = combine_kinds(kind, ChangeKind::Full);
         }
         if set.position.is_some() {
@@ -1369,6 +1678,41 @@ impl WorkingCopy {
         if let Some(fills) = &set.fills {
             set_fills(node, fills.clone());
         }
+        if let Some(strokes) = &set.strokes {
+            set_strokes(node, strokes.clone());
+        }
+        if let Some(w) = set.stroke_width {
+            set_stroke_width_val(node, w);
+        }
+        if let Some(a) = set.stroke_align
+            && let Some(s) = node_stroke_style_mut(node)
+        {
+            s.stroke_align = a;
+        }
+        if let Some(c) = set.stroke_cap
+            && let Some(s) = node_stroke_style_mut(node)
+        {
+            s.stroke_cap = c;
+        }
+        if let Some(j) = set.stroke_join
+            && let Some(s) = node_stroke_style_mut(node)
+        {
+            s.stroke_join = j;
+        }
+        if let Some(m) = set.stroke_miter
+            && let Some(s) = node_stroke_style_mut(node)
+        {
+            s.stroke_miter_limit = StrokeMiterLimit(m);
+        }
+        if let Some(d) = &set.stroke_dash
+            && let Some(s) = node_stroke_style_mut(node)
+        {
+            s.stroke_dash_array = if d.is_empty() {
+                Option::None
+            } else {
+                Some(StrokeDashArray(d.clone()))
+            };
+        }
         if let Some(blend_mode) = set.blend_mode {
             set_blend_mode(node, blend_mode);
         }
@@ -1383,6 +1727,38 @@ impl WorkingCopy {
         }
         if let Some(align) = set.text_align {
             set_text_align(node, align);
+        }
+        if let Some(v) = set.text_align_vertical {
+            set_text_align_vertical(node, v);
+        }
+        // One mutable lookup writes every requested typography field
+        // (all live in the same `TextStyleRec`).
+        if wants_text_style && let Some(s) = node_text_style_mut(node) {
+            if let Some(sz) = set.font_size {
+                s.font_size = sz.max(1.0);
+            }
+            if let Some(w) = set.font_weight {
+                s.font_weight = FontWeight(w.clamp(1, 1000));
+            }
+            if let Some(it) = set.font_italic {
+                s.font_style_italic = it;
+            }
+            if let Some(lh) = &set.line_height {
+                s.line_height = lh.clone();
+            }
+            if let Some(ls) = set.letter_spacing {
+                s.letter_spacing = ls;
+            }
+        }
+        // One mutable lookup writes every requested effect field (both
+        // live in the same `LayerEffects`).
+        if wants_effects && let Some(fx) = node_effects_mut(node) {
+            if let Some(blur) = &set.layer_blur {
+                fx.blur = blur.clone();
+            }
+            if let Some(shadows) = &set.shadows {
+                fx.shadows = shadows.clone();
+            }
         }
         if let Some((x, y)) = set.position {
             set_position(node, x, y);
@@ -1557,36 +1933,75 @@ impl WorkingCopy {
 // renderer and should not expose mutable setters on its data model.
 // Getters exist so inverses can capture prior values (DOC-2).
 
-/// Property signature for [`WorkingCopy::structure_eq`]: variant,
-/// active, opacity, fill stack, effective position, effective size,
-/// rotation, text, vector network. The full `fills` stack (not just
-/// the first solid) is included so the panel observes any paint edit —
-/// recolor, add/remove, reorder, kind change (`PROP-7`).
-#[allow(clippy::type_complexity)]
-fn node_signature(
-    node: &Node,
-) -> (
-    std::mem::Discriminant<Node>,
-    bool,
-    f32,
-    Option<Paints>,
-    Option<(f32, f32)>,
-    Option<(f32, f32)>,
-    Option<f32>,
-    Option<String>,
-    Option<NetworkSignature>,
-) {
-    (
-        std::mem::discriminant(node),
-        node.active(),
-        node.opacity(),
-        node.fills().cloned(),
-        node_position(node),
-        node_size(node),
-        node_rotation(node),
-        node_text(node),
-        node_vector_network(node).map(network_signature),
-    )
+/// Property signature for [`WorkingCopy::structure_eq`] (`PROP-7`): the
+/// observable node state the panel diffs against. The full `fills`/
+/// `strokes` stacks (not just the first solid) are included so the panel
+/// observes any paint edit — recolor, add/remove, reorder, kind change;
+/// `effects` likewise so an effect add/remove/param edit rebuilds the
+/// Effects sections. A named struct (not a tuple) so it grows a field at
+/// a time without the std 12-arity `PartialEq` tuple ceiling.
+#[derive(Debug, Clone, PartialEq)]
+struct NodeSignature {
+    kind: std::mem::Discriminant<Node>,
+    active: bool,
+    opacity: f32,
+    fills: Option<Paints>,
+    strokes: Option<Paints>,
+    stroke_width: Option<f32>,
+    stroke_style: Option<StrokeStyle>,
+    position: Option<(f32, f32)>,
+    size: Option<(f32, f32)>,
+    rotation: Option<f32>,
+    text: Option<String>,
+    text_style: Option<TextStyleSignature>,
+    effects: Option<LayerEffects>,
+    vector_network: Option<NetworkSignature>,
+}
+
+fn node_signature(node: &Node) -> NodeSignature {
+    NodeSignature {
+        kind: std::mem::discriminant(node),
+        active: node.active(),
+        opacity: node.opacity(),
+        fills: node.fills().cloned(),
+        strokes: node_strokes_ref(node).cloned(),
+        stroke_width: node_stroke_width_val(node),
+        stroke_style: node_stroke_style(node).cloned(),
+        position: node_position(node),
+        size: node_size(node),
+        rotation: node_rotation(node),
+        text: node_text(node),
+        text_style: text_style_signature(node),
+        effects: node.effects().cloned(),
+        vector_network: node_vector_network(node).map(network_signature),
+    }
+}
+
+/// Comparable projection of a node's typography (`TextStyleRec` derives
+/// no `PartialEq`, so the panel observes typography edits through this
+/// tuple-of-scalars instead — the `NetworkSignature` pattern). Covers
+/// the fields the Text section authors; per-run styles are excluded (the
+/// rich-text refinement).
+#[derive(Debug, Clone, PartialEq)]
+struct TextStyleSignature {
+    font_size: f32,
+    font_weight: u32,
+    italic: bool,
+    line_height: TextLineHeight,
+    letter_spacing: TextLetterSpacing,
+    align_vertical: Option<TextAlignVertical>,
+}
+
+fn text_style_signature(node: &Node) -> Option<TextStyleSignature> {
+    let style = node_text_style(node)?;
+    Some(TextStyleSignature {
+        font_size: style.font_size,
+        font_weight: style.font_weight.0,
+        italic: style.font_style_italic,
+        line_height: style.line_height.clone(),
+        letter_spacing: style.letter_spacing,
+        align_vertical: node_text_align_vertical(node),
+    })
 }
 
 /// Comparable projection of a vector network: vertices, segments
@@ -1936,6 +2351,95 @@ pub(crate) fn set_text_align(node: &mut Node, align: TextAlign) {
     }
 }
 
+/// The node's vertical text alignment (text kinds only).
+pub(crate) fn node_text_align_vertical(node: &Node) -> Option<TextAlignVertical> {
+    match node {
+        Node::TextSpan(n) => Some(n.text_align_vertical),
+        Node::AttributedText(n) => Some(n.text_align_vertical),
+        _ => None,
+    }
+}
+
+pub(crate) fn set_text_align_vertical(node: &mut Node, v: TextAlignVertical) {
+    match node {
+        Node::TextSpan(n) => n.text_align_vertical = v,
+        Node::AttributedText(n) => n.text_align_vertical = v,
+        _ => {}
+    }
+}
+
+/// The node's node-level text style — `TextSpan.text_style` or
+/// `AttributedText.default_style`. `None` for non-text kinds. The engine
+/// exposes no `Node::text_style()` accessor (unlike `fills()`), so this
+/// per-kind match is the domain owner for typography (the `stroke_style`
+/// pattern). Per-run styles on `AttributedText` are outside this domain
+/// (the rich-text refinement).
+pub(crate) fn node_text_style(node: &Node) -> Option<&TextStyleRec> {
+    match node {
+        Node::TextSpan(n) => Some(&n.text_style),
+        Node::AttributedText(n) => Some(&n.default_style),
+        _ => None,
+    }
+}
+
+/// Mutable [`node_text_style`].
+pub(crate) fn node_text_style_mut(node: &mut Node) -> Option<&mut TextStyleRec> {
+    match node {
+        Node::TextSpan(n) => Some(&mut n.text_style),
+        Node::AttributedText(n) => Some(&mut n.default_style),
+        _ => None,
+    }
+}
+
+/// The line height as an authoring multiplier (display projection):
+/// `Factor(x)` → `x`; `Fixed(px)` → `px / font_size` (font-relative);
+/// `Normal` → `1.0` (an editable baseline). Lossy on purpose — the
+/// invertible truth is the whole [`TextLineHeight`] carried in the patch.
+pub(crate) fn line_height_multiplier(style: &TextStyleRec) -> f32 {
+    match style.line_height {
+        TextLineHeight::Factor(x) => x,
+        TextLineHeight::Fixed(px) if style.font_size > 0.0 => px / style.font_size,
+        TextLineHeight::Fixed(px) => px,
+        TextLineHeight::Normal => 1.0,
+    }
+}
+
+/// The letter spacing as a plain px-ish magnitude (display projection):
+/// both variants surface their inner value. v1 authors `Fixed`.
+pub(crate) fn letter_spacing_value(spacing: &TextLetterSpacing) -> f32 {
+    match spacing {
+        TextLetterSpacing::Fixed(x) => *x,
+        TextLetterSpacing::Factor(x) => *x,
+    }
+}
+
+/// Mutable layer effects — the write counterpart to `Node::effects()`.
+/// The engine exposes the read accessor but no `effects_mut()`, so this
+/// per-kind match owns the mutable path (the `stroke_style` pattern). The
+/// arms mirror `Node::effects()` exactly: the kinds returning `None`
+/// there carry no effects here. Used by `apply_patch` after the field
+/// was validated against `Node::effects()`.
+pub(crate) fn node_effects_mut(node: &mut Node) -> Option<&mut LayerEffects> {
+    match node {
+        Node::InitialContainer(_) | Node::Error(_) | Node::Group(_) | Node::Tray(_) => None,
+        Node::Container(n) => Some(&mut n.effects),
+        Node::Rectangle(n) => Some(&mut n.effects),
+        Node::Ellipse(n) => Some(&mut n.effects),
+        Node::Polygon(n) => Some(&mut n.effects),
+        Node::RegularPolygon(n) => Some(&mut n.effects),
+        Node::RegularStarPolygon(n) => Some(&mut n.effects),
+        Node::Line(n) => Some(&mut n.effects),
+        Node::TextSpan(n) => Some(&mut n.effects),
+        Node::AttributedText(n) => Some(&mut n.effects),
+        Node::Path(n) => Some(&mut n.effects),
+        Node::Vector(n) => Some(&mut n.effects),
+        Node::BooleanOperation(n) => Some(&mut n.effects),
+        Node::Image(n) => Some(&mut n.effects),
+        Node::MarkdownEmbed(n) => Some(&mut n.effects),
+        Node::HTMLEmbed(n) => Some(&mut n.effects),
+    }
+}
+
 /// Set a node's layer blend mode. `InitialContainer` and `Error`
 /// have no blend mode (guarded out before this in `apply_patch`).
 pub(crate) fn set_blend_mode(node: &mut Node, blend_mode: LayerBlendMode) {
@@ -2183,6 +2687,144 @@ pub(crate) fn set_fills(node: &mut Node, fills: Paints) {
     }
 }
 
+/// The node's stroke paint stack, or `None` for kinds that carry no
+/// strokes. The engine exposes no `Node::strokes()` accessor (unlike
+/// `fills()`), so this reader lives here — covering exactly the kinds
+/// with a `strokes` field, so the read domain equals [`set_strokes`]'s
+/// write domain and the `strokes` inverse is always applicable.
+pub(crate) fn node_strokes_ref(node: &Node) -> Option<&Paints> {
+    match node {
+        Node::Container(n) => Some(&n.strokes),
+        Node::Tray(n) => Some(&n.strokes),
+        Node::Rectangle(n) => Some(&n.strokes),
+        Node::Ellipse(n) => Some(&n.strokes),
+        Node::Polygon(n) => Some(&n.strokes),
+        Node::RegularPolygon(n) => Some(&n.strokes),
+        Node::RegularStarPolygon(n) => Some(&n.strokes),
+        Node::TextSpan(n) => Some(&n.strokes),
+        Node::AttributedText(n) => Some(&n.strokes),
+        Node::Path(n) => Some(&n.strokes),
+        Node::Vector(n) => Some(&n.strokes),
+        Node::BooleanOperation(n) => Some(&n.strokes),
+        Node::Line(n) => Some(&n.strokes),
+        Node::Image(n) => Some(&n.strokes),
+        _ => Option::None,
+    }
+}
+
+/// Overwrite the node's whole stroke paint stack. Covers exactly the
+/// kinds [`node_strokes_ref`] reads.
+pub(crate) fn set_strokes(node: &mut Node, strokes: Paints) {
+    match node {
+        Node::Container(n) => n.strokes = strokes,
+        Node::Tray(n) => n.strokes = strokes,
+        Node::Rectangle(n) => n.strokes = strokes,
+        Node::Ellipse(n) => n.strokes = strokes,
+        Node::Polygon(n) => n.strokes = strokes,
+        Node::RegularPolygon(n) => n.strokes = strokes,
+        Node::RegularStarPolygon(n) => n.strokes = strokes,
+        Node::TextSpan(n) => n.strokes = strokes,
+        Node::AttributedText(n) => n.strokes = strokes,
+        Node::Path(n) => n.strokes = strokes,
+        Node::Vector(n) => n.strokes = strokes,
+        Node::BooleanOperation(n) => n.strokes = strokes,
+        Node::Line(n) => n.strokes = strokes,
+        Node::Image(n) => n.strokes = strokes,
+        _ => {}
+    }
+}
+
+/// The node's uniform stroke weight, normalized across the engine's
+/// three width representations (`StrokeWidth` enum, `SingularStrokeWidth`,
+/// plain `f32`). `None` for kinds with no stroke width.
+pub(crate) fn node_stroke_width_val(node: &Node) -> Option<f32> {
+    match node {
+        Node::Container(n) => Some(n.stroke_width.max()),
+        Node::Tray(n) => Some(n.stroke_width.max()),
+        Node::Rectangle(n) => Some(n.stroke_width.max()),
+        Node::Image(n) => Some(n.stroke_width.max()),
+        Node::Ellipse(n) => Some(n.stroke_width.value_or_zero()),
+        Node::Polygon(n) => Some(n.stroke_width.value_or_zero()),
+        Node::RegularPolygon(n) => Some(n.stroke_width.value_or_zero()),
+        Node::RegularStarPolygon(n) => Some(n.stroke_width.value_or_zero()),
+        Node::Path(n) => Some(n.stroke_width.value_or_zero()),
+        Node::BooleanOperation(n) => Some(n.stroke_width.value_or_zero()),
+        Node::Line(n) => Some(n.stroke_width),
+        Node::Vector(n) => Some(n.stroke_width),
+        Node::TextSpan(n) => Some(n.stroke_width),
+        Node::AttributedText(n) => Some(n.stroke_width),
+        _ => Option::None,
+    }
+}
+
+/// Set the node's uniform stroke weight, writing whichever width
+/// representation the kind carries. Covers exactly [`node_stroke_width_val`].
+pub(crate) fn set_stroke_width_val(node: &mut Node, w: f32) {
+    match node {
+        Node::Container(n) => n.stroke_width = StrokeWidth::Uniform(w),
+        Node::Tray(n) => n.stroke_width = StrokeWidth::Uniform(w),
+        Node::Rectangle(n) => n.stroke_width = StrokeWidth::Uniform(w),
+        Node::Image(n) => n.stroke_width = StrokeWidth::Uniform(w),
+        Node::Ellipse(n) => n.stroke_width = SingularStrokeWidth(Some(w)),
+        Node::Polygon(n) => n.stroke_width = SingularStrokeWidth(Some(w)),
+        Node::RegularPolygon(n) => n.stroke_width = SingularStrokeWidth(Some(w)),
+        Node::RegularStarPolygon(n) => n.stroke_width = SingularStrokeWidth(Some(w)),
+        Node::Path(n) => n.stroke_width = SingularStrokeWidth(Some(w)),
+        Node::BooleanOperation(n) => n.stroke_width = SingularStrokeWidth(Some(w)),
+        Node::Line(n) => n.stroke_width = w,
+        Node::Vector(n) => n.stroke_width = w,
+        Node::TextSpan(n) => n.stroke_width = w,
+        Node::AttributedText(n) => n.stroke_width = w,
+        _ => {}
+    }
+}
+
+/// The node's stroke style (align / cap / join / miter / dash) — the
+/// common `stroke_style` kinds. `None` for kinds that flatten or lack
+/// it (Line, Vector, text): their bespoke stroke geometry and markers
+/// are a later refinement.
+pub(crate) fn node_stroke_style(node: &Node) -> Option<&StrokeStyle> {
+    match node {
+        Node::Container(n) => Some(&n.stroke_style),
+        Node::Tray(n) => Some(&n.stroke_style),
+        Node::Rectangle(n) => Some(&n.stroke_style),
+        Node::Image(n) => Some(&n.stroke_style),
+        Node::Ellipse(n) => Some(&n.stroke_style),
+        Node::Polygon(n) => Some(&n.stroke_style),
+        Node::RegularPolygon(n) => Some(&n.stroke_style),
+        Node::RegularStarPolygon(n) => Some(&n.stroke_style),
+        Node::Path(n) => Some(&n.stroke_style),
+        Node::BooleanOperation(n) => Some(&n.stroke_style),
+        _ => Option::None,
+    }
+}
+
+/// Mutable [`node_stroke_style`].
+pub(crate) fn node_stroke_style_mut(node: &mut Node) -> Option<&mut StrokeStyle> {
+    match node {
+        Node::Container(n) => Some(&mut n.stroke_style),
+        Node::Tray(n) => Some(&mut n.stroke_style),
+        Node::Rectangle(n) => Some(&mut n.stroke_style),
+        Node::Image(n) => Some(&mut n.stroke_style),
+        Node::Ellipse(n) => Some(&mut n.stroke_style),
+        Node::Polygon(n) => Some(&mut n.stroke_style),
+        Node::RegularPolygon(n) => Some(&mut n.stroke_style),
+        Node::RegularStarPolygon(n) => Some(&mut n.stroke_style),
+        Node::Path(n) => Some(&mut n.stroke_style),
+        Node::BooleanOperation(n) => Some(&mut n.stroke_style),
+        _ => Option::None,
+    }
+}
+
+/// The dash pattern as a plain sequence (empty = solid).
+pub(crate) fn stroke_style_dash(style: &StrokeStyle) -> Vec<f32> {
+    style
+        .stroke_dash_array
+        .as_ref()
+        .map(|d| d.0.clone())
+        .unwrap_or_default()
+}
+
 // ---------------------------------------------------------------------------
 // Batch coalescing (endpoint-minimal gesture entries)
 // ---------------------------------------------------------------------------
@@ -2291,11 +2933,26 @@ fn merge_patch_over(base: &mut PropPatch, over: &PropPatch) {
         opacity,
         fill_solid,
         fills,
+        strokes,
+        stroke_width,
+        stroke_align,
+        stroke_cap,
+        stroke_join,
+        stroke_miter,
+        stroke_dash,
+        layer_blur,
+        shadows,
         blend_mode,
         corner_radius,
         point_count,
         clips_content,
         text_align,
+        text_align_vertical,
+        font_size,
+        font_weight,
+        font_italic,
+        line_height,
+        letter_spacing,
         position,
         size,
         rotation,
@@ -2320,6 +2977,33 @@ fn merge_patch_over(base: &mut PropPatch, over: &PropPatch) {
     if fills.is_some() {
         base.fills = fills.clone();
     }
+    if strokes.is_some() {
+        base.strokes = strokes.clone();
+    }
+    if stroke_width.is_some() {
+        base.stroke_width = *stroke_width;
+    }
+    if stroke_align.is_some() {
+        base.stroke_align = *stroke_align;
+    }
+    if stroke_cap.is_some() {
+        base.stroke_cap = *stroke_cap;
+    }
+    if stroke_join.is_some() {
+        base.stroke_join = *stroke_join;
+    }
+    if stroke_miter.is_some() {
+        base.stroke_miter = *stroke_miter;
+    }
+    if stroke_dash.is_some() {
+        base.stroke_dash = stroke_dash.clone();
+    }
+    if layer_blur.is_some() {
+        base.layer_blur = layer_blur.clone();
+    }
+    if shadows.is_some() {
+        base.shadows = shadows.clone();
+    }
     if blend_mode.is_some() {
         base.blend_mode = *blend_mode;
     }
@@ -2334,6 +3018,24 @@ fn merge_patch_over(base: &mut PropPatch, over: &PropPatch) {
     }
     if text_align.is_some() {
         base.text_align = *text_align;
+    }
+    if text_align_vertical.is_some() {
+        base.text_align_vertical = *text_align_vertical;
+    }
+    if font_size.is_some() {
+        base.font_size = *font_size;
+    }
+    if font_weight.is_some() {
+        base.font_weight = *font_weight;
+    }
+    if font_italic.is_some() {
+        base.font_italic = *font_italic;
+    }
+    if line_height.is_some() {
+        base.line_height = line_height.clone();
+    }
+    if letter_spacing.is_some() {
+        base.letter_spacing = *letter_spacing;
     }
     if position.is_some() {
         base.position = *position;
