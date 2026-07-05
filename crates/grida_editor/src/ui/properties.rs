@@ -1364,15 +1364,34 @@ impl PropertiesPanel {
                 BindingValue::ListOp(ListOp::Add),
             )),
         };
-        children.push(Box::new(SectionHeader {
-            id: paint_header_id(target),
-            label: target.title().to_string(),
-            width: self.width - 24.0,
-            height: 22.0,
-            children: vec![Box::new(add)],
-        }));
+        children.push(Box::new(self.section_header(
+            paint_header_id(target),
+            target.title(),
+            self.width - 24.0,
+            vec![Box::new(add)],
+        )));
         for (i, paint) in paints.iter().enumerate() {
             children.push(Box::new(self.paint_row(target, i, paint, snapshot)));
+        }
+    }
+
+    /// A section title line at the fixed heading height — centralizes the
+    /// [`SectionHeader`] construction so each section names only its id,
+    /// label, width, and optional action control (the `*_HEADER_ID`
+    /// constants stay explicit at the call site).
+    fn section_header(
+        &self,
+        id: impl Into<String>,
+        label: impl Into<String>,
+        width: f32,
+        children: Vec<Box<dyn Widget>>,
+    ) -> SectionHeader {
+        SectionHeader {
+            id: id.into(),
+            label: label.into(),
+            width,
+            height: 22.0,
+            children,
         }
     }
 
@@ -1522,13 +1541,12 @@ impl PropertiesPanel {
         let Some(size) = snapshot.font_size else {
             return;
         };
-        children.push(Box::new(SectionHeader {
-            id: TEXT_HEADER_ID.to_string(),
-            label: "Text".to_string(),
-            width: self.width - 24.0,
-            height: 22.0,
-            children: Vec::new(),
-        }));
+        children.push(Box::new(self.section_header(
+            TEXT_HEADER_ID,
+            "Text",
+            self.width - 24.0,
+            Vec::new(),
+        )));
         self.push_row(
             children,
             TEXT_SIZE_ROW_ID,
@@ -1883,13 +1901,12 @@ impl PropertiesPanel {
         if !snapshot.effects_capable {
             return;
         }
-        children.push(Box::new(SectionHeader {
-            id: BLUR_HEADER_ID.to_string(),
-            label: "Layer blur".to_string(),
-            width: self.width - 24.0,
-            height: 22.0,
-            children: vec![Box::new(self.blur_enable_toggle(snapshot))],
-        }));
+        children.push(Box::new(self.section_header(
+            BLUR_HEADER_ID,
+            "Layer blur",
+            self.width - 24.0,
+            vec![Box::new(self.blur_enable_toggle(snapshot))],
+        )));
         if let Some((radius, _)) = snapshot.blur {
             self.push_row(
                 children,
@@ -1972,13 +1989,12 @@ impl PropertiesPanel {
                 BindingValue::ListOp(ListOp::Add),
             )),
         };
-        children.push(Box::new(SectionHeader {
-            id: SHADOWS_HEADER_ID.to_string(),
-            label: "Shadows".to_string(),
-            width: self.width - 24.0,
-            height: 22.0,
-            children: vec![Box::new(add)],
-        }));
+        children.push(Box::new(self.section_header(
+            SHADOWS_HEADER_ID,
+            "Shadows",
+            self.width - 24.0,
+            vec![Box::new(add)],
+        )));
         for (i, shadow) in snapshot.shadows.iter().enumerate() {
             self.push_shadow_entry(children, i, shadow, snapshot);
         }
@@ -2278,13 +2294,12 @@ impl PropertiesPanel {
             return;
         }
         let cw = self.width - 24.0;
-        children.push(Box::new(SectionHeader {
-            id: SELECTION_COLORS_HEADER_ID.to_string(),
-            label: "Colors".to_string(),
-            width: cw,
-            height: 22.0,
-            children: Vec::new(),
-        }));
+        children.push(Box::new(self.section_header(
+            SELECTION_COLORS_HEADER_ID,
+            "Colors",
+            cw,
+            Vec::new(),
+        )));
         for (i, hex) in hexes.iter().enumerate() {
             children.push(Box::new(Label {
                 id: selection_color_id(i),
@@ -2303,13 +2318,12 @@ impl PropertiesPanel {
     /// a control that does nothing.
     fn push_export(&self, children: &mut Vec<Box<dyn Widget>>) {
         let cw = self.width - 24.0;
-        children.push(Box::new(SectionHeader {
-            id: EXPORT_HEADER_ID.to_string(),
-            label: "Export".to_string(),
-            width: cw,
-            height: 22.0,
-            children: Vec::new(),
-        }));
+        children.push(Box::new(self.section_header(
+            EXPORT_HEADER_ID,
+            "Export",
+            cw,
+            Vec::new(),
+        )));
         children.push(Box::new(Label {
             id: EXPORT_NOTE_ID.to_string(),
             text: "No export presets".to_string(),

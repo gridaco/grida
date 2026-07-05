@@ -594,20 +594,13 @@ impl ShellApp {
             return None;
         }
         let doc = self.editor.document();
-        let selected: std::collections::HashSet<&Id> = selection.iter().collect();
+        let selected: std::collections::HashSet<Id> = selection.iter().cloned().collect();
         // A root is a selected node with no selected ancestor.
-        let is_root = |id: &Id| {
-            let mut cur = doc.node_parent(id).flatten();
-            while let Some(p) = cur {
-                if selected.contains(&p) {
-                    return false;
-                }
-                cur = doc.node_parent(&p).flatten();
-            }
-            true
-        };
-        let root_set: std::collections::HashSet<Id> =
-            selection.iter().filter(|id| is_root(id)).cloned().collect();
+        let root_set: std::collections::HashSet<Id> = selection
+            .iter()
+            .filter(|id| !doc.has_ancestor_in(id, &selected))
+            .cloned()
+            .collect();
 
         let renderer = self.app.renderer();
         let cache = renderer.get_cache();
@@ -1031,10 +1024,18 @@ impl ShellApp {
     }
 
     fn command(&mut self, cmd: Command) -> bool {
-        // Any command may move the state the menu bar reflects
-        // (enablement, history, mode, toggle direction): rebuild it on
-        // the next tick.
-        self.menu_dirty = true;
+        let consumed = self.dispatch(cmd);
+        // Only a consumed command can move the state the menu bar
+        // reflects (enablement, history, mode, toggle direction); a
+        // decline (`ROUTE-2`) leaves it untouched, so mark the bar dirty
+        // only then (`MENU-2`).
+        if consumed {
+            self.menu_dirty = true;
+        }
+        consumed
+    }
+
+    fn dispatch(&mut self, cmd: Command) -> bool {
         match cmd {
             Command::Undo => self.editor.undo(),
             Command::Redo => self.editor.redo(),
@@ -1655,20 +1656,13 @@ impl ShellApp {
             // Drop candidates that sit under another candidate (nested).
             let mut dissolvable: Vec<crate::document::Id> = candidates
                 .iter()
-                .filter(|id| {
-                    let mut cur = doc.node_parent(id).flatten();
-                    while let Some(p) = cur {
-                        if cand_set.contains(&p) {
-                            return false;
-                        }
-                        cur = doc.node_parent(&p).flatten();
-                    }
-                    true
-                })
+                .filter(|id| !doc.has_ancestor_in(id, &cand_set))
                 .cloned()
                 .collect();
             // Descending sibling index for index-safe batch composition.
-            dissolvable.sort_by_key(|id| {
+            // `sort_by_cached_key` so the per-key `children` allocation
+            // runs once per node, not on every comparison.
+            dissolvable.sort_by_cached_key(|id| {
                 let parent = doc.node_parent(id).flatten();
                 let siblings = doc.children(parent.as_ref());
                 std::cmp::Reverse(siblings.iter().position(|s| s == id).unwrap_or(0))

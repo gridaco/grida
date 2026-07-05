@@ -7,6 +7,37 @@ use grida::node::schema::*;
 
 use crate::ui::widget::{BuildCtx, Widget, WidgetId};
 
+/// The shared horizontal-line scaffold: a fixed flex container (8px gap,
+/// centered cross-axis, no fill, no clip) appended under `parent` and
+/// registered non-focusable / non-interactive under `id`. Both [`Row`]
+/// and [`super::section::SectionHeader`] build their (differently-styled)
+/// label and children into it — the *structure* is shared; each supplies
+/// its own hardcoded label look (dumbness doctrine: no style parameter).
+pub(crate) fn hrow(
+    ctx: &mut BuildCtx,
+    parent: Parent,
+    id: &WidgetId,
+    width: f32,
+    height: f32,
+) -> NodeId {
+    let nf = NodeFactory::new();
+    let mut row = nf.create_container_node();
+    row.layout_container = LayoutContainerStyle {
+        layout_mode: LayoutMode::Flex,
+        layout_direction: Axis::Horizontal,
+        layout_gap: Some(LayoutGap::uniform(8.0)),
+        layout_cross_axis_alignment: Some(CrossAxisAlignment::Center),
+        ..Default::default()
+    };
+    row.layout_dimensions.layout_target_width = Some(width);
+    row.layout_dimensions.layout_target_height = Some(height);
+    row.fills = Paints::default();
+    row.clip = false;
+    let node = ctx.graph.append_child(Node::Container(row), parent);
+    ctx.register(id, node, false, false);
+    node
+}
+
 pub struct Row {
     pub id: WidgetId,
     pub label: String,
@@ -23,21 +54,7 @@ impl Widget for Row {
     }
 
     fn build(&self, ctx: &mut BuildCtx, parent: Parent) -> NodeId {
-        let nf = NodeFactory::new();
-        let mut row = nf.create_container_node();
-        row.layout_container = LayoutContainerStyle {
-            layout_mode: LayoutMode::Flex,
-            layout_direction: Axis::Horizontal,
-            layout_gap: Some(LayoutGap::uniform(8.0)),
-            layout_cross_axis_alignment: Some(CrossAxisAlignment::Center),
-            ..Default::default()
-        };
-        row.layout_dimensions.layout_target_width = Some(self.width);
-        row.layout_dimensions.layout_target_height = Some(self.height);
-        row.fills = Paints::default();
-        row.clip = false;
-        let node = ctx.graph.append_child(Node::Container(row), parent);
-        ctx.register(&self.id, node, false, false);
+        let node = hrow(ctx, parent, &self.id, self.width, self.height);
 
         let nf = NodeFactory::new();
         let mut label = nf.create_text_span_node();

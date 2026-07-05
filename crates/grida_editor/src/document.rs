@@ -630,6 +630,21 @@ impl WorkingCopy {
         }
     }
 
+    /// Whether any ancestor of `id` (walking to the root) is a member of
+    /// `set` — the shared "is this node nested under one of these?" walk
+    /// used both by root-of-selection detection and by ungroup's
+    /// nested-candidate filter.
+    pub(crate) fn has_ancestor_in(&self, id: &Id, set: &std::collections::HashSet<Id>) -> bool {
+        let mut cur = self.node_parent(id).flatten();
+        while let Some(p) = cur {
+            if set.contains(&p) {
+                return true;
+            }
+            cur = self.node_parent(&p).flatten();
+        }
+        false
+    }
+
     /// Partition a selection by direct parent — the substrate the
     /// structural commands read
     /// ([selection-partition.md](../../../docs/wg/canvas/ux-surface/selection-partition.md),

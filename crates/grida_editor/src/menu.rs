@@ -185,33 +185,67 @@ fn action(command: Command, label: &'static str, enabled: bool) -> Item {
     })
 }
 
+/// The selection-scoped enablement both menu surfaces resolve against
+/// the working copy — computed once (`MENU-2`) and shared so the canvas
+/// menu and the application bar cannot drift on what a command enables.
+struct SelectionCaps {
+    /// Any node is selected.
+    some: bool,
+    /// The paired visibility toggle's applicable label ("Show"/"Hide").
+    toggle_label: &'static str,
+    flatten: bool,
+    create_outlines: bool,
+    /// Bring-to-front / send-to-back would move something — `MENU-2`
+    /// dry-run of the same `arrange::reorder` resolver the command runs
+    /// (an already-frontmost selection disables Bring to front).
+    front: bool,
+    back: bool,
+    /// A dissolvable member exists — `MENU-2` dry-run of the same
+    /// `grouping::ungroup` resolver the command runs.
+    ungroup: bool,
+}
+
+impl SelectionCaps {
+    fn resolve(doc: &WorkingCopy, selection: &[Id]) -> Self {
+        let some = !selection.is_empty();
+        // Paired toggle (spec doctrine): present the applicable
+        // direction — any visible member means the action hides.
+        let any_visible = selection
+            .iter()
+            .any(|id| doc.node_active(id).unwrap_or(false));
+        let toggle_label = if some && !any_visible { "Show" } else { "Hide" };
+        SelectionCaps {
+            some,
+            toggle_label,
+            flatten: crate::mode::can_flatten(doc, selection),
+            create_outlines: crate::mode::can_create_outlines(doc, selection),
+            front: some
+                && crate::arrange::reorder(doc, selection, crate::arrange::ZOrder::Front).is_some(),
+            back: some
+                && crate::arrange::reorder(doc, selection, crate::arrange::ZOrder::Back).is_some(),
+            ungroup: selection
+                .iter()
+                .any(|id| crate::grouping::ungroup(doc, id).is_some()),
+        }
+    }
+}
+
 /// The canvas menu (the spec's inventory, restricted to shipped
 /// commands — see the module docs' unshipped list) over the current
 /// target. Enablement is resolved here, once, at open time (`MENU-2`).
 pub fn canvas_menu(doc: &WorkingCopy, selection: &[Id]) -> Menu {
-    let some = !selection.is_empty();
+    let SelectionCaps {
+        some,
+        toggle_label,
+        flatten,
+        create_outlines,
+        front,
+        back,
+        ungroup,
+    } = SelectionCaps::resolve(doc, selection);
+    // Canvas-only, single-target affordances (Copy name / Copy ID).
     let single = selection.len() == 1;
-    // Paired toggle (spec doctrine): present the applicable
-    // direction — any visible member means the action hides.
-    let any_visible = selection
-        .iter()
-        .any(|id| doc.node_active(id).unwrap_or(false));
-    let toggle_label = if some && !any_visible { "Show" } else { "Hide" };
     let named = single && doc.node_name(&selection[0]).is_some();
-    let flatten = crate::mode::can_flatten(doc, selection);
-    let create_outlines = crate::mode::can_create_outlines(doc, selection);
-    // Exact capability via the same pure resolver the command runs
-    // (`MENU-2` refines the spec table's coarse "selection non-empty":
-    // an already-frontmost selection disables Bring to front).
-    let front =
-        some && crate::arrange::reorder(doc, selection, crate::arrange::ZOrder::Front).is_some();
-    let back =
-        some && crate::arrange::reorder(doc, selection, crate::arrange::ZOrder::Back).is_some();
-    // Ungroup enables only when a dissolvable member exists (`MENU-2`
-    // dry-run of the same resolver the command runs).
-    let ungroup = selection
-        .iter()
-        .any(|id| crate::grouping::ungroup(doc, id).is_some());
 
     Menu {
         items: vec![
@@ -299,20 +333,15 @@ pub fn application_menu(ctx: &AppMenuContext) -> Menu {
         can_undo,
         can_redo,
     } = *ctx;
-    let some = !selection.is_empty();
-    let any_visible = selection
-        .iter()
-        .any(|id| doc.node_active(id).unwrap_or(false));
-    let toggle_label = if some && !any_visible { "Show" } else { "Hide" };
-    let flatten = crate::mode::can_flatten(doc, selection);
-    let create_outlines = crate::mode::can_create_outlines(doc, selection);
-    let front =
-        some && crate::arrange::reorder(doc, selection, crate::arrange::ZOrder::Front).is_some();
-    let back =
-        some && crate::arrange::reorder(doc, selection, crate::arrange::ZOrder::Back).is_some();
-    let ungroup = selection
-        .iter()
-        .any(|id| crate::grouping::ungroup(doc, id).is_some());
+    let SelectionCaps {
+        some,
+        toggle_label,
+        flatten,
+        create_outlines,
+        front,
+        back,
+        ungroup,
+    } = SelectionCaps::resolve(doc, selection);
 
     use crate::align::{Align, Distribute};
 

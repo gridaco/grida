@@ -29,21 +29,9 @@ impl Widget for SectionHeader {
     }
 
     fn build(&self, ctx: &mut BuildCtx, parent: Parent) -> NodeId {
-        let nf = NodeFactory::new();
-        let mut row = nf.create_container_node();
-        row.layout_container = LayoutContainerStyle {
-            layout_mode: LayoutMode::Flex,
-            layout_direction: Axis::Horizontal,
-            layout_gap: Some(LayoutGap::uniform(8.0)),
-            layout_cross_axis_alignment: Some(CrossAxisAlignment::Center),
-            ..Default::default()
-        };
-        row.layout_dimensions.layout_target_width = Some(self.width);
-        row.layout_dimensions.layout_target_height = Some(self.height);
-        row.fills = Paints::default();
-        row.clip = false;
-        let node = ctx.graph.append_child(Node::Container(row), parent);
-        ctx.register(&self.id, node, false, false);
+        // Shares the row scaffold (super::row::hrow); only the label look
+        // below diverges — that's the whole point of the heading widget.
+        let node = super::row::hrow(ctx, parent, &self.id, self.width, self.height);
 
         let nf = NodeFactory::new();
         let mut label = nf.create_text_span_node();
