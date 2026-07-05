@@ -15,7 +15,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TriangleAlertIcon } from "lucide-react";
 import {
   PromptInputSelect,
@@ -42,20 +42,17 @@ import type {
 import { registered_models } from "./registered-models";
 import { GG_PROVIDER_METADATA } from "@grida/agent";
 import * as gridaGateway from "@/lib/desktop/gg-session";
+import {
+  GG_INCLUDED_MODEL_ID,
+  resolveDefaultModelId,
+  shouldUpgradeToIncluded,
+} from "./default-model";
+// The default-model constants live in a react-free module so the decision
+// is unit-testable in Node; re-exported here to keep the public symbol home.
+export { DEFAULT_MODEL_ID } from "./default-model";
 
 const catalog = _models.text.catalog;
 type CatalogId = _models.text.CatalogId;
-
-/**
- * Default selection — Claude Code on Opus 4.8 (1M), the user's own Claude
- * subscription (issue #813): zero key, the largest context, the path we want
- * users to land on. NOTE: assumes the user is logged in to Claude — a
- * no-Claude fallback wants the zero-config auto-detect (see
- * `docs/wg/ai/agent/acp-provider.plan.md`); until then a signed-out user's
- * first run hits `auth_required`. Revert to `TIER_MODEL_IDS.pro` (hosted
- * Sonnet 4.6) for a catalog default.
- */
-export const DEFAULT_MODEL_ID: string = "claude-code/opus-4.8-1m";
 
 const MODEL_OPTIONS = Object.values(catalog);
 
@@ -260,11 +257,14 @@ export function ModelToolCallNotice({
 /**
  * Model selection state for a chat panel. Defaults to
  * {@link DEFAULT_MODEL_ID} (or `initial`, when a caller seeds one — e.g.
- * the welcome handoff carrying the home composer's pick) and re-seeds
+ * the welcome handoff carrying the home composer's pick), then re-seeds
  * from a session's stored model whenever the active session id changes —
  * so opening a past chat shows the model it ran with, while a background
  * session-list refresh never clobbers a pick the user just made (the seed
- * fires once per id, not per `sessions` change).
+ * fires once per id, not per `sessions` change). When a Grida Gateway
+ * session is live and nothing else has claimed the selection, the keyless
+ * default is upgraded to the included hosted tier ({@link
+ * GG_INCLUDED_MODEL_ID}; issue #942).
  */
 export function useModelPickerState({
   current_id: currentId,
@@ -290,9 +290,12 @@ export function useModelPickerState({
     (typeof id === "string" &&
       (registeredIds.has(id) || AGENT_PROVIDER_IDS.has(id)));
 
-  const [modelId, setModelId] = useState<string>(
-    isKnownId(initial) ? initial : DEFAULT_MODEL_ID
+  const [modelId, setModelId] = useState<string>(() =>
+    resolveDefaultModelId({ initial, ggActive: false, isKnownId })
   );
+  // Flipped once the user picks a model in the UI, so the async Grida
+  // Gateway upgrade below never clobbers a deliberate choice.
+  const userPickedRef = useRef(false);
   // The session id we last seeded from. Re-seed only when the active id
   // changes — `undefined` means "never seeded" so the first run fires.
   const seededFor = useRef<string | null | undefined>(undefined);
@@ -322,5 +325,44 @@ export function useModelPickerState({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, sessions, registeredIds]);
 
-  return { model_id: modelId, setModelId };
+  // GRIDA-SEC-006 / issue #942 — when a Grida Gateway session is live and
+  // the user hasn't otherwise chosen a model, upgrade the keyless default
+  // to the included hosted tier, so a fresh signed-in, no-BYOK user's first
+  // run uses GG instead of hitting the Claude-Code provider's
+  // `auth_required`. Session liveness resolves async, so this arrives after
+  // mount; `shouldUpgradeToIncluded` reads live refs so an explicit pick, a
+  // caller `initial`, or a stored-session seed always wins the race. The
+  // catalog itself is never hidden — BYOK can still serve any model.
+  useEffect(() => {
+    if (!gridaGateway.isSupported()) return;
+    let cancelled = false;
+    void gridaGateway.ensureFresh().then((state) => {
+      if (cancelled || state.kind !== "active") return;
+      setModelId((prev) =>
+        shouldUpgradeToIncluded({
+          current: prev,
+          userPicked: userPickedRef.current,
+          initialKnown: isKnownId(initial),
+          storedSeeded: seededFor.current != null,
+        })
+          ? GG_INCLUDED_MODEL_ID
+          : prev
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Resolve once on mount; the guard reads live refs, not reactive deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Wrap the setter so a user's explicit pick marks the selection touched —
+  // the async GG upgrade above then leaves it alone. Internal seeding calls
+  // the raw `setModelId` (unchanged), so it doesn't trip the flag.
+  const pickModel = useCallback((id: string) => {
+    userPickedRef.current = true;
+    setModelId(id);
+  }, []);
+
+  return { model_id: modelId, setModelId: pickModel };
 }
