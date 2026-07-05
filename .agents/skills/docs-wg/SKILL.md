@@ -42,6 +42,12 @@ way_. Spec-rich. It defines vocabulary, states constraints and
 invariants, and argues the design tradeoffs. It reads like a standards
 document, not like a code comment.
 
+- **A model, not an explanation.** The strongest specs are *models* — a
+  canonical vocabulary, a small generating rule or set of invariants,
+  contract tables, and conformance clauses — the kind of thing a second
+  implementer runs in their head. A doc that *explains the code* has the
+  arrow backwards: the code conforms to the spec, never the reverse.
+  Prose justifies the model; it does not substitute for it.
 - **Covers why and what.** The motivation, the requirements, the model,
   the chosen design and the alternatives rejected (and why).
 - **No code-level implementation detail.** Describe the behavior and the
@@ -67,6 +73,14 @@ study established; research that surveys how the domain is understood.
 it has its own stricter rules (pure survey, Grida absent from the body).
 When writing there, use [`research`](../research/SKILL.md) — it governs
 > that subtree specifically. This skill governs the broader WG surface.
+
+**Name the genre — and don't let one wear another's costume.** A cluster
+also collects legitimate non-spec artifacts: methodology, a decision
+record, an inventory, an RFD (a design proposal still under discussion).
+Each is fine — but it must *say what it is*. An inventory or a
+decision-memo dressed as a normative spec, numbered with "contracts" it
+cannot enforce, misleads everyone who tries to conform to it. If a doc is
+not a model, label it and drop the costume.
 
 ## What a good WG doc is
 
@@ -115,10 +129,45 @@ kind of artifact:
   decided…" is process, not knowledge. Historical snapshots that must be
   kept go under a `_history/` folder marked `unlisted: true` (see
   [`docs/AGENTS.md`](../../../docs/AGENTS.md)), never in the live spec.
+- **Implementation-binding specs.** A spec that binds a universal
+  contract to _one_ codebase — the concrete data an undo entry is, this
+  build's default keymap, the mapping from contracts to running code — is
+  code-specific by nature. It belongs _with the code_ (a `docs/` folder in
+  the package or crate, next to what it binds), not under `docs/wg`. The
+  WG tree stays code-agnostic; the binding lives where it can name files
+  honestly and move with them.
 
 The throughline: a WG doc states **what is true and what is intended**,
 in domain terms, for a reader who arrives cold. Anything that is _about
 the work_ rather than _about the thing_ is a different artifact.
+
+## One concept, one home
+
+Where a doc lives is a design decision, not filing — and the WG tree only
+stays honest as it grows if three rules hold.
+
+- **A universal concept gets exactly one home.** A concept true of any
+  implementation — selection, undo, snapping — is specified once, in the
+  cluster that owns the _domain_, and never re-homed per consumer. Two
+  clusters specifying "selection" under their own names is a smell: the
+  second is either duplication to delete or a _delta_ that should defer
+  (below). Name the home at the domain's natural scope, not an over-broad
+  umbrella: an "editor" cluster that quietly means the canvas editor is
+  misnamed — `canvas` is the honest home. (See [`naming`](../naming/SKILL.md).)
+- **Defer to the golden doc; spec only the delta.** When a doc leans on a
+  concept another doc owns, it _references_ the owner and specifies only
+  what it adds — it never restates the model. A disciplined delta ("the
+  golden spec owns the pointer routing; this owns the resolution math") is
+  not duplication; a restatement that drifts is. The test: could you
+  delete the section and replace it with a link without losing anything?
+  If yes, do.
+- **Tone drives placement.** When a concept turns deeply technical — a
+  convergence model, an undo-as-data study — that depth earns a
+  _dedicated study_, and the application-facing home _points to_ it rather
+  than swallowing it. The home reads at application altitude and links
+  out; the study is the source of truth and stays as pedantic as it needs
+  to be. Splitting by tone keeps the home approachable and the study
+  rigorous, each at its register.
 
 ## Placement and upkeep
 
@@ -151,6 +200,12 @@ the work_ rather than _about the thing_ is a different artifact.
       `research/`.
 - [ ] Any `TODO`, plan fragment, or "we decided on <date>"? Remove it —
       it belongs in a plan, an issue, or `_history/`.
+- [ ] Is this a _model_ (vocabulary, a generating rule, contracts) or
+      prose explaining code? If prose, lift it to a model — or, if it is
+      genuinely a non-spec genre, label it honestly.
+- [ ] Does any section restate a concept another doc owns? Defer and keep
+      only the delta. Is this the _one_ home for its concept, named at the
+      domain's scope, with deep material split into a study it points to?
 - [ ] Did you update the cluster `index.md`?
 
 ## Related skills

@@ -64,6 +64,13 @@ The boundaries are real, not bureaucratic:
   why"; SDK says "this is the API and how to call it." A WG doc that
   drifts into API signatures has become an SDK doc in the wrong place —
   see [`docs-wg`](../docs-wg/SKILL.md) on staying code-agnostic.
+- **Implementation-binding specs live with the code, not in `docs/wg`.**
+  A spec that maps a universal contract onto _one_ codebase — the concrete
+  data a structure holds, this build's keymap, the contract→code mapping —
+  is code-specific. It belongs in the package or crate's own `docs/`, next
+  to what it binds, so `docs/wg` can stay code-agnostic. It is neither a WG
+  doc (too code-specific) nor an SDK doc (not for external consumers) — its
+  home is the code.
 - **Plans, TODO lists, and conversational logs are not docs of any
   family.** Plans live in untracked `*.plan.md` files (gitignored); they
   do not belong under `docs/`.

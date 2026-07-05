@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
   "crates/grida",
+  "crates/grida_editor",
   "crates/grida-canvas-wasm",
   "crates/fonts",
   "crates/grida_dev",

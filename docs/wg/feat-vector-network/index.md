@@ -8,7 +8,33 @@ tags:
   - editor
 ---
 
-# Grida's VectorNetwork Implementation.
+# Vector Networks
+
+The vector-network model behind Grida's vector editing: the topology a
+path is stored as, the pen and its projection, tangent mirroring and
+bending, and non-destructive boolean path algebra over the same model.
+This is the deep study the [canvas spec](../canvas/) relies on for its
+vector content-edit mode but does not restate.
+
+## Specs
+
+- **[Vector edit](./vector-edit.md)** — the model spine: vector network
+  invariants, sub-selection, the pen state machine with projection,
+  tangent mirroring, editing gestures, and the escape ladder (`VEC-*`).
+- **[Snap — vector](./snap-vector.md)** — snapping vector anchors and
+  segments while vector-editing (reserved; the vector member of the
+  snap family).
+- **[Boolean path operations](./boolean.md)** — non-destructive path
+  booleans: operand model, order semantics, live re-evaluation, release
+  and flatten (`BOOL-*`).
+- **[Flatten](./flatten.md)** — the destructive combine: convert a
+  selection's shapes into one baked vector per selection partition, the
+  counterpart to boolean (`FLAT-*`).
+- **[Create Outlines](./create-outlines.md)** — convert text to its
+  glyph-outline vector paths, per node in place; the font-baking twin of
+  the single-node flatten (`OUTL-*`).
+
+## Implementation status
 
 > see [PR #408](https://github.com/gridaco/grida/pull/408)
 
