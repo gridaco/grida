@@ -315,6 +315,9 @@ pub struct AppMenuContext<'a> {
     /// History has an undoable / redoable entry.
     pub can_undo: bool,
     pub can_redo: bool,
+    /// Outline (wireframe) mode is on — gates the "Ignore clips
+    /// content" sub-row, which is meaningless while outline is off.
+    pub outline_mode: bool,
 }
 
 /// The application menu (`menu.md` "The application menu"): the
@@ -334,6 +337,7 @@ pub fn application_menu(ctx: &AppMenuContext) -> Menu {
         text_mode,
         can_undo,
         can_redo,
+        outline_mode,
     } = *ctx;
     let SelectionCaps {
         some,
@@ -450,6 +454,25 @@ pub fn application_menu(ctx: &AppMenuContext) -> Menu {
                 action(Command::ZoomFit, "Zoom to fit", true),
                 action(Command::ZoomSelection, "Zoom to selection", some),
                 Item::Separator,
+                submenu(
+                    "Outlines",
+                    vec![
+                        action(Command::ToggleOutlineMode, "Show outlines", true),
+                        action(
+                            Command::ToggleOutlineIgnoresClips,
+                            "Ignore clips content",
+                            outline_mode,
+                        ),
+                    ],
+                ),
+                submenu(
+                    "Pixel preview",
+                    vec![
+                        action(Command::SetPixelPreview(0), "Disabled", true),
+                        action(Command::SetPixelPreview(1), "1x", true),
+                        action(Command::SetPixelPreview(2), "2x", true),
+                    ],
+                ),
                 action(Command::TogglePixelGrid, "Pixel grid", true),
                 action(Command::ToggleRuler, "Ruler", true),
                 action(Command::ToggleUi, "Show/Hide UI", true),

@@ -102,6 +102,7 @@ pub mod keys;
 pub mod measurement;
 pub mod menu;
 pub mod mode;
+pub mod paint_session;
 pub mod pixel_grid;
 pub mod ruler;
 #[cfg(feature = "shell")]

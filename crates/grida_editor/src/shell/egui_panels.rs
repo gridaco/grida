@@ -10,20 +10,25 @@
 //! (`Panel::right`), the **hierarchy** tree (`Panel::left`), the
 //! **toolbar** (`Area`), and the **context menu** (`Popup`). `UiLayer`
 //! is fully dormant (`draw_ui` is a no-op) pending the dead-plumbing
-//! deletion. Deferred within properties (named, not silently dropped):
-//! per-paint active/opacity, gradient stop-track, image source,
-//! selection-colors aggregate, and the export scaffold. Deferred in the
-//! hierarchy: drag-reorder (egui dnd).
+//! deletion. A gradient row's **Edit** toggle opens the in-canvas
+//! gradient session and its inline stop editor (see
+//! [`crate::paint_session::gradient`]). Deferred within properties
+//! (named, not silently dropped): per-paint active/opacity, image
+//! source, selection-colors aggregate, and the export scaffold.
+//! Deferred in the hierarchy: drag-reorder (egui dnd).
 
 use std::collections::HashSet;
 
 use grida::cg::prelude::{CGColor, Paint};
 
+use super::icon;
 use crate::command::Command;
-use crate::document::{Id, Mutation};
+use crate::document::{Id, Mutation, NodeKind};
 use crate::editor::{Editor, Recording};
 use crate::history::Origin;
 use crate::menu::{Item, Menu};
+use crate::paint_session::gradient::mode::{self as gradient, PaintTarget};
+use crate::paint_session::gradient::ops as gops;
 use crate::tool::{ShapeKind, Tool};
 use crate::ui::bind::{
     self, BLEND_MODES, Binding, BindingPhase, BindingProperty, BindingValue, Emission,
@@ -31,6 +36,15 @@ use crate::ui::bind::{
     TEXT_ALIGN_VERTICALS, TEXT_ALIGNS, blur_radius, font_weight_index, shadow_params,
 };
 use crate::ui::hierarchy::{DropIndicator, INDENT, ROW_H};
+
+/// A request from the properties panel to toggle a paint session
+/// (drained by the shell after the egui frame — the panel holds no
+/// [`EditMode`](crate::mode::EditMode)). Carries the paint's address.
+pub(crate) struct PaintSessionRequest {
+    pub node: Id,
+    pub target: PaintTarget,
+    pub index: usize,
+}
 
 /// Transient panel state that immediate mode cannot derive from the
 /// document each frame.
@@ -58,12 +72,19 @@ impl EguiPanels {
     }
 
     /// Build the right-hand properties panel for the current selection.
+    /// `active_session` is the gradient session's address, if one is
+    /// open (so its Edit toggle reads pressed and its stop list shows).
+    /// Returns a toggle request for the shell to drain.
     pub(crate) fn properties(
         &mut self,
         ui: &mut egui::Ui,
         editor: &mut Editor,
         last_frame_ms: f32,
-    ) {
+        active_session: Option<(Id, PaintTarget, usize)>,
+        view: ViewState,
+    ) -> (Option<PaintSessionRequest>, Option<ViewAction>) {
+        let mut request = None;
+        let mut view_action = None;
         // `exact_size` (not `default_size`) PINS the width to the camera's
         // right inset (`super::PANEL_WIDTH`, the same constant
         // `apply_viewport` reserves) — so an empty/scene selection can't
@@ -84,6 +105,10 @@ impl EguiPanels {
                 // Calmer vertical rhythm than egui's default.
                 ui.spacing_mut().item_spacing = egui::vec2(8.0, 6.0);
                 ui.spacing_mut().interact_size.y = 22.0;
+                // View control pinned top-right (the `ext-zoom.tsx`
+                // mirror): zoom readout + view toggles, above the
+                // selection sections.
+                view_action = view_control(ui, view);
                 // No scrollbar drawn (wheel / trackpad scroll only): the
                 // panel stays clean and right-aligned controls (+/✕) never
                 // sit under a bar. Nothing reserves horizontal space, so
@@ -96,7 +121,14 @@ impl EguiPanels {
                             scene_section(ui, editor);
                         } else {
                             let head = selection[0].clone();
-                            self.node_sections(ui, editor, &head, &selection);
+                            self.node_sections(
+                                ui,
+                                editor,
+                                &head,
+                                &selection,
+                                active_session.as_ref(),
+                                &mut request,
+                            );
                         }
                         // Dev-only frame-time readout — deliberately faint.
                         ui.add_space(16.0);
@@ -107,9 +139,18 @@ impl EguiPanels {
                         );
                     });
             });
+        (request, view_action)
     }
 
-    fn node_sections(&mut self, ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id]) {
+    fn node_sections(
+        &mut self,
+        ui: &mut egui::Ui,
+        editor: &mut Editor,
+        head: &Id,
+        sel: &[Id],
+        active_session: Option<&(Id, PaintTarget, usize)>,
+        request: &mut Option<PaintSessionRequest>,
+    ) {
         section(ui, "Layer", |ui| {
             grid(ui, "g.layer", |ui| {
                 lbl(ui, "Name");
@@ -312,8 +353,24 @@ impl EguiPanels {
         if editor.node_font_size(head).is_some() {
             text_section(ui, editor, head, sel);
         }
-        paint_section(ui, editor, head, sel, PaintKind::Fill);
-        paint_section(ui, editor, head, sel, PaintKind::Stroke);
+        paint_section(
+            ui,
+            editor,
+            head,
+            sel,
+            PaintKind::Fill,
+            active_session,
+            request,
+        );
+        paint_section(
+            ui,
+            editor,
+            head,
+            sel,
+            PaintKind::Stroke,
+            active_session,
+            request,
+        );
         if editor.node_stroke_width(head).is_some() {
             stroke_geometry_section(ui, editor, head, sel);
         }
@@ -410,23 +467,35 @@ impl EguiPanels {
                             let indent = row.depth as f32 * INDENT;
                             // Disclosure triangle (containers only).
                             if row.is_container {
-                                let glyph = if row.expanded { "▾" } else { "▸" };
+                                let glyph = if row.expanded {
+                                    icon::CHEVRON_DOWN
+                                } else {
+                                    icon::CHEVRON_RIGHT
+                                };
                                 ui.painter().text(
                                     egui::pos2(rect.left() + indent, rect.center().y),
                                     egui::Align2::LEFT_CENTER,
                                     glyph,
-                                    egui::FontId::proportional(10.0),
+                                    icon::font_id(10.0),
                                     HIER_DISCLOSURE,
                                 );
                             }
-                            let name_x = rect.left() + indent + HIER_DISCLOSURE_W;
+                            let icon_x = rect.left() + indent + HIER_DISCLOSURE_W;
                             let color = if row.active {
                                 HIER_TEXT
                             } else {
                                 HIER_TEXT_INACTIVE
                             };
+                            // Node-type icon, then the name shifted past it.
                             ui.painter().text(
-                                egui::pos2(name_x, rect.center().y),
+                                egui::pos2(icon_x, rect.center().y),
+                                egui::Align2::LEFT_CENTER,
+                                type_icon(row.kind),
+                                icon::font_id(11.0),
+                                color,
+                            );
+                            ui.painter().text(
+                                egui::pos2(icon_x + HIER_TYPE_ICON_W, rect.center().y),
                                 egui::Align2::LEFT_CENTER,
                                 &row.name,
                                 egui::FontId::proportional(12.0),
@@ -561,40 +630,227 @@ impl EguiPanels {
 
 // ── Toolbar ──────────────────────────────────────────────────────────
 
-/// The closed tool taxonomy shown in the strip, in order, with the
-/// single-glyph shortcut label (mirrors the retired `UiLayer` toolbar).
-const TOOLBAR_ITEMS: &[(Tool, &str)] = &[
-    (Tool::Cursor, "V"),
-    (Tool::Shape(ShapeKind::Rectangle), "R"),
-    (Tool::Shape(ShapeKind::Ellipse), "O"),
-    (Tool::Shape(ShapeKind::Polygon), "Y"),
-    (Tool::Container { tray: false }, "F"),
-    (Tool::Container { tray: true }, "⇧F"),
-    (Tool::Text, "T"),
-    (Tool::Line { arrow: false }, "L"),
-    (Tool::Line { arrow: true }, "⇧L"),
-    (Tool::Pencil, "P"),
+/// The tool strip, in order: `(command, Lucide icon, name, shortcut)`.
+/// The icon is the button face; the name + shortcut ride the hover
+/// tooltip (so the shortcut stays discoverable now the face is a glyph).
+///
+/// The rows dispatch through the [`Command`] registry (like the menu),
+/// not a `Tool` fast-path: most are `SetTool`, but the **Pen** is
+/// [`Command::PenTool`] (a vector-edit entry, not a `Tool`). Pen (`P`) and
+/// Pencil (`⇧P`) form a pair, mirroring Line/Arrow (`L`/`⇧L`) and
+/// Frame/Tray (`F`/`⇧F`).
+const TOOLBAR_ITEMS: &[(Command, char, &str, &str)] = &[
+    (
+        Command::SetTool(Tool::Cursor),
+        icon::MOUSE_POINTER_2,
+        "Cursor",
+        "V",
+    ),
+    (
+        Command::SetTool(Tool::Shape(ShapeKind::Rectangle)),
+        icon::SQUARE,
+        "Rectangle",
+        "R",
+    ),
+    (
+        Command::SetTool(Tool::Shape(ShapeKind::Ellipse)),
+        icon::CIRCLE,
+        "Ellipse",
+        "O",
+    ),
+    (
+        Command::SetTool(Tool::Shape(ShapeKind::Polygon)),
+        icon::TRIANGLE,
+        "Polygon",
+        "Y",
+    ),
+    (
+        Command::SetTool(Tool::Container { tray: false }),
+        icon::FRAME,
+        "Frame",
+        "F",
+    ),
+    (
+        Command::SetTool(Tool::Container { tray: true }),
+        icon::FRAME,
+        "Frame (tray)",
+        "⇧F",
+    ),
+    (Command::SetTool(Tool::Text), icon::TYPE, "Text", "T"),
+    (
+        Command::SetTool(Tool::Line { arrow: false }),
+        icon::MINUS,
+        "Line",
+        "L",
+    ),
+    (
+        Command::SetTool(Tool::Line { arrow: true }),
+        icon::MOVE_UP_RIGHT,
+        "Arrow",
+        "⇧L",
+    ),
+    (Command::PenTool, icon::PEN_TOOL, "Pen", "P"),
+    (Command::SetTool(Tool::Pencil), icon::PENCIL, "Pencil", "⇧P"),
 ];
 
-/// The bottom-centered tool strip. Returns the tool the user clicked
-/// this frame; the shell activates it on the machine (`ARCH-3` — the
-/// toolbar owns no tool logic, exactly like the panel it replaces).
-pub(crate) fn toolbar(ui: &mut egui::Ui, current: Tool) -> Option<Tool> {
+/// The bottom-centered tool strip. Returns the command the user clicked
+/// this frame; the shell dispatches it through the registry (`ARCH-3` —
+/// the toolbar owns no tool logic). `current` is the active authoring
+/// tool and `pen_active` whether the pen/vector entry is engaged, so the
+/// right button reads pressed.
+pub(crate) fn toolbar(ui: &mut egui::Ui, current: Tool, pen_active: bool) -> Option<Command> {
     let mut picked = None;
     egui::Area::new(egui::Id::new("toolbar.egui"))
         .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -16.0))
         .show(ui.ctx(), |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    for (tool, label) in TOOLBAR_ITEMS {
-                        if ui.selectable_label(*tool == current, *label).clicked() {
-                            picked = Some(*tool);
+                    for (cmd, glyph, name, shortcut) in TOOLBAR_ITEMS {
+                        let selected = match cmd {
+                            Command::SetTool(t) => *t == current && !pen_active,
+                            Command::PenTool => pen_active,
+                            _ => false,
+                        };
+                        let hit = ui
+                            .selectable_label(selected, icon::icon(*glyph))
+                            .on_hover_text(format!("{name}  ({shortcut})"));
+                        if hit.clicked() {
+                            picked = Some(*cmd);
                         }
                     }
                 });
             });
         });
     picked
+}
+
+// ── View control (top-right of the properties panel) ─────────────────
+
+/// Live view state the [`view_control`] reflects (read-only mirror of
+/// the shell's `ruler`/`pixelgrid`/`outline_mode`/… fields + the camera
+/// zoom). Mirrors the web `ext-zoom.tsx` control.
+#[derive(Clone, Copy)]
+pub(crate) struct ViewState {
+    pub zoom_pct: i32,
+    pub outline_mode: bool,
+    pub outline_ignore_clips: bool,
+    pub pixel_preview: u8,
+    pub pixelgrid: bool,
+    pub ruler: bool,
+}
+
+/// What the view control produced this frame. A registry `Command` (the
+/// shell dispatches it) or an absolute zoom-to-percentage (direct camera
+/// UX — the numeric field + 50/100/200 presets — no registry command).
+pub(crate) enum ViewAction {
+    Command(Command),
+    ZoomToPct(f32),
+}
+
+/// The zoom/view dropdown, right-aligned at the top of the properties
+/// panel (the crate mirror of `ext-zoom.tsx`). Reads live [`ViewState`],
+/// emits a [`ViewAction`]; each control returns its action up through the
+/// menu closures (no shared `&mut` across the nested menus).
+fn view_control(ui: &mut egui::Ui, view: ViewState) -> Option<ViewAction> {
+    let mut out = None;
+    // A single-height row (`horizontal`) so the control sits at the
+    // panel's TOP; `right_to_left` inside it right-aligns the button.
+    // (A bare `with_layout` would claim the panel's full height and
+    // vertically-center the button, swallowing the sections below.)
+    ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let resp = ui.menu_button(format!("{}%  ⌄", view.zoom_pct), |ui| {
+                let mut a: Option<ViewAction> = None;
+                // Absolute zoom (2–256%), center-anchored — direct camera UX.
+                let mut pct = view.zoom_pct as f32;
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut pct)
+                            .range(2.0..=256.0)
+                            .suffix("%")
+                            .speed(1.0),
+                    )
+                    .changed()
+                {
+                    a = Some(ViewAction::ZoomToPct(pct));
+                }
+                ui.separator();
+                // The discrete zoom verbs — each has a registry command.
+                for (label, cmd) in [
+                    ("Zoom in", Command::ZoomIn),
+                    ("Zoom out", Command::ZoomOut),
+                    ("Zoom to fit", Command::ZoomFit),
+                    ("Zoom to selection", Command::ZoomSelection),
+                ] {
+                    if ui.button(label).clicked() {
+                        a = Some(ViewAction::Command(cmd));
+                    }
+                }
+                // The %-presets: 100% has a registry command (`Zoom100`);
+                // 50/200 are arbitrary zoom-to-value (`ZoomToPct`, direct
+                // camera UX). The split is intentional, so they stay
+                // explicit rather than joining the table above.
+                if ui.button("Zoom to 50%").clicked() {
+                    a = Some(ViewAction::ZoomToPct(50.0));
+                }
+                if ui.button("Zoom to 100%").clicked() {
+                    a = Some(ViewAction::Command(Command::Zoom100));
+                }
+                if ui.button("Zoom to 200%").clicked() {
+                    a = Some(ViewAction::ZoomToPct(200.0));
+                }
+                ui.separator();
+                // Outlines submenu (Show outlines + independent ignore-clips).
+                let outlines = ui
+                    .menu_button("Outlines", |ui| {
+                        let mut s = None;
+                        let mut on = view.outline_mode;
+                        if ui.checkbox(&mut on, "Show outlines").clicked() {
+                            s = Some(ViewAction::Command(Command::ToggleOutlineMode));
+                        }
+                        let mut clips = view.outline_ignore_clips;
+                        if ui
+                            .add_enabled(
+                                view.outline_mode,
+                                egui::Checkbox::new(&mut clips, "Ignore clips content"),
+                            )
+                            .clicked()
+                        {
+                            s = Some(ViewAction::Command(Command::ToggleOutlineIgnoresClips));
+                        }
+                        s
+                    })
+                    .inner
+                    .flatten();
+                a = a.or(outlines);
+                // Pixel preview submenu (radio 0/1/2).
+                let preview = ui
+                    .menu_button("Pixel preview", |ui| {
+                        let mut s = None;
+                        for (scale, label) in [(0u8, "Disabled"), (1, "1x"), (2, "2x")] {
+                            if ui.radio(view.pixel_preview == scale, label).clicked() {
+                                s = Some(ViewAction::Command(Command::SetPixelPreview(scale)));
+                            }
+                        }
+                        s
+                    })
+                    .inner
+                    .flatten();
+                a = a.or(preview);
+                let mut pg = view.pixelgrid;
+                if ui.checkbox(&mut pg, "Pixel Grid").clicked() {
+                    a = Some(ViewAction::Command(Command::TogglePixelGrid));
+                }
+                let mut rl = view.ruler;
+                if ui.checkbox(&mut rl, "Ruler").clicked() {
+                    a = Some(ViewAction::Command(Command::ToggleRuler));
+                }
+                a
+            });
+            out = resp.inner.flatten();
+        });
+    });
+    out
 }
 
 // ── Context menu ─────────────────────────────────────────────────────
@@ -838,7 +1094,19 @@ enum PaintKind {
     Stroke,
 }
 
-fn paint_section(ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id], target: PaintKind) {
+fn paint_section(
+    ui: &mut egui::Ui,
+    editor: &mut Editor,
+    head: &Id,
+    sel: &[Id],
+    target: PaintKind,
+    active_session: Option<&(Id, PaintTarget, usize)>,
+    request: &mut Option<PaintSessionRequest>,
+) {
+    let ptarget = match target {
+        PaintKind::Fill => PaintTarget::Fill,
+        PaintKind::Stroke => PaintTarget::Stroke,
+    };
     let (title, stack, list_prop, color_prop, kind_prop, id_prefix, label_prefix) = match target {
         PaintKind::Fill => (
             "Fills",
@@ -870,6 +1138,9 @@ fn paint_section(ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id], 
         );
     }
     for (i, paint) in paints.as_slice().iter().enumerate() {
+        let is_gradient = gradient::is_gradient(paint);
+        let editing = is_gradient
+            && active_session.is_some_and(|(n, t, idx)| n == head && *t == ptarget && *idx == i);
         ui.horizontal(|ui| {
             if let Paint::Image(_) = paint {
                 ui.label("Image");
@@ -914,9 +1185,118 @@ fn paint_section(ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id], 
                         ListOp::Remove(i),
                     );
                 }
+                // The Edit toggle opens the in-canvas gradient session
+                // (the paint's control — MODE-5/`PSES-1`). The shell
+                // drains the request into the edit-mode slot.
+                if is_gradient && ui.selectable_label(editing, "Edit").clicked() {
+                    *request = Some(PaintSessionRequest {
+                        node: head.clone(),
+                        target: ptarget,
+                        index: i,
+                    });
+                }
             });
         });
+        // The inline stop editor, while this paint's session is open.
+        if editing {
+            stop_editor(ui, editor, head, ptarget, i, paint);
+        }
     }
+}
+
+/// The inline color-stop list shown under a gradient row while its
+/// session is open — add / remove / recolor / re-offset, each one
+/// history entry through [`gradient::edit_stops`] (the panel and the
+/// canvas session are two views of one state, `PSES-1`).
+fn stop_editor(
+    ui: &mut egui::Ui,
+    editor: &mut Editor,
+    node: &Id,
+    target: PaintTarget,
+    index: usize,
+    paint: &Paint,
+) {
+    let Some(stops) = gradient::stops_of(paint) else {
+        return;
+    };
+    ui.indent("gradient.stops", |ui| {
+        for (si, stop) in stops.iter().enumerate() {
+            ui.horizontal(|ui| {
+                let mut c = to_c32(stop.color);
+                if ui.color_edit_button_srgba(&mut c).changed() {
+                    let color = from_c32(c);
+                    gradient::edit_stops(
+                        editor,
+                        node,
+                        target,
+                        index,
+                        "gradient.stop.color",
+                        move |s| {
+                            if let Some(x) = s.get_mut(si) {
+                                x.color = color;
+                            }
+                        },
+                    );
+                }
+                let mut off = stop.offset;
+                let r = num(ui, &mut off, 0.005);
+                // Commit once when the drag/edit ends (not per delta), so
+                // a drag is one undoable step.
+                if (r.drag_stopped() || r.lost_focus()) && (off - stop.offset).abs() > f32::EPSILON
+                {
+                    let off = off.clamp(0.0, 1.0);
+                    gradient::edit_stops(
+                        editor,
+                        node,
+                        target,
+                        index,
+                        "gradient.stop.offset",
+                        move |s| {
+                            if let Some(x) = s.get_mut(si) {
+                                x.offset = off;
+                            }
+                            s.sort_by(|a, b| a.offset.total_cmp(&b.offset));
+                        },
+                    );
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if remove_button(ui).clicked() {
+                        gradient::edit_stops(
+                            editor,
+                            node,
+                            target,
+                            index,
+                            "gradient.stop.delete",
+                            move |s| {
+                                gops::remove_stop(s, si);
+                            },
+                        );
+                    }
+                });
+            });
+        }
+        // Add a stop at the widest gap — a predictable default spot.
+        if section_add(ui, "Stop") {
+            gradient::edit_stops(editor, node, target, index, "gradient.stop.insert", |s| {
+                let off = widest_gap_mid(s);
+                let color = gops::color_at(s, off);
+                gops::insert_stop(s, off, color);
+            });
+        }
+    });
+}
+
+/// The midpoint of the widest gap between consecutive stops (assumed
+/// ordered) — where an added stop reads most naturally.
+fn widest_gap_mid(stops: &[grida::cg::prelude::GradientStop]) -> f32 {
+    let mut best = (f32::NEG_INFINITY, 0.5f32);
+    for w in stops.windows(2) {
+        let gap = w[1].offset - w[0].offset;
+        if gap > best.0 {
+            best = (gap, (w[0].offset + w[1].offset) * 0.5);
+        }
+    }
+    best.1
 }
 
 fn stroke_geometry_section(ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id]) {
@@ -1285,6 +1665,28 @@ const VAL_W: f32 = 132.0;
 // drop-resolution geometry and this rendering must share one source.
 /// The disclosure-triangle gutter width (rendering-only).
 const HIER_DISCLOSURE_W: f32 = 13.0;
+/// Gutter reserved for a row's node-type icon, before the name.
+const HIER_TYPE_ICON_W: f32 = 16.0;
+
+/// The Lucide glyph for a node's display category — the editor-semantic
+/// node→icon mapping (kept here at the call site, not in `icon`, which
+/// stays an agnostic Lucide mirror). Shape kinds reuse the tool glyphs.
+fn type_icon(kind: NodeKind) -> char {
+    match kind {
+        NodeKind::Frame => icon::FRAME,
+        NodeKind::Group => icon::GROUP,
+        NodeKind::Boolean => icon::COMBINE,
+        NodeKind::Rectangle => icon::SQUARE,
+        NodeKind::Ellipse => icon::CIRCLE,
+        NodeKind::Polygon => icon::TRIANGLE,
+        NodeKind::Star => icon::STAR,
+        NodeKind::Line => icon::MINUS,
+        NodeKind::Text => icon::TYPE,
+        NodeKind::Vector => icon::PEN_TOOL,
+        NodeKind::Image => icon::IMAGE,
+        NodeKind::Other => icon::BOX,
+    }
+}
 /// Selected / hovered row fills — greys, not the selection accent.
 const HIER_SEL_BG: egui::Color32 = egui::Color32::from_gray(216);
 const HIER_HOVER_BG: egui::Color32 = egui::Color32::from_gray(232);
@@ -1314,7 +1716,10 @@ fn section_add(ui: &mut egui::Ui, title: &str) -> bool {
     ui.horizontal(|ui| {
         ui.label(section_title(title));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.add(egui::Button::new("+").frame(false)).clicked() {
+            if ui
+                .add(egui::Button::new(icon::icon(icon::PLUS)).frame(false))
+                .clicked()
+            {
                 clicked = true;
             }
         });
@@ -1366,10 +1771,7 @@ fn pair(ui: &mut egui::Ui, value: &mut f32, speed: f32, tag: &str) -> egui::Resp
 
 /// A frameless remove control for list rows.
 fn remove_button(ui: &mut egui::Ui) -> egui::Response {
-    ui.add(
-        egui::Button::new(egui::RichText::new("✕").color(egui::Color32::from_gray(140)))
-            .frame(false),
-    )
+    ui.add(egui::Button::new(icon::icon(icon::X).color(egui::Color32::from_gray(140))).frame(false))
 }
 
 /// A one-of-N combo of the given width; returns the new index on change.

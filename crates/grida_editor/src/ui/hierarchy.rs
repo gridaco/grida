@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 
 use math2::rect::Rectangle;
 
-use crate::document::Id;
+use crate::document::{Id, NodeKind};
 use crate::editor::Editor;
 
 /// Row height, logical px (also the drop-band unit).
@@ -39,6 +39,8 @@ pub struct TreeRow {
     pub depth: usize,
     /// Display name (falls back to the stable id).
     pub name: String,
+    /// Display category, for the row's per-type icon.
+    pub kind: NodeKind,
     /// Container kinds accept "into" drops and show a disclosure.
     pub is_container: bool,
     /// Document child count (for "into" drop indices).
@@ -99,6 +101,7 @@ fn flatten_level(
             parent: parent.cloned(),
             depth,
             name,
+            kind: doc.node_kind(&id).unwrap_or(NodeKind::Other),
             is_container,
             child_count: children.len(),
             expanded: is_expanded,

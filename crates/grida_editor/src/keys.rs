@@ -28,9 +28,9 @@
 //! contradictory row.
 //!
 //! Sheet rows whose commands are not yet implemented (auto-layout,
-//! boolean, text style, outline mode, color picker, locked, remove
-//! fill/stroke) are **not shipped** — an unshippable row would be a
-//! permanently-declining lie. The remaining rows are tracked in
+//! boolean, text style, color picker, locked, remove fill/stroke) are
+//! **not shipped** — an unshippable row would be a permanently-declining
+//! lie. (Outline mode now ships — Mod+Shift+O → `ToggleOutlineMode`.) The remaining rows are tracked in
 //! `TODO.md`; the reserved rows the spec mandates (flip-h/v, scale
 //! tool, lasso) ship as named no-ops. Align & distribute (Alt+A/D/W/S,
 //! Alt+H/V, Alt+Ctrl+H/V) ship live (`Command::Align`/`Distribute`), as
@@ -697,6 +697,19 @@ pub const SHEET: &[Binding] = &[
         KeyCode::Char('\''),
         plain(Req::Held),
         &[Command::TogglePixelGrid],
+    ),
+    // Outline (wireframe) mode — Mod+Shift+O (the sheet's reserved
+    // "outline mode" chord, now shipped). Pixel-preview cycle rides
+    // Mod+Shift+P.
+    cmd_row(
+        KeyCode::Char('o'),
+        cmd(Req::Held),
+        &[Command::ToggleOutlineMode],
+    ),
+    cmd_row(
+        KeyCode::Char('p'),
+        cmd(Req::Held),
+        &[Command::CyclePixelPreview],
     ),
     cmd_row(
         KeyCode::Char('\''),

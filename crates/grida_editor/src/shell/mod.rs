@@ -23,6 +23,7 @@
 
 mod app;
 mod egui_panels;
+pub(crate) mod icon;
 mod menubar;
 mod session;
 mod window;
@@ -57,7 +58,12 @@ const HIER_WIDTH: f32 = 220.0;
 /// into the binary (`grida::embedded_fonts`) — no new asset. Geist is
 /// inserted at the *front* of each family list, keeping egui's bundled
 /// Ubuntu/Noto/emoji fonts as fallbacks for glyphs Geist lacks (the
-/// panels use `▸ ▾ ✕ °`).
+/// panels use a `°` unit suffix).
+///
+/// The Lucide icon font ([`icon`]) is registered as its **own** family
+/// (`FontFamily::Name("lucide")`), never a proportional/monospace fallback:
+/// its glyphs live in the Private Use Area, which egui's bundled fonts also
+/// populate, so an isolated family prevents shadowing.
 fn install_egui_fonts(ctx: &egui::Context) {
     use std::sync::Arc;
 
@@ -74,12 +80,20 @@ fn install_egui_fonts(ctx: &egui::Context) {
             grida::embedded_fonts::geistmono::BYTES,
         )),
     );
+    fonts.font_data.insert(
+        icon::FAMILY.to_owned(),
+        Arc::new(egui::FontData::from_static(icon::BYTES)),
+    );
     if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
         family.insert(0, "Geist".to_owned());
     }
     if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
         family.insert(0, "Geist Mono".to_owned());
     }
+    fonts.families.insert(
+        egui::FontFamily::Name(icon::FAMILY.into()),
+        vec![icon::FAMILY.to_owned()],
+    );
     ctx.set_fonts(fonts);
 }
 
@@ -260,6 +274,9 @@ pub fn run_with(options: ShellOptions) -> Result<(), ShellError> {
         tools: crate::tool::ToolMachine::new(),
         ruler: true,
         pixelgrid: true,
+        outline_mode: false,
+        outline_ignore_clips: true,
+        pixel_preview: 0,
         ui_visible: true,
         title: String::new(),
         dpr: scale_factor as f32,
@@ -307,58 +324,113 @@ pub fn run_with(options: ShellOptions) -> Result<(), ShellError> {
     el.run_app(&mut shell).map_err(ShellError::EventLoop)
 }
 
-/// A built-in demo document: a few rectangles to select, translate,
-/// and undo against.
+/// A built-in demo document: a 2×2 grid of rectangles, one per gradient
+/// type, each labeled — a showcase for the gradient paint session (open
+/// a fill's **Edit** toggle to edit it on canvas), and enough content to
+/// select, translate, and undo against.
 fn demo_scene() -> (Scene, HashMap<NodeId, Id>) {
     let nf = NodeFactory::new();
     let mut graph = SceneGraph::new();
     let mut id_map = HashMap::new();
 
-    let rects: [(f32, f32, f32, f32, CGColor); 3] = [
+    /// Evenly-spaced stops from a color ramp (the two-arg gradient
+    /// constructors only cover linear/radial).
+    fn even_stops(colors: &[CGColor]) -> Vec<GradientStop> {
+        let n = colors.len();
+        colors
+            .iter()
+            .enumerate()
+            .map(|(i, c)| GradientStop {
+                offset: if n <= 1 {
+                    0.0
+                } else {
+                    i as f32 / (n - 1) as f32
+                },
+                color: *c,
+            })
+            .collect()
+    }
+    let rgb = |r, g, b| CGColor::from_rgba(r, g, b, 255);
+
+    let (cw, ch) = (260.0_f32, 200.0_f32);
+    let (gap_x, gap_y) = (60.0_f32, 90.0_f32);
+    let (ox, oy) = (120.0_f32, 120.0_f32);
+    let cells: [(&str, &str, Paint); 4] = [
         (
-            80.0,
-            80.0,
-            240.0,
-            180.0,
-            CGColor::from_rgba(230, 90, 70, 255),
+            "linear",
+            "Linear",
+            Paint::LinearGradient(LinearGradientPaint::from_colors(vec![
+                rgb(124, 58, 237),
+                rgb(236, 72, 153),
+            ])),
         ),
         (
-            400.0,
-            160.0,
-            200.0,
-            200.0,
-            CGColor::from_rgba(80, 150, 230, 255),
+            "radial",
+            "Radial",
+            Paint::RadialGradient(RadialGradientPaint::from_colors(vec![
+                rgb(253, 224, 71),
+                rgb(249, 115, 22),
+                rgb(124, 45, 18),
+            ])),
         ),
         (
-            240.0,
-            420.0,
-            320.0,
-            140.0,
-            CGColor::from_rgba(120, 200, 120, 255),
+            "sweep",
+            "Sweep",
+            Paint::SweepGradient(SweepGradientPaint {
+                stops: even_stops(&[
+                    rgb(239, 68, 68),
+                    rgb(234, 179, 8),
+                    rgb(34, 197, 94),
+                    rgb(6, 182, 212),
+                    rgb(59, 130, 246),
+                    rgb(168, 85, 247),
+                    rgb(239, 68, 68),
+                ]),
+                ..Default::default()
+            }),
+        ),
+        (
+            "diamond",
+            "Diamond",
+            Paint::DiamondGradient(DiamondGradientPaint {
+                stops: even_stops(&[rgb(34, 211, 238), rgb(30, 58, 138)]),
+                ..Default::default()
+            }),
         ),
     ];
-    for (i, (x, y, w, h, color)) in rects.into_iter().enumerate() {
+
+    for (i, (name, label, paint)) in cells.into_iter().enumerate() {
+        let x = ox + (i % 2) as f32 * (cw + gap_x);
+        let y = oy + (i / 2) as f32 * (ch + gap_y);
+
         let mut rect = nf.create_rectangle_node();
         rect.transform = AffineTransform::new(x, y, 0.0);
         rect.size = Size {
-            width: w,
-            height: h,
+            width: cw,
+            height: ch,
         };
-        rect.fills = Paints::new([Paint::Solid(SolidPaint::new_color(color))]);
+        rect.fills = Paints::new([paint]);
         let iid = graph.append_child(Node::Rectangle(rect), Parent::Root);
-        let stable = format!("rect{}", i + 1);
-        graph.set_name(iid, stable.clone());
-        id_map.insert(iid, stable);
+        graph.set_name(iid, name.to_string());
+        id_map.insert(iid, name.to_string());
+
+        // The type label, sitting just above its cell.
+        let mut text = nf.create_text_span_node();
+        text.transform = AffineTransform::new(x, y - 28.0, 0.0);
+        text.text = label.to_string();
+        let tid = graph.append_child(Node::TextSpan(text), Parent::Root);
+        let tname = format!("label_{name}");
+        graph.set_name(tid, tname.clone());
+        id_map.insert(tid, tname);
     }
 
-    // A text node so the egui spike's font-size write (bind::apply) is
-    // exercisable — the factory default text is empty, so seed content.
-    let mut text = nf.create_text_span_node();
-    text.transform = AffineTransform::new(120.0, 300.0, 0.0);
-    text.text = "egui spike — edit my font size".to_string();
-    let tid = graph.append_child(Node::TextSpan(text), Parent::Root);
-    graph.set_name(tid, "text1".to_string());
-    id_map.insert(tid, "text1".to_string());
+    // A title above the grid.
+    let mut title = nf.create_text_span_node();
+    title.transform = AffineTransform::new(ox, 60.0, 0.0);
+    title.text = "Gradient showcase".to_string();
+    let title_id = graph.append_child(Node::TextSpan(title), Parent::Root);
+    graph.set_name(title_id, "title".to_string());
+    id_map.insert(title_id, "title".to_string());
 
     let scene = Scene {
         name: "demo".to_string(),

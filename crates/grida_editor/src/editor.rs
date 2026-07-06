@@ -517,6 +517,22 @@ impl Editor {
         self.doc.node_size(id)
     }
 
+    /// The `(width, height)` of the **local paint box** — the box the
+    /// engine maps a fill/stroke paint into (`scale(size)` about the
+    /// node's local origin; see the gradient/image placement model). For
+    /// concrete-`Size` kinds this is [`node_size`](Self::node_size); for a
+    /// geometry-defined kind (a vector) it is the network's tight bounds,
+    /// matching the engine's `path.compute_tight_bounds()`. This — not
+    /// `node_size` — is what a paint session maps unit→canvas through, so
+    /// the session works on a vector-edited/flattened shape too.
+    pub fn node_paint_box_size(&self, id: &Id) -> Option<(f32, f32)> {
+        if let Some(size) = self.node_size(id) {
+            return Some(size);
+        }
+        let bounds = crate::vector::ops::network_bounds(&self.node_vector_network(id)?)?;
+        Some((bounds.width, bounds.height))
+    }
+
     /// A node's fill color when its fills are exactly one solid paint.
     pub fn node_fill_solid(&self, id: &Id) -> Option<grida::cg::prelude::CGColor> {
         self.doc.node_fill_solid(id)
