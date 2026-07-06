@@ -22,17 +22,20 @@ Runbook for cutting desktop releases — macOS / Windows / Linux signed, notariz
 
    Or via UI: **Actions → Publish Desktop App → Run workflow**.
 
-3. **Approve in the environment gate.** Each platform job (mac/win/linux) pauses at the `release` environment. Open the run in Actions and click "Review deployments → Approve and deploy."
+3. **Approve in the environment gate.** Each platform job pauses at the `release` environment — that's **four** jobs to approve: `macos-apple-silicon`, `macos-intel`, `windows`, `linux` (macOS builds one arch per runner, see [Hard constraints](#hard-constraints)). Open the run in Actions and click "Review deployments → Approve and deploy."
 
-4. **Verify.** When the run finishes, the GitHub Release page has `Grida-darwin-arm64-<version>.zip`, `Grida-darwin-x64-<version>.zip`, the `.dmg` siblings, Windows `.exe` + nupkg, and Linux `.deb` / `.rpm`. Confirm the feed serves it:
+4. **Verify.** When the run finishes, the GitHub Release page has both macOS arches — `Grida-darwin-arm64-<version>.zip` + `Grida-darwin-x64-<version>.zip` and their `.dmg` siblings (`Grida-<version>-arm64.dmg`, `Grida-<version>-x64.dmg`) — plus Windows `.exe` + nupkg and Linux `.deb` / `.rpm`. Confirm the feed serves **each arch** (the autoupdate feed URL is per-`<platform>-<arch>`):
 
    ```sh
-   BASE=https://update.electronjs.org/gridaco/grida/darwin-arm64
-   curl -s -w "\n%{http_code}\n" "$BASE/0.0.0"
-   # WANT: 200 + JSON pointing at the new .zip
+   for ARCH in arm64 x64; do
+     BASE="https://update.electronjs.org/gridaco/grida/darwin-$ARCH"
+     echo "== darwin-$ARCH =="
+     curl -s -w "\n%{http_code}\n" "$BASE/0.0.0"
+     # WANT: 200 + JSON pointing at the new .zip
 
-   curl -s -o /dev/null -w "%{http_code}\n" "$BASE/<just-released-version>"
-   # WANT: 204 (no update — correct)
+     curl -s -o /dev/null -w "%{http_code}\n" "$BASE/<just-released-version>"
+     # WANT: 204 (no update — correct)
+   done
    ```
 
    If the old-client request returns 204, either the release is marked prerelease or the tag isn't valid semver. See [Troubleshooting](#troubleshooting).
@@ -79,6 +82,7 @@ These are silent footguns. Pinned, do not change without a plan:
 - **Plain semver tags.** `update.electronjs.org` skips tags that don't pass `semver.valid()`. No `desktop-v…` or other prefixes.
 - **`hardenedRuntime: true`** in `osxSign.optionsForFile`. Required for notarization; required for the entitlements plist to apply.
 - **`allowBuilds` in `pnpm-workspace.yaml`** (not `package.json`). pnpm 11 replaced the old `onlyBuiltDependencies` list with the `allowBuilds` map and ignores the `pnpm` field in `package.json` entirely. The native deps (`electron`, `electron-winstaller`, `fs-xattr`, `macos-alias`) must be set to `true` so their install scripts run; pnpm otherwise silently disables native module builds. Removing them breaks the DMG maker (`Cannot find module '../build/Release/volume.node'`).
+- **macOS builds one arch per runner** — `macos-apple-silicon` (`macos-26`, arm64) and `macos-intel` (`macos-15-intel`, x64) are separate matrix rows, each running a single-arch `publish --arch=…`. Do **not** collapse them into one parallel `--arch="x64,arm64"` invocation: it hits the maker-dmg race (electron/forge#3517 — `hdiutil` EAGAIN + appdmg "Target already exists"), which is why Intel was dropped in the first place (issue #947). Separate native runners also let pnpm resolve each arch's per-platform prebuilds (`@parcel/watcher-darwin-<arch>`). `macos-15-intel` is GitHub's last x86_64 image, retired **Aug 2027** (actions/runner-images#13045); revisit once Forge 8 GA (electron/forge#4082) fixes the race.
 
 ---
 

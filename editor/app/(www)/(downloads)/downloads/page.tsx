@@ -103,6 +103,17 @@ function DownloadButtons({ links }: { links: downloads.DownloadLinks }) {
         </Button>
       </Link>
 
+      {/* macOS Intel — hidden until the first x64-bearing release ships
+          (issue #947); mac_dmg_x64 is null until then. */}
+      {links.mac_dmg_x64 && (
+        <Link href={links.mac_dmg_x64} download>
+          <Button size="lg" variant="outline">
+            <AppleLogo className="size-4" /> Download for macOS (Intel-based
+            Macs)
+          </Button>
+        </Link>
+      )}
+
       {/* Windows x64 */}
       <Link href={links.windows_exe_x64} download>
         <Button size="lg" variant="outline">
