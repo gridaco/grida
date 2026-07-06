@@ -77,6 +77,11 @@ pub struct GradientSession {
     /// The value at entry — for the untouched-exit check.
     snapshot: GradientValue,
     entry_depth: usize,
+    /// The paint-list length at entry. The session is pinned by index,
+    /// not a stable paint id, so a length change means a paint was
+    /// inserted/removed and `index` may now address a different paint —
+    /// the session ends rather than editing the neighbor (`PSES-4`).
+    entry_paint_len: usize,
     /// Selected stop indices; the panel color control edits these.
     selected: BTreeSet<usize>,
     hover: Option<Control>,
@@ -106,6 +111,7 @@ impl GradientSession {
                 stops: stops.to_vec(),
             },
             entry_depth: editor.history_len(),
+            entry_paint_len: paints.as_slice().len(),
             selected: BTreeSet::new(),
             hover: None,
             phase: Phase::Idle,
@@ -127,6 +133,12 @@ impl GradientSession {
         let Some(paints) = read_paints(editor, &self.node, self.target) else {
             return false;
         };
+        // A paint was inserted/removed: the index no longer reliably
+        // addresses the pinned paint (a neighbor may have shifted into
+        // it), so the session ends (`PSES-4`).
+        if paints.as_slice().len() != self.entry_paint_len {
+            return false;
+        }
         let Some((ty, _, stops)) = paints.as_slice().get(self.index).and_then(gradient_of) else {
             return false;
         };

@@ -1,6 +1,5 @@
 ---
 title: Gradient Session
-description: The canonical gradient transform model — a per-type normalized gradient space mapped to the object by a user transform and the node's size — and the control-point frame and color-stop track that edit it on the canvas.
 tags:
   - internal
   - wg
@@ -29,12 +28,12 @@ The four gradient types differ **only** in how a color-ramp position
 `t ∈ [0,1]` is assigned to a point of unit gradient space. The center of
 the space is `(0.5, 0.5)`.
 
-| Type        | Ramp domain (`t ∈ [0,1]`)                                                                                                    |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Type        | Ramp domain (`t ∈ [0,1]`)                                                                                                          |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | **Linear**  | A straight axis. `t = 0` at the start point `(0, 0.5)`, `t = 1` at the end point `(1, 0.5)`; `t` is the projection onto that axis. |
-| **Radial**  | Concentric circles about `(0.5, 0.5)`. `t = 0` at the center, `t = 1` on the unit circle of radius `0.5`.                    |
-| **Diamond** | Concentric squares (an L∞ metric) about `(0.5, 0.5)`. `t = 0` at the center, `t = 1` on the square inscribed to the unit box. |
-| **Sweep**   | Angular about `(0.5, 0.5)`. `t = 0` at a reference direction, increasing **clockwise**, `t = 1` after a full `360°` turn.    |
+| **Radial**  | Concentric circles about `(0.5, 0.5)`. `t = 0` at the center, `t = 1` on the unit circle of radius `0.5`.                          |
+| **Diamond** | Concentric squares (an L∞ metric) about `(0.5, 0.5)`. `t = 0` at the center, `t = 1` on the square inscribed to the unit box.      |
+| **Sweep**   | Angular about `(0.5, 0.5)`. `t = 0` at a reference direction, increasing **clockwise**, `t = 1` after a full `360°` turn.          |
 
 These are _base_ geometries — the identity pose of each type. A gradient
 is rarely left in its base pose; it carries a transform that moves it.

@@ -265,7 +265,13 @@ impl ShellApp {
             _ => false,
         };
         if drop_mode {
-            self.mode = EditMode::None;
+            // Residue-free teardown: a gradient session may hold an
+            // in-flight gesture, so `exit` aborts it (and restores no
+            // selection — correct when the subject is already gone)
+            // before the slot clears. Other modes drop as before.
+            if let EditMode::Gradient(s) = std::mem::take(&mut self.mode) {
+                s.exit(&mut self.editor);
+            }
             self.overlay_damaged();
         }
         self.update_title();

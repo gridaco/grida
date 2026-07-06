@@ -8,7 +8,7 @@ embedded into the `grida_editor` shell binary for the egui dev chrome
 - **Source:** `https://unpkg.com/lucide-static@1.23.0/font/lucide.ttf`
 - **License:** ISC
 
-```
+```text
 ISC License
 
 Copyright (c) 2020, Lucide Contributors

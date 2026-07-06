@@ -1,6 +1,5 @@
 ---
 title: Image Session
-description: The canonical image placement model — orientation, the three mutually-exclusive placements (declarative fit, free transform, tile), and the paint-box coordinate space — and the quad transform handles that edit the free-transform placement on the canvas.
 tags:
   - internal
   - wg

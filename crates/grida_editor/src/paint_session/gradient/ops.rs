@@ -5,7 +5,7 @@
 //! these and own what the results mean.
 
 use grida::cg::prelude::{CGColor, GradientStop};
-use math2::vector2::{self, Vector2};
+use math2::vector2::Vector2;
 
 use super::frame::{Frame, GradientType};
 
@@ -128,11 +128,25 @@ pub fn point_to_offset(ty: GradientType, frame: &Frame, point: Vector2) -> f32 {
     let p = frame.primary;
     match ty {
         GradientType::Sweep => {
-            // Angle from the primary direction to the point (same sense
-            // as the parametric `φ = 2π·t`), normalized to `[0,1]`.
-            let ar = vector2::angle(o, p);
-            let aq = vector2::angle(o, point);
-            (((aq - ar + 360.0) % 360.0) / 360.0).clamp(0.0, 1.0)
+            // Invert the forward ellipse
+            // `point = o + cos(φ)·(p−o) + sin(φ)·(s−o)` in the affine
+            // `{p−o, s−o}` basis (`GRAD-7`). A Euclidean angle around `o`
+            // only round-trips on an unrotated unit circle; on a skewed
+            // or elliptical sweep frame it does not. Solve the point in
+            // the basis (Cramer), then `atan2` recovers `φ = 2π·t`.
+            let s = frame.secondary.unwrap_or(p);
+            let b1 = [p[0] - o[0], p[1] - o[1]];
+            let b2 = [s[0] - o[0], s[1] - o[1]];
+            let det = b1[0] * b2[1] - b1[1] * b2[0];
+            if det.abs() <= f32::EPSILON {
+                return 0.0;
+            }
+            let d = [point[0] - o[0], point[1] - o[1]];
+            let cos = (d[0] * b2[1] - d[1] * b2[0]) / det;
+            let sin = (b1[0] * d[1] - b1[1] * d[0]) / det;
+            let t = sin.atan2(cos) / std::f32::consts::TAU;
+            let t = if t < 0.0 { t + 1.0 } else { t };
+            t.clamp(0.0, 1.0)
         }
         _ => {
             let axis = [p[0] - o[0], p[1] - o[1]];

@@ -1,6 +1,5 @@
 ---
 title: Paint Session
-description: The in-canvas editing surfaces for a single paint — gradient and image — and the shared doctrine they inherit: the normalized value model, the panel⇄canvas duality, and preview-then-commit.
 tags:
   - internal
   - wg
@@ -33,11 +32,11 @@ The [edit-mode](../edit-mode.md) spec is the golden owner of the session
 _as a slot_. This cluster **defers to it** for every lifecycle fact and
 specifies only the surface delta:
 
-| Concern                                                       | Owned by                          |
-| ------------------------------------------------------------- | --------------------------------- |
+| Concern                                                        | Owned by                              |
+| -------------------------------------------------------------- | ------------------------------------- |
 | Exclusivity, entry idiom, exit ladder, subject pinning, domain | [edit-mode](../edit-mode.md) `MODE-*` |
-| The normalized value model each surface edits                 | this cluster (`PSES-2`, per-kind) |
-| The canvas chrome, its handles, and their gestures            | per-kind (`GRAD-*`, `IMG-*`)      |
+| The normalized value model each surface edits                  | this cluster (`PSES-2`, per-kind)     |
+| The canvas chrome, its handles, and their gestures             | per-kind (`GRAD-*`, `IMG-*`)          |
 
 A paint session never appears in a saved document, round-trips through
 undo as authoring context, and ends without residue when its subject or

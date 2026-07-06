@@ -92,36 +92,35 @@ in `docs/wg/canvas/**, the feat-* studies, and this crate's docs/**` vs ids cite
       the width facet (MODE-4), text-slot mirror (session stays
       engine-owned), MODE-3/5/9.
 - [~] **paint session** —
-      [spec](../../docs/wg/canvas/paint-session/) (the two in-canvas
-      paint-editing surfaces edit-mode's slot delegates to): shared
-      surface doctrine (PSES-1..4), gradient (GRAD-1..8), image
-      (IMG-1..7). **Gradient shipped** (2026-07): the vector-edit split
-      in `src/paint_session/gradient/` — pure `frame` (the per-type
-      unit-gradient-space control frame ↔ user transform, `math2`
-      gained `vector2::perpendicular`), `ops` (stop insert/remove≥2/move
-      + ramp offset↔point), `hit` (canvas-space nearest, handles ≻ stops
-      ≻ track), `chrome` (frame axes + `HudPrim::Swatch` stop knobs +
-      gradient `Role`s), and the stateful `mode::GradientSession`
-      (begin_gesture → silent fills patch → commit_gesture, one entry
-      per drag; whole-list replace-and-invert = `PSES-1`). Slot:
-      `EditMode::Gradient(Box<..>)` with routing/chrome/reconcile/
-      Escape+Delete in `src/shell/app.rs`. Entry: the **Edit toggle**
-      on a gradient paint row (`egui_panels.rs`) → `PaintSessionRequest`
-      drained by the shell (`enter_paint_session`); the row's inline
-      stop editor (add/remove/recolor/re-offset via `gradient::
-      edit_stops`) is the panel's other view (`PSES-1`). Tests:
-      `tests/grad_contracts.rs` (6 — entry-gates-gradient, one-entry
-      drag + undo, track-insert, GRAD-6 delete floor, retype-ends,
-      panel⇄session one-state) + the module's GRAD-1..9 unit tests. Chrome
-      matches the production web editor (GRAD-9): the A→B axis + the
-      **ellipse ring** for the elliptical types (radial/sweep/diamond),
-      circle handles, and color-stop **chips** (`HudPrim::GradientChip`)
-      floated off the ramp point and rotated to the track (linear/radial/
-      diamond along A→B, sweep on the ring), with the hovered-track
-      insertion preview ghost. **Deferred:** the **image** session
-      (IMG-*, the sibling), stop arrow-step keys, per-run rich chips.
-      Ties off the properties-sheet **gradient stop-track editor** row
-      below.
+  [spec](../../docs/wg/canvas/paint-session/) (the two in-canvas
+  paint-editing surfaces edit-mode's slot delegates to): shared
+  surface doctrine (PSES-1..4), gradient (GRAD-1..9), image
+  (IMG-1..7). **Gradient shipped** (2026-07): the vector-edit split
+  in `src/paint_session/gradient/` — pure `frame` (the per-type
+  unit-gradient-space control frame ↔ user transform, `math2`
+  gained `vector2::perpendicular`), `ops` (stop insert/remove≥2/move + ramp offset↔point), `hit` (canvas-space nearest, handles ≻ stops
+  ≻ track), `chrome` (frame axes + `HudPrim::Swatch` stop knobs +
+  gradient `Role`s), and the stateful `mode::GradientSession`
+  (begin_gesture → silent fills patch → commit_gesture, one entry
+  per drag; whole-list replace-and-invert = `PSES-1`). Slot:
+  `EditMode::Gradient(Box<..>)` with routing/chrome/reconcile/
+  Escape+Delete in `src/shell/app.rs`. Entry: the **Edit toggle**
+  on a gradient paint row (`egui_panels.rs`) → `PaintSessionRequest`
+  drained by the shell (`enter_paint_session`); the row's inline
+  stop editor (add/remove/recolor/re-offset via `gradient::
+edit_stops`) is the panel's other view (`PSES-1`). Tests:
+  `tests/grad_contracts.rs` (6 — entry-gates-gradient, one-entry
+  drag + undo, track-insert, GRAD-6 delete floor, retype-ends,
+  panel⇄session one-state) + the module's GRAD-1..9 unit tests. Chrome
+  matches the production web editor (GRAD-9): the A→B axis + the
+  **ellipse ring** for the elliptical types (radial/sweep/diamond),
+  circle handles, and color-stop **chips** (`HudPrim::GradientChip`)
+  floated off the ramp point and rotated to the track (linear/radial/
+  diamond along A→B, sweep on the ring), with the hovered-track
+  insertion preview ghost. **Deferred:** the **image** session
+  (IMG-\*, the sibling), stop arrow-step keys, per-run rich chips.
+  Ties off the properties-sheet **gradient stop-track editor** row
+  below.
 - [x] **tool** — [spec](../../docs/wg/canvas/tool.md) · `src/tool.rs`
       · `tests/tool_contracts.rs` (TOOL 9/9). The pen itself is
       tracked under **vector edit**.

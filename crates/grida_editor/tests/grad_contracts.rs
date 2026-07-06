@@ -392,7 +392,7 @@ fn reconcile_ends_on_retype() {
 #[test]
 fn panel_edit_and_session_read_one_state() {
     let mut editor = editor_with_fills(vec![linear_two()]);
-    let session = enter(&editor);
+    let mut session = enter(&editor);
     let len_before = editor.history_len();
 
     // The panel's write path inserts a stop; one entry.
@@ -413,5 +413,10 @@ fn panel_edit_and_session_read_one_state() {
         3,
         "the added stop is visible to both views"
     );
-    let _ = session; // still valid; both are views of the node's fills
+    // The session queries the same live paint after the panel write — a
+    // stale cache or an invalidated address would reconcile `false`.
+    assert!(
+        session.reconcile(&editor),
+        "the session tracks the live paint the panel wrote"
+    );
 }
