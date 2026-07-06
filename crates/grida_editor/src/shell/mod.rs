@@ -23,6 +23,7 @@
 
 mod app;
 mod egui_panels;
+pub(crate) mod icon;
 mod menubar;
 mod session;
 mod window;
@@ -57,7 +58,12 @@ const HIER_WIDTH: f32 = 220.0;
 /// into the binary (`grida::embedded_fonts`) — no new asset. Geist is
 /// inserted at the *front* of each family list, keeping egui's bundled
 /// Ubuntu/Noto/emoji fonts as fallbacks for glyphs Geist lacks (the
-/// panels use `▸ ▾ ✕ °`).
+/// panels use a `°` unit suffix).
+///
+/// The Lucide icon font ([`icon`]) is registered as its **own** family
+/// (`FontFamily::Name("lucide")`), never a proportional/monospace fallback:
+/// its glyphs live in the Private Use Area, which egui's bundled fonts also
+/// populate, so an isolated family prevents shadowing.
 fn install_egui_fonts(ctx: &egui::Context) {
     use std::sync::Arc;
 
@@ -74,12 +80,20 @@ fn install_egui_fonts(ctx: &egui::Context) {
             grida::embedded_fonts::geistmono::BYTES,
         )),
     );
+    fonts.font_data.insert(
+        icon::FAMILY.to_owned(),
+        Arc::new(egui::FontData::from_static(icon::BYTES)),
+    );
     if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
         family.insert(0, "Geist".to_owned());
     }
     if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
         family.insert(0, "Geist Mono".to_owned());
     }
+    fonts.families.insert(
+        egui::FontFamily::Name(icon::FAMILY.into()),
+        vec![icon::FAMILY.to_owned()],
+    );
     ctx.set_fonts(fonts);
 }
 

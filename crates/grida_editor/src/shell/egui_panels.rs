@@ -410,23 +410,35 @@ impl EguiPanels {
                             let indent = row.depth as f32 * INDENT;
                             // Disclosure triangle (containers only).
                             if row.is_container {
-                                let glyph = if row.expanded { "▾" } else { "▸" };
+                                let glyph = if row.expanded {
+                                    icon::CHEVRON_DOWN
+                                } else {
+                                    icon::CHEVRON_RIGHT
+                                };
                                 ui.painter().text(
                                     egui::pos2(rect.left() + indent, rect.center().y),
                                     egui::Align2::LEFT_CENTER,
                                     glyph,
-                                    egui::FontId::proportional(10.0),
+                                    icon::font_id(10.0),
                                     HIER_DISCLOSURE,
                                 );
                             }
-                            let name_x = rect.left() + indent + HIER_DISCLOSURE_W;
+                            let icon_x = rect.left() + indent + HIER_DISCLOSURE_W;
                             let color = if row.active {
                                 HIER_TEXT
                             } else {
                                 HIER_TEXT_INACTIVE
                             };
+                            // Node-type icon, then the name shifted past it.
                             ui.painter().text(
-                                egui::pos2(name_x, rect.center().y),
+                                egui::pos2(icon_x, rect.center().y),
+                                egui::Align2::LEFT_CENTER,
+                                type_icon(row.kind),
+                                icon::font_id(11.0),
+                                color,
+                            );
+                            ui.painter().text(
+                                egui::pos2(icon_x + HIER_TYPE_ICON_W, rect.center().y),
                                 egui::Align2::LEFT_CENTER,
                                 &row.name,
                                 egui::FontId::proportional(12.0),
@@ -561,34 +573,92 @@ impl EguiPanels {
 
 // ── Toolbar ──────────────────────────────────────────────────────────
 
-/// The closed tool taxonomy shown in the strip, in order, with the
-/// single-glyph shortcut label (mirrors the retired `UiLayer` toolbar).
-const TOOLBAR_ITEMS: &[(Tool, &str)] = &[
-    (Tool::Cursor, "V"),
-    (Tool::Shape(ShapeKind::Rectangle), "R"),
-    (Tool::Shape(ShapeKind::Ellipse), "O"),
-    (Tool::Shape(ShapeKind::Polygon), "Y"),
-    (Tool::Container { tray: false }, "F"),
-    (Tool::Container { tray: true }, "⇧F"),
-    (Tool::Text, "T"),
-    (Tool::Line { arrow: false }, "L"),
-    (Tool::Line { arrow: true }, "⇧L"),
-    (Tool::Pencil, "P"),
+/// The tool strip, in order: `(command, Lucide icon, name, shortcut)`.
+/// The icon is the button face; the name + shortcut ride the hover
+/// tooltip (so the shortcut stays discoverable now the face is a glyph).
+///
+/// The rows dispatch through the [`Command`] registry (like the menu),
+/// not a `Tool` fast-path: most are `SetTool`, but the **Pen** is
+/// [`Command::PenTool`] (a vector-edit entry, not a `Tool`). Pen (`P`) and
+/// Pencil (`⇧P`) form a pair, mirroring Line/Arrow (`L`/`⇧L`) and
+/// Frame/Tray (`F`/`⇧F`).
+const TOOLBAR_ITEMS: &[(Command, char, &str, &str)] = &[
+    (
+        Command::SetTool(Tool::Cursor),
+        icon::MOUSE_POINTER_2,
+        "Cursor",
+        "V",
+    ),
+    (
+        Command::SetTool(Tool::Shape(ShapeKind::Rectangle)),
+        icon::SQUARE,
+        "Rectangle",
+        "R",
+    ),
+    (
+        Command::SetTool(Tool::Shape(ShapeKind::Ellipse)),
+        icon::CIRCLE,
+        "Ellipse",
+        "O",
+    ),
+    (
+        Command::SetTool(Tool::Shape(ShapeKind::Polygon)),
+        icon::TRIANGLE,
+        "Polygon",
+        "Y",
+    ),
+    (
+        Command::SetTool(Tool::Container { tray: false }),
+        icon::FRAME,
+        "Frame",
+        "F",
+    ),
+    (
+        Command::SetTool(Tool::Container { tray: true }),
+        icon::FRAME,
+        "Frame (tray)",
+        "⇧F",
+    ),
+    (Command::SetTool(Tool::Text), icon::TYPE, "Text", "T"),
+    (
+        Command::SetTool(Tool::Line { arrow: false }),
+        icon::MINUS,
+        "Line",
+        "L",
+    ),
+    (
+        Command::SetTool(Tool::Line { arrow: true }),
+        icon::MOVE_UP_RIGHT,
+        "Arrow",
+        "⇧L",
+    ),
+    (Command::PenTool, icon::PEN_TOOL, "Pen", "P"),
+    (Command::SetTool(Tool::Pencil), icon::PENCIL, "Pencil", "⇧P"),
 ];
 
-/// The bottom-centered tool strip. Returns the tool the user clicked
-/// this frame; the shell activates it on the machine (`ARCH-3` — the
-/// toolbar owns no tool logic, exactly like the panel it replaces).
-pub(crate) fn toolbar(ui: &mut egui::Ui, current: Tool) -> Option<Tool> {
+/// The bottom-centered tool strip. Returns the command the user clicked
+/// this frame; the shell dispatches it through the registry (`ARCH-3` —
+/// the toolbar owns no tool logic). `current` is the active authoring
+/// tool and `pen_active` whether the pen/vector entry is engaged, so the
+/// right button reads pressed.
+pub(crate) fn toolbar(ui: &mut egui::Ui, current: Tool, pen_active: bool) -> Option<Command> {
     let mut picked = None;
     egui::Area::new(egui::Id::new("toolbar.egui"))
         .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -16.0))
         .show(ui.ctx(), |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    for (tool, label) in TOOLBAR_ITEMS {
-                        if ui.selectable_label(*tool == current, *label).clicked() {
-                            picked = Some(*tool);
+                    for (cmd, glyph, name, shortcut) in TOOLBAR_ITEMS {
+                        let selected = match cmd {
+                            Command::SetTool(t) => *t == current && !pen_active,
+                            Command::PenTool => pen_active,
+                            _ => false,
+                        };
+                        let hit = ui
+                            .selectable_label(selected, icon::icon(*glyph))
+                            .on_hover_text(format!("{name}  ({shortcut})"));
+                        if hit.clicked() {
+                            picked = Some(*cmd);
                         }
                     }
                 });
@@ -1285,6 +1355,28 @@ const VAL_W: f32 = 132.0;
 // drop-resolution geometry and this rendering must share one source.
 /// The disclosure-triangle gutter width (rendering-only).
 const HIER_DISCLOSURE_W: f32 = 13.0;
+/// Gutter reserved for a row's node-type icon, before the name.
+const HIER_TYPE_ICON_W: f32 = 16.0;
+
+/// The Lucide glyph for a node's display category — the editor-semantic
+/// node→icon mapping (kept here at the call site, not in `icon`, which
+/// stays an agnostic Lucide mirror). Shape kinds reuse the tool glyphs.
+fn type_icon(kind: NodeKind) -> char {
+    match kind {
+        NodeKind::Frame => icon::FRAME,
+        NodeKind::Group => icon::GROUP,
+        NodeKind::Boolean => icon::COMBINE,
+        NodeKind::Rectangle => icon::SQUARE,
+        NodeKind::Ellipse => icon::CIRCLE,
+        NodeKind::Polygon => icon::TRIANGLE,
+        NodeKind::Star => icon::STAR,
+        NodeKind::Line => icon::MINUS,
+        NodeKind::Text => icon::TYPE,
+        NodeKind::Vector => icon::PEN_TOOL,
+        NodeKind::Image => icon::IMAGE,
+        NodeKind::Other => icon::BOX,
+    }
+}
 /// Selected / hovered row fills — greys, not the selection accent.
 const HIER_SEL_BG: egui::Color32 = egui::Color32::from_gray(216);
 const HIER_HOVER_BG: egui::Color32 = egui::Color32::from_gray(232);
@@ -1314,7 +1406,10 @@ fn section_add(ui: &mut egui::Ui, title: &str) -> bool {
     ui.horizontal(|ui| {
         ui.label(section_title(title));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.add(egui::Button::new("+").frame(false)).clicked() {
+            if ui
+                .add(egui::Button::new(icon::icon(icon::PLUS)).frame(false))
+                .clicked()
+            {
                 clicked = true;
             }
         });
@@ -1366,10 +1461,7 @@ fn pair(ui: &mut egui::Ui, value: &mut f32, speed: f32, tag: &str) -> egui::Resp
 
 /// A frameless remove control for list rows.
 fn remove_button(ui: &mut egui::Ui) -> egui::Response {
-    ui.add(
-        egui::Button::new(egui::RichText::new("✕").color(egui::Color32::from_gray(140)))
-            .frame(false),
-    )
+    ui.add(egui::Button::new(icon::icon(icon::X).color(egui::Color32::from_gray(140))).frame(false))
 }
 
 /// A one-of-N combo of the given width; returns the new index on change.
