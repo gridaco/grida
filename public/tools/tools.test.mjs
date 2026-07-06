@@ -46,7 +46,10 @@ describe("resolve", () => {
         "publish.json": map({ "json/": "/schema/" }),
         "json/dotcanvas/v1.json": "{}",
         "json/other.json": "{}",
+        // Hidden files at any depth must NOT be published by a bulk `dir/` map.
         "json/.DS_Store": "junk",
+        "json/.gitignore": "secret",
+        "json/nested/.hidden": "secret",
       },
     });
     const entries = await resolve(root);

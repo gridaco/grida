@@ -59,9 +59,15 @@ async function walk(dir) {
   });
   for (const e of entries) {
     if (!e.isFile()) continue;
-    if (e.name === ".DS_Store") continue;
     const abs = path.join(e.parentPath, e.name);
-    out.push(path.relative(dir, abs).split(path.sep).join("/"));
+    const rel = path.relative(dir, abs).split(path.sep).join("/");
+    // A `dir/` mapping bulk-publishes a tree as-is; hidden files at ANY depth
+    // (a unit's own `.gitignore`, `.DS_Store`, editor dotfiles) must never leak
+    // to a public URL. An explicit `file → url` entry can still target a
+    // dotfile deliberately (e.g. `.well-known/…`); this only guards the
+    // recursive bulk form.
+    if (rel.split("/").some((seg) => seg.startsWith("."))) continue;
+    out.push(rel);
   }
   return out.sort();
 }
@@ -145,17 +151,24 @@ export async function discoverUnits(root) {
   return units.sort();
 }
 
+// Generous cap so a truly-hung build can't wedge `build`/CI forever, while
+// still allowing a slow legitimate producer (e.g. a future cargo-backed unit).
+const BUILD_TIMEOUT_MS = 10 * 60 * 1000;
+
 /** Run a unit's build.mjs (if present) with the unit dir as cwd. */
 async function buildUnit(root, unit) {
   const script = path.join(root, unit, "build.mjs");
   if (!(await exists(script))) return;
-  await exec(process.execPath, [script], { cwd: path.join(root, unit) }).catch(
-    (err) => {
-      throw new PublishError(
-        `unit "${unit}": build.mjs failed\n${err.stderr || err.message}`
-      );
-    }
-  );
+  await exec(process.execPath, [script], {
+    cwd: path.join(root, unit),
+    timeout: BUILD_TIMEOUT_MS,
+  }).catch((err) => {
+    const why =
+      err.killed && err.signal
+        ? `timed out after ${BUILD_TIMEOUT_MS / 1000}s (${err.signal})`
+        : err.stderr || err.message;
+    throw new PublishError(`unit "${unit}": build.mjs failed\n${why}`);
+  });
 }
 
 /**

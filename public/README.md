@@ -90,8 +90,10 @@ Its shape:
 manifest; `sync` materializes into a host; `ls` prints the URL registry),
 pinned by `tools/tools.test.mjs`. The first tenant is
 [`slides-templates/`](./slides-templates) (deterministic per-bundle
-`<name>.canvas.zip` + index for the desktop home gallery); the editor syncs
-on `predev`/`prebuild` via its `sync:public` script. The layer must stay
+`<name>.canvas.zip` + index for the desktop home gallery). Host wiring —
+the editor's `sync:public` step (`predev`/`prebuild`) and the gallery that
+consumes the bundles — lands in a follow-up; this contract ships first. The
+layer must stay
 small (read maps → validate → materialize; low hundreds of lines, tested).
 If it can't stay that small, it is becoming the legacy it was meant to
 prevent — stop and reassess.

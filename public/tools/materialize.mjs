@@ -42,6 +42,17 @@ export async function materialize(root, target) {
   });
 
   const repo = await gitToplevel(targetRoot);
+  if (!repo) {
+    // The overwrite/gitignore guards below are git-derived, so they can't run
+    // for a target outside a git working tree. Real hosts (the editor's
+    // `public/`) always are, so this is a degenerate case — but never skip the
+    // guards *silently*: a caller pointing at an ad-hoc dir must be told the
+    // safety net is off before we copy over whatever is there.
+    console.warn(
+      `public: WARNING — target "${target}" is not inside a git repository; ` +
+        `overwrite-protection and gitignore guards are DISABLED for this sync.`
+    );
+  }
   if (repo) {
     const rel = writes.map((w) => path.relative(repo, w.dest));
     // (a) Refuse to clobber anything git-tracked in the host.
