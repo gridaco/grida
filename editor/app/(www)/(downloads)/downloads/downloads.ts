@@ -9,6 +9,12 @@ export namespace downloads {
 
   export interface DownloadLinks {
     mac_dmg_arm64: string;
+    // Nullable: the editor deploys on merge to main, before the first
+    // x64-bearing desktop release is cut (issue #947). A non-null type would
+    // make getLinks() throw on the missing asset and getLinksForPage's catch
+    // would degrade ALL platforms to the static v0.0.1 fallback during that
+    // window. The Intel button is hidden while this is null.
+    mac_dmg_x64: string | null;
     linux_deb_x64: string;
     linux_rpm_x64: string;
     linux_deb_arm64: string;
@@ -43,6 +49,7 @@ export namespace downloads {
         ext: "dmg",
         arch: {
           arm64: "arm64",
+          x64: "x64",
         },
       },
     ],
@@ -94,6 +101,8 @@ export namespace downloads {
     const f = new Fetcher();
 
     const mac_dmg_arm64 = await f.getAsset("mac", "dmg", "arm64");
+    // May be absent until the first x64-bearing release ships (issue #947).
+    const mac_dmg_x64 = await f.getAsset("mac", "dmg", "x64");
     const linux_deb_x64 = await f.getAsset("linux", "deb", "x64");
     const linux_rpm_x64 = await f.getAsset("linux", "rpm", "x64");
     const linux_deb_arm64 = await f.getAsset("linux", "deb", "arm64");
@@ -102,6 +111,7 @@ export namespace downloads {
 
     return {
       mac_dmg_arm64: mac_dmg_arm64.browser_download_url,
+      mac_dmg_x64: mac_dmg_x64?.browser_download_url ?? null,
       linux_deb_x64: linux_deb_x64.browser_download_url,
       linux_rpm_x64: linux_rpm_x64.browser_download_url,
       linux_deb_arm64: linux_deb_arm64.browser_download_url,
@@ -201,6 +211,8 @@ export namespace downloads {
     const links: DownloadLinks = {
       mac_dmg_arm64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-arm64.dmg",
+      mac_dmg_x64:
+        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-x64.dmg",
       linux_deb_x64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/grida_0.0.1_amd64.deb",
       linux_rpm_x64:
@@ -252,6 +264,8 @@ export namespace downloads {
       default: d,
       mac_dmg_arm64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-arm64.dmg",
+      mac_dmg_x64:
+        "https://github.com/gridaco/grida/releases/download/v0.0.1/Grida-0.0.1-x64.dmg",
       linux_deb_x64:
         "https://github.com/gridaco/grida/releases/download/v0.0.1/grida_0.0.1_amd64.deb",
       linux_rpm_x64:

@@ -23,8 +23,21 @@ jobs:
             image: ubuntu-latest
           - name: windows
             image: windows-latest
+          # macOS builds one arch per runner ON PURPOSE (issue #947): a single
+          # parallel --arch="x64,arm64" invocation hits the maker-dmg race
+          # (electron/forge#3517 — hdiutil EAGAIN + appdmg "Target already
+          # exists"), fixed only in Forge 8 (GA tracker: electron/forge#4082).
+          # Native per-arch runners also make pnpm resolve the per-platform
+          # native prebuilds (e.g. @parcel/watcher-darwin-<arch>) correctly.
           - name: macos-apple-silicon
             image: macos-26
+            mac_arch: arm64
+          - name: macos-intel
+            # GitHub's LAST x86_64 macOS image — retired Aug 2027
+            # (actions/runner-images#13045). When it dies, either Forge 8 GA
+            # has fixed the parallel-arch DMG race or we re-drop Intel.
+            image: macos-15-intel
+            mac_arch: x64
     runs-on: ${{ matrix.os.image }}
     env:
       HAS_SIGNING: ${{ secrets.APPLE_CERTIFICATE_P12 != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.APPLE_SIGNING_IDENTITY != '' }}
@@ -81,7 +94,7 @@ jobs:
             --filter=@grida/home
 
       - name: Import Apple signing certificate
-        if: ${{ matrix.os.name == 'macos-apple-silicon' && env.HAS_SIGNING == 'true' }}
+        if: ${{ matrix.os.mac_arch && env.HAS_SIGNING == 'true' }}
         uses: apple-actions/import-codesign-certs@v2
         with:
           keychain: build
@@ -89,7 +102,7 @@ jobs:
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Stage App Store Connect API key
-        if: ${{ matrix.os.name == 'macos-apple-silicon' && env.HAS_NOTARIZE == 'true' }}
+        if: ${{ matrix.os.mac_arch && env.HAS_NOTARIZE == 'true' }}
         shell: bash
         env:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
@@ -116,14 +129,15 @@ jobs:
         run: pnpm run publish:prerelease --arch="x64,arm64"
 
       - name: Publish App (MacOS)
-        if: ${{ matrix.os.name == 'macos-apple-silicon' && env.HAS_SIGNING == 'true' && env.HAS_NOTARIZE == 'true' }}
+        if: ${{ matrix.os.mac_arch && env.HAS_SIGNING == 'true' && env.HAS_NOTARIZE == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PRERELEASE: ${{ inputs.prerelease }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: pnpm run publish:prerelease --arch="arm64"
+        # One arch per runner (matrix.os.mac_arch) — see the matrix comment.
+        run: pnpm run publish:prerelease --arch="${{ matrix.os.mac_arch }}"
 
       - name: Update release notes from template
         # Runs once (gated to the linux row, which has no signing-secret
