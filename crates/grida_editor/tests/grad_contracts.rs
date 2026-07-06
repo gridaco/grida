@@ -112,6 +112,82 @@ fn gradient_stops(editor: &Editor) -> Vec<GradientStop> {
     }
 }
 
+// -- the HUD appears on a vector node (regression) --------------------------
+
+#[test]
+fn hud_appears_on_a_vector_node() {
+    // A vector (e.g. a shape after vector-editing) carrying a gradient
+    // fill. Its size is the network's tight bounds, not a stored field.
+    let mut wc = WorkingCopy::new_empty("grad");
+    wc.apply(&[Mutation::Insert {
+        parent: None,
+        index: 0,
+        fragment: Box::new(grida_editor::tool::vector_fragment(
+            "v".to_string(),
+            "V",
+            [0.0, 0.0],
+            grida_editor::document::polyline_network(&[
+                (0.0, 0.0),
+                (100.0, 0.0),
+                (100.0, 100.0),
+                (0.0, 100.0),
+            ]),
+        )),
+    }])
+    .unwrap();
+    let mut editor = Editor::new(wc);
+    editor
+        .dispatch(
+            vec![Mutation::Patch {
+                id: "v".to_string(),
+                set: Box::new(PropPatch {
+                    fills: Some(Paints::new(vec![linear_two()])),
+                    ..Default::default()
+                }),
+            }],
+            Origin::Local,
+            Recording::Silent,
+        )
+        .unwrap();
+
+    // The paint-box size comes from the network's tight bounds — the
+    // stored `node_size` is `None` for a vector.
+    assert_eq!(editor.node_size(&"v".to_string()), None);
+    assert_eq!(
+        editor.node_paint_box_size(&"v".to_string()),
+        Some((100.0, 100.0))
+    );
+
+    let mut session = GradientSession::enter(&editor, "v".to_string(), PaintTarget::Fill, 0)
+        .expect("gradient fill on a vector");
+    // The bug: `node_size(vector)` was `None` → `unit_to_canvas` bailed →
+    // `chrome()` returned `None` → no HUD. It now draws.
+    assert!(
+        session
+            .chrome(&editor, 1.0)
+            .is_some_and(|d| !d.prims.is_empty()),
+        "the gradient HUD draws on a vector node"
+    );
+
+    // And its control points react: the primary handle sits at unit
+    // (1, 0.5) → box-local (100, 50) → canvas (100, 50). Dragging it must
+    // move the gradient (the same `node_size` gap silently no-op'd the
+    // handle drag on a vector).
+    let matrix = |e: &Editor| match &e.node_fills(&"v".to_string()).unwrap().as_slice()[0] {
+        Paint::LinearGradient(g) => g.transform.matrix,
+        other => panic!("expected a linear gradient, got {other:?}"),
+    };
+    let before = matrix(&editor);
+    session.pointer_down(&mut editor, [100.0, 50.0], [100.0, 50.0], 1.0, 0);
+    session.pointer_move(&mut editor, [130.0, 30.0], 1.0);
+    session.pointer_up(&mut editor, [130.0, 30.0], 1.0);
+    assert_ne!(
+        matrix(&editor),
+        before,
+        "dragging a control point reacts on a vector node"
+    );
+}
+
 // -- MODE-2 / PSES-4: entry resolves only a gradient ------------------------
 
 #[test]

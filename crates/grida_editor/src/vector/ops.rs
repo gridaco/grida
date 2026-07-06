@@ -35,6 +35,41 @@ fn t2(p: [f32; 2]) -> (f32, f32) {
     (p[0], p[1])
 }
 
+/// The network's tight bounds in the node's local space — the union of
+/// its segments' cubic bounding boxes (falling back to the vertex hull
+/// when the network has no segments). `None` for an empty network. This
+/// matches the engine's `path.compute_tight_bounds()` (both tight), so
+/// it is the box a paint fills — the size gradients/images map into.
+pub fn network_bounds(net: &VectorNetwork) -> Option<math2::Rectangle> {
+    let mut min = [f32::INFINITY; 2];
+    let mut max = [f32::NEG_INFINITY; 2];
+    let mut fold = |p: [f32; 2]| {
+        min[0] = min[0].min(p[0]);
+        min[1] = min[1].min(p[1]);
+        max[0] = max[0].max(p[0]);
+        max[1] = max[1].max(p[1]);
+    };
+    if net.segments.is_empty() {
+        for v in &net.vertices {
+            fold(v2(*v));
+        }
+    } else {
+        for i in 0..net.segments.len() {
+            if let Some(c) = segment_cubic(net, i) {
+                let bb = math2::bezier::get_bbox(&c);
+                fold([bb.x, bb.y]);
+                fold([bb.x + bb.width, bb.y + bb.height]);
+            }
+        }
+    }
+    min[0].is_finite().then_some(math2::Rectangle {
+        x: min[0],
+        y: min[1],
+        width: max[0] - min[0],
+        height: max[1] - min[1],
+    })
+}
+
 /// The segment as a cubic in the node's local space (`None` when the
 /// index or its vertex references are out of bounds).
 pub fn segment_cubic(net: &VectorNetwork, index: usize) -> Option<CubicBezierWithTangents> {

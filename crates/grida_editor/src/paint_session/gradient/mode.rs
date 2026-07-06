@@ -356,7 +356,11 @@ impl GradientSession {
         base: &GradientValue,
         canvas: [f32; 2],
     ) {
-        let Some((w, h)) = editor.node_size(&self.node) else {
+        // The node-local pixel space is `unit × paint-box size`, so it
+        // must use the same box `unit_to_canvas` does — the paint box, not
+        // the stored size (`None` for a vector), or the handle drag would
+        // silently no-op on a vector-edited shape.
+        let Some((w, h)) = editor.node_paint_box_size(&self.node) else {
             return;
         };
         if w.abs() < f32::EPSILON || h.abs() < f32::EPSILON {
@@ -446,7 +450,10 @@ impl GradientSession {
 
     /// Unit gradient space → canvas: `node_world × scale(w, h)`.
     fn unit_to_canvas(&self, editor: &Editor) -> Option<AffineTransform> {
-        let (w, h) = editor.node_size(&self.node)?;
+        // The **paint box** the engine maps the gradient into — the stored
+        // size for a primitive, the network's tight bounds for a
+        // vector-edited/flattened shape (so the HUD appears on both).
+        let (w, h) = editor.node_paint_box_size(&self.node)?;
         if w.abs() < f32::EPSILON || h.abs() < f32::EPSILON {
             return None;
         }
