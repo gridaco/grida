@@ -10,20 +10,25 @@
 //! (`Panel::right`), the **hierarchy** tree (`Panel::left`), the
 //! **toolbar** (`Area`), and the **context menu** (`Popup`). `UiLayer`
 //! is fully dormant (`draw_ui` is a no-op) pending the dead-plumbing
-//! deletion. Deferred within properties (named, not silently dropped):
-//! per-paint active/opacity, gradient stop-track, image source,
-//! selection-colors aggregate, and the export scaffold. Deferred in the
-//! hierarchy: drag-reorder (egui dnd).
+//! deletion. A gradient row's **Edit** toggle opens the in-canvas
+//! gradient session and its inline stop editor (see
+//! [`crate::paint_session::gradient`]). Deferred within properties
+//! (named, not silently dropped): per-paint active/opacity, image
+//! source, selection-colors aggregate, and the export scaffold.
+//! Deferred in the hierarchy: drag-reorder (egui dnd).
 
 use std::collections::HashSet;
 
 use grida::cg::prelude::{CGColor, Paint};
 
+use super::icon;
 use crate::command::Command;
-use crate::document::{Id, Mutation};
+use crate::document::{Id, Mutation, NodeKind};
 use crate::editor::{Editor, Recording};
 use crate::history::Origin;
 use crate::menu::{Item, Menu};
+use crate::paint_session::gradient::mode::{self as gradient, PaintTarget};
+use crate::paint_session::gradient::ops as gops;
 use crate::tool::{ShapeKind, Tool};
 use crate::ui::bind::{
     self, BLEND_MODES, Binding, BindingPhase, BindingProperty, BindingValue, Emission,
@@ -31,6 +36,15 @@ use crate::ui::bind::{
     TEXT_ALIGN_VERTICALS, TEXT_ALIGNS, blur_radius, font_weight_index, shadow_params,
 };
 use crate::ui::hierarchy::{DropIndicator, INDENT, ROW_H};
+
+/// A request from the properties panel to toggle a paint session
+/// (drained by the shell after the egui frame — the panel holds no
+/// [`EditMode`](crate::mode::EditMode)). Carries the paint's address.
+pub(crate) struct PaintSessionRequest {
+    pub node: Id,
+    pub target: PaintTarget,
+    pub index: usize,
+}
 
 /// Transient panel state that immediate mode cannot derive from the
 /// document each frame.
@@ -58,12 +72,19 @@ impl EguiPanels {
     }
 
     /// Build the right-hand properties panel for the current selection.
+    /// `active_session` is the gradient session's address, if one is
+    /// open (so its Edit toggle reads pressed and its stop list shows).
+    /// Returns a toggle request for the shell to drain.
     pub(crate) fn properties(
         &mut self,
         ui: &mut egui::Ui,
         editor: &mut Editor,
         last_frame_ms: f32,
-    ) {
+        active_session: Option<(Id, PaintTarget, usize)>,
+        view: ViewState,
+    ) -> (Option<PaintSessionRequest>, Option<ViewAction>) {
+        let mut request = None;
+        let mut view_action = None;
         // `exact_size` (not `default_size`) PINS the width to the camera's
         // right inset (`super::PANEL_WIDTH`, the same constant
         // `apply_viewport` reserves) — so an empty/scene selection can't
@@ -96,7 +117,14 @@ impl EguiPanels {
                             scene_section(ui, editor);
                         } else {
                             let head = selection[0].clone();
-                            self.node_sections(ui, editor, &head, &selection);
+                            self.node_sections(
+                                ui,
+                                editor,
+                                &head,
+                                &selection,
+                                active_session.as_ref(),
+                                &mut request,
+                            );
                         }
                         // Dev-only frame-time readout — deliberately faint.
                         ui.add_space(16.0);
@@ -107,9 +135,18 @@ impl EguiPanels {
                         );
                     });
             });
+        (request, view_action)
     }
 
-    fn node_sections(&mut self, ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id]) {
+    fn node_sections(
+        &mut self,
+        ui: &mut egui::Ui,
+        editor: &mut Editor,
+        head: &Id,
+        sel: &[Id],
+        active_session: Option<&(Id, PaintTarget, usize)>,
+        request: &mut Option<PaintSessionRequest>,
+    ) {
         section(ui, "Layer", |ui| {
             grid(ui, "g.layer", |ui| {
                 lbl(ui, "Name");
@@ -312,8 +349,24 @@ impl EguiPanels {
         if editor.node_font_size(head).is_some() {
             text_section(ui, editor, head, sel);
         }
-        paint_section(ui, editor, head, sel, PaintKind::Fill);
-        paint_section(ui, editor, head, sel, PaintKind::Stroke);
+        paint_section(
+            ui,
+            editor,
+            head,
+            sel,
+            PaintKind::Fill,
+            active_session,
+            request,
+        );
+        paint_section(
+            ui,
+            editor,
+            head,
+            sel,
+            PaintKind::Stroke,
+            active_session,
+            request,
+        );
         if editor.node_stroke_width(head).is_some() {
             stroke_geometry_section(ui, editor, head, sel);
         }
@@ -908,7 +961,19 @@ enum PaintKind {
     Stroke,
 }
 
-fn paint_section(ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id], target: PaintKind) {
+fn paint_section(
+    ui: &mut egui::Ui,
+    editor: &mut Editor,
+    head: &Id,
+    sel: &[Id],
+    target: PaintKind,
+    active_session: Option<&(Id, PaintTarget, usize)>,
+    request: &mut Option<PaintSessionRequest>,
+) {
+    let ptarget = match target {
+        PaintKind::Fill => PaintTarget::Fill,
+        PaintKind::Stroke => PaintTarget::Stroke,
+    };
     let (title, stack, list_prop, color_prop, kind_prop, id_prefix, label_prefix) = match target {
         PaintKind::Fill => (
             "Fills",
@@ -940,6 +1005,9 @@ fn paint_section(ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id], 
         );
     }
     for (i, paint) in paints.as_slice().iter().enumerate() {
+        let is_gradient = gradient::is_gradient(paint);
+        let editing = is_gradient
+            && active_session.is_some_and(|(n, t, idx)| n == head && *t == ptarget && *idx == i);
         ui.horizontal(|ui| {
             if let Paint::Image(_) = paint {
                 ui.label("Image");
@@ -984,9 +1052,118 @@ fn paint_section(ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id], 
                         ListOp::Remove(i),
                     );
                 }
+                // The Edit toggle opens the in-canvas gradient session
+                // (the paint's control — MODE-5/`PSES-1`). The shell
+                // drains the request into the edit-mode slot.
+                if is_gradient && ui.selectable_label(editing, "Edit").clicked() {
+                    *request = Some(PaintSessionRequest {
+                        node: head.clone(),
+                        target: ptarget,
+                        index: i,
+                    });
+                }
             });
         });
+        // The inline stop editor, while this paint's session is open.
+        if editing {
+            stop_editor(ui, editor, head, ptarget, i, paint);
+        }
     }
+}
+
+/// The inline color-stop list shown under a gradient row while its
+/// session is open — add / remove / recolor / re-offset, each one
+/// history entry through [`gradient::edit_stops`] (the panel and the
+/// canvas session are two views of one state, `PSES-1`).
+fn stop_editor(
+    ui: &mut egui::Ui,
+    editor: &mut Editor,
+    node: &Id,
+    target: PaintTarget,
+    index: usize,
+    paint: &Paint,
+) {
+    let Some(stops) = gradient::stops_of(paint) else {
+        return;
+    };
+    ui.indent("gradient.stops", |ui| {
+        for (si, stop) in stops.iter().enumerate() {
+            ui.horizontal(|ui| {
+                let mut c = to_c32(stop.color);
+                if ui.color_edit_button_srgba(&mut c).changed() {
+                    let color = from_c32(c);
+                    gradient::edit_stops(
+                        editor,
+                        node,
+                        target,
+                        index,
+                        "gradient.stop.color",
+                        move |s| {
+                            if let Some(x) = s.get_mut(si) {
+                                x.color = color;
+                            }
+                        },
+                    );
+                }
+                let mut off = stop.offset;
+                let r = num(ui, &mut off, 0.005);
+                // Commit once when the drag/edit ends (not per delta), so
+                // a drag is one undoable step.
+                if (r.drag_stopped() || r.lost_focus()) && (off - stop.offset).abs() > f32::EPSILON
+                {
+                    let off = off.clamp(0.0, 1.0);
+                    gradient::edit_stops(
+                        editor,
+                        node,
+                        target,
+                        index,
+                        "gradient.stop.offset",
+                        move |s| {
+                            if let Some(x) = s.get_mut(si) {
+                                x.offset = off;
+                            }
+                            s.sort_by(|a, b| a.offset.total_cmp(&b.offset));
+                        },
+                    );
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if remove_button(ui).clicked() {
+                        gradient::edit_stops(
+                            editor,
+                            node,
+                            target,
+                            index,
+                            "gradient.stop.delete",
+                            move |s| {
+                                gops::remove_stop(s, si);
+                            },
+                        );
+                    }
+                });
+            });
+        }
+        // Add a stop at the widest gap — a predictable default spot.
+        if section_add(ui, "Stop") {
+            gradient::edit_stops(editor, node, target, index, "gradient.stop.insert", |s| {
+                let off = widest_gap_mid(s);
+                let color = gops::color_at(s, off);
+                gops::insert_stop(s, off, color);
+            });
+        }
+    });
+}
+
+/// The midpoint of the widest gap between consecutive stops (assumed
+/// ordered) — where an added stop reads most naturally.
+fn widest_gap_mid(stops: &[grida::cg::prelude::GradientStop]) -> f32 {
+    let mut best = (f32::NEG_INFINITY, 0.5f32);
+    for w in stops.windows(2) {
+        let gap = w[1].offset - w[0].offset;
+        if gap > best.0 {
+            best = (gap, (w[0].offset + w[1].offset) * 0.5);
+        }
+    }
+    best.1
 }
 
 fn stroke_geometry_section(ui: &mut egui::Ui, editor: &mut Editor, head: &Id, sel: &[Id]) {

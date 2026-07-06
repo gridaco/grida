@@ -73,6 +73,8 @@ use crate::hud::{Hud, HudCursor, HudEvent, HudPrim, ResizeDirection, Role};
 use crate::interpret::{self, InterpretScene, Interpreter};
 use crate::keys::{self, Command, KeyCode};
 use crate::mode::{EditMode, EnterDispatch, dispatch_enter};
+use crate::paint_session::gradient::chrome::layout as gradient_layout;
+use crate::paint_session::gradient::mode::{GradientSession, PaintTarget};
 use crate::shell::session::SyncSession;
 use crate::tool::{Tool, ToolMachine, ToolOutcome};
 use crate::vector::mode::{EscapeStep, VecMods, VectorMode, VectorTool as VecTool};
@@ -246,6 +248,7 @@ impl ShellApp {
         // residue.
         let drop_mode = match &mut self.mode {
             EditMode::Vector(m) => !m.reconcile(&self.editor),
+            EditMode::Gradient(s) => !s.reconcile(&self.editor),
             _ => false,
         };
         if drop_mode {
@@ -464,18 +467,40 @@ impl ShellApp {
         }
     }
 
+    /// Enter the gradient paint session on the paint at `(id, target,
+    /// index)` (MODE-1: the previous occupant exits first). No-op when
+    /// the address is not a gradient.
+    fn enter_paint_session(&mut self, id: Id, target: PaintTarget, index: usize) {
+        self.exit_active_mode();
+        if let Some(session) = GradientSession::enter(&self.editor, id, target, index) {
+            self.mode = EditMode::Gradient(Box::new(session));
+            self.overlay_damaged();
+        }
+    }
+
     /// Exit whatever occupies the edit-mode slot, restoring the
     /// document selection to the world above (`vector-edit.md` exit).
     fn exit_active_mode(&mut self) {
         let prev = std::mem::take(&mut self.mode);
-        if let EditMode::Vector(mode) = prev {
-            let out = mode.exit(&mut self.editor);
-            self.editor.set_selection(if out.deleted {
-                Vec::new()
-            } else {
-                vec![out.node]
-            });
-            self.overlay_damaged();
+        match prev {
+            EditMode::Vector(mode) => {
+                let out = mode.exit(&mut self.editor);
+                self.editor.set_selection(if out.deleted {
+                    Vec::new()
+                } else {
+                    vec![out.node]
+                });
+                self.overlay_damaged();
+            }
+            // A paint session leaves its subject selected (no cleanup
+            // doctrine — its edits already committed).
+            EditMode::Gradient(session) => {
+                let node = session.node().clone();
+                session.exit(&mut self.editor);
+                self.editor.set_selection(vec![node]);
+                self.overlay_damaged();
+            }
+            _ => {}
         }
     }
 
@@ -812,6 +837,9 @@ impl ShellApp {
         // Edit-mode key capture (routing.md capture layer 1): the
         // active vector mode re-resolves keys first.
         if matches!(self.mode, EditMode::Vector(_)) && self.on_vector_mode_key(code) {
+            return;
+        }
+        if matches!(self.mode, EditMode::Gradient(_)) && self.on_gradient_mode_key(code) {
             return;
         }
         // Chain dispatch (routing.md): the chord's commands in
@@ -1722,6 +1750,59 @@ impl ShellApp {
         true
     }
 
+    /// The visible canvas center in camera screen px (physical). The
+    /// camera already excludes the right properties strip; the hierarchy
+    /// strip covers `[0, HIER_WIDTH]` on the left, so the visible center
+    /// sits at `inset + (width - inset)/2`. The one home for that inset
+    /// rule (`fit_camera_to_visible` still inlines its own copy — it
+    /// needs `inset`/`vis_w` for the fit ratio too — and can migrate
+    /// here later).
+    fn visible_center_screen(&self) -> [f32; 2] {
+        let cam_size = *self.app.renderer().camera.get_size();
+        let inset = super::HIER_WIDTH * self.dpr;
+        let vis_w = (cam_size.width - inset).max(1.0);
+        [inset + vis_w * 0.5, cam_size.height * 0.5]
+    }
+
+    /// Set the camera zoom to an absolute percentage, anchored at the
+    /// visible canvas center — the view control's numeric field and
+    /// 50/100/200 presets (direct camera UX, no registry command). `pct`
+    /// is clamped to the control's 2–256% range; the target is
+    /// dpr-scaled (the camera works in physical px).
+    fn zoom_to_pct(&mut self, pct: f32) {
+        let target = pct.clamp(2.0, 256.0) / 100.0 * self.dpr;
+        let center = self.visible_center_screen();
+        self.app.renderer_mut().camera.set_zoom_at(target, center);
+        self.window.request_redraw();
+    }
+
+    /// Key routing while the gradient session is active (the session's
+    /// rungs of the MODE-10 ladder): Escape exits, Delete/Backspace
+    /// removes the selected stop (`GRAD-6`). Returns whether consumed —
+    /// a declined Delete (no stop selected) falls through to the chain,
+    /// so deleting the subject node ends the session via reconcile.
+    fn on_gradient_mode_key(&mut self, code: Option<KeyCode>) -> bool {
+        match code {
+            Some(KeyCode::Escape) => {
+                self.exit_active_mode();
+                self.overlay_damaged();
+                true
+            }
+            Some(KeyCode::Delete | KeyCode::Backspace) => {
+                let removed = if let EditMode::Gradient(s) = &mut self.mode {
+                    s.delete_selected(&mut self.editor)
+                } else {
+                    false
+                };
+                if removed {
+                    self.overlay_damaged();
+                }
+                removed
+            }
+            _ => false,
+        }
+    }
+
     /// Key routing while the vector mode is active (`routing.md`
     /// capture; the mode's rungs of the MODE-10 ladder). Matches the
     /// layout-base [`KeyCode`] (the mode's letters are shortcuts, not
@@ -2152,6 +2233,16 @@ impl ShellApp {
         };
         if let Some(draw) = vector_draw {
             if !draw.prims.is_empty() {
+                self.paint_hud_list(&draw);
+            }
+            return;
+        }
+        // The gradient session's chrome likewise replaces the document
+        // chrome while active (its handles + stop track own the canvas).
+        if let EditMode::Gradient(s) = &self.mode {
+            if let Some(draw) = s.chrome(&self.editor, self.logical_zoom())
+                && !draw.prims.is_empty()
+            {
                 self.paint_hud_list(&draw);
             }
             return;
@@ -2659,10 +2750,54 @@ impl ShellApp {
             return;
         }
         self.egui_panels.hierarchy(ui, &mut self.editor);
-        self.egui_panels
-            .properties(ui, &mut self.editor, self.last_frame_ms);
-        if let Some(tool) = super::egui_panels::toolbar(ui, self.tools.tool()) {
-            self.select_tool(tool);
+        // The active gradient session's address, so the panel reflects
+        // the open Edit toggle and shows its stop list (`PSES-1`).
+        let active_session = if let EditMode::Gradient(s) = &self.mode {
+            Some((s.node().clone(), s.target(), s.index()))
+        } else {
+            None
+        };
+        let view = super::egui_panels::ViewState {
+            zoom_pct: (self.logical_zoom() * 100.0).round() as i32,
+            outline_mode: self.outline_mode,
+            outline_ignore_clips: self.outline_ignore_clips,
+            pixel_preview: self.pixel_preview,
+            pixelgrid: self.pixelgrid,
+            ruler: self.ruler,
+        };
+        let (session_request, view_action) = self.egui_panels.properties(
+            ui,
+            &mut self.editor,
+            self.last_frame_ms,
+            active_session,
+            view,
+        );
+        match view_action {
+            Some(super::egui_panels::ViewAction::Command(cmd)) => {
+                self.command(cmd);
+            }
+            Some(super::egui_panels::ViewAction::ZoomToPct(pct)) => {
+                self.zoom_to_pct(pct);
+            }
+            None => {}
+        }
+        // Drain the panel's Edit-toggle after the frame (the panel holds
+        // no EditMode): a request for the active paint exits, otherwise
+        // enters (MODE-1).
+        if let Some(req) = session_request {
+            let editing = matches!(
+                &self.mode,
+                EditMode::Gradient(s) if s.edits(&req.node, req.target, req.index)
+            );
+            if editing {
+                self.exit_active_mode();
+            } else {
+                self.enter_paint_session(req.node, req.target, req.index);
+            }
+        }
+        let pen_active = self.pen_pending || matches!(self.mode, EditMode::Vector(_));
+        if let Some(cmd) = super::egui_panels::toolbar(ui, self.tools.tool(), pen_active) {
+            self.command(cmd);
         }
         // Context menu (egui): take it out so the render can borrow
         // `self`; put it back only while it stays open. A chosen command
@@ -2844,6 +2979,21 @@ impl ShellApp {
                     let logical = self.to_ui_point(screen_point);
                     if let EditMode::Vector(m) = &mut self.mode {
                         m.pointer_move(&mut self.editor, canvas_point, logical, zoom, mods);
+                    }
+                    self.overlay_damaged();
+                    return;
+                }
+                // The gradient paint session owns content input likewise
+                // (MODE-1: above the tools and the HUD).
+                if matches!(self.mode, EditMode::Gradient(_)) {
+                    let zoom = self.logical_zoom();
+                    let canvas_point = self
+                        .app
+                        .renderer()
+                        .camera
+                        .screen_to_canvas_point(screen_point);
+                    if let EditMode::Gradient(s) = &mut self.mode {
+                        s.pointer_move(&mut self.editor, canvas_point, zoom);
                     }
                     self.overlay_damaged();
                     return;
@@ -3069,6 +3219,34 @@ impl ShellApp {
                     if exit_requested {
                         // Double-click on empty canvas: the enter
                         // idiom's inverse (VEC-13).
+                        self.exit_active_mode();
+                    }
+                    self.overlay_damaged();
+                    return;
+                }
+                // The gradient paint session owns content clicks likewise
+                // (MODE-1). It has no canvas exit — a gradient is
+                // control-only (GRAD-8); Escape and the panel toggle end
+                // it.
+                if matches!(self.mode, EditMode::Gradient(_)) {
+                    let zoom = self.logical_zoom();
+                    let now = self.now_ms();
+                    let screen = self.to_ui_point(screen_point);
+                    let mut exit = false;
+                    if let EditMode::Gradient(s) = &mut self.mode {
+                        match state {
+                            ElementState::Pressed => {
+                                exit = s
+                                    .pointer_down(&mut self.editor, canvas_point, screen, zoom, now)
+                                    .exit_requested;
+                            }
+                            ElementState::Released => {
+                                s.pointer_up(&mut self.editor, canvas_point, zoom);
+                            }
+                        }
+                    }
+                    // Double-click on empty canvas exits, like Escape.
+                    if exit {
                         self.exit_active_mode();
                     }
                     self.overlay_damaged();
@@ -3321,7 +3499,10 @@ fn paint_hud(
                 // The size badge hangs below its anchor; measurement
                 // labels center on their line midpoint.
                 let top = match role {
-                    Role::Measurement => a.y - height * 0.5,
+                    // Vertically centered on the anchor: the measurement
+                    // readout and the gradient offset badge (which floats
+                    // beside its chip).
+                    Role::Measurement | Role::GradientBadge => a.y - height * 0.5,
                     _ => a.y + 6.0,
                 };
                 let rect = skia_safe::Rect::from_xywh(
@@ -3399,6 +3580,71 @@ fn paint_hud(
                         canvas.draw_circle(c, radius, &stroke(role_color(role), 1.0));
                     }
                 }
+            }
+            HudPrim::GradientHandle { anchor, active } => {
+                // The gradient frame handle: a screen-fixed white circle,
+                // ringed in the accent while hovered/dragged.
+                let c = project(*anchor);
+                let radius = gradient_layout::HANDLE_RADIUS;
+                canvas.draw_circle(c, radius, &fill(skia_safe::Color::WHITE));
+                let (ring, width) = if *active {
+                    (HUD_ACCENT, 2.0)
+                } else {
+                    (skia_safe::Color::from_argb(0xff, 0xc8, 0xc8, 0xc8), 1.0)
+                };
+                canvas.draw_circle(c, radius, &stroke(ring, width));
+            }
+            HudPrim::GradientChip {
+                anchor,
+                color,
+                toward,
+                selected,
+                preview,
+            } => {
+                // A color-stop chip: a rounded square filled with the
+                // stop's color, rotated so an edge faces the track, with
+                // a caret pointing back at the track point `toward`.
+                let c = project(*anchor);
+                let t = project(*toward);
+                // Unit direction from the chip toward its caret target;
+                // degenerate (chip == target) falls back to straight down.
+                let dir = math2::vector2::normalize([t.x - c.x, t.y - c.y]);
+                let (ux, uy) = if dir == [0.0, 0.0] {
+                    (0.0, 1.0)
+                } else {
+                    (dir[0], dir[1])
+                };
+                let half = gradient_layout::CHIP * 0.5;
+                let alpha = if *preview { 0x99 } else { color[3] };
+                let fillc = skia_safe::Color::from_argb(alpha, color[0], color[1], color[2]);
+                let (ring, ring_w) = if *selected {
+                    (HUD_ACCENT, 2.0)
+                } else if *preview {
+                    (skia_safe::Color::from_argb(0x99, 0xff, 0xff, 0xff), 1.5)
+                } else {
+                    (skia_safe::Color::from_argb(0xff, 0xd0, 0xd0, 0xd0), 1.5)
+                };
+                canvas.save();
+                canvas.translate((c.x, c.y));
+                canvas.rotate(uy.atan2(ux).to_degrees(), None);
+                let rect = skia_safe::Rect::from_xywh(-half, -half, half * 2.0, half * 2.0);
+                canvas.draw_round_rect(rect, 3.0, 3.0, &fill(fillc));
+                canvas.draw_round_rect(rect, 3.0, 3.0, &stroke(ring, ring_w));
+                canvas.restore();
+                // The caret: a small triangle just past the edge facing
+                // `toward`, pointing at it (the track point off a straight
+                // axis; the gradient center on the sweep ring).
+                let (px, py) = (-uy, ux);
+                let (ctip, chalf) = (gradient_layout::CARET_TIP, gradient_layout::CARET_HALF);
+                let tip = (c.x + ux * (half + ctip), c.y + uy * (half + ctip));
+                let b1 = (c.x + ux * half + px * chalf, c.y + uy * half + py * chalf);
+                let b2 = (c.x + ux * half - px * chalf, c.y + uy * half - py * chalf);
+                let mut tri = skia_safe::PathBuilder::new();
+                tri.move_to(tip);
+                tri.line_to(b1);
+                tri.line_to(b2);
+                tri.close();
+                canvas.draw_path(&tri.detach(), &fill(ring));
             }
             HudPrim::Rule { axis, offset, role } => {
                 // Full-length hairline at a canvas offset: project the

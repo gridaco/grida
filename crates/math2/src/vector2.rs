@@ -125,6 +125,12 @@ pub fn rotate(v: Vector2, angle: f32) -> Vector2 {
     [v[0] * cos - v[1] * sin, v[0] * sin + v[1] * cos]
 }
 
+/// Returns the perpendicular vector — a 90° counter-clockwise turn
+/// (`[-y, x]`), preserving length.
+pub fn perpendicular(v: Vector2) -> Vector2 {
+    [-v[1], v[0]]
+}
+
 /// Returns true if two segments intersect or overlap.
 pub fn intersects(a: Vector2, b: Vector2) -> bool {
     a[1] >= b[0] && b[1] >= a[0]
@@ -179,10 +185,34 @@ pub fn distance(a: Vector2, b: Vector2) -> f32 {
     ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt()
 }
 
-/// Applies an affine transform to a vector.
+/// The Euclidean length (magnitude) of a vector.
+pub fn magnitude(v: Vector2) -> f32 {
+    (v[0] * v[0] + v[1] * v[1]).sqrt()
+}
+
+/// The unit vector in the direction of `v`, or `[0, 0]` when `v` is
+/// (near-)zero.
+pub fn normalize(v: Vector2) -> Vector2 {
+    let len = magnitude(v);
+    if len < 1e-6 {
+        [0.0, 0.0]
+    } else {
+        [v[0] / len, v[1] / len]
+    }
+}
+
+/// Applies an affine transform to a vector (translation included).
 pub fn transform(v: Vector2, t: &AffineTransform) -> Vector2 {
     let [[a, c, tx], [b, d, ty]] = t.matrix;
     [a * v[0] + c * v[1] + tx, b * v[0] + d * v[1] + ty]
+}
+
+/// Applies an affine transform's **linear part** to a direction —
+/// rotation/scale/skew only, no translation (directions do not
+/// translate).
+pub fn transform_direction(v: Vector2, t: &AffineTransform) -> Vector2 {
+    let [[a, c, _], [b, d, _]] = t.matrix;
+    [a * v[0] + c * v[1], b * v[0] + d * v[1]]
 }
 
 /// Returns true if two vectors are identical.

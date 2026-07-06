@@ -48,6 +48,27 @@ use grida::runtime::invalidation::ChangeKind;
 /// [`WorkingCopy`]. Stable ids persist in files and across instances.
 pub type Id = String;
 
+/// A node's display category — the coarse classification the hierarchy
+/// panel needs to show a per-type icon. Collapses the engine's `Node`
+/// variants into icon-worthy groups (e.g. `Polygon`/`RegularPolygon` →
+/// [`NodeKind::Polygon`]); the icon mapping itself lives in the shell,
+/// never here (the document owns classification, not presentation).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeKind {
+    Frame,
+    Group,
+    Boolean,
+    Rectangle,
+    Ellipse,
+    Polygon,
+    Star,
+    Line,
+    Text,
+    Vector,
+    Image,
+    Other,
+}
+
 /// A ruler guide (`docs/wg/canvas/ruler.md`): the axis-aligned line
 /// `axis = offset`, stored per scene as document truth (`RUL-4`).
 /// Re-exported from `math2` so the document, the snap session
@@ -588,6 +609,27 @@ impl WorkingCopy {
                     | Node::Tray(_)
                     | Node::BooleanOperation(_)
             )
+        })
+    }
+
+    /// The node's display category ([`NodeKind`]), for the hierarchy
+    /// panel's per-type icon. Unknown / non-visual kinds collapse to
+    /// [`NodeKind::Other`].
+    pub fn node_kind(&self, id: &Id) -> Option<NodeKind> {
+        let iid = self.to_internal.get(id)?;
+        self.scene.graph.get_node(iid).ok().map(|n| match n {
+            Node::Container(_) | Node::InitialContainer(_) | Node::Tray(_) => NodeKind::Frame,
+            Node::Group(_) => NodeKind::Group,
+            Node::BooleanOperation(_) => NodeKind::Boolean,
+            Node::Rectangle(_) => NodeKind::Rectangle,
+            Node::Ellipse(_) => NodeKind::Ellipse,
+            Node::Polygon(_) | Node::RegularPolygon(_) => NodeKind::Polygon,
+            Node::RegularStarPolygon(_) => NodeKind::Star,
+            Node::Line(_) => NodeKind::Line,
+            Node::TextSpan(_) | Node::AttributedText(_) => NodeKind::Text,
+            Node::Path(_) | Node::Vector(_) => NodeKind::Vector,
+            Node::Image(_) => NodeKind::Image,
+            _ => NodeKind::Other,
         })
     }
 

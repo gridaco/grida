@@ -101,10 +101,11 @@ them "content edit modes" is the squat this review removes. They are
 - No cleanup doctrine: edits commit against the paint as they
   happen; there is no "empty paint" to delete.
 - Session chrome: gradient — the transform control points and the
-  color-stop track (drag stops, double-click to insert, arrows step
-  the selected stop, delete removes it); image — the transformed
-  image quad with side handles (scale), corner handles (rotate), and
-  body drag (translate).
+  color-stop track; image — the transformed image quad with side
+  handles (scale), corner handles (rotate), and body drag (translate).
+  This slot owns the sessions' _lifecycle_; the canvas surfaces
+  themselves and the normalized transform model each edits are specified
+  in [paint-session](./paint-session/) (`GRAD-*`, `IMG-*`).
 
 **Excluded**: the production union's **bitmap** member is legacy and
 is not part of this spec; raster editing, if it returns, would be a

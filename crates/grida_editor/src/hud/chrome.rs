@@ -72,6 +72,15 @@ pub enum Role {
     VectorPreview,
     /// Tangent knobs and their hairline connectors.
     VectorTangent,
+    /// Gradient paint session (`paint-session/gradient.md`): the ramp
+    /// track — the A→B axis and the ellipse ring. (The control-point
+    /// handles and color-stop chips carry their own state in their
+    /// prims below.)
+    GradientTrack,
+    /// The gradient session's offset readout pill (e.g. `42%`) beside the
+    /// hovered insertion preview — accent-filled, vertically centered on
+    /// its anchor.
+    GradientBadge,
 }
 
 /// A dumb draw primitive. Canvas-space geometry; the host projects
@@ -125,6 +134,24 @@ pub enum HudPrim {
     /// Small screen-fixed dot at a canvas anchor (vector vertices and
     /// tangent knobs; the role carries the state).
     Dot { anchor: [f32; 2], role: Role },
+    /// A gradient control-point handle — a screen-fixed white circle
+    /// (origin / primary / secondary). `active` = hovered or dragged.
+    GradientHandle { anchor: [f32; 2], active: bool },
+    /// A gradient color-stop chip — a screen-fixed rounded square filled
+    /// with the stop's RGBA, with a caret. `anchor` is the chip centre;
+    /// `toward` is the canvas point the caret points at (and the rotation
+    /// derives from). Off a straight axis (linear/radial/diamond) the
+    /// chip floats off the ramp point and the caret points back at it; on
+    /// the sweep ring the chip sits on its ramp point and the caret
+    /// points at the gradient center. `selected` rings it in the accent;
+    /// `preview` draws it translucent (the insertion ghost).
+    GradientChip {
+        anchor: [f32; 2],
+        toward: [f32; 2],
+        color: [u8; 4],
+        selected: bool,
+        preview: bool,
+    },
 }
 
 /// One frame of chrome.

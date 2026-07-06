@@ -57,6 +57,7 @@ these contracts to running code.
 | **targeting**           | Pointer→node resolution mathematics: hit chains, graph-distance, descent, deep-select, marquee predicates                 | [ux-surface/targeting.md](./ux-surface/targeting.md)                     |
 | **selection partition** | The per-parent partition of a multi-node selection: N overlay boxes, and which commands act per-partition vs on the union | [ux-surface/selection-partition.md](./ux-surface/selection-partition.md) |
 | **edit mode**           | The exclusive nested-editing slot and its taxonomy: content modes (text, vector) vs paint sessions                        | [edit-mode.md](./edit-mode.md)                                           |
+| **paint session**       | The in-canvas editing surfaces for one paint — the gradient control frame + stop track, the image quad — and the normalized transform model each edits | [paint-session/](./paint-session/)                                       |
 | **tool**                | The authoring tool system: taxonomy, activation, insertion gestures, container adoption                                   | [tool.md](./tool.md)                                                     |
 | **translate**           | The move gesture's structural models: clone-on-translate and live re-parenting                                            | [translate.md](./translate.md)                                           |
 

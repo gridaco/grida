@@ -36,6 +36,9 @@ pub enum EditMode {
     Text { id: Id },
     /// The vector content mode (boxed: the machine dwarfs the enum).
     Vector(Box<VectorMode>),
+    /// A gradient paint session (`paint-session/gradient.md`). Boxed
+    /// like [`Vector`](Self::Vector).
+    Gradient(Box<crate::paint_session::gradient::mode::GradientSession>),
 }
 
 impl EditMode {
@@ -50,6 +53,7 @@ impl EditMode {
             EditMode::None => None,
             EditMode::Text { id } => Some(id),
             EditMode::Vector(mode) => Some(mode.node()),
+            EditMode::Gradient(session) => Some(session.node()),
         }
     }
 
@@ -67,6 +71,10 @@ impl EditMode {
         let prev = std::mem::replace(self, EditMode::None);
         let out = match prev {
             EditMode::Vector(mode) => Some(mode.exit(editor)),
+            EditMode::Gradient(session) => {
+                session.exit(editor);
+                None
+            }
             EditMode::Text { .. } | EditMode::None => None,
         };
         *self = next;
