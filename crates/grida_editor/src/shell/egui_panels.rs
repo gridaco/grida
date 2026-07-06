@@ -105,6 +105,10 @@ impl EguiPanels {
                 // Calmer vertical rhythm than egui's default.
                 ui.spacing_mut().item_spacing = egui::vec2(8.0, 6.0);
                 ui.spacing_mut().interact_size.y = 22.0;
+                // View control pinned top-right (the `ext-zoom.tsx`
+                // mirror): zoom readout + view toggles, above the
+                // selection sections.
+                view_action = view_control(ui, view);
                 // No scrollbar drawn (wheel / trackpad scroll only): the
                 // panel stays clean and right-aligned controls (+/✕) never
                 // sit under a bar. Nothing reserves horizontal space, so
@@ -718,6 +722,135 @@ pub(crate) fn toolbar(ui: &mut egui::Ui, current: Tool, pen_active: bool) -> Opt
             });
         });
     picked
+}
+
+// ── View control (top-right of the properties panel) ─────────────────
+
+/// Live view state the [`view_control`] reflects (read-only mirror of
+/// the shell's `ruler`/`pixelgrid`/`outline_mode`/… fields + the camera
+/// zoom). Mirrors the web `ext-zoom.tsx` control.
+#[derive(Clone, Copy)]
+pub(crate) struct ViewState {
+    pub zoom_pct: i32,
+    pub outline_mode: bool,
+    pub outline_ignore_clips: bool,
+    pub pixel_preview: u8,
+    pub pixelgrid: bool,
+    pub ruler: bool,
+}
+
+/// What the view control produced this frame. A registry `Command` (the
+/// shell dispatches it) or an absolute zoom-to-percentage (direct camera
+/// UX — the numeric field + 50/100/200 presets — no registry command).
+pub(crate) enum ViewAction {
+    Command(Command),
+    ZoomToPct(f32),
+}
+
+/// The zoom/view dropdown, right-aligned at the top of the properties
+/// panel (the crate mirror of `ext-zoom.tsx`). Reads live [`ViewState`],
+/// emits a [`ViewAction`]; each control returns its action up through the
+/// menu closures (no shared `&mut` across the nested menus).
+fn view_control(ui: &mut egui::Ui, view: ViewState) -> Option<ViewAction> {
+    let mut out = None;
+    // A single-height row (`horizontal`) so the control sits at the
+    // panel's TOP; `right_to_left` inside it right-aligns the button.
+    // (A bare `with_layout` would claim the panel's full height and
+    // vertically-center the button, swallowing the sections below.)
+    ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let resp = ui.menu_button(format!("{}%  ⌄", view.zoom_pct), |ui| {
+                let mut a: Option<ViewAction> = None;
+                // Absolute zoom (2–256%), center-anchored — direct camera UX.
+                let mut pct = view.zoom_pct as f32;
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut pct)
+                            .range(2.0..=256.0)
+                            .suffix("%")
+                            .speed(1.0),
+                    )
+                    .changed()
+                {
+                    a = Some(ViewAction::ZoomToPct(pct));
+                }
+                ui.separator();
+                // The discrete zoom verbs — each has a registry command.
+                for (label, cmd) in [
+                    ("Zoom in", Command::ZoomIn),
+                    ("Zoom out", Command::ZoomOut),
+                    ("Zoom to fit", Command::ZoomFit),
+                    ("Zoom to selection", Command::ZoomSelection),
+                ] {
+                    if ui.button(label).clicked() {
+                        a = Some(ViewAction::Command(cmd));
+                    }
+                }
+                // The %-presets: 100% has a registry command (`Zoom100`);
+                // 50/200 are arbitrary zoom-to-value (`ZoomToPct`, direct
+                // camera UX). The split is intentional, so they stay
+                // explicit rather than joining the table above.
+                if ui.button("Zoom to 50%").clicked() {
+                    a = Some(ViewAction::ZoomToPct(50.0));
+                }
+                if ui.button("Zoom to 100%").clicked() {
+                    a = Some(ViewAction::Command(Command::Zoom100));
+                }
+                if ui.button("Zoom to 200%").clicked() {
+                    a = Some(ViewAction::ZoomToPct(200.0));
+                }
+                ui.separator();
+                // Outlines submenu (Show outlines + independent ignore-clips).
+                let outlines = ui
+                    .menu_button("Outlines", |ui| {
+                        let mut s = None;
+                        let mut on = view.outline_mode;
+                        if ui.checkbox(&mut on, "Show outlines").clicked() {
+                            s = Some(ViewAction::Command(Command::ToggleOutlineMode));
+                        }
+                        let mut clips = view.outline_ignore_clips;
+                        if ui
+                            .add_enabled(
+                                view.outline_mode,
+                                egui::Checkbox::new(&mut clips, "Ignore clips content"),
+                            )
+                            .clicked()
+                        {
+                            s = Some(ViewAction::Command(Command::ToggleOutlineIgnoresClips));
+                        }
+                        s
+                    })
+                    .inner
+                    .flatten();
+                a = a.or(outlines);
+                // Pixel preview submenu (radio 0/1/2).
+                let preview = ui
+                    .menu_button("Pixel preview", |ui| {
+                        let mut s = None;
+                        for (scale, label) in [(0u8, "Disabled"), (1, "1x"), (2, "2x")] {
+                            if ui.radio(view.pixel_preview == scale, label).clicked() {
+                                s = Some(ViewAction::Command(Command::SetPixelPreview(scale)));
+                            }
+                        }
+                        s
+                    })
+                    .inner
+                    .flatten();
+                a = a.or(preview);
+                let mut pg = view.pixelgrid;
+                if ui.checkbox(&mut pg, "Pixel Grid").clicked() {
+                    a = Some(ViewAction::Command(Command::TogglePixelGrid));
+                }
+                let mut rl = view.ruler;
+                if ui.checkbox(&mut rl, "Ruler").clicked() {
+                    a = Some(ViewAction::Command(Command::ToggleRuler));
+                }
+                a
+            });
+            out = resp.inner.flatten();
+        });
+    });
+    out
 }
 
 // ── Context menu ─────────────────────────────────────────────────────

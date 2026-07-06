@@ -127,6 +127,22 @@ pub enum Command {
     /// instance view state, like the ruler and pixel-grid toggles.
     ToggleUi,
     TogglePixelGrid,
+    /// Toggle outline (wireframe) render mode — the engine
+    /// `RenderPolicy` wireframe preset. Per-instance view state, like
+    /// the ruler and pixel-grid toggles; a content change (repaints the
+    /// scene, not just the overlay).
+    ToggleOutlineMode,
+    /// Toggle whether outline mode ignores clip/mask content
+    /// (`RenderPolicy::ignore_clips_content`). Meaningful only while
+    /// outline mode is on.
+    ToggleOutlineIgnoresClips,
+    /// Set the pixel-preview scale: `0` disabled, `1` = 1x, `2` = 2x
+    /// (`Renderer::set_pixel_preview_scale`). Radio-style — the payload
+    /// selects the exact state (menu / view control).
+    SetPixelPreview(u8),
+    /// Cycle the pixel-preview scale `0 → 1 → 2 → 0` (the keybinding
+    /// form of [`Command::SetPixelPreview`]).
+    CyclePixelPreview,
     ToggleSnapPixelGrid,
     ToggleSnapGeometry,
     PrevScene,
@@ -189,6 +205,10 @@ impl Command {
             Command::ToggleRuler => "toggle-ruler",
             Command::ToggleUi => "toggle-ui",
             Command::TogglePixelGrid => "toggle-pixel-grid",
+            Command::ToggleOutlineMode => "toggle-outline-mode",
+            Command::ToggleOutlineIgnoresClips => "toggle-outline-ignores-clips",
+            Command::SetPixelPreview(_) => "set-pixel-preview",
+            Command::CyclePixelPreview => "cycle-pixel-preview",
             Command::ToggleSnapPixelGrid => "toggle-snap-pixel-grid",
             Command::ToggleSnapGeometry => "toggle-snap-geometry",
             Command::PrevScene => "prev-scene",

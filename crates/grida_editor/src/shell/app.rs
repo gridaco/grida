@@ -50,6 +50,8 @@ use glutin::{
 };
 use grida::node::schema::Size;
 use grida::overlay::{Modifiers, PointerButton, SurfaceEvent};
+use grida::runtime::invalidation::GlobalFlag;
+use grida::runtime::render_policy::RenderPolicy;
 use grida::text_edit::session::KeyName;
 use grida::window::application::{ApplicationApi, HostEvent, UnknownTargetApplication};
 use grida::window::command::ApplicationCommand;
@@ -130,6 +132,17 @@ pub(crate) struct ShellApp {
     /// per-instance view state, ⇧' (web parity). Independent of the
     /// snap-to-pixel-grid toggle (`PXG-5`).
     pub(crate) pixelgrid: bool,
+    /// Outline (wireframe) render mode — drives the engine's
+    /// `RenderPolicy` wireframe preset. A content view state (repaints
+    /// the scene, not just the overlay). ⇧⌘O (web parity).
+    pub(crate) outline_mode: bool,
+    /// Whether outline mode ignores clip/mask content
+    /// (`RenderPolicy::ignore_clips_content`). Defaults on, matching
+    /// `WIREFRAME_DEFAULT`; only meaningful while `outline_mode` is on.
+    pub(crate) outline_ignore_clips: bool,
+    /// Pixel-preview scale (`Renderer::set_pixel_preview_scale`): 0
+    /// disabled, 1 = 1x, 2 = 2x. A content view state.
+    pub(crate) pixel_preview: u8,
     /// Shell chrome visibility (keybindings.md, Mod+\): when false
     /// `build_inspector` builds no egui, so the panels/toolbar/menu are
     /// neither drawn nor input-claiming and the canvas stands alone.
@@ -267,6 +280,50 @@ impl ShellApp {
     /// no content frame of their own; quiescence holds — no event, no
     /// damage, no present.
     fn overlay_damaged(&mut self) {
+        self.window.request_redraw();
+    }
+
+    /// Push the current outline-mode state into the engine render
+    /// policy. Outline mode swaps `STANDARD`⇄`WIREFRAME_DEFAULT`, with
+    /// the independent `ignore_clips_content` sub-toggle applied on top
+    /// (both fields are `pub` on `RenderPolicy`). A content change, so
+    /// it invalidates the picture cache (`GlobalFlag::Config`) and
+    /// requests a full repaint — never the overlay path.
+    fn apply_outline_policy(&mut self) {
+        let policy = if self.outline_mode {
+            RenderPolicy {
+                ignore_clips_content: self.outline_ignore_clips,
+                ..RenderPolicy::WIREFRAME_DEFAULT
+            }
+        } else {
+            RenderPolicy::STANDARD
+        };
+        let r = self.app.renderer_mut();
+        r.set_render_policy(policy);
+        r.mark_global(GlobalFlag::Config);
+        eprintln!(
+            "grida_editor: outline: {} (ignore clips: {})",
+            if self.outline_mode { "on" } else { "off" },
+            self.outline_ignore_clips
+        );
+        self.window.request_redraw();
+    }
+
+    /// Set the pixel-preview scale (0 disabled / 1 = 1x / 2 = 2x) on the
+    /// engine and mirror it onto shell state. A content change (same
+    /// invalidation path as [`Self::apply_outline_policy`]).
+    fn set_pixel_preview(&mut self, scale: u8) {
+        let scale = scale.min(2);
+        // A redundant radio pick (e.g. "1x" while already 1x) would
+        // otherwise drop the picture cache and force a full repaint.
+        if scale == self.pixel_preview {
+            return;
+        }
+        self.pixel_preview = scale;
+        let r = self.app.renderer_mut();
+        r.set_pixel_preview_scale(scale);
+        r.mark_global(GlobalFlag::Config);
+        eprintln!("grida_editor: pixel preview: {scale}x");
         self.window.request_redraw();
     }
 
@@ -958,6 +1015,7 @@ impl ShellApp {
             text_mode: matches!(self.mode, EditMode::Text { .. }),
             can_undo: self.editor.can_undo(),
             can_redo: self.editor.can_redo(),
+            outline_mode: self.outline_mode,
         });
         let bar = crate::shell::menubar::MenuBar::build(&app_menu);
         bar.install();
@@ -1236,6 +1294,29 @@ impl ShellApp {
                     if self.pixelgrid { "on" } else { "off" }
                 );
                 self.overlay_damaged();
+                true
+            }
+            // Outline / pixel-preview are engine render-policy changes:
+            // unlike the ruler/grid overlays these repaint the scene
+            // content, so they route through the config-invalidation
+            // path (`apply_outline_policy` / `set_pixel_preview_scale`
+            // + `mark_global(Config)`), never `overlay_damaged`.
+            Command::ToggleOutlineMode => {
+                self.outline_mode = !self.outline_mode;
+                self.apply_outline_policy();
+                true
+            }
+            Command::ToggleOutlineIgnoresClips => {
+                self.outline_ignore_clips = !self.outline_ignore_clips;
+                self.apply_outline_policy();
+                true
+            }
+            Command::SetPixelPreview(scale) => {
+                self.set_pixel_preview(scale);
+                true
+            }
+            Command::CyclePixelPreview => {
+                self.set_pixel_preview((self.pixel_preview + 1) % 3);
                 true
             }
             // The snap toggles (snap.md; both on by default). Mod+'

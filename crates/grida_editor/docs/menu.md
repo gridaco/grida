@@ -147,6 +147,8 @@ appear.
 | Item                             | Wired to · Awaiting                                            |
 | -------------------------------- | -------------------------------------------------------------- |
 | Zoom in/out/100%/fit/selection   | `ZoomIn` / `ZoomOut` / `Zoom100` / `ZoomFit` / `ZoomSelection` |
+| Outlines → show · ignore clips   | `ToggleOutlineMode` / `ToggleOutlineIgnoresClips` (ignore-clips enabled only while outline on) |
+| Pixel preview → disabled/1x/2x   | `SetPixelPreview(0)` / `SetPixelPreview(1)` / `SetPixelPreview(2)` (cycle: `CyclePixelPreview`) |
 | Pixel grid · Ruler               | `TogglePixelGrid` / `ToggleRuler`                              |
 | Show/Hide UI                     | `ToggleUi`                                                     |
 | Snapping → pixel-grid / geometry | `ToggleSnapPixelGrid` / `ToggleSnapGeometry`                   |
