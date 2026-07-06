@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Cover</title>
+  <rect width="1920" height="1080" fill="#0A0A0B"/>
+  <rect x="160" y="234" width="16" height="16" fill="#C9A227"/>
+  <text x="198" y="248" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="700" fill="#C9A227" letter-spacing="5">STARTUP PITCH &#8212; SERIES A</text>
+  <text font-family="'Playfair Display',Georgia,'Times New Roman',serif" font-size="132" font-weight="700" fill="#EDEAE3" letter-spacing="-2">
+    <tspan x="158" y="500">The operating system</tspan>
+    <tspan x="158" y="636">for modern teams.</tspan>
+  </text>
+  <text x="160" y="762" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="30" font-weight="400" fill="rgba(237,234,227,0.55)">We turn scattered tools into one system of record &#8212; so work finally moves in sync.</text>
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="600" fill="#C9A227" letter-spacing="1">NORTHWIND</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(237,234,227,0.4)" letter-spacing="1">2026</text>
+</svg>

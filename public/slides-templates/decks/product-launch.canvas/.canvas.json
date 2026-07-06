@@ -1,0 +1,33 @@
+{
+  "$schema": "https://grida.co/schema/dotcanvas/v1.json",
+  "version": "1",
+  "editor": "slides",
+  "files": ["*.svg"],
+  "documents": [
+    { "src": "001.svg", "id": "cover", "name": "Cover" },
+    { "src": "002.svg", "id": "old-way", "name": "The old way" },
+    { "src": "003.svg", "id": "introducing", "name": "Introducing Orbit One" },
+    {
+      "src": "004.svg",
+      "id": "capability-1",
+      "name": "Everything in one surface"
+    },
+    {
+      "src": "005.svg",
+      "id": "capability-2",
+      "name": "Fast enough to disappear"
+    },
+    { "src": "006.svg", "id": "capability-3", "name": "It learns your work" },
+    { "src": "007.svg", "id": "proof", "name": "What early teams say" },
+    { "src": "008.svg", "id": "availability", "name": "Available today" },
+    { "src": "009.svg", "id": "cta", "name": "Start your orbit" }
+  ],
+  "ext": {
+    "co.grida.templates": {
+      "title": "Product Launch",
+      "prompt": "Create a 9-slide product launch deck: the old way, introducing the product, three key capabilities, social proof, availability, and a bold call to action.",
+      "system": "riso",
+      "activeId": "cover"
+    }
+  }
+}

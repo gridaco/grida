@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Block 2 — Try</title>
+  <rect width="1920" height="1080" fill="#F6D8D2"/>
+
+  <text x="1480" y="640" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="420" font-weight="700" fill="#3A3A3A" letter-spacing="-10" opacity="0.06">2</text>
+
+  <text x="160" y="250" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="22" font-weight="700" fill="#EF7A6D" letter-spacing="5">BLOCK TWO · TRY</text>
+  <text font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="76" font-weight="700" fill="#3A3A3A" letter-spacing="-1.5">
+    <tspan x="158" y="380">Now make a small,</tspan>
+    <tspan x="158" y="470">low-stakes attempt.</tspan>
+  </text>
+  <path d="M162 512 C300 500 440 526 578 512" fill="none" stroke="#EF7A6D" stroke-width="5" stroke-linecap="round"/>
+
+  <rect x="160" y="580" width="1120" height="320" rx="28" fill="#FFFFFF" opacity="0.9"/>
+  <circle cx="230" cy="662" r="10" fill="#EF7A6D"/>
+  <text x="270" y="672" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="30" font-weight="400" fill="#3A3A3A">Pick one observation and turn it into a tiny experiment.</text>
+  <circle cx="230" cy="742" r="10" fill="#EF7A6D"/>
+  <text x="270" y="752" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="30" font-weight="400" fill="#3A3A3A">Give yourself five minutes — rough is perfectly fine.</text>
+  <circle cx="230" cy="822" r="10" fill="#EF7A6D"/>
+  <text x="270" y="832" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="30" font-weight="400" fill="#3A3A3A">Notice what surprised you along the way.</text>
+
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(58,58,58,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="600" fill="#3A3A3A" opacity="0.7" letter-spacing="1">Workshop Session</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(58,58,58,0.4)" letter-spacing="1">05 / 09</text>
+</svg>

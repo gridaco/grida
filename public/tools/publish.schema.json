@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "publish.json — a publishing unit's map (public/ origin tree)",
+  "description": "Maps unit-relative sources to published URLs. DATA only — build logic lives in the unit's build.mjs, never here. Entry forms: \"file\" → \"/exact/url\", \"dir/\" → \"/prefix/\", \"single-*-glob\" → \"/prefix/\".",
+  "type": "object",
+  "required": ["publish"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "publish": {
+      "type": "object",
+      "description": "source (unit-relative path, dir/ suffix, or single-* glob) → URL (must start with /; prefix targets end with /)",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^/"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Idea 03 — Where it breaks</title>
+  <rect width="1920" height="1080" fill="#FAFAF8"/>
+  <text x="150" y="620" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="440" font-weight="800" fill="#111111" letter-spacing="-20" opacity="0.06">03</text>
+  <text x="160" y="250" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="700" fill="#8A8A82" letter-spacing="4">WHERE IT BREAKS</text>
+  <text font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="72" font-weight="800" fill="#111111" letter-spacing="-2">
+    <tspan x="158" y="430">It holds — until one</tspan>
+    <tspan x="158" y="520">assumption stops being true.</tspan>
+  </text>
+
+  <g font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="30" font-weight="400" fill="#111111">
+    <rect x="160" y="632" width="10" height="10" fill="#E5484D"/>
+    <text x="200" y="646">The inputs arrive faster than a stage can drain them.</text>
+    <rect x="160" y="712" width="10" height="10" fill="#E5484D"/>
+    <text x="200" y="726">Two parts quietly disagree about the same fact.</text>
+    <rect x="160" y="792" width="10" height="10" fill="#E5484D"/>
+    <text x="200" y="806">A hand-off you assumed was instant… isn't.</text>
+  </g>
+
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(17,17,17,0.10)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="600" fill="#8A8A82" letter-spacing="1">How it actually works</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(17,17,17,0.4)" letter-spacing="1">06 / 09</text>
+</svg>

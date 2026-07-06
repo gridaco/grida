@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Warm-up</title>
+  <rect width="1920" height="1080" fill="#F3E7C4"/>
+
+  <!-- soft blob accents -->
+  <path d="M1500 140 C1680 110 1830 250 1770 420 C1715 575 1530 580 1450 450 C1380 335 1390 160 1500 140 Z" fill="#EF7A6D" opacity="0.10"/>
+  <circle cx="230" cy="860" r="60" fill="#EF7A6D" opacity="0.12"/>
+  <circle cx="1680" cy="880" r="24" fill="#EF7A6D" opacity="0.20"/>
+
+  <text x="160" y="260" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="22" font-weight="700" fill="#EF7A6D" letter-spacing="5">WARM-UP</text>
+
+  <rect x="160" y="330" width="1600" height="470" rx="28" fill="#FFFFFF" opacity="0.85"/>
+  <text font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="80" font-weight="700" fill="#3A3A3A" letter-spacing="-1.5">
+    <tspan x="230" y="490">What&#8217;s one small thing</tspan>
+    <tspan x="230" y="590">that made you smile</tspan>
+    <tspan x="230" y="690">this week?</tspan>
+  </text>
+  <path d="M232 730 C360 716 490 744 618 730" fill="none" stroke="#EF7A6D" stroke-width="6" stroke-linecap="round"/>
+
+  <text x="160" y="880" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="28" font-weight="400" fill="#3A3A3A" opacity="0.8">Take turns — one sentence each. No wrong answers.</text>
+
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(58,58,58,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="600" fill="#3A3A3A" opacity="0.7" letter-spacing="1">Workshop Session</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(58,58,58,0.4)" letter-spacing="1">03 / 09</text>
+</svg>

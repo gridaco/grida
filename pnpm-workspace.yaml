@@ -1,6 +1,7 @@
 packages:
   - "editor"
   - "database"
+  - "public"
   - "apps/*"
   - "crates/*"
   - "packages/*"

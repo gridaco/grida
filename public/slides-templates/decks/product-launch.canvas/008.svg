@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Available today</title>
+  <rect width="1920" height="1080" fill="#F7F5EF"/>
+  <text x="160" y="200" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="22" font-weight="700" fill="#0D0D0D" letter-spacing="5" fill-opacity="0.55">AVAILABLE TODAY</text>
+  <text font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-weight="700" fill="#0D0D0D" letter-spacing="-4">
+    <tspan x="156" y="360" font-size="118">Pick your orbit.</tspan>
+  </text>
+
+  <rect x="160" y="470" width="500" height="380" fill="#F7F5EF" stroke="#0D0D0D" stroke-width="6"/>
+  <text x="200" y="560" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="30" font-weight="700" fill="#0D0D0D" letter-spacing="1">STARTER</text>
+  <text x="200" y="680" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="88" font-weight="700" fill="#0D0D0D" letter-spacing="-3">$0</text>
+  <text x="200" y="740" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="24" font-weight="400" fill="#0D0D0D" fill-opacity="0.65">For one, forever.</text>
+  <text x="200" y="800" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="22" font-weight="500" fill="#0D0D0D" fill-opacity="0.8">Core surface + 3 boards.</text>
+
+  <rect x="710" y="470" width="500" height="380" fill="#2323FF"/>
+  <text x="750" y="560" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="30" font-weight="700" fill="#F2FF49" letter-spacing="1">TEAM</text>
+  <text x="750" y="680" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="88" font-weight="700" fill="#F7F5EF" letter-spacing="-3">$12</text>
+  <text x="750" y="740" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="24" font-weight="400" fill="rgba(247,245,239,0.75)">Per seat / month.</text>
+  <text x="750" y="800" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="22" font-weight="500" fill="rgba(247,245,239,0.95)">Unlimited boards + AI assist.</text>
+
+  <rect x="1260" y="470" width="500" height="380" fill="#0D0D0D"/>
+  <text x="1300" y="560" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="30" font-weight="700" fill="#FF3D7F" letter-spacing="1">SCALE</text>
+  <text x="1300" y="680" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="76" font-weight="700" fill="#F7F5EF" letter-spacing="-2">Custom</text>
+  <text x="1300" y="740" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="24" font-weight="400" fill="rgba(247,245,239,0.7)">Let&#8217;s talk.</text>
+  <text x="1300" y="800" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="22" font-weight="500" fill="rgba(247,245,239,0.95)">SSO, audit, dedicated support.</text>
+
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(13,13,13,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="17" font-weight="700" fill="#0D0D0D" fill-opacity="0.55" letter-spacing="1">ORBIT ONE — PRODUCT LAUNCH</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(13,13,13,0.4)" letter-spacing="1">08 / 09</text>
+</svg>

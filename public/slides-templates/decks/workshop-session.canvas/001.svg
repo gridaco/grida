@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Welcome</title>
+  <rect width="1920" height="1080" fill="#F6D8D2"/>
+  <defs>
+    <linearGradient id="blob-cover" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EF7A6D" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#EF7A6D" stop-opacity="0.06"/>
+    </linearGradient>
+  </defs>
+
+  <!-- soft blob accents -->
+  <path d="M1540 120 C1720 90 1860 230 1800 400 C1745 555 1560 560 1480 430 C1410 315 1420 140 1540 120 Z" fill="url(#blob-cover)"/>
+  <circle cx="1660" cy="820" r="70" fill="#EF7A6D" opacity="0.14"/>
+  <circle cx="250" cy="180" r="26" fill="#EF7A6D" opacity="0.20"/>
+
+  <text x="160" y="250" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="22" font-weight="700" fill="#EF7A6D" letter-spacing="5">A WORKSHOP SESSION</text>
+
+  <text font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="140" font-weight="700" fill="#3A3A3A" letter-spacing="-2">
+    <tspan x="158" y="520">Welcome — let&#8217;s</tspan>
+    <tspan x="158" y="670">make something</tspan>
+    <tspan x="158" y="820">together.</tspan>
+  </text>
+
+  <!-- hand-drawn squiggle underline -->
+  <path d="M162 862 C260 848 360 876 460 862 C560 848 660 876 760 862" fill="none" stroke="#EF7A6D" stroke-width="6" stroke-linecap="round"/>
+
+  <text x="160" y="932" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="30" font-weight="400" fill="#3A3A3A" opacity="0.85">A relaxed, hands-on session. Bring your curiosity — we&#8217;ll bring the rest.</text>
+
+  <text x="1760" y="1016" text-anchor="end" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="18" font-weight="600" fill="#3A3A3A" opacity="0.55" letter-spacing="1">Facilitated by [Your Name] · [Date]</text>
+</svg>

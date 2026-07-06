@@ -1,0 +1,25 @@
+{
+  "$schema": "https://grida.co/schema/dotcanvas/v1.json",
+  "version": "1",
+  "editor": "slides",
+  "files": ["*.svg"],
+  "documents": [
+    { "src": "001.svg", "id": "cover", "name": "Cover" },
+    { "src": "002.svg", "id": "why", "name": "Why it matters" },
+    { "src": "003.svg", "id": "agenda", "name": "Three ideas" },
+    { "src": "004.svg", "id": "idea-1", "name": "The core concept" },
+    { "src": "005.svg", "id": "idea-2", "name": "How the pieces fit" },
+    { "src": "006.svg", "id": "idea-3", "name": "Where it breaks" },
+    { "src": "007.svg", "id": "numbers", "name": "By the numbers" },
+    { "src": "008.svg", "id": "quote", "name": "In one line" },
+    { "src": "009.svg", "id": "takeaway", "name": "The takeaway" }
+  ],
+  "ext": {
+    "co.grida.templates": {
+      "title": "Topic Explainer",
+      "prompt": "Create a 9-slide explainer deck that teaches one topic clearly: a title slide, why it matters, an agenda of three ideas, one slide per idea, a by-the-numbers slide, a one-line quote, and the takeaway.",
+      "system": "whitepaper",
+      "activeId": "cover"
+    }
+  }
+}

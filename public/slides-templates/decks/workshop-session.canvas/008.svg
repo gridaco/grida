@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Takeaways</title>
+  <rect width="1920" height="1080" fill="#D5E0CE"/>
+
+  <circle cx="1700" cy="170" r="34" fill="#EF7A6D" opacity="0.16"/>
+
+  <text x="160" y="240" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="22" font-weight="700" fill="#EF7A6D" letter-spacing="5">TAKEAWAYS</text>
+  <text x="160" y="330" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="72" font-weight="700" fill="#3A3A3A" letter-spacing="-1.5">Three things to carry with you</text>
+  <path d="M162 366 C300 354 440 380 578 366" fill="none" stroke="#EF7A6D" stroke-width="5" stroke-linecap="round"/>
+
+  <g font-family="'Nunito Sans','Inter',Arial,sans-serif">
+    <!-- card 1 -->
+    <rect x="160" y="470" width="500" height="410" rx="26" fill="#FFFFFF" opacity="0.92"/>
+    <circle cx="240" cy="560" r="34" fill="#F6D8D2"/>
+    <text x="240" y="572" text-anchor="middle" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="34" font-weight="700" fill="#EF7A6D">1</text>
+    <text x="200" y="660" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="32" font-weight="700" fill="#3A3A3A">Notice first</text>
+    <text font-size="25" font-weight="400" fill="#3A3A3A" opacity="0.8">
+      <tspan x="200" y="712">Observation beats</tspan>
+      <tspan x="200" y="748">assumption, every time.</tspan>
+    </text>
+
+    <!-- card 2 -->
+    <rect x="710" y="470" width="500" height="410" rx="26" fill="#FFFFFF" opacity="0.92"/>
+    <circle cx="790" cy="560" r="34" fill="#CFE3EC"/>
+    <text x="790" y="572" text-anchor="middle" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="34" font-weight="700" fill="#EF7A6D">2</text>
+    <text x="750" y="660" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="32" font-weight="700" fill="#3A3A3A">Try small</text>
+    <text font-size="25" font-weight="400" fill="#3A3A3A" opacity="0.8">
+      <tspan x="750" y="712">A rough attempt today</tspan>
+      <tspan x="750" y="748">beats a perfect someday.</tspan>
+    </text>
+
+    <!-- card 3 -->
+    <rect x="1260" y="470" width="500" height="410" rx="26" fill="#FFFFFF" opacity="0.92"/>
+    <circle cx="1340" cy="560" r="34" fill="#F3E7C4"/>
+    <text x="1340" y="572" text-anchor="middle" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="34" font-weight="700" fill="#EF7A6D">3</text>
+    <text x="1300" y="660" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="32" font-weight="700" fill="#3A3A3A">Share warmly</text>
+    <text font-size="25" font-weight="400" fill="#3A3A3A" opacity="0.8">
+      <tspan x="1300" y="712">Ideas grow faster in</tspan>
+      <tspan x="1300" y="748">kind, honest company.</tspan>
+    </text>
+  </g>
+
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(58,58,58,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="600" fill="#3A3A3A" opacity="0.7" letter-spacing="1">Workshop Session</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(58,58,58,0.4)" letter-spacing="1">08 / 09</text>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>The ask</title>
+  <rect width="1920" height="1080" fill="#0A0A0B"/>
+  <text x="150" y="640" font-family="'Playfair Display',Georgia,'Times New Roman',serif" font-size="420" font-weight="700" fill="#C9A227" letter-spacing="-12" opacity="0.1">$8M</text>
+  <text x="160" y="250" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="700" fill="#C9A227" letter-spacing="5">THE ASK</text>
+  <text font-family="'Playfair Display',Georgia,'Times New Roman',serif" font-size="88" font-weight="700" fill="#EDEAE3" letter-spacing="-2">
+    <tspan x="158" y="440">Raising $8M to reach</tspan>
+    <tspan x="158" y="548">$20M ARR in 24 months.</tspan>
+  </text>
+  <line x1="160" y1="628" x2="900" y2="628" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <g font-family="'Inter','Helvetica Neue',Arial,sans-serif">
+    <rect x="160" y="700" width="10" height="10" fill="#C9A227"/>
+    <text x="196" y="710" font-size="27" font-weight="400" fill="#EDEAE3">Scale go-to-market: double the sales and success team.</text>
+    <rect x="160" y="766" width="10" height="10" fill="#C9A227"/>
+    <text x="196" y="776" font-size="27" font-weight="400" fill="#EDEAE3">Ship the automation platform and 30 new integrations.</text>
+    <rect x="160" y="832" width="10" height="10" fill="#C9A227"/>
+    <text x="196" y="842" font-size="27" font-weight="400" fill="#EDEAE3">Extend our lead as the connective layer of work.</text>
+  </g>
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="600" fill="rgba(237,234,227,0.55)" letter-spacing="1">Startup Pitch</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(237,234,227,0.4)" letter-spacing="1">11 / 12</text>
+</svg>

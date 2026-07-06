@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Reflection</title>
+  <rect width="1920" height="1080" fill="#F3E7C4"/>
+
+  <path d="M1520 150 C1700 120 1840 260 1780 430 C1725 585 1540 590 1460 460 C1390 345 1400 170 1520 150 Z" fill="#EF7A6D" opacity="0.10"/>
+  <circle cx="250" cy="840" r="52" fill="#EF7A6D" opacity="0.12"/>
+
+  <text x="160" y="270" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="22" font-weight="700" fill="#EF7A6D" letter-spacing="5">REFLECTION</text>
+
+  <text x="180" y="470" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="240" font-weight="700" fill="#EF7A6D" opacity="0.25">&#8220;</text>
+
+  <text font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="72" font-weight="700" fill="#3A3A3A" letter-spacing="-1">
+    <tspan x="160" y="500">The best ideas today</tspan>
+    <tspan x="160" y="600">weren&#8217;t the loudest —</tspan>
+    <tspan x="160" y="700">they were the honest ones.</tspan>
+  </text>
+  <path d="M162 742 C320 728 480 756 640 742" fill="none" stroke="#EF7A6D" stroke-width="6" stroke-linecap="round"/>
+
+  <text x="160" y="852" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="28" font-weight="400" fill="#3A3A3A" opacity="0.8">Take a quiet minute: what will you keep thinking about after today?</text>
+
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(58,58,58,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="600" fill="#3A3A3A" opacity="0.7" letter-spacing="1">Workshop Session</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(58,58,58,0.4)" letter-spacing="1">07 / 09</text>
+</svg>
