@@ -75,7 +75,7 @@ pressing (a spot with no selectable control underneath — over the box body, a
 region — does not light up, matching its no-op click). This is the general "a
 drag-claiming handle over a selectable control is ambiguous and defers" rule;
 see
-[selection-intent](../feat-editor/ux-surface/selection-intent.md) §"Transform
+[selection-intent](../canvas/ux-surface/selection-intent.md) §"Transform
 box over a sub-selection". With nothing selectable underneath (a whole-element
 transform box, or a corner over empty canvas) the press is a singleton again
 and a click is a no-op.

@@ -21,7 +21,9 @@ pub mod vector4;
 
 pub use align::{scalar as align_scalar, vector2 as align_vector2};
 pub use bezier::{
-    a2c as bezier_a2c, get_bbox as bezier_get_bbox, CubicBezier, CubicBezierWithTangents, KAPPA,
+    a2c as bezier_a2c, evaluate as bezier_evaluate, get_bbox as bezier_get_bbox,
+    project as bezier_project, solve_tangents_for_point as bezier_solve_tangents_for_point,
+    subdivide as bezier_subdivide, CubicBezier, CubicBezierWithTangents, KAPPA,
 };
 pub use color::{
     hex_to_rgba8888, rgba8888_to_hex, rgba_to_unit8_chunk, rgbaf_multiply_alpha, rgbaf_to_rgba8888,

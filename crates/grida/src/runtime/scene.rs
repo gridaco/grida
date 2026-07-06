@@ -3076,6 +3076,52 @@ impl Renderer {
         let _ = self.draw_nocache(canvas, &frame, background, width, height);
     }
 
+    /// Outline a text node to a [`VectorNetwork`] — the glyph outlines
+    /// of its laid-out paragraph, in the node's local space.
+    ///
+    /// Reuses the render path's shaping (the same paragraph the painter
+    /// draws), so the outline is exactly what was painted. The
+    /// font-backed primitive behind the editor's Create Outlines command
+    /// (`OUTL-*`); flatten delegates its text members here too. Returns
+    /// `None` for a non-text node or an unloaded scene — and, when fonts
+    /// are unavailable, the shaped paragraph is empty, so the network is
+    /// empty (the caller declines rather than replacing with nothing).
+    pub fn outline_text_node(
+        &self,
+        node_id: &crate::node::id::NodeId,
+    ) -> Option<crate::vectornetwork::VectorNetwork> {
+        let scene = self.scene.as_ref()?;
+        // Clone the shaping params so the immutable graph borrow ends
+        // before the paragraph cache is touched.
+        let (text, fills, align, style, max_lines, ellipsis, width) =
+            match scene.graph.get_node(node_id) {
+                Ok(crate::node::schema::Node::TextSpan(n)) => (
+                    n.text.clone(),
+                    n.fills.clone(),
+                    n.text_align,
+                    n.text_style.clone(),
+                    n.max_lines,
+                    n.ellipsis.clone(),
+                    n.width,
+                ),
+                _ => return None,
+            };
+        let paragraph = self.scene_cache.paragraph.borrow_mut().paragraph(
+            &text,
+            fills.as_slice(),
+            &align,
+            &style,
+            &max_lines,
+            &ellipsis,
+            width,
+            &self.fonts,
+            &self.images,
+            Some(node_id),
+        );
+        let mut paragraph = paragraph.borrow_mut();
+        Some(crate::text::paragraph_to_vector_network(&mut paragraph))
+    }
+
     /// Export a single node as a raster image.
     ///
     /// Renders only the target node's subtree onto a temporary raster surface,

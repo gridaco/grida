@@ -26,6 +26,14 @@ pub struct CubicBezierWithTangents {
 }
 
 fn solve_quad(a: f32, b: f32, c: f32) -> Vec<f32> {
+    if a == 0.0 {
+        // Degenerate to linear `bt + c = 0` (symmetric curves hit this:
+        // the derivative's t² coefficient vanishes).
+        if b == 0.0 {
+            return Vec::new();
+        }
+        return vec![-c / b];
+    }
     let d = b * b - 4.0 * a * c;
     if d < 0.0 {
         Vec::new()
@@ -103,6 +111,199 @@ pub fn get_bbox(segment: &CubicBezierWithTangents) -> Rectangle {
         width: max_x - min_x,
         height: max_y - min_y,
     }
+}
+
+/// Evaluates a cubic Bézier segment (tangent form) at parameter `t`.
+///
+/// The curve is `B(t) = (1−t)³·a + 3(1−t)²t·(a+ta) + 3(1−t)t²·(b+tb) + t³·b`.
+/// `t` is clamped to `[0, 1]`; `NaN` evaluates at `0`.
+pub fn evaluate(segment: &CubicBezierWithTangents, t: f32) -> Vector2 {
+    let CubicBezierWithTangents { a, b, ta, tb } = *segment;
+    let t = if t.is_nan() { 0.0 } else { t.clamp(0.0, 1.0) };
+    let c1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+    let c2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+    [
+        cubic_eval(a[0], c1[0], c2[0], b[0], t),
+        cubic_eval(a[1], c1[1], c2[1], b[1], t),
+    ]
+}
+
+/// Splits a cubic Bézier segment at parameter `t` by de Casteljau
+/// subdivision, returning the `(left, right)` halves in tangent form.
+///
+/// The halves reproduce the original curve exactly (`left.b == right.a`
+/// is the split point). Note that subdividing a straight segment (both
+/// tangents zero) yields collinear but *nonzero* tangents — callers
+/// that must keep straight segments handle-free preserve zeros
+/// themselves.
+pub fn subdivide(
+    segment: &CubicBezierWithTangents,
+    t: f32,
+) -> (CubicBezierWithTangents, CubicBezierWithTangents) {
+    let CubicBezierWithTangents { a, b, ta, tb } = *segment;
+    let t = t.clamp(0.0, 1.0);
+    let mt = 1.0 - t;
+
+    let p0 = a;
+    let p1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+    let p2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+    let p3 = b;
+
+    let lerp = |u: Vector2, v: Vector2| -> Vector2 { [mt * u[0] + t * v[0], mt * u[1] + t * v[1]] };
+
+    let q0 = lerp(p0, p1);
+    let q1 = lerp(p1, p2);
+    let q2 = lerp(p2, p3);
+    let r0 = lerp(q0, q1);
+    let r1 = lerp(q1, q2);
+    let s = lerp(r0, r1);
+
+    (
+        CubicBezierWithTangents {
+            a: p0,
+            b: s,
+            ta: [q0[0] - p0[0], q0[1] - p0[1]],
+            tb: [r0[0] - s[0], r0[1] - s[1]],
+        },
+        CubicBezierWithTangents {
+            a: s,
+            b: p3,
+            ta: [r1[0] - s[0], r1[1] - s[1]],
+            tb: [q2[0] - p3[0], q2[1] - p3[1]],
+        },
+    )
+}
+
+/// Finds the parameter of the closest point on a cubic Bézier segment
+/// to `point`, returning `(t, dist_sq)`.
+///
+/// Coarse scan over 20 uniform samples followed by up to 5
+/// Newton–Raphson refinements of the perpendicularity condition
+/// `f(t) = (B(t) − p) · B′(t) = 0`; `t` stays clamped to `[0, 1]`.
+pub fn project(segment: &CubicBezierWithTangents, point: Vector2) -> (f32, f32) {
+    let CubicBezierWithTangents { a, b, ta, tb } = *segment;
+    let p0 = a;
+    let p1: Vector2 = [a[0] + ta[0], a[1] + ta[1]];
+    let p2: Vector2 = [b[0] + tb[0], b[1] + tb[1]];
+    let p3 = b;
+
+    let eval = |t: f32| -> Vector2 {
+        [
+            cubic_eval(p0[0], p1[0], p2[0], p3[0], t),
+            cubic_eval(p0[1], p1[1], p2[1], p3[1], t),
+        ]
+    };
+    let deriv = |t: f32| -> Vector2 {
+        let mt = 1.0 - t;
+        [
+            3.0 * mt * mt * (p1[0] - p0[0])
+                + 6.0 * mt * t * (p2[0] - p1[0])
+                + 3.0 * t * t * (p3[0] - p2[0]),
+            3.0 * mt * mt * (p1[1] - p0[1])
+                + 6.0 * mt * t * (p2[1] - p1[1])
+                + 3.0 * t * t * (p3[1] - p2[1]),
+        ]
+    };
+    let deriv2 = |t: f32| -> Vector2 {
+        let mt = 1.0 - t;
+        [
+            6.0 * mt * (p2[0] - 2.0 * p1[0] + p0[0]) + 6.0 * t * (p3[0] - 2.0 * p2[0] + p1[0]),
+            6.0 * mt * (p2[1] - 2.0 * p1[1] + p0[1]) + 6.0 * t * (p3[1] - 2.0 * p2[1] + p1[1]),
+        ]
+    };
+
+    let mut best_t = 0.0f32;
+    let mut best_dist = f32::INFINITY;
+    for i in 0..=20 {
+        let t = i as f32 / 20.0;
+        let [x, y] = eval(t);
+        let dx = x - point[0];
+        let dy = y - point[1];
+        let dist = dx * dx + dy * dy;
+        if dist < best_dist {
+            best_dist = dist;
+            best_t = t;
+        }
+    }
+
+    let mut t = best_t;
+    for _ in 0..5 {
+        let pt = eval(t);
+        let d1 = deriv(t);
+        let d2 = deriv2(t);
+        let rx = pt[0] - point[0];
+        let ry = pt[1] - point[1];
+        let f = rx * d1[0] + ry * d1[1];
+        let df = d1[0] * d1[0] + d1[1] * d1[1] + rx * d2[0] + ry * d2[1];
+        if df == 0.0 {
+            break;
+        }
+        t = (t - f / df).clamp(0.0, 1.0);
+    }
+
+    let [x, y] = eval(t);
+    let dx = x - point[0];
+    let dy = y - point[1];
+    (t, dx * dx + dy * dy)
+}
+
+/// Solves for the tangent pair that makes the segment pass through
+/// `target` at parameter `t`, moving as little as possible from the
+/// current tangents (least-squares via a Lagrange multiplier on the
+/// single-point constraint).
+///
+/// At `t == 0`/`t == 1` only the touched endpoint's tangent changes.
+/// A target within `0.1` units of the chord's linear interpolation
+/// collapses both tangents to zero (the segment snaps back straight).
+pub fn solve_tangents_for_point(
+    segment: &CubicBezierWithTangents,
+    t: f32,
+    target: Vector2,
+) -> (Vector2, Vector2) {
+    let CubicBezierWithTangents { a, b, ta, tb } = *segment;
+
+    if t == 0.0 {
+        return ([target[0] - a[0], target[1] - a[1]], tb);
+    }
+    if t == 1.0 {
+        return (ta, [target[0] - b[0], target[1] - b[1]]);
+    }
+
+    let linear: Vector2 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    if (target[0] - linear[0]).hypot(target[1] - linear[1]) < 0.1 {
+        return ([0.0, 0.0], [0.0, 0.0]);
+    }
+
+    let s = 1.0 - t;
+    let (s2, t2) = (s * s, t * t);
+    let (s3, t3) = (s2 * s, t2 * t);
+    let coef_ta = 3.0 * s2 * t;
+    let coef_tb = 3.0 * s * t2;
+
+    // B(t) with zero tangents contributes the endpoint mix; the tangent
+    // pair must supply the remainder.
+    let rhs: Vector2 = [
+        target[0] - (s3 * a[0] + 3.0 * s2 * t * a[0] + 3.0 * s * t2 * b[0] + t3 * b[0]),
+        target[1] - (s3 * a[1] + 3.0 * s2 * t * a[1] + 3.0 * s * t2 * b[1] + t3 * b[1]),
+    ];
+
+    let denominator = coef_ta * coef_ta + coef_tb * coef_tb;
+    if denominator.abs() <= 1e-10 {
+        return (ta, tb);
+    }
+
+    let current: Vector2 = [
+        coef_ta * ta[0] + coef_tb * tb[0],
+        coef_ta * ta[1] + coef_tb * tb[1],
+    ];
+    let lambda = [
+        (rhs[0] - current[0]) / denominator,
+        (rhs[1] - current[1]) / denominator,
+    ];
+    (
+        [ta[0] + lambda[0] * coef_ta, ta[1] + lambda[1] * coef_ta],
+        [tb[0] + lambda[0] * coef_tb, tb[1] + lambda[1] * coef_tb],
+    )
 }
 
 /// Converts an SVG elliptical arc to cubic Bézier curve segments.
