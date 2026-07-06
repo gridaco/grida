@@ -209,8 +209,8 @@ fires on a handle, a chip, or the track, so it cannot interrupt editing.
 
 - **GRAD-4 — Frame roles.** Linear exposes two handles — the free,
   independent start (origin) and end (primary) of the axis; there is no
-  secondary. The elliptical types expose the ellipse's {center=origin,
-  major=primary, minor=secondary}; the minor exists iff the type is
+  secondary. The elliptical types expose the ellipse's `{center=origin,
+major=primary, minor=secondary}`; the minor exists iff the type is
   elliptical and stays perpendicular to origin→primary.
 
 - **GRAD-5 — Frame drag model.** Every frame gesture is applied as a
