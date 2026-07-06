@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Thank you</title>
+  <rect width="1920" height="1080" fill="#F6D8D2"/>
+  <defs>
+    <linearGradient id="blob-end" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EF7A6D" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#EF7A6D" stop-opacity="0.06"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M1520 130 C1710 100 1860 250 1795 430 C1735 595 1540 600 1455 460 C1380 340 1395 155 1520 130 Z" fill="url(#blob-end)"/>
+  <circle cx="240" cy="820" r="64" fill="#EF7A6D" opacity="0.13"/>
+  <circle cx="1690" cy="840" r="24" fill="#EF7A6D" opacity="0.20"/>
+
+  <text x="160" y="270" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="22" font-weight="700" fill="#EF7A6D" letter-spacing="5">THANK YOU</text>
+
+  <text font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="132" font-weight="700" fill="#3A3A3A" letter-spacing="-2">
+    <tspan x="158" y="500">Thanks for</tspan>
+    <tspan x="158" y="640">showing up.</tspan>
+  </text>
+  <path d="M162 690 C300 676 440 704 580 690 C700 678 800 700 900 690" fill="none" stroke="#EF7A6D" stroke-width="6" stroke-linecap="round"/>
+
+  <text x="160" y="778" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="30" font-weight="400" fill="#3A3A3A" opacity="0.85">Next step: pick one takeaway and try it before we meet again.</text>
+
+  <rect x="160" y="840" width="720" height="88" rx="20" fill="#FFFFFF" opacity="0.85"/>
+  <text x="200" y="895" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="28" font-weight="400" fill="#3A3A3A">Stay in touch — [you@email.com] · [@yourhandle]</text>
+
+  <text x="1760" y="1016" text-anchor="end" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="18" font-weight="600" fill="#3A3A3A" opacity="0.55" letter-spacing="1">Workshop Session · 09 / 09</text>
+</svg>

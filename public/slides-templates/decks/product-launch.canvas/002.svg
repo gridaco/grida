@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>The old way</title>
+  <rect width="1920" height="1080" fill="#F7F5EF"/>
+  <text x="160" y="240" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="22" font-weight="700" fill="#0D0D0D" letter-spacing="5" fill-opacity="0.55">THE OLD WAY</text>
+  <text font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-weight="700" fill="#0D0D0D" letter-spacing="-4">
+    <tspan x="156" y="470" font-size="130">Ten tabs.</tspan>
+    <tspan x="156" y="610" font-size="130">Five tools.</tspan>
+    <tspan x="156" y="750" font-size="130">Zero focus.</tspan>
+  </text>
+  <text x="1360" y="470" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="26" font-weight="400" fill="#0D0D0D" fill-opacity="0.6">
+    <tspan x="1360" dy="0">Every day the same drag —</tspan>
+    <tspan x="1360" dy="42">context lost between apps,</tspan>
+    <tspan x="1360" dy="42">work waiting on the tool</tspan>
+    <tspan x="1360" dy="42">instead of the other way</tspan>
+    <tspan x="1360" dy="42">around.</tspan>
+  </text>
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(13,13,13,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="17" font-weight="700" fill="#0D0D0D" fill-opacity="0.55" letter-spacing="1">ORBIT ONE — PRODUCT LAUNCH</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(13,13,13,0.4)" letter-spacing="1">02 / 09</text>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Start your orbit</title>
+  <defs>
+    <pattern id="halftone3" width="26" height="26" patternUnits="userSpaceOnUse">
+      <circle cx="6" cy="6" r="4" fill="#F2FF49" fill-opacity="0.22"/>
+    </pattern>
+  </defs>
+  <rect width="1920" height="1080" fill="#2323FF"/>
+  <rect x="0" y="0" width="1920" height="1080" fill="url(#halftone3)"/>
+  <text x="160" y="230" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="22" font-weight="700" fill="#F2FF49" letter-spacing="5">GET STARTED</text>
+  <text font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-weight="700" fill="#F7F5EF" letter-spacing="-7">
+    <tspan x="150" y="510" font-size="200">Start your</tspan>
+    <tspan x="150" y="720" font-size="200">orbit today.</tspan>
+  </text>
+  <rect x="160" y="800" width="520" height="96" fill="#F2FF49"/>
+  <text x="420" y="862" text-anchor="middle" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="38" font-weight="700" fill="#0D0D0D" letter-spacing="0">orbit.app/launch</text>
+  <text x="720" y="862" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="30" font-weight="500" fill="rgba(247,245,239,0.9)">Free to start. No card. Ships now.</text>
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(247,245,239,0.3)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="17" font-weight="700" fill="rgba(247,245,239,0.9)" letter-spacing="1">grida.co</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(247,245,239,0.65)" letter-spacing="1">09 / 09</text>
+</svg>

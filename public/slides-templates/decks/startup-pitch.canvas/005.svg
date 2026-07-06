@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>How it works</title>
+  <rect width="1920" height="1080" fill="#0A0A0B"/>
+  <text x="160" y="250" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="700" fill="#C9A227" letter-spacing="5">HOW IT WORKS</text>
+  <text x="160" y="360" font-family="'Playfair Display',Georgia,'Times New Roman',serif" font-size="72" font-weight="700" fill="#EDEAE3" letter-spacing="-1">Three steps to one source of truth.</text>
+  <line x1="160" y1="440" x2="1760" y2="440" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <g font-family="'Inter','Helvetica Neue',Arial,sans-serif">
+    <text x="160" y="600" font-family="'Playfair Display',Georgia,serif" font-size="80" font-weight="700" fill="#C9A227">01</text>
+    <text x="160" y="662" font-size="30" font-weight="700" fill="#EDEAE3">Connect</text>
+    <text font-size="23" font-weight="400" fill="rgba(237,234,227,0.55)">
+      <tspan x="160" y="712">Link your tools in minutes</tspan>
+      <tspan x="160" y="746">with one-click integrations.</tspan>
+    </text>
+
+    <text x="720" y="600" font-family="'Playfair Display',Georgia,serif" font-size="80" font-weight="700" fill="#C9A227">02</text>
+    <text x="720" y="662" font-size="30" font-weight="700" fill="#EDEAE3">Sync</text>
+    <text font-size="23" font-weight="400" fill="rgba(237,234,227,0.55)">
+      <tspan x="720" y="712">We reconcile records into a</tspan>
+      <tspan x="720" y="746">live, unified model of work.</tspan>
+    </text>
+
+    <text x="1280" y="600" font-family="'Playfair Display',Georgia,serif" font-size="80" font-weight="700" fill="#C9A227">03</text>
+    <text x="1280" y="662" font-size="30" font-weight="700" fill="#EDEAE3">Act</text>
+    <text font-size="23" font-weight="400" fill="rgba(237,234,227,0.55)">
+      <tspan x="1280" y="712">Automations and dashboards</tspan>
+      <tspan x="1280" y="746">run on numbers everyone trusts.</tspan>
+    </text>
+  </g>
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="600" fill="rgba(237,234,227,0.55)" letter-spacing="1">Startup Pitch</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(237,234,227,0.4)" letter-spacing="1">05 / 12</text>
+</svg>

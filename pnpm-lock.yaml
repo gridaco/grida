@@ -1770,6 +1770,18 @@ importers:
         specifier: ^4
         version: 4.1.18
 
+  public:
+    devDependencies:
+      dotcanvas:
+        specifier: workspace:*
+        version: link:../packages/dotcanvas
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
+      vitest:
+        specifier: ^4
+        version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.6.1)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
+
   services/grida-canvas-document-worker-cf:
     dependencies:
       '@grida/canvas-sync':

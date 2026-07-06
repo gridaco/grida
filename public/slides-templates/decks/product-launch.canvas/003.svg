@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Introducing Orbit One</title>
+  <rect width="1920" height="1080" fill="#FF3D7F"/>
+  <rect x="0" y="792" width="1920" height="10" fill="#0D0D0D"/>
+  <text x="160" y="230" font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-size="22" font-weight="700" fill="#0D0D0D" letter-spacing="5">INTRODUCING</text>
+  <text font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-weight="700" fill="#F7F5EF" letter-spacing="-6">
+    <tspan x="156" y="470" font-size="176">Orbit One.</tspan>
+  </text>
+  <text font-family="'Space Grotesk','Arial Black',Arial,sans-serif" font-weight="700" fill="#0D0D0D" letter-spacing="-3">
+    <tspan x="156" y="640" font-size="92">One place for all of it.</tspan>
+  </text>
+  <text x="160" y="900" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="30" font-weight="500" fill="rgba(247,245,239,0.95)">Docs, tasks, and data in a single fast surface — built to disappear so the work can show up.</text>
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(247,245,239,0.35)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="17" font-weight="700" fill="rgba(247,245,239,0.95)" letter-spacing="1">ORBIT ONE — PRODUCT LAUNCH</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Space Grotesk','Inter',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(247,245,239,0.7)" letter-spacing="1">03 / 09</text>
+</svg>

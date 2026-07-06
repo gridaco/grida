@@ -1,0 +1,28 @@
+{
+  "$schema": "https://grida.co/schema/dotcanvas/v1.json",
+  "version": "1",
+  "editor": "slides",
+  "files": ["*.svg"],
+  "documents": [
+    { "src": "001.svg", "id": "cover", "name": "Cover" },
+    { "src": "002.svg", "id": "problem", "name": "The problem" },
+    { "src": "003.svg", "id": "why-now", "name": "Why now" },
+    { "src": "004.svg", "id": "solution", "name": "The solution" },
+    { "src": "005.svg", "id": "how-it-works", "name": "How it works" },
+    { "src": "006.svg", "id": "market", "name": "Market size" },
+    { "src": "007.svg", "id": "traction", "name": "Traction" },
+    { "src": "008.svg", "id": "business-model", "name": "Business model" },
+    { "src": "009.svg", "id": "competition", "name": "Why we win" },
+    { "src": "010.svg", "id": "team", "name": "Team" },
+    { "src": "011.svg", "id": "ask", "name": "The ask" },
+    { "src": "012.svg", "id": "vision", "name": "The vision" }
+  ],
+  "ext": {
+    "co.grida.templates": {
+      "title": "Startup Pitch",
+      "prompt": "Create a 12-slide startup pitch deck covering the problem, why now, the solution, how it works, market size, traction, business model, competition, team, the ask, and the vision.",
+      "system": "obsidian",
+      "activeId": "cover"
+    }
+  }
+}

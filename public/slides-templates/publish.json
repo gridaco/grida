@@ -1,0 +1,7 @@
+{
+  "$schema": "../tools/publish.schema.json",
+  "publish": {
+    "out/*.canvas.zip": "/templates/slides/",
+    "out/index.json": "/templates/slides/index.json"
+  }
+}

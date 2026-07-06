@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Idea 02 — How the pieces fit</title>
+  <rect width="1920" height="1080" fill="#FAFAF8"/>
+  <text x="160" y="250" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="700" fill="#8A8A82" letter-spacing="4">HOW THE PIECES FIT</text>
+  <text font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="72" font-weight="800" fill="#111111" letter-spacing="-2">
+    <tspan x="158" y="440">Each part does one</tspan>
+    <tspan x="158" y="530">job, then hands off.</tspan>
+  </text>
+  <text font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="28" font-weight="400" fill="#111111">
+    <tspan x="160" y="650">No single piece is clever on its own. The behaviour you</tspan>
+    <tspan x="160" y="696">notice is what emerges when they pass work down the line,</tspan>
+    <tspan x="160" y="742">in order, each trusting the step before it.</tspan>
+  </text>
+
+  <line x1="1180" y1="250" x2="1180" y2="800" stroke="rgba(17,17,17,0.12)" stroke-width="1"/>
+  <text x="1260" y="360" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="22" font-weight="700" fill="#8A8A82" letter-spacing="3">TYPICALLY</text>
+  <text x="1256" y="560" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="200" font-weight="800" fill="#E5484D" letter-spacing="-6">3</text>
+  <text x="1260" y="660" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="40" font-weight="700" fill="#111111">stages, start</text>
+  <text x="1260" y="712" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="40" font-weight="700" fill="#111111">to finish.</text>
+
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(17,17,17,0.10)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="600" fill="#8A8A82" letter-spacing="1">How it actually works</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(17,17,17,0.4)" letter-spacing="1">05 / 09</text>
+</svg>

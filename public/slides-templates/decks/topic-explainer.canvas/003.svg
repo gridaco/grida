@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Three ideas</title>
+  <rect width="1920" height="1080" fill="#FAFAF8"/>
+  <text x="160" y="252" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="68" font-weight="800" fill="#111111" letter-spacing="-1.5">Three ideas</text>
+  <text x="160" y="320" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="26" font-weight="400" fill="#8A8A82">What you'll understand by the last slide.</text>
+
+  <g font-family="'Inter','Helvetica Neue',Arial,sans-serif">
+    <line x1="160" y1="470" x2="660" y2="470" stroke="#111111" stroke-width="3"/>
+    <text x="160" y="580" font-size="80" font-weight="800" fill="#E5484D" letter-spacing="-2">01</text>
+    <text x="160" y="670" font-size="34" font-weight="700" fill="#111111">The core concept</text>
+    <text font-size="24" font-weight="400" fill="#8A8A82">
+      <tspan x="160" y="726">The single thing every-</tspan>
+      <tspan x="160" y="760">thing else is built on.</tspan>
+    </text>
+
+    <line x1="710" y1="470" x2="1210" y2="470" stroke="#111111" stroke-width="3"/>
+    <text x="710" y="580" font-size="80" font-weight="800" fill="#111111" letter-spacing="-2">02</text>
+    <text x="710" y="670" font-size="34" font-weight="700" fill="#111111">How the pieces fit</text>
+    <text font-size="24" font-weight="400" fill="#8A8A82">
+      <tspan x="710" y="726">Each part does one job,</tspan>
+      <tspan x="710" y="760">then hands off cleanly.</tspan>
+    </text>
+
+    <line x1="1260" y1="470" x2="1760" y2="470" stroke="#111111" stroke-width="3"/>
+    <text x="1260" y="580" font-size="80" font-weight="800" fill="#111111" letter-spacing="-2">03</text>
+    <text x="1260" y="670" font-size="34" font-weight="700" fill="#111111">Where it breaks</text>
+    <text font-size="24" font-weight="400" fill="#8A8A82">
+      <tspan x="1260" y="726">The assumptions that,</tspan>
+      <tspan x="1260" y="760">once false, undo it.</tspan>
+    </text>
+  </g>
+
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(17,17,17,0.10)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="600" fill="#8A8A82" letter-spacing="1">How it actually works</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(17,17,17,0.4)" letter-spacing="1">03 / 09</text>
+</svg>

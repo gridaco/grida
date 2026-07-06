@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Today&#8217;s plan</title>
+  <rect width="1920" height="1080" fill="#CFE3EC"/>
+
+  <circle cx="1720" cy="150" r="34" fill="#EF7A6D" opacity="0.16"/>
+
+  <text x="160" y="240" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="22" font-weight="700" fill="#EF7A6D" letter-spacing="5">AGENDA</text>
+  <text x="160" y="330" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="72" font-weight="700" fill="#3A3A3A" letter-spacing="-1.5">Here&#8217;s our plan for today</text>
+  <path d="M162 366 C300 354 440 380 578 366" fill="none" stroke="#EF7A6D" stroke-width="5" stroke-linecap="round"/>
+
+  <g font-family="'Nunito Sans','Inter',Arial,sans-serif">
+    <!-- card 1 -->
+    <rect x="160" y="470" width="770" height="200" rx="24" fill="#FFFFFF" opacity="0.9"/>
+    <text x="200" y="548" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="24" font-weight="700" fill="#EF7A6D" letter-spacing="1">00:00 — WARM-UP</text>
+    <text x="200" y="600" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="34" font-weight="700" fill="#3A3A3A">Getting comfortable</text>
+    <text x="200" y="642" font-size="24" font-weight="400" fill="#3A3A3A" opacity="0.8">A quick icebreaker to loosen up.</text>
+
+    <!-- card 2 -->
+    <rect x="990" y="470" width="770" height="200" rx="24" fill="#FFFFFF" opacity="0.9"/>
+    <text x="1030" y="548" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="24" font-weight="700" fill="#EF7A6D" letter-spacing="1">00:15 — EXPLORE</text>
+    <text x="1030" y="600" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="34" font-weight="700" fill="#3A3A3A">Three short blocks</text>
+    <text x="1030" y="642" font-size="24" font-weight="400" fill="#3A3A3A" opacity="0.8">Hands-on, one idea at a time.</text>
+
+    <!-- card 3 -->
+    <rect x="160" y="700" width="770" height="200" rx="24" fill="#FFFFFF" opacity="0.9"/>
+    <text x="200" y="778" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="24" font-weight="700" fill="#EF7A6D" letter-spacing="1">01:00 — REFLECT</text>
+    <text x="200" y="830" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="34" font-weight="700" fill="#3A3A3A">Make sense of it</text>
+    <text x="200" y="872" font-size="24" font-weight="400" fill="#3A3A3A" opacity="0.8">A gentle pause to think out loud.</text>
+
+    <!-- card 4 -->
+    <rect x="990" y="700" width="770" height="200" rx="24" fill="#FFFFFF" opacity="0.9"/>
+    <text x="1030" y="778" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="24" font-weight="700" fill="#EF7A6D" letter-spacing="1">01:20 — WRAP</text>
+    <text x="1030" y="830" font-family="'Poppins','Avenir Next','Trebuchet MS',sans-serif" font-size="34" font-weight="700" fill="#3A3A3A">Takeaways &amp; next steps</text>
+    <text x="1030" y="872" font-size="24" font-weight="400" fill="#3A3A3A" opacity="0.8">What to carry forward.</text>
+  </g>
+
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(58,58,58,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="600" fill="#3A3A3A" opacity="0.7" letter-spacing="1">Workshop Session</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Nunito Sans','Inter',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(58,58,58,0.4)" letter-spacing="1">02 / 09</text>
+</svg>

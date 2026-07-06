@@ -1,0 +1,16 @@
+{
+  "name": "@grida/public",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The canonical web-published content tree (origin tree) and its resolver/sync tooling. See README.md.",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/cli.mjs build",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "dotcanvas": "workspace:*",
+    "fflate": "^0.8.2",
+    "vitest": "^4"
+  }
+}

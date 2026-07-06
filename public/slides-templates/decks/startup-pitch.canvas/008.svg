@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Business model</title>
+  <rect width="1920" height="1080" fill="#0A0A0B"/>
+  <text x="160" y="250" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="700" fill="#C9A227" letter-spacing="5">BUSINESS MODEL</text>
+  <text x="160" y="360" font-family="'Playfair Display',Georgia,'Times New Roman',serif" font-size="72" font-weight="700" fill="#EDEAE3" letter-spacing="-1">Simple, per-seat, expands with the team.</text>
+  <line x1="160" y1="440" x2="1760" y2="440" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <g font-family="'Inter','Helvetica Neue',Arial,sans-serif">
+    <text x="160" y="600" font-family="'Playfair Display',Georgia,serif" font-size="72" font-weight="700" fill="#EDEAE3">$24</text>
+    <text x="160" y="654" font-size="24" font-weight="400" fill="rgba(237,234,227,0.55)">per seat / month</text>
+
+    <text x="720" y="600" font-family="'Playfair Display',Georgia,serif" font-size="72" font-weight="700" fill="#EDEAE3">128%</text>
+    <text x="720" y="654" font-size="24" font-weight="400" fill="rgba(237,234,227,0.55)">net revenue retention</text>
+
+    <text x="1280" y="600" font-family="'Playfair Display',Georgia,serif" font-size="72" font-weight="700" fill="#C9A227">6 mo</text>
+    <text x="1280" y="654" font-size="24" font-weight="400" fill="rgba(237,234,227,0.55)">payback period</text>
+  </g>
+  <text font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="26" font-weight="400" fill="#EDEAE3">
+    <tspan x="160" y="790">Land with a single team, expand across the org as more tools connect.</tspan>
+    <tspan x="160" y="832">Usage-based add-ons for automation volume keep upside uncapped.</tspan>
+  </text>
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="600" fill="rgba(237,234,227,0.55)" letter-spacing="1">Startup Pitch</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(237,234,227,0.4)" letter-spacing="1">08 / 12</text>
+</svg>

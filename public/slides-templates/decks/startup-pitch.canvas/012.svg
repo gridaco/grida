@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>The vision</title>
+  <rect width="1920" height="1080" fill="#0A0A0B"/>
+  <rect x="160" y="234" width="16" height="16" fill="#C9A227"/>
+  <text x="198" y="248" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="700" fill="#C9A227" letter-spacing="5">THE VISION</text>
+  <text font-family="'Playfair Display',Georgia,'Times New Roman',serif" font-size="108" font-weight="700" fill="#EDEAE3" letter-spacing="-2">
+    <tspan x="158" y="480">Every team, working</tspan>
+    <tspan x="158" y="608">from one source of truth.</tspan>
+  </text>
+  <text x="160" y="712" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="28" font-weight="400" fill="rgba(237,234,227,0.55)">If we win, the seams between tools disappear &#8212; and work simply moves.</text>
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="600" fill="#C9A227" letter-spacing="1">NORTHWIND</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(237,234,227,0.4)" letter-spacing="1">12 / 12</text>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <title>Why we win</title>
+  <rect width="1920" height="1080" fill="#0A0A0B"/>
+  <text x="160" y="250" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="20" font-weight="700" fill="#C9A227" letter-spacing="5">WHY WE WIN</text>
+  <text x="160" y="360" font-family="'Playfair Display',Georgia,'Times New Roman',serif" font-size="72" font-weight="700" fill="#EDEAE3" letter-spacing="-1">Others add a tool. We remove the seams.</text>
+  <line x1="160" y1="440" x2="1760" y2="440" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+
+  <g font-family="'Inter','Helvetica Neue',Arial,sans-serif">
+    <text x="160" y="530" font-size="20" font-weight="700" fill="rgba(237,234,227,0.4)" letter-spacing="3">THE OLD WAY</text>
+    <rect x="160" y="566" width="10" height="10" fill="rgba(237,234,227,0.3)"/>
+    <text x="196" y="576" font-size="26" font-weight="400" fill="rgba(237,234,227,0.55)">Yet another app to log into.</text>
+    <rect x="160" y="632" width="10" height="10" fill="rgba(237,234,227,0.3)"/>
+    <text x="196" y="642" font-size="26" font-weight="400" fill="rgba(237,234,227,0.55)">Manual exports to reconcile data.</text>
+    <rect x="160" y="698" width="10" height="10" fill="rgba(237,234,227,0.3)"/>
+    <text x="196" y="708" font-size="26" font-weight="400" fill="rgba(237,234,227,0.55)">Rip-and-replace to adopt.</text>
+
+    <text x="1000" y="530" font-size="20" font-weight="700" fill="#C9A227" letter-spacing="3">NORTHWIND</text>
+    <rect x="1000" y="566" width="10" height="10" fill="#C9A227"/>
+    <text x="1036" y="576" font-size="26" font-weight="400" fill="#EDEAE3">Runs invisibly under your stack.</text>
+    <rect x="1000" y="632" width="10" height="10" fill="#C9A227"/>
+    <text x="1036" y="642" font-size="26" font-weight="400" fill="#EDEAE3">Reconciles automatically, in real time.</text>
+    <rect x="1000" y="698" width="10" height="10" fill="#C9A227"/>
+    <text x="1036" y="708" font-size="26" font-weight="400" fill="#EDEAE3">Live in an afternoon, keep every tool.</text>
+  </g>
+
+  <line x1="920" y1="500" x2="920" y2="740" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <line x1="160" y1="980" x2="1760" y2="980" stroke="rgba(237,234,227,0.15)" stroke-width="1"/>
+  <text x="160" y="1016" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="600" fill="rgba(237,234,227,0.55)" letter-spacing="1">Startup Pitch</text>
+  <text x="1760" y="1016" text-anchor="end" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="500" fill="rgba(237,234,227,0.4)" letter-spacing="1">09 / 12</text>
+</svg>

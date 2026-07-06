@@ -1,0 +1,25 @@
+{
+  "$schema": "https://grida.co/schema/dotcanvas/v1.json",
+  "version": "1",
+  "editor": "slides",
+  "files": ["*.svg"],
+  "documents": [
+    { "src": "001.svg", "id": "cover", "name": "Welcome" },
+    { "src": "002.svg", "id": "agenda", "name": "Today's plan" },
+    { "src": "003.svg", "id": "warm-up", "name": "Warm-up" },
+    { "src": "004.svg", "id": "block-1", "name": "Block 1 — Notice" },
+    { "src": "005.svg", "id": "block-2", "name": "Block 2 — Try" },
+    { "src": "006.svg", "id": "block-3", "name": "Block 3 — Share" },
+    { "src": "007.svg", "id": "reflection", "name": "Reflection" },
+    { "src": "008.svg", "id": "takeaways", "name": "Takeaways" },
+    { "src": "009.svg", "id": "thankyou", "name": "Thank you" }
+  ],
+  "ext": {
+    "co.grida.templates": {
+      "title": "Workshop Session",
+      "prompt": "Create a 9-slide workshop session deck: a welcome slide, today's plan, a warm-up, three activity blocks with clear instructions, a reflection slide, takeaways, and a thank-you close.",
+      "system": "studio",
+      "activeId": "cover"
+    }
+  }
+}

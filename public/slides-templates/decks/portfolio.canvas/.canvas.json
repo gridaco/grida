@@ -1,0 +1,61 @@
+{
+  "$schema": "https://grida.co/schema/dotcanvas/v1.json",
+  "version": "1",
+  "editor": "slides",
+  "files": ["*.svg"],
+  "documents": [
+    {
+      "src": "001.svg",
+      "id": "cover",
+      "name": "Cover"
+    },
+    {
+      "src": "002.svg",
+      "id": "about",
+      "name": "About me"
+    },
+    {
+      "src": "003.svg",
+      "id": "education",
+      "name": "Education"
+    },
+    {
+      "src": "004.svg",
+      "id": "project-1",
+      "name": "Project 01"
+    },
+    {
+      "src": "005.svg",
+      "id": "project-2",
+      "name": "Project 02"
+    },
+    {
+      "src": "006.svg",
+      "id": "project-3",
+      "name": "Project 03"
+    },
+    {
+      "src": "007.svg",
+      "id": "skills",
+      "name": "Skills & tools"
+    },
+    {
+      "src": "008.svg",
+      "id": "experience",
+      "name": "Experience"
+    },
+    {
+      "src": "009.svg",
+      "id": "contact",
+      "name": "Let's connect"
+    }
+  ],
+  "ext": {
+    "co.grida.templates": {
+      "title": "Portfolio",
+      "prompt": "Create a 9-slide personal portfolio deck to land a job: a bold cover with my name, about me, education, three project case studies, skills and tools, experience, and a let's-connect contact slide.",
+      "system": "marque",
+      "activeId": "cover"
+    }
+  }
+}

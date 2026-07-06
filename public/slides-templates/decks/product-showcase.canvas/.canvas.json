@@ -1,0 +1,56 @@
+{
+  "$schema": "https://grida.co/schema/dotcanvas/v1.json",
+  "version": "1",
+  "editor": "slides",
+  "files": ["*.svg"],
+  "documents": [
+    {
+      "src": "001.svg",
+      "id": "cover",
+      "name": "Cover"
+    },
+    {
+      "src": "002.svg",
+      "id": "why",
+      "name": "Why Nova"
+    },
+    {
+      "src": "003.svg",
+      "id": "features",
+      "name": "Features"
+    },
+    {
+      "src": "004.svg",
+      "id": "showcase",
+      "name": "Showcase"
+    },
+    {
+      "src": "005.svg",
+      "id": "spotlight",
+      "name": "Spotlight"
+    },
+    {
+      "src": "006.svg",
+      "id": "numbers",
+      "name": "By the numbers"
+    },
+    {
+      "src": "007.svg",
+      "id": "details",
+      "name": "Details"
+    },
+    {
+      "src": "008.svg",
+      "id": "cta",
+      "name": "Start building"
+    }
+  ],
+  "ext": {
+    "co.grida.templates": {
+      "title": "Product Showcase",
+      "prompt": "Create an 8-slide product showcase deck: a bold cover, why the product exists, a feature grid, UI showcase and spotlight slides, a by-the-numbers stats slide, details, and a closing call to action.",
+      "system": "bento",
+      "activeId": "cover"
+    }
+  }
+}
