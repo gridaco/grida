@@ -70,7 +70,9 @@ milestone): lasso, the vector/path editing gestures
 ([vector-edit](../feat-vector-network/vector-edit.md)), padding handles. The clone and
 re-parenting behaviors of translate are [translate](./translate.md);
 the resolution mathematics behind the scene pick and the marquee are
-[targeting](./ux-surface/targeting.md).
+[targeting](./ux-surface/targeting.md); the corner-radius knob's
+cardinality, placement, drag mapping, and link/split modifier are
+[corner-radius](./corner-radius.md).
 
 ## HUD chrome inventory
 

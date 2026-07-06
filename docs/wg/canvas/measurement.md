@@ -95,6 +95,66 @@ Deferred, named: measuring between two arbitrary nodes without
 selecting one (A defaults to selection in v1), sub-node measurement
 (vector segments, text baselines), pinned annotations.
 
+## Gesture-feedback readouts
+
+Measurement reads a layout while nothing moves. Its two siblings read
+a value **while a gesture is in flight** — they are transient
+readouts that surface a quantity the gesture is producing, and vanish
+when it ends. They are the same nature as the measurement overlay: a
+readout, never a control; they carry no interaction and never alter
+how the gesture is interpreted. They ride the same host-extras slot
+of the HUD draw list, in the same layer band as measurement and snap
+guides (golden [snap](./snap.md)), and accrue overlay damage only.
+
+Where measurement is triggered by a modifier while idle, these are
+triggered by the gesture itself: they exist for the lifetime of the
+gesture and are gone the instant it commits or cancels. Neither is
+ever present while the HUD is idle, and neither survives into the
+document.
+
+### Aspect-ratio guide
+
+While a resize/scale gesture is **aspect-locked**, the canvas draws a
+dashed diagonal across the node being scaled — a hint that width and
+height are moving together, and along which axis. It communicates the
+lock, nothing more.
+
+A resize is aspect-locked when any of three independent sources say so:
+
+- **by property** — the node carries a fixed target aspect ratio;
+- **by tool** — the active tool scales uniformly (the parametric
+  uniform-scale tool);
+- **by modifier** — the preserve-aspect modifier is held for this
+  gesture (golden [input](./input.md)).
+
+Any one suffices; the guide reads the same regardless of which. It is
+shown per scaled node — only nodes participating in the current scale
+gesture draw a diagonal — and its endpoints are a pure function of
+the node's box and the scale's active direction (an eight-way
+direction→diagonal mapping). It appears when the aspect-locked scale
+begins and disappears when the gesture ends; it is not shown for an
+unlocked scale, nor while idle.
+
+### Cursor value readout
+
+For gestures whose defining quantity is a single scalar, the canvas
+floats that value in a small pill near the cursor for the duration of
+the gesture — the live number the user is dialing in. In v1 the
+scalar gestures are:
+
+- **rotate** — the rotation angle (degrees);
+- **gap** — the inter-child spacing being dragged;
+- **padding** — the container inset being dragged.
+
+The readout is a projection of the active gesture to one formatted
+scalar; a gesture with no single defining scalar (translate, scale,
+z-order sort) shows nothing. Its lifecycle is the gesture's: it
+appears when the scalar gesture starts, tracks the cursor and updates
+live as the value changes, and is gone when the gesture commits or
+cancels. The value is the gesture's own quantity in its natural unit,
+independent of zoom. New scalar gestures join by naming their scalar;
+the readout mechanism does not otherwise change.
+
 ## Contracts
 
 - **MEAS-1** Trigger truth-table: the readout is present exactly when
@@ -115,3 +175,25 @@ selecting one (A defaults to selection in v1), sub-node measurement
 - **MEAS-6** Determinism: the readout chrome is a pure function of
   (selection bounds, hover bounds, camera) — equal inputs, identical
   draw list (refines SURF-5).
+- **MEAS-7** Gesture-bound lifecycle: the aspect-ratio guide and the
+  cursor value readout are present only while their triggering gesture
+  is active; both appear when it begins, update live for its duration,
+  and are dismissed the instant it commits or cancels. Neither is ever
+  present while the HUD is idle, and neither is written to the
+  document.
+- **MEAS-8** Read-only feedback: with either readout active, document,
+  history, selection, hover, and the gesture's own outcome are
+  bit-for-bit what they would be without it, and neither readout
+  registers a hit region — extends MEAS-2 to the gesture-feedback
+  family.
+- **MEAS-9** Aspect-lock equivalence: the aspect-ratio guide is shown
+  for exactly the scaled nodes of an aspect-locked scale, where locked
+  means any one of property, tool, or modifier holds; the diagonal is
+  a pure function of the node box and the scale's active direction and
+  reads identically regardless of which source imposed the lock. An
+  unlocked scale draws no guide.
+- **MEAS-10** Scalar projection: the cursor value readout shows the
+  active gesture's single defining scalar, formatted in its natural
+  unit and independent of zoom; a gesture with no such scalar
+  (translate, scale, sort) shows nothing. Equal (gesture, value)
+  yields an identical readout.

@@ -21,7 +21,7 @@ import { css } from "@/grida-canvas-utils/css";
  *
  * Pure math + property rewrite rules live under `schema.parametric_scale` and are unit-tested.
  *
- * Spec: https://grida.co/docs/wg/feat-authoring/parametric-scaling
+ * Spec: https://grida.co/docs/wg/canvas/parametric-scaling
  */
 
 function deepClone<T>(value: T): T {

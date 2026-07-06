@@ -60,6 +60,7 @@ these contracts to running code.
 | **paint session**       | The in-canvas editing surfaces for one paint — the gradient control frame + stop track, the image quad — and the normalized transform model each edits | [paint-session/](./paint-session/)                                       |
 | **tool**                | The authoring tool system: taxonomy, activation, insertion gestures, container adoption                                                                | [tool.md](./tool.md)                                                     |
 | **translate**           | The move gesture's structural models: clone-on-translate and live re-parenting                                                                         | [translate.md](./translate.md)                                           |
+| **scale (K)**           | Parameter-space scaling: rewrites geometry-defining parameters to a uniform similarity result, baking the transform rather than storing one            | [parametric-scaling.md](./parametric-scaling.md)                         |
 
 **Structure**
 

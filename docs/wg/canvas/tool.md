@@ -54,7 +54,7 @@ human, not tools in the taxonomy.
 | arrow     | `Shift+L` | draw        | Line node with an end marker                                                  |
 | pencil    | `Shift+P` | draw        | Vector node (polyline network)                                                |
 | pen       | `P`       | mode-scoped | vector network editing ([vector-edit](../feat-vector-network/vector-edit.md)) |
-| scale     | `K`       | deferred    | parametric resize of the selection                                            |
+| scale     | `K`       | transform   | uniform scale of the selection about a pivot                                  |
 
 Web-parity notes, decided here as spec:
 
@@ -79,7 +79,9 @@ Web-parity notes, decided here as spec:
 - The cursor tool is the home state. After an insert tool completes
   one insertion (click or drag), the tool **reverts to cursor** —
   except **pencil, which stays active** so consecutive strokes need no
-  re-arming (web parity; TOOL-8).
+  re-arming (web parity; TOOL-8). The **scale tool likewise stays
+  active** across scales — it is a transform, not an insertion, and
+  reverting after each drag would defeat repeated tuning (TOOL-10).
 - Escape steps down one rung at a time: abort an in-flight authoring
   drag → revert a non-cursor tool to cursor → (then the surface's own
   Escape semantics: deselect).
@@ -188,11 +190,45 @@ Recorded so deferral is a decision, not a gap:
   mode is the mode's _entry_ (edit the selected vector, or create
   from scratch on the first placement) — never an armed document
   tool.
-- **Scale (`K`)** — selection-parametric resize: drags scale the
-  selection proportionally (position and size together), tool stays
-  active. It is a _modifier of surface gestures_ rather than an
-  authoring tool; defer until the surface's resize gesture is bound
-  through the editor.
+
+## Uniform scale
+
+The **scale tool (`K`)** is a _transform_ tool, not an authoring tool:
+it produces no node and edits no property directly. While armed, a drag
+applies the **parametric-scale operation** to the current selection — a
+single similarity factor about a pivot — in contrast to the cursor
+tool's per-handle resize, which stretches width and height
+independently.
+
+The operation itself is **owned by its own specification**: parameter-
+space scaling that rewrites each node's geometry-defining values (box,
+stroke, radii, text size, effects) so the render matches a uniform
+similarity transform, including its uniformity-across-size-coupled-
+scalars, baking, and round-trip rules
+([Scale (K) — parametric scaling](./parametric-scaling.md)).
+That model is not restated here. This section specifies only the _tool
+rung_: how the operation is armed and framed as an interaction.
+
+- **Arming.** The scale tool selects the **uniform mode** of the
+  editor's existing resize gesture; the cursor tool's handle drag runs
+  the same gesture in its ordinary directional mode. The gesture math —
+  how pointer travel maps to a factor, snapping, and the live preview
+  frame — is owned by the [surface](./surface.md)'s resize gesture and
+  is not restated here. The tool contributes only the _mode selection_
+  and the pivot below.
+- **The pivot** is the point the transform holds fixed. By default it
+  is the **center** of the selection bounding box; dragging a specific
+  resize handle pins the **opposite** corner/edge as the pivot (the
+  cardinal-direction origin), so the grabbed handle follows the pointer
+  while its opposite stays put. The pivot is never the document origin.
+- **Lifecycle.** Like pencil, the scale tool **stays active** after a
+  completed scale rather than reverting to cursor — reverting after
+  each drag would defeat repeated tuning (TOOL-10).
+- **History.** A completed scale drag is one endpoint-shaped entry
+  whose undo restores every affected node's pre-scale state in one
+  step; Escape mid-drag aborts to the pre-gesture document with no
+  entry (the same gesture-frame contract as every other drag here — see
+  [history](https://github.com/gridaco/grida/blob/main/crates/grida_editor/docs/history.md) `HISB-2`/`HISB-4`).
 
 ## Contracts
 
@@ -227,3 +263,16 @@ Recorded so deferral is a decision, not a gap:
 - **TOOL-9** The arrow tool's output differs from the line tool's
   output only in marker properties: same node kind, same geometry
   contract.
+- **TOOL-10** The scale tool is a transform tool: it inserts no node
+  and, like pencil, **stays active** after a completed scale rather
+  than reverting to cursor. A completed scale drag is one history
+  entry whose single undo restores the affected nodes' pre-scale
+  state; Escape mid-drag aborts to the pre-gesture document with no
+  entry.
+- **TOOL-11** A scale-tool drag arms the parametric-scale operation
+  ([Scale (K)](./parametric-scaling.md)) in uniform
+  mode about the pivot (default: selection-box center; a grabbed handle
+  pins the opposite corner/edge). The operation's parameter-space
+  semantics — which values scale and how — are owned there; the tool
+  contributes only mode selection and the pivot. A factor of exactly 1
+  is a no-op — no gesture, no entry.
