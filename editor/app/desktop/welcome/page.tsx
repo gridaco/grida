@@ -4,54 +4,34 @@
  * Desktop welcome window — the reference-first artwork studio front door.
  *
  * Composer-first and outcome-first: describe what you want, or gather references
- * from the gallery — then Grida AUTO-CREATES a fresh project
- * for you — a `.canvas` board under `~/Documents/Grida` — then hands your
- * prompt to that project's agent as a fresh first turn via {@link welcome_handoff}.
- * No workspace picker, no folder dialog to get started: the newcomer never has
- * to choose a folder. "Open folder…" and the recents list stay for opening
- * work that already exists (files stay visible — a named tree, not hidden).
+ * from the gallery — then Grida AUTO-CREATES a fresh, EMPTY project for you (a
+ * plain folder under `~/Documents/Grida`) and hands your prompt to that
+ * project's agent as its first turn via {@link welcome_handoff}. No workspace
+ * picker, no folder dialog to get started: the newcomer never has to choose a
+ * folder. "Open folder…" and the recents list stay for opening work that
+ * already exists (files stay visible — a named tree, not hidden).
  *
- * Clicking a gallery reference doesn't start a board on its own — it drops the
+ * The home makes NO document decision. It never seeds a `.canvas`, a deck, or
+ * any file: whether the workspace becomes a board, a slides deck, or a tree of
+ * files is the AGENT's choice, made on turn one (guided by the advertised
+ * skills). The workspace is just a place to work; the document is the agent's
+ * to create. (Pre-seeding a board here is what mis-steered decks onto boards —
+ * deferring creation to the agent is the fix.)
+ *
+ * Clicking a gallery reference doesn't start a project on its own — it drops the
  * pin into the composer's picked-references tray (multi-select). The user can
- * collect several, optionally add a prompt, then start ONE project seeded with
- * all of them. Every start opens the MAIN workbench (`/desktop/workspace`) — the
- * full surface with the file tree, tool-approval, and auto-accept — whose agent
- * pane consumes the handoff and auto-sends when there's a prompt. The seeded
- * `.canvas` board is the document the agent works on.
- *
- * Landing surface: `/desktop/workspace?id=…` (the workbench), whose agent pane
- * already consumes the handoff and auto-sends turn one. The handoff carries the
- * `dotcanvas` skill so the artwork agent knows the board format from the start,
- * even before any editor tab is open.
+ * collect several, optionally add a prompt, then start ONE project; the picked
+ * references fold into the first-turn prompt as plain context (URLs the agent
+ * can use however it decides). Every start opens the MAIN workbench
+ * (`/desktop/workspace`) — the full surface with the file tree, tool-approval,
+ * and auto-accept — whose agent pane consumes the handoff and auto-sends when
+ * there's a prompt.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  ArrowRightIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  FolderIcon,
-  PlusIcon,
-  SettingsIcon,
-  XIcon,
-} from "lucide-react";
-import { Button } from "@app/ui/components/button";
+import { XIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@app/ui/components/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@app/ui/components/popover";
 import {
   getDesktopBridge,
   workspaces as workspacesNs,
@@ -61,11 +41,11 @@ import { welcome_handoff } from "@/lib/desktop/welcome-handoff";
 import { onboarding_flag } from "@/lib/desktop/onboarding-flag";
 import { FirstRunOnboarding } from "@/scaffolds/desktop/onboarding/first-run-onboarding";
 import { dotcanvas } from "dotcanvas";
+import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
 import {
-  TitleBar,
-  TITLEBAR_NO_DRAG_STYLE,
-} from "@/scaffolds/desktop/chrome/title-bar";
-import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
+  AgentComposerInput,
+  type AgentComposerHandle,
+} from "@/scaffolds/desktop/shared/agent-composer-input";
 import {
   DesktopModelPicker,
   useModelPickerState,
@@ -74,7 +54,15 @@ import { useEndpointProviders } from "@/scaffolds/desktop/shared/registered-mode
 import type { ComposerCatalog } from "@/kits/composer";
 import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 import { ReferenceGallery } from "@/scaffolds/desktop/home/reference-gallery";
+import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-gallery";
 import { RecentProjectsCommand } from "@/scaffolds/desktop/home/recent-projects-command";
+import { WorkspacePicker } from "@/scaffolds/desktop/home/workspace-picker";
+import {
+  ApplicationPreset,
+  type ApplicationPresetId,
+} from "@/scaffolds/desktop/home/application-preset";
+import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
+import { PresetChip } from "@/scaffolds/desktop/home/preset-chip";
 import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
 
 const NOOP = () => {};
@@ -92,6 +80,23 @@ function deriveProjectName(prompt: string): string {
   return words.slice(0, 48) || "Untitled";
 }
 
+/** Fold picked references into the first-turn prompt as plain context. The
+ *  workspace starts empty — there is no seeded document to place references in
+ *  anymore — so the agent receives them as URLs and decides what to make of
+ *  them (a moodboard board, style refs for a deck, …). Returns `text` unchanged
+ *  when nothing is picked. */
+function composePromptWithRefs(
+  text: string,
+  refs: AgentDesignSearch.DesignSearchResult[]
+): string {
+  if (refs.length === 0) return text;
+  const list = refs
+    .map((r) => `- ${r.title || "reference"}: ${r.url}`)
+    .join("\n");
+  const lead = text || "Use these visual references as the starting point.";
+  return `${lead}\n\nReferences:\n${list}`;
+}
+
 export default function DesktopWelcomePage() {
   const router = useRouter();
   // The home's single page-scroll container — everything (composer, gallery)
@@ -99,12 +104,22 @@ export default function DesktopWelcomePage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The active `application_preset` (SPIKE). Mutated by the icon rail and the
+  // composer's mode chip; re-themes the one shared home (placeholder now; the
+  // gallery's visual references and the handoff seed are the next seams).
+  const [preset, setPreset] = useState<ApplicationPresetId>(
+    ApplicationPreset.DEFAULT
+  );
+  // The composer placeholder is the active preset's representative example.
+  // It swaps when the mode changes, but does not rotate.
+  const presetPlaceholder = ApplicationPreset.byId(preset).placeholder;
   // Recent-projects quick switcher (⌃R, VS Code's "Open Recent"). Keeps the
   // home minimal — no persistent recents list.
   const [commandOpen, setCommandOpen] = useState(false);
-  // The composer's target: null = create a NEW project (the default), or an
-  // existing workspace to send the prompt into instead.
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // The composer's target: null = create a NEW project under the managed root
+  // (the default, shown as "Default workspace"), or an existing workspace to
+  // send the prompt into instead. Owned here; the top-left WorkspacePicker
+  // mutates it and the composer's `start` reads it.
   const [target, setTarget] = useState<Workspace | null>(null);
   // References the user has gathered from the gallery (multi-select). They seed
   // ONE fresh board on submit; a click in the gallery toggles membership here.
@@ -122,6 +137,9 @@ export default function DesktopWelcomePage() {
   // spacer that holds its old spot so the gallery doesn't jump when it detaches.
   const composerRef = useRef<HTMLDivElement>(null);
   const composerSlotRef = useRef<HTMLDivElement>(null);
+  // Imperative handle into the composer — a slides template click prefills the
+  // draft (and focuses the caret) rather than starting a session.
+  const composerApiRef = useRef<AgentComposerHandle>(null);
   const [docked, setDocked] = useState(false);
   const [heroHeight, setHeroHeight] = useState<number>();
   // First-run onboarding (issue #813): zero-config Claude detection. Start
@@ -279,11 +297,7 @@ export default function DesktopWelcomePage() {
   );
 
   const createAndGo = useCallback(
-    async (opts: {
-      name?: string;
-      prompt: string;
-      seed?: { documents: { src: string }[] };
-    }) => {
+    async (opts: { name?: string; prompt: string }) => {
       const bridge = getDesktopBridge();
       if (!bridge) {
         setError("Desktop bridge not available.");
@@ -292,16 +306,16 @@ export default function DesktopWelcomePage() {
       try {
         setBusy(true);
         setError(null);
-        const ws = await workspacesNs.createProject({
-          name: opts.name,
-          seed: opts.seed,
-        });
+        // Create an EMPTY project — just a folder. No `.canvas`, no document:
+        // the agent creates whatever the task needs on turn one (see the file
+        // header). The workspace is only a place to work.
+        const ws = await workspacesNs.createProject({ name: opts.name });
         // Every start opens the MAIN workbench (`/desktop/workspace`) — the full
         // surface with the file tree, tool-approval bar, and auto-accept mode
-        // picker. The seeded `.canvas` board is the document the agent works on;
-        // the workbench's agent pane consumes the handoff and auto-sends when
-        // there's a prompt. (The lean board window at `/desktop/file` stays for
-        // directly opening an existing `.canvas`/file — Finder, ⌃R, File ▸ Open.)
+        // picker. The workbench's agent pane consumes the handoff and auto-sends
+        // the prompt as turn one; the agent's first act is to create the
+        // document. (The lean board window at `/desktop/file` stays for directly
+        // opening an existing `.canvas`/file — Finder, ⌃R, File ▸ Open.)
         handoffAndGo(ws, opts.prompt);
       } catch (err) {
         setError(
@@ -314,8 +328,9 @@ export default function DesktopWelcomePage() {
   );
 
   // The one "start" path, shared by the composer's send and the reference
-  // tray's Start button. References (if any) always seed a fresh board and take
-  // precedence over the target picker — they're only meaningful for a new board.
+  // tray's Start button. Picked references (if any) fold into the first-turn
+  // prompt as context and always start a FRESH project — they take precedence
+  // over the target picker, since they're only meaningful for a new start.
   const start = useCallback(
     (text: string) => {
       const t = text.trim();
@@ -323,8 +338,7 @@ export default function DesktopWelcomePage() {
       if (pickedRefs.length > 0) {
         void createAndGo({
           name: t ? deriveProjectName(t) : pickedRefs[0]?.title || "Artwork",
-          prompt: t,
-          seed: { documents: pickedRefs.map((p) => ({ src: p.url })) },
+          prompt: composePromptWithRefs(t, pickedRefs),
         });
         return;
       }
@@ -335,11 +349,6 @@ export default function DesktopWelcomePage() {
     },
     [busy, pickedRefs, target, handoffAndGo, createAndGo]
   );
-
-  const onStartBlank = useCallback(() => {
-    if (busy) return;
-    void createAndGo({ prompt: "" });
-  }, [busy, createAndGo]);
 
   // Clicking a gallery reference toggles it in the composer's tray (multi-select)
   // instead of starting a board on its own — the user gathers several, then
@@ -354,6 +363,13 @@ export default function DesktopWelcomePage() {
     },
     []
   );
+
+  // Clicking a slides template doesn't start a session — it just prefills the
+  // composer with the template's prompt and returns focus to the input, so the
+  // user reviews/tweaks it and sends when ready (setText focuses the caret).
+  const useTemplate = useCallback((prompt: string) => {
+    composerApiRef.current?.setText(prompt);
+  }, []);
 
   const onOpen = useCallback(async () => {
     const bridge = getDesktopBridge();
@@ -400,245 +416,165 @@ export default function DesktopWelcomePage() {
           }}
         />
       )}
-      <TitleBar>
-        <div
-          className="ml-auto flex items-center gap-0.5"
-          style={TITLEBAR_NO_DRAG_STYLE}
-        >
-          <Button
-            asChild
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Settings"
-            title="Settings"
-          >
-            <Link href="/desktop/settings" prefetch={false}>
-              <SettingsIcon />
-            </Link>
-          </Button>
-        </div>
-      </TitleBar>
+      {/* Bare drag region — Settings moved to the rail footer below. */}
+      <TitleBar />
 
-      {/* One page-scroll container — composer hero then gallery scroll together
-          (no nested scroll); the gallery virtualizes against this element. */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 pb-10 pt-[14vh]">
-          {/* Composer slot — narrow and centered; the gallery below spans the
+      {/* Home-scoped icon rail + the shared home surface. The rail lives BELOW
+          the title bar (so it never collides with the macOS traffic lights) and
+          only mutates the active preset — it is not app-wide chrome. */}
+      <div className="flex min-h-0 flex-1">
+        <PresetRail value={preset} onChange={setPreset} />
+
+        {/* One page-scroll container — composer hero then gallery scroll
+            together (no nested scroll); the gallery virtualizes against this. */}
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          {/* Top-left workspace picker — where a start lands (the managed
+              ~/Documents/Grida root by default, shown as "Default workspace")
+              or which existing project to aim at. Borderless + friendly;
+              replaces the old picker-above-composer + "start blank" row. */}
+          <div className="px-3 pt-3">
+            <WorkspacePicker
+              value={target}
+              onChange={setTarget}
+              workspaces={workspaces}
+              onOpenFolder={onOpen}
+            />
+          </div>
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pb-10">
+            {/* Composer hero — a generous top offset drops the input to roughly
+              mid-screen, but the space below stays tight so the gallery sits
+              close beneath it (not an even top/bottom split) and peeks in to
+              invite the scroll that docks the composer. */}
+            <div className="flex flex-col pt-[30vh]">
+              {/* Composer slot — narrow and centered; the gallery below spans the
               wider container. This slot stays in flow and is what the dock
               observer watches; once the composer floats it reserves `heroHeight`
               so detaching doesn't jump the gallery up. */}
-          <div
-            ref={composerSlotRef}
-            className="mx-auto w-full max-w-2xl"
-            style={docked ? { height: heroHeight } : undefined}
-          >
-            {/* The composer itself. In the hero it's a plain in-flow block; once
+              <div
+                ref={composerSlotRef}
+                className="mx-auto w-full max-w-2xl"
+                style={docked ? { height: heroHeight } : undefined}
+              >
+                {/* The composer itself. In the hero it's a plain in-flow block; once
                 docked it becomes a floating card fixed to the bottom, sliding up
                 on entry. It's the SAME element in both states, so the Tiptap
                 draft, focus, and caret carry across the transition. */}
-            <div
-              ref={composerRef}
-              className={cn(
-                "flex flex-col gap-2",
-                docked &&
-                  "fixed inset-x-4 bottom-4 z-30 mx-auto max-w-2xl rounded-xl border bg-background/95 p-2 shadow-lg backdrop-blur-sm duration-200 animate-in fade-in slide-in-from-bottom-4"
-              )}
-            >
-              {/* Target picker + blank, above the input. */}
-              <div className="flex items-center gap-3 px-1">
-                <Popover open={pickerOpen} onOpenChange={setPickerOpen} modal>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      role="combobox"
-                      aria-expanded={pickerOpen}
-                      className="max-w-[16rem] gap-1.5"
-                    >
-                      {target ? (
-                        <FolderIcon className="size-3.5 shrink-0" />
-                      ) : (
-                        <PlusIcon className="size-3.5 shrink-0" />
-                      )}
-                      <span className="min-w-0 truncate">
-                        {target?.name ?? "New project"}
-                      </span>
-                      <ChevronDownIcon className="size-3.5 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  {/* Radix flips on collision, so this opens down in the hero and
-                      up when the composer is docked at the bottom. */}
-                  <PopoverContent align="start" className="w-72 p-0">
-                    <Command>
-                      <CommandInput placeholder="Search projects…" />
-                      <CommandList>
-                        <CommandEmpty>No project found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            value="new project"
-                            onSelect={() => {
-                              setTarget(null);
-                              setPickerOpen(false);
-                            }}
-                          >
-                            <PlusIcon className="text-muted-foreground" />
-                            New project
-                            {target === null && (
-                              <CheckIcon className="ml-auto size-4" />
-                            )}
-                          </CommandItem>
-                        </CommandGroup>
-                        {workspaces.length > 0 && (
-                          <CommandGroup heading="Recent">
-                            {workspaces.map((w) => (
-                              <CommandItem
-                                key={w.id}
-                                value={`${w.name} ${w.root}`}
-                                onSelect={() => {
-                                  setTarget(w);
-                                  setPickerOpen(false);
-                                }}
-                              >
-                                <FolderIcon className="text-muted-foreground" />
-                                <span className="min-w-0 flex-1 truncate">
-                                  {w.name}
-                                </span>
-                                {target?.id === w.id && (
-                                  <CheckIcon className="ml-auto size-4" />
-                                )}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        )}
-                        <CommandGroup>
-                          <CommandItem
-                            value="open folder existing project"
-                            onSelect={() => {
-                              setPickerOpen(false);
-                              void onOpen();
-                            }}
-                          >
-                            Open folder…
-                          </CommandItem>
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {/* Hidden while references are picked: "blank" means blank, and
-                    rendering it would either silently drop the gathered picks or
-                    duplicate the tray's Start — the tray owns starting then. */}
-                {pickedRefs.length === 0 && (
-                  <button
-                    type="button"
-                    onClick={onStartBlank}
-                    disabled={busy}
-                    className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
-                  >
-                    or start with a blank
-                  </button>
-                )}
-              </div>
-              {/* Picked-references tray — the gallery drops pins here so several
-                  can be gathered before starting one board from all of them. A
-                  single horizontal scroll row keeps the composer compact — which
-                  matters most once it's floating. */}
-              {pickedRefs.length > 0 && (
-                <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-2">
-                  <div className="flex items-center justify-between px-1">
-                    <span className="text-xs text-muted-foreground">
-                      {pickedRefs.length} reference
-                      {pickedRefs.length > 1 ? "s" : ""} selected — add a
-                      prompt, or just start
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPickedRefs([])}
-                        className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-                      >
-                        Clear
-                      </button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => start("")}
-                        disabled={busy}
-                        className="h-6 gap-1 px-2 text-xs"
-                      >
-                        Start
-                        <ArrowRightIcon className="size-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 overflow-x-auto">
-                    {pickedRefs.map((p) => (
-                      <div
-                        key={p.id}
-                        className="group relative size-16 shrink-0 overflow-hidden rounded-md border"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={p.url}
-                          alt={p.title}
-                          className="size-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => togglePick(p)}
-                          aria-label={`Remove ${p.title}`}
-                          className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 shadow transition group-hover:opacity-100"
-                        >
-                          <XIcon className="size-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <AgentComposerInput
-                catalog={EMPTY_CATALOG}
-                onSubmit={start}
-                isStreaming={false}
-                onStop={NOOP}
-                autofocus
-                placeholder={
-                  pickedRefs.length > 0
-                    ? "Describe what to make from these references…"
-                    : target
-                      ? `Ask Grida to design something in ${target.name}…`
-                      : "Describe an image to create, or start from a reference…"
-                }
-                toolbar={
-                  <DesktopModelPicker
-                    value={modelId}
-                    onValueChange={setModelId}
-                    endpoints={endpoints}
-                  />
-                }
-              />
-              {/* Kept inside the composer so a submit error is visible even when
-                  the composer is floating (docked). */}
-              {error && (
-                <p
-                  role="alert"
-                  className="px-1 text-center text-xs text-destructive"
-                  onClick={() => setError(null)}
+                <div
+                  ref={composerRef}
+                  className={cn(
+                    "flex flex-col gap-2",
+                    // Docked: the composer floats as a bare bottom bar — no card
+                    // wrapper (no extra border/background/padding). It's just the
+                    // input itself, lifted with a shadow (applied to the input
+                    // below), so it reads as floating over the gallery rather than
+                    // boxed in a panel. The references tray rides in the same stack.
+                    docked &&
+                      "fixed inset-x-4 bottom-4 z-30 mx-auto max-w-2xl duration-200 animate-in fade-in slide-in-from-bottom-4"
+                  )}
                 >
-                  {error}
-                </p>
+                  {/* Picked-references tray — a bare, compact row of thumbnails:
+                  no panel, no label, no Clear/Start. Membership IS the state, so
+                  each pin just removes on its hover-X, and starting is the
+                  composer's own send. When docked the row floats above the input
+                  in the same stack — same design language, lifted by shadow, not
+                  boxed in a container. */}
+                  {pickedRefs.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto pb-0.5">
+                      {pickedRefs.map((p) => (
+                        <div
+                          key={p.id}
+                          className="group relative size-14 shrink-0 overflow-hidden rounded-lg border bg-background shadow-sm"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={p.url}
+                            alt={p.title}
+                            className="size-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePick(p)}
+                            aria-label={`Remove ${p.title}`}
+                            className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 shadow transition group-hover:opacity-100"
+                          >
+                            <XIcon className="size-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <AgentComposerInput
+                    catalog={EMPTY_CATALOG}
+                    apiRef={composerApiRef}
+                    // Docked: lift the input on its own shadow so it floats over
+                    // the gallery — there's no card wrapper doing it anymore.
+                    className={docked ? "shadow-xl" : undefined}
+                    onSubmit={start}
+                    isStreaming={false}
+                    onStop={NOOP}
+                    autofocus
+                    placeholder={
+                      pickedRefs.length > 0
+                        ? "Describe what to make from these references…"
+                        : target
+                          ? `Ask Grida to design something in ${target.name}…`
+                          : presetPlaceholder
+                    }
+                    toolbar={
+                      <>
+                        <PresetChip value={preset} onChange={setPreset} />
+                        <DesktopModelPicker
+                          value={modelId}
+                          onValueChange={setModelId}
+                          endpoints={endpoints}
+                        />
+                      </>
+                    }
+                  />
+                  {/* Kept inside the composer so a submit error is visible even when
+                  the composer is floating (docked). */}
+                  {error && (
+                    <p
+                      role="alert"
+                      className="px-1 text-center text-xs text-destructive"
+                      onClick={() => setError(null)}
+                    >
+                      {error}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Gallery — preset-aware. The library corpus (image/video pins)
+              fits general/image/video, so those share the reference gallery.
+              Slides swaps in the bundled starter templates instead — real
+              `.canvas` decks served from /templates/slides/ (the
+              `public/slides-templates` publishing unit; loaded lazily by
+              `slides-template-loader.ts`). Filtering the library corpus PER
+              preset (image vs video) is a separate later seam. Both are part
+              of the single page scroll (the reference gallery virtualizes
+              against it). The "Ideas" label is universal — it heads whichever
+              gallery renders. */}
+            <div>
+              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                Start from an idea
+              </h2>
+              {preset === "slides" ? (
+                <SlidesTemplateGallery
+                  onUseTemplate={useTemplate}
+                  disabled={busy}
+                />
+              ) : (
+                <ReferenceGallery
+                  onPick={togglePick}
+                  selectedIds={selectedRefIds}
+                  disabled={busy}
+                  scrollContainerRef={scrollRef}
+                />
               )}
             </div>
           </div>
-
-          {/* Reference gallery — part of the single page scroll (virtualizes
-              against the scroll container above). */}
-          <ReferenceGallery
-            onPick={togglePick}
-            selectedIds={selectedRefIds}
-            disabled={busy}
-            scrollContainerRef={scrollRef}
-          />
         </div>
       </div>
 

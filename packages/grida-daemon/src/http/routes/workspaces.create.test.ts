@@ -3,11 +3,11 @@
  * Contract pins — auto-create route `POST /workspaces/create` (GRIDA-SEC-004).
  *
  * The desktop home's "auto-create, ask nothing" flow posts here to mint a fresh
- * project (a folder under the host's managed root) seeded with a `.canvas`
- * board. What must hold: it creates + registers a project, the seed is
- * field-constrained (only `src` + a numeric layout box reach the manifest — no
- * raw-manifest injection), a hostile `name` can't escape the managed root, and
- * a host without a managed root refuses with a 400.
+ * EMPTY project (a folder under the host's managed root). No document is
+ * seeded — the agent creates that on its first turn, so the route has no seed
+ * body to field-constrain. What must hold: it creates + registers an empty
+ * project, a hostile `name` can't escape the managed root, and a host without a
+ * managed root refuses with a 400.
  *
  * Routes are registered onto a bare Hono app and driven via `app.request()`.
  */
@@ -47,67 +47,30 @@ describe("POST /workspaces/create (auto-create)", () => {
       body: JSON.stringify(jsonBody),
     });
 
-  // The manifest lives inside the `<name>.canvas` bundle dir, not at the root.
-  const readManifest = async (root: string) =>
-    JSON.parse(
-      await fs.readFile(
-        path.join(root, `${path.basename(root)}.canvas`, ".canvas.json"),
-        "utf8"
-      )
-    );
-
-  it("creates + registers a project seeded with a board manifest", async () => {
+  it("creates + registers an EMPTY project (no seeded document)", async () => {
     const res = await post(app, { name: "Poster" });
     expect(res.status).toBe(200);
     const ws = await res.json();
     expect(ws.name).toBe("Poster");
-    const manifest = await readManifest(ws.root);
-    expect(manifest.editor).toBe("board");
-    expect(manifest.documents).toEqual([]);
+    // The project folder is empty — the host seeds nothing; the agent creates
+    // whatever document the task needs on its first turn.
+    expect(await fs.readdir(ws.root)).toEqual([]);
   });
 
-  it("field-constrains the seed: only src + numeric layout survive", async () => {
+  it("ignores an unexpected `seed` body — no document reaches disk", async () => {
+    // A stale/hostile client might still post a `seed`. It must be inert: the
+    // route no longer accepts it, so the project stays empty (no injection).
     const res = await post(app, {
       name: "Ref",
       seed: {
         documents: [
-          {
-            src: "https://library.grida.co/ref.png",
-            layout: { x: 1, y: 2, evil: "rm -rf" },
-            skip: true,
-            thumbnail: "../../etc/passwd",
-          },
-          { notsrc: "dropme" }, // no src → dropped
-          "junk", // not an object → dropped
+          { src: "https://library.grida.co/ref.png", evil: "rm -rf" },
         ],
       },
     });
     expect(res.status).toBe(200);
     const ws = await res.json();
-    const manifest = await readManifest(ws.root);
-    expect(manifest.documents).toEqual([
-      { src: "https://library.grida.co/ref.png", layout: { x: 1, y: 2 } },
-    ]);
-    // The smuggled top-level fields never reached the manifest.
-    expect(manifest.documents[0].skip).toBeUndefined();
-    expect(manifest.documents[0].thumbnail).toBeUndefined();
-  });
-
-  it("caps seed documents at 500: exactly 500 passes, 501 rejects", async () => {
-    const docs = (n: number) =>
-      Array.from({ length: n }, (_, i) => ({
-        src: `https://library.grida.co/${i}.png`,
-      }));
-    const atCap = await post(app, {
-      name: "AtCap",
-      seed: { documents: docs(500) },
-    });
-    expect(atCap.status).toBe(200);
-    const overCap = await post(app, {
-      name: "Flood",
-      seed: { documents: docs(501) },
-    });
-    expect(overCap.status).toBe(400);
+    expect(await fs.readdir(ws.root)).toEqual([]);
   });
 
   it("slugifies a traversal name so it stays inside the managed root", async () => {

@@ -38,20 +38,14 @@ export type WorkspaceFsEntry = {
 };
 
 /**
- * Wire input for `POST /workspaces/create` (auto-create). A field-constrained
- * board seed — only a document's `src` (a bundle-relative path or an `https://`
- * reference) and an optional layout box, never a raw manifest (GRIDA-SEC-004).
- * The host re-validates this shape server-side before it touches disk.
+ * Wire input for `POST /workspaces/create` (auto-create). Creates an EMPTY
+ * project directory — no document is seeded. Whether the workspace becomes a
+ * board, a slides deck, or a tree of files is the agent's choice on its first
+ * turn, not the caller's; so there is nothing here to inject (GRIDA-SEC-004).
  */
-export type WorkspaceCreateSeedDocument = {
-  src: string;
-  layout?: { x?: number; y?: number; w?: number; h?: number; z?: number };
-};
 export type WorkspaceCreateInput = {
   /** Friendly name → slugified into the folder segment. Defaults to "Untitled". */
   name?: string;
-  /** Documents to place on the fresh board (e.g. a picked reference). */
-  seed?: { documents: WorkspaceCreateSeedDocument[] };
 };
 
 export type WorkspaceReadFileResult = {

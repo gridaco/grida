@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="ap-art-video" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d4f4a" />
+      <stop offset="1" stop-color="#a67c6d" />
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#ap-art-video)" />
+  <circle cx="160" cy="90" r="40" fill="#f3f0ea" fill-opacity="0.16" />
+  <circle cx="160" cy="90" r="30" fill="#f3f0ea" />
+  <path d="M152 76 L178 90 L152 104 Z" fill="#6d4f4a" />
+</svg>

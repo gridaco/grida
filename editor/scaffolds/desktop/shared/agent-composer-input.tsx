@@ -19,10 +19,12 @@
 import {
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
   type ReactNode,
+  type Ref,
 } from "react";
 import { ArrowUpIcon, SquareIcon } from "lucide-react";
 import type { FileUIPart } from "ai";
@@ -51,8 +53,17 @@ export type ComposerCommandAction = {
   run: () => void | Promise<void>;
 };
 
+/** Imperative handle for the host to drive the composer's draft — e.g.
+ *  prefilling it from a slides template and focusing the caret. */
+export type AgentComposerHandle = {
+  setText: (text: string) => void;
+};
+
 export type AgentComposerInputProps = {
   catalog: ComposerCatalog;
+  /** Imperative handle (see {@link AgentComposerHandle}). Lives inside the
+   *  composer provider, so it's wired from the inner component. */
+  apiRef?: Ref<AgentComposerHandle>;
   /** Action `/`-commands (e.g. `/compact`). Merged into the menu, ahead
    *  of the catalog's own commands, and intercepted on submit. */
   commandActions?: ComposerCommandAction[];
@@ -113,6 +124,7 @@ export function AgentComposerInput({
 
 function AgentComposerInner({
   commandActions,
+  apiRef,
   onSubmit,
   isStreaming,
   busy,
@@ -129,6 +141,15 @@ function AgentComposerInner({
   const isBusy = busy ?? isStreaming;
   const composer = useComposer();
   const { addAttachment } = composer;
+
+  // Expose a thin imperative handle so the host can prefill the draft (e.g. a
+  // slides template) and focus the caret — the composer controller lives inside
+  // the provider, so this is the only place with access to it.
+  useImperativeHandle(
+    apiRef,
+    () => ({ setText: (text: string) => composer.setText(text) }),
+    [composer]
+  );
 
   const actionById = useMemo(() => {
     const map = new Map<string, ComposerCommandAction>();

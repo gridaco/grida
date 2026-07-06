@@ -645,12 +645,12 @@ first-party public read-only storage, and the product keeps its pins as URLs.
 
 **Auto-created projects (managed root).** The reference-first home lets a
 newcomer start without choosing a folder: it posts to `POST /workspaces/create`,
-which mints a new project directory and seeds a `.canvas` bundle (a
-`<name>.canvas` dir + manifest inside it). This adds a new
-renderer-reachable **write** authority (previously the renderer could only
-register a folder the user had already picked through the OS dialog), so it is
-recorded here. The boundary holds by four rules, none of which trust the caller
-for a path: (a) the managed root is **host-injected** — the supervisor passes
+which mints a new **empty** project directory (just the folder — no `.canvas`,
+no manifest, no document of any kind). This adds a new renderer-reachable
+**write** authority (previously the renderer could only register a folder the
+user had already picked through the OS dialog), so it is recorded here. The
+boundary holds by three rules, none of which trust the caller for a path: (a)
+the managed root is **host-injected** — the supervisor passes
 `--projects-root=<~/Documents/Grida>` (`desktop/src/main/agent-sidecar-supervisor.ts`),
 never derived from the request; a host that wired no root refuses with a 400.
 (b) The request's `name` is **slugified to a single filesystem segment**
@@ -658,15 +658,18 @@ never derived from the request; a host that wired no root refuses with a 400.
 `..`, NUL, and control chars cannot survive, so it can never be a path. (c) The
 minted directory's realpath is **asserted strictly under the managed root** via
 the shared `containsPath` (`path-contains.ts` — the same prefix+sep discipline
-as the shell runner's root gates); an escape is removed and rejected. (d)
-The `seed` is **field-constrained** (`seedValidator` in
-`http/routes/workspaces.ts`) to `{ src, layout? }` documents — a raw dotcanvas
-manifest never reaches disk, so the route is not a manifest-injection vector.
+as the shell runner's root gates); an escape is removed and rejected. There is
+**no `seed` field** anymore: the route body is `{ name? }` only, and the
+registry writes nothing but the directory, so the earlier manifest-injection
+surface is removed outright rather than field-constrained — whatever document
+the workspace eventually holds is created by the AGENT through its own
+already-bound (and separately-gated) fs write capability, not by this route.
 The sidecar's own `fs` writes are not srt-confined (srt wraps only the
 `run_command` shell child), and a created project registers as a workspace root
 the shell fs-policy already unions — so this adds no new reachable root for the
 sandboxed shell. `workspaces.create.test.ts` pins traversal-name containment,
-seed field-constraining, and the no-managed-root refusal.
+that the created project is empty (an unexpected `seed` body is inert), and the
+no-managed-root refusal.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 Today:

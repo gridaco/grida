@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# synced from the repo-root public/ origin tree (see /public/README.md)
+/public/templates/
+
 # production
 /build
 

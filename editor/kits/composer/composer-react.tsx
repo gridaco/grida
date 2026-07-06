@@ -45,6 +45,9 @@ export type ComposerController = {
   removeAttachment: ComposerCore["removeAttachment"];
   setContexts: ComposerCore["setContexts"];
   clear: () => void;
+  /** Replace the whole draft with `text` and focus the caret at the end — e.g.
+   *  prefilling the composer from a template / quick reply. */
+  setText: (text: string) => void;
   insertFileReference: (reference: ComposerFileReference) => boolean;
   setTriggerIndex: (index: number) => void;
   moveTriggerIndex: (delta: number) => void;
@@ -119,6 +122,11 @@ export function useComposer() {
       clear() {
         editor?.commands.clearContent(true);
         core.clear();
+      },
+      setText(text) {
+        if (!editor) return;
+        editor.commands.setContent(text);
+        editor.commands.focus("end");
       },
       insertFileReference(reference) {
         if (!editor) return false;
@@ -254,6 +262,23 @@ export function ComposerContent({
       setEditor(null);
     },
   });
+
+  // Keep the placeholder reactive. `useEditor` builds the editor once, so a
+  // changed `placeholder` prop never reconfigures the Placeholder extension on
+  // its own — the rendered `data-placeholder` would stay frozen at first mount
+  // (e.g. the desktop home switching modes). Update the extension's option in
+  // place and dispatch a no-op transaction so ProseMirror recomputes the
+  // placeholder decoration, preserving focus, selection, and the draft (unlike
+  // recreating the editor, which would also thrash on any rotation).
+  useEffect(() => {
+    if (!editor) return;
+    const ext = editor.extensionManager.extensions.find(
+      (e) => e.name === "placeholder"
+    );
+    if (!ext || ext.options.placeholder === placeholder) return;
+    ext.options.placeholder = placeholder;
+    editor.view.dispatch(editor.state.tr);
+  }, [editor, placeholder]);
 
   useEffect(() => {
     if (!editor) return;

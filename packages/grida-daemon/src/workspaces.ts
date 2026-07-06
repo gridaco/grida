@@ -43,40 +43,8 @@ export type Workspace = {
   pinned: boolean;
 };
 
-/**
- * A field-constrained board seed for {@link WorkspaceRegistry.createProject}.
- * Deliberately NOT a raw dotcanvas manifest — only a document's `src` (a
- * bundle-relative path or an `https://` reference) and an optional layout box.
- * Keeping the shape this narrow is what stops the `/workspaces/create` route
- * from being a manifest-injection vector (GRIDA-SEC-004).
- */
-export type ProjectSeedDocument = {
-  src: string;
-  layout?: { x?: number; y?: number; w?: number; h?: number; z?: number };
-};
-export type ProjectSeed = { documents: ProjectSeedDocument[] };
-
 const FILE_NAME = "workspaces.json";
 const MAX_ENTRIES = 100;
-
-/**
- * The dotcanvas manifest filename (mirrors `dotcanvas.MANIFEST_FILENAME`).
- * Inlined rather than imported so the sidecar doesn't pull in the whole
- * `dotcanvas` package just to write a two-key seed — the shape below is the
- * stable v1 contract the reader heals against.
- */
-const MANIFEST_FILENAME = ".canvas.json";
-
-/**
- * The dotcanvas bundle directory extension (mirrors `dotcanvas.BUNDLE_EXTENSION`).
- * A bundle is a *directory* whose name ends with this — the macOS-package
- * convention. Naming the seeded dir `<name>.canvas` is what makes the board
- * RECOGNIZABLE: the file tree renders it as an openable bundle
- * (`dotcanvas.isBundlePath`) and the workbench opens it as a board tab. A bare
- * `.canvas.json` at the workspace root would just be a JSON file to the tree.
- * Inlined (not imported) for the same reason as {@link MANIFEST_FILENAME}.
- */
-const BUNDLE_EXTENSION = ".canvas";
 
 export class WorkspaceRegistry {
   private entries: Workspace[] = [];
@@ -174,27 +142,29 @@ export class WorkspaceRegistry {
   }
 
   /**
-   * GRIDA-SEC-004 — auto-create a fresh project: mint a new directory under the
-   * host-injected {@link projects_root}, seed it with a real `.canvas` bundle
-   * (a `<name>.canvas` dir + manifest), and register it (via {@link open}, so id/name/persistence rules
-   * stay single-sourced). Powers the desktop home's "auto-create, ask nothing"
-   * flow — clicking a template or picking a reference lands the user in a board
-   * without ever choosing a folder.
+   * GRIDA-SEC-004 — auto-create a fresh project: mint a new EMPTY directory
+   * under the host-injected {@link projects_root} and register it (via
+   * {@link open}, so id/name/persistence rules stay single-sourced). Powers the
+   * desktop home's "auto-create, ask nothing" flow — describing what you want
+   * lands you in a project without ever choosing a folder.
+   *
+   * The project is deliberately EMPTY: no `.canvas` board, no manifest, no
+   * document of any kind. Whether the workspace becomes a board, a slides deck,
+   * or a tree of files is the AGENT's choice, made on its first turn (guided by
+   * the advertised skills) — not the host's. A workspace is just a place to
+   * work; the document is created by the agent. (Pre-seeding a `.canvas` here
+   * is what mis-steered decks onto boards; deferring to the agent is the fix,
+   * and it also removes the seed as a manifest-injection surface entirely.)
    *
    * Safety (never trust the caller for a path):
    *   - `name` is SLUGIFIED to a single filesystem segment — path separators,
    *     `..`, NUL, and control chars can't survive, so it can never be a path.
    *   - the created dir is `realpath`'d and asserted to sit under the (also
    *     `realpath`'d) managed root; anything else is removed and rejected.
-   *   - the `seed` is field-constrained ({@link ProjectSeed}) — only `src` +
-   *     an optional layout box reach the manifest, never a raw manifest.
    *
    * Throws `projects-root-not-configured` on a host that didn't wire a root.
    */
-  async createProject(opts: {
-    name?: string;
-    seed?: ProjectSeed;
-  }): Promise<Workspace> {
+  async createProject(opts: { name?: string }): Promise<Workspace> {
     if (!this.projects_root) {
       throw new Error("projects-root-not-configured");
     }
@@ -215,25 +185,12 @@ export class WorkspaceRegistry {
       throw new Error("project-path-escapes-root");
     }
 
-    // The project is a plain workspace CONTAINER that holds a real dotcanvas
-    // BUNDLE — a `<name>.canvas` directory with the manifest inside it — NOT a
-    // loose `.canvas.json` at the root. That distinction is what makes the board
-    // recognizable: the file tree shows the `.canvas` dir as an openable bundle
-    // (`dotcanvas.isBundlePath`) and the workbench opens it as a board tab; a
-    // root-level manifest is just JSON to the tree. Keeping the manifest OUT of
-    // the workspace root also means the reopen path (menu/⌃R, which sniff root
-    // `.canvas.json`) lands on the workbench too, matching the create flow.
-    const bundleDir = path.join(
-      realDir,
-      `${path.basename(realDir)}${BUNDLE_EXTENSION}`
-    );
+    // The project is an EMPTY workspace CONTAINER — just the directory. No
+    // `.canvas` bundle, no manifest: the agent creates whatever document the
+    // task calls for on its first turn (see the doc comment). The mint is
+    // already on disk (`mintProjectDir` created it), so all that remains is to
+    // register it.
     try {
-      await fs.mkdir(bundleDir, { recursive: false });
-      await atomicWrite(
-        path.join(bundleDir, MANIFEST_FILENAME),
-        buildSeedManifest(opts.seed),
-        { mode: 0o644 }
-      );
       // Register through `open` so the id (sha256(realpath)[:16]) and recents
       // bookkeeping stay identical to a user-opened folder.
       return await this.open(realDir);
@@ -242,7 +199,7 @@ export class WorkspaceRegistry {
       // persist error) — otherwise an orphaned half-project lingers on disk,
       // unregistered, squatting the slug for the next create. Recursive rm is
       // safe here: `realDir` is containment-asserted above and we created it
-      // fresh this call, so it holds nothing but our own partial seed.
+      // fresh this call, so it holds nothing but our own empty dir.
       await fs.rm(realDir, { recursive: true, force: true }).catch(() => {});
       throw err;
     }
@@ -404,27 +361,6 @@ function slugifyProjectName(name?: string): string {
     .trim()
     .replace(/\.+$/, ""); // the length cap can re-expose a trailing dot
   return cleaned || "Untitled";
-}
-
-/**
- * Serialize a `.canvas` board manifest for a freshly-created project. Mirrors
- * the dotcanvas v1 board shape (see `fixtures/test-canvas/board.canvas`): an
- * `https://` `src` is a first-class placed reference (used as-is), a relative
- * `src` is a bundle file. Only `src` + an optional layout box are emitted — the
- * seed is field-constrained upstream, so nothing else can reach disk.
- */
-function buildSeedManifest(seed?: ProjectSeed): string {
-  const documents = (seed?.documents ?? []).map((d) => ({
-    src: d.src,
-    ...(d.layout ? { layout: d.layout } : {}),
-  }));
-  const manifest = {
-    $schema: "https://grida.co/schema/dotcanvas/v1.json",
-    version: "1",
-    editor: "board",
-    documents,
-  };
-  return JSON.stringify(manifest, null, 2) + "\n";
 }
 
 // `workspaceFs` is NOT re-exported here (de-barreled): import it directly

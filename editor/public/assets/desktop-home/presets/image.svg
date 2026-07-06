@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="ap-art-image" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3f3b5e" />
+      <stop offset="1" stop-color="#6c6690" />
+    </linearGradient>
+    <clipPath id="ap-art-image-clip">
+      <rect x="94" y="48" width="132" height="84" rx="14" />
+    </clipPath>
+  </defs>
+  <rect width="320" height="180" fill="url(#ap-art-image)" />
+  <rect x="94" y="48" width="132" height="84" rx="14" fill="#f3f0ea" />
+  <g clip-path="url(#ap-art-image-clip)">
+    <circle cx="126" cy="76" r="12" fill="#d6b183" />
+    <path d="M94 132 L138 96 L166 116 L200 88 L226 132 Z" fill="#ada6c6" />
+  </g>
+</svg>
