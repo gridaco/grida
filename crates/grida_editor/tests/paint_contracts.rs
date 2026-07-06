@@ -360,3 +360,32 @@ fn stroke_dash_number_toggles_solid_dashed() {
         "0 clears to solid"
     );
 }
+
+/// Editing the dash length must not collapse a multi-segment pattern:
+/// the panel edits the first entry in place, so `[4, 2]` keeps its gap.
+#[test]
+fn stroke_dash_preserves_gap_segments() {
+    let mut editor = editor_with_fills(vec![solid(0, 0, 0, 255)]);
+    editor
+        .dispatch(
+            vec![Mutation::Patch {
+                id: "r".to_string(),
+                set: Box::new(PropPatch {
+                    stroke_dash: Some(vec![4.0, 2.0]),
+                    ..Default::default()
+                }),
+            }],
+            Origin::Local,
+            Recording::Silent,
+        )
+        .unwrap();
+    bind::apply(
+        &mut editor,
+        &commit(BindingProperty::StrokeDash, None, BindingValue::Number(6.0)),
+    );
+    assert_eq!(
+        editor.node_stroke_dash(&"r".to_string()),
+        Some(vec![6.0, 2.0]),
+        "editing the first length preserves the trailing gap"
+    );
+}

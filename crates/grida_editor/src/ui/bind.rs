@@ -500,11 +500,23 @@ fn patch_for(
             })
         }
         (BindingProperty::StrokeDash, value) => {
-            // A single dash length: 0 clears (solid), > 0 sets `[n]`.
-            let current = editor.node_stroke_dash(id)?.first().copied().unwrap_or(0.0);
+            // The panel edits the first dash length; preserve any remaining
+            // segments (e.g. the gap in `[4, 2]`) by editing element 0 in
+            // place. 0 clears the pattern entirely (solid stroke).
+            let mut dashes = editor.node_stroke_dash(id)?;
+            let current = dashes.first().copied().unwrap_or(0.0);
             let n = resolve_number(value, current)?.max(0.0);
+            if n > 0.0 {
+                if dashes.is_empty() {
+                    dashes.push(n);
+                } else {
+                    dashes[0] = n;
+                }
+            } else {
+                dashes.clear();
+            }
             Some(PropPatch {
-                stroke_dash: Some(if n > 0.0 { vec![n] } else { Vec::new() }),
+                stroke_dash: Some(dashes),
                 ..Default::default()
             })
         }
