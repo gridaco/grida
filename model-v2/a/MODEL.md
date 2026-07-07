@@ -76,7 +76,7 @@ Why this shape is right, per the evidence:
    contributions, hug, derived unions) never reads rotation or flips;
    the read tier (world AABBs, selection, hit) stays oriented. The
    normative rule set incl. the V-4 group-box fork:
-   [`a/dec0-visual-only.md`](./a/dec0-visual-only.md). The E1 arm
+   [`dec0-visual-only.md`](./dec0-visual-only.md). The E1 arm
    (oriented-AABB participation) remains implemented and tested as the
    documented alternative.
 

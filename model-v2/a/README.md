@@ -6,7 +6,7 @@ This directory hosts the experiments, spikes, and spec drafts for
 **self-sufficient for session re-entry after context compaction** — read it
 top to bottom and you have working state.
 
-> **2026-07-07 — the ledger has been RUN.** E1–E7 are complete with
+> **2026-07-07 — the ledger has been RUN.** E1–E7 and E10 are complete with
 > verdicts; the lab implementation lives in [`lab/`](./lab) (**114** conformance-derived tests green). Start at **[`REPORT.md`](./REPORT.md)**
 > — win/lose/lessons-learnt and the fourteen spec deltas (E-A1…E-A14 + Taffy
 > guards). The consolidated model statement — the phase-3 seed — is
@@ -14,12 +14,12 @@ top to bottom and you have working state.
 
 ## State of decisions (compressed)
 
-| decision      | state                                                                                                                                                                                     | where                                                                      |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Main model    | **`anchor`** — intent-canonical anchored box model                                                                                                                                        | [`../models/a.md`](../models/a.md) (the model spec draft)                  |
-| How decided   | 32-question model-blind owner triage; deciders: canvas-truth (#1) + "the CSS path already exists as the `htmlcss` engine; the new taxonomy exists to be a new editor-first standard" (#6) | [`../triage.md`](../triage.md), instrument: [`../survey.md`](../survey.md) |
-| Retired       | `sheet` (adopt-CSS — its domain is the existing htmlcss engine), `bake` (post-T1), `wire` (deferred; re-enters additively via `Pin.to`)                                                   | [`../finale.md`](../finale.md), [`../models/`](../models/)                 |
-| ~~Open fork~~ | rotation-in-flow — **DECIDED: layout-visible** (E1 measured prototype, 2026-07-07); R-3/OP-ROT-2 → INV                                                                                    | [`e1-rotation-in-flow/verdict.md`](./e1-rotation-in-flow/verdict.md)       |
+| decision      | state                                                                                                                                                                                                                  | where                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Main model    | **`anchor`** — intent-canonical anchored box model                                                                                                                                                                     | [`../models/a.md`](../models/a.md) (the model spec draft)                  |
+| How decided   | 32-question model-blind owner triage; deciders: canvas-truth (#1) + "the CSS path already exists as the `htmlcss` engine; the new taxonomy exists to be a new editor-first standard" (#6)                              | [`../triage.md`](../triage.md), instrument: [`../survey.md`](../survey.md) |
+| Retired       | `sheet` (adopt-CSS — its domain is the existing htmlcss engine), `bake` (post-T1), `wire` (deferred; re-enters additively via `Pin.to`)                                                                                | [`../finale.md`](../finale.md), [`../models/`](../models/)                 |
+| ~~Open fork~~ | rotation-in-flow — **DECIDED: VISUAL-ONLY** (DEC-0 second lock, 2026-07-07; rules in [`dec0-visual-only.md`](./dec0-visual-only.md)); E1's layout-visible arm stays implemented + tested as the documented alternative | [`e1-rotation-in-flow/verdict.md`](./e1-rotation-in-flow/verdict.md)       |
 
 ### The five triage amendments (binding on everything here)
 
@@ -53,7 +53,8 @@ lens`. Shape descriptors are size-free, evaluated at the resolved box.
   derived (group, bool, lens — never store size).
 - Rotation pivot: box center (boxed/measured); own origin + gesture
   compensation (derived). `lens` = sole home for skew/matrix/3D ops.
-- Resolution: measure → layout (flex over rotated AABBs — pending E1) →
+- Resolution: measure → layout (flex over unrotated boxes — DEC-0
+  visual-only; rotation applies in phase T, post-layout) →
   transforms (`from_box_center`) → bounds. One-way; resolved tier never
   serializes ("derivable ⇒ not encodable").
 
@@ -84,12 +85,13 @@ wired into the workspace; promote into `crates/`/`format/` only at phase 4.
 | **E10**               | the feel spike: does the model drive a REAL editor? (owner: feel it + textbook) | **BUILT** — [`spike-canvas/`](./spike-canvas): native winit+Skia app on the lab (`cargo run --release`); resolve-per-frame thesis MEASURED (starter frame 0.17 ms; 10k nodes paint-bound at 9 ms); arena+SOA storage evolution in the lab (**up to 11.5× resolver speedup**, 100 tests); interaction FSM, HUD w/ E-A7 readout, cross-zero flip gesture, undo, live+editable IR panel, reports-as-badges; [`TEXTBOOK.md`](./spike-canvas/TEXTBOOK.md) + [`SPIKE.md`](./spike-canvas/SPIKE.md) |
 
 All verdicts + the spec deltas roll up in [`REPORT.md`](./REPORT.md).
-Implementation: [`lab/`](./lab) — standalone crate, `cargo test` (92
-green), bins `e1`, `e3`, `e4`, `e5scan`, `edge`.
+Implementation: [`lab/`](./lab) — standalone crate, `cargo test` (114
+green), bins `e1`, `e3`, `e4`, `e5scan`, `edge`, `fork`.
 
 ## Phase-3 definition of done
 
-1. E1 verdict folded in → R-3/OP-ROT-2 become `INV`, not `POL`.
+1. DEC-0 verdict folded in (visual-only, rules V-1…V-10) → R-3/OP-ROT-2
+   become `INV`, not `POL`.
 2. Normative spec: `../models/a.md` rewritten as spec (amendments folded,
    every `POL` in [`../conformance.md`](../conformance.md) answered and
    locked, applicability matrix final).
@@ -110,7 +112,10 @@ Read in this order — ~10 minutes to full context:
 5. Skim [`../problems.md`](../problems.md) / [`../harnesses.md`](../harnesses.md)
    only when a design argument needs its source.
 
-Also standing: nothing in `model-v2/` is committed to git yet (untracked
-working state); the session convention is grounding-first, problems before
-solutions, and no scope beyond **Rust engine + format spec** — other seams
-(TS editor, WASM bindings) follow after the model lands.
+Also standing: this workbench lives on the **`model-v2-anchor`** branch
+(tracking issue
+[gridaco/grida#957](https://github.com/gridaco/grida/issues/957), pinned);
+pushes require owner approval, per turn. The session convention is
+grounding-first, problems before solutions, and no scope beyond
+**Rust engine + format spec** — other seams (TS editor, WASM bindings)
+follow after the model lands.
