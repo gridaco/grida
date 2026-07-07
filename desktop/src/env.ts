@@ -1,4 +1,5 @@
 import { app } from "electron";
+import type { DeepLinkScheme } from "./deep-link";
 
 export const IS_INSIDERS = INSIDERS === 1;
 // Use Electron's own packaging signal — `app.isPackaged` is true only
@@ -25,4 +26,5 @@ export const EDITOR_BASE_URL =
 // schemes are the only durable isolation. Mirrors the EDITOR_BASE_URL local/prod
 // split exactly, so the desktop's registered scheme and the editor's redirect
 // target (editor/lib/desktop/auth-deeplink.ts) always agree.
-export const DEEP_LINK_SCHEME = IS_INSIDERS || IS_DEV ? "grida-dev" : "grida";
+export const DEEP_LINK_SCHEME: DeepLinkScheme =
+  IS_INSIDERS || IS_DEV ? "grida-dev" : "grida";

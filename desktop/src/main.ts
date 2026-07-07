@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, Menu, dialog } from "electron";
+import path from "node:path";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
 import create_menu, {
@@ -79,7 +80,18 @@ app.setName(RUNTIME_APP_NAME);
 // registration is the dev bundle's CFBundleURLTypes (dev: prepare-dev-electron-
 // branding.mjs; packaged: forge.config `protocols`); this runtime call is the
 // Windows/Linux path and a macOS best-effort.
-app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+if (process.defaultApp && process.argv.length >= 2) {
+  // Dev (`electron-forge start` → `process.defaultApp`): the one-arg form would
+  // register the bare Electron executable WITHOUT our app entry, so on Windows a
+  // `grida-dev://` deep link could relaunch a blank Electron instead of delivering
+  // the URL. Point the registration at the app entry (Electron's documented dev
+  // pattern: setAsDefaultProtocolClient(scheme, execPath, [appPath])).
+  app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME, process.execPath, [
+    path.resolve(process.argv[1]),
+  ]);
+} else {
+  app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+}
 
 // GRIDA-SEC-004 — register the `grida-workspace://` privileged media scheme
 // (#924). `registerSchemesAsPrivileged` MUST run before `app.whenReady()`; the

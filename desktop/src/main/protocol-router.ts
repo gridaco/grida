@@ -16,6 +16,7 @@
  */
 import { BrowserWindow } from "electron";
 import { EDITOR_BASE_URL } from "../env";
+import { DEEP_LINK_SCHEMES } from "../deep-link";
 import { findWindowByUrl } from "./window-focus";
 
 /**
@@ -77,12 +78,13 @@ export async function routeDeepLink(url: string): Promise<boolean> {
     console.warn(`[grida] malformed deep link, ignoring: ${url}`);
     return true;
   }
-  // GRIDA-SEC-005 / #955 — accept both `grida:` (production) and `grida-dev:`
-  // (local dev + insiders). A build only ever RECEIVES its own scheme (the OS
-  // routes by the declared CFBundleURLTypes / forge `protocols`), so accepting
-  // both keeps this router env-agnostic and testable; routing is byte-identical
-  // either way — the fixed-target, verifier-gated exchange doesn't depend on it.
-  if (parsed.protocol !== "grida:" && parsed.protocol !== "grida-dev:") {
+  // GRIDA-SEC-005 / #955 — accept every scheme Grida owns (`grida:` prod,
+  // `grida-dev:` local); the shared set is `../deep-link`. A build only ever
+  // RECEIVES its own (the OS routes by the declared CFBundleURLTypes / forge
+  // `protocols`), so accepting both keeps this router env-agnostic and testable;
+  // routing is byte-identical either way — the fixed-target, verifier-gated
+  // exchange doesn't depend on the scheme.
+  if (!DEEP_LINK_SCHEMES.some((scheme) => parsed.protocol === `${scheme}:`)) {
     console.warn(`[grida] unrecognized protocol, ignoring: ${parsed.protocol}`);
     return true;
   }
