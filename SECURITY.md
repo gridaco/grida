@@ -815,10 +815,22 @@ paths, and params are public, so the design must not rely on obscurity.
    `shell.openExternal`'d — logging the user out of their OS browser.
 6. **Ceremony in the system browser only** — the launch URL travels
    renderer → `shell.open_external` (http/https-validated IPC); the
-   webview never loads a provider page, and the `grida://auth/callback`
+   webview never loads a provider page, and the `…://auth/callback`
    redirect is allowlisted in Supabase
    ([supabase/config.toml](supabase/config.toml) locally; the hosted
-   project's dashboard in production).
+   project's dashboard in production). The scheme is **per-environment**
+   (#955): production returns to `grida://`, while local dev/insiders
+   builds register and return to `grida-dev://` — so a machine running
+   BOTH a dev build and the installed production Grida never has the two
+   fight over one OS handler. The target is chosen from the build channel
+   (`process.env.NODE_ENV` in the editor's
+   [auth-deeplink.ts](editor/lib/desktop/auth-deeplink.ts);
+   `app.isPackaged`/insiders in the desktop's `env.ts`), **never from
+   request input**, so it stays a fixed, non-attacker-controllable
+   constant. The router
+   ([protocol-router.ts](desktop/src/main/protocol-router.ts)) accepts
+   either scheme with byte-identical fixed-target behavior; the OS only
+   ever delivers a build its own declared scheme.
 
 The Electron main process remains credential-free, and the sidecar
 holds at most the purpose-scoped, short-lived hosted-AI token
@@ -832,7 +844,8 @@ calls.
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-005 .` to enumerate.
 Today:
 
-- [supabase/config.toml](supabase/config.toml) — `grida://auth/callback` redirect allowlist entry.
+- [supabase/config.toml](supabase/config.toml) — redirect allowlist entries: `grida://auth/callback` (production) + `grida-dev://auth/callback` (local dev/insiders, #955). The hosted dashboard allowlists only the production `grida://` target.
+- [editor/lib/desktop/auth-deeplink.ts](editor/lib/desktop/auth-deeplink.ts) — the single, per-environment `…://auth/callback` redirect-target constant (build-time, never request input). Must stay aligned with the desktop's `DEEP_LINK_SCHEME` (`desktop/src/env.ts`).
 - [editor/app/desktop/auth/start/route.ts](editor/app/desktop/auth/start/route.ts) — PKCE start; verifier cookie + launch-page URL (method-neutral; the desktop never names a provider).
 - [editor/app/(untracked)/desktop-auth/page.tsx](<editor/app/(untracked)/desktop-auth/page.tsx>) + [editor/app/(untracked)/layout.tsx](<editor/app/(untracked)/layout.tsx>) — the web launch page and its analytics-free root layout. Shares the sign-in shell ([editor/components/auth/sign-in-shell.tsx](editor/components/auth/sign-in-shell.tsx)) and Google button (`authorize_url` mode); validates the challenge, binds the offered method's GoTrue flow to it, mirrors the web sign-in's insiders routing (`NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH` → redirect to the insiders page with the challenge forwarded). Deliberately NOT a `(site)` sibling: `(site)` loads Google/Vercel analytics that would beacon the challenge-bearing URL. The `(untracked)` group must never gain a URL-reporting script.
 - [editor/host/auth/desktop-auth-flow.ts](editor/host/auth/desktop-auth-flow.ts) — the flow vocabulary shared by the launch page and the insiders route: challenge validation, challenge-bound authorize/OTP builders, verify-link extraction pinned to the Supabase origin (pinned by `desktop-auth-flow.test.ts`).

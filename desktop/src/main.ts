@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, Menu, dialog } from "electron";
+import path from "node:path";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
 import create_menu, {
@@ -6,7 +7,7 @@ import create_menu, {
   rebuild_application_menu,
 } from "./menu";
 import { open_welcome_window, open_document_window } from "./window";
-import { EDITOR_BASE_URL } from "./env";
+import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
 import {
   RUNTIME_APP_NAME,
   USE_DEV_INSIDERS_BRANDING,
@@ -73,7 +74,24 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 // #endregion chrome flags
 
 app.setName(RUNTIME_APP_NAME);
-app.setAsDefaultProtocolClient("grida");
+// GRIDA-SEC-005 / #955 — register this build's channel-specific deep-link scheme
+// (`grida-dev` for local builds, `grida` for production) so dev and an installed
+// production Grida don't fight over one scheme. On macOS the reliable, declarative
+// registration is the dev bundle's CFBundleURLTypes (dev: prepare-dev-electron-
+// branding.mjs; packaged: forge.config `protocols`); this runtime call is the
+// Windows/Linux path and a macOS best-effort.
+if (process.defaultApp && process.argv.length >= 2) {
+  // Dev (`electron-forge start` → `process.defaultApp`): the one-arg form would
+  // register the bare Electron executable WITHOUT our app entry, so on Windows a
+  // `grida-dev://` deep link could relaunch a blank Electron instead of delivering
+  // the URL. Point the registration at the app entry (Electron's documented dev
+  // pattern: setAsDefaultProtocolClient(scheme, execPath, [appPath])).
+  app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME, process.execPath, [
+    path.resolve(process.argv[1]),
+  ]);
+} else {
+  app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+}
 
 // GRIDA-SEC-004 — register the `grida-workspace://` privileged media scheme
 // (#924). `registerSchemesAsPrivileged` MUST run before `app.whenReady()`; the

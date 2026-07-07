@@ -211,15 +211,15 @@ judging the bridge state.
 
 ## Boundaries
 
-| Concern                   | Lives in                                              | Notes                                            |
-| ------------------------- | ----------------------------------------------------- | ------------------------------------------------ |
-| Window/menu/dialog wiring | `desktop/src/main/**`                                 | Native shell behavior                            |
-| Protocol and file routing | `desktop/src/main/**`, `desktop/Info.plist`           | `grida://`, open-file, argv queue                |
-| Agent sidecar supervision | `desktop/src/main/**`, `desktop/src/agent-sidecar.ts` | Adapter only; core is `agent-system`             |
-| Preload bridge            | `desktop/src/preload.ts`                              | Path-scoped `window.grida`, auth held in closure |
-| Renderer desktop routes   | `editor/app/desktop/**`                               | No server actions, no `next/headers`             |
-| Renderer scaffolds        | `editor/scaffolds/desktop/**`                         | UI using `@/lib/desktop/*`                       |
-| Typed bridge client       | `editor/lib/desktop/**`                               | Pure TS client, no server-only imports           |
+| Concern                   | Lives in                                              | Notes                                                                 |
+| ------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------- |
+| Window/menu/dialog wiring | `desktop/src/main/**`                                 | Native shell behavior                                                 |
+| Protocol and file routing | `desktop/src/main/**`, `desktop/Info.plist`           | `grida://` (prod) / `grida-dev://` (dev, #955), open-file, argv queue |
+| Agent sidecar supervision | `desktop/src/main/**`, `desktop/src/agent-sidecar.ts` | Adapter only; core is `agent-system`                                  |
+| Preload bridge            | `desktop/src/preload.ts`                              | Path-scoped `window.grida`, auth held in closure                      |
+| Renderer desktop routes   | `editor/app/desktop/**`                               | No server actions, no `next/headers`                                  |
+| Renderer scaffolds        | `editor/scaffolds/desktop/**`                         | UI using `@/lib/desktop/*`                                            |
+| Typed bridge client       | `editor/lib/desktop/**`                               | Pure TS client, no server-only imports                                |
 
 Do not put OPFS or IndexedDB desktop storage in `editor/app/desktop/**`.
 Desktop storage goes through the bridge and agent host.
@@ -266,8 +266,9 @@ For non-trivial desktop changes:
 - Preload bridge: `desktop/src/preload.ts`
 - Forge config: `desktop/forge.config.ts`
 - File associations: `desktop/Info.plist`
+- Deep-link scheme + router: `desktop/src/env.ts` (`DEEP_LINK_SCHEME`) + `desktop/src/main/protocol-router.ts` — per-environment `grida://` (prod) / `grida-dev://` (dev + insiders), so a dev build never fights an installed prod Grida over one OS handler. Dev registration is `CFBundleURLTypes` via `scripts/prepare-dev-electron-branding.mjs` (macOS `setAsDefaultProtocolClient` no-ops unpackaged). Full context: #955.
 - Renderer routes: `editor/app/desktop/`
 - Renderer scaffolds: `editor/scaffolds/desktop/`
 - Typed bridge client: `editor/lib/desktop/bridge.ts`
 - CSP for `/desktop/*`: `editor/proxy.ts`
-- Threat model: `SECURITY.md` (`GRIDA-SEC-004`)
+- Threat model: `SECURITY.md` (`GRIDA-SEC-004` bridge · `GRIDA-SEC-005` sign-in deep link)

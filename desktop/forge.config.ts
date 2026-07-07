@@ -29,6 +29,11 @@ dotenv.config();
 const productName = IS_INSIDERS ? "Grida Insiders" : "Grida";
 const appBundleId = IS_INSIDERS ? "co.grida.insiders" : "co.grida.desktop";
 const icon = IS_INSIDERS ? "./images/insiders/icon" : "./images/icon";
+// GRIDA-SEC-005 / #955 — deep-link scheme. Insiders targets the localhost editor
+// (like dev) and so registers `grida-dev` to match the editor's dev redirect
+// target; production owns `grida`. Must agree with `DEEP_LINK_SCHEME` in
+// `src/env.ts` and the editor's `DESKTOP_AUTH_REDIRECT`.
+const deepLinkScheme = IS_INSIDERS ? "grida-dev" : "grida";
 
 const signingIdentity = process.env.APPLE_SIGNING_IDENTITY;
 const entitlementsPath = path.join(
@@ -142,7 +147,7 @@ const config: ForgeConfig = {
     protocols: [
       {
         name: "Grida",
-        schemes: ["grida"],
+        schemes: [deepLinkScheme],
       },
     ],
     extendInfo: "./Info.plist",
@@ -235,8 +240,8 @@ const config: ForgeConfig = {
         name: productName,
         icon: "./images/icon.png",
         mimeType: [
-          // grida:// deep linking
-          "x-scheme-handler/grida",
+          // grida:// (prod) / grida-dev:// (insiders) deep linking
+          `x-scheme-handler/${deepLinkScheme}`,
         ],
         // GRIDA-SEC-004 — srt's Linux backend shells out to these.
         // bubblewrap = namespace+seccomp sandbox; socat = unix-socket
@@ -252,8 +257,8 @@ const config: ForgeConfig = {
         name: productName,
         icon: "./images/icon.png",
         mimeType: [
-          // grida:// deep linking
-          "x-scheme-handler/grida",
+          // grida:// (prod) / grida-dev:// (insiders) deep linking
+          `x-scheme-handler/${deepLinkScheme}`,
         ],
         // GRIDA-SEC-004 — see MakerRpm comment above.
         depends: ["bubblewrap", "socat", "ripgrep"],

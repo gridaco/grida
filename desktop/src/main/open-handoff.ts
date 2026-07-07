@@ -25,8 +25,11 @@
  */
 
 import path from "node:path";
+// GRIDA-SEC-005 / #955 — shared, electron-free scheme set (both `grida` and
+// `grida-dev`; see `../deep-link`). Classify both so this Windows/Linux argv path
+// stays env-agnostic, mirroring the protocol router; `routeDeepLink` re-validates.
+import { DEEP_LINK_SCHEMES } from "../deep-link";
 
-const DEEP_LINK_SCHEME = "grida://";
 const SUPPORTED_FILE_EXTENSIONS = new Set([".svg", ".grida"]);
 /** A `.canvas` is a directory (a macOS package), not a file — routed to the
  * slides editor rather than the single-document/docId flow. Recognized by the
@@ -68,7 +71,7 @@ export namespace open_handoff {
   export function fromArgv(argv: readonly string[]): Open[] {
     const opens: Open[] = [];
     for (const arg of argv) {
-      if (arg.startsWith(DEEP_LINK_SCHEME))
+      if (DEEP_LINK_SCHEMES.some((scheme) => arg.startsWith(`${scheme}://`)))
         opens.push({ kind: "url", url: arg });
       else if (isSupportedFile(arg) || isCanvasBundle(arg))
         opens.push({ kind: "file", path: arg });
