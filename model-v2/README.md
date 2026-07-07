@@ -98,8 +98,10 @@ Ground rules:
   (each with verdicts and lab tests), the decision register
   ([`a/DECISIONS.md`](./a/DECISIONS.md)), the DEC-0 normative rules, the
   ship-readiness census ([`a/LIMITS.md`](./a/LIMITS.md)), the peer-compat
-  matrix, the 114-test Rust lab ([`a/lab/`](./a/lab/)), and the native
-  interactive spike ([`a/spike-canvas/`](./a/spike-canvas/)).
+  matrix, the phase-4 engine layer programs with day-1 contracts
+  ([`a/ENGINE.md`](./a/ENGINE.md)), the 114-test Rust lab
+  ([`a/lab/`](./a/lab/)), and the native interactive spike
+  ([`a/spike-canvas/`](./a/spike-canvas/)).
 - [`models/`](./models/) — concrete candidate models, one file each,
   harness-scored, best-faith. Files keep letter slots (`a.md`, `b.md`, …);
   the names are the working identifiers:
