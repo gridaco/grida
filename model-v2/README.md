@@ -7,10 +7,11 @@ represented — in the **Rust engine** (`crates/grida`) and the **format spec**
 after the model lands; they are out of scope here.
 
 > **Branch note.** This directory lives on the `model-v2-anchor` branch as a
-> working snapshot. The plan: finish the feel pass on the spike, then propose
-> an RFC with this branch as the textbook, then start the legacy
-> migration/rebuild (weeks out). Nothing here ships; no production code is
-> touched by this branch.
+> working snapshot — tracking issue:
+> [gridaco/grida#957](https://github.com/gridaco/grida/issues/957) (pinned).
+> The plan: finish the feel pass on the spike, then propose an RFC with this
+> branch as the textbook, then start the legacy migration/rebuild (weeks
+> out). Nothing here ships; no production code is touched by this branch.
 
 ## Run
 
