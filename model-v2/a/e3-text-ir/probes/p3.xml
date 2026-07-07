@@ -1,0 +1,6 @@
+<frame name="root" w="1000" h="1000">
+  <frame name="card" x="10" y="10" w="200" h="auto" layout="flex" direction="column" gap="8" padding="16" cross="stretch">
+    <shape name="hero" kind="rect" w="100" h="90"/>
+    <text name="title" size="20">Anchor wins big</text>
+  </frame>
+</frame>

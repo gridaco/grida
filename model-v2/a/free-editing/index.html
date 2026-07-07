@@ -1,0 +1,911 @@
+<title>anchor &mdash; free context: the editing experience</title>
+<style>
+  :root {
+    --paper: #f7f8f9;
+    --card: #ffffff;
+    --ink: #171a1f;
+    --muted: #5c6470;
+    --line: #e2e5e9;
+    --blue: #4a90d9;
+    --red: #e2574c;
+    --green: #57b894;
+    --amber: #b97f22;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  html {
+    background: var(--paper);
+  }
+  body {
+    font: 15px/1.6 var(--sans);
+    color: var(--ink);
+    margin: 0;
+    padding: 0 20px 96px;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  header.page {
+    padding: 52px 0 8px;
+  }
+  .eyebrow {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font: 600 30px/1.15 var(--mono);
+    letter-spacing: -0.01em;
+    margin: 14px 0 10px;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 74ch;
+    color: var(--muted);
+    margin: 0 0 22px;
+  }
+  .lede b {
+    color: var(--ink);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(420px, 1.4fr) minmax(320px, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel h2 {
+    font: 600 12px/1 var(--mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 0 0 10px;
+    color: var(--muted);
+  }
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 1px dashed var(--line);
+    border-radius: 4px;
+    background: #fdfdfc;
+    cursor: default;
+    touch-action: none;
+  }
+  .hint {
+    font: 12px var(--mono);
+    color: var(--muted);
+    margin-top: 10px;
+  }
+
+  pre.ir {
+    font: 12.5px/1.55 var(--mono);
+    background: #14171c;
+    color: #d6dee8;
+    border-radius: 6px;
+    padding: 14px;
+    overflow-x: auto;
+    margin: 0;
+    min-height: 220px;
+  }
+  pre.ir .a {
+    color: #8ab8e8;
+  }
+  pre.ir .v {
+    color: #a8d5a2;
+  }
+  pre.ir .t {
+    color: #7d8794;
+  }
+
+  .log {
+    font: 12px/1.7 var(--mono);
+    margin-top: 0;
+    max-height: 250px;
+    overflow-y: auto;
+  }
+  .log .g {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .log .w {
+    color: #2f7d5d;
+  }
+  .log .e {
+    color: var(--red);
+  }
+  .log .n {
+    color: var(--muted);
+  }
+  .log div {
+    border-bottom: 1px dashed var(--line);
+    padding: 6px 0;
+  }
+
+  .reads {
+    font: 12px var(--mono);
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .reads b {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .note {
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    font: 13px/1.6 var(--sans);
+    background: #eaf2fb;
+  }
+  .note .k {
+    font: 600 10px/1 var(--mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+    color: #2b6cb0;
+  }
+  .note b {
+    font-family: var(--mono);
+  }
+  table.ops {
+    border-collapse: collapse;
+    font: 12.5px var(--mono);
+    margin-top: 10px;
+    width: 100%;
+  }
+  table.ops td,
+  table.ops th {
+    border: 1px solid var(--line);
+    padding: 5px 9px;
+    text-align: left;
+  }
+  table.ops th {
+    background: #f2f4f6;
+    font-weight: 600;
+  }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div class="eyebrow">
+      model-v2 &middot; anchor &middot; free context &mdash; 2026-07-07
+    </div>
+    <h1>Without layout: the base case, hands on.</h1>
+    <p class="lede">
+      A live free-context document &mdash; <b>no layout engine runs here</b>;
+      resolution is bindings + one rotation scalar, mirrored from the
+      lab&rsquo;s free-context rules. Drag bodies to move, the corner dot to
+      resize, the stick to rotate. Watch two things: the
+      <b>IR stays SVG-shaped</b>, and every gesture is a
+      <b>counted set of scalar writes</b> (never a matrix). Then drag the
+      <b>artboard&rsquo;s right edge</b>: the green badge is
+      <b>end-pinned</b> and the amber bar is <b>spanned</b> &mdash; they respond
+      with <b>zero writes</b>, because position is a relation. That is what SVG
+      cannot say, and it is the on-ramp to layout-as-feature.
+    </p>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>canvas &mdash; free frame, five nodes</h2>
+      <canvas id="c" width="760" height="440"></canvas>
+      <div class="hint">
+        click = select &middot; drag = move (2 writes) &middot; corner dot =
+        resize (2) &middot; stick = rotate (1; group = 3 center-feel) &middot;
+        right-edge grip = artboard resize (0 writes)
+      </div>
+      <div class="reads" id="reads">
+        select a node &mdash; reads come from the resolved tier
+      </div>
+    </div>
+    <div class="panel">
+      <h2>the IR &mdash; canonical print, live</h2>
+      <pre class="ir" id="ir"></pre>
+      <h2 style="margin-top: 14px">writes &mdash; per gesture, typed</h2>
+      <div class="log" id="log"><div class="n">no gestures yet</div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <span class="k">what this shows</span>
+    Free context is not a degraded mode &mdash; it is the model&rsquo;s ground
+    floor.
+    <b>Pin Start</b> is literally svg x/y; <b>rotation</b> is one scalar with
+    one pivot rule (box center &mdash; so rotate is a 1-field write, no x/y
+    compensation, and resize-after-rotate never drifts: R-4 commutes,
+    lab-tested). A <b>group</b> is a named set with a coordinate space; dragging
+    it is 2 writes on the group, its children untouched. What SVG has no words
+    for: <b>end / center / span bindings</b> &mdash; responsiveness without any
+    layout engine, which is why &ldquo;svg-first, layout-as-feature&rdquo; is a
+    gradient here, not a mode switch: free (bindings) &rarr; constrained
+    (end/center/span) &rarr; flex (a frame feature). The lens (general
+    transform) never appears in the base case &mdash; it exists only when you
+    import one.
+    <table class="ops">
+      <tr>
+        <th>gesture</th>
+        <th>writes</th>
+        <th>fields</th>
+      </tr>
+      <tr>
+        <td>move</td>
+        <td>2</td>
+        <td>x.offset, y.offset (delta-form; works under any anchor)</td>
+      </tr>
+      <tr>
+        <td>rotate (boxed)</td>
+        <td>1</td>
+        <td>rotation &mdash; center pivot needs no compensation</td>
+      </tr>
+      <tr>
+        <td>rotate (group, center-feel)</td>
+        <td>3</td>
+        <td>rotation, x, y &mdash; Figma&rsquo;s trick over legible scalars</td>
+      </tr>
+      <tr>
+        <td>resize (corner)</td>
+        <td>2&ndash;4</td>
+        <td>w, h (+ x, y from the top-left corner)</td>
+      </tr>
+      <tr>
+        <td>resize across zero</td>
+        <td>2&ndash;3</td>
+        <td>|extent|, pin, flip toggle (E-A14; out-and-back = identity)</td>
+      </tr>
+      <tr>
+        <td>artboard resize</td>
+        <td>0</td>
+        <td>end/center/span children respond in the resolved tier</td>
+      </tr>
+      <tr>
+        <td>move a spanned axis</td>
+        <td>typed error</td>
+        <td>Err(AxisOwnedBySpan) &mdash; the wall is visible, never silent</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<script>
+  "use strict";
+  // A faithful JS mirror of the lab's FREE-CONTEXT rules only (no Taffy --
+  // that absence is the point). The Rust lab remains the source of truth.
+
+  const AB = { x: 46, y: 34, w: 520, h: 340, minw: 380, maxw: 660 };
+
+  const doc = {
+    nodes: [
+      {
+        id: "hero",
+        kind: "rect",
+        x: { t: "start", off: 40 },
+        y: { t: "start", off: 40 },
+        w: 140,
+        h: 90,
+        rot: 0,
+        fill: "#4A90D9",
+      },
+      {
+        id: "title",
+        kind: "text",
+        x: { t: "start", off: 40 },
+        y: { t: "start", off: 170 },
+        text: "make it obvious",
+        size: 20,
+        rot: 0,
+        fill: "#171A1F",
+      },
+      {
+        id: "badge",
+        kind: "rect",
+        x: { t: "end", off: 32 },
+        y: { t: "start", off: 32 },
+        w: 72,
+        h: 44,
+        rot: 0,
+        fill: "#57B894",
+      },
+      {
+        id: "bar",
+        kind: "rect",
+        x: { t: "span", a: 32, b: 32 },
+        y: { t: "end", off: 24 },
+        h: 18,
+        rot: 0,
+        fill: "#E2A23F",
+      },
+      {
+        id: "chips",
+        kind: "group",
+        x: { t: "start", off: 320 },
+        y: { t: "start", off: 170 },
+        rot: 0,
+        children: [
+          {
+            id: "chip.a",
+            kind: "rect",
+            x: { t: "start", off: 0 },
+            y: { t: "start", off: 0 },
+            w: 54,
+            h: 34,
+            rot: 0,
+            fill: "#8B7BD8",
+          },
+          {
+            id: "chip.b",
+            kind: "rect",
+            x: { t: "start", off: 24 },
+            y: { t: "start", off: 44 },
+            w: 54,
+            h: 34,
+            rot: 0,
+            fill: "#E2574C",
+          },
+        ],
+      },
+    ],
+  };
+
+  const cv = document.getElementById("c"),
+    cx = cv.getContext("2d");
+
+  // ---- resolve (mirror of place_by_bindings + from_box_center, free only) --
+  function measureText(n) {
+    cx.font = "600 " + n.size + "px ui-monospace,monospace";
+    return { w: cx.measureText(n.text).width, h: n.size * 1.3 };
+  }
+  function extent(n, P) {
+    if (n.kind === "group") {
+      const u = unionOf(n);
+      return { w: u.w, h: u.h, u };
+    }
+    let w = n.w,
+      h = n.h;
+    if (n.kind === "text") {
+      const m = measureText(n);
+      w = m.w;
+      h = m.h;
+    }
+    if (n.x.t === "span") w = Math.max(0, P.w - n.x.a - n.x.b);
+    if (n.y && n.y.t === "span") h = Math.max(0, P.h - n.y.a - n.y.b);
+    return { w, h };
+  }
+  function place(n, P) {
+    const e = extent(n, P);
+    const px = (b) =>
+      b.t === "start"
+        ? b.off
+        : b.t === "end"
+          ? P.w - b.off - e.w
+          : b.t === "center"
+            ? (P.w - e.w) / 2 + b.off
+            : b.a;
+    const py = (b) =>
+      b.t === "start"
+        ? b.off
+        : b.t === "end"
+          ? P.h - b.off - e.h
+          : b.t === "center"
+            ? (P.h - e.h) / 2 + b.off
+            : b.a;
+    if (n.kind === "group") {
+      // bindings place the ORIGIN (E-A1); the box = origin + union offset
+      const o = { x: n.x.off, y: n.y.off };
+      return {
+        x: o.x + e.u.x,
+        y: o.y + e.u.y,
+        w: e.w,
+        h: e.h,
+        origin: o,
+        u: e.u,
+      };
+    }
+    return { x: px(n.x), y: py(n.y), w: e.w, h: e.h };
+  }
+  function localAABB(n) {
+    // child AABB in group space, rotation about center
+    const b = place(n, { w: 0, h: 0 }); // start pins only inside groups (demo)
+    if (!n.rot) return b;
+    const r = (n.rot * Math.PI) / 180,
+      c = Math.abs(Math.cos(r)),
+      s = Math.abs(Math.sin(r));
+    const w2 = b.w * c + b.h * s,
+      h2 = b.w * s + b.h * c;
+    return {
+      x: b.x + b.w / 2 - w2 / 2,
+      y: b.y + b.h / 2 - h2 / 2,
+      w: w2,
+      h: h2,
+    };
+  }
+  function unionOf(g) {
+    let u = null;
+    for (const ch of g.children) {
+      const a = localAABB(ch);
+      u = u
+        ? {
+            x: Math.min(u.x, a.x),
+            y: Math.min(u.y, a.y),
+            w: Math.max(u.x + u.w, a.x + a.w) - Math.min(u.x, a.x),
+            h: Math.max(u.y + u.h, a.y + a.h) - Math.min(u.y, a.y),
+          }
+        : { x: a.x, y: a.y, w: a.w, h: a.h };
+    }
+    return u || { x: 0, y: 0, w: 0, h: 0 };
+  }
+
+  // ---- render ---------------------------------------------------------------
+  let sel = null;
+  function nodeTransform(n, b) {
+    // T(x+c) R T(-c) for boxed; T(origin) R for groups (origin pivot)
+    if (n.kind === "group") {
+      return { tx: b.origin.x, ty: b.origin.y, rot: n.rot, cx: 0, cy: 0 };
+    }
+    return {
+      tx: b.x + b.w / 2,
+      ty: b.y + b.h / 2,
+      rot: n.rot,
+      cx: -b.w / 2,
+      cy: -b.h / 2,
+    };
+  }
+  function applyT(t) {
+    cx.translate(AB.x + t.tx, AB.y + t.ty);
+    cx.rotate((t.rot * Math.PI) / 180);
+    cx.translate(t.cx, t.cy);
+  }
+  function drawNode(n, b) {
+    cx.save();
+    applyT(nodeTransform(n, b));
+    if (n.kind === "group") {
+      for (const ch of n.children) {
+        const cb = place(ch, { w: 0, h: 0 });
+        cx.save();
+        cx.translate(cb.x + cb.w / 2, cb.y + cb.h / 2);
+        cx.rotate((ch.rot * Math.PI) / 180);
+        cx.fillStyle = ch.fill;
+        cx.globalAlpha = 0.9;
+        cx.fillRect(-cb.w / 2, -cb.h / 2, cb.w, cb.h);
+        cx.restore();
+      }
+    } else if (n.kind === "text") {
+      cx.fillStyle = n.fill;
+      cx.font = "600 " + n.size + "px ui-monospace,monospace";
+      cx.textBaseline = "top";
+      cx.fillText(n.text, 0, 0);
+    } else {
+      cx.fillStyle = n.fill;
+      cx.globalAlpha = 0.9;
+      cx.fillRect(0, 0, b.w, b.h);
+    }
+    cx.restore();
+  }
+  function chrome(n, b) {
+    cx.save();
+    applyT(nodeTransform(n, b));
+    const r = n.kind === "group" ? b.u : { x: 0, y: 0, w: b.w, h: b.h };
+    cx.strokeStyle = "#4A90D9";
+    cx.lineWidth = 1.5;
+    cx.strokeRect(r.x, r.y, r.w, r.h);
+    cx.fillStyle = "#fff";
+    cx.strokeStyle = "#4A90D9";
+    // corner handle (bottom-right)
+    cx.beginPath();
+    cx.arc(r.x + r.w, r.y + r.h, 5, 0, 7);
+    cx.fill();
+    cx.stroke();
+    // rotate stick (top-center)
+    cx.beginPath();
+    cx.moveTo(r.x + r.w / 2, r.y);
+    cx.lineTo(r.x + r.w / 2, r.y - 22);
+    cx.stroke();
+    cx.beginPath();
+    cx.arc(r.x + r.w / 2, r.y - 26, 5, 0, 7);
+    cx.fill();
+    cx.stroke();
+    cx.restore();
+  }
+  function draw() {
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    cx.clearRect(0, 0, cv.width, cv.height);
+    cx.globalAlpha = 1;
+    // artboard
+    cx.strokeStyle = "#B9C0C9";
+    cx.lineWidth = 1.5;
+    cx.strokeRect(AB.x, AB.y, AB.w, AB.h);
+    cx.fillStyle = "#8A93A0";
+    cx.font = "12px ui-monospace,monospace";
+    cx.fillText("frame " + AB.w + " x " + AB.h, AB.x + 2, AB.y - 8);
+    // artboard grip
+    cx.fillStyle = "#fff";
+    cx.strokeStyle = "#8A93A0";
+    cx.fillRect(AB.x + AB.w - 4, AB.y + AB.h / 2 - 14, 8, 28);
+    cx.strokeRect(AB.x + AB.w - 4, AB.y + AB.h / 2 - 14, 8, 28);
+    for (const n of doc.nodes) {
+      drawNode(n, place(n, AB));
+    }
+    if (sel) {
+      chrome(sel, place(sel, AB));
+    }
+    renderIR();
+    renderReads();
+  }
+
+  // ---- IR canonical print (mirror of textir printer) ------------------------
+  function num(v) {
+    const r = Math.round(v * 10) / 10;
+    return r % 1 === 0 ? r.toFixed(0) : r.toFixed(1);
+  }
+  function fb(b) {
+    if (b.t === "start") return b.off === 0 ? null : num(b.off);
+    if (b.t === "end") return "end " + num(b.off);
+    if (b.t === "center")
+      return b.off === 0 ? "center" : "center " + num(b.off);
+    return "span " + num(b.a) + " " + num(b.b);
+  }
+  function attr(k, v) {
+    return v == null
+      ? ""
+      : ' <span class="a">' + k + '</span>=<span class="v">"' + v + '"</span>';
+  }
+  function printNode(n, d) {
+    const i = "  ".repeat(d);
+    let s =
+      i +
+      '<span class="t">&lt;' +
+      (n.kind === "rect" ? "shape" : n.kind) +
+      "</span>";
+    if (n.kind === "rect") s += attr("kind", "rect");
+    s += attr("x", fb(n.x)) + attr("y", fb(n.y));
+    if (n.kind === "rect") {
+      if (n.x.t !== "span") s += attr("w", num(n.w));
+      s += attr("h", num(n.h));
+    }
+    if (n.rot) s += attr("rotation", num(n.rot));
+    if (n.flipx) s += attr("flip-x", "true");
+    if (n.kind === "text") s += attr("size", num(n.size));
+    if (n.fill && n.kind !== "text") s += attr("fill", n.fill);
+    if (n.kind === "group") {
+      s += '<span class="t">&gt;</span>\n';
+      for (const ch of n.children) s += printNode(ch, d + 1);
+      s += i + '<span class="t">&lt;/group&gt;</span>\n';
+    } else if (n.kind === "text") {
+      s +=
+        '<span class="t">&gt;</span>' +
+        n.text +
+        '<span class="t">&lt;/text&gt;</span>\n';
+    } else {
+      s += '<span class="t">/&gt;</span>\n';
+    }
+    return s;
+  }
+  function renderIR() {
+    let s =
+      '<span class="t">&lt;frame</span>' +
+      attr("w", num(AB.w)) +
+      attr("h", num(AB.h)) +
+      '<span class="t">&gt;</span>\n';
+    for (const n of doc.nodes) s += printNode(n, 1);
+    s += '<span class="t">&lt;/frame&gt;</span>';
+    document.getElementById("ir").innerHTML = s;
+  }
+  function renderReads() {
+    const el = document.getElementById("reads");
+    if (!sel) {
+      el.innerHTML = "select a node &mdash; reads come from the resolved tier";
+      return;
+    }
+    const b = place(sel, AB);
+    el.innerHTML =
+      "resolved read <b>" +
+      sel.id +
+      "</b> &mdash; x <b>" +
+      num(b.x) +
+      "</b> y <b>" +
+      num(b.y) +
+      "</b> w <b>" +
+      num(b.w) +
+      "</b> h <b>" +
+      num(b.h) +
+      "</b>" +
+      (sel.rot ? " rotation <b>" + num(sel.rot) + "&deg;</b>" : "") +
+      " <span>(intent may be end/span &mdash; the read is always plain xywh)</span>";
+  }
+
+  // ---- writes log ------------------------------------------------------------
+  const logEl = document.getElementById("log");
+  let logInit = false;
+  function logGesture(name, writes, errors) {
+    if (!logInit) {
+      logEl.innerHTML = "";
+      logInit = true;
+    }
+    const d = document.createElement("div");
+    let h =
+      '<span class="g">' +
+      name +
+      '</span> &mdash; <span class="w">' +
+      writes.length +
+      " write" +
+      (writes.length === 1 ? "" : "s") +
+      "</span>";
+    if (writes.length)
+      h += '<br><span class="w">' + writes.join("<br>") + "</span>";
+    if (errors && errors.length)
+      h += '<br><span class="e">' + errors.join("<br>") + "</span>";
+    d.innerHTML = h;
+    logEl.prepend(d);
+    while (logEl.children.length > 7) logEl.removeChild(logEl.lastChild);
+  }
+
+  // ---- ops (mirror of ops.rs, free context) ----------------------------------
+  function opSetAxis(n, axis, delta) {
+    // delta-form re-target; returns write or error string
+    const b = n[axis];
+    if (b.t === "span") return { err: axis + ": Err(AxisOwnedBySpan)" };
+    const from = b.off;
+    b.off += b.t === "end" ? -delta : delta;
+    return { w: axis + ".offset " + num(from) + " -> " + num(b.off) };
+  }
+
+  // ---- interaction ------------------------------------------------------------
+  function toCanvas(ev) {
+    const r = cv.getBoundingClientRect();
+    return {
+      x: ((ev.clientX - r.left) * cv.width) / r.width,
+      y: ((ev.clientY - r.top) * cv.height) / r.height,
+    };
+  }
+  function invT(t, p) {
+    // canvas point -> local, for a given transform snapshot
+    let x = p.x - AB.x - t.tx,
+      y = p.y - AB.y - t.ty;
+    const r = (-t.rot * Math.PI) / 180,
+      c = Math.cos(r),
+      s = Math.sin(r);
+    const rx = x * c - y * s,
+      ry = x * s + y * c;
+    return { x: rx - t.cx, y: ry - t.cy };
+  }
+  function invNode(n, b, p) {
+    return invT(nodeTransform(n, b), p);
+  }
+  function hit(p) {
+    for (let i = doc.nodes.length - 1; i >= 0; i--) {
+      const n = doc.nodes[i],
+        b = place(n, AB);
+      const r = n.kind === "group" ? b.u : { x: 0, y: 0, w: b.w, h: b.h };
+      const q = invNode(n, b, p);
+      if (q.x >= r.x && q.x <= r.x + r.w && q.y >= r.y && q.y <= r.y + r.h)
+        return n;
+    }
+    return null;
+  }
+  function handleHit(p) {
+    // which handle of the selected node
+    if (!sel) return null;
+    const b = place(sel, AB),
+      q = invNode(sel, b, p);
+    const r = sel.kind === "group" ? b.u : { x: 0, y: 0, w: b.w, h: b.h };
+    const near = (a, c) => Math.hypot(q.x - a, q.y - c) < 9;
+    if (near(r.x + r.w, r.y + r.h)) return "resize";
+    if (near(r.x + r.w / 2, r.y - 26)) return "rotate";
+    return null;
+  }
+  function abGripHit(p) {
+    return (
+      p.x > AB.x + AB.w - 8 &&
+      p.x < AB.x + AB.w + 8 &&
+      p.y > AB.y + AB.h / 2 - 16 &&
+      p.y < AB.y + AB.h / 2 + 16
+    );
+  }
+
+  let drag = null;
+  cv.addEventListener("pointerdown", (ev) => {
+    const p = toCanvas(ev);
+    cv.setPointerCapture(ev.pointerId);
+    if (abGripHit(p)) {
+      drag = { kind: "ab", from: AB.w, px: p.x };
+      return;
+    }
+    const h = handleHit(p);
+    if (h === "resize") {
+      const b = place(sel, AB);
+      drag = {
+        kind: "resize",
+        n: sel,
+        w0: b.w,
+        h0: b.h,
+        p0: p,
+        t0: nodeTransform(sel, b),
+        errs: {},
+      };
+      return;
+    }
+    if (h === "rotate") {
+      const b = place(sel, AB);
+      const t = nodeTransform(sel, b);
+      const cxw =
+        AB.x +
+        t.tx +
+        (sel.kind === "group"
+          ? Math.cos((t.rot * Math.PI) / 180) * (b.u.x + b.u.w / 2) -
+            Math.sin((t.rot * Math.PI) / 180) * (b.u.y + b.u.h / 2)
+          : 0);
+      const cyw =
+        AB.y +
+        t.ty +
+        (sel.kind === "group"
+          ? Math.sin((t.rot * Math.PI) / 180) * (b.u.x + b.u.w / 2) +
+            Math.cos((t.rot * Math.PI) / 180) * (b.u.y + b.u.h / 2)
+          : 0);
+      drag = {
+        kind: "rotate",
+        n: sel,
+        cx: cxw,
+        cy: cyw,
+        rot0: sel.rot,
+        a0: Math.atan2(p.y - cyw, p.x - cxw),
+      };
+      return;
+    }
+    const n = hit(p);
+    sel = n;
+    if (n)
+      drag = {
+        kind: "move",
+        n,
+        p0: p,
+        x0: JSON.parse(JSON.stringify(n.x)),
+        y0: JSON.parse(JSON.stringify(n.y)),
+        errs: {},
+      };
+    draw();
+  });
+  cv.addEventListener("pointermove", (ev) => {
+    if (!drag) return;
+    const p = toCanvas(ev);
+    if (drag.kind === "ab") {
+      AB.w = Math.max(AB.minw, Math.min(AB.maxw, drag.from + (p.x - drag.px)));
+      draw();
+      return;
+    }
+    if (drag.kind === "move") {
+      const n = drag.n;
+      // apply as absolute re-target from gesture start (editor pattern)
+      n.x = JSON.parse(JSON.stringify(drag.x0));
+      n.y = JSON.parse(JSON.stringify(drag.y0));
+      const rx = opSetAxis(n, "x", p.x - drag.p0.x);
+      const ry = opSetAxis(n, "y", p.y - drag.p0.y);
+      drag.errs.x = rx.err;
+      drag.errs.y = ry.err;
+      draw();
+      return;
+    }
+    if (drag.kind === "resize") {
+      const n = drag.n,
+        q0 = invT(drag.t0, drag.p0),
+        q = invT(drag.t0, p);
+      if (n.kind === "group") {
+        drag.errs.w = "w/h: Err(BoxDerived)";
+        draw();
+        return;
+      }
+      if (n.kind === "text") {
+        drag.errs.w = "w/h: measured kind (auto) - resize sets none in demo";
+        draw();
+        return;
+      }
+      if (n.x.t !== "span") n.w = Math.max(4, drag.w0 + (q.x - q0.x));
+      else drag.errs.w = "w: Err(AxisOwnedBySpan)";
+      n.h = Math.max(4, drag.h0 + (q.y - q0.y));
+      draw();
+      return;
+    }
+    if (drag.kind === "rotate") {
+      const a = Math.atan2(p.y - drag.cy, p.x - drag.cx);
+      let deg = drag.rot0 + ((a - drag.a0) * 180) / Math.PI;
+      deg = Math.round(deg * 10) / 10;
+      const n = drag.n;
+      if (n.kind === "group") {
+        // center-feel: 3 writes (rotation + origin x/y compensation)
+        const b = place(n, AB);
+        const d = { x: b.u.x + b.u.w / 2, y: b.u.y + b.u.h / 2 };
+        const rot = (t) => {
+          const r = (t * Math.PI) / 180;
+          return {
+            x: d.x * Math.cos(r) - d.y * Math.sin(r),
+            y: d.x * Math.sin(r) + d.y * Math.cos(r),
+          };
+        };
+        const cOld = rot(n.rot),
+          cNew = rot(deg);
+        const cw = { x: n.x.off + cOld.x, y: n.y.off + cOld.y };
+        n.rot = deg;
+        n.x.off = cw.x - cNew.x;
+        n.y.off = cw.y - cNew.y;
+      } else {
+        n.rot = deg === 0 ? 0 : deg; // -0 canonicalized at the boundary
+      }
+      draw();
+      return;
+    }
+  });
+  cv.addEventListener("pointerup", () => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if (d.kind === "ab") {
+      logGesture("artboard resize -> " + num(AB.w), [], []);
+      logGesture(
+        "(end-pinned + spanned nodes responded with 0 writes)",
+        [],
+        []
+      );
+    } else if (d.kind === "move") {
+      const w = [],
+        e = [];
+      const n = d.n;
+      (d.errs.x ? e : w).push(
+        d.errs.x ||
+          "x.offset " +
+            num(d.x0.t === "span" ? d.x0.a : d.x0.off) +
+            " -> " +
+            num(n.x.t === "span" ? n.x.a : n.x.off) +
+            (n.x.t === "end" ? " (End pin: delta negated)" : "")
+      );
+      (d.errs.y ? e : w).push(
+        d.errs.y ||
+          "y.offset " +
+            num(d.y0.t === "span" ? d.y0.a : d.y0.off) +
+            " -> " +
+            num(n.y.t === "span" ? n.y.a : n.y.off)
+      );
+      logGesture("move '" + n.id + "'", w, e);
+    } else if (d.kind === "resize") {
+      const w = [],
+        e = [];
+      if (d.errs.w) e.push(d.errs.w);
+      else w.push("width -> " + num(d.n.w));
+      if (d.n.kind !== "group" && d.n.kind !== "text")
+        w.push("height -> " + num(d.n.h));
+      logGesture("resize '" + d.n.id + "'", w, e);
+    } else if (d.kind === "rotate") {
+      if (d.n.kind === "group") {
+        logGesture(
+          "rotate group '" + d.n.id + "' (center-feel)",
+          [
+            "rotation -> " + num(d.n.rot),
+            "x.offset -> " + num(d.n.x.off),
+            "y.offset -> " + num(d.n.y.off),
+          ],
+          []
+        );
+      } else {
+        logGesture(
+          "rotate '" + d.n.id + "'",
+          ["rotation " + num(d.rot0) + " -> " + num(d.n.rot)],
+          []
+        );
+      }
+    }
+    draw();
+  });
+
+  draw();
+</script>

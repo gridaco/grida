@@ -1,0 +1,5 @@
+<frame name="root" w="1000" h="1000">
+  <frame name="stage" x="0" y="0" w="400" h="400">
+    <shape name="tile" kind="rect" x="60" y="80" w="120" h="60" rotation="30"/>
+  </frame>
+</frame>

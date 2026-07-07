@@ -1,0 +1,141 @@
+{
+  "nodes": [
+    {
+      "header": {
+        "id": 0,
+        "name": "root",
+        "x": { "start": 0.0, "end": 0.0 },
+        "x_type": "Span",
+        "y": { "start": 0.0, "end": 0.0 },
+        "y_type": "Span"
+      },
+      "payload_type": "FramePayload",
+      "payload": {}
+    },
+    {
+      "header": {
+        "id": 1,
+        "name": "a-rotated-rect",
+        "parent": { "id": 0, "order": "a0" },
+        "x": { "offset": 10.0 },
+        "x_type": "Pin",
+        "y": { "offset": 20.0 },
+        "y_type": "Pin",
+        "width": { "value": 120.0 },
+        "width_type": "SizeFixed",
+        "height": { "value": 80.0 },
+        "height_type": "SizeFixed",
+        "rotation": 15.0,
+        "corner_radius": { "value": 8.0 }
+      },
+      "payload_type": "ShapePayload",
+      "payload": { "desc_type": "RectDesc", "desc": {} }
+    },
+    {
+      "header": {
+        "id": 2,
+        "name": "b-end-pinned",
+        "parent": { "id": 0, "order": "a1" },
+        "x": { "anchor": "End", "offset": 24.0 },
+        "x_type": "Pin",
+        "y": { "offset": 20.0 },
+        "y_type": "Pin",
+        "width": { "value": 120.0 },
+        "width_type": "SizeFixed",
+        "height": { "value": 80.0 },
+        "height_type": "SizeFixed"
+      },
+      "payload_type": "ShapePayload",
+      "payload": { "desc_type": "RectDesc", "desc": {} }
+    },
+    {
+      "header": {
+        "id": 3,
+        "name": "c-flex-column",
+        "parent": { "id": 0, "order": "a2" },
+        "width": { "value": 400.0 },
+        "width_type": "SizeFixed",
+        "height": {},
+        "height_type": "SizeAuto"
+      },
+      "payload_type": "FramePayload",
+      "payload": {
+        "layout": {
+          "mode": "Flex",
+          "direction": "Column",
+          "gap_main": 8.0,
+          "padding": {
+            "top": 16.0,
+            "right": 16.0,
+            "bottom": 16.0,
+            "left": 16.0
+          }
+        }
+      }
+    },
+    {
+      "header": {
+        "id": 4,
+        "name": "stretch-rect",
+        "parent": { "id": 3, "order": "a0" },
+        "width": { "value": 100.0 },
+        "width_type": "SizeFixed",
+        "height": { "value": 40.0 },
+        "height_type": "SizeFixed",
+        "self_align": "Stretch"
+      },
+      "payload_type": "ShapePayload",
+      "payload": { "desc_type": "RectDesc", "desc": {} }
+    },
+    {
+      "header": {
+        "id": 5,
+        "name": "grow-text",
+        "parent": { "id": 3, "order": "a1" },
+        "grow": 1.0
+      },
+      "payload_type": "TextPayload",
+      "payload": { "content": "hello", "max_lines": { "value": 2 } }
+    },
+    {
+      "header": {
+        "id": 6,
+        "name": "d-group",
+        "parent": { "id": 0, "order": "a3" },
+        "x": { "offset": 100.0 },
+        "x_type": "Pin",
+        "y": { "offset": 50.0 },
+        "y_type": "Pin",
+        "rotation": 30.0
+      },
+      "payload_type": "GroupPayload",
+      "payload": {}
+    },
+    {
+      "header": {
+        "id": 7,
+        "name": "e-lens",
+        "parent": { "id": 0, "order": "a4" },
+        "aspect_ratio": { "w": 16.0, "h": 9.0 }
+      },
+      "payload_type": "LensPayload",
+      "payload": {
+        "ops": [
+          { "op_type": "SkewOp", "op": { "x_deg": 20.0 } },
+          {
+            "op_type": "Matrix2D",
+            "op": {
+              "m00": 1.0,
+              "m01": 0.25,
+              "m02": 0.0,
+              "m10": 0.0,
+              "m11": 1.0,
+              "m12": 3.5
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "root": 0
+}

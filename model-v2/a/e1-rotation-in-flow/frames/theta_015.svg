@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420" font-family="monospace">
+<g transform="translate(0 10)">
+<text x="20" y="12" font-size="11" fill="#555">anchor: AABB participates — θ=15°</text>
+  <rect width="640" height="200" transform="matrix(1 0 0 1 0 0)" fill="#f6f6f6" stroke="#999" stroke-width="1"/>
+  <rect width="243.83745" height="140" transform="matrix(1 0 0 1 20.000008 20)" fill="#f6f6f6" stroke="#999" stroke-width="1"/>
+  <rect width="60" height="100" transform="matrix(1 0 0 1 30.000008 40)" fill="#4a90d9"/>
+  <rect width="60" height="100" transform="matrix(0.9659258 0.25881904 -0.25881904 0.9659258 125.88191 33.939137)" fill="#e2574c"/>
+  <rect width="60" height="100" transform="matrix(1 0 0 1 193.83746 40)" fill="#57b894"/>
+  <rect x="20.000008" y="20" width="243.83746" height="140" fill="none" stroke="#f0f" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <rect x="100.00001" y="33.939137" width="83.837456" height="112.121735" fill="none" stroke="#f0f" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <rect x="193.83746" y="40" width="60" height="100" fill="none" stroke="#f0f" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <rect x="30.000008" y="40" width="60" height="100" fill="none" stroke="#f0f" stroke-width="0.5" stroke-dasharray="3 3"/>
+</g>
+<g transform="translate(0 210)">
+<text x="20" y="12" font-size="11" fill="#555">control: visual-only (CSS) — θ=15°</text>
+  <rect width="640" height="200" transform="matrix(1 0 0 1 0 0)" fill="#f6f6f6" stroke="#999" stroke-width="1"/>
+  <rect width="220" height="140" transform="matrix(1 0 0 1 20 20)" fill="#f6f6f6" stroke="#999" stroke-width="1"/>
+  <rect width="60" height="100" transform="matrix(1 0 0 1 30 40)" fill="#4a90d9"/>
+  <rect width="60" height="100" transform="matrix(0.9659258 0.25881904 -0.25881904 0.9659258 113.96318 33.939137)" fill="#e2574c"/>
+  <rect width="60" height="100" transform="matrix(1 0 0 1 170 40)" fill="#57b894"/>
+  <rect x="30" y="40" width="60" height="100" fill="none" stroke="#f0f" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <rect x="20" y="20" width="220" height="140" fill="none" stroke="#f0f" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <rect x="88.081276" y="33.939137" width="83.837456" height="112.121735" fill="none" stroke="#f0f" stroke-width="0.5" stroke-dasharray="3 3"/>
+  <rect x="170" y="40" width="60" height="100" fill="none" stroke="#f0f" stroke-width="0.5" stroke-dasharray="3 3"/>
+</g>
+</svg>

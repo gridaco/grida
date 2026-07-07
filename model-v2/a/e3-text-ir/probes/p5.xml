@@ -1,0 +1,7 @@
+<frame name="root" w="1000" h="1000">
+  <frame name="list" x="0" y="0" w="auto" h="140" layout="flex" gap="10" padding="10" cross="center">
+    <shape name="a" kind="rect" w="60" h="100"/>
+    <shape name="b" kind="rect" w="60" h="100" rotation="90"/>
+    <shape name="c" kind="rect" w="60" h="100"/>
+  </frame>
+</frame>

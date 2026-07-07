@@ -1,0 +1,1017 @@
+<title>anchor &mdash; how the model works</title>
+<style>
+  :root {
+    --paper: #f7f8f9;
+    --card: #ffffff;
+    --ink: #171a1f;
+    --muted: #5c6470;
+    --line: #e2e5e9;
+    --blue: #4a90d9;
+    --red: #e2574c;
+    --green: #57b894;
+    --amber: #e2a23f;
+    --blue-dim: #eaf2fb;
+    --green-dim: #eaf7f2;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  html {
+    background: var(--paper);
+  }
+  body {
+    font: 15px/1.6 var(--sans);
+    color: var(--ink);
+    margin: 0;
+    padding: 0 20px 96px;
+  }
+  .wrap {
+    max-width: 1020px;
+    margin: 0 auto;
+  }
+  header.page {
+    padding: 52px 0 8px;
+  }
+  .eyebrow {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font: 600 32px/1.15 var(--mono);
+    letter-spacing: -0.01em;
+    margin: 14px 0 10px;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 64ch;
+    color: var(--muted);
+    margin: 0;
+  }
+  .lede b {
+    color: var(--ink);
+  }
+
+  section {
+    margin-top: 60px;
+  }
+  .exh {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .exh::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+  h2 {
+    font: 600 21px/1.3 var(--mono);
+    margin: 12px 0 6px;
+    text-wrap: balance;
+  }
+  .sub {
+    color: var(--muted);
+    max-width: 68ch;
+    margin: 0 0 18px;
+  }
+  .sub b {
+    color: var(--ink);
+  }
+
+  .stage {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    font: 600 12px var(--mono);
+  }
+  .controls label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .controls input[type="range"] {
+    width: 180px;
+    accent-color: var(--blue);
+  }
+  .controls .val {
+    font-variant-numeric: tabular-nums;
+    min-width: 44px;
+    color: var(--blue);
+  }
+  button {
+    font: 600 12px/1 var(--mono);
+    background: var(--ink);
+    color: #fff;
+    border: 0;
+    border-radius: 4px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  button.ghost {
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  button:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  .quad {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fdfdfc;
+    padding: 10px;
+  }
+  .panel .t {
+    font: 600 11px/1.3 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .panel .t.blue {
+    color: var(--blue);
+  }
+  .panel .t.green {
+    color: #2e9a72;
+  }
+  .panel .t.amber {
+    color: #b97f22;
+  }
+  .panel .t.red {
+    color: var(--red);
+  }
+  .panel .d {
+    font: 11.5px/1.45 var(--sans);
+    color: var(--muted);
+    margin: 2px 0 8px;
+    min-height: 48px;
+  }
+  .panel canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 1px dashed var(--line);
+    border-radius: 4px;
+  }
+  .panel .w {
+    font: 11px var(--mono);
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  .panel .w b {
+    color: var(--ink);
+  }
+
+  .duo {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  .datacard {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fdfdfc;
+    padding: 12px;
+    font: 12px/1.6 var(--mono);
+  }
+  .datacard .t {
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font: 12px var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  th,
+  td {
+    text-align: right;
+    padding: 3px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  th:first-child,
+  td:first-child {
+    text-align: left;
+  }
+  td.hot {
+    background: var(--green-dim);
+    color: #22755a;
+    font-weight: 600;
+  }
+  .log {
+    font: 11.5px/1.7 var(--mono);
+    color: var(--muted);
+    margin-top: 10px;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+  .log b {
+    color: var(--ink);
+  }
+  .log .w2 {
+    color: var(--blue);
+  }
+  .log .wN {
+    color: var(--green);
+  }
+  .frozen {
+    display: inline-block;
+    background: var(--blue-dim);
+    color: #2b6cb0;
+    font: 600 10px/1 var(--mono);
+    border-radius: 3px;
+    padding: 3px 7px;
+    letter-spacing: 0.06em;
+  }
+
+  .trio {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .doc {
+    font: 11.5px/1.7 var(--mono);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 10px 12px;
+    margin-top: 10px;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .doc .chg {
+    background: var(--green-dim);
+    color: #22755a;
+    font-weight: 600;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+  .doc .op {
+    background: var(--blue-dim);
+    color: #2b6cb0;
+    font-weight: 600;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+  .doc .cm {
+    color: #9aa3af;
+  }
+
+  .lawline {
+    font: 12.5px/1.7 var(--mono);
+    color: var(--muted);
+    border-left: 3px solid var(--line);
+    padding: 2px 0 2px 14px;
+    margin-top: 16px;
+  }
+  .lawline b {
+    color: var(--ink);
+  }
+  @media (max-width: 900px) {
+    .quad {
+      grid-template-columns: 1fr 1fr;
+    }
+    .trio {
+      grid-template-columns: 1fr;
+    }
+    .duo {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div class="eyebrow">
+      model-v2 &middot; anchor &middot; model demo &mdash; 2026-07-07
+    </div>
+    <h1>One box. Content realizes into it.</h1>
+    <p class="lede">
+      The consolidated model in three interactive laws. A node is an
+      <b>anchored box with typed content</b>: the box comes from intent, content
+      is <b>realized into</b> the box at render, and nothing derivable is ever
+      stored. Everything below runs the spec&rsquo;s own formulas (the same ones
+      the Rust lab asserts in 58 tests and LLMs predicted cold at 100%).
+    </p>
+  </header>
+
+  <section>
+    <div class="exh">demo a &mdash; the two-axis core</div>
+    <h2>One box, four realizations.</h2>
+    <p class="sub">
+      Drag the box size.
+      <b>The document writes are the same two fields every time (w, h)</b>
+      &mdash; what differs per kind is how content re-realizes: parametric
+      shapes re-derive, vectors re-map from their reference rect, text re-wraps,
+      image paint re-fits. No points move, no matrix appears, no bake happens.
+    </p>
+
+    <div class="stage">
+      <div class="controls">
+        <label
+          >w <input id="aw" type="range" min="70" max="300" value="170" /><span
+            class="val"
+            id="awv"
+            >170</span
+          ></label
+        >
+        <label
+          >h <input id="ah" type="range" min="60" max="220" value="120" /><span
+            class="val"
+            id="ahv"
+            >120</span
+          ></label
+        >
+        <button class="ghost" id="asq">square</button>
+        <button class="ghost" id="awide">wide</button>
+        <button class="ghost" id="atall">tall</button>
+        <span style="color: var(--muted); font-weight: 400"
+          >document writes per drag:
+          <b style="color: var(--green)">2 fields</b></span
+        >
+      </div>
+      <div class="quad">
+        <div class="panel">
+          <div class="t blue">shape &middot; parametric</div>
+          <div class="d">
+            Descriptor = f(box). A star has <b>no points</b> &mdash; count 5 +
+            inner ratio 0.45, evaluated at the box. Stroke stays 2px.
+          </div>
+          <canvas id="pa" width="440" height="360"></canvas>
+          <div class="w">stored: <b>kind=star points=5 inner=0.45</b></div>
+        </div>
+        <div class="panel">
+          <div class="t green">vector &middot; mapped</div>
+          <div class="d">
+            Points live in a <b>24&times;24 reference rect</b> (inset, frozen).
+            Render maps &times;(box/ref). Stroke stays 2px &mdash; non-scaling
+            by construction.
+          </div>
+          <canvas id="pv" width="440" height="360"></canvas>
+          <div class="w">
+            stored: <b>ref=24&times;24 + 7 vertices</b> (never rewritten)
+          </div>
+        </div>
+        <div class="panel">
+          <div class="t amber">text &middot; flowed</div>
+          <div class="d">
+            Content re-wraps at the imposed width (greedy, the spec metric).
+            Font size stays 14 &mdash; a style, not geometry.
+          </div>
+          <canvas id="pt" width="440" height="360"></canvas>
+          <div class="w">stored: <b>content + size=14</b></div>
+        </div>
+        <div class="panel">
+          <div class="t red">image fill &middot; fitted</div>
+          <div class="d">
+            Paint re-fits at the resolved box per fit mode &mdash; never
+            stretched with geometry.
+            <button
+              class="ghost"
+              id="fitbtn"
+              style="padding: 3px 8px; font-size: 10px"
+            >
+              cover
+            </button>
+          </div>
+          <canvas id="pi" width="440" height="360"></canvas>
+          <div class="w">stored: <b>image ref + fit mode</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="exh">demo b &mdash; the points law (e-a9)</div>
+    <h2>Resize all you want. The blob stays the blob.</h2>
+    <p class="sub">
+      The table is the <b>stored document data</b> &mdash; vertices in the
+      reference rect. Resize writes w/h and the table never changes (Sketch
+      stores 0&ndash;1 points, Figma ships
+      <span style="font-family: var(--mono)">normalizedSize &ne; size</span>
+      nodes &mdash; same law). Only a <b>vertex-editing gesture</b> writes
+      points; then the reference bounds re-derive.
+    </p>
+
+    <div class="stage">
+      <div class="duo">
+        <div>
+          <div class="controls">
+            <label
+              >w
+              <input id="bw" type="range" min="80" max="420" value="200" /><span
+                class="val"
+                id="bwv"
+                >200</span
+              ></label
+            >
+            <label
+              >h
+              <input id="bh" type="range" min="80" max="300" value="200" /><span
+                class="val"
+                id="bhv"
+                >200</span
+              ></label
+            >
+            <button id="bnudge">edit vertex #4</button>
+            <button class="ghost" id="breset">reset</button>
+          </div>
+          <canvas
+            id="pb"
+            width="880"
+            height="620"
+            style="
+              width: 100%;
+              height: auto;
+              border: 1px dashed var(--line);
+              border-radius: 4px;
+            "
+          ></canvas>
+          <div class="log" id="blog"></div>
+        </div>
+        <div class="datacard">
+          <div class="t">
+            stored document data
+            <span class="frozen" id="bfrozen">FROZEN UNDER RESIZE</span>
+          </div>
+          <div style="margin-bottom: 6px">
+            w: <b id="bdw">200</b> &nbsp; h: <b id="bdh">200</b> &nbsp; ref:
+            <b id="bdref">24&times;24</b>
+          </div>
+          <table id="btab">
+            <tr>
+              <th>vertex</th>
+              <th>x (ref)</th>
+              <th>y (ref)</th>
+            </tr>
+          </table>
+          <div style="margin-top: 10px; color: var(--muted); font-size: 11px">
+            resolved (read tier, materialized like Figma&rsquo;s plugin API):<br />
+            vertex #4 &rarr; <b id="bmat">&mdash;</b>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="exh">demo c &mdash; the two scales</div>
+    <h2>Resize is not scale. And scale is two different things.</h2>
+    <p class="sub">
+      One card (dotted image fill, 2px stroke, radius 10, label 12px), one
+      slider, three semantics. Watch the <b>document</b> under each: resize
+      writes two fields and keeps every style in px; <b>K</b> is a sanctioned
+      bake that multiplies the numbers; <b>lens</b> stores one op and touches no
+      value &mdash; the picture semantics (strokes and tiles magnify),
+      quarantined.
+    </p>
+
+    <div class="stage">
+      <div class="controls">
+        <label
+          >scale
+          <input id="cs" type="range" min="100" max="220" value="160" /><span
+            class="val"
+            id="csv"
+            >1.60&times;</span
+          ></label
+        >
+      </div>
+      <div class="trio">
+        <div class="panel">
+          <div class="t blue">resize</div>
+          <canvas id="pc0" width="660" height="480"></canvas>
+          <div class="doc" id="doc0"></div>
+        </div>
+        <div class="panel">
+          <div class="t green">K &middot; parameter scale (bake)</div>
+          <canvas id="pc1" width="660" height="480"></canvas>
+          <div class="doc" id="doc1"></div>
+        </div>
+        <div class="panel">
+          <div class="t red">lens &middot; picture scale (stored op)</div>
+          <canvas id="pc2" width="660" height="480"></canvas>
+          <div class="doc" id="doc2"></div>
+        </div>
+      </div>
+      <div class="lawline">
+        <b>Law 5.</b> Styles are px-stable under resize (non-scaling-stroke by
+        construction). K bakes numbers through the subtree &mdash; Figma
+        rescale(), Sketch K, Grida parametric_scale, already shipping. A
+        retained picture-scale exists only as a lens op &mdash; the
+        SVG/Graphics-container semantics, opt-in, never a prerequisite.
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  "use strict";
+  const INK = "#171A1F",
+    BLUE = "#4A90D9",
+    GREEN = "#57B894",
+    RED = "#E2574C",
+    MUTED = "#9AA3AF";
+
+  function ctx2(id) {
+    const c = document.getElementById(id);
+    const x = c.getContext("2d");
+    x.setTransform(2, 0, 0, 2, 0, 0);
+    return [x, c.width / 2, c.height / 2];
+  }
+
+  /* ---------- shared geometry (the spec's formulas) ---------- */
+  // star: parametric, evaluated at the box (no stored points)
+  function starPath(x, cx, cy, rx, ry, n, inner) {
+    x.beginPath();
+    for (let i = 0; i < n * 2; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / n;
+      const f = i % 2 === 0 ? 1 : inner;
+      const px = cx + Math.cos(a) * rx * f,
+        py = cy + Math.sin(a) * ry * f;
+      i ? x.lineTo(px, py) : x.moveTo(px, py);
+    }
+    x.closePath();
+  }
+  // vector: stored once, in a 24x24 reference rect
+  const REF = { w: 24, h: 24 };
+  const BOLT0 = [
+    [13, 1],
+    [5, 13],
+    [11, 13],
+    [9, 23],
+    [19, 10],
+    [13, 10],
+    [15, 1],
+  ];
+  let BOLT = BOLT0.map((p) => p.slice());
+  function boltPath(x, bx, by, bw, bh, pts, ref) {
+    const sx = bw / ref.w,
+      sy = bh / ref.h; // the E-A9 mapping: box / reference
+    x.beginPath();
+    pts.forEach((p, i) =>
+      i
+        ? x.lineTo(bx + p[0] * sx, by + p[1] * sy)
+        : x.moveTo(bx + p[0] * sx, by + p[1] * sy)
+    );
+    x.closePath();
+  }
+  // text: the deterministic metric (0.6 / 1.2, greedy word wrap)
+  function wrapText(content, size, maxw) {
+    const cw = 0.6 * size,
+      maxc = Math.max(1, Math.floor(maxw / cw));
+    const lines = [];
+    let cur = "";
+    for (const word of content.split(" ")) {
+      if (!cur.length) cur = word;
+      else if (cur.length + 1 + word.length <= maxc) cur += " " + word;
+      else {
+        lines.push(cur);
+        cur = word;
+      }
+    }
+    lines.push(cur);
+    return lines;
+  }
+  // procedural "photo" for fitted paint
+  const photo = document.createElement("canvas");
+  photo.width = 200;
+  photo.height = 140;
+  {
+    const p = photo.getContext("2d");
+    const g = p.createLinearGradient(0, 0, 0, 140);
+    g.addColorStop(0, "#BFD9F2");
+    g.addColorStop(1, "#EAF2FB");
+    p.fillStyle = g;
+    p.fillRect(0, 0, 200, 140);
+    p.fillStyle = "#F2C86B";
+    p.beginPath();
+    p.arc(150, 45, 22, 0, 7);
+    p.fill();
+    p.fillStyle = "#8CCDB4";
+    p.beginPath();
+    p.moveTo(0, 140);
+    p.quadraticCurveTo(60, 70, 130, 140);
+    p.fill();
+    p.fillStyle = "#57B894";
+    p.beginPath();
+    p.moveTo(70, 140);
+    p.quadraticCurveTo(160, 80, 200, 140);
+    p.fill();
+    p.fillStyle = "#fff";
+    for (const [bx, by] of [
+      [40, 38],
+      [52, 34],
+      [64, 40],
+    ]) {
+      p.beginPath();
+      p.arc(bx, by, 7, 0, 7);
+      p.fill();
+    }
+  }
+  function drawFitted(x, bx, by, bw, bh, mode) {
+    x.save();
+    x.beginPath();
+    x.rect(bx, by, bw, bh);
+    x.clip();
+    const iw = photo.width,
+      ih = photo.height;
+    const s =
+      mode === "cover"
+        ? Math.max(bw / iw, bh / ih)
+        : Math.min(bw / iw, bh / ih);
+    const dw = iw * s,
+      dh = ih * s;
+    x.fillStyle = "#F2F4F6";
+    x.fillRect(bx, by, bw, bh);
+    x.drawImage(photo, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
+    x.restore();
+  }
+
+  /* ---------- demo A ---------- */
+  const A = { w: 170, h: 120, fit: "cover" };
+  function boxIn(cw, ch, w, h) {
+    return [(cw - w) / 2, (ch - h) / 2];
+  }
+  function frameBox(x, bx, by, w, h) {
+    x.strokeStyle = MUTED;
+    x.setLineDash([4, 3]);
+    x.lineWidth = 1;
+    x.strokeRect(bx, by, w, h);
+    x.setLineDash([]);
+  }
+  function renderA() {
+    const { w, h } = A;
+    {
+      const [x, cw, ch] = ctx2("pa");
+      x.clearRect(0, 0, cw, ch);
+      const [bx, by] = boxIn(cw, ch, w, h);
+      frameBox(x, bx, by, w, h);
+      starPath(
+        x,
+        bx + w / 2,
+        by + h / 2,
+        (w / 2) * 0.9,
+        (h / 2) * 0.9,
+        5,
+        0.45
+      );
+      x.fillStyle = BLUE;
+      x.globalAlpha = 0.25;
+      x.fill();
+      x.globalAlpha = 1;
+      x.strokeStyle = BLUE;
+      x.lineWidth = 2;
+      x.stroke();
+    }
+    {
+      const [x, cw, ch] = ctx2("pv");
+      x.clearRect(0, 0, cw, ch);
+      const [bx, by] = boxIn(cw, ch, w, h);
+      frameBox(x, bx, by, w, h);
+      boltPath(x, bx, by, w, h, BOLT0, REF);
+      x.fillStyle = GREEN;
+      x.globalAlpha = 0.25;
+      x.fill();
+      x.globalAlpha = 1;
+      x.strokeStyle = "#2E9A72";
+      x.lineWidth = 2;
+      x.stroke();
+      // frozen reference-space inset
+      const rx = 8,
+        ry = 8,
+        rs = 44;
+      x.fillStyle = "#fff";
+      x.fillRect(rx - 4, ry - 4, rs + 8, rs + 8);
+      x.strokeStyle = MUTED;
+      x.strokeRect(rx - 4, ry - 4, rs + 8, rs + 8);
+      boltPath(x, rx, ry, rs, rs, BOLT0, REF);
+      x.strokeStyle = "#2E9A72";
+      x.lineWidth = 1;
+      x.stroke();
+      x.fillStyle = MUTED;
+      x.font = "8px ui-monospace,monospace";
+      x.fillText("ref 24\u00D724", rx - 2, ry + rs + 12);
+    }
+    {
+      const [x, cw, ch] = ctx2("pt");
+      x.clearRect(0, 0, cw, ch);
+      const [bx, by] = boxIn(cw, ch, w, h);
+      frameBox(x, bx, by, w, h);
+      const size = 14,
+        lines = wrapText(
+          "Anchor realizes content into the box at render time",
+          size,
+          w - 12
+        );
+      x.fillStyle = INK;
+      x.font = "600 " + size + "px ui-monospace,monospace";
+      x.save();
+      x.beginPath();
+      x.rect(bx, by, w, h);
+      x.clip();
+      lines.forEach((ln, i) =>
+        x.fillText(ln, bx + 6, by + 6 + size + i * 1.2 * size)
+      );
+      x.restore();
+    }
+    {
+      const [x, cw, ch] = ctx2("pi");
+      x.clearRect(0, 0, cw, ch);
+      const [bx, by] = boxIn(cw, ch, w, h);
+      drawFitted(x, bx, by, w, h, A.fit);
+      frameBox(x, bx, by, w, h);
+    }
+    document.getElementById("awv").textContent = A.w;
+    document.getElementById("ahv").textContent = A.h;
+  }
+  for (const [id, k] of [
+    ["aw", "w"],
+    ["ah", "h"],
+  ]) {
+    document.getElementById(id).addEventListener("input", (e) => {
+      A[k] = +e.target.value;
+      renderA();
+    });
+  }
+  function setA(w, h) {
+    A.w = w;
+    A.h = h;
+    document.getElementById("aw").value = w;
+    document.getElementById("ah").value = h;
+    renderA();
+  }
+  document
+    .getElementById("asq")
+    .addEventListener("click", () => setA(140, 140));
+  document
+    .getElementById("awide")
+    .addEventListener("click", () => setA(290, 90));
+  document
+    .getElementById("atall")
+    .addEventListener("click", () => setA(90, 210));
+  document.getElementById("fitbtn").addEventListener("click", (e) => {
+    A.fit = A.fit === "cover" ? "contain" : "cover";
+    e.target.textContent = A.fit;
+    renderA();
+  });
+
+  /* ---------- demo B ---------- */
+  const B = { w: 200, h: 200, ref: { w: 24, h: 24 }, edits: 0 };
+  function refBounds(pts) {
+    let x0 = 1e9,
+      y0 = 1e9,
+      x1 = -1e9,
+      y1 = -1e9;
+    for (const [px, py] of pts) {
+      x0 = Math.min(x0, px);
+      y0 = Math.min(y0, py);
+      x1 = Math.max(x1, px);
+      y1 = Math.max(y1, py);
+    }
+    return [x0, y0, x1, y1];
+  }
+  function blog(msg) {
+    const el = document.getElementById("blog");
+    el.innerHTML = msg + "<br>" + el.innerHTML;
+  }
+  function renderB() {
+    const [x, cw, ch] = ctx2("pb");
+    x.clearRect(0, 0, cw, ch);
+    const bx = (cw - B.w) / 2,
+      by = (ch - B.h) / 2;
+    frameBox(x, bx, by, B.w, B.h);
+    boltPath(x, bx, by, B.w, B.h, BOLT, B.ref);
+    x.fillStyle = GREEN;
+    x.globalAlpha = 0.22;
+    x.fill();
+    x.globalAlpha = 1;
+    x.strokeStyle = "#2E9A72";
+    x.lineWidth = 2;
+    x.stroke();
+    // vertex handles
+    const sx = B.w / B.ref.w,
+      sy = B.h / B.ref.h;
+    BOLT.forEach((p, i) => {
+      x.fillStyle = i === 4 ? RED : "#fff";
+      x.strokeStyle = "#2E9A72";
+      x.lineWidth = 1.4;
+      x.beginPath();
+      x.arc(bx + p[0] * sx, by + p[1] * sy, 3.4, 0, 7);
+      x.fill();
+      x.stroke();
+    });
+    // table
+    const tab = document.getElementById("btab");
+    tab.innerHTML =
+      "<tr><th>vertex</th><th>x (ref)</th><th>y (ref)</th></tr>" +
+      BOLT.map(
+        (p, i) =>
+          "<tr><td>#" +
+          i +
+          "</td><td" +
+          (i === 4 && B.edits ? " class='hot'" : "") +
+          ">" +
+          p[0].toFixed(1) +
+          "</td><td" +
+          (i === 4 && B.edits ? " class='hot'" : "") +
+          ">" +
+          p[1].toFixed(1) +
+          "</td></tr>"
+      ).join("");
+    document.getElementById("bdw").textContent = B.w;
+    document.getElementById("bdh").textContent = B.h;
+    document.getElementById("bdref").textContent =
+      B.ref.w.toFixed(0) + "\u00D7" + B.ref.h.toFixed(0);
+    document.getElementById("bwv").textContent = B.w;
+    document.getElementById("bhv").textContent = B.h;
+    document.getElementById("bmat").textContent =
+      "(" +
+      (BOLT[4][0] * sx).toFixed(1) +
+      ", " +
+      (BOLT[4][1] * sy).toFixed(1) +
+      ") px";
+  }
+  let btimer = null;
+  for (const [id, k] of [
+    ["bw", "w"],
+    ["bh", "h"],
+  ]) {
+    document.getElementById(id).addEventListener("input", (e) => {
+      B[k] = +e.target.value;
+      renderB();
+      clearTimeout(btimer);
+      btimer = setTimeout(
+        () =>
+          blog(
+            "resize \u2192 wrote <b class='w2'>2 fields</b> (w, h) \u00B7 0 vertices touched"
+          ),
+        300
+      );
+    });
+  }
+  document.getElementById("bnudge").addEventListener("click", () => {
+    BOLT[4] = [BOLT[4][0] + 1.5, BOLT[4][1] - 1.0];
+    B.edits++;
+    const [x0, y0, x1, y1] = refBounds(BOLT);
+    blog(
+      "vertex edit \u2192 wrote <b class='wN'>1 vertex</b> (points[4]) \u00B7 reference bounds re-derive to " +
+        (x1 - x0).toFixed(1) +
+        "\u00D7" +
+        (y1 - y0).toFixed(1)
+    );
+    document.getElementById("bfrozen").textContent =
+      "POINTS CHANGED BY GESTURE";
+    renderB();
+  });
+  document.getElementById("breset").addEventListener("click", () => {
+    BOLT = BOLT0.map((p) => p.slice());
+    B.edits = 0;
+    document.getElementById("bfrozen").textContent = "FROZEN UNDER RESIZE";
+    blog("reset");
+    renderB();
+  });
+
+  /* ---------- demo C ---------- */
+  const CBASE = { w: 150, h: 96, r: 10, stroke: 2, font: 12, tile: 16 };
+  const dot = document.createElement("canvas");
+  function makeDot(size) {
+    dot.width = size * 2;
+    dot.height = size * 2;
+    const p = dot.getContext("2d");
+    p.fillStyle = "#EAF2FB";
+    p.fillRect(0, 0, size * 2, size * 2);
+    p.fillStyle = "#4A90D9";
+    p.beginPath();
+    p.arc(size / 2, size / 2, size / 5, 0, 7);
+    p.fill();
+    p.beginPath();
+    p.arc(size * 1.5, size * 1.5, size / 5, 0, 7);
+    p.fill();
+    return dot;
+  }
+  function card(x, cw, ch, v, lensScale) {
+    x.clearRect(0, 0, cw, ch);
+    x.save();
+    if (lensScale) {
+      x.translate(cw / 2, ch / 2);
+      x.scale(lensScale, lensScale);
+      x.translate(-cw / 2, -ch / 2);
+    }
+    const bx = (cw - v.w) / 2,
+      by = (ch - v.h) / 2 - 8;
+    x.beginPath();
+    x.roundRect(bx, by, v.w, v.h, v.r);
+    x.save();
+    x.clip();
+    const pat = x.createPattern(makeDot(v.tile), "repeat");
+    x.fillStyle = pat;
+    x.fillRect(bx, by, v.w, v.h);
+    x.restore();
+    x.strokeStyle = INK;
+    x.lineWidth = v.stroke;
+    x.stroke();
+    x.fillStyle = INK;
+    x.font = "600 " + v.font + "px ui-monospace,monospace";
+    x.fillText("Card", bx, by + v.h + v.font + 6);
+    x.restore();
+  }
+  function docHTML(v, mode, s) {
+    const f = (n, chg) => (chg ? "<span class='chg'>" + n + "</span>" : n);
+    if (mode === "resize")
+      return (
+        "w: " +
+        f((CBASE.w * s).toFixed(0), 1) +
+        "  h: " +
+        f((CBASE.h * s).toFixed(0), 1) +
+        "\nstroke: 2   radius: 10\nfont: 12    tile: 16\n<span class='cm'>// 2 fields wrote; styles px-stable</span>"
+      );
+    if (mode === "k")
+      return (
+        "w: " +
+        f((CBASE.w * s).toFixed(0), 1) +
+        "  h: " +
+        f((CBASE.h * s).toFixed(0), 1) +
+        "\nstroke: " +
+        f((CBASE.stroke * s).toFixed(1), 1) +
+        " radius: " +
+        f((CBASE.r * s).toFixed(1), 1) +
+        "\nfont: " +
+        f((CBASE.font * s).toFixed(1), 1) +
+        "  tile: " +
+        f((CBASE.tile * s).toFixed(1), 1) +
+        "\n<span class='cm'>// bake: every number multiplied</span>"
+      );
+    return (
+      "w: 150  h: 96\nstroke: 2   radius: 10\nfont: 12    tile: 16\n<span class='op'>ops: scale(" +
+      s.toFixed(2) +
+      ")</span> <span class='cm'>// one stored op</span>"
+    );
+  }
+  function renderC() {
+    const s = +document.getElementById("cs").value / 100;
+    document.getElementById("csv").textContent = s.toFixed(2) + "\u00D7";
+    {
+      const [x, cw, ch] = ctx2("pc0");
+      card(x, cw, ch, { ...CBASE, w: CBASE.w * s, h: CBASE.h * s });
+    }
+    {
+      const [x, cw, ch] = ctx2("pc1");
+      card(x, cw, ch, {
+        w: CBASE.w * s,
+        h: CBASE.h * s,
+        r: CBASE.r * s,
+        stroke: CBASE.stroke * s,
+        font: CBASE.font * s,
+        tile: CBASE.tile * s,
+      });
+    }
+    {
+      const [x, cw, ch] = ctx2("pc2");
+      card(x, cw, ch, CBASE, s);
+    }
+    document.getElementById("doc0").innerHTML = docHTML(null, "resize", s);
+    document.getElementById("doc1").innerHTML = docHTML(null, "k", s);
+    document.getElementById("doc2").innerHTML = docHTML(null, "lens", s);
+  }
+  document.getElementById("cs").addEventListener("input", renderC);
+
+  renderA();
+  renderB();
+  renderC();
+  blog("ready \u2014 drag w/h, then try the vertex edit");
+</script>

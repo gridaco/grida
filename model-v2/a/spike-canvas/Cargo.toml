@@ -1,0 +1,40 @@
+[package]
+name = "anchor-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "E10 — the feel spike: a native Skia canvas driven by the anchor model (model-v2). Consumes anchor-lab as a library, the same relationship the phase-4 migration will have."
+
+# Standalone on purpose (model-v2 containment) — not a member of the
+# repo workspace, not committed. See ../a/README.md ledger row E10.
+[workspace]
+
+[dependencies]
+anchor-lab = { path = "../lab" }
+
+# Shell deps: versions matched to crates/grida_dev / crates/grida_editor
+# (the prior-art winit hosts) so the shared target dir can reuse the
+# already-compiled artifacts — especially skia-safe.
+winit = "0.30.0"
+glutin = "0.32.0"
+glutin-winit = "0.5.0"
+raw-window-handle = "0.6.0"
+gl = "0.14.0"
+skia-safe = { version = "0.93.1", features = [
+  "gpu",
+  "gl",
+  "textlayout",
+  "pdf",
+  "svg",
+  "webp",
+] }
+
+# egui overlay for the dev panels (IR / writes / reports) — the house UI
+# dialect (grida_editor shell), same versions so glow types unify.
+egui = "0.35"
+egui-winit = { version = "0.35", default-features = false }
+egui_glow = "0.35"
+glow = "0.17"
+
+[profile.release]
+debug = true

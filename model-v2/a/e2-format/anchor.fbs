@@ -1,0 +1,134 @@
+// anchor.fbs — E2 draft of the anchor model encoding (models/a.md §9).
+//
+// Written against the grida.fbs header rules:
+//  - intent states are STRUCTURAL (unions / nullable tables), never scalar
+//    sentinels (H11): absent AxisBinding ⇒ Pin{Start,0}; absent SizeIntent
+//    ⇒ the kind default; absent MinMax ⇒ unconstrained; absent MaxLines ⇒
+//    unlimited (the current `max_lines: 0 ≡ unset` hack is unrepresentable).
+//  - tables over structs everywhere evolution is conceivable.
+//  - evolution is additive: new payloads extend NodePayload; new binding
+//    forms extend AxisBinding (e.g. a future PinPercent), new layout modes
+//    extend LayoutBehavior.
+//
+// This is a lab-standalone schema: identity/asset/paint tables from the
+// real grida.fbs are stubbed to keep E2 focused on the geometry header.
+
+namespace grida.anchor;
+
+// ---------- geometry intent ----------
+
+enum AnchorEdge : byte { Start = 0, Center = 1, End = 2 }
+
+table Pin  { anchor: AnchorEdge = Start; offset: float = 0; }
+table Span { start: float = 0; end: float = 0; }
+union AxisBinding { Pin, Span }          // absent ⇒ Pin{Start, 0}
+
+table SizeFixed { value: float; }
+table SizeAuto  {}
+union SizeIntent { SizeFixed, SizeAuto } // absent ⇒ kind default (a.md §4)
+
+// nullable scalar boxes — structural unset, no sentinel values
+table FloatBox  { value: float; }
+table UInt32Box { value: uint32; }
+table StringBox { value: string; }
+
+table AspectRatio { w: float; h: float; }
+
+enum Flow : byte { InFlow = 0, Absolute = 1 }
+enum SelfAlign : byte { Auto = 0, Start = 1, Center = 2, End = 3, Stretch = 4 }
+
+// ---------- hierarchy ----------
+
+table ParentRef {
+  id: uint32;
+  order: string;                          // fractional index (S-4)
+}
+
+// ---------- the uniform header ----------
+
+table NodeHeader {
+  id: uint32;
+  name: string;
+  active: bool = true;
+  locked: bool = false;
+  parent: ParentRef;                      // absent ⇒ scene root
+
+  x: AxisBinding;
+  y: AxisBinding;
+  width: SizeIntent;
+  height: SizeIntent;
+  min_width: FloatBox;                    // nullable tables, not sentinels
+  max_width: FloatBox;
+  min_height: FloatBox;
+  max_height: FloatBox;
+  aspect_ratio: AspectRatio;              // absent ⇒ unset (no (0,0) hack)
+  rotation: float = 0;                    // degrees; pivot per a.md §5
+
+  flow: Flow = InFlow;
+  grow: float = 0;
+  self_align: SelfAlign = Auto;
+
+  opacity: float = 1;
+}
+
+// ---------- payloads (lab subset; the full set is additive) ----------
+
+enum LayoutMode : byte { None = 0, Flex = 1 }
+enum Direction : byte { Row = 0, Column = 1 }
+enum MainAlign : byte { Start = 0, Center = 1, End = 2, SpaceBetween = 3, SpaceAround = 4, SpaceEvenly = 5 }
+enum CrossAlign : byte { Start = 0, Center = 1, End = 2, Stretch = 3 }
+
+table EdgeInsets { top: float = 0; right: float = 0; bottom: float = 0; left: float = 0; }
+
+table LayoutBehavior {
+  mode: LayoutMode = None;
+  direction: Direction = Row;
+  wrap: bool = false;
+  main_align: MainAlign = Start;
+  cross_align: CrossAlign = Start;
+  padding: EdgeInsets;
+  gap_main: float = 0;
+  gap_cross: float = 0;
+}
+
+// shape descriptors are size-free; evaluated at the resolved box (a.md §3.2)
+table RectDesc {}
+table EllipseDesc { inner_ratio: float = 0; start_angle: float = 0; sweep: float = 360; }
+table LineDesc {}
+table RegularPolygonDesc { points: uint32; }
+table StarDesc { points: uint32; inner_ratio: float; }
+union ShapeDesc { RectDesc, EllipseDesc, LineDesc, RegularPolygonDesc, StarDesc }
+
+table FramePayload { layout: LayoutBehavior; clips_content: bool = false; }
+table ShapePayload { desc: ShapeDesc; }
+table TextPayload {
+  content: string;
+  font_size: float = 16;
+  max_lines: UInt32Box;                   // absent ⇒ unlimited (T-2 witness)
+  ellipsis: StringBox;                    // absent ⇒ "…"; empty string ⇒ none
+}
+table GroupPayload {}
+
+// each lens op parameter is a named scalar — an animation channel (a.md §3.3)
+table TranslateOp { x: float = 0; y: float = 0; }
+table RotateOp    { deg: float = 0; }
+table ScaleOp     { x: float = 1; y: float = 1; }
+table SkewOp      { x_deg: float = 0; y_deg: float = 0; }
+table Matrix2D    { m00: float; m01: float; m02: float; m10: float; m11: float; m12: float; }
+union LensOpU { TranslateOp, RotateOp, ScaleOp, SkewOp, Matrix2D }
+table LensOpSlot { op: LensOpU; }
+table LensPayload { ops: [LensOpSlot]; }
+
+union NodePayload { FramePayload, ShapePayload, TextPayload, GroupPayload, LensPayload }
+
+table NodeSlot {
+  header: NodeHeader (required);
+  payload: NodePayload;
+}
+
+table AnchorDocument {
+  nodes: [NodeSlot];
+  root: uint32;
+}
+
+root_type AnchorDocument;

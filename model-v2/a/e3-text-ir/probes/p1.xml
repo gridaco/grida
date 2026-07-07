@@ -1,0 +1,7 @@
+<frame name="root" w="1000" h="1000">
+  <frame name="panel" x="50" y="40" w="400" h="300">
+    <shape name="a" kind="rect" x="10" y="20" w="120" h="80"/>
+    <shape name="b" kind="rect" x="end 24" y="center" w="120" h="80"/>
+    <shape name="c" kind="rect" x="span 30 50" y="end 0" w="99" h="60"/>
+  </frame>
+</frame>

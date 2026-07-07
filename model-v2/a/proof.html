@@ -1,0 +1,3876 @@
+<title>anchor &#8212; visual proof</title>
+<style>
+  :root {
+    --paper: #f7f8f9;
+    --card: #ffffff;
+    --ink: #171a1f;
+    --muted: #5c6470;
+    --line: #e2e5e9;
+    --blue: #4a90d9;
+    --red: #e2574c;
+    --green: #57b894;
+    --blue-dim: #eaf2fb;
+    --red-dim: #fcedeb;
+    --green-dim: #eaf7f2;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  html {
+    background: var(--paper);
+  }
+  body {
+    font: 15px/1.6 var(--sans);
+    color: var(--ink);
+    margin: 0;
+    padding: 0 20px 96px;
+  }
+  .wrap {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  header.page {
+    padding: 56px 0 8px;
+  }
+  .eyebrow {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font: 600 34px/1.15 var(--mono);
+    letter-spacing: -0.01em;
+    margin: 14px 0 10px;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 62ch;
+    color: var(--muted);
+    margin: 0;
+  }
+  .lede b {
+    color: var(--ink);
+  }
+
+  .tiers {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 28px 0 8px;
+  }
+  .tier {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .tier .k {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tier .v {
+    font: 600 14px/1.4 var(--mono);
+    margin-top: 8px;
+  }
+  .tier p {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .board {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 22px 0 0;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 14px 6px 8px;
+    font: 600 12px/1 var(--mono);
+  }
+  .chip .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+  .chip small {
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  section {
+    margin-top: 64px;
+  }
+  .exh {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .exh::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+  h2 {
+    font: 600 22px/1.3 var(--mono);
+    margin: 12px 0 6px;
+    text-wrap: balance;
+  }
+  .sub {
+    color: var(--muted);
+    max-width: 66ch;
+    margin: 0 0 20px;
+  }
+
+  .stage {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .arms {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .armlabel {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin: 2px 0 6px;
+  }
+  .armlabel.blue {
+    color: var(--blue);
+  }
+  .armlabel.red {
+    color: var(--red);
+  }
+  canvas.arm {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fdfdfc;
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .controls input[type="range"] {
+    flex: 1;
+    min-width: 200px;
+    accent-color: var(--blue);
+  }
+  .deg {
+    font: 600 16px/1 var(--mono);
+    min-width: 64px;
+    font-variant-numeric: tabular-nums;
+  }
+  button {
+    font: 600 12px/1 var(--mono);
+    letter-spacing: 0.04em;
+    background: var(--ink);
+    color: #fff;
+    border: 0;
+    border-radius: 4px;
+    padding: 9px 16px;
+    cursor: pointer;
+  }
+  button.ghost {
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  button:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+  .readouts {
+    display: flex;
+    gap: 24px;
+    margin-top: 14px;
+    font: 400 13px var(--mono);
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .readouts b {
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .readouts .bad b {
+    color: var(--red);
+  }
+
+  .charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .chart {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 14px 8px;
+  }
+  .chart .t {
+    font: 600 12px/1.4 var(--mono);
+    margin-bottom: 2px;
+  }
+  .chart .d {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  canvas.ch {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .frames {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 4px 0 10px;
+    margin-top: 14px;
+  }
+  .frame {
+    flex: 0 0 460px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+  }
+  .frame svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .frame .cap {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 6px 4px 2px;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font: 13px var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .tablewrap {
+    overflow-x: auto;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  td.ok {
+    color: var(--green);
+    font-weight: 600;
+  }
+  td.no {
+    color: var(--red);
+    font-weight: 600;
+  }
+  .score {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-weight: 600;
+  }
+  .score.g {
+    background: var(--green-dim);
+    color: #22755a;
+  }
+  .score.r {
+    background: var(--red-dim);
+    color: #a33327;
+  }
+
+  pre {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    font: 12.5px/1.55 var(--mono);
+    margin: 0;
+  }
+  pre .hl {
+    background: var(--blue-dim);
+    border-radius: 2px;
+  }
+  pre .cm {
+    color: var(--muted);
+  }
+  .cols2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  .badge {
+    display: inline-block;
+    background: var(--green-dim);
+    color: #22755a;
+    font: 600 12px/1 var(--mono);
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin-top: 10px;
+  }
+
+  .bar {
+    display: flex;
+    height: 34px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    margin-top: 14px;
+  }
+  .bar div {
+    min-width: 2px;
+  }
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    font: 12px var(--mono);
+    color: var(--muted);
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sw {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  .repro {
+    background: var(--ink);
+    color: #e8eaed;
+    border-radius: 8px;
+    padding: 20px 22px;
+    margin-top: 18px;
+  }
+  .repro .t {
+    font: 600 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #9aa3af;
+    margin-bottom: 12px;
+  }
+  .repro pre {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: #e8eaed;
+  }
+  .repro .cm {
+    color: #8a93a0;
+  }
+
+  @media (max-width: 760px) {
+    .tiers,
+    .charts,
+    .cols2,
+    .arms {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      scroll-behavior: auto;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div class="eyebrow">
+      model-v2 &#183; anchor &#183; proof run &#8212; 2026-07-07
+    </div>
+    <h1>The list makes room.</h1>
+    <p class="lede">
+      Every number and pixel on this page comes from the lab in
+      <b>model-v2/a/</b> &#8212; the resolver that implements the anchor spec,
+      the sweeps it ran, and the agents that were tested against it. Three kinds
+      of proof, in order of strength:
+    </p>
+
+    <div class="tiers">
+      <div class="tier">
+        <div class="k">runtime</div>
+        <div class="v">it runs, live</div>
+        <p>
+          The E1 demo below is the resolver's actual output, scrubbable. On your
+          machine:
+          <code style="font-family: var(--mono)">cargo test</code> &#8594;
+          56/56.
+        </p>
+      </div>
+      <div class="tier">
+        <div class="k">image</div>
+        <div class="v">it renders, exactly</div>
+        <p>
+          SVG frames emitted by the resolver at key angles, magenta dashes =
+          computed world AABBs.
+        </p>
+      </div>
+      <div class="tier">
+        <div class="k">record</div>
+        <div class="v">it is written down</div>
+        <p>
+          metrics.csv, truth.txt, prediction files, byte-fixpoint binaries
+          &#8212; every claim re-derivable.
+        </p>
+      </div>
+    </div>
+
+    <div class="board">
+      <span class="chip"
+        ><span class="dot"></span>LAB <small>56/56 tests</small></span
+      >
+      <span class="chip"
+        ><span class="dot"></span>E1 <small>layout-visible locked</small></span
+      >
+      <span class="chip"
+        ><span class="dot"></span>E2 <small>byte-fixpoint</small></span
+      >
+      <span class="chip"
+        ><span class="dot"></span>E3 <small>LLM 22/22 &#215;2</small></span
+      >
+      <span class="chip"
+        ><span class="dot"></span>E4 <small>10k &#8594; 5.4 ms</small></span
+      >
+      <span class="chip"
+        ><span class="dot"></span>E5 <small>1M transforms</small></span
+      >
+    </div>
+  </header>
+
+  <section>
+    <div class="exh">exhibit e1 &#8212; the deciding experiment, live</div>
+    <h2>Rotate the middle card. Watch both worlds.</h2>
+    <p class="sub">
+      Same document, same resolver, one flag. Top:
+      <b style="color: var(--blue)">anchor</b> &#8212; the rotated card
+      participates by its oriented envelope, siblings make room, the hug
+      container breathes. Bottom:
+      <b style="color: var(--red)">CSS control</b> &#8212; layout is frozen,
+      rotation is paint-only, and the red wash is sibling overlap that no
+      document field expresses.
+    </p>
+
+    <div class="stage">
+      <div class="arms">
+        <div>
+          <div class="armlabel blue">anchor &#8212; aabb participates</div>
+          <canvas class="arm" id="c0" width="1240" height="640"></canvas>
+        </div>
+        <div>
+          <div class="armlabel red">css control &#8212; visual-only</div>
+          <canvas class="arm" id="c1" width="1240" height="640"></canvas>
+        </div>
+      </div>
+      <div class="controls">
+        <span class="deg" id="deg">&#952; = 0&#176;</span>
+        <input
+          id="s"
+          type="range"
+          min="0"
+          max="180"
+          value="0"
+          aria-label="rotation angle"
+        />
+        <button id="play">&#9654; play</button>
+        <button class="ghost jump" data-i="0">0&#176;</button>
+        <button class="ghost jump" data-i="30">60&#176;</button>
+        <button class="ghost jump" data-i="45">90&#176;</button>
+      </div>
+      <div class="readouts">
+        <span>anchor container <b id="r-aw">220.0</b> px</span>
+        <span>anchor overlap <b id="r-ao">0</b> px&#178;</span>
+        <span class="bad">control overlap <b id="r-vo">0</b> px&#178;</span>
+        <span>rotate gesture <b>1 write</b> / step</span>
+      </div>
+    </div>
+
+    <div class="charts">
+      <div class="chart">
+        <div class="t">Container width vs &#952;</div>
+        <div class="d">
+          anchor breathes 220&#8594;276.6 px, peak at
+          &#952;*=atan(h/w)&#8776;59&#176;; control flat
+        </div>
+        <canvas class="ch" id="ch1" width="880" height="360"></canvas>
+      </div>
+      <div class="chart">
+        <div class="t">Sibling overlap area vs &#952;</div>
+        <div class="d">
+          anchor: zero at every angle &#183; control: up to 1,830 px&#178;
+        </div>
+        <canvas class="ch" id="ch2" width="880" height="360"></canvas>
+      </div>
+      <div class="chart">
+        <div class="t">Third card position vs &#952;</div>
+        <div class="d">
+          smooth &#8212; max step 3.45 px per 2&#176;, inside the
+          &#8730;(w&#178;+h&#178;)&#183;&#916;&#952; = 4.07 px bound
+        </div>
+        <canvas class="ch" id="ch3" width="880" height="360"></canvas>
+      </div>
+      <div class="chart">
+        <div class="t">Verdict</div>
+        <div class="d">
+          conformance R-3 and editor OP-ROT-2: POL &#8594; INV
+        </div>
+        <p
+          style="font: 13px/1.6 var(--sans); color: var(--ink); margin: 6px 0 0"
+        >
+          Locked <b>layout-visible</b>. Zero overlap by construction and by
+          measurement; displacement continuous through
+          0&#176;/90&#176;/180&#176;; rotation stays a one-field write.
+          Breathing during a full spin (56.6 px) is a hug-container phenomenon
+          and is exactly why motion rotation targets a lens channel &#8212; the
+          two-lane rule, now measured rather than argued.
+        </p>
+      </div>
+    </div>
+
+    <div class="frames">
+      <div class="frame">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="100%"
+          viewBox="0 0 640 420"
+          font-family="monospace"
+        >
+          <g transform="translate(0 10)">
+            <text x="20" y="12" font-size="11" fill="#555">
+              anchor: AABB participates &#8212; &#952;=0&#176;
+            </text>
+            <rect
+              width="640"
+              height="200"
+              transform="matrix(1 0 0 1 0 0)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="220"
+              height="140"
+              transform="matrix(1 0 0 1 20 20)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 30 40)"
+              fill="#4a90d9"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 100 40)"
+              fill="#e2574c"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 170 40)"
+              fill="#57b894"
+            />
+            <rect
+              x="20"
+              y="20"
+              width="220"
+              height="140"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="30"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="100"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="170"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+          </g>
+          <g transform="translate(0 210)">
+            <text x="20" y="12" font-size="11" fill="#555">
+              control: visual-only (CSS) &#8212; &#952;=0&#176;
+            </text>
+            <rect
+              width="640"
+              height="200"
+              transform="matrix(1 0 0 1 0 0)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="220"
+              height="140"
+              transform="matrix(1 0 0 1 20 20)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 30 40)"
+              fill="#4a90d9"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 100 40)"
+              fill="#e2574c"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 170 40)"
+              fill="#57b894"
+            />
+            <rect
+              x="20"
+              y="20"
+              width="220"
+              height="140"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="170"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="30"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="100"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+          </g>
+        </svg>
+        <div class="cap">&#952; = 0&#176; &#8212; resolver SVG output</div>
+      </div>
+      <div class="frame">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="100%"
+          viewBox="0 0 640 420"
+          font-family="monospace"
+        >
+          <g transform="translate(0 10)">
+            <text x="20" y="12" font-size="11" fill="#555">
+              anchor: AABB participates &#8212; &#952;=45&#176;
+            </text>
+            <rect
+              width="640"
+              height="200"
+              transform="matrix(1 0 0 1 0 0)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="273.1371"
+              height="140"
+              transform="matrix(1 0 0 1 20 20)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 30 40)"
+              fill="#4a90d9"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(0.70710677 0.70710677 -0.70710677 0.70710677 170.71068 33.431458)"
+              fill="#e2574c"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 223.13708 40)"
+              fill="#57b894"
+            />
+            <rect
+              x="100"
+              y="33.431458"
+              width="113.137085"
+              height="113.137085"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="223.13708"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="20"
+              y="20"
+              width="273.1371"
+              height="140"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="30"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+          </g>
+          <g transform="translate(0 210)">
+            <text x="20" y="12" font-size="11" fill="#555">
+              control: visual-only (CSS) &#8212; &#952;=45&#176;
+            </text>
+            <rect
+              width="640"
+              height="200"
+              transform="matrix(1 0 0 1 0 0)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="220"
+              height="140"
+              transform="matrix(1 0 0 1 20 20)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 30 40)"
+              fill="#4a90d9"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(0.70710677 0.70710677 -0.70710677 0.70710677 144.14214 33.431458)"
+              fill="#e2574c"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 170 40)"
+              fill="#57b894"
+            />
+            <rect
+              x="170"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="30"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="20"
+              y="20"
+              width="220"
+              height="140"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="73.43146"
+              y="33.431458"
+              width="113.137085"
+              height="113.137085"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+          </g>
+        </svg>
+        <div class="cap">
+          &#952; = 45&#176; &#8212; envelope 113.1&#215;113.1
+        </div>
+      </div>
+      <div class="frame">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="100%"
+          viewBox="0 0 640 420"
+          font-family="monospace"
+        >
+          <g transform="translate(0 10)">
+            <text x="20" y="12" font-size="11" fill="#555">
+              anchor: AABB participates &#8212; &#952;=90&#176;
+            </text>
+            <rect
+              width="640"
+              height="200"
+              transform="matrix(1 0 0 1 0 0)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="260"
+              height="140"
+              transform="matrix(1 0 0 1 20 20)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 30 40)"
+              fill="#4a90d9"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(0 1 -1 0 200 60)"
+              fill="#e2574c"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 210 40)"
+              fill="#57b894"
+            />
+            <rect
+              x="210"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="100"
+              y="60"
+              width="100"
+              height="60"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="30"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="20"
+              y="20"
+              width="260"
+              height="140"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+          </g>
+          <g transform="translate(0 210)">
+            <text x="20" y="12" font-size="11" fill="#555">
+              control: visual-only (CSS) &#8212; &#952;=90&#176;
+            </text>
+            <rect
+              width="640"
+              height="200"
+              transform="matrix(1 0 0 1 0 0)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="220"
+              height="140"
+              transform="matrix(1 0 0 1 20 20)"
+              fill="#f6f6f6"
+              stroke="#999"
+              stroke-width="1"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 30 40)"
+              fill="#4a90d9"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(0 1 -1 0 180 60)"
+              fill="#e2574c"
+            />
+            <rect
+              width="60"
+              height="100"
+              transform="matrix(1 0 0 1 170 40)"
+              fill="#57b894"
+            />
+            <rect
+              x="170"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="30"
+              y="40"
+              width="60"
+              height="100"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="80"
+              y="60"
+              width="100"
+              height="60"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+            <rect
+              x="20"
+              y="20"
+              width="220"
+              height="140"
+              fill="none"
+              stroke="#f0f"
+              stroke-width="0.5"
+              stroke-dasharray="3 3"
+            />
+          </g>
+        </svg>
+        <div class="cap">
+          &#952; = 90&#176; &#8212; slot is exactly 100&#215;60
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="exh">exhibit e3 &#8212; can a model predict it cold?</div>
+    <h2>Two fresh agents, a 150-line grammar, 22/22 exact.</h2>
+    <p class="sub">
+      Three agents were handed only the grammar and six documents &#8212; no
+      tools, no resolver &#8212; and asked for every resolved box. The hardest
+      probe is the E1 rule itself (p5, below). Frontier agents matched the
+      resolver on all 22 values within 0.5 px.
+    </p>
+
+    <div class="cols2">
+      <pre><span class="cm">&lt;!-- probe p5 &#8212; rotated card in a hug row --&gt;</span>
+&lt;frame name="list" w="auto" h="140"
+       layout="flex" gap="10" padding="10"
+       cross="center"&gt;
+  &lt;shape name="a" kind="rect" w="60" h="100"/&gt;
+  &lt;shape name="b" kind="rect" w="60" h="100"
+         <span class="hl">rotation="90"</span>/&gt;
+  &lt;shape name="c" kind="rect" w="60" h="100"/&gt;
+&lt;/frame&gt;</pre>
+      <div class="tablewrap">
+        <table>
+          <tr>
+            <th>p5 value</th>
+            <th>resolver</th>
+            <th>fable-a</th>
+            <th>fable-b</th>
+            <th>haiku-c</th>
+          </tr>
+          <tr>
+            <td>list (hug w)</td>
+            <td>260</td>
+            <td class="ok">260</td>
+            <td class="ok">260</td>
+            <td class="ok">260</td>
+          </tr>
+          <tr>
+            <td>b box x,y</td>
+            <td>100, 20</td>
+            <td class="ok">100, 20</td>
+            <td class="ok">100, 20</td>
+            <td class="no">50, 40</td>
+          </tr>
+          <tr>
+            <td>b world AABB</td>
+            <td>80, 40, 100&#215;60</td>
+            <td class="ok">exact</td>
+            <td class="ok">exact</td>
+            <td class="no">x=30</td>
+          </tr>
+          <tr>
+            <td>c (pushed) x</td>
+            <td>190</td>
+            <td class="ok">190</td>
+            <td class="ok">190</td>
+            <td class="ok">190</td>
+          </tr>
+          <tr>
+            <td>all 6 probes</td>
+            <td>22 values</td>
+            <td><span class="score g">22/22</span></td>
+            <td><span class="score g">22/22</span></td>
+            <td><span class="score r">17/22</span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <p class="sub" style="margin-top: 14px">
+      Even the small-model control applied the rotation-in-flow
+      <i>rule</i> correctly &#8212; its misses were an off-by-one character
+      count and placing a box at slot-start instead of slot-center. Slips, not
+      structural confusion. Records:
+      <span style="font-family: var(--mono)"
+        >e3-text-ir/truth.txt &#183; predictions/*</span
+      >
+    </p>
+  </section>
+
+  <section>
+    <div class="exh">exhibit e2 &#8212; the file format</div>
+    <h2>Encode &#8594; decode &#8594; encode: byte-identical.</h2>
+    <p class="sub">
+      The quartet document through flatc 25.12: JSON &#8594; binary &#8594; JSON
+      &#8594; binary produces the same bytes. And "unset" is structural &#8212;
+      read the decoded output:
+    </p>
+    <div class="cols2">
+      <pre><span class="cm">// grow-text node &#8212; decoded JSON</span>
+{
+  "id": 5, <span class="cm">// no x, no y keys at all</span>
+  <span class="hl">"grow": 1.0</span>  <span class="cm">// &#8658; Pin{Start,0} by rule</span>
+}
+<span class="cm">// flex frame &#8212; height IS auto, structurally</span>
+{
+  "width_type": "SizeFixed",
+  "width": { "value": 400.0 },
+  <span class="hl">"height_type": "SizeAuto"</span>,
+  "height": { }
+}</pre>
+      <div>
+        <pre>
+$ ./run.sh
+S-1 FIXPOINT: byte-identical
+M-4 forward:  v1 binary decodes under v2 schema
+M-4 backward: v2 binary decodes under v1 schema</pre
+        >
+        <span class="badge"
+          >max_lines: 0 &#8801; unset &#8212; now unrepresentable</span
+        >
+        <p class="sub" style="margin-top: 10px">
+          One policy owed for phase 3: re-encoding through an <i>old</i> schema
+          drops unknown fields &#8212; read-skip is free, read-modify-write
+          preservation is not.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="exh">exhibit e4 &#8212; the resolver, timed</div>
+    <h2>10,000 nodes in 5.4 ms, unoptimized.</h2>
+    <div class="tablewrap">
+      <table>
+        <tr>
+          <th>scene</th>
+          <th>nodes</th>
+          <th>full resolve</th>
+          <th>throughput</th>
+        </tr>
+        <tr>
+          <td>flat canvas (&#8528; rotated)</td>
+          <td>10,001</td>
+          <td>5.42 ms</td>
+          <td>1,844 nodes/ms</td>
+        </tr>
+        <tr>
+          <td>flex cards &#8212; nested hug + text measure (worst case)</td>
+          <td>5,785</td>
+          <td>24.4 ms</td>
+          <td>237 nodes/ms</td>
+        </tr>
+        <tr>
+          <td>mixed groups + rotated-in-flow</td>
+          <td>10,003</td>
+          <td>8.21 ms</td>
+          <td>1,218 nodes/ms</td>
+        </tr>
+        <tr>
+          <td>one card subtree (locality bound per leaf edit)</td>
+          <td>6</td>
+          <td><b>18 &#181;s</b></td>
+          <td>&#8212;</td>
+        </tr>
+      </table>
+    </div>
+    <p class="sub" style="margin-top: 14px">
+      Single-threaded, zero caching, and the lab double-runs layout on hug
+      containers &#8212; this is the floor. Scaling is linear (10&#215; nodes
+      &#8594; 9.6&#215; time in the all-flex worst case). What it replaces: the
+      26-arm branch forest, the atan2 transform reconstruction, and
+      <span style="font-family: var(--mono)">MIN_SIZE_DIRTY_HACK</span>.
+    </p>
+  </section>
+
+  <section>
+    <div class="exh">exhibit e5 &#8212; a million transforms</div>
+    <h2>The corpus re-ranked the escape hatch.</h2>
+    <p class="sub">
+      7,138 SVGs, 1,003,787 transforms scanned. The lens was designed for skew
+      &#8212; but genuine shear is under 1%. The real finding is
+      <b>flip at 26%</b>: single-axis mirrors must be native header bits, or the
+      "quarantine" fires on a quarter of wild files.
+    </p>
+    <div class="bar" role="img" aria-label="geometry transform classes">
+      <div
+        style="width: 9.1%; background: #9db6d8"
+        title="translate 9.1%"
+      ></div>
+      <div style="width: 1.3%; background: #4a90d9" title="rotate 1.3%"></div>
+      <div
+        style="width: 19.8%; background: #57b894"
+        title="uniform scale 19.8%"
+      ></div>
+      <div
+        style="width: 42.8%; background: #8ccdb4"
+        title="non-uniform scale 42.8%"
+      ></div>
+      <div style="width: 26.1%; background: #e2a23f" title="flip 26.1%"></div>
+      <div style="width: 0.95%; background: #e2574c" title="shear 0.95%"></div>
+    </div>
+    <div class="legend">
+      <span
+        ><span class="sw" style="background: #9db6d8"></span>translate
+        9.1%</span
+      >
+      <span
+        ><span class="sw" style="background: #4a90d9"></span>rotate 1.3%</span
+      >
+      <span
+        ><span class="sw" style="background: #57b894"></span>scale= 19.8%</span
+      >
+      <span
+        ><span class="sw" style="background: #8ccdb4"></span>scale&#8800;
+        42.8%</span
+      >
+      <span
+        ><span class="sw" style="background: #e2a23f"></span>flip 26.1% &#8594;
+        goes native</span
+      >
+      <span
+        ><span class="sw" style="background: #e2574c"></span>shear 0.95% &#8594;
+        lens</span
+      >
+    </div>
+  </section>
+
+  <section>
+    <div class="exh">reproduce it</div>
+    <h2>Runtime proof, on your machine.</h2>
+    <div class="repro">
+      <div class="t">from the repo root</div>
+      <pre>open model-v2/a/e1-rotation-in-flow/demo.html   <span class="cm"># the offline twin of the demo above</span>
+cd model-v2/a/lab
+cargo test                        <span class="cm"># 56/56 conformance-derived tests</span>
+cargo run --bin e1                <span class="cm"># regenerate the sweep, frames, metrics</span>
+cargo run --bin e3 -- truth       <span class="cm"># ground truth an agent must match</span>
+cargo run --release --bin e4      <span class="cm"># the timings above</span></pre>
+    </div>
+    <p class="sub" style="margin-top: 16px">
+      Full narrative, amendments E-A1&#8230;E-A7, and the honest lose column:
+      <span style="font-family: var(--mono)">model-v2/a/REPORT.md</span>.
+      Nothing is committed to git &#8212; the workbench is yours to review.
+    </p>
+  </section>
+</div>
+
+<script>
+  const FRAMES = [
+    [
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 0.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 223.45, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [81.73, 20.0, 60.0, 100.0, 2.0],
+        [153.45, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 226.83, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [83.41, 20.0, 60.0, 100.0, 4.0],
+        [156.83, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 230.12, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [85.06, 20.0, 60.0, 100.0, 6.0],
+        [160.12, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 233.33, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [86.67, 20.0, 60.0, 100.0, 8.0],
+        [163.33, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 236.45, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [88.23, 20.0, 60.0, 100.0, 10.0],
+        [166.45, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 239.48, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [89.74, 20.0, 60.0, 100.0, 12.0],
+        [169.48, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 242.41, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [91.2, 20.0, 60.0, 100.0, 14.0],
+        [172.41, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 245.24, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [92.62, 20.0, 60.0, 100.0, 16.0],
+        [175.24, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 247.97, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [93.98, 20.0, 60.0, 100.0, 18.0],
+        [177.97, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 250.58, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [95.29, 20.0, 60.0, 100.0, 20.0],
+        [180.58, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 253.09, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [96.55, 20.0, 60.0, 100.0, 22.0],
+        [183.09, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 255.49, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [97.74, 20.0, 60.0, 100.0, 24.0],
+        [185.49, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 257.76, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [98.88, 20.0, 60.0, 100.0, 26.0],
+        [187.76, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 259.92, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [99.96, 20.0, 60.0, 100.0, 28.0],
+        [189.92, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 261.96, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [100.98, 20.0, 60.0, 100.0, 30.0],
+        [191.96, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 263.87, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.94, 20.0, 60.0, 100.0, 32.0],
+        [193.87, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 265.66, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [102.83, 20.0, 60.0, 100.0, 34.0],
+        [195.66, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 267.32, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [103.66, 20.0, 60.0, 100.0, 36.0],
+        [197.32, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 268.85, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [104.42, 20.0, 60.0, 100.0, 38.0],
+        [198.85, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 270.24, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.12, 20.0, 60.0, 100.0, 40.0],
+        [200.24, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 271.5, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.75, 20.0, 60.0, 100.0, 42.0],
+        [201.5, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 272.63, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.31, 20.0, 60.0, 100.0, 44.0],
+        [202.63, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 273.61, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.81, 20.0, 60.0, 100.0, 46.0],
+        [203.61, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 274.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.23, 20.0, 60.0, 100.0, 48.0],
+        [204.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.17, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.59, 20.0, 60.0, 100.0, 50.0],
+        [205.17, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.74, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.87, 20.0, 60.0, 100.0, 52.0],
+        [205.74, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.17, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.08, 20.0, 60.0, 100.0, 54.0],
+        [206.17, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.23, 20.0, 60.0, 100.0, 56.0],
+        [206.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.6, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.3, 20.0, 60.0, 100.0, 58.0],
+        [206.6, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.6, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.3, 20.0, 60.0, 100.0, 60.0],
+        [206.6, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.23, 20.0, 60.0, 100.0, 62.0],
+        [206.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.18, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.09, 20.0, 60.0, 100.0, 64.0],
+        [206.18, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.76, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.88, 20.0, 60.0, 100.0, 66.0],
+        [205.76, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.19, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.6, 20.0, 60.0, 100.0, 68.0],
+        [205.19, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 274.49, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.25, 20.0, 60.0, 100.0, 70.0],
+        [204.49, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 273.65, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.82, 20.0, 60.0, 100.0, 72.0],
+        [203.65, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 272.66, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.33, 20.0, 60.0, 100.0, 74.0],
+        [202.66, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 271.54, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.77, 20.0, 60.0, 100.0, 76.0],
+        [201.54, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 270.29, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.14, 20.0, 60.0, 100.0, 78.0],
+        [200.29, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 268.9, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [104.45, 20.0, 60.0, 100.0, 80.0],
+        [198.9, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 267.38, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [103.69, 20.0, 60.0, 100.0, 82.0],
+        [197.38, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 265.72, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [102.86, 20.0, 60.0, 100.0, 84.0],
+        [195.72, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 263.94, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.97, 20.0, 60.0, 100.0, 86.0],
+        [193.94, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 262.03, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.02, 20.0, 60.0, 100.0, 88.0],
+        [192.03, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 260.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [100.0, 20.0, 60.0, 100.0, 90.0],
+        [190.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 262.03, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.02, 20.0, 60.0, 100.0, 92.0],
+        [192.03, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 263.94, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.97, 20.0, 60.0, 100.0, 94.0],
+        [193.94, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 265.72, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [102.86, 20.0, 60.0, 100.0, 96.0],
+        [195.72, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 267.38, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [103.69, 20.0, 60.0, 100.0, 98.0],
+        [197.38, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 268.9, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [104.45, 20.0, 60.0, 100.0, 100.0],
+        [198.9, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 270.29, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.14, 20.0, 60.0, 100.0, 102.0],
+        [200.29, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 271.54, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.77, 20.0, 60.0, 100.0, 104.0],
+        [201.54, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 272.66, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.33, 20.0, 60.0, 100.0, 106.0],
+        [202.66, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 273.65, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.82, 20.0, 60.0, 100.0, 108.0],
+        [203.65, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 274.49, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.25, 20.0, 60.0, 100.0, 110.0],
+        [204.49, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.19, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.6, 20.0, 60.0, 100.0, 112.0],
+        [205.19, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.76, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.88, 20.0, 60.0, 100.0, 114.0],
+        [205.76, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.18, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.09, 20.0, 60.0, 100.0, 116.0],
+        [206.18, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.23, 20.0, 60.0, 100.0, 118.0],
+        [206.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.6, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.3, 20.0, 60.0, 100.0, 120.0],
+        [206.6, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.6, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.3, 20.0, 60.0, 100.0, 122.0],
+        [206.6, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.23, 20.0, 60.0, 100.0, 124.0],
+        [206.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.17, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.08, 20.0, 60.0, 100.0, 126.0],
+        [206.17, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.74, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.87, 20.0, 60.0, 100.0, 128.0],
+        [205.74, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.17, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.59, 20.0, 60.0, 100.0, 130.0],
+        [205.17, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 274.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.23, 20.0, 60.0, 100.0, 132.0],
+        [204.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 273.61, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.81, 20.0, 60.0, 100.0, 134.0],
+        [203.61, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 272.63, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.31, 20.0, 60.0, 100.0, 136.0],
+        [202.63, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 271.5, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.75, 20.0, 60.0, 100.0, 138.0],
+        [201.5, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 270.24, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.12, 20.0, 60.0, 100.0, 140.0],
+        [200.24, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 268.85, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [104.42, 20.0, 60.0, 100.0, 142.0],
+        [198.85, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 267.32, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [103.66, 20.0, 60.0, 100.0, 144.0],
+        [197.32, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 265.66, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [102.83, 20.0, 60.0, 100.0, 146.0],
+        [195.66, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 263.87, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.94, 20.0, 60.0, 100.0, 148.0],
+        [193.87, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 261.96, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [100.98, 20.0, 60.0, 100.0, 150.0],
+        [191.96, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 259.92, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [99.96, 20.0, 60.0, 100.0, 152.0],
+        [189.92, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 257.76, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [98.88, 20.0, 60.0, 100.0, 154.0],
+        [187.76, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 255.49, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [97.74, 20.0, 60.0, 100.0, 156.0],
+        [185.49, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 253.09, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [96.55, 20.0, 60.0, 100.0, 158.0],
+        [183.09, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 250.58, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [95.29, 20.0, 60.0, 100.0, 160.0],
+        [180.58, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 247.97, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [93.98, 20.0, 60.0, 100.0, 162.0],
+        [177.97, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 245.24, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [92.62, 20.0, 60.0, 100.0, 164.0],
+        [175.24, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 242.41, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [91.2, 20.0, 60.0, 100.0, 166.0],
+        [172.41, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 239.48, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [89.74, 20.0, 60.0, 100.0, 168.0],
+        [169.48, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 236.45, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [88.23, 20.0, 60.0, 100.0, 170.0],
+        [166.45, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 233.33, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [86.67, 20.0, 60.0, 100.0, 172.0],
+        [163.33, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 230.12, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [85.06, 20.0, 60.0, 100.0, 174.0],
+        [160.12, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 226.83, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [83.41, 20.0, 60.0, 100.0, 176.0],
+        [156.83, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 223.45, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [81.73, 20.0, 60.0, 100.0, 178.0],
+        [153.45, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 180.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 223.45, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [81.73, 20.0, 60.0, 100.0, 182.0],
+        [153.45, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 226.83, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [83.41, 20.0, 60.0, 100.0, 184.0],
+        [156.83, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 230.12, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [85.06, 20.0, 60.0, 100.0, 186.0],
+        [160.12, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 233.33, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [86.67, 20.0, 60.0, 100.0, 188.0],
+        [163.33, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 236.45, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [88.23, 20.0, 60.0, 100.0, 190.0],
+        [166.45, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 239.48, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [89.74, 20.0, 60.0, 100.0, 192.0],
+        [169.48, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 242.41, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [91.2, 20.0, 60.0, 100.0, 194.0],
+        [172.41, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 245.24, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [92.62, 20.0, 60.0, 100.0, 196.0],
+        [175.24, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 247.97, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [93.98, 20.0, 60.0, 100.0, 198.0],
+        [177.97, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 250.58, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [95.29, 20.0, 60.0, 100.0, 200.0],
+        [180.58, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 253.09, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [96.55, 20.0, 60.0, 100.0, 202.0],
+        [183.09, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 255.49, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [97.74, 20.0, 60.0, 100.0, 204.0],
+        [185.49, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 257.76, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [98.88, 20.0, 60.0, 100.0, 206.0],
+        [187.76, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 259.92, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [99.96, 20.0, 60.0, 100.0, 208.0],
+        [189.92, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 261.96, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [100.98, 20.0, 60.0, 100.0, 210.0],
+        [191.96, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 263.87, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.94, 20.0, 60.0, 100.0, 212.0],
+        [193.87, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 265.66, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [102.83, 20.0, 60.0, 100.0, 214.0],
+        [195.66, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 267.32, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [103.66, 20.0, 60.0, 100.0, 216.0],
+        [197.32, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 268.85, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [104.42, 20.0, 60.0, 100.0, 218.0],
+        [198.85, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 270.24, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.12, 20.0, 60.0, 100.0, 220.0],
+        [200.24, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 271.5, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.75, 20.0, 60.0, 100.0, 222.0],
+        [201.5, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 272.63, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.31, 20.0, 60.0, 100.0, 224.0],
+        [202.63, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 273.61, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.81, 20.0, 60.0, 100.0, 226.0],
+        [203.61, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 274.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.23, 20.0, 60.0, 100.0, 228.0],
+        [204.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.17, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.59, 20.0, 60.0, 100.0, 230.0],
+        [205.17, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.74, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.87, 20.0, 60.0, 100.0, 232.0],
+        [205.74, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.17, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.08, 20.0, 60.0, 100.0, 234.0],
+        [206.17, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.23, 20.0, 60.0, 100.0, 236.0],
+        [206.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.6, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.3, 20.0, 60.0, 100.0, 238.0],
+        [206.6, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.6, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.3, 20.0, 60.0, 100.0, 240.0],
+        [206.6, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.23, 20.0, 60.0, 100.0, 242.0],
+        [206.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.18, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.09, 20.0, 60.0, 100.0, 244.0],
+        [206.18, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.76, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.88, 20.0, 60.0, 100.0, 246.0],
+        [205.76, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.19, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.6, 20.0, 60.0, 100.0, 248.0],
+        [205.19, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 274.49, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.25, 20.0, 60.0, 100.0, 250.0],
+        [204.49, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 273.65, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.82, 20.0, 60.0, 100.0, 252.0],
+        [203.65, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 272.66, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.33, 20.0, 60.0, 100.0, 254.0],
+        [202.66, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 271.54, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.77, 20.0, 60.0, 100.0, 256.0],
+        [201.54, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 270.29, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.14, 20.0, 60.0, 100.0, 258.0],
+        [200.29, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 268.9, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [104.45, 20.0, 60.0, 100.0, 260.0],
+        [198.9, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 267.38, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [103.69, 20.0, 60.0, 100.0, 262.0],
+        [197.38, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 265.72, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [102.86, 20.0, 60.0, 100.0, 264.0],
+        [195.72, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 263.94, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.97, 20.0, 60.0, 100.0, 266.0],
+        [193.94, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 262.03, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.02, 20.0, 60.0, 100.0, 268.0],
+        [192.03, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 260.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [100.0, 20.0, 60.0, 100.0, 270.0],
+        [190.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 262.03, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.02, 20.0, 60.0, 100.0, 272.0],
+        [192.03, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 263.94, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.97, 20.0, 60.0, 100.0, 274.0],
+        [193.94, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 265.72, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [102.86, 20.0, 60.0, 100.0, 276.0],
+        [195.72, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 267.38, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [103.69, 20.0, 60.0, 100.0, 278.0],
+        [197.38, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 268.9, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [104.45, 20.0, 60.0, 100.0, 280.0],
+        [198.9, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 270.29, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.14, 20.0, 60.0, 100.0, 282.0],
+        [200.29, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 271.54, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.77, 20.0, 60.0, 100.0, 284.0],
+        [201.54, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 272.66, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.33, 20.0, 60.0, 100.0, 286.0],
+        [202.66, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 273.65, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.82, 20.0, 60.0, 100.0, 288.0],
+        [203.65, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 274.49, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.25, 20.0, 60.0, 100.0, 290.0],
+        [204.49, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.19, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.6, 20.0, 60.0, 100.0, 292.0],
+        [205.19, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.76, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.88, 20.0, 60.0, 100.0, 294.0],
+        [205.76, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.18, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.09, 20.0, 60.0, 100.0, 296.0],
+        [206.18, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.23, 20.0, 60.0, 100.0, 298.0],
+        [206.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.6, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.3, 20.0, 60.0, 100.0, 300.0],
+        [206.6, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.6, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.3, 20.0, 60.0, 100.0, 302.0],
+        [206.6, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.23, 20.0, 60.0, 100.0, 304.0],
+        [206.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 276.17, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [108.08, 20.0, 60.0, 100.0, 306.0],
+        [206.17, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.74, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.87, 20.0, 60.0, 100.0, 308.0],
+        [205.74, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 275.17, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.59, 20.0, 60.0, 100.0, 310.0],
+        [205.17, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 274.46, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [107.23, 20.0, 60.0, 100.0, 312.0],
+        [204.46, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 273.61, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.81, 20.0, 60.0, 100.0, 314.0],
+        [203.61, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 272.63, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [106.31, 20.0, 60.0, 100.0, 316.0],
+        [202.63, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 271.5, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.75, 20.0, 60.0, 100.0, 318.0],
+        [201.5, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 270.24, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [105.12, 20.0, 60.0, 100.0, 320.0],
+        [200.24, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 268.85, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [104.42, 20.0, 60.0, 100.0, 322.0],
+        [198.85, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 267.32, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [103.66, 20.0, 60.0, 100.0, 324.0],
+        [197.32, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 265.66, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [102.83, 20.0, 60.0, 100.0, 326.0],
+        [195.66, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 263.87, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [101.94, 20.0, 60.0, 100.0, 328.0],
+        [193.87, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 261.96, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [100.98, 20.0, 60.0, 100.0, 330.0],
+        [191.96, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 259.92, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [99.96, 20.0, 60.0, 100.0, 332.0],
+        [189.92, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 257.76, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [98.88, 20.0, 60.0, 100.0, 334.0],
+        [187.76, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 255.49, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [97.74, 20.0, 60.0, 100.0, 336.0],
+        [185.49, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 253.09, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [96.55, 20.0, 60.0, 100.0, 338.0],
+        [183.09, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 250.58, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [95.29, 20.0, 60.0, 100.0, 340.0],
+        [180.58, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 247.97, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [93.98, 20.0, 60.0, 100.0, 342.0],
+        [177.97, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 245.24, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [92.62, 20.0, 60.0, 100.0, 344.0],
+        [175.24, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 242.41, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [91.2, 20.0, 60.0, 100.0, 346.0],
+        [172.41, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 239.48, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [89.74, 20.0, 60.0, 100.0, 348.0],
+        [169.48, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 236.45, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [88.23, 20.0, 60.0, 100.0, 350.0],
+        [166.45, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 233.33, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [86.67, 20.0, 60.0, 100.0, 352.0],
+        [163.33, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 230.12, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [85.06, 20.0, 60.0, 100.0, 354.0],
+        [160.12, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 226.83, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [83.41, 20.0, 60.0, 100.0, 356.0],
+        [156.83, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 223.45, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [81.73, 20.0, 60.0, 100.0, 358.0],
+        [153.45, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 360.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+    ],
+    [
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 0.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 2.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 4.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 6.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 8.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 10.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 12.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 14.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 16.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 18.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 20.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 22.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 24.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 26.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 28.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 30.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 32.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 34.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 36.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 38.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 40.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 42.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 44.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 46.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 48.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 50.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 52.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 54.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 56.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 58.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 60.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 62.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 64.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 66.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 68.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 70.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 72.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 74.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 76.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 78.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 80.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 82.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 84.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 86.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 88.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 90.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 92.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 94.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 96.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 98.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 100.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 102.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 104.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 106.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 108.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 110.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 112.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 114.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 116.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 118.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 120.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 122.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 124.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 126.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 128.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 130.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 132.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 134.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 136.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 138.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 140.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 142.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 144.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 146.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 148.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 150.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 152.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 154.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 156.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 158.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 160.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 162.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 164.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 166.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 168.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 170.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 172.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 174.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 176.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 178.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 180.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 182.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 184.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 186.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 188.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 190.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 192.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 194.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 196.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 198.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 200.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 202.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 204.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 206.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 208.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 210.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 212.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 214.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 216.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 218.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 220.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 222.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 224.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 226.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 228.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 230.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 232.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 234.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 236.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 238.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 240.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 242.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 244.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 246.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 248.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 250.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 252.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 254.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 256.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 258.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 260.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 262.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 264.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 266.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 268.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 270.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 272.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 274.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 276.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 278.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 280.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 282.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 284.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 286.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 288.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 290.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 292.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 294.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 296.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 298.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 300.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 302.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 304.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 306.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 308.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 310.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 312.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 314.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 316.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 318.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 320.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 322.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 324.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 326.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 328.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 330.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 332.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 334.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 336.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 338.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 340.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 342.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 344.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 346.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 348.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 350.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 352.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 354.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 356.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 358.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+      [
+        [20.0, 20.0, 220.0, 140.0],
+        [10.0, 20.0, 60.0, 100.0, 0.0],
+        [80.0, 20.0, 60.0, 100.0, 360.0],
+        [150.0, 20.0, 60.0, 100.0, 0.0],
+      ],
+    ],
+  ];
+  const M = [
+    [0, 220.0, 220.0, 150.0, 150.0, 0.0],
+    [2, 223.453, 220.0, 153.453, 150.0, 0.0],
+    [4, 226.829, 220.0, 156.829, 150.0, 0.0],
+    [6, 230.124, 220.0, 160.124, 150.0, 0.0],
+    [8, 233.333, 220.0, 163.333, 150.0, 0.0],
+    [10, 236.453, 220.0, 166.453, 150.0, 0.0],
+    [12, 239.48, 220.0, 169.48, 150.0, 0.0],
+    [14, 242.41, 220.0, 172.41, 150.0, 120.497],
+    [16, 245.239, 220.0, 175.239, 150.0, 261.972],
+    [18, 247.965, 220.0, 177.965, 150.0, 398.255],
+    [20, 250.584, 220.0, 180.584, 150.0, 529.179],
+    [22, 253.092, 220.0, 183.092, 150.0, 654.585],
+    [24, 255.486, 220.0, 185.486, 150.0, 774.319],
+    [26, 257.765, 220.0, 187.765, 150.0, 888.239],
+    [28, 259.924, 220.0, 189.924, 150.0, 996.201],
+    [30, 261.962, 220.0, 191.962, 150.0, 1098.077],
+    [32, 263.875, 220.0, 193.875, 150.0, 1193.741],
+    [34, 265.662, 220.0, 195.662, 150.0, 1283.078],
+    [36, 267.32, 220.0, 197.32, 150.0, 1365.978],
+    [38, 268.847, 220.0, 198.847, 150.0, 1442.34],
+    [40, 270.241, 220.0, 200.241, 150.0, 1512.071],
+    [42, 271.502, 220.0, 201.502, 150.0, 1575.088],
+    [44, 272.626, 220.0, 202.626, 150.0, 1631.312],
+    [46, 273.613, 220.0, 203.613, 150.0, 1680.675],
+    [48, 274.462, 220.0, 204.462, 150.0, 1723.117],
+    [50, 275.172, 220.0, 205.172, 150.0, 1758.586],
+    [52, 275.741, 220.0, 205.741, 150.0, 1787.039],
+    [54, 276.169, 220.0, 206.169, 150.0, 1808.441],
+    [56, 276.455, 220.0, 206.455, 150.0, 1822.767],
+    [58, 276.6, 220.0, 206.6, 150.0, 1829.999],
+    [60, 276.603, 220.0, 206.603, 150.0, 1830.128],
+    [62, 276.463, 220.0, 206.463, 150.0, 1821.768],
+    [64, 276.182, 220.0, 206.182, 150.0, 1768.648],
+    [66, 275.759, 220.0, 205.759, 150.0, 1707.237],
+    [68, 275.195, 220.0, 205.195, 150.0, 1638.171],
+    [70, 274.49, 220.0, 204.49, 150.0, 1562.135],
+    [72, 273.647, 220.0, 203.647, 150.0, 1479.866],
+    [74, 272.664, 220.0, 202.664, 150.0, 1392.148],
+    [76, 271.545, 220.0, 201.545, 150.0, 1299.806],
+    [78, 270.289, 220.0, 200.289, 150.0, 1203.704],
+    [80, 268.9, 220.0, 198.9, 150.0, 1104.738],
+    [82, 267.377, 220.0, 197.377, 150.0, 1003.832],
+    [84, 265.724, 220.0, 195.724, 150.0, 901.934],
+    [86, 263.942, 220.0, 193.942, 150.0, 800.009],
+    [88, 262.033, 220.0, 192.033, 150.0, 699.036],
+    [90, 260.0, 220.0, 190.0, 150.0, 600.0],
+    [92, 262.033, 220.0, 192.033, 150.0, 699.036],
+    [94, 263.942, 220.0, 193.942, 150.0, 800.009],
+    [96, 265.724, 220.0, 195.724, 150.0, 901.934],
+    [98, 267.377, 220.0, 197.377, 150.0, 1003.831],
+    [100, 268.9, 220.0, 198.9, 150.0, 1104.737],
+    [102, 270.289, 220.0, 200.289, 150.0, 1203.703],
+    [104, 271.545, 220.0, 201.545, 150.0, 1299.806],
+    [106, 272.664, 220.0, 202.664, 150.0, 1392.149],
+    [108, 273.647, 220.0, 203.647, 150.0, 1479.866],
+    [110, 274.49, 220.0, 204.49, 150.0, 1562.135],
+    [112, 275.195, 220.0, 205.195, 150.0, 1638.172],
+    [114, 275.759, 220.0, 205.759, 150.0, 1707.237],
+    [116, 276.182, 220.0, 206.182, 150.0, 1768.646],
+    [118, 276.463, 220.0, 206.463, 150.0, 1821.768],
+    [120, 276.603, 220.0, 206.603, 150.0, 1830.127],
+    [122, 276.6, 220.0, 206.6, 150.0, 1829.999],
+    [124, 276.455, 220.0, 206.455, 150.0, 1822.768],
+    [126, 276.169, 220.0, 206.169, 150.0, 1808.441],
+    [128, 275.741, 220.0, 205.741, 150.0, 1787.039],
+    [130, 275.172, 220.0, 205.172, 150.0, 1758.586],
+    [132, 274.462, 220.0, 204.462, 150.0, 1723.117],
+    [134, 273.613, 220.0, 203.613, 150.0, 1680.675],
+    [136, 272.626, 220.0, 202.626, 150.0, 1631.312],
+    [138, 271.502, 220.0, 201.502, 150.0, 1575.089],
+    [140, 270.241, 220.0, 200.241, 150.0, 1512.071],
+    [142, 268.847, 220.0, 198.847, 150.0, 1442.34],
+    [144, 267.32, 220.0, 197.32, 150.0, 1365.978],
+    [146, 265.662, 220.0, 195.662, 150.0, 1283.078],
+    [148, 263.875, 220.0, 193.875, 150.0, 1193.741],
+    [150, 261.962, 220.0, 191.962, 150.0, 1098.077],
+    [152, 259.924, 220.0, 189.924, 150.0, 996.201],
+    [154, 257.765, 220.0, 187.765, 150.0, 888.239],
+    [156, 255.486, 220.0, 185.486, 150.0, 774.319],
+    [158, 253.092, 220.0, 183.092, 150.0, 654.585],
+    [160, 250.584, 220.0, 180.584, 150.0, 529.179],
+    [162, 247.965, 220.0, 177.965, 150.0, 398.254],
+    [164, 245.239, 220.0, 175.239, 150.0, 261.972],
+    [166, 242.41, 220.0, 172.41, 150.0, 120.497],
+    [168, 239.48, 220.0, 169.48, 150.0, 0.0],
+    [170, 236.453, 220.0, 166.453, 150.0, 0.0],
+    [172, 233.333, 220.0, 163.333, 150.0, 0.0],
+    [174, 230.124, 220.0, 160.124, 150.0, 0.0],
+    [176, 226.829, 220.0, 156.829, 150.0, 0.0],
+    [178, 223.453, 220.0, 153.453, 150.0, 0.0],
+    [180, 220.0, 220.0, 150.0, 150.0, 0.0],
+    [182, 223.453, 220.0, 153.453, 150.0, 0.0],
+    [184, 226.829, 220.0, 156.829, 150.0, 0.0],
+    [186, 230.124, 220.0, 160.124, 150.0, 0.0],
+    [188, 233.333, 220.0, 163.333, 150.0, 0.0],
+    [190, 236.453, 220.0, 166.453, 150.0, 0.0],
+    [192, 239.48, 220.0, 169.48, 150.0, 0.0],
+    [194, 242.41, 220.0, 172.41, 150.0, 120.497],
+    [196, 245.239, 220.0, 175.239, 150.0, 261.972],
+    [198, 247.965, 220.0, 177.965, 150.0, 398.255],
+    [200, 250.584, 220.0, 180.584, 150.0, 529.179],
+    [202, 253.092, 220.0, 183.092, 150.0, 654.585],
+    [204, 255.486, 220.0, 185.486, 150.0, 774.319],
+    [206, 257.765, 220.0, 187.765, 150.0, 888.239],
+    [208, 259.924, 220.0, 189.924, 150.0, 996.201],
+    [210, 261.962, 220.0, 191.962, 150.0, 1098.077],
+    [212, 263.875, 220.0, 193.875, 150.0, 1193.741],
+    [214, 265.662, 220.0, 195.662, 150.0, 1283.078],
+    [216, 267.32, 220.0, 197.32, 150.0, 1365.977],
+    [218, 268.847, 220.0, 198.847, 150.0, 1442.34],
+    [220, 270.241, 220.0, 200.241, 150.0, 1512.071],
+    [222, 271.502, 220.0, 201.502, 150.0, 1575.089],
+    [224, 272.626, 220.0, 202.626, 150.0, 1631.311],
+    [226, 273.613, 220.0, 203.613, 150.0, 1680.675],
+    [228, 274.462, 220.0, 204.462, 150.0, 1723.117],
+    [230, 275.172, 220.0, 205.172, 150.0, 1758.585],
+    [232, 275.741, 220.0, 205.741, 150.0, 1787.038],
+    [234, 276.169, 220.0, 206.169, 150.0, 1808.441],
+    [236, 276.455, 220.0, 206.455, 150.0, 1822.767],
+    [238, 276.6, 220.0, 206.6, 150.0, 1829.999],
+    [240, 276.603, 220.0, 206.603, 150.0, 1830.127],
+    [242, 276.463, 220.0, 206.463, 150.0, 1821.768],
+    [244, 276.182, 220.0, 206.182, 150.0, 1768.646],
+    [246, 275.759, 220.0, 205.759, 150.0, 1707.237],
+    [248, 275.195, 220.0, 205.195, 150.0, 1638.172],
+    [250, 274.49, 220.0, 204.49, 150.0, 1562.135],
+    [252, 273.647, 220.0, 203.647, 150.0, 1479.867],
+    [254, 272.664, 220.0, 202.664, 150.0, 1392.148],
+    [256, 271.545, 220.0, 201.545, 150.0, 1299.806],
+    [258, 270.289, 220.0, 200.289, 150.0, 1203.705],
+    [260, 268.9, 220.0, 198.9, 150.0, 1104.737],
+    [262, 267.377, 220.0, 197.377, 150.0, 1003.832],
+    [264, 265.724, 220.0, 195.724, 150.0, 901.933],
+    [266, 263.942, 220.0, 193.942, 150.0, 800.009],
+    [268, 262.033, 220.0, 192.033, 150.0, 699.037],
+    [270, 260.0, 220.0, 190.0, 150.0, 600.0],
+    [272, 262.033, 220.0, 192.033, 150.0, 699.036],
+    [274, 263.942, 220.0, 193.942, 150.0, 800.009],
+    [276, 265.724, 220.0, 195.724, 150.0, 901.933],
+    [278, 267.377, 220.0, 197.377, 150.0, 1003.832],
+    [280, 268.9, 220.0, 198.9, 150.0, 1104.737],
+    [282, 270.289, 220.0, 200.289, 150.0, 1203.703],
+    [284, 271.545, 220.0, 201.545, 150.0, 1299.806],
+    [286, 272.664, 220.0, 202.664, 150.0, 1392.149],
+    [288, 273.647, 220.0, 203.647, 150.0, 1479.867],
+    [290, 274.49, 220.0, 204.49, 150.0, 1562.135],
+    [292, 275.195, 220.0, 205.195, 150.0, 1638.17],
+    [294, 275.759, 220.0, 205.759, 150.0, 1707.237],
+    [296, 276.182, 220.0, 206.182, 150.0, 1768.646],
+    [298, 276.463, 220.0, 206.463, 150.0, 1821.768],
+    [300, 276.603, 220.0, 206.603, 150.0, 1830.127],
+    [302, 276.6, 220.0, 206.6, 150.0, 1829.999],
+    [304, 276.455, 220.0, 206.455, 150.0, 1822.767],
+    [306, 276.169, 220.0, 206.169, 150.0, 1808.441],
+    [308, 275.741, 220.0, 205.741, 150.0, 1787.039],
+    [310, 275.172, 220.0, 205.172, 150.0, 1758.585],
+    [312, 274.462, 220.0, 204.462, 150.0, 1723.117],
+    [314, 273.613, 220.0, 203.613, 150.0, 1680.674],
+    [316, 272.626, 220.0, 202.626, 150.0, 1631.311],
+    [318, 271.502, 220.0, 201.502, 150.0, 1575.089],
+    [320, 270.241, 220.0, 200.241, 150.0, 1512.073],
+    [322, 268.847, 220.0, 198.847, 150.0, 1442.34],
+    [324, 267.32, 220.0, 197.32, 150.0, 1365.978],
+    [326, 265.662, 220.0, 195.662, 150.0, 1283.078],
+    [328, 263.875, 220.0, 193.875, 150.0, 1193.741],
+    [330, 261.962, 220.0, 191.962, 150.0, 1098.077],
+    [332, 259.924, 220.0, 189.924, 150.0, 996.201],
+    [334, 257.765, 220.0, 187.765, 150.0, 888.239],
+    [336, 255.486, 220.0, 185.486, 150.0, 774.319],
+    [338, 253.092, 220.0, 183.092, 150.0, 654.584],
+    [340, 250.584, 220.0, 180.584, 150.0, 529.179],
+    [342, 247.965, 220.0, 177.965, 150.0, 398.254],
+    [344, 245.239, 220.0, 175.239, 150.0, 261.972],
+    [346, 242.41, 220.0, 172.41, 150.0, 120.496],
+    [348, 239.48, 220.0, 169.48, 150.0, 0.0],
+    [350, 236.453, 220.0, 166.453, 150.0, 0.0],
+    [352, 233.333, 220.0, 163.333, 150.0, 0.0],
+    [354, 230.124, 220.0, 160.124, 150.0, 0.0],
+    [356, 226.829, 220.0, 156.829, 150.0, 0.0],
+    [358, 223.453, 220.0, 153.453, 150.0, 0.0],
+    [360, 220.0, 220.0, 150.0, 150.0, 0.0],
+  ];
+  const COLORS = ["#4A90D9", "#E2574C", "#57B894"];
+  const SCALE = 4.0,
+    OX = 60,
+    OY = 40; // canvas 1240x640; scene <=276.6x140
+
+  function aabbOf(c) {
+    const [x, y, w, h, rot] = c;
+    if (!rot) return [x, y, w, h];
+    const r = (rot * Math.PI) / 180,
+      cw = Math.abs(w * Math.cos(r)) + Math.abs(h * Math.sin(r)),
+      ch = Math.abs(w * Math.sin(r)) + Math.abs(h * Math.cos(r));
+    return [x + w / 2 - cw / 2, y + h / 2 - ch / 2, cw, ch];
+  }
+  function overlap(a, b) {
+    const x = Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0]);
+    const y = Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]);
+    return Math.max(0, x) * Math.max(0, y);
+  }
+  function draw(canvas, frame, showOverlap) {
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const [f, ...cards] = frame;
+    ctx.save();
+    ctx.setTransform(SCALE, 0, 0, SCALE, OX, OY);
+    ctx.lineWidth = 1.5 / SCALE;
+    ctx.strokeStyle = "#B9C0C9";
+    ctx.strokeRect(0, 0, f[2], f[3]);
+    cards.forEach((c, i) => {
+      const [x, y, w, h, rot] = c;
+      ctx.save();
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate((rot * Math.PI) / 180);
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = COLORS[i];
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.restore();
+      if (rot) {
+        // dashed AABB of the rotated card
+        const A = aabbOf(c);
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = "#C36";
+        ctx.strokeRect(A[0], A[1], A[2], A[3]);
+        ctx.restore();
+      }
+    });
+    let ov = 0;
+    if (showOverlap) {
+      for (let i = 0; i < cards.length; i++)
+        for (let j = i + 1; j < cards.length; j++) {
+          const A = aabbOf(cards[i]),
+            B = aabbOf(cards[j]);
+          const x0 = Math.max(A[0], B[0]),
+            y0 = Math.max(A[1], B[1]);
+          const x1 = Math.min(A[0] + A[2], B[0] + B[2]),
+            y1 = Math.min(A[1] + A[3], B[1] + B[3]);
+          if (x1 > x0 && y1 > y0) {
+            ov += (x1 - x0) * (y1 - y0);
+            ctx.fillStyle = "rgba(226,87,76,.45)";
+            ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+          }
+        }
+    }
+    ctx.restore();
+    return ov;
+  }
+  const slider = document.getElementById("s"),
+    deg = document.getElementById("deg");
+  function render() {
+    const i = +slider.value;
+    const th = i * 2;
+    deg.textContent = "\u03B8 = " + th + "\u00B0";
+    const f0 = FRAMES[0][i],
+      f1 = FRAMES[1][i];
+    const ao = draw(document.getElementById("c0"), f0, true);
+    const vo = draw(document.getElementById("c1"), f1, true);
+    document.getElementById("r-aw").textContent = f0[0][2].toFixed(1);
+    document.getElementById("r-ao").textContent = Math.round(ao);
+    document.getElementById("r-vo").textContent = Math.round(vo);
+  }
+  slider.addEventListener("input", render);
+  document.querySelectorAll(".jump").forEach((b) =>
+    b.addEventListener("click", () => {
+      slider.value = b.dataset.i;
+      render();
+    })
+  );
+  let timer = null;
+  const playBtn = document.getElementById("play");
+  playBtn.addEventListener("click", () => {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+      playBtn.textContent = "\u25B6 play";
+      return;
+    }
+    playBtn.textContent = "\u275A\u275A pause";
+    timer = setInterval(() => {
+      slider.value = (+slider.value + 1) % FRAMES[0].length;
+      render();
+    }, 40);
+  });
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    /* leave autoplay off; it already is */
+  }
+
+  /* ---- charts ---- */
+  function chart(id, series, opts) {
+    const cv = document.getElementById(id),
+      ctx = cv.getContext("2d");
+    const W = 440,
+      H = 180,
+      L = 46,
+      R = 10,
+      T = 12,
+      B = 26;
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const xs = M.map((r) => r[0]);
+    const ymin = opts.ymin,
+      ymax = opts.ymax;
+    const px = (x) => L + (x / 360) * (W - L - R);
+    const py = (y) => T + (1 - (y - ymin) / (ymax - ymin)) * (H - T - B);
+    ctx.strokeStyle = "#EDF0F3";
+    ctx.lineWidth = 1;
+    ctx.font = "9px ui-monospace,monospace";
+    ctx.fillStyle = "#98A0AB";
+    for (const gy of opts.grid) {
+      ctx.beginPath();
+      ctx.moveTo(L, py(gy));
+      ctx.lineTo(W - R, py(gy));
+      ctx.stroke();
+      ctx.fillText(String(gy), 8, py(gy) + 3);
+    }
+    for (const gx of [0, 90, 180, 270, 360]) {
+      ctx.fillText(gx + "\u00B0", px(gx) - 8, H - 10);
+    }
+    series.forEach((s) => {
+      ctx.beginPath();
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 1.6;
+      if (s.dash) ctx.setLineDash([4, 3]);
+      else ctx.setLineDash([]);
+      M.forEach((r, i) => {
+        const y = s.get(r);
+        i ? ctx.lineTo(px(r[0]), py(y)) : ctx.moveTo(px(r[0]), py(y));
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (s.fill) {
+        ctx.lineTo(px(360), py(ymin));
+        ctx.lineTo(px(0), py(ymin));
+        ctx.closePath();
+        ctx.fillStyle = s.fill;
+        ctx.fill();
+      }
+    });
+  }
+  chart(
+    "ch1",
+    [
+      { get: (r) => r[1], color: "#4A90D9" },
+      { get: (r) => r[2], color: "#E2574C", dash: true },
+    ],
+    { ymin: 200, ymax: 290, grid: [220, 260, 276.6] }
+  );
+  chart(
+    "ch2",
+    [
+      { get: (r) => r[5], color: "#E2574C", fill: "rgba(226,87,76,.12)" },
+      { get: (_) => 0, color: "#4A90D9" },
+    ],
+    { ymin: 0, ymax: 2000, grid: [0, 600, 1830] }
+  );
+  chart(
+    "ch3",
+    [
+      { get: (r) => r[3], color: "#4A90D9" },
+      { get: (r) => r[4], color: "#E2574C", dash: true },
+    ],
+    { ymin: 140, ymax: 210, grid: [150, 190, 206.6] }
+  );
+
+  render();
+</script>
