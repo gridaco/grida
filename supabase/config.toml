@@ -164,7 +164,11 @@ site_url = "http://127.0.0.1:3000"
 # they don't fight an installed production Grida over one handler. The hosted
 # project's dashboard allowlists only `grida://auth/callback` (prod); `grida-dev` is
 # local-only and never belongs in the hosted allowlist.
-additional_redirect_urls = ["https://127.0.0.1:3000", "grida://auth/callback", "grida-dev://auth/callback"]
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "grida://auth/callback",
+  "grida-dev://auth/callback",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # If disabled, the refresh token will never expire.
