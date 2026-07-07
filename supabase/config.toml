@@ -158,10 +158,13 @@ enabled = true
 # in emails.
 site_url = "http://127.0.0.1:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-# GRIDA-SEC-005 — `grida://auth/callback` is the desktop deep-link return for the
-# PKCE sign-in flow (see /SECURITY.md). The hosted project's dashboard must
-# allowlist the same URL before a desktop release that enables sign-in.
-additional_redirect_urls = ["https://127.0.0.1:3000", "grida://auth/callback"]
+# GRIDA-SEC-005 — the desktop deep-link returns for the PKCE sign-in flow (see
+# /SECURITY.md). `grida://auth/callback` is production; `grida-dev://auth/callback`
+# is the LOCAL dev/insiders scheme (#955) — dev builds register their own scheme so
+# they don't fight an installed production Grida over one handler. The hosted
+# project's dashboard allowlists only `grida://auth/callback` (prod); `grida-dev` is
+# local-only and never belongs in the hosted allowlist.
+additional_redirect_urls = ["https://127.0.0.1:3000", "grida://auth/callback", "grida-dev://auth/callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # If disabled, the refresh token will never expire.

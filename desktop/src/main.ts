@@ -6,7 +6,7 @@ import create_menu, {
   rebuild_application_menu,
 } from "./menu";
 import { open_welcome_window, open_document_window } from "./window";
-import { EDITOR_BASE_URL } from "./env";
+import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
 import {
   RUNTIME_APP_NAME,
   USE_DEV_INSIDERS_BRANDING,
@@ -73,7 +73,13 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 // #endregion chrome flags
 
 app.setName(RUNTIME_APP_NAME);
-app.setAsDefaultProtocolClient("grida");
+// GRIDA-SEC-005 / #955 — register this build's channel-specific deep-link scheme
+// (`grida-dev` for local builds, `grida` for production) so dev and an installed
+// production Grida don't fight over one scheme. On macOS the reliable, declarative
+// registration is the dev bundle's CFBundleURLTypes (dev: prepare-dev-electron-
+// branding.mjs; packaged: forge.config `protocols`); this runtime call is the
+// Windows/Linux path and a macOS best-effort.
+app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
 
 // GRIDA-SEC-004 — register the `grida-workspace://` privileged media scheme
 // (#924). `registerSchemesAsPrivileged` MUST run before `app.whenReady()`; the

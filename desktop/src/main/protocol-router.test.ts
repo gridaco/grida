@@ -89,6 +89,18 @@ describe("routeDeepLink — auth/callback", () => {
     );
   });
 
+  // #955 — local dev/insiders builds register their own `grida-dev://` scheme so
+  // they never fight an installed production Grida over `grida://`. The router
+  // must route it identically to the fixed same-origin callback.
+  it("routes the dev scheme (grida-dev://) identically", async () => {
+    const window = makeWindow("https://grida.test/desktop/auth/sign-in");
+    state.all = [window];
+    await routeDeepLink("grida-dev://auth/callback?code=dev-123");
+    expect(window.loadURL).toHaveBeenCalledWith(
+      "https://grida.test/desktop/auth/callback?code=dev-123"
+    );
+  });
+
   it("forwards only known params — attacker extras are dropped", async () => {
     const window = makeWindow("https://grida.test/desktop/auth/sign-in");
     state.all = [window];

@@ -77,8 +77,13 @@ export async function routeDeepLink(url: string): Promise<boolean> {
     console.warn(`[grida] malformed deep link, ignoring: ${url}`);
     return true;
   }
-  if (parsed.protocol !== "grida:") {
-    console.warn(`[grida] non-grida protocol, ignoring: ${parsed.protocol}`);
+  // GRIDA-SEC-005 / #955 — accept both `grida:` (production) and `grida-dev:`
+  // (local dev + insiders). A build only ever RECEIVES its own scheme (the OS
+  // routes by the declared CFBundleURLTypes / forge `protocols`), so accepting
+  // both keeps this router env-agnostic and testable; routing is byte-identical
+  // either way — the fixed-target, verifier-gated exchange doesn't depend on it.
+  if (parsed.protocol !== "grida:" && parsed.protocol !== "grida-dev:") {
+    console.warn(`[grida] unrecognized protocol, ignoring: ${parsed.protocol}`);
     return true;
   }
   // Custom-scheme hosts are NOT lowercased by the URL parser (unlike
