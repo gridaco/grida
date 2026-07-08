@@ -23,8 +23,10 @@ messages.map((m, i) => (
 - **Reasoning** parts → a collapsible `Reasoning` block (auto-open while streaming,
   auto-collapses to "Thought for Ns" once the turn moves on).
 - **Tool** parts → a compact `Task` row each; a run of consecutive tool calls
-  collapses into one summary `Task` (label from `toolDisplay.summarize`). Each row
-  expands to its input/output JSON.
+  collapses into one summary `Task` (label from `toolDisplay.summarize`). Known
+  Grida tools expand to dedicated bodies (files, grep results, todos, commands,
+  skills, images, questions); unknown tools fall back to a readable key/value
+  summary.
 - **`question` tool** parts → only a passive record in the transcript ("asked you
   …" + the answered summary). The interactive prompt is **session-global**, not a
   transcript card — see below.

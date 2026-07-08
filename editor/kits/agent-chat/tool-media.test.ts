@@ -8,6 +8,7 @@ import {
   mediaImageSrc,
   mediaPath,
   mediaPrompt,
+  mediaReferences,
 } from "./tool-media";
 import type { ToolCallEntry } from "@/lib/agent-chat";
 
@@ -87,6 +88,30 @@ describe("tool-media — generate_image", () => {
     expect(mediaImageSrc(ok)).toBe("data:image/jpeg;base64,BBBB");
   });
 
+  it("extracts image-to-image references from input", () => {
+    const withRefs = result(
+      "generate_image",
+      {
+        prompt: "make it warmer",
+        references: [
+          "pins/a.png",
+          "https://x/b.jpg",
+          "",
+          123,
+          { path: "/not-a-string.png" },
+        ],
+      },
+      { ok: true }
+    );
+    expect(mediaReferences(withRefs)).toEqual([
+      "pins/a.png",
+      "https://x/b.jpg",
+    ]);
+    expect(
+      mediaReferences(result("generate_image", { prompt: "x" }, { ok: true }))
+    ).toEqual([]);
+  });
+
   it("no src when bytes absent (model-only path) — prompt + path still show", () => {
     const noData = result(
       "generate_image",
@@ -98,7 +123,7 @@ describe("tool-media — generate_image", () => {
     expect(mediaPath(noData)).toBe("/tmp/scratch/y.png");
   });
 
-  it("is pending while in flight (args sent, no result) — drives the skeleton", () => {
+  it("is pending while in flight (args sent, no result) — drives the pending prompt view", () => {
     const inflight = {
       type: "tool-generate_image",
       toolCallId: "1",

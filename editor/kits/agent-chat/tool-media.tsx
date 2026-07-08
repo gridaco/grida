@@ -5,9 +5,8 @@
  * splat a multi-MB base64 string into the transcript):
  *
  *   - view_image      → the viewed path, then the image.
- *   - generate_image  → WHILE GENERATING (it's slow): a skeleton placeholder
- *     with the prompt + a spinner. DONE: the image is the default view; the
- *     prompt (and saved path) reveal on hover.
+ *   - generate_image  → WHILE GENERATING (it's slow): the shimmering prompt
+ *     plus optional references. DONE: the image first, then the prompt below.
  *
  * The image bytes are the result's base64 `data` (on the client transcript even
  * when the model-facing view omits/elides them). Kept in the editor kit, which
@@ -15,10 +14,15 @@
  * tool-agnostic.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { getToolName } from "ai";
-import { Loader2Icon } from "lucide-react";
-import { Skeleton } from "@app/ui/components/skeleton";
+import { Shimmer } from "@app/ui/ai-elements/shimmer";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@app/ui/components/dialog";
 import { AgentVision } from "@grida/agent/vision";
 import type { ToolCallEntry } from "@/lib/agent-chat";
 
@@ -80,6 +84,20 @@ export function mediaPrompt(entry: ToolCallEntry): string | undefined {
   return str(asRecord("input" in entry ? entry.input : undefined).prompt);
 }
 
+/** generate_image's image-to-image references, if the call used them. */
+export function mediaReferences(entry: ToolCallEntry): string[] {
+  if (!isGenerateImageEntry(entry)) return [];
+  const references = asRecord(
+    "input" in entry ? entry.input : undefined
+  ).references;
+  return Array.isArray(references)
+    ? references.filter(
+        (value): value is string =>
+          typeof value === "string" && value.length > 0
+      )
+    : [];
+}
+
 /**
  * The file path to show: generate_image returns the SAVED path in its output;
  * view_image's path is the file it was asked to view (its input).
@@ -92,6 +110,48 @@ export function mediaPath(entry: ToolCallEntry): string | undefined {
 }
 
 const imageClass = "max-h-96 max-w-full rounded-md border object-contain";
+const ELAPSED_REVEAL_AFTER_MS = 3000;
+
+export function FullscreenImagePreview({
+  src,
+  alt,
+  title,
+  className,
+  children,
+}: {
+  src: string;
+  alt: string;
+  title?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className={`inline-block max-w-full cursor-zoom-in rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${className ?? ""}`}
+          title={title}
+        >
+          {children}
+        </button>
+      </DialogTrigger>
+      <DialogContent
+        className="flex h-screen max-h-screen w-screen max-w-none items-center justify-center rounded-none border-0 bg-background/95 p-4 shadow-none backdrop-blur-sm sm:max-w-none"
+        showCloseButton
+      >
+        <DialogTitle className="sr-only">{title ?? alt}</DialogTitle>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={alt}
+          className="max-h-full max-w-full object-contain"
+          decoding="async"
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /** `view_image`: the viewed path, then the image (or refusal message). */
 function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
@@ -99,7 +159,7 @@ function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
   const src = mediaImageSrc(entry);
   const error = mediaError(entry);
   return (
-    <div className="space-y-2 p-4">
+    <div className="space-y-2">
       {path && (
         <div
           className="truncate font-mono text-muted-foreground text-xs"
@@ -109,14 +169,20 @@ function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
         </div>
       )}
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <FullscreenImagePreview
           src={src}
           alt={path ?? "viewed image"}
-          loading="lazy"
-          decoding="async"
-          className={imageClass}
-        />
+          title={path}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={path ?? "viewed image"}
+            loading="lazy"
+            decoding="async"
+            className={imageClass}
+          />
+        </FullscreenImagePreview>
       ) : error ? (
         <div className="text-muted-foreground text-xs">{error}</div>
       ) : null}
@@ -126,10 +192,8 @@ function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
 
 /**
  * `generate_image`: a producer that takes a while.
- *  - pending → a skeleton placeholder with the prompt + spinner (you see WHAT is
- *    being made while you wait);
- *  - done    → the image as the default view, the prompt + saved path revealed
- *    on hover (so the transcript stays image-first);
+ *  - pending → the shimmering prompt, then optional references;
+ *  - done    → the image as the default view, then the muted prompt below;
  *  - failed / no bytes → prompt + path + the refusal message.
  */
 function GenerateImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
@@ -137,54 +201,36 @@ function GenerateImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
   const path = mediaPath(entry);
   const src = mediaImageSrc(entry);
   const error = mediaError(entry);
+  const references = mediaReferences(entry);
 
   if (isMediaPending(entry)) {
     return (
-      <div className="relative flex min-h-40 w-full items-center justify-center overflow-hidden rounded-md border p-4">
-        <Skeleton className="absolute inset-0 rounded-md" />
-        <div className="relative flex flex-col items-center gap-2 text-center">
-          <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
-          {prompt && (
-            <span className="line-clamp-3 max-w-prose text-muted-foreground text-xs">
-              {prompt}
-            </span>
-          )}
-        </div>
+      <div className="max-w-full space-y-2 py-1 text-left">
+        <PendingPrompt prompt={prompt} />
+        <ReferenceStrip references={references} />
       </div>
     );
   }
 
   if (src) {
     return (
-      <div className="group/gen relative inline-block max-w-full">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+      <div className="space-y-2">
+        <FullscreenImagePreview
           src={src}
           alt={prompt ?? "generated image"}
           title={prompt}
-          loading="lazy"
-          decoding="async"
-          className={imageClass}
-        />
-        {(prompt || path) && (
-          // Image-first by default; the prompt + path fade in on hover.
-          // `pointer-events-none` so the overlay never blocks interaction.
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 space-y-1 rounded-b-md bg-popover/95 p-2 opacity-0 transition-opacity group-hover/gen:opacity-100">
-            {prompt && (
-              <p className="line-clamp-4 text-popover-foreground text-xs">
-                {prompt}
-              </p>
-            )}
-            {path && (
-              <p
-                className="truncate font-mono text-[10px] text-muted-foreground"
-                title={path}
-              >
-                {path}
-              </p>
-            )}
-          </div>
-        )}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={prompt ?? "generated image"}
+            loading="lazy"
+            decoding="async"
+            className={imageClass}
+          />
+        </FullscreenImagePreview>
+        {prompt && <GeneratedImagePrompt prompt={prompt} />}
+        <ReferenceStrip references={references} />
       </div>
     );
   }
@@ -192,6 +238,7 @@ function GenerateImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
   return (
     <div className="space-y-2 p-4">
       {prompt && <div className="text-foreground text-xs">{prompt}</div>}
+      <ReferenceStrip references={references} />
       {path && (
         <div
           className="truncate font-mono text-muted-foreground text-xs"
@@ -203,6 +250,118 @@ function GenerateImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
       {error && <div className="text-muted-foreground text-xs">{error}</div>}
     </div>
   );
+}
+
+function GeneratedImagePrompt({ prompt }: { prompt: string }): ReactNode {
+  const [expanded, setExpanded] = useState(false);
+  const expandable = prompt.length > 180;
+  return (
+    <div className="max-w-prose space-y-1">
+      <p
+        className={`whitespace-pre-wrap text-muted-foreground text-xs leading-5 ${
+          expandable && !expanded ? "line-clamp-3" : ""
+        }`}
+      >
+        {prompt}
+      </p>
+      {expandable && (
+        <button
+          type="button"
+          className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Show less" : "Show all"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function PendingPrompt({ prompt }: { prompt?: string }): ReactNode {
+  const elapsed = useElapsedSeconds();
+  return (
+    <div className="max-w-prose space-y-0.5">
+      {prompt ? (
+        <Shimmer as="p" className="max-w-prose text-xs">
+          {prompt}
+        </Shimmer>
+      ) : (
+        <Shimmer as="p" className="text-xs">
+          Generating image
+        </Shimmer>
+      )}
+      {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
+        <div className="tabular-nums text-[10px] text-muted-foreground">
+          {formatElapsed(elapsed)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReferenceStrip({ references }: { references: string[] }): ReactNode {
+  if (references.length === 0) return null;
+  return (
+    <div className="flex max-w-full items-center gap-1.5 overflow-x-auto">
+      {references.map((reference, index) => {
+        const src = renderableReferenceSrc(reference);
+        return src ? (
+          <FullscreenImagePreview
+            key={`${reference}-${index}`}
+            src={src}
+            alt={`Reference ${index + 1}`}
+            title={reference}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={src}
+              alt={`Reference ${index + 1}`}
+              loading="lazy"
+              decoding="async"
+              className="size-9 rounded-sm border object-cover"
+            />
+          </FullscreenImagePreview>
+        ) : (
+          <div
+            key={`${reference}-${index}`}
+            className="max-w-40 truncate rounded-sm border bg-muted/40 px-1.5 py-1 font-mono text-[10px] text-muted-foreground"
+            title={reference}
+          >
+            {reference}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function renderableReferenceSrc(reference: string): string | undefined {
+  if (
+    reference.startsWith("data:image/") ||
+    reference.startsWith("https://") ||
+    reference.startsWith("http://")
+  ) {
+    return reference;
+  }
+  return undefined;
+}
+
+export function useElapsedSeconds(): number {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const startedAt = Date.now();
+    const id = setInterval(() => {
+      setSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return seconds;
+}
+
+export function formatElapsed(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 /** The whole image-tool call body — dispatched by tool. No JSON, ever. */

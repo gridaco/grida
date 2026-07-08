@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Chat, useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import { Button } from "@app/ui/components/button";
@@ -97,6 +98,14 @@ export default function AiChatDemoPage() {
             SDK stream — no model call. Pick a scenario and press{" "}
             <strong>Stream</strong> to watch it build, or toggle{" "}
             <strong>Instant</strong> to jump to the settled state.
+          </p>
+          <p className="mt-2 text-sm">
+            <Link
+              href="/ui/components/ai-chat/tools"
+              className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              View all tool card renderers
+            </Link>
           </p>
         </div>
         <hr />

@@ -34,20 +34,23 @@ import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import {
+  BookOpenIcon,
   CheckIcon,
   ChevronDownIcon,
   CopyIcon,
-  EyeIcon,
+  FileIcon,
   FilePenLineIcon,
   FilePlus2Icon,
   FolderTreeIcon,
   GitBranchIcon,
+  ImageIcon,
   LayoutTemplateIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
   PaperclipIcon,
   RotateCcwIcon,
   SearchIcon,
+  SparklesIcon,
   SquareTerminalIcon,
   WrenchIcon,
   type LucideIcon,
@@ -65,21 +68,22 @@ import {
   ReasoningTrigger,
 } from "@app/ui/ai-elements/reasoning";
 import { Shimmer } from "@app/ui/ai-elements/shimmer";
-import { ToolInput, ToolOutput } from "@app/ui/ai-elements/tool";
+import { ToolOutput } from "@app/ui/ai-elements/tool";
 import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
-import {
-  Confirmation,
-  ConfirmationAccepted,
-  ConfirmationRejected,
-  ConfirmationRequest,
-  ConfirmationTitle,
-} from "@app/ui/ai-elements/confirmation";
 // Message/tool types stay in the shared `@/lib/agent-chat` seam (the
 // bridge transport + session helpers use them too); `toolDisplay` is
 // this renderer's own label/summary formatting, colocated in the kit.
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
-import { isMediaToolEntry, MediaToolContent } from "./tool-media";
+import {
+  formatElapsed,
+  isGenerateImageEntry,
+  isMediaPending,
+  isMediaToolEntry,
+  MediaToolContent,
+  useElapsedSeconds,
+} from "./tool-media";
+import { ToolCardContent, isHumanReadableToolCardEntry } from "./tool-card";
 import {
   isDesignSearchEntry,
   DesignSearchContent,
@@ -90,7 +94,7 @@ import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
 export type { ChatMessage, ToolCallEntry };
 
 const markdown = {
-  className: "grida-ai-response-markdown space-y-2 text-sm leading-6",
+  className: "grida-ai-response-markdown space-y-2 text-[13px] leading-6",
   controls: {
     code: { copy: true, download: false },
     table: { copy: true, download: false, fullscreen: false },
@@ -164,7 +168,7 @@ export function ChatMessageView({
     );
     return (
       <Message from="user">
-        <MessageContent>
+        <MessageContent className="text-[13px]">
           <CollapsibleBubbleBody>
             {contexts.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -275,7 +279,7 @@ export function ChatMessageView({
     .join("\n\n");
   return (
     <Message from="assistant" className="w-full max-w-none">
-      <MessageContent className="w-full max-w-full">
+      <MessageContent className="w-full max-w-full text-[13px]">
         {groups.map((group, groupIndex) => {
           if (group.type === "text") {
             return (
@@ -469,32 +473,6 @@ function CompactionDivider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Seconds elapsed since mount, ticking once a second. The host renders
- * {@link CompactingIndicator} only while a compaction is in flight, so
- * "since mount" == "since the run started". Diffs `Date.now()` rather than
- * incrementing a counter so a throttled/slept tab catches up instead of
- * drifting. Reads no clock during render (effect-only) — no SSR/hydration skew.
- */
-function useElapsedSeconds(): number {
-  const [seconds, setSeconds] = useState(0);
-  useEffect(() => {
-    const startedAt = Date.now();
-    const id = setInterval(() => {
-      setSeconds(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-  return seconds;
-}
-
-/** `73` → `"1m 13s"`; under a minute drops the `0m` part: `42` → `"42s"`. */
-function formatElapsed(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-}
-
-/**
  * How long an in-flight indicator runs bare before the elapsed-time counter
  * appears, in milliseconds. Below this only the shimmering label shows; at or
  * past it the "· {time}" counter is revealed.
@@ -680,53 +658,30 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
       </Task>
     );
   }
-  // The image tools (view_image, generate_image) have known shapes, so they get
-  // a dedicated body (prompt/path + image, no JSON) and open by default — the
-  // point is to SEE the image, not unfold a tool row. Other tools keep the
-  // generic input/approval/output view.
   const mediaTool = isMediaToolEntry(entry);
-  const hasInput = entry.input !== undefined;
-  const hasOutput = entry.output !== undefined || Boolean(entry.errorText);
+  const humanReadableTool = isHumanReadableToolCardEntry(entry);
   // The Allow/Deny ACTION lives in the session-global approval bar above the
   // composer (instantly visible). Here we only echo the status passively so the
   // transcript shows which call is awaiting / was approved / was denied.
   const approval = approvalOf(entry);
+  const showTriggerSpinner =
+    isGenerateImageEntry(entry) && isMediaPending(entry);
 
   return (
-    <Task defaultOpen={mediaTool} className="w-full">
+    <Task defaultOpen={mediaTool || humanReadableTool} className="w-full">
       <TaskTrigger title={title}>
-        {triggerRow(iconForAction(description.action), title)}
+        {triggerRow(iconForAction(description.action), title, {
+          busy: showTriggerSpinner,
+        })}
       </TaskTrigger>
       {mediaTool ? (
         <TaskContent>
           <MediaToolContent entry={entry} />
         </TaskContent>
       ) : (
-        (hasInput || hasOutput || approval) && (
-          <TaskContent>
-            {hasInput && <ToolInput input={entry.input} />}
-            {approval && (
-              <Confirmation
-                approval={approval}
-                state={entry.state}
-                className="mt-2"
-              >
-                <ConfirmationRequest>
-                  <ConfirmationTitle>
-                    Awaiting your approval (see the prompt above the composer).
-                  </ConfirmationTitle>
-                </ConfirmationRequest>
-                <ConfirmationAccepted>
-                  <ConfirmationTitle>Approved.</ConfirmationTitle>
-                </ConfirmationAccepted>
-                <ConfirmationRejected>
-                  <ConfirmationTitle>Denied — not run.</ConfirmationTitle>
-                </ConfirmationRejected>
-              </Confirmation>
-            )}
-            <ToolOutput output={entry.output} errorText={entry.errorText} />
-          </TaskContent>
-        )
+        <TaskContent>
+          <ToolCardContent entry={entry} approval={approval} />
+        </TaskContent>
       )}
     </Task>
   );
@@ -770,20 +725,49 @@ function QuestionToolView({ entry }: { entry: ToolCallEntry }) {
 // `TaskTrigger` renders `children ?? <default SearchIcon row>`, so a custom
 // child swaps the action-agnostic search glyph for a per-action icon. Must
 // be a single element (the trigger is `asChild`), not a component instance.
-function triggerRow(Icon: LucideIcon, title: string) {
+function triggerRow(
+  Icon: LucideIcon,
+  title: string,
+  options?: { busy?: boolean }
+) {
   return (
     <div className="flex w-full cursor-pointer items-center gap-2 text-muted-foreground text-xs transition-colors hover:text-foreground">
-      <Icon className="size-3.5 shrink-0" />
+      {options?.busy ? (
+        <ToolActivitySpinner className="size-3.5 shrink-0" />
+      ) : (
+        <Icon className="size-3.5 shrink-0" />
+      )}
       <span className="min-w-0 flex-1 truncate">{title}</span>
       <ChevronDownIcon className="size-3 shrink-0 opacity-50 transition-transform group-data-[state=open]:rotate-180" />
     </div>
   );
 }
 
+function ToolActivitySpinner({ className }: { className?: string }) {
+  return (
+    <span
+      role="status"
+      aria-label="Loading"
+      className={cn("relative inline-block size-3.5 animate-spin", className)}
+    >
+      {Array.from({ length: 12 }, (_, index) => (
+        <span
+          key={index}
+          className="absolute top-1/2 left-1/2 h-[28%] w-[8%] origin-[50%_175%] rounded-full bg-current"
+          style={{
+            opacity: (index + 1) / 12,
+            transform: `translate(-50%, -175%) rotate(${index * 30}deg)`,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
 function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
   switch (action) {
     case "read":
-      return EyeIcon;
+      return FileIcon;
     case "edit":
       return FilePenLineIcon;
     case "write":
@@ -792,12 +776,18 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return FolderTreeIcon;
     case "search":
       return SearchIcon;
+    case "view_image":
+      return ImageIcon;
+    case "generate_image":
+      return SparklesIcon;
     case "plan":
       return ListTodoIcon;
     case "command":
       return SquareTerminalIcon;
     case "question":
       return MessageCircleQuestionIcon;
+    case "skill":
+      return BookOpenIcon;
     case "tool":
       return WrenchIcon;
   }
