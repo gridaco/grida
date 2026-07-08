@@ -1,0 +1,31 @@
+#anchor-replay v0
+oracle text=stub@lab-0
+viewport 2000 1400
+arm visual
+--- ir ---
+<frame x="span 0 0" y="span 0 0" w="auto" h="auto">
+  <frame name="artboard" x="60" y="60" w="900" h="640" fill="#FFFFFF">
+    <frame name="row" x="40" y="40" w="520" h="150" layout="flex" cross="center" gap="10 0" padding="10" fill="#F1F3F5">
+      <shape name="card.a" w="70" h="110" kind="rect" fill="#4A90D9"/>
+      <shape name="card.rot" w="70" h="110" rotation="20" kind="rect" fill="#E2574C"/>
+      <text name="label" size="18" fill="#171A1F">revenue</text>
+      <shape name="card.grow" w="70" h="110" grow="1" kind="rect" fill="#57B894"/>
+    </frame>
+    <frame name="hug" x="40" y="240" w="auto" h="auto" layout="flex" cross="center" gap="10 0" padding="10" fill="#F1F3F5">
+      <shape name="hug.a" w="60" h="90" kind="rect" fill="#8B7BD8"/>
+      <shape name="hug.rot" w="60" h="90" rotation="30" kind="rect" fill="#E2A23F"/>
+    </frame>
+    <shape name="badge" x="end 32" y="32" w="84" h="48" kind="rect" fill="#57B894"/>
+    <shape name="bar" x="span 32 32" y="end 24" h="16" kind="rect" fill="#E2A23F"/>
+    <group name="chips" x="620" y="240">
+      <shape name="chip.a" w="56" h="36" kind="rect" fill="#8B7BD8"/>
+      <shape name="chip.b" x="26" y="46" w="56" h="36" kind="rect" fill="#E2574C"/>
+    </group>
+    <lens name="lens" x="620" y="380" ops="rotate(25)">
+      <shape name="lens.child" w="80" h="80" kind="rect" fill="#4A90D9"/>
+    </lens>
+    <text name="title" x="40" y="560" size="24" fill="#171A1F">anchor spike — E10</text>
+  </frame>
+</frame>
+--- ops ---
+{"Ungroup":{"id":12}}

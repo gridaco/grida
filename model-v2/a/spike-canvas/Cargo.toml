@@ -11,6 +11,9 @@ description = "E10 — the feel spike: a native Skia canvas driven by the anchor
 
 [dependencies]
 anchor-lab = { path = "../lab" }
+# The engine this spike is being re-hosted onto (ENGINE.md). Same skia
+# version/features, so the shared target dir stays a single build.
+anchor-engine = { path = "../../engine" }
 
 # Shell deps: versions matched to crates/grida_dev / crates/grida_editor
 # (the prior-art winit hosts) so the shared target dir can reuse the

@@ -13,7 +13,7 @@ use anchor_lab::resolve::Resolved;
 use skia_safe::{Canvas, Color, Font, Paint, PaintStyle, PathBuilder, Rect};
 
 use crate::camera::Camera;
-use crate::paint::Painter;
+use anchor_engine::paint::PaintCtx;
 
 pub const HANDLE: f32 = 8.0;
 pub const ROTATE_STICK: f32 = 26.0;
@@ -75,7 +75,13 @@ pub fn screen_corners(doc: &Document, r: &Resolved, cam: &Camera, id: NodeId) ->
 
 /// Handle anchor points in screen space, shared by paint and hit-testing
 /// (one geometry, two consumers — never disagree).
-pub fn handles(doc: &Document, r: &Resolved, cam: &Camera, id: NodeId, dpr: f32) -> Vec<(HandleKind, (f32, f32))> {
+pub fn handles(
+    doc: &Document,
+    r: &Resolved,
+    cam: &Camera,
+    id: NodeId,
+    dpr: f32,
+) -> Vec<(HandleKind, (f32, f32))> {
     let c = screen_corners(doc, r, cam, id);
     let mid = |a: (f32, f32), b: (f32, f32)| ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0);
     let top = mid(c[0], c[1]);
@@ -97,7 +103,10 @@ pub fn handles(doc: &Document, r: &Resolved, cam: &Camera, id: NodeId, dpr: f32)
         (HandleKind::Edge(1), mid(c[1], c[2])),
         (HandleKind::Edge(2), bottom),
         (HandleKind::Edge(3), mid(c[0], c[3])),
-        (HandleKind::Rotate, (top.0 + up.0 * stick, top.1 + up.1 * stick)),
+        (
+            HandleKind::Rotate,
+            (top.0 + up.0 * stick, top.1 + up.1 * stick),
+        ),
     ]
 }
 
@@ -128,9 +137,9 @@ pub fn paint_hud(
     cam: &Camera,
     selection: Option<NodeId>,
     hover: Option<NodeId>,
-    painter: &Painter,
+    ctx: &PaintCtx,
 ) {
-    paint_hud_dpr(canvas, doc, resolved, cam, selection, hover, painter, 1.0);
+    paint_hud_dpr(canvas, doc, resolved, cam, selection, hover, ctx, 1.0);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -141,7 +150,7 @@ pub fn paint_hud_dpr(
     cam: &Camera,
     selection: Option<NodeId>,
     hover: Option<NodeId>,
-    painter: &Painter,
+    ctx: &PaintCtx,
     dpr: f32,
 ) {
     canvas.save();
@@ -196,7 +205,7 @@ pub fn paint_hud_dpr(
             // Ink readout (E-A7, demoted post-DEC-0): sizing never moves
             // with rotation anymore; the readout explains box vs INK.
             let node = doc.get(id);
-            if let Some(tf) = &painter.font {
+            if let Some(tf) = &ctx.font {
                 let b = resolved.box_of(id);
                 let aabb = resolved.aabb_of(id);
                 let label = if node.header.rotation != 0.0 {
@@ -218,9 +227,9 @@ pub fn paint_hud_dpr(
                     )
                 };
                 let font = Font::new(tf.clone(), 12.0 * dpr);
-                let anchor = c
-                    .iter()
-                    .fold((f32::MAX, f32::MAX), |acc, p| (acc.0.min(p.0), acc.1.min(p.1)));
+                let anchor = c.iter().fold((f32::MAX, f32::MAX), |acc, p| {
+                    (acc.0.min(p.0), acc.1.min(p.1))
+                });
                 let pos = (anchor.0, anchor.1 - 10.0 * dpr);
                 let mut bg = fill(Color::new(0xE6FFFFFF));
                 bg.set_style(PaintStyle::Fill);

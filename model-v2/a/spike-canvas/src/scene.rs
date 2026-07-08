@@ -129,7 +129,10 @@ pub fn starter() -> (Document, NodeId) {
 
     // Span bar: stretches with the artboard, x is owned by the Span
     // (dragging it sideways is a TYPED error, visible in the log).
-    let mut bar = named(Header::new(SizeIntent::Auto, SizeIntent::Fixed(16.0)), "bar");
+    let mut bar = named(
+        Header::new(SizeIntent::Auto, SizeIntent::Fixed(16.0)),
+        "bar",
+    );
     bar.x = AxisBinding::Span {
         start: 32.0,
         end: 32.0,
@@ -142,21 +145,33 @@ pub fn starter() -> (Document, NodeId) {
     let grp = b.add(
         artboard,
         named(
-            at(Header::new(SizeIntent::Auto, SizeIntent::Auto), 620.0, 240.0),
+            at(
+                Header::new(SizeIntent::Auto, SizeIntent::Auto),
+                620.0,
+                240.0,
+            ),
             "chips",
         ),
         Payload::Group,
     );
     let g1 = b.add(grp, named(card(56.0, 36.0), "chip.a"), rect());
     b.node_mut(g1).fill = Some("#8B7BD8".into());
-    let g2 = b.add(grp, named(at(card(56.0, 36.0), 26.0, 46.0), "chip.b"), rect());
+    let g2 = b.add(
+        grp,
+        named(at(card(56.0, 36.0), 26.0, 46.0), "chip.b"),
+        rect(),
+    );
     b.node_mut(g2).fill = Some("#E2574C".into());
 
     // Lens: the paint lane — rotates visually, layout-transparent.
     let lens = b.add(
         artboard,
         named(
-            at(Header::new(SizeIntent::Auto, SizeIntent::Auto), 620.0, 380.0),
+            at(
+                Header::new(SizeIntent::Auto, SizeIntent::Auto),
+                620.0,
+                380.0,
+            ),
             "lens",
         ),
         Payload::Lens {

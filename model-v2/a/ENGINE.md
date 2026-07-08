@@ -358,6 +358,75 @@ external pinning where a peer is the oracle (flex conformance pins to
 Chromium, never to Taffy — the E4 lesson `[MEASURED]`; `grida_wpt`
 is the in-repo precedent for the discipline `[MEASURED]`).
 
+## SETUP — the ground contracts (S-1…S-7)
+
+The five layers above are the runtime; these are the ground they sit on
+— the workspace shape, the boundaries, and the rig. A **day-1 skeleton
+now implements them** ([`../engine/`](../engine) — `anchor-engine`,
+consuming `anchor-lab`; the spike is re-hosted onto it and the gate is
+green), so several of these are `[MEASURED]` rather than aspirational.
+
+- **S-1 · crate topology & the Stylo landing** `[CONTRACT]` — the model
+  crate (`anchor-lab` today) carries no host deps and compiles for every
+  target incl. server; the engine embeds into the host component-wise.
+  The one industry rewrite that shipped did it this way — Stylo and
+  WebRender landed _into_ Gecko; greenfield "new browser" rewrites did
+  not `[PEER]`. So the lab stays the greenfield core, kept
+  dependency-clean, and promotion to `crates/` is a `git mv`, not a
+  rewrite `[MEASURED]`. Phase-4 landing order: resolve+drawlist behind
+  the pipeline seam first, then pick/query, then interaction/journal —
+  each gated by shot+replay parity. The spike re-host **is** this
+  landing, rehearsed `[MEASURED]`.
+- **S-2 · dependency-direction law** `[CONTRACT]` — arrows never
+  reverse: model (no skia/winit/wasm-bindgen) ← engine (model + skia;
+  `use skia_safe` confined to `paint.rs` + `bin/gate.rs`) ← hosts
+  (engine + winit/egui/GL). Compiler-enforced, not reviewer-enforced.
+  Proven: `anchor-lab` builds feature-less, `anchor-engine` adds only
+  skia, the spike holds all chrome `[MEASURED]`.
+- **S-3 · one write door, one read door** `[CONTRACT]` — every mutation
+  is a typed `Op` through `apply` (the journal's unit); every read is
+  the resolved tier (via `query`) or the text IR. No tool reaches into
+  node fields. The legacy's three-answers-to-one-question split-brain is
+  what reach-ins grow into. Proven: the spike's interaction sites all
+  route through `apply`; pick/hover through `query` `[MEASURED]`.
+- **S-4 · wasm-first mechanics** `[CONTRACT]` — the core is
+  single-thread-first (wasm threads need cross-origin isolation;
+  parallelism is a native bonus behind ENG-0.3, never load-bearing)
+  `[PEER]`; no interior mutability in the model/resolved tiers (value
+  semantics also make snapshot undo and replay cheap — the document is
+  one value `[MEASURED]`); the arena/SOA layout suits linear memory that
+  only grows `[PEER]`; the boundary is ops in, damage/query results out
+  (the C-ABI seam), never "JS reaches into engine memory."
+- **S-5 · rig before engine** `[CONTRACT]` — the gate exists _before_
+  the engine grows: shots byte-compare, replay determinism, resolve+build
+  budgets against a machine-tagged baseline. Pixel goldens raster on CPU
+  (GPU AA varies by machine — browsers golden on software raster
+  `[PEER]`). The first untested "temporary" optimization fails here.
+  Built with the skeleton (`bin/gate.rs`, green) `[MEASURED]`.
+- **S-6 · gated observability** `[CONTRACT]` — per-stage spans/counters
+  compile to zero when off (the `trace` feature); the profiler must
+  never distort the profile (the legacy loop measured exactly this —
+  devtools cost-prediction polluted plan build until gated `[PRIOR]`).
+  Proven: `t_span!`/`t_count!` expand to the bare block with `trace` off
+  `[MEASURED]`.
+- **S-7 · one shipping profile** `[CONTRACT]` — both DEC-0 arms stay
+  implemented and tested, but the engine ships ONE profile; arms and
+  flags exist for tests/studies only, and CI enumerates the supported
+  configuration set. The guard against the legacy's 26-arm branch forest
+  regrowing as feature flags — the lab pins both arms in tests while the
+  default resolves one `[MEASURED]`.
+
+Two one-liners that also belong on day 1:
+
+- **Format carries a version field from byte one** `[CONTRACT]` — the
+  refuse-newer posture is DEC-7's call; the field itself is not optional.
+  The `.replay` header already stamps magic + version, the pattern
+  rehearsed `[MEASURED]`.
+- **DPR / pixel-snapping is a declared paint policy** `[CONTRACT]`, not
+  rounding scattered through code — the executor takes the view
+  transform and the host owns DPR (the spike passes `dpr` into the HUD;
+  the scene view composes it) `[MEASURED]`.
+
 ## Scope fence (named, not silent)
 
 - **Above Skia.** Raster stays Skia; this document pioneers the

@@ -1,0 +1,14 @@
+{
+  "entries": {
+    "flat10k": {
+      "build_us": 82.5,
+      "resolve_us": 346.709
+    },
+    "starter": {
+      "build_us": 0.458,
+      "resolve_us": 7.25
+    }
+  },
+  "machine": "aarch64-macos",
+  "note": "min-of-11 microseconds; regenerate with `gate --bless-bench`"
+}

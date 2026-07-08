@@ -1,0 +1,46 @@
+[package]
+name = "anchor-engine"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "The phase-4 canvas engine skeleton for the model-v2 anchor model: resolve -> drawlist -> paint pipeline, spatial query, journal/replay, damage. Consumes anchor-lab; hosts (the spike, later crates/grida) consume this. See model-v2/a/ENGINE.md."
+
+# Standalone on purpose (model-v2 containment) — own workspace, shared
+# target dir for skia reuse. Promoted into crates/ at the migration gate,
+# where the public name becomes a commitment. See model-v2/a/ENGINE.md S-1.
+[workspace]
+
+[features]
+# ENG S-6 · observability compiled to zero unless asked. The profiler must
+# never distort the profile.
+trace = []
+# The headless-GPU probe (probe_gpu): real GL flush timing for the two
+# GPU-only wins (scene raster cache, layerization) that raster mis-signs.
+# Optional so the default raster build (probe, gate, spike) stays GL-free.
+native-gl-context = ["dep:glutin", "dep:gl", "dep:raw-window-handle"]
+
+[dependencies]
+# serde feature ON: the op-log wire for replay (`Op` becomes serializable).
+anchor-lab = { path = "../a/lab", features = ["serde"] }
+serde_json = "1.0"
+
+# Same exact version + features as anchor-spike / grida_dev so the shared
+# target dir reuses the compiled skia-safe artifact instead of rebuilding
+# it. `use skia_safe` stays confined to paint.rs (ENGINE.md S-1).
+skia-safe = { version = "=0.93.1", features = [
+  "gpu",
+  "gl",
+  "textlayout",
+  "pdf",
+  "svg",
+  "webp",
+] }
+
+# Headless-GPU probe only (feature native-gl-context) — same versions as the
+# spike shell / grida_dev, so the shared target dir reuses the artifacts.
+glutin = { version = "0.32.0", optional = true }
+gl = { version = "0.14.0", optional = true }
+raw-window-handle = { version = "0.6.0", optional = true }
+
+[profile.release]
+debug = true

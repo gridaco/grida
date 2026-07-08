@@ -124,10 +124,18 @@ fn fmt_size(s: &SizeIntent) -> String {
 pub fn diff_header(before: &Header, after: &Header) -> Vec<String> {
     let mut out = Vec::new();
     if before.x != after.x {
-        out.push(format!("x: {} -> {}", fmt_binding(&before.x), fmt_binding(&after.x)));
+        out.push(format!(
+            "x: {} -> {}",
+            fmt_binding(&before.x),
+            fmt_binding(&after.x)
+        ));
     }
     if before.y != after.y {
-        out.push(format!("y: {} -> {}", fmt_binding(&before.y), fmt_binding(&after.y)));
+        out.push(format!(
+            "y: {} -> {}",
+            fmt_binding(&before.y),
+            fmt_binding(&after.y)
+        ));
     }
     if before.width != after.width {
         out.push(format!(

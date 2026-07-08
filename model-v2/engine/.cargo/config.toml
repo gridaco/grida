@@ -1,0 +1,5 @@
+# Reuse the repo's shared target dir so the already-compiled skia-safe
+# build (grida_dev / anchor-spike — same version, same features) is hit
+# instead of rebuilt inside this standalone workspace.
+[build]
+target-dir = "../../target"

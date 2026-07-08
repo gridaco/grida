@@ -56,10 +56,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "anchor-engine"
+version = "0.0.0"
+dependencies = [
+ "anchor-lab",
+ "serde_json",
+ "skia-safe",
+]
+
+[[package]]
 name = "anchor-lab"
 version = "0.0.0"
 dependencies = [
  "quick-xml 0.37.5",
+ "serde",
  "taffy",
 ]
 
@@ -67,6 +77,7 @@ dependencies = [
 name = "anchor-spike"
 version = "0.0.0"
 dependencies = [
+ "anchor-engine",
  "anchor-lab",
  "egui",
  "egui-winit",

@@ -12,10 +12,10 @@ mod paint;
 mod scene;
 mod shell;
 
-use anchor_lab::model::Document;
-use anchor_lab::resolve::{resolve, Resolved, ResolveOptions};
+use anchor_lab::model::{Document, NodeId};
+use anchor_lab::ops::Op;
+use anchor_lab::resolve::{resolve, ResolveOptions, Resolved};
 use camera::Camera;
-use paint::Painter;
 
 /// The resolve viewport — the root frame spans it; think "world extent
 /// of the infinite canvas' initial container", not the window.
@@ -35,8 +35,23 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     if let Some(i) = args.iter().position(|a| a == "--shot") {
         let path = args.get(i + 1).cloned().unwrap_or("spike.png".into());
-        let state = args.get(i + 2).cloned().unwrap_or_default();
+        // The state arg is positional but optional; a following flag is not it.
+        let state = args
+            .get(i + 2)
+            .filter(|s| !s.starts_with("--"))
+            .cloned()
+            .unwrap_or_default();
         shot(&path, &state);
+        return;
+    }
+    if let Some(i) = args.iter().position(|a| a == "--record") {
+        let path = args.get(i + 1).cloned().unwrap_or("out.replay".into());
+        let state = args
+            .get(i + 2)
+            .filter(|s| !s.starts_with("--"))
+            .cloned()
+            .unwrap_or_default();
+        record(&path, &state);
         return;
     }
     if args.iter().any(|a| a == "--bench") {
@@ -46,21 +61,18 @@ fn main() {
     shell::run();
 }
 
-/// Headless render: paint the starter scene (after an optional scripted
-/// state) into a raster surface and encode PNG — no window, no GL.
-fn shot(path: &str, state: &str) {
-    let (mut doc, artboard) = scene::starter();
-    let mut selection: Option<anchor_lab::model::NodeId> = None;
-
+/// A scripted state as a typed op sequence — the SAME writes the gesture would
+/// issue, expressed as data so both `--shot` (apply + render) and `--record`
+/// (serialize to a `.replay`) share one definition. Ops address nodes by name
+/// so they survive the recorder's `parse(print(doc))` normalization.
+fn state_ops(doc: &Document, state: &str) -> Vec<Op> {
     match state {
         "crosszero" => {
-            // Drag card.a's right edge THROUGH the left edge: |extent| +
-            // flip toggle + re-pin (E-A14). Scripted exactly as the
-            // gesture would issue it.
-            let id = find(&doc, "card.a");
-            let r = resolve_doc(&doc);
+            // Drag card.a's right edge THROUGH the left edge (E-A14).
+            let id = find(doc, "card.a");
+            let r = resolve_doc(doc);
             let drag = anchor_lab::ops::ResizeDrag::begin(
-                &doc,
+                doc,
                 &r,
                 id,
                 anchor_lab::ops::Axis::X,
@@ -68,29 +80,70 @@ fn shot(path: &str, state: &str) {
             )
             .unwrap();
             let b = r.box_of(id);
-            let target = b.x + b.w + 50.0; // 50px past the FIXED right edge
-            let r = resolve_doc(&doc);
-            anchor_lab::ops::resize_drag(&mut doc, &r, id, &drag, target).unwrap();
-            selection = Some(id);
+            vec![Op::ResizeDrag {
+                id,
+                drag,
+                target: b.x + b.w + 50.0, // 50px past the FIXED right edge
+            }]
         }
-        "ungroup" => {
-            let id = find(&doc, "chips");
-            let r = resolve_doc(&doc);
-            anchor_lab::ops::ungroup(&mut doc, &r, id).unwrap();
-        }
-        "rot45" => {
-            let id = find(&doc, "card.rot");
-            anchor_lab::ops::set_rotation(&mut doc, id, 45.0).unwrap();
-            selection = Some(id);
-        }
-        _ => {
-            selection = Some(find(&doc, "card.rot"));
-        }
+        "ungroup" => vec![Op::Ungroup {
+            id: find(doc, "chips"),
+        }],
+        "rot45" => vec![Op::SetRotation {
+            id: find(doc, "card.rot"),
+            deg: 45.0,
+        }],
+        _ => vec![],
     }
+}
+
+/// The HUD selection a shot shows for a state (chrome only).
+fn shot_selection(doc: &Document, state: &str) -> Option<NodeId> {
+    match state {
+        "crosszero" => Some(find(doc, "card.a")),
+        "ungroup" => None,
+        _ => Some(find(doc, "card.rot")), // rot45 and default
+    }
+}
+
+/// Record the starter + a scripted state as a `.replay` file (ENG-5.2). The
+/// document is normalized so recorded ids are the parse-assigned ones; ops are
+/// built against the normalized doc (by name), so the file is self-consistent.
+fn record(path: &str, state: &str) {
+    let (starter, _) = scene::starter();
+    let doc = anchor_lab::textir::parse(&anchor_lab::textir::print(&starter)).expect("normalize");
+    let ops = state_ops(&doc, state);
+    let opts = ResolveOptions {
+        viewport: RESOLVE_VIEWPORT,
+        ..Default::default()
+    };
+    let text = anchor_engine::replay::write_string(
+        &doc,
+        &ops,
+        &anchor_engine::oracle::OracleTags::default(),
+        &opts,
+    );
+    std::fs::write(path, text).expect("write replay");
+    println!("recorded {} op(s) to {path}", ops.len());
+}
+
+/// Headless render: paint the starter scene (after an optional scripted
+/// state) into a raster surface and encode PNG — no window, no GL. The SCENE
+/// is painted by the engine pipeline (`drawlist::build` -> `paint::execute`);
+/// the HUD is spike chrome on top. These shots are the gate's goldens.
+fn shot(path: &str, state: &str) {
+    let (mut doc, artboard) = scene::starter();
+
+    // Apply the scripted state as typed ops (byte-identical to the free-fn
+    // script — apply is pure dispatch), each with a fresh resolve.
+    for op in state_ops(&doc, state) {
+        let r = resolve_doc(&doc);
+        anchor_lab::ops::apply(&mut doc, &r, &op).expect("scripted op");
+    }
+    let selection = shot_selection(&doc, state);
 
     let (w, h) = (1360, 900);
-    let mut surface =
-        skia_safe::surfaces::raster_n32_premul((w, h)).expect("raster surface");
+    let mut surface = skia_safe::surfaces::raster_n32_premul((w, h)).expect("raster surface");
     let resolved = resolve_doc(&doc);
     let mut cam = Camera::new();
     let ab = resolved.aabb_of(artboard);
@@ -98,9 +151,10 @@ fn shot(path: &str, state: &str) {
 
     let canvas = surface.canvas();
     canvas.clear(skia_safe::Color::from_argb(255, 0xF7, 0xF8, 0xF9));
-    let painter = Painter::new();
-    painter.paint_scene(canvas, &doc, &resolved, &cam);
-    shell::hud::paint_hud(canvas, &doc, &resolved, &cam, selection, None, &painter);
+    let ctx = paint::paint_ctx();
+    let list = anchor_engine::drawlist::build(&doc, &resolved);
+    anchor_engine::paint::execute(canvas, &list, &cam.view(), &ctx);
+    shell::hud::paint_hud(canvas, &doc, &resolved, &cam, selection, None, &ctx);
 
     let image = surface.image_snapshot();
     let data = image
@@ -114,46 +168,61 @@ fn find(doc: &Document, name: &str) -> anchor_lab::model::NodeId {
     scene::find_named(doc, name).expect("named node")
 }
 
-/// Resolve + paint wall time on raster, starter scene and synthetic
-/// flat canvases — the seam numbers phase 4 wants (native, no boundary).
+/// Per-stage frame cost on raster, across scene sizes. Separates the three
+/// pipeline stages — resolve (lab) / drawlist build (engine, CPU) / skia
+/// execute (the draw calls) — so the paint wall is visible, and packs each
+/// heavy scene so every node is ON the surface (the honest all-visible worst
+/// case; real editing culls to the viewport). fps is against the 120fps
+/// (8.33ms) budget. Every frame here is a FULL redraw — which is exactly the
+/// architecture problem: a pan changes nothing in the document yet pays all
+/// three stages, and a one-node mutation pays the whole scene's execute.
 fn bench() {
     use anchor_lab::model::*;
     use std::time::Instant;
 
-    let mut surface = skia_safe::surfaces::raster_n32_premul((1360, 900)).unwrap();
-    let painter = Painter::new();
-    let cam = Camera::new();
+    const W: i32 = 1360;
+    const H: i32 = 900;
+    let mut surface = skia_safe::surfaces::raster_n32_premul((W, H)).unwrap();
+    let ctx = paint::paint_ctx();
+    let view = Camera::new().view();
 
     let mut run = |label: &str, doc: &Document| {
-        let mut resolve_ms = f64::MAX;
-        let mut paint_ms = f64::MAX;
+        let (mut resolve_ms, mut build_ms, mut exec_ms) = (f64::MAX, f64::MAX, f64::MAX);
         for _ in 0..11 {
             let t0 = Instant::now();
             let resolved = resolve_doc(doc);
             let t1 = Instant::now();
+            let list = anchor_engine::drawlist::build(doc, &resolved);
+            let t2 = Instant::now();
             let canvas = surface.canvas();
             canvas.clear(skia_safe::Color::WHITE);
-            painter.paint_scene(canvas, doc, &resolved, &cam);
-            let t2 = Instant::now();
-            resolve_ms = resolve_ms.min((t1 - t0).as_secs_f64() * 1000.0);
-            paint_ms = paint_ms.min((t2 - t1).as_secs_f64() * 1000.0);
+            anchor_engine::paint::execute(canvas, &list, &view, &ctx);
+            let t3 = Instant::now();
+            let ms = |a: Instant, b: Instant| (b - a).as_secs_f64() * 1000.0;
+            resolve_ms = resolve_ms.min(ms(t0, t1));
+            build_ms = build_ms.min(ms(t1, t2));
+            exec_ms = exec_ms.min(ms(t2, t3));
         }
+        let frame = resolve_ms + build_ms + exec_ms;
         println!(
-            "{label:26} {:5} nodes   resolve {resolve_ms:7.3} ms   paint {paint_ms:7.3} ms   frame {:7.3} ms",
+            "{label:20} {:>7} nodes  resolve {resolve_ms:8.3}  build {build_ms:8.3}  execute {exec_ms:8.3}  frame {frame:8.3} ms  {:6.1} fps",
             doc.len(),
-            resolve_ms + paint_ms
+            1000.0 / frame
         );
     };
 
-    let (starter, _) = scene::starter();
-    run("starter scene", &starter);
-
-    for n in [100usize, 1000, 10000] {
+    // Pack n nodes into the W×H surface so all are visible (worst case).
+    let packed = |n: usize| -> Document {
+        let cols = ((n as f32 * W as f32 / H as f32).sqrt().ceil() as usize).max(1);
+        let cell = W as f32 / cols as f32;
         let mut b = DocBuilder::new();
         for i in 0..n {
-            let mut h = Header::new(SizeIntent::Fixed(40.0), SizeIntent::Fixed(28.0));
-            h.x = AxisBinding::start((i % 100) as f32 * 19.0);
-            h.y = AxisBinding::start((i / 100) as f32 * 13.0);
+            let mut h = Header::new(
+                SizeIntent::Fixed((cell * 0.8).max(1.0)),
+                SizeIntent::Fixed((cell * 0.8).max(1.0)),
+            );
+            h.x = AxisBinding::start((i % cols) as f32 * cell);
+            h.y = AxisBinding::start((i / cols) as f32 * cell);
             h.rotation = (i % 7) as f32 * 5.0;
             b.add(
                 0,
@@ -163,7 +232,13 @@ fn bench() {
                 },
             );
         }
-        let doc = b.build();
-        run(&format!("flat canvas ({n})"), &doc);
+        b.build()
+    };
+
+    println!("== full-redraw cost (raster, min of 11); 120fps budget = 8.33 ms ==");
+    let (starter, _) = scene::starter();
+    run("starter", &starter);
+    for n in [1_000usize, 10_000, 50_000, 100_000] {
+        run(&format!("packed {n}"), &packed(n));
     }
 }

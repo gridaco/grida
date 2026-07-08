@@ -5,9 +5,11 @@
 
 use std::num::NonZeroU32;
 
+use anchor_engine::journal::Journal;
+use anchor_engine::query::Query;
 use anchor_lab::model::{Document, NodeId};
-use anchor_lab::ops::{self, Axis, ResizeDrag};
-use anchor_lab::pick::pick;
+use anchor_lab::ops::{self, Axis, Op, ResizeDrag};
+use anchor_lab::resolve::Resolved;
 use glutin::prelude::GlSurface;
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
@@ -20,9 +22,10 @@ use crate::interaction::{
     box_center_screen, diff_header, dist, handle_at, parent_point, resize_anchors, screen_angle,
     Drag, Fsm, Gesture, LogEntry, DRAG_THRESHOLD,
 };
-use crate::paint::Painter;
+use crate::paint::paint_ctx;
 use crate::shell::hud::{self, HandleKind};
 use crate::{resolve_doc, scene};
+use anchor_engine::paint::PaintCtx;
 
 pub struct App {
     // document + editor state
@@ -33,6 +36,9 @@ pub struct App {
     pub undo: Vec<Document>,
     pub redo: Vec<Document>,
     pub log: Vec<LogEntry>,
+    /// The session op-log (ENG-5.1) — every gesture recorded as typed ops for
+    /// replay. Records only; undo remains the snapshot stacks above (ENG-5.5).
+    pub journal: Journal,
 
     // interaction
     pub fsm: Fsm,
@@ -43,9 +49,31 @@ pub struct App {
 
     // view
     pub camera: Camera,
-    pub painter: Painter,
+    pub ctx: PaintCtx,
     pub dpr: f32,
     pub last_frame_ms: f32,
+    /// Per-stage frame breakdown (ms): [resolve, scene, flush, egui, gpu, swap].
+    /// `gpu` is a `glFinish` — the REAL GPU work (blocks until done), so `swap`
+    /// after it is pure vsync idle, not work. This separates "the display is
+    /// pacing us" (fine) from "we are slow" (a problem) — the distinction my
+    /// headless probes and the raw swap-wall both hid.
+    pub bd: [f32; 6],
+    frame_count: u64,
+    /// One-time diagnostic: every frame appended to `/tmp/anchor-spike-frames.log`
+    /// (truncated per run), flushed each frame so a kill preserves it. Captures
+    /// the inter-frame GAP (true fps, incl. time spent outside draw) during a
+    /// real pan — the signal idle capture can't see. NOT the dev-iteration
+    /// method; a human-in-the-loop bridge to show the symptom once.
+    /// Opt-in via `ANCHOR_FRAMELOG=1` — off by default so its per-frame file
+    /// I/O never sits in the latency path during normal use.
+    want_framelog: bool,
+    frame_log: Option<std::io::BufWriter<std::fs::File>>,
+    frame_clock: std::time::Instant,
+    /// Previous frame's resolved tier and the count of nodes that changed
+    /// against it (ENG-2.2 damage) — shown in the panel; not yet used to
+    /// scope repaint (OS-2a).
+    last_resolved: Option<Resolved>,
+    pub last_damage: usize,
 
     // panels (egui overlay on the shared GL context)
     egui_ctx: egui::Context,
@@ -54,6 +82,9 @@ pub struct App {
     pub ir_draft: String,
     pub ir_dirty: bool,
     pub ir_error: Option<String>,
+    /// Cmd+\ toggles the egui dev panels off, to feel raw canvas paint cost
+    /// (the panel is a per-frame egui layout + GL composite). Default on.
+    pub ui_visible: bool,
 
     // shell
     gpu: super::window::GpuSurface,
@@ -98,21 +129,30 @@ pub fn run(init: WindowInit) {
         undo: Vec::new(),
         redo: Vec::new(),
         log: Vec::new(),
+        journal: Journal::new(),
         fsm: Fsm::Idle,
         gesture: None,
         space_held: false,
         cursor: (0.0, 0.0),
         modifiers: ModifiersState::default(),
         camera: Camera::new(),
-        painter: Painter::new(),
+        ctx: paint_ctx(),
         dpr: scale_factor as f32,
         last_frame_ms: 0.0,
+        bd: [0.0; 6],
+        frame_count: 0,
+        want_framelog: std::env::var("ANCHOR_FRAMELOG").is_ok(),
+        frame_log: None,
+        frame_clock: std::time::Instant::now(),
+        last_resolved: None,
+        last_damage: 0,
         egui_ctx,
         egui_winit,
         egui_painter,
         ir_draft: String::new(),
         ir_dirty: false,
         ir_error: None,
+        ui_visible: true,
         gpu,
         window,
         gl_surface,
@@ -151,6 +191,17 @@ impl App {
             self.undo.remove(0);
         }
         self.redo.clear();
+    }
+
+    /// Apply a typed op through the engine's dispatch (`anchor_lab::ops::apply`)
+    /// and record it in the journal (ENG-5.1). `resolved` must be a fresh
+    /// resolve of the current document — callers pass the same resolve they
+    /// already computed, so this is byte-identical to the pre-journal free-fn
+    /// path (guarded by the lab's `apply ≡ free_fn` test).
+    fn apply_op(&mut self, resolved: &Resolved, op: Op) -> ops::OpResult {
+        let result = ops::apply(&mut self.doc, resolved, &op);
+        self.journal.record(op, result.clone());
+        result
     }
 
     fn log_push(&mut self, entry: LogEntry) {
@@ -215,7 +266,7 @@ impl App {
         }
 
         let (wx, wy) = self.camera.screen_to_world(self.cursor);
-        match pick(&self.doc, &resolved, wx, wy) {
+        match Query::new(&self.doc, &resolved).hit_point(wx, wy) {
             Some(hit) if hit != self.doc.root => {
                 self.selection = Some(hit);
                 self.fsm = Fsm::Pressed {
@@ -251,7 +302,8 @@ impl App {
             }
             HandleKind::Edge(_) | HandleKind::Corner(_) => {
                 let (ax, ay) = resize_anchors(kind);
-                let begin = |axis, anchor| ResizeDrag::begin(&self.doc, &resolved, id, axis, anchor);
+                let begin =
+                    |axis, anchor| ResizeDrag::begin(&self.doc, &resolved, id, axis, anchor);
                 let dx = ax.map(|a| begin(Axis::X, a));
                 let dy = ay.map(|a| begin(Axis::Y, a));
                 // A derived box refuses resize — the wall is a log line,
@@ -318,8 +370,20 @@ impl App {
                 let p0 = parent_point(&self.doc, &resolved, &self.camera, id, last);
                 let p1 = parent_point(&self.doc, &resolved, &self.camera, id, self.cursor);
                 let b = resolved.box_of(id);
-                let rx = ops::set_x(&mut self.doc, &resolved, id, b.x + (p1.0 - p0.0));
-                let ry = ops::set_y(&mut self.doc, &resolved, id, b.y + (p1.1 - p0.1));
+                let rx = self.apply_op(
+                    &resolved,
+                    Op::SetX {
+                        id,
+                        value: b.x + (p1.0 - p0.0),
+                    },
+                );
+                let ry = self.apply_op(
+                    &resolved,
+                    Op::SetY {
+                        id,
+                        value: b.y + (p1.1 - p0.1),
+                    },
+                );
                 if let Some(g) = &mut self.gesture {
                     if let Err(e) = rx {
                         g.error(format!("x: Err({e:?})"));
@@ -338,7 +402,7 @@ impl App {
                     Axis::X => p.0,
                     Axis::Y => p.1,
                 };
-                let r = ops::resize_drag(&mut self.doc, &resolved, id, &drag, target);
+                let r = self.apply_op(&resolved, Op::ResizeDrag { id, drag, target });
                 if let (Some(g), Err(e)) = (&mut self.gesture, r) {
                     g.error(format!("{:?}: Err({e:?})", drag.axis));
                 }
@@ -348,10 +412,24 @@ impl App {
                 let (dx, dy) = (*dx, *dy);
                 let r1 = resolve_doc(&self.doc);
                 let p = parent_point(&self.doc, &r1, &self.camera, id, self.cursor);
-                let rx = ops::resize_drag(&mut self.doc, &r1, id, &dx, p.0);
+                let rx = self.apply_op(
+                    &r1,
+                    Op::ResizeDrag {
+                        id,
+                        drag: dx,
+                        target: p.0,
+                    },
+                );
                 let r2 = resolve_doc(&self.doc);
                 let p = parent_point(&self.doc, &r2, &self.camera, id, self.cursor);
-                let ry = ops::resize_drag(&mut self.doc, &r2, id, &dy, p.1);
+                let ry = self.apply_op(
+                    &r2,
+                    Op::ResizeDrag {
+                        id,
+                        drag: dy,
+                        target: p.1,
+                    },
+                );
                 if let Some(g) = &mut self.gesture {
                     if let Err(e) = rx {
                         g.error(format!("x: Err({e:?})"));
@@ -374,11 +452,11 @@ impl App {
                     deg = (deg / 15.0).round() * 15.0;
                 }
                 let derived = *derived;
+                let resolved = resolve_doc(&self.doc);
                 let r = if derived {
-                    let resolved = resolve_doc(&self.doc);
-                    ops::rotate_derived_center_feel(&mut self.doc, &resolved, id, deg)
+                    self.apply_op(&resolved, Op::RotateDerivedCenterFeel { id, deg })
                 } else {
-                    ops::set_rotation(&mut self.doc, id, deg)
+                    self.apply_op(&resolved, Op::SetRotation { id, deg })
                 };
                 if let (Some(g), Err(e)) = (&mut self.gesture, r) {
                     g.error(format!("rotation: Err({e:?})"));
@@ -388,7 +466,9 @@ impl App {
                 // Idle / Pressed: hover tracking only.
                 let resolved = resolve_doc(&self.doc);
                 let (wx, wy) = self.camera.screen_to_world(self.cursor);
-                self.hover = pick(&self.doc, &resolved, wx, wy).filter(|h| *h != self.doc.root);
+                self.hover = Query::new(&self.doc, &resolved)
+                    .hit_point(wx, wy)
+                    .filter(|h| *h != self.doc.root);
             }
         }
     }
@@ -434,7 +514,8 @@ impl App {
                 if let Some(id) = self.selection {
                     let name = self.name_of(id);
                     self.push_undo();
-                    match ops::delete(&mut self.doc, id) {
+                    let resolved = resolve_doc(&self.doc);
+                    match self.apply_op(&resolved, Op::Delete { id }) {
                         Ok(n) => {
                             self.after_structural();
                             self.log_push(LogEntry {
@@ -461,7 +542,11 @@ impl App {
                 | NamedKey::ArrowDown),
             ) => {
                 if let Some(id) = self.selection {
-                    let step = if self.modifiers.shift_key() { 10.0 } else { 1.0 };
+                    let step = if self.modifiers.shift_key() {
+                        10.0
+                    } else {
+                        1.0
+                    };
                     let (dx, dy) = match k {
                         NamedKey::ArrowLeft => (-step, 0.0),
                         NamedKey::ArrowRight => (step, 0.0),
@@ -471,8 +556,20 @@ impl App {
                     self.push_undo();
                     let before = self.doc.get(id).header.clone();
                     let resolved = resolve_doc(&self.doc);
-                    let rx = ops::set_x(&mut self.doc, &resolved, id, resolved.box_of(id).x + dx);
-                    let ry = ops::set_y(&mut self.doc, &resolved, id, resolved.box_of(id).y + dy);
+                    let rx = self.apply_op(
+                        &resolved,
+                        Op::SetX {
+                            id,
+                            value: resolved.box_of(id).x + dx,
+                        },
+                    );
+                    let ry = self.apply_op(
+                        &resolved,
+                        Op::SetY {
+                            id,
+                            value: resolved.box_of(id).y + dy,
+                        },
+                    );
                     let writes = diff_header(&before, &self.doc.get(id).header);
                     let mut errors = vec![];
                     if let Err(e) = rx {
@@ -504,7 +601,7 @@ impl App {
                     let name = self.name_of(id);
                     let resolved = resolve_doc(&self.doc);
                     self.push_undo();
-                    match ops::ungroup(&mut self.doc, &resolved, id) {
+                    match self.apply_op(&resolved, Op::Ungroup { id }) {
                         Ok(n) => {
                             self.selection = None;
                             self.log_push(LogEntry {
@@ -534,8 +631,16 @@ impl App {
             }
             Key::Character(ref c) if primary && c.as_str() == "-" => {
                 let size = self.window.inner_size();
-                self.camera
-                    .zoom_about((size.width as f32 / 2.0, size.height as f32 / 2.0), 1.0 / 1.2);
+                self.camera.zoom_about(
+                    (size.width as f32 / 2.0, size.height as f32 / 2.0),
+                    1.0 / 1.2,
+                );
+            }
+            Key::Character(ref c) if primary && c.as_str() == "\\" => {
+                // Toggle the dev panels — feel raw canvas paint without the
+                // per-frame egui overlay.
+                self.ui_visible = !self.ui_visible;
+                self.window.request_redraw();
             }
             _ => {}
         }
@@ -544,12 +649,26 @@ impl App {
     // ── paint ───────────────────────────────────────────────────────
 
     fn draw(&mut self) {
+        let ms = |t: std::time::Instant| t.elapsed().as_secs_f32() * 1000.0;
         let t0 = std::time::Instant::now();
+        // The inter-frame GAP: wall time since the last draw START. This is the
+        // true frame period (fps = 1000/gap) — it includes everything BETWEEN
+        // draws (event loop, scheduling, present blocking), which the in-draw
+        // stage sum does not. If gap >> draw, the problem is not rendering.
+        let gap = t0.duration_since(self.frame_clock).as_secs_f32() * 1000.0;
+        self.frame_clock = t0;
         let resolved = resolve_doc(&self.doc);
+        self.last_damage = match &self.last_resolved {
+            Some(prev) => anchor_engine::damage::diff(prev, &resolved).changed.len(),
+            None => 0,
+        };
+        let t_resolve = ms(t0);
+
+        let t1 = std::time::Instant::now();
         let canvas = self.gpu.surface.canvas();
         canvas.clear(skia_safe::Color::from_argb(255, 0xF7, 0xF8, 0xF9));
-        self.painter
-            .paint_scene(canvas, &self.doc, &resolved, &self.camera);
+        let list = anchor_engine::drawlist::build(&self.doc, &resolved);
+        anchor_engine::paint::execute(canvas, &list, &self.camera.view(), &self.ctx);
         hud::paint_hud_dpr(
             canvas,
             &self.doc,
@@ -557,22 +676,87 @@ impl App {
             &self.camera,
             self.selection,
             self.hover,
-            &self.painter,
+            &self.ctx,
             self.dpr,
         );
+        let t_scene = ms(t1);
+
+        let t2 = std::time::Instant::now();
         self.gpu.gr_context.flush_and_submit();
-        // egui chrome — topmost, on the shared GL context.
+        let t_flush = ms(t2);
+
+        let t3 = std::time::Instant::now();
         self.paint_egui(resolved.reports.len());
+        let t_egui = ms(t3);
+
+        // glFinish: block until the GPU has ACTUALLY finished all submitted
+        // work (scene + egui). Its wall time is the real GPU cost; whatever
+        // swap_buffers then spends is pure vsync idle, not work. This is the
+        // measurement the OpenGL literature prescribes — a raw swap wall only
+        // ever shows multiples of the refresh interval and hides the truth.
+        let t_gpu = std::time::Instant::now();
+        unsafe {
+            gl::Finish();
+        }
+        let t_gpufinish = ms(t_gpu);
+
+        let t4 = std::time::Instant::now();
         if let Err(e) = self.gl_surface.swap_buffers(&self.gl_context) {
             eprintln!("swap_buffers: {e:?}");
         }
-        self.last_frame_ms = t0.elapsed().as_secs_f32() * 1000.0;
+        let t_swap = ms(t4);
+
+        self.last_frame_ms = ms(t0);
+        self.bd = [t_resolve, t_scene, t_flush, t_egui, t_gpufinish, t_swap];
+        self.frame_count += 1;
+
+        // Per-run frame log (opt-in `ANCHOR_FRAMELOG=1`). Truncated on the first
+        // frame; flushed every frame so a hard kill during panning preserves it.
+        if self.want_framelog && self.frame_log.is_none() {
+            let path = "/tmp/anchor-spike-frames.log";
+            match std::fs::File::create(path) {
+                Ok(f) => {
+                    let sz = self.window.inner_size();
+                    eprintln!(
+                        "frame log -> {path}  (dpr {:.1} surface {}x{})",
+                        self.dpr, sz.width, sz.height
+                    );
+                    self.frame_log = Some(std::io::BufWriter::new(f));
+                }
+                Err(e) => eprintln!("frame log open failed: {e}"),
+            }
+        }
+        if let Some(w) = self.frame_log.as_mut() {
+            use std::io::Write as _;
+            let panning = matches!(self.fsm, Fsm::Dragging(Drag::Pan { .. }));
+            let dragging = matches!(self.fsm, Fsm::Dragging(_));
+            let _ = writeln!(
+                w,
+                "f{:<6} gap {:7.2}ms ({:6.1}fps)  draw {:6.2} = res {:.2} scene {:.2} flush {:.2} egui {:.2} gpu {:.2} vsync {:.2}  | pan={} drag={} cursor=({:.0},{:.0}) damage={} zoom={:.2}",
+                self.frame_count, gap, 1000.0 / gap.max(0.001),
+                self.last_frame_ms,
+                t_resolve, t_scene, t_flush, t_egui, t_gpufinish, t_swap,
+                panning as u8, dragging as u8,
+                self.cursor.0, self.cursor.1, self.last_damage, self.camera.zoom,
+            );
+            let _ = w.flush();
+        }
+
+        self.last_resolved = Some(resolved);
     }
 
     // ── panels (egui) ───────────────────────────────────────────────
 
     fn paint_egui(&mut self, _report_count: usize) {
         use glow::HasContext as _;
+
+        if !self.ui_visible {
+            // Panels hidden (Cmd+\): drain accumulated input so it can't pile
+            // up while hidden, but skip the panel build + egui GL composite —
+            // the point is to feel raw canvas paint cost.
+            let _ = self.egui_winit.take_egui_input(&self.window);
+            return;
+        }
 
         let raw = self.egui_winit.take_egui_input(&self.window);
         let ctx = self.egui_ctx.clone();
@@ -596,14 +780,15 @@ impl App {
         // egui issued raw GL — resync Ganesh before the next Skia frame
         // (the grida_editor reset dance).
         self.gpu.gr_context.reset(None);
-        if full
-            .viewport_output
-            .get(&egui::ViewportId::ROOT)
-            .map(|v| v.repaint_delay == std::time::Duration::ZERO)
-            .unwrap_or(false)
-        {
-            self.window.request_redraw();
-        }
+        // RENDER ON DEMAND: do NOT auto-request another redraw here. egui asks
+        // for an immediate repaint every frame (the code-editor keeps it
+        // unsettled), which drove continuous rendering — the CPU racing ahead
+        // of vsync, filling the present chain 2-3 frames deep = the input lag
+        // (winit#2468 / glutin#1322). Redraws now come only from real input
+        // events (window_event), so each input maps to one frame presented
+        // ASAP: shallow chain, tight input->photon coupling, no idle GPU burn.
+        // Cost: egui's own animations (cursor blink) don't tick when idle —
+        // acceptable for a dev panel, and any click/keypress redraws it.
     }
 
     fn build_panels(&mut self, ui: &mut egui::Ui) {
@@ -627,11 +812,21 @@ impl App {
                 });
                 ui.label(
                     egui::RichText::new(format!(
-                        "frame {:.2} ms · zoom {:.0}% · undo {} · redo {}",
+                        "frame {:.2} ms · zoom {:.0}% · undo {} · redo {} · damage {} · journal {}",
                         self.last_frame_ms,
                         self.camera.zoom * 100.0,
                         self.undo.len(),
-                        self.redo.len()
+                        self.redo.len(),
+                        self.last_damage,
+                        self.journal.len(),
+                    ))
+                    .monospace()
+                    .weak(),
+                );
+                ui.label(
+                    egui::RichText::new(format!(
+                        "  resolve {:.2} · scene {:.2} · flush {:.2} · egui {:.2} · GPU {:.2} · vsync {:.2}",
+                        self.bd[0], self.bd[1], self.bd[2], self.bd[3], self.bd[4], self.bd[5],
                     ))
                     .monospace()
                     .weak(),
@@ -683,12 +878,9 @@ impl App {
                     }
                     if resolved.reports.len() > 6 {
                         ui.label(
-                            egui::RichText::new(format!(
-                                "… {} more",
-                                resolved.reports.len() - 6
-                            ))
-                            .weak()
-                            .small(),
+                            egui::RichText::new(format!("… {} more", resolved.reports.len() - 6))
+                                .weak()
+                                .small(),
                         );
                     }
                     ui.separator();
@@ -812,20 +1004,30 @@ impl ApplicationHandler for App {
         // sees every event; input it is using must not also reach the
         // canvas FSM. Non-input events always pass through.
         let resp = self.egui_winit.on_window_event(&self.window, &event);
-        if resp.repaint {
-            self.window.request_redraw();
-        }
-        let gated = match &event {
-            WindowEvent::CursorMoved { .. }
-            | WindowEvent::MouseInput { .. }
-            | WindowEvent::MouseWheel { .. }
-            | WindowEvent::PinchGesture { .. } => {
-                resp.consumed || self.egui_ctx.egui_wants_pointer_input()
+        // RENDER ON DEMAND: do NOT redraw just because egui wants to repaint.
+        // A RedrawRequested is itself an event, so `egui wants repaint ->
+        // request_redraw` self-perpetuated a continuous render loop (the input
+        // lag). Real input still drives redraws below (canvas via the fall-
+        // through request, egui-consumed input via the `gated` branch), so the
+        // panel stays responsive; only egui's idle self-animation is dropped.
+        let _ = resp.repaint;
+        // With the panels hidden there is nothing to arbitrate — every input
+        // goes to the canvas (incl. the Cmd+\ that toggles them back on).
+        let gated = if !self.ui_visible {
+            false
+        } else {
+            match &event {
+                WindowEvent::CursorMoved { .. }
+                | WindowEvent::MouseInput { .. }
+                | WindowEvent::MouseWheel { .. }
+                | WindowEvent::PinchGesture { .. } => {
+                    resp.consumed || self.egui_ctx.egui_wants_pointer_input()
+                }
+                WindowEvent::KeyboardInput { .. } | WindowEvent::Ime(_) => {
+                    resp.consumed || self.egui_ctx.egui_wants_keyboard_input()
+                }
+                _ => false,
             }
-            WindowEvent::KeyboardInput { .. } | WindowEvent::Ime(_) => {
-                resp.consumed || self.egui_ctx.egui_wants_keyboard_input()
-            }
-            _ => false,
         };
         if gated {
             self.window.request_redraw();
@@ -847,8 +1049,7 @@ impl ApplicationHandler for App {
                 self.gl_surface.resize(
                     &self.gl_context,
                     NonZeroU32::new(size.width).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
-                    NonZeroU32::new(size.height)
-                        .unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
+                    NonZeroU32::new(size.height).unwrap_or(unsafe { NonZeroU32::new_unchecked(1) }),
                 );
                 self.gpu.recreate(size.width as i32, size.height as i32);
             }
