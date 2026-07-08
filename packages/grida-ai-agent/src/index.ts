@@ -55,6 +55,7 @@ export {
   type AgentRunMessagePart,
   type AgentRunOptions,
 } from "./protocol/run";
+export { normalizeSdkToolPartFields } from "./protocol/tool-part-fields";
 export { CONTEXT_MARKERS, USER_TEMPLATE_SELECTION } from "./protocol/context";
 export {
   AGENT_MODES,

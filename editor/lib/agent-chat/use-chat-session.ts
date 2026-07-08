@@ -37,6 +37,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UIMessage } from "ai";
+import { normalizeSdkToolPartFields } from "@grida/agent";
 import {
   sessions as bridgeSessions,
   type ChatMessageWithParts,
@@ -418,35 +419,7 @@ export function toUIMessagePart(
   if (!type.startsWith("tool-") && type !== "dynamic-tool") {
     return data as UIMessagePartUnknown;
   }
-  const out: Record<string, unknown> = { ...data };
-  const toolCallId = out.toolCallId ?? out.tool_call_id ?? part.tool_call_id;
-  delete out.tool_call_id;
-  delete out.tool_name;
-  delete out.input_text_delta;
-  delete out.error_text;
-  delete out.provider_executed;
-  if (typeof toolCallId === "string") out.toolCallId = toolCallId;
-  if (typeof out.toolName !== "string" && typeof data.tool_name === "string") {
-    out.toolName = data.tool_name;
-  }
-  if (
-    typeof out.inputTextDelta !== "string" &&
-    typeof data.input_text_delta === "string"
-  ) {
-    out.inputTextDelta = data.input_text_delta;
-  }
-  if (
-    typeof out.errorText !== "string" &&
-    typeof data.error_text === "string"
-  ) {
-    out.errorText = data.error_text;
-  }
-  if (
-    typeof out.providerExecuted !== "boolean" &&
-    typeof data.provider_executed === "boolean"
-  ) {
-    out.providerExecuted = data.provider_executed;
-  }
+  const out = normalizeSdkToolPartFields(data, part.tool_call_id);
   return out as UIMessagePartUnknown;
 }
 
