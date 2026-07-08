@@ -18,19 +18,20 @@ If you find yourself adding heavy state machines, feature workflows, or global/e
 - **Small surface area**: keep components narrowly-scoped; split when a component becomes a mini-feature.
 - **No new directories by default**: do not create new folders under `components/` unless explicitly required. This tree is intentionally curated by project maintainers, and everything here should remain broadly reusable.
 
-## Base primitives live in `@app/ui` (not here)
+## Shared primitives live in `@app/ui` (not here)
 
 The shadcn **base primitive set** and the **AI elements** were promoted out of this
-directory into the `@app/ui` workspace package (`packages/ui`). Import them — do not
-re-add them here:
+directory into the `@app/ui` workspace package (`packages/ui`). Import them — do
+not re-add them here:
 
 - Primitives: `@app/ui/components/*` (e.g. `@app/ui/components/button`)
 - AI elements: `@app/ui/ai-elements/*`
 - `cn` helper: `@app/ui/lib/utils`
 - Shared theme/tokens: `@app/ui/globals.css` (owned by the package)
 
-To add or update a base primitive, run `shadcn` against the **package** (`packages/ui`
-has its own `components.json`), not the editor. See `packages/ui` for details.
+To add or update a base primitive, follow
+[`../../packages/ui/AGENTS.md`](../../packages/ui/AGENTS.md). This directory is for
+the editor-local component sets that build on top of `@app/ui`.
 
 ## Directory map (highlighted)
 
@@ -47,7 +48,7 @@ primitive sets that build _on top of_ `@app/ui`:
 
 | if your component is…                                                      | put it in…                                 |
 | -------------------------------------------------------------------------- | ------------------------------------------ |
-| a basic primitive (button, input, popover, dialog, etc.)                   | `@app/ui` (`shadcn add` → `packages/ui`)   |
+| a basic primitive (button, input, popover, dialog, etc.)                   | `@app/ui` (`packages/ui`)                  |
 | an AI / chat registry primitive                                            | `@app/ui/ai-elements` (add to the package) |
 | a primitive but optimized for editor density / special editor interactions | `components/ui-editor/`                    |
 | a primitive meant for forms-specific UX                                    | `components/ui-forms/`                     |
