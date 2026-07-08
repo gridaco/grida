@@ -42,10 +42,12 @@ a linear **deck / presentation / pitch / slideshow**, use the `slides` skill.
 
 ## Working pattern
 
-- To start, create or open a `.canvas` board, then `write_file` its
-  `.canvas.json`. To add to an existing board, `read_file` `.canvas.json` first
-  (preserve `version`/`$schema`/`editor` and any unknown fields), then write the
-  FULL updated manifest back.
+- To start, **make the bundle folder first** — a NEW directory whose name ends
+  in `.canvas` (e.g. `poster.canvas/`); a plain folder, or files loose in the
+  workspace root, is NOT a board and won't open. Then `write_file` its
+  `.canvas.json` and each document file INSIDE that folder. To add to an existing
+  board, `read_file` `.canvas.json` first (preserve `version`/`$schema`/`editor`
+  and any unknown fields), then write the FULL updated manifest back.
 - A document's `src` may be a **URL** (a pointable reference — a picked library
   image, used as-is, no download) OR a **file path inside the bundle**. Both are
   first-class placed documents.
