@@ -57,6 +57,47 @@ describe("toolDisplay", () => {
       tone: "running",
     });
   });
+
+  it("labels image tools with media-specific actions", () => {
+    expect(
+      toolDisplay.describe(
+        tool("1", "view_image", { path: "/assets/logo.png" })
+      )
+    ).toMatchObject({
+      action: "view_image",
+      title: "Viewed image",
+      detail: "logo.png",
+    });
+
+    expect(
+      toolDisplay.describe(
+        tool("2", "generate_image", {
+          prompt: "A small luminous square logo mark",
+        })
+      )
+    ).toMatchObject({
+      action: "generate_image",
+      title: "Generated image",
+      detail: "A small luminous square logo mark",
+    });
+  });
+
+  it("labels skill loading as a dedicated action", () => {
+    expect(
+      toolDisplay.describe(tool("1", "skill", { name: "slides" }))
+    ).toMatchObject({
+      action: "skill",
+      title: "Loaded skill",
+      detail: "slides",
+    });
+
+    expect(
+      toolDisplay.summarize([
+        tool("1", "skill", { name: "slides" }),
+        tool("2", "skill", { name: "pdf" }),
+      ])
+    ).toBe("Loaded 2 skills");
+  });
 });
 
 function tool(id: string, toolName: string, input: unknown): ToolCallEntry {

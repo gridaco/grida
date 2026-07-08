@@ -10,6 +10,7 @@ import { getToolName } from "ai";
 import { Loader2Icon } from "lucide-react";
 import { AgentDesignSearch } from "@grida/agent/tools/design-search";
 import type { ToolCallEntry } from "@/lib/agent-chat";
+import { FullscreenImagePreview } from "./tool-media";
 
 export function isDesignSearchEntry(entry: ToolCallEntry): boolean {
   return getToolName(entry) === AgentDesignSearch.TOOL_NAME;
@@ -80,15 +81,21 @@ export function DesignSearchContent({ entry }: { entry: ToolCallEntry }) {
       </p>
       <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
         {picked.map((pin) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <FullscreenImagePreview
             key={pin.id}
             src={pin.url}
             alt={pin.title}
             title={pin.title}
-            loading="lazy"
-            className="aspect-square w-full rounded-md border border-border object-cover"
-          />
+            className="block w-full"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={pin.url}
+              alt={pin.title}
+              loading="lazy"
+              className="aspect-square w-full rounded-md border border-border object-cover"
+            />
+          </FullscreenImagePreview>
         ))}
       </div>
     </div>

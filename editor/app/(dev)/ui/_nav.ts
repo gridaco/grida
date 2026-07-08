@@ -10,6 +10,7 @@ export const uiNavGroups: NavGroup[] = [
     label: "Components",
     items: [
       { name: "AI Chat", href: "/ui/components/ai-chat" },
+      { name: "AI Chat Tool Cards", href: "/ui/components/ai-chat/tools" },
       {
         name: "AI Response Markdown",
         href: "/ui/components/ai-chat/markdown",

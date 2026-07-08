@@ -1,8 +1,12 @@
 import { AgentFs } from "@grida/agent/fs";
 import { AgentTodos } from "@grida/agent/todos";
+import { AgentVision } from "@grida/agent/vision";
 import { AgentDesignSearch } from "@grida/agent/tools/design-search";
 import { getToolName } from "ai";
 import type { ToolCallEntry } from "@/lib/agent-chat";
+
+const GENERATE_IMAGE = "generate_image";
+const SKILL = "skill";
 
 export type ToolDisplayAction =
   | "read"
@@ -10,9 +14,12 @@ export type ToolDisplayAction =
   | "write"
   | "list"
   | "search"
+  | "view_image"
+  | "generate_image"
   | "plan"
   | "command"
   | "question"
+  | "skill"
   | "tool";
 
 export type ToolDisplayTone = "running" | "ok" | "warn" | "error";
@@ -85,6 +92,23 @@ export namespace toolDisplay {
           tone,
         };
 
+      case AgentVision.TOOL_NAMES.view_image:
+        return {
+          action: "view_image",
+          title: isActive(entry) ? "Viewing image" : "Viewed image",
+          detail: shortPath(path),
+          target: path,
+          tone,
+        };
+
+      case GENERATE_IMAGE:
+        return {
+          action: "generate_image",
+          title: isActive(entry) ? "Generating image" : "Generated image",
+          detail: describeGenerateImageDetail(entry),
+          tone,
+        };
+
       case "run_command":
         return {
           action: "command",
@@ -98,6 +122,14 @@ export namespace toolDisplay {
           action: "question",
           title: isActive(entry) ? "Asking you" : "Asked you",
           detail: describeQuestionDetail(entry),
+          tone,
+        };
+
+      case SKILL:
+        return {
+          action: "skill",
+          title: isActive(entry) ? "Loading skill" : "Loaded skill",
+          detail: stringValue(args.name),
           tone,
         };
 
@@ -142,11 +174,14 @@ export namespace toolDisplay {
     pushClause(clauses, counts, "edit", "edited");
     pushClause(clauses, counts, "write", "wrote");
     pushClause(clauses, counts, "read", "read");
+    pushClause(clauses, counts, "generate_image", "generated", "image");
+    pushClause(clauses, counts, "view_image", "viewed", "image");
     pushClause(clauses, counts, "search", "searched");
     pushClause(clauses, counts, "list", "listed");
     pushClause(clauses, counts, "command", "ran");
     pushClause(clauses, counts, "plan", "updated", "plan update");
     pushClause(clauses, counts, "question", "asked");
+    pushClause(clauses, counts, "skill", "loaded", "skill");
     pushClause(clauses, counts, "tool", "used");
 
     return capitalize(clauses.join(", "));
@@ -178,6 +213,9 @@ function nounForAction(action: ToolDisplayAction): string {
       return "file";
     case "search":
       return "search";
+    case "view_image":
+    case "generate_image":
+      return "image";
     case "list":
       return "listing";
     case "command":
@@ -186,6 +224,8 @@ function nounForAction(action: ToolDisplayAction): string {
       return "plan update";
     case "question":
       return "question";
+    case "skill":
+      return "skill";
     case "tool":
       return "tool call";
   }
@@ -264,6 +304,13 @@ function describeCommandDetail(entry: ToolCallEntry): string | undefined {
     .join(" ");
   if (!command) return undefined;
   return argv ? `${command} ${argv}` : command;
+}
+
+function describeGenerateImageDetail(entry: ToolCallEntry): string | undefined {
+  const args = asRecord(readToolInput(entry));
+  const prompt = stringValue(args.prompt);
+  if (prompt) return prompt;
+  return shortPath(stringValue(asRecord(readToolOutput(entry)).path));
 }
 
 function isActive(entry: ToolCallEntry): boolean {
