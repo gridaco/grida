@@ -474,6 +474,7 @@ function AgentPaneContent({
       scratchSeed,
       contexts,
     }),
+    hasSendContext: (contexts?.length ?? 0) > 0,
   });
 
   // React to the CORE drain (RFC `queue`): when the core fires a queued turn (a

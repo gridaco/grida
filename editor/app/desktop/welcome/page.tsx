@@ -598,6 +598,7 @@ export default function DesktopWelcomePage() {
                     onSubmit={start}
                     isStreaming={false}
                     onStop={NOOP}
+                    allowEmptySubmit={pickedTemplate != null}
                     autofocus
                     placeholder={
                       pickedTemplate

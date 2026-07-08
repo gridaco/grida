@@ -59,7 +59,7 @@ export type AgentComposerInputProps = {
   /**
    * Receives the lowered prompt text plus any inlined image attachments as
    * AI-SDK `file` parts (perceive-only). Empty submissions (no text AND no
-   * files) are filtered.
+   * files) are filtered unless `allowEmptySubmit` is set.
    */
   onSubmit: (text: string, files?: FileUIPart[]) => void | Promise<void>;
   isStreaming: boolean;
@@ -80,6 +80,11 @@ export type AgentComposerInputProps = {
    * Defaults to `true`.
    */
   multimodal?: boolean;
+  /**
+   * Allows a submit with empty text/files when the host has out-of-band context
+   * to attach to the turn.
+   */
+  allowEmptySubmit?: boolean;
   /** Left-aligned footer content (e.g. the model picker). */
   toolbar?: ReactNode;
   className?: string;
@@ -120,6 +125,7 @@ function AgentComposerInner({
   placeholder = "Ask anything…",
   autofocus,
   multimodal = true,
+  allowEmptySubmit = false,
   toolbar,
   className,
 }: Omit<AgentComposerInputProps, "catalog">) {
@@ -238,7 +244,7 @@ function AgentComposerInner({
     // them — track it so neither the only-images nor the text+images path drops
     // attachments silently.
     const droppedImages = images.length > 0 && files.length === 0;
-    if (!text.trim() && files.length === 0) {
+    if (!text.trim() && files.length === 0 && !allowEmptySubmit) {
       if (droppedImages) notify("This model can't read images.");
       return;
     }

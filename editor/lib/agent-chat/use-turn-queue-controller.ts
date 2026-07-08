@@ -39,6 +39,11 @@ export type UseTurnQueueControllerArgs = {
    * (perceive-only) on the immediate-send path only.
    */
   send: (text: string, files?: FileUIPart[]) => void | Promise<void>;
+  /**
+   * True when the send closure carries non-text context parts (for example a
+   * picked template). In that case empty text is still a real immediate send.
+   */
+  hasSendContext?: boolean;
 };
 
 export type UseTurnQueueControllerResult = {
@@ -71,11 +76,14 @@ export function useTurnQueueController(
   enqueueRef.current = queue.enqueue;
   const sendRef = useRef(args.send);
   sendRef.current = args.send;
+  const hasSendContextRef = useRef(args.hasSendContext === true);
+  hasSendContextRef.current = args.hasSendContext === true;
 
   const submit = useCallback(async (text: string, files?: FileUIPart[]) => {
     const t = text.trim();
     const hasFiles = !!files && files.length > 0;
-    if (!t && !hasFiles) return;
+    const hasContext = hasSendContextRef.current;
+    if (!t && !hasFiles && !hasContext) return;
     const sid = sessionIdRef.current;
     if (decideSubmit({ busy: busyRef.current }) === "enqueue") {
       // Queue behind the busy session. A null session can't be mid-turn (the
@@ -83,8 +91,8 @@ export function useTurnQueueController(
       // drop it rather than enqueue into the void. The queue is text-only;
       // image submits are blocked at the composer while busy, so `files` never
       // reaches this branch. Require non-empty `t` too: a files-only submit
-      // would otherwise queue an empty turn (the early `!t && !hasFiles` guard
-      // lets `!t && hasFiles` through).
+      // would otherwise queue an empty turn. Context-only sends are first-turn
+      // immediate sends; the queue has no durable context payload.
       if (sid && t) await enqueueRef.current(sid, t);
       return;
     }
