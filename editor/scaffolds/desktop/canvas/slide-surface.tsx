@@ -64,7 +64,11 @@ export function SlideSurface({
     <div className="relative h-full w-full bg-muted">
       <div ref={containerRef} className="absolute inset-0" />
       {(save.dirty || save.saving) && (
-        <DirtyBadge dirty={save.dirty} saving={save.saving} />
+        <DirtyBadge
+          dirty={save.dirty}
+          saving={save.saving}
+          className="left-3 right-auto top-3 z-10"
+        />
       )}
       {save.saveError && (
         <SaveErrorToast

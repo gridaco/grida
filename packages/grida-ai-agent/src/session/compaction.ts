@@ -133,7 +133,10 @@ export function renderMessage(
       const inner = (data.data ?? {}) as { summary?: string };
       if (inner.summary) lines.push(inner.summary);
     } else if (type.startsWith("tool-") || type === "dynamic-tool") {
-      const name = (data.tool_name as string) ?? type.replace(/^tool-/, "");
+      const name =
+        (data.toolName as string | undefined) ??
+        (data.tool_name as string | undefined) ??
+        type.replace(/^tool-/, "");
       const input = data.input !== undefined ? compactJson(data.input) : "";
       lines.push(`(tool: ${name}${input ? ` ${input}` : ""})`);
       if (!opts.drop_tool_outputs && data.output !== undefined) {

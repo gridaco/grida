@@ -66,7 +66,7 @@ import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-
 // fflate/dotcanvas deps) into the home chunk; the gallery's dynamic `import()`
 // stays the sole code-split boundary. The home only holds the picked template
 // object and reads its `files` (the unzipped bundle) to seed the session scratch.
-import type { SlidesTemplate } from "@/scaffolds/desktop/home/slides-template-loader";
+import type { SlidesTemplate } from "@/lib/slides-templates";
 import { RecentProjectsCommand } from "@/scaffolds/desktop/home/recent-projects-command";
 import { WorkspacePicker } from "@/scaffolds/desktop/home/workspace-picker";
 import {
@@ -639,8 +639,8 @@ export default function DesktopWelcomePage() {
               fits general/image/video, so those share the reference gallery.
               Slides swaps in the bundled starter templates instead — real
               `.canvas` decks served from /templates/slides/ (the
-              `public/slides-templates` publishing unit; loaded lazily by
-              `slides-template-loader.ts`). Filtering the library corpus PER
+              `public/slides-templates` publishing unit; loaded lazily by the
+              shared slides-template loader). Filtering the library corpus PER
               preset (image vs video) is a separate later seam. Both are part
               of the single page scroll (the reference gallery virtualizes
               against it). The "Ideas" label is universal — it heads whichever

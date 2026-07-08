@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@app/ui/components/dialog";
-import type { SlidesTemplate } from "./slides-template-loader";
+import type { SlidesTemplate } from "@/lib/slides-templates";
 
 /**
  * `SlidesTemplatePreviewDialog` — the "eye" button's larger-context view of a
@@ -28,7 +28,7 @@ import type { SlidesTemplate } from "./slides-template-loader";
  * trackpad/mouse-wheel scrolling), plus a "Use this template" action that
  * SELECTS the deck into the composer (same as clicking the card) and closes —
  * or a "Selected" state that just closes when it's already picked. Pages are the
- * deck's REAL slides (see `slides-template-loader.ts`).
+ * deck's REAL slides (see `@/lib/slides-templates`).
  */
 export function SlidesTemplatePreviewDialog({
   template,

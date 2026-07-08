@@ -390,8 +390,10 @@ export function useChatSession(
 
 function toUIMessages(rows: ChatMessageWithParts[]): UIMessage[] {
   // Parts arrive sorted by index; the AI SDK expects an ordered array
-  // of UIMessageParts. The recorder writes parts whose `data` is already
-  // shaped like `UIMessagePart`, so we trust the cast.
+  // of UIMessageParts. New recorder rows store `data_json` in that SDK shape.
+  // Legacy rows may still carry the older server-shaped snake_case tool fields;
+  // normalize those at the hydration boundary so `Chat.addToolResult` can
+  // mutate a re-opened pending tool call by `toolCallId`.
   //
   // Hidden rows (soft-truncated by a rewind, or summarized by a
   // compaction) are excluded — the transcript shows the live, visible
@@ -402,7 +404,52 @@ function toUIMessages(rows: ChatMessageWithParts[]): UIMessage[] {
     .map((row) => ({
       id: row.id,
       role: row.role,
-      parts: row.parts.map((p) => p.data as UIMessagePartUnknown),
+      parts: row.parts.map(toUIMessagePart),
       metadata: row.metadata,
     })) as UIMessage[];
+}
+
+export function toUIMessagePart(
+  part: ChatMessageWithParts["parts"][number]
+): UIMessagePartUnknown {
+  const data = part.data;
+  if (!isRecord(data)) return data as UIMessagePartUnknown;
+  const type = typeof data.type === "string" ? data.type : part.type;
+  if (!type.startsWith("tool-") && type !== "dynamic-tool") {
+    return data as UIMessagePartUnknown;
+  }
+  const out: Record<string, unknown> = { ...data };
+  const toolCallId = out.toolCallId ?? out.tool_call_id ?? part.tool_call_id;
+  delete out.tool_call_id;
+  delete out.tool_name;
+  delete out.input_text_delta;
+  delete out.error_text;
+  delete out.provider_executed;
+  if (typeof toolCallId === "string") out.toolCallId = toolCallId;
+  if (typeof out.toolName !== "string" && typeof data.tool_name === "string") {
+    out.toolName = data.tool_name;
+  }
+  if (
+    typeof out.inputTextDelta !== "string" &&
+    typeof data.input_text_delta === "string"
+  ) {
+    out.inputTextDelta = data.input_text_delta;
+  }
+  if (
+    typeof out.errorText !== "string" &&
+    typeof data.error_text === "string"
+  ) {
+    out.errorText = data.error_text;
+  }
+  if (
+    typeof out.providerExecuted !== "boolean" &&
+    typeof data.provider_executed === "boolean"
+  ) {
+    out.providerExecuted = data.provider_executed;
+  }
+  return out as UIMessagePartUnknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

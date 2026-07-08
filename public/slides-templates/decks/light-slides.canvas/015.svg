@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+
+  <title>Light slides - Image + text</title>
+<rect width="1920" height="1080" fill="#FAFAFA"/>
+  <rect x="160" y="160" width="760" height="760" fill="white" stroke="rgba(10,10,10,0.12)" stroke-width="1"/>
+  <g stroke="rgba(10,10,10,0.35)" stroke-width="1">
+    <line x1="160" y1="160" x2="920" y2="920"/>
+    <line x1="920" y1="160" x2="160" y2="920"/>
+  </g>
+  <text x="540" y="550" text-anchor="middle" font-family="'Helvetica Neue', sans-serif" font-size="18" font-weight="400" fill="rgba(10,10,10,0.35)" letter-spacing="1">IMAGE</text>
+  <text x="1000" y="280" font-family="'Helvetica Neue', sans-serif" font-size="20" font-weight="700" fill="rgba(10,10,10,0.55)" letter-spacing="2">EXHIBIT A</text>
+  <text x="1000" y="380" font-family="'Helvetica Neue', sans-serif" font-size="64" font-weight="800" fill="#0A0A0A" letter-spacing="-1.5">Image + text</text>
+  <text font-family="'Helvetica Neue', sans-serif" font-size="24" font-weight="400" fill="#0A0A0A">
+    <tspan x="1000" y="480">A short, descriptive paragraph that</tspan>
+    <tspan x="1000" y="516">sits next to an image. Useful for</tspan>
+    <tspan x="1000" y="552">product shots, screenshots, or charts.</tspan>
+  </text>
+  <text font-family="'Helvetica Neue', sans-serif" font-size="20" font-weight="400" fill="rgba(10,10,10,0.55)">
+    <tspan x="1000" y="640">Replace the placeholder on the left</tspan>
+    <tspan x="1000" y="672">with your own image asset.</tspan>
+  </text>
+</svg>

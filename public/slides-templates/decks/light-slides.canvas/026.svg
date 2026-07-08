@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+
+  <title>Light slides - Contact</title>
+<rect width="1920" height="1080" fill="#FAFAFA"/>
+  <text x="160" y="220" font-family="'Helvetica Neue', sans-serif" font-size="20" font-weight="700" fill="rgba(10,10,10,0.55)" letter-spacing="3">CONTACT</text>
+  <text x="160" y="380" font-family="'Helvetica Neue', sans-serif" font-size="92" font-weight="800" fill="#0A0A0A" letter-spacing="-2">Stay in touch.</text>
+  <g font-family="'Helvetica Neue', sans-serif" font-size="28" fill="#0A0A0A">
+    <text x="160" y="540" font-weight="700">Email</text>
+    <text x="380" y="540" font-weight="400" fill="rgba(10,10,10,0.55)">hello@grida.co</text>
+    <text x="160" y="600" font-weight="700">Web</text>
+    <text x="380" y="600" font-weight="400" fill="rgba(10,10,10,0.55)">grida.co</text>
+    <text x="160" y="660" font-weight="700">Twitter</text>
+    <text x="380" y="660" font-weight="400" fill="rgba(10,10,10,0.55)">@grida_co</text>
+    <text x="160" y="720" font-weight="700">GitHub</text>
+    <text x="380" y="720" font-weight="400" fill="rgba(10,10,10,0.55)">github.com/gridaco</text>
+  </g>
+</svg>

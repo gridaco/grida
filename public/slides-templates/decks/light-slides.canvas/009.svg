@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+
+  <title>Light slides - Heading and body</title>
+<rect width="1920" height="1080" fill="#FAFAFA"/>
+  <text x="160" y="240" font-family="'Helvetica Neue', sans-serif" font-size="64" font-weight="800" fill="#0A0A0A" letter-spacing="-1.5">Heading and body</text>
+  <line x1="160" y1="300" x2="1760" y2="300" stroke="rgba(10,10,10,0.12)" stroke-width="1"/>
+  <text font-family="'Helvetica Neue', sans-serif" font-size="26" font-weight="400" fill="#0A0A0A">
+    <tspan x="160" y="400">A paragraph of supporting copy that sits below the heading and</tspan>
+    <tspan x="160" y="442">explains the idea in a few honest sentences. Keep it human and</tspan>
+    <tspan x="160" y="484">specific — the deck reads better when each slide carries one thought.</tspan>
+  </text>
+  <text font-family="'Helvetica Neue', sans-serif" font-size="22" font-weight="400" fill="rgba(10,10,10,0.55)">
+    <tspan x="160" y="600">Use this layout when the slide is mostly prose and you don't want</tspan>
+    <tspan x="160" y="636">columns or bullets to fragment the reading.</tspan>
+  </text>
+</svg>

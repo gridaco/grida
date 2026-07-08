@@ -167,21 +167,6 @@ export function DesktopCanvasShell({
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
-      <header className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
-        <span className="text-xs font-medium text-muted-foreground">
-          Slides
-        </span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          disabled={slides.length === 0}
-          onClick={() => setPresenting(true)}
-          title="Present from current slide"
-          aria-label="Present from current slide"
-        >
-          <Play />
-        </Button>
-      </header>
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-56 shrink-0 flex-col border-r border-border">
           <SlideStrip
@@ -197,6 +182,17 @@ export function DesktopCanvasShell({
           />
         </aside>
         <main ref={mainRef} className="relative min-w-0 flex-1">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            className="absolute right-3 top-3 z-20 bg-background/80 shadow-sm backdrop-blur hover:bg-background"
+            disabled={slides.length === 0}
+            onClick={() => setPresenting(true)}
+            title="Present from current slide"
+            aria-label="Present from current slide"
+          >
+            <Play />
+          </Button>
           <ActiveSlide
             key={activeSlide ? activeSlide.src : "__empty__"}
             workspaceId={workspaceId}
@@ -263,6 +259,25 @@ function useSlideThumbnails(
 
 type Page = { id: string; name: string; thumbnailDataUri: string };
 
+function scrollIntoPaddedView(container: HTMLElement, item: HTMLElement) {
+  const containerRect = container.getBoundingClientRect();
+  const itemRect = item.getBoundingClientRect();
+  const style = getComputedStyle(container);
+  const paddingTop = Number.parseFloat(style.paddingTop) || 0;
+  const paddingBottom = Number.parseFloat(style.paddingBottom) || 0;
+  const itemTop = itemRect.top - containerRect.top + container.scrollTop;
+  const itemBottom = itemTop + itemRect.height;
+  const viewTop = container.scrollTop + paddingTop;
+  const viewBottom =
+    container.scrollTop + container.clientHeight - paddingBottom;
+
+  if (itemTop < viewTop) {
+    container.scrollTop = itemTop - paddingTop;
+  } else if (itemBottom > viewBottom) {
+    container.scrollTop = itemBottom - container.clientHeight + paddingBottom;
+  }
+}
+
 function SlideStrip({
   pages,
   slideIds,
@@ -285,7 +300,15 @@ function SlideStrip({
   removable: boolean;
 }) {
   const dragIndex = useRef<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const selectedSlideRef = useRef<HTMLDivElement | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    const item = selectedSlideRef.current;
+    if (container && item) scrollIntoPaddedView(container, item);
+  }, [activeId]);
 
   const commitDrop = (to: number) => {
     const from = dragIndex.current;
@@ -317,6 +340,7 @@ function SlideStrip({
         </Button>
       </div>
       <div
+        ref={scrollRef}
         role="listbox"
         aria-label="Slides"
         className="flex-1 overflow-auto px-1 py-1"
@@ -324,6 +348,7 @@ function SlideStrip({
         {pages.map((p, i) => (
           <div
             key={p.id}
+            ref={p.id === activeId ? selectedSlideRef : null}
             draggable
             onDragStart={() => {
               dragIndex.current = i;

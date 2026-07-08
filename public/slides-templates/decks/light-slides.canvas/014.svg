@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+
+  <title>Light slides - Callout</title>
+<rect width="1920" height="1080" fill="#FAFAFA"/>
+  <text x="160" y="240" font-family="'Helvetica Neue', sans-serif" font-size="56" font-weight="800" fill="#0A0A0A" letter-spacing="-1.5">Callout</text>
+  <line x1="160" y1="300" x2="1760" y2="300" stroke="rgba(10,10,10,0.12)" stroke-width="1"/>
+  <rect x="160" y="420" width="1600" height="320" fill="white" stroke="rgba(10,10,10,0.12)" stroke-width="1"/>
+  <rect x="160" y="420" width="6" height="320" fill="#0A0A0A"/>
+  <text x="208" y="490" font-family="'Helvetica Neue', sans-serif" font-size="20" font-weight="700" fill="rgba(10,10,10,0.55)" letter-spacing="2">NOTE</text>
+  <text font-family="'Helvetica Neue', sans-serif" font-size="36" font-weight="600" fill="#0A0A0A" letter-spacing="-0.5">
+    <tspan x="208" y="560">The thing worth pausing on.</tspan>
+    <tspan x="208" y="612">A single line that earns its own slide.</tspan>
+  </text>
+  <text x="208" y="690" font-family="'Helvetica Neue', sans-serif" font-size="20" font-weight="400" fill="rgba(10,10,10,0.55)">Add a supporting sentence if it helps — but it usually doesn't.</text>
+</svg>

@@ -704,7 +704,10 @@ function printMessages(messages: ChatMessageWithParts[], out: CliWriter): void {
       .join("");
     const tools = m.parts
       .filter((p) => p.type.startsWith("tool-") || p.type === "dynamic-tool")
-      .map((p) => (p.data as { tool_name?: string }).tool_name ?? p.type);
+      .map((p) => {
+        const data = p.data as { toolName?: string; tool_name?: string };
+        return data.toolName ?? data.tool_name ?? p.type;
+      });
     const body = [text, tools.length ? `[tools: ${tools.join(", ")}]` : ""]
       .filter(Boolean)
       .join(" ");

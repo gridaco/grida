@@ -275,9 +275,34 @@ function toSdkToolPart(
   data: Record<string, unknown>,
   fallbackToolCallId: string | null
 ): Record<string, unknown> {
-  const toolCallId = data.tool_call_id ?? fallbackToolCallId;
+  const toolCallId = data.toolCallId ?? data.tool_call_id ?? fallbackToolCallId;
   const out: Record<string, unknown> = { ...data };
   delete out.tool_call_id;
+  delete out.tool_name;
+  delete out.input_text_delta;
+  delete out.error_text;
+  delete out.provider_executed;
   if (typeof toolCallId === "string") out.toolCallId = toolCallId;
+  if (typeof data.toolName !== "string" && typeof data.tool_name === "string") {
+    out.toolName = data.tool_name;
+  }
+  if (
+    typeof data.inputTextDelta !== "string" &&
+    typeof data.input_text_delta === "string"
+  ) {
+    out.inputTextDelta = data.input_text_delta;
+  }
+  if (
+    typeof data.errorText !== "string" &&
+    typeof data.error_text === "string"
+  ) {
+    out.errorText = data.error_text;
+  }
+  if (
+    typeof data.providerExecuted !== "boolean" &&
+    typeof data.provider_executed === "boolean"
+  ) {
+    out.providerExecuted = data.provider_executed;
+  }
   return out;
 }
