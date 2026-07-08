@@ -99,6 +99,16 @@ export type AgentRunOptions = {
    */
   approval_answer?: ApprovalAnswer;
   /**
+   * Files to seed into the session's scratch dir before the model turn (WG
+   * `scratch.md` / `binary.md`) — an attachment (e.g. a picked slides template's
+   * unzipped `.canvas` bundle) lands in scratch, NOT the user's workspace. Flat
+   * single-segment paths; the host bounds the set and enforces containment at
+   * write (`parseScratchSeed` / `writeScratchFile`). Carried on the FIRST turn;
+   * forwarded verbatim in the run POST body (JSON), so every bridge layer that
+   * whitelists run-option fields must also carry it.
+   */
+  scratch_seed?: { path: string; text: string }[];
+  /**
    * Optional persistent session id. When omitted, the agent host creates a
    * new chat session row and returns the id via the transport response.
    */

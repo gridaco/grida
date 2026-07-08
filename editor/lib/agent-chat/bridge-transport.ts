@@ -162,6 +162,7 @@ function streamFromBridge(
             session_id: opts.session_id,
             mode: opts.mode,
             approval_answer: opts.approval_answer,
+            scratch_seed: opts.scratch_seed,
           },
           (chunk: AgentUIMessageChunk) => {
             if (!settled) controller.enqueue(chunk);
@@ -288,6 +289,14 @@ function readBodyOptions(body: unknown): DesktopAgentTransportOptions {
         ...(typeof a.reason === "string" ? { reason: a.reason } : {}),
       };
     }
+  }
+  // Scratch seed (a picked template's unzipped bundle) — a first-turn body field
+  // that lands in the session scratch (agent-only, WG `scratch.md`). Shape gate
+  // only; the sidecar bounds + contains it (`parseScratchSeed`/`writeScratchFile`).
+  // Without this pick the closed bridge whitelist silently drops it before the
+  // run POST — the bug that left every template session's scratch empty.
+  if (Array.isArray(obj.scratch_seed)) {
+    out.scratch_seed = obj.scratch_seed as AgentRunOptions["scratch_seed"];
   }
   return out;
 }

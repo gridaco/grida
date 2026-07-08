@@ -61,6 +61,14 @@ export type RunRequest = {
   library?: boolean;
   /** Resume answer for a paused supervised approval; absent on a normal turn. */
   approval_answer?: ApprovalAnswer;
+  /**
+   * Files to seed into the session's per-session scratch dir BEFORE the model
+   * turn (WG `scratch.md` / `binary.md`): an attachment lands in scratch, NOT
+   * the user's workspace. Flat single-segment paths only (containment enforced
+   * at write by `writeScratchFile`). Carried on the FIRST turn — e.g. a picked
+   * slides template's unzipped `.canvas` bundle. Bounded in {@link parseRunBody}.
+   */
+  scratch_seed?: Array<{ path: string; text: string }>;
   session_id?: string;
 };
 
@@ -86,6 +94,7 @@ export async function parseRunBody(
     interactive?: unknown;
     library?: unknown;
     approval_answer?: unknown;
+    scratch_seed?: unknown;
     session_id?: unknown;
   };
   const messages = normalizeWireMessages(b.messages);
@@ -185,11 +194,45 @@ export async function parseRunBody(
     // 400 — and `store.answerApproval` re-validates it against the persisted
     // pending approval regardless, so a forged answer is a no-op.
     approval_answer: coerceApprovalAnswer(b.approval_answer),
+    scratch_seed: parseScratchSeed(b.scratch_seed),
     session_id:
       typeof b.session_id === "string" && b.session_id.length > 0
         ? b.session_id
         : undefined,
   };
+}
+
+/**
+ * Bound + validate `scratch_seed` — client-provided files to write into the
+ * session scratch before the turn (WG `scratch.md`). Caps file count and total
+ * size so a client cannot balloon scratch; per-file path containment is enforced
+ * at write time by `writeScratchFile` (one safe segment). Malformed entries are
+ * dropped; over-cap truncates. Empty ⇒ undefined.
+ */
+function parseScratchSeed(
+  raw: unknown
+): Array<{ path: string; text: string }> | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const MAX_FILES = 64;
+  const MAX_TOTAL = 8 * 1024 * 1024; // ~8M chars — a deck is ~20KB; bounds abuse
+  const out: Array<{ path: string; text: string }> = [];
+  let total = 0;
+  for (const e of raw) {
+    if (out.length >= MAX_FILES) break;
+    if (
+      e == null ||
+      typeof e !== "object" ||
+      typeof (e as { path?: unknown }).path !== "string" ||
+      typeof (e as { text?: unknown }).text !== "string"
+    ) {
+      continue;
+    }
+    const entry = e as { path: string; text: string };
+    total += entry.text.length;
+    if (total > MAX_TOTAL) break;
+    out.push({ path: entry.path, text: entry.text });
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 async function isRegisteredModelId(

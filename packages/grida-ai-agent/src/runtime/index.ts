@@ -80,6 +80,7 @@ import {
   scratchRootFor,
   ensureScratch,
   removeScratch,
+  writeScratchFile,
 } from "../session/scratch";
 import { buildModelMessages } from "./message-view";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
@@ -287,6 +288,13 @@ type StartTurnOptions = {
   /** Whether the requesting client can resolve `design_search` (per-run; absent
    *  ⇒ the host `library` default). */
   library?: RunRequest["library"];
+  /**
+   * Files to seed into the session's scratch dir before the turn (WG
+   * `scratch.md`): a picked template's unzipped bundle / an upload lands there,
+   * not the workspace. Only the direct HTTP run (the first turn) carries it; a
+   * queue drain leaves it absent — scratch was already seeded on turn one.
+   */
+  scratch_seed?: RunRequest["scratch_seed"];
   /**
    * The user message this turn fires — the fired-message identity the
    * turn-lifecycle wire carries (RFC `turn-authority`; emitted on the
@@ -813,6 +821,9 @@ export class AgentRuntime {
         interactive: req.interactive,
         // Per-run library-search capability (renderer wires the resolver).
         library: req.library,
+        // First-turn scratch seed (a picked template's unzipped bundle / an
+        // upload) — landed in scratch before the model turn (WG `scratch.md`).
+        scratch_seed: req.scratch_seed,
         // The fired message of a direct run is the incoming tail's user
         // message (the client resends history; the tail is the new one). An
         // approval-answer resume continues the PRIOR turn's tool call — it
@@ -863,6 +874,7 @@ export class AgentRuntime {
       mode,
       interactive,
       library,
+      scratch_seed: scratchSeed,
     } = opts;
 
     // Reserve the registry entry; its `modelAbort.signal` (not the request
@@ -1015,6 +1027,32 @@ export class AgentRuntime {
         // and re-asserts it sits outside the secret root (S4). Unwired ⇒ skip.
         if (scratchDir) {
           await ensureScratch(scratchDir, secretsRoot);
+          // Seed client-provided files into scratch (WG `scratch.md` /
+          // `binary.md`): a picked template's unzipped `.canvas` bundle (or an
+          // upload) lands here as agent-only reference — NOT in the user's
+          // workspace. First turn only (the client sends `scratch_seed` once).
+          // `writeScratchFile` enforces single-segment containment; settle each
+          // so one bad file can't abort the turn.
+          if (scratchSeed && scratchSeed.length > 0) {
+            const seeded = await Promise.allSettled(
+              scratchSeed.map((f) =>
+                writeScratchFile(
+                  scratchDir,
+                  f.path,
+                  new TextEncoder().encode(f.text)
+                )
+              )
+            );
+            for (const r of seeded) {
+              if (r.status === "rejected") {
+                console.warn(
+                  `[agent-host] scratch seed file failed sessionId=${sessionId}: ${String(
+                    r.reason
+                  )}`
+                );
+              }
+            }
+          }
         }
 
         // Session-static skills + project instructions (discovered once).

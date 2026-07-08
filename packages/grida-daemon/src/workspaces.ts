@@ -41,6 +41,17 @@ export type Workspace = {
   name: string;
   opened_at: number;
   pinned: boolean;
+  /**
+   * True for the host's DEFAULT workspace — the managed root itself
+   * ({@link WorkspaceRegistry} `projects_root`, e.g. `~/Documents/Grida`).
+   * COMPUTED per {@link WorkspaceRegistry.list} (root === realpath'd
+   * `projects_root`); never persisted. The desktop home roots a fresh session
+   * HERE instead of minting a per-session folder — the agent takes the wheel
+   * inside the default workspace, and produced files land where the agent
+   * decides, not in a system-minted junk dir. Absent/false for user-opened
+   * folders and on hosts with no managed root.
+   */
+  is_default?: boolean;
 };
 
 const FILE_NAME = "workspaces.json";
@@ -58,6 +69,12 @@ export class WorkspaceRegistry {
    * don't wire it (the CLI/dev daemon), where `createProject` throws.
    */
   private readonly projects_root?: string;
+  /**
+   * Realpath'd {@link projects_root}, resolved once by {@link ensureDefault}.
+   * {@link list} flags the entry whose root matches as `is_default`.
+   */
+  private default_root?: string;
+  private default_ensured = false;
 
   constructor(userDataPath: string, projectsRoot?: string) {
     this.file_path = path.join(userDataPath, FILE_NAME);
@@ -233,10 +250,47 @@ export class WorkspaceRegistry {
     return dir;
   }
 
-  /** Most-recent-first. Defensive copy — callers may mutate. */
+  /**
+   * Ensure the host's DEFAULT workspace — the managed {@link projects_root}
+   * itself (e.g. `~/Documents/Grida`) — is registered, so {@link list} always
+   * surfaces it and the desktop home can root a session there WITHOUT minting a
+   * per-session folder or knowing the (host-owned, GRIDA-SEC-004) path. This is
+   * the correction to the old auto-create flow: the managed root IS the
+   * workspace; the agent works inside it. Idempotent — runs its `open` once.
+   * Returns null on a host with no managed root (the CLI/dev daemon), where
+   * there is no default workspace to offer.
+   */
+  async ensureDefault(): Promise<Workspace | null> {
+    if (!this.projects_root) return null;
+    if (!this.default_ensured) {
+      try {
+        await fs.mkdir(this.projects_root, { recursive: true });
+        // `open` realpaths + registers + persists (single-sourced id/name rules).
+        const ws = await this.open(this.projects_root);
+        this.default_root = ws.root;
+        this.default_ensured = true;
+        return { ...ws, is_default: true };
+      } catch {
+        // Leave unensured so a later call retries (transient mkdir/realpath race).
+        return null;
+      }
+    }
+    const ws = this.entries.find((e) => e.root === this.default_root);
+    return ws ? { ...ws, is_default: true } : null;
+  }
+
+  /**
+   * Most-recent-first. Defensive copy — callers may mutate. Ensures the default
+   * workspace is registered and flags it (`is_default`) so the home can target
+   * the managed root directly instead of minting a folder.
+   */
   async list(): Promise<Workspace[]> {
+    await this.ensureDefault();
     await this.ensureLoaded();
-    return this.entries.slice();
+    return this.entries.map((e) => ({
+      ...e,
+      is_default: this.default_root != null && e.root === this.default_root,
+    }));
   }
 
   /**

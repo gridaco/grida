@@ -27,6 +27,7 @@ import {
   type ReactNode,
 } from "react";
 import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
+import { CONTEXT_MARKERS, USER_TEMPLATE_SELECTION } from "@grida/agent";
 import { cn } from "@app/ui/lib/utils";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
@@ -41,8 +42,10 @@ import {
   FilePlus2Icon,
   FolderTreeIcon,
   GitBranchIcon,
+  LayoutTemplateIcon,
   ListTodoIcon,
   MessageCircleQuestionIcon,
+  PaperclipIcon,
   RotateCcwIcon,
   SearchIcon,
   SquareTerminalIcon,
@@ -150,10 +153,58 @@ export function ChatMessageView({
       (part): part is FileUIPart =>
         isFileUIPart(part) && part.mediaType.startsWith("image/")
     );
+    // Registered context tokens (WG `compositor.md` §templating) the host
+    // attached on the user's behalf — e.g. a picked template. Rendered as a chip
+    // (the USER view) so the context is visible WITHOUT being fabricated into the
+    // user's prose. Same array live + DB-rebuilt (reads `message.parts`).
+    const contexts = message.parts.filter(
+      (part) =>
+        typeof (part as { type?: unknown }).type === "string" &&
+        (part as { type: string }).type in CONTEXT_MARKERS
+    );
     return (
       <Message from="user">
         <MessageContent>
           <CollapsibleBubbleBody>
+            {contexts.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {contexts.map((rawPart, index) => {
+                  // `data-*` context part — read past the closed UIMessagePart
+                  // union; the filter above already gated `type` to CONTEXT_MARKERS.
+                  const part = rawPart as {
+                    type: string;
+                    data?: Record<string, unknown>;
+                  };
+                  const isTemplate = part.type === USER_TEMPLATE_SELECTION;
+                  const d = part.data ?? {};
+                  const title =
+                    typeof d.title === "string" ? d.title : undefined;
+                  const slides =
+                    typeof d.slides === "number" ? d.slides : undefined;
+                  const Icon = isTemplate ? LayoutTemplateIcon : PaperclipIcon;
+                  return (
+                    // Index key: a sent user message's parts are immutable and
+                    // never reorder (same reasoning as the images below).
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs shadow-sm"
+                    >
+                      <Icon className="size-3.5 text-muted-foreground" />
+                      <span className="font-medium">
+                        {isTemplate && title
+                          ? `${title} template`
+                          : CONTEXT_MARKERS[part.type]}
+                      </span>
+                      {isTemplate && slides !== undefined && (
+                        <span className="text-muted-foreground">
+                          · {slides} slides
+                        </span>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             {images.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {images.map((image, index) => (

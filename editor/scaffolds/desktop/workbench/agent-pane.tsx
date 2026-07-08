@@ -60,6 +60,7 @@ import {
 import { useDesktopAgentFocusSession } from "@/lib/desktop/agent-focus-session";
 import {
   buildAgentSend,
+  buildTemplateContext,
   buildApprovalResumeBody,
   desktopAgentTransport,
   isSessionBusy,
@@ -164,6 +165,20 @@ function AgentPaneContent({
   }
   const handoff = handoffRef.current;
   const handoffPrompt = handoff?.prompt ?? null;
+  // Whether the handoff carries a picked-template context — drives the auto-send:
+  // a template pick with no typed ask still fires (a context-only turn).
+  const hasHandoffContext = handoff?.template_context != null;
+  // A picked template's unzipped bundle (`scratch_seed`) AND its context part
+  // both ride the handoff onto the FIRST (auto-sent) turn ONLY — a ref gates them
+  // so re-renders don't resurrect them and later user turns don't re-ship them.
+  // The context part carries the template as a `user_template_selection`
+  // chip/`<…>` block (WG `compositor.md`) instead of fabricating it into the
+  // user's text; the bundle rides scratch (WG `scratch.md`). Cleared on auto-send.
+  const seedSentRef = useRef(false);
+  const scratchSeed = seedSentRef.current ? undefined : handoff?.scratch_seed;
+  const contexts = seedSentRef.current
+    ? undefined
+    : buildTemplateContext(handoff?.template_context);
 
   // Composer catalog: `@` file references + `/` skill commands.
   const catalog = useWorkspaceComposerCatalog(workspace.id);
@@ -456,6 +471,8 @@ function AgentPaneContent({
       modelId,
       providerId,
       mode,
+      scratchSeed,
+      contexts,
     }),
   });
 
@@ -488,9 +505,19 @@ function AgentPaneContent({
       return;
     }
     autoSentRef.current = true;
+    seedSentRef.current = true; // scratch seed + context part ride this turn only
     welcome_handoff.clear(workspace.id);
-    if (handoffPrompt) void onSubmit(handoffPrompt);
-  }, [handoffPrompt, chatSession.loading, onSubmit, workspace.id]);
+    // Fire the first turn when there's a prompt OR a template context to attach:
+    // a template pick with no typed ask sends a context-only message (the chip,
+    // no fabricated text). A truly blank / references-only start stays un-sent.
+    if (handoffPrompt || hasHandoffContext) void onSubmit(handoffPrompt);
+  }, [
+    handoffPrompt,
+    hasHandoffContext,
+    chatSession.loading,
+    onSubmit,
+    workspace.id,
+  ]);
 
   // Rewind: soft-truncate to the chosen user message, then re-hydrate.
   const onRewind = useCallback(

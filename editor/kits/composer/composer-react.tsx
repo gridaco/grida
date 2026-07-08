@@ -45,9 +45,6 @@ export type ComposerController = {
   removeAttachment: ComposerCore["removeAttachment"];
   setContexts: ComposerCore["setContexts"];
   clear: () => void;
-  /** Replace the whole draft with `text` and focus the caret at the end — e.g.
-   *  prefilling the composer from a template / quick reply. */
-  setText: (text: string) => void;
   insertFileReference: (reference: ComposerFileReference) => boolean;
   setTriggerIndex: (index: number) => void;
   moveTriggerIndex: (delta: number) => void;
@@ -122,11 +119,6 @@ export function useComposer() {
       clear() {
         editor?.commands.clearContent(true);
         core.clear();
-      },
-      setText(text) {
-        if (!editor) return;
-        editor.commands.setContent(text);
-        editor.commands.focus("end");
       },
       insertFileReference(reference) {
         if (!editor) return false;

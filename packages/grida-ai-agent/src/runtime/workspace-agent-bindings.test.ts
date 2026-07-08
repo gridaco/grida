@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { WorkspaceRegistry } from "@grida/daemon/server";
 import type { SecretsStore } from "@grida/daemon/server";
+import { AgentFs } from "../fs";
 import {
   WorkspaceAgentFsBackend,
   createWorkspaceAgentBindings,
@@ -182,6 +183,61 @@ describe("WorkspaceAgentFsBackend — bounded/filtered hydrate scan", () => {
  * pauses a non-read-only command for Allow/Deny but auto-runs inspection; `auto`
  * supplies NO predicate (every command runs without asking).
  */
+/**
+ * The session scratch dir is an ADDITIONAL fs root. A file placed there OUTSIDE
+ * the fs — a host seed (a picked template's bundle) or a produced artifact — must
+ * hydrate into the AgentFs map so `read_file <abs scratch path>` works, not just
+ * `cat` / `view_image`. The bug this pins: `read_file` returned `not_found` on a
+ * scratch path that the shell + `view_image` read fine, because the fs map only
+ * ever hydrated the workspace tree.
+ */
+describe("WorkspaceAgentFsBackend — scratch (additional root) hydrate", () => {
+  let baseDir: string;
+  let workspaceRoot: string;
+  let scratchRoot: string;
+  let backend: WorkspaceAgentFsBackend;
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-wsfs-scratch-"));
+    const wsDir = path.join(baseDir, "ws");
+    const scDir = path.join(baseDir, "scratch");
+    await fs.mkdir(wsDir);
+    await fs.mkdir(scDir);
+    workspaceRoot = await fs.realpath(wsDir);
+    scratchRoot = await fs.realpath(scDir);
+    const registry = new WorkspaceRegistry(path.join(baseDir, "ud"));
+    const ws = await registry.open(workspaceRoot);
+    backend = new WorkspaceAgentFsBackend(ws, [
+      { id: "scratch", root: scratchRoot },
+    ]);
+  });
+
+  afterEach(async () => {
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  it("enumerates scratch as absolute paths, workspace as logical", async () => {
+    await fs.writeFile(path.join(workspaceRoot, "a.txt"), "ws");
+    await fs.writeFile(path.join(scratchRoot, "b.txt"), "sc");
+    const listed = await backend.list();
+    expect(listed).toContain("/a.txt"); // workspace → logical "/"-rooted
+    expect(listed).toContain(path.join(scratchRoot, "b.txt")); // scratch → absolute
+  });
+
+  it("read_file reaches a scratch file seeded outside the fs (via hydrate)", async () => {
+    // Host seeds a bundle into scratch, bypassing the fs (as the daemon's
+    // writeScratchFile does). Previously invisible to read_file.
+    const svgAbs = path.join(scratchRoot, "001.svg");
+    await fs.writeFile(svgAbs, "<svg/>");
+
+    const agentFs = new AgentFs(backend);
+    await agentFs.hydrate();
+    // The absolute scratch path — was `null` (not_found) before the fix because
+    // the map only held workspace files.
+    expect(agentFs.read(svgAbs)?.content).toBe("<svg/>");
+  });
+});
+
 describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
   let baseDir: string;
   let workspaceRoot: string;

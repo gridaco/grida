@@ -125,6 +125,54 @@ describe("buildModelMessages", () => {
     expect(textOf(out[0])).toContain("continue");
   });
 
+  // Registered context tokens (WG `compositor.md` §templating) lower to a
+  // `<marker>…</marker>` block so the model sees host-contributed context WITHOUT
+  // it being fabricated into the user's text. Agnostic registry (CONTEXT_MARKERS):
+  // any registered `data-*` token lowers; unregistered ones stay UI-only.
+  it("lowers a registered context token to a <marker> block (payload at .data.data)", async () => {
+    const out = buildModelMessages([
+      msg("m1", "user", [
+        part("text", { type: "text", text: "make it about Q3" }),
+        part("data-user_template_selection", {
+          type: "data-user_template_selection",
+          data: {
+            title: "Startup Pitch",
+            slides: 12,
+            system: "obsidian",
+            bundle_location: "scratch",
+          },
+        }),
+      ]),
+    ]);
+    // Two text parts: the verbatim user text FIRST, then the lowered marker.
+    expect(out[0].parts.length).toBe(2);
+    expect((out[0].parts[0] as { text: string }).text).toBe("make it about Q3");
+    const marker = out[0].parts[1] as { type: string; text: string };
+    expect(marker.type).toBe("text");
+    expect(marker.text).toContain("<user_template_selection>");
+    expect(marker.text).toContain('"title": "Startup Pitch"');
+    expect(marker.text).toContain("</user_template_selection>");
+    // The `data-` wire prefix must NOT leak into the marker the model sees.
+    expect(marker.text).not.toContain("data-user_template_selection");
+    // …and the result is a valid model message.
+    await expect(validateView(out)).resolves.toBeDefined();
+  });
+
+  it("drops an UNregistered data-* part (registry gate)", () => {
+    const out = buildModelMessages([
+      msg("m1", "user", [
+        part("text", { type: "text", text: "hi" }),
+        part("data-not-registered", {
+          type: "data-not-registered",
+          data: { anything: true },
+        }),
+      ]),
+    ]);
+    // Only the text survives; an unregistered token is UI-only → dropped.
+    expect(out[0].parts.length).toBe(1);
+    expect((out[0].parts[0] as { text: string }).text).toBe("hi");
+  });
+
   it("resolves a bottom summary: drops the head, reorders the summary to the front", () => {
     // New model: the marker sorts LAST. The boundary is read from tail_start_id,
     // the head before it is dropped, and the summary leads.

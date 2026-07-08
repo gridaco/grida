@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { FileUIPart } from "ai";
-import { buildAgentSend, type SendMessageFn } from "./build-agent-send";
+import { USER_TEMPLATE_SELECTION } from "@grida/agent";
+import {
+  buildAgentSend,
+  buildTemplateContext,
+  type SendMessageFn,
+} from "./build-agent-send";
 
 const filepart: FileUIPart = {
   type: "file",
@@ -113,5 +118,101 @@ describe("buildAgentSend — endpoint provider pin (#806)", () => {
 
     const body = sendMessage.mock.calls[0][1]?.body;
     expect(body).not.toHaveProperty("provider_id");
+  });
+});
+
+describe("buildAgentSend — context token parts (WG compositor.md §templating)", () => {
+  it("attaches contexts as {role, parts} beside the honest text, keeping scratch_seed in the body", () => {
+    const sendMessage = vi.fn<SendMessageFn>();
+    const send = buildAgentSend({
+      sendMessage,
+      sessionId: "s1",
+      modelId: "m1",
+      scratchSeed: [{ path: ".canvas.json", text: "{}" }],
+      contexts: buildTemplateContext({
+        title: "Startup Pitch",
+        slides: 12,
+        system: "obsidian",
+      }),
+    });
+
+    send("make it about Q3");
+
+    // The mock is typed to the `{text, files}` arm; at runtime buildAgentSend
+    // sends the `{role, parts}` arm (cast `as never` in the impl), so read the
+    // recorded value through `unknown`.
+    const message = sendMessage.mock.calls[0][0] as unknown as {
+      role: string;
+      parts: Array<{ type: string; text?: string }>;
+    };
+    const options = sendMessage.mock.calls[0][1];
+    // ARM 1 `{role, parts}` — the user text is a SIBLING part, not fabricated.
+    expect(message.role).toBe("user");
+    expect(message.parts[0]).toEqual({
+      type: "text",
+      text: "make it about Q3",
+    });
+    expect(message.parts[1]?.type).toBe(USER_TEMPLATE_SELECTION);
+    // The scratch seed still rides the body on the same (first) turn.
+    expect(options?.body?.scratch_seed).toEqual([
+      { path: ".canvas.json", text: "{}" },
+    ]);
+  });
+
+  it("sends a context-only message when the user typed nothing (zero fabricated text)", () => {
+    const sendMessage = vi.fn<SendMessageFn>();
+    buildAgentSend({
+      sendMessage,
+      sessionId: "s1",
+      modelId: "m1",
+      contexts: buildTemplateContext({ title: "Portfolio", slides: 9 }),
+    })("");
+
+    const message = sendMessage.mock.calls[0][0] as unknown as {
+      role: string;
+      parts: Array<{ type: string }>;
+    };
+    expect(message.role).toBe("user");
+    // No text part at all — nothing the user didn't type.
+    expect(message.parts).toHaveLength(1);
+    expect(message.parts[0]?.type).toBe(USER_TEMPLATE_SELECTION);
+  });
+
+  it("leaves the no-context path on the {text, files} arm (unchanged)", () => {
+    const sendMessage = vi.fn<SendMessageFn>();
+    buildAgentSend({ sendMessage, sessionId: "s1", modelId: "m1" })("hi");
+    expect(sendMessage).toHaveBeenCalledWith(
+      { text: "hi" },
+      { body: { session_id: "s1", model_id: "m1" } }
+    );
+  });
+});
+
+describe("buildTemplateContext", () => {
+  it("maps template metadata to one USER_TEMPLATE_SELECTION part with a lean payload", () => {
+    expect(
+      buildTemplateContext({
+        title: "Startup Pitch",
+        slides: 12,
+        system: "obsidian",
+      })
+    ).toEqual([
+      {
+        type: USER_TEMPLATE_SELECTION,
+        data: {
+          title: "Startup Pitch",
+          slides: 12,
+          system: "obsidian",
+          bundle_location: "scratch",
+        },
+      },
+    ]);
+  });
+
+  it("omits system when absent, and returns [] for no metadata", () => {
+    expect(
+      buildTemplateContext({ title: "Portfolio", slides: 9 })[0].data
+    ).not.toHaveProperty("system");
+    expect(buildTemplateContext(undefined)).toEqual([]);
   });
 });
