@@ -21,11 +21,6 @@
  * the MARKER (what the model sees) is the clean, explicit name.
  */
 
-/** Registered on-wire part `type` (`data-*`) → the model-view marker name. */
-export const CONTEXT_MARKERS: Readonly<Record<string, string>> = {
-  "data-user_template_selection": "user_template_selection",
-};
-
 /**
  * The user picked a slides template from the gallery. The part's `.data` payload
  * carries LEAN facts — `{ title, slides, system?, bundle_location: "scratch" }` —
@@ -33,3 +28,8 @@ export const CONTEXT_MARKERS: Readonly<Record<string, string>> = {
  * `.canvas` bundle rides `scratch_seed` into the session scratch separately.
  */
 export const USER_TEMPLATE_SELECTION = "data-user_template_selection";
+
+/** Registered on-wire part `type` (`data-*`) → the model-view marker name. */
+export const CONTEXT_MARKERS: Readonly<Record<string, string>> = {
+  [USER_TEMPLATE_SELECTION]: "user_template_selection",
+};

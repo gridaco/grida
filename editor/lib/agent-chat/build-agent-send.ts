@@ -10,7 +10,7 @@
  * agent discovers them from disk and advertises them itself.)
  */
 
-import type { FileUIPart } from "ai";
+import type { FileUIPart, UIMessage } from "ai";
 import { USER_TEMPLATE_SELECTION, type AgentMode } from "@grida/agent";
 
 /**
@@ -55,7 +55,9 @@ export type AgentSendBody = {
 
 /** Minimal `useChat` `sendMessage` surface this helper needs. */
 export type SendMessageFn = (
-  message: { text: string; files?: FileUIPart[] },
+  message:
+    | { text: string; files?: FileUIPart[] }
+    | { role: "user"; parts: UIMessage["parts"] },
   options?: { body?: AgentSendBody }
 ) => void | Promise<void>;
 
@@ -101,16 +103,15 @@ export function buildAgentSend(opts: {
     if (contexts && contexts.length > 0) {
       // Attach context tokens (a picked template, …) as sibling `parts` next to
       // the honest user `text` — the `{role, parts}` arm of useChat().sendMessage.
-      // `as never`: our local SendMessageFn types only the `{text, files}` arm;
-      // the real `sendMessage` handles `{role, parts}` at runtime, and the
-      // `data-*` context parts survive the wire via `normalizeWireParts` (WG
-      // compositor.md §templating). Text + images ride as native parts here too.
+      // The `data-*` context parts survive the wire via `normalizeWireParts`
+      // (WG compositor.md §templating). Text + images ride as native parts here
+      // too.
       const parts = [
         ...(text ? [{ type: "text", text }] : []),
         ...(files ?? []),
         ...contexts,
-      ];
-      void sendMessage({ role: "user", parts } as never, { body });
+      ] as UIMessage["parts"];
+      void sendMessage({ role: "user", parts }, { body });
       return;
     }
     void sendMessage(files && files.length > 0 ? { text, files } : { text }, {

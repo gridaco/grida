@@ -138,6 +138,9 @@ export function loadSlidesTemplates(): Promise<SlidesTemplate[]> {
     return loaded.filter(
       (t): t is SlidesTemplate => t !== null && t.pages.length > 0
     );
-  })();
+  })().catch((err) => {
+    memo = null;
+    throw err;
+  });
   return memo;
 }

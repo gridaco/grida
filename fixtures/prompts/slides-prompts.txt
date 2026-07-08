@@ -25,7 +25,7 @@ design a 7-slide clean corporate deck in blue and white, 16:9, sans-serif, no ph
 
 // --- content-from-source (turn material into a deck) ---
 turn this outline into a slide deck: 1) the problem, 2) our approach, 3) how it works, 4) results, 5) what's next.
-i'll paste my meeting notes — make a tidy 8-slide recap deck out of them.
+make a tidy 8-slide meeting recap deck from these notes: launch is on track; design froze the onboarding flow; engineering needs one more week for billing QA; support flagged three migration questions; marketing wants screenshots by Friday; decisions were to keep the beta invite-only and publish docs before launch; next steps are QA owner assignment, migration FAQ draft, and launch-readiness review.
 summarize a 30-minute product demo into a 5-slide leave-behind for the customer.
 
 // --- iterate / edit an existing deck ---

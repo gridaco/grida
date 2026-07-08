@@ -16,6 +16,12 @@ type SvgResourceDocument = {
   attributes(): SvgResourceAttribute[];
   serialize(): string;
 };
+type PendingSvgResource = {
+  attr: SvgResourceAttribute;
+  href: string;
+  relPath: string;
+  sequence: number;
+};
 type SvgHrefAttributeSpec = {
   name: string;
   namespace?: string;
@@ -72,27 +78,31 @@ export async function materializeSlideSvgResources(
   const readFileBytes = options.readFileBytes ?? workspacesNs.readFileBytes;
   const restores = new Map<string, string>();
   const projectionId = createProjectionId();
-  let sequence = 0;
 
-  for (const attr of doc.attributes()) {
+  const resources: PendingSvgResource[] = [];
+  doc.attributes().forEach((attr, sequence) => {
     const href = attr.value;
     const relPath = resolveResourceRelPath({
       href,
       bundleBasePath: options.bundleBasePath,
       slideRelPath: options.slideRelPath,
     });
-    if (!relPath) continue;
+    if (relPath) resources.push({ attr, href, relPath, sequence });
+  });
 
-    try {
-      const { base64 } = await readFileBytes(options.workspaceId, relPath);
-      const materialized = toDataUrl(relPath, base64, projectionId, sequence++);
-      restores.set(materialized, escapeXmlAttribute(href));
-      attr.set(materialized);
-    } catch {
-      // Per #960 this is a render projection, not document validation. A
-      // missing/oversized/binary asset should leave only that image broken.
-    }
-  }
+  await Promise.all(
+    resources.map(async ({ attr, href, relPath, sequence }) => {
+      try {
+        const { base64 } = await readFileBytes(options.workspaceId, relPath);
+        const materialized = toDataUrl(relPath, base64, projectionId, sequence);
+        restores.set(materialized, escapeXmlAttribute(href));
+        attr.set(materialized);
+      } catch {
+        // Per #960 this is a render projection, not document validation. A
+        // missing/oversized/binary asset should leave only that image broken.
+      }
+    })
+  );
 
   const materialized = doc.serialize();
   return {
