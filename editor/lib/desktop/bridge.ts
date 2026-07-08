@@ -812,6 +812,17 @@ export namespace workspaces {
   ): Promise<Workspace> {
     return await bridgeOrThrow().workspaces.create(input);
   }
+  /**
+   * The host's DEFAULT workspace — the managed root itself (`~/Documents/Grida`),
+   * surfaced by {@link list} with `is_default`. The home roots a fresh session
+   * HERE instead of minting a per-session folder (the old auto-create flow
+   * littered the managed root and pre-picked where to work). Null on a host with
+   * no managed root (the web-daemon dev bridge), where the caller must fall back
+   * to opening a folder.
+   */
+  export async function getDefault(): Promise<Workspace | null> {
+    return (await list()).find((w) => w.is_default) ?? null;
+  }
   export async function pin(id: string, pinned: boolean): Promise<void> {
     await bridgeOrThrow().workspaces.pin(id, pinned);
   }

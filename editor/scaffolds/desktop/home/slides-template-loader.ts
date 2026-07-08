@@ -16,6 +16,7 @@
 
 import { unzipSync } from "fflate";
 import { dotcanvas } from "dotcanvas";
+import type { ScratchSeedFile } from "@/lib/desktop/welcome-handoff";
 
 /** One deck page, ready to render as `<img src={url}>`. */
 export type SlidesTemplatePage = {
@@ -31,9 +32,23 @@ export type SlidesTemplate = {
   /** Bundle name, e.g. `"startup-pitch.canvas"` — stable template identity. */
   name: string;
   title: string;
-  /** Composer seed prompt (manifest `ext["co.grida.templates"].prompt`). */
-  prompt: string;
+  /** The deck's visual-system name (manifest `ext["co.grida.templates"].system`,
+   *  e.g. `"obsidian"`, `"riso"`) — carried into the `user_template_selection`
+   *  context so the model can name the style it holds. Absent if the manifest
+   *  omits it. */
+  system?: string;
   pages: SlidesTemplatePage[];
+  /**
+   * The deck's unzipped `.canvas` bundle as text files (the manifest
+   * `.canvas.json` + each `NNN.svg`), flat single-segment paths. On start these
+   * ride the handoff into the session's SCRATCH dir (agent-only, ephemeral) —
+   * NOT the user's workspace: a picked template is reference material, like an
+   * attachment (WG `scratch.md`). The agent reads them from scratch, holds the
+   * template's visual system, and builds the adapted deck in the workspace.
+   * Closes over the in-memory `entries` this loader already unzipped for the
+   * previews — the raw bytes previously discarded.
+   */
+  files: ScratchSeedFile[];
 };
 
 type TemplatesExt = {
@@ -53,6 +68,21 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
   return new Uint8Array(await res.arrayBuffer());
 }
 
+/**
+ * The unzipped bundle as flat text files — the manifest + slide SVGs, each
+ * UTF-8-decoded. Backs {@link SlidesTemplate.files}: these ride the handoff into
+ * the session scratch on start (agent-only). Only single-segment entries are
+ * kept — the bundle IS flat (`.canvas.json` + `NNN.svg`, no nested dirs); the
+ * filter guards the daemon's single-segment `writeScratchFile` contract against
+ * a malformed zip.
+ */
+function bundleFiles(entries: Record<string, Uint8Array>): ScratchSeedFile[] {
+  const dec = new TextDecoder();
+  return Object.entries(entries)
+    .filter(([rel]) => !rel.includes("/") && !rel.includes("\\"))
+    .map(([rel, bytes]) => ({ path: rel, text: dec.decode(bytes) }));
+}
+
 async function loadOne(zipName: string): Promise<SlidesTemplate> {
   const entries = unzipSync(await fetchBytes(`${BASE}/${zipName}`));
   const dec = new TextDecoder();
@@ -67,7 +97,7 @@ async function loadOne(zipName: string): Promise<SlidesTemplate> {
   return {
     name,
     title,
-    prompt: ext?.prompt ?? `Create a slide deck like the "${title}" template.`,
+    system: ext?.system,
     pages: canvas.documents
       .filter((d) => d.src in entries)
       .map((d) => ({
@@ -78,6 +108,9 @@ async function loadOne(zipName: string): Promise<SlidesTemplate> {
           new Blob([entries[d.src].slice()], { type: "image/svg+xml" })
         ),
       })),
+    // The unzipped bundle as text files — seeded into the session scratch on
+    // start (agent-only reference), instead of discarding the bytes here.
+    files: bundleFiles(entries),
   };
 }
 

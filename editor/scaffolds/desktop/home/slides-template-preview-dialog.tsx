@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { WheelGesturesPlugin } from "embla-carousel-wheel-gestures";
 import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
@@ -26,19 +26,22 @@ import type { SlidesTemplate } from "./slides-template-loader";
  * template: a big page preview with prev/next paging and a filmstrip of every
  * page (a real embla {@link Carousel} — magnet snapping, arrow-key a11y, and
  * trackpad/mouse-wheel scrolling), plus a "Use this template" action that
- * prefills the composer (same as clicking the card) and closes. Pages are the
+ * SELECTS the deck into the composer (same as clicking the card) and closes —
+ * or a "Selected" state that just closes when it's already picked. Pages are the
  * deck's REAL slides (see `slides-template-loader.ts`).
  */
 export function SlidesTemplatePreviewDialog({
   template,
+  selected,
   open,
   onOpenChange,
-  onUse,
+  onPick,
 }: {
   template: SlidesTemplate;
+  selected: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUse: (prompt: string) => void;
+  onPick: (template: SlidesTemplate) => void;
 }) {
   const count = template.pages.length;
   const [page, setPage] = useState(0);
@@ -194,14 +197,24 @@ export function SlidesTemplatePreviewDialog({
         </div>
 
         <DialogFooter>
-          <Button
-            onClick={() => {
-              onUse(template.prompt);
-              onOpenChange(false);
-            }}
-          >
-            Use this template
-          </Button>
+          {selected ? (
+            // Already picked — don't offer a deselect here (the composer chip
+            // and the card own removal); just let the user return to the home,
+            // where the chip is waiting and Start builds from it.
+            <Button variant="secondary" onClick={() => onOpenChange(false)}>
+              <CheckIcon className="size-4" />
+              Selected
+            </Button>
+          ) : (
+            <Button
+              onClick={() => {
+                onPick(template);
+                onOpenChange(false);
+              }}
+            >
+              Use this template
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

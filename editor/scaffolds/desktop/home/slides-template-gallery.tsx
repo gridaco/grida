@@ -12,12 +12,14 @@
  * Each card is a {@link SlideScrubPreview} (hover-scrub through the deck's
  * real pages) with an "eye" button that opens the
  * {@link SlidesTemplatePreviewDialog} for a larger view. Clicking the card
- * PREFILLS the composer with the template's seed prompt (via `onUseTemplate`)
- * — it does NOT start a session.
+ * SELECTS the template (via `onPickTemplate`) into the composer — like
+ * attaching a reference, single-select. It does NOT start a project; the
+ * composer's send materializes the chosen deck and hands it to the agent.
  */
 
 import { useEffect, useState } from "react";
-import { EyeIcon } from "lucide-react";
+import { CheckIcon, EyeIcon } from "lucide-react";
+import { cn } from "@app/ui/lib/utils";
 import { SlideScrubPreview } from "./slide-scrub-preview";
 import { SlidesTemplatePreviewDialog } from "./slides-template-preview-dialog";
 import type { SlidesTemplate } from "./slides-template-loader";
@@ -25,25 +27,37 @@ import type { SlidesTemplate } from "./slides-template-loader";
 /** One template card: a scrubbable page preview + an "eye" that opens the
  *  larger preview dialog. The scrub surface and the eye are DOM SIBLINGS (not
  *  nested buttons) — the eye sits on top, so a click on it opens the dialog
- *  without also firing the card's prefill. */
+ *  without also firing the card's select. A selected card gets a primary ring +
+ *  a check badge (matching the reference gallery), so single-select reads at a
+ *  glance; clicking the selected card again deselects it. */
 function SlidesTemplateCard({
   template,
+  selected,
   disabled,
-  onUse,
+  onPick,
 }: {
   template: SlidesTemplate;
+  selected: boolean;
   disabled: boolean;
-  onUse: (prompt: string) => void;
+  onPick: (template: SlidesTemplate) => void;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   return (
-    <div className="group relative aspect-video overflow-hidden rounded-lg border transition hover:border-primary/50 hover:shadow-sm">
-      {/* Scrub surface = the prefill target (fills the card). */}
+    <div
+      className={cn(
+        "group relative aspect-video overflow-hidden rounded-lg border transition hover:shadow-sm",
+        selected
+          ? "border-primary ring-2 ring-primary/40"
+          : "hover:border-primary/50"
+      )}
+    >
+      {/* Scrub surface = the select target (fills the card). */}
       <button
         type="button"
         disabled={disabled}
-        onClick={() => onUse(template.prompt)}
-        aria-label={`Use ${template.title} template`}
+        aria-pressed={selected}
+        onClick={() => onPick(template)}
+        aria-label={`${selected ? "Deselect" : "Select"} ${template.title} template`}
         title={template.title}
         className="absolute inset-0 disabled:pointer-events-none disabled:opacity-50"
       >
@@ -62,6 +76,14 @@ function SlidesTemplateCard({
         />
       </button>
 
+      {/* Selected badge — top-left (the eye sits top-right), so single-select
+          is legible without hover. Primary fill matches the reference gallery. */}
+      {selected && (
+        <div className="absolute left-1.5 top-1.5 z-10 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
+          <CheckIcon className="size-3.5" />
+        </div>
+      )}
+
       {/* Eye → larger-context preview dialog. On top of the scrub surface. */}
       <button
         type="button"
@@ -75,24 +97,29 @@ function SlidesTemplateCard({
 
       <SlidesTemplatePreviewDialog
         template={template}
+        selected={selected}
         open={previewOpen}
         onOpenChange={setPreviewOpen}
-        onUse={onUse}
+        onPick={onPick}
       />
     </div>
   );
 }
 
 /**
- * `onUseTemplate` receives the template's seed prompt — the host prefills the
- * composer with it and focuses the input. It does NOT start a session; the user
- * sends when ready.
+ * `onPickTemplate` receives the clicked {@link SlidesTemplate} to toggle it in
+ * the composer's single-select tray — it does NOT start a project (the composer
+ * send does). `selectedName` is the currently-picked template's `name` (or null)
+ * so the matching card shows its selected state. The gallery is disabled while a
+ * start is in flight (`disabled`).
  */
 export function SlidesTemplateGallery({
-  onUseTemplate,
+  onPickTemplate,
+  selectedName,
   disabled = false,
 }: {
-  onUseTemplate: (prompt: string) => void;
+  onPickTemplate: (template: SlidesTemplate) => void;
+  selectedName: string | null;
   disabled?: boolean;
 }) {
   // null = loading (skeletons); [] = load failed / nothing to show.
@@ -127,8 +154,9 @@ export function SlidesTemplateGallery({
             <SlidesTemplateCard
               key={t.name}
               template={t}
+              selected={t.name === selectedName}
               disabled={disabled}
-              onUse={onUseTemplate}
+              onPick={onPickTemplate}
             />
           ))}
     </div>

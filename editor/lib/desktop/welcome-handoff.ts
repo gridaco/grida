@@ -31,16 +31,45 @@ function storageKey(workspaceId: string): string {
   return `${KEY_PREFIX}.${workspaceId}`;
 }
 
+/** One file to seed into the session's scratch dir on the first turn (WG
+ *  `scratch.md`) — a picked template's unzipped `.canvas` bundle entry (or an
+ *  upload). Flat single-segment `path` (the daemon's `writeScratchFile`
+ *  enforces containment). */
+export type ScratchSeedFile = { path: string; text: string };
+
 /** The prompt + composer settings stashed for the workspace chat. */
 export type WelcomeHandoff = {
-  /** The composer prompt, sent verbatim as the first turn. Empty string when
-   * the home only wants to open the workspace primed (e.g. a picked reference)
-   * without auto-sending a turn. */
+  /** The user's RAW composer text — sent verbatim as the first turn, NEVER
+   * fabricated (a picked template rides `template_context`, not this string).
+   * Empty string when the home only wants to open the workspace primed (a picked
+   * reference, or a template pick with no typed ask) without auto-sending a
+   * plain-text turn. */
   prompt: string;
   /** The model the home composer was set to. Applied to that first
    * turn so the picker's choice survives the navigation; omitted when
    * the workspace chat should fall back to its own default. */
   model_id?: string;
+  /**
+   * Files to land in the session's SCRATCH dir before the first turn — agent-only
+   * reference material (a picked slides template's unzipped bundle), NOT written
+   * to the user's workspace. The agent-pane threads these onto the first send's
+   * body (`scratch_seed`); the daemon writes them into scratch (WG `scratch.md`).
+   */
+  scratch_seed?: ScratchSeedFile[];
+  /**
+   * Metadata for a picked slides template (WG `compositor.md` §"Templating: user
+   * view vs model view"). The agent-pane lowers this to a first-turn
+   * `user_template_selection` context part — a CHIP in the user view, a
+   * `<user_template_selection>` block in the model view — so the template is
+   * referenced honestly, never narrated into `prompt`. Its `.canvas` bundle rides
+   * `scratch_seed`. First turn only.
+   */
+  template_context?: {
+    name: string;
+    title: string;
+    slides: number;
+    system?: string;
+  };
 };
 
 export namespace welcome_handoff {

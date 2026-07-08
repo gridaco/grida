@@ -11,21 +11,27 @@
  * folder. "Open folder…" and the recents list stay for opening work that
  * already exists (files stay visible — a named tree, not hidden).
  *
- * The home makes NO document decision. It never seeds a `.canvas`, a deck, or
- * any file: whether the workspace becomes a board, a slides deck, or a tree of
- * files is the AGENT's choice, made on turn one (guided by the advertised
- * skills). The workspace is just a place to work; the document is the agent's
- * to create. (Pre-seeding a board here is what mis-steered decks onto boards —
- * deferring creation to the agent is the fix.)
+ * The home NEVER mints a per-session folder and NEVER dirties the user's
+ * workspace. Starting a session roots the agent at the DEFAULT workspace — the
+ * managed root itself (`~/Documents/Grida`), always registered — and the agent
+ * takes the wheel: whether the workspace becomes a board, a slides deck, or a
+ * tree of files is the AGENT's choice on turn one (guided by the advertised
+ * skills), and produced files land where the agent decides. The system provides
+ * MINIMALLY — the default workspace + a per-session scratch dir. (The old flow
+ * minted `~/Documents/Grida/<prompt>` folders per session and pre-picked where
+ * to work; that's the legacy this replaces.)
  *
- * Clicking a gallery reference doesn't start a project on its own — it drops the
- * pin into the composer's picked-references tray (multi-select). The user can
- * collect several, optionally add a prompt, then start ONE project; the picked
- * references fold into the first-turn prompt as plain context (URLs the agent
- * can use however it decides). Every start opens the MAIN workbench
- * (`/desktop/workspace`) — the full surface with the file tree, tool-approval,
- * and auto-accept — whose agent pane consumes the handoff and auto-sends when
- * there's a prompt.
+ * Clicking a gallery reference OR a slides template doesn't start anything — it
+ * drops the pick into the composer's tray (references multi-select; a template
+ * is single-select, like choosing one Keynote theme). The user can add a prompt,
+ * then start ONE session. References fold into the first-turn prompt as plain
+ * URLs; a picked template's unzipped `.canvas` bundle rides the handoff into the
+ * session's SCRATCH dir — agent-only reference, like an attachment (WG
+ * `scratch.md`), never the user's workspace — and the prompt tells the agent to
+ * read it from scratch and build the adapted deck. Every start opens the MAIN
+ * workbench (`/desktop/workspace`) — the full surface with the file tree,
+ * tool-approval, and auto-accept — whose agent pane consumes the handoff and
+ * auto-sends when there's a prompt.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -37,15 +43,16 @@ import {
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import { welcome_handoff } from "@/lib/desktop/welcome-handoff";
+import {
+  welcome_handoff,
+  type ScratchSeedFile,
+  type WelcomeHandoff,
+} from "@/lib/desktop/welcome-handoff";
 import { onboarding_flag } from "@/lib/desktop/onboarding-flag";
 import { FirstRunOnboarding } from "@/scaffolds/desktop/onboarding/first-run-onboarding";
 import { dotcanvas } from "dotcanvas";
 import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
-import {
-  AgentComposerInput,
-  type AgentComposerHandle,
-} from "@/scaffolds/desktop/shared/agent-composer-input";
+import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
 import {
   DesktopModelPicker,
   useModelPickerState,
@@ -55,6 +62,11 @@ import type { ComposerCatalog } from "@/kits/composer";
 import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 import { ReferenceGallery } from "@/scaffolds/desktop/home/reference-gallery";
 import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-gallery";
+// `import type` is erased at build — it does NOT pull the loader (and its
+// fflate/dotcanvas deps) into the home chunk; the gallery's dynamic `import()`
+// stays the sole code-split boundary. The home only holds the picked template
+// object and reads its `files` (the unzipped bundle) to seed the session scratch.
+import type { SlidesTemplate } from "@/scaffolds/desktop/home/slides-template-loader";
 import { RecentProjectsCommand } from "@/scaffolds/desktop/home/recent-projects-command";
 import { WorkspacePicker } from "@/scaffolds/desktop/home/workspace-picker";
 import {
@@ -72,13 +84,6 @@ const NOOP = () => {};
  *  — not `useWorkspaceComposerCatalog("")`, which would fire doomed bridge
  *  readdirs per mount just to yield this same empty shape. */
 const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
-
-/** A short, friendly folder name derived from the prompt (the sidecar slugifies
- *  it further). First few words keep the project recognizable in the tree. */
-function deriveProjectName(prompt: string): string {
-  const words = prompt.trim().split(/\s+/).slice(0, 6).join(" ");
-  return words.slice(0, 48) || "Untitled";
-}
 
 /** Fold picked references into the first-turn prompt as plain context. The
  *  workspace starts empty — there is no seeded document to place references in
@@ -130,6 +135,19 @@ export default function DesktopWelcomePage() {
     () => new Set(pickedRefs.map((p) => p.id)),
     [pickedRefs]
   );
+  // The slides template the user picked from the gallery — single-select (you
+  // start from ONE template, like choosing a Keynote theme). Null = none. It's
+  // an attachment-style reference, NOT an instant start: the composer send seeds
+  // its bundle into the session scratch and hands it to the agent (see `start`).
+  const [pickedTemplate, setPickedTemplate] = useState<SlidesTemplate | null>(
+    null
+  );
+  // A picked template only makes sense in slides mode (the template gallery is
+  // slides-only). If the user switches the preset away, drop it so a stale
+  // template chip can't linger over the reference gallery.
+  useEffect(() => {
+    if (preset !== "slides") setPickedTemplate(null);
+  }, [preset]);
   // Composer docking: the composer starts as the in-flow hero, then floats as a
   // fixed bottom bar once it scrolls out of view — so you can keep writing while
   // browsing the gallery. It's the SAME element (its position toggles), so the
@@ -137,9 +155,6 @@ export default function DesktopWelcomePage() {
   // spacer that holds its old spot so the gallery doesn't jump when it detaches.
   const composerRef = useRef<HTMLDivElement>(null);
   const composerSlotRef = useRef<HTMLDivElement>(null);
-  // Imperative handle into the composer — a slides template click prefills the
-  // draft (and focuses the caret) rather than starting a session.
-  const composerApiRef = useRef<AgentComposerHandle>(null);
   const [docked, setDocked] = useState(false);
   const [heroHeight, setHeroHeight] = useState<number>();
   // First-run onboarding (issue #813): zero-config Claude detection. Start
@@ -265,7 +280,7 @@ export default function DesktopWelcomePage() {
 
   // Model selection for the composer. No sessions here (the welcome page never
   // loads a chat), so this just holds the user's pick; it rides the handoff so
-  // the created project's first turn runs on the chosen model.
+  // the session's first turn runs on the chosen model.
   const {
     model_id: modelId,
     setModelId,
@@ -276,11 +291,18 @@ export default function DesktopWelcomePage() {
     endpoints,
   });
 
-  // Stash the (possibly empty) prompt + model + skill for a workspace's agent and
-  // become the workspace window. Shared by the new-project and existing-target
-  // paths; an empty prompt lands primed but doesn't auto-send a turn.
+  // Stash the (possibly empty) prompt + model + scratch seed for a workspace's
+  // agent and become the workspace window. Shared by the default-workspace and
+  // existing-target paths; an empty prompt lands primed but doesn't auto-send a
+  // turn. `scratchSeed` (a picked template's unzipped bundle) rides into the
+  // session scratch on the first turn — agent-only, never the workspace.
   const handoffAndGo = useCallback(
-    (workspace: Workspace, prompt: string) => {
+    (
+      workspace: Workspace,
+      prompt: string,
+      scratchSeed?: ScratchSeedFile[],
+      templateContext?: WelcomeHandoff["template_context"]
+    ) => {
       welcome_handoff.set(workspace.id, {
         prompt,
         // Carry the model only when the user deliberately picked one. An
@@ -290,14 +312,28 @@ export default function DesktopWelcomePage() {
         // seed the workspace with the Claude-Code default as a false
         // explicit pick, and keyless users would hit `auth_required` (#942).
         ...(isUserPick ? { model_id: modelId } : {}),
+        ...(scratchSeed && scratchSeed.length > 0
+          ? { scratch_seed: scratchSeed }
+          : {}),
+        ...(templateContext ? { template_context: templateContext } : {}),
       });
       router.push(workspaceWorkbenchHref(workspace));
     },
     [modelId, isUserPick, router]
   );
 
-  const createAndGo = useCallback(
-    async (opts: { name?: string; prompt: string }) => {
+  // Start a session in the DEFAULT workspace (`~/Documents/Grida`). We NEVER mint
+  // a per-session folder — that littered the managed root and pre-picked where to
+  // work; the agent roots at the default workspace and takes the wheel, writing
+  // only what it decides. Optional `scratchSeed` (a picked template's unzipped
+  // bundle) rides the handoff into the session scratch — agent-only reference,
+  // never the user's workspace.
+  const startFresh = useCallback(
+    async (opts: {
+      prompt: string;
+      scratchSeed?: ScratchSeedFile[];
+      templateContext?: WelcomeHandoff["template_context"];
+    }) => {
       const bridge = getDesktopBridge();
       if (!bridge) {
         setError("Desktop bridge not available.");
@@ -306,20 +342,19 @@ export default function DesktopWelcomePage() {
       try {
         setBusy(true);
         setError(null);
-        // Create an EMPTY project — just a folder. No `.canvas`, no document:
-        // the agent creates whatever the task needs on turn one (see the file
-        // header). The workspace is only a place to work.
-        const ws = await workspacesNs.createProject({ name: opts.name });
-        // Every start opens the MAIN workbench (`/desktop/workspace`) — the full
-        // surface with the file tree, tool-approval bar, and auto-accept mode
-        // picker. The workbench's agent pane consumes the handoff and auto-sends
-        // the prompt as turn one; the agent's first act is to create the
-        // document. (The lean board window at `/desktop/file` stays for directly
-        // opening an existing `.canvas`/file — Finder, ⌃R, File ▸ Open.)
-        handoffAndGo(ws, opts.prompt);
+        const ws = await workspacesNs.getDefault();
+        if (!ws) {
+          setError("No default workspace available on this host.");
+          setBusy(false);
+          return;
+        }
+        // Opens the MAIN workbench (`/desktop/workspace`) — the full surface with
+        // the file tree, tool-approval bar, and auto-accept picker; its agent pane
+        // consumes the handoff and auto-sends the prompt as turn one.
+        handoffAndGo(ws, opts.prompt, opts.scratchSeed, opts.templateContext);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Couldn't create a project."
+          err instanceof Error ? err.message : "Couldn't start a session."
         );
         setBusy(false); // navigation unmounts on success; only reset on failure
       }
@@ -335,19 +370,35 @@ export default function DesktopWelcomePage() {
     (text: string) => {
       const t = text.trim();
       if (busy) return;
-      if (pickedRefs.length > 0) {
-        void createAndGo({
-          name: t ? deriveProjectName(t) : pickedRefs[0]?.title || "Artwork",
-          prompt: composePromptWithRefs(t, pickedRefs),
+      // A picked template starts a session in the default workspace. Its unzipped
+      // `.canvas` bundle rides into the session SCRATCH (agent-only), and the
+      // template itself rides as a `user_template_selection` CONTEXT part (a chip
+      // in the transcript, a `<user_template_selection>` block for the model) —
+      // NOT fabricated into the message. The user's raw text `t` is the only ask
+      // (empty ⇒ a context-only send; the agent-pane fires it anyway).
+      if (pickedTemplate) {
+        void startFresh({
+          prompt: t,
+          scratchSeed: pickedTemplate.files,
+          templateContext: {
+            name: pickedTemplate.name,
+            title: pickedTemplate.title,
+            slides: pickedTemplate.pages.length,
+            system: pickedTemplate.system,
+          },
         });
         return;
       }
+      if (pickedRefs.length > 0) {
+        void startFresh({ prompt: composePromptWithRefs(t, pickedRefs) });
+        return;
+      }
       if (!t) return;
-      // No references: send into an existing project, or auto-create from words.
+      // Send into an existing opened workspace, or the default workspace.
       if (target) handoffAndGo(target, t);
-      else void createAndGo({ name: deriveProjectName(t), prompt: t });
+      else void startFresh({ prompt: t });
     },
-    [busy, pickedRefs, target, handoffAndGo, createAndGo]
+    [busy, pickedTemplate, pickedRefs, target, handoffAndGo, startFresh]
   );
 
   // Clicking a gallery reference toggles it in the composer's tray (multi-select)
@@ -364,11 +415,13 @@ export default function DesktopWelcomePage() {
     []
   );
 
-  // Clicking a slides template doesn't start a session — it just prefills the
-  // composer with the template's prompt and returns focus to the input, so the
-  // user reviews/tweaks it and sends when ready (setText focuses the caret).
-  const useTemplate = useCallback((prompt: string) => {
-    composerApiRef.current?.setText(prompt);
+  // Picking a slides template SELECTS it into the composer (single-select), like
+  // attaching a reference — it does NOT start a session on its own. Clicking the
+  // already-picked one clears it. The start (composer send / Enter) attaches it
+  // as a `user_template_selection` context part + seeds the deck's bundle into
+  // scratch, handing it to the agent to adapt; see `start`.
+  const togglePickTemplate = useCallback((template: SlidesTemplate) => {
+    setPickedTemplate((cur) => (cur?.name === template.name ? null : template));
   }, []);
 
   const onOpen = useCallback(async () => {
@@ -472,6 +525,40 @@ export default function DesktopWelcomePage() {
                       "fixed inset-x-4 bottom-4 z-30 mx-auto max-w-2xl duration-200 animate-in fade-in slide-in-from-bottom-4"
                   )}
                 >
+                  {/* Picked-template chip — the slides-mode counterpart of the
+                  references tray: a single attachment-style chip for the deck the
+                  user chose to start from (single-select). Neutral styling (no
+                  accent) — it reads as an attachment, and starting is the
+                  composer's own send. Its X removes; the gallery card also
+                  toggles it. */}
+                  {pickedTemplate && (
+                    <div className="flex items-center gap-2 rounded-lg border bg-background p-1.5 shadow-sm">
+                      <div className="size-10 shrink-0 overflow-hidden rounded border bg-muted">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- blob object URL; next/image can't optimize it */}
+                        <img
+                          src={pickedTemplate.pages[0]?.url}
+                          alt=""
+                          className="size-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium">
+                          {pickedTemplate.title}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Template · {pickedTemplate.pages.length} slides
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPickedTemplate(null)}
+                        aria-label={`Remove ${pickedTemplate.title} template`}
+                        className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      >
+                        <XIcon className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
                   {/* Picked-references tray — a bare, compact row of thumbnails:
                   no panel, no label, no Clear/Start. Membership IS the state, so
                   each pin just removes on its hover-X, and starting is the
@@ -505,7 +592,6 @@ export default function DesktopWelcomePage() {
                   )}
                   <AgentComposerInput
                     catalog={EMPTY_CATALOG}
-                    apiRef={composerApiRef}
                     // Docked: lift the input on its own shadow so it floats over
                     // the gallery — there's no card wrapper doing it anymore.
                     className={docked ? "shadow-xl" : undefined}
@@ -514,11 +600,13 @@ export default function DesktopWelcomePage() {
                     onStop={NOOP}
                     autofocus
                     placeholder={
-                      pickedRefs.length > 0
-                        ? "Describe what to make from these references…"
-                        : target
-                          ? `Ask Grida to design something in ${target.name}…`
-                          : presetPlaceholder
+                      pickedTemplate
+                        ? `Adapt the "${pickedTemplate.title}" template — describe your deck…`
+                        : pickedRefs.length > 0
+                          ? "Describe what to make from these references…"
+                          : target
+                            ? `Ask Grida to design something in ${target.name}…`
+                            : presetPlaceholder
                     }
                     toolbar={
                       <>
@@ -562,7 +650,8 @@ export default function DesktopWelcomePage() {
               </h2>
               {preset === "slides" ? (
                 <SlidesTemplateGallery
-                  onUseTemplate={useTemplate}
+                  onPickTemplate={togglePickTemplate}
+                  selectedName={pickedTemplate?.name ?? null}
                   disabled={busy}
                 />
               ) : (
