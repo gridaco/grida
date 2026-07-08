@@ -7,6 +7,7 @@ name = "anchor-lab"
 version = "0.0.0"
 dependencies = [
  "quick-xml",
+ "serde",
  "taffy",
 ]
 

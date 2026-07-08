@@ -36,8 +36,16 @@ fn hit_subtree(doc: &Document, r: &Resolved, id: NodeId, p: (f32, f32)) -> Optio
     let inv = r.world_of(id).invert()?;
     let (lx, ly) = inv.apply(p);
     let b = r.box_of(id);
-    let sx = if b.w < 2.0 * HAIRLINE_SLOP { HAIRLINE_SLOP } else { 0.0 };
-    let sy = if b.h < 2.0 * HAIRLINE_SLOP { HAIRLINE_SLOP } else { 0.0 };
+    let sx = if b.w < 2.0 * HAIRLINE_SLOP {
+        HAIRLINE_SLOP
+    } else {
+        0.0
+    };
+    let sy = if b.h < 2.0 * HAIRLINE_SLOP {
+        HAIRLINE_SLOP
+    } else {
+        0.0
+    };
     if lx >= -sx && lx <= b.w + sx && ly >= -sy && ly <= b.h + sy {
         Some(id)
     } else {

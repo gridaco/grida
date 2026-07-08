@@ -92,9 +92,17 @@ fn parse_transform(s: &str) -> Option<M> {
             ("scale", [s]) => M { a: *s, d: *s, ..ID },
             ("scale", [x, y]) => M { a: *x, d: *y, ..ID },
             ("rotate", [deg]) => rot(*deg),
-            ("rotate", [deg, cx, cy]) => M { e: *cx, f: *cy, ..ID }
-                .mul(&rot(*deg))
-                .mul(&M { e: -*cx, f: -*cy, ..ID }),
+            ("rotate", [deg, cx, cy]) => M {
+                e: *cx,
+                f: *cy,
+                ..ID
+            }
+            .mul(&rot(*deg))
+            .mul(&M {
+                e: -*cx,
+                f: -*cy,
+                ..ID
+            }),
             ("skewX", [deg]) => M {
                 c: deg.to_radians().tan(),
                 ..ID
@@ -178,7 +186,11 @@ fn scan_file(path: &Path, c: &mut Counts) {
     let mut found = 0usize;
     let mut needs_lens = false;
     let mut flip = false;
-    for key in ["transform=\"", "gradientTransform=\"", "patternTransform=\""] {
+    for key in [
+        "transform=\"",
+        "gradientTransform=\"",
+        "patternTransform=\"",
+    ] {
         let is_paint = key != "transform=\"";
         let mut at = 0usize;
         while let Some(pos) = src[at..].find(key) {
@@ -251,7 +263,11 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     for e in entries.flatten() {
         let p = e.path();
         if p.is_dir() {
-            let name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let name = p
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             if name == "node_modules" || name == "target" || name == ".git" {
                 continue;
             }

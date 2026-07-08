@@ -164,5 +164,12 @@ fn root_is_viewport_bound_frame() {
     let b = DocBuilder::new();
     let doc = b.build();
     let r = resolve(&doc, &opts());
-    assert_rect(r.box_of(doc.root), 0.0, 0.0, 1000.0, 1000.0, "root=viewport");
+    assert_rect(
+        r.box_of(doc.root),
+        0.0,
+        0.0,
+        1000.0,
+        1000.0,
+        "root=viewport",
+    );
 }

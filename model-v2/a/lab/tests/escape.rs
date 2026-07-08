@@ -120,5 +120,9 @@ fn diagonal_wrapper_gives_theta_stable_slot() {
     for w in &widths {
         assert_close(*w, widths[0], "θ-stable container");
     }
-    assert_close(widths[0], 10.0 + 60.0 + 10.0 + 116.61903 + 10.0 + 60.0 + 10.0, "diagonal slot");
+    assert_close(
+        widths[0],
+        10.0 + 60.0 + 10.0 + 116.61903 + 10.0 + 60.0 + 10.0,
+        "diagonal slot",
+    );
 }

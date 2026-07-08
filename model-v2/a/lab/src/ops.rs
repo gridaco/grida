@@ -10,7 +10,7 @@
 
 use crate::math::Affine;
 use crate::model::*;
-use crate::resolve::Resolved;
+use crate::resolve::{Resolved, RotationInFlow};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpError {
@@ -97,13 +97,7 @@ pub fn set_y(doc: &mut Document, resolved: &Resolved, id: NodeId, value: f32) ->
 }
 
 /// OP-MOVE: drag by (dx,dy) → exactly two offset writes.
-pub fn move_by(
-    doc: &mut Document,
-    resolved: &Resolved,
-    id: NodeId,
-    dx: f32,
-    dy: f32,
-) -> OpResult {
+pub fn move_by(doc: &mut Document, resolved: &Resolved, id: NodeId, dx: f32, dy: f32) -> OpResult {
     let (x, y, _, _) = resolved.xywh(id);
     let a = set_x(doc, resolved, id, x + dx)?;
     let b = set_y(doc, resolved, id, y + dy)?;
@@ -206,6 +200,7 @@ pub fn rotate_derived_center_feel(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Axis {
     X,
     Y,
@@ -217,7 +212,8 @@ pub enum Axis {
 /// becomes |target − anchor| and the axis flip toggles relative to the
 /// gesture baseline (Figma parity: fill/flip survive as intent; the typed
 /// `set_width(−50)` stays a wall — `NegativeExtent`).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ResizeDrag {
     pub axis: Axis,
     /// Parent-space coordinate of the FIXED edge, captured at gesture start.
@@ -349,7 +345,10 @@ pub fn ungroup(doc: &mut Document, resolved: &Resolved, group_id: NodeId) -> OpR
     let parent_id = doc.parent_of(group_id).ok_or(OpError::WrongKind)?;
     let group_local = resolved.local_of(group_id);
     let group_theta = doc.get(group_id).header.rotation;
-    let (gfx, gfy) = (doc.get(group_id).header.flip_x, doc.get(group_id).header.flip_y);
+    let (gfx, gfy) = (
+        doc.get(group_id).header.flip_x,
+        doc.get(group_id).header.flip_y,
+    );
     // Mirror conjugation: F·R(θ) = R(σθ)·F with σ = −1 under a single-axis
     // mirror (det −1) and σ = +1 under none/both (F_xy = R(180), det +1).
     // So R(θg)·F_g·R(θc)·F_c = R(θg + σ·θc)·F_{g⊕c} — the bake stays three
@@ -408,3 +407,194 @@ pub fn ungroup(doc: &mut Document, resolved: &Resolved, group_id: NodeId) -> OpR
     Ok(writes)
 }
 
+// ---------------------------------------------------------------------------
+// The op as data (ENG-5.1) + its dispatcher + its dirty class (ENG-1.2).
+//
+// The free functions above are the implementations; `Op` names each one as a
+// value and `apply` is the sole dispatcher, so the journal, replay, and the
+// dirty-class map all describe exactly the writes the free functions perform.
+// The free functions stay the primary API (every existing test calls them);
+// `apply` is pure dispatch, guarded equal to them per-variant by
+// `tests/op_apply.rs`.
+// ---------------------------------------------------------------------------
+
+/// One editor write as data. `ResizeDrag` carries its begin-state inline, so
+/// replaying the op never has to re-derive gesture context.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Op {
+    SetX {
+        id: NodeId,
+        value: f32,
+    },
+    SetY {
+        id: NodeId,
+        value: f32,
+    },
+    MoveBy {
+        id: NodeId,
+        dx: f32,
+        dy: f32,
+    },
+    SetWidth {
+        id: NodeId,
+        value: f32,
+    },
+    SetHeight {
+        id: NodeId,
+        value: f32,
+    },
+    SetRotation {
+        id: NodeId,
+        deg: f32,
+    },
+    RotateDerivedCenterFeel {
+        id: NodeId,
+        deg: f32,
+    },
+    ResizeDrag {
+        id: NodeId,
+        drag: ResizeDrag,
+        target: f32,
+    },
+    ResizeTopLeft {
+        id: NodeId,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+    },
+    Delete {
+        id: NodeId,
+    },
+    Ungroup {
+        id: NodeId,
+    },
+}
+
+impl Op {
+    /// The node this op addresses (logging, dirty scoping).
+    pub fn target(&self) -> NodeId {
+        match *self {
+            Op::SetX { id, .. }
+            | Op::SetY { id, .. }
+            | Op::MoveBy { id, .. }
+            | Op::SetWidth { id, .. }
+            | Op::SetHeight { id, .. }
+            | Op::SetRotation { id, .. }
+            | Op::RotateDerivedCenterFeel { id, .. }
+            | Op::ResizeDrag { id, .. }
+            | Op::ResizeTopLeft { id, .. }
+            | Op::Delete { id }
+            | Op::Ungroup { id } => id,
+        }
+    }
+}
+
+/// Apply one typed op — pure dispatch to the free functions above. `resolved`
+/// must be a FRESH resolve of `doc`; variants that don't consult it
+/// (size/rotation/delete) ignore it. Never diverges from the free functions
+/// (guarded by `tests/op_apply.rs`).
+pub fn apply(doc: &mut Document, resolved: &Resolved, op: &Op) -> OpResult {
+    match op {
+        Op::SetX { id, value } => set_x(doc, resolved, *id, *value),
+        Op::SetY { id, value } => set_y(doc, resolved, *id, *value),
+        Op::MoveBy { id, dx, dy } => move_by(doc, resolved, *id, *dx, *dy),
+        Op::SetWidth { id, value } => set_width(doc, *id, *value),
+        Op::SetHeight { id, value } => set_height(doc, *id, *value),
+        Op::SetRotation { id, deg } => set_rotation(doc, *id, *deg),
+        Op::RotateDerivedCenterFeel { id, deg } => {
+            rotate_derived_center_feel(doc, resolved, *id, *deg)
+        }
+        Op::ResizeDrag { id, drag, target } => resize_drag(doc, resolved, *id, drag, *target),
+        Op::ResizeTopLeft { id, x, y, w, h } => resize_top_left(doc, resolved, *id, *x, *y, *w, *h),
+        Op::Delete { id } => delete(doc, *id),
+        Op::Ungroup { id } => ungroup(doc, resolved, *id),
+    }
+}
+
+/// Which resolve phases a write can dirty (ENG-1.2): M measure, L layout,
+/// T transform, B bounds. A bitmask, so one op can name several.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PhaseMask(pub u8);
+
+impl PhaseMask {
+    pub const M: PhaseMask = PhaseMask(1);
+    pub const L: PhaseMask = PhaseMask(2);
+    pub const T: PhaseMask = PhaseMask(4);
+    pub const B: PhaseMask = PhaseMask(8);
+    pub const fn or(self, o: PhaseMask) -> PhaseMask {
+        PhaseMask(self.0 | o.0)
+    }
+    pub fn has(self, o: PhaseMask) -> bool {
+        self.0 & o.0 == o.0
+    }
+}
+
+/// How far a write's damage reaches (ENG-1.2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DirtyExtent {
+    SelfOnly,
+    Subtree,
+    MeasureChainToFixedAncestor,
+    BoundsOnly,
+}
+
+/// The invalidation scope an op declares. Consumed by the incremental
+/// resolver (OS-1a) — **today the engine ignores it and does a full resolve**,
+/// so the full resolver stays the oracle (ENG-1.1). The assignments in
+/// [`dirty_class`] are deliberately conservative (wide): an over-approximation
+/// only costs extra work, never a missed update; they tighten with
+/// measurement. The exhaustive match guarantees every op has one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DirtyClass {
+    pub phases: PhaseMask,
+    pub extent: DirtyExtent,
+}
+
+/// The declared dirty class per op. Parameterized on [`RotationInFlow`]
+/// because rotation is paint-only under `VisualOnly` (DEC-0) but feeds the
+/// parent's sizing under `AabbParticipates` — hardcoding the default would be
+/// a landmine when the incremental engine finally reads this.
+pub fn dirty_class(op: &Op, rot: RotationInFlow) -> DirtyClass {
+    let all = PhaseMask::M
+        .or(PhaseMask::L)
+        .or(PhaseMask::T)
+        .or(PhaseMask::B);
+    let layout = PhaseMask::L.or(PhaseMask::T).or(PhaseMask::B); // reflow, no re-measure
+    let paint = PhaseMask::T.or(PhaseMask::B); // transform + bounds only
+    match op {
+        // Position: never re-measures. Free move is self+subtree; an in-flow
+        // attempt reflows up-chain (coerced) — declare the wider reach.
+        Op::SetX { .. } | Op::SetY { .. } | Op::MoveBy { .. } => DirtyClass {
+            phases: layout,
+            extent: DirtyExtent::MeasureChainToFixedAncestor,
+        },
+        // Size: changes measure -> reflow -> transform -> bounds.
+        Op::SetWidth { .. }
+        | Op::SetHeight { .. }
+        | Op::ResizeTopLeft { .. }
+        | Op::ResizeDrag { .. } => DirtyClass {
+            phases: all,
+            extent: DirtyExtent::MeasureChainToFixedAncestor,
+        },
+        // Rotation: arm-dependent. Paint-only under VisualOnly; feeds the
+        // parent's sizing under AabbParticipates.
+        Op::SetRotation { .. } | Op::RotateDerivedCenterFeel { .. } => match rot {
+            RotationInFlow::VisualOnly => DirtyClass {
+                phases: paint,
+                extent: DirtyExtent::Subtree,
+            },
+            RotationInFlow::AabbParticipates => DirtyClass {
+                phases: layout,
+                extent: DirtyExtent::MeasureChainToFixedAncestor,
+            },
+        },
+        // Structural: a subtree leaves/changes; the parent's measure chain
+        // reflows (hug/flex).
+        Op::Delete { .. } | Op::Ungroup { .. } => DirtyClass {
+            phases: all,
+            extent: DirtyExtent::MeasureChainToFixedAncestor,
+        },
+    }
+}

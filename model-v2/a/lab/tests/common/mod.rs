@@ -2,7 +2,7 @@
 
 use anchor_lab::math::RectF;
 use anchor_lab::model::*;
-use anchor_lab::resolve::{resolve, Resolved, ResolveOptions, RotationInFlow};
+use anchor_lab::resolve::{resolve, ResolveOptions, Resolved, RotationInFlow};
 
 pub const EPS: f32 = 1e-3; // N-3 within-platform tolerance for the lab
 

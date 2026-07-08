@@ -173,11 +173,11 @@ fn main() {
     println!("E4 resolver spike — full-resolve wall time (median of 11, release)");
     for scale in [1_000, 10_000] {
         bench(&format!("flat canvas ({scale})"), &scene_flat(scale));
+        bench(&format!("flex cards (~{scale})"), &scene_flex(scale / 7));
         bench(
-            &format!("flex cards (~{scale})"),
-            &scene_flex(scale / 7),
+            &format!("mixed groups+flex (~{scale})"),
+            &scene_mixed(scale),
         );
-        bench(&format!("mixed groups+flex (~{scale})"), &scene_mixed(scale));
     }
     // locality proxy: cost of re-resolving one card subtree (what an
     // incremental engine pays for a leaf edit under clean parents)

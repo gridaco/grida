@@ -59,7 +59,10 @@ fn quartet_parses_and_resolves() {
     assert_close(r.box_of(lens).w, 240.0, "(e) pre-ops box");
     let child = 10;
     let w = r.world_of(child);
-    assert!((w.c - (20.0f32).to_radians().tan()).abs() < 1e-4, "(e) skew");
+    assert!(
+        (w.c - (20.0f32).to_radians().tan()).abs() < 1e-4,
+        "(e) skew"
+    );
 }
 
 /// S-1 analogue: parse → print → parse is a fixpoint on the model.
@@ -78,7 +81,10 @@ fn roundtrip_fixpoint() {
 #[test]
 fn parse_errors_are_typed() {
     assert!(parse(r#"<frame w="NaN"/>"#).is_err(), "NaN rejected (N-2)");
-    assert!(parse(r#"<frame foo="1"/>"#).is_err(), "unknown attr rejected");
+    assert!(
+        parse(r#"<frame foo="1"/>"#).is_err(),
+        "unknown attr rejected"
+    );
     assert!(parse(r#"<shape/>"#).is_err(), "shape without kind rejected");
     assert!(parse(r#"<frame x="left 10"/>"#).is_err(), "bad anchor word");
 }
@@ -91,5 +97,9 @@ fn kind_defaults_in_ir() {
     let t = 1;
     assert_eq!(doc.get(t).header.width, SizeIntent::Auto);
     let l = 2;
-    assert_eq!(doc.get(l).header.height, SizeIntent::Fixed(0.0), "line h locked");
+    assert_eq!(
+        doc.get(l).header.height,
+        SizeIntent::Fixed(0.0),
+        "line h locked"
+    );
 }

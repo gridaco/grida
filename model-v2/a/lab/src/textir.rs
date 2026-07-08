@@ -40,7 +40,12 @@ fn parse_num(s: &str, what: &str) -> Result<f32, ParseError> {
 fn parse_binding(s: &str, what: &str) -> Result<AxisBinding, ParseError> {
     let parts: Vec<&str> = s.split_whitespace().collect();
     match parts.as_slice() {
-        [n] if n.chars().next().map(|c| c.is_ascii_digit() || c == '-' || c == '.') == Some(true) => {
+        [n] if n
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit() || c == '-' || c == '.')
+            == Some(true) =>
+        {
             Ok(AxisBinding::start(parse_num(n, what)?))
         }
         ["start", n] => Ok(AxisBinding::start(parse_num(n, what)?)),
@@ -277,8 +282,8 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                         }
                     }
                     "shape" => {
-                        let desc = shape_kind
-                            .ok_or_else(|| ParseError("<shape> requires kind".into()))?;
+                        let desc =
+                            shape_kind.ok_or_else(|| ParseError("<shape> requires kind".into()))?;
                         if matches!(desc, ShapeDesc::Line) {
                             header.height = SizeIntent::Fixed(0.0); // §3.2 locked
                         }
@@ -325,9 +330,7 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
             }
             Ok(Event::Text(t)) => {
                 if let Some(p) = stack.last_mut() {
-                    let txt = t
-                        .unescape()
-                        .map_err(|e| ParseError(format!("text: {e}")))?;
+                    let txt = t.unescape().map_err(|e| ParseError(format!("text: {e}")))?;
                     p.text_content.push_str(&txt);
                 }
             }
@@ -347,7 +350,9 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
 }
 
 fn finish(stack: &mut Vec<Pending>, nodes: &mut BTreeMap<NodeId, Node>) -> Result<(), ParseError> {
-    let p = stack.pop().ok_or_else(|| ParseError("unbalanced end".into()))?;
+    let p = stack
+        .pop()
+        .ok_or_else(|| ParseError("unbalanced end".into()))?;
     if p.is_text {
         if let Payload::Text { content, .. } = &mut nodes.get_mut(&p.id).unwrap().payload {
             *content = p.text_content;
@@ -530,11 +535,7 @@ fn print_node(doc: &Document, id: NodeId, depth: usize, out: &mut String) {
                         push_attr(
                             out,
                             "gap",
-                            &format!(
-                                "{} {}",
-                                fmt_num(layout.gap_main),
-                                fmt_num(layout.gap_cross)
-                            ),
+                            &format!("{} {}", fmt_num(layout.gap_main), fmt_num(layout.gap_cross)),
                         );
                     }
                 }

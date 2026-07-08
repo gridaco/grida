@@ -274,6 +274,14 @@ pub struct Document {
     /// Parent link column, index-aligned with `slots`. Maintained by the
     /// structural APIs below — mutate children through them, not by hand.
     parents: Vec<Option<NodeId>>,
+    /// Generation per slot (ENG-2.3), index-aligned with `slots`:
+    /// incremented when a slot is tombstoned, so a future reused slot
+    /// cannot alias a prior node's cache identity (`engine::ident::Key`).
+    /// The arena is append-only today (`add_child` asserts a fresh slot),
+    /// so every live node sits at generation 0 and the column is the
+    /// dormant guard the cache tier will key on. A storage artifact —
+    /// ignored by the semantic `PartialEq`, like tombstones.
+    generations: Vec<u32>,
     /// Scene root: a frame whose bindings span the viewport (a.md §3 — the
     /// InitialContainer regularized).
     pub root: NodeId,
@@ -288,15 +296,8 @@ impl PartialEq for Document {
             return false;
         }
         self.slots.iter().enumerate().all(|(i, s)| match s {
-            None => other
-                .slots
-                .get(i)
-                .map(|o| o.is_none())
-                .unwrap_or(true),
-            Some(n) => {
-                other.get_opt(i as NodeId) == Some(n)
-                    && self.parents[i] == other.parents[i]
-            }
+            None => other.slots.get(i).map(|o| o.is_none()).unwrap_or(true),
+            Some(n) => other.get_opt(i as NodeId) == Some(n) && self.parents[i] == other.parents[i],
         })
     }
 }
@@ -327,12 +328,28 @@ impl Document {
         self.slots.len()
     }
 
+    /// The slot's generation (ENG-2.3) — pair with the [`NodeId`] to form
+    /// an `engine::ident::Key`. Out-of-range ids read 0.
+    pub fn gen_of(&self, id: NodeId) -> u32 {
+        self.generations.get(id as usize).copied().unwrap_or(0)
+    }
+
     fn ensure_slot(&mut self, id: NodeId) {
         let need = id as usize + 1;
         if self.slots.len() < need {
             self.slots.resize_with(need, || None);
             self.parents.resize(need, None);
+            self.generations.resize(need, 0);
         }
+    }
+
+    /// Tombstone slot `id` and bump its generation (ENG-2.3). The single
+    /// place a slot dies — both remove paths funnel through it, so the
+    /// generation guard can never be bypassed.
+    fn vacate(&mut self, id: NodeId) {
+        self.slots[id as usize] = None;
+        self.parents[id as usize] = None;
+        self.generations[id as usize] += 1;
     }
 
     /// Structural insert: registers the node at `node.id` and attaches it
@@ -364,16 +381,14 @@ impl Document {
         for c in children {
             n += self.tombstone_rec(c);
         }
-        self.slots[id as usize] = None;
-        self.parents[id as usize] = None;
+        self.vacate(id);
         n
     }
 
     /// Tombstone a single slot without touching its (already re-homed)
     /// children — the ungroup bake's final step.
     pub fn remove_slot(&mut self, id: NodeId) {
-        self.slots[id as usize] = None;
-        self.parents[id as usize] = None;
+        self.vacate(id);
     }
 
     /// Replace `remove` children of `parent` at `idx` with `insert`,
@@ -411,6 +426,7 @@ impl Document {
         Document {
             slots,
             parents,
+            generations: vec![0; cap],
             root,
         }
     }

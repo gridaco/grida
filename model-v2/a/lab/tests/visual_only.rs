@@ -122,7 +122,11 @@ fn v2_no_inert_reports() {
         matches!(rep, Report::IgnoredByRule { field, .. }
             if *field == "grow" || *field == "self_align")
     });
-    assert!(!inert, "nothing is ignored-for-rotation anymore: {:?}", r.reports);
+    assert!(
+        !inert,
+        "nothing is ignored-for-rotation anymore: {:?}",
+        r.reports
+    );
 }
 
 // ── V-3: hug ignores transforms (flex AND free) ──────────────────────
@@ -194,7 +198,14 @@ fn v4_group_box_is_unrotated_union() {
     let doc = b.build();
     let r = run_default(&doc);
     // Sizing tier: the member's UNROTATED box.
-    assert_rect(r.box_of(g), 200.0, 100.0, 100.0, 20.0, "group box unrotated");
+    assert_rect(
+        r.box_of(g),
+        200.0,
+        100.0,
+        100.0,
+        20.0,
+        "group box unrotated",
+    );
     // Read tier: the ink is oriented and larger.
     let ink = r.aabb_of(c);
     let (ew, eh) = rotated_aabb_size(100.0, 20.0, 45.0);
@@ -219,7 +230,11 @@ fn v4_group_flex_contribution_is_unrotated() {
         10.0,
     );
     let f = b.add(0, at(fh, 20.0, 20.0), fp);
-    let g = b.add(f, Header::new(SizeIntent::Auto, SizeIntent::Auto), Payload::Group);
+    let g = b.add(
+        f,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Group,
+    );
     let (mut m, mp) = shape(100.0, 20.0);
     m.rotation = 45.0;
     b.add(g, m, mp);
@@ -356,7 +371,14 @@ fn v3v4_hug_of_group_of_rotated() {
     let r = run_default(&b.build());
     // Hug wraps the group's SIZING box (unrotated union at its pins):
     // 15 + 100 wide, 25 + 20 tall — no envelope anywhere in sizing.
-    assert_rect(r.box_of(f), 10.0, 10.0, 115.0, 45.0, "hug of group of rotated");
+    assert_rect(
+        r.box_of(f),
+        10.0,
+        10.0,
+        115.0,
+        45.0,
+        "hug of group of rotated",
+    );
     // The ink still escapes, visibly, in the read tier.
     assert!(r.aabb_of(f).w > r.box_of(f).w - 1.0);
 }

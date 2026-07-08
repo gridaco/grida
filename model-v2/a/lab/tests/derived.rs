@@ -25,7 +25,11 @@ fn rotated_group_doc() -> (Document, NodeId, NodeId, NodeId) {
 #[test]
 fn d1_union_of_oriented_corners() {
     let mut b = DocBuilder::new();
-    let g = b.add(0, Header::new(SizeIntent::Auto, SizeIntent::Auto), Payload::Group);
+    let g = b.add(
+        0,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Group,
+    );
     let (mut s1h, s1p) = shape(100.0, 20.0);
     s1h.rotation = 90.0; // oriented AABB: 20×100 about center (50,10)
     let s1 = b.add(g, s1h, s1p);
@@ -83,7 +87,11 @@ fn d6_group_in_flex_participates_via_derived_aabb() {
     let f = b.add(0, h, p);
     let (s0h, s0p) = shape(50.0, 50.0);
     let s0 = b.add(f, s0h, s0p);
-    let g = b.add(f, Header::new(SizeIntent::Auto, SizeIntent::Auto), Payload::Group);
+    let g = b.add(
+        f,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Group,
+    );
     let (g1h, g1p) = shape(30.0, 30.0);
     b.add(g, g1h, g1p);
     let (mut g2h, g2p) = shape(30.0, 30.0);
@@ -148,7 +156,10 @@ fn lens_ops_are_layout_transparent() {
     assert_close(r.box_of(s3).x, 50.0 + 10.0 + 240.0 + 10.0, "sibling slot");
     // …but the child's world transform carries the skew
     let w = r.world_of(c);
-    assert!((w.c - (20.0f32).to_radians().tan()).abs() < 1e-4, "skew in world");
+    assert!(
+        (w.c - (20.0f32).to_radians().tan()).abs() < 1e-4,
+        "skew in world"
+    );
     // and the render bounds (world AABB) are wider than the box
     assert!(r.aabb_of(lens).w > 240.0, "post-ops render bounds");
 }

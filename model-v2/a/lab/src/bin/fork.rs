@@ -67,7 +67,12 @@ fn at(mut h: Header, x: f32, y: f32) -> Header {
 /// grow: fixed row, middle card grow=1 rotating — DEC-1's home turf.
 fn s_grow(theta: f32) -> Built {
     let mut b = DocBuilder::new();
-    let (fh, fp) = frame_flex(SizeIntent::Fixed(460.0), SizeIntent::Fixed(170.0), 10.0, 10.0);
+    let (fh, fp) = frame_flex(
+        SizeIntent::Fixed(460.0),
+        SizeIntent::Fixed(170.0),
+        10.0,
+        10.0,
+    );
     let f = b.add(0, at(fh, 20.0, 20.0), fp);
     let mut out = vec![(f, "container")];
     for i in 0..3 {
@@ -84,7 +89,12 @@ fn s_grow(theta: f32) -> Built {
 /// stretch: cross-axis fill rotating.
 fn s_stretch(theta: f32) -> Built {
     let mut b = DocBuilder::new();
-    let (fh, fp) = frame_flex(SizeIntent::Fixed(460.0), SizeIntent::Fixed(190.0), 10.0, 10.0);
+    let (fh, fp) = frame_flex(
+        SizeIntent::Fixed(460.0),
+        SizeIntent::Fixed(190.0),
+        10.0,
+        10.0,
+    );
     let f = b.add(0, at(fh, 20.0, 20.0), fp);
     let mut out = vec![(f, "container")];
     for i in 0..3 {
@@ -162,7 +172,12 @@ fn s_wrap(theta: f32) -> Built {
 /// between: pinned ends, envelope eats the free space — or overlaps.
 fn s_between(theta: f32) -> Built {
     let mut b = DocBuilder::new();
-    let (fh, fp) = frame_flex(SizeIntent::Fixed(460.0), SizeIntent::Fixed(170.0), 0.0, 10.0);
+    let (fh, fp) = frame_flex(
+        SizeIntent::Fixed(460.0),
+        SizeIntent::Fixed(170.0),
+        0.0,
+        10.0,
+    );
     let f = b.add(0, at(fh, 20.0, 20.0), fp);
     if let Payload::Frame { layout, .. } = &mut b.node_mut(f).payload {
         layout.main_align = MainAlign::SpaceBetween;
@@ -183,7 +198,12 @@ fn s_between(theta: f32) -> Built {
 /// keeps CSS semantics; in the CSS arm both behave the same (overlap).
 fn s_lens(theta: f32) -> Built {
     let mut b = DocBuilder::new();
-    let (fh, fp) = frame_flex(SizeIntent::Fixed(520.0), SizeIntent::Fixed(190.0), 10.0, 10.0);
+    let (fh, fp) = frame_flex(
+        SizeIntent::Fixed(520.0),
+        SizeIntent::Fixed(190.0),
+        10.0,
+        10.0,
+    );
     let f = b.add(0, at(fh, 20.0, 20.0), fp);
     let mut out = vec![(f, "container")];
     let (h1, p1) = card(60.0, 100.0);
@@ -298,13 +318,41 @@ fn emit_arm(json: &mut String, arm: RotationInFlow, sc: &Scene) {
 
 fn main() {
     let scenes: Vec<Scene> = vec![
-        Scene { id: "grow", name: "grow x rotation", build: s_grow },
-        Scene { id: "stretch", name: "stretch x rotation", build: s_stretch },
-        Scene { id: "text", name: "rotated text in a row", build: s_text },
-        Scene { id: "hug", name: "hug containment", build: s_hug },
-        Scene { id: "wrap", name: "wrap reflow", build: s_wrap },
-        Scene { id: "between", name: "space-between", build: s_between },
-        Scene { id: "lens", name: "two lanes in one row", build: s_lens },
+        Scene {
+            id: "grow",
+            name: "grow x rotation",
+            build: s_grow,
+        },
+        Scene {
+            id: "stretch",
+            name: "stretch x rotation",
+            build: s_stretch,
+        },
+        Scene {
+            id: "text",
+            name: "rotated text in a row",
+            build: s_text,
+        },
+        Scene {
+            id: "hug",
+            name: "hug containment",
+            build: s_hug,
+        },
+        Scene {
+            id: "wrap",
+            name: "wrap reflow",
+            build: s_wrap,
+        },
+        Scene {
+            id: "between",
+            name: "space-between",
+            build: s_between,
+        },
+        Scene {
+            id: "lens",
+            name: "two lanes in one row",
+            build: s_lens,
+        },
     ];
 
     let mut json = String::from("{\"step\":3,\"scenes\":[");

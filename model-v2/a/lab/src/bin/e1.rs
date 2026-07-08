@@ -59,7 +59,13 @@ fn scene(fixed_w: Option<f32>) -> Scene {
     let mut cards = vec![];
     for (i, color) in ["#4a90d9", "#e2574c", "#57b894"].iter().enumerate() {
         let h = Header::new(SizeIntent::Fixed(60.0), SizeIntent::Fixed(100.0));
-        let c = b.add(f, h, Payload::Shape { desc: ShapeDesc::Rect });
+        let c = b.add(
+            f,
+            h,
+            Payload::Shape {
+                desc: ShapeDesc::Rect,
+            },
+        );
         b.node_mut(c).fill = Some(color.to_string());
         let _ = i;
         cards.push(c);
@@ -110,7 +116,10 @@ fn sweep(mode: RotationInFlow, fixed_w: Option<f32>) -> Vec<Frame> {
 }
 
 fn summarize(name: &str, frames: &[Frame]) -> String {
-    let wmin = frames.iter().map(|f| f.container_w).fold(f32::MAX, f32::min);
+    let wmin = frames
+        .iter()
+        .map(|f| f.container_w)
+        .fold(f32::MAX, f32::min);
     let wmax = frames.iter().map(|f| f.container_w).fold(0.0f32, f32::max);
     let peak_overlap = frames
         .iter()
@@ -163,7 +172,10 @@ fn snapshot(theta: f32) -> String {
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420" font-family="monospace">"#
     );
     for (i, (mode, label)) in [
-        (RotationInFlow::AabbParticipates, "anchor: AABB participates"),
+        (
+            RotationInFlow::AabbParticipates,
+            "anchor: AABB participates",
+        ),
         (RotationInFlow::VisualOnly, "control: visual-only (CSS)"),
     ]
     .iter()
@@ -323,12 +335,15 @@ fn main() {
     // The envelope (and thus sibling displacement) peaks at θ* = atan(h/w).
     let bound = (60.0f32 * 60.0 + 100.0 * 100.0).sqrt() * STEP.to_radians();
     let peak = (100.0f32 / 60.0).atan().to_degrees();
-    println!("  analytic continuity bound: {bound:.2}px per {STEP}° step; envelope peak θ* = {peak:.1}°");
+    println!(
+        "  analytic continuity bound: {bound:.2}px per {STEP}° step; envelope peak θ* = {peak:.1}°"
+    );
 
     write_csv(&out.join("metrics.csv"), &aabb, &visual, &fixed);
     for theta in [0.0f32, 15.0, 30.0, 45.0, 60.0, 75.0, 90.0] {
         fs::write(
-            out.join("frames").join(format!("theta_{:03}.svg", theta as u32)),
+            out.join("frames")
+                .join(format!("theta_{:03}.svg", theta as u32)),
             snapshot(theta),
         )
         .unwrap();

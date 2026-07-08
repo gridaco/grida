@@ -287,9 +287,18 @@ fn f4_in_flow_drag_writes_extent_and_flip_only() {
 fn f5_typed_negative_size_is_rejected_untouched() {
     let (mut doc, id) = free_rect();
     let before = doc.clone();
-    assert_eq!(ops::set_width(&mut doc, id, -50.0), Err(OpError::NegativeExtent));
-    assert_eq!(ops::set_height(&mut doc, id, -0.5), Err(OpError::NegativeExtent));
-    assert_eq!(doc, before, "rejected op must leave the document byte-identical");
+    assert_eq!(
+        ops::set_width(&mut doc, id, -50.0),
+        Err(OpError::NegativeExtent)
+    );
+    assert_eq!(
+        ops::set_height(&mut doc, id, -0.5),
+        Err(OpError::NegativeExtent)
+    );
+    assert_eq!(
+        doc, before,
+        "rejected op must leave the document byte-identical"
+    );
 }
 
 // --- F-6: ungroup bakes flips exactly ------------------------------------

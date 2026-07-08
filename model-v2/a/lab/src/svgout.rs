@@ -7,10 +7,7 @@ use crate::resolve::Resolved;
 use std::fmt::Write as _;
 
 fn mat(t: &Affine) -> String {
-    format!(
-        "matrix({} {} {} {} {} {})",
-        t.a, t.b, t.c, t.d, t.e, t.f
-    )
+    format!("matrix({} {} {} {} {} {})", t.a, t.b, t.c, t.d, t.e, t.f)
 }
 
 pub struct SvgOptions {

@@ -136,7 +136,11 @@ fn nan_rejected_at_write_boundary() {
 #[test]
 fn set_width_on_group_typed_error() {
     let mut b = DocBuilder::new();
-    let g = b.add(0, Header::new(SizeIntent::Auto, SizeIntent::Auto), Payload::Group);
+    let g = b.add(
+        0,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Group,
+    );
     let (h1, p1) = shape(40.0, 40.0);
     b.add(g, h1, p1);
     let mut doc = b.build();

@@ -110,6 +110,25 @@ impl Resolved {
     pub fn world_opt(&self, id: NodeId) -> Option<Affine> {
         self.world.get(id as usize).copied().flatten()
     }
+    /// Non-panicking column reads. Any consumer that walks all slots
+    /// (some absent — hidden subtrees, tombstones) uses these, never the
+    /// `*_of` forms that assert resolution. The damage differ
+    /// (`engine::damage`) is the first caller.
+    pub fn box_opt(&self, id: NodeId) -> Option<RectF> {
+        self.box_in_parent.get(id as usize).copied().flatten()
+    }
+    pub fn local_opt(&self, id: NodeId) -> Option<Affine> {
+        self.local.get(id as usize).copied().flatten()
+    }
+    pub fn aabb_opt(&self, id: NodeId) -> Option<RectF> {
+        self.world_aabb.get(id as usize).copied().flatten()
+    }
+    /// Number of slots in the resolved columns (matches the document's
+    /// arena capacity) — the upper bound for a full-column walk. Distinct
+    /// from [`Self::resolved_count`], which counts only the `Some` entries.
+    pub fn slot_count(&self) -> usize {
+        self.world.len()
+    }
     /// Number of nodes that resolved (hidden subtrees are absent).
     pub fn resolved_count(&self) -> usize {
         self.world.iter().filter(|w| w.is_some()).count()
@@ -231,7 +250,14 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
     });
 
     // min/max clamp last; min beats max (G-4 declared rule).
-    wv = clamp_axis(id, "width", wv, node.header.min_width, node.header.max_width, cx);
+    wv = clamp_axis(
+        id,
+        "width",
+        wv,
+        node.header.min_width,
+        node.header.max_width,
+        cx,
+    );
     hv = clamp_axis(
         id,
         "height",
@@ -310,9 +336,7 @@ fn intent_extent_x(id: NodeId, cx: &mut Ctx) -> Option<f32> {
     match node.header.width {
         SizeIntent::Fixed(v) => Some(v),
         SizeIntent::Auto => match &node.payload {
-            Payload::Text { content, font_size } => {
-                Some(measure_text(content, *font_size, None).0)
-            }
+            Payload::Text { content, font_size } => Some(measure_text(content, *font_size, None).0),
             Payload::Frame { .. } => Some(hug_size(id, cx).0),
             _ => None,
         },
@@ -376,9 +400,17 @@ fn hug_size(id: NodeId, cx: &mut Ctx) -> (f32, f32) {
                 let (cw, ch) = extent_of(child_id, None, cx);
                 let is_derived = cx.doc.get(child_id).payload.box_is_derived();
                 let u = if is_derived {
-                    cx.union_cache.get(&child_id).copied().unwrap_or(RectF::EMPTY)
+                    cx.union_cache
+                        .get(&child_id)
+                        .copied()
+                        .unwrap_or(RectF::EMPTY)
                 } else {
-                    RectF { x: 0.0, y: 0.0, w: cw, h: ch }
+                    RectF {
+                        x: 0.0,
+                        y: 0.0,
+                        w: cw,
+                        h: ch,
+                    }
                 };
                 let child = cx.doc.get(child_id);
                 let ox = start_offset_or_report(child_id, child.header.x, "x", cx);
@@ -566,7 +598,11 @@ fn union_of_derived(id: NodeId, cx: &mut Ctx) -> RectF {
         // Derived children: pins place the ORIGIN; the box = origin + own
         // union offset (census fix: nested unions must not swallow it).
         let derived_off = if cx.doc.get(child_id).payload.box_is_derived() {
-            let u = cx.union_cache.get(&child_id).copied().unwrap_or(RectF::EMPTY);
+            let u = cx
+                .union_cache
+                .get(&child_id)
+                .copied()
+                .unwrap_or(RectF::EMPTY);
             (u.x, u.y)
         } else {
             (0.0, 0.0)
@@ -708,7 +744,11 @@ fn layout_frame_children(id: NodeId, layout: LayoutBehavior, extent: (f32, f32),
                     // Derived kinds keep their union dims; under AABB mode
                     // the *post-rotation* union center lands on the slot
                     // center (pivot is the origin, so the center swings).
-                    let u = cx.union_cache.get(&child_id).copied().unwrap_or(RectF::EMPTY);
+                    let u = cx
+                        .union_cache
+                        .get(&child_id)
+                        .copied()
+                        .unwrap_or(RectF::EMPTY);
                     if cx.opts.rotation_in_flow == RotationInFlow::AabbParticipates {
                         let (scx, scy) = slot.center();
                         // Post-transform union center (R·F — same composition
@@ -730,9 +770,7 @@ fn layout_frame_children(id: NodeId, layout: LayoutBehavior, extent: (f32, f32),
                             h: u.h,
                         }
                     }
-                } else if rotated
-                    && cx.opts.rotation_in_flow == RotationInFlow::AabbParticipates
-                {
+                } else if rotated && cx.opts.rotation_in_flow == RotationInFlow::AabbParticipates {
                     // Box center := slot center; box keeps its basis dims.
                     let (bw, bh) = basis;
                     let (cx_, cy_) = slot.center();
@@ -990,25 +1028,31 @@ fn flex_layout(
         avail,
         |known, avail_space, _node, ctx, _style| {
             if std::env::var("ANCHOR_DBG").is_ok() {
-                eprintln!("measure ctx={} known={:?} avail={:?}", ctx.is_some(), known, avail_space);
+                eprintln!(
+                    "measure ctx={} known={:?} avail={:?}",
+                    ctx.is_some(),
+                    known,
+                    avail_space
+                );
             }
             match ctx {
-            Some(t) => {
-                let constraint = known.width.or(match avail_space.width {
-                    AvailableSpace::Definite(w) => Some(w),
-                    _ => None,
-                });
-                let (w, h) = measure_text(&t.content, t.font_size, constraint);
-                taffy::geometry::Size {
-                    width: known.width.unwrap_or(w),
-                    height: known.height.unwrap_or(h),
+                Some(t) => {
+                    let constraint = known.width.or(match avail_space.width {
+                        AvailableSpace::Definite(w) => Some(w),
+                        _ => None,
+                    });
+                    let (w, h) = measure_text(&t.content, t.font_size, constraint);
+                    taffy::geometry::Size {
+                        width: known.width.unwrap_or(w),
+                        height: known.height.unwrap_or(h),
+                    }
                 }
+                None => taffy::geometry::Size {
+                    width: known.width.unwrap_or(0.0),
+                    height: known.height.unwrap_or(0.0),
+                },
             }
-            None => taffy::geometry::Size {
-                width: known.width.unwrap_or(0.0),
-                height: known.height.unwrap_or(0.0),
-            },
-        }},
+        },
     )
     .unwrap();
 

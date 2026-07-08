@@ -255,13 +255,7 @@ fn nested_flex_exact() {
         0.0,
     );
     let outer = b.add(0, h, p);
-    let (h2, p2) = frame_flex(
-        SizeIntent::Auto,
-        SizeIntent::Auto,
-        Direction::Row,
-        5.0,
-        0.0,
-    );
+    let (h2, p2) = frame_flex(SizeIntent::Auto, SizeIntent::Auto, Direction::Row, 5.0, 0.0);
     let inner = b.add(outer, h2, p2);
     let (s1h, s1p) = shape(40.0, 30.0);
     let s1 = b.add(inner, s1h, s1p);

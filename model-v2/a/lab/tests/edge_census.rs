@@ -72,13 +72,7 @@ fn text_hug_chain_3_deep() {
     let mut parent = 0;
     let mut frames = vec![];
     for _ in 0..3 {
-        let (h, p) = frame_flex(
-            SizeIntent::Auto,
-            SizeIntent::Auto,
-            Direction::Row,
-            0.0,
-            5.0,
-        );
+        let (h, p) = frame_flex(SizeIntent::Auto, SizeIntent::Auto, Direction::Row, 0.0, 5.0);
         parent = b.add(parent, h, p);
         frames.push(parent);
     }
@@ -132,7 +126,11 @@ fn empty_group_in_flex() {
     let f = b.add(0, h, p);
     let (h1, p1) = shape(50.0, 50.0);
     b.add(f, h1, p1);
-    b.add(f, Header::new(SizeIntent::Auto, SizeIntent::Auto), Payload::Group);
+    b.add(
+        f,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Group,
+    );
     let (h2, p2) = shape(50.0, 50.0);
     let c = b.add(f, h2, p2);
     let r = run(&b.build());
@@ -197,7 +195,11 @@ fn nested_groups_3_deep_rotated() {
 #[test]
 fn group_union_of_rotated_members() {
     let mut b = DocBuilder::new();
-    let g = b.add(0, Header::new(SizeIntent::Auto, SizeIntent::Auto), Payload::Group);
+    let g = b.add(
+        0,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Group,
+    );
     let (mut h1, p1) = shape(40.0, 40.0);
     h1.rotation = 45.0; // envelope 56.57 about center (20,20)
     b.add(g, h1, p1);
@@ -314,7 +316,10 @@ fn lens_scale_zero_degenerate() {
     let r = run(&b.build());
     assert_close(r.box_of(c).x, 70.0, "layout uses pre-ops box (10+50+10)");
     let aabb = r.aabb_of(l);
-    assert!(aabb.w.is_finite() && aabb.w < 1e-3, "paint collapsed, finite");
+    assert!(
+        aabb.w.is_finite() && aabb.w < 1e-3,
+        "paint collapsed, finite"
+    );
 }
 
 // ---------- rotation extremes ----------
@@ -345,8 +350,14 @@ fn span_full_bleed_rotated_overflows() {
     fh.x = AxisBinding::start(0.0);
     let f = b.add(0, fh, fp);
     let mut h = Header::new(SizeIntent::Auto, SizeIntent::Auto);
-    h.x = AxisBinding::Span { start: 0.0, end: 0.0 };
-    h.y = AxisBinding::Span { start: 0.0, end: 0.0 };
+    h.x = AxisBinding::Span {
+        start: 0.0,
+        end: 0.0,
+    };
+    h.y = AxisBinding::Span {
+        start: 0.0,
+        end: 0.0,
+    };
     h.rotation = 30.0;
     let s = b.add(
         f,
@@ -356,7 +367,14 @@ fn span_full_bleed_rotated_overflows() {
         },
     );
     let r = run(&b.build());
-    assert_rect(r.box_of(s), 0.0, 0.0, 400.0, 300.0, "span box unbent by rotation");
+    assert_rect(
+        r.box_of(s),
+        0.0,
+        0.0,
+        400.0,
+        300.0,
+        "span box unbent by rotation",
+    );
     let aabb = r.aabb_of(s);
     assert!(aabb.w > 400.0 && aabb.h > 300.0, "corners swing outside");
 }
@@ -418,8 +436,16 @@ fn far_canvas_rotation_center() {
     let r = run(&b.build());
     let c = r.world_of(s).apply((60.0, 40.0));
     // f32 ULP at 1e6 is 0.0625 — allow a scaled tolerance
-    assert!((c.0 - 1_000_060.0).abs() < 0.25, "center x at far canvas: {}", c.0);
-    assert!((c.1 - 1_000_040.0).abs() < 0.25, "center y at far canvas: {}", c.1);
+    assert!(
+        (c.0 - 1_000_060.0).abs() < 0.25,
+        "center x at far canvas: {}",
+        c.0
+    );
+    assert!(
+        (c.1 - 1_000_040.0).abs() < 0.25,
+        "center y at far canvas: {}",
+        c.1
+    );
 }
 
 /// Census blocker fix: Span{0,0} (the canonical free-context fill) is a
@@ -431,7 +457,10 @@ fn span_fill_text_rewraps() {
     fh.x = AxisBinding::start(0.0);
     let f = b.add(0, fh, fp);
     let mut th = Header::new(SizeIntent::Auto, SizeIntent::Auto);
-    th.x = AxisBinding::Span { start: 0.0, end: 0.0 };
+    th.x = AxisBinding::Span {
+        start: 0.0,
+        end: 0.0,
+    };
     let t = b.add(
         f,
         th,
@@ -456,7 +485,11 @@ fn nested_group_union_offset_exact() {
     gh.x = AxisBinding::start(100.0);
     gh.y = AxisBinding::start(50.0);
     let g = b.add(0, gh, Payload::Group);
-    let h = b.add(g, Header::new(SizeIntent::Auto, SizeIntent::Auto), Payload::Group);
+    let h = b.add(
+        g,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Group,
+    );
     let (mut sh, sp) = shape(40.0, 40.0);
     sh.x = AxisBinding::start(20.0);
     let s = b.add(h, sh, sp);
@@ -476,7 +509,11 @@ fn ungroup_nested_group_preserves_world() {
     gh.y = AxisBinding::start(50.0);
     gh.rotation = 30.0;
     let g = b.add(0, gh, Payload::Group);
-    let h = b.add(g, Header::new(SizeIntent::Auto, SizeIntent::Auto), Payload::Group);
+    let h = b.add(
+        g,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Group,
+    );
     let (mut s1h, s1p) = shape(40.0, 40.0);
     s1h.x = AxisBinding::start(20.0);
     let s1 = b.add(h, s1h, s1p);
@@ -491,7 +528,14 @@ fn ungroup_nested_group_preserves_world() {
     let after = run(&doc);
     for (id, w) in [(s1, w1), (s2, w2)] {
         let v = after.world_of(id);
-        for (a, e) in [(v.a,w.a),(v.b,w.b),(v.c,w.c),(v.d,w.d),(v.e,w.e),(v.f,w.f)] {
+        for (a, e) in [
+            (v.a, w.a),
+            (v.b, w.b),
+            (v.c, w.c),
+            (v.d, w.d),
+            (v.e, w.e),
+            (v.f, w.f),
+        ] {
             assert!((a - e).abs() < 1e-3, "nested bake exact: {a} vs {e}");
         }
     }
@@ -527,5 +571,8 @@ fn negative_zero_rotation_canonicalized() {
     let s = b.add(0, h, p);
     let mut doc = b.build();
     anchor_lab::ops::set_rotation(&mut doc, s, -0.0).unwrap();
-    assert!(doc.get(s).header.rotation.is_sign_positive(), "−0.0 never stored");
+    assert!(
+        doc.get(s).header.rotation.is_sign_positive(),
+        "−0.0 never stored"
+    );
 }

@@ -200,8 +200,7 @@ fn group_origin_pivot_and_center_feel_gesture() {
     doc.get_mut(g).header.rotation = 0.0;
     let r2 = run(&doc);
     let center_before = (b0.x + b0.w / 2.0, b0.y + b0.h / 2.0);
-    let writes =
-        anchor_lab::ops::rotate_derived_center_feel(&mut doc, &r2, g, 30.0).unwrap();
+    let writes = anchor_lab::ops::rotate_derived_center_feel(&mut doc, &r2, g, 30.0).unwrap();
     assert_eq!(writes, 3, "rotation + x + y — the Figma trick over scalars");
     let r3 = run(&doc);
     let bb = r3.box_of(g);

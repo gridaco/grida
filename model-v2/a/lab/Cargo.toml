@@ -9,9 +9,16 @@ publish = false
 # experiment code is promoted into crates/ only at phase 4).
 [workspace]
 
+[features]
+# `serde` (default OFF) makes `Op` / `ResizeDrag` / `Axis` serializable — the
+# op-log wire for engine replay. Kept optional so the default lab pulls only
+# taffy + quick-xml (the model crate stays dependency-lean).
+serde = ["dep:serde"]
+
 [dependencies]
 taffy = "0.9.2"
 quick-xml = "0.37"
+serde = { version = "1.0", optional = true, features = ["derive"] }
 
 [profile.release]
 debug = true

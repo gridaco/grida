@@ -345,14 +345,54 @@ fn s_flipzero(t: f32) -> (Document, Vec<(NodeId, &'static str)>) {
 
 fn main() {
     let scenes: Vec<Scene> = vec![
-        Scene { id: "grow", name: "grow × rotation (E-A4)", build: s_grow, extra: "" },
-        Scene { id: "stretch", name: "stretch × rotation", build: s_stretch, extra: "" },
-        Scene { id: "text", name: "rotated text in flow", build: s_text, extra: "" },
-        Scene { id: "rotframe", name: "rotated flex frame (rigid)", build: s_rotated_frame, extra: "" },
-        Scene { id: "group", name: "group rotating in flow", build: s_group, extra: "" },
-        Scene { id: "two", name: "two rotating siblings", build: s_two, extra: "" },
-        Scene { id: "between", name: "space-between × rotation", build: s_between, extra: "" },
-        Scene { id: "wrap", name: "wrap reflow mid-rotation", build: s_wrap, extra: "" },
+        Scene {
+            id: "grow",
+            name: "grow × rotation (E-A4)",
+            build: s_grow,
+            extra: "",
+        },
+        Scene {
+            id: "stretch",
+            name: "stretch × rotation",
+            build: s_stretch,
+            extra: "",
+        },
+        Scene {
+            id: "text",
+            name: "rotated text in flow",
+            build: s_text,
+            extra: "",
+        },
+        Scene {
+            id: "rotframe",
+            name: "rotated flex frame (rigid)",
+            build: s_rotated_frame,
+            extra: "",
+        },
+        Scene {
+            id: "group",
+            name: "group rotating in flow",
+            build: s_group,
+            extra: "",
+        },
+        Scene {
+            id: "two",
+            name: "two rotating siblings",
+            build: s_two,
+            extra: "",
+        },
+        Scene {
+            id: "between",
+            name: "space-between × rotation",
+            build: s_between,
+            extra: "",
+        },
+        Scene {
+            id: "wrap",
+            name: "wrap reflow mid-rotation",
+            build: s_wrap,
+            extra: "",
+        },
         Scene {
             id: "flipzero",
             name: "resize across zero (flip)",
@@ -368,10 +408,7 @@ fn main() {
         }
         // node labels from θ=0 build
         let (_, nodes0) = (sc.build)(0.0);
-        let labels: Vec<String> = nodes0
-            .iter()
-            .map(|(_, l)| format!("\"{}\"", l))
-            .collect();
+        let labels: Vec<String> = nodes0.iter().map(|(_, l)| format!("\"{}\"", l)).collect();
         let _ = write!(
             json,
             "{{\"id\":\"{}\",\"name\":\"{}\",\"labels\":[{}]{},\"frames\":[",
