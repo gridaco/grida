@@ -76,10 +76,12 @@ import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
 import {
+  formatElapsed,
   isGenerateImageEntry,
   isMediaPending,
   isMediaToolEntry,
   MediaToolContent,
+  useElapsedSeconds,
 } from "./tool-media";
 import { ToolCardContent, isHumanReadableToolCardEntry } from "./tool-card";
 import {
@@ -468,32 +470,6 @@ function CompactionDivider({ children }: { children: ReactNode }) {
       <span aria-hidden className="h-px flex-1 bg-border" />
     </div>
   );
-}
-
-/**
- * Seconds elapsed since mount, ticking once a second. The host renders
- * {@link CompactingIndicator} only while a compaction is in flight, so
- * "since mount" == "since the run started". Diffs `Date.now()` rather than
- * incrementing a counter so a throttled/slept tab catches up instead of
- * drifting. Reads no clock during render (effect-only) — no SSR/hydration skew.
- */
-function useElapsedSeconds(): number {
-  const [seconds, setSeconds] = useState(0);
-  useEffect(() => {
-    const startedAt = Date.now();
-    const id = setInterval(() => {
-      setSeconds(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-  return seconds;
-}
-
-/** `73` → `"1m 13s"`; under a minute drops the `0m` part: `42` → `"42s"`. */
-function formatElapsed(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 /**

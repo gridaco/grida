@@ -15,10 +15,14 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { getToolName } from "ai";
-import { XIcon } from "lucide-react";
 import { Shimmer } from "@app/ui/ai-elements/shimmer";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@app/ui/components/dialog";
 import { AgentVision } from "@grida/agent/vision";
 import type { ToolCallEntry } from "@/lib/agent-chat";
 
@@ -87,7 +91,10 @@ export function mediaReferences(entry: ToolCallEntry): string[] {
     "input" in entry ? entry.input : undefined
   ).references;
   return Array.isArray(references)
-    ? references.filter((value): value is string => value.length > 0)
+    ? references.filter(
+        (value): value is string =>
+          typeof value === "string" && value.length > 0
+      )
     : [];
 }
 
@@ -105,22 +112,6 @@ export function mediaPath(entry: ToolCallEntry): string | undefined {
 const imageClass = "max-h-96 max-w-full rounded-md border object-contain";
 const ELAPSED_REVEAL_AFTER_MS = 3000;
 
-let bodyLockCount = 0;
-
-function lockBodyScroll() {
-  bodyLockCount += 1;
-  if (bodyLockCount === 1) {
-    document.body.style.overflow = "hidden";
-  }
-}
-
-function unlockBodyScroll() {
-  bodyLockCount = Math.max(0, bodyLockCount - 1);
-  if (bodyLockCount === 0) {
-    document.body.style.overflow = "";
-  }
-}
-
 export function FullscreenImagePreview({
   src,
   alt,
@@ -134,63 +125,31 @@ export function FullscreenImagePreview({
   className?: string;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    lockBodyScroll();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      unlockBodyScroll();
-    };
-  }, [open]);
-
   return (
-    <>
-      <button
-        type="button"
-        className={`inline-block max-w-full cursor-zoom-in rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${className ?? ""}`}
-        onClick={() => setOpen(true)}
-        title={title}
+    <Dialog>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className={`inline-block max-w-full cursor-zoom-in rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${className ?? ""}`}
+          title={title}
+        >
+          {children}
+        </button>
+      </DialogTrigger>
+      <DialogContent
+        className="flex h-screen max-h-screen w-screen max-w-none items-center justify-center rounded-none border-0 bg-background/95 p-4 shadow-none backdrop-blur-sm sm:max-w-none"
+        showCloseButton
       >
-        {children}
-      </button>
-      {open
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 p-4 backdrop-blur-sm"
-              onClick={() => setOpen(false)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setOpen(false);
-              }}
-              role="button"
-              tabIndex={0}
-            >
-              <button
-                type="button"
-                className="absolute top-4 right-4 z-10 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                onClick={() => setOpen(false)}
-                title="Close"
-              >
-                <XIcon className="size-5" />
-              </button>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={src}
-                alt={alt}
-                className="max-h-full max-w-full object-contain"
-                decoding="async"
-                onClick={(event) => event.stopPropagation()}
-              />
-            </div>,
-            document.body
-          )
-        : null}
-    </>
+        <DialogTitle className="sr-only">{title ?? alt}</DialogTitle>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={alt}
+          className="max-h-full max-w-full object-contain"
+          decoding="async"
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -387,7 +346,7 @@ function renderableReferenceSrc(reference: string): string | undefined {
   return undefined;
 }
 
-function useElapsedSeconds(): number {
+export function useElapsedSeconds(): number {
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {
     const startedAt = Date.now();
@@ -399,7 +358,7 @@ function useElapsedSeconds(): number {
   return seconds;
 }
 
-function formatElapsed(totalSeconds: number): string {
+export function formatElapsed(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;

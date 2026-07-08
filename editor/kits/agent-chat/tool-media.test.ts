@@ -93,7 +93,13 @@ describe("tool-media — generate_image", () => {
       "generate_image",
       {
         prompt: "make it warmer",
-        references: ["pins/a.png", "https://x/b.jpg", ""],
+        references: [
+          "pins/a.png",
+          "https://x/b.jpg",
+          "",
+          123,
+          { path: "/not-a-string.png" },
+        ],
       },
       { ok: true }
     );
