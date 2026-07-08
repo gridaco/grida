@@ -200,7 +200,7 @@ function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
   const src = mediaImageSrc(entry);
   const error = mediaError(entry);
   return (
-    <div className="space-y-2 p-4">
+    <div className="space-y-2">
       {path && (
         <div
           className="truncate font-mono text-muted-foreground text-xs"
