@@ -26,6 +26,8 @@ export function SlideSurface({
   initialMtime,
   active = true,
   onSaved,
+  prepareContentForEditor,
+  prepareContentForWrite,
 }: {
   workspaceId: string;
   relPath: string;
@@ -33,6 +35,8 @@ export function SlideSurface({
   /** Gates Cmd+S — false when this deck is a hidden workbench tab. */
   active?: boolean;
   onSaved?: () => void;
+  prepareContentForEditor?: (diskContent: string) => Promise<string> | string;
+  prepareContentForWrite?: (editorSerializedContent: string) => string;
 }) {
   const editor = useSvgEditor();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -52,6 +56,8 @@ export function SlideSurface({
     active,
     initialMtime,
     onSaved,
+    prepareContentForEditor,
+    prepareContentForWrite,
   });
 
   return (
