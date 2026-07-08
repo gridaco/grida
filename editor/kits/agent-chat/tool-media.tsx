@@ -5,9 +5,8 @@
  * splat a multi-MB base64 string into the transcript):
  *
  *   - view_image      → the viewed path, then the image.
- *   - generate_image  → WHILE GENERATING (it's slow): a skeleton placeholder
- *     with the prompt + a spinner. DONE: the image is the default view; the
- *     prompt (and saved path) reveal on hover.
+ *   - generate_image  → WHILE GENERATING (it's slow): the shimmering prompt
+ *     plus optional references. DONE: the image first, then the prompt below.
  *
  * The image bytes are the result's base64 `data` (on the client transcript even
  * when the model-facing view omits/elides them). Kept in the editor kit, which
@@ -235,8 +234,7 @@ function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
 /**
  * `generate_image`: a producer that takes a while.
  *  - pending → the shimmering prompt, then optional references;
- *  - done    → the image as the default view, the prompt + saved path revealed
- *    on hover (so the transcript stays image-first);
+ *  - done    → the image as the default view, then the muted prompt below;
  *  - failed / no bytes → prompt + path + the refusal message.
  */
 function GenerateImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
@@ -263,35 +261,16 @@ function GenerateImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
           alt={prompt ?? "generated image"}
           title={prompt}
         >
-          <div className="group/gen relative inline-block max-w-full">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={src}
-              alt={prompt ?? "generated image"}
-              loading="lazy"
-              decoding="async"
-              className={imageClass}
-            />
-            {(prompt || path) && (
-              // Image-first by default; the prompt + path fade in on hover.
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 space-y-1 rounded-b-md bg-popover/95 p-2 opacity-0 transition-opacity group-hover/gen:opacity-100">
-                {prompt && (
-                  <p className="line-clamp-4 text-popover-foreground text-xs">
-                    {prompt}
-                  </p>
-                )}
-                {path && (
-                  <p
-                    className="truncate font-mono text-[10px] text-muted-foreground"
-                    title={path}
-                  >
-                    {path}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={prompt ?? "generated image"}
+            loading="lazy"
+            decoding="async"
+            className={imageClass}
+          />
         </FullscreenImagePreview>
+        {prompt && <GeneratedImagePrompt prompt={prompt} />}
         <ReferenceStrip references={references} />
       </div>
     );
@@ -310,6 +289,31 @@ function GenerateImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
         </div>
       )}
       {error && <div className="text-muted-foreground text-xs">{error}</div>}
+    </div>
+  );
+}
+
+function GeneratedImagePrompt({ prompt }: { prompt: string }): ReactNode {
+  const [expanded, setExpanded] = useState(false);
+  const expandable = prompt.length > 180;
+  return (
+    <div className="max-w-prose space-y-1">
+      <p
+        className={`whitespace-pre-wrap text-muted-foreground text-xs leading-5 ${
+          expandable && !expanded ? "line-clamp-3" : ""
+        }`}
+      >
+        {prompt}
+      </p>
+      {expandable && (
+        <button
+          type="button"
+          className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "Show less" : "Show all"}
+        </button>
+      )}
     </div>
   );
 }
