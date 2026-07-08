@@ -38,12 +38,7 @@ export { Daemon } from "./daemon";
 // ── Tenant toolkit ──────────────────────────────────────────────────
 // The daemon-owned primitives a tenant builds on. Kept explicit (no
 // star) so the seam surface stays reviewable.
-export {
-  WorkspaceRegistry,
-  type ProjectSeed,
-  type ProjectSeedDocument,
-  type Workspace,
-} from "./workspaces";
+export { WorkspaceRegistry, type Workspace } from "./workspaces";
 export { workspaceFs } from "./workspaces/fs";
 export {
   SCAN_MAX_DEPTH,

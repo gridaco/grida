@@ -80,8 +80,9 @@ import {
   scratchRootFor,
   ensureScratch,
   removeScratch,
+  writeScratchFile,
 } from "../session/scratch";
-import { buildModelMessages } from "./message-view";
+import { buildModelMessages, type ModelUIMessage } from "./message-view";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
 
@@ -288,6 +289,13 @@ type StartTurnOptions = {
    *  ⇒ the host `library` default). */
   library?: RunRequest["library"];
   /**
+   * Files to seed into the session's scratch dir before the turn (WG
+   * `scratch.md`): a picked template's unzipped bundle / an upload lands there,
+   * not the workspace. Only the direct HTTP run (the first turn) carries it; a
+   * queue drain leaves it absent — scratch was already seeded on turn one.
+   */
+  scratch_seed?: RunRequest["scratch_seed"];
+  /**
    * The user message this turn fires — the fired-message identity the
    * turn-lifecycle wire carries (RFC `turn-authority`; emitted on the
    * `turn-started` event). A queue drain names the dequeued row; an HTTP
@@ -301,6 +309,57 @@ type StartTurnOptions = {
    */
   agent_prompt?: string;
 };
+
+async function prepareScratchForTurn(
+  sessionId: string,
+  scratchDir: string | undefined,
+  secretsRoot: string | undefined,
+  scratchSeed: StartTurnOptions["scratch_seed"]
+): Promise<void> {
+  if (!scratchDir) return;
+  await ensureScratch(scratchDir, secretsRoot);
+  if (!scratchSeed || scratchSeed.length === 0) return;
+
+  const seeded = await Promise.allSettled(
+    scratchSeed.map((f) =>
+      writeScratchFile(scratchDir, f.path, new TextEncoder().encode(f.text))
+    )
+  );
+  for (const r of seeded) {
+    if (r.status === "rejected") {
+      console.warn(
+        `[agent-host] scratch seed file failed sessionId=${sessionId}: ${String(
+          r.reason
+        )}`
+      );
+    }
+  }
+}
+
+function promptFromLatestUserModelMessage(
+  messages: ModelUIMessage[],
+  fallback: string
+): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "user") continue;
+    const text = m.parts
+      .map((p) =>
+        typeof p === "object" &&
+        p !== null &&
+        "type" in p &&
+        (p as { type?: unknown }).type === "text" &&
+        "text" in p &&
+        typeof (p as { text?: unknown }).text === "string"
+          ? (p as { text: string }).text
+          : null
+      )
+      .filter((p): p is string => p !== null && p.length > 0)
+      .join("\n\n");
+    if (text.length > 0) return text;
+  }
+  return fallback;
+}
 
 export class AgentRuntime {
   /** In-flight run registry. Owned here; `AgentHost.streams` aliases it. */
@@ -813,6 +872,9 @@ export class AgentRuntime {
         interactive: req.interactive,
         // Per-run library-search capability (renderer wires the resolver).
         library: req.library,
+        // First-turn scratch seed (a picked template's unzipped bundle / an
+        // upload) — landed in scratch before the model turn (WG `scratch.md`).
+        scratch_seed: req.scratch_seed,
         // The fired message of a direct run is the incoming tail's user
         // message (the client resends history; the tail is the new one). An
         // approval-answer resume continues the PRIOR turn's tool call — it
@@ -863,6 +925,7 @@ export class AgentRuntime {
       mode,
       interactive,
       library,
+      scratch_seed: scratchSeed,
     } = opts;
 
     // Reserve the registry entry; its `modelAbort.signal` (not the request
@@ -915,7 +978,9 @@ export class AgentRuntime {
     const scratchDir =
       scratchBase &&
       workspaceRoot &&
-      (shellExecutionAllowed || this.deps.image_gen_enabled === true)
+      (shellExecutionAllowed ||
+        this.deps.image_gen_enabled === true ||
+        (scratchSeed && scratchSeed.length > 0))
         ? scratchRootFor(scratchBase, sessionId)
         : undefined;
     // Bindings deps for the run. Typed (not an inline literal) so the
@@ -946,12 +1011,25 @@ export class AgentRuntime {
     // consumer (HTTP) or reconnects later (a core drain has no live consumer).
     void (async () => {
       try {
+        // Create the session scratch dir before ANY provider split so
+        // agent-provider turns and model-provider turns see the same first-turn
+        // template/upload seed. `scratchDir` also exists for shell/image-only
+        // hosts even without a seed.
+        await prepareScratchForTurn(
+          sessionId,
+          scratchDir,
+          secretsRoot,
+          scratchSeed
+        );
+
         // Agent-provider class (issue #813): the external agent owns the loop.
         // Skip compaction/model-factory/tool-injection entirely — just run one
         // turn and push its mapped chunks into the registry. The recorder
         // (attached above) persists the assistant message from those chunks;
         // `streams.finish` flushes it, same as the normal terminal edge.
         if (provider.kind === "agent-provider") {
+          const visible = await sessionsStore.listVisibleMessages(sessionId);
+          const preparedMessages = buildModelMessages(visible);
           // Continuity (issue #813): resume the external agent's prior session
           // so it keeps the conversation. Read the id stored last turn, pass it
           // in, and persist the id observed this turn for the NEXT turn.
@@ -969,7 +1047,10 @@ export class AgentRuntime {
             : undefined;
           const result = await runAgentProviderTurn({
             provider_id: provider.provider_id as AgentProviderId,
-            prompt: opts.agent_prompt ?? "",
+            prompt: promptFromLatestUserModelMessage(
+              preparedMessages,
+              opts.agent_prompt ?? ""
+            ),
             cwd: workspaceRoot,
             resume_session_id: resumeSessionId,
             model: agentModel,
@@ -1008,14 +1089,6 @@ export class AgentRuntime {
         // rows drop out; the summary folds into the next user turn).
         const visible = await sessionsStore.listVisibleMessages(sessionId);
         const preparedMessages = buildModelMessages(visible);
-
-        // Create the session scratch dir on disk before the turn so a command
-        // the agent runs can `cd`/write into it (WG `scratch.md` S1). The path
-        // was already derived (scratchDir); ensureScratch mkdir's it owner-only
-        // and re-asserts it sits outside the secret root (S4). Unwired ⇒ skip.
-        if (scratchDir) {
-          await ensureScratch(scratchDir, secretsRoot);
-        }
 
         // Session-static skills + project instructions (discovered once).
         const ctx = await this.sessionContext(sessionId, workspaceRoot);

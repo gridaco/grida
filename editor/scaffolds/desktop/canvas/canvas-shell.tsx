@@ -40,6 +40,7 @@ import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import { useWorkspaceChanges } from "../workbench/workspace-changes";
 import { CanvasDeck, type Slide } from "./deck-store";
 import { SlideSurface } from "./slide-surface";
+import { materializeSlideSvgResources } from "./slide-svg-resources";
 
 export function DesktopCanvasShell({
   workspaceId,
@@ -129,6 +130,41 @@ export function DesktopCanvasShell({
     [deck]
   );
 
+  // Keyboard page nav (↑/↓) — like a slide list. Skipped while the slide editor
+  // holds keyboard focus (there arrows NUDGE the selection — the same focus gate
+  // the surface uses at `dom.ts` `is_focus_within`) and while a hidden workbench
+  // tab (`active` false), so a background deck never steals the keys. Clamps at
+  // the ends (no wrap).
+  const mainRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      const el = document.activeElement as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable ||
+          mainRef.current?.contains(el))
+      ) {
+        return;
+      }
+      if (slides.length === 0) return;
+      const cur = Math.max(
+        0,
+        slides.findIndex((s) => s.id === activeSlide?.id)
+      );
+      const next = e.key === "ArrowUp" ? cur - 1 : cur + 1;
+      if (next < 0 || next >= slides.length) return;
+      e.preventDefault();
+      setActiveId(slides[next].id);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, slides, activeSlide]);
+
   return (
     <div className="flex h-full flex-col bg-background text-foreground">
       <header className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
@@ -160,13 +196,14 @@ export function DesktopCanvasShell({
             removable={slides.length > 1}
           />
         </aside>
-        <main className="relative min-w-0 flex-1">
+        <main ref={mainRef} className="relative min-w-0 flex-1">
           <ActiveSlide
             key={activeSlide ? activeSlide.src : "__empty__"}
             workspaceId={workspaceId}
             slide={activeSlide}
             basePath={basePath}
             editable={active}
+            thumbnail={activeSlide ? thumbnails[activeSlide.src] : undefined}
             onSaved={() => activeSlide && refresh(activeSlide.src)}
           />
         </main>
@@ -197,7 +234,14 @@ function useSlideThumbnails(
       const rel = basePath ? `${basePath}/${src}` : src;
       workspacesNs
         .readFile(workspaceId, rel)
-        .then((r) => setMap((m) => ({ ...m, [src]: svgToDataUri(r.content) })))
+        .then(async (r) => {
+          const materialized = await materializeSlideSvgResources(r.content, {
+            workspaceId,
+            bundleBasePath: basePath,
+            slideRelPath: rel,
+          });
+          setMap((m) => ({ ...m, [src]: svgToDataUri(materialized.svg) }));
+        })
         .catch(() => {
           /* a slide that can't be read just shows an empty thumbnail */
         });
@@ -342,6 +386,7 @@ function ActiveSlide({
   slide,
   basePath,
   editable,
+  thumbnail,
   onSaved,
 }: {
   workspaceId: string;
@@ -349,6 +394,10 @@ function ActiveSlide({
   basePath: string;
   /** Whether Cmd+S in the slide editor applies (false for a hidden tab). */
   editable: boolean;
+  /** The active slide's rendered thumbnail (data URI), shown full-surface WHILE
+   *  the slide file loads so switching pages doesn't blink a "Loading…"
+   *  placeholder — the deck strip already has these, so a revisit is instant. */
+  thumbnail?: string;
   onSaved: () => void;
 }) {
   // The slide file's workspace-relative path (the bundle may sit at `basePath`).
@@ -360,6 +409,25 @@ function ActiveSlide({
   const [state, setState] = useState<ActiveState>(
     slide ? { kind: "loading" } : { kind: "empty" }
   );
+  const restoreRef = useRef<(serialized: string) => string>(
+    (serialized) => serialized
+  );
+  const prepareContentForEditor = useCallback(
+    async (diskContent: string) => {
+      if (!relPath) return diskContent;
+      const materialized = await materializeSlideSvgResources(diskContent, {
+        workspaceId,
+        bundleBasePath: basePath,
+        slideRelPath: relPath,
+      });
+      restoreRef.current = materialized.restore;
+      return materialized.svg;
+    },
+    [workspaceId, basePath, relPath]
+  );
+  const prepareContentForWrite = useCallback((serialized: string) => {
+    return restoreRef.current(serialized);
+  }, []);
 
   useEffect(() => {
     if (!relPath) {
@@ -370,9 +438,10 @@ function ActiveSlide({
     setState({ kind: "loading" });
     workspacesNs
       .readFile(workspaceId, relPath)
-      .then((r) => {
+      .then(async (r) => {
+        const content = await prepareContentForEditor(r.content);
         if (!cancelled) {
-          setState({ kind: "ready", content: r.content, mtime: r.mtime });
+          setState({ kind: "ready", content, mtime: r.mtime });
         }
       })
       .catch((err: unknown) => {
@@ -387,7 +456,7 @@ function ActiveSlide({
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, relPath]);
+  }, [workspaceId, relPath, prepareContentForEditor]);
 
   if (state.kind === "empty") {
     return (
@@ -397,9 +466,20 @@ function ActiveSlide({
     );
   }
   if (state.kind === "loading") {
+    // Show the slide's thumbnail while its file loads so switching pages doesn't
+    // flash a "Loading…" placeholder (the SVG is re-read on each page change).
+    // Falls back to a neutral surface — never the jarring text — before the
+    // first thumbnail is ready.
     return (
-      <div className="flex h-full items-center justify-center text-xs italic text-muted-foreground">
-        Loading…
+      <div className="flex h-full w-full items-center justify-center bg-muted">
+        {thumbnail ? (
+          // eslint-disable-next-line @next/next/no-img-element -- data URI; next/image can't optimize it
+          <img
+            src={thumbnail}
+            alt=""
+            className="h-full w-full object-contain"
+          />
+        ) : null}
       </div>
     );
   }
@@ -419,6 +499,8 @@ function ActiveSlide({
         initialMtime={state.mtime}
         active={editable}
         onSaved={onSaved}
+        prepareContentForEditor={prepareContentForEditor}
+        prepareContentForWrite={prepareContentForWrite}
       />
       <SvgToolbar />
       <PathToolbarPosition>

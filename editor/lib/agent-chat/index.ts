@@ -78,4 +78,10 @@ export {
   type ImageAttachmentPolicy,
   type EncodedImageAttachment,
 } from "./image-attachment";
-export { buildAgentSend, type AgentSendBody } from "./build-agent-send";
+export {
+  buildAgentSend,
+  buildTemplateContext,
+  type AgentSendBody,
+  type ContextPart,
+  type TemplateContextMeta,
+} from "./build-agent-send";

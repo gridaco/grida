@@ -129,6 +129,37 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
   );
 }
 
+/** Deterministic, varied card heights for the loading skeleton — a small cycle
+ *  of aspect-y sizes so the placeholder masonry looks organic (not a uniform
+ *  grid) without any randomness that would reshuffle across renders. */
+const SKELETON_HEIGHTS = [
+  220, 160, 264, 188, 300, 172, 232, 196, 276, 152, 244, 208, 184, 268, 164,
+  248, 200, 224,
+];
+
+/** Loading placeholder — a dummy masonry that matches the real grid's geometry
+ *  (`columnWidth` 180 / `columnGutter` 12 / `rowGutter` 12 via `column-width` +
+ *  `mb-3`), so the layout is already in place as real pins stream in rather than
+ *  a centered spinner popping out of nowhere. Purely decorative → `aria-hidden`;
+ *  the pulse is lightly staggered per column for a more natural shimmer. */
+function GallerySkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="animate-in fade-in duration-300"
+      style={{ columnWidth: "180px", columnGap: "12px" }}
+    >
+      {SKELETON_HEIGHTS.map((h, i) => (
+        <div
+          key={i}
+          className="mb-3 w-full animate-pulse rounded-lg bg-muted"
+          style={{ height: h, animationDelay: `${(i % 6) * 120}ms` }}
+        />
+      ))}
+    </div>
+  );
+}
+
 /** `memo`-wrapped: the home page re-renders on every composer keystroke/resize
  *  (`heroHeight`, `docked`, picker state…), and all props here are already
  *  referentially stable — so the up-to-300-cell masonry only re-renders on a
@@ -299,12 +330,7 @@ export const ReferenceGallery = memo(function ReferenceGallery({
         </p>
       )}
 
-      {!seeded && items.length === 0 && !error && (
-        <div className="flex items-center justify-center py-10 text-xs text-muted-foreground">
-          <Loader2Icon className="mr-2 size-4 animate-spin" />
-          Loading references…
-        </div>
-      )}
+      {!seeded && items.length === 0 && !error && <GallerySkeleton />}
 
       <PickContext.Provider value={pickContext}>{grid}</PickContext.Provider>
 

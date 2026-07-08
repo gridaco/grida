@@ -801,15 +801,27 @@ export namespace workspaces {
     return await bridgeOrThrow().workspaces.open(rootPath);
   }
   /**
-   * Auto-create a fresh project — mint a managed-root folder, seed a `.canvas`
-   * board (optionally with placed reference documents), and register it. Powers
-   * the home's "auto-create, ask nothing" flow: no OS folder dialog. Rejects
-   * when the host wired no managed root (e.g. the web-daemon dev bridge).
+   * Auto-create a fresh project — mint an EMPTY managed-root folder and
+   * register it. No document is seeded: the agent creates whatever the task
+   * needs on its first turn. Powers the home's "auto-create, ask nothing" flow:
+   * no OS folder dialog. Rejects when the host wired no managed root (e.g. the
+   * web-daemon dev bridge).
    */
   export async function createProject(
     input: WorkspaceCreateInput
   ): Promise<Workspace> {
     return await bridgeOrThrow().workspaces.create(input);
+  }
+  /**
+   * The host's DEFAULT workspace — the managed root itself (`~/Documents/Grida`),
+   * surfaced by {@link list} with `is_default`. The home roots a fresh session
+   * HERE instead of minting a per-session folder (the old auto-create flow
+   * littered the managed root and pre-picked where to work). Null on a host with
+   * no managed root (the web-daemon dev bridge), where the caller must fall back
+   * to opening a folder.
+   */
+  export async function getDefault(): Promise<Workspace | null> {
+    return (await list()).find((w) => w.is_default) ?? null;
   }
   export async function pin(id: string, pinned: boolean): Promise<void> {
     await bridgeOrThrow().workspaces.pin(id, pinned);

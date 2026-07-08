@@ -41,6 +41,8 @@ export function useWorkspaceFileSave({
   initialMtime,
   onDirtyChange,
   onSaved,
+  prepareContentForEditor,
+  prepareContentForWrite,
 }: {
   workspaceId: string;
   relPath: string;
@@ -48,6 +50,10 @@ export function useWorkspaceFileSave({
   initialMtime: number;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
+  /** Optional host projection before bytes from disk enter the editor. */
+  prepareContentForEditor?: (diskContent: string) => Promise<string> | string;
+  /** Optional inverse projection before serialized editor content hits disk. */
+  prepareContentForWrite?: (editorSerializedContent: string) => string;
 }): WorkspaceFileSave {
   const editor = useSvgEditor();
   const contentVersion = useEditorState((s) => s.content_version);
@@ -122,12 +128,20 @@ export function useWorkspaceFileSave({
 
   const onSave = useCallback(() => {
     const snapshot = editor.state.content_version;
-    const content = editor.serialize();
+    let content: string;
+    try {
+      content = prepareContentForWrite
+        ? prepareContentForWrite(editor.serialize())
+        : editor.serialize();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed.");
+      return;
+    }
     void commitWrite(content, snapshot, {
       expectedMtime: lastMtimeRef.current,
       onConflict: () => setConflict({ content, snapshot }),
     });
-  }, [editor, commitWrite]);
+  }, [editor, commitWrite, prepareContentForWrite]);
 
   // Replace the editor's document with the current bytes on disk, then
   // re-baseline `savedVersion` to the post-load content_version so the
@@ -145,13 +159,16 @@ export function useWorkspaceFileSave({
       // editor.load() would needlessly reset selection / history / mode on
       // every Cmd+S. Reload only when disk genuinely moved ahead of us.
       if (r.mtime === lastMtimeRef.current) return;
-      editor.load(r.content);
+      const content = prepareContentForEditor
+        ? await prepareContentForEditor(r.content)
+        : r.content;
+      editor.load(content);
       lastMtimeRef.current = r.mtime;
       setSavedVersion(editor.state.content_version);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Reload failed.");
     }
-  }, [workspaceId, relPath, editor]);
+  }, [workspaceId, relPath, editor, prepareContentForEditor]);
 
   const overwriteAnyway = useCallback(() => {
     if (!conflict) return;

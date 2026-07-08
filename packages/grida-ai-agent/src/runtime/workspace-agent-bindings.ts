@@ -479,6 +479,12 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
      * `write_file` see scratch exactly as `run_command` does. Without it, scratch
      * was reachable by the shell but invisible to the structured fs tools — the
      * reach-fragmentation bug this fixes.
+     *
+     * These roots are also enumerated by {@link list} on hydrate (as ABSOLUTE
+     * paths), so a file placed in scratch OUTSIDE the fs — a host seed (a picked
+     * template's bundle) or a produced artifact — lands in the AgentFs map and
+     * `read_file` can read it. `view_image` reads bytes straight from the backend
+     * so it never needed this; `read_file` reads the hydrated map, so it did.
      */
     private readonly additionalRoots: ReadonlyArray<workspaceFs.Scope> = []
   ) {}
@@ -494,10 +500,31 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
    */
   async list(): Promise<string[]> {
     const out: string[] = [];
-    const truncated = await this.walk("", 0, out);
+    // The workspace tree — emitted in the fs tools' logical "/"-rooted form.
+    let truncated = await this.walk(
+      this.workspace,
+      (rel) => "/" + rel,
+      "",
+      0,
+      out
+    );
+    // Additional roots (the session scratch dir) — emitted as ABSOLUTE paths, the
+    // form the agent addresses them by (from the scratch capability hint). This
+    // hydrates a file SEEDED into scratch by the host (a picked template's
+    // bundle) or produced there so it is readable via `read_file`, not just the
+    // shell / `view_image`. Without it, `read_file <scratch/x>` returned
+    // `not_found` while `cat` / `view_image` on the SAME path worked (the
+    // structured-fs half of the reach-fragmentation bug).
+    for (const scope of this.additionalRoots) {
+      if (
+        await this.walk(scope, (rel) => path.join(scope.root, rel), "", 0, out)
+      ) {
+        truncated = true;
+      }
+    }
     if (truncated) {
       console.warn(
-        `[agent-fs] workspace hydrate scan hit a cap at ${this.workspace.root} ` +
+        `[agent-fs] hydrate scan hit a cap at ${this.workspace.root} ` +
           `(${SCAN_MAX_FILES}-file / depth-${SCAN_MAX_DEPTH}); the agent's initial ` +
           `file list is truncated. It can still read any path on demand via the shell.`
       );
@@ -612,6 +639,8 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
    * of the tree must not abort the whole hydrate.
    */
   private async walk(
+    scope: workspaceFs.Scope,
+    toPath: (relPath: string) => string,
     relPath: string,
     depth: number,
     out: string[]
@@ -619,10 +648,10 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     if (depth > SCAN_MAX_DEPTH) return true;
     let entries: workspaceFs.Entry[];
     try {
-      entries = await workspaceFs.readDir(this.workspace, relPath);
+      entries = await workspaceFs.readDir(scope, relPath);
     } catch (err) {
       console.warn(
-        `[agent-fs] workspace hydrate scan skipped ${relPath || "/"}:`,
+        `[agent-fs] hydrate scan skipped ${scope.id}:${relPath || "/"}:`,
         err
       );
       return false;
@@ -633,7 +662,9 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       if (entry.kind === "directory") {
         // Skip heavy/generated subtrees (node_modules, .git, build output, …).
         if (isIgnoredScanDir(entry.name)) continue;
-        if (await this.walk(entry.rel_path, depth + 1, out)) truncated = true;
+        if (await this.walk(scope, toPath, entry.rel_path, depth + 1, out)) {
+          truncated = true;
+        }
         continue;
       }
       if (entry.kind === "file" || entry.kind === "symlink") {
@@ -642,7 +673,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
         // binary-heavy subtree (an `assets/` of images) starve the real
         // source files that sort after it. See `workspaces/scan`.
         if (isIgnoredScanFile(entry.name)) continue;
-        out.push("/" + entry.rel_path.replace(/\\/g, "/"));
+        out.push(toPath(entry.rel_path.replace(/\\/g, "/")));
       }
     }
     return truncated;

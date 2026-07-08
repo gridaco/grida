@@ -17,6 +17,12 @@
 /.next/
 /out/
 
+# synced from the repo-root public/ origin tree (see /public/README.md).
+# Scope to slides/ ONLY: that's the sole synced/generated unit. The sibling
+# sample-* dirs under templates/ are COMMITTED assets — never widen this to the
+# whole templates/ dir, or they'd read as ignored/disposable.
+/public/templates/slides/
+
 # production
 /build
 

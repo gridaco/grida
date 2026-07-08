@@ -34,6 +34,7 @@
 import type { ChatMessageWithParts } from "../session/rows";
 import { compactionBoundary } from "../session/boundary";
 import { AgentVision } from "../vision";
+import { CONTEXT_MARKERS } from "../protocol/context";
 
 export type ModelUIMessage = {
   id: string;
@@ -182,6 +183,18 @@ function lowerParts(
     }
     if (type === "reasoning") {
       // Dropped on purpose — see file header.
+      continue;
+    }
+    // Registered context tokens (WG `compositor.md` §templating) lower to a
+    // `<marker>…</marker>` block — the MODEL-view half of "user view vs model
+    // view". Agnostic: any type in CONTEXT_MARKERS lowers here with no per-token
+    // branch. The token rides as an AI-SDK `data-*` part, so `data` here is the
+    // whole part (the recorder persists `data: part`) and the payload is `data.data`.
+    const marker = CONTEXT_MARKERS[type];
+    if (marker) {
+      const payload = (data as { data?: unknown }).data ?? null;
+      const body = payload == null ? "" : JSON.stringify(payload, null, 2);
+      out.push({ type: "text", text: `<${marker}>\n${body}\n</${marker}>` });
       continue;
     }
     if (type.startsWith("tool-") || type === "dynamic-tool") {

@@ -49,7 +49,9 @@ export type ComposerController = {
   setTriggerIndex: (index: number) => void;
   moveTriggerIndex: (delta: number) => void;
   selectTriggerItem: (index: number) => boolean;
-  submit: (input: { submitted_at: number }) => ComposerMessage | null;
+  submit: (
+    input: Parameters<ComposerCore["createMessage"]>[0]
+  ) => ComposerMessage | null;
 };
 
 export type ComposerViewSnapshot = Pick<
@@ -254,6 +256,23 @@ export function ComposerContent({
       setEditor(null);
     },
   });
+
+  // Keep the placeholder reactive. `useEditor` builds the editor once, so a
+  // changed `placeholder` prop never reconfigures the Placeholder extension on
+  // its own — the rendered `data-placeholder` would stay frozen at first mount
+  // (e.g. the desktop home switching modes). Update the extension's option in
+  // place and dispatch a no-op transaction so ProseMirror recomputes the
+  // placeholder decoration, preserving focus, selection, and the draft (unlike
+  // recreating the editor, which would also thrash on any rotation).
+  useEffect(() => {
+    if (!editor) return;
+    const ext = editor.extensionManager.extensions.find(
+      (e) => e.name === "placeholder"
+    );
+    if (!ext || ext.options.placeholder === placeholder) return;
+    ext.options.placeholder = placeholder;
+    editor.view.dispatch(editor.state.tr);
+  }, [editor, placeholder]);
 
   useEffect(() => {
     if (!editor) return;

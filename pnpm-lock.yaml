@@ -427,6 +427,9 @@ importers:
       '@grida/pixel-grid':
         specifier: workspace:*
         version: link:../packages/grida-canvas-pixelgrid
+      '@grida/public':
+        specifier: workspace:*
+        version: link:../public
       '@grida/react-icons':
         specifier: workspace:*
         version: link:../packages/grida-react-icons
@@ -715,12 +718,18 @@ importers:
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.2.5)
+      embla-carousel-wheel-gestures:
+        specifier: ^8.1.0
+        version: 8.1.0(embla-carousel@8.6.0)
       fast-deep-equal:
         specifier: ^3.1.3
         version: 3.1.3
       fast-xml-parser:
         specifier: ^5.8.0
         version: 5.8.0
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
       figma-api:
         specifier: 2.0.1-beta
         version: 2.0.1-beta
@@ -9484,6 +9493,12 @@ packages:
     peerDependencies:
       embla-carousel: 8.6.0
 
+  embla-carousel-wheel-gestures@8.1.0:
+    resolution: {integrity: sha512-J68jkYrxbWDmXOm2n2YHl+uMEXzkGSKjWmjaEgL9xVvPb3HqVmg6rJSKfI3sqIDVvm7mkeTy87wtG/5263XqHQ==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      embla-carousel: ^8.0.0 || ~8.0.0-rc03
+
   embla-carousel@8.6.0:
     resolution: {integrity: sha512-SjWyZBHJPbqxHOzckOfo8lHisEaJWmwd23XppYFYVh10bU66/Pn5tkVkbkCMZVdbUE5eTCI2nD8OyIP4Z+uwkA==}
 
@@ -15055,6 +15070,10 @@ packages:
 
   whatwg-url@5.0.0:
     resolution: {integrity: sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==}
+
+  wheel-gestures@2.2.48:
+    resolution: {integrity: sha512-f+Gy33Oa5Z14XY9679Zze+7VFhbsQfBFXodnU2x589l4kxGM9L5Y8zETTmcMR5pWOPQyRv4Z0lNax6xCO0NSlA==}
+    engines: {node: '>=18'}
 
   which-boxed-primitive@1.1.1:
     resolution: {integrity: sha512-TbX3mj8n0odCBFVlY8AxkqcHASw3L60jIuF8jFP78az3C2YhmGvqbHBpAjTRH2/xqYunrJ9g1jSyjCjpoWzIAA==}
@@ -24504,6 +24523,11 @@ snapshots:
     dependencies:
       embla-carousel: 8.6.0
 
+  embla-carousel-wheel-gestures@8.1.0(embla-carousel@8.6.0):
+    dependencies:
+      embla-carousel: 8.6.0
+      wheel-gestures: 2.2.48
+
   embla-carousel@8.6.0: {}
 
   emoji-regex@10.6.0: {}
@@ -31294,6 +31318,8 @@ snapshots:
     dependencies:
       tr46: 0.0.3
       webidl-conversions: 3.0.1
+
+  wheel-gestures@2.2.48: {}
 
   which-boxed-primitive@1.1.1:
     dependencies:

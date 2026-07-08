@@ -114,7 +114,7 @@ describe("Workspaces", () => {
       projectsRoot = path.join(baseDir, "Grida");
     });
 
-    it("mints a folder holding a `<name>.canvas` bundle, seeds an empty board, and registers it", async () => {
+    it("mints an EMPTY folder (no document) and registers it", async () => {
       const registry = new WorkspaceRegistry(userDataDir, projectsRoot);
       const ws = await registry.createProject({ name: "Poster" });
 
@@ -124,37 +124,10 @@ describe("Workspaces", () => {
       expect(ws.name).toBe("Poster");
       expect(await registry.findById(ws.id)).not.toBeNull();
 
-      // The manifest lives INSIDE a `<name>.canvas` bundle dir (so the tree
-      // recognizes it as an openable board), NOT loose at the workspace root.
-      const bundleName = `${path.basename(ws.root)}.canvas`;
+      // The project is EMPTY: no `.canvas` bundle, no manifest, nothing. The
+      // agent creates the document on its first turn — the host never seeds one.
       const rootEntries = await fs.readdir(ws.root);
-      expect(rootEntries).toContain(bundleName);
-      expect(rootEntries).not.toContain(".canvas.json"); // nothing loose at root
-      const manifest = JSON.parse(
-        await fs.readFile(
-          path.join(ws.root, bundleName, ".canvas.json"),
-          "utf8"
-        )
-      );
-      expect(manifest.editor).toBe("board");
-      expect(manifest.documents).toEqual([]);
-    });
-
-    it("seeds a picked reference as a first-class URI document", async () => {
-      const registry = new WorkspaceRegistry(userDataDir, projectsRoot);
-      const url = "https://library.grida.co/ref.png";
-      const ws = await registry.createProject({
-        name: "Sunset",
-        seed: { documents: [{ src: url }] },
-      });
-      const bundleName = `${path.basename(ws.root)}.canvas`;
-      const manifest = JSON.parse(
-        await fs.readFile(
-          path.join(ws.root, bundleName, ".canvas.json"),
-          "utf8"
-        )
-      );
-      expect(manifest.documents).toEqual([{ src: url }]);
+      expect(rootEntries).toEqual([]);
     });
 
     it("suffixes -2, -3… on name collision (distinct folders + ids)", async () => {

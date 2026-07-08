@@ -4,67 +4,54 @@
  * Desktop welcome window — the reference-first artwork studio front door.
  *
  * Composer-first and outcome-first: describe what you want, or gather references
- * from the gallery — then Grida AUTO-CREATES a fresh project
- * for you — a `.canvas` board under `~/Documents/Grida` — then hands your
- * prompt to that project's agent as a fresh first turn via {@link welcome_handoff}.
- * No workspace picker, no folder dialog to get started: the newcomer never has
- * to choose a folder. "Open folder…" and the recents list stay for opening
- * work that already exists (files stay visible — a named tree, not hidden).
+ * from the gallery — then Grida AUTO-CREATES a fresh, EMPTY project for you (a
+ * plain folder under `~/Documents/Grida`) and hands your prompt to that
+ * project's agent as its first turn via {@link welcome_handoff}. No workspace
+ * picker, no folder dialog to get started: the newcomer never has to choose a
+ * folder. "Open folder…" and the recents list stay for opening work that
+ * already exists (files stay visible — a named tree, not hidden).
  *
- * Clicking a gallery reference doesn't start a board on its own — it drops the
- * pin into the composer's picked-references tray (multi-select). The user can
- * collect several, optionally add a prompt, then start ONE project seeded with
- * all of them. Every start opens the MAIN workbench (`/desktop/workspace`) — the
- * full surface with the file tree, tool-approval, and auto-accept — whose agent
- * pane consumes the handoff and auto-sends when there's a prompt. The seeded
- * `.canvas` board is the document the agent works on.
+ * The home NEVER mints a per-session folder and NEVER dirties the user's
+ * workspace. Starting a session roots the agent at the DEFAULT workspace — the
+ * managed root itself (`~/Documents/Grida`), always registered — and the agent
+ * takes the wheel: whether the workspace becomes a board, a slides deck, or a
+ * tree of files is the AGENT's choice on turn one (guided by the advertised
+ * skills), and produced files land where the agent decides. The system provides
+ * MINIMALLY — the default workspace + a per-session scratch dir. (The old flow
+ * minted `~/Documents/Grida/<prompt>` folders per session and pre-picked where
+ * to work; that's the legacy this replaces.)
  *
- * Landing surface: `/desktop/workspace?id=…` (the workbench), whose agent pane
- * already consumes the handoff and auto-sends turn one. The handoff carries the
- * `dotcanvas` skill so the artwork agent knows the board format from the start,
- * even before any editor tab is open.
+ * Clicking a gallery reference OR a slides template doesn't start anything — it
+ * drops the pick into the composer's tray (references multi-select; a template
+ * is single-select, like choosing one Keynote theme). The user can add a prompt,
+ * then start ONE session. References fold into the first-turn prompt as plain
+ * URLs; a picked template's unzipped `.canvas` bundle rides the handoff into the
+ * session's SCRATCH dir — agent-only reference, like an attachment (WG
+ * `scratch.md`), never the user's workspace — and the prompt tells the agent to
+ * read it from scratch and build the adapted deck. Every start opens the MAIN
+ * workbench (`/desktop/workspace`) — the full surface with the file tree,
+ * tool-approval, and auto-accept — whose agent pane consumes the handoff and
+ * auto-sends when there's a prompt.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  ArrowRightIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  FolderIcon,
-  PlusIcon,
-  SettingsIcon,
-  XIcon,
-} from "lucide-react";
-import { Button } from "@app/ui/components/button";
+import { XIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@app/ui/components/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@app/ui/components/popover";
 import {
   getDesktopBridge,
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
-import { welcome_handoff } from "@/lib/desktop/welcome-handoff";
+import {
+  welcome_handoff,
+  type ScratchSeedFile,
+  type WelcomeHandoff,
+} from "@/lib/desktop/welcome-handoff";
 import { onboarding_flag } from "@/lib/desktop/onboarding-flag";
 import { FirstRunOnboarding } from "@/scaffolds/desktop/onboarding/first-run-onboarding";
 import { dotcanvas } from "dotcanvas";
-import {
-  TitleBar,
-  TITLEBAR_NO_DRAG_STYLE,
-} from "@/scaffolds/desktop/chrome/title-bar";
+import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
 import {
   DesktopModelPicker,
@@ -74,7 +61,20 @@ import { useEndpointProviders } from "@/scaffolds/desktop/shared/registered-mode
 import type { ComposerCatalog } from "@/kits/composer";
 import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 import { ReferenceGallery } from "@/scaffolds/desktop/home/reference-gallery";
+import { SlidesTemplateGallery } from "@/scaffolds/desktop/home/slides-template-gallery";
+// `import type` is erased at build — it does NOT pull the loader (and its
+// fflate/dotcanvas deps) into the home chunk; the gallery's dynamic `import()`
+// stays the sole code-split boundary. The home only holds the picked template
+// object and reads its `files` (the unzipped bundle) to seed the session scratch.
+import type { SlidesTemplate } from "@/scaffolds/desktop/home/slides-template-loader";
 import { RecentProjectsCommand } from "@/scaffolds/desktop/home/recent-projects-command";
+import { WorkspacePicker } from "@/scaffolds/desktop/home/workspace-picker";
+import {
+  ApplicationPreset,
+  type ApplicationPresetId,
+} from "@/scaffolds/desktop/home/application-preset";
+import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
+import { PresetChip } from "@/scaffolds/desktop/home/preset-chip";
 import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
 
 const NOOP = () => {};
@@ -85,11 +85,21 @@ const NOOP = () => {};
  *  readdirs per mount just to yield this same empty shape. */
 const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
 
-/** A short, friendly folder name derived from the prompt (the sidecar slugifies
- *  it further). First few words keep the project recognizable in the tree. */
-function deriveProjectName(prompt: string): string {
-  const words = prompt.trim().split(/\s+/).slice(0, 6).join(" ");
-  return words.slice(0, 48) || "Untitled";
+/** Fold picked references into the first-turn prompt as plain context. The
+ *  workspace starts empty — there is no seeded document to place references in
+ *  anymore — so the agent receives them as URLs and decides what to make of
+ *  them (a moodboard board, style refs for a deck, …). Returns `text` unchanged
+ *  when nothing is picked. */
+function composePromptWithRefs(
+  text: string,
+  refs: AgentDesignSearch.DesignSearchResult[]
+): string {
+  if (refs.length === 0) return text;
+  const list = refs
+    .map((r) => `- ${r.title || "reference"}: ${r.url}`)
+    .join("\n");
+  const lead = text || "Use these visual references as the starting point.";
+  return `${lead}\n\nReferences:\n${list}`;
 }
 
 export default function DesktopWelcomePage() {
@@ -99,12 +109,22 @@ export default function DesktopWelcomePage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The active `application_preset` (SPIKE). Mutated by the icon rail and the
+  // composer's mode chip; re-themes the one shared home (placeholder now; the
+  // gallery's visual references and the handoff seed are the next seams).
+  const [preset, setPreset] = useState<ApplicationPresetId>(
+    ApplicationPreset.DEFAULT
+  );
+  // The composer placeholder is the active preset's representative example.
+  // It swaps when the mode changes, but does not rotate.
+  const presetPlaceholder = ApplicationPreset.byId(preset).placeholder;
   // Recent-projects quick switcher (⌃R, VS Code's "Open Recent"). Keeps the
   // home minimal — no persistent recents list.
   const [commandOpen, setCommandOpen] = useState(false);
-  // The composer's target: null = create a NEW project (the default), or an
-  // existing workspace to send the prompt into instead.
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // The composer's target: null = create a NEW project under the managed root
+  // (the default, shown as "Default workspace"), or an existing workspace to
+  // send the prompt into instead. Owned here; the top-left WorkspacePicker
+  // mutates it and the composer's `start` reads it.
   const [target, setTarget] = useState<Workspace | null>(null);
   // References the user has gathered from the gallery (multi-select). They seed
   // ONE fresh board on submit; a click in the gallery toggles membership here.
@@ -115,6 +135,19 @@ export default function DesktopWelcomePage() {
     () => new Set(pickedRefs.map((p) => p.id)),
     [pickedRefs]
   );
+  // The slides template the user picked from the gallery — single-select (you
+  // start from ONE template, like choosing a Keynote theme). Null = none. It's
+  // an attachment-style reference, NOT an instant start: the composer send seeds
+  // its bundle into the session scratch and hands it to the agent (see `start`).
+  const [pickedTemplate, setPickedTemplate] = useState<SlidesTemplate | null>(
+    null
+  );
+  // A picked template only makes sense in slides mode (the template gallery is
+  // slides-only). If the user switches the preset away, drop it so a stale
+  // template chip can't linger over the reference gallery.
+  useEffect(() => {
+    if (preset !== "slides") setPickedTemplate(null);
+  }, [preset]);
   // Composer docking: the composer starts as the in-flow hero, then floats as a
   // fixed bottom bar once it scrolls out of view — so you can keep writing while
   // browsing the gallery. It's the SAME element (its position toggles), so the
@@ -247,7 +280,7 @@ export default function DesktopWelcomePage() {
 
   // Model selection for the composer. No sessions here (the welcome page never
   // loads a chat), so this just holds the user's pick; it rides the handoff so
-  // the created project's first turn runs on the chosen model.
+  // the session's first turn runs on the chosen model.
   const {
     model_id: modelId,
     setModelId,
@@ -258,11 +291,18 @@ export default function DesktopWelcomePage() {
     endpoints,
   });
 
-  // Stash the (possibly empty) prompt + model + skill for a workspace's agent and
-  // become the workspace window. Shared by the new-project and existing-target
-  // paths; an empty prompt lands primed but doesn't auto-send a turn.
+  // Stash the (possibly empty) prompt + model + scratch seed for a workspace's
+  // agent and become the workspace window. Shared by the default-workspace and
+  // existing-target paths; an empty prompt lands primed but doesn't auto-send a
+  // turn. `scratchSeed` (a picked template's unzipped bundle) rides into the
+  // session scratch on the first turn — agent-only, never the workspace.
   const handoffAndGo = useCallback(
-    (workspace: Workspace, prompt: string) => {
+    (
+      workspace: Workspace,
+      prompt: string,
+      scratchSeed?: ScratchSeedFile[],
+      templateContext?: WelcomeHandoff["template_context"]
+    ) => {
       welcome_handoff.set(workspace.id, {
         prompt,
         // Carry the model only when the user deliberately picked one. An
@@ -272,17 +312,27 @@ export default function DesktopWelcomePage() {
         // seed the workspace with the Claude-Code default as a false
         // explicit pick, and keyless users would hit `auth_required` (#942).
         ...(isUserPick ? { model_id: modelId } : {}),
+        ...(scratchSeed && scratchSeed.length > 0
+          ? { scratch_seed: scratchSeed }
+          : {}),
+        ...(templateContext ? { template_context: templateContext } : {}),
       });
       router.push(workspaceWorkbenchHref(workspace));
     },
     [modelId, isUserPick, router]
   );
 
-  const createAndGo = useCallback(
+  // Start a session in the DEFAULT workspace (`~/Documents/Grida`). We NEVER mint
+  // a per-session folder — that littered the managed root and pre-picked where to
+  // work; the agent roots at the default workspace and takes the wheel, writing
+  // only what it decides. Optional `scratchSeed` (a picked template's unzipped
+  // bundle) rides the handoff into the session scratch — agent-only reference,
+  // never the user's workspace.
+  const startFresh = useCallback(
     async (opts: {
-      name?: string;
       prompt: string;
-      seed?: { documents: { src: string }[] };
+      scratchSeed?: ScratchSeedFile[];
+      templateContext?: WelcomeHandoff["template_context"];
     }) => {
       const bridge = getDesktopBridge();
       if (!bridge) {
@@ -292,20 +342,19 @@ export default function DesktopWelcomePage() {
       try {
         setBusy(true);
         setError(null);
-        const ws = await workspacesNs.createProject({
-          name: opts.name,
-          seed: opts.seed,
-        });
-        // Every start opens the MAIN workbench (`/desktop/workspace`) — the full
-        // surface with the file tree, tool-approval bar, and auto-accept mode
-        // picker. The seeded `.canvas` board is the document the agent works on;
-        // the workbench's agent pane consumes the handoff and auto-sends when
-        // there's a prompt. (The lean board window at `/desktop/file` stays for
-        // directly opening an existing `.canvas`/file — Finder, ⌃R, File ▸ Open.)
-        handoffAndGo(ws, opts.prompt);
+        const ws = await workspacesNs.getDefault();
+        if (!ws) {
+          setError("No default workspace available on this host.");
+          setBusy(false);
+          return;
+        }
+        // Opens the MAIN workbench (`/desktop/workspace`) — the full surface with
+        // the file tree, tool-approval bar, and auto-accept picker; its agent pane
+        // consumes the handoff and auto-sends the prompt as turn one.
+        handoffAndGo(ws, opts.prompt, opts.scratchSeed, opts.templateContext);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Couldn't create a project."
+          err instanceof Error ? err.message : "Couldn't start a session."
         );
         setBusy(false); // navigation unmounts on success; only reset on failure
       }
@@ -314,32 +363,43 @@ export default function DesktopWelcomePage() {
   );
 
   // The one "start" path, shared by the composer's send and the reference
-  // tray's Start button. References (if any) always seed a fresh board and take
-  // precedence over the target picker — they're only meaningful for a new board.
+  // tray's Start button. Picked references (if any) fold into the first-turn
+  // prompt as context and always start a FRESH project — they take precedence
+  // over the target picker, since they're only meaningful for a new start.
   const start = useCallback(
     (text: string) => {
       const t = text.trim();
       if (busy) return;
-      if (pickedRefs.length > 0) {
-        void createAndGo({
-          name: t ? deriveProjectName(t) : pickedRefs[0]?.title || "Artwork",
+      // A picked template starts a session in the default workspace. Its unzipped
+      // `.canvas` bundle rides into the session SCRATCH (agent-only), and the
+      // template itself rides as a `user_template_selection` CONTEXT part (a chip
+      // in the transcript, a `<user_template_selection>` block for the model) —
+      // NOT fabricated into the message. The user's raw text `t` is the only ask
+      // (empty ⇒ a context-only send; the agent-pane fires it anyway).
+      if (pickedTemplate) {
+        void startFresh({
           prompt: t,
-          seed: { documents: pickedRefs.map((p) => ({ src: p.url })) },
+          scratchSeed: pickedTemplate.files,
+          templateContext: {
+            name: pickedTemplate.name,
+            title: pickedTemplate.title,
+            slides: pickedTemplate.pages.length,
+            system: pickedTemplate.system,
+          },
         });
         return;
       }
+      if (pickedRefs.length > 0) {
+        void startFresh({ prompt: composePromptWithRefs(t, pickedRefs) });
+        return;
+      }
       if (!t) return;
-      // No references: send into an existing project, or auto-create from words.
+      // Send into an existing opened workspace, or the default workspace.
       if (target) handoffAndGo(target, t);
-      else void createAndGo({ name: deriveProjectName(t), prompt: t });
+      else void startFresh({ prompt: t });
     },
-    [busy, pickedRefs, target, handoffAndGo, createAndGo]
+    [busy, pickedTemplate, pickedRefs, target, handoffAndGo, startFresh]
   );
-
-  const onStartBlank = useCallback(() => {
-    if (busy) return;
-    void createAndGo({ prompt: "" });
-  }, [busy, createAndGo]);
 
   // Clicking a gallery reference toggles it in the composer's tray (multi-select)
   // instead of starting a board on its own — the user gathers several, then
@@ -354,6 +414,15 @@ export default function DesktopWelcomePage() {
     },
     []
   );
+
+  // Picking a slides template SELECTS it into the composer (single-select), like
+  // attaching a reference — it does NOT start a session on its own. Clicking the
+  // already-picked one clears it. The start (composer send / Enter) attaches it
+  // as a `user_template_selection` context part + seeds the deck's bundle into
+  // scratch, handing it to the agent to adapt; see `start`.
+  const togglePickTemplate = useCallback((template: SlidesTemplate) => {
+    setPickedTemplate((cur) => (cur?.name === template.name ? null : template));
+  }, []);
 
   const onOpen = useCallback(async () => {
     const bridge = getDesktopBridge();
@@ -400,245 +469,202 @@ export default function DesktopWelcomePage() {
           }}
         />
       )}
-      <TitleBar>
-        <div
-          className="ml-auto flex items-center gap-0.5"
-          style={TITLEBAR_NO_DRAG_STYLE}
-        >
-          <Button
-            asChild
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Settings"
-            title="Settings"
-          >
-            <Link href="/desktop/settings" prefetch={false}>
-              <SettingsIcon />
-            </Link>
-          </Button>
-        </div>
-      </TitleBar>
+      {/* Bare drag region — Settings moved to the rail footer below. */}
+      <TitleBar />
 
-      {/* One page-scroll container — composer hero then gallery scroll together
-          (no nested scroll); the gallery virtualizes against this element. */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 pb-10 pt-[14vh]">
-          {/* Composer slot — narrow and centered; the gallery below spans the
+      {/* Home-scoped icon rail + the shared home surface. The rail lives BELOW
+          the title bar (so it never collides with the macOS traffic lights) and
+          only mutates the active preset — it is not app-wide chrome. */}
+      <div className="flex min-h-0 flex-1">
+        <PresetRail value={preset} onChange={setPreset} />
+
+        {/* One page-scroll container — composer hero then gallery scroll
+            together (no nested scroll); the gallery virtualizes against this. */}
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          {/* Top-left workspace picker — where a start lands (the managed
+              ~/Documents/Grida root by default, shown as "Default workspace")
+              or which existing project to aim at. Borderless + friendly;
+              replaces the old picker-above-composer + "start blank" row. */}
+          <div className="px-3 pt-3">
+            <WorkspacePicker
+              value={target}
+              onChange={setTarget}
+              workspaces={workspaces}
+              onOpenFolder={onOpen}
+            />
+          </div>
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-16 px-6 pb-10">
+            {/* Composer hero — a generous top offset drops the input to roughly
+              mid-screen, but the space below stays tight so the gallery sits
+              close beneath it (not an even top/bottom split) and peeks in to
+              invite the scroll that docks the composer. */}
+            <div className="flex flex-col pt-[30vh]">
+              {/* Composer slot — narrow and centered; the gallery below spans the
               wider container. This slot stays in flow and is what the dock
               observer watches; once the composer floats it reserves `heroHeight`
               so detaching doesn't jump the gallery up. */}
-          <div
-            ref={composerSlotRef}
-            className="mx-auto w-full max-w-2xl"
-            style={docked ? { height: heroHeight } : undefined}
-          >
-            {/* The composer itself. In the hero it's a plain in-flow block; once
+              <div
+                ref={composerSlotRef}
+                className="mx-auto w-full max-w-2xl"
+                style={docked ? { height: heroHeight } : undefined}
+              >
+                {/* The composer itself. In the hero it's a plain in-flow block; once
                 docked it becomes a floating card fixed to the bottom, sliding up
                 on entry. It's the SAME element in both states, so the Tiptap
                 draft, focus, and caret carry across the transition. */}
-            <div
-              ref={composerRef}
-              className={cn(
-                "flex flex-col gap-2",
-                docked &&
-                  "fixed inset-x-4 bottom-4 z-30 mx-auto max-w-2xl rounded-xl border bg-background/95 p-2 shadow-lg backdrop-blur-sm duration-200 animate-in fade-in slide-in-from-bottom-4"
-              )}
-            >
-              {/* Target picker + blank, above the input. */}
-              <div className="flex items-center gap-3 px-1">
-                <Popover open={pickerOpen} onOpenChange={setPickerOpen} modal>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      role="combobox"
-                      aria-expanded={pickerOpen}
-                      className="max-w-[16rem] gap-1.5"
-                    >
-                      {target ? (
-                        <FolderIcon className="size-3.5 shrink-0" />
-                      ) : (
-                        <PlusIcon className="size-3.5 shrink-0" />
-                      )}
-                      <span className="min-w-0 truncate">
-                        {target?.name ?? "New project"}
-                      </span>
-                      <ChevronDownIcon className="size-3.5 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  {/* Radix flips on collision, so this opens down in the hero and
-                      up when the composer is docked at the bottom. */}
-                  <PopoverContent align="start" className="w-72 p-0">
-                    <Command>
-                      <CommandInput placeholder="Search projects…" />
-                      <CommandList>
-                        <CommandEmpty>No project found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            value="new project"
-                            onSelect={() => {
-                              setTarget(null);
-                              setPickerOpen(false);
-                            }}
-                          >
-                            <PlusIcon className="text-muted-foreground" />
-                            New project
-                            {target === null && (
-                              <CheckIcon className="ml-auto size-4" />
-                            )}
-                          </CommandItem>
-                        </CommandGroup>
-                        {workspaces.length > 0 && (
-                          <CommandGroup heading="Recent">
-                            {workspaces.map((w) => (
-                              <CommandItem
-                                key={w.id}
-                                value={`${w.name} ${w.root}`}
-                                onSelect={() => {
-                                  setTarget(w);
-                                  setPickerOpen(false);
-                                }}
-                              >
-                                <FolderIcon className="text-muted-foreground" />
-                                <span className="min-w-0 flex-1 truncate">
-                                  {w.name}
-                                </span>
-                                {target?.id === w.id && (
-                                  <CheckIcon className="ml-auto size-4" />
-                                )}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        )}
-                        <CommandGroup>
-                          <CommandItem
-                            value="open folder existing project"
-                            onSelect={() => {
-                              setPickerOpen(false);
-                              void onOpen();
-                            }}
-                          >
-                            Open folder…
-                          </CommandItem>
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {/* Hidden while references are picked: "blank" means blank, and
-                    rendering it would either silently drop the gathered picks or
-                    duplicate the tray's Start — the tray owns starting then. */}
-                {pickedRefs.length === 0 && (
-                  <button
-                    type="button"
-                    onClick={onStartBlank}
-                    disabled={busy}
-                    className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-50"
-                  >
-                    or start with a blank
-                  </button>
-                )}
-              </div>
-              {/* Picked-references tray — the gallery drops pins here so several
-                  can be gathered before starting one board from all of them. A
-                  single horizontal scroll row keeps the composer compact — which
-                  matters most once it's floating. */}
-              {pickedRefs.length > 0 && (
-                <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-2">
-                  <div className="flex items-center justify-between px-1">
-                    <span className="text-xs text-muted-foreground">
-                      {pickedRefs.length} reference
-                      {pickedRefs.length > 1 ? "s" : ""} selected — add a
-                      prompt, or just start
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPickedRefs([])}
-                        className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-                      >
-                        Clear
-                      </button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => start("")}
-                        disabled={busy}
-                        className="h-6 gap-1 px-2 text-xs"
-                      >
-                        Start
-                        <ArrowRightIcon className="size-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 overflow-x-auto">
-                    {pickedRefs.map((p) => (
-                      <div
-                        key={p.id}
-                        className="group relative size-16 shrink-0 overflow-hidden rounded-md border"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div
+                  ref={composerRef}
+                  className={cn(
+                    "flex flex-col gap-2",
+                    // Docked: the composer floats as a bare bottom bar — no card
+                    // wrapper (no extra border/background/padding). It's just the
+                    // input itself, lifted with a shadow (applied to the input
+                    // below), so it reads as floating over the gallery rather than
+                    // boxed in a panel. The references tray rides in the same stack.
+                    docked &&
+                      "fixed inset-x-4 bottom-4 z-30 mx-auto max-w-2xl duration-200 animate-in fade-in slide-in-from-bottom-4"
+                  )}
+                >
+                  {/* Picked-template chip — the slides-mode counterpart of the
+                  references tray: a single attachment-style chip for the deck the
+                  user chose to start from (single-select). Neutral styling (no
+                  accent) — it reads as an attachment, and starting is the
+                  composer's own send. Its X removes; the gallery card also
+                  toggles it. */}
+                  {pickedTemplate && (
+                    <div className="flex items-center gap-2 rounded-lg border bg-background p-1.5 shadow-sm">
+                      <div className="size-10 shrink-0 overflow-hidden rounded border bg-muted">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- blob object URL; next/image can't optimize it */}
                         <img
-                          src={p.url}
-                          alt={p.title}
+                          src={pickedTemplate.pages[0]?.url}
+                          alt=""
                           className="size-full object-cover"
                         />
-                        <button
-                          type="button"
-                          onClick={() => togglePick(p)}
-                          aria-label={`Remove ${p.title}`}
-                          className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 shadow transition group-hover:opacity-100"
-                        >
-                          <XIcon className="size-3" />
-                        </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <AgentComposerInput
-                catalog={EMPTY_CATALOG}
-                onSubmit={start}
-                isStreaming={false}
-                onStop={NOOP}
-                autofocus
-                placeholder={
-                  pickedRefs.length > 0
-                    ? "Describe what to make from these references…"
-                    : target
-                      ? `Ask Grida to design something in ${target.name}…`
-                      : "Describe an image to create, or start from a reference…"
-                }
-                toolbar={
-                  <DesktopModelPicker
-                    value={modelId}
-                    onValueChange={setModelId}
-                    endpoints={endpoints}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium">
+                          {pickedTemplate.title}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Template · {pickedTemplate.pages.length} slides
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPickedTemplate(null)}
+                        aria-label={`Remove ${pickedTemplate.title} template`}
+                        className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      >
+                        <XIcon className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  {/* Picked-references tray — a bare, compact row of thumbnails:
+                  no panel, no label, no Clear/Start. Membership IS the state, so
+                  each pin just removes on its hover-X, and starting is the
+                  composer's own send. When docked the row floats above the input
+                  in the same stack — same design language, lifted by shadow, not
+                  boxed in a container. */}
+                  {pickedRefs.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto pb-0.5">
+                      {pickedRefs.map((p) => (
+                        <div
+                          key={p.id}
+                          className="group relative size-14 shrink-0 overflow-hidden rounded-lg border bg-background shadow-sm"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={p.url}
+                            alt={p.title}
+                            className="size-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePick(p)}
+                            aria-label={`Remove ${p.title}`}
+                            className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 shadow transition group-hover:opacity-100"
+                          >
+                            <XIcon className="size-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <AgentComposerInput
+                    catalog={EMPTY_CATALOG}
+                    // Docked: lift the input on its own shadow so it floats over
+                    // the gallery — there's no card wrapper doing it anymore.
+                    className={docked ? "shadow-xl" : undefined}
+                    onSubmit={start}
+                    isStreaming={false}
+                    onStop={NOOP}
+                    allowEmptySubmit={pickedTemplate != null}
+                    autofocus
+                    placeholder={
+                      pickedTemplate
+                        ? `Adapt the "${pickedTemplate.title}" template — describe your deck…`
+                        : pickedRefs.length > 0
+                          ? "Describe what to make from these references…"
+                          : target
+                            ? `Ask Grida to design something in ${target.name}…`
+                            : presetPlaceholder
+                    }
+                    toolbar={
+                      <>
+                        <PresetChip value={preset} onChange={setPreset} />
+                        <DesktopModelPicker
+                          value={modelId}
+                          onValueChange={setModelId}
+                          endpoints={endpoints}
+                        />
+                      </>
+                    }
                   />
-                }
-              />
-              {/* Kept inside the composer so a submit error is visible even when
+                  {/* Kept inside the composer so a submit error is visible even when
                   the composer is floating (docked). */}
-              {error && (
-                <p
-                  role="alert"
-                  className="px-1 text-center text-xs text-destructive"
-                  onClick={() => setError(null)}
-                >
-                  {error}
-                </p>
+                  {error && (
+                    <p
+                      role="alert"
+                      className="px-1 text-center text-xs text-destructive"
+                      onClick={() => setError(null)}
+                    >
+                      {error}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Gallery — preset-aware. The library corpus (image/video pins)
+              fits general/image/video, so those share the reference gallery.
+              Slides swaps in the bundled starter templates instead — real
+              `.canvas` decks served from /templates/slides/ (the
+              `public/slides-templates` publishing unit; loaded lazily by
+              `slides-template-loader.ts`). Filtering the library corpus PER
+              preset (image vs video) is a separate later seam. Both are part
+              of the single page scroll (the reference gallery virtualizes
+              against it). The "Ideas" label is universal — it heads whichever
+              gallery renders. */}
+            <div>
+              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                Start from an idea
+              </h2>
+              {preset === "slides" ? (
+                <SlidesTemplateGallery
+                  onPickTemplate={togglePickTemplate}
+                  selectedName={pickedTemplate?.name ?? null}
+                  disabled={busy}
+                />
+              ) : (
+                <ReferenceGallery
+                  onPick={togglePick}
+                  selectedIds={selectedRefIds}
+                  disabled={busy}
+                  scrollContainerRef={scrollRef}
+                />
               )}
             </div>
           </div>
-
-          {/* Reference gallery — part of the single page scroll (virtualizes
-              against the scroll container above). */}
-          <ReferenceGallery
-            onPick={togglePick}
-            selectedIds={selectedRefIds}
-            disabled={busy}
-            scrollContainerRef={scrollRef}
-          />
         </div>
       </div>
 

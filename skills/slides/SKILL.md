@@ -47,13 +47,40 @@ deck stays uniform. Start each from this shape:
 
 ## Working pattern
 
-- To start a deck: `write_file` each `NNN.svg`, then `write_file` the
-  `.canvas.json` listing them in order.
+- To start a deck: **first make the bundle folder** — a NEW directory whose name
+  ends in `.canvas` (e.g. `Q3 Report.canvas/`), created under your working root.
+  The `.canvas` suffix on the FOLDER is what marks it a bundle (see Structure);
+  a plain folder — or files loose in the workspace root — is NOT a deck and won't
+  open. Then `write_file` each slide as `<name>.canvas/NNN.svg` and `write_file`
+  the manifest as `<name>.canvas/.canvas.json` listing them in order. Every file
+  lives INSIDE that one `.canvas` folder.
 - To edit a deck: `read_file` `.canvas.json` first (preserve `version` /
   `$schema` and any unknown fields), edit the slide SVGs, then write the full
   manifest back with `documents` in the intended order.
 - Reorder = reorder `documents`. Add a slide = `write_file` a new `NNN.svg` and
   insert it into `documents`. Remove = drop it from `documents`.
+
+## Starting from a template
+
+When the user picks a template from the gallery, a `<user_template_selection>`
+block on the first turn names it (title, slide count, visual system), and its
+unzipped `.canvas` bundle (the manifest `.canvas.json` + slide SVGs) is placed in
+your **scratch dir** — a reference, like an attachment, NOT part of the user's
+workspace. Treat it as the STARTING POINT, not a fixed result:
+
+- List your scratch dir and `read_file` the `.canvas.json` + slide SVGs there
+  first. The template defines the deck's **visual system** — palette, type,
+  layout, margins, footer, accents. Hold it: reuse those so every slide you write
+  reads as a sibling, not a stray.
+- Build the adapted deck in the **workspace** as a NEW `<name>.canvas/` folder
+  (that's where the user's document lives — scratch is throwaway; and the
+  `.canvas` folder suffix is what makes it a deck — see Working pattern). Write
+  the slide SVGs + `.canvas.json` INSIDE it, replacing the placeholder copy with
+  the user's content and adding / reordering / removing slides (update
+  `documents`) to fit. Keep the frame (`1920×1080` viewBox, safe margins) and the
+  conventions above.
+- Don't discard the template's design and start from nothing unless the user asks
+  for a different look — keeping that design is the whole point of the pick.
 
 ## See also
 

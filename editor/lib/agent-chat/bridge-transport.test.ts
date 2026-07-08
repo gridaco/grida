@@ -197,6 +197,41 @@ describe("desktopAgentTransport", () => {
     );
   });
 
+  // Regression: a picked slides template's unzipped bundle rides the FIRST send
+  // as `body.scratch_seed` and MUST reach `startAgentRun` whole — the sidecar
+  // writes it into the session scratch (agent-only, WG `scratch.md`). The SAME
+  // whitelist-drop bug as `mode`/`approval_answer` above left every template
+  // session's scratch empty until `readBodyOptions` + the `startAgentRun` field
+  // list carried it.
+  it("forwards the `scratch_seed` body field to startAgentRun", async () => {
+    vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_test",
+      done: Promise.resolve(),
+    }));
+
+    const seed = [
+      { path: ".canvas.json", text: "{}" },
+      { path: "001.svg", text: "<svg/>" },
+    ];
+    const stream = await desktopAgentTransport.create().sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+      body: { scratch_seed: seed },
+    });
+    await stream.cancel();
+
+    expect(ai.startAgentRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scratch_seed: seed }),
+      expect.any(Function)
+    );
+  });
+
   // A malformed `approval_answer` (missing `approved`) is dropped at the body
   // gate, not forwarded — the sidecar re-validates regardless, but the transport
   // shouldn't relay junk.

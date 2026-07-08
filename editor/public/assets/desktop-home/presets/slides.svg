@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="ap-art-slides" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f574e" />
+      <stop offset="1" stop-color="#5e877b" />
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" fill="url(#ap-art-slides)" />
+  <rect x="104" y="60" width="128" height="80" rx="12" fill="#f3f0ea" fill-opacity="0.30" />
+  <rect x="88" y="46" width="128" height="80" rx="12" fill="#f3f0ea" />
+  <rect x="104" y="62" width="60" height="10" rx="5" fill="#4e7a6e" />
+  <rect x="104" y="84" width="96" height="6" rx="3" fill="#d5cfc4" />
+  <rect x="104" y="98" width="72" height="6" rx="3" fill="#d5cfc4" />
+</svg>

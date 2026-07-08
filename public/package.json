@@ -4,8 +4,9 @@
   "private": true,
   "description": "The canonical web-published content tree (origin tree) and its resolver/sync tooling. See README.md.",
   "type": "module",
+  "sideEffects": true,
   "scripts": {
-    "build": "node tools/cli.mjs build",
+    "build": "node tools/cli.mjs build && node tools/cli.mjs sync --to ../editor/public",
     "test": "vitest run"
   },
   "devDependencies": {
