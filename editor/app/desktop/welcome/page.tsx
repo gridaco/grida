@@ -157,10 +157,10 @@ export default function DesktopWelcomePage() {
   const composerSlotRef = useRef<HTMLDivElement>(null);
   const [docked, setDocked] = useState(false);
   const [heroHeight, setHeroHeight] = useState<number>();
-  // First-run onboarding (issue #813): zero-config Claude detection. Start
-  // hidden so the server render and first client render agree — `localStorage`
-  // is client-only, so seeding in the initializer would render the modal during
-  // SSR and tear it down on hydration for returning users. Decide after mount.
+  // First-run onboarding. Start hidden so the server render and first client
+  // render agree — `localStorage` is client-only, so seeding in the initializer
+  // would render the modal during SSR and tear it down on hydration for
+  // returning users. Decide after mount.
   const [onboarding, setOnboarding] = useState(false);
   useEffect(() => {
     if (!onboarding_flag.isComplete()) setOnboarding(true);

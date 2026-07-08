@@ -13,37 +13,34 @@
  *    arrives after mount, so it can't be baked into the first value).
  *
  * Precedence, highest first: an explicit caller-seeded pick / a stored
- * session model / a live GG session (included, no key) / the Claude-Code
- * default. BYOK is orthogonal — it changes who *serves* a chosen model
+ * session model / the Grida Gateway included hosted tier. BYOK is orthogonal
+ * — it changes who *serves* a chosen model
  * (BYOK → gg → endpoints), never which model a fresh chat defaults to.
  */
 import { TIER_MODEL_IDS } from "@grida/ai-models";
 
 /**
- * The keyless fallback default — Claude Code on Opus 4.8 (1M), the user's
- * own Claude subscription (issue #813): zero key, the largest context.
- * NOTE: assumes the user is logged in to Claude — with no Claude login and
- * no live Grida Gateway session, a first run hits `auth_required`. A live
- * GG session upgrades this to {@link GG_INCLUDED_MODEL_ID} so a signed-in,
- * no-BYOK user's first run just works (issue #942).
+ * The keyless fallback default — a catalog model id served through the
+ * BYOK → gg → endpoints precedence. Grida Gateway is the first-party path;
+ * ACP models remain runtime-only until they are explicitly surfaced again.
  */
-export const DEFAULT_MODEL_ID: string = "claude-code/opus-4.8-1m";
+export const DEFAULT_MODEL_ID: string = TIER_MODEL_IDS.pro;
 
 /**
  * The included hosted tier a live Grida Gateway session upgrades the
  * keyless default to — a catalog model id served by `gg` (the "pro" tier).
- * A catalog id (not a `claude-code/*` agent-provider id) so it routes
- * through the gateway under the BYOK → gg → endpoints precedence.
+ * A catalog id so it routes through the gateway under the BYOK → gg →
+ * endpoints precedence.
  */
 export const GG_INCLUDED_MODEL_ID: string = TIER_MODEL_IDS.pro;
 
 /**
  * The initial default for a new chat. An explicit caller-seeded `initial`
  * (a known id — e.g. the welcome handoff carrying the home composer's
- * pick) always wins; otherwise the Claude-Code default. The GG upgrade is
- * NOT applied here because session liveness is only known asynchronously
- * (see {@link shouldUpgradeToIncluded}); `ggActive` is threaded only so a
- * caller that already knows the state can seed the included model directly.
+ * pick) always wins; otherwise the first-party hosted default. `ggActive`
+ * is kept in the signature for callers that already know the state and for
+ * the async upgrade guard, but both fallback paths currently resolve to the
+ * same catalog id.
  */
 export function resolveDefaultModelId(opts: {
   initial?: string;

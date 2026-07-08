@@ -6,14 +6,14 @@ import {
   DialogTitle,
 } from "@app/ui/components/dialog";
 
-/** Step 1 — what Grida Desktop is + the on-your-own-subscription value prop. */
+/** Step 1 — what Grida Desktop is. */
 export function WelcomeStep() {
   return (
     <div data-testid="onboarding-step-welcome" className="flex flex-col gap-5">
       <DialogHeader>
         <DialogTitle>Welcome to Grida Desktop</DialogTitle>
         <DialogDescription>
-          Design and build on your machine, powered by your own Claude.
+          Design and build projects from your desktop.
         </DialogDescription>
       </DialogHeader>
     </div>

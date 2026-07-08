@@ -15,6 +15,4 @@ export type OnboardingStepProps = {
   next: () => void;
   /** Mark onboarding done and close the modal. */
   complete: () => void;
-  /** Finish onboarding and jump to Settings (the BYOK / local-model setup). */
-  openSettings: () => void;
 };

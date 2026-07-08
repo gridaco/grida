@@ -1,12 +1,10 @@
 "use client";
 
 /**
- * First-run onboarding modal (issue #813 zero-config Claude).
+ * First-run onboarding modal.
  *
  * A dedicated multi-step wizard shown once to a new desktop user (gated by
- * {@link onboarding_flag}): Welcome → Choose your AI → Open a workspace →
- * You're all set. Claude detection is ONE item inside the "Choose your AI"
- * step ({@link AiStep}), not the whole flow.
+ * {@link onboarding_flag}): Welcome → Open a workspace → You're all set.
  *
  * This orchestrator owns only the chrome: the non-dismissible {@link Dialog},
  * step navigation, the progress dots, and the shared {@link OnboardingState}.
@@ -15,14 +13,12 @@
  */
 
 import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@app/ui/components/button";
 import { Dialog, DialogContent } from "@app/ui/components/dialog";
 import { cn } from "@app/ui/lib/utils";
 import { onboarding_flag } from "@/lib/desktop/onboarding-flag";
 import type { OnboardingState, OnboardingStepProps } from "./types";
 import { WelcomeStep } from "./steps/welcome-step";
-import { AiStep } from "./steps/ai-step";
 import { WorkspaceStep } from "./steps/workspace-step";
 import { FinishStep } from "./steps/finish-step";
 
@@ -30,12 +26,12 @@ type StepDef = {
   /** Doubles as the artwork basename: `/onboarding/<id>.svg` (+ `-dark`). */
   id: string;
   Body: React.ComponentType<OnboardingStepProps>;
+  skippable?: boolean;
 };
 
 const STEPS: StepDef[] = [
   { id: "welcome", Body: WelcomeStep },
-  { id: "ai", Body: AiStep },
-  { id: "workspace", Body: WorkspaceStep },
+  { id: "workspace", Body: WorkspaceStep, skippable: true },
   { id: "finish", Body: FinishStep },
 ];
 
@@ -45,7 +41,6 @@ export function FirstRunOnboarding({
   /** Called when onboarding finishes; carries a workspace opened mid-flow. */
   onDone: (openedWorkspaceId?: string) => void;
 }) {
-  const router = useRouter();
   const [index, setIndex] = useState(0);
   const [state, setState] = useState<OnboardingState>({
     openedWorkspace: null,
@@ -60,14 +55,8 @@ export function FirstRunOnboarding({
     onDone(state.openedWorkspace?.id);
   }, [onDone, state.openedWorkspace]);
 
-  const openSettings = useCallback(() => {
-    // Choosing an alternative provider finishes onboarding and hands off to the
-    // settings setup (BYOK / Ollama) — don't re-prompt next launch.
-    onboarding_flag.markComplete();
-    router.push("/desktop/settings");
-  }, [router]);
-
   const isLast = index === STEPS.length - 1;
+  const isSkippable = STEPS[index].skippable === true;
 
   const next = useCallback(() => {
     if (index === STEPS.length - 1) complete();
@@ -83,7 +72,6 @@ export function FirstRunOnboarding({
     update,
     next,
     complete,
-    openSettings,
   };
 
   return (
@@ -136,9 +124,16 @@ export function FirstRunOnboarding({
 
         {/* Action footer — divider, progress dots, nav. */}
         <div className="border-t" />
-        <div className="flex items-center justify-between gap-2 px-6 pb-6 pt-4">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-6 pb-6 pt-4">
+          <div className="flex justify-start">
+            {index > 0 && (
+              <Button variant="ghost" onClick={back}>
+                Back
+              </Button>
+            )}
+          </div>
           <div
-            className="flex items-center gap-1.5"
+            className="flex items-center justify-center gap-1.5"
             aria-label={`Step ${index + 1} of ${STEPS.length}`}
           >
             {STEPS.map((s, i) => (
@@ -151,13 +146,8 @@ export function FirstRunOnboarding({
               />
             ))}
           </div>
-          <div className="flex gap-2">
-            {index > 0 && (
-              <Button variant="ghost" onClick={back}>
-                Back
-              </Button>
-            )}
-            {!isLast && (
+          <div className="flex justify-end gap-2">
+            {isSkippable && (
               <Button variant="ghost" onClick={complete}>
                 Skip
               </Button>

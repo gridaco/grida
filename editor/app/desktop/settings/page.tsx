@@ -1,12 +1,29 @@
 "use client";
 // GRIDA-GG: desktop — GG sign-out + BYOK precedence copy (docs/wg/platform/hosted-ai.md)
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ExternalLinkIcon,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Label } from "@app/ui/components/label";
 import { Switch } from "@app/ui/components/switch";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@app/ui/components/collapsible";
 import {
   Card,
   CardContent,
@@ -17,7 +34,18 @@ import {
 import { Skeleton } from "@app/ui/components/skeleton";
 import { models } from "@grida/ai-models";
 import {
-  BYOK_PROVIDER_LABELS,
+  BlackForestLabsLogo,
+  ClaudeLogo,
+  FalLogo,
+  GoogleLogo,
+  OllamaLogo,
+  OpenAILogo,
+  OpenRouterLogo,
+  RecraftLogo,
+  VercelLogo,
+  XAILogo,
+} from "@grida/react-icons/logos";
+import {
   DesktopBridgeMissingError,
   OLLAMA_ENDPOINT_PRESET,
   app,
@@ -28,6 +56,7 @@ import {
   resolveEndpointModel,
   secrets,
   type ByokProviderId,
+  type ByokProviderMetadata,
   type EndpointModelEntry,
   type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
@@ -61,19 +90,65 @@ export default function DesktopSettingsPage() {
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Account, credits, AI provider keys, local models, and app info.
+            Account, credits, providers, external agents, and app info.
           </p>
         </header>
 
         <AccountSection />
         <CreditsSection />
-        <ByokSection />
-        <ImageModelsSection />
-        <VideoModelsSection />
-        <LocalModelsSection />
+        <SettingsSection
+          title="LLM Providers"
+          description="Text model providers for Grida's native agent."
+        >
+          <ByokSection
+            title="Providers"
+            description={
+              <>
+                Connect provider API keys or local model endpoints.
+                Grida-included AI works when you&apos;re signed in; keys you add
+                here take precedence.
+              </>
+            }
+            modalities={["text"]}
+          >
+            <OllamaProviderRow />
+          </ByokSection>
+        </SettingsSection>
+        <SettingsSection
+          title="Image/Video/Audio Providers"
+          description="Generation providers for media workflows."
+        >
+          <ByokSection
+            title="Media Provider Keys"
+            description="Provider keys for image, video, and audio workflows. Providers that also serve LLMs may appear in both sections."
+            modalities={["image", "video"]}
+          />
+          <MediaModelsSection />
+        </SettingsSection>
+        <AcpSection />
         <AboutSection />
       </DesktopPageContent>
     </DesktopPageShell>
+  );
+}
+
+function SettingsSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-4">
+      <header>
+        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </header>
+      <div className="flex flex-col gap-4">{children}</div>
+    </section>
   );
 }
 
@@ -174,24 +249,109 @@ function AccountSection() {
   );
 }
 
-/* ────────────────────────────── BYOK ─────────────────────────────── */
+/* ───────────────────────────── Providers ──────────────────────────── */
 
-function ByokSection() {
-  const providers = secrets.byokProviderMetadata();
-  const precedence = providers.map((provider) => provider.label).join(" → ");
+type ProviderModality = "text" | "image" | "video";
+
+const BYOK_PROVIDER_LOGOS: Partial<
+  Record<ByokProviderId, React.ComponentType<React.ComponentProps<"svg">>>
+> = {
+  openrouter: OpenRouterLogo,
+  vercel: VercelLogo,
+  fal: FalLogo,
+};
+
+const MODEL_VENDOR_LOGOS: Partial<
+  Record<models.Vendor, React.ComponentType<React.ComponentProps<"svg">>>
+> = {
+  openai: OpenAILogo,
+  "recraft-ai": RecraftLogo,
+  google: GoogleLogo,
+  "black-forest-labs": BlackForestLabsLogo,
+  xai: XAILogo,
+};
+
+const BYOK_PROVIDER_SETUP: Record<
+  ByokProviderId,
+  {
+    label: string;
+    article: "an" | "a";
+    consoleLabel: string;
+    consoleHref: string;
+    placeholder: string;
+  }
+> = {
+  openrouter: {
+    label: "OpenRouter",
+    article: "an",
+    consoleLabel: "OpenRouter keys",
+    consoleHref: "https://openrouter.ai/settings/keys",
+    placeholder: "sk-or-v1-00000000000000000000000000000000",
+  },
+  vercel: {
+    label: "Vercel AI Gateway",
+    article: "a",
+    consoleLabel: "Vercel AI Gateway's console",
+    consoleHref: "https://vercel.com/ai-gateway",
+    placeholder: "vck_00000000000000000000000000000000",
+  },
+  fal: {
+    label: "fal",
+    article: "a",
+    consoleLabel: "fal dashboard keys",
+    consoleHref: "https://fal.ai/dashboard/keys",
+    placeholder: "fal_sk_00000000000000000000000000000000",
+  },
+};
+
+function providerServesAny(
+  provider: ByokProviderMetadata,
+  modalities: readonly ProviderModality[]
+): boolean {
+  return modalities.some((modality) =>
+    (provider.modalities as readonly string[]).includes(modality)
+  );
+}
+
+function ByokSection({
+  title,
+  description,
+  modalities,
+  excludeModalities = [],
+  children,
+}: {
+  title: string;
+  description: ReactNode;
+  modalities: readonly ProviderModality[];
+  excludeModalities?: readonly ProviderModality[];
+  children?: ReactNode;
+}) {
+  const byokProviders = secrets
+    .byokProviderMetadata()
+    .filter(
+      (provider) =>
+        providerServesAny(provider, modalities) &&
+        !providerServesAny(provider, excludeModalities)
+    );
+  const precedence = byokProviders
+    .map((provider) => provider.label)
+    .join(" → ");
   return (
     <Card>
       <CardHeader>
-        <CardTitle>AI Provider Keys</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Optional — when you&apos;re signed in, Grida-included AI is available
-          without a key. Keys you add here take precedence: {precedence}.
+          {description}
+          {precedence ? <> Precedence: {precedence}.</> : null}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-6">
-        {providers.map((provider) => (
-          <ByokRow key={provider.id} providerId={provider.id} />
-        ))}
+      <CardContent className="p-0">
+        <div className="divide-y">
+          {byokProviders.map((provider) => (
+            <ByokRow key={provider.id} provider={provider} />
+          ))}
+          {children}
+        </div>
       </CardContent>
     </Card>
   );
@@ -205,8 +365,11 @@ type RowState =
   | { kind: "removing" }
   | { kind: "error"; message: string; previous: "empty" | "configured" };
 
-function ByokRow({ providerId }: { providerId: ByokProviderId }) {
-  const label = BYOK_PROVIDER_LABELS[providerId];
+function ByokRow({ provider }: { provider: ByokProviderMetadata }) {
+  const providerId = provider.id;
+  const setup = BYOK_PROVIDER_SETUP[providerId];
+  const label = setup.label;
+  const [open, setOpen] = useState(false);
   const [state, setState] = useState<RowState>({ kind: "loading" });
   const [value, setValue] = useState("");
 
@@ -286,70 +449,159 @@ function ByokRow({ providerId }: { providerId: ByokProviderId }) {
     void refresh();
   }, [refresh]);
 
-  // Status pill — driven by the "stable" facet of state. Saving /
-  // removing keep the pill at the previous state so the user has a
-  // continuous visual anchor while the request is in flight.
+  // Row status — driven by the stable facet of state. Saving/removing keep the
+  // visible state steady so the row has a continuous visual anchor in flight.
   const statusKind = stableKind(state);
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">{label}</Label>
-        <StatusPill kind={statusKind} />
-      </div>
-
-      {state.kind === "loading" ? (
-        <Skeleton className="h-9 w-full" />
-      ) : statusKind === "configured" ? (
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={state.kind === "removing"}
-            onClick={() => void handleRemove()}
-          >
-            {state.kind === "removing" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
-            Remove
-          </Button>
-        </div>
-      ) : (
-        <div className="flex gap-2">
-          <Input
-            type="password"
-            placeholder={`Paste your ${label} key`}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            disabled={state.kind === "saving"}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <Button
-            size="default"
-            disabled={state.kind === "saving" || value.trim().length === 0}
-            onClick={() => void handleSave()}
-          >
-            {state.kind === "saving" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
-            Save
-          </Button>
-        </div>
-      )}
-
-      {state.kind === "error" && (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
         <button
           type="button"
-          role="alert"
-          aria-live="polite"
-          onClick={handleErrorDismiss}
-          className="self-start text-left text-sm text-destructive underline-offset-4 hover:underline"
+          className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          {state.message} (click to retry)
+          <span className="flex min-w-0 items-center gap-3">
+            <ProviderLogo providerId={providerId} label={label} />
+            <span className="truncate text-base font-medium">{label}</span>
+            {statusKind === "configured" && (
+              <CheckIcon className="size-4 shrink-0 text-emerald-600" />
+            )}
+          </span>
+          <span className="flex shrink-0 items-center gap-3">
+            {statusKind === "loading" && <Skeleton className="h-4 w-16" />}
+            <ChevronDownIcon
+              className={`size-4 text-muted-foreground transition-transform ${
+                open ? "rotate-180" : ""
+              }`}
+            />
+          </span>
         </button>
-      )}
-    </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="px-6 pb-5 text-sm text-muted-foreground">
+          <p className="text-foreground">
+            {statusKind === "configured"
+              ? `${label} is connected.`
+              : `To use Grida with ${label}, add ${setup.article} API key.`}
+          </p>
+          {statusKind !== "configured" && (
+            <>
+              <p className="mt-2">Follow these steps:</p>
+              <ul className="mt-2 space-y-1.5">
+                <li className="flex gap-2">
+                  <span aria-hidden="true">-</span>
+                  <span>
+                    Create an API key in{" "}
+                    <a
+                      href={setup.consoleHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-foreground underline underline-offset-4"
+                    >
+                      {setup.consoleLabel}
+                      <ExternalLinkIcon className="size-3" />
+                    </a>
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <span aria-hidden="true">-</span>
+                  <span>Paste your API key below and press Enter.</span>
+                </li>
+              </ul>
+            </>
+          )}
+
+          <div className="mt-3">
+            {state.kind === "loading" ? (
+              <Skeleton className="h-9 w-full" />
+            ) : statusKind === "configured" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={state.kind === "removing"}
+                onClick={() => void handleRemove()}
+              >
+                {state.kind === "removing" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                Remove key
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  placeholder={setup.placeholder}
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    void handleSave();
+                  }}
+                  disabled={state.kind === "saving"}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <Button
+                  size="default"
+                  disabled={
+                    state.kind === "saving" || value.trim().length === 0
+                  }
+                  onClick={() => void handleSave()}
+                >
+                  {state.kind === "saving" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : null}
+                  Save
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {state.kind === "error" && (
+            <button
+              type="button"
+              role="alert"
+              aria-live="polite"
+              onClick={handleErrorDismiss}
+              className="mt-2 text-left text-sm text-destructive underline-offset-4 hover:underline"
+            >
+              {state.message} (click to retry)
+            </button>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function ProviderLogo({
+  providerId,
+  label,
+}: {
+  providerId: ByokProviderId;
+  label: string;
+}) {
+  const Logo = BYOK_PROVIDER_LOGOS[providerId];
+  if (!Logo) {
+    return (
+      <span
+        aria-hidden="true"
+        className="flex size-5 shrink-0 items-center justify-center rounded border bg-muted text-[10px] font-medium text-muted-foreground"
+      >
+        {label.slice(0, 1)}
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex size-5 shrink-0 items-center justify-center rounded border bg-background">
+      <Logo
+        aria-hidden="true"
+        focusable="false"
+        className="size-4 text-foreground"
+      />
+    </span>
   );
 }
 
@@ -368,170 +620,291 @@ function stableKind(state: RowState): "loading" | "empty" | "configured" {
   }
 }
 
-function StatusPill({ kind }: { kind: "loading" | "empty" | "configured" }) {
-  if (kind === "loading") {
-    return <Skeleton className="h-4 w-24" />;
-  }
-  if (kind === "configured") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-        <span
-          aria-hidden="true"
-          className="size-2 rounded-full bg-emerald-500"
-        />
-        Configured
-      </span>
-    );
-  }
+/* ────────────────────────────── ACP ──────────────────────────────── */
+
+type AcpDetectState = "checking" | "installed" | "missing";
+
+function AcpSection() {
+  const [claude, setClaude] = useState<AcpDetectState>("checking");
+
+  const detect = useCallback(async () => {
+    setClaude("checking");
+    try {
+      const { installed } = await providers.detectClaude();
+      setClaude(installed ? "installed" : "missing");
+    } catch {
+      setClaude("installed");
+    }
+  }, []);
+
+  useEffect(() => {
+    void detect();
+  }, [detect]);
+
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-      <span
-        aria-hidden="true"
-        className="size-2 rounded-full bg-muted-foreground/40"
-      />
-      Not configured
-    </span>
+    <SettingsSection
+      title="ACP (Experimental)"
+      description="External agents connected through the Agent Client Protocol."
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>Claude Code</CardTitle>
+          <CardDescription>
+            Runs as an external agent on the user&apos;s Claude subscription.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded border bg-background">
+                <ClaudeLogo
+                  aria-hidden="true"
+                  focusable="false"
+                  className="size-5 text-foreground"
+                />
+              </span>
+              <div className="flex min-w-0 flex-col">
+                <span className="text-sm font-medium">Claude Code</span>
+                <span className="text-xs text-muted-foreground">
+                  Local CLI bridge via ACP.
+                </span>
+              </div>
+            </div>
+            {claude === "checking" ? (
+              <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                Checking
+              </span>
+            ) : claude === "installed" ? (
+              <span className="shrink-0 text-xs text-muted-foreground">
+                Detected
+              </span>
+            ) : (
+              <span className="shrink-0 text-xs text-muted-foreground">
+                Not found
+              </span>
+            )}
+          </div>
+
+          {claude === "missing" && (
+            <div className="flex flex-col gap-2 border-t pt-3 text-xs text-muted-foreground">
+              <code className="rounded bg-muted px-2 py-1 font-mono text-foreground">
+                npm install -g @anthropic-ai/claude-code
+              </code>
+              <Button
+                size="sm"
+                variant="outline"
+                className="self-start"
+                onClick={() => void detect()}
+              >
+                I&apos;ve installed it
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </SettingsSection>
   );
 }
 
 /* ───────────────────────────── Models ───────────────────────────── */
 
-/** Image providers, by precedence — one connected key serves the whole list. */
-const IMAGE_PROVIDER_IDS: ByokProviderId[] = ["openrouter", "vercel", "fal"];
+/** Media providers, by precedence — one connected key unlocks media routes. */
+const MEDIA_PROVIDER_IDS = [
+  "openrouter",
+  "vercel",
+  "fal",
+] as const satisfies readonly ByokProviderId[];
 
 /**
- * Image-generation models (#908). Shows the curated, provider-agnostic list and
- * a readiness line. Provider is hidden by design — connecting any one image
- * provider key (above) unlocks every model here. The agent host resolves the
- * provider per request; the renderer never sees the key (GRIDA-SEC-004).
+ * Media-generation models (#908). Shows the curated, provider-agnostic image
+ * and video lists with provider availability badges. The agent host resolves
+ * the provider per request; the renderer never sees the key (GRIDA-SEC-004).
  */
-function ImageModelsSection() {
+function MediaModelsSection() {
   const [ready, setReady] = useState<boolean | null>(null);
-  const supported = images.isSupported();
-  const listed = models.image.listed_models();
+  const imageSupported = images.isSupported();
+  const videoSupported = video.isSupported();
+  const imageModels = imageSupported ? models.image.listed_models() : [];
+  const videoModels = videoSupported ? models.video.listed_models() : [];
 
   useEffect(() => {
-    if (!supported) return;
+    if (!imageSupported && !videoSupported) return;
     let live = true;
     (async () => {
       const present = await Promise.all(
-        IMAGE_PROVIDER_IDS.map((id) => secrets.hasKey(id).catch(() => false))
+        MEDIA_PROVIDER_IDS.map((id) => secrets.hasKey(id).catch(() => false))
       );
       if (live) setReady(present.some(Boolean));
     })();
     return () => {
       live = false;
     };
-  }, [supported]);
+  }, [imageSupported, videoSupported]);
 
-  if (!supported) return null;
+  if (!imageSupported && !videoSupported) return null;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Image models</CardTitle>
+        <CardTitle>Media models</CardTitle>
         <CardDescription>
           {ready === null
             ? "Checking your connected providers…"
             : ready
-              ? "Ready — you can generate images with any model below."
-              : "Connect one provider key above (OpenRouter, Vercel, or fal) to use these."}
+              ? "Ready — you can generate media with the models below."
+              : "Connect an OpenRouter, Vercel, or fal key above to use these."}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {listed.map((card) => (
-          <div
-            key={card.id}
-            className="flex items-center justify-between gap-4 text-sm"
-          >
-            <div className="flex min-w-0 flex-col">
-              <span className="font-medium">{card.label}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {card.short_description}
-              </span>
-            </div>
-            {ready && (
-              <Button asChild variant="outline" size="sm" className="shrink-0">
-                <Link
-                  href={`/desktop/images?model=${encodeURIComponent(card.id)}`}
-                >
-                  Try this model
-                </Link>
-              </Button>
-            )}
-          </div>
-        ))}
+      <CardContent className="p-0">
+        {imageSupported && (
+          <MediaModelGroup
+            title="Image"
+            models={imageModels}
+            ready={ready === true}
+            hrefForModel={(id) =>
+              `/desktop/images?model=${encodeURIComponent(id)}`
+            }
+            actionLabel="Open in image generator"
+          />
+        )}
+        {videoSupported && (
+          <MediaModelGroup
+            title="Video"
+            models={videoModels}
+            ready={ready === true}
+            hrefForModel={(id) =>
+              `/desktop/video?model=${encodeURIComponent(id)}`
+            }
+            actionLabel="Open in video generator"
+          />
+        )}
       </CardContent>
     </Card>
   );
 }
 
-/** Video providers, by precedence. OpenRouter serves Veo + Seedance; Vercel
- *  serves every listed model; fal serves a subset (image-to-video). */
-const VIDEO_PROVIDER_IDS: ByokProviderId[] = ["openrouter", "vercel", "fal"];
+type MediaModelCard = {
+  id: string;
+  label: string;
+  short_description: string;
+  vendor: models.Vendor;
+  providers: object;
+};
 
-/**
- * Video-generation models (#908). Same provider-hidden treatment as image —
- * connecting a provider key above (Vercel covers every model) unlocks the list.
- */
-function VideoModelsSection() {
-  const [ready, setReady] = useState<boolean | null>(null);
-  const supported = video.isSupported();
-  const listed = models.video.listed_models();
+function MediaModelGroup({
+  title,
+  models,
+  ready,
+  hrefForModel,
+  actionLabel,
+}: {
+  title: string;
+  models: readonly MediaModelCard[];
+  ready: boolean;
+  hrefForModel: (id: string) => string;
+  actionLabel: string;
+}) {
+  return (
+    <section className="border-t first:border-t-0">
+      <header className="px-6 py-3">
+        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+      </header>
+      <div className="divide-y">
+        {models.map((card) => (
+          <MediaModelRow
+            key={card.id}
+            card={card}
+            ready={ready}
+            href={hrefForModel(card.id)}
+            actionLabel={actionLabel}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
 
-  useEffect(() => {
-    if (!supported) return;
-    let live = true;
-    (async () => {
-      const present = await Promise.all(
-        VIDEO_PROVIDER_IDS.map((id) => secrets.hasKey(id).catch(() => false))
-      );
-      if (live) setReady(present.some(Boolean));
-    })();
-    return () => {
-      live = false;
-    };
-  }, [supported]);
+function MediaModelRow({
+  card,
+  ready,
+  href,
+  actionLabel,
+}: {
+  card: MediaModelCard;
+  ready: boolean;
+  href: string;
+  actionLabel: string;
+}) {
+  return (
+    <div className="flex gap-3 px-6 py-4 text-sm">
+      <MediaVendorLogo vendor={card.vendor} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="font-medium">{card.label}</span>
+          <MediaProviderLogos providers={card.providers} />
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {card.short_description}
+        </span>
+        {ready && (
+          <Button
+            asChild
+            variant="link"
+            size="sm"
+            className="mt-1 h-auto self-start p-0 text-xs"
+          >
+            <Link href={href}>{actionLabel}</Link>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
-  if (!supported) return null;
+function MediaVendorLogo({ vendor }: { vendor: models.Vendor }) {
+  const Logo = MODEL_VENDOR_LOGOS[vendor];
+  if (!Logo) {
+    return (
+      <span
+        aria-hidden="true"
+        className="flex size-8 shrink-0 items-center justify-center rounded border bg-muted text-[10px] font-medium uppercase text-muted-foreground"
+      >
+        {vendor.slice(0, 1)}
+      </span>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Video models</CardTitle>
-        <CardDescription>
-          {ready === null
-            ? "Checking your connected providers…"
-            : ready
-              ? "Ready — you can generate video with the models below."
-              : "Connect an OpenRouter, Vercel, or fal key above to use these."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {listed.map((card) => (
-          <div
-            key={card.id}
-            className="flex items-center justify-between gap-4 text-sm"
+    <span
+      className="flex size-8 shrink-0 items-center justify-center rounded border bg-background"
+      aria-hidden="true"
+    >
+      <Logo focusable="false" className="size-5 text-foreground" />
+    </span>
+  );
+}
+
+function MediaProviderLogos({ providers }: { providers: object }) {
+  const providerIds = MEDIA_PROVIDER_IDS.filter((id) =>
+    Object.prototype.hasOwnProperty.call(providers, id)
+  );
+
+  return (
+    <div className="flex shrink-0 -space-x-1" aria-hidden="true">
+      {providerIds.map((id) => {
+        const Logo = BYOK_PROVIDER_LOGOS[id];
+        if (!Logo) return null;
+        return (
+          <span
+            key={id}
+            className="flex size-5 items-center justify-center rounded border bg-background ring-1 ring-background"
           >
-            <div className="flex min-w-0 flex-col">
-              <span className="font-medium">{card.label}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {card.short_description}
-              </span>
-            </div>
-            {ready && (
-              <Button asChild variant="outline" size="sm" className="shrink-0">
-                <Link
-                  href={`/desktop/video?model=${encodeURIComponent(card.id)}`}
-                >
-                  Try this model
-                </Link>
-              </Button>
-            )}
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+            <Logo focusable="false" className="size-3.5 text-foreground" />
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -554,7 +927,8 @@ type LocalState =
   | { kind: "saving"; draft: EndpointProviderConfig | null }
   | { kind: "error"; message: string; draft: EndpointProviderConfig | null };
 
-function LocalModelsSection() {
+function OllamaProviderRow() {
+  const [open, setOpen] = useState(false);
   const [state, setState] = useState<LocalState>({ kind: "loading" });
   const [newModelId, setNewModelId] = useState("");
   const [probing, setProbing] = useState(false);
@@ -729,179 +1103,241 @@ function LocalModelsSection() {
   // than render a dead section.
   if (state.kind === "unsupported") return null;
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Local Models</CardTitle>
-        <CardDescription>
-          Run the agent on your own machine with{" "}
-          <a
-            className="underline underline-offset-4"
-            href="https://ollama.com"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Ollama
-          </a>{" "}
-          — no account, no API key. Start <code>ollama serve</code> and pull a
-          model; Grida detects it automatically. Local models vary widely in
-          agent ability; larger models (~30B+) are recommended for agent tasks.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {state.kind === "loading" ? (
-          <Skeleton className="h-9 w-full" />
-        ) : !draft ? (
-          <div className="flex justify-start">
-            <Button variant="outline" onClick={handleEnable}>
-              Set up Ollama
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div className="flex flex-col gap-2">
-              <Label className="text-sm font-medium">Base URL</Label>
-              <Input
-                value={draft.base_url}
-                onChange={(e) => edit({ ...draft, base_url: e.target.value })}
-                placeholder={OLLAMA_ENDPOINT_PRESET.base_url}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </div>
+  const connected = persisted && draft != null;
 
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Models</Label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={probing || state.kind === "saving"}
-                  onClick={() => void detectInto(draft, { persist: false })}
-                >
-                  {probing ? <Loader2 className="size-4 animate-spin" /> : null}
-                  Detect
-                </Button>
-              </div>
-              {probeNote && (
-                <p className="text-xs text-muted-foreground" role="status">
-                  {probeNote}
-                </p>
-              )}
-              {draft.models.length === 0 && !probing && (
-                <p className="text-xs text-muted-foreground">
-                  Models you pulled in Ollama are detected automatically — or
-                  add one by id (e.g. <code>llama3.1:8b</code>). The first model
-                  is the default.
-                </p>
-              )}
-              {draft.models.map((model, index) => (
-                <LocalModelRow
-                  key={model.id}
-                  model={model}
-                  onChange={(next) =>
-                    edit({
-                      ...draft,
-                      models: draft.models.map((m, i) =>
-                        i === index ? next : m
-                      ),
-                    })
-                  }
-                  onRemove={() =>
-                    edit({
-                      ...draft,
-                      models: draft.models.filter((_, i) => i !== index),
-                      default_model_id:
-                        draft.default_model_id === model.id
-                          ? undefined
-                          : draft.default_model_id,
-                    })
-                  }
-                />
-              ))}
-              <div className="flex gap-2">
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex size-5 shrink-0 items-center justify-center rounded border bg-background">
+              <OllamaLogo
+                aria-hidden="true"
+                focusable="false"
+                className="size-4 text-foreground"
+              />
+            </span>
+            <span className="truncate text-base font-medium">Ollama</span>
+            {connected && (
+              <CheckIcon className="size-4 shrink-0 text-emerald-600" />
+            )}
+          </span>
+          <span className="flex shrink-0 items-center gap-3">
+            {state.kind === "loading" && <Skeleton className="h-4 w-16" />}
+            <ChevronDownIcon
+              className={`size-4 text-muted-foreground transition-transform ${
+                open ? "rotate-180" : ""
+              }`}
+            />
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="flex flex-col gap-4 px-6 pb-5 text-sm text-muted-foreground">
+          <p className="text-foreground">
+            Run LLMs locally on your machine with{" "}
+            <a
+              className="underline underline-offset-4"
+              href="https://ollama.com"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Ollama
+            </a>
+            , or connect to an Ollama server. Local models vary widely in agent
+            ability; larger models (~30B+) are recommended for agent tasks.
+          </p>
+          <div>
+            <p>To use local Ollama:</p>
+            <ul className="mt-2 space-y-1.5">
+              <li className="flex gap-2">
+                <span aria-hidden="true">-</span>
+                <span>
+                  Download and install Ollama from{" "}
+                  <a
+                    className="inline-flex items-center gap-1 text-foreground underline underline-offset-4"
+                    href="https://ollama.com"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    ollama.com
+                    <ExternalLinkIcon className="size-3" />
+                  </a>
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span aria-hidden="true">-</span>
+                <span>
+                  Start Ollama and pull a model with{" "}
+                  <code>ollama run gpt-oss:20b</code>
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span aria-hidden="true">-</span>
+                <span>Set up the endpoint below to start using Ollama.</span>
+              </li>
+            </ul>
+          </div>
+          {state.kind === "loading" ? (
+            <Skeleton className="h-9 w-full" />
+          ) : !draft ? (
+            <div className="flex justify-start">
+              <Button variant="outline" onClick={handleEnable}>
+                Set up Ollama
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm font-medium">Base URL</Label>
                 <Input
-                  value={newModelId}
-                  onChange={(e) => setNewModelId(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addModel();
-                    }
-                  }}
-                  placeholder="model id, e.g. llama3.1:8b"
+                  value={draft.base_url}
+                  onChange={(e) => edit({ ...draft, base_url: e.target.value })}
+                  placeholder={OLLAMA_ENDPOINT_PRESET.base_url}
                   autoComplete="off"
                   spellCheck={false}
                 />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Models</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={probing || state.kind === "saving"}
+                    onClick={() => void detectInto(draft, { persist: false })}
+                  >
+                    {probing ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : null}
+                    Detect
+                  </Button>
+                </div>
+                {probeNote && (
+                  <p className="text-xs text-muted-foreground" role="status">
+                    {probeNote}
+                  </p>
+                )}
+                {draft.models.length === 0 && !probing && (
+                  <p className="text-xs text-muted-foreground">
+                    Models you pulled in Ollama are detected automatically — or
+                    add one by id (e.g. <code>llama3.1:8b</code>). The first
+                    model is the default.
+                  </p>
+                )}
+                {draft.models.map((model, index) => (
+                  <LocalModelRow
+                    key={model.id}
+                    model={model}
+                    onChange={(next) =>
+                      edit({
+                        ...draft,
+                        models: draft.models.map((m, i) =>
+                          i === index ? next : m
+                        ),
+                      })
+                    }
+                    onRemove={() =>
+                      edit({
+                        ...draft,
+                        models: draft.models.filter((_, i) => i !== index),
+                        default_model_id:
+                          draft.default_model_id === model.id
+                            ? undefined
+                            : draft.default_model_id,
+                      })
+                    }
+                  />
+                ))}
+                <div className="flex gap-2">
+                  <Input
+                    value={newModelId}
+                    onChange={(e) => setNewModelId(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addModel();
+                      }
+                    }}
+                    placeholder="model id, e.g. llama3.1:8b"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <Button
+                    variant="outline"
+                    disabled={newModelId.trim().length === 0}
+                    onClick={addModel}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+
+              {persisted && (
+                <EndpointKeyRow
+                  endpointId={draft.id}
+                  label={draft.label ?? draft.id}
+                />
+              )}
+
+              <div className="flex items-center justify-between">
                 <Button
-                  variant="outline"
-                  disabled={newModelId.trim().length === 0}
-                  onClick={addModel}
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  disabled={state.kind === "saving"}
+                  onClick={() => void handleRemove()}
                 >
-                  Add
+                  Remove
+                </Button>
+                <Button
+                  size="default"
+                  disabled={saveDisabled}
+                  onClick={() => void handleSave()}
+                >
+                  {state.kind === "saving" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : null}
+                  Save
                 </Button>
               </div>
-            </div>
+            </>
+          )}
 
-            {persisted && (
-              <EndpointKeyRow
-                endpointId={draft.id}
-                label={draft.label ?? draft.id}
-              />
-            )}
-
-            <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive"
-                disabled={state.kind === "saving"}
-                onClick={() => void handleRemove()}
-              >
-                Remove
-              </Button>
-              <Button
-                size="default"
-                disabled={saveDisabled}
-                onClick={() => void handleSave()}
-              >
-                {state.kind === "saving" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : null}
-                Save
-              </Button>
-            </div>
-          </>
-        )}
-
-        {state.kind === "error" && (
-          <button
-            type="button"
-            role="alert"
-            aria-live="polite"
-            onClick={() => void refresh()}
-            className="self-start text-left text-sm text-destructive underline-offset-4 hover:underline"
-          >
-            {state.message} (click to retry)
-          </button>
-        )}
-
-        {draft && providers.canRevealConfigFile() && (
-          <p className="text-xs text-muted-foreground">
-            Stored as plain JSON — detected values refresh automatically; to pin
-            a value the endpoint reports wrong, set <code>overrides</code> in{" "}
+          {state.kind === "error" && (
             <button
               type="button"
-              className="underline underline-offset-4 hover:text-foreground"
-              onClick={() => void providers.revealConfigFile()}
+              role="alert"
+              aria-live="polite"
+              onClick={() => void refresh()}
+              className="self-start text-left text-sm text-destructive underline-offset-4 hover:underline"
             >
-              endpoints.json
+              {state.message} (click to retry)
             </button>
-            .
-          </p>
-        )}
-      </CardContent>
-    </Card>
+          )}
+
+          {draft && providers.canRevealConfigFile() && (
+            <p className="text-xs text-muted-foreground">
+              Stored as plain JSON — detected values refresh automatically; to
+              pin a value the endpoint reports wrong, set <code>overrides</code>{" "}
+              in{" "}
+              <button
+                type="button"
+                className="underline underline-offset-4 hover:text-foreground"
+                onClick={() => void providers.revealConfigFile()}
+              >
+                endpoints.json
+              </button>
+              .
+            </p>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
