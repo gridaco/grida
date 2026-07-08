@@ -566,7 +566,7 @@ export function AISidebarChat({
 
       {/* The agent is asking — session-global prompt above the composer. */}
       {pendingQuestion && (
-        <div className="shrink-0 border-t p-3">
+        <div className="shrink-0 px-3 py-2">
           <QuestionCard
             entry={pendingQuestion}
             onAnswer={onAnswerQuestion}

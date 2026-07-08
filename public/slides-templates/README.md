@@ -17,8 +17,8 @@ tree](../README.md): `decks/` is the committed source of truth,
 
 ## The starter set
 
-Six decks, each a distinct **communication job × visual system** — so the set
-covers six audiences and six looks with no redundancy.
+Seven decks, each a distinct **communication job × visual system** — so the set
+covers seven audiences and seven looks with no redundancy.
 
 | Bundle                    | Job                             | Visual system                                                               | Slides |
 | ------------------------- | ------------------------------- | --------------------------------------------------------------------------- | ------ |
@@ -28,6 +28,7 @@ covers six audiences and six looks with no redundancy.
 | `workshop-session.canvas` | Facilitate a group session      | **Studio** — soft pastels, rounded cards, squiggle accents                  | 9      |
 | `product-showcase.canvas` | Show a product / feature set    | **Bento** — dark canvas, filled bento grid of type + stats + UI screenshots | 8      |
 | `portfolio.canvas`        | Land a job (student / new-grad) | **Marque** — bold personal-brand: bone + one persimmon accent, huge type    | 9      |
+| `light-slides.canvas`     | Build a deck from slide layouts | **Light** — neutral editorial layouts for title/content/data/story slides   | 26     |
 
 ## Visual systems
 
@@ -43,6 +44,7 @@ soft-human).
 | **studio**     | blush `#F6D8D2`, sky `#CFE3EC`, butter `#F3E7C4`, sage `#D5E0CE`, ink `#3A3A3A`, coral `#EF7A6D`                                                                                | Poppins + Nunito Sans             | rounded cards, squiggle underlines, soft blobs                                                                                                                            |
 | **bento**      | warm near-black `#161513`; **neutrals lead** — cream `#EFEBE2`, dark card `#201F1C`; muted accents used 1–2×/slide — terracotta `#DE7A5C`, sage `#AFC17C`, periwinkle `#8E93D6` | Inter Tight + Inter               | bento grid, one clear hero per slide; every cell is **filled** — large centred type, a big stat, or a drawn product-UI screenshot (no placeholders, no decorative filler) |
 | **marque**     | bone `#ECE8DF`, ink `#191612`, dark card `#1B1A17`; ONE bold signature accent (default persimmon `#FF5233`, the swappable "brand color")                                        | Inter Tight, huge                 | bold personal-brand: accent-field cover/close with a huge name + monogram; content is neutrals + one accent pop; drawn work-sample thumbnails                             |
+| **light**      | soft white `#FAFAFA`, ink `#0A0A0A`, muted black alpha tiers                                                                                                                    | Helvetica Neue / system sans      | simple editorial layout primitives: large headings, rules, columns, charts, quotes, and closing slides                                                                    |
 
 Fonts are declared as graceful stacks (e.g. `"Playfair Display",Georgia,serif`)
 so a slide degrades to a system face where the web font is absent.

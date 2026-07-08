@@ -59,8 +59,7 @@ export function isQuestionEntry(entry: ToolCallEntry): boolean {
   return getToolName(entry) === QUESTION_TOOL_NAME;
 }
 
-/** Tolerate the AI SDK's `toolCallId` (live stream) vs the persisted
- *  `tool_call_id` (rehydrated from the DB on reload). */
+/** Tolerate the AI SDK's `toolCallId` plus legacy persisted `tool_call_id`. */
 function toolCallIdOf(entry: ToolCallEntry): string {
   const e = entry as { toolCallId?: string; tool_call_id?: string };
   return e.toolCallId ?? e.tool_call_id ?? "";
@@ -68,6 +67,19 @@ function toolCallIdOf(entry: ToolCallEntry): string {
 
 function inputOf(entry: ToolCallEntry): unknown {
   return "input" in entry ? entry.input : undefined;
+}
+
+function optionCardClassName(selected: boolean, disabled: boolean) {
+  return cn(
+    "flex cursor-pointer items-start gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm font-normal transition-colors hover:bg-muted/50",
+    selected &&
+      "border-primary/60 bg-primary/10 text-primary hover:bg-primary/15",
+    disabled && "cursor-default opacity-70"
+  );
+}
+
+function optionDescriptionClassName(selected: boolean) {
+  return cn("text-xs", selected ? "text-primary/80" : "text-muted-foreground");
 }
 
 /**
@@ -144,6 +156,7 @@ export function QuestionCard({
   const questionId = `${labelId}-q${qi}`;
   const hasOptions = (q.options?.length ?? 0) > 0;
   const writeIn = survey.writeInFor(qi);
+  const writeInSelected = survey.isCustomSelected(qi);
 
   const finalize = (s: QuestionSurvey) => {
     if (busy) return;
@@ -160,7 +173,7 @@ export function QuestionCard({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 rounded-lg border bg-background p-3 shadow-lg shadow-black/10">
       <div className="flex flex-col gap-2">
         {(q.header || survey.multiStep) && (
           <div className="flex items-center justify-between gap-2">
@@ -186,22 +199,22 @@ export function QuestionCard({
             disabled={busy}
             className="gap-1.5"
           >
-            {q.options!.map((opt, oi) => (
-              <Label
-                key={oi}
-                className="flex cursor-pointer items-start gap-2 text-sm font-normal"
-              >
-                <RadioGroupItem value={opt.label} className="mt-0.5" />
-                <span className="flex flex-col">
-                  <span>{opt.label}</span>
-                  {opt.description && (
-                    <span className="text-xs text-muted-foreground">
-                      {opt.description}
-                    </span>
-                  )}
-                </span>
-              </Label>
-            ))}
+            {q.options!.map((opt, oi) => {
+              const selected = survey.pickedFor(qi)[0] === opt.label;
+              return (
+                <Label key={oi} className={optionCardClassName(selected, busy)}>
+                  <RadioGroupItem value={opt.label} className="mt-0.5" />
+                  <span className="flex flex-col">
+                    <span>{opt.label}</span>
+                    {opt.description && (
+                      <span className={optionDescriptionClassName(selected)}>
+                        {opt.description}
+                      </span>
+                    )}
+                  </span>
+                </Label>
+              );
+            })}
           </RadioGroup>
         )}
 
@@ -211,49 +224,60 @@ export function QuestionCard({
             aria-labelledby={questionId}
             className="flex flex-col gap-1.5"
           >
-            {q.options!.map((opt, oi) => (
-              <Label
-                key={oi}
-                className="flex cursor-pointer items-start gap-2 text-sm font-normal"
-              >
-                <Checkbox
-                  checked={survey.pickedFor(qi).includes(opt.label)}
-                  onCheckedChange={() =>
-                    setSurvey(survey.togglePick(qi, opt.label))
-                  }
-                  disabled={busy}
-                  className="mt-0.5"
-                />
-                <span className="flex flex-col">
-                  <span>{opt.label}</span>
-                  {opt.description && (
-                    <span className="text-xs text-muted-foreground">
-                      {opt.description}
-                    </span>
-                  )}
-                </span>
-              </Label>
-            ))}
+            {q.options!.map((opt, oi) => {
+              const selected = survey.pickedFor(qi).includes(opt.label);
+              return (
+                <Label key={oi} className={optionCardClassName(selected, busy)}>
+                  <Checkbox
+                    checked={selected}
+                    onCheckedChange={() =>
+                      setSurvey(survey.togglePick(qi, opt.label))
+                    }
+                    disabled={busy}
+                    className="mt-0.5"
+                  />
+                  <span className="flex flex-col">
+                    <span>{opt.label}</span>
+                    {opt.description && (
+                      <span className={optionDescriptionClassName(selected)}>
+                        {opt.description}
+                      </span>
+                    )}
+                  </span>
+                </Label>
+              );
+            })}
           </div>
         )}
 
-        <Textarea
-          aria-labelledby={questionId}
-          value={writeIn}
-          onFocus={() => setSurvey(survey.selectCustom(qi))}
-          onChange={(e) => setSurvey(survey.setWriteIn(qi, e.target.value))}
-          disabled={busy}
-          rows={2}
-          placeholder={
-            hasOptions ? "Or write your own answer…" : "Type your answer…"
-          }
-          // Highlight the custom field while it holds the answer (its options are
-          // cleared), so "custom is selected" reads visually.
-          className={cn(
-            "text-sm",
-            writeIn.trim().length > 0 && "ring-1 ring-ring"
-          )}
-        />
+        <div className={optionCardClassName(writeInSelected, busy)}>
+          <Checkbox
+            checked={writeInSelected}
+            onCheckedChange={(checked) =>
+              setSurvey((current) =>
+                checked === true
+                  ? current.selectCustom(qi)
+                  : current.clearCustom(qi)
+              )
+            }
+            disabled={busy}
+            className="mt-0.5"
+          />
+          <Textarea
+            aria-labelledby={questionId}
+            value={writeIn}
+            onFocus={() => setSurvey((current) => current.selectCustom(qi))}
+            onChange={(e) =>
+              setSurvey((current) => current.setWriteIn(qi, e.target.value))
+            }
+            disabled={busy}
+            rows={2}
+            placeholder={
+              hasOptions ? "Or write your own answer…" : "Type your answer…"
+            }
+            className="min-h-14 resize-y border-0 bg-transparent p-0 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -261,7 +285,7 @@ export function QuestionCard({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="xs"
             onClick={() => setSurvey(survey.back())}
             disabled={busy}
           >
@@ -272,7 +296,7 @@ export function QuestionCard({
         <Button
           type="button"
           variant="ghost"
-          size="sm"
+          size="xs"
           onClick={onSkip}
           disabled={busy}
         >
@@ -281,7 +305,7 @@ export function QuestionCard({
         {survey.multiStep && !survey.isLast ? (
           <Button
             type="button"
-            size="sm"
+            size="xs"
             onClick={() => setSurvey(survey.next())}
             disabled={!survey.currentAnswered || busy}
           >
@@ -290,7 +314,7 @@ export function QuestionCard({
         ) : (
           <Button
             type="button"
-            size="sm"
+            size="xs"
             onClick={() => finalize(survey)}
             disabled={!survey.canSubmit || busy}
           >

@@ -166,10 +166,17 @@ class PartAccumulator {
     if (existing) {
       const data = existing.data as {
         tool_name?: unknown;
+        toolName?: unknown;
         input?: unknown;
       } | null;
-      if (typeof data?.tool_name === "string" && data.tool_name.length > 0) {
-        this.tool_name_by_call.set(toolCallId, data.tool_name);
+      const toolName =
+        data?.toolName ??
+        data?.tool_name ??
+        (existing.type.startsWith("tool-")
+          ? existing.type.slice("tool-".length)
+          : undefined);
+      if (typeof toolName === "string" && toolName.length > 0) {
+        this.tool_name_by_call.set(toolCallId, toolName);
       }
       if (data?.input !== undefined && !this.input_by_tool.has(toolCallId)) {
         this.input_by_tool.set(toolCallId, data.input);
@@ -321,23 +328,23 @@ class PartAccumulator {
           : "tool";
       const data: Record<string, unknown> = {
         type: partType,
-        tool_call_id: toolCallId,
-        tool_name: stickyToolName,
+        toolCallId,
         state: toolState,
       };
+      if (c.dynamic && stickyToolName) data.toolName = stickyToolName;
       // Use the remembered input, not `c.input`: the terminal
       // `tool-output-available` chunk omits it, and upsertPart replaces the
       // row wholesale, so reading the chunk here would erase the input on the
       // final write and poison the session for the next turn.
       if (stickyInput !== undefined) data.input = stickyInput;
       const inputTextDelta = c.input_text_delta ?? c.inputTextDelta;
-      if (inputTextDelta !== undefined) data.input_text_delta = inputTextDelta;
+      if (inputTextDelta !== undefined) data.inputTextDelta = inputTextDelta;
       if (c.output !== undefined) data.output = c.output;
       const errorText = c.error_text ?? c.errorText;
-      if (errorText !== undefined) data.error_text = errorText;
+      if (errorText !== undefined) data.errorText = errorText;
       const providerExecuted = c.provider_executed ?? c.providerExecuted;
       if (providerExecuted !== undefined) {
-        data.provider_executed = providerExecuted;
+        data.providerExecuted = providerExecuted;
       }
       await this.opts.store.upsertPart(messageId, {
         index: partIndex,
@@ -374,8 +381,7 @@ class PartAccumulator {
       const partType = stickyToolName ? `tool-${stickyToolName}` : "tool";
       const data: Record<string, unknown> = {
         type: partType,
-        tool_call_id: toolCallId,
-        tool_name: stickyToolName,
+        toolCallId,
         state: "approval-requested",
         approval: { id: approvalId },
       };

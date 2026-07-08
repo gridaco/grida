@@ -35,6 +35,7 @@ import type { ChatMessageWithParts } from "../session/rows";
 import { compactionBoundary } from "../session/boundary";
 import { AgentVision } from "../vision";
 import { CONTEXT_MARKERS } from "../protocol/context";
+import { normalizeSdkToolPartFields } from "../protocol/tool-part-fields";
 
 export type ModelUIMessage = {
   id: string;
@@ -275,9 +276,5 @@ function toSdkToolPart(
   data: Record<string, unknown>,
   fallbackToolCallId: string | null
 ): Record<string, unknown> {
-  const toolCallId = data.tool_call_id ?? fallbackToolCallId;
-  const out: Record<string, unknown> = { ...data };
-  delete out.tool_call_id;
-  if (typeof toolCallId === "string") out.toolCallId = toolCallId;
-  return out;
+  return normalizeSdkToolPartFields(data, fallbackToolCallId);
 }

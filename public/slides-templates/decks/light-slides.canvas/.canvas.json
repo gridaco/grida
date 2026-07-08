@@ -1,0 +1,146 @@
+{
+  "$schema": "https://grida.co/schema/dotcanvas/v1.json",
+  "version": "1",
+  "editor": "slides",
+  "files": ["*.svg"],
+  "documents": [
+    {
+      "src": "001.svg",
+      "id": "blank",
+      "name": "Blank"
+    },
+    {
+      "src": "002.svg",
+      "id": "title",
+      "name": "Slide Deck Title"
+    },
+    {
+      "src": "003.svg",
+      "id": "title-centered",
+      "name": "Centered title"
+    },
+    {
+      "src": "004.svg",
+      "id": "title-eyebrow",
+      "name": "Title with eyebrow"
+    },
+    {
+      "src": "005.svg",
+      "id": "section",
+      "name": "Section title"
+    },
+    {
+      "src": "006.svg",
+      "id": "section-desc",
+      "name": "Section title with description"
+    },
+    {
+      "src": "007.svg",
+      "id": "section-bottom",
+      "name": "Section title (bottom)"
+    },
+    {
+      "src": "008.svg",
+      "id": "section-numbered",
+      "name": "Numbered section"
+    },
+    {
+      "src": "009.svg",
+      "id": "heading-body",
+      "name": "Heading and body"
+    },
+    {
+      "src": "010.svg",
+      "id": "bullets",
+      "name": "Bullet list"
+    },
+    {
+      "src": "011.svg",
+      "id": "highlight",
+      "name": "Highlight"
+    },
+    {
+      "src": "012.svg",
+      "id": "two-column",
+      "name": "Two columns"
+    },
+    {
+      "src": "013.svg",
+      "id": "three-column",
+      "name": "Three columns"
+    },
+    {
+      "src": "014.svg",
+      "id": "callout",
+      "name": "Callout"
+    },
+    {
+      "src": "015.svg",
+      "id": "image-text",
+      "name": "Image + text"
+    },
+    {
+      "src": "016.svg",
+      "id": "big-number",
+      "name": "Big number"
+    },
+    {
+      "src": "017.svg",
+      "id": "stats-three",
+      "name": "Three stats"
+    },
+    {
+      "src": "018.svg",
+      "id": "comparison",
+      "name": "Before / After"
+    },
+    {
+      "src": "019.svg",
+      "id": "bar-chart",
+      "name": "Bar chart"
+    },
+    {
+      "src": "020.svg",
+      "id": "line-chart",
+      "name": "Line chart"
+    },
+    {
+      "src": "021.svg",
+      "id": "quote",
+      "name": "Quote"
+    },
+    {
+      "src": "022.svg",
+      "id": "agenda",
+      "name": "Agenda"
+    },
+    {
+      "src": "023.svg",
+      "id": "timeline",
+      "name": "Timeline"
+    },
+    {
+      "src": "024.svg",
+      "id": "thank-you",
+      "name": "Thank you"
+    },
+    {
+      "src": "025.svg",
+      "id": "qanda",
+      "name": "Q&A"
+    },
+    {
+      "src": "026.svg",
+      "id": "contact",
+      "name": "Contact"
+    }
+  ],
+  "ext": {
+    "co.grida.templates": {
+      "title": "Light slides",
+      "prompt": "Create a clean light presentation deck using simple editorial slide layouts: title, section, content, data, story, and closing slides.",
+      "system": "light",
+      "activeId": "title"
+    }
+  }
+}

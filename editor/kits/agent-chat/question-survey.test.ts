@@ -89,7 +89,31 @@ describe("QuestionSurvey — answer building", () => {
   it("selectCustom deselects options for that question", () => {
     const s = QuestionSurvey.from(SINGLE).togglePick(0, "Warm").selectCustom(0);
     expect(s.pickedFor(0)).toEqual([]);
+    expect(s.isCustomSelected(0)).toBe(true);
     expect(s.answersFor(0)).toEqual([]); // nothing typed yet
+  });
+
+  it("custom selection starts on focus and lives until cleared or another option is picked", () => {
+    const focused = QuestionSurvey.from(SINGLE).selectCustom(0);
+    expect(focused.isCustomSelected(0)).toBe(true);
+    expect(focused.answersFor(0)).toEqual([]);
+
+    const typedThenCleared = focused.setWriteIn(0, "Pastel").setWriteIn(0, "");
+    expect(typedThenCleared.isCustomSelected(0)).toBe(true);
+    expect(typedThenCleared.answersFor(0)).toEqual([]);
+
+    const picked = typedThenCleared.togglePick(0, "Cool");
+    expect(picked.isCustomSelected(0)).toBe(false);
+    expect(picked.answersFor(0)).toEqual(["Cool"]);
+  });
+
+  it("clearCustom clears the write-in and deselects the custom row", () => {
+    const s = QuestionSurvey.from(SINGLE)
+      .setWriteIn(0, "Pastel")
+      .clearCustom(0);
+    expect(s.writeInFor(0)).toBe("");
+    expect(s.isCustomSelected(0)).toBe(false);
+    expect(s.answersFor(0)).toEqual([]);
   });
 });
 

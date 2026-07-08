@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+
+  <title>Light slides - Highlight</title>
+<rect width="1920" height="1080" fill="#FAFAFA"/>
+  <text x="160" y="540" font-family="'Helvetica Neue', sans-serif" font-size="92" font-weight="800" fill="#0A0A0A" letter-spacing="-2">Highlight</text>
+  <text font-family="'Helvetica Neue', sans-serif" font-size="28" font-weight="400" fill="rgba(10,10,10,0.55)">
+    <tspan x="1080" y="500">Use this slide to highlight a single,</tspan>
+    <tspan x="1080" y="540">important thing. To keep it short and</tspan>
+    <tspan x="1080" y="580">sweet, you might link away to relevant</tspan>
+    <tspan x="1080" y="620">doc or file.</tspan>
+  </text>
+</svg>

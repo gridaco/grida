@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+
+  <title>Light slides - Centered title</title>
+<rect width="1920" height="1080" fill="#FAFAFA"/>
+  <text x="960" y="500" text-anchor="middle" font-family="'Helvetica Neue', sans-serif" font-size="15" font-weight="700" fill="rgba(10,10,10,0.55)" letter-spacing="3">A PRESENTATION</text>
+  <text x="960" y="600" text-anchor="middle" font-family="'Helvetica Neue', sans-serif" font-size="96" font-weight="800" fill="#0A0A0A" letter-spacing="-2.5">Centered Title</text>
+  <text x="960" y="680" text-anchor="middle" font-family="'Helvetica Neue', sans-serif" font-size="26" font-weight="400" fill="rgba(10,10,10,0.55)">A short, memorable subtitle goes here.</text>
+</svg>

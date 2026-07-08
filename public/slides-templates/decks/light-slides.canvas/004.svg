@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+
+  <title>Light slides - Title with eyebrow</title>
+<rect width="1920" height="1080" fill="#FAFAFA"/>
+  <rect x="160" y="200" width="48" height="4" fill="#0A0A0A"/>
+  <text x="160" y="260" font-family="'Helvetica Neue', sans-serif" font-size="20" font-weight="700" fill="#0A0A0A" letter-spacing="2">CHAPTER ONE</text>
+  <text font-family="'Helvetica Neue', sans-serif" font-size="120" font-weight="800" fill="#0A0A0A" letter-spacing="-3">
+    <tspan x="160" y="500">Beginnings,</tspan>
+    <tspan x="160" y="640">and what comes next.</tspan>
+  </text>
+  <text x="160" y="980" font-family="'Helvetica Neue', sans-serif" font-size="15" font-weight="400" fill="rgba(10,10,10,0.35)" letter-spacing="1">grida.co</text>
+</svg>

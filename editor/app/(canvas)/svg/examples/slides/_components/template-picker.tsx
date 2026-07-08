@@ -8,7 +8,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@app/ui/components/popover";
-import { SLIDE_TEMPLATES, type SlideTemplate } from "./templates";
+import {
+  LIGHT_SLIDES_TEMPLATE_NAME,
+  slideTemplateFromPage,
+  type SlideTemplate,
+} from "./templates";
 
 /**
  * Template picker trigger + popover. The popover is anchored to the sidebar
@@ -30,6 +34,30 @@ export function TemplatePicker({
   triggerClassName?: string;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [templates, setTemplates] = React.useState<SlideTemplate[] | null>(
+    null
+  );
+  const [title, setTitle] = React.useState("Light slides");
+
+  React.useEffect(() => {
+    let alive = true;
+    import("@/lib/slides-templates")
+      .then((m) => m.SlidesTemplates.load(LIGHT_SLIDES_TEMPLATE_NAME))
+      .then((deck) => {
+        if (!alive) return;
+        setTitle(deck.title);
+        setTemplates(deck.pages.map(slideTemplateFromPage));
+      })
+      .catch((err) => {
+        console.error("[slides-templates] failed to load light slides:", err);
+        if (alive) setTemplates([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const loadedTemplates = templates ?? [];
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -64,7 +92,7 @@ export function TemplatePicker({
             </Button>
             <div className="text-xs truncate">
               <span className="text-muted-foreground">Templates / </span>
-              <span className="font-medium">Light slides</span>
+              <span className="font-medium">{title}</span>
               <span className="text-muted-foreground"> by Grida</span>
             </div>
           </div>
@@ -73,8 +101,9 @@ export function TemplatePicker({
               variant="outline"
               size="xs"
               className="shrink-0"
+              disabled={loadedTemplates.length === 0}
               onClick={() => {
-                onPickAll(SLIDE_TEMPLATES);
+                onPickAll(loadedTemplates);
                 setOpen(false);
               }}
             >
@@ -84,37 +113,45 @@ export function TemplatePicker({
         </div>
         <div className="max-h-[640px] overflow-auto p-3">
           <div className="grid grid-cols-2 gap-3">
-            {SLIDE_TEMPLATES.map((tpl) => (
-              <button
-                key={tpl.id}
-                type="button"
-                onClick={() => {
-                  onPick(tpl);
-                  setOpen(false);
-                }}
-                className="group/tpl text-left outline-none"
-                title={tpl.name}
-              >
-                <div
-                  className="relative w-full overflow-hidden rounded border border-border/60 bg-card transition-colors group-hover/tpl:border-foreground/40 group-focus-visible/tpl:border-workbench-accent-sky"
-                  style={{ aspectRatio: "16 / 9" }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={tpl.thumbnailDataUri}
-                    alt={tpl.name}
-                    className="absolute inset-0 w-full h-full object-contain"
-                    draggable={false}
+            {templates === null
+              ? Array.from({ length: 6 }, (_, i) => (
+                  <div
+                    key={i}
+                    className="w-full animate-pulse rounded border bg-muted"
+                    style={{ aspectRatio: "16 / 9" }}
                   />
-                  <div className="absolute inset-0 bg-foreground/40 opacity-0 transition-opacity group-hover/tpl:opacity-100 group-focus-visible/tpl:opacity-100">
-                    <Plus className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 size-6 text-background" />
-                    <div className="absolute bottom-1.5 left-2 right-2 truncate text-[10px] font-medium text-background">
-                      {tpl.name}
+                ))
+              : loadedTemplates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => {
+                      onPick(tpl);
+                      setOpen(false);
+                    }}
+                    className="group/tpl text-left outline-none"
+                    title={tpl.name}
+                  >
+                    <div
+                      className="relative w-full overflow-hidden rounded border border-border/60 bg-card transition-colors group-hover/tpl:border-foreground/40 group-focus-visible/tpl:border-workbench-accent-sky"
+                      style={{ aspectRatio: "16 / 9" }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={tpl.thumbnailDataUri}
+                        alt={tpl.name}
+                        className="absolute inset-0 w-full h-full object-contain"
+                        draggable={false}
+                      />
+                      <div className="absolute inset-0 bg-foreground/40 opacity-0 transition-opacity group-hover/tpl:opacity-100 group-focus-visible/tpl:opacity-100">
+                        <Plus className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 size-6 text-background" />
+                        <div className="absolute bottom-1.5 left-2 right-2 truncate text-[10px] font-medium text-background">
+                          {tpl.name}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </button>
-            ))}
+                  </button>
+                ))}
           </div>
         </div>
       </PopoverContent>

@@ -37,6 +37,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UIMessage } from "ai";
+import { normalizeSdkToolPartFields } from "@grida/agent";
 import {
   sessions as bridgeSessions,
   type ChatMessageWithParts,
@@ -390,8 +391,10 @@ export function useChatSession(
 
 function toUIMessages(rows: ChatMessageWithParts[]): UIMessage[] {
   // Parts arrive sorted by index; the AI SDK expects an ordered array
-  // of UIMessageParts. The recorder writes parts whose `data` is already
-  // shaped like `UIMessagePart`, so we trust the cast.
+  // of UIMessageParts. New recorder rows store `data_json` in that SDK shape.
+  // Legacy rows may still carry the older server-shaped snake_case tool fields;
+  // normalize those at the hydration boundary so `Chat.addToolResult` can
+  // mutate a re-opened pending tool call by `toolCallId`.
   //
   // Hidden rows (soft-truncated by a rewind, or summarized by a
   // compaction) are excluded — the transcript shows the live, visible
@@ -402,7 +405,24 @@ function toUIMessages(rows: ChatMessageWithParts[]): UIMessage[] {
     .map((row) => ({
       id: row.id,
       role: row.role,
-      parts: row.parts.map((p) => p.data as UIMessagePartUnknown),
+      parts: row.parts.map(toUIMessagePart),
       metadata: row.metadata,
     })) as UIMessage[];
+}
+
+export function toUIMessagePart(
+  part: ChatMessageWithParts["parts"][number]
+): UIMessagePartUnknown {
+  const data = part.data;
+  if (!isRecord(data)) return data as UIMessagePartUnknown;
+  const type = typeof data.type === "string" ? data.type : part.type;
+  if (!type.startsWith("tool-") && type !== "dynamic-tool") {
+    return data as UIMessagePartUnknown;
+  }
+  const out = normalizeSdkToolPartFields(data, part.tool_call_id);
+  return out as UIMessagePartUnknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

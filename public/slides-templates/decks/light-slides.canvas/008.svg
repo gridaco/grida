@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+
+  <title>Light slides - Numbered section</title>
+<rect width="1920" height="1080" fill="#FAFAFA"/>
+  <text x="160" y="460" font-family="'Helvetica Neue', sans-serif" font-size="280" font-weight="800" fill="#0A0A0A" letter-spacing="-10" opacity="0.12">02</text>
+  <text x="160" y="640" font-family="'Helvetica Neue', sans-serif" font-size="20" font-weight="700" fill="rgba(10,10,10,0.55)" letter-spacing="3">SECTION 02</text>
+  <text x="160" y="740" font-family="'Helvetica Neue', sans-serif" font-size="80" font-weight="800" fill="#0A0A0A" letter-spacing="-2">Numbered section</text>
+</svg>

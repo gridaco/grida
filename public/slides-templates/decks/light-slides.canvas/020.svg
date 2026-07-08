@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+
+  <title>Light slides - Line chart</title>
+<rect width="1920" height="1080" fill="#FAFAFA"/>
+  <text x="160" y="200" font-family="'Helvetica Neue', sans-serif" font-size="15" font-weight="700" fill="rgba(10,10,10,0.55)" letter-spacing="3">LATENCY — P95</text>
+  <text x="160" y="280" font-family="'Helvetica Neue', sans-serif" font-size="56" font-weight="800" fill="#0A0A0A" letter-spacing="-1.5">Trending down</text>
+
+  <g font-family="'Helvetica Neue', sans-serif" font-size="16" font-weight="400" fill="rgba(10,10,10,0.35)" letter-spacing="1">
+    <text x="160" y="406" text-anchor="end">240ms</text>
+    <text x="160" y="546" text-anchor="end">180ms</text>
+    <text x="160" y="686" text-anchor="end">120ms</text>
+    <text x="160" y="826" text-anchor="end">60ms</text>
+  </g>
+
+  <g stroke="rgba(10,10,10,0.12)" stroke-width="1">
+    <line x1="200" y1="400" x2="1760" y2="400"/>
+    <line x1="200" y1="540" x2="1760" y2="540"/>
+    <line x1="200" y1="680" x2="1760" y2="680"/>
+    <line x1="200" y1="820" x2="1760" y2="820"/>
+  </g>
+  <line x1="200" y1="820" x2="1760" y2="820" stroke="#0A0A0A" stroke-width="2"/>
+
+  <polyline fill="none" stroke="#0A0A0A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+    points="280,440 520,500 760,560 1000,620 1240,700 1480,740 1620,780"/>
+  <g fill="#FAFAFA" stroke="#0A0A0A" stroke-width="3">
+    <circle cx="280" cy="440" r="7"/>
+    <circle cx="520" cy="500" r="7"/>
+    <circle cx="760" cy="560" r="7"/>
+    <circle cx="1000" cy="620" r="7"/>
+    <circle cx="1240" cy="700" r="7"/>
+    <circle cx="1480" cy="740" r="7"/>
+    <circle cx="1620" cy="780" r="7"/>
+  </g>
+
+  <g font-family="'Helvetica Neue', sans-serif" font-size="20" font-weight="400" fill="rgba(10,10,10,0.55)" text-anchor="middle">
+    <text x="280" y="880">Jan</text>
+    <text x="520" y="880">Feb</text>
+    <text x="760" y="880">Mar</text>
+    <text x="1000" y="880">Apr</text>
+    <text x="1240" y="880">May</text>
+    <text x="1480" y="880">Jun</text>
+    <text x="1620" y="880">Jul</text>
+  </g>
+
+  <text x="160" y="980" font-family="'Helvetica Neue', sans-serif" font-size="18" font-weight="400" fill="rgba(10,10,10,0.35)">Source: edge metrics — p95 request latency, /api/* aggregate.</text>
+</svg>

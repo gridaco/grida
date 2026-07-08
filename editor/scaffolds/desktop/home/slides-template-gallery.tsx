@@ -7,7 +7,7 @@
  * shows a small grid of starting templates instead.
  *
  * Templates are the real bundled `.canvas` decks served from
- * `/templates/slides/` (see `slides-template-loader.ts` — loaded via dynamic
+ * `/templates/slides/` (see `@/lib/slides-templates` — loaded via dynamic
  * `import()` so the unzip/dotcanvas machinery stays out of the home chunk).
  * Each card is a {@link SlideScrubPreview} (hover-scrub through the deck's
  * real pages) with an "eye" button that opens the
@@ -20,9 +20,9 @@
 import { useEffect, useState } from "react";
 import { CheckIcon, EyeIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
+import type { SlidesTemplate } from "@/lib/slides-templates";
 import { SlideScrubPreview } from "./slide-scrub-preview";
 import { SlidesTemplatePreviewDialog } from "./slides-template-preview-dialog";
-import type { SlidesTemplate } from "./slides-template-loader";
 
 /** One template card: a scrubbable page preview + an "eye" that opens the
  *  larger preview dialog. The scrub surface and the eye are DOM SIBLINGS (not
@@ -126,8 +126,8 @@ export function SlidesTemplateGallery({
   const [templates, setTemplates] = useState<SlidesTemplate[] | null>(null);
   useEffect(() => {
     let alive = true;
-    import("./slides-template-loader")
-      .then((m) => m.loadSlidesTemplates())
+    import("@/lib/slides-templates")
+      .then((m) => m.SlidesTemplates.loadAll())
       .then((t) => alive && setTemplates(t))
       .catch((err) => {
         console.error("[slides-templates] load failed:", err);

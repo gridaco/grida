@@ -398,8 +398,8 @@ function isResolvedToolPart(part: AgentRunMessagePart): boolean {
   return state === "output-available" || state === "output-error";
 }
 
-/** The tool call id off an incoming part, tolerating camel/snake (the AI SDK
- *  client sends `toolCallId`; the persisted shape uses `tool_call_id`). */
+/** The tool call id off an incoming part, tolerating SDK camelCase and legacy
+ *  persisted snake_case. */
 function toolCallIdOf(part: AgentRunMessagePart): string | null {
   const p = part as { toolCallId?: unknown; tool_call_id?: unknown };
   const id = typeof p.toolCallId === "string" ? p.toolCallId : p.tool_call_id;

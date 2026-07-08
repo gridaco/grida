@@ -138,6 +138,10 @@ describe("createRecorderConsumer", () => {
     expect(toolPart).toBeTruthy();
     expect(toolPart!.tool_call_id).toBe("tc1");
     expect(toolPart!.tool_state).toBe("output-available");
+    expect((toolPart!.data as { toolCallId?: string }).toolCallId).toBe("tc1");
+    expect((toolPart!.data as { tool_call_id?: string }).tool_call_id).toBe(
+      undefined
+    );
     expect((toolPart!.data as { output: unknown }).output).toEqual({
       files: ["/canvas.svg"],
     });
@@ -172,6 +176,10 @@ describe("createRecorderConsumer", () => {
     const toolPart = messages[0].parts.find((p) => p.tool_call_id === "tc1");
     expect(toolPart).toBeTruthy();
     expect(toolPart!.tool_state).toBe("input-streaming");
+    expect((toolPart!.data as { toolCallId?: string }).toolCallId).toBe("tc1");
+    expect((toolPart!.data as { inputTextDelta?: string }).inputTextDelta).toBe(
+      '{"path":'
+    );
   });
 
   it("ignores the [DONE] sentinel and malformed JSON frames", async () => {
