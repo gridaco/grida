@@ -222,7 +222,14 @@ function AgentComposerInner({
     // No blanket `isStreaming` early-return: submitting WHILE a turn streams is
     // how a TEXT message gets queued (RFC `queue`). Images are the exception —
     // the turn queue persists text only, so image sends need an idle session.
-    const message = composer.submit({ submitted_at: Date.now() });
+    // `allow_empty` mirrors the later `allowEmptySubmit` guard: without it the
+    // composer core returns null for a blank editor and we'd bail here, before
+    // that guard — so a picked-template start (payload on the handoff, not the
+    // text) would be lost. Let the empty message through and gate below.
+    const message = composer.submit({
+      submitted_at: Date.now(),
+      allow_empty: allowEmptySubmit,
+    });
     if (!message) return;
     // Intercept action commands (`/compact`, …) — run them instead of
     // sending a normal turn.

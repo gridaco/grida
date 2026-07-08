@@ -49,7 +49,9 @@ export type ComposerController = {
   setTriggerIndex: (index: number) => void;
   moveTriggerIndex: (delta: number) => void;
   selectTriggerItem: (index: number) => boolean;
-  submit: (input: { submitted_at: number }) => ComposerMessage | null;
+  submit: (
+    input: Parameters<ComposerCore["createMessage"]>[0]
+  ) => ComposerMessage | null;
 };
 
 export type ComposerViewSnapshot = Pick<
