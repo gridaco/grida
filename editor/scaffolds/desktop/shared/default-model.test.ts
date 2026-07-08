@@ -14,13 +14,17 @@ const knows =
     typeof id === "string" && ids.includes(id);
 
 describe("resolveDefaultModelId — the initial default for a new chat", () => {
+  it("defaults the picker to Claude Sonnet 5", () => {
+    expect(DEFAULT_MODEL_ID).toBe("anthropic/claude-sonnet-5");
+  });
+
   it("upgrades the keyless default to the included tier when a GG session is live", () => {
     expect(resolveDefaultModelId({ ggActive: true, isKnownId: knows() })).toBe(
       GG_INCLUDED_MODEL_ID
     );
   });
 
-  it("falls back to the Claude-Code default when no GG session is live", () => {
+  it("falls back to the hosted catalog default when no GG session is live", () => {
     expect(resolveDefaultModelId({ ggActive: false, isKnownId: knows() })).toBe(
       DEFAULT_MODEL_ID
     );
@@ -37,11 +41,10 @@ describe("resolveDefaultModelId — the initial default for a new chat", () => {
     ).toBe(initial);
   });
 
-  it("a provided-but-unknown initial falls back to the plain default, never the GG included model", () => {
+  it("a provided-but-unknown initial falls back to the hosted default", () => {
     // A caller `initial` that isn't known yet may be a late-loading endpoint
-    // model (issue #806). The GG default must NOT be substituted for it —
-    // that would silently override the caller's choice. Falls to the plain
-    // default instead (recovered once the registry loads, upstream).
+    // model (issue #806). Falls to the default until the registry loads
+    // upstream.
     expect(
       resolveDefaultModelId({
         initial: "ollama/llama-3.3",
@@ -51,11 +54,11 @@ describe("resolveDefaultModelId — the initial default for a new chat", () => {
     ).toBe(DEFAULT_MODEL_ID);
   });
 
-  it("the included tier is a catalog id distinct from the Claude-Code default", () => {
-    // A `claude-code/*` agent-provider id would run the user's own Claude
-    // auth, not the gateway — the included default must be a catalog id.
-    expect(GG_INCLUDED_MODEL_ID).not.toBe(DEFAULT_MODEL_ID);
-    expect(GG_INCLUDED_MODEL_ID.startsWith("claude-code/")).toBe(false);
+  it("the default is the included hosted catalog id", () => {
+    // A `claude-acp/*` agent-provider id would run the user's own Claude auth,
+    // not the gateway — the default must be a catalog id.
+    expect(DEFAULT_MODEL_ID).toBe(GG_INCLUDED_MODEL_ID);
+    expect(GG_INCLUDED_MODEL_ID.startsWith("claude-acp/")).toBe(false);
   });
 });
 

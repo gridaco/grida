@@ -88,7 +88,7 @@ user's own subscription (`src/agent-provider/`, spawning the ACP-team bridge
 `@agentclientprotocol/claude-agent-acp` over stdio). The runtime branches on
 this kind _before_ provider resolution and streams from the external agent, so
 no `ModelFactory` is ever called — it does **not** make the package a
-model-provider router (the anti-goal above stands). Synthetic `claude-code/*`
+model-provider router (the anti-goal above stands). Synthetic `claude-acp/*`
 model ids (`agent-provider/types.ts`) select it; continuity rides ACP
 `session/resume`.
 

@@ -82,10 +82,10 @@ export interface OpenProviderOptions {
  * `claude-opus-4-8` (the smaller-context build, intentionally not surfaced).
  */
 export const AGENT_PROVIDER_MODELS = {
-  "claude-code": { id: "claude" }, // subscription default (back-compat)
-  "claude-code/opus-4.8-1m": { id: "claude", model: "claude-opus-4-8[1m]" },
-  "claude-code/sonnet-4.6": { id: "claude", model: "claude-sonnet-4-6" },
-  "claude-code/haiku-4.5": { id: "claude", model: "claude-haiku-4-5" },
+  "claude-acp": { id: "claude" }, // subscription default
+  "claude-acp/opus-4.8-1m": { id: "claude", model: "claude-opus-4-8[1m]" },
+  "claude-acp/sonnet-4.6": { id: "claude", model: "claude-sonnet-4-6" },
+  "claude-acp/haiku-4.5": { id: "claude", model: "claude-haiku-4-5" },
 } as const satisfies Record<string, { id: AgentProviderId; model?: string }>;
 
 export type AgentProviderModelId = keyof typeof AGENT_PROVIDER_MODELS;
@@ -103,7 +103,7 @@ export function isAgentProviderModel(
 /**
  * The vendor model id a picker selection maps to (e.g. `claude-opus-4-8[1m]`),
  * passed to the bridge via `_meta.claudeCode.options.model`. `undefined` for the
- * bare `claude-code` default → use the subscription default. The cast is the
+ * bare `claude-acp` default → use the subscription default. The cast is the
  * single place that reconciles the union (the bare entry has no `model` key).
  */
 export function agentProviderModel(

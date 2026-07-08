@@ -1,7 +1,7 @@
 /**
  * LIVE end-to-end — the agent-provider class (issue #813) through the REAL
  * run path. A host with NO BYOK key and NO endpoint configured picks the
- * synthetic `claude-code` model and runs one turn on the user's own Claude
+ * synthetic `claude-acp` model and runs one turn on the user's own Claude
  * subscription via `@anthropic-ai/claude-agent-sdk`. Proves the full seam:
  * run-input gate → run() branch → startTurn pump → ProviderChunk→UIChunk
  * mapping → SSE → recorder persistence.
@@ -97,7 +97,7 @@ liveDescribe("LIVE — agent-provider class, no key (issue #813)", () => {
     "runs a keyless turn via the user's Claude subscription and persists it",
     async () => {
       const turn = await runTurn(host, {
-        model_id: "claude-code",
+        model_id: "claude-acp",
         messages: [
           {
             role: "user",
@@ -127,7 +127,7 @@ liveDescribe("LIVE — agent-provider class, no key (issue #813)", () => {
     "continues the SAME external session across turns (issue #813)",
     async () => {
       const first = await runTurn(host, {
-        model_id: "claude-code",
+        model_id: "claude-acp",
         messages: [
           {
             role: "user",
@@ -140,7 +140,7 @@ liveDescribe("LIVE — agent-provider class, no key (issue #813)", () => {
       expect(first.session_id).toBeTruthy();
 
       const second = await runTurn(host, {
-        model_id: "claude-code",
+        model_id: "claude-acp",
         session_id: first.session_id,
         messages: [
           {
@@ -165,7 +165,7 @@ liveDescribe("LIVE — agent-provider class, no key (issue #813)", () => {
       // gate → runtime → _meta.claudeCode.options.model → bridge. A 200 + answer
       // proves the whole chain accepts the picked model id and runs it.
       const turn = await runTurn(host, {
-        model_id: "claude-code/haiku-4.5",
+        model_id: "claude-acp/haiku-4.5",
         messages: [
           {
             role: "user",

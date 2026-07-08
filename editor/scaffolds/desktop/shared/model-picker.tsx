@@ -1,9 +1,8 @@
 // GRIDA-GG: desktop — the GG-included picker affordance (docs/wg/platform/hosted-ai.md)
 /**
  * Desktop model picker — every catalog model grouped by provider, plus
- * the Claude Code agent-provider options (issue #813) and any user-
- * registered endpoint models (issue #806 — local Ollama, self-hosted
- * gateways).
+ * any user-registered endpoint models (issue #806 — local Ollama,
+ * self-hosted gateways).
  *
  * The agent system is tier-based (4 tiers → 4 models), but the catalog
  * holds more models than the tiers map to, leaving some unreachable.
@@ -55,29 +54,6 @@ const catalog = _models.text.catalog;
 type CatalogId = _models.text.CatalogId;
 
 const MODEL_OPTIONS = Object.values(catalog);
-
-/**
- * Agent-provider options (issue #813): synthetic ids that route a run to an
- * EXTERNAL agent owning its own loop (e.g. Claude Code) on the USER'S OWN
- * subscription — not a catalog model. Keep these ids in sync with
- * `AGENT_PROVIDER_MODELS` in
- * `packages/grida-ai-agent/src/agent-provider/types.ts`. (Hardcoded, not
- * imported: that module is node-only and would break the renderer bundle.)
- */
-const AGENT_PROVIDER_OPTIONS = [
-  // Opus 4.8 is the 1M-context variant (the synthetic id keeps the `-1m` tag;
-  // the label hides it). The smaller-context build isn't surfaced.
-  { id: "claude-code/opus-4.8-1m", label: "Opus 4.8" },
-  { id: "claude-code/sonnet-4.6", label: "Sonnet 4.6" },
-  { id: "claude-code/haiku-4.5", label: "Haiku 4.5" },
-] as const;
-const AGENT_PROVIDER_IDS = new Set<string>([
-  ...AGENT_PROVIDER_OPTIONS.map((o) => o.id),
-  // Legacy bare id (runtime back-compat in `AGENT_PROVIDER_MODELS`): keep a
-  // session stored with it recognized so it re-seeds + runs instead of being
-  // clobbered to the default.
-  "claude-code",
-]);
 
 function isCatalogId(id: string | undefined | null): id is CatalogId {
   return typeof id === "string" && Object.hasOwn(catalog, id);
@@ -167,19 +143,9 @@ export function DesktopModelPicker({
         <PromptInputSelectValue placeholder="Model" />
       </PromptInputSelectTrigger>
       <PromptInputSelectContent>
-        {/* Claude Code — external agent on the user's own subscription (#813) */}
-        <SelectGroup>
-          <SelectLabel>Claude Code</SelectLabel>
-          {AGENT_PROVIDER_OPTIONS.map((o) => (
-            <PromptInputSelectItem key={o.id} value={o.id} className="text-xs">
-              {o.label}
-            </PromptInputSelectItem>
-          ))}
-        </SelectGroup>
         {/* Hosted catalog, grouped by provider (Anthropic first) */}
         {gridaGatewayState !== "hidden" && (
           <SelectGroup>
-            <SelectSeparator />
             <SelectLabel className="text-[10px] font-normal text-muted-foreground">
               {gridaGatewayState === "active"
                 ? GG_PROVIDER_METADATA.included_label
@@ -187,9 +153,11 @@ export function DesktopModelPicker({
             </SelectLabel>
           </SelectGroup>
         )}
-        {CATALOG_GROUPS.map((group) => (
+        {CATALOG_GROUPS.map((group, index) => (
           <SelectGroup key={group.vendor}>
-            <SelectSeparator />
+            {(gridaGatewayState !== "hidden" || index > 0) && (
+              <SelectSeparator />
+            )}
             <SelectLabel>{group.label}</SelectLabel>
             {group.models.map((m) => (
               <PromptInputSelectItem
@@ -295,9 +263,7 @@ export function useModelPickerState({
     [endpoints]
   );
   const isKnownId = (id: string | undefined | null): id is string =>
-    isCatalogId(id) ||
-    (typeof id === "string" &&
-      (registeredIds.has(id) || AGENT_PROVIDER_IDS.has(id)));
+    isCatalogId(id) || (typeof id === "string" && registeredIds.has(id));
 
   // Whether a caller passed an `initial` at all — a stable mount-time fact
   // (the prop never changes). The GG upgrade guards on THIS, not on whether
@@ -312,7 +278,7 @@ export function useModelPickerState({
       // Synchronous cached GG state: when the session is already known
       // active (warmed by an earlier `ensureFresh`), a keyless surface
       // starts on the included model with no async gap — so an instant
-      // first submit can't capture the Claude-Code default before the
+      // first submit can't capture a stale fallback before the
       // effect below runs. `peek()` never does IO; the effect still
       // covers a cold cache.
       ggActive: gridaGateway.peek().kind === "active",
@@ -352,14 +318,12 @@ export function useModelPickerState({
   }, [currentId, sessions, registeredIds]);
 
   // GRIDA-SEC-006 / issue #942 — when a Grida Gateway session is live and
-  // the user hasn't otherwise chosen a model, upgrade the keyless default
-  // to the included hosted tier, so a fresh signed-in, no-BYOK user's first
-  // run uses GG instead of hitting the Claude-Code provider's
-  // `auth_required`. Session liveness resolves async, so this arrives after
-  // mount; `shouldUpgradeToIncluded` guards on live refs + the stable
-  // `initialProvided` so an explicit pick, a caller `initial`, or a
-  // stored-session seed always wins the race. The catalog itself is never
-  // hidden — BYOK can still serve any model.
+  // the user hasn't otherwise chosen a model, keep the keyless default on the
+  // included hosted tier. Session liveness resolves async, so this arrives
+  // after mount; `shouldUpgradeToIncluded` guards on live refs + the stable
+  // `initialProvided` so an explicit pick, a caller `initial`, or a stored-
+  // session seed always wins the race. The catalog itself is never hidden —
+  // BYOK can still serve any model.
   useEffect(() => {
     if (!gridaGateway.isSupported()) return;
     let cancelled = false;
