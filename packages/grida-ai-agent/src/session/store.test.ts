@@ -386,14 +386,14 @@ describe("SessionsStore messages + parts", () => {
       reasoning_tokens: 10,
       cache_read: 8,
       cache_write: 2,
-      total_tokens: 150,
+      total_tokens: 170,
     });
     row = await store.get(s.id);
     expect(row!.prompt_tokens).toBe(100);
     expect(row!.reasoning_tokens).toBe(10);
     expect(row!.cache_read).toBe(8);
     expect(row!.cache_write).toBe(2);
-    expect(row!.total_tokens).toBe(150);
+    expect(row!.total_tokens).toBe(170);
     expect(row!.cost_usd).toBe(0);
   });
 
@@ -637,6 +637,35 @@ describe("SessionsStore rollups", () => {
       .prepare("SELECT cost_usd FROM chat_sessions WHERE id = ?")
       .get(s.id) as { cost_usd: number };
     expect(dbRow.cost_usd).toBe(0);
+
+    const listed = await store.list({ agent: "grida" });
+    expect(listed.items.find((item) => item.id === s.id)!.cost_usd).toBeCloseTo(
+      row!.cost_usd
+    );
+  });
+
+  it("setMessageAccounting ignores undefined fields when merging metadata", async () => {
+    const s = await store.create({ agent: "grida" });
+    const a = await store.appendMessage(s.id, { role: "assistant" });
+    const model = {
+      provider_id: "openrouter",
+      tier: "mini",
+      model_id: "openai/gpt-5.4-mini",
+    } as const;
+
+    await store.setMessageAccounting(a.id, {
+      model,
+      usage: { input: 10, output: 2 },
+    });
+    await store.setMessageAccounting(a.id, {
+      model: undefined,
+      usage: { input: 12, output: 3 },
+    });
+
+    expect((await store.getMessage(a.id))!.metadata).toMatchObject({
+      model,
+      usage: { input: 12, output: 3 },
+    });
   });
 
   it("rewind excludes hidden assistant usage from the rollup", async () => {

@@ -57,8 +57,8 @@ export type ChatSessionRow = {
   cache_read: number;
   cache_write: number;
   total_tokens: number;
-  /** Derived from visible assistant-message `{ model, usage }`; not
-   * authoritative billing state. */
+  /** Derived from assistant-message `{ model, usage }`, including turns hidden
+   * by rewind or compaction; not authoritative billing state. */
   cost_usd: number;
   created_at: number;
   updated_at: number;

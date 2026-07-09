@@ -1123,14 +1123,16 @@ export class AgentRuntime {
             on_step_usage: (usage) => {
               const delta = messageUsageFromStepUsage(usage);
               accumulateUsage(runUsage, delta);
-              void sessionsStore.updateUsage(sessionId, {
-                prompt_tokens: delta.input,
-                completion_tokens: delta.output,
-                reasoning_tokens: delta.reasoning,
-                cache_read: delta.cache_read,
-                cache_write: delta.cache_write,
-                total_tokens: usageTokenTotal(delta),
-              });
+              void sessionsStore
+                .updateUsage(sessionId, {
+                  prompt_tokens: delta.input,
+                  completion_tokens: delta.output,
+                  reasoning_tokens: delta.reasoning,
+                  cache_read: delta.cache_read,
+                  cache_write: delta.cache_write,
+                  total_tokens: usageTokenTotal(delta),
+                })
+                .catch(() => undefined);
             },
           },
           // GRIDA-SEC-004 — `secrets_root` rides the bindings deps down to the
@@ -1487,12 +1489,14 @@ export class AgentRuntime {
  */
 function messageUsageFromStepUsage(u: AgentStepUsage): MessageUsage {
   const cacheRead = u.cached_input_tokens ?? 0;
-  const input = Math.max(0, (u.input_tokens ?? 0) - cacheRead);
+  const cacheWrite = u.cache_write_tokens ?? 0;
+  const input = Math.max(0, (u.input_tokens ?? 0) - cacheRead - cacheWrite);
   return {
     input,
     output: u.output_tokens ?? 0,
     reasoning: u.reasoning_tokens ?? 0,
     cache_read: cacheRead,
+    cache_write: cacheWrite,
   };
 }
 

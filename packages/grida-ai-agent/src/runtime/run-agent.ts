@@ -119,6 +119,7 @@ export type AgentStepUsage = {
   total_tokens?: number;
   reasoning_tokens?: number;
   cached_input_tokens?: number;
+  cache_write_tokens?: number;
 };
 
 /**
@@ -134,6 +135,11 @@ type SdkStepUsage = {
   totalTokens?: number;
   reasoningTokens?: number;
   cachedInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  inputTokenDetails?: {
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+  };
 };
 
 /**
@@ -143,12 +149,16 @@ type SdkStepUsage = {
  * cache reads, so subtract them so `input` + `cache_read` don't double-count.
  */
 function toMessageUsage(u: SdkStepUsage): MessageUsage {
-  const cacheRead = u.cachedInputTokens ?? 0;
+  const cacheRead =
+    u.cachedInputTokens ?? u.inputTokenDetails?.cacheReadTokens ?? 0;
+  const cacheWrite =
+    u.cacheCreationInputTokens ?? u.inputTokenDetails?.cacheWriteTokens ?? 0;
   return {
-    input: Math.max(0, (u.inputTokens ?? 0) - cacheRead),
+    input: Math.max(0, (u.inputTokens ?? 0) - cacheRead - cacheWrite),
     output: u.outputTokens ?? 0,
     reasoning: u.reasoningTokens ?? 0,
     cache_read: cacheRead,
+    cache_write: cacheWrite,
   };
 }
 
@@ -274,7 +284,11 @@ export async function runAgent(
                 output_tokens: u.outputTokens,
                 total_tokens: u.totalTokens,
                 reasoning_tokens: u.reasoningTokens,
-                cached_input_tokens: u.cachedInputTokens,
+                cached_input_tokens:
+                  u.cachedInputTokens ?? u.inputTokenDetails?.cacheReadTokens,
+                cache_write_tokens:
+                  u.cacheCreationInputTokens ??
+                  u.inputTokenDetails?.cacheWriteTokens,
               });
             }
           } catch {

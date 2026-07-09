@@ -206,9 +206,12 @@ export class SessionsStore {
       .orderBy(desc(chatSessions.updated_at), desc(chatSessions.id))
       .limit(limit + 1);
     const rows = where ? await query.where(where) : await query;
-    const items = await Promise.all(
-      rows.slice(0, limit).map((row) => this.rowToSessionWithDerivedCost(row))
-    );
+    const pageRows = rows.slice(0, limit);
+    const costs = await this.sessionCostsUsd(pageRows.map((row) => row.id));
+    const items = pageRows.map((row) => ({
+      ...rowToSession(row),
+      cost_usd: costs.get(row.id) ?? 0,
+    }));
     const last = rows[limit - 1];
     const nextCursor =
       rows.length > limit && last
@@ -690,7 +693,10 @@ export class SessionsStore {
   ): Promise<void> {
     const existing = await this.getMessage(messageId);
     if (!existing) return;
-    const metadata = { ...existing.metadata, ...accounting };
+    const next: Partial<AssistantTurnAccounting> = {};
+    if (accounting.model !== undefined) next.model = accounting.model;
+    if (accounting.usage !== undefined) next.usage = accounting.usage;
+    const metadata = { ...existing.metadata, ...next };
     await this.db
       .update(chatMessages)
       .set({ metadata_json: JSON.stringify(metadata), updated_at: Date.now() })
@@ -854,24 +860,38 @@ export class SessionsStore {
   }
 
   private async sessionCostUsd(sessionId: string): Promise<number> {
+    return (await this.sessionCostsUsd([sessionId])).get(sessionId) ?? 0;
+  }
+
+  private async sessionCostsUsd(
+    sessionIds: readonly string[]
+  ): Promise<Map<string, number>> {
+    if (sessionIds.length === 0) return new Map();
     const rows = await this.db
-      .select({ metadata_json: chatMessages.metadata_json })
+      .select({
+        session_id: chatMessages.session_id,
+        metadata_json: chatMessages.metadata_json,
+      })
       .from(chatMessages)
       .where(
         and(
-          eq(chatMessages.session_id, sessionId),
+          inArray(chatMessages.session_id, [...sessionIds]),
           eq(chatMessages.role, "assistant")
         )
       );
-    let costUsd = 0;
+    const costs = new Map<string, number>();
     for (const row of rows) {
       const meta = parseJsonOr(row.metadata_json, {}) as
         | ({ usage?: MessageUsage } & Partial<AssistantTurnAccounting>)
         | undefined;
       if (!meta?.usage) continue;
-      costUsd += costUsdFromMessageUsage(meta.model, meta.usage) ?? 0;
+      costs.set(
+        row.session_id,
+        (costs.get(row.session_id) ?? 0) +
+          (costUsdFromMessageUsage(meta.model, meta.usage) ?? 0)
+      );
     }
-    return costUsd;
+    return costs;
   }
 
   private async visibleUsageRollup(sessionId: string): Promise<{
