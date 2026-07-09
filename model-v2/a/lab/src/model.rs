@@ -252,13 +252,66 @@ impl Payload {
     }
 }
 
+/// A packed opaque color, `0xAARRGGBB` — the numeric paint value. Browsers
+/// never store a resolved color as a string (a CSS string is a parse *input*
+/// and a serialize *output* only — verified across Blink/Stylo/Skia); the text
+/// IR and SVG boundaries convert via `from_hex`/`to_hex`, and everything in
+/// between is this fixed-size number, read straight by the drawlist with no
+/// per-build parse. The wide-gamut canonical form the engines converged on
+/// (f32×4 channels + a color-space tag) is the deferred upgrade — see
+/// `engine/DATA-MODEL.md` (tied to the color-management day-1 gap).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Color(pub u32);
+
+impl Color {
+    pub const BLACK: Color = Color(0xFF00_0000);
+
+    /// Packed `0xAARRGGBB`.
+    pub fn argb(self) -> u32 {
+        self.0
+    }
+
+    /// Parse `#rrggbb` (forced opaque, byte-identical to the painter's old
+    /// `resolve_color`). `None` on any other form — the caller keeps its own
+    /// per-kind fallback.
+    pub fn from_hex(s: &str) -> Option<Color> {
+        let h = s.trim_start_matches('#');
+        if h.len() == 6 {
+            if let Ok(v) = u32::from_str_radix(h, 16) {
+                return Some(Color(0xFF00_0000 | v));
+            }
+        }
+        None
+    }
+
+    /// Serialize as `#RRGGBB` (the IR/SVG boundary; alpha dropped — lab paint
+    /// is opaque).
+    pub fn to_hex(self) -> String {
+        format!("#{:06X}", self.0 & 0x00FF_FFFF)
+    }
+}
+
+/// Ergonomic authoring + the IR/SVG parse boundary: `"#4A90D9".into()`. A
+/// malformed literal falls back to opaque black (no exercised path hits it —
+/// every fill is a valid `#rrggbb`; the gate proves pixel-identity).
+impl From<&str> for Color {
+    fn from(s: &str) -> Color {
+        Color::from_hex(s).unwrap_or(Color::BLACK)
+    }
+}
+impl From<String> for Color {
+    fn from(s: String) -> Color {
+        Color::from(s.as_str())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     pub id: NodeId,
     pub header: Header,
     pub payload: Payload,
     pub children: Vec<NodeId>,
-    pub fill: Option<String>, // lab-only paint for SVG snapshots
+    pub fill: Option<Color>, // lab-only paint for SVG snapshots
 }
 
 /// The document store is a **node arena**: `NodeId` IS the slot index,

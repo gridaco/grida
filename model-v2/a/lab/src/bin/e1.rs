@@ -66,7 +66,7 @@ fn scene(fixed_w: Option<f32>) -> Scene {
                 desc: ShapeDesc::Rect,
             },
         );
-        b.node_mut(c).fill = Some(color.to_string());
+        b.node_mut(c).fill = Some((*color).into());
         let _ = i;
         cards.push(c);
     }

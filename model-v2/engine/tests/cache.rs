@@ -41,9 +41,9 @@ fn scene() -> Document {
     let (h3, p3) = mk(360.0, 120.0, 90.0, 50.0, 0.0, ShapeDesc::Ellipse);
     let e = b.add(0, h3, p3);
     let mut doc = b.build();
-    doc.get_mut(a).fill = Some("#4A90D9".to_string());
-    doc.get_mut(c).fill = Some("#E2574C".to_string());
-    doc.get_mut(e).fill = Some("#57B894".to_string());
+    doc.get_mut(a).fill = Some("#4A90D9".into());
+    doc.get_mut(c).fill = Some("#E2574C".into());
+    doc.get_mut(e).fill = Some("#57B894".into());
     doc
 }
 

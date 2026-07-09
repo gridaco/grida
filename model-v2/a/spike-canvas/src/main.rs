@@ -238,6 +238,10 @@ fn bench() {
     println!("== full-redraw cost (raster, min of 11); 120fps budget = 8.33 ms ==");
     let (starter, _) = scene::starter();
     run("starter", &starter);
+    // The realistic nested workload (the live `ANCHOR_SCENE=pages` scene):
+    // flex-nested cards, not a flat packed grid — a truer per-node paint mix.
+    run("pages 100", &scene::pages(10, 10).0);
+    run("pages 400", &scene::pages(20, 20).0);
     for n in [1_000usize, 10_000, 50_000, 100_000] {
         run(&format!("packed {n}"), &packed(n));
     }

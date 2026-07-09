@@ -120,7 +120,7 @@ pub fn run(init: WindowInit) {
     let egui_painter = egui_glow::Painter::new(glow_context, "", None, false)
         .expect("failed to create egui_glow painter");
 
-    let (doc, artboard) = scene::starter();
+    let (doc, artboard) = scene::from_env();
     let mut app = App {
         doc,
         artboard,

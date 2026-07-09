@@ -89,7 +89,7 @@ fn scene() -> (Document, NodeId, NodeId) {
     );
 
     let mut doc = b.build();
-    doc.get_mut(f).fill = Some("ff0000".to_string());
+    doc.get_mut(f).fill = Some("ff0000".into());
     (doc, f, r)
 }
 

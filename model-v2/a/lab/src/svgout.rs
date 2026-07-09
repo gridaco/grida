@@ -52,7 +52,8 @@ fn paint(doc: &Document, id: NodeId, resolved: &Resolved, out: &mut String) {
     };
     let world = &world;
     let b = resolved.box_of(id);
-    let fill = node.fill.as_deref();
+    let fill_hex = node.fill.map(|c| c.to_hex()); // numeric → `#RRGGBB` at the SVG boundary
+    let fill = fill_hex.as_deref();
 
     match &node.payload {
         Payload::Frame { .. } => {

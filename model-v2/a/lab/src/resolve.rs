@@ -15,7 +15,6 @@
 use crate::math::{rotated_aabb_size, Affine, RectF};
 use crate::measure::measure_text;
 use crate::model::*;
-use std::collections::HashMap;
 use taffy::prelude::{auto, length, AvailableSpace, TaffyTree};
 use taffy::style::{
     AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, JustifyContent, Style,
@@ -149,9 +148,14 @@ struct Ctx<'a> {
     out: Resolved,
     /// Derived-box kinds: union rect of children in node-local space,
     /// cached once children are committed (children commit exactly once).
-    union_cache: HashMap<NodeId, RectF>,
-    /// Lens nodes: the folded post-resolution ops transform.
-    ops_cache: HashMap<NodeId, Affine>,
+    /// `NodeId`-indexed column, not a map: `NodeId` is a dense arena index, and
+    /// the browser rule is to index dense ids directly and never hash them
+    /// (cc's property trees are `Vec`-indexed; a `HashMap<dense-id>` is the
+    /// anti-pattern). Sized to the arena, like the `Resolved` columns.
+    union_cache: Vec<Option<RectF>>,
+    /// Lens nodes: the folded post-resolution ops transform (same dense-index
+    /// column discipline).
+    ops_cache: Vec<Option<Affine>>,
 }
 
 pub fn resolve(doc: &Document, opts: &ResolveOptions) -> Resolved {
@@ -159,8 +163,8 @@ pub fn resolve(doc: &Document, opts: &ResolveOptions) -> Resolved {
         doc,
         opts: *opts,
         out: Resolved::with_capacity(doc.capacity()),
-        union_cache: HashMap::new(),
-        ops_cache: HashMap::new(),
+        union_cache: vec![None; doc.capacity()],
+        ops_cache: vec![None; doc.capacity()],
     };
     let vp = RectF {
         x: 0.0,
@@ -400,10 +404,7 @@ fn hug_size(id: NodeId, cx: &mut Ctx) -> (f32, f32) {
                 let (cw, ch) = extent_of(child_id, None, cx);
                 let is_derived = cx.doc.get(child_id).payload.box_is_derived();
                 let u = if is_derived {
-                    cx.union_cache
-                        .get(&child_id)
-                        .copied()
-                        .unwrap_or(RectF::EMPTY)
+                    cx.union_cache[child_id as usize].unwrap_or(RectF::EMPTY)
                 } else {
                     RectF {
                         x: 0.0,
@@ -490,7 +491,7 @@ fn place_by_bindings(id: NodeId, parent_extent: (f32, f32), cx: &mut Ctx) -> Rec
     let (w, h) = extent_of(id, Some(parent_extent), cx);
     let node = cx.doc.get(id);
     if node.payload.box_is_derived() {
-        let u = cx.union_cache.get(&id).copied().unwrap_or(RectF::EMPTY);
+        let u = cx.union_cache[id as usize].unwrap_or(RectF::EMPTY);
         let ox = match node.header.x {
             AxisBinding::Pin {
                 anchor: AnchorEdge::Start,
@@ -583,8 +584,8 @@ fn place_by_bindings(id: NodeId, parent_extent: (f32, f32), cx: &mut Ctx) -> Rec
 /// Resolve a derived-box node's children in node-local space (committing
 /// them), returning the union rect. Cached — children commit exactly once.
 fn union_of_derived(id: NodeId, cx: &mut Ctx) -> RectF {
-    if let Some(u) = cx.union_cache.get(&id) {
-        return *u;
+    if let Some(u) = cx.union_cache[id as usize] {
+        return u;
     }
     let children: Vec<NodeId> = cx.doc.get(id).children.clone();
     let mut union: Option<RectF> = None;
@@ -598,11 +599,7 @@ fn union_of_derived(id: NodeId, cx: &mut Ctx) -> RectF {
         // Derived children: pins place the ORIGIN; the box = origin + own
         // union offset (census fix: nested unions must not swallow it).
         let derived_off = if cx.doc.get(child_id).payload.box_is_derived() {
-            let u = cx
-                .union_cache
-                .get(&child_id)
-                .copied()
-                .unwrap_or(RectF::EMPTY);
+            let u = cx.union_cache[child_id as usize].unwrap_or(RectF::EMPTY);
             (u.x, u.y)
         } else {
             (0.0, 0.0)
@@ -642,7 +639,7 @@ fn union_of_derived(id: NodeId, cx: &mut Ctx) -> RectF {
     }
     // D-E1 declared: empty/hidden-only derived box = zero rect at origin.
     let u = union.unwrap_or(RectF::EMPTY);
-    cx.union_cache.insert(id, u);
+    cx.union_cache[id as usize] = Some(u);
     u
 }
 
@@ -691,13 +688,13 @@ fn commit(id: NodeId, box_rect: RectF, cx: &mut Ctx) {
         // origin space, so no further correction term exists — which is
         // exactly why child edits never move siblings (D-2).
         // Flip shares the pivot (B1) and composes innermost: T·R·F.
-        let u = cx.union_cache.get(&id).copied().unwrap_or(RectF::EMPTY);
+        let u = cx.union_cache[id as usize].unwrap_or(RectF::EMPTY);
         let t = Affine::translate(box_rect.x - u.x, box_rect.y - u.y)
             .then(&Affine::rotate_deg(theta))
             .then(&Affine::flip(fx, fy));
         if let Payload::Lens { ops } = &node.payload {
             let folded = fold_lens_ops(ops, u);
-            cx.ops_cache.insert(id, folded);
+            cx.ops_cache[id as usize] = Some(folded);
         }
         t
     } else {
@@ -744,11 +741,7 @@ fn layout_frame_children(id: NodeId, layout: LayoutBehavior, extent: (f32, f32),
                     // Derived kinds keep their union dims; under AABB mode
                     // the *post-rotation* union center lands on the slot
                     // center (pivot is the origin, so the center swings).
-                    let u = cx
-                        .union_cache
-                        .get(&child_id)
-                        .copied()
-                        .unwrap_or(RectF::EMPTY);
+                    let u = cx.union_cache[child_id as usize].unwrap_or(RectF::EMPTY);
                     if cx.opts.rotation_in_flow == RotationInFlow::AabbParticipates {
                         let (scx, scy) = slot.center();
                         // Post-transform union center (R·F — same composition
@@ -1087,8 +1080,8 @@ fn compose_world(id: NodeId, parent_world: Affine, cx: &mut Ctx) {
     cx.out.world[id as usize] = Some(world);
     // Children of a lens compose through the folded ops:
     // world = parent ∘ local ∘ eval(ops)  (a.md §6 Phase T).
-    let child_basis = match cx.ops_cache.get(&id) {
-        Some(ops) => world.then(ops),
+    let child_basis = match cx.ops_cache[id as usize] {
+        Some(ops) => world.then(&ops),
         None => world,
     };
     let children: Vec<NodeId> = cx.doc.get(id).children.clone();

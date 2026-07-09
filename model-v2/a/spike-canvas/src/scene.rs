@@ -197,3 +197,203 @@ pub fn starter() -> (Document, NodeId) {
 
     (b.build(), artboard)
 }
+
+// ── the stress scene: one realistic card, loop-placed into a grid ──────────
+//
+// A "real-world-ish" document for feeling perf on the live spike (and for the
+// `--bench` headless numbers): a content card with genuine nesting depth and
+// flex layout, tiled across a large board so the content extends well past the
+// viewport (a true pan/zoom test). `starter()` stays the golden scene; this is
+// selected only for the live window via `ANCHOR_SCENE` (see `from_env`).
+
+const PAGE_W: f32 = 240.0;
+const PAGE_H: f32 = 320.0;
+/// Page content width = PAGE_W − 2·padding; the inner rows/blocks are sized to
+/// it explicitly (deterministic — no reliance on cross-axis stretch).
+const PAGE_INNER_W: f32 = PAGE_W - 24.0;
+const PAGE_GAP: f32 = 40.0;
+const BOARD_MARGIN: f32 = 40.0;
+
+const PALETTE: [&str; 6] = [
+    "#4A90D9", "#E2574C", "#57B894", "#8B7BD8", "#E2A23F", "#43B7C6",
+];
+
+fn flex_row(main: MainAlign, gap: f32) -> Payload {
+    Payload::Frame {
+        layout: LayoutBehavior {
+            mode: LayoutMode::Flex,
+            direction: Direction::Row,
+            main_align: main,
+            cross_align: CrossAlign::Center,
+            gap_main: gap,
+            ..Default::default()
+        },
+        clips_content: false,
+    }
+}
+
+/// One card: a flex-column frame holding a header row (avatar · title · menu),
+/// a hero block, three body lines, a flex footer (two buttons), and an
+/// absolutely-pinned rotated "NEW" badge (DEC-0 visual-only paint). ~13 nodes,
+/// nested to the header's avatar/title (page → header → children).
+fn page(b: &mut DocBuilder, parent: NodeId, x: f32, y: f32, i: usize) -> NodeId {
+    let accent = PALETTE[i % PALETTE.len()];
+
+    let page = b.add(
+        parent,
+        at(named(card(PAGE_W, PAGE_H), &format!("page.{i}")), x, y),
+        Payload::Frame {
+            layout: LayoutBehavior {
+                mode: LayoutMode::Flex,
+                direction: Direction::Column,
+                gap_main: 10.0,
+                padding: EdgeInsets::all(12.0),
+                ..Default::default()
+            },
+            clips_content: false,
+        },
+    );
+    b.node_mut(page).fill = Some("#FFFFFF".into());
+
+    // header row: avatar (ellipse) · title (text) · menu (rect), space-between.
+    let header = b.add(
+        page,
+        named(card(PAGE_INNER_W, 36.0), "hdr"),
+        flex_row(MainAlign::SpaceBetween, 8.0),
+    );
+    let avatar = b.add(
+        header,
+        card(32.0, 32.0),
+        Payload::Shape {
+            desc: ShapeDesc::Ellipse,
+        },
+    );
+    b.node_mut(avatar).fill = Some(accent.into());
+    let title = b.add(
+        header,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Text {
+            content: format!("Project {i}"),
+            font_size: 15.0,
+        },
+    );
+    b.node_mut(title).fill = Some("#171A1F".into());
+    let menu = b.add(header, card(20.0, 20.0), rect());
+    b.node_mut(menu).fill = Some("#CED4DA".into());
+
+    // hero block (image placeholder).
+    let hero = b.add(page, card(PAGE_INNER_W, 110.0), rect());
+    b.node_mut(hero).fill = Some(accent.into());
+
+    // three body lines (the last one short, left-set — a text paragraph feel).
+    for k in 0..3 {
+        let w = if k == 2 { 120.0 } else { PAGE_INNER_W };
+        let line = b.add(page, card(w, 10.0), rect());
+        b.node_mut(line).fill = Some("#E9ECEF".into());
+    }
+
+    // footer: two buttons pushed to the edges.
+    let footer = b.add(
+        page,
+        named(card(PAGE_INNER_W, 30.0), "ftr"),
+        flex_row(MainAlign::SpaceBetween, 8.0),
+    );
+    let b1 = b.add(footer, card(70.0, 28.0), rect());
+    b.node_mut(b1).fill = Some("#F1F3F5".into());
+    let b2 = b.add(footer, card(70.0, 28.0), rect());
+    b.node_mut(b2).fill = Some(accent.into());
+
+    // rotated "NEW" badge, absolutely pinned to the top-right corner. Out of
+    // flex flow, end-pinned, visually rotated — exercises the paint transform.
+    let mut badge = Header::new(SizeIntent::Auto, SizeIntent::Auto);
+    badge.flow = Flow::Absolute;
+    badge.x = AxisBinding::end(10.0);
+    badge.y = AxisBinding::start(10.0);
+    badge.rotation = -12.0;
+    let bg = b.add(
+        page,
+        badge,
+        Payload::Text {
+            content: "NEW".into(),
+            font_size: 12.0,
+        },
+    );
+    b.node_mut(bg).fill = Some("#E2574C".into());
+
+    page
+}
+
+/// A `cols × rows` grid of [`page`] cards on one board frame. ~13 nodes/card,
+/// e.g. 10×10 = 100 cards ≈ 1.3k nodes on a ~2840×3640 board.
+pub fn pages(cols: usize, rows: usize) -> (Document, NodeId) {
+    let (cols, rows) = (cols.max(1), rows.max(1));
+    let mut b = DocBuilder::new();
+
+    let grid_w = cols as f32 * PAGE_W + (cols - 1) as f32 * PAGE_GAP;
+    let grid_h = rows as f32 * PAGE_H + (rows - 1) as f32 * PAGE_GAP;
+    let board = b.add(
+        0,
+        at(
+            named(
+                card(grid_w + 2.0 * BOARD_MARGIN, grid_h + 2.0 * BOARD_MARGIN),
+                ARTBOARD,
+            ),
+            60.0,
+            60.0,
+        ),
+        Payload::Frame {
+            layout: LayoutBehavior::default(),
+            clips_content: false,
+        },
+    );
+    b.node_mut(board).fill = Some("#F7F8F9".into());
+
+    for i in 0..(cols * rows) {
+        let (col, row) = (i % cols, i / cols);
+        let x = BOARD_MARGIN + col as f32 * (PAGE_W + PAGE_GAP);
+        let y = BOARD_MARGIN + row as f32 * (PAGE_H + PAGE_GAP);
+        page(&mut b, board, x, y, i);
+    }
+
+    (b.build(), board)
+}
+
+/// The live-window scene, selected by `ANCHOR_SCENE` (the `--shot` goldens
+/// always use `starter`, so they are unaffected):
+///   • unset / `starter` → the feel scene
+///   • `pages`           → 100 cards (10×10)
+///   • `pages:N`         → ~N cards (squared into a grid)
+///   • `pages:CxR`       → an explicit `C×R` grid
+pub fn from_env() -> (Document, NodeId) {
+    let spec = std::env::var("ANCHOR_SCENE").unwrap_or_default();
+    if spec == "pages" || spec.starts_with("pages:") {
+        let (cols, rows) = parse_grid(spec.strip_prefix("pages").unwrap_or(""));
+        let doc = pages(cols, rows);
+        eprintln!(
+            "scene: pages {cols}×{rows} = {} cards, {} nodes",
+            cols * rows,
+            doc.0.len()
+        );
+        doc
+    } else {
+        starter()
+    }
+}
+
+/// Parse the tail after `pages`: "" → 10×10; ":N" → squared grid; ":CxR".
+fn parse_grid(tail: &str) -> (usize, usize) {
+    let tail = tail.trim_start_matches(':');
+    if tail.is_empty() {
+        return (10, 10);
+    }
+    if let Some((c, r)) = tail.split_once('x') {
+        if let (Ok(c), Ok(r)) = (c.parse::<usize>(), r.parse::<usize>()) {
+            return (c, r);
+        }
+    }
+    if let Ok(n) = tail.parse::<usize>() {
+        let cols = (n as f32).sqrt().ceil() as usize;
+        return (cols.max(1), n.div_ceil(cols.max(1)));
+    }
+    (10, 10)
+}

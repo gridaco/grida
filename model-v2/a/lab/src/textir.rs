@@ -142,7 +142,7 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                 let mut font_size = 16.0f32;
                 let mut lens_ops: Vec<LensOp> = vec![];
                 let mut clips = false;
-                let mut fill: Option<String> = None;
+                let mut fill: Option<Color> = None;
 
                 for attr in el.attributes() {
                     let attr = attr.map_err(|e| ParseError(format!("attr: {e}")))?;
@@ -266,7 +266,7 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                         }
                         "size" => font_size = parse_num(&val, "size")?,
                         "ops" => lens_ops = parse_lens_ops(&val)?,
-                        "fill" => fill = Some(val),
+                        "fill" => fill = Some(val.into()),
                         _ => return err(format!("unknown attribute `{key}` on <{tag}>")),
                     }
                 }
@@ -615,7 +615,7 @@ fn print_node(doc: &Document, id: NodeId, depth: usize, out: &mut String) {
         }
     }
     if let Some(fill) = &node.fill {
-        push_attr(out, "fill", fill);
+        push_attr(out, "fill", &fill.to_hex());
     }
 
     let is_text = matches!(node.payload, Payload::Text { .. });

@@ -80,17 +80,12 @@ const FRAME_STROKE: Argb = 0xFFC9_CED4;
 const SHAPE_FILL: Argb = 0xFF4A_90D9;
 const TEXT_FILL: Argb = 0xFF00_0000; // black
 
-/// Resolve a node's optional `#rrggbb` fill to packed ARGB, or the default.
-/// Byte-for-byte the painter's `color()`: opaque, 6-hex only, else fallback.
-fn resolve_color(hex: Option<&str>, fallback: Argb) -> Argb {
-    let Some(h) = hex else { return fallback };
-    let h = h.trim_start_matches('#');
-    if h.len() == 6 {
-        if let Ok(v) = u32::from_str_radix(h, 16) {
-            return 0xFF00_0000 | v;
-        }
-    }
-    fallback
+/// A node's fill as packed ARGB, or the per-kind default. The color is a
+/// stored number now (`model::Color`), so this is a plain read — no per-build
+/// hex parse (the old `resolve_color`), no `String` chase.
+#[inline]
+fn fill_or(fill: Option<anchor_lab::model::Color>, fallback: Argb) -> Argb {
+    fill.map(|c| c.argb()).unwrap_or(fallback)
 }
 
 /// Project the resolved tier into an ordered primitive stream — the pure
@@ -123,7 +118,7 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                     kind: ItemKind::RectFill {
                         w: b.w,
                         h: b.h,
-                        argb: resolve_color(node.fill.as_deref(), FRAME_FILL),
+                        argb: fill_or(node.fill, FRAME_FILL),
                     },
                 });
                 items.push(Item {
@@ -138,7 +133,7 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                 });
             }
             Payload::Shape { desc } => {
-                let argb = resolve_color(node.fill.as_deref(), SHAPE_FILL);
+                let argb = fill_or(node.fill, SHAPE_FILL);
                 let kind = match desc {
                     ShapeDesc::Rect => ItemKind::RectFill {
                         w: b.w,
@@ -173,7 +168,7 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                         text: content.clone(),
                         font_size: *font_size,
                         baseline_y: font_size * 0.85,
-                        argb: resolve_color(node.fill.as_deref(), TEXT_FILL),
+                        argb: fill_or(node.fill, TEXT_FILL),
                     },
                 });
             }

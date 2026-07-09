@@ -34,6 +34,10 @@ How the engine proves it is _fast_ (the four measurement axes — automated work
 software-unmeasurable input→photon limit) is its own doctrine:
 [`MEASURE.md`](./MEASURE.md).
 
+How the engine _stores_ its data — each memory/data-layout detail decided
+against verified browser prior art (`cc`/Blink/Stylo/Skia), validity-tagged
+ALIGNED / ADOPTED / SOCKET — is [`DATA-MODEL.md`](./DATA-MODEL.md).
+
 ## Contract → module → guarding test
 
 | concern                              | module           | contract      | guarding test                                                                |
