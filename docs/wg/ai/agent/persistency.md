@@ -60,7 +60,7 @@ list can render token counts without replaying chunks.
 | `cache_read`        | INTEGER | required | Sum of `usage.cache_read`. Default `0`.                                                                                                                                                      |
 | `cache_write`       | INTEGER | required | Sum of `usage.cache_write`. Default `0`.                                                                                                                                                     |
 | `total_tokens`      | INTEGER | required | `prompt_tokens + completion_tokens + reasoning_tokens + cache_read + cache_write`. Equals `context_window_used` per [session](./session.md#what-the-context-window-means-here). Default `0`. |
-| `cost_usd`          | REAL    | required | Default `0`. The store never **computes** cost; a writer (a hosted route, a metadata hook) MAY populate it.                                                                                  |
+| `cost_usd`          | REAL    | required | Default `0`. Compatibility/cache field only; canonical cost is derived from assistant-message `{ model, usage }` plus the model catalog, not from this persisted value.                      |
 | `created_at`        | INTEGER | required | Epoch ms.                                                                                                                                                                                    |
 | `updated_at`        | INTEGER | required | Epoch ms.                                                                                                                                                                                    |
 | `archived_at`       | INTEGER | optional | Epoch ms when archived. Conforming session-list operations MUST filter rows with non-null `archived_at` by default, and MUST expose a way to include them. **Not** a delete.                 |
@@ -160,7 +160,9 @@ The schema promotes only the fields the picker, filter, or recorder
 needs to columns. Everything else lives in JSON:
 
 - **Picker reads, indexable filters, rollups → columns.** Tokens,
-  cost, `archived_at`, `updated_at`, `parent_id`.
+  `archived_at`, `updated_at`, `parent_id`. Cost MAY be cached for
+  compatibility, but its canonical source is per-turn metadata plus the
+  model catalog.
 - **Per-turn payload → `data_json`, `metadata_json`.** The full part
   object verbatim. New part types (a future `tool-input-progress`, a
   `media-*` chunk) ship without a migration.

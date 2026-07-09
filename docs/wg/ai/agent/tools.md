@@ -46,17 +46,18 @@ sandbox; the manifest does not need a parallel update.
 
 ## Locked fundamental tools
 
-Every implementation MUST ship the locked set. Models trained on tool
-use have learned these names; renaming `read` to something else
-measurably degrades quality. The set is the smallest union of what a
-code agent, a design agent, and a research agent all need.
+Every implementation that advertises the locked structured-tool
+profile MUST ship the locked set. Models trained on tool use have
+learned these names; renaming `read` to something else measurably
+degrades quality. The set is the smallest union of what a code agent,
+a design agent, and a research agent all need.
 
 | Id            | Purpose                                                                   | Capability declared                                |
 | ------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
 | `read`        | Read a file from the root                                                 | `fs.read`                                          |
 | `write`       | Create or overwrite a file in the root                                    | `fs.write`                                         |
 | `edit`        | String-replace edit on an existing file                                   | `fs.read` + `fs.write`                             |
-| `glob`        | List files by pattern                                                     | `fs.read`                                          |
+| `glob`        | Discover filesystem entries by path / pattern                             | `fs.read`                                          |
 | `grep`        | Regex search across the root                                              | `fs.read`                                          |
 | `bash`        | Run a shell command under a sub-policy                                    | `shell.run` (per-call sub-policy)                  |
 | `todo`        | Write a todo list to a session-scoped store                               | none (session-internal)                            |
@@ -78,6 +79,20 @@ it can be:
 Implementors who need richer behavior layer it via MCP, plugin tools,
 or agent-specific tools. They MUST NOT redefine the locked id with a
 richer shape — the lock guarantees portability.
+
+Filesystem discovery is in the lock because an agent often needs to
+orient itself before it knows what to read. The shape must stay
+**scoped**: a conforming `glob` / directory-listing binding returns
+entries for an explicit path or pattern, marks truncation, and never
+implies that a partial result is the whole workspace. Whole-repository
+enumeration is a poor default on real filesystems because it competes
+with faster native search tools, leaks backend indexing limits into
+reasoning, and can make the model trust an incomplete inventory. Hosts
+with a virtual filesystem may still need the structured discovery tool
+because there may be no shell, no `find`, and no `rg`. A real-fs
+profile that intentionally relies on shell/search commands for
+discovery should document that product choice in its binding instead
+of shipping a misleading whole-index list tool.
 
 **Common extensions seen on top of the lock.** A code-shaped agent
 typically ships additional tools beyond the lock. Names are not

@@ -111,7 +111,7 @@ export type AgentRunRequest = {
 /**
  * Subset of AI SDK `LanguageModelUsage` we use for persistence. The
  * SDK's `LanguageModelUsage` has many optional fields; we project the
- * three we keep on `chat_sessions.{prompt,completion,total}_tokens`.
+ * fields we keep on assistant-message usage metadata and session rollups.
  */
 export type AgentStepUsage = {
   input_tokens?: number;
@@ -252,11 +252,8 @@ export async function runAgent(
     },
     abortSignal: req.signal,
     // Stream the turn's usage as message metadata so the LIVE assistant
-    // message the renderer holds carries it — the context meter reads
-    // `metadata.usage` off `useChat` messages, and nothing rehydrates from
-    // the DB after a normal turn. Mirrors the canvas route; shape matches
-    // what `setLatestAssistantUsage` writes to the row so live and
-    // post-reload agree.
+    // message the renderer holds carries it. The DB row is stamped after
+    // recorder flush with this usage plus the runtime-resolved model.
     messageMetadata: ({ part }) =>
       part.type === "finish"
         ? { usage: toMessageUsage(part.totalUsage) }

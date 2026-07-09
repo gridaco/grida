@@ -40,13 +40,49 @@ describe("agent workspace bindings", () => {
     );
 
     expect(bindings).not.toBeNull();
-    const output = AgentFs.resolveToolCall(bindings!.fs, {
+    const output = await AgentFs.resolveToolCallAsync(bindings!.fs, {
       tool_name: AgentFs.TOOL_NAMES.list_files,
       input: {},
     });
 
     expect(output).toEqual({
-      files: ["/canvas.svg", "/notes/brief.md"],
+      path: "/",
+      folders: ["/notes"],
+      files: ["/canvas.svg"],
+      truncated: false,
+    });
+  });
+
+  it("list_files reads a requested workspace directory from disk on demand", async () => {
+    await fixture.write_workspace_file("canvas.svg", "<svg/>");
+
+    const bindings = await createWorkspaceAgentBindings(
+      {
+        workspace_root: fixture.workspace_root,
+      },
+      { workspace_registry: fixture.registry }
+    );
+
+    expect(bindings).not.toBeNull();
+
+    // Written after createWorkspaceAgentBindings hydrates AgentFs. A flat
+    // hydrated index cannot see this path; the workspace backend's scoped
+    // directory read can.
+    await fixture.write_workspace_file(
+      "public/slides-templates/README.md",
+      "slides"
+    );
+
+    const output = await AgentFs.resolveToolCallAsync(bindings!.fs, {
+      tool_name: AgentFs.TOOL_NAMES.list_files,
+      input: { path: "/public/slides-templates" },
+    });
+
+    expect(output).toEqual({
+      path: "/public/slides-templates",
+      folders: [],
+      files: ["/public/slides-templates/README.md"],
+      truncated: false,
     });
   });
 

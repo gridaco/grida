@@ -39,6 +39,7 @@ import { compactionBoundary } from "./boundary";
 // re-exported at the bottom of this module so consumers get one import
 // path for both the CRUD surface and the row shapes it emits.
 import type {
+  AssistantTurnAccounting,
   ForkSessionOptions,
   ChatMessageRow,
   ChatModel,
@@ -51,6 +52,7 @@ import type {
   SessionListFilter,
   SessionListPage,
 } from "./rows";
+import { costUsdFromMessageUsage, usageTokenTotal } from "./cost";
 
 export type AppendMessageInput = {
   id?: string;
@@ -77,8 +79,10 @@ export type UpsertPartInput = {
 export type UpdateUsageDelta = {
   prompt_tokens?: number;
   completion_tokens?: number;
+  reasoning_tokens?: number;
+  cache_read?: number;
+  cache_write?: number;
   total_tokens?: number;
-  cost_usd?: number;
 };
 
 const DEFAULT_LIMIT = 50;
@@ -139,7 +143,7 @@ export class SessionsStore {
       .from(chatSessions)
       .where(eq(chatSessions.id, id))
       .limit(1);
-    return rows[0] ? rowToSession(rows[0]) : null;
+    return rows[0] ? await this.rowToSessionWithDerivedCost(rows[0]) : null;
   }
 
   /**
@@ -202,7 +206,9 @@ export class SessionsStore {
       .orderBy(desc(chatSessions.updated_at), desc(chatSessions.id))
       .limit(limit + 1);
     const rows = where ? await query.where(where) : await query;
-    const items = rows.slice(0, limit).map(rowToSession);
+    const items = await Promise.all(
+      rows.slice(0, limit).map((row) => this.rowToSessionWithDerivedCost(row))
+    );
     const last = rows[limit - 1];
     const nextCursor =
       rows.length > limit && last
@@ -306,11 +312,17 @@ export class SessionsStore {
     if (delta.completion_tokens !== undefined) {
       parts.completion_tokens = sql`${chatSessions.completion_tokens} + ${delta.completion_tokens}`;
     }
+    if (delta.reasoning_tokens !== undefined) {
+      parts.reasoning_tokens = sql`${chatSessions.reasoning_tokens} + ${delta.reasoning_tokens}`;
+    }
+    if (delta.cache_read !== undefined) {
+      parts.cache_read = sql`${chatSessions.cache_read} + ${delta.cache_read}`;
+    }
+    if (delta.cache_write !== undefined) {
+      parts.cache_write = sql`${chatSessions.cache_write} + ${delta.cache_write}`;
+    }
     if (delta.total_tokens !== undefined) {
       parts.total_tokens = sql`${chatSessions.total_tokens} + ${delta.total_tokens}`;
-    }
-    if (delta.cost_usd !== undefined) {
-      parts.cost_usd = sql`${chatSessions.cost_usd} + ${delta.cost_usd}`;
     }
     await this.db
       .update(chatSessions)
@@ -331,9 +343,12 @@ export class SessionsStore {
     if (usage.completion_tokens !== undefined) {
       parts.completion_tokens = usage.completion_tokens;
     }
+    if (usage.reasoning_tokens !== undefined)
+      parts.reasoning_tokens = usage.reasoning_tokens;
+    if (usage.cache_read !== undefined) parts.cache_read = usage.cache_read;
+    if (usage.cache_write !== undefined) parts.cache_write = usage.cache_write;
     if (usage.total_tokens !== undefined)
       parts.total_tokens = usage.total_tokens;
-    if (usage.cost_usd !== undefined) parts.cost_usd = usage.cost_usd;
     await this.db
       .update(chatSessions)
       .set(parts)
@@ -612,7 +627,7 @@ export class SessionsStore {
    * Fire a queued message: clear `metadata.queued_at` so it becomes a normal
    * visible user message (RFC `queue / the run-state machine`). No-op if the
    * row is gone or was not queued. Merges metadata so sibling keys survive
-   * (mirrors {@link setMessageUsage}).
+   * (mirrors {@link setMessageAccounting}).
    */
   async dequeueMessage(messageId: string): Promise<void> {
     const existing = await this.getMessage(messageId);
@@ -666,9 +681,16 @@ export class SessionsStore {
    * existing metadata so a `model` / `agent` key set elsewhere survives.
    */
   async setMessageUsage(messageId: string, usage: MessageUsage): Promise<void> {
+    await this.setMessageAccounting(messageId, { usage });
+  }
+
+  async setMessageAccounting(
+    messageId: string,
+    accounting: AssistantTurnAccounting
+  ): Promise<void> {
     const existing = await this.getMessage(messageId);
     if (!existing) return;
-    const metadata = { ...existing.metadata, usage };
+    const metadata = { ...existing.metadata, ...accounting };
     await this.db
       .update(chatMessages)
       .set({ metadata_json: JSON.stringify(metadata), updated_at: Date.now() })
@@ -685,6 +707,13 @@ export class SessionsStore {
     sessionId: string,
     usage: MessageUsage
   ): Promise<void> {
+    await this.setLatestAssistantAccounting(sessionId, { usage });
+  }
+
+  async setLatestAssistantAccounting(
+    sessionId: string,
+    accounting: AssistantTurnAccounting
+  ): Promise<void> {
     const rows = await this.db
       .select({ id: chatMessages.id })
       .from(chatMessages)
@@ -696,7 +725,7 @@ export class SessionsStore {
       )
       .orderBy(desc(chatMessages.created_at), desc(chatMessages.id))
       .limit(1);
-    if (rows[0]) await this.setMessageUsage(rows[0].id, usage);
+    if (rows[0]) await this.setMessageAccounting(rows[0].id, accounting);
   }
 
   /**
@@ -810,17 +839,49 @@ export class SessionsStore {
     await this.recomputeRollups(sessionId);
   }
 
-  /**
-   * Recompute the session-row token rollups to reflect what the MODEL sees.
-   * Called after a rewind/compaction/fork changes the live view.
-   *
-   * A compaction does not hide the summarized head, so a naive "sum every
-   * visible assistant" would over-count the turns that are no longer in the
-   * model's context. Instead, sum assistant `metadata.usage` from the latest
-   * compaction boundary onward (the verbatim tail + the summary's own token
-   * cost); rewind-hidden rows are already excluded by `listVisibleMessages`.
-   */
-  async recomputeRollups(sessionId: string): Promise<void> {
+  private async rowToSessionWithDerivedCost(
+    row: ChatSessionDbRow
+  ): Promise<ChatSessionRow> {
+    const session = rowToSession(row);
+    return {
+      ...session,
+      // `chat_sessions.cost_usd` is a legacy persisted column. Public session
+      // rows expose cumulative cost as derived data from every assistant turn's
+      // model+usage. Unlike context rollups, spend does not disappear after a
+      // rewind or compaction.
+      cost_usd: await this.sessionCostUsd(row.id),
+    };
+  }
+
+  private async sessionCostUsd(sessionId: string): Promise<number> {
+    const rows = await this.db
+      .select({ metadata_json: chatMessages.metadata_json })
+      .from(chatMessages)
+      .where(
+        and(
+          eq(chatMessages.session_id, sessionId),
+          eq(chatMessages.role, "assistant")
+        )
+      );
+    let costUsd = 0;
+    for (const row of rows) {
+      const meta = parseJsonOr(row.metadata_json, {}) as
+        | ({ usage?: MessageUsage } & Partial<AssistantTurnAccounting>)
+        | undefined;
+      if (!meta?.usage) continue;
+      costUsd += costUsdFromMessageUsage(meta.model, meta.usage) ?? 0;
+    }
+    return costUsd;
+  }
+
+  private async visibleUsageRollup(sessionId: string): Promise<{
+    promptTokens: number;
+    completionTokens: number;
+    reasoningTokens: number;
+    cacheRead: number;
+    cacheWrite: number;
+    totalTokens: number;
+  }> {
     const visible = await this.listVisibleMessages(sessionId);
     const boundary = compactionBoundary(visible);
     // Auto: count from the verbatim tail. Manual (no tail): count from the
@@ -841,7 +902,10 @@ export class SessionsStore {
     for (let i = from; i < visible.length; i += 1) {
       const m = visible[i];
       if (m.role !== "assistant") continue;
-      const u = (m.metadata as { usage?: MessageUsage } | undefined)?.usage;
+      const meta = m.metadata as
+        | ({ usage?: MessageUsage } & Partial<AssistantTurnAccounting>)
+        | undefined;
+      const u = meta?.usage;
       if (!u) continue;
       promptTokens += u.input ?? 0;
       completionTokens += u.output ?? 0;
@@ -849,21 +913,48 @@ export class SessionsStore {
       cacheRead += u.cache_read ?? 0;
       cacheWrite += u.cache_write ?? 0;
     }
-    const totalTokens =
-      promptTokens +
-      completionTokens +
-      reasoningTokens +
-      cacheRead +
-      cacheWrite;
+    const totalTokens = usageTokenTotal({
+      input: promptTokens,
+      output: completionTokens,
+      reasoning: reasoningTokens,
+      cache_read: cacheRead,
+      cache_write: cacheWrite,
+    });
+    return {
+      promptTokens,
+      completionTokens,
+      reasoningTokens,
+      cacheRead,
+      cacheWrite,
+      totalTokens,
+    };
+  }
+
+  /**
+   * Recompute the session-row token rollups to reflect what the MODEL sees.
+   * Called after a rewind/compaction/fork changes the live view.
+   *
+   * A compaction does not hide the summarized head, so a naive "sum every
+   * visible assistant" would over-count the turns that are no longer in the
+   * model's context. Instead, sum assistant `metadata.usage` from the latest
+   * compaction boundary onward (the verbatim tail + the summary's own token
+   * cost); rewind-hidden rows are already excluded by `listVisibleMessages`.
+   *
+   * Cost is deliberately not persisted. Public session rows derive cumulative
+   * spend from every assistant turn's `{ model, usage }` and the current model
+   * catalog, independent of the current context-window boundary.
+   */
+  async recomputeRollups(sessionId: string): Promise<void> {
+    const rollup = await this.visibleUsageRollup(sessionId);
     await this.db
       .update(chatSessions)
       .set({
-        prompt_tokens: promptTokens,
-        completion_tokens: completionTokens,
-        reasoning_tokens: reasoningTokens,
-        cache_read: cacheRead,
-        cache_write: cacheWrite,
-        total_tokens: totalTokens,
+        prompt_tokens: rollup.promptTokens,
+        completion_tokens: rollup.completionTokens,
+        reasoning_tokens: rollup.reasoningTokens,
+        cache_read: rollup.cacheRead,
+        cache_write: rollup.cacheWrite,
+        total_tokens: rollup.totalTokens,
         updated_at: Date.now(),
       })
       .where(eq(chatSessions.id, sessionId));

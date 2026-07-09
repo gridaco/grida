@@ -236,9 +236,8 @@ async function main(): Promise<void> {
   if (!session || session.total_tokens <= 0) {
     fail(`[smoke] session totalTokens not positive: ${session?.total_tokens}`);
   }
-  // Cost is intentionally not asserted: BYOK pays the upstream provider
-  // directly; pricing-aware cost rollup lives in the editor's hosted
-  // route, not in the agent host recorder. `cost_usd` stays at 0 for BYOK.
+  // Cost is intentionally not asserted: model ids and pricing cards vary
+  // across BYOK/endpoint smoke runs, while usage is always required.
 
   // ── Open the DB directly to prove the file is inspectable ───────────
   const dbPath = path.join(userDataPath, "sessions.db");
