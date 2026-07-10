@@ -41,6 +41,7 @@ import {
 } from "@/lib/desktop/bridge";
 import {
   buildAgentSend,
+  chatError,
   desktopAgentTransport,
   isSessionBusy,
   StreamAttachOwner,
@@ -269,6 +270,31 @@ export function AISidebarChat({
     epoch: chatSession.epoch,
     resumeStream: rehydrateThenAttach,
   });
+
+  // Self-heal (owner-gated, once per binding): a `disconnect` or
+  // `stream-state` error means only this client's VIEW died — the server
+  // state is durable. Restore from the DB and re-attach if the run is still
+  // live; on success the error clears silently. Mirrors
+  // `workbench/agent-pane.tsx`.
+  const [recovering, setRecovering] = useState(false);
+  const clearErrorRef = useRef(clearError);
+  clearErrorRef.current = clearError;
+  useEffect(() => {
+    if (!error) return;
+    const kind = chatError.classify(error);
+    if (!chatError.recoverable(kind)) return;
+    if (attachOwner.noteStreamError(kind) !== "recover") return;
+    setRecovering(true);
+    const decision = attachOwner.request("resume-recovery", async () => {
+      try {
+        await rehydrateThenAttach();
+        clearErrorRef.current();
+      } finally {
+        setRecovering(false);
+      }
+    });
+    if (!decision.granted) setRecovering(false);
+  }, [error, attachOwner, rehydrateThenAttach]);
 
   // Manual compaction (RFC `session / compaction`) runs as a separate op that
   // does NOT move `useChat` status. Declared here so the single `busy` signal
@@ -583,7 +609,11 @@ export function AISidebarChat({
 
       {error && (
         <div className="flex items-start gap-2 border-t bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          <span className="flex-1">{error.message}</span>
+          <span className="flex-1">
+            {recovering
+              ? `${chatError.describe(error)} Reconnecting…`
+              : chatError.describe(error)}
+          </span>
           <button
             type="button"
             onClick={clearError}

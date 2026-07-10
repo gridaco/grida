@@ -248,3 +248,75 @@ describe("StreamAttachOwner / settlement + robustness", () => {
     }
   });
 });
+
+describe("StreamAttachOwner / self-heal recovery (PR4)", () => {
+  it("grants exactly ONE recovery per binding; a rebind resets the budget", async () => {
+    const { owner } = makeOwner();
+    owner.bind({ session_id: "ses_1", epoch: 1 });
+
+    expect(owner.noteStreamError("disconnect")).toBe("recover");
+    // The one attempt is spent even before the exec runs (synchronous mark).
+    expect(owner.noteStreamError("disconnect")).toBe("ignore");
+    expect(owner.noteStreamError("stream-state")).toBe("ignore");
+
+    // A real re-open restores the budget.
+    owner.bind({ session_id: "ses_1", epoch: 2 });
+    expect(owner.noteStreamError("stream-state")).toBe("recover");
+  });
+
+  it("ignores stream errors while unbound or while an attach is live", () => {
+    const { owner } = makeOwner();
+    expect(owner.noteStreamError("disconnect")).toBe("ignore");
+
+    owner.bind({ session_id: "ses_1", epoch: 1 });
+    owner.noteTransportOpen();
+    expect(owner.noteStreamError("disconnect")).toBe("ignore");
+    owner.noteTransportSettle();
+    expect(owner.noteStreamError("disconnect")).toBe("recover");
+  });
+
+  it("a resume-recovery exec drives the `recovering` phase and settles back", async () => {
+    const { owner } = makeOwner();
+    owner.bind({ session_id: "ses_1", epoch: 1 });
+    expect(owner.noteStreamError("stream-state")).toBe("recover");
+
+    const recovery = gatedExec();
+    const decision = owner.request("resume-recovery", recovery.exec);
+    expect(decision).toEqual({ granted: true, mode: "exec" });
+    expect(owner.phase).toBe("recovering");
+    // Other intents serialize behind the recovery.
+    expect(owner.request("send", () => {})).toEqual({
+      granted: false,
+      reason: "attach-in-flight",
+    });
+
+    recovery.release();
+    await flush();
+    expect(owner.phase).toBe("idle");
+    // The budget stays spent after the attempt (no ping-pong).
+    expect(owner.noteStreamError("stream-state")).toBe("ignore");
+  });
+
+  it("the recovering phase survives the transport-open of its own reconnect", async () => {
+    const { owner } = makeOwner();
+    owner.bind({ session_id: "ses_1", epoch: 1 });
+    owner.noteStreamError("disconnect");
+    const recovery = gatedExec();
+    owner.request("resume-recovery", recovery.exec);
+    // The recovery's own reconnect stream opens — still `recovering`.
+    owner.noteTransportOpen();
+    expect(owner.phase).toBe("recovering");
+    owner.noteTransportSettle();
+    recovery.release();
+    await flush();
+    expect(owner.phase).toBe("idle");
+  });
+
+  it("resume-recovery without a binding is denied", () => {
+    const { owner } = makeOwner();
+    expect(owner.request("resume-recovery", () => {})).toEqual({
+      granted: false,
+      reason: "no-session",
+    });
+  });
+});

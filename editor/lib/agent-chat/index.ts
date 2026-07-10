@@ -61,6 +61,7 @@ export {
   type StreamAttachPhase,
 } from "./stream-attach-owner";
 export { useStreamAttach, type UseStreamAttachArgs } from "./use-stream-attach";
+export { chatError } from "./chat-error";
 export {
   computeContextUsage,
   estimateContextBreakdown,

@@ -62,6 +62,7 @@ import {
   buildAgentSend,
   buildTemplateContext,
   buildApprovalResumeBody,
+  chatError,
   desktopAgentTransport,
   isSessionBusy,
   StreamAttachOwner,
@@ -370,6 +371,33 @@ function AgentPaneContent({
     epoch: chatSession.epoch,
     resumeStream: rehydrateThenAttach,
   });
+
+  // Self-heal (owner-gated, once per binding): a `disconnect` or
+  // `stream-state` error means only this client's VIEW died — the server
+  // state is durable (a detach is never an abort; the recorder is always
+  // attached host-side). Restore from the DB and re-attach if the run is
+  // still live; on success the error clears silently (the transcript is the
+  // truth). A second failure in the same binding surfaces honestly — the
+  // owner grants exactly one recovery.
+  const [recovering, setRecovering] = useState(false);
+  const clearErrorRef = useRef(clearError);
+  clearErrorRef.current = clearError;
+  useEffect(() => {
+    if (!error) return;
+    const kind = chatError.classify(error);
+    if (!chatError.recoverable(kind)) return;
+    if (attachOwner.noteStreamError(kind) !== "recover") return;
+    setRecovering(true);
+    const decision = attachOwner.request("resume-recovery", async () => {
+      try {
+        await rehydrateThenAttach();
+        clearErrorRef.current();
+      } finally {
+        setRecovering(false);
+      }
+    });
+    if (!decision.granted) setRecovering(false);
+  }, [error, attachOwner, rehydrateThenAttach]);
 
   // Manual compaction (RFC `session / compaction`) runs as a separate op that
   // does NOT move `useChat` status. Declared here so the single `busy` signal
@@ -790,11 +818,9 @@ function AgentPaneContent({
               token-expired error also fires a background re-mint so the
               user's next send just works. */}
           <span className="flex-1">
-            {gridaGateway.isGgTokenExpired(error)
-              ? "Your Grida session needed a refresh — try sending again."
-              : gridaGateway.isGgInsufficientCredits(error)
-                ? "Your organization is out of AI credits."
-                : error.message}
+            {recovering
+              ? `${chatError.describe(error)} Reconnecting…`
+              : chatError.describe(error)}
           </span>
           {gridaGateway.isGgInsufficientCredits(error) && (
             <button

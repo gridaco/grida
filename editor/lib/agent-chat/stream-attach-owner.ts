@@ -82,7 +82,7 @@ export type StreamAttachBinding = {
   readonly epoch: number;
 };
 
-export type StreamAttachPhase = "unbound" | "idle" | "attaching";
+export type StreamAttachPhase = "unbound" | "idle" | "attaching" | "recovering";
 
 type Logger = (line: string) => void;
 
@@ -94,6 +94,11 @@ export class StreamAttachOwner {
   private pending_exec = 0;
   /** Transport-reported live streams (opens minus settles, floored at 0). */
   private open_streams = 0;
+  /** Self-heal used for the current binding (one attempt max — a recovery
+   * that dies again must surface honestly, not ping-pong). */
+  private recovery_attempted = false;
+  /** A `resume-recovery` executor is live (drives the `recovering` phase). */
+  private recovering = false;
   private readonly log: Logger;
 
   constructor(opts?: { log?: Logger }) {
@@ -111,6 +116,7 @@ export class StreamAttachOwner {
   }
 
   get phase(): StreamAttachPhase {
+    if (this.recovering) return "recovering";
     if (this.busy) return "attaching";
     return this.binding ? "idle" : "unbound";
   }
@@ -132,10 +138,31 @@ export class StreamAttachOwner {
     }
     this.binding = binding;
     this.resume_claimed = false;
+    this.recovery_attempted = false;
     if (this.busy) {
       this.note("superseded", `pending=${this.pending_exec}`);
     }
     this.note("bind");
+  }
+
+  /**
+   * Report a recoverable stream failure (`chat-error.ts`: `disconnect` /
+   * `stream-state` — the server state is intact; only this client's view
+   * died). Returns `"recover"` exactly once per binding when a self-heal
+   * attempt is sound (bound, nothing live); the caller then runs the
+   * restore through `request("resume-recovery", …)`. Everything else —
+   * unbound, an attach still live, or the one attempt already spent —
+   * returns `"ignore"` and the failure surfaces honestly instead of
+   * ping-ponging.
+   */
+  noteStreamError(kind: "disconnect" | "stream-state"): "recover" | "ignore" {
+    if (!this.binding || this.busy || this.recovery_attempted) {
+      this.note("recovery-ignore", `kind=${kind}`);
+      return "ignore";
+    }
+    this.recovery_attempted = true;
+    this.note("recovery", `kind=${kind}`);
+    return "recover";
   }
 
   /** Pure read of what `request(intent)` would do right now. */
@@ -191,9 +218,11 @@ export class StreamAttachOwner {
       return decision;
     }
     this.pending_exec += 1;
+    if (intent === "resume-recovery") this.recovering = true;
     this.note("grant", `intent=${intent}`);
     const settle = () => {
       this.pending_exec = Math.max(0, this.pending_exec - 1);
+      if (intent === "resume-recovery") this.recovering = false;
       this.note("settle", `intent=${intent}`);
     };
     const fail = (err: unknown) => {
