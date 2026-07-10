@@ -1,0 +1,398 @@
+<grida version="0">
+  <container name="source-becomes-surface" width="1600" height="1000" clips="true">
+    <fill>
+      <solid color="#060812"/>
+      <gradient kind="diamond" transform="1.3 0 0 1.15 -0.28 -0.08" opacity="0.82">
+        <stop offset="0" color="#7C3AED"/>
+        <stop offset="0.44" color="#111827"/>
+        <stop offset="1" color="#020617"/>
+      </gradient>
+      <image src="../../../../fixtures/images/512.jpg" fit="fill" opacity="0.2" blend-mode="soft-light"/>
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.72" blend-mode="screen">
+        <stop offset="0" color="#F472B6" opacity="0.4"/>
+        <stop offset="0.42" color="#8B5CF6" opacity="0.2"/>
+        <stop offset="1" color="#020617" opacity="0"/>
+      </gradient>
+      <solid color="#FF00FF" visible="false"/>
+    </fill>
+    <stroke width="4" miter-limit="2">
+      <solid color="#FFFFFF" opacity="0.2"/>
+    </stroke>
+    <stroke miter-limit="2">
+      <gradient kind="linear" from="0 0" to="1 1">
+        <stop offset="0" color="#F9A8D4"/>
+        <stop offset="0.5" color="#C4B5FD"/>
+        <stop offset="1" color="#67E8F9"/>
+      </gradient>
+    </stroke>
+    <container name="masthead" x="72" y="48" width="1456" height="44" layout="flex" main="space-between" cross="center">
+      <text name="wordmark" width="280" size="18" fill="#FFFFFF">GRIDA / XML</text>
+      <text name="edition" width="500" size="14" fill="#C4B5FD">AUTHORING SURFACE · DRAFT 0</text>
+      <text name="viewport-label" width="300" fill="#F8FAFC">1600 × 1000 / LIVE</text>
+      <ellipse name="live-dot" x="end 314" y="center" width="10" height="10" flow="absolute" fill="#34D399">
+        <stroke width="8" align="outside">
+          <solid color="#34D399" opacity="0.2"/>
+        </stroke>
+        <stroke>
+          <solid color="#ECFDF5"/>
+        </stroke>
+      </ellipse>
+    </container>
+    <line name="spectral-rule" x="span 72 72" y="116">
+      <stroke width="7" cap="round">
+        <solid color="#8B5CF6" opacity="0.2"/>
+      </stroke>
+      <stroke width="2" cap="round" dash-array="1 15">
+        <gradient kind="linear" from="0.25 0.5" to="0.75 0.5" tile-mode="mirror">
+          <stop offset="0" color="#F472B6"/>
+          <stop offset="0.5" color="#A78BFA"/>
+          <stop offset="1" color="#22D3EE"/>
+        </gradient>
+      </stroke>
+    </line>
+    <container name="hero-copy" x="72" y="154" width="760" height="690" min-width="680" max-width="720" min-height="620" max-height="660">
+      <rect name="draft-label" width="254" height="38">
+        <fill>
+          <solid color="#6D28D9"/>
+          <gradient kind="linear" from="0 0" to="1 1" blend-mode="screen">
+            <stop offset="0" color="#F472B6"/>
+            <stop offset="0.54" color="#8B5CF6"/>
+            <stop offset="1" color="#22D3EE"/>
+          </gradient>
+        </fill>
+        <stroke width="6" align="outside" join="bevel">
+          <solid color="#8B5CF6" opacity="0.2"/>
+        </stroke>
+        <stroke join="bevel">
+          <solid color="#FFFFFF" opacity="0.8"/>
+        </stroke>
+        <text x="center" y="center" size="14" fill="#FFFFFF">FILE-FIRST DESIGN IR</text>
+      </rect>
+      <text name="headline" y="72" width="720" size="72" fill="#F8FAFC"><stroke width="1.5" align="outside">
+          <gradient kind="linear" from="0 0" to="1 1" opacity="0.68">
+            <stop offset="0" color="#F9A8D4"/>
+            <stop offset="0.48" color="#C4B5FD"/>
+            <stop offset="1" color="#67E8F9"/>
+          </gradient>
+        </stroke>MATERIAL,
+NOT MYSTERY.</text>
+      <text name="dek" y="286" width="650" size="20" fill="#CBD5E1">One inspectable tree for live interfaces,
+presentations, and programmable graphics.</text>
+      <container name="actions" y="384" width="auto" height="auto" layout="flex" cross="center" gap="20">
+        <rect name="primary-action" width="300" height="64">
+          <fill>
+            <solid color="#7C3AED"/>
+            <gradient kind="linear" from="0 0" to="1 1" blend-mode="screen">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="0.5" color="#A855F7"/>
+              <stop offset="1" color="#2563EB"/>
+            </gradient>
+            <image src="../../../../fixtures/images/512.jpg" fit="fill" opacity="0.16" blend-mode="soft-light"/>
+          </fill>
+          <stroke width="14" align="outside" join="round">
+            <gradient kind="radial" opacity="0.3" blend-mode="screen">
+              <stop offset="0" color="#F9A8D4"/>
+              <stop offset="0.55" color="#A78BFA"/>
+              <stop offset="1" color="#2563EB" opacity="0"/>
+            </gradient>
+          </stroke>
+          <stroke width="3" align="center" join="bevel">
+            <gradient kind="linear" from="0 0" to="1 1">
+              <stop offset="0" color="#FDF2F8"/>
+              <stop offset="0.5" color="#DDD6FE"/>
+              <stop offset="1" color="#CFFAFE"/>
+            </gradient>
+          </stroke>
+          <stroke join="bevel">
+            <solid color="#FFFFFF" opacity="0.8"/>
+          </stroke>
+          <text x="center" y="center" fill="#FFFFFF">OPEN THE SOURCE  &gt;</text>
+        </rect>
+        <rect name="secondary-action" width="260" height="64" fill="#0F172A">
+          <stroke width="8" align="outside" miter-limit="2">
+            <solid color="#020617" opacity="0.4"/>
+          </stroke>
+          <stroke width="2" align="center" miter-limit="2" dash-array="10 8">
+            <gradient kind="linear" tile-mode="mirror">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="0.5" color="#A78BFA"/>
+              <stop offset="1" color="#22D3EE"/>
+            </gradient>
+          </stroke>
+          <stroke miter-limit="2">
+            <solid color="#FFFFFF" opacity="0.4"/>
+          </stroke>
+          <text x="center" y="center" fill="#E2E8F0">READ THE SCENE</text>
+        </rect>
+      </container>
+      <lens name="kinetic-ribbon" x="8" y="500" opacity="0.76" ops="translate(0,0) rotate(-3) scale(1.02) skew-x(-10)">
+        <rect width="520" height="12">
+          <fill>
+            <gradient kind="linear" from="0.125 0.5" to="0.875 0.5" tile-mode="mirror">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="0.34" color="#8B5CF6"/>
+              <stop offset="0.68" color="#2563EB"/>
+              <stop offset="1" color="#22D3EE"/>
+            </gradient>
+          </fill>
+        </rect>
+        <rect x="48" y="30" width="420" height="5" opacity="0.48" fill="#FFFFFF"/>
+        <line y="58" width="540" min-width="500" max-width="560">
+          <stroke width="2" cap="square" dash-array="20 10">
+            <gradient kind="linear">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="1" color="#67E8F9"/>
+            </gradient>
+          </stroke>
+        </line>
+      </lens>
+      <container name="syntax-rack" y="570" width="620" height="52" layout="flex" wrap="true" main="space-between" cross="center" gap="8 12">
+        <ellipse width="132" height="30" fill="#1E1B4B">
+          <text x="center" y="center" size="12" fill="#DDD6FE">ORDERED PAINT</text>
+        </ellipse>
+        <ellipse width="132" height="30" fill="#172554">
+          <text x="center" y="center" size="12" fill="#BFDBFE">FLEX + FREE</text>
+        </ellipse>
+        <ellipse width="132" height="30" fill="#083344">
+          <text x="center" y="center" size="12" fill="#A5F3FC">MULTI-STROKE</text>
+        </ellipse>
+        <ellipse width="132" height="30" fill="#052E16">
+          <text x="center" y="center" size="12" fill="#BBF7D0">AGENT-READY</text>
+        </ellipse>
+      </container>
+      <group name="capability-legend" y="632" opacity="0.82">
+        <ellipse width="18" height="18" fill="#A3E635">
+          <stroke width="7" align="outside">
+            <solid color="#A3E635" opacity="0.2"/>
+          </stroke>
+          <stroke>
+            <solid color="#F7FEE7"/>
+          </stroke>
+        </ellipse>
+        <text x="34" width="620" size="15" fill="#CBD5E1">ONE TREE · RESPONSIVE BOXES · PRODUCTION PAINTS</text>
+      </group>
+    </container>
+    <container name="material-lab" x="850" y="150" width="678" height="680" clips="true">
+      <fill>
+        <solid color="#070B16"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.78">
+          <stop offset="0" color="#172554"/>
+          <stop offset="0.5" color="#312E81"/>
+          <stop offset="1" color="#09090B"/>
+        </gradient>
+        <image src="../../../../fixtures/images/512.jpg" fit="fill" opacity="0.24" blend-mode="soft-light"/>
+        <gradient kind="radial" transform="1.35 0 0 1.35 -0.42 -0.38" opacity="0.52" blend-mode="screen">
+          <stop offset="0" color="#F472B6"/>
+          <stop offset="0.48" color="#7C3AED" opacity="0.4"/>
+          <stop offset="1" color="#020617" opacity="0"/>
+        </gradient>
+      </fill>
+      <stroke width="18" align="outside" join="round">
+        <solid color="#020617" opacity="0.8"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.3" blend-mode="screen">
+          <stop offset="0" color="#F472B6"/>
+          <stop offset="0.5" color="#8B5CF6"/>
+          <stop offset="1" color="#22D3EE"/>
+        </gradient>
+      </stroke>
+      <stroke width="3" align="center" join="bevel">
+        <gradient kind="linear" from="0 0" to="1 1">
+          <stop offset="0" color="#FBCFE8"/>
+          <stop offset="0.5" color="#C4B5FD"/>
+          <stop offset="1" color="#A5F3FC"/>
+        </gradient>
+      </stroke>
+      <stroke join="bevel">
+        <solid color="#FFFFFF" opacity="0.4"/>
+      </stroke>
+      <ellipse name="clipped-pink-orbit" x="480" y="-120" width="360" aspect-ratio="1:1" flip-y="true" opacity="0.82">
+        <fill>
+          <gradient kind="radial" tile-mode="mirror" transform="1.2 0 0 1.2 -0.16 -0.12">
+            <stop offset="0" color="#FDF2F8"/>
+            <stop offset="0.34" color="#F472B6"/>
+            <stop offset="0.7" color="#7C3AED"/>
+            <stop offset="1" color="#172554"/>
+          </gradient>
+        </fill>
+        <stroke width="12" dash-array="6 14">
+          <solid color="#FFFFFF" opacity="0.4"/>
+        </stroke>
+      </ellipse>
+      <ellipse name="clipped-cyan-orbit" x="-180" y="470" width="420" height="420" rotation="24" flip-x="true" opacity="0.52">
+        <fill>
+          <gradient kind="sweep" transform="1.1 0 0 1.1 -0.05 -0.05" blend-mode="screen">
+            <stop offset="0" color="#22D3EE"/>
+            <stop offset="0.35" color="#2563EB"/>
+            <stop offset="0.68" color="#8B5CF6"/>
+            <stop offset="1" color="#22D3EE"/>
+          </gradient>
+        </fill>
+      </ellipse>
+      <rect name="absolute-flare" x="430" y="510" width="260" height="96" rotation="-18" flip-x="true" flip-y="true" opacity="0.36">
+        <fill>
+          <gradient kind="linear" from="-0.25 0.5" to="1.25 0.5" tile-mode="repeated">
+            <stop offset="0" color="#F472B6"/>
+            <stop offset="0.5" color="#8B5CF6"/>
+            <stop offset="1" color="#22D3EE"/>
+          </gradient>
+        </fill>
+      </rect>
+      <lens name="spectral-bars" x="62" y="44" opacity="0.46" ops="rotate(11) skew-x(-10)">
+        <rect width="500" height="22">
+          <fill>
+            <gradient kind="linear" from="0.125 0.5" to="0.875 0.5" tile-mode="repeated">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="0.32" color="#A78BFA"/>
+              <stop offset="0.68" color="#2563EB"/>
+              <stop offset="1" color="#22D3EE"/>
+            </gradient>
+          </fill>
+        </rect>
+        <rect x="50" y="48" width="380" height="8" opacity="0.64" fill="#FFFFFF"/>
+        <line y="86" width="520">
+          <stroke width="3" cap="round" dash-array="2 18">
+            <solid color="#A5F3FC" opacity="0.8"/>
+          </stroke>
+        </line>
+      </lens>
+      <ellipse name="paint-orb" x="104" y="100" width="470" height="470">
+        <fill>
+          <solid color="#08101F"/>
+          <gradient kind="radial" transform="1.16 0 0 1.16 -0.08 -0.06">
+            <stop offset="0" color="#4C1D95"/>
+            <stop offset="0.46" color="#1E3A8A"/>
+            <stop offset="0.78" color="#0F172A"/>
+            <stop offset="1" color="#020617"/>
+          </gradient>
+          <image src="../../../../fixtures/images/512.jpg" fit="fill" opacity="0.18" blend-mode="overlay"/>
+          <gradient kind="linear" from="0 0" to="1 1" opacity="0.48" blend-mode="screen">
+            <stop offset="0" color="#F472B6" opacity="0.6"/>
+            <stop offset="0.5" color="#8B5CF6" opacity="0.2"/>
+            <stop offset="1" color="#22D3EE" opacity="0.4"/>
+          </gradient>
+        </fill>
+        <stroke width="38" align="outside">
+          <solid color="#020617" opacity="0.8"/>
+          <gradient kind="radial" opacity="0.72" blend-mode="screen">
+            <stop offset="0" color="#F472B6"/>
+            <stop offset="0.48" color="#8B5CF6"/>
+            <stop offset="1" color="#22D3EE" opacity="0"/>
+          </gradient>
+          <image src="../../../../fixtures/images/512.jpg" fit="fill" opacity="0.14" blend-mode="screen"/>
+        </stroke>
+        <stroke width="10" align="center" dash-array="5 15">
+          <gradient kind="sweep">
+            <stop offset="0" color="#F472B6"/>
+            <stop offset="0.25" color="#A78BFA"/>
+            <stop offset="0.5" color="#60A5FA"/>
+            <stop offset="0.75" color="#22D3EE"/>
+            <stop offset="1" color="#F472B6"/>
+          </gradient>
+        </stroke>
+        <stroke width="2">
+          <solid color="#FFFFFF" opacity="0.8"/>
+        </stroke>
+        <rect name="diamond-core" x="155" y="155" width="160" height="160" rotation="45" flip-x="true">
+          <fill>
+            <solid color="#111827"/>
+            <gradient kind="diamond" transform="1.25 0 0 1.25 -0.12 -0.12" blend-mode="screen">
+              <stop offset="0" color="#FFFFFF"/>
+              <stop offset="0.22" color="#F472B6"/>
+              <stop offset="0.56" color="#8B5CF6"/>
+              <stop offset="1" color="#172554"/>
+            </gradient>
+          </fill>
+          <stroke width="12" align="outside" join="bevel">
+            <solid color="#020617" opacity="0.6"/>
+          </stroke>
+          <stroke width="3" align="center" join="bevel">
+            <gradient kind="linear" from="0 0" to="1 1">
+              <stop offset="0" color="#FBCFE8"/>
+              <stop offset="0.5" color="#DDD6FE"/>
+              <stop offset="1" color="#CFFAFE"/>
+            </gradient>
+          </stroke>
+          <ellipse x="49" y="49" width="62" height="62">
+            <fill>
+              <gradient kind="sweep">
+                <stop offset="0" color="#F472B6"/>
+                <stop offset="0.34" color="#8B5CF6"/>
+                <stop offset="0.68" color="#22D3EE"/>
+                <stop offset="1" color="#F472B6"/>
+              </gradient>
+            </fill>
+            <stroke width="2" align="center">
+              <solid color="#FFFFFF" opacity="0.8"/>
+            </stroke>
+          </ellipse>
+        </rect>
+        <text x="center" y="center" size="24"><fill/><stroke width="1.5" align="center">
+            <gradient kind="linear" from="0 0" to="1 1">
+              <stop offset="0" color="#F9A8D4"/>
+              <stop offset="0.5" color="#FFFFFF"/>
+              <stop offset="1" color="#67E8F9"/>
+            </gradient>
+          </stroke>IR</text>
+        <text x="center" y="360" size="14" fill="#CFFAFE">PAINT · LAYOUT · TYPE</text>
+      </ellipse>
+      <line name="instrument-line" x="64" y="586" width="550" rotation="-6">
+        <stroke width="10" cap="round">
+          <solid color="#020617" opacity="0.4"/>
+        </stroke>
+        <stroke width="3" cap="round" dash-array="28 12">
+          <gradient kind="linear">
+            <stop offset="0" color="#F472B6"/>
+            <stop offset="0.5" color="#A78BFA"/>
+            <stop offset="1" color="#22D3EE"/>
+          </gradient>
+        </stroke>
+      </line>
+      <group name="render-status" x="70" y="632" opacity="0.84">
+        <ellipse width="10" height="10" fill="#34D399">
+          <stroke width="8" align="outside">
+            <solid color="#34D399" opacity="0.2"/>
+          </stroke>
+        </ellipse>
+        <text x="28" width="500" size="13" fill="#D1FAE5">MATERIALIZED THROUGH THE SAME ENGINE PAINT MODEL</text>
+      </group>
+    </container>
+    <container name="status-dock" x="72" y="872" width="1456" height="80" layout="flex" wrap="true" main="space-between" cross="center" gap="20 12" padding="16 20 16 20" fill="#090E1A">
+      <stroke width="10" align="outside" join="bevel">
+        <solid color="#020617" opacity="0.4"/>
+      </stroke>
+      <stroke join="bevel">
+        <gradient kind="linear">
+          <stop offset="0" color="#F472B6"/>
+          <stop offset="0.5" color="#8B5CF6"/>
+          <stop offset="1" color="#22D3EE"/>
+        </gradient>
+      </stroke>
+      <container name="live-pipeline" width="600" height="48" grow="1" align="center" layout="flex" direction="column" main="center" gap="2">
+        <text width="520" size="11" fill="#A3E635">LIVE PIPELINE</text>
+        <text width="560" size="15" fill="#E2E8F0">SOURCE  &gt;  RESOLVE  &gt;  DRAWLIST  &gt;  PAINT</text>
+      </container>
+      <rect name="ordered-paints-chip" width="220" height="48" align="center" fill="#111827">
+        <stroke width="2" align="center" join="round">
+          <gradient kind="linear" from="0 0" to="1 1">
+            <stop offset="0" color="#F472B6"/>
+            <stop offset="1" color="#8B5CF6"/>
+          </gradient>
+        </stroke>
+        <text x="center" y="center" size="14" fill="#F5D0FE">PAINTS × ORDERED</text>
+      </rect>
+      <rect name="native-strokes-chip" width="220" height="48" align="center" fill="#111827">
+        <stroke width="7" align="outside" join="round">
+          <solid color="#22D3EE" opacity="0.2"/>
+        </stroke>
+        <stroke width="2" align="center" join="round" dash-array="8 6">
+          <gradient kind="linear" from="0 0" to="1 1">
+            <stop offset="0" color="#60A5FA"/>
+            <stop offset="1" color="#22D3EE"/>
+          </gradient>
+        </stroke>
+        <text x="center" y="center" size="14" fill="#CFFAFE">STROKES × NATIVE</text>
+      </rect>
+    </container>
+    <rect name="hidden-source-variant" x="72" y="72" width="320" height="180" hidden="true" fill="#FF00FF"/>
+  </container>
+</grida>

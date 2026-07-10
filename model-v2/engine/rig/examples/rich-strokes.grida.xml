@@ -1,0 +1,19 @@
+<grida version="0">
+  <container name="stroke-showcase" width="720" height="320" fill="#F8FAFC">
+    <rect name="card" x="80" y="60" width="560" height="200" fill="#101828">
+      <stroke width="18" align="outside" join="round">
+        <solid color="#111827"/>
+      </stroke>
+      <stroke width="8" align="center" join="round" dash-array="24 12">
+        <gradient kind="linear" from="0 0" to="1 1">
+          <stop offset="0" color="#A78BFA"/>
+          <stop offset="1" color="#60A5FA"/>
+        </gradient>
+      </stroke>
+      <stroke width="3" join="round">
+        <solid color="#FFFFFF" opacity="0.8"/>
+      </stroke>
+      <text x="center" y="center" width="500" size="32" fill="#FFFFFF">One shape · three strokes</text>
+    </rect>
+  </container>
+</grida>

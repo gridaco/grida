@@ -1,0 +1,35 @@
+<grida version="0">
+  <container name="paint-showcase" width="720" height="300" layout="flex" gap="24" padding="36" fill="#F8FAFC">
+    <rect name="layered-card" width="320" height="228">
+      <fill>
+        <solid color="#101828"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.8">
+          <stop offset="0" color="#7C3AED"/>
+          <stop offset="1" color="#2563EB"/>
+        </gradient>
+        <image src="../../../../fixtures/images/border-diamonds.png" opacity="0.15"/>
+      </fill>
+      <text x="24" y="24" width="272" size="28" fill="#FFFFFF">Ordered fills</text>
+      <text x="24" y="72" width="272" fill="#E0E7FF">solid + gradient + image</text>
+    </rect>
+    <rect name="radial-card" width="280" height="228">
+      <fill>
+        <gradient kind="radial" transform="1.4 0 0 1.4 -0.2 -0.2">
+          <stop offset="0" color="#FEF3C7"/>
+          <stop offset="0.55" color="#F97316"/>
+          <stop offset="1" color="#7C2D12"/>
+        </gradient>
+      </fill>
+      <text x="24" y="24" width="232" size="22" fill="#FFFFFF">Unit-space radial</text>
+      <ellipse x="108" y="116" width="64" height="64">
+        <fill>
+          <gradient kind="sweep">
+            <stop offset="0" color="#FFFFFF"/>
+            <stop offset="0.5" color="#FDBA74"/>
+            <stop offset="1" color="#FFFFFF"/>
+          </gradient>
+        </fill>
+      </ellipse>
+    </rect>
+  </container>
+</grida>

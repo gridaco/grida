@@ -1,0 +1,30 @@
+<grida version="0">
+  <container name="slide" width="1280" height="720" layout="flex" direction="column" gap="24" padding="64" fill="#F7F4EE">
+    <text name="eyebrow" width="300" size="22" fill="#5B5F97">GRIDA XML · DRAFT 0</text>
+    <text name="title" width="1152" size="58" fill="#111827">Dynamic design, plain text.</text>
+    <text name="subtitle" width="1152" size="22" fill="#4B5563">A small authored tree can mix graphics, layout, and local composition.</text>
+    <container name="feature-row" width="1152" height="300" layout="flex" cross="center" gap="24" fill="#F7F4EE">
+      <rect name="presentation-card" width="368" height="260" fill="#7C3AED">
+        <text name="presentation-title" x="28" y="34" width="312" size="26" fill="#FFFFFF">Presentations</text>
+        <text name="presentation-body" x="28" y="88" width="312" size="18" fill="#FFFFFF">Compose slides as trees.</text>
+        <ellipse name="presentation-badge" x="284" y="176" width="56" height="56" fill="#FFFFFF">
+          <text x="center" y="center" size="18" fill="#7C3AED">01</text>
+        </ellipse>
+      </rect>
+      <rect name="interface-card" width="368" height="260" fill="#2563EB">
+        <text name="interface-title" x="28" y="34" width="312" size="26" fill="#FFFFFF">Interfaces</text>
+        <text name="interface-body" x="28" y="88" width="312" size="18" fill="#FFFFFF">Flex keeps intent editable.</text>
+        <ellipse name="interface-badge" x="284" y="176" width="56" height="56" fill="#FFFFFF">
+          <text x="center" y="center" size="18" fill="#2563EB">02</text>
+        </ellipse>
+      </rect>
+      <rect name="agent-card" width="368" height="260" fill="#0F766E">
+        <text name="agent-title" x="28" y="34" width="312" size="26" fill="#FFFFFF">Agent-ready</text>
+        <text name="agent-body" x="28" y="88" width="312" size="18" fill="#FFFFFF">Readable source, fewer traps.</text>
+        <ellipse name="agent-badge" x="284" y="176" width="56" height="56" fill="#FFFFFF">
+          <text x="center" y="center" size="18" fill="#0F766E">03</text>
+        </ellipse>
+      </rect>
+    </container>
+  </container>
+</grida>
