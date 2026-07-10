@@ -22,8 +22,9 @@
  * Last-session memory lives in **localStorage**, keyed by filter scope:
  * `grida.lastChatSession.<agent>[.<workspaceId>]`. On mount the hook
  * reads that key, validates the session still exists on the agent sidecar
- * (and discards stale ids cleanly), and sets `currentId`. Streaming
- * continuity is then automatic: the chat panel's `useResumeInFlight`
+ * (and discards stale ids cleanly), and sets `currentId` (bumping `epoch` —
+ * a restore is a real rebinding). Streaming continuity is then automatic:
+ * the chat panel's `useStreamAttach` (the attach owner's mount resume)
  * calls `transport.reconnectToStream` once the rebuilt chat carries the
  * restored session id; the agent sidecar serves replay + live tail if the
  * run is still in flight, or 404s into a clean no-op. (The SDK's own
@@ -71,6 +72,18 @@ export type UseChatSessionFilter = {
 export type UseChatSessionResult = {
   /** Current active session id, or `null` if none selected (new chat). */
   current_id: string | null;
+  /**
+   * Session-binding generation. Bumps on every REAL rebinding of the panel —
+   * `select` to a different id, `start_new`, the localStorage restore, a
+   * scope reset, archive/remove of the current session — and deliberately
+   * NOT on same-session churn (hydration, `rehydrate`, and the mid-stream
+   * `apply_resolved_session_id` adoption). The chat panels key their `Chat`
+   * instance and the attach owner's resume claim on this
+   * (`stream-attach-owner.ts`): a rehydrate mid-send must never mint a fresh
+   * Chat whose mount-resume races the live stream (the H1 incident class),
+   * while a real re-open of a busy session must re-attach.
+   */
+  epoch: number;
   /** Recent sessions in the filter scope. */
   sessions: ChatSessionRow[];
   /** Initial UIMessages hydrated for `currentId`; empty when `currentId` is null. */
@@ -92,14 +105,15 @@ export type UseChatSessionResult = {
   rehydrate: () => void;
   /**
    * Awaitable {@link rehydrate}: fetch + apply the active session's messages
-   * and resolve once `initialMessages` has been set. Compaction awaits this
-   * before clearing its busy flag so the compacted transcript reconciles
-   * BEFORE the turn queue drains — otherwise a queued message would fire
-   * against the pre-compaction view and the late hydration would clobber the
-   * in-flight turn (RFC `queue`; see `agent-pane.tsx` / `ai-sidebar/chat.tsx`
-   * onCompact).
+   * and resolve once `initialMessages` has been set — returning the applied
+   * messages (`null` when there is no active session or a fresher request
+   * superseded this one). Compaction awaits this before clearing its busy
+   * flag so the compacted transcript reconciles BEFORE the turn queue drains
+   * (RFC `queue`). The attach owner's rehydrate-then-attach resume executor
+   * uses the RETURN value to seed the live chat deterministically
+   * (`setMessages(msgs)`) instead of racing the reconcile effect.
    */
-  rehydrate_async: () => Promise<void>;
+  rehydrate_async: () => Promise<UIMessage[] | null>;
   /** Inline rename helper that updates list state optimistically. */
   rename: (id: string, title: string) => Promise<void>;
   /** Archive + drop from list. */
@@ -159,9 +173,16 @@ export function useChatSession(
   filterRef.current = filter;
 
   const [currentId, setCurrentId] = useState<string | null>(null);
+  // Binding generation (see `UseChatSessionResult.epoch`). Bumped ONLY by
+  // real rebindings below — never by hydration or mid-stream id adoption.
+  const [epoch, setEpoch] = useState(0);
   const [sessionsList, setSessionsList] = useState<ChatSessionRow[]>([]);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  // Render-fresh mirror of `currentId` for callbacks/effects that must read
+  // it without keying on it (the restore effect, `rehydrate_async`).
+  const currentIdRef = useRef<string | null>(null);
+  currentIdRef.current = currentId;
   // Bumped by `rehydrate()` to force a re-fetch of the active session's
   // messages without a currentId change (rewind keeps the same session).
   const [hydrateNonce, setHydrateNonce] = useState(0);
@@ -226,6 +247,9 @@ export function useChatSession(
   useEffect(() => {
     let cancelled = false;
     persistReadyRef.current = false;
+    // Scope reset (workspace/agent change) is a real rebinding — but only
+    // when it actually clears a session (never on the initial mount run).
+    if (currentIdRef.current !== null) setEpoch((n) => n + 1);
     setCurrentId(null);
     setInitialMessages([]);
     // forceNew: skip the restore entirely and stay on a fresh null
@@ -248,7 +272,13 @@ export function useChatSession(
           // `applyResolvedSessionId`-equivalent: set currentId only if
           // we haven't drifted (e.g. user clicked into a different
           // chat already by the time the validation roundtrip finished).
-          setCurrentId((cur) => cur ?? stored);
+          // The restore is a real rebinding: it MUST bump the epoch so the
+          // panel rebuilds its Chat around the restored id (the transport's
+          // reconnect falls back to the Chat's own id before the first send).
+          if (currentIdRef.current === null) {
+            setEpoch((n) => n + 1);
+            setCurrentId(stored);
+          }
         } else {
           writeLastSession(storageKey, null);
         }
@@ -305,29 +335,38 @@ export function useChatSession(
   // `hydrateGenRef` with the hydrate effect so the latest request wins
   // regardless of which path issued it. Reads `currentId` from a ref so the
   // callback stays identity-stable (no spurious effect re-runs downstream).
-  const currentIdRef = useRef(currentId);
-  currentIdRef.current = currentId;
-  const rehydrateAsync = useCallback(async () => {
+  const rehydrateAsync = useCallback(async (): Promise<UIMessage[] | null> => {
     const cur = currentIdRef.current;
     if (cur === null) {
       setInitialMessages([]);
-      return;
+      return null;
     }
     const gen = ++hydrateGenRef.current;
     try {
       const rows = await bridgeSessions.listMessages(cur);
-      if (gen !== hydrateGenRef.current) return;
-      setInitialMessages(toUIMessages(rows));
+      if (gen !== hydrateGenRef.current) return null;
+      const msgs = toUIMessages(rows);
+      setInitialMessages(msgs);
+      return msgs;
     } catch {
       // Keep the last-known transcript on a transient failure.
+      return null;
     }
   }, []);
 
   const select = useCallback((id: string | null) => {
+    // A real switch rebinds; re-selecting the already-active id is a no-op
+    // (no epoch churn from a picker re-click).
+    if (currentIdRef.current !== id) setEpoch((n) => n + 1);
     setCurrentId(id);
   }, []);
 
-  const startNew = useCallback(() => setCurrentId(null), []);
+  const startNew = useCallback(() => {
+    // Always a rebinding — "new chat" from an already-null session must
+    // still mint a fresh Chat (that is the affordance).
+    setEpoch((n) => n + 1);
+    setCurrentId(null);
+  }, []);
 
   const rename = useCallback(async (id: string, title: string) => {
     const updated = await bridgeSessions.rename(id, title);
@@ -338,7 +377,10 @@ export function useChatSession(
     async (id: string) => {
       await bridgeSessions.archive(id);
       setSessionsList((prev) => prev.filter((s) => s.id !== id));
-      if (currentId === id) setCurrentId(null);
+      if (currentId === id) {
+        setEpoch((n) => n + 1); // losing the current session is a rebinding
+        setCurrentId(null);
+      }
     },
     [currentId]
   );
@@ -347,7 +389,10 @@ export function useChatSession(
     async (id: string) => {
       await bridgeSessions.remove(id);
       setSessionsList((prev) => prev.filter((s) => s.id !== id));
-      if (currentId === id) setCurrentId(null);
+      if (currentId === id) {
+        setEpoch((n) => n + 1); // losing the current session is a rebinding
+        setCurrentId(null);
+      }
     },
     [currentId]
   );
@@ -374,6 +419,7 @@ export function useChatSession(
 
   return {
     current_id: currentId,
+    epoch,
     sessions: sessionsList,
     initial_messages: initialMessages,
     loading,

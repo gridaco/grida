@@ -43,12 +43,13 @@ import {
   buildAgentSend,
   desktopAgentTransport,
   isSessionBusy,
+  StreamAttachOwner,
   useChatSession,
   useCoreTurnSync,
   useRefreshOnStreamEnd,
-  useResumeInFlight,
   useSessionFork,
   useSessionStatus,
+  useStreamAttach,
   useTurnQueueController,
   type ChatMessage,
 } from "@/lib/agent-chat";
@@ -140,6 +141,11 @@ export function AISidebarChat({
   // the session's model instead of resetting it. Assigned once the picker
   // resolves; read fresh per send via the getter.
   const runContextRef = useRef<Partial<Omit<AgentRunOptions, "messages">>>({});
+  // Single attach authority for this sidebar (`stream-attach-owner.ts`):
+  // mount/rebuild resume, queue-drain attach, and the SDK's adopted
+  // auto-resubmit serialize here — one live attach max, resume-once keyed
+  // on (session, epoch), never on Chat identity.
+  const attachOwner = useMemo(() => new StreamAttachOwner(), []);
   const chat = useMemo(() => {
     const todos = new AgentTodos();
     const chat = new Chat<UIMessage>({
@@ -152,11 +158,16 @@ export function AISidebarChat({
         onSessionId: (resolvedId) => {
           chatSession.apply_resolved_session_id(resolvedId);
         },
+        // Attach-owner reporting (never vetoes): adopted streams serialize
+        // every other intent behind them.
+        onStreamOpen: () => attachOwner.noteTransportOpen(),
+        onStreamSettle: () => attachOwner.noteTransportSettle(),
         onResumeStart: () => {
           // AgentHost confirmed an in-flight run for this chat id; drop
           // the in-progress assistant message we hydrated from the DB
           // so the registry's full replay rebuilds it cleanly instead
-          // of stacking duplicate parts.
+          // of stacking duplicate parts. Sound for continuation turns
+          // too — the reconnect stream is self-contained (replay prefix).
           const cur = chatRef.current;
           if (!cur) return;
           const last = cur.messages.at(-1);
@@ -190,29 +201,35 @@ export function AISidebarChat({
         });
       },
     });
-    chatRef.current = chat;
     return chat;
-    // Rebuild ONLY on a real session switch / new chat — signalled by
-    // `initialMessages` changing (hydration). `currentId` is intentionally
-    // NOT a dep: when the live fresh chat adopts its server id mid-stream
-    // (`apply_resolved_session_id`), rebuilding here would orphan the in-flight
-    // first response (it streams into the discarded instance). Continuity
-    // rides the per-send `body.sessionId` below, and `useChatSession`
-    // suppresses the adoption hydrate so this memo sees no `initialMessages`
-    // change for it.
+    // Rebuild ONLY on a real rebinding — `epoch` bumps on select/start-new/
+    // restore/archive-of-current and deliberately NOT on hydration or the
+    // mid-stream id adoption (`apply_resolved_session_id`). Keying on
+    // `initial_messages` identity here was the H1 incident hazard: a
+    // rehydrate mid-send minted a fresh unclaimed Chat whose mount-resume
+    // opened a second stream over the live send. Hydration reaches the live
+    // instance through the guarded reconcile effect below and the owner's
+    // rehydrate-then-attach resume executor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fs, chatSession.initial_messages]);
+  }, [fs, chatSession.epoch]);
+  // Sync the ref to the ACTUAL `chat` React committed (StrictMode-safe — the
+  // memo factory must stay pure: it is double-invoked under StrictMode, and a
+  // `chatRef.current = instance` side-effect there leaves the ref pointing at
+  // the DISCARDED instance while `useChat` keeps the other; the client-tool
+  // resolver and onResumeStart would then act on an empty chat. Mirrors
+  // `workbench/agent-pane.tsx`.
+  useEffect(() => {
+    chatRef.current = chat;
+  }, [chat]);
 
-  // Reconnect to an in-flight run on remount/refresh via `useResumeInFlight`
-  // (NOT the SDK's `resume: true`). `resume: true` fires `resumeStream()`
-  // exactly once on mount, against the placeholder chat that has no session
-  // id yet — the id is restored async from localStorage, so the rebuilt chat
-  // that DOES carry it never resumes, and the refresh silently shows a stale
-  // DB snapshot. The hook resumes once per chat instance that has a real
-  // session id, and never over a turn this client is streaming itself. Our
-  // transport returns null on the agent sidecar's 404 → clean no-op; on
-  // success the agent sidecar replays from its in-memory chunk log and
-  // live-tails until finish. See `bridge-transport.ts` + `agent/stream-registry.ts`.
+  // Reconnect to an in-flight run via `useStreamAttach` below (NOT the SDK's
+  // `resume: true`, which fires once on mount before the async localStorage
+  // restore resolves the session id and so never reconnects the rebuilt
+  // chat). The attach owner resumes once per (session, epoch) — surviving
+  // Chat rebuilds — and degrades to a claim when this client already holds
+  // the live attach. Transport returns null on the agent sidecar's 404 →
+  // clean no-op; on success it replays the (self-contained) chunk log and
+  // live-tails. See `bridge-transport.ts` + `agent/stream-registry.ts`.
   const {
     messages,
     status,
@@ -230,14 +247,27 @@ export function AISidebarChat({
   // state.
   const isStreaming = status === "submitted" || status === "streaming";
 
-  // Reconnect to the session's in-flight run after a remount/refresh. Keyed on
-  // the chat instance + session id so the resume tracks the chat the async
-  // localStorage restore rebuilds — the gap `resume: true` left open.
-  useResumeInFlight({
-    chat,
+  // Reconnect to the session's in-flight run after a remount/refresh/switch,
+  // through the attach owner (resume-once per (session, epoch); degrades to a
+  // claim when this client already holds the live attach). The executor is
+  // REHYDRATE-THEN-ATTACH — seed the chat from the DB snapshot, then
+  // reconnect — so a restore into a BUSY session shows its history before
+  // the replay lands (the reconcile effect is blocked while busy).
+  const setMessagesRef = useRef(setMessages);
+  setMessagesRef.current = setMessages;
+  const resumeStreamRef = useRef(resumeStream);
+  resumeStreamRef.current = resumeStream;
+  const rehydrateThenAttach = useCallback(async () => {
+    const msgs = await chatSession.rehydrate_async();
+    if (msgs) setMessagesRef.current(msgs);
+    await resumeStreamRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatSession.rehydrate_async]);
+  useStreamAttach({
+    owner: attachOwner,
     sessionId: chatSession.current_id,
-    isStreaming,
-    resumeStream,
+    epoch: chatSession.epoch,
+    resumeStream: rehydrateThenAttach,
   });
 
   // Manual compaction (RFC `session / compaction`) runs as a separate op that
@@ -363,7 +393,11 @@ export function AISidebarChat({
     queued,
     setMessages,
     dropQueued,
-    resumeStream,
+    // Drain attaches go through the owner: a second stream over a live
+    // attach is denied and logged instead of interleaving into the reducer.
+    resumeStream: () => {
+      attachOwner.request("resume-drain", () => resumeStream());
+    },
     refetchQueue,
   });
 

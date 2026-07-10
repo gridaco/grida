@@ -43,6 +43,16 @@ export type DesktopAgentTransportOptions = Partial<
    * per-send `body` still wins; this only backfills what a body-less send omits.
    */
   runContext?: () => Partial<Omit<AgentRunOptions, "messages">>;
+  /**
+   * Reporting hooks for the attach owner (`stream-attach-owner.ts`).
+   * `onStreamOpen` fires when a run/reconnect stream goes live — including
+   * the AI SDK's body-less auto-resubmit, which no scaffold ever requests —
+   * and `onStreamSettle` fires exactly once when that stream ends (close,
+   * failure, or consumer cancel). Reporting ONLY: the transport never asks
+   * permission and never vetoes — ownership decisions live in the owner.
+   */
+  onStreamOpen?: () => void;
+  onStreamSettle?: () => void;
 };
 
 export namespace desktopAgentTransport {
@@ -98,7 +108,11 @@ export namespace desktopAgentTransport {
         // send (no in-flight run to reconnect to anyway).
         const sessionId = liveSessionId ?? options?.chatId;
         if (!sessionId) return null;
-        return await reconnectFromBridge(sessionId, defaults.onResumeStart);
+        return await reconnectFromBridge(sessionId, {
+          onResumeStart: defaults.onResumeStart,
+          onStreamOpen: defaults.onStreamOpen,
+          onStreamSettle: defaults.onStreamSettle,
+        });
       },
     };
   }
@@ -109,21 +123,43 @@ function streamFromBridge(
     messages: UIMessage[];
     abortSignal?: AbortSignal;
     onSessionId?: (sessionId: string) => void;
+    onStreamOpen?: () => void;
+    onStreamSettle?: () => void;
   }
 ): ReadableStream<UIMessageChunk> {
   let sessionId: string | null = opts.session_id ?? null;
   let settled = false;
+  // Attach-owner reporting: `open` at start, `settle` exactly once on the
+  // first of close / fail / cancel. Guarded independently of `settled`
+  // (cancel sets `settled` without passing through close/fail).
+  let settleReported = false;
+  const reportSettle = () => {
+    if (settleReported) return;
+    settleReported = true;
+    try {
+      opts.onStreamSettle?.();
+    } catch {
+      /* reporting must never break the stream */
+    }
+  };
 
   return new ReadableStream<UIMessageChunk>({
     async start(controller) {
+      try {
+        opts.onStreamOpen?.();
+      } catch {
+        /* reporting must never break the stream */
+      }
       const close = () => {
         if (settled) return;
         settled = true;
+        reportSettle();
         controller.close();
       };
       const fail = (err: unknown) => {
         if (settled) return;
         settled = true;
+        reportSettle();
         controller.error(err);
       };
       // The ONE sanctioned run-termination path. `abortRun` is the only caller
@@ -198,6 +234,7 @@ function streamFromBridge(
       // `abortRun`. Keep `settled` so no further chunk is enqueued onto the dead
       // controller.
       settled = true;
+      reportSettle();
     },
   });
 }
@@ -214,7 +251,11 @@ function streamFromBridge(
  */
 async function reconnectFromBridge(
   chatId: string,
-  onResumeStart?: () => void
+  hooks?: {
+    onResumeStart?: () => void;
+    onStreamOpen?: () => void;
+    onStreamSettle?: () => void;
+  }
 ): Promise<ReadableStream<UIMessageChunk> | null> {
   const queue: AgentUIMessageChunk[] = [];
   let downstream: ReadableStreamDefaultController<UIMessageChunk> | null = null;
@@ -224,8 +265,26 @@ async function reconnectFromBridge(
   );
   if (!handle) return null;
 
+  // Attach-owner reporting: a non-null handle IS a live attach (a null one
+  // never opened — no report). Settle exactly once on done/error/cancel.
+  let settleReported = false;
+  const reportSettle = () => {
+    if (settleReported) return;
+    settleReported = true;
+    try {
+      hooks?.onStreamSettle?.();
+    } catch {
+      /* reporting must never break the stream */
+    }
+  };
   try {
-    onResumeStart?.();
+    hooks?.onStreamOpen?.();
+  } catch {
+    /* reporting must never break the stream */
+  }
+
+  try {
+    hooks?.onResumeStart?.();
   } catch {
     /* never let the reset hook break the stream */
   }
@@ -236,9 +295,28 @@ async function reconnectFromBridge(
       for (const c of queue) controller.enqueue(c);
       queue.length = 0;
       void handle.done.then(
-        () => controller.close(),
-        (err) => controller.error(err)
+        () => {
+          reportSettle();
+          try {
+            controller.close();
+          } catch {
+            /* consumer already cancelled the stream */
+          }
+        },
+        (err) => {
+          reportSettle();
+          try {
+            controller.error(err);
+          } catch {
+            /* consumer already cancelled the stream */
+          }
+        }
       );
+    },
+    cancel() {
+      // Consumer stopped reading (stream-replace / unmount): a detach, and
+      // the owner must see the slot free again.
+      reportSettle();
     },
   });
 }

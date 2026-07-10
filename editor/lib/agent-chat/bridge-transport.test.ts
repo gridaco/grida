@@ -523,3 +523,162 @@ describe("detach ≠ abort (session.md#abort-vs-tcp-close)", () => {
     expect(ai.abortAgentRun).not.toHaveBeenCalled();
   });
 });
+
+// Attach-owner reporting hooks (`onStreamOpen`/`onStreamSettle`): the
+// transport REPORTS stream lifecycles — including the SDK's body-less
+// auto-resubmit no scaffold ever requests — so the owner can adopt them and
+// serialize every other intent behind a live attach. Reporting only: these
+// pins also re-assert the detach≠abort block above is untouched (a settle
+// report must never come with an abort).
+describe("attach-owner reporting (onStreamOpen / onStreamSettle)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function mockRun(sessionId: string, opts?: { neverDone?: boolean }) {
+    let emit!: (chunk: UIMessageChunk) => void;
+    let finish!: () => void;
+    const done = opts?.neverDone
+      ? new Promise<void>(() => {})
+      : new Promise<void>((r) => (finish = r));
+    vi.mocked(ai.startAgentRun).mockImplementation(async (_opts, onChunk) => {
+      emit = onChunk;
+      return { streamId: "local-1", sessionId, done };
+    });
+    return {
+      emit: (chunk: UIMessageChunk) => emit(chunk),
+      finish: () => finish(),
+    };
+  }
+
+  it("send: open fires at stream start, settle exactly once at close", async () => {
+    const run = mockRun("ses_live");
+    const onStreamOpen = vi.fn();
+    const onStreamSettle = vi.fn();
+    const stream = await desktopAgentTransport
+      .create({ onStreamOpen, onStreamSettle })
+      .sendMessages({
+        trigger: "submit-message",
+        chatId: "chat-1",
+        messageId: undefined,
+        messages: [
+          { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+        ],
+        abortSignal: undefined,
+      });
+    const reader = stream.getReader();
+    run.emit({ type: "text-start", id: "t" });
+    await reader.read();
+    expect(onStreamOpen).toHaveBeenCalledTimes(1);
+    expect(onStreamSettle).not.toHaveBeenCalled();
+
+    run.finish();
+    await reader.read(); // drains the close
+    expect(onStreamSettle).toHaveBeenCalledTimes(1);
+  });
+
+  it("send: consumer cancel settles exactly once — and still never aborts", async () => {
+    mockRun("ses_live", { neverDone: true });
+    const onStreamOpen = vi.fn();
+    const onStreamSettle = vi.fn();
+    const stream = await desktopAgentTransport
+      .create({ onStreamOpen, onStreamSettle })
+      .sendMessages({
+        trigger: "submit-message",
+        chatId: "chat-1",
+        messageId: undefined,
+        messages: [
+          { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+        ],
+        abortSignal: undefined,
+      });
+    const reader = stream.getReader();
+    await reader.cancel();
+    expect(onStreamOpen).toHaveBeenCalledTimes(1);
+    expect(onStreamSettle).toHaveBeenCalledTimes(1);
+    expect(ai.abortAgentRun).not.toHaveBeenCalled();
+  });
+
+  it("reconnect: a null handle (no live run) reports NOTHING", async () => {
+    vi.mocked(ai.reconnectAgentRun).mockResolvedValue(null);
+    const onStreamOpen = vi.fn();
+    const onStreamSettle = vi.fn();
+    const resume = await desktopAgentTransport.create({
+      session_id: "ses_live",
+      onStreamOpen,
+      onStreamSettle,
+    }).reconnectToStream!({ chatId: "chat-client" });
+    expect(resume).toBeNull();
+    expect(onStreamOpen).not.toHaveBeenCalled();
+    expect(onStreamSettle).not.toHaveBeenCalled();
+  });
+
+  it("reconnect: open on a live handle, settle once when the replay finishes", async () => {
+    let finish!: () => void;
+    vi.mocked(ai.reconnectAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_live",
+      done: new Promise<void>((r) => (finish = r)),
+    }));
+    const onStreamOpen = vi.fn();
+    const onStreamSettle = vi.fn();
+    const resume = await desktopAgentTransport.create({
+      session_id: "ses_live",
+      onStreamOpen,
+      onStreamSettle,
+    }).reconnectToStream!({ chatId: "chat-client" });
+    expect(resume).not.toBeNull();
+    expect(onStreamOpen).toHaveBeenCalledTimes(1);
+    expect(onStreamSettle).not.toHaveBeenCalled();
+
+    const reader = resume!.getReader();
+    finish();
+    await reader.read(); // drains the close
+    expect(onStreamSettle).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconnect: consumer cancel settles once (stream-replace teardown)", async () => {
+    vi.mocked(ai.reconnectAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_live",
+      done: new Promise<void>(() => {}),
+    }));
+    const onStreamSettle = vi.fn();
+    const resume = await desktopAgentTransport.create({
+      session_id: "ses_live",
+      onStreamSettle,
+    }).reconnectToStream!({ chatId: "chat-client" });
+    await resume!.cancel();
+    expect(onStreamSettle).toHaveBeenCalledTimes(1);
+    expect(ai.abortAgentRun).not.toHaveBeenCalled();
+  });
+
+  it("a throwing hook never breaks the stream", async () => {
+    const run = mockRun("ses_live");
+    const stream = await desktopAgentTransport
+      .create({
+        onStreamOpen: () => {
+          throw new Error("hook down");
+        },
+        onStreamSettle: () => {
+          throw new Error("hook down");
+        },
+      })
+      .sendMessages({
+        trigger: "submit-message",
+        chatId: "chat-1",
+        messageId: undefined,
+        messages: [
+          { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+        ],
+        abortSignal: undefined,
+      });
+    const reader = stream.getReader();
+    run.emit({ type: "text-start", id: "t" });
+    const first = await reader.read();
+    expect(first.done).toBe(false);
+    run.finish();
+    const end = await reader.read();
+    expect(end.done).toBe(true);
+  });
+});

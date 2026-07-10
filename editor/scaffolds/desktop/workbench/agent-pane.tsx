@@ -64,12 +64,13 @@ import {
   buildApprovalResumeBody,
   desktopAgentTransport,
   isSessionBusy,
+  StreamAttachOwner,
   useChatSession,
   useCoreTurnSync,
   useRefreshOnStreamEnd,
-  useResumeInFlight,
   useSessionFork,
   useSessionStatus,
+  useStreamAttach,
   useTurnQueueController,
   type ChatMessage,
 } from "@/lib/agent-chat";
@@ -248,6 +249,12 @@ function AgentPaneContent({
   // session's model + posture instead of resetting them. Assigned below once the
   // pickers resolve; read fresh per send via the getter.
   const runContextRef = useRef<Partial<Omit<AgentRunOptions, "messages">>>({});
+  // The single authority over stream starts/attaches for this pane
+  // (`stream-attach-owner.ts`): the approval resume, the mount/rebuild
+  // resume, the queue-drain attach, and the SDK's adopted auto-resubmit all
+  // serialize here — one live attach max, resume-once keyed on
+  // (session, epoch), never on Chat identity.
+  const attachOwner = useMemo(() => new StreamAttachOwner(), []);
   const chat = useMemo(
     () =>
       new Chat<UIMessage>({
@@ -260,10 +267,18 @@ function AgentPaneContent({
           onSessionId: (resolvedId) => {
             chatSession.apply_resolved_session_id(resolvedId);
           },
+          // Attach-owner reporting: every live stream (including the SDK's
+          // body-less auto-resubmit no scaffold requests) is adopted so
+          // other intents serialize behind it. Reporting only — never vetoes.
+          onStreamOpen: () => attachOwner.noteTransportOpen(),
+          onStreamSettle: () => attachOwner.noteTransportSettle(),
           onResumeStart: () => {
             // AgentHost confirmed an in-flight run — drop the unfinished
-            // assistant we hydrated from the DB so the replay rebuilds
-            // it cleanly.
+            // assistant we hydrated from the DB so the replay rebuilds it
+            // cleanly. Sound for continuation turns too: the reconnect
+            // stream is self-contained (the registry serves a replay
+            // prefix reconstructing the persisted head — see the agent
+            // package's `replay-prefix.ts`).
             const cur = chatRef.current;
             if (!cur) return;
             const last = cur.messages.at(-1);
@@ -281,15 +296,16 @@ function AgentPaneContent({
         // are NOT affected (an approval-requested call has no result).
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
       }),
-    // Rebuild ONLY on a real session switch / new chat (or workspace change)
-    // — signalled by `initialMessages` changing (hydration). `currentId` is
-    // intentionally NOT a dep: when the live fresh chat adopts its server id
-    // mid-stream (`apply_resolved_session_id`), rebuilding here would orphan the
-    // in-flight first response. Continuity rides the per-send `body.sessionId`
-    // below; `useChatSession` suppresses the adoption hydrate so this memo
-    // sees no `initialMessages` change for it.
+    // Rebuild ONLY on a real rebinding — `epoch` bumps on select/start-new/
+    // restore/archive-of-current and deliberately NOT on hydration or the
+    // mid-stream id adoption (`apply_resolved_session_id`). Keying on
+    // `initial_messages` identity here was the H1 incident hazard: a
+    // rehydrate mid-send minted a fresh unclaimed Chat whose mount-resume
+    // opened a second stream over the live approval resume. Hydration now
+    // reaches the live instance only through the guarded reconcile effect
+    // below and the owner's rehydrate-then-attach resume executor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [workspace.id, chatSession.initial_messages]
+    [workspace.id, chatSession.epoch]
   );
   // Sync the ref to the ACTUAL `chat` React committed (StrictMode-safe — the
   // memo factory is pure, so the ref assignment lives here in a post-commit
@@ -297,14 +313,13 @@ function AgentPaneContent({
   useEffect(() => {
     chatRef.current = chat;
   }, [chat]);
-  // Reconnect to an in-flight run on remount/refresh via `useResumeInFlight`
-  // (NOT the SDK's `resume: true`). `resume: true` resumes once on mount,
-  // against the placeholder chat that has no session id yet — the id is
-  // restored async from localStorage, so the rebuilt chat that carries it
-  // never resumes and a refresh silently shows a stale DB snapshot. The hook
-  // resumes once per chat instance that has a real session id, never over a
-  // turn this client is streaming itself. Transport returns null on the agent
-  // sidecar's 404 → clean no-op; on success it replays the chunk log and
+  // Reconnect to an in-flight run via `useStreamAttach` below (NOT the SDK's
+  // `resume: true`, which fires once on mount before the async localStorage
+  // restore resolves the session id and so never reconnects the rebuilt
+  // chat). The attach owner resumes once per (session, epoch) — surviving
+  // Chat rebuilds — and degrades to a claim when this client already holds
+  // the live attach. Transport returns null on the agent sidecar's 404 →
+  // clean no-op; on success it replays the (self-contained) chunk log and
   // live-tails. See `bridge-transport.ts` + `agent/stream-registry.ts`.
   const {
     messages,
@@ -332,14 +347,28 @@ function AgentPaneContent({
   // state.
   const isStreaming = status === "submitted" || status === "streaming";
 
-  // Reconnect to the session's in-flight run after a remount/refresh. Keyed on
-  // the chat instance + session id so the resume tracks the chat the async
-  // localStorage restore rebuilds — the gap `resume: true` left open.
-  useResumeInFlight({
-    chat,
+  // Reconnect to the session's in-flight run after a remount/refresh/switch,
+  // through the attach owner (resume-once per (session, epoch); degrades to a
+  // claim when this client already holds the live attach). The executor is
+  // REHYDRATE-THEN-ATTACH: seed the chat from the DB snapshot first, then
+  // reconnect — deterministic ordering that doesn't depend on the reconcile
+  // effect (which is blocked while the session is busy), so a restore into a
+  // BUSY session still shows its history before the replay lands on top.
+  const setMessagesRef = useRef(setMessages);
+  setMessagesRef.current = setMessages;
+  const resumeStreamRef = useRef(resumeStream);
+  resumeStreamRef.current = resumeStream;
+  const rehydrateThenAttach = useCallback(async () => {
+    const msgs = await chatSession.rehydrate_async();
+    if (msgs) setMessagesRef.current(msgs);
+    await resumeStreamRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatSession.rehydrate_async]);
+  useStreamAttach({
+    owner: attachOwner,
     sessionId: chatSession.current_id,
-    isStreaming,
-    resumeStream,
+    epoch: chatSession.epoch,
+    resumeStream: rehydrateThenAttach,
   });
 
   // Manual compaction (RFC `session / compaction`) runs as a separate op that
@@ -488,7 +517,12 @@ function AgentPaneContent({
     queued,
     setMessages,
     dropQueued,
-    resumeStream,
+    // Drain attaches go through the owner: if an attach is already live for
+    // this pane (its own send, an adopted auto-resubmit), the second stream
+    // is denied and logged instead of interleaving into the reducer.
+    resumeStream: () => {
+      attachOwner.request("resume-drain", () => resumeStream());
+    },
     refetchQueue,
   });
 
@@ -610,24 +644,30 @@ function AgentPaneContent({
   // body shape is pinned headless in `approval-resume.test.ts`.
   const onApprove = useCallback(
     (pending: PendingApproval, approved: boolean) => {
-      // Send through `chat` directly (the instance `useChat` renders), NOT
-      // `chatRef.current` — the ref is a post-commit mirror, while `chat` is the
-      // live populated instance holding `[user, A]`. Resuming through the right
-      // instance is what lets the AI-SDK reducer merge the resume's tool-output
-      // into the existing `run_command` part instead of failing to find it.
-      return chat.sendMessage(undefined, {
-        body: buildApprovalResumeBody({
-          session_id: chatSession.current_id ?? undefined,
-          model_id: modelId,
-          provider_id: providerId,
-          mode,
-          tool_call_id: pending.toolCallId,
-          approval_id: pending.approvalId,
-          approved,
-        }),
-      });
+      // Requested through the attach owner: a double-fired Allow (re-render,
+      // double-click, a concurrent attach) is denied `attach-in-flight` and
+      // logged instead of opening a second stream over the live resume — the
+      // 2026-07-10 incident class. Send through `chat` directly (the instance
+      // `useChat` renders), NOT `chatRef.current` — the ref is a post-commit
+      // mirror, while `chat` is the live populated instance holding
+      // `[user, A]`. Resuming through the right instance is what lets the
+      // AI-SDK reducer merge the resume's tool-output into the existing
+      // `run_command` part instead of failing to find it.
+      attachOwner.request("approval-resume", () =>
+        chat.sendMessage(undefined, {
+          body: buildApprovalResumeBody({
+            session_id: chatSession.current_id ?? undefined,
+            model_id: modelId,
+            provider_id: providerId,
+            mode,
+            tool_call_id: pending.toolCallId,
+            approval_id: pending.approvalId,
+            approved,
+          }),
+        })
+      );
     },
-    [chat, chatSession.current_id, modelId, providerId, mode]
+    [attachOwner, chat, chatSession.current_id, modelId, providerId, mode]
   );
 
   // A pending supervised approval (the model called a mutating command in
