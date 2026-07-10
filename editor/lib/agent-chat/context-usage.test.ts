@@ -8,9 +8,9 @@ import {
   usageTokenTotal,
 } from "./context-usage";
 
-// The ring % is REAL (provider usage / context window); the role breakdown
-// is an ESTIMATE (chars/4) with `other` as the residual. These tests pin
-// both halves of that contract — see the module header.
+// The ring % is an estimate from visible transcript parts. Provider usage is
+// exposed separately as last-turn usage because tool loops can consume far more
+// cumulative tokens than the final transcript occupies.
 
 describe("estimateTokens", () => {
   it("is chars/4, rounded up, and 0 for empty", () => {
@@ -87,20 +87,26 @@ describe("estimateContextBreakdown", () => {
     },
   ];
 
-  it("buckets user / assistant(text+reasoning) / tools and folds the rest into other", () => {
-    // accounted = 10 + (20 + 4) + 3 = 37; other = 150 - 37 = 113
-    expect(estimateContextBreakdown(messages, 150)).toEqual({
+  it("buckets visible user / assistant(text+reasoning) / tools", () => {
+    expect(estimateContextBreakdown(messages)).toEqual({
       user: 10,
       assistant: 24,
       tools: 3,
-      other: 113,
+      other: 0,
     });
   });
 
-  it("clamps other to 0 when estimates exceed the real used total", () => {
-    const b = estimateContextBreakdown(messages, 10);
-    expect(b.other).toBe(0);
-    expect(b.user + b.assistant + b.tools).toBeGreaterThan(10);
+  it("puts visible unclassified roles in other", () => {
+    expect(
+      estimateContextBreakdown([
+        { role: "system", parts: [{ type: "text", text: "s".repeat(12) }] },
+      ])
+    ).toEqual({
+      user: 0,
+      assistant: 0,
+      tools: 0,
+      other: 3,
+    });
   });
 });
 
@@ -114,41 +120,54 @@ describe("computeContextUsage", () => {
     },
   ];
 
-  it("computes a real % from usage / contextWindow", () => {
+  it("computes context % from visible transcript estimates", () => {
     const u = computeContextUsage(messages, 1000);
-    expect(u.usedTokens).toBe(150);
+    expect(u.usedTokens).toBe(30);
     expect(u.maxTokens).toBe(1000);
-    expect(u.percent).toBeCloseTo(0.15);
+    expect(u.percent).toBeCloseTo(0.03);
     expect(u.breakdown).toEqual({
       user: 10,
       assistant: 20,
       tools: 0,
-      other: 120,
+      other: 0,
     });
+    expect(u.turnUsageTokens).toBe(150);
+    expect(u.usage).toEqual({ input: 100, output: 50 });
   });
 
-  it("yields percent 0 and used 0 when the window or usage is unknown", () => {
+  it("yields percent 0 when the window is unknown", () => {
     expect(computeContextUsage(messages, undefined).percent).toBe(0);
-    expect(
-      computeContextUsage(
-        [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
-        1000
-      ).usedTokens
-    ).toBe(0);
+    expect(computeContextUsage(messages, undefined).usedTokens).toBe(30);
   });
 
-  it("clamps percent to 1 when usage exceeds the window", () => {
-    // A turn can report usage above the catalog window (provider drift / an
-    // over-budget request); percent must honor its [0, 1] contract.
+  it("does not use provider turn usage as context occupancy", () => {
+    const u = computeContextUsage(
+      [
+        { role: "user", parts: [{ type: "text", text: "fix this" }] },
+        {
+          role: "assistant",
+          parts: [{ type: "text", text: "done" }],
+          metadata: { usage: { input: 191031, output: 2708 } },
+        },
+      ],
+      1_000_000
+    );
+    expect(u.turnUsageTokens).toBe(193739);
+    expect(u.usedTokens).toBe(3);
+    expect(u.percent).toBeCloseTo(0.000003);
+  });
+
+  it("clamps percent to 1 when the visible estimate exceeds the window", () => {
     const over = [
       {
         role: "assistant",
-        parts: [{ type: "text", text: "y" }],
+        parts: [{ type: "text", text: "y".repeat(4004) }],
         metadata: { usage: { input: 900, output: 400 } },
       },
     ];
     const u = computeContextUsage(over, 1000);
-    expect(u.usedTokens).toBe(1300);
+    expect(u.usedTokens).toBe(1001);
     expect(u.percent).toBe(1);
+    expect(u.turnUsageTokens).toBe(1300);
   });
 });

@@ -71,10 +71,10 @@ chat_messages.metadata_json: {
 }
 ```
 
-Session-level rollups (`prompt_tokens`, `completion_tokens`,
-`reasoning_tokens`, `cache_read`, `cache_write`, `total_tokens`,
-`cost_usd`) are sums of the above across the session's assistant
-messages.
+Session-level token rollups (`prompt_tokens`, `completion_tokens`,
+`reasoning_tokens`, `cache_read`, `cache_write`, `total_tokens`) are
+sums of the above across the assistant messages that currently count
+toward the model context.
 
 ### Why the breakdown
 
@@ -107,10 +107,17 @@ for the exact formula and the per-component mapping.
 
 ### Cost
 
-`cost_usd` is recorded when a writer (a hosted route, a metadata
-hook) supplies it. The agent system MUST NOT compute cost from a
-pricing table inside the recorder. Pricing lives next to the model
-catalog, not next to the session store.
+Cost is a derived view over per-turn `{ model, usage }`, not
+authoritative session state. An implementation MAY keep a legacy or
+cached cost column for compatibility, but the canonical cost input is
+the assistant message metadata plus the current model catalog pricing.
+Cost is cumulative spend: it includes assistant turns that were later
+hidden by rewind or excluded from the live context by compaction,
+because those turns were still charged.
+
+The recorder MUST NOT hard-code pricing. It records provider usage and
+the model that produced the turn; the pricing table lives with the
+model catalog.
 
 ### What "the context window" means here
 

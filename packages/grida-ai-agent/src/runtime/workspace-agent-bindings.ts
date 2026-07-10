@@ -532,6 +532,50 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     return out;
   }
 
+  async list_directory(pathname: string): Promise<AgentFs.ListEntries> {
+    try {
+      const { scope, rel } = this.scopeFor(pathname);
+      const entries = await workspaceFs.readDir(scope, rel);
+      const workspaceRooted = scope === this.workspace;
+      const folders: string[] = [];
+      const files: string[] = [];
+
+      for (const entry of entries) {
+        if (entry.kind === "directory") {
+          if (isIgnoredScanDir(entry.name)) continue;
+          folders.push(
+            workspaceRooted
+              ? `/${entry.rel_path.replace(/\\/g, "/")}`
+              : path.join(scope.root, entry.rel_path)
+          );
+          continue;
+        }
+        if (entry.kind === "file" || entry.kind === "symlink") {
+          if (isIgnoredScanFile(entry.name)) continue;
+          files.push(
+            workspaceRooted
+              ? `/${entry.rel_path.replace(/\\/g, "/")}`
+              : path.join(scope.root, entry.rel_path)
+          );
+        }
+      }
+
+      return {
+        folders: folders.sort(),
+        files: files.sort(),
+      };
+    } catch (err) {
+      if (
+        isNotFound(err) ||
+        isWorkspaceFsCode(err, "not-a-directory") ||
+        isWorkspaceFsCode(err, "not-a-file")
+      ) {
+        return { folders: [], files: [] };
+      }
+      throw err;
+    }
+  }
+
   async read(path: string): Promise<string | null> {
     try {
       const { scope, rel } = this.scopeFor(path);

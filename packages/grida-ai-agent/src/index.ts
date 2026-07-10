@@ -88,6 +88,7 @@ export type {
   ChatPartRow,
   ChatMessageWithParts,
   MessageUsage,
+  AssistantTurnAccounting,
   PermissionRule,
   ForkSessionOptions,
   RewindResult,

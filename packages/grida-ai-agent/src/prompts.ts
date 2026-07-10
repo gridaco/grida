@@ -50,11 +50,14 @@ seen.
 You operate on the user's workspace via a virtual filesystem. The
 consumer mounts what you can see; paths outside the mount will be
 rejected. If a request is ambiguous about which file to act on, ask,
-or call ${fs.list_files} first.
+or call ${fs.list_files} on the relevant directory first.
 
 Filesystem tools:
 
-- ${fs.list_files}: {} → { files: string[] }. Enumerate every file.
+- ${fs.list_files}: { path?, offset?, limit? } → { path, folders, files,
+  truncated, next_offset? }. List direct children of a directory only.
+  Defaults to \`/\`; this is not recursive and not a whole-workspace
+  inventory.
 - ${fs.read_file}: { path } → { content, version }.
 - ${fs.edit_file}: { path, old_string, new_string, replace_all?, version }.
   Match-and-replace. The default write path.
@@ -78,6 +81,9 @@ Rules:
    output. Include enough surrounding context to be unique; on
    reason="ambiguous" you'll get the count — add more context and retry.
 5. Multiple unrelated edits → multiple ${fs.edit_file} calls.
+6. Treat ${fs.list_files} results as one directory page. If \`truncated\`
+   is true, call it again with \`next_offset\`; use ${fs.grep_files} or
+   command/search tools for broad searches.
 </filesystem>
 
 <planning>

@@ -46,6 +46,11 @@ type FileEntry = {
   version: number;
 };
 
+type DirectoryEntries = {
+  folders: string[];
+  files: string[];
+};
+
 const PATH_DESCRIPTION =
   "Absolute path in the agent filesystem, starting with `/`. " +
   "Examples: `/canvas.svg`, `/notes/draft.md`.";
@@ -59,6 +64,88 @@ const PATH_DESCRIPTION =
  * list reads safely.
  */
 const HYDRATE_READ_CONCURRENCY = 24;
+const LIST_DIRECTORY_DEFAULT_LIMIT = 200;
+const LIST_DIRECTORY_MAX_LIMIT = 1000;
+
+function normalizeDirectoryPath(path: string | undefined): string {
+  const raw = path?.trim();
+  if (!raw || raw === "." || raw === "./" || raw === "*") return "/";
+  const rooted = raw.startsWith("/") ? raw : `/${raw}`;
+  const collapsed = rooted.replace(/\/+/g, "/");
+  if (collapsed === "/") return "/";
+  return collapsed.replace(/\/+$/, "");
+}
+
+function normalizeListOffset(offset: number | undefined): number {
+  if (offset === undefined || !Number.isFinite(offset)) return 0;
+  return Math.max(0, Math.trunc(offset));
+}
+
+function normalizeListLimit(limit: number | undefined): number {
+  if (limit === undefined || !Number.isFinite(limit)) {
+    return LIST_DIRECTORY_DEFAULT_LIMIT;
+  }
+  return Math.max(1, Math.min(Math.trunc(limit), LIST_DIRECTORY_MAX_LIMIT));
+}
+
+function collectDirectoryEntries(
+  paths: Iterable<string>,
+  path: string
+): DirectoryEntries {
+  const prefix = path === "/" ? "/" : `${path}/`;
+  const folders = new Set<string>();
+  const files = new Set<string>();
+
+  for (const filePath of paths) {
+    if (!filePath.startsWith(prefix)) continue;
+    const rest = filePath.slice(prefix.length);
+    if (rest.length === 0) continue;
+    const slash = rest.indexOf("/");
+    if (slash === -1) {
+      files.add(filePath);
+    } else {
+      folders.add(`${prefix}${rest.slice(0, slash)}`);
+    }
+  }
+
+  return {
+    folders: [...folders].sort(),
+    files: [...files].sort(),
+  };
+}
+
+function mergeDirectoryEntries(
+  a: DirectoryEntries,
+  b: DirectoryEntries
+): DirectoryEntries {
+  return {
+    folders: [...new Set([...a.folders, ...b.folders])].sort(),
+    files: [...new Set([...a.files, ...b.files])].sort(),
+  };
+}
+
+function pageDirectoryEntries(
+  path: string,
+  entries: DirectoryEntries,
+  args: AgentFs.ListArgs
+): AgentFs.ListResult {
+  const offset = normalizeListOffset(args.offset);
+  const limit = normalizeListLimit(args.limit);
+  const ordered: Array<{ type: "folder" | "file"; path: string }> = [
+    ...entries.folders.map((p) => ({ type: "folder" as const, path: p })),
+    ...entries.files.map((p) => ({ type: "file" as const, path: p })),
+  ];
+  const page = ordered.slice(offset, offset + limit);
+  const truncated = offset + limit < ordered.length;
+
+  return {
+    path,
+    folders: page.filter((e) => e.type === "folder").map((e) => e.path),
+    files: page.filter((e) => e.type === "file").map((e) => e.path),
+    truncated,
+    ...(truncated ? { next_offset: offset + limit } : {}),
+  };
+}
 
 /**
  * `Promise.allSettled`-shaped map with a fixed in-flight width. Results are
@@ -351,6 +438,44 @@ export class AgentFs {
     // Keys are disjoint by construction (`mount()` drops any shadowing
     // pure-file entry; `write()` to a mounted path goes through the binding).
     return [...this.bindings.keys(), ...this.files.keys()];
+  }
+
+  /**
+   * List direct children under a directory path. Unlike `list()`, this is the
+   * model-facing discovery shape: scoped, paginated, and explicit about
+   * truncation so the agent never mistakes an index cap for a full inventory.
+   */
+  list_directory(args: AgentFs.ListArgs = {}): AgentFs.ListResult {
+    const path = normalizeDirectoryPath(args.path);
+    return pageDirectoryEntries(
+      path,
+      collectDirectoryEntries(this.list(), path),
+      args
+    );
+  }
+
+  /**
+   * Fresh directory listing for server-bound real filesystem backends. Falls
+   * back to the hydrated VFS map when the backend cannot list directories
+   * directly. In-memory writes/mounts are merged before pagination so a
+   * just-written file remains discoverable even inside the debounce window.
+   */
+  async list_directory_fresh(
+    args: AgentFs.ListArgs = {}
+  ): Promise<AgentFs.ListResult> {
+    const path = normalizeDirectoryPath(args.path);
+    let entries = collectDirectoryEntries(this.list(), path);
+    if (this.backend.list_directory) {
+      try {
+        entries = mergeDirectoryEntries(
+          entries,
+          await this.backend.list_directory(path)
+        );
+      } catch (err) {
+        console.warn(`[agent-fs] backend.list_directory(${path}) failed:`, err);
+      }
+    }
+    return pageDirectoryEntries(path, entries, args);
   }
 
   exists(path: string): boolean {
@@ -767,6 +892,13 @@ export namespace AgentFs {
     /** Enumerate every persisted path. Order undefined. */
     list(): Promise<string[]>;
 
+    /**
+     * List direct child folders/files under `path`, if the backend can do
+     * scoped directory reads without hydrating the whole tree. `path` is already
+     * normalized in the agent filesystem's path space.
+     */
+    list_directory?(path: string): Promise<ListEntries>;
+
     /** Read the bytes at `path`, or `null` if no such file. */
     read(path: string): Promise<string | null>;
 
@@ -921,6 +1053,33 @@ export namespace AgentFs {
     | { ok: true }
     | { ok: false; reason: DeleteFailureReason; message: string };
 
+  export type ListArgs = {
+    /**
+     * Directory path rooted in the agent filesystem. Defaults to `/`. Relative
+     * inputs are tolerated by resolving them from `/`.
+     */
+    path?: string;
+    /** Zero-based offset over the sorted direct-child entry list. */
+    offset?: number;
+    /** Page size, host-capped. Defaults to 200, max 1000. */
+    limit?: number;
+  };
+
+  export type ListResult = {
+    /** Normalized directory path that was listed. */
+    path: string;
+    /** Sorted absolute paths of direct child folders in this page. */
+    folders: string[];
+    /** Sorted absolute paths of direct child files in this page. */
+    files: string[];
+    /** True when more direct children remain after this page. */
+    truncated: boolean;
+    /** Pass as `offset` to fetch the next page. Present only when truncated. */
+    next_offset?: number;
+  };
+
+  export type ListEntries = DirectoryEntries;
+
   export type GrepArgs = {
     /** Literal substring to match. Empty pattern → empty result. */
     pattern: string;
@@ -1043,13 +1202,49 @@ export namespace AgentFs {
 
     [TOOL_NAMES.list_files]: tool({
       description:
-        "Enumerate every known file in the agent filesystem. Returns " +
-        "sorted absolute paths (e.g. `/canvas.svg`, `/notes/draft.md`).",
-      inputSchema: z.object({}),
+        "List direct child folders and files under a directory in the agent " +
+        "filesystem. Defaults to `/`. This is scoped directory discovery, " +
+        "not a recursive whole-workspace inventory; use grep_files for " +
+        "content search.",
+      inputSchema: z.object({
+        path: z
+          .string()
+          .optional()
+          .describe(
+            "Directory path rooted in the agent filesystem. Examples: `/`, `/notes`, `/public/slides-templates`. Omit for `/`."
+          ),
+        offset: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe("Zero-based pagination offset. Omit for the first page."),
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .max(LIST_DIRECTORY_MAX_LIMIT)
+          .optional()
+          .describe(
+            `Maximum direct-child entries to return. Defaults to ${LIST_DIRECTORY_DEFAULT_LIMIT}.`
+          ),
+      }),
       outputSchema: z.object({
+        path: z.string().describe("Normalized directory path that was listed."),
+        folders: z
+          .array(z.string())
+          .describe("Sorted absolute paths of direct child folders."),
         files: z
           .array(z.string())
-          .describe("Sorted absolute paths of every known file."),
+          .describe("Sorted absolute paths of direct child files."),
+        truncated: z
+          .boolean()
+          .describe("True when more direct children remain after this page."),
+        next_offset: z
+          .number()
+          .int()
+          .optional()
+          .describe("Pass as offset to fetch the next page."),
       }),
     }),
 
@@ -1165,6 +1360,11 @@ export namespace AgentFs {
     version: number;
   };
   type WriteFileInput = { path: string; content: string; version?: number };
+  type ListFilesInput = {
+    path?: string;
+    offset?: number;
+    limit?: number;
+  };
   type GrepFilesInput = {
     pattern: string;
     path_prefix?: string;
@@ -1190,7 +1390,9 @@ export namespace AgentFs {
         return r;
       }
       case TOOL_NAMES.list_files: {
-        return { files: [...fs.list()].sort() };
+        const { path, offset, limit } = (toolCall.input ??
+          {}) as ListFilesInput;
+        return fs.list_directory({ path, offset, limit });
       }
       case TOOL_NAMES.grep_files: {
         const { pattern, path_prefix, case_sensitive } =
@@ -1214,6 +1416,18 @@ export namespace AgentFs {
       default:
         return undefined;
     }
+  }
+
+  export async function resolveToolCallAsync(
+    fs: AgentFs,
+    toolCall: { tool_name: string; input: unknown; dynamic?: boolean }
+  ): Promise<unknown> {
+    if (toolCall.dynamic) return undefined;
+    if (toolCall.tool_name === TOOL_NAMES.list_files) {
+      const { path, offset, limit } = (toolCall.input ?? {}) as ListFilesInput;
+      return await fs.list_directory_fresh({ path, offset, limit });
+    }
+    return resolveToolCall(fs, toolCall);
   }
 
   // -------------------------------------------------------------------------

@@ -40,13 +40,49 @@ describe("agent workspace bindings", () => {
     );
 
     expect(bindings).not.toBeNull();
-    const output = AgentFs.resolveToolCall(bindings!.fs, {
+    const output = await AgentFs.resolveToolCallAsync(bindings!.fs, {
       tool_name: AgentFs.TOOL_NAMES.list_files,
       input: {},
     });
 
     expect(output).toEqual({
-      files: ["/canvas.svg", "/notes/brief.md"],
+      path: "/",
+      folders: ["/notes"],
+      files: ["/canvas.svg"],
+      truncated: false,
+    });
+  });
+
+  it("list_files reads a requested workspace directory from disk on demand", async () => {
+    await fixture.write_workspace_file("canvas.svg", "<svg/>");
+
+    const bindings = await createWorkspaceAgentBindings(
+      {
+        workspace_root: fixture.workspace_root,
+      },
+      { workspace_registry: fixture.registry }
+    );
+
+    expect(bindings).not.toBeNull();
+
+    // Written after createWorkspaceAgentBindings hydrates AgentFs. A flat
+    // hydrated index cannot see this path; the workspace backend's scoped
+    // directory read can.
+    await fixture.write_workspace_file(
+      "public/slides-templates/README.md",
+      "slides"
+    );
+
+    const output = await AgentFs.resolveToolCallAsync(bindings!.fs, {
+      tool_name: AgentFs.TOOL_NAMES.list_files,
+      input: { path: "/public/slides-templates" },
+    });
+
+    expect(output).toEqual({
+      path: "/public/slides-templates",
+      folders: [],
+      files: ["/public/slides-templates/README.md"],
+      truncated: false,
     });
   });
 
@@ -202,10 +238,10 @@ describe("agent workspace bindings", () => {
                   finishReason: { unified: "stop", raw: "stop" },
                   usage: {
                     inputTokens: {
-                      total: 7,
+                      total: 11,
                       noCache: 7,
-                      cacheRead: undefined,
-                      cacheWrite: undefined,
+                      cacheRead: 2,
+                      cacheWrite: 2,
                     },
                     outputTokens: { total: 3, text: 3, reasoning: undefined },
                   },
@@ -243,13 +279,18 @@ describe("agent workspace bindings", () => {
     expect(usages.length).toBeGreaterThan(0);
     const last = usages.at(-1)!;
     // Pre-fix, the bare cast left these undefined (camelCase keys never read).
-    expect(last.input_tokens).toBe(7);
+    expect(last.input_tokens).toBe(11);
     expect(last.output_tokens).toBe(3);
+    expect(last.cached_input_tokens).toBe(2);
+    expect(last.cache_write_tokens).toBe(2);
 
     // 2) The stream carries usage as message metadata (live context-meter
-    //    path) — `input` is cache-normalized: 7 input − 0 cache_read = 7.
+    //    path) — `input` is cache-normalized:
+    //    11 input − 2 cache_read − 2 cache_write = 7.
     expect(body).toContain('"usage"');
     expect(body).toMatch(/"input":7/);
     expect(body).toMatch(/"output":3/);
+    expect(body).toMatch(/"cache_read":2/);
+    expect(body).toMatch(/"cache_write":2/);
   });
 });

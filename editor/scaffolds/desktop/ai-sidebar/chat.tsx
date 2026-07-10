@@ -539,6 +539,9 @@ export function AISidebarChat({
   // to mount on. Bridge that dead-air window with a tail indicator until an
   // assistant turn begins.
   const pendingTurn = isStreaming && messages.at(-1)?.role !== "assistant";
+  // Restored transcripts can hydrate after the scroll container has already
+  // mounted. Keep that entry stable; reserve smooth follow for live turns.
+  const conversationResize = busy ? "smooth" : "instant";
 
   return (
     <div className={cn("flex h-full flex-col bg-background", className)}>
@@ -550,7 +553,11 @@ export function AISidebarChat({
         conversationEmpty={isEmpty}
       />
 
-      <Conversation className="flex-1 min-h-0">
+      <Conversation
+        className="flex-1 min-h-0"
+        initial="instant"
+        resize={conversationResize}
+      >
         <ConversationContent className="gap-4 px-3 py-4">
           {isEmpty ? (
             <ConversationEmptyState

@@ -200,6 +200,76 @@ describe("AgentFs — basics", () => {
   });
 });
 
+describe("AgentFs.list_directory", () => {
+  function seed(): AgentFs {
+    const fs = new AgentFs(new AgentFs.MemoryBackend());
+    fs.write("/canvas.svg", { content: "<svg/>", expected_version: null });
+    fs.write("/notes/brief.md", { content: "brief", expected_version: null });
+    fs.write("/notes/drafts/a.md", { content: "a", expected_version: null });
+    fs.write("/public/slides/index.md", {
+      content: "slides",
+      expected_version: null,
+    });
+    return fs;
+  }
+
+  it("lists root direct children as folders and files", () => {
+    expect(seed().list_directory()).toEqual({
+      path: "/",
+      folders: ["/notes", "/public"],
+      files: ["/canvas.svg"],
+      truncated: false,
+    });
+  });
+
+  it("lists a nested directory without returning descendants as files", () => {
+    expect(seed().list_directory({ path: "/notes" })).toEqual({
+      path: "/notes",
+      folders: ["/notes/drafts"],
+      files: ["/notes/brief.md"],
+      truncated: false,
+    });
+  });
+
+  it("normalizes relative paths from the agent fs root", () => {
+    expect(seed().list_directory({ path: "public/slides/" })).toEqual({
+      path: "/public/slides",
+      folders: [],
+      files: ["/public/slides/index.md"],
+      truncated: false,
+    });
+  });
+
+  it("paginates over sorted folders first, then files", () => {
+    expect(seed().list_directory({ path: "/", limit: 2 })).toEqual({
+      path: "/",
+      folders: ["/notes", "/public"],
+      files: [],
+      truncated: true,
+      next_offset: 2,
+    });
+    expect(seed().list_directory({ path: "/", offset: 2, limit: 2 })).toEqual({
+      path: "/",
+      folders: [],
+      files: ["/canvas.svg"],
+      truncated: false,
+    });
+  });
+
+  it("resolveToolCallAsync falls back to the in-memory directory listing", async () => {
+    const out = await AgentFs.resolveToolCallAsync(seed(), {
+      tool_name: AgentFs.TOOL_NAMES.list_files,
+      input: { path: "/public", limit: 1 },
+    });
+    expect(out).toEqual({
+      path: "/public",
+      folders: ["/public/slides"],
+      files: [],
+      truncated: false,
+    });
+  });
+});
+
 describe("AgentFs — mounted (live binding)", () => {
   it("reads through the binding and tracks its version", () => {
     const fs = new AgentFs(new AgentFs.MemoryBackend());

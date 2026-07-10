@@ -111,7 +111,7 @@ export type AgentRunRequest = {
 /**
  * Subset of AI SDK `LanguageModelUsage` we use for persistence. The
  * SDK's `LanguageModelUsage` has many optional fields; we project the
- * three we keep on `chat_sessions.{prompt,completion,total}_tokens`.
+ * fields we keep on assistant-message usage metadata and session rollups.
  */
 export type AgentStepUsage = {
   input_tokens?: number;
@@ -119,6 +119,7 @@ export type AgentStepUsage = {
   total_tokens?: number;
   reasoning_tokens?: number;
   cached_input_tokens?: number;
+  cache_write_tokens?: number;
 };
 
 /**
@@ -134,6 +135,11 @@ type SdkStepUsage = {
   totalTokens?: number;
   reasoningTokens?: number;
   cachedInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  inputTokenDetails?: {
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+  };
 };
 
 /**
@@ -143,12 +149,16 @@ type SdkStepUsage = {
  * cache reads, so subtract them so `input` + `cache_read` don't double-count.
  */
 function toMessageUsage(u: SdkStepUsage): MessageUsage {
-  const cacheRead = u.cachedInputTokens ?? 0;
+  const cacheRead =
+    u.cachedInputTokens ?? u.inputTokenDetails?.cacheReadTokens ?? 0;
+  const cacheWrite =
+    u.cacheCreationInputTokens ?? u.inputTokenDetails?.cacheWriteTokens ?? 0;
   return {
-    input: Math.max(0, (u.inputTokens ?? 0) - cacheRead),
+    input: Math.max(0, (u.inputTokens ?? 0) - cacheRead - cacheWrite),
     output: u.outputTokens ?? 0,
     reasoning: u.reasoningTokens ?? 0,
     cache_read: cacheRead,
+    cache_write: cacheWrite,
   };
 }
 
@@ -252,11 +262,8 @@ export async function runAgent(
     },
     abortSignal: req.signal,
     // Stream the turn's usage as message metadata so the LIVE assistant
-    // message the renderer holds carries it — the context meter reads
-    // `metadata.usage` off `useChat` messages, and nothing rehydrates from
-    // the DB after a normal turn. Mirrors the canvas route; shape matches
-    // what `setLatestAssistantUsage` writes to the row so live and
-    // post-reload agree.
+    // message the renderer holds carries it. The DB row is stamped after
+    // recorder flush with this usage plus the runtime-resolved model.
     messageMetadata: ({ part }) =>
       part.type === "finish"
         ? { usage: toMessageUsage(part.totalUsage) }
@@ -277,7 +284,11 @@ export async function runAgent(
                 output_tokens: u.outputTokens,
                 total_tokens: u.totalTokens,
                 reasoning_tokens: u.reasoningTokens,
-                cached_input_tokens: u.cachedInputTokens,
+                cached_input_tokens:
+                  u.cachedInputTokens ?? u.inputTokenDetails?.cacheReadTokens,
+                cache_write_tokens:
+                  u.cacheCreationInputTokens ??
+                  u.inputTokenDetails?.cacheWriteTokens,
               });
             }
           } catch {

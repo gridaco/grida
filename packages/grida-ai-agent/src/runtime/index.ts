@@ -37,6 +37,7 @@ import { createRecorderConsumer } from "../session/recorder";
 import { titler } from "../session/titler";
 import type { SessionsStore } from "../session/store";
 import type { ChatModel, MessageUsage } from "../session/rows";
+import { usageTokenTotal } from "../session/cost";
 import {
   DEFAULT_COMPACTION_CONFIG,
   compactSession,
@@ -1149,6 +1150,11 @@ export class AgentRuntime {
         // assistant message — recomputeRollups (rewind/fork/compaction)
         // sums per-message usage.
         const runUsage: MessageUsage = {};
+        const turnModel: ChatModel = {
+          provider_id: provider.provider_id,
+          tier,
+          model_id: modelId,
+        };
 
         const response = await runAgentFn(
           provider,
@@ -1167,12 +1173,18 @@ export class AgentRuntime {
             skill_cache: ctx.skill_cache,
             project_instructions: ctx.project_instructions,
             on_step_usage: (usage) => {
-              accumulateUsage(runUsage, usage);
-              void sessionsStore.updateUsage(sessionId, {
-                prompt_tokens: usage.input_tokens,
-                completion_tokens: usage.output_tokens,
-                total_tokens: usage.total_tokens,
-              });
+              const delta = messageUsageFromStepUsage(usage);
+              accumulateUsage(runUsage, delta);
+              void sessionsStore
+                .updateUsage(sessionId, {
+                  prompt_tokens: delta.input,
+                  completion_tokens: delta.output,
+                  reasoning_tokens: delta.reasoning,
+                  cache_read: delta.cache_read,
+                  cache_write: delta.cache_write,
+                  total_tokens: usageTokenTotal(delta),
+                })
+                .catch(() => undefined);
             },
           },
           // GRIDA-SEC-004 — `secrets_root` rides the bindings deps down to the
@@ -1186,17 +1198,23 @@ export class AgentRuntime {
         // Drain the recorder BEFORE stamping usage. The recorder creates the
         // assistant row on a fire-and-forget write_chain fed by each pushed
         // frame; `pumpResponseIntoRegistry` returning only means the frames
-        // were enqueued, not that the row was written. `setLatestAssistantUsage`
-        // addresses "the latest assistant row", so stamping before the write
-        // settles races onto the wrong row (or none). The recorder's terminal
-        // flush (its `on_end`) awaits its write_chain + finalizes, so awaiting
-        // it here makes the row exist deterministically. Detach so the later
+        // were enqueued, not that the row was written. Usage/accounting stamps
+        // "the latest assistant row", so stamping before the write settles
+        // races onto the wrong row (or none). The recorder's terminal flush
+        // (its `on_end`) awaits its write_chain + finalizes, so awaiting it
+        // here makes the row exist deterministically. Detach so the later
         // `streams.finish` won't re-fire `on_end` on it.
         detachRecorder();
         await recorder.on_end("finish");
         if (hasUsage(runUsage)) {
           await sessionsStore
-            .setLatestAssistantUsage(sessionId, runUsage)
+            .setLatestAssistantAccounting(sessionId, {
+              model: turnModel,
+              usage: runUsage,
+            })
+            .catch(() => undefined);
+          await sessionsStore
+            .recomputeRollups(sessionId)
             .catch(() => undefined);
         }
         streams.finish(sessionId, "finish");
@@ -1524,13 +1542,25 @@ export class AgentRuntime {
  * RFC cache-normalization rule, `inputTokens` already includes cache
  * reads, so subtract them out before recording `input`.
  */
-function accumulateUsage(acc: MessageUsage, u: AgentStepUsage): void {
+function messageUsageFromStepUsage(u: AgentStepUsage): MessageUsage {
   const cacheRead = u.cached_input_tokens ?? 0;
-  const input = Math.max(0, (u.input_tokens ?? 0) - cacheRead);
-  acc.input = (acc.input ?? 0) + input;
-  acc.output = (acc.output ?? 0) + (u.output_tokens ?? 0);
-  acc.reasoning = (acc.reasoning ?? 0) + (u.reasoning_tokens ?? 0);
-  acc.cache_read = (acc.cache_read ?? 0) + cacheRead;
+  const cacheWrite = u.cache_write_tokens ?? 0;
+  const input = Math.max(0, (u.input_tokens ?? 0) - cacheRead - cacheWrite);
+  return {
+    input,
+    output: u.output_tokens ?? 0,
+    reasoning: u.reasoning_tokens ?? 0,
+    cache_read: cacheRead,
+    cache_write: cacheWrite,
+  };
+}
+
+function accumulateUsage(acc: MessageUsage, u: MessageUsage): void {
+  acc.input = (acc.input ?? 0) + (u.input ?? 0);
+  acc.output = (acc.output ?? 0) + (u.output ?? 0);
+  acc.reasoning = (acc.reasoning ?? 0) + (u.reasoning ?? 0);
+  acc.cache_read = (acc.cache_read ?? 0) + (u.cache_read ?? 0);
+  acc.cache_write = (acc.cache_write ?? 0) + (u.cache_write ?? 0);
 }
 
 function hasUsage(u: MessageUsage): boolean {

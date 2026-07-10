@@ -38,7 +38,7 @@ tool](#adding-a-new-fundamental-tool)).
 | `read`        | `read_file`                | Same shape; Grida's name is more specific.                                                                                                                      |
 | `write`       | `write_file`               | Same shape; Grida adds an optional `version` for stale-check.                                                                                                   |
 | `edit`        | `edit_file`                | Same shape; Grida adds a strict ambiguity rule on multi-match.                                                                                                  |
-| `glob`        | `list_files`               | Today a flat enumerate; promote to glob-shape when needed.                                                                                                      |
+| `glob`        | `list_files`               | Grida binding uses a path-scoped directory-listing shape; VFS hosts should provide it, real-fs hosts may omit it when command/search tools are stronger.        |
 | `grep`        | `grep_files`               | Same shape; literal substring search (regex is not shipped).                                                                                                    |
 | `bash`        | `run_command`              | Honest name — Grida's host does not always launch a shell.                                                                                                      |
 | `todo`        | `todo_write`               | Same shape; replace-all semantics.                                                                                                                              |
@@ -95,9 +95,51 @@ fresh-start writes).
 
 ### `list_files`
 
-Today a flat enumeration of every known path, sorted absolute. If we
-need filename pattern matching later we will promote to a glob-shape
-(`glob` in the RFC).
+Grida adopts a path-scoped directory-listing shape for the RFC's
+filesystem-discovery primitive. Despite the current Grida id, this
+tool is **not** a whole-workspace inventory.
+
+```ts
+list_files({
+  path?: string,   // defaults to "/"
+  offset?: number,
+  limit?: number,
+}) -> {
+  path: string,
+  folders: string[],
+  files: string[],
+  truncated: boolean,
+  next_offset?: number,
+}
+```
+
+Contract:
+
+- `path` is rooted in the agent workspace or virtual filesystem. It
+  must not be a general host-absolute path.
+- The result lists only the direct children of `path`, grouped into
+  folders and files.
+- The result is sorted, paginated, and explicit about truncation.
+- `list_files` discovers names only. It does not search file content,
+  and it does not count as `read_file`.
+- For filename-pattern search, use a separate glob / find-path tool
+  rather than overloading this directory-listing result.
+
+Implementation guidance:
+
+- **VFS / OPFS / memory backends:** provide `list_files`. A virtual
+  filesystem may not have a shell, `find`, `tree`, or `rg`, so the
+  structured directory-listing tool is the portable way for the agent
+  to discover reachable paths.
+- **Real filesystem backends:** treat this tool as optional. A
+  shell-capable real-fs agent often gets better behavior from explicit
+  commands (`rg --files`, `find`, `ls`, `tree`) because those tools
+  follow mature ignore rules, stream large output, and make scope
+  visible in the command. A flat "all known files" tool can degrade
+  agent quality by confusing the model into trusting an incomplete or
+  stale index as ground truth.
+- **Do not hide truncation.** If a backend is indexed, capped, or
+  ignore-filtered, the tool result must say so in-band.
 
 ### `grep_files`
 

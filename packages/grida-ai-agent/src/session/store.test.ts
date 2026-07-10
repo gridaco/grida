@@ -358,26 +358,43 @@ describe("SessionsStore messages + parts", () => {
     await store.updateUsage(s.id, {
       prompt_tokens: 10,
       completion_tokens: 5,
-      total_tokens: 15,
+      reasoning_tokens: 1,
+      cache_read: 3,
+      cache_write: 2,
+      total_tokens: 21,
     });
     await store.updateUsage(s.id, {
       prompt_tokens: 2,
       completion_tokens: 1,
-      total_tokens: 3,
+      reasoning_tokens: 4,
+      cache_read: 5,
+      cache_write: 6,
+      total_tokens: 18,
     });
     let row = await store.get(s.id);
     expect(row!.prompt_tokens).toBe(12);
     expect(row!.completion_tokens).toBe(6);
-    expect(row!.total_tokens).toBe(18);
+    expect(row!.reasoning_tokens).toBe(5);
+    expect(row!.cache_read).toBe(8);
+    expect(row!.cache_write).toBe(8);
+    expect(row!.total_tokens).toBe(39);
+    expect(row!.cost_usd).toBe(0);
 
     await store.setUsage(s.id, {
       prompt_tokens: 100,
       completion_tokens: 50,
-      total_tokens: 150,
+      reasoning_tokens: 10,
+      cache_read: 8,
+      cache_write: 2,
+      total_tokens: 170,
     });
     row = await store.get(s.id);
     expect(row!.prompt_tokens).toBe(100);
-    expect(row!.total_tokens).toBe(150);
+    expect(row!.reasoning_tokens).toBe(10);
+    expect(row!.cache_read).toBe(8);
+    expect(row!.cache_write).toBe(2);
+    expect(row!.total_tokens).toBe(170);
+    expect(row!.cost_usd).toBe(0);
   });
 
   it("listMessages returns messages in insertion order with their parts", async () => {
@@ -572,17 +589,31 @@ describe("SessionsStore rollups", () => {
     const s = await store.create({ agent: "grida" });
     await store.appendMessage(s.id, { role: "user" });
     const a1 = await store.appendMessage(s.id, { role: "assistant" });
-    await store.setMessageUsage(a1.id, {
-      input: 100,
-      output: 20,
-      reasoning: 5,
-      cache_read: 10,
-      cache_write: 2,
+    await store.setMessageAccounting(a1.id, {
+      model: {
+        provider_id: "openrouter",
+        tier: "pro",
+        model_id: "anthropic/claude-sonnet-5",
+      },
+      usage: {
+        input: 100,
+        output: 20,
+        reasoning: 5,
+        cache_read: 10,
+        cache_write: 2,
+      },
     });
     await delay(2);
     await store.appendMessage(s.id, { role: "user" });
     const a2 = await store.appendMessage(s.id, { role: "assistant" });
-    await store.setMessageUsage(a2.id, { input: 50, output: 10 });
+    await store.setMessageAccounting(a2.id, {
+      model: {
+        provider_id: "openrouter",
+        tier: "mini",
+        model_id: "openai/gpt-5.4-mini",
+      },
+      usage: { input: 50, output: 10 },
+    });
 
     await store.recomputeRollups(s.id);
     const row = await store.get(s.id);
@@ -592,6 +623,49 @@ describe("SessionsStore rollups", () => {
     expect(row!.cache_read).toBe(10);
     expect(row!.cache_write).toBe(2);
     expect(row!.total_tokens).toBe(150 + 30 + 5 + 10 + 2);
+    expect(row!.cost_usd).toBeCloseTo(
+      (100 * 3 +
+        20 * 15 +
+        5 * 15 +
+        10 * 0.3 +
+        2 * 3.75 +
+        50 * 0.75 +
+        10 * 4.5) /
+        1_000_000
+    );
+    const dbRow = opened.sqlite
+      .prepare("SELECT cost_usd FROM chat_sessions WHERE id = ?")
+      .get(s.id) as { cost_usd: number };
+    expect(dbRow.cost_usd).toBe(0);
+
+    const listed = await store.list({ agent: "grida" });
+    expect(listed.items.find((item) => item.id === s.id)!.cost_usd).toBeCloseTo(
+      row!.cost_usd
+    );
+  });
+
+  it("setMessageAccounting ignores undefined fields when merging metadata", async () => {
+    const s = await store.create({ agent: "grida" });
+    const a = await store.appendMessage(s.id, { role: "assistant" });
+    const model = {
+      provider_id: "openrouter",
+      tier: "mini",
+      model_id: "openai/gpt-5.4-mini",
+    } as const;
+
+    await store.setMessageAccounting(a.id, {
+      model,
+      usage: { input: 10, output: 2 },
+    });
+    await store.setMessageAccounting(a.id, {
+      model: undefined,
+      usage: { input: 12, output: 3 },
+    });
+
+    expect((await store.getMessage(a.id))!.metadata).toMatchObject({
+      model,
+      usage: { input: 12, output: 3 },
+    });
   });
 
   it("rewind excludes hidden assistant usage from the rollup", async () => {
@@ -609,6 +683,37 @@ describe("SessionsStore rollups", () => {
     // Rewinding to u1 hides a1, u2, a2 → only nothing-visible-assistant remains.
     await store.rewind(s.id, u1.id);
     expect((await store.get(s.id))!.total_tokens).toBe(0);
+  });
+
+  it("cost includes charged assistant turns hidden by rewind", async () => {
+    const s = await store.create({ agent: "grida" });
+    const u1 = await store.appendMessage(s.id, { role: "user" });
+    const a1 = await store.appendMessage(s.id, { role: "assistant" });
+    await store.setMessageAccounting(a1.id, {
+      model: {
+        provider_id: "openrouter",
+        tier: "mini",
+        model_id: "openai/gpt-5.4-mini",
+      },
+      usage: { input: 100, output: 10 },
+    });
+    await delay(2);
+    await store.appendMessage(s.id, { role: "user" });
+    const a2 = await store.appendMessage(s.id, { role: "assistant" });
+    await store.setMessageAccounting(a2.id, {
+      model: {
+        provider_id: "openrouter",
+        tier: "mini",
+        model_id: "openai/gpt-5.4-mini",
+      },
+      usage: { input: 50, output: 5 },
+    });
+
+    await store.recomputeRollups(s.id);
+    await store.rewind(s.id, u1.id);
+    const row = await store.get(s.id);
+    expect(row!.total_tokens).toBe(0);
+    expect(row!.cost_usd).toBeCloseTo((150 * 0.75 + 15 * 4.5) / 1_000_000);
   });
 
   it("recomputeRollups counts from the compaction boundary (summarized head excluded)", async () => {

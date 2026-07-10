@@ -117,9 +117,10 @@ session.
 
 ## Locked fundamental tools
 
-Every implementation MUST ship the locked tool set. The 13 ids are
-`read`, `write`, `edit`, `glob`, `grep`, `bash`, `todo`, `task`,
-`question`, `web_search`, `web_fetch`, `skill`, `tool_search`.
+Every implementation that advertises the locked structured-tool
+profile MUST ship the locked tool set. The 13 ids are `read`,
+`write`, `edit`, `glob`, `grep`, `bash`, `todo`, `task`, `question`,
+`web_search`, `web_fetch`, `skill`, `tool_search`.
 
 The set is **non-opinionated**: each tool is the smallest thing it
 can be. Models trained on tool use have learned these names; the

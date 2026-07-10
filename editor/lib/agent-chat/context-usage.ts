@@ -1,31 +1,27 @@
 /**
- * Context-window usage — the data behind the desktop context meter.
+ * Context-window estimate — the data behind the desktop context meter.
  *
  * Pure + framework-free (no react, no AI-SDK imports) so the math is one
  * testable unit. The view (`scaffolds/desktop/shared/context-meter.tsx`)
  * memoizes {@link computeContextUsage} and renders the ring + popover.
  *
- * ## Two numbers, two sources of truth
+ * ## Two numbers, two meanings
  *
- * The ring **%** is REAL: it reads the provider-reported token usage the
- * agent sidecar stamps onto the latest assistant message
- * (`metadata.usage`, the `MessageUsage` shape from
- * `@grida/ai-agent`'s `session/rows.ts`) and divides by the model's
- * `contextWindow` from the catalog. This mirrors the system's own
- * compaction signal (`session.total_tokens` vs the model limit, see
- * `wg/ai/agent/session.md#context-window-tracking`).
+ * The ring **%** is an estimate of the current transcript's context
+ * footprint. The desktop client does not have the exact prompt that the
+ * runtime will send next: hidden system prompt, skill blocks, tool schemas,
+ * provider framing, and server-side compaction state all live outside this
+ * UI message list. Until the runtime exposes a prompt-token preflight value,
+ * the honest client-side value is chars/4 over the visible message parts.
  *
- * The role **breakdown** (user / assistant / tools / other) is
- * ESTIMATED. The provider reports tokens by *type* (input / output /
- * reasoning / cache), never by *who authored them*, so a per-role split
- * is impossible to read off the usage object. We approximate it the same
- * way the agent's own compactor does — chars/4 over each message's text
- * — and let `other` absorb the residual (the server-side system prompt,
- * skill blocks, tool definitions, and estimation drift), which is never
- * present in the client message list.
+ * Provider-reported `metadata.usage` is still surfaced separately as
+ * last-turn usage. That number is useful for cost/debugging, but it is not
+ * current context occupancy: multi-step tool loops can resend context and
+ * accumulate far more provider input tokens than the final live transcript
+ * occupies.
  *
- * This is the same shape opencode ships (`session-context-breakdown.ts`):
- * a real ring over an approximate, clearly-labeled composition.
+ * The role **breakdown** (user / assistant / tools / other) is estimated
+ * from visible message parts only.
  */
 
 /** chars/4 — the portable token approximation the RFC + compactor use. */
@@ -52,7 +48,7 @@ export type MessageUsage = {
   cache_write?: number;
 };
 
-/** All five buckets count toward the window (RFC `session`). */
+/** Provider usage total for a settled turn; not current context occupancy. */
 export function usageTokenTotal(usage: MessageUsage): number {
   return (
     (usage.input ?? 0) +
@@ -144,26 +140,25 @@ export type ContextBreakdown = {
   /** Tool calls + their results. */
   tools: number;
   /**
-   * Residual: the real used total minus the estimated roles above —
-   * the server-side system prompt, skill blocks, tool definitions,
-   * protocol overhead, and chars/4 drift. Clamped to ≥ 0.
+   * Visible parts with roles the meter does not classify. This does not
+   * include hidden system prompt, skill blocks, tool definitions, provider
+   * framing, or estimation drift.
    */
   other: number;
 };
 
 /**
- * Estimate the per-role composition of the context window. `user`,
- * `assistant`, and `tools` are chars/4 estimates over the visible
- * messages; `other` is whatever real used budget those estimates don't
- * account for (so the parts sum to at least `usedTokens`).
+ * Estimate the per-role composition of the visible transcript. This is not a
+ * provider-token accounting API; it is the best client-side approximation of
+ * what the current chat contents occupy before hidden runtime prompt parts.
  */
 export function estimateContextBreakdown(
-  messages: readonly MessageLike[],
-  usedTokens: number
+  messages: readonly MessageLike[]
 ): ContextBreakdown {
   let user = 0;
   let assistant = 0;
   let tools = 0;
+  let other = 0;
 
   for (const m of messages) {
     const parts = m.parts ?? [];
@@ -175,20 +170,17 @@ export function estimateContextBreakdown(
       } else if (m.role === "assistant") {
         if (isToolPart(part)) tools += toks;
         else assistant += toks;
+      } else {
+        other += toks;
       }
-      // Other roles (system, synthetic) aren't shown verbatim client-side;
-      // their tokens land in `other` via the residual below.
     }
   }
 
-  const accounted = user + assistant + tools;
-  const other = Math.max(0, usedTokens - accounted);
   return { user, assistant, tools, other };
 }
 
 export type ContextUsage = {
-  /** Real provider-reported tokens in the current window (0 until the
-   * first turn settles). */
+  /** Estimated visible transcript tokens. */
   usedTokens: number;
   /** Model context window from the catalog (0 when unknown). */
   maxTokens: number;
@@ -196,27 +188,30 @@ export type ContextUsage = {
   percent: number;
   /** Estimated per-role composition (see {@link ContextBreakdown}). */
   breakdown: ContextBreakdown;
-  /** The raw last-turn usage the ring is computed from, if any. */
+  /** The raw provider-reported last-turn usage, if any. */
   usage: MessageUsage | undefined;
+  /** Provider-reported tokens consumed by the latest settled assistant turn. */
+  turnUsageTokens: number;
 };
 
 /**
- * Compute everything the meter needs: the real ring %, and the estimated
- * role breakdown. `contextWindow` is the model's limit (from
- * `@grida/ai-models`); pass 0/undefined when unknown — `percent` is then 0
- * and the view hides itself.
+ * Compute everything the meter needs: the estimated context ring %, visible
+ * role breakdown, and provider-reported last-turn usage. `contextWindow` is
+ * the model's limit (from `@grida/ai-models`); pass 0/undefined when unknown
+ * — `percent` is then 0 and the view hides itself.
  */
 export function computeContextUsage(
   messages: readonly MessageLike[],
   contextWindow: number | undefined
 ): ContextUsage {
   const usage = lastAssistantUsage(messages);
-  const usedTokens = usage ? usageTokenTotal(usage) : 0;
+  const turnUsageTokens = usage ? usageTokenTotal(usage) : 0;
+  const breakdown = estimateContextBreakdown(messages);
+  const usedTokens =
+    breakdown.user + breakdown.assistant + breakdown.tools + breakdown.other;
   const maxTokens = contextWindow ?? 0;
-  // Clamp to the documented [0, 1] contract — a turn can report usage above the
-  // catalog window (provider drift, an over-budget request), and an unbounded
-  // ratio would mis-scale the ring math downstream.
+  // Clamp to the documented [0, 1] contract; estimates can still exceed a
+  // catalog window for stale model metadata or oversized local transcripts.
   const percent = maxTokens > 0 ? Math.min(1, usedTokens / maxTokens) : 0;
-  const breakdown = estimateContextBreakdown(messages, usedTokens);
-  return { usedTokens, maxTokens, percent, breakdown, usage };
+  return { usedTokens, maxTokens, percent, breakdown, usage, turnUsageTokens };
 }

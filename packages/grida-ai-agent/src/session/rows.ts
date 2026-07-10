@@ -57,6 +57,8 @@ export type ChatSessionRow = {
   cache_read: number;
   cache_write: number;
   total_tokens: number;
+  /** Derived from assistant-message `{ model, usage }`, including turns hidden
+   * by rewind or compaction; not authoritative billing state. */
   cost_usd: number;
   created_at: number;
   updated_at: number;
@@ -92,7 +94,8 @@ export type ChatMessageWithParts = ChatMessageRow & { parts: ChatPartRow[] };
 /**
  * Per-turn token usage (RFC `session / context-window-tracking`).
  * Stored under an assistant message's `metadata.usage`; summed into the
- * session-row rollups. All five buckets count toward the context window.
+ * session-row rollups for usage and cost. This is provider accounting data,
+ * not the UI's visible-transcript context estimate.
  */
 export type MessageUsage = {
   /** User + system tokens this step consumed (cache excluded). */
@@ -105,6 +108,14 @@ export type MessageUsage = {
   cache_read?: number;
   /** Tokens written to the provider's prompt cache. */
   cache_write?: number;
+};
+
+export type AssistantTurnAccounting = {
+  /** Model that produced this assistant turn. Required for accurate cost when
+   * a session switches models between turns. */
+  model?: ChatModel;
+  /** Provider-reported token usage for this assistant turn. */
+  usage?: MessageUsage;
 };
 
 export type SessionListFilter = {

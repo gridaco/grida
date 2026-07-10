@@ -181,7 +181,7 @@ export function createToolset(caps: ToolsetCapabilities = {}) {
   const todosBinding = caps.todos;
   const fsTools = fsBinding
     ? wrapWithResolver(AgentFs.tools, (name, input) =>
-        AgentFs.resolveToolCall(fsBinding, {
+        AgentFs.resolveToolCallAsync(fsBinding, {
           tool_name: name as AgentFs.ToolName,
           input,
         })

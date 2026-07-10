@@ -65,6 +65,8 @@ class AgentFs {
 
   // File ops
   list(): string[];
+  list_directory(args?: AgentFs.ListArgs): AgentFs.ListResult;
+  list_directory_fresh(args?: AgentFs.ListArgs): Promise<AgentFs.ListResult>;
   exists(path: string): boolean;
   read(path: string): AgentFs.ReadResult | null;
   write(
@@ -84,16 +86,30 @@ All types (`AgentFs.Backend`, `AgentFs.LiveBinding`, `AgentFs.ReadResult`, the r
 
 `AgentFs.tools` is the AI-SDK tool table (four zod-schema'd defs plus `grep_files`). Name constants live alongside as `AgentFs.TOOL_NAMES`:
 
-| Tool         | Operation                                                                                         | Claude Code parallel |
-| ------------ | ------------------------------------------------------------------------------------------------- | -------------------- |
-| `read_file`  | `{ path }` → `{ content, version }`                                                               | `Read`               |
-| `edit_file`  | `{ path, old_string, new_string, replace_all?, version }` → match-and-replace                     | `Edit`               |
-| `write_file` | `{ path, content, version? }` → full upsert; version-checked or permissive                        | `Write`              |
-| `list_files` | `{}` → `{ files: string[] }` — flat enumeration                                                   | ~`Glob` (simpler)    |
-| `grep_files` | `{ pattern, path_prefix?, case_sensitive? }` → `{ matches, files_scanned }`, mirrors `grep -n -F` | `Grep`               |
+| Tool         | Operation                                                                                                 | Claude Code parallel |
+| ------------ | --------------------------------------------------------------------------------------------------------- | -------------------- |
+| `read_file`  | `{ path }` → `{ content, version }`                                                                       | `Read`               |
+| `edit_file`  | `{ path, old_string, new_string, replace_all?, version }` → match-and-replace                             | `Edit`               |
+| `write_file` | `{ path, content, version? }` → full upsert; version-checked or permissive                                | `Write`              |
+| `list_files` | `{ path?, offset?, limit? }` → `{ path, folders, files, truncated, next_offset? }` — direct children only | ~`Glob` (scoped)     |
+| `grep_files` | `{ pattern, path_prefix?, case_sensitive? }` → `{ matches, files_scanned }`, mirrors `grep -n -F`         | `Grep`               |
 
-`AgentFs.resolveToolCall(fs, toolCall)` dispatches inbound calls. Hosts
-plug it into `Chat.onToolCall`:
+`list_files` is directory discovery, not a repository inventory. It
+defaults to `/`, returns sorted absolute child paths grouped into
+`folders` and `files`, and marks pagination with `truncated` /
+`next_offset`. Keep the tool for VFS / OPFS / memory-backed agents
+that may not have shell search. In a shell-capable real-fs profile,
+prefer explicit command/search tools for broad discovery (`rg --files`,
+`find`, `ls`, `tree`) rather than teaching the model to trust a flat
+index.
+
+`AgentFs.resolveToolCall(fs, toolCall)` dispatches inbound calls
+synchronously against the hydrated VFS map. Use
+`AgentFs.resolveToolCallAsync(fs, toolCall)` on server-bound real-fs
+agents so `list_files` can call the backend's scoped directory reader
+instead of trusting the hydrate index.
+
+Client-resolved VFS hosts plug the sync resolver into `Chat.onToolCall`:
 
 ```ts
 const chat = new Chat({
@@ -110,6 +126,10 @@ const chat = new Chat({
 });
 ```
 
+Server-bound toolsets use the async resolver through `createToolset`, so
+workspace `list_files({ path })` reads the requested directory from disk
+on demand when the backend supports it.
+
 ```ts
 namespace AgentFs {
   interface LiveBinding {
@@ -121,6 +141,7 @@ namespace AgentFs {
 
   interface Backend {
     list(): Promise<string[]>;
+    list_directory?(path: string): Promise<AgentFs.ListEntries>;
     read(path: string): Promise<string | null>;
     write(path: string, content: string): Promise<void>;
     delete(path: string): Promise<void>;

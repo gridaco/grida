@@ -753,6 +753,9 @@ function AgentPaneContent({
   // to mount on. Bridge that dead-air window with a tail indicator until an
   // assistant turn begins.
   const pendingTurn = isStreaming && messages.at(-1)?.role !== "assistant";
+  // Restored transcripts can hydrate after the scroll container has already
+  // mounted. Keep that entry stable; reserve smooth follow for live turns.
+  const conversationResize = busy ? "smooth" : "instant";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -762,7 +765,11 @@ function AgentPaneContent({
         onSelect={(id) => chatSession.select(id)}
         conversationEmpty={messages.length === 0}
       />
-      <Conversation className="flex-1 min-h-0">
+      <Conversation
+        className="flex-1 min-h-0"
+        initial="instant"
+        resize={conversationResize}
+      >
         <ConversationContent className="gap-4 px-3 py-4">
           {/* Empty state intentionally omitted — the chat starts blank
               and the prompt input below is the only affordance the
