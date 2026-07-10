@@ -18,24 +18,31 @@
  *
  * Every attach INTENT is requested here and granted/denied synchronously:
  *
- *   - `send`            — a user send (`buildAgentSend` → `sendMessage`).
  *   - `approval-resume` — the Allow/Deny body-send that resumes a paused
  *                         supervised tool call.
  *   - `resume-mount`    — reconnect on mount / Chat rebuild / session
- *                         switch (replaces `decideResumeInFlight`).
+ *                         switch.
  *   - `resume-drain`    — attach to a core-started queue-drain turn
  *                         (requested by `useCoreTurnSync`'s executor).
- *   - `resume-recovery` — the self-heal re-attach (error recovery).
+ *   - `resume-recovery` — the self-heal re-attach ({@link requestRecovery}).
  *
- * The SDK's body-less tool/approval auto-resubmit is never requested — the
- * transport REPORTS it (`noteTransportOpen`/`noteTransportSettle`) and the
- * owner adopts it as a live attach, so everything else serializes behind it.
+ * Two stream sources are deliberately NOT requested intents:
+ *
+ *   - a plain user send — `decideSubmit` owns its gate with the correct
+ *     busy semantics (busy → ENQUEUE, never drop; an owner deny would lose
+ *     the message);
+ *   - the SDK's body-less tool/approval auto-resubmit.
+ *
+ * Both are adopted instead: the transport REPORTS every opened stream
+ * (`noteTransportOpen`/`noteTransportSettle`) and the owner treats it as
+ * the live attach, so every requested intent serializes behind it.
  *
  * ## Invariants (pinned by stream-attach-owner.test.ts)
  *
- *   I1 — at most one unsettled attach per owner: while one is live, `send` /
- *        `approval-resume` / `resume-drain` are denied `attach-in-flight`
- *        and `resume-mount` degrades to a claim (never a second stream).
+ *   I1 — at most one unsettled attach per owner: while one is live,
+ *        `approval-resume` / `resume-drain` / `resume-recovery` are denied
+ *        `attach-in-flight` and `resume-mount` degrades to a claim (never a
+ *        second stream).
  *   I2 — `resume-mount` executes at most once per `(session_id, epoch)`
  *        binding. The claim survives Chat-instance rebuilds (the H1 hazard:
  *        identity-keyed claims reset on every rehydrate) and StrictMode
@@ -53,7 +60,6 @@
  */
 
 export type StreamAttachIntent =
-  | "send"
   | "approval-resume"
   | "resume-mount"
   | "resume-drain"
@@ -82,8 +88,6 @@ export type StreamAttachBinding = {
   readonly epoch: number;
 };
 
-export type StreamAttachPhase = "unbound" | "idle" | "attaching" | "recovering";
-
 type Logger = (line: string) => void;
 
 export class StreamAttachOwner {
@@ -97,8 +101,6 @@ export class StreamAttachOwner {
   /** Self-heal used for the current binding (one attempt max — a recovery
    * that dies again must surface honestly, not ping-pong). */
   private recovery_attempted = false;
-  /** A `resume-recovery` executor is live (drives the `recovering` phase). */
-  private recovering = false;
   private readonly log: Logger;
 
   constructor(opts?: { log?: Logger }) {
@@ -113,12 +115,6 @@ export class StreamAttachOwner {
   /** True while any granted executor or transport-reported stream is live. */
   private get busy(): boolean {
     return this.pending_exec > 0 || this.open_streams > 0;
-  }
-
-  get phase(): StreamAttachPhase {
-    if (this.recovering) return "recovering";
-    if (this.busy) return "attaching";
-    return this.binding ? "idle" : "unbound";
   }
 
   /**
@@ -146,32 +142,34 @@ export class StreamAttachOwner {
   }
 
   /**
-   * Report a recoverable stream failure (`chat-error.ts`: `disconnect` /
-   * `stream-state` — the server state is intact; only this client's view
-   * died). Returns `"recover"` exactly once per binding when a self-heal
-   * attempt is sound (bound, nothing live); the caller then runs the
-   * restore through `request("resume-recovery", …)`. Everything else —
-   * unbound, an attach still live, or the one attempt already spent —
-   * returns `"ignore"` and the failure surfaces honestly instead of
-   * ping-ponging.
+   * The one-shot self-heal for a recoverable stream failure
+   * (`chat-error.ts`: `disconnect` / `stream-state` — the server state is
+   * intact; only this client's view died). Gates, marks, and runs in one
+   * synchronous step: exactly once per binding, only when a restore is
+   * sound (bound, nothing live). Returns whether the recovery started —
+   * `false` means the failure surfaces honestly instead of ping-ponging.
    */
-  noteStreamError(kind: "disconnect" | "stream-state"): "recover" | "ignore" {
+  requestRecovery(
+    kind: "disconnect" | "stream-state",
+    exec: () => void | Promise<void>
+  ): boolean {
     if (!this.binding || this.busy || this.recovery_attempted) {
       this.note("recovery-ignore", `kind=${kind}`);
-      return "ignore";
+      return false;
     }
     this.recovery_attempted = true;
     this.note("recovery", `kind=${kind}`);
-    return "recover";
+    // The gate above IS the resume-recovery decision (I5: no interleaving
+    // between it and the request), so this grant cannot be denied.
+    return this.request("resume-recovery", exec).granted;
   }
 
   /** Pure read of what `request(intent)` would do right now. */
   decide(intent: StreamAttachIntent): StreamAttachDecision {
     switch (intent) {
-      case "send":
       case "approval-resume":
-        // A fresh chat's first send legitimately has no session id yet (the
-        // server mints one) — sends never require a binding.
+        // A fresh chat's approval can arrive before the session id is
+        // adopted — approval sends never require a binding.
         if (this.busy) return deny("attach-in-flight");
         return grant("exec");
       case "resume-mount":
@@ -180,17 +178,11 @@ export class StreamAttachOwner {
         // A live attach means THIS client already holds the turn (its own
         // send, or an adopted auto-resubmit). Take the claim so the binding
         // is never re-resumed later, but never open a second stream over it
-        // — exactly the old `decideResumeInFlight` claim-only case, now
-        // keyed on owner state instead of the racy `isStreaming` snapshot.
+        // — keyed on owner state instead of a racy `isStreaming` snapshot.
         if (this.busy) return grant("claim-only");
         return grant("exec");
       case "resume-drain":
-        if (!this.binding) return deny("no-session");
-        if (this.busy) return deny("attach-in-flight");
-        return grant("exec");
       case "resume-recovery":
-        // Recovery is requested by the self-heal flow only; without a
-        // binding (or over a live attach) there is nothing sound to do.
         if (!this.binding) return deny("no-session");
         if (this.busy) return deny("attach-in-flight");
         return grant("exec");
@@ -218,11 +210,9 @@ export class StreamAttachOwner {
       return decision;
     }
     this.pending_exec += 1;
-    if (intent === "resume-recovery") this.recovering = true;
     this.note("grant", `intent=${intent}`);
     const settle = () => {
       this.pending_exec = Math.max(0, this.pending_exec - 1);
-      if (intent === "resume-recovery") this.recovering = false;
       this.note("settle", `intent=${intent}`);
     };
     const fail = (err: unknown) => {

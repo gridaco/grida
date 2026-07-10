@@ -14,12 +14,15 @@
  * only casualty.
  *
  * Headless by doctrine (no React, no transport, no bridge imports) so the
- * table is provable in a plain Node test. The GG detection matches the
- * GRIDA-GG wire contract directly — the bare literal codes ARE the
- * renderer-detection contract (Electron's contextBridge strips custom error
- * props; see the agent package's `run-agent.ts` onError) — mirroring
- * `gg-session.ts`'s predicates without importing its bridge-touching module.
+ * table is provable in a plain Node test. GG detection reuses the shared
+ * bridge-free predicates (`@/lib/desktop/gg-errors` — the GRIDA-GG wire
+ * contract in one place; `gg-session.ts` re-exports the same functions).
  */
+
+import {
+  isGgTokenExpired,
+  isGgInsufficientCredits,
+} from "@/lib/desktop/gg-errors";
 
 export namespace chatError {
   export type Kind =
@@ -37,11 +40,10 @@ export namespace chatError {
     | "unknown";
 
   export function classify(err: unknown): Kind {
-    const message = errorText(err);
-    if (message.includes("gg_token_expired")) return "gg-token-expired";
-    if (message.includes("insufficient_credits"))
-      return "gg-insufficient-credits";
+    if (isGgTokenExpired(err)) return "gg-token-expired";
+    if (isGgInsufficientCredits(err)) return "gg-insufficient-credits";
     if (isNamed(err, "AI_UIMessageStreamError")) return "stream-state";
+    const message = errorText(err);
     // Mirror the AI SDK's own disconnect heuristic (a TypeError whose
     // message mentions fetch/network is the browser's torn-connection
     // shape) — plus WebKit's "Load failed" wording.

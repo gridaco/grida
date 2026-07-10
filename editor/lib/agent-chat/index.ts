@@ -58,7 +58,6 @@ export {
   type StreamAttachDecision,
   type StreamAttachDenyReason,
   type StreamAttachIntent,
-  type StreamAttachPhase,
 } from "./stream-attach-owner";
 export { useStreamAttach, type UseStreamAttachArgs } from "./use-stream-attach";
 export { chatError } from "./chat-error";

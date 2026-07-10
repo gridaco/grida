@@ -130,36 +130,23 @@ function streamFromBridge(
   let sessionId: string | null = opts.session_id ?? null;
   let settled = false;
   // Attach-owner reporting: `open` at start, `settle` exactly once on the
-  // first of close / fail / cancel. Guarded independently of `settled`
-  // (cancel sets `settled` without passing through close/fail).
-  let settleReported = false;
-  const reportSettle = () => {
-    if (settleReported) return;
-    settleReported = true;
-    try {
-      opts.onStreamSettle?.();
-    } catch {
-      /* reporting must never break the stream */
-    }
-  };
+  // first of close / fail / cancel (cancel sets `settled` without passing
+  // through close/fail, so the reporter guards independently).
+  const reporter = makeStreamReporter(opts);
 
   return new ReadableStream<UIMessageChunk>({
     async start(controller) {
-      try {
-        opts.onStreamOpen?.();
-      } catch {
-        /* reporting must never break the stream */
-      }
+      reporter.open();
       const close = () => {
         if (settled) return;
         settled = true;
-        reportSettle();
+        reporter.settle();
         controller.close();
       };
       const fail = (err: unknown) => {
         if (settled) return;
         settled = true;
-        reportSettle();
+        reporter.settle();
         controller.error(err);
       };
       // The ONE sanctioned run-termination path. `abortRun` is the only caller
@@ -234,9 +221,39 @@ function streamFromBridge(
       // `abortRun`. Keep `settled` so no further chunk is enqueued onto the dead
       // controller.
       settled = true;
-      reportSettle();
+      reporter.settle();
     },
   });
+}
+
+/**
+ * Once-guarded attach-owner reporting for one stream's lifetime: `open` is
+ * fire-and-forget; `settle` fires exactly once across close / fail / cancel.
+ * Reporting must never break the stream — both swallow throws.
+ */
+function makeStreamReporter(hooks?: {
+  onStreamOpen?: () => void;
+  onStreamSettle?: () => void;
+}): { open: () => void; settle: () => void } {
+  let settled = false;
+  return {
+    open() {
+      try {
+        hooks?.onStreamOpen?.();
+      } catch {
+        /* reporting must never break the stream */
+      }
+    },
+    settle() {
+      if (settled) return;
+      settled = true;
+      try {
+        hooks?.onStreamSettle?.();
+      } catch {
+        /* reporting must never break the stream */
+      }
+    },
+  };
 }
 
 /**
@@ -267,21 +284,8 @@ async function reconnectFromBridge(
 
   // Attach-owner reporting: a non-null handle IS a live attach (a null one
   // never opened — no report). Settle exactly once on done/error/cancel.
-  let settleReported = false;
-  const reportSettle = () => {
-    if (settleReported) return;
-    settleReported = true;
-    try {
-      hooks?.onStreamSettle?.();
-    } catch {
-      /* reporting must never break the stream */
-    }
-  };
-  try {
-    hooks?.onStreamOpen?.();
-  } catch {
-    /* reporting must never break the stream */
-  }
+  const reporter = makeStreamReporter(hooks);
+  reporter.open();
 
   try {
     hooks?.onResumeStart?.();
@@ -296,7 +300,7 @@ async function reconnectFromBridge(
       queue.length = 0;
       void handle.done.then(
         () => {
-          reportSettle();
+          reporter.settle();
           try {
             controller.close();
           } catch {
@@ -304,7 +308,7 @@ async function reconnectFromBridge(
           }
         },
         (err) => {
-          reportSettle();
+          reporter.settle();
           try {
             controller.error(err);
           } catch {
@@ -316,7 +320,7 @@ async function reconnectFromBridge(
     cancel() {
       // Consumer stopped reading (stream-replace / unmount): a detach, and
       // the owner must see the slot free again.
-      reportSettle();
+      reporter.settle();
     },
   });
 }

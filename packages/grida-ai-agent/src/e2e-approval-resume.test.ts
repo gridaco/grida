@@ -16,7 +16,8 @@
  * have a deterministic package-level repro.
  */
 import fs from "node:fs/promises";
-import { sessionIdFromSse } from "./testing/sse";
+import { chunksOf, sessionIdFromSse, startIdsOf } from "./testing/sse";
+import { FINISH_USAGE, lastUserText, waitFor } from "./testing/harness";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -43,20 +44,6 @@ import { registerSessionsRoutes } from "./http/routes/sessions";
  * prompt, finish with plain text. */
 const CMD_TRIGGER = "COPY_THE_FILE";
 
-const FINISH_USAGE = {
-  type: "finish" as const,
-  finishReason: { unified: "stop" as const, raw: "stop" },
-  usage: {
-    inputTokens: {
-      total: 10,
-      noCache: 10,
-      cacheRead: undefined,
-      cacheWrite: undefined,
-    },
-    outputTokens: { total: 5, text: 5, reasoning: undefined },
-  },
-};
-
 let baseDir: string;
 let workspaceRoot: string;
 let workspace: Workspace;
@@ -71,21 +58,6 @@ function promptHasToolResult(prompt: unknown): boolean {
     Array.isArray(prompt) &&
     prompt.some((m) => (m as { role?: string }).role === "tool")
   );
-}
-
-function lastUserText(prompt: unknown): string {
-  if (!Array.isArray(prompt)) return "";
-  for (let i = prompt.length - 1; i >= 0; i -= 1) {
-    const m = prompt[i] as { role?: string; content?: unknown };
-    if (m.role !== "user") continue;
-    if (typeof m.content === "string") return m.content;
-    if (Array.isArray(m.content)) {
-      return m.content
-        .map((p) => (p as { text?: string }).text ?? "")
-        .join(" ");
-    }
-  }
-  return "";
 }
 
 function makeMockModel(): MockLanguageModelV3 {
@@ -194,22 +166,6 @@ afterEach(async () => {
   await fs.rm(baseDir, { recursive: true, force: true });
 });
 
-async function waitFor(
-  fn: () => Promise<void>,
-  timeoutMs = 5000
-): Promise<void> {
-  const start = Date.now();
-  for (;;) {
-    try {
-      await fn();
-      return;
-    } catch (err) {
-      if (Date.now() - start > timeoutMs) throw err;
-      await new Promise((r) => setTimeout(r, 15));
-    }
-  }
-}
-
 describe("supervised approval resume (accept-edits) — real SDK stream path", () => {
   it(
     "pause → Allow → resume EXECUTES the command and completes the part (no 'No tool invocation found')",
@@ -285,12 +241,8 @@ describe("supervised approval resume (accept-edits) — real SDK stream path", (
       // "No tool invocation found", tears the stream down, and the UI shows
       // a bogus "network error". The server can't see that crash — this id
       // equality is the wire-level contract that prevents it.
-      const startIds = (sse: string): string[] =>
-        [...sse.matchAll(/"type":"start","messageId":"([^"]+)"/g)].map(
-          (m) => m[1]
-        );
-      const [turn1Id] = startIds(sse1);
-      const [resumeId] = startIds(sse2);
+      const [turn1Id] = startIdsOf(sse1);
+      const [resumeId] = startIdsOf(sse2);
       expect(resumeId).toBe(turn1Id);
 
       // The approved command actually ran: cp produced the destination file.
@@ -451,31 +403,3 @@ describe("supervised approval resume (accept-edits) — real SDK stream path", (
     }
   );
 });
-
-/** All `start` chunk messageIds in an SSE body, in order. */
-function startIdsOf(sse: string): string[] {
-  return [...sse.matchAll(/"type":"start","messageId":"([^"]+)"/g)].map(
-    (m) => m[1]!
-  );
-}
-
-/** Parse an agent SSE body into UI-message chunk objects (skips the
- * `grida-session` continuity frame and the `[DONE]` sentinel). */
-function chunksOf(sse: string): Array<Record<string, unknown>> {
-  const out: Array<Record<string, unknown>> = [];
-  for (const frame of sse.split("\n\n")) {
-    if (frame.includes("event:")) continue;
-    const data = frame
-      .split("\n")
-      .filter((l) => l.startsWith("data:"))
-      .map((l) => l.slice(5).trimStart())
-      .join("\n");
-    if (!data || data === "[DONE]") continue;
-    try {
-      out.push(JSON.parse(data));
-    } catch {
-      // non-JSON frame — not a chunk
-    }
-  }
-  return out;
-}

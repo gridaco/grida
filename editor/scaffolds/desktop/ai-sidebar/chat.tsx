@@ -248,53 +248,19 @@ export function AISidebarChat({
   // state.
   const isStreaming = status === "submitted" || status === "streaming";
 
-  // Reconnect to the session's in-flight run after a remount/refresh/switch,
-  // through the attach owner (resume-once per (session, epoch); degrades to a
-  // claim when this client already holds the live attach). The executor is
-  // REHYDRATE-THEN-ATTACH — seed the chat from the DB snapshot, then
-  // reconnect — so a restore into a BUSY session shows its history before
-  // the replay lands (the reconcile effect is blocked while busy).
-  const setMessagesRef = useRef(setMessages);
-  setMessagesRef.current = setMessages;
-  const resumeStreamRef = useRef(resumeStream);
-  resumeStreamRef.current = resumeStream;
-  const rehydrateThenAttach = useCallback(async () => {
-    const msgs = await chatSession.rehydrate_async();
-    if (msgs) setMessagesRef.current(msgs);
-    await resumeStreamRef.current();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatSession.rehydrate_async]);
-  useStreamAttach({
+  // Mount/rebuild resume (rehydrate-then-attach) + the owner-gated
+  // self-heal, in the ONE shared wire (`use-stream-attach.ts`) — the
+  // workspace agent pane runs the identical wiring.
+  const { recovering } = useStreamAttach({
     owner: attachOwner,
     sessionId: chatSession.current_id,
     epoch: chatSession.epoch,
-    resumeStream: rehydrateThenAttach,
+    rehydrateAsync: chatSession.rehydrate_async,
+    setMessages,
+    resumeStream,
+    error,
+    clearError,
   });
-
-  // Self-heal (owner-gated, once per binding): a `disconnect` or
-  // `stream-state` error means only this client's VIEW died — the server
-  // state is durable. Restore from the DB and re-attach if the run is still
-  // live; on success the error clears silently. Mirrors
-  // `workbench/agent-pane.tsx`.
-  const [recovering, setRecovering] = useState(false);
-  const clearErrorRef = useRef(clearError);
-  clearErrorRef.current = clearError;
-  useEffect(() => {
-    if (!error) return;
-    const kind = chatError.classify(error);
-    if (!chatError.recoverable(kind)) return;
-    if (attachOwner.noteStreamError(kind) !== "recover") return;
-    setRecovering(true);
-    const decision = attachOwner.request("resume-recovery", async () => {
-      try {
-        await rehydrateThenAttach();
-        clearErrorRef.current();
-      } finally {
-        setRecovering(false);
-      }
-    });
-    if (!decision.granted) setRecovering(false);
-  }, [error, attachOwner, rehydrateThenAttach]);
 
   // Manual compaction (RFC `session / compaction`) runs as a separate op that
   // does NOT move `useChat` status. Declared here so the single `busy` signal

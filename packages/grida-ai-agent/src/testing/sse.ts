@@ -52,3 +52,32 @@ export function assistantTextFromSse(body: string): string {
   }
   return text;
 }
+
+/** All `start` chunk messageIds in a drained SSE body, in order — the
+ * message-identity probe (a resume must re-advertise the paused turn's id). */
+export function startIdsOf(sse: string): string[] {
+  return [...sse.matchAll(/"type":"start","messageId":"([^"]+)"/g)].map(
+    (m) => m[1]!
+  );
+}
+
+/** Parse an agent SSE body into UI-message chunk objects (skips the
+ * `grida-session` continuity frame and the `[DONE]` sentinel). */
+export function chunksOf(sse: string): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  for (const frame of sse.split("\n\n")) {
+    if (frame.includes("event:")) continue;
+    const data = frame
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).trimStart())
+      .join("\n");
+    if (!data || data === "[DONE]") continue;
+    try {
+      out.push(JSON.parse(data));
+    } catch {
+      // non-JSON frame — not a chunk
+    }
+  }
+  return out;
+}

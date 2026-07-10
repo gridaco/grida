@@ -368,10 +368,9 @@ describe("StreamRegistry / lifecycle observer", () => {
 
 describe("StreamRegistry / continuation replay prefix", () => {
   it("serves the prefix BEFORE the buffered replay to an opt-in consumer", async () => {
-    const entry = registry.create("ses_a", {
+    registry.create("ses_a", {
       replay_prefix: Promise.resolve(["p1", "p2"]),
     });
-    void entry;
     registry.push("ses_a", "b1");
     registry.push("ses_a", "b2");
     const c = makeConsumer();

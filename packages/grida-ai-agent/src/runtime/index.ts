@@ -84,6 +84,7 @@ import {
 } from "../session/scratch";
 import { buildModelMessages, type ModelUIMessage } from "./message-view";
 import { buildReplayPrefix } from "./replay-prefix";
+import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
 
@@ -682,22 +683,24 @@ export class AgentRuntime {
    * (RFC `session / compaction`). Blocks the turn on the summarizer — by
    * design, the next user message waits rather than overflowing. Failures
    * are swallowed: a failed compaction proceeds uncompacted (the
-   * compaction layer logs).
+   * compaction layer logs). Returns whether the transcript MAY have
+   * changed (compaction ran, successfully or not) so the caller knows a
+   * pre-compaction snapshot is stale.
    */
   private async maybeAutoCompact(
     sessionId: string,
     modelFactory: Parameters<typeof compactSession>[0]["model_factory"],
     signal: AbortSignal
-  ): Promise<void> {
-    if (!this.compaction_enabled) return;
+  ): Promise<boolean> {
+    if (!this.compaction_enabled) return false;
     const session = await this.deps.sessions_store.get(sessionId);
-    if (!session) return;
+    if (!session) return false;
     const limits = await this.limitsResolver();
     const modelLimits = limits.resolve(session.model);
     if (
       !shouldCompact(session.total_tokens, modelLimits, this.compaction_config)
     ) {
-      return;
+      return false;
     }
     try {
       await compactSession(
@@ -722,6 +725,9 @@ export class AgentRuntime {
         }`
       );
     }
+    // A failed compaction may still have written rows — report "changed"
+    // either way; the cost is one re-read on a rare path.
+    return true;
   }
 
   /**
@@ -929,25 +935,30 @@ export class AgentRuntime {
       scratch_seed: scratchSeed,
     } = opts;
 
-    // Self-contained continuation replay (`replay-prefix.ts`): snapshot the
-    // visible tail NOW — before the pump can persist this turn's own frames
-    // into it — and lower an assistant tail (an approval/question resume)
-    // into reconstruction chunks for reconnect consumers. A user tail (every
-    // normal send and queue drain) lowers to []. The promise never rejects
-    // (degrades to [] with a warning); the pump awaits it below so the
-    // snapshot read strictly precedes the recorder's first write.
-    const replayPrefix = (async (): Promise<readonly string[]> => {
+    // ONE visible-messages snapshot per turn, kicked at reserve time — it
+    // serves BOTH consumers: the continuation replay prefix
+    // (`replay-prefix.ts`: an assistant tail — an approval/question resume —
+    // lowers to reconstruction chunks for reconnect consumers; a user tail
+    // lowers to []) AND the pump's model view below, which previously
+    // re-read the identical transcript moments later. The promise never
+    // rejects (degrades with a warning; the pump falls back to its own
+    // read); the pump awaits it so the snapshot strictly precedes the
+    // recorder's first write.
+    const turnSnapshot = (async (): Promise<{
+      visible: ChatMessageWithParts[] | null;
+      prefix: readonly string[];
+    }> => {
       try {
         const visible =
           await this.deps.sessions_store.listVisibleMessages(sessionId);
-        return buildReplayPrefix(visible[visible.length - 1]);
+        return { visible, prefix: buildReplayPrefix(visible.at(-1)) };
       } catch (err) {
         console.warn(
-          `[agent-host-agent] replay-prefix build failed sessionId=${sessionId} err=${
+          `[agent-host-agent] turn snapshot failed sessionId=${sessionId} err=${
             err instanceof Error ? err.message : String(err)
           }`
         );
-        return [];
+        return { visible: null, prefix: [] };
       }
     })();
 
@@ -957,7 +968,7 @@ export class AgentRuntime {
     // prefix rides the entry from the reserve on, so no consumer can attach
     // before it is decided.
     const entry = this.streams.create(sessionId, {
-      replay_prefix: replayPrefix,
+      replay_prefix: turnSnapshot.then((s) => s.prefix),
     });
 
     // Lifecycle event (RFC `events`): the turn is reserved — announce it,
@@ -1038,10 +1049,11 @@ export class AgentRuntime {
     // consumer (HTTP) or reconnects later (a core drain has no live consumer).
     void (async () => {
       try {
-        // Ordering invariant for the continuation prefix: the tail snapshot
+        // Ordering invariant for the continuation prefix: the snapshot
         // completes before ANY of this turn's frames can reach the recorder.
-        // The promise never rejects (see above).
-        await replayPrefix;
+        // The promise never rejects (see above); `visible` is null only on a
+        // failed read, and each consumer below falls back to its own read.
+        const snapshotVisible = (await turnSnapshot).visible;
 
         // Create the session scratch dir before ANY provider split so
         // agent-provider turns and model-provider turns see the same first-turn
@@ -1060,7 +1072,9 @@ export class AgentRuntime {
         // (attached above) persists the assistant message from those chunks;
         // `streams.finish` flushes it, same as the normal terminal edge.
         if (provider.kind === "agent-provider") {
-          const visible = await sessionsStore.listVisibleMessages(sessionId);
+          const visible =
+            snapshotVisible ??
+            (await sessionsStore.listVisibleMessages(sessionId));
           const preparedMessages = buildModelMessages(visible);
           // Continuity (issue #813): resume the external agent's prior session
           // so it keeps the conversation. Read the id stored last turn, pass it
@@ -1109,7 +1123,7 @@ export class AgentRuntime {
 
         // Auto-compaction (RFC `session / compaction`): if the session is
         // at/over its usable context, block this turn on the summarizer.
-        await this.maybeAutoCompact(
+        const compacted = await this.maybeAutoCompact(
           sessionId,
           provider.model_factory,
           entry.model_abort.signal
@@ -1118,8 +1132,14 @@ export class AgentRuntime {
         // Server-authoritative message view (RFC `session`): rebuild what
         // the model sees from the VISIBLE persisted messages — NOT the raw
         // client array. This is what makes rewind + compaction real (hidden
-        // rows drop out; the summary folds into the next user turn).
-        const visible = await sessionsStore.listVisibleMessages(sessionId);
+        // rows drop out; the summary folds into the next user turn). The
+        // reserve-time snapshot is that view — single-flight means nothing
+        // else writes between reserve and here — EXCEPT when compaction just
+        // rewrote the transcript, which forces a fresh read.
+        const visible =
+          !compacted && snapshotVisible
+            ? snapshotVisible
+            : await sessionsStore.listVisibleMessages(sessionId);
         const preparedMessages = buildModelMessages(visible);
 
         // Session-static skills + project instructions (discovered once).

@@ -174,8 +174,18 @@ export function useChatSession(
 
   const [currentId, setCurrentId] = useState<string | null>(null);
   // Binding generation (see `UseChatSessionResult.epoch`). Bumped ONLY by
-  // real rebindings below — never by hydration or mid-stream id adoption.
+  // real rebindings — every one goes through `rebind` below; the single
+  // named NON-bumping id change is `apply_resolved_session_id` (mid-stream
+  // adoption).
   const [epoch, setEpoch] = useState(0);
+  // The one place a real rebinding happens: the epoch bump and the id set
+  // are paired here so a future `setCurrentId` caller can't silently skip
+  // the bump (the H1 hazard class). Callers state their own "is this a real
+  // rebind?" condition.
+  const rebind = useCallback((id: string | null) => {
+    setEpoch((n) => n + 1);
+    setCurrentId(id);
+  }, []);
   const [sessionsList, setSessionsList] = useState<ChatSessionRow[]>([]);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,8 +259,8 @@ export function useChatSession(
     persistReadyRef.current = false;
     // Scope reset (workspace/agent change) is a real rebinding — but only
     // when it actually clears a session (never on the initial mount run).
-    if (currentIdRef.current !== null) setEpoch((n) => n + 1);
-    setCurrentId(null);
+    if (currentIdRef.current !== null) rebind(null);
+    else setCurrentId(null);
     setInitialMessages([]);
     // forceNew: skip the restore entirely and stay on a fresh null
     // session. Mark persistence ready so the id adopted on first send
@@ -275,10 +285,7 @@ export function useChatSession(
           // The restore is a real rebinding: it MUST bump the epoch so the
           // panel rebuilds its Chat around the restored id (the transport's
           // reconnect falls back to the Chat's own id before the first send).
-          if (currentIdRef.current === null) {
-            setEpoch((n) => n + 1);
-            setCurrentId(stored);
-          }
+          if (currentIdRef.current === null) rebind(stored);
         } else {
           writeLastSession(storageKey, null);
         }
@@ -354,19 +361,21 @@ export function useChatSession(
     }
   }, []);
 
-  const select = useCallback((id: string | null) => {
-    // A real switch rebinds; re-selecting the already-active id is a no-op
-    // (no epoch churn from a picker re-click).
-    if (currentIdRef.current !== id) setEpoch((n) => n + 1);
-    setCurrentId(id);
-  }, []);
+  const select = useCallback(
+    (id: string | null) => {
+      // A real switch rebinds; re-selecting the already-active id is a no-op
+      // (no epoch churn from a picker re-click).
+      if (currentIdRef.current !== id) rebind(id);
+      else setCurrentId(id);
+    },
+    [rebind]
+  );
 
   const startNew = useCallback(() => {
     // Always a rebinding — "new chat" from an already-null session must
     // still mint a fresh Chat (that is the affordance).
-    setEpoch((n) => n + 1);
-    setCurrentId(null);
-  }, []);
+    rebind(null);
+  }, [rebind]);
 
   const rename = useCallback(async (id: string, title: string) => {
     const updated = await bridgeSessions.rename(id, title);
@@ -377,24 +386,20 @@ export function useChatSession(
     async (id: string) => {
       await bridgeSessions.archive(id);
       setSessionsList((prev) => prev.filter((s) => s.id !== id));
-      if (currentId === id) {
-        setEpoch((n) => n + 1); // losing the current session is a rebinding
-        setCurrentId(null);
-      }
+      // Losing the current session is a rebinding.
+      if (currentId === id) rebind(null);
     },
-    [currentId]
+    [currentId, rebind]
   );
 
   const remove = useCallback(
     async (id: string) => {
       await bridgeSessions.remove(id);
       setSessionsList((prev) => prev.filter((s) => s.id !== id));
-      if (currentId === id) {
-        setEpoch((n) => n + 1); // losing the current session is a rebinding
-        setCurrentId(null);
-      }
+      // Losing the current session is a rebinding.
+      if (currentId === id) rebind(null);
     },
-    [currentId]
+    [currentId, rebind]
   );
 
   const applyResolvedSessionId = useCallback(

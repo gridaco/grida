@@ -15,6 +15,7 @@
  */
 import fs from "node:fs/promises";
 import { sessionIdFromSse } from "./testing/sse";
+import { FINISH_USAGE, lastUserText, waitFor } from "./testing/harness";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -45,35 +46,6 @@ let captured: CapturedTurn[];
  *  emits a `skill` tool call instead of plain text. */
 const SKILL_TRIGGER = "USE_ALPHA_SKILL";
 const QUESTION_TRIGGER = "ASK_THE_USER";
-
-const FINISH_USAGE = {
-  type: "finish" as const,
-  finishReason: { unified: "stop" as const, raw: "stop" },
-  usage: {
-    inputTokens: {
-      total: 10,
-      noCache: 10,
-      cacheRead: undefined,
-      cacheWrite: undefined,
-    },
-    outputTokens: { total: 5, text: 5, reasoning: undefined },
-  },
-};
-
-function lastUserText(prompt: unknown): string {
-  if (!Array.isArray(prompt)) return "";
-  for (let i = prompt.length - 1; i >= 0; i -= 1) {
-    const m = prompt[i] as { role?: string; content?: unknown };
-    if (m.role !== "user") continue;
-    if (typeof m.content === "string") return m.content;
-    if (Array.isArray(m.content)) {
-      return m.content
-        .map((p) => (p as { text?: string }).text ?? "")
-        .join(" ");
-    }
-  }
-  return "";
-}
 
 function systemText(prompt: unknown): string {
   if (!Array.isArray(prompt)) return "";
@@ -299,22 +271,6 @@ async function runTurn(opts: {
     expect(msgs.some((m) => m.role === "assistant")).toBe(true);
   });
   return sessionId;
-}
-
-async function waitFor(
-  fn: () => Promise<void>,
-  timeoutMs = 2000
-): Promise<void> {
-  const start = Date.now();
-  for (;;) {
-    try {
-      await fn();
-      return;
-    } catch (err) {
-      if (Date.now() - start > timeoutMs) throw err;
-      await new Promise((r) => setTimeout(r, 10));
-    }
-  }
 }
 
 describe("agent system e2e (skills · rewind · fork · compaction)", () => {
