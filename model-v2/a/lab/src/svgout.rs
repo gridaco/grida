@@ -16,7 +16,77 @@ pub struct SvgOptions {
     pub height: f32,
 }
 
-pub fn render(doc: &Document, resolved: &Resolved, opts: &SvgOptions) -> String {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SvgError(pub String);
+
+impl std::fmt::Display for SvgError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "svgout: {}", self.0)
+    }
+}
+
+impl std::error::Error for SvgError {}
+
+#[derive(Debug, Clone, PartialEq)]
+enum SvgFill {
+    None,
+    Solid { color: Color, active: bool },
+}
+
+impl SvgFill {
+    fn attributes(&self, property: &str) -> String {
+        match self {
+            SvgFill::None | SvgFill::Solid { active: false, .. } => {
+                format!(r#"{property}="none""#)
+            }
+            SvgFill::Solid {
+                color,
+                active: true,
+            } => {
+                let opacity = color.opacity();
+                if opacity == 1.0 {
+                    format!(r#"{property}="{}""#, color.to_hex())
+                } else {
+                    format!(
+                        r#"{property}="{}" {property}-opacity="{opacity}""#,
+                        color.to_hex()
+                    )
+                }
+            }
+        }
+    }
+}
+
+fn svg_fill(node: &Node) -> Result<SvgFill, SvgError> {
+    if !node.strokes.is_empty() {
+        return Err(SvgError(format!(
+            "node {} uses authored strokes the SVG snapshot subset cannot represent",
+            node.id
+        )));
+    }
+    match node.fills.as_slice() {
+        [] => Ok(SvgFill::None),
+        [Paint::Solid(solid)] if solid.blend_mode == BlendMode::Normal => Ok(SvgFill::Solid {
+            color: solid.color,
+            active: solid.active,
+        }),
+        [Paint::Solid(_)] => Err(SvgError(format!(
+            "node {} uses a solid blend mode the SVG snapshot subset cannot represent",
+            node.id
+        ))),
+        [_] => Err(SvgError(format!(
+            "node {} uses a rich paint the SVG snapshot subset cannot represent",
+            node.id
+        ))),
+        paints => Err(SvgError(format!(
+            "node {} has {} paints; the SVG snapshot subset supports at most one solid",
+            node.id,
+            paints.len()
+        ))),
+    }
+}
+
+pub fn render(doc: &Document, resolved: &Resolved, opts: &SvgOptions) -> Result<String, SvgError> {
     let mut out = String::new();
     let _ = writeln!(
         out,
@@ -24,7 +94,7 @@ pub fn render(doc: &Document, resolved: &Resolved, opts: &SvgOptions) -> String 
         w = opts.width,
         h = opts.height
     );
-    paint(doc, doc.root, resolved, &mut out);
+    paint(doc, doc.root, resolved, &mut out)?;
     if opts.show_aabb {
         for (i, slot) in resolved.world_aabb.iter().enumerate() {
             let (id, aabb) = match slot {
@@ -42,75 +112,98 @@ pub fn render(doc: &Document, resolved: &Resolved, opts: &SvgOptions) -> String 
         }
     }
     let _ = writeln!(out, "</svg>");
-    out
+    Ok(out)
 }
 
-fn paint(doc: &Document, id: NodeId, resolved: &Resolved, out: &mut String) {
+fn paint(
+    doc: &Document,
+    id: NodeId,
+    resolved: &Resolved,
+    out: &mut String,
+) -> Result<(), SvgError> {
     let node = doc.get(id);
     let Some(world) = resolved.world_opt(id) else {
-        return; // hidden
+        return Ok(()); // hidden
     };
     let world = &world;
     let b = resolved.box_of(id);
-    let fill_hex = node.fill.map(|c| c.to_hex()); // numeric → `#RRGGBB` at the SVG boundary
-    let fill = fill_hex.as_deref();
+    if node.header.opacity != 1.0 {
+        return Err(SvgError(format!(
+            "node {} uses subtree opacity the SVG snapshot subset cannot represent",
+            node.id
+        )));
+    }
+    if matches!(
+        node.payload,
+        Payload::Frame {
+            clips_content: true,
+            ..
+        }
+    ) {
+        return Err(SvgError(format!(
+            "node {} clips content, which the SVG snapshot subset cannot represent",
+            node.id
+        )));
+    }
+    let fill = svg_fill(node)?;
 
     match &node.payload {
         Payload::Frame { .. } => {
-            let f = fill.unwrap_or("#f6f6f6");
+            let fill = fill.attributes("fill");
             let _ = writeln!(
                 out,
-                r##"  <rect width="{}" height="{}" transform="{}" fill="{}" stroke="#999" stroke-width="1"/>"##,
+                r#"  <rect width="{}" height="{}" transform="{}" {}/>"#,
                 b.w,
                 b.h,
                 mat(world),
-                f
+                fill
             );
         }
-        Payload::Shape { desc } => {
-            let f = fill.unwrap_or("#4a90d9");
-            match desc {
-                ShapeDesc::Rect => {
-                    let _ = writeln!(
-                        out,
-                        r#"  <rect width="{}" height="{}" transform="{}" fill="{}"/>"#,
-                        b.w,
-                        b.h,
-                        mat(world),
-                        f
-                    );
-                }
-                ShapeDesc::Ellipse => {
-                    let _ = writeln!(
-                        out,
-                        r#"  <ellipse cx="{}" cy="{}" rx="{}" ry="{}" transform="{}" fill="{}"/>"#,
-                        b.w / 2.0,
-                        b.h / 2.0,
-                        b.w / 2.0,
-                        b.h / 2.0,
-                        mat(world),
-                        f
-                    );
-                }
-                ShapeDesc::Line => {
-                    let _ = writeln!(
-                        out,
-                        r#"  <line x1="0" y1="0" x2="{}" y2="0" transform="{}" stroke="{}" stroke-width="2"/>"#,
-                        b.w,
-                        mat(world),
-                        f
-                    );
-                }
+        Payload::Shape { desc } => match desc {
+            ShapeDesc::Rect => {
+                let fill = fill.attributes("fill");
+                let _ = writeln!(
+                    out,
+                    r#"  <rect width="{}" height="{}" transform="{}" {}/>"#,
+                    b.w,
+                    b.h,
+                    mat(world),
+                    fill
+                );
             }
-        }
+            ShapeDesc::Ellipse => {
+                let fill = fill.attributes("fill");
+                let _ = writeln!(
+                    out,
+                    r#"  <ellipse cx="{}" cy="{}" rx="{}" ry="{}" transform="{}" {}/>"#,
+                    b.w / 2.0,
+                    b.h / 2.0,
+                    b.w / 2.0,
+                    b.h / 2.0,
+                    mat(world),
+                    fill
+                );
+            }
+            ShapeDesc::Line => {
+                let stroke = fill.attributes("stroke");
+                let _ = writeln!(
+                    out,
+                    r#"  <line x1="0" y1="0" x2="{}" y2="0" transform="{}" {} stroke-width="2"/>"#,
+                    b.w,
+                    mat(world),
+                    stroke
+                );
+            }
+        },
         Payload::Text { content, font_size } => {
+            let fill = fill.attributes("fill");
             let _ = writeln!(
                 out,
-                r#"  <text x="0" y="{}" transform="{}" font-size="{}" fill="{}">{}</text>"#,
+                r#"  <text x="0" y="{}" transform="{}" font-size="{}" {}>{}</text>"#,
                 font_size,
                 mat(world),
                 font_size,
-                fill.unwrap_or("#222"),
+                fill,
                 content
                     .replace('&', "&amp;")
                     .replace('<', "&lt;")
@@ -121,6 +214,7 @@ fn paint(doc: &Document, id: NodeId, resolved: &Resolved, out: &mut String) {
     }
 
     for c in &node.children {
-        paint(doc, *c, resolved, out);
+        paint(doc, *c, resolved, out)?;
     }
+    Ok(())
 }

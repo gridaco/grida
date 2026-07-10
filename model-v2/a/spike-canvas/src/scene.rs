@@ -54,7 +54,7 @@ pub fn starter() -> (Document, NodeId) {
             clips_content: false,
         },
     );
-    b.node_mut(artboard).fill = Some("#FFFFFF".into());
+    b.node_mut(artboard).fills = Paints::solid("#FFFFFF".into());
 
     // Flex row: cards + a rotated card + a grow card. Under DEC-0
     // (visual-only) rotation is paint: the row does NOT reflow, fill
@@ -73,13 +73,13 @@ pub fn starter() -> (Document, NodeId) {
             clips_content: false,
         },
     );
-    b.node_mut(row).fill = Some("#F1F3F5".into());
+    b.node_mut(row).fills = Paints::solid("#F1F3F5".into());
     let a1 = b.add(row, named(card(70.0, 110.0), "card.a"), rect());
-    b.node_mut(a1).fill = Some("#4A90D9".into());
+    b.node_mut(a1).fills = Paints::solid("#4A90D9".into());
     let mut rot = named(card(70.0, 110.0), "card.rot");
     rot.rotation = 20.0;
     let a2 = b.add(row, rot, rect());
-    b.node_mut(a2).fill = Some("#E2574C".into());
+    b.node_mut(a2).fills = Paints::solid("#E2574C".into());
     let a3 = b.add(
         row,
         named(Header::new(SizeIntent::Auto, SizeIntent::Auto), "label"),
@@ -88,11 +88,11 @@ pub fn starter() -> (Document, NodeId) {
             font_size: 18.0,
         },
     );
-    b.node_mut(a3).fill = Some("#171A1F".into());
+    b.node_mut(a3).fills = Paints::solid("#171A1F".into());
     let mut grow = named(card(70.0, 110.0), "card.grow");
     grow.grow = 1.0;
     let a4 = b.add(row, grow, rect());
-    b.node_mut(a4).fill = Some("#57B894".into());
+    b.node_mut(a4).fills = Paints::solid("#57B894".into());
 
     // Hug frame: breathes when its rotated member turns.
     let hug = b.add(
@@ -112,20 +112,20 @@ pub fn starter() -> (Document, NodeId) {
             clips_content: false,
         },
     );
-    b.node_mut(hug).fill = Some("#F1F3F5".into());
+    b.node_mut(hug).fills = Paints::solid("#F1F3F5".into());
     let h1 = b.add(hug, named(card(60.0, 90.0), "hug.a"), rect());
-    b.node_mut(h1).fill = Some("#8B7BD8".into());
+    b.node_mut(h1).fills = Paints::solid("#8B7BD8".into());
     let mut h2h = named(card(60.0, 90.0), "hug.rot");
     h2h.rotation = 30.0;
     let h2 = b.add(hug, h2h, rect());
-    b.node_mut(h2).fill = Some("#E2A23F".into());
+    b.node_mut(h2).fills = Paints::solid("#E2A23F".into());
 
     // End-pinned badge: tracks the artboard's right edge with 0 writes.
     let mut badge = named(card(84.0, 48.0), "badge");
     badge.x = AxisBinding::end(32.0);
     badge.y = AxisBinding::start(32.0);
     let bd = b.add(artboard, badge, rect());
-    b.node_mut(bd).fill = Some("#57B894".into());
+    b.node_mut(bd).fills = Paints::solid("#57B894".into());
 
     // Span bar: stretches with the artboard, x is owned by the Span
     // (dragging it sideways is a TYPED error, visible in the log).
@@ -139,7 +139,7 @@ pub fn starter() -> (Document, NodeId) {
     };
     bar.y = AxisBinding::end(24.0);
     let br = b.add(artboard, bar, rect());
-    b.node_mut(br).fill = Some("#E2A23F".into());
+    b.node_mut(br).fills = Paints::solid("#E2A23F".into());
 
     // Group: transparent-select, origin pivot, 3-write center-feel rotate.
     let grp = b.add(
@@ -155,13 +155,13 @@ pub fn starter() -> (Document, NodeId) {
         Payload::Group,
     );
     let g1 = b.add(grp, named(card(56.0, 36.0), "chip.a"), rect());
-    b.node_mut(g1).fill = Some("#8B7BD8".into());
+    b.node_mut(g1).fills = Paints::solid("#8B7BD8".into());
     let g2 = b.add(
         grp,
         named(at(card(56.0, 36.0), 26.0, 46.0), "chip.b"),
         rect(),
     );
-    b.node_mut(g2).fill = Some("#E2574C".into());
+    b.node_mut(g2).fills = Paints::solid("#E2574C".into());
 
     // Lens: the paint lane — rotates visually, layout-transparent.
     let lens = b.add(
@@ -179,7 +179,7 @@ pub fn starter() -> (Document, NodeId) {
         },
     );
     let l1 = b.add(lens, named(card(80.0, 80.0), "lens.child"), rect());
-    b.node_mut(l1).fill = Some("#4A90D9".into());
+    b.node_mut(l1).fills = Paints::solid("#4A90D9".into());
 
     // Free text.
     let t = b.add(
@@ -193,7 +193,7 @@ pub fn starter() -> (Document, NodeId) {
             font_size: 24.0,
         },
     );
-    b.node_mut(t).fill = Some("#171A1F".into());
+    b.node_mut(t).fills = Paints::solid("#171A1F".into());
 
     (b.build(), artboard)
 }
@@ -253,7 +253,7 @@ fn page(b: &mut DocBuilder, parent: NodeId, x: f32, y: f32, i: usize) -> NodeId 
             clips_content: false,
         },
     );
-    b.node_mut(page).fill = Some("#FFFFFF".into());
+    b.node_mut(page).fills = Paints::solid("#FFFFFF".into());
 
     // header row: avatar (ellipse) · title (text) · menu (rect), space-between.
     let header = b.add(
@@ -268,7 +268,7 @@ fn page(b: &mut DocBuilder, parent: NodeId, x: f32, y: f32, i: usize) -> NodeId 
             desc: ShapeDesc::Ellipse,
         },
     );
-    b.node_mut(avatar).fill = Some(accent.into());
+    b.node_mut(avatar).fills = Paints::solid(accent.into());
     let title = b.add(
         header,
         Header::new(SizeIntent::Auto, SizeIntent::Auto),
@@ -277,19 +277,19 @@ fn page(b: &mut DocBuilder, parent: NodeId, x: f32, y: f32, i: usize) -> NodeId 
             font_size: 15.0,
         },
     );
-    b.node_mut(title).fill = Some("#171A1F".into());
+    b.node_mut(title).fills = Paints::solid("#171A1F".into());
     let menu = b.add(header, card(20.0, 20.0), rect());
-    b.node_mut(menu).fill = Some("#CED4DA".into());
+    b.node_mut(menu).fills = Paints::solid("#CED4DA".into());
 
     // hero block (image placeholder).
     let hero = b.add(page, card(PAGE_INNER_W, 110.0), rect());
-    b.node_mut(hero).fill = Some(accent.into());
+    b.node_mut(hero).fills = Paints::solid(accent.into());
 
     // three body lines (the last one short, left-set — a text paragraph feel).
     for k in 0..3 {
         let w = if k == 2 { 120.0 } else { PAGE_INNER_W };
         let line = b.add(page, card(w, 10.0), rect());
-        b.node_mut(line).fill = Some("#E9ECEF".into());
+        b.node_mut(line).fills = Paints::solid("#E9ECEF".into());
     }
 
     // footer: two buttons pushed to the edges.
@@ -299,9 +299,9 @@ fn page(b: &mut DocBuilder, parent: NodeId, x: f32, y: f32, i: usize) -> NodeId 
         flex_row(MainAlign::SpaceBetween, 8.0),
     );
     let b1 = b.add(footer, card(70.0, 28.0), rect());
-    b.node_mut(b1).fill = Some("#F1F3F5".into());
+    b.node_mut(b1).fills = Paints::solid("#F1F3F5".into());
     let b2 = b.add(footer, card(70.0, 28.0), rect());
-    b.node_mut(b2).fill = Some(accent.into());
+    b.node_mut(b2).fills = Paints::solid(accent.into());
 
     // rotated "NEW" badge, absolutely pinned to the top-right corner. Out of
     // flex flow, end-pinned, visually rotated — exercises the paint transform.
@@ -318,7 +318,7 @@ fn page(b: &mut DocBuilder, parent: NodeId, x: f32, y: f32, i: usize) -> NodeId 
             font_size: 12.0,
         },
     );
-    b.node_mut(bg).fill = Some("#E2574C".into());
+    b.node_mut(bg).fills = Paints::solid("#E2574C".into());
 
     page
 }
@@ -346,7 +346,7 @@ pub fn pages(cols: usize, rows: usize) -> (Document, NodeId) {
             clips_content: false,
         },
     );
-    b.node_mut(board).fill = Some("#F7F8F9".into());
+    b.node_mut(board).fills = Paints::solid("#F7F8F9".into());
 
     for i in 0..(cols * rows) {
         let (col, row) = (i % cols, i / cols);
@@ -356,6 +356,18 @@ pub fn pages(cols: usize, rows: usize) -> (Document, NodeId) {
     }
 
     (b.build(), board)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{pages, starter};
+
+    #[test]
+    fn live_scenes_remain_editable_in_the_historical_panel_ir() {
+        for (doc, _) in [starter(), pages(1, 1)] {
+            anchor_lab::textir::try_print(&doc).expect("live scene must remain TextIr-compatible");
+        }
+    }
 }
 
 /// The live-window scene, selected by `ANCHOR_SCENE` (the `--shot` goldens

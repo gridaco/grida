@@ -27,7 +27,7 @@ kind answers two **independent** questions:
 | kind     | box                                                             | content realization                                                |
 | -------- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `frame`  | declared (Auto = hug)                                           | children — bindings or flex                                        |
-| `shape`  | declared                                                        | **parametric**: descriptor = f(box); no points exist               |
+| `shape`  | declared                                                        | **parametric**: descriptor = f(box), then children in local space  |
 | `vector` | declared (Auto = reference bounds)                              | **mapped**: points in a reference rect, scaled `box/ref` at render |
 | `text`   | measured under intent constraints                               | **flowed**: re-wraps at the imposed box                            |
 | `image`  | declared                                                        | **fitted**: paint re-covers per fit mode                           |
@@ -35,6 +35,11 @@ kind answers two **independent** questions:
 | `group`  | derived (union of oriented children)                            | children in origin space                                           |
 | `bool`   | derived (**op-result** bounds — D-5; subtract-to-empty ⇒ empty) | operands in origin space                                           |
 | `lens`   | derived                                                         | children ∘ ops — **paint only**                                    |
+
+`shape` here names the internal parametric payload family, not an authored
+element. Draft 0 Grida XML lowers `<rect>`, `<ellipse>`, and `<line>` into
+this family; the frozen E3 TextIr dialect alone spells it
+`<shape kind="…">`.
 
 Why this shape is right, per the evidence:
 
@@ -50,6 +55,12 @@ Why this shape is right, per the evidence:
   read side.
 - _Flowed_ and _fitted_ are the standard measure-function and BoxFit
   seams, already shipping.
+
+Child ownership is orthogonal to box source. A shape may own ordered,
+free-positioned children in its declared local box: the primitive paints first,
+then its descendants. Those descendants never measure or resize the shape and
+never change its contribution to parent layout. Text therefore composes under a
+shape as an ordinary child; there is no combined shape-with-text kind.
 
 ## The laws
 

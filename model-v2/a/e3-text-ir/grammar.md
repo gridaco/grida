@@ -1,5 +1,10 @@
 # The anchor text IR — pocket grammar & resolution semantics
 
+> Historical note: this freezes the E3 TextIr element and attribute vocabulary.
+> `<frame>` and `<shape kind="…">` are not Draft 0 `.grida.xml` syntax. Text
+> measurement below includes the shared resolver's whitespace and explicit-line
+> correction.
+
 An anchor document is XML. The root element is a `<frame>`. Every element
 is a node; nesting is the scene tree. This document is **complete**: an
 agent holding only this file can compute the resolved geometry of any
@@ -45,14 +50,19 @@ changes where the node paints (its world AABB).
 
 ### 1. Text measurement (exact, deterministic)
 
-- character advance = `0.6 × size`; every character counts (spaces too)
+- character advance = `0.6 × size`; every non-newline character counts
+  (spaces too)
 - line height = `1.2 × size`
-- unconstrained (auto width): one line — `w = chars × 0.6 × size`,
-  `h = 1.2 × size`
+- authored `\n` starts a new line, including a final empty line after a
+  trailing newline
+- unconstrained (auto width): no soft wrapping — `w` is the widest explicit
+  line's character count times `0.6 × size`; `h = lines × 1.2 × size`
 - constrained to width `W` (fixed or stretched): greedy word wrap:
-  max chars per line = `floor(W / (0.6 × size))`; words (split on single
-  spaces) are packed left to right; a joining space costs 1 char; a word
-  never breaks. `w = widest line's chars × 0.6 × size`,
+  max chars per line = `floor(W / (0.6 × size))`; each explicit line wraps
+  independently at ASCII-space runs; authored leading, repeated, and trailing
+  spaces retain their advances unless a separator run would become trailing
+  ink at a soft wrap, in which case that run is dropped. A word never breaks.
+  `w = widest line's chars × 0.6 × size`,
   `h = lines × 1.2 × size`. (Reported w may be smaller than W only when
   width is `auto`; a fixed or stretched width reports that width.)
 

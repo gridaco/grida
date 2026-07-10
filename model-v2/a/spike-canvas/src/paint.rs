@@ -10,7 +10,7 @@ use anchor_engine::paint::PaintCtx;
 /// same face the pre-engine painter used), or `None` — in which case text is
 /// skipped, exactly as before.
 pub fn paint_ctx() -> PaintCtx {
-    PaintCtx {
-        font: skia_safe::FontMgr::new().legacy_make_typeface(None, skia_safe::FontStyle::default()),
-    }
+    PaintCtx::new(
+        skia_safe::FontMgr::new().legacy_make_typeface(None, skia_safe::FontStyle::default()),
+    )
 }

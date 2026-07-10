@@ -145,7 +145,7 @@ fn packed(n: usize) -> (Document, Vec<NodeId>, RectF) {
     }
     let mut doc = b.build();
     for (i, &id) in ids.iter().enumerate() {
-        doc.get_mut(id).fill = Some((format!("#{}", palette[i % palette.len()])).into());
+        doc.get_mut(id).fills = Paints::solid(format!("#{}", palette[i % palette.len()]).into());
     }
     let aabb = RectF {
         x: 0.0,
@@ -311,7 +311,7 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
                     // deliberately exercises the missing paint-damage channel:
                     // damage::diff sees NO geometry change though the pixels do.
                     let hex = ["4A90D9", "E2574C", "57B894"][frame % 3];
-                    doc.get_mut(target).fill = Some((format!("#{hex}")).into());
+                    doc.get_mut(target).fills = Paints::solid(format!("#{hex}").into());
                 }
                 _ => {}
             },
@@ -325,7 +325,7 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
                 } else {
                     let hex = ["4A90D9", "E2574C", "57B894"][frame % 3];
                     for &id in &ids[..k] {
-                        doc.get_mut(id).fill = Some((format!("#{hex}")).into());
+                        doc.get_mut(id).fills = Paints::solid(format!("#{hex}").into());
                     }
                 }
             }
@@ -572,7 +572,7 @@ fn main() {
 
     // font: None → text is skipped by the executor (deterministic, no
     // font-availability nondeterminism), same as the gate's raster path.
-    let ctx = PaintCtx { font: None };
+    let ctx = PaintCtx::new(None);
 
     if cache_mode {
         println!("== Win 1: scene raster cache (view scenarios) ==");

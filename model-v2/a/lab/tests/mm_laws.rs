@@ -173,7 +173,8 @@ fn mm7_add_delete_restores() {
             header: shape(10.0, 10.0).0,
             payload: shape(10.0, 10.0).1,
             children: vec![],
-            fill: None,
+            fills: Paints::default(),
+            strokes: vec![],
         },
     );
     let _mid = run(&doc2);

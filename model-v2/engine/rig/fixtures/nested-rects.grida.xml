@@ -1,0 +1,7 @@
+<grida version="0">
+  <container name="surface" width="96" height="80" fill="#FFFFFF">
+    <rect name="parent" x="16" y="16" width="64" height="48" fill="#FF0000">
+      <rect name="child" x="16" y="12" width="24" height="16" fill="#0000FF"/>
+    </rect>
+  </container>
+</grida>

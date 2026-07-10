@@ -19,14 +19,33 @@ pub fn pick(doc: &Document, resolved: &Resolved, x: f32, y: f32) -> Option<NodeI
 }
 
 fn hit_subtree(doc: &Document, r: &Resolved, id: NodeId, p: (f32, f32)) -> Option<NodeId> {
-    if r.world_opt(id).is_none() {
-        return None; // hidden subtree
-    }
+    r.world_opt(id)?; // hidden subtree
     let node = doc.get(id);
     // Children first, topmost-first (paint order = document order).
-    for &c in node.children.iter().rev() {
-        if let Some(hit) = hit_subtree(doc, r, c, p) {
-            return Some(hit);
+    // A container clip scopes descendants only: outside it, skip the child
+    // traversal but still test the container's own fill/strokes below. The
+    // inverse world transform makes this exact for rotated/flipped containers
+    // and naturally enforces every clip encountered along the ancestor walk.
+    let children_visible = if matches!(
+        &node.payload,
+        Payload::Frame {
+            clips_content: true,
+            ..
+        }
+    ) {
+        r.world_of(id).invert().is_some_and(|inverse| {
+            let (lx, ly) = inverse.apply(p);
+            let b = r.box_of(id);
+            lx >= 0.0 && lx <= b.w && ly >= 0.0 && ly <= b.h
+        })
+    } else {
+        true
+    };
+    if children_visible {
+        for &c in node.children.iter().rev() {
+            if let Some(hit) = hit_subtree(doc, r, c, p) {
+                return Some(hit);
+            }
         }
     }
     // Own ink: derived kinds have none (their bounds come from children).

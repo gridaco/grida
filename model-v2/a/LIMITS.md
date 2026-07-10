@@ -20,7 +20,7 @@ limitation (not built / can't hold as stated).
 | kind   | box           | realization                       | rotation          | flip                             | in flow        | as parent   | quarantine | notes                           |
 | ------ | ------------- | --------------------------------- | ----------------- | -------------------------------- | -------------- | ----------- | ---------- | ------------------------------- |
 | frame  | ✅            | ✅ children/flex                  | ✅ rigid (🎬)     | 📜 (boxed path, F-1 class)       | ✅             | ✅          | —          |                                 |
-| shape  | ✅            | ✅ parametric                     | ✅                | ✅ (F-1/2/4 + 🎬)                | ✅             | n/a         | —          | rect/ellipse/line only in lab   |
+| shape  | ✅            | ✅ parametric + free children     | ✅                | ✅ (F-1/2/4 + 🎬)                | ✅             | ✅          | —          | rect/ellipse/line only in lab   |
 | text   | ✅            | ✅ flowed (lab metric)            | ✅ (🎬)           | 📜 mirrors uniformly (DEC-9 sub) | ✅             | n/a         | —          | real shaping = the big ⛔ below |
 | vector | ⛔ not in lab | 📜 mapped (E-A9, write side open) | 📜                | 📜 flip bits, points untouched   | 📜             | n/a         | —          | B2 lock set before phase 3      |
 | image  | ⛔ not in lab | 📜 fitted (engine ships BoxFit)   | 📜                | 📜 paint mirrors (DEC-9)         | 📜             | n/a         | —          | low risk: paint seam exists     |
@@ -100,7 +100,7 @@ math that doesn't exist) · auto-width basis in definite flex
 (wraps-at-available vs Chromium's max-content — same deviation family
 as the Taffy guards) · grow on the measured axis (spec example (c) is
 currently a no-op and its annotation is wrong — fix the example) ·
-`max_lines: 0` semantics + max_lines→natural-size rule · font_size
+`max_lines: 0` semantics + max*lines→natural-size rule · font_size
 domain (reject ≤0) · whitespace-only non-monotonicity · giant-word ink
 escapes the world AABB (hit/cull miss — declare ink-bounds ⊃ box).
 Transform: ~~flip×rotation composition order~~ (CLOSED E-A14: `T·R·F`,
@@ -108,7 +108,7 @@ innermost, tested) · flip on text (Figma mirrors; DEC-9 sub-decision,
 uniform recommended) · flip on lens (outside-ops vs inside-ops) ·
 negative-determinant lens Matrix
 = second home for mirror (extend the E-A8 lint) · winding read source
-(rotation reads the stored scalar — it _is_ intent; resolves the law-7 /
+(rotation reads the stored scalar — it \_is* intent; resolves the law-7 /
 R-E2 / H5 three-way) · "spec-reserved" 3D ops need a declared v1
 runtime posture (render-skip + preserve ≠ silent drop) · singular
 resolved matrices (CSS: not displayed — adopt?) · resolved-tier

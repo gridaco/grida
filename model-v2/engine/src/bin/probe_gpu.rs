@@ -264,7 +264,7 @@ mod imp {
             }
         };
         gpu.gl_info();
-        let ctx = PaintCtx { font: None };
+        let ctx = PaintCtx::new(None);
 
         println!(
             "\n{:<12} {:>8}  {:>22}  {:>7} {:>7}",

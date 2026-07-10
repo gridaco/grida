@@ -214,3 +214,37 @@ fn pick_hairline_line_is_grabbable() {
     let r = resolve(&doc, &opts());
     assert_eq!(pick(&doc, &r, 180.0, 401.5), Some(line));
 }
+
+#[test]
+fn pick_respects_the_exact_transformed_clip_of_every_ancestor() {
+    let mut b = DocBuilder::new();
+    let mut clip_header = Header::new(SizeIntent::Fixed(100.0), SizeIntent::Fixed(100.0));
+    clip_header = at(clip_header, 200.0, 200.0);
+    clip_header.rotation = 45.0;
+    let clip = b.add(
+        0,
+        clip_header,
+        Payload::Frame {
+            layout: LayoutBehavior::default(),
+            clips_content: true,
+        },
+    );
+    let (child_header, child_payload) = card(40.0, 40.0);
+    let child = b.add(clip, at(child_header, 80.0, 20.0), child_payload);
+    let doc = b.build();
+    let r = resolve(&doc, &opts());
+
+    let inside_clip = r.world_of(child).apply((10.0, 10.0));
+    assert_eq!(
+        pick(&doc, &r, inside_clip.0, inside_clip.1),
+        Some(child),
+        "the visible part of the child remains pickable"
+    );
+
+    let outside_clip = r.world_of(child).apply((30.0, 10.0));
+    assert_eq!(
+        pick(&doc, &r, outside_clip.0, outside_clip.1),
+        Some(doc.root),
+        "the child is not pickable through its rotated ancestor clip"
+    );
+}

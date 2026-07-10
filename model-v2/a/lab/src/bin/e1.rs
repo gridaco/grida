@@ -66,7 +66,7 @@ fn scene(fixed_w: Option<f32>) -> Scene {
                 desc: ShapeDesc::Rect,
             },
         );
-        b.node_mut(c).fill = Some((*color).into());
+        b.node_mut(c).fills = Paints::solid((*color).into());
         let _ = i;
         cards.push(c);
     }
@@ -196,7 +196,8 @@ fn snapshot(theta: f32) -> String {
                 width: 640.0,
                 height: 200.0,
             },
-        );
+        )
+        .expect("E1 snapshot uses only empty or singleton-solid paint stacks");
         let y = 10 + i * 200;
         let _ = writeln!(svg, r#"<g transform="translate(0 {y})">"#);
         let _ = writeln!(

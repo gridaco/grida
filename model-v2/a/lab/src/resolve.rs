@@ -215,11 +215,14 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
 
     let mut w = span_w;
     let mut h = span_h;
+    let text_auto_height = h.is_none()
+        && matches!(node.header.height, SizeIntent::Auto)
+        && matches!(&node.payload, Payload::Text { .. });
 
     if w.is_none() {
         w = intent_extent_x(id, cx);
     }
-    if h.is_none() {
+    if h.is_none() && !text_auto_height {
         // A span-resolved width IS a wrap constraint (census finding: the
         // canonical Span{0,0} fill must re-wrap like Fixed/stretched widths).
         h = intent_extent_y(id, span_w, cx);
@@ -236,6 +239,7 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
         }
     }
 
+    let width_before_clamp = w;
     let mut wv = w.unwrap_or_else(|| {
         cx.out.reports.push(Report::ErrorByRule {
             node: id,
@@ -244,6 +248,36 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
         });
         0.0
     });
+    // Width constraints precede auto-height text measurement: changing the
+    // final wrapping width must change the measured line count in the same
+    // resolution pass.
+    wv = clamp_axis(
+        id,
+        "width",
+        wv,
+        node.header.min_width,
+        node.header.max_width,
+        cx,
+    );
+    if text_auto_height {
+        let node = cx.doc.get(id);
+        let Payload::Text { content, font_size } = &node.payload else {
+            unreachable!("text_auto_height is set only for text")
+        };
+        let wrap_width = if span_w.is_some()
+            || matches!(node.header.width, SizeIntent::Fixed(_))
+            || width_before_clamp.is_some_and(|before| wv < before)
+        {
+            Some(wv)
+        } else {
+            // Auto width with no narrowing constraint keeps its no-soft-wrap
+            // contract; passing the computed natural width back through a
+            // floating-point floor can otherwise invent a wrap.
+            None
+        };
+        h = Some(measure_text(content, *font_size, wrap_width).1);
+    }
+
     let mut hv = h.unwrap_or_else(|| {
         cx.out.reports.push(Report::ErrorByRule {
             node: id,
@@ -253,15 +287,8 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
         0.0
     });
 
-    // min/max clamp last; min beats max (G-4 declared rule).
-    wv = clamp_axis(
-        id,
-        "width",
-        wv,
-        node.header.min_width,
-        node.header.max_width,
-        cx,
-    );
+    // Height clamps apply after any width-driven text re-measure. Min beats
+    // max on both axes (G-4 declared rule).
     hv = clamp_axis(
         id,
         "height",
@@ -709,28 +736,47 @@ fn commit(id: NodeId, box_rect: RectF, cx: &mut Ctx) {
     cx.out.box_in_parent[id as usize] = Some(box_rect);
     cx.out.local[id as usize] = Some(local);
 
-    // Recurse into frame children (group/lens children were committed by
-    // union_of_derived; leaves have none).
-    if let Payload::Frame { layout, .. } = &cx.doc.get(id).payload {
-        let layout = *layout;
-        layout_frame_children(id, layout, (box_rect.w, box_rect.h), cx);
+    // Child ownership is orthogonal to box source. Frames can lay children
+    // out; boxed shapes establish a free-positioned local coordinate space;
+    // group/lens children were already committed while deriving their union.
+    // Text is the only implemented leaf kind.
+    enum ChildProgram {
+        Frame(LayoutBehavior),
+        Free,
+        Derived,
+        Leaf,
+    }
+    let child_program = match &cx.doc.get(id).payload {
+        Payload::Frame { layout, .. } => ChildProgram::Frame(*layout),
+        Payload::Shape { .. } => ChildProgram::Free,
+        Payload::Group | Payload::Lens { .. } => ChildProgram::Derived,
+        Payload::Text { .. } => ChildProgram::Leaf,
+    };
+    match child_program {
+        ChildProgram::Frame(layout) => {
+            layout_frame_children(id, layout, (box_rect.w, box_rect.h), cx)
+        }
+        ChildProgram::Free => {
+            layout_free_children(id, (box_rect.w, box_rect.h), EdgeInsets::default(), cx)
+        }
+        ChildProgram::Derived => {}
+        ChildProgram::Leaf => {
+            if !cx.doc.get(id).children.is_empty() {
+                cx.out.reports.push(Report::ErrorByRule {
+                    node: id,
+                    field: "children",
+                    rule: "text is a leaf payload",
+                });
+            }
+        }
     }
 }
 
 fn layout_frame_children(id: NodeId, layout: LayoutBehavior, extent: (f32, f32), cx: &mut Ctx) {
-    let children: Vec<NodeId> = cx.doc.get(id).children.clone();
     match layout.mode {
-        LayoutMode::None => {
-            for child_id in children {
-                if !cx.doc.get(child_id).header.active {
-                    continue;
-                }
-                report_flow_fields_inert(child_id, cx);
-                let b = place_by_bindings(child_id, extent, cx);
-                commit(child_id, b, cx);
-            }
-        }
+        LayoutMode::None => layout_free_children(id, extent, layout.padding, cx),
         LayoutMode::Flex => {
+            let children: Vec<NodeId> = cx.doc.get(id).children.clone();
             let out = flex_layout(id, layout, (Some(extent.0), Some(extent.1)), cx);
             for (child_id, slot, basis) in out.slots {
                 let child = cx.doc.get(child_id);
@@ -790,6 +836,29 @@ fn layout_frame_children(id: NodeId, layout: LayoutBehavior, extent: (f32, f32),
                 commit(child_id, b, cx);
             }
         }
+    }
+}
+
+/// Resolve children against a local content box without a layout algorithm.
+/// Free frames inset that box by padding; shapes pass zero padding, so their
+/// children remain in the shape's direct local coordinates. A shape's children
+/// may paint outside it, but never change its declared box or parent layout
+/// contribution — the box remains the only negotiation surface (MODEL law 3).
+fn layout_free_children(id: NodeId, extent: (f32, f32), padding: EdgeInsets, cx: &mut Ctx) {
+    let content_extent = (
+        (extent.0 - padding.left - padding.right).max(0.0),
+        (extent.1 - padding.top - padding.bottom).max(0.0),
+    );
+    let children: Vec<NodeId> = cx.doc.get(id).children.clone();
+    for child_id in children {
+        if !cx.doc.get(child_id).header.active {
+            continue;
+        }
+        report_flow_fields_inert(child_id, cx);
+        let mut b = place_by_bindings(child_id, content_extent, cx);
+        b.x += padding.left;
+        b.y += padding.top;
+        commit(child_id, b, cx);
     }
 }
 
@@ -927,6 +996,15 @@ fn flex_layout(
                 SizeIntent::Fixed(v) => style.size.height = length(v),
                 SizeIntent::Auto => style.size.height = auto(),
             }
+            // Per-child stretch is an explicit cross-axis fill override, even
+            // when text authored a fixed cross size. Container-level stretch
+            // still applies only to the Auto values left above.
+            if child.header.self_align == SelfAlign::Stretch {
+                match layout.direction {
+                    Direction::Row => style.size.height = auto(),
+                    Direction::Column => style.size.width = auto(),
+                }
+            }
             basis = (0.0, 0.0); // unused for θ=0 slots
             tree.new_leaf_with_context(style, TextCtx { content, font_size })
                 .unwrap()
@@ -935,9 +1013,31 @@ fn flex_layout(
             basis = b;
             style.size.width = length(b.0);
             style.size.height = length(b.1);
-            // Stretch must be able to override the cross-axis basis (§2.2:
-            // cross-axis fill := self_align Stretch).
-            if child.header.self_align == SelfAlign::Stretch {
+            // An explicit per-child stretch overrides even a fixed cross size.
+            // Container-level stretch applies only when the authored cross
+            // size remains Auto; retaining the resolved basis as Definite here
+            // would erase that authored intent before Taffy sees it.
+            let authored_cross_is_auto = match layout.direction {
+                Direction::Row => matches!(child.header.height, SizeIntent::Auto),
+                Direction::Column => matches!(child.header.width, SizeIntent::Auto),
+            };
+            // A line's vertical extent is geometry, not a flex-owned box
+            // axis. Even explicit self-stretch cannot turn its locked zero
+            // height into a non-degenerate paint box in a row container.
+            let line_height_is_locked = layout.direction == Direction::Row
+                && matches!(
+                    &child.payload,
+                    Payload::Shape {
+                        desc: ShapeDesc::Line
+                    }
+                );
+            let stretches_cross = !line_height_is_locked
+                && (child.header.self_align == SelfAlign::Stretch
+                    || (!child.payload.box_is_derived()
+                        && child.header.self_align == SelfAlign::Auto
+                        && layout.cross_align == CrossAlign::Stretch
+                        && authored_cross_is_auto));
+            if stretches_cross {
                 match layout.direction {
                     Direction::Row => style.size.height = auto(),
                     Direction::Column => style.size.width = auto(),
@@ -1092,18 +1192,68 @@ fn compose_world(id: NodeId, parent_world: Affine, cx: &mut Ctx) {
     }
 }
 
+/// Maximum outward coverage contributed by authored strokes in node-local
+/// coordinates. Layout remains based on the source box; only visual bounds
+/// read this expansion. Open line strokes are centered by definition, so their
+/// cap/join details are conservatively covered by half the width on every side.
+fn effective_stroke_outset(node: &Node) -> f32 {
+    let is_line = matches!(
+        &node.payload,
+        Payload::Shape {
+            desc: ShapeDesc::Line
+        }
+    );
+    node.strokes
+        .iter()
+        .filter(|stroke| stroke.visible())
+        .map(|stroke| {
+            if is_line {
+                stroke.width / 2.0
+            } else {
+                let base = match stroke.align {
+                    StrokeAlign::Inside => 0.0,
+                    StrokeAlign::Center => stroke.width / 2.0,
+                    StrokeAlign::Outside => stroke.width,
+                };
+                if matches!(node.payload, Payload::Text { .. }) && stroke.join == StrokeJoin::Miter
+                {
+                    base * stroke.miter_limit
+                } else {
+                    base
+                }
+            }
+        })
+        .fold(0.0, f32::max)
+}
+
+fn intersect_aabbs(a: RectF, b: RectF) -> Option<RectF> {
+    let x0 = a.x.max(b.x);
+    let y0 = a.y.max(b.y);
+    let x1 = (a.x + a.w).min(b.x + b.w);
+    let y1 = (a.y + a.h).min(b.y + b.h);
+    if x1 < x0 || y1 < y0 {
+        None
+    } else {
+        Some(RectF {
+            x: x0,
+            y: y0,
+            w: x1 - x0,
+            h: y1 - y0,
+        })
+    }
+}
+
 fn compute_world_aabb(id: NodeId, cx: &mut Ctx) -> Option<RectF> {
     let node = cx.doc.get(id);
-    if cx.out.world[id as usize].is_none() {
-        return None; // hidden subtree
-    }
+    cx.out.world[id as usize]?; // hidden subtree
     let world = cx.out.world[id as usize].unwrap();
     let own_box = cx.out.box_in_parent[id as usize].unwrap();
+    let stroke_outset = effective_stroke_outset(node);
     let local_rect = RectF {
-        x: 0.0,
-        y: 0.0,
-        w: own_box.w,
-        h: own_box.h,
+        x: -stroke_outset,
+        y: -stroke_outset,
+        w: own_box.w + stroke_outset * 2.0,
+        h: own_box.h + stroke_outset * 2.0,
     };
 
     let mut aabb = match node.payload {
@@ -1111,9 +1261,34 @@ fn compute_world_aabb(id: NodeId, cx: &mut Ctx) -> Option<RectF> {
         Payload::Group | Payload::Lens { .. } => None,
         _ => Some(local_rect.transformed_aabb(&world)),
     };
+    // The painter clips descendants in the container's transformed local
+    // rectangle, but not the container's own fill or strokes. Intersect child
+    // contributions with that clip's world AABB so ancestor bounds remain a
+    // conservative over-approximation of pixels that can actually survive.
+    // A rotated clip remains conservative here; exact polygon clipping is a
+    // pick/narrowphase responsibility.
+    let child_clip = matches!(
+        &node.payload,
+        Payload::Frame {
+            clips_content: true,
+            ..
+        }
+    )
+    .then(|| {
+        RectF {
+            x: 0.0,
+            y: 0.0,
+            w: own_box.w,
+            h: own_box.h,
+        }
+        .transformed_aabb(&world)
+    });
     let children: Vec<NodeId> = node.children.clone();
     for c in children {
-        if let Some(child_aabb) = compute_world_aabb(c, cx) {
+        let child_aabb = compute_world_aabb(c, cx).and_then(|bounds| {
+            child_clip.map_or(Some(bounds), |clip| intersect_aabbs(bounds, clip))
+        });
+        if let Some(child_aabb) = child_aabb {
             aabb = Some(match aabb {
                 None => child_aabb,
                 Some(a) => a.union(&child_aabb),

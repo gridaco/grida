@@ -45,30 +45,40 @@ SOA" was an overstatement, corrected below.)
 
 ## The six details
 
-| detail                    | proven precedent (cited)                                                                                                                                         | anchor now                                                                                                           | decision                                                                                                                                                            |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Node storage**          | cold = AoS + RareData (Blink `Node`/Servo `Node`); hot = `cc` domain-`Vec`s by int index / Stylo `Arc` groups                                                    | `Document` = index-arena `Vec<Option<Node>>` + `parents`/`generations` columns; `Resolved` = SOA columns by `NodeId` | **[ALIGNED]** — cold AoS-arena (index, not pointers — Servo-ish, _more_ cache-coherent than Blink's GC pointer DOM); hot SOA-by-domain = `cc`'s property-tree shape |
-| **Computed tier**         | builder-sealed, **immutable**, structurally-shared snapshot, **cached across frames** (Blink `ComputedStyle`/`LayoutResult`; Stylo `Arc<ComputedValues>`)        | `resolve()` builds a value `Resolved` — but **rebuilt every frame**, not shared/cached                               | **[SOCKET]** immutability is fine; the _persistence_ is incremental-resolve (ENG-1)                                                                                 |
-| **Color**                 | never a string — `f32×4` + color-space tag is canonical (`SkColor4f`, `blink::Color`, Stylo `AbsoluteColor`); packed `u32` is interchange only                   | ~~`fill: Option<String>`, re-parsed every build~~ → **`model::Color(u32)`**, read straight                           | **[ADOPTED]** numeric now (packed `u32`); `f32×4`+space = **[SOCKET]** (the color-management gap)                                                                   |
-| **Style sharing**         | share **by group** COW + cache **by matched-rule-set**; RAM ∝ distinct group-values, not node count                                                              | every node owns a **full `Header`**; nothing shared (100 identical cards = 100 copies)                               | **[SOCKET]** the memory-scaling move — group-partition + COW, or interning                                                                                          |
-| **Caching / incremental** | dirty-scope + one "descendant-dirty" bit up (O(depth) prune); memoize keyed by inputs; **graded** damage descriptor; isolation boundaries; **reset after frame** | **full-resolve every frame**; `DirtyClass` + `damage` exist but unconsumed                                           | **[SOCKET]** the big one (ENG-1/ENG-2). Our `DirtyClass` ≈ the graded descriptor; `damage` ≈ dirty-scope                                                            |
-| **Index vs hash**         | dense engine ids → **direct array index, never hashed**; hash only at the sparse _identity seam_ (`cc` `flat_map<ElementId,int>`; Stylo rule-source ptr)         | ~~`HashMap<NodeId, _>` in `resolve`~~ → **`Vec<Option<_>>`** indexed                                                 | **[ADOPTED]** dense-index columns, no hashing                                                                                                                       |
+| detail                    | proven precedent (cited)                                                                                                                                             | anchor now                                                                                                           | decision                                                                                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Node storage**          | cold = AoS + RareData (Blink `Node`/Servo `Node`); hot = `cc` domain-`Vec`s by int index / Stylo `Arc` groups                                                        | `Document` = index-arena `Vec<Option<Node>>` + `parents`/`generations` columns; `Resolved` = SOA columns by `NodeId` | **[ALIGNED]** — cold AoS-arena (index, not pointers — Servo-ish, _more_ cache-coherent than Blink's GC pointer DOM); hot SOA-by-domain = `cc`'s property-tree shape |
+| **Computed tier**         | builder-sealed, **immutable**, structurally-shared snapshot, **cached across frames** (Blink `ComputedStyle`/`LayoutResult`; Stylo `Arc<ComputedValues>`)            | `resolve()` builds a value `Resolved` — but **rebuilt every frame**, not shared/cached                               | **[SOCKET]** immutability is fine; the _persistence_ is incremental-resolve (ENG-1)                                                                                 |
+| **Paint**                 | colors are numeric values inside typed, ordered paints; `f32×4` + color-space tag is the wide-gamut destination (`SkColor4f`, `blink::Color`, Stylo `AbsoluteColor`) | `Node.fills: Paints`; RGBA8 `Color(u32)` plus typed gradient/image values, read straight by the drawlist             | **[ADOPTED]** ordered typed paints now; `f32×4`+space = **[SOCKET]** (the color-management gap)                                                                     |
+| **Style sharing**         | share **by group** COW + cache **by matched-rule-set**; RAM ∝ distinct group-values, not node count                                                                  | every node owns a **full `Header`**; nothing shared (100 identical cards = 100 copies)                               | **[SOCKET]** the memory-scaling move — group-partition + COW, or interning                                                                                          |
+| **Caching / incremental** | dirty-scope + one "descendant-dirty" bit up (O(depth) prune); memoize keyed by inputs; **graded** damage descriptor; isolation boundaries; **reset after frame**     | **full-resolve every frame**; `DirtyClass` + `damage` exist but unconsumed                                           | **[SOCKET]** the big one (ENG-1/ENG-2). Our `DirtyClass` ≈ the graded descriptor; `damage` ≈ dirty-scope                                                            |
+| **Index vs hash**         | dense engine ids → **direct array index, never hashed**; hash only at the sparse _identity seam_ (`cc` `flat_map<ElementId,int>`; Stylo rule-source ptr)             | ~~`HashMap<NodeId, _>` in `resolve`~~ → **`Vec<Option<_>>`** indexed                                                 | **[ADOPTED]** dense-index columns, no hashing                                                                                                                       |
 
-### Landed this pass (both gate-verified, goldens byte-identical)
+### Landed in the original re-host pass
 
-1. **Color: `String` → `model::Color(u32)`** (`0xAARRGGBB`). The drawlist reads
-   the number directly — no per-node heap `String`, no per-build hex parse. The
-   text-IR and SVG paths convert at the boundary via `from_hex`/`to_hex`
-   (string as parse-input / serialize-output only — the browser rule). Measured:
-   `build` −31% at 100k nodes (the parse removal shows at scale). Parse logic is
-   byte-identical to the old `resolve_color`, so pixels are unchanged (gate: 4/4
-   IDENTICAL).
+These storage changes were gate-verified and golden-identical when they
+landed.
+
+1. **Color: `String` → `Color(u32)`.** The original singleton fill became a
+   numeric RGBA8 value read directly by the drawlist. Text IR and SVG convert
+   strings only at their boundaries. Removing the per-node heap string and
+   per-build parse measured `build` −31% at 100k nodes.
 2. **Resolve caches: `HashMap<NodeId,_>` → `Vec<Option<_>>`** (`union_cache`,
    `ops_cache`). `NodeId` is a dense arena index; hashing it is the exact
-   anti-pattern `cc` avoids. Correctness preserved (gate PASS, replays
-   deterministic, 121 lab tests). Perf-neutral on the `pages` workload (those
-   caches serve derived boxes, which `pages` has none of) — this one is
-   principled alignment, not a measured mover here.
+   anti-pattern `cc` avoids. Correctness remains covered by deterministic
+   replays and the differential/cache checks. Perf-neutral on the `pages`
+   workload (those caches serve derived boxes, which `pages` has none of) —
+   this one is principled alignment, not a measured mover here.
+
+### Landed in the Draft 0 pass
+
+**Fill: singleton color → typed `Paints`.** A node now owns the same
+bottom-to-top stack projected by Grida XML: RGBA8 solids, structured gradients,
+and image RIDs. Richer paints retain the parse-free hot path, but this pass is
+not golden-identical: it also removes implicit frame ink and paints explicit
+parent strokes after children. The legacy screenshots therefore require an
+intentional oracle review; they are not evidence for or against the storage
+decision.
 
 ## Corrections to the record (honesty)
 

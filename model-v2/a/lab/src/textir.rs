@@ -8,7 +8,8 @@
 //! a binary-format concern; recorded as an E3 finding).
 
 use crate::model::*;
-use quick_xml::events::Event;
+use quick_xml::events::attributes::Attributes;
+use quick_xml::events::{BytesDecl, BytesStart, Event};
 use quick_xml::Reader;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -37,13 +38,24 @@ fn parse_num(s: &str, what: &str) -> Result<f32, ParseError> {
     Ok(v)
 }
 
+fn parse_num_f64(s: &str, what: &str) -> Result<f64, ParseError> {
+    let v: f64 = s
+        .trim()
+        .parse()
+        .map_err(|_| ParseError(format!("bad number `{s}` in {what}")))?;
+    if !v.is_finite() {
+        return err(format!("non-finite number `{s}` in {what} (N-2)"));
+    }
+    Ok(v)
+}
+
 fn parse_binding(s: &str, what: &str) -> Result<AxisBinding, ParseError> {
     let parts: Vec<&str> = s.split_whitespace().collect();
     match parts.as_slice() {
         [n] if n
             .chars()
             .next()
-            .map(|c| c.is_ascii_digit() || c == '-' || c == '.')
+            .map(|c| c.is_ascii_digit() || c == '+' || c == '-' || c == '.')
             == Some(true) =>
         {
             Ok(AxisBinding::start(parse_num(n, what)?))
@@ -60,70 +72,784 @@ fn parse_binding(s: &str, what: &str) -> Result<AxisBinding, ParseError> {
     }
 }
 
-fn parse_size(s: &str, what: &str) -> Result<SizeIntent, ParseError> {
-    if s.trim() == "auto" {
-        Ok(SizeIntent::Auto)
-    } else {
-        Ok(SizeIntent::Fixed(parse_num(s, what)?))
+fn parse_bool(s: &str, what: &str, strict: bool) -> Result<bool, ParseError> {
+    if !strict {
+        return Ok(s == "true");
+    }
+    match s {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => err(format!("{what} must be exactly `true` or `false`")),
     }
 }
 
-fn parse_lens_ops(s: &str) -> Result<Vec<LensOp>, ParseError> {
+fn parse_size(s: &str, what: &str, strict: bool) -> Result<SizeIntent, ParseError> {
+    if s.trim() == "auto" {
+        Ok(SizeIntent::Auto)
+    } else {
+        let value = parse_num(s, what)?;
+        if strict && value < 0.0 {
+            return err(format!("{what} must be non-negative"));
+        }
+        Ok(SizeIntent::Fixed(value))
+    }
+}
+
+fn parse_non_negative(s: &str, what: &str, strict: bool) -> Result<f32, ParseError> {
+    let value = parse_num(s, what)?;
+    if strict && value < 0.0 {
+        return err(format!("{what} must be non-negative"));
+    }
+    Ok(value)
+}
+
+fn parse_positive(s: &str, what: &str, strict: bool) -> Result<f32, ParseError> {
+    let value = parse_num(s, what)?;
+    if strict && value <= 0.0 {
+        return err(format!("{what} must be greater than zero"));
+    }
+    Ok(value)
+}
+
+fn parse_lens_ops(s: &str, strict: bool) -> Result<Vec<LensOp>, ParseError> {
+    if strict {
+        let mut ops = vec![];
+        let mut rest = s.trim();
+        while !rest.is_empty() {
+            let open = rest
+                .find('(')
+                .ok_or_else(|| ParseError(format!("bad lens op `{rest}`")))?;
+            let close = rest[open + 1..]
+                .find(')')
+                .map(|index| open + 1 + index)
+                .ok_or_else(|| ParseError(format!("unclosed lens op `{rest}`")))?;
+            let raw = &rest[..close];
+            ops.push(parse_lens_op(raw, true)?);
+
+            let after = &rest[close + 1..];
+            if after.is_empty() {
+                break;
+            }
+            if !after.chars().next().is_some_and(char::is_whitespace) {
+                return err("lens ops must be separated by whitespace");
+            }
+            rest = after.trim_start();
+        }
+        return Ok(ops);
+    }
+
     let mut ops = vec![];
     for raw in s.split(')') {
         let raw = raw.trim().trim_start_matches(',').trim();
         if raw.is_empty() {
             continue;
         }
-        let (name, args) = raw
-            .split_once('(')
-            .ok_or_else(|| ParseError(format!("bad lens op `{raw}`")))?;
-        let nums: Vec<f32> = args
-            .split(',')
-            .filter(|a| !a.trim().is_empty())
-            .map(|a| parse_num(a, "lens ops"))
-            .collect::<Result<_, _>>()?;
-        let op = match (name.trim(), nums.as_slice()) {
-            ("translate", [x, y]) => LensOp::Translate { x: *x, y: *y },
-            ("rotate", [d]) => LensOp::Rotate { deg: *d },
-            ("scale", [s]) => LensOp::Scale { x: *s, y: *s },
-            ("scale", [x, y]) => LensOp::Scale { x: *x, y: *y },
-            ("skew-x", [d]) => LensOp::Skew {
-                x_deg: *d,
-                y_deg: 0.0,
-            },
-            ("skew-y", [d]) => LensOp::Skew {
-                x_deg: 0.0,
-                y_deg: *d,
-            },
-            ("skew", [x, y]) => LensOp::Skew {
-                x_deg: *x,
-                y_deg: *y,
-            },
-            ("matrix", [a, b, c, d, e, f]) => LensOp::Matrix {
-                m: [*a, *b, *c, *d, *e, *f],
-            },
-            _ => return err(format!("bad lens op `{raw}`")),
-        };
-        ops.push(op);
+        ops.push(parse_lens_op(raw, false)?);
     }
     Ok(ops)
 }
 
+fn parse_lens_op(raw: &str, strict: bool) -> Result<LensOp, ParseError> {
+    let (name, args) = raw
+        .split_once('(')
+        .ok_or_else(|| ParseError(format!("bad lens op `{raw}`")))?;
+    let arg_parts: Vec<&str> = args.split(',').collect();
+    if strict && arg_parts.iter().any(|arg| arg.trim().is_empty()) {
+        return err(format!("empty argument in lens op `{raw}`"));
+    }
+    let nums: Vec<f32> = arg_parts
+        .into_iter()
+        .filter(|a| !a.trim().is_empty())
+        .map(|a| parse_num(a, "lens ops"))
+        .collect::<Result<_, _>>()?;
+    match (name.trim(), nums.as_slice()) {
+        ("translate", [x, y]) => Ok(LensOp::Translate { x: *x, y: *y }),
+        ("rotate", [d]) => Ok(LensOp::Rotate { deg: *d }),
+        ("scale", [s]) => Ok(LensOp::Scale { x: *s, y: *s }),
+        ("scale", [x, y]) => Ok(LensOp::Scale { x: *x, y: *y }),
+        ("skew-x", [d]) => Ok(LensOp::Skew {
+            x_deg: *d,
+            y_deg: 0.0,
+        }),
+        ("skew-y", [d]) => Ok(LensOp::Skew {
+            x_deg: 0.0,
+            y_deg: *d,
+        }),
+        ("skew", [x, y]) => Ok(LensOp::Skew {
+            x_deg: *x,
+            y_deg: *y,
+        }),
+        ("matrix", [a, b, c, d, e, f]) => Ok(LensOp::Matrix {
+            m: [*a, *b, *c, *d, *e, *f],
+        }),
+        _ => err(format!("bad lens op `{raw}`")),
+    }
+}
+
+fn validate_grida_xml_declaration(decl: &BytesDecl<'_>) -> Result<(), ParseError> {
+    let raw = std::str::from_utf8(decl.as_ref())
+        .map_err(|_| ParseError("XML declaration must be UTF-8".into()))?;
+    let mut fields = vec![];
+    for attr in Attributes::new(raw, 3) {
+        let attr = attr.map_err(|error| ParseError(format!("XML declaration: {error}")))?;
+        let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
+        let value = attr
+            .unescape_value()
+            .map_err(|error| ParseError(format!("XML declaration: {error}")))?
+            .to_string();
+        fields.push((key, value));
+    }
+
+    let valid = match fields.as_slice() {
+        [(version_key, version)] => version_key == "version" && version == "1.0",
+        [(version_key, version), (encoding_key, encoding)] => {
+            version_key == "version"
+                && version == "1.0"
+                && encoding_key == "encoding"
+                && encoding.eq_ignore_ascii_case("UTF-8")
+        }
+        _ => false,
+    };
+    if !valid {
+        return err(
+            "XML declaration must be version=\"1.0\" with optional encoding=\"UTF-8\" only",
+        );
+    }
+    Ok(())
+}
+
+fn collect_attributes(el: &BytesStart<'_>) -> Result<BTreeMap<String, String>, ParseError> {
+    let tag = String::from_utf8_lossy(el.name().as_ref()).to_string();
+    let mut attributes = BTreeMap::new();
+    for attr in el.attributes() {
+        let attr = attr.map_err(|error| ParseError(format!("attr on <{tag}>: {error}")))?;
+        let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
+        let value = attr
+            .unescape_value()
+            .map_err(|error| ParseError(format!("attr value on <{tag}>: {error}")))?
+            .to_string();
+        if attributes.insert(key.clone(), value).is_some() {
+            return err(format!("duplicate `{key}` on <{tag}>"));
+        }
+    }
+    Ok(attributes)
+}
+
+fn take_required(
+    attributes: &mut BTreeMap<String, String>,
+    key: &str,
+    tag: &str,
+) -> Result<String, ParseError> {
+    attributes
+        .remove(key)
+        .ok_or_else(|| ParseError(format!("<{tag}> requires `{key}`")))
+}
+
+fn reject_unknown_attribute(
+    attributes: &BTreeMap<String, String>,
+    tag: &str,
+) -> Result<(), ParseError> {
+    if let Some(key) = attributes.keys().next() {
+        return err(format!("unknown attribute `{key}` on <{tag}>"));
+    }
+    Ok(())
+}
+
+fn parse_color(s: &str, what: &str) -> Result<Color, ParseError> {
+    Color::from_grida_hex(s).ok_or_else(|| ParseError(format!("{what} must be #RGB or #RRGGBB")))
+}
+
+fn parse_opacity(s: &str, what: &str) -> Result<f32, ParseError> {
+    let opacity = parse_num(s, what)?;
+    if !(0.0..=1.0).contains(&opacity) {
+        return err(format!("{what} must be between 0 and 1 inclusive"));
+    }
+    Ok(opacity)
+}
+
+fn parse_pair_f64(s: &str, what: &str) -> Result<(f64, f64), ParseError> {
+    let parts: Vec<_> = s.split_whitespace().collect();
+    let [x, y] = parts.as_slice() else {
+        return err(format!("{what} requires exactly two numbers"));
+    };
+    Ok((parse_num_f64(x, what)?, parse_num_f64(y, what)?))
+}
+
+fn parse_affine(s: &str, what: &str) -> Result<crate::math::Affine, ParseError> {
+    let parts: Vec<_> = s.split_whitespace().collect();
+    let [a, b, c, d, e, f] = parts.as_slice() else {
+        return err(format!("{what} requires exactly six numbers"));
+    };
+    Ok(crate::math::Affine {
+        a: parse_num(a, what)?,
+        b: parse_num(b, what)?,
+        c: parse_num(c, what)?,
+        d: parse_num(d, what)?,
+        e: parse_num(e, what)?,
+        f: parse_num(f, what)?,
+    })
+}
+
+fn parse_blend_mode(s: &str) -> Result<BlendMode, ParseError> {
+    match s {
+        "normal" => Ok(BlendMode::Normal),
+        "multiply" => Ok(BlendMode::Multiply),
+        "screen" => Ok(BlendMode::Screen),
+        "overlay" => Ok(BlendMode::Overlay),
+        "darken" => Ok(BlendMode::Darken),
+        "lighten" => Ok(BlendMode::Lighten),
+        "color-dodge" => Ok(BlendMode::ColorDodge),
+        "color-burn" => Ok(BlendMode::ColorBurn),
+        "hard-light" => Ok(BlendMode::HardLight),
+        "soft-light" => Ok(BlendMode::SoftLight),
+        "difference" => Ok(BlendMode::Difference),
+        "exclusion" => Ok(BlendMode::Exclusion),
+        "hue" => Ok(BlendMode::Hue),
+        "saturation" => Ok(BlendMode::Saturation),
+        "color" => Ok(BlendMode::Color),
+        "luminosity" => Ok(BlendMode::Luminosity),
+        "pass-through" => err("pass-through is a layer mode, not a paint blend-mode"),
+        _ => err(format!("unknown paint blend-mode `{s}`")),
+    }
+}
+
+fn parse_tile_mode(s: &str) -> Result<TileMode, ParseError> {
+    match s {
+        "clamp" => Ok(TileMode::Clamp),
+        "repeated" => Ok(TileMode::Repeated),
+        "mirror" => Ok(TileMode::Mirror),
+        "decal" => Ok(TileMode::Decal),
+        _ => err(format!("bad tile-mode `{s}`")),
+    }
+}
+
+fn parse_box_fit(s: &str) -> Result<BoxFit, ParseError> {
+    match s {
+        "contain" => Ok(BoxFit::Contain),
+        "cover" => Ok(BoxFit::Cover),
+        "fill" => Ok(BoxFit::Fill),
+        "none" => Ok(BoxFit::None),
+        _ => err(format!("bad image fit `{s}`")),
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PaintCommon {
+    active: bool,
+    opacity: f32,
+    blend_mode: BlendMode,
+}
+
+fn take_paint_common(
+    attributes: &mut BTreeMap<String, String>,
+    tag: &str,
+) -> Result<PaintCommon, ParseError> {
+    let active = match attributes.remove("visible") {
+        Some(value) => parse_bool(&value, &format!("visible on <{tag}>"), true)?,
+        None => true,
+    };
+    let opacity = match attributes.remove("opacity") {
+        Some(value) => parse_opacity(&value, &format!("opacity on <{tag}>"))?,
+        None => 1.0,
+    };
+    let blend_mode = match attributes.remove("blend-mode") {
+        Some(value) => parse_blend_mode(&value)?,
+        None => BlendMode::Normal,
+    };
+    Ok(PaintCommon {
+        active,
+        opacity,
+        blend_mode,
+    })
+}
+
+fn parse_solid(mut attributes: BTreeMap<String, String>) -> Result<Paint, ParseError> {
+    let color = parse_color(
+        &take_required(&mut attributes, "color", "solid")?,
+        "solid color",
+    )?;
+    let common = take_paint_common(&mut attributes, "solid")?;
+    reject_unknown_attribute(&attributes, "solid")?;
+    Ok(Paint::Solid(SolidPaint {
+        active: common.active,
+        color: color.with_opacity(common.opacity),
+        blend_mode: common.blend_mode,
+    }))
+}
+
+fn parse_image_paint(mut attributes: BTreeMap<String, String>) -> Result<Paint, ParseError> {
+    let src = take_required(&mut attributes, "src", "image")?;
+    if src.trim().is_empty() {
+        return err("image src must not be empty");
+    }
+    let fit = match attributes.remove("fit") {
+        Some(value) => parse_box_fit(&value)?,
+        None => BoxFit::Cover,
+    };
+    let common = take_paint_common(&mut attributes, "image")?;
+    reject_unknown_attribute(&attributes, "image")?;
+    let mut image = ImagePaint::from_rid(src);
+    image.fit = ImagePaintFit::Fit(fit);
+    image.active = common.active;
+    image.opacity = common.opacity;
+    image.blend_mode = common.blend_mode;
+    Ok(Paint::Image(image))
+}
+
+fn parse_stop(mut attributes: BTreeMap<String, String>) -> Result<GradientStop, ParseError> {
+    let offset = parse_num(
+        &take_required(&mut attributes, "offset", "stop")?,
+        "stop offset",
+    )?;
+    if !(0.0..=1.0).contains(&offset) {
+        return err("stop offset must be between 0 and 1 inclusive");
+    }
+    let color = parse_color(
+        &take_required(&mut attributes, "color", "stop")?,
+        "stop color",
+    )?;
+    let opacity = match attributes.remove("opacity") {
+        Some(value) => parse_opacity(&value, "stop opacity")?,
+        None => 1.0,
+    };
+    reject_unknown_attribute(&attributes, "stop")?;
+    Ok(GradientStop {
+        offset,
+        color: color.with_opacity(opacity),
+    })
+}
+
+fn parse_gradient_stops(
+    reader: &mut Reader<&[u8]>,
+    gradient_tag: &str,
+) -> Result<Vec<GradientStop>, ParseError> {
+    let mut stops: Vec<GradientStop> = vec![];
+    loop {
+        match reader.read_event() {
+            Err(error) => return err(format!("xml in <{gradient_tag}>: {error}")),
+            Ok(Event::Eof) => return err(format!("unclosed <{gradient_tag}>")),
+            Ok(Event::Empty(el)) => {
+                let tag = String::from_utf8_lossy(el.name().as_ref()).to_string();
+                if tag != "stop" {
+                    return err(format!(
+                        "<{gradient_tag}> may contain only empty <stop> elements, found <{tag}>"
+                    ));
+                }
+                let stop = parse_stop(collect_attributes(&el)?)?;
+                if let Some(previous) = stops.last() {
+                    if stop.offset < previous.offset {
+                        return err(format!(
+                            "gradient stop offsets must be nondecreasing ({} follows {})",
+                            stop.offset, previous.offset
+                        ));
+                    }
+                }
+                stops.push(stop);
+            }
+            Ok(Event::Start(el)) => {
+                let tag = String::from_utf8_lossy(el.name().as_ref()).to_string();
+                if tag == "stop" {
+                    return err("<stop> must be empty; use <stop .../>");
+                }
+                return err(format!(
+                    "<{gradient_tag}> may contain only empty <stop> elements, found <{tag}>"
+                ));
+            }
+            Ok(Event::End(el)) => {
+                let tag = String::from_utf8_lossy(el.name().as_ref()).to_string();
+                if tag != gradient_tag {
+                    return err(format!("mismatched end tag </{tag}> in <{gradient_tag}>"));
+                }
+                if stops.len() < 2 {
+                    return err(format!("<{gradient_tag}> requires at least two stops"));
+                }
+                return Ok(stops);
+            }
+            Ok(Event::Text(text)) => {
+                let text = text
+                    .unescape()
+                    .map_err(|error| ParseError(format!("text in <{gradient_tag}>: {error}")))?;
+                if !text.trim().is_empty() {
+                    return err(format!(
+                        "character content is not allowed in <{gradient_tag}>"
+                    ));
+                }
+            }
+            Ok(Event::Comment(_)) => {}
+            Ok(Event::CData(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_)) => {
+                return err(format!("unsupported XML event in <{gradient_tag}>"));
+            }
+        }
+    }
+}
+
+fn parse_gradient(
+    mut attributes: BTreeMap<String, String>,
+    stops: Vec<GradientStop>,
+) -> Result<Paint, ParseError> {
+    let kind = take_required(&mut attributes, "kind", "gradient")?;
+    let common = take_paint_common(&mut attributes, "gradient")?;
+    let transform = match attributes.remove("transform") {
+        Some(value) => parse_affine(&value, "transform on <gradient>")?,
+        None => crate::math::Affine::IDENTITY,
+    };
+
+    let paint = match kind.as_str() {
+        "linear" => {
+            let from = match attributes.remove("from") {
+                Some(value) => parse_pair_f64(&value, "from on <gradient kind=\"linear\">")?,
+                None => (0.0, 0.5),
+            };
+            let to = match attributes.remove("to") {
+                Some(value) => parse_pair_f64(&value, "to on <gradient kind=\"linear\">")?,
+                None => (1.0, 0.5),
+            };
+            let xy1 = Alignment::from_uv_f64(from.0, from.1);
+            let xy2 = Alignment::from_uv_f64(to.0, to.1);
+            if !xy1.0.is_finite() || !xy1.1.is_finite() || !xy2.0.is_finite() || !xy2.1.is_finite()
+            {
+                return err("linear gradient endpoints overflow after lowering to model alignment");
+            }
+            if xy1 == xy2 {
+                return err(
+                    "linear gradient from and to must differ after lowering to model alignment",
+                );
+            }
+            let tile_mode = match attributes.remove("tile-mode") {
+                Some(value) => parse_tile_mode(&value)?,
+                None => TileMode::Clamp,
+            };
+            Paint::LinearGradient(LinearGradientPaint {
+                active: common.active,
+                xy1,
+                xy2,
+                tile_mode,
+                transform,
+                stops,
+                opacity: common.opacity,
+                blend_mode: common.blend_mode,
+            })
+        }
+        "radial" => {
+            let tile_mode = match attributes.remove("tile-mode") {
+                Some(value) => parse_tile_mode(&value)?,
+                None => TileMode::Clamp,
+            };
+            Paint::RadialGradient(RadialGradientPaint {
+                active: common.active,
+                transform,
+                stops,
+                opacity: common.opacity,
+                blend_mode: common.blend_mode,
+                tile_mode,
+            })
+        }
+        "sweep" => Paint::SweepGradient(SweepGradientPaint {
+            active: common.active,
+            transform,
+            stops,
+            opacity: common.opacity,
+            blend_mode: common.blend_mode,
+        }),
+        "diamond" => Paint::DiamondGradient(DiamondGradientPaint {
+            active: common.active,
+            transform,
+            stops,
+            opacity: common.opacity,
+            blend_mode: common.blend_mode,
+        }),
+        _ => {
+            return err(format!(
+                "gradient kind must be `linear`, `radial`, `sweep`, or `diamond`, found `{kind}`"
+            ));
+        }
+    };
+    reject_unknown_attribute(&attributes, "gradient")?;
+    Ok(paint)
+}
+
+fn is_typed_paint_tag(tag: &str) -> bool {
+    matches!(tag, "solid" | "gradient" | "image")
+}
+
+fn is_legacy_gradient_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "linear-gradient" | "radial-gradient" | "sweep-gradient" | "diamond-gradient"
+    )
+}
+
+fn parse_paint_channel(
+    reader: &mut Reader<&[u8]>,
+    channel_tag: &str,
+) -> Result<Paints, ParseError> {
+    let mut paints = Paints::default();
+    loop {
+        match reader.read_event() {
+            Err(error) => return err(format!("xml in <{channel_tag}>: {error}")),
+            Ok(Event::Eof) => return err(format!("unclosed <{channel_tag}>")),
+            Ok(Event::Empty(el)) => {
+                let tag = String::from_utf8_lossy(el.name().as_ref()).to_string();
+                let attributes = collect_attributes(&el)?;
+                let paint = match tag.as_str() {
+                    "solid" => parse_solid(attributes)?,
+                    "image" => parse_image_paint(attributes)?,
+                    "gradient" => {
+                        return err("<gradient> requires at least two stops");
+                    }
+                    "fill" | "stroke" => {
+                        return err(format!("nested <{tag}> is not allowed"));
+                    }
+                    _ if is_legacy_gradient_tag(&tag) => {
+                        return err("kind-specific gradient tags are not Draft 0; use <gradient kind=\"…\">");
+                    }
+                    _ => {
+                        return err(format!("unknown paint element <{tag}> in <{channel_tag}>"));
+                    }
+                };
+                paints.push(paint);
+            }
+            Ok(Event::Start(el)) => {
+                let tag = String::from_utf8_lossy(el.name().as_ref()).to_string();
+                let attributes = collect_attributes(&el)?;
+                let paint = match tag.as_str() {
+                    "gradient" => {
+                        let stops = parse_gradient_stops(reader, "gradient")?;
+                        parse_gradient(attributes, stops)?
+                    }
+                    "solid" | "image" => {
+                        return err(format!("<{tag}> must be empty; use <{tag} .../>"));
+                    }
+                    "fill" | "stroke" => {
+                        return err(format!("nested <{tag}> is not allowed"));
+                    }
+                    _ if is_legacy_gradient_tag(&tag) => {
+                        return err("kind-specific gradient tags are not Draft 0; use <gradient kind=\"…\">");
+                    }
+                    _ => {
+                        return err(format!("unknown paint element <{tag}> in <{channel_tag}>"));
+                    }
+                };
+                paints.push(paint);
+            }
+            Ok(Event::End(el)) => {
+                let tag = String::from_utf8_lossy(el.name().as_ref()).to_string();
+                if tag != channel_tag {
+                    return err(format!("mismatched end tag </{tag}> in <{channel_tag}>"));
+                }
+                return Ok(paints);
+            }
+            Ok(Event::Text(text)) => {
+                let text = text
+                    .unescape()
+                    .map_err(|error| ParseError(format!("text in <{channel_tag}>: {error}")))?;
+                if !text.trim().is_empty() {
+                    return err(format!(
+                        "character content is not allowed in <{channel_tag}>"
+                    ));
+                }
+            }
+            Ok(Event::Comment(_)) => {}
+            Ok(Event::CData(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_)) => {
+                return err(format!("unsupported XML event in <{channel_tag}>"));
+            }
+        }
+    }
+}
+
+fn grida_xml_default_fills(payload: &Payload) -> Paints {
+    match payload {
+        Payload::Shape {
+            desc: ShapeDesc::Rect | ShapeDesc::Ellipse,
+        }
+        | Payload::Text { .. } => Paints::solid(Color::BLACK),
+        Payload::Frame { .. }
+        | Payload::Shape {
+            desc: ShapeDesc::Line,
+        }
+        | Payload::Group
+        | Payload::Lens { .. } => Paints::default(),
+    }
+}
+
+fn parse_stroke_align(value: &str) -> Result<StrokeAlign, ParseError> {
+    match value {
+        "inside" => Ok(StrokeAlign::Inside),
+        "center" => Ok(StrokeAlign::Center),
+        "outside" => Ok(StrokeAlign::Outside),
+        _ => err(format!(
+            "stroke align must be `inside`, `center`, or `outside`, found `{value}`"
+        )),
+    }
+}
+
+fn parse_stroke_cap(value: &str) -> Result<StrokeCap, ParseError> {
+    match value {
+        "butt" => Ok(StrokeCap::Butt),
+        "round" => Ok(StrokeCap::Round),
+        "square" => Ok(StrokeCap::Square),
+        _ => err(format!(
+            "stroke cap must be `butt`, `round`, or `square`, found `{value}`"
+        )),
+    }
+}
+
+fn parse_stroke_join(value: &str) -> Result<StrokeJoin, ParseError> {
+    match value {
+        "miter" => Ok(StrokeJoin::Miter),
+        "round" => Ok(StrokeJoin::Round),
+        "bevel" => Ok(StrokeJoin::Bevel),
+        _ => err(format!(
+            "stroke join must be `miter`, `round`, or `bevel`, found `{value}`"
+        )),
+    }
+}
+
+fn parse_dash_array(value: &str) -> Result<Vec<f32>, ParseError> {
+    let mut values: Vec<f32> = value
+        .split_whitespace()
+        .map(|part| parse_non_negative(part, "dash-array", true))
+        .collect::<Result<_, _>>()?;
+    if values.is_empty() {
+        return err("dash-array requires at least one non-negative number");
+    }
+    if values.iter().all(|value| *value == 0.0) {
+        return err("dash-array must not be all zero");
+    }
+    if values.len() % 2 == 1 {
+        let repeated = values.clone();
+        values.extend(repeated);
+    }
+    Ok(values)
+}
+
+fn parse_stroke(
+    mut attributes: BTreeMap<String, String>,
+    payload: &Payload,
+    paints: Paints,
+) -> Result<Stroke, ParseError> {
+    let mut stroke = Stroke::default_for(payload).ok_or_else(|| {
+        ParseError(format!(
+            "<stroke> is not valid on <{}>",
+            payload.kind_name()
+        ))
+    })?;
+    stroke.paints = paints;
+
+    if let Some(value) = attributes.remove("width") {
+        stroke.width = parse_non_negative(&value, "stroke width", true)?;
+    }
+    if let Some(value) = attributes.remove("align") {
+        stroke.align = parse_stroke_align(&value)?;
+    }
+
+    let is_line = matches!(
+        payload,
+        Payload::Shape {
+            desc: ShapeDesc::Line
+        }
+    );
+    let is_rect = matches!(
+        payload,
+        Payload::Frame { .. }
+            | Payload::Shape {
+                desc: ShapeDesc::Rect
+            }
+    );
+    let supports_dash = matches!(
+        payload,
+        Payload::Frame { .. }
+            | Payload::Shape {
+                desc: ShapeDesc::Rect | ShapeDesc::Ellipse | ShapeDesc::Line
+            }
+    );
+
+    if let Some(value) = attributes.remove("cap") {
+        if !is_line {
+            return err("stroke attribute `cap` is valid only on <line>");
+        }
+        stroke.cap = parse_stroke_cap(&value)?;
+    }
+    if let Some(value) = attributes.remove("join") {
+        if !is_rect {
+            return err("stroke attribute `join` is valid only on <container> and <rect>");
+        }
+        stroke.join = parse_stroke_join(&value)?;
+    }
+    if let Some(value) = attributes.remove("miter-limit") {
+        if !is_rect {
+            return err("stroke attribute `miter-limit` is valid only on <container> and <rect>");
+        }
+        stroke.miter_limit = parse_positive(&value, "stroke miter-limit", true)?;
+    }
+    if let Some(value) = attributes.remove("dash-array") {
+        if !supports_dash {
+            return err("stroke attribute `dash-array` is not valid on <text>");
+        }
+        stroke.dash_array = Some(parse_dash_array(&value)?);
+    }
+    if is_line && stroke.align != StrokeAlign::Center {
+        return err("a <line> stroke must use align=\"center\"");
+    }
+    reject_unknown_attribute(&attributes, "stroke")?;
+    Ok(stroke)
+}
+
 struct Pending {
     id: NodeId,
+    tag: String,
     text_content: String,
     is_text: bool,
+    allows_children: bool,
+    fill_seen: bool,
+    stroke_seen: bool,
+    legacy_fill_seen: bool,
+    content_started: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Syntax {
+    TextIr,
+    GridaXml,
 }
 
 pub fn parse(input: &str) -> Result<Document, ParseError> {
+    parse_with_syntax(input, Syntax::TextIr)
+}
+
+/// Shared parser core for the first-class `.grida.xml` surface. Kept
+/// crate-private so the historical [`parse`] contract remains exactly the
+/// experiment grammar while `grida_xml` owns its public error vocabulary.
+pub(crate) fn parse_grida_xml(input: &str) -> Result<Document, ParseError> {
+    parse_with_syntax(input, Syntax::GridaXml)
+}
+
+fn parse_with_syntax(input: &str, syntax: Syntax) -> Result<Document, ParseError> {
     let mut reader = Reader::from_str(input);
-    reader.config_mut().trim_text(true);
+    // Draft 0 preserves authored whitespace inside <text>. Historical TextIr
+    // keeps its experiment-era trimming behavior for compatibility.
+    reader.config_mut().trim_text(syntax == Syntax::TextIr);
 
     let mut nodes: BTreeMap<NodeId, Node> = BTreeMap::new();
     let mut stack: Vec<Pending> = vec![];
     let mut next_id: NodeId = 0;
     let mut root: Option<NodeId> = None;
+    let mut render_root: Option<NodeId> = None;
+    let mut envelope_open = false;
+    let mut envelope_closed = false;
+    let mut declaration_seen = false;
+    let mut pre_declaration_content = false;
+
+    if syntax == Syntax::GridaXml {
+        // `.grida.xml`'s envelope is structural, while the model's root is
+        // the canonical viewport-spanning frame. The one authored render
+        // root is attached beneath it rather than replacing it.
+        let root_doc = DocBuilder::new().build();
+        let root_id = root_doc.root;
+        nodes.insert(root_id, root_doc.get(root_id).clone());
+        next_id = 1;
+        root = Some(root_id);
+    }
 
     loop {
         match reader.read_event() {
@@ -136,13 +862,204 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                     _ => unreachable!(),
                 };
                 let tag = String::from_utf8_lossy(el.name().as_ref()).to_string();
+
+                if syntax == Syntax::GridaXml && tag == "grida" {
+                    if is_empty {
+                        return err("<grida> must contain exactly one render root");
+                    }
+                    if envelope_open || envelope_closed || !stack.is_empty() {
+                        return err("<grida> must be the single document envelope");
+                    }
+                    let mut version: Option<String> = None;
+                    for attr in el.attributes() {
+                        let attr = attr.map_err(|e| ParseError(format!("attr: {e}")))?;
+                        let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
+                        let val = attr
+                            .unescape_value()
+                            .map_err(|e| ParseError(format!("attr value: {e}")))?
+                            .to_string();
+                        if key != "version" {
+                            return err(format!("unknown attribute `{key}` on <grida>"));
+                        }
+                        if version.replace(val).is_some() {
+                            return err("duplicate `version` on <grida>");
+                        }
+                    }
+                    match version.as_deref() {
+                        Some("0") => {}
+                        Some(v) => return err(format!("unsupported <grida> version `{v}`")),
+                        None => return err("<grida> requires version=\"0\""),
+                    }
+                    envelope_open = true;
+                    continue;
+                }
+
+                if syntax == Syntax::GridaXml && (!envelope_open || envelope_closed) {
+                    return err(format!("<{tag}> must be inside <grida version=\"0\">"));
+                }
+                if syntax == Syntax::GridaXml && matches!(tag.as_str(), "fill" | "stroke") {
+                    let attributes = collect_attributes(&el)?;
+                    let parent = stack.last().ok_or_else(|| {
+                        ParseError(format!(
+                            "<{tag}> must be a direct child of a paintable node"
+                        ))
+                    })?;
+                    if parent.content_started {
+                        return err(format!(
+                            "<{tag}> must appear before content or scene children in <{}>",
+                            parent.tag
+                        ));
+                    }
+                    let parent_id = parent.id;
+                    let parent_tag = parent.tag.clone();
+                    let payload = nodes.get(&parent_id).unwrap().payload.clone();
+
+                    // Whitespace before or between leading text properties is
+                    // formatting, not character content. The same buffer is
+                    // retained when no later property appears, preserving all
+                    // authored text after the final property.
+                    if parent.is_text {
+                        debug_assert!(parent.text_content.trim().is_empty());
+                        stack.last_mut().unwrap().text_content.clear();
+                    }
+
+                    match tag.as_str() {
+                        "fill" => {
+                            let parent = stack.last().expect("parent remains open");
+                            if parent.fill_seen {
+                                return err(format!("duplicate <fill> on <{}>", parent.tag));
+                            }
+                            if parent.stroke_seen {
+                                return err(format!(
+                                    "<fill> must precede <stroke> elements in <{}>",
+                                    parent.tag
+                                ));
+                            }
+                            if parent.legacy_fill_seen {
+                                return err(format!(
+                                    "<{}> cannot use both the `fill` attribute and <fill>",
+                                    parent.tag
+                                ));
+                            }
+                            if matches!(
+                                payload,
+                                Payload::Group
+                                    | Payload::Lens { .. }
+                                    | Payload::Shape {
+                                        desc: ShapeDesc::Line
+                                    }
+                            ) {
+                                return err(format!("<fill> is not valid on <{parent_tag}>"));
+                            }
+                            reject_unknown_attribute(&attributes, "fill")?;
+                            let paints = if is_empty {
+                                Paints::default()
+                            } else {
+                                parse_paint_channel(&mut reader, "fill")?
+                            };
+                            nodes.get_mut(&parent_id).unwrap().fills = paints;
+                            stack.last_mut().unwrap().fill_seen = true;
+                        }
+                        "stroke" => {
+                            if matches!(payload, Payload::Group | Payload::Lens { .. }) {
+                                return err(format!("<stroke> is not valid on <{parent_tag}>"));
+                            }
+                            let paints = if is_empty {
+                                Paints::default()
+                            } else {
+                                parse_paint_channel(&mut reader, "stroke")?
+                            };
+                            let stroke = parse_stroke(attributes, &payload, paints)?;
+                            if stroke.paints.is_empty() && stroke.geometry_is_default_for(&payload)
+                            {
+                                return err(format!(
+                                    "default empty <stroke> (empty stroke) on <{parent_tag}> is indistinguishable from omission"
+                                ));
+                            }
+                            nodes.get_mut(&parent_id).unwrap().strokes.push(stroke);
+                            stack.last_mut().unwrap().stroke_seen = true;
+                        }
+                        _ => unreachable!(),
+                    }
+                    continue;
+                }
+                if syntax == Syntax::GridaXml && matches!(tag.as_str(), "fills" | "strokes") {
+                    return err(format!(
+                        "plural <{tag}> is not Draft 0; use singular <{}>",
+                        if tag == "fills" { "fill" } else { "stroke" }
+                    ));
+                }
+                if syntax == Syntax::GridaXml && is_legacy_gradient_tag(&tag) {
+                    return err(
+                        "kind-specific gradient tags are not Draft 0; use <gradient kind=\"…\">",
+                    );
+                }
+                if syntax == Syntax::GridaXml && is_typed_paint_tag(&tag) {
+                    if tag == "image" {
+                        return err(
+                            "scene <image> is not supported in Draft 0; place <image> directly inside <fill> or <stroke> for an image paint",
+                        );
+                    }
+                    return err(format!(
+                        "<{tag}> is a paint and must be a direct child of <fill> or <stroke>"
+                    ));
+                }
+                if syntax == Syntax::GridaXml && tag == "stop" {
+                    return err("<stop> must be a direct child of a gradient paint");
+                }
+                if syntax == Syntax::GridaXml && tag == "frame" {
+                    return err("<frame> belongs to historical textir; use <container>");
+                }
+                if syntax == Syntax::GridaXml && tag == "shape" {
+                    return err("<shape> is reserved in Draft 0; use <rect>, <ellipse>, or <line>");
+                }
+                let is_authored_root =
+                    syntax == Syntax::GridaXml && stack.is_empty() && render_root.is_none();
+                if is_authored_root && tag != "container" {
+                    return err(format!(
+                        "the authored render root must be <container>, found <{tag}>"
+                    ));
+                }
+                if stack.last().is_some_and(|parent| !parent.allows_children) {
+                    let parent = stack.last().expect("checked above");
+                    return err(format!(
+                        "<{}> cannot contain child elements; use <container> for local composition",
+                        parent.tag
+                    ));
+                }
+                if let Some(parent) = stack.last_mut() {
+                    parent.content_started = true;
+                }
+
+                let (node_tag, direct_shape_kind) = match (syntax, tag.as_str()) {
+                    (Syntax::GridaXml, "container") => ("frame", None),
+                    (Syntax::GridaXml, "rect") => ("shape", Some(ShapeDesc::Rect)),
+                    (Syntax::GridaXml, "ellipse") => ("shape", Some(ShapeDesc::Ellipse)),
+                    (Syntax::GridaXml, "line") => ("shape", Some(ShapeDesc::Line)),
+                    _ => (tag.as_str(), None),
+                };
                 let mut header = Header::new(SizeIntent::Auto, SizeIntent::Auto);
                 let mut layout = LayoutBehavior::default();
-                let mut shape_kind: Option<ShapeDesc> = None;
+                let mut shape_kind: Option<ShapeDesc> = direct_shape_kind;
                 let mut font_size = 16.0f32;
                 let mut lens_ops: Vec<LensOp> = vec![];
                 let mut clips = false;
-                let mut fill: Option<Color> = None;
+                let mut legacy_fill: Option<Color> = None;
+                let mut width_seen = false;
+                let mut height_seen = false;
+                let mut x_seen = false;
+                let mut y_seen = false;
+                let mut flow_seen = false;
+                let mut grow_seen = false;
+                let mut align_seen = false;
+                let mut box_constraint_seen = false;
+                let mut aspect_seen = false;
+                let mut frame_only_attr: Option<String> = None;
+                let mut flex_only_attr: Option<String> = None;
+                let mut shape_only_attr: Option<String> = None;
+                let mut text_only_attr: Option<String> = None;
+                let mut lens_only_attr: Option<String> = None;
+                let strict = syntax == Syntax::GridaXml;
 
                 for attr in el.attributes() {
                     let attr = attr.map_err(|e| ParseError(format!("attr: {e}")))?;
@@ -153,33 +1070,120 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                         .to_string();
                     match key.as_str() {
                         "name" => header.name = Some(val),
-                        "x" => header.x = parse_binding(&val, "x")?,
-                        "y" => header.y = parse_binding(&val, "y")?,
-                        "w" => header.width = parse_size(&val, "w")?,
-                        "h" => header.height = parse_size(&val, "h")?,
-                        "min-w" => header.min_width = Some(parse_num(&val, "min-w")?),
-                        "max-w" => header.max_width = Some(parse_num(&val, "max-w")?),
-                        "min-h" => header.min_height = Some(parse_num(&val, "min-h")?),
-                        "max-h" => header.max_height = Some(parse_num(&val, "max-h")?),
-                        "aspect" => {
+                        "x" => {
+                            if is_authored_root {
+                                return err("the authored root <container> cannot declare `x`");
+                            }
+                            x_seen = true;
+                            header.x = parse_binding(&val, "x")?;
+                        }
+                        "y" => {
+                            if is_authored_root {
+                                return err("the authored root <container> cannot declare `y`");
+                            }
+                            y_seen = true;
+                            header.y = parse_binding(&val, "y")?;
+                        }
+                        "w" if syntax == Syntax::TextIr => {
+                            if width_seen {
+                                return err(format!("duplicate width attribute on <{tag}>"));
+                            }
+                            width_seen = true;
+                            header.width = parse_size(&val, "width", false)?;
+                        }
+                        "width" if syntax == Syntax::GridaXml => {
+                            if width_seen {
+                                return err(format!("duplicate width attribute on <{tag}>"));
+                            }
+                            width_seen = true;
+                            header.width = parse_size(&val, "width", true)?;
+                        }
+                        "h" if syntax == Syntax::TextIr => {
+                            if height_seen {
+                                return err(format!("duplicate height attribute on <{tag}>"));
+                            }
+                            height_seen = true;
+                            header.height = parse_size(&val, "height", false)?;
+                        }
+                        "height" if syntax == Syntax::GridaXml => {
+                            if height_seen {
+                                return err(format!("duplicate height attribute on <{tag}>"));
+                            }
+                            height_seen = true;
+                            header.height = parse_size(&val, "height", true)?;
+                        }
+                        "min-w" if syntax == Syntax::TextIr => {
+                            header.min_width = Some(parse_non_negative(&val, "min-w", false)?)
+                        }
+                        "min-width" if syntax == Syntax::GridaXml => {
+                            box_constraint_seen = true;
+                            header.min_width = Some(parse_non_negative(&val, "min-width", true)?)
+                        }
+                        "max-w" if syntax == Syntax::TextIr => {
+                            header.max_width = Some(parse_non_negative(&val, "max-w", false)?)
+                        }
+                        "max-width" if syntax == Syntax::GridaXml => {
+                            box_constraint_seen = true;
+                            header.max_width = Some(parse_non_negative(&val, "max-width", true)?)
+                        }
+                        "min-h" if syntax == Syntax::TextIr => {
+                            header.min_height = Some(parse_non_negative(&val, "min-h", false)?)
+                        }
+                        "min-height" if syntax == Syntax::GridaXml => {
+                            box_constraint_seen = true;
+                            header.min_height = Some(parse_non_negative(&val, "min-height", true)?)
+                        }
+                        "max-h" if syntax == Syntax::TextIr => {
+                            header.max_height = Some(parse_non_negative(&val, "max-h", false)?)
+                        }
+                        "max-height" if syntax == Syntax::GridaXml => {
+                            box_constraint_seen = true;
+                            header.max_height = Some(parse_non_negative(&val, "max-height", true)?)
+                        }
+                        "aspect" if syntax == Syntax::TextIr => {
                             let (a, b) = val
                                 .split_once(':')
                                 .ok_or_else(|| ParseError("aspect needs `w:h`".into()))?;
                             header.aspect_ratio =
                                 Some((parse_num(a, "aspect")?, parse_num(b, "aspect")?));
                         }
+                        "aspect-ratio" if syntax == Syntax::GridaXml => {
+                            box_constraint_seen = true;
+                            aspect_seen = true;
+                            let (a, b) = val
+                                .split_once(':')
+                                .ok_or_else(|| ParseError("aspect-ratio needs `w:h`".into()))?;
+                            header.aspect_ratio = Some((
+                                parse_positive(a, "aspect-ratio", true)?,
+                                parse_positive(b, "aspect-ratio", true)?,
+                            ));
+                        }
                         "rotation" => header.rotation = parse_num(&val, "rotation")?,
-                        "flip-x" => header.flip_x = val == "true",
-                        "flip-y" => header.flip_y = val == "true",
+                        "flip-x" => header.flip_x = parse_bool(&val, "flip-x", strict)?,
+                        "flip-y" => header.flip_y = parse_bool(&val, "flip-y", strict)?,
                         "flow" => {
+                            if is_authored_root {
+                                return err("the authored root <container> cannot declare `flow`");
+                            }
+                            flow_seen = true;
                             header.flow = match val.as_str() {
                                 "absolute" => Flow::Absolute,
                                 "in" => Flow::InFlow,
                                 _ => return err(format!("bad flow `{val}`")),
                             }
                         }
-                        "grow" => header.grow = parse_num(&val, "grow")?,
+                        "grow" => {
+                            if is_authored_root {
+                                return err("the authored root <container> cannot declare `grow`");
+                            }
+                            grow_seen = true;
+                            header.grow = parse_non_negative(&val, "grow", strict)?;
+                        }
                         "align" => {
+                            if is_authored_root {
+                                return err("the authored root <container> cannot declare `align`");
+                            }
+                            align_seen = true;
                             header.self_align = match val.as_str() {
                                 "start" => SelfAlign::Start,
                                 "center" => SelfAlign::Center,
@@ -188,9 +1192,16 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                                 _ => return err(format!("bad align `{val}`")),
                             }
                         }
-                        "opacity" => header.opacity = parse_num(&val, "opacity")?,
-                        "hidden" => header.active = val != "true",
+                        "opacity" => {
+                            let opacity = parse_num(&val, "opacity")?;
+                            if strict && !(0.0..=1.0).contains(&opacity) {
+                                return err("opacity must be between 0 and 1 inclusive");
+                            }
+                            header.opacity = opacity;
+                        }
+                        "hidden" => header.active = !parse_bool(&val, "hidden", strict)?,
                         "layout" => {
+                            frame_only_attr.get_or_insert_with(|| key.clone());
                             layout.mode = match val.as_str() {
                                 "flex" => LayoutMode::Flex,
                                 "none" => LayoutMode::None,
@@ -198,14 +1209,22 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                             }
                         }
                         "direction" => {
+                            frame_only_attr.get_or_insert_with(|| key.clone());
+                            flex_only_attr.get_or_insert_with(|| key.clone());
                             layout.direction = match val.as_str() {
                                 "row" => Direction::Row,
                                 "column" => Direction::Column,
                                 _ => return err(format!("bad direction `{val}`")),
                             }
                         }
-                        "wrap" => layout.wrap = val == "true",
+                        "wrap" => {
+                            frame_only_attr.get_or_insert_with(|| key.clone());
+                            flex_only_attr.get_or_insert_with(|| key.clone());
+                            layout.wrap = parse_bool(&val, "wrap", strict)?;
+                        }
                         "main" => {
+                            frame_only_attr.get_or_insert_with(|| key.clone());
+                            flex_only_attr.get_or_insert_with(|| key.clone());
                             layout.main_align = match val.as_str() {
                                 "start" => MainAlign::Start,
                                 "center" => MainAlign::Center,
@@ -217,6 +1236,8 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                             }
                         }
                         "cross" => {
+                            frame_only_attr.get_or_insert_with(|| key.clone());
+                            flex_only_attr.get_or_insert_with(|| key.clone());
                             layout.cross_align = match val.as_str() {
                                 "start" => CrossAlign::Start,
                                 "center" => CrossAlign::Center,
@@ -226,23 +1247,26 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                             }
                         }
                         "gap" => {
+                            frame_only_attr.get_or_insert_with(|| key.clone());
+                            flex_only_attr.get_or_insert_with(|| key.clone());
                             let parts: Vec<&str> = val.split_whitespace().collect();
                             match parts.as_slice() {
                                 [g] => {
-                                    layout.gap_main = parse_num(g, "gap")?;
+                                    layout.gap_main = parse_non_negative(g, "gap", strict)?;
                                     layout.gap_cross = layout.gap_main;
                                 }
                                 [m, c] => {
-                                    layout.gap_main = parse_num(m, "gap")?;
-                                    layout.gap_cross = parse_num(c, "gap")?;
+                                    layout.gap_main = parse_non_negative(m, "gap", strict)?;
+                                    layout.gap_cross = parse_non_negative(c, "gap", strict)?;
                                 }
                                 _ => return err("gap takes 1 or 2 numbers"),
                             }
                         }
                         "padding" => {
+                            frame_only_attr.get_or_insert_with(|| key.clone());
                             let nums: Vec<f32> = val
                                 .split_whitespace()
-                                .map(|p| parse_num(p, "padding"))
+                                .map(|p| parse_non_negative(p, "padding", strict))
                                 .collect::<Result<_, _>>()?;
                             layout.padding = match nums.as_slice() {
                                 [a] => EdgeInsets::all(*a),
@@ -255,8 +1279,12 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                                 _ => return err("padding takes 1 or 4 numbers"),
                             };
                         }
-                        "clips" => clips = val == "true",
-                        "kind" => {
+                        "clips" => {
+                            frame_only_attr.get_or_insert_with(|| key.clone());
+                            clips = parse_bool(&val, "clips", strict)?;
+                        }
+                        "kind" if syntax == Syntax::TextIr => {
+                            shape_only_attr.get_or_insert_with(|| key.clone());
                             shape_kind = Some(match val.as_str() {
                                 "rect" => ShapeDesc::Rect,
                                 "ellipse" => ShapeDesc::Ellipse,
@@ -264,14 +1292,157 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
                                 _ => return err(format!("bad shape kind `{val}`")),
                             })
                         }
-                        "size" => font_size = parse_num(&val, "size")?,
-                        "ops" => lens_ops = parse_lens_ops(&val)?,
-                        "fill" => fill = Some(val.into()),
+                        "size" => {
+                            text_only_attr.get_or_insert_with(|| key.clone());
+                            font_size = parse_positive(&val, "size", strict)?;
+                        }
+                        "ops" => {
+                            lens_only_attr.get_or_insert_with(|| key.clone());
+                            lens_ops = parse_lens_ops(&val, strict)?;
+                        }
+                        "fill" => {
+                            let fillable = matches!(node_tag, "frame" | "text")
+                                || matches!(shape_kind, Some(ShapeDesc::Rect | ShapeDesc::Ellipse));
+                            if strict && !fillable {
+                                return err(format!("fill is not valid on <{tag}>"));
+                            }
+                            if legacy_fill.is_some() {
+                                return err(format!("duplicate `fill` on <{tag}>"));
+                            }
+                            if strict {
+                                legacy_fill = Some(parse_color(&val, "fill")?);
+                            } else {
+                                legacy_fill = Some(val.into());
+                            }
+                        }
                         _ => return err(format!("unknown attribute `{key}` on <{tag}>")),
                     }
                 }
 
-                let payload = match tag.as_str() {
+                if syntax == Syntax::GridaXml {
+                    let parent_is_flex = stack.last().is_some_and(|parent| {
+                        matches!(
+                            &nodes.get(&parent.id).expect("open parent exists").payload,
+                            Payload::Frame { layout, .. } if layout.mode == LayoutMode::Flex
+                        )
+                    });
+                    if flow_seen && !parent_is_flex {
+                        return err("flow is only valid on a child of a flex container");
+                    }
+                    if parent_is_flex && header.flow == Flow::InFlow && (x_seen || y_seen) {
+                        return err("x/y are not valid on an in-flow child of a flex container");
+                    }
+                    if (!parent_is_flex || header.flow != Flow::InFlow) && (grow_seen || align_seen)
+                    {
+                        return err(
+                            "grow/align are only valid on an in-flow child of a flex container",
+                        );
+                    }
+                    if node_tag != "frame" {
+                        if let Some(attr) = frame_only_attr {
+                            return err(format!("attribute `{attr}` is only valid on <container>"));
+                        }
+                    }
+                    if node_tag != "shape" {
+                        if let Some(attr) = shape_only_attr {
+                            return err(format!("attribute `{attr}` is only valid on <shape>"));
+                        }
+                    }
+                    if node_tag != "text" {
+                        if let Some(attr) = text_only_attr {
+                            return err(format!("attribute `{attr}` is only valid on <text>"));
+                        }
+                    }
+                    if node_tag != "lens" {
+                        if let Some(attr) = lens_only_attr {
+                            return err(format!("attribute `{attr}` is only valid on <lens>"));
+                        }
+                    }
+                    if layout.mode != LayoutMode::Flex {
+                        if let Some(attr) = flex_only_attr {
+                            return err(format!("attribute `{attr}` requires layout=\"flex\""));
+                        }
+                    }
+                    if matches!(node_tag, "group" | "lens")
+                        && (width_seen || height_seen || box_constraint_seen)
+                    {
+                        return err(format!(
+                            "<{tag}> has a derived box and cannot declare size constraints"
+                        ));
+                    }
+                    if matches!(node_tag, "group" | "lens")
+                        && (matches!(header.x, AxisBinding::Span { .. })
+                            || matches!(header.y, AxisBinding::Span { .. }))
+                    {
+                        return err(format!(
+                            "<{tag}> has a derived origin and cannot use Span bindings"
+                        ));
+                    }
+                    if aspect_seen && node_tag != "shape" {
+                        return err("aspect-ratio is only valid on <rect> and <ellipse>");
+                    }
+                    if matches!(header.x, AxisBinding::Span { .. })
+                        && (width_seen || header.min_width.is_some() || header.max_width.is_some())
+                    {
+                        return err(
+                            "a span x binding cannot also declare width/min-width/max-width",
+                        );
+                    }
+                    if matches!(header.y, AxisBinding::Span { .. })
+                        && (height_seen
+                            || header.min_height.is_some()
+                            || header.max_height.is_some())
+                    {
+                        return err(
+                            "a span y binding cannot also declare height/min-height/max-height",
+                        );
+                    }
+                    if node_tag == "shape" {
+                        match shape_kind {
+                            Some(ShapeDesc::Rect | ShapeDesc::Ellipse) => {
+                                let width_supplied = matches!(
+                                    (header.width, header.x),
+                                    (SizeIntent::Fixed(_), _) | (_, AxisBinding::Span { .. })
+                                );
+                                let height_supplied = matches!(
+                                    (header.height, header.y),
+                                    (SizeIntent::Fixed(_), _) | (_, AxisBinding::Span { .. })
+                                );
+                                let valid = matches!(
+                                    (width_supplied, height_supplied, aspect_seen),
+                                    (true, true, false) | (true, false, true) | (false, true, true)
+                                );
+                                if !valid {
+                                    return err("<rect> and <ellipse> require both axes supplied by a fixed size or Span, or exactly one supplied axis plus aspect-ratio");
+                                }
+                            }
+                            Some(ShapeDesc::Line) => {
+                                let width_supplied = matches!(
+                                    (header.width, header.x),
+                                    (SizeIntent::Fixed(_), _) | (_, AxisBinding::Span { .. })
+                                );
+                                if !width_supplied {
+                                    return err("<line> requires a fixed width or x Span");
+                                }
+                                if matches!(header.y, AxisBinding::Span { .. }) {
+                                    return err("<line> must not declare a y Span");
+                                }
+                                if height_seen {
+                                    return err("<line> must not declare height");
+                                }
+                                if header.min_height.is_some() || header.max_height.is_some() {
+                                    return err("<line> must not declare min-height/max-height");
+                                }
+                                if header.aspect_ratio.is_some() {
+                                    return err("<line> must not declare aspect-ratio");
+                                }
+                            }
+                            None => {}
+                        }
+                    }
+                }
+
+                let payload = match node_tag {
                     "frame" => {
                         // Kind defaults (§4): frame sizes are Fixed-required;
                         // the IR treats missing w/h as auto (hug) which is
@@ -300,42 +1471,110 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
 
                 let id = next_id;
                 next_id += 1;
+                let legacy_fill_seen = legacy_fill.is_some();
+                let fills = match legacy_fill {
+                    Some(color) => Paints::solid(color),
+                    None if syntax == Syntax::GridaXml => grida_xml_default_fills(&payload),
+                    None => Paints::default(),
+                };
                 let node = Node {
                     id,
                     header,
                     payload,
                     children: vec![],
-                    fill,
+                    fills,
+                    strokes: vec![],
                 };
                 nodes.insert(id, node);
                 if let Some(parent) = stack.last() {
                     let pid = parent.id;
                     nodes.get_mut(&pid).unwrap().children.push(id);
+                } else if syntax == Syntax::GridaXml {
+                    if render_root.is_some() {
+                        return err("multiple render roots in <grida>");
+                    }
+                    let root_id = root.expect("grida.xml root initialized");
+                    nodes.get_mut(&root_id).unwrap().children.push(id);
+                    render_root = Some(id);
                 } else if root.is_none() {
                     root = Some(id);
                 } else {
                     return err("multiple root elements");
                 }
 
-                let is_text = tag == "text";
+                let is_text = node_tag == "text";
+                let allows_children = matches!(node_tag, "frame" | "shape" | "group" | "lens");
                 stack.push(Pending {
                     id,
+                    tag,
                     text_content: String::new(),
                     is_text,
+                    allows_children,
+                    fill_seen: false,
+                    stroke_seen: false,
+                    legacy_fill_seen,
+                    content_started: false,
                 });
                 // Self-closing (`Event::Empty`) has no matching End event.
                 if is_empty {
-                    finish(&mut stack, &mut nodes)?;
+                    finish(&mut stack, &mut nodes, None)?;
                 }
             }
             Ok(Event::Text(t)) => {
+                let txt = t.unescape().map_err(|e| ParseError(format!("text: {e}")))?;
+                if syntax == Syntax::GridaXml && !declaration_seen && !txt.is_empty() {
+                    pre_declaration_content = true;
+                }
                 if let Some(p) = stack.last_mut() {
-                    let txt = t.unescape().map_err(|e| ParseError(format!("text: {e}")))?;
+                    if syntax == Syntax::GridaXml && !p.is_text && !txt.trim().is_empty() {
+                        return err(format!("character content is not allowed in <{}>", p.tag));
+                    }
+                    if p.is_text && !txt.trim().is_empty() {
+                        p.content_started = true;
+                    }
                     p.text_content.push_str(&txt);
+                } else if syntax == Syntax::GridaXml && !txt.trim().is_empty() {
+                    return err("character content is not allowed outside the document envelope");
                 }
             }
-            Ok(Event::End(_)) => {
-                finish(&mut stack, &mut nodes)?;
+            Ok(Event::End(e)) => {
+                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                if syntax == Syntax::GridaXml && tag == "grida" {
+                    if !envelope_open || envelope_closed {
+                        return err("unbalanced </grida>");
+                    }
+                    if !stack.is_empty() {
+                        return err("</grida> closed before its render root");
+                    }
+                    if render_root.is_none() {
+                        return err("<grida> must contain exactly one render root");
+                    }
+                    envelope_open = false;
+                    envelope_closed = true;
+                    continue;
+                }
+                finish(&mut stack, &mut nodes, Some(&tag))?;
+            }
+            Ok(Event::Decl(decl)) if syntax == Syntax::GridaXml => {
+                if declaration_seen {
+                    return err("duplicate XML declaration");
+                }
+                if pre_declaration_content || envelope_open || envelope_closed {
+                    return err("XML declaration must be the first document event");
+                }
+                validate_grida_xml_declaration(&decl)?;
+                declaration_seen = true;
+            }
+            Ok(Event::Comment(_)) if syntax == Syntax::GridaXml => {
+                if !declaration_seen {
+                    pre_declaration_content = true;
+                }
+            }
+            Ok(Event::CData(_)) if syntax == Syntax::GridaXml => {
+                return err("CDATA is not supported; use escaped text content");
+            }
+            Ok(Event::PI(_) | Event::DocType(_)) if syntax == Syntax::GridaXml => {
+                return err("processing instructions and doctypes are not supported");
             }
             Ok(_) => {}
         }
@@ -344,12 +1583,37 @@ pub fn parse(input: &str) -> Result<Document, ParseError> {
     if !stack.is_empty() {
         return err("unclosed elements");
     }
+    if syntax == Syntax::GridaXml {
+        if envelope_open {
+            return err("unclosed <grida> envelope");
+        }
+        if !envelope_closed {
+            return err("missing <grida version=\"0\"> envelope");
+        }
+        if render_root.is_none() {
+            return err("<grida> must contain exactly one render root");
+        }
+    }
     let root = root.ok_or_else(|| ParseError("empty document".into()))?;
     // The scene root spans the viewport unless bindings were given.
     Ok(Document::from_map(nodes, root))
 }
 
-fn finish(stack: &mut Vec<Pending>, nodes: &mut BTreeMap<NodeId, Node>) -> Result<(), ParseError> {
+fn finish(
+    stack: &mut Vec<Pending>,
+    nodes: &mut BTreeMap<NodeId, Node>,
+    end_tag: Option<&str>,
+) -> Result<(), ParseError> {
+    if let Some(end_tag) = end_tag {
+        let start_tag = stack
+            .last()
+            .ok_or_else(|| ParseError("unbalanced end".into()))?
+            .tag
+            .as_str();
+        if start_tag != end_tag {
+            return err(format!("mismatched end tag </{end_tag}> for <{start_tag}>"));
+        }
+    }
     let p = stack
         .pop()
         .ok_or_else(|| ParseError("unbalanced end".into()))?;
@@ -371,6 +1635,10 @@ fn fmt_num(v: f32) -> String {
     } else {
         format!("{v}")
     }
+}
+
+fn fmt_num_f64(v: f64) -> String {
+    format!("{v}")
 }
 
 fn fmt_binding(b: AxisBinding) -> Option<String> {
@@ -404,19 +1672,618 @@ fn fmt_binding(b: AxisBinding) -> Option<String> {
 }
 
 fn push_attr(out: &mut String, key: &str, val: &str) {
-    let _ = write!(out, " {key}=\"{val}\"");
+    let escaped = val
+        .replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    let _ = write!(out, " {key}=\"{escaped}\"");
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Vocabulary {
+    TextIr,
+    GridaXml,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrintError(pub String);
+
+impl std::fmt::Display for PrintError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "textir: {}", self.0)
+    }
+}
+
+impl std::error::Error for PrintError {}
+
+/// Historical E3 TextIr has only a singleton opaque solid `fill` attribute.
+/// This fallible entry point refuses richer model state instead of narrowing
+/// it. New file-first documents should use [`crate::grida_xml::print`].
+pub fn try_print(doc: &Document) -> Result<String, PrintError> {
+    let mut out = String::new();
+    print_node(doc, doc.root, 0, Vocabulary::TextIr, &mut out).map_err(PrintError)?;
+    Ok(out)
 }
 
 pub fn print(doc: &Document) -> String {
-    let mut out = String::new();
-    print_node(doc, doc.root, 0, &mut out);
-    out
+    try_print(doc).expect("document is not representable by historical E3 TextIr")
 }
 
-fn print_node(doc: &Document, id: NodeId, depth: usize, out: &mut String) {
+pub(crate) fn print_grida_xml_render_root(
+    doc: &Document,
+    id: NodeId,
+    depth: usize,
+    out: &mut String,
+) -> Result<(), String> {
+    print_node(doc, id, depth, Vocabulary::GridaXml, out)
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FillEmission<'a> {
+    Omit,
+    Attribute(Color),
+    Empty,
+    Stack(&'a Paints),
+}
+
+fn grida_xml_fill_emission(node: &Node) -> Result<FillEmission<'_>, String> {
+    if matches!(
+        node.payload,
+        Payload::Group
+            | Payload::Lens { .. }
+            | Payload::Shape {
+                desc: ShapeDesc::Line
+            }
+    ) && !node.fills.is_empty()
+    {
+        return Err(format!("<{}> cannot carry fills", node.payload.kind_name()));
+    }
+    let default = grida_xml_default_fills(&node.payload);
+    if node.fills == default {
+        Ok(FillEmission::Omit)
+    } else if let [Paint::Solid(solid)] = node.fills.as_slice() {
+        if solid.active && solid.color.alpha() == 255 && solid.blend_mode == BlendMode::Normal {
+            Ok(FillEmission::Attribute(solid.color))
+        } else {
+            Ok(FillEmission::Stack(&node.fills))
+        }
+    } else if node.fills.is_empty() {
+        Ok(FillEmission::Empty)
+    } else {
+        Ok(FillEmission::Stack(&node.fills))
+    }
+}
+
+fn historical_fill(node: &Node) -> Result<Option<Color>, String> {
+    if node
+        .strokes
+        .iter()
+        .any(|stroke| !(stroke.paints.is_empty() && stroke.geometry_is_default_for(&node.payload)))
+    {
+        return Err(format!(
+            "node {} has strokes historical E3 TextIr cannot represent",
+            node.id
+        ));
+    }
+    match node.fills.as_slice() {
+        [] => Ok(None),
+        [Paint::Solid(solid)]
+            if solid.active
+                && solid.blend_mode == BlendMode::Normal
+                && solid.color.alpha() == 255 =>
+        {
+            Ok(Some(solid.color))
+        }
+        _ => Err(format!(
+            "node {} has a paint stack historical E3 TextIr cannot represent",
+            node.id
+        )),
+    }
+}
+
+fn validate_common_paint(opacity: f32, tag: &str) -> Result<(), String> {
+    if !opacity.is_finite() || !(0.0..=1.0).contains(&opacity) {
+        return Err(format!(
+            "<{tag}> opacity must be finite and between 0 and 1"
+        ));
+    }
+    Ok(())
+}
+
+fn push_common_paint_attrs(
+    out: &mut String,
+    active: bool,
+    opacity: f32,
+    blend_mode: BlendMode,
+    tag: &str,
+) -> Result<(), String> {
+    validate_common_paint(opacity, tag)?;
+    if !active {
+        push_attr(out, "visible", "false");
+    }
+    if opacity != 1.0 {
+        push_attr(out, "opacity", &fmt_num(opacity));
+    }
+    if blend_mode != BlendMode::Normal {
+        push_attr(out, "blend-mode", blend_mode.as_str());
+    }
+    Ok(())
+}
+
+fn validate_gradient_stops(stops: &[GradientStop], tag: &str) -> Result<(), String> {
+    if stops.len() < 2 {
+        return Err(format!("<{tag}> requires at least two stops"));
+    }
+    let mut previous = None;
+    for stop in stops {
+        if !stop.offset.is_finite() || !(0.0..=1.0).contains(&stop.offset) {
+            return Err(format!(
+                "<{tag}> stop offset must be finite and between 0 and 1"
+            ));
+        }
+        if previous.is_some_and(|offset| stop.offset < offset) {
+            return Err(format!("<{tag}> stop offsets must be nondecreasing"));
+        }
+        previous = Some(stop.offset);
+    }
+    Ok(())
+}
+
+fn validate_affine(transform: crate::math::Affine, tag: &str) -> Result<(), String> {
+    if [
+        transform.a,
+        transform.b,
+        transform.c,
+        transform.d,
+        transform.e,
+        transform.f,
+    ]
+    .iter()
+    .any(|value| !value.is_finite())
+    {
+        return Err(format!(
+            "<{tag}> transform must contain only finite numbers"
+        ));
+    }
+    Ok(())
+}
+
+fn push_transform_attr(
+    out: &mut String,
+    transform: crate::math::Affine,
+    tag: &str,
+) -> Result<(), String> {
+    validate_affine(transform, tag)?;
+    if transform != crate::math::Affine::IDENTITY {
+        push_attr(
+            out,
+            "transform",
+            &format!(
+                "{} {} {} {} {} {}",
+                fmt_num(transform.a),
+                fmt_num(transform.b),
+                fmt_num(transform.c),
+                fmt_num(transform.d),
+                fmt_num(transform.e),
+                fmt_num(transform.f)
+            ),
+        );
+    }
+    Ok(())
+}
+
+fn write_gradient_stops(
+    stops: &[GradientStop],
+    tag: &str,
+    depth: usize,
+    out: &mut String,
+) -> Result<(), String> {
+    validate_gradient_stops(stops, tag)?;
+    let indent = "  ".repeat(depth);
+    for stop in stops {
+        let _ = write!(out, "{indent}<stop");
+        push_attr(out, "offset", &fmt_num(stop.offset));
+        push_attr(out, "color", &stop.color.to_hex());
+        if stop.color.alpha() != 255 {
+            push_attr(out, "opacity", &fmt_num(stop.color.opacity()));
+        }
+        let _ = writeln!(out, "/>");
+    }
+    Ok(())
+}
+
+fn write_paint(paint: &Paint, depth: usize, out: &mut String) -> Result<(), String> {
+    let indent = "  ".repeat(depth);
+    match paint {
+        Paint::Solid(solid) => {
+            let _ = write!(out, "{indent}<solid");
+            push_attr(out, "color", &solid.color.to_hex());
+            push_common_paint_attrs(
+                out,
+                solid.active,
+                solid.opacity(),
+                solid.blend_mode,
+                "solid",
+            )?;
+            let _ = writeln!(out, "/>");
+        }
+        Paint::LinearGradient(gradient) => {
+            if !gradient.xy1.0.is_finite()
+                || !gradient.xy1.1.is_finite()
+                || !gradient.xy2.0.is_finite()
+                || !gradient.xy2.1.is_finite()
+            {
+                return Err("<gradient kind=\"linear\"> endpoints must be finite".into());
+            }
+            if gradient.xy1 == gradient.xy2 {
+                return Err("<gradient kind=\"linear\"> from and to must differ".into());
+            }
+            let from = gradient.xy1.try_to_uv().ok_or_else(|| {
+                "<gradient kind=\"linear\"> from alignment is not representable: binary64 UV arithmetic cannot reproduce its stored f32 components".to_string()
+            })?;
+            let to = gradient.xy2.try_to_uv().ok_or_else(|| {
+                "<gradient kind=\"linear\"> to alignment is not representable: binary64 UV arithmetic cannot reproduce its stored f32 components".to_string()
+            })?;
+            let _ = write!(out, "{indent}<gradient");
+            push_attr(out, "kind", "linear");
+            if gradient.xy1 != Alignment::CENTER_LEFT || gradient.xy2 != Alignment::CENTER_RIGHT {
+                push_attr(
+                    out,
+                    "from",
+                    &format!("{} {}", fmt_num_f64(from.0), fmt_num_f64(from.1)),
+                );
+                push_attr(
+                    out,
+                    "to",
+                    &format!("{} {}", fmt_num_f64(to.0), fmt_num_f64(to.1)),
+                );
+            }
+            if gradient.tile_mode != TileMode::Clamp {
+                push_attr(out, "tile-mode", gradient.tile_mode.as_str());
+            }
+            push_transform_attr(out, gradient.transform, "gradient")?;
+            push_common_paint_attrs(
+                out,
+                gradient.active,
+                gradient.opacity,
+                gradient.blend_mode,
+                "gradient",
+            )?;
+            let _ = writeln!(out, ">");
+            write_gradient_stops(&gradient.stops, "gradient", depth + 1, out)?;
+            let _ = writeln!(out, "{indent}</gradient>");
+        }
+        Paint::RadialGradient(gradient) => {
+            let _ = write!(out, "{indent}<gradient");
+            push_attr(out, "kind", "radial");
+            if gradient.tile_mode != TileMode::Clamp {
+                push_attr(out, "tile-mode", gradient.tile_mode.as_str());
+            }
+            push_transform_attr(out, gradient.transform, "gradient")?;
+            push_common_paint_attrs(
+                out,
+                gradient.active,
+                gradient.opacity,
+                gradient.blend_mode,
+                "gradient",
+            )?;
+            let _ = writeln!(out, ">");
+            write_gradient_stops(&gradient.stops, "gradient", depth + 1, out)?;
+            let _ = writeln!(out, "{indent}</gradient>");
+        }
+        Paint::SweepGradient(gradient) => {
+            let _ = write!(out, "{indent}<gradient");
+            push_attr(out, "kind", "sweep");
+            push_transform_attr(out, gradient.transform, "gradient")?;
+            push_common_paint_attrs(
+                out,
+                gradient.active,
+                gradient.opacity,
+                gradient.blend_mode,
+                "gradient",
+            )?;
+            let _ = writeln!(out, ">");
+            write_gradient_stops(&gradient.stops, "gradient", depth + 1, out)?;
+            let _ = writeln!(out, "{indent}</gradient>");
+        }
+        Paint::DiamondGradient(gradient) => {
+            let _ = write!(out, "{indent}<gradient");
+            push_attr(out, "kind", "diamond");
+            push_transform_attr(out, gradient.transform, "gradient")?;
+            push_common_paint_attrs(
+                out,
+                gradient.active,
+                gradient.opacity,
+                gradient.blend_mode,
+                "gradient",
+            )?;
+            let _ = writeln!(out, ">");
+            write_gradient_stops(&gradient.stops, "gradient", depth + 1, out)?;
+            let _ = writeln!(out, "{indent}</gradient>");
+        }
+        Paint::Image(image) => {
+            let src = match &image.image {
+                ResourceRef::Rid(src) if !src.trim().is_empty() => src,
+                ResourceRef::Rid(_) => return Err("<image> src must not be empty".into()),
+                ResourceRef::Hash(_) => {
+                    return Err("Draft 0 XML cannot represent a hash image resource".into());
+                }
+            };
+            if image.quarter_turns != 0 {
+                return Err("Draft 0 XML cannot represent image quarter-turns".into());
+            }
+            if image.alignment != Alignment::CENTER {
+                return Err("Draft 0 XML cannot represent non-centered image alignment".into());
+            }
+            if image.filters != ImageFilters::default() {
+                return Err("Draft 0 XML cannot represent image filters".into());
+            }
+            let fit = match image.fit {
+                ImagePaintFit::Fit(fit) => fit,
+                ImagePaintFit::Transform(_) => {
+                    return Err("Draft 0 XML cannot represent transformed image fit".into());
+                }
+                ImagePaintFit::Tile(_) => {
+                    return Err("Draft 0 XML cannot represent tiled image fit".into());
+                }
+            };
+            let _ = write!(out, "{indent}<image");
+            push_attr(out, "src", src);
+            if fit != BoxFit::Cover {
+                push_attr(out, "fit", fit.as_str());
+            }
+            push_common_paint_attrs(out, image.active, image.opacity, image.blend_mode, "image")?;
+            let _ = writeln!(out, "/>");
+        }
+    }
+    Ok(())
+}
+
+fn write_fill(
+    emission: FillEmission<'_>,
+    depth: usize,
+    inline: bool,
+    out: &mut String,
+) -> Result<(), String> {
+    match emission {
+        FillEmission::Omit | FillEmission::Attribute(_) => {}
+        FillEmission::Empty => {
+            if !inline {
+                let _ = write!(out, "{}", "  ".repeat(depth));
+            }
+            if inline {
+                let _ = write!(out, "<fill/>");
+            } else {
+                let _ = writeln!(out, "<fill/>");
+            }
+        }
+        FillEmission::Stack(paints) => {
+            if !inline {
+                let _ = write!(out, "{}", "  ".repeat(depth));
+            }
+            let _ = writeln!(out, "<fill>");
+            for paint in paints.iter() {
+                write_paint(paint, depth + 1, out)?;
+            }
+            if inline {
+                let _ = write!(out, "{}</fill>", "  ".repeat(depth));
+            } else {
+                let _ = writeln!(out, "{}</fill>", "  ".repeat(depth));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn normalized_dash_array(values: &[f32]) -> Vec<f32> {
+    if values.len().is_multiple_of(2) {
+        values.to_vec()
+    } else {
+        values.iter().chain(values).copied().collect()
+    }
+}
+
+fn validate_stroke_for_write(stroke: &Stroke, payload: &Payload) -> Result<(), String> {
+    let default = Stroke::default_for(payload)
+        .ok_or_else(|| format!("<{}> cannot carry strokes", payload.kind_name()))?;
+    if !stroke.width.is_finite() || stroke.width < 0.0 {
+        return Err("<stroke> width must be finite and non-negative".into());
+    }
+    if !stroke.miter_limit.is_finite() || stroke.miter_limit <= 0.0 {
+        return Err("<stroke> miter-limit must be finite and positive".into());
+    }
+    if let Some(values) = &stroke.dash_array {
+        if values.is_empty()
+            || values
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0)
+            || values.iter().all(|value| *value == 0.0)
+        {
+            return Err(
+                "<stroke> dash-array must contain non-negative finite values and not be all zero"
+                    .into(),
+            );
+        }
+    }
+
+    match payload {
+        Payload::Shape {
+            desc: ShapeDesc::Line,
+        } => {
+            if stroke.align != StrokeAlign::Center {
+                return Err("a <line> stroke must use align=\"center\"".into());
+            }
+            if stroke.join != default.join || stroke.miter_limit != default.miter_limit {
+                return Err("a <line> stroke cannot carry join or miter-limit state".into());
+            }
+        }
+        Payload::Frame { .. }
+        | Payload::Shape {
+            desc: ShapeDesc::Rect,
+        } => {
+            if stroke.cap != default.cap {
+                return Err("a container/rect stroke cannot carry cap state".into());
+            }
+        }
+        Payload::Shape {
+            desc: ShapeDesc::Ellipse,
+        } => {
+            if stroke.cap != default.cap
+                || stroke.join != default.join
+                || stroke.miter_limit != default.miter_limit
+            {
+                return Err(
+                    "an ellipse stroke cannot carry cap, join, or miter-limit state".into(),
+                );
+            }
+        }
+        Payload::Text { .. } => {
+            if stroke.cap != default.cap
+                || stroke.join != default.join
+                || stroke.miter_limit != default.miter_limit
+                || stroke.dash_array.is_some()
+            {
+                return Err(
+                    "a text stroke cannot carry cap, join, miter-limit, or dash-array state".into(),
+                );
+            }
+        }
+        Payload::Group | Payload::Lens { .. } => unreachable!("checked above"),
+    }
+    Ok(())
+}
+
+fn stroke_is_omitted(stroke: &Stroke, payload: &Payload) -> bool {
+    stroke.paints.is_empty() && stroke.geometry_is_default_for(payload)
+}
+
+fn write_stroke(
+    stroke: &Stroke,
+    payload: &Payload,
+    depth: usize,
+    inline: bool,
+    out: &mut String,
+) -> Result<(), String> {
+    validate_stroke_for_write(stroke, payload)?;
+    if stroke_is_omitted(stroke, payload) {
+        return Ok(());
+    }
+    let default = Stroke::default_for(payload).expect("validated stroke target");
+    if !inline {
+        let _ = write!(out, "{}", "  ".repeat(depth));
+    }
+    let _ = write!(out, "<stroke");
+    if stroke.width != default.width {
+        push_attr(out, "width", &fmt_num(stroke.width));
+    }
+    if stroke.align != default.align {
+        push_attr(out, "align", stroke.align.as_str());
+    }
+    if matches!(
+        payload,
+        Payload::Shape {
+            desc: ShapeDesc::Line
+        }
+    ) && stroke.cap != default.cap
+    {
+        push_attr(out, "cap", stroke.cap.as_str());
+    }
+    if matches!(
+        payload,
+        Payload::Frame { .. }
+            | Payload::Shape {
+                desc: ShapeDesc::Rect
+            }
+    ) {
+        if stroke.join != default.join {
+            push_attr(out, "join", stroke.join.as_str());
+        }
+        if stroke.miter_limit != default.miter_limit {
+            push_attr(out, "miter-limit", &fmt_num(stroke.miter_limit));
+        }
+    }
+    if let Some(values) = &stroke.dash_array {
+        let value = normalized_dash_array(values)
+            .iter()
+            .map(|value| fmt_num(*value))
+            .collect::<Vec<_>>()
+            .join(" ");
+        push_attr(out, "dash-array", &value);
+    }
+    if stroke.paints.is_empty() {
+        if inline {
+            let _ = write!(out, "/>");
+        } else {
+            let _ = writeln!(out, "/>");
+        }
+        return Ok(());
+    }
+    let _ = writeln!(out, ">");
+    for paint in stroke.paints.iter() {
+        write_paint(paint, depth + 1, out)?;
+    }
+    if inline {
+        let _ = write!(out, "{}</stroke>", "  ".repeat(depth));
+    } else {
+        let _ = writeln!(out, "{}</stroke>", "  ".repeat(depth));
+    }
+    Ok(())
+}
+
+fn print_node(
+    doc: &Document,
+    id: NodeId,
+    depth: usize,
+    vocabulary: Vocabulary,
+    out: &mut String,
+) -> Result<(), String> {
     let node = doc.get(id);
     let indent = "  ".repeat(depth);
-    let tag = node.payload.kind_name();
+    let tag = match (vocabulary, &node.payload) {
+        (Vocabulary::GridaXml, Payload::Frame { .. }) => "container",
+        (
+            Vocabulary::GridaXml,
+            Payload::Shape {
+                desc: ShapeDesc::Rect,
+            },
+        ) => "rect",
+        (
+            Vocabulary::GridaXml,
+            Payload::Shape {
+                desc: ShapeDesc::Ellipse,
+            },
+        ) => "ellipse",
+        (
+            Vocabulary::GridaXml,
+            Payload::Shape {
+                desc: ShapeDesc::Line,
+            },
+        ) => "line",
+        _ => node.payload.kind_name(),
+    };
+    let width_attr = if vocabulary == Vocabulary::GridaXml {
+        "width"
+    } else {
+        "w"
+    };
+    let height_attr = if vocabulary == Vocabulary::GridaXml {
+        "height"
+    } else {
+        "h"
+    };
+    let (min_width_attr, max_width_attr, min_height_attr, max_height_attr, aspect_attr) =
+        if vocabulary == Vocabulary::GridaXml {
+            (
+                "min-width",
+                "max-width",
+                "min-height",
+                "max-height",
+                "aspect-ratio",
+            )
+        } else {
+            ("min-w", "max-w", "min-h", "max-h", "aspect")
+        };
     let _ = write!(out, "{indent}<{tag}");
 
     if let Some(name) = &node.header.name {
@@ -430,10 +2297,10 @@ fn print_node(doc: &Document, id: NodeId, depth: usize, out: &mut String) {
     }
     if !node.payload.box_is_derived() {
         match node.header.width {
-            SizeIntent::Fixed(v) => push_attr(out, "w", &fmt_num(v)),
+            SizeIntent::Fixed(v) => push_attr(out, width_attr, &fmt_num(v)),
             SizeIntent::Auto => {
                 if matches!(node.payload, Payload::Frame { .. }) {
-                    push_attr(out, "w", "auto");
+                    push_attr(out, width_attr, "auto");
                 }
                 // text: auto is the kind default — omitted
             }
@@ -447,30 +2314,30 @@ fn print_node(doc: &Document, id: NodeId, depth: usize, out: &mut String) {
         match node.header.height {
             SizeIntent::Fixed(v) => {
                 if !is_line {
-                    push_attr(out, "h", &fmt_num(v));
+                    push_attr(out, height_attr, &fmt_num(v));
                 }
             }
             SizeIntent::Auto => {
                 if matches!(node.payload, Payload::Frame { .. }) {
-                    push_attr(out, "h", "auto");
+                    push_attr(out, height_attr, "auto");
                 }
             }
         }
     }
     if let Some(v) = node.header.min_width {
-        push_attr(out, "min-w", &fmt_num(v));
+        push_attr(out, min_width_attr, &fmt_num(v));
     }
     if let Some(v) = node.header.max_width {
-        push_attr(out, "max-w", &fmt_num(v));
+        push_attr(out, max_width_attr, &fmt_num(v));
     }
     if let Some(v) = node.header.min_height {
-        push_attr(out, "min-h", &fmt_num(v));
+        push_attr(out, min_height_attr, &fmt_num(v));
     }
     if let Some(v) = node.header.max_height {
-        push_attr(out, "max-h", &fmt_num(v));
+        push_attr(out, max_height_attr, &fmt_num(v));
     }
     if let Some((a, b)) = node.header.aspect_ratio {
-        push_attr(out, "aspect", &format!("{}:{}", fmt_num(a), fmt_num(b)));
+        push_attr(out, aspect_attr, &format!("{}:{}", fmt_num(a), fmt_num(b)));
     }
     if node.header.rotation != 0.0 {
         push_attr(out, "rotation", &fmt_num(node.header.rotation));
@@ -563,12 +2430,14 @@ fn print_node(doc: &Document, id: NodeId, depth: usize, out: &mut String) {
             }
         }
         Payload::Shape { desc } => {
-            let kind = match desc {
-                ShapeDesc::Rect => "rect",
-                ShapeDesc::Ellipse => "ellipse",
-                ShapeDesc::Line => "line",
-            };
-            push_attr(out, "kind", kind);
+            if vocabulary == Vocabulary::TextIr {
+                let kind = match desc {
+                    ShapeDesc::Rect => "rect",
+                    ShapeDesc::Ellipse => "ellipse",
+                    ShapeDesc::Line => "line",
+                };
+                push_attr(out, "kind", kind);
+            }
         }
         Payload::Text { font_size, .. } => {
             if *font_size != 16.0 {
@@ -614,9 +2483,32 @@ fn print_node(doc: &Document, id: NodeId, depth: usize, out: &mut String) {
             push_attr(out, "ops", &parts.join(" "));
         }
     }
-    if let Some(fill) = &node.fill {
-        push_attr(out, "fill", &fill.to_hex());
+    let fill_emission = match vocabulary {
+        Vocabulary::TextIr => {
+            if let Some(fill) = historical_fill(node)? {
+                push_attr(out, "fill", &fill.to_hex());
+            }
+            FillEmission::Omit
+        }
+        Vocabulary::GridaXml => grida_xml_fill_emission(node)?,
+    };
+    if let FillEmission::Attribute(color) = fill_emission {
+        push_attr(out, "fill", &color.to_hex());
     }
+    let strokes: Vec<&Stroke> = match vocabulary {
+        Vocabulary::TextIr => vec![],
+        Vocabulary::GridaXml => {
+            for stroke in &node.strokes {
+                validate_stroke_for_write(stroke, &node.payload)?;
+            }
+            node.strokes
+                .iter()
+                .filter(|stroke| !stroke_is_omitted(stroke, &node.payload))
+                .collect()
+        }
+    };
+    let has_fill_child = matches!(fill_emission, FillEmission::Empty | FillEmission::Stack(_));
+    let has_properties = has_fill_child || !strokes.is_empty();
 
     let is_text = matches!(node.payload, Payload::Text { .. });
     if is_text {
@@ -628,14 +2520,28 @@ fn print_node(doc: &Document, id: NodeId, depth: usize, out: &mut String) {
             .replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;");
-        let _ = writeln!(out, ">{escaped}</text>");
-    } else if node.children.is_empty() {
+        let _ = write!(out, ">");
+        if has_fill_child {
+            write_fill(fill_emission, depth + 1, true, out)?;
+        }
+        for stroke in strokes {
+            write_stroke(stroke, &node.payload, depth + 1, true, out)?;
+        }
+        let _ = writeln!(out, "{escaped}</text>");
+    } else if node.children.is_empty() && !has_properties {
         let _ = writeln!(out, "/>");
     } else {
         let _ = writeln!(out, ">");
+        if has_fill_child {
+            write_fill(fill_emission, depth + 1, false, out)?;
+        }
+        for stroke in strokes {
+            write_stroke(stroke, &node.payload, depth + 1, false, out)?;
+        }
         for c in &node.children {
-            print_node(doc, *c, depth + 1, out);
+            print_node(doc, *c, depth + 1, vocabulary, out)?;
         }
         let _ = writeln!(out, "{indent}</{tag}>");
     }
+    Ok(())
 }

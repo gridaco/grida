@@ -151,7 +151,7 @@ fn gate_diff() -> bool {
         viewport: (2000.0, 1400.0),
         rotation_in_flow: RotationInFlow::VisualOnly,
     };
-    let ctx = paint::PaintCtx { font: None };
+    let ctx = paint::PaintCtx::new(None);
     let view = Affine::scale(0.6, 0.6); // fit-ish so the frame has real draws
     let (w, h) = (1360, 900);
     let mut all = true;

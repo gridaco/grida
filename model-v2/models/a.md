@@ -149,7 +149,7 @@ SurfaceStyle { fills: [Paint], strokes: [Paint], stroke_width, stroke_style,
 | -------- | ------------------------------------------------------------------ | -------------------------- | --------------------------------------------- |
 | `frame`  | `LayoutBehavior` (§3.1) + `SurfaceStyle` + `clips_content: bool`   | declared (Auto = hug)      | yes                                           |
 | `tray`   | `SurfaceStyle`                                                     | declared                   | yes (canvas organization; no clip, no layout) |
-| `shape`  | `ShapeDescriptor` (§3.2) + `SurfaceStyle`                          | declared                   | no                                            |
+| `shape`  | `ShapeDescriptor` (§3.2) + `SurfaceStyle`                          | declared                   | yes (free-positioned in the declared box)     |
 | `image`  | `ResourceRef` + `ImageFit` + `SurfaceStyle`                        | declared                   | no                                            |
 | `text`   | content + `TextStyle` + align + overflow (`max_lines`, `ellipsis`) | measured                   | no                                            |
 | `embed`  | `format: markdown \| html` + source + `SurfaceStyle`               | measured                   | no                                            |
@@ -205,6 +205,13 @@ ShapeDescriptor =
 editable geometry, hence a measured box. `shape/Path` (render-only,
 normalized) vs `vector` (editable, measured) is the same split the format
 draft already makes.
+
+A shape's child list is composition, not measurement or layout. The
+parametric primitive paints first; ordered children then paint in the shape's
+local box using free bindings. Descendant edits never rewrite or resize the
+primitive and never change the shape's parent-layout contribution. A shape
+with text is therefore an ordinary `shape → text` subtree, not a separate
+`ShapeWithText` payload.
 
 Stroke endpoint markers live in `SurfaceStyle`-adjacent stroke props and are
 honored only on open geometry (`Line`, open `Path`, open network) —
@@ -316,7 +323,10 @@ Resolution never writes back to the document.
 
 ---
 
-## 7. Worked examples (H1 — the XML quartet)
+## 7. Worked examples (H1 — historical XML sketches)
+
+These model sketches predate both the frozen E3 TextIr grammar and Draft 0
+`.grida.xml`. They are not parseable source for either language.
 
 ```xml
 <!-- (a) rectangle rotated 15° -->

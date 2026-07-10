@@ -299,3 +299,86 @@ fn l7_resolution_unquantized() {
     assert!((w - 33.333332).abs() < 1e-3, "fractional width kept: {w}");
     let _ = resolve(&doc, &opts_visual()); // both modes agree here
 }
+
+#[test]
+fn free_container_padding_insets_fixed_content_box() {
+    let mut b = DocBuilder::new();
+    let (h, p) = frame_free(SizeIntent::Fixed(100.0), SizeIntent::Fixed(80.0));
+    let p = match p {
+        Payload::Frame {
+            mut layout,
+            clips_content,
+        } => {
+            layout.padding = EdgeInsets {
+                top: 7.0,
+                right: 20.0,
+                bottom: 13.0,
+                left: 10.0,
+            };
+            Payload::Frame {
+                layout,
+                clips_content,
+            }
+        }
+        _ => unreachable!(),
+    };
+    let frame = b.add(0, h, p);
+
+    let (mut child_h, child_p) = shape(20.0, 10.0);
+    child_h.x = AxisBinding::start(5.0);
+    child_h.y = AxisBinding::start(6.0);
+    let child = b.add(frame, child_h, child_p);
+
+    let mut span_h = Header::new(SizeIntent::Auto, SizeIntent::Fixed(10.0));
+    span_h.x = AxisBinding::Span {
+        start: 0.0,
+        end: 0.0,
+    };
+    span_h.y = AxisBinding::start(30.0);
+    let span = b.add(
+        frame,
+        span_h,
+        Payload::Shape {
+            desc: ShapeDesc::Rect,
+        },
+    );
+
+    let r = run(&b.build());
+    assert_rect(r.box_of(child), 15.0, 13.0, 20.0, 10.0, "padded start");
+    assert_rect(
+        r.box_of(span),
+        10.0,
+        37.0,
+        70.0,
+        10.0,
+        "span fills padded content width",
+    );
+}
+
+#[test]
+fn free_container_padding_insets_auto_content_box() {
+    let mut b = DocBuilder::new();
+    let (h, p) = frame_free(SizeIntent::Auto, SizeIntent::Auto);
+    let p = match p {
+        Payload::Frame {
+            mut layout,
+            clips_content,
+        } => {
+            layout.padding = EdgeInsets::all(10.0);
+            Payload::Frame {
+                layout,
+                clips_content,
+            }
+        }
+        _ => unreachable!(),
+    };
+    let frame = b.add(0, h, p);
+    let (mut child_h, child_p) = shape(20.0, 30.0);
+    child_h.x = AxisBinding::start(5.0);
+    child_h.y = AxisBinding::start(7.0);
+    let child = b.add(frame, child_h, child_p);
+
+    let r = run(&b.build());
+    assert_rect(r.box_of(frame), 0.0, 0.0, 45.0, 57.0, "auto padded frame");
+    assert_rect(r.box_of(child), 15.0, 17.0, 20.0, 30.0, "auto padded child");
+}
