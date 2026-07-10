@@ -365,3 +365,84 @@ describe("StreamRegistry / lifecycle observer", () => {
     expect(kept).toEqual(["ses_a", "ses_b"]);
   });
 });
+
+describe("StreamRegistry / continuation replay prefix", () => {
+  it("serves the prefix BEFORE the buffered replay to an opt-in consumer", async () => {
+    const entry = registry.create("ses_a", {
+      replay_prefix: Promise.resolve(["p1", "p2"]),
+    });
+    void entry;
+    registry.push("ses_a", "b1");
+    registry.push("ses_a", "b2");
+    const c = makeConsumer();
+    registry.attach("ses_a", c, { replay_prefix: true });
+    await flushMicrotasks();
+    expect(c.frames).toEqual(["p1", "p2", "b1", "b2"]);
+  });
+
+  it("default-off: a plain attach (recorder / run response) never sees the prefix", async () => {
+    registry.create("ses_a", { replay_prefix: Promise.resolve(["p1"]) });
+    registry.push("ses_a", "b1");
+    const plain = makeConsumer();
+    registry.attach("ses_a", plain);
+    await flushMicrotasks();
+    expect(plain.frames).toEqual(["b1"]);
+  });
+
+  it("frames pushed while the prefix is being served are not lost or reordered", async () => {
+    let releasePrefix!: (v: readonly string[]) => void;
+    const gate = new Promise<readonly string[]>((r) => {
+      releasePrefix = r;
+    });
+    registry.create("ses_a", { replay_prefix: gate });
+    registry.push("ses_a", "b1");
+    const c = makeConsumer();
+    registry.attach("ses_a", c, { replay_prefix: true });
+    await flushMicrotasks();
+    // Prefix unresolved: nothing delivered yet; a concurrent push buffers.
+    expect(c.frames).toEqual([]);
+    registry.push("ses_a", "b2");
+    releasePrefix(["p1"]);
+    await flushMicrotasks();
+    expect(c.frames).toEqual(["p1", "b1", "b2"]);
+    // And live delivery works after catch-up.
+    registry.push("ses_a", "b3");
+    await flushMicrotasks();
+    expect(c.frames).toEqual(["p1", "b1", "b2", "b3"]);
+  });
+
+  it("prefix rides the finish grace window (late reconnect still gets it)", async () => {
+    registry.create("ses_a", { replay_prefix: Promise.resolve(["p1"]) });
+    registry.push("ses_a", "b1");
+    registry.finish("ses_a", "finish");
+    const late = makeConsumer();
+    registry.attach("ses_a", late, { replay_prefix: true });
+    await flushMicrotasks();
+    expect(late.frames).toEqual(["p1", "b1"]);
+    expect(late.ended).toEqual(["finish"]);
+  });
+
+  it("an entry created without a prefix serves opt-in consumers plain", async () => {
+    registry.create("ses_a");
+    registry.push("ses_a", "b1");
+    const c = makeConsumer();
+    registry.attach("ses_a", c, { replay_prefix: true });
+    await flushMicrotasks();
+    expect(c.frames).toEqual(["b1"]);
+  });
+
+  it("detach during prefix delivery stops everything", async () => {
+    let releasePrefix!: (v: readonly string[]) => void;
+    const gate = new Promise<readonly string[]>((r) => {
+      releasePrefix = r;
+    });
+    registry.create("ses_a", { replay_prefix: gate });
+    registry.push("ses_a", "b1");
+    const c = makeConsumer();
+    const detach = registry.attach("ses_a", c, { replay_prefix: true });
+    detach();
+    releasePrefix(["p1"]);
+    await flushMicrotasks();
+    expect(c.frames).toEqual([]);
+  });
+});

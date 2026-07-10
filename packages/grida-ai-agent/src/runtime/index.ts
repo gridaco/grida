@@ -83,6 +83,7 @@ import {
   writeScratchFile,
 } from "../session/scratch";
 import { buildModelMessages, type ModelUIMessage } from "./message-view";
+import { buildReplayPrefix } from "./replay-prefix";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
 import { buildStatusConsumerResponse } from "./status-sse";
 
@@ -928,10 +929,36 @@ export class AgentRuntime {
       scratch_seed: scratchSeed,
     } = opts;
 
+    // Self-contained continuation replay (`replay-prefix.ts`): snapshot the
+    // visible tail NOW — before the pump can persist this turn's own frames
+    // into it — and lower an assistant tail (an approval/question resume)
+    // into reconstruction chunks for reconnect consumers. A user tail (every
+    // normal send and queue drain) lowers to []. The promise never rejects
+    // (degrades to [] with a warning); the pump awaits it below so the
+    // snapshot read strictly precedes the recorder's first write.
+    const replayPrefix = (async (): Promise<readonly string[]> => {
+      try {
+        const visible =
+          await this.deps.sessions_store.listVisibleMessages(sessionId);
+        return buildReplayPrefix(visible[visible.length - 1]);
+      } catch (err) {
+        console.warn(
+          `[agent-host-agent] replay-prefix build failed sessionId=${sessionId} err=${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+        return [];
+      }
+    })();
+
     // Reserve the registry entry; its `modelAbort.signal` (not the request
     // signal) drives the model call so a disconnect can resume. Throws
-    // RunInFlightError to the caller if a run is already in flight.
-    const entry = this.streams.create(sessionId);
+    // RunInFlightError to the caller if a run is already in flight. The
+    // prefix rides the entry from the reserve on, so no consumer can attach
+    // before it is decided.
+    const entry = this.streams.create(sessionId, {
+      replay_prefix: replayPrefix,
+    });
 
     // Lifecycle event (RFC `events`): the turn is reserved — announce it,
     // naming the fired message (RFC `turn-authority`). Stash the id for the
@@ -1011,6 +1038,11 @@ export class AgentRuntime {
     // consumer (HTTP) or reconnects later (a core drain has no live consumer).
     void (async () => {
       try {
+        // Ordering invariant for the continuation prefix: the tail snapshot
+        // completes before ANY of this turn's frames can reach the recorder.
+        // The promise never rejects (see above).
+        await replayPrefix;
+
         // Create the session scratch dir before ANY provider split so
         // agent-provider turns and model-provider turns see the same first-turn
         // template/upload seed. `scratchDir` also exists for shell/image-only
@@ -1166,9 +1198,10 @@ export class AgentRuntime {
   }
 
   /**
-   * `GET /agent/stream/:sessionId` — reconnect to an in-flight run. Full
-   * replay from chunk 0 then live tail; 404 if no run is in flight (the
-   * client falls back to DB hydration).
+   * `GET /agent/stream/:sessionId` — reconnect to an in-flight run. Serves
+   * the continuation prefix (a resumed turn's persisted head — see
+   * `replay-prefix.ts`), then full replay from chunk 0, then live tail; 404
+   * if no run is in flight (the client falls back to DB hydration).
    */
   stream(sessionId: string, requestSignal: AbortSignal): Response {
     if (!sessionId) {
@@ -1184,7 +1217,9 @@ export class AgentRuntime {
         { status: 404 }
       );
     }
-    return buildConsumerResponse(this.streams, sessionId, requestSignal);
+    return buildConsumerResponse(this.streams, sessionId, requestSignal, {
+      replay_prefix: true,
+    });
   }
 
   /**

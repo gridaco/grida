@@ -22,6 +22,16 @@ export type StreamEntry = {
   chunks: string[];
   consumers: Map<string, StreamConsumer>;
   gc_timer?: ReturnType<typeof setTimeout>;
+  /**
+   * Self-contained continuation replay (see `replay-prefix.ts`): frames
+   * that reconstruct the CONTINUED assistant message's persisted parts,
+   * served to opt-in (reconnect) consumers BEFORE the buffered replay.
+   * Never enters `chunks[]` — the run-response consumer and the recorder
+   * must not see it (duplication / double-persist). A promise because the
+   * snapshot is an async store read kicked at reserve time; it must never
+   * reject (the builder degrades to `[]`).
+   */
+  replay_prefix?: Promise<readonly string[]>;
 };
 
 export class RunInFlightError extends Error {
@@ -98,8 +108,13 @@ export class StreamRegistry {
   }
 
   /** Reserve a new entry. Throws `RunInFlightError` if one is running.
-   *  A previously-ended entry in its grace window is replaced. */
-  create(sessionId: string): StreamEntry {
+   *  A previously-ended entry in its grace window is replaced.
+   *  `replay_prefix` is assigned here — synchronously with the reserve — so
+   *  no consumer can attach to an entry whose prefix isn't decided yet. */
+  create(
+    sessionId: string,
+    opts?: { replay_prefix?: Promise<readonly string[]> }
+  ): StreamEntry {
     const existing = this.entries.get(sessionId);
     if (existing?.status === "running") throw new RunInFlightError(sessionId);
     if (existing) this.drop(sessionId);
@@ -109,6 +124,7 @@ export class StreamRegistry {
       status: "running",
       chunks: [],
       consumers: new Map(),
+      replay_prefix: opts?.replay_prefix,
     };
     this.entries.set(sessionId, entry);
     // Busy edge — AFTER the entry is in the map (throws above never notify).
@@ -163,8 +179,18 @@ export class StreamRegistry {
    * Attach a consumer. Replays every buffered frame in insertion order
    * then live-tails. If the entry already ended, fires `onEnd` after
    * replay. Returns detach fn.
+   *
+   * `replay_prefix: true` (reconnect consumers ONLY) additionally serves
+   * the entry's continuation prefix BEFORE the buffered replay — see
+   * `replay-prefix.ts`. Default false: the run-response consumer would
+   * duplicate the live message's parts and the recorder would
+   * double-persist rows.
    */
-  attach(sessionId: string, consumer: StreamConsumer): () => void {
+  attach(
+    sessionId: string,
+    consumer: StreamConsumer,
+    opts?: { replay_prefix?: boolean }
+  ): () => void {
     const entry = this.entries.get(sessionId);
     if (!entry) throw new Error(`stream entry not found: ${sessionId}`);
     const id = `c${++this.consumer_seq}`;
@@ -175,6 +201,16 @@ export class StreamRegistry {
     };
     void (async () => {
       try {
+        if (opts?.replay_prefix && entry.replay_prefix) {
+          // Never rejects by contract (the builder degrades to []); frames
+          // precede the buffer so the client reducer sees the continued
+          // message's head before the live turn's own chunks.
+          const prefix = await entry.replay_prefix;
+          for (const frame of prefix) {
+            if (detached) return;
+            await consumer.on_frame(frame);
+          }
+        }
         // Replay buffered frames first, catching up to whatever is live.
         // The consumer is NOT registered for live delivery until replay
         // has drained every currently-buffered frame: registering it up

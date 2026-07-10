@@ -51,11 +51,15 @@ export async function pumpResponseIntoRegistry(
  * SSE Response that attaches a fresh registry consumer. `requestSignal`
  * abort detaches this consumer only; the upstream model call is
  * untouched (the whole point of the registry).
+ *
+ * `opts.replay_prefix` (reconnect route only) serves the continuation
+ * prefix before the buffered replay — see `replay-prefix.ts`.
  */
 export function buildConsumerResponse(
   registry: StreamRegistry,
   sessionId: string,
-  requestSignal: AbortSignal
+  requestSignal: AbortSignal,
+  opts?: { replay_prefix?: boolean }
 ): Response {
   const encoder = new TextEncoder();
   let detach: (() => void) | null = null;
@@ -92,23 +96,27 @@ export function buildConsumerResponse(
           })}\n\n`
         )
       );
-      detach = registry.attach(sessionId, {
-        on_frame: (data) => {
-          if (closed) return;
-          try {
-            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-          } catch {} // controller already closed
+      detach = registry.attach(
+        sessionId,
+        {
+          on_frame: (data) => {
+            if (closed) return;
+            try {
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            } catch {} // controller already closed
+          },
+          // A failed upstream run ends with reason "error": surface it to
+          // the client as a stream error (controller.error) so it is NOT
+          // mistaken for a graceful completion. "finish"/"abort" close
+          // cleanly — an abort is a user-intended stop, not a failure.
+          on_end: (reason) =>
+            reason === "error"
+              ? fail(controller, new Error("agent stream failed"))
+              : close(controller),
+          on_error: (err) => fail(controller, err),
         },
-        // A failed upstream run ends with reason "error": surface it to
-        // the client as a stream error (controller.error) so it is NOT
-        // mistaken for a graceful completion. "finish"/"abort" close
-        // cleanly — an abort is a user-intended stop, not a failure.
-        on_end: (reason) =>
-          reason === "error"
-            ? fail(controller, new Error("agent stream failed"))
-            : close(controller),
-        on_error: (err) => fail(controller, err),
-      });
+        { replay_prefix: opts?.replay_prefix }
+      );
       const onAbort = () => {
         detach?.();
         close(controller);
