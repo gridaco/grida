@@ -53,11 +53,14 @@ export {
   type CoreRunState,
 } from "./use-session-status";
 export {
-  useResumeInFlight,
-  decideResumeInFlight,
-  type ResumeInFlightDecision,
-  type UseResumeInFlightArgs,
-} from "./use-resume-in-flight";
+  StreamAttachOwner,
+  type StreamAttachBinding,
+  type StreamAttachDecision,
+  type StreamAttachDenyReason,
+  type StreamAttachIntent,
+} from "./stream-attach-owner";
+export { useStreamAttach, type UseStreamAttachArgs } from "./use-stream-attach";
+export { chatError } from "./chat-error";
 export {
   computeContextUsage,
   estimateContextBreakdown,

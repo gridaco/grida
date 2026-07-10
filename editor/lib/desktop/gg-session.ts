@@ -132,23 +132,12 @@ function setCached(state: GridaGatewaySessionState): GridaGatewaySessionState {
 }
 
 // ---------------------------------------------------------------------------
-// Error detection — the daemon's typed errors cross Electron's
-// contextBridge, which strips custom props; the LITERAL CODE leads the
-// message (the `isWriteConflict` idiom). Detect by substring.
+// Error detection — hoisted to the bridge-free `gg-errors.ts` so the chat
+// error classifier (`agent-chat/chat-error.ts`) shares the one
+// implementation; re-exported here for the existing call sites.
 // ---------------------------------------------------------------------------
 
-function errorText(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return typeof err === "string" ? err : JSON.stringify(err ?? "");
-}
-
-export function isGgTokenExpired(err: unknown): boolean {
-  return errorText(err).includes("gg_token_expired");
-}
-
-export function isGgInsufficientCredits(err: unknown): boolean {
-  return errorText(err).includes("insufficient_credits");
-}
+export { isGgTokenExpired, isGgInsufficientCredits } from "./gg-errors";
 
 /** Test-only: reset module singletons between cases. */
 export function __unsafe_reset_for_tests(): void {
