@@ -70,6 +70,22 @@ describe("SidecarLogWriter", () => {
     expect(all).not.toContain("gen-1");
   });
 
+  it("rotates by UTF-8 byte count, not UTF-16 length (multi-byte content)", () => {
+    // 40 emoji = 40 UTF-16 code units apiece would badly undercount; each is
+    // 4 UTF-8 bytes → 160 bytes/line + timestamp prefix. With a 200-byte cap
+    // the second line must rotate. If size tracked `.length` it would think
+    // the file was far under the cap and never rotate.
+    const w = new SidecarLogWriter(dir, { max_bytes: 200, keep: 2 });
+    const emoji = "🚀".repeat(40);
+    w.write("out", emoji);
+    w.write("out", emoji);
+    expect(fs.existsSync(path.join(dir, "sidecar.1.log"))).toBe(true);
+    expect(fs.readFileSync(path.join(dir, "sidecar.1.log"), "utf8")).toContain(
+      emoji
+    );
+    expect(fs.readFileSync(w.file, "utf8")).toContain(emoji);
+  });
+
   it("swallows fs errors and recovers on the next write", () => {
     const w = new SidecarLogWriter(dir, { max_bytes: 1024, keep: 2 });
     w.write("out", "before");

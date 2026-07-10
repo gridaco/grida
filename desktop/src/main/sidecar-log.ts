@@ -52,9 +52,14 @@ export class SidecarLogWriter {
     const entry = `${new Date().toISOString()} [${stream}] ${line}\n`;
     try {
       if (this.size === null) this.size = this.currentSize();
-      if (this.size + entry.length > this.max_bytes) this.rotate();
+      // Byte count (not `entry.length`, which is UTF-16 code units) so the
+      // accounting matches `statSync().size` — sidecar stderr can carry
+      // multi-byte content, and an undercount would let the file overshoot
+      // the cap the rotation exists to enforce.
+      const entryBytes = Buffer.byteLength(entry, "utf8");
+      if (this.size + entryBytes > this.max_bytes) this.rotate();
       fs.appendFileSync(this.file, entry, "utf8");
-      this.size += entry.length;
+      this.size += entryBytes;
     } catch {
       // Logging is best-effort by contract; a full disk or a permissions
       // problem must never take the supervisor down with it.
