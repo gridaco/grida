@@ -53,6 +53,7 @@ import {
   isSupportedPlatform,
   checkDependencies,
 } from "./sandbox/manager";
+import { SidecarLogWriter } from "./sidecar-log";
 import { EDITOR_BASE_URL } from "../env";
 
 export type AgentSidecarInfo = {
@@ -83,6 +84,13 @@ class AgentSidecarSupervisor {
   // app.getPath("userData") (Chromium cookies/cache/window state) is left
   // untouched — mirrors codex keeping ~/.codex separate from its GUI shell dir.
   private readonly user_data_path = home.join("agent");
+
+  // Durable sidecar log (~/.grida/agent/logs/sidecar.log). The console
+  // mirroring below stays — this ADDS the on-disk trace a packaged-app
+  // incident needs (the console is gone by the time anyone looks).
+  private readonly log = new SidecarLogWriter(
+    path.join(this.user_data_path, "logs")
+  );
 
   constructor() {
     app.on("before-quit", () => {
@@ -253,6 +261,7 @@ class AgentSidecarSupervisor {
       const timeout = setTimeout(() => {
         if (resolved) return;
         resolved = true;
+        this.log.write("sup", "startup timed out; stopping child");
         this.stop();
         reject(new Error("agent sidecar startup timed out"));
       }, STARTUP_TIMEOUT_MS);
@@ -315,6 +324,10 @@ class AgentSidecarSupervisor {
             stdio: ["pipe", "pipe", "pipe"],
           });
       this.child = child;
+      this.log.write(
+        "sup",
+        `spawned pid=${child.pid ?? "?"} sandbox=${supportedSandbox ? "srt" : "none"}`
+      );
       child.stdin?.end(`${password}\n`);
 
       child.stdout?.on("data", (chunk: Buffer) => {
@@ -327,6 +340,7 @@ class AgentSidecarSupervisor {
             if (Number.isFinite(port) && port > 0 && port < 65536) {
               this.info = { port, password };
               this.restartBackoffMs = BACKOFF_INITIAL_MS;
+              this.log.write("sup", `listening port=${port}`);
               if (!resolved) {
                 resolved = true;
                 clearTimeout(timeout);
@@ -335,6 +349,7 @@ class AgentSidecarSupervisor {
             }
           } else {
             console.log(`[agent-sidecar] ${trimmed}`);
+            this.log.write("out", trimmed);
           }
         }
       });
@@ -343,14 +358,20 @@ class AgentSidecarSupervisor {
         const text = chunk.toString("utf8");
         for (const line of text.split("\n")) {
           const trimmed = line.trim();
-          if (trimmed.length > 0)
+          if (trimmed.length > 0) {
             console.error(`[agent-sidecar:err] ${trimmed}`);
+            this.log.write("err", trimmed);
+          }
         }
       });
 
       child.on("exit", (code, signal) => {
         console.warn(
           `[agent-sidecar] exited code=${code}${signal ? ` signal=${signal}` : ""}`
+        );
+        this.log.write(
+          "sup",
+          `exited code=${code}${signal ? ` signal=${signal}` : ""}`
         );
         this.info = null;
         this.child = null;
@@ -375,9 +396,11 @@ class AgentSidecarSupervisor {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
+          this.log.write("sup", `spawn failed: ${err.message}`);
           reject(new Error(`agent sidecar spawn failed: ${err.message}`));
         } else {
           console.error("[agent-sidecar] spawn error:", err);
+          this.log.write("sup", `spawn error: ${err.message}`);
         }
       });
     });
@@ -385,6 +408,10 @@ class AgentSidecarSupervisor {
 
   private handleRestartFailure(err: unknown): void {
     console.error("[agent-sidecar] restart failed:", err);
+    this.log.write(
+      "sup",
+      `restart failed: ${err instanceof Error ? err.message : String(err)}`
+    );
     this.scheduleRestart();
   }
 
@@ -401,6 +428,7 @@ class AgentSidecarSupervisor {
     const wait = this.restartBackoffMs;
     this.restartBackoffMs = Math.min(this.restartBackoffMs * 2, BACKOFF_MAX_MS);
     console.warn(`[agent-sidecar] restart in ${wait}ms`);
+    this.log.write("sup", `restart in ${wait}ms`);
     this.restartTimer = setTimeout(() => {
       this.restartTimer = null;
       if (this.isShuttingDown) return;
