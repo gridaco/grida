@@ -71,11 +71,13 @@ describe("SidecarLogWriter", () => {
   });
 
   it("rotates by UTF-8 byte count, not UTF-16 length (multi-byte content)", () => {
-    // 40 emoji = 40 UTF-16 code units apiece would badly undercount; each is
-    // 4 UTF-8 bytes → 160 bytes/line + timestamp prefix. With a 200-byte cap
-    // the second line must rotate. If size tracked `.length` it would think
-    // the file was far under the cap and never rotate.
-    const w = new SidecarLogWriter(dir, { max_bytes: 200, keep: 2 });
+    // Discriminating cap: each 🚀 is a UTF-16 surrogate PAIR (2 code units)
+    // but 4 UTF-8 bytes. Per line the entry is ~112 UTF-16 units vs ~192
+    // bytes (32-char prefix + 80 units / 160 bytes of emoji). With a 300 cap,
+    // a `.length`-based counter sees 112+112=224 < 300 on the second write and
+    // would NOT rotate; byte counting sees 192+192=384 > 300 and DOES. So this
+    // fails against the old `.length` accounting and passes only with bytes.
+    const w = new SidecarLogWriter(dir, { max_bytes: 300, keep: 2 });
     const emoji = "🚀".repeat(40);
     w.write("out", emoji);
     w.write("out", emoji);
