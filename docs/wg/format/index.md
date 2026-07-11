@@ -18,6 +18,7 @@ Tracking docs for the Grida IR schema and how external formats map into it.
 | [Grida IR](./grida)                            | Canonical IR reference — node types, paint, layout         |
 | [Grida XML](./grida-xml)                       | Open RFD for the authored, inspectable `.grida.xml` source |
 | [Grida XML properties](./grida-xml-properties) | XML property names, applicability, and design placeholders |
+| [Grida XML animation](./grida-xml-animation)   | Open day-one animation question set for `.grida.xml`       |
 | [CSS](./css)                                   | CSS → Grida IR property mapping and TODO tracker           |
 | [HTML](./html)                                 | HTML element → Grida IR node mapping                       |
 | [SVG](./svg)                                   | SVG → usvg → Grida IR mapping and TODO tracker             |
