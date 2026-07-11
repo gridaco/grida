@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<grida version="0">
+  <container name="Orbital Night Grid" width="1000" height="620" clips="true">
+    <fill>
+      <solid color="#030611"/>
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.92">
+        <stop offset="0" color="#13213E"/>
+        <stop offset="0.48" color="#07101F"/>
+        <stop offset="1" color="#02040B"/>
+      </gradient>
+      <gradient kind="radial" transform="1.7 0 0 1.2 -0.55 -0.15" opacity="0.48" blend-mode="screen">
+        <stop offset="0" color="#0EA5E9" opacity="0.42"/>
+        <stop offset="0.45" color="#312E81" opacity="0.18"/>
+        <stop offset="1" color="#020617" opacity="0"/>
+      </gradient>
+      <gradient kind="sweep" transform="1.5 0 0 1.5 -0.15 -0.2" opacity="0.08" blend-mode="screen">
+        <stop offset="0" color="#22D3EE"/>
+        <stop offset="0.34" color="#A855F7"/>
+        <stop offset="0.68" color="#F59E0B"/>
+        <stop offset="1" color="#22D3EE"/>
+      </gradient>
+    </fill>
+    <stroke width="5" align="inside" join="miter">
+      <solid color="#01030A" opacity="0.9"/>
+    </stroke>
+    <stroke width="1" align="inside" join="miter">
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.72">
+        <stop offset="0" color="#22D3EE"/>
+        <stop offset="0.5" color="#7C3AED"/>
+        <stop offset="1" color="#F59E0B"/>
+      </gradient>
+    </stroke>
+
+    <!-- Ambient orbital geometry -->
+    <ellipse name="upper orbit" x="640" y="-310" width="610" height="610" rotation="-12" opacity="0.34">
+      <fill/>
+      <stroke width="22" align="center" dash-array="3 28">
+        <gradient kind="linear" from="0 0.5" to="1 0.5" opacity="0.12" blend-mode="screen">
+          <stop offset="0" color="#22D3EE"/>
+          <stop offset="0.5" color="#A855F7"/>
+          <stop offset="1" color="#F59E0B"/>
+        </gradient>
+      </stroke>
+      <stroke width="2" align="center" dash-array="2 11">
+        <solid color="#93C5FD" opacity="0.28"/>
+      </stroke>
+    </ellipse>
+    <ellipse name="lower orbit" x="-260" y="325" width="590" height="590" rotation="18" opacity="0.24">
+      <fill/>
+      <stroke width="3" align="center" dash-array="1 15">
+        <gradient kind="linear" opacity="0.46" blend-mode="screen">
+          <stop offset="0" color="#F472B6"/>
+          <stop offset="1" color="#22D3EE"/>
+        </gradient>
+      </stroke>
+    </ellipse>
+
+    <!-- Poster heading -->
+    <text name="title" x="42" y="36" font-size="34">
+      <fill>
+        <gradient kind="linear" from="0 0.5" to="1 0.5">
+          <stop offset="0" color="#F8FAFC"/>
+          <stop offset="0.46" color="#BAE6FD"/>
+          <stop offset="1" color="#C4B5FD"/>
+        </gradient>
+      </fill>
+      <stroke width="2" align="outside">
+        <solid color="#0EA5E9" opacity="0.22" blend-mode="screen"/>
+      </stroke>ORBITAL NIGHT GRID</text>
+    <text x="44" y="82" font-size="13" fill="#7DD3FC">NIGHT TRANSIT FIELD • 03 ACTIVE LINES • 18 STATIONS</text>
+    <text x="end 40" y="42" font-size="12" fill="#94A3B8">37.5665° N / 126.9780° E</text>
+    <text x="end 40" y="63" font-size="10" fill="#475569">SECTOR 07 — SERVICE MAP</text>
+
+    <ellipse name="service status" x="836" y="91" width="122" height="28">
+      <fill>
+        <solid color="#052E2B" opacity="0.9"/>
+        <gradient kind="linear" opacity="0.34" blend-mode="screen">
+          <stop offset="0" color="#10B981"/>
+          <stop offset="1" color="#22D3EE"/>
+        </gradient>
+      </fill>
+      <stroke width="1" align="inside">
+        <solid color="#5EEAD4" opacity="0.8"/>
+      </stroke>
+      <text x="center" y="center" font-size="11" fill="#CCFBF1">● NETWORK LIVE</text>
+    </ellipse>
+
+    <!-- Map field -->
+    <rect name="map field" x="40" y="132" width="700" height="398">
+      <fill>
+        <solid color="#07101E" opacity="0.72"/>
+        <gradient kind="radial" transform="1.3 0 0 1.8 -0.05 -0.5" opacity="0.42" blend-mode="screen">
+          <stop offset="0" color="#1D4ED8" opacity="0.3"/>
+          <stop offset="0.62" color="#111827" opacity="0.06"/>
+          <stop offset="1" color="#020617" opacity="0"/>
+        </gradient>
+      </fill>
+      <stroke width="7" align="inside" join="miter">
+        <solid color="#020617" opacity="0.7"/>
+      </stroke>
+      <stroke width="1" align="inside" join="miter" dash-array="6 4">
+        <gradient kind="linear" opacity="0.48">
+          <stop offset="0" color="#164E63"/>
+          <stop offset="0.5" color="#312E81"/>
+          <stop offset="1" color="#78350F"/>
+        </gradient>
+      </stroke>
+    </rect>
+
+    <group name="coordinate mesh" opacity="0.55">
+      <line x="62" y="180" width="656">
+        <stroke width="1" align="center" cap="round" dash-array="1 17">
+          <solid color="#38BDF8" opacity="0.17"/>
+        </stroke>
+      </line>
+      <line x="62" y="245" width="656">
+        <stroke width="1" align="center" cap="round" dash-array="1 17">
+          <solid color="#A78BFA" opacity="0.14"/>
+        </stroke>
+      </line>
+      <line x="62" y="310" width="656">
+        <stroke width="1" align="center" cap="round" dash-array="1 17">
+          <solid color="#38BDF8" opacity="0.13"/>
+        </stroke>
+      </line>
+      <line x="62" y="375" width="656">
+        <stroke width="1" align="center" cap="round" dash-array="1 17">
+          <solid color="#A78BFA" opacity="0.14"/>
+        </stroke>
+      </line>
+      <line x="62" y="440" width="656">
+        <stroke width="1" align="center" cap="round" dash-array="1 17">
+          <solid color="#38BDF8" opacity="0.13"/>
+        </stroke>
+      </line>
+      <line x="62" y="505" width="656">
+        <stroke width="1" align="center" cap="round" dash-array="1 17">
+          <solid color="#A78BFA" opacity="0.14"/>
+        </stroke>
+      </line>
+      <lens x="105" y="150" ops="rotate(90)">
+        <line width="360">
+          <stroke width="1" align="center" cap="round" dash-array="1 17">
+            <solid color="#38BDF8" opacity="0.13"/>
+          </stroke>
+        </line>
+      </lens>
+      <lens x="215" y="150" ops="rotate(90)">
+        <line width="360">
+          <stroke width="1" align="center" cap="round" dash-array="1 17">
+            <solid color="#A78BFA" opacity="0.13"/>
+          </stroke>
+        </line>
+      </lens>
+      <lens x="325" y="150" ops="rotate(90)">
+        <line width="360">
+          <stroke width="1" align="center" cap="round" dash-array="1 17">
+            <solid color="#38BDF8" opacity="0.13"/>
+          </stroke>
+        </line>
+      </lens>
+      <lens x="435" y="150" ops="rotate(90)">
+        <line width="360">
+          <stroke width="1" align="center" cap="round" dash-array="1 17">
+            <solid color="#A78BFA" opacity="0.13"/>
+          </stroke>
+        </line>
+      </lens>
+      <lens x="545" y="150" ops="rotate(90)">
+        <line width="360">
+          <stroke width="1" align="center" cap="round" dash-array="1 17">
+            <solid color="#38BDF8" opacity="0.13"/>
+          </stroke>
+        </line>
+      </lens>
+      <lens x="655" y="150" ops="rotate(90)">
+        <line width="360">
+          <stroke width="1" align="center" cap="round" dash-array="1 17">
+            <solid color="#A78BFA" opacity="0.13"/>
+          </stroke>
+        </line>
+      </lens>
+    </group>
+
+    <!-- Small field lights -->
+    <group name="field lights">
+      <ellipse x="83" y="158" width="3" height="3" fill="#E0F2FE" opacity="0.72"/>
+      <ellipse x="184" y="286" width="2" height="2" fill="#C4B5FD" opacity="0.55"/>
+      <ellipse x="248" y="190" width="4" height="4" fill="#BAE6FD" opacity="0.42"/>
+      <ellipse x="456" y="182" width="2" height="2" fill="#FDE68A" opacity="0.6"/>
+      <ellipse x="534" y="462" width="3" height="3" fill="#C4B5FD" opacity="0.58"/>
+      <ellipse x="681" y="190" width="4" height="4" fill="#BAE6FD" opacity="0.48"/>
+      <ellipse x="685" y="493" width="2" height="2" fill="#FDE68A" opacity="0.65"/>
+    </group>
+
+    <!-- Aqua route A1 -->
+    <group name="Aqua route A1">
+      <lens x="115" y="445" ops="rotate(0)">
+        <line width="110">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#22D3EE" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round">
+            <gradient kind="linear"><stop offset="0" color="#0891B2"/><stop offset="0.52" color="#22D3EE"/><stop offset="1" color="#38BDF8"/></gradient>
+          </stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#CFFAFE" opacity="0.55"/></stroke>
+        </line>
+      </lens>
+      <lens x="225" y="445" ops="rotate(-45)">
+        <line width="127.279">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#22D3EE" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#0891B2"/><stop offset="0.52" color="#22D3EE"/><stop offset="1" color="#38BDF8"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#CFFAFE" opacity="0.55"/></stroke>
+        </line>
+      </lens>
+      <lens x="315" y="355" ops="rotate(0)">
+        <line width="160">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#22D3EE" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#0891B2"/><stop offset="0.52" color="#22D3EE"/><stop offset="1" color="#38BDF8"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#CFFAFE" opacity="0.55"/></stroke>
+        </line>
+      </lens>
+      <lens x="475" y="355" ops="rotate(-45)">
+        <line width="141.421">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#22D3EE" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#0891B2"/><stop offset="0.52" color="#22D3EE"/><stop offset="1" color="#38BDF8"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#CFFAFE" opacity="0.55"/></stroke>
+        </line>
+      </lens>
+      <lens x="575" y="255" ops="rotate(0)">
+        <line width="135">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#22D3EE" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#0891B2"/><stop offset="0.52" color="#22D3EE"/><stop offset="1" color="#38BDF8"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#CFFAFE" opacity="0.55"/></stroke>
+        </line>
+      </lens>
+    </group>
+
+    <!-- Violet route V2 -->
+    <group name="Violet route V2">
+      <lens x="135" y="235" ops="rotate(0)">
+        <line width="135">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#D946EF" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#7C3AED"/><stop offset="0.52" color="#D946EF"/><stop offset="1" color="#F472B6"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#FAE8FF" opacity="0.52"/></stroke>
+        </line>
+      </lens>
+      <lens x="270" y="235" ops="rotate(45)">
+        <line width="127.279">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#D946EF" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#7C3AED"/><stop offset="0.52" color="#D946EF"/><stop offset="1" color="#F472B6"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#FAE8FF" opacity="0.52"/></stroke>
+        </line>
+      </lens>
+      <lens x="360" y="325" ops="rotate(0)">
+        <line width="140">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#D946EF" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#7C3AED"/><stop offset="0.52" color="#D946EF"/><stop offset="1" color="#F472B6"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#FAE8FF" opacity="0.52"/></stroke>
+        </line>
+      </lens>
+      <lens x="500" y="325" ops="rotate(45)">
+        <line width="169.706">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#D946EF" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#7C3AED"/><stop offset="0.52" color="#D946EF"/><stop offset="1" color="#F472B6"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#FAE8FF" opacity="0.52"/></stroke>
+        </line>
+      </lens>
+      <lens x="620" y="445" ops="rotate(0)">
+        <line width="85">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#D946EF" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#7C3AED"/><stop offset="0.52" color="#D946EF"/><stop offset="1" color="#F472B6"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#FAE8FF" opacity="0.52"/></stroke>
+        </line>
+      </lens>
+    </group>
+
+    <!-- Solar route S3 -->
+    <group name="Solar route S3">
+      <lens x="315" y="160" ops="rotate(90)">
+        <line width="120">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#F59E0B" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#F97316"/><stop offset="0.52" color="#F59E0B"/><stop offset="1" color="#FDE047"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#FEF3C7" opacity="0.55"/></stroke>
+        </line>
+      </lens>
+      <lens x="315" y="280" ops="rotate(45)">
+        <line width="127.279">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#F59E0B" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#F97316"/><stop offset="0.52" color="#F59E0B"/><stop offset="1" color="#FDE047"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#FEF3C7" opacity="0.55"/></stroke>
+        </line>
+      </lens>
+      <lens x="405" y="370" ops="rotate(90)">
+        <line width="135">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#F59E0B" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#F97316"/><stop offset="0.52" color="#F59E0B"/><stop offset="1" color="#FDE047"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#FEF3C7" opacity="0.55"/></stroke>
+        </line>
+      </lens>
+      <lens x="405" y="505" ops="rotate(0)">
+        <line width="185">
+          <stroke width="20" align="center" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="15" align="center" cap="round"><solid color="#F59E0B" opacity="0.2" blend-mode="screen"/></stroke>
+          <stroke width="8" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#F97316"/><stop offset="0.52" color="#F59E0B"/><stop offset="1" color="#FDE047"/></gradient></stroke>
+          <stroke width="2" align="center" cap="round"><solid color="#FEF3C7" opacity="0.55"/></stroke>
+        </line>
+      </lens>
+    </group>
+
+    <!-- Route badges -->
+    <ellipse x="68" y="427" width="58" height="28">
+      <fill>
+        <solid color="#083344"/>
+        <gradient kind="linear" opacity="0.72" blend-mode="screen"><stop offset="0" color="#0891B2"/><stop offset="1" color="#22D3EE"/></gradient>
+      </fill>
+      <stroke width="1" align="inside"><solid color="#A5F3FC" opacity="0.72"/></stroke>
+      <text x="center" y="center" font-size="13" fill="#ECFEFF">A1</text>
+    </ellipse>
+    <ellipse x="106" y="214" width="58" height="28">
+      <fill>
+        <solid color="#3B0764"/>
+        <gradient kind="linear" opacity="0.68" blend-mode="screen"><stop offset="0" color="#7C3AED"/><stop offset="1" color="#F472B6"/></gradient>
+      </fill>
+      <stroke width="1" align="inside"><solid color="#F5D0FE" opacity="0.72"/></stroke>
+      <text x="center" y="center" font-size="13" fill="#FDF4FF">V2</text>
+    </ellipse>
+    <ellipse x="286" y="143" width="58" height="28">
+      <fill>
+        <solid color="#451A03"/>
+        <gradient kind="linear" opacity="0.7" blend-mode="screen"><stop offset="0" color="#F97316"/><stop offset="1" color="#FDE047"/></gradient>
+      </fill>
+      <stroke width="1" align="inside"><solid color="#FEF3C7" opacity="0.74"/></stroke>
+      <text x="center" y="center" font-size="13" fill="#FFFBEB">S3</text>
+    </ellipse>
+
+    <!-- Standard stations -->
+    <group name="stations">
+      <ellipse x="107" y="437" width="16" height="16" fill="#06101B"><stroke width="7" align="outside"><solid color="#22D3EE" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#22D3EE"/></stroke><stroke width="2" align="inside"><solid color="#ECFEFF"/></stroke></ellipse>
+      <ellipse x="217" y="437" width="16" height="16" fill="#06101B"><stroke width="7" align="outside"><solid color="#22D3EE" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#22D3EE"/></stroke><stroke width="2" align="inside"><solid color="#ECFEFF"/></stroke></ellipse>
+      <ellipse x="307" y="347" width="16" height="16" fill="#06101B"><stroke width="7" align="outside"><solid color="#22D3EE" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#22D3EE"/></stroke><stroke width="2" align="inside"><solid color="#ECFEFF"/></stroke></ellipse>
+      <ellipse x="467" y="347" width="16" height="16" fill="#06101B"><stroke width="7" align="outside"><solid color="#22D3EE" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#22D3EE"/></stroke><stroke width="2" align="inside"><solid color="#ECFEFF"/></stroke></ellipse>
+      <ellipse x="567" y="247" width="16" height="16" fill="#06101B"><stroke width="7" align="outside"><solid color="#22D3EE" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#22D3EE"/></stroke><stroke width="2" align="inside"><solid color="#ECFEFF"/></stroke></ellipse>
+      <ellipse x="702" y="247" width="16" height="16" fill="#06101B"><stroke width="7" align="outside"><solid color="#22D3EE" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#22D3EE"/></stroke><stroke width="2" align="inside"><solid color="#ECFEFF"/></stroke></ellipse>
+
+      <ellipse x="127" y="227" width="16" height="16" fill="#10091A"><stroke width="7" align="outside"><solid color="#D946EF" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#D946EF"/></stroke><stroke width="2" align="inside"><solid color="#FDF4FF"/></stroke></ellipse>
+      <ellipse x="262" y="227" width="16" height="16" fill="#10091A"><stroke width="7" align="outside"><solid color="#D946EF" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#D946EF"/></stroke><stroke width="2" align="inside"><solid color="#FDF4FF"/></stroke></ellipse>
+      <ellipse x="492" y="317" width="16" height="16" fill="#10091A"><stroke width="7" align="outside"><solid color="#D946EF" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#D946EF"/></stroke><stroke width="2" align="inside"><solid color="#FDF4FF"/></stroke></ellipse>
+      <ellipse x="612" y="437" width="16" height="16" fill="#10091A"><stroke width="7" align="outside"><solid color="#D946EF" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#D946EF"/></stroke><stroke width="2" align="inside"><solid color="#FDF4FF"/></stroke></ellipse>
+      <ellipse x="697" y="437" width="16" height="16" fill="#10091A"><stroke width="7" align="outside"><solid color="#D946EF" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#D946EF"/></stroke><stroke width="2" align="inside"><solid color="#FDF4FF"/></stroke></ellipse>
+
+      <ellipse x="307" y="152" width="16" height="16" fill="#171007"><stroke width="7" align="outside"><solid color="#F59E0B" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#F59E0B"/></stroke><stroke width="2" align="inside"><solid color="#FFFBEB"/></stroke></ellipse>
+      <ellipse x="307" y="272" width="16" height="16" fill="#171007"><stroke width="7" align="outside"><solid color="#F59E0B" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#F59E0B"/></stroke><stroke width="2" align="inside"><solid color="#FFFBEB"/></stroke></ellipse>
+      <ellipse x="397" y="362" width="16" height="16" fill="#171007"><stroke width="7" align="outside"><solid color="#F59E0B" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#F59E0B"/></stroke><stroke width="2" align="inside"><solid color="#FFFBEB"/></stroke></ellipse>
+      <ellipse x="397" y="497" width="16" height="16" fill="#171007"><stroke width="7" align="outside"><solid color="#F59E0B" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#F59E0B"/></stroke><stroke width="2" align="inside"><solid color="#FFFBEB"/></stroke></ellipse>
+      <ellipse x="582" y="497" width="16" height="16" fill="#171007"><stroke width="7" align="outside"><solid color="#F59E0B" opacity="0.16" blend-mode="screen"/></stroke><stroke width="3" align="outside"><solid color="#F59E0B"/></stroke><stroke width="2" align="inside"><solid color="#FFFBEB"/></stroke></ellipse>
+    </group>
+
+    <!-- Interchange stations, composed in local primitive space -->
+    <ellipse name="Violet Solar interchange" x="347" y="312" width="26" height="26" fill="#050816">
+      <stroke width="13" align="outside"><solid color="#D946EF" opacity="0.13" blend-mode="screen"/></stroke>
+      <stroke width="5" align="outside"><solid color="#D946EF"/></stroke>
+      <stroke width="3" align="inside"><solid color="#F59E0B"/></stroke>
+      <ellipse x="center" y="center" width="8" height="8" fill="#FFFFFF">
+        <stroke width="2" align="outside"><solid color="#FEF3C7" opacity="0.8"/></stroke>
+      </ellipse>
+    </ellipse>
+    <ellipse name="Aqua Solar interchange" x="377" y="342" width="26" height="26" fill="#050816">
+      <stroke width="13" align="outside"><solid color="#22D3EE" opacity="0.13" blend-mode="screen"/></stroke>
+      <stroke width="5" align="outside"><solid color="#22D3EE"/></stroke>
+      <stroke width="3" align="inside"><solid color="#F59E0B"/></stroke>
+      <ellipse x="center" y="center" width="8" height="8" fill="#FFFFFF">
+        <stroke width="2" align="outside"><solid color="#CFFAFE" opacity="0.8"/></stroke>
+      </ellipse>
+    </ellipse>
+
+    <!-- Station labels -->
+    <text x="91" y="468" font-size="12" fill="#020617" opacity="0.9">HARBOR GATE</text>
+    <text x="89" y="466" font-size="12" fill="#BAE6FD">HARBOR GATE</text>
+    <text x="202" y="468" font-size="12" fill="#020617" opacity="0.9">GLASSWORKS</text>
+    <text x="200" y="466" font-size="12" fill="#BAE6FD">GLASSWORKS</text>
+    <text x="419" y="382" font-size="12" fill="#020617" opacity="0.9">CENTRAL ARC</text>
+    <text x="417" y="380" font-size="12" fill="#E0F2FE">CENTRAL ARC</text>
+    <text x="548" y="226" font-size="12" fill="#020617" opacity="0.9">MOONRISE</text>
+    <text x="546" y="224" font-size="12" fill="#BAE6FD">MOONRISE</text>
+    <text x="631" y="278" font-size="12" fill="#020617" opacity="0.9">OBSERVATORY</text>
+    <text x="629" y="276" font-size="12" fill="#BAE6FD">OBSERVATORY</text>
+
+    <text x="117" y="187" font-size="12" fill="#020617" opacity="0.9">NOVA YARD</text>
+    <text x="115" y="185" font-size="12" fill="#F5D0FE">NOVA YARD</text>
+    <text x="373" y="295" font-size="12" fill="#020617" opacity="0.9">VIOLET JUNCTION</text>
+    <text x="371" y="293" font-size="12" fill="#F5D0FE">VIOLET JUNCTION</text>
+    <text x="595" y="474" font-size="12" fill="#020617" opacity="0.9">AFTERGLOW</text>
+    <text x="593" y="472" font-size="12" fill="#F5D0FE">AFTERGLOW</text>
+
+    <text x="337" y="174" font-size="12" fill="#020617" opacity="0.9">NORTH STACK</text>
+    <text x="335" y="172" font-size="12" fill="#FDE68A">NORTH STACK</text>
+    <text x="423" y="489" font-size="12" fill="#020617" opacity="0.9">SUNLINE DEPOT</text>
+    <text x="421" y="487" font-size="12" fill="#FDE68A">SUNLINE DEPOT</text>
+
+    <!-- Legend / operations plate -->
+    <rect name="legend" x="765" y="132" width="195" height="398">
+      <fill>
+        <solid color="#07101E" opacity="0.94"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.34" blend-mode="screen">
+          <stop offset="0" color="#164E63"/>
+          <stop offset="0.54" color="#312E81"/>
+          <stop offset="1" color="#451A03"/>
+        </gradient>
+      </fill>
+      <stroke width="7" align="inside" join="miter"><solid color="#020617" opacity="0.78"/></stroke>
+      <stroke width="1" align="inside" join="miter"><gradient kind="linear"><stop offset="0" color="#22D3EE"/><stop offset="0.5" color="#A855F7"/><stop offset="1" color="#F59E0B"/></gradient></stroke>
+
+      <text x="18" y="20" font-size="19" fill="#F8FAFC">SYSTEM LEGEND</text>
+      <text x="19" y="48" font-size="10" fill="#64748B">LINES / TRANSFERS / FIELD DATA</text>
+
+      <line x="20" y="92" width="48">
+        <stroke width="13" align="center" cap="round"><solid color="#020617"/></stroke>
+        <stroke width="7" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#0891B2"/><stop offset="1" color="#22D3EE"/></gradient></stroke>
+        <stroke width="2" align="center" cap="round"><solid color="#CFFAFE" opacity="0.5"/></stroke>
+      </line>
+      <text x="82" y="81" font-size="12" fill="#CFFAFE">A1 AQUA</text>
+      <text x="82" y="99" font-size="9" fill="#64748B">EAST LOOP</text>
+
+      <line x="20" y="145" width="48">
+        <stroke width="13" align="center" cap="round"><solid color="#020617"/></stroke>
+        <stroke width="7" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#7C3AED"/><stop offset="1" color="#F472B6"/></gradient></stroke>
+        <stroke width="2" align="center" cap="round"><solid color="#FAE8FF" opacity="0.5"/></stroke>
+      </line>
+      <text x="82" y="134" font-size="12" fill="#F5D0FE">V2 VIOLET</text>
+      <text x="82" y="152" font-size="9" fill="#64748B">NIGHT ARC</text>
+
+      <line x="20" y="198" width="48">
+        <stroke width="13" align="center" cap="round"><solid color="#020617"/></stroke>
+        <stroke width="7" align="center" cap="round"><gradient kind="linear"><stop offset="0" color="#F97316"/><stop offset="1" color="#FDE047"/></gradient></stroke>
+        <stroke width="2" align="center" cap="round"><solid color="#FEF3C7" opacity="0.5"/></stroke>
+      </line>
+      <text x="82" y="187" font-size="12" fill="#FDE68A">S3 SOLAR</text>
+      <text x="82" y="205" font-size="9" fill="#64748B">MERIDIAN</text>
+
+      <line x="19" y="237" width="157">
+        <stroke width="1" align="center" cap="round" dash-array="3 6"><solid color="#475569" opacity="0.8"/></stroke>
+      </line>
+
+      <ellipse x="25" y="264" width="18" height="18" fill="#07101E">
+        <stroke width="4" align="outside"><solid color="#38BDF8"/></stroke>
+        <stroke width="2" align="inside"><solid color="#FFFFFF"/></stroke>
+      </ellipse>
+      <text x="61" y="263" font-size="11" fill="#CBD5E1">LOCAL STATION</text>
+      <text x="61" y="280" font-size="9" fill="#64748B">SINGLE-LINE STOP</text>
+
+      <ellipse x="21" y="315" width="26" height="26" fill="#07101E">
+        <stroke width="5" align="outside"><solid color="#D946EF"/></stroke>
+        <stroke width="3" align="inside"><solid color="#F59E0B"/></stroke>
+        <ellipse x="center" y="center" width="8" height="8" fill="#FFFFFF"/>
+      </ellipse>
+      <text x="61" y="316" font-size="11" fill="#F8FAFC">INTERCHANGE</text>
+      <text x="61" y="333" font-size="9" fill="#64748B">MULTI-LINE TRANSFER</text>
+
+      <text x="20" y="367" font-size="9" fill="#475569">MAP REV 07.11 / 23:48 KST</text>
+      <text x="20" y="382" font-size="9" fill="#334155">CONTROL ID: O-NG-620</text>
+    </rect>
+
+    <!-- Footer telemetry -->
+    <rect name="telemetry" x="40" y="548" width="920" height="42">
+      <fill>
+        <solid color="#050B16" opacity="0.94"/>
+        <gradient kind="linear" opacity="0.24" blend-mode="screen"><stop offset="0" color="#0E7490"/><stop offset="0.5" color="#312E81"/><stop offset="1" color="#92400E"/></gradient>
+      </fill>
+      <stroke width="1" align="inside" join="miter"><solid color="#334155" opacity="0.9"/></stroke>
+      <text x="18" y="center" font-size="11" fill="#94A3B8">HEADWAY 04:20</text>
+      <text x="190" y="center" font-size="11" fill="#64748B">SIGNAL 98.7%</text>
+      <text x="352" y="center" font-size="11" fill="#64748B">PLATFORM TEMP 17°C</text>
+      <text x="615" y="center" font-size="11" fill="#64748B">NIGHT WINDOW 23:30—05:10</text>
+      <text x="end 18" y="center" font-size="11" fill="#5EEAD4">ALL CLEAR</text>
+    </rect>
+
+    <text x="42" y="600" font-size="9" fill="#334155">A DYNAMIC 2D SCENE — LOCAL COORDINATES / ORDERED PAINT / MULTI-STROKE NETWORK GEOMETRY</text>
+    <text x="end 42" y="600" font-size="9" fill="#334155">GRIDA XML DRAFT 0</text>
+  </container>
+</grida>

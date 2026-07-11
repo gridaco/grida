@@ -1,0 +1,211 @@
+<grida version="0">
+  <container name="nocturne-transit" width="1400" height="900" clips="true">
+    <fill>
+      <solid color="#030712"/>
+      <gradient kind="radial" transform="1.55 0 0 1.25 -0.55 -0.28" opacity="0.72">
+        <stop offset="0" color="#172554"/>
+        <stop offset="0.52" color="#0F172A"/>
+        <stop offset="1" color="#020617"/>
+      </gradient>
+      <image src="../../../../fixtures/images/checker.png" fit="fill" opacity="0.045" blend-mode="screen"/>
+    </fill>
+    <stroke width="3" align="inside">
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.5">
+        <stop offset="0" color="#22D3EE"/>
+        <stop offset="0.5" color="#8B5CF6"/>
+        <stop offset="1" color="#A3E635"/>
+      </gradient>
+    </stroke>
+
+    <container name="title-block" x="62" y="48" width="850" height="92">
+      <text width="720" font-size="34" fill="#FFFFFF">NOCTURNE / SIGNAL MAP</text>
+      <text y="50" width="820" font-size="13" fill="#94A3B8">NIGHT NETWORK · SERVICE WINDOW 23:00—05:00 · LIVE TOPOLOGY</text>
+    </container>
+    <ellipse x="1268" y="52" width="58" height="58">
+      <fill>
+        <gradient kind="sweep">
+          <stop offset="0" color="#22D3EE"/>
+          <stop offset="0.33" color="#8B5CF6"/>
+          <stop offset="0.66" color="#A3E635"/>
+          <stop offset="1" color="#22D3EE"/>
+        </gradient>
+      </fill>
+      <stroke width="8" align="outside" dash-array="3 8"><solid color="#FFFFFF" opacity="0.18"/></stroke>
+      <text x="center" y="center" font-size="13" fill="#FFFFFF">N7</text>
+    </ellipse>
+
+    <line x="span 62 62" y="142">
+      <stroke width="2" cap="round" dash-array="2 12">
+        <gradient kind="linear" from="0.1 0.5" to="0.9 0.5" tile-mode="mirror">
+          <stop offset="0" color="#22D3EE"/>
+          <stop offset="0.5" color="#8B5CF6"/>
+          <stop offset="1" color="#A3E635"/>
+        </gradient>
+      </stroke>
+    </line>
+
+    <container name="map-field" x="54" y="172" width="952" height="646" clips="true">
+      <fill>
+        <solid color="#07101C"/>
+        <gradient kind="diamond" transform="1.25 0 0 1.1 -0.1 -0.08" opacity="0.42">
+          <stop offset="0" color="#172554"/>
+          <stop offset="0.58" color="#0F172A"/>
+          <stop offset="1" color="#020617"/>
+        </gradient>
+      </fill>
+      <stroke width="12" align="outside" join="round"><solid color="#020617" opacity="0.72"/></stroke>
+      <stroke width="2" align="inside" join="bevel"><solid color="#334155"/></stroke>
+
+      <line x="54" y="110" width="844"><stroke width="1" dash-array="2 10"><solid color="#334155" opacity="0.5"/></stroke></line>
+      <line x="54" y="220" width="844"><stroke width="1" dash-array="2 10"><solid color="#334155" opacity="0.5"/></stroke></line>
+      <line x="54" y="330" width="844"><stroke width="1" dash-array="2 10"><solid color="#334155" opacity="0.5"/></stroke></line>
+      <line x="54" y="440" width="844"><stroke width="1" dash-array="2 10"><solid color="#334155" opacity="0.5"/></stroke></line>
+      <line x="54" y="550" width="844"><stroke width="1" dash-array="2 10"><solid color="#334155" opacity="0.5"/></stroke></line>
+
+      <lens name="cyan-route" x="94" y="310" ops="rotate(-4)">
+        <line width="770">
+          <stroke width="22" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="13" cap="round"><solid color="#0891B2"/></stroke>
+          <stroke width="4" cap="round"><gradient kind="linear" tile-mode="mirror"><stop offset="0" color="#67E8F9"/><stop offset="0.5" color="#22D3EE"/><stop offset="1" color="#CFFAFE"/></gradient></stroke>
+        </line>
+      </lens>
+
+      <lens name="violet-route" x="126" y="536" ops="rotate(-25)">
+        <line width="790">
+          <stroke width="22" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="13" cap="round"><solid color="#6D28D9"/></stroke>
+          <stroke width="4" cap="round" dash-array="22 8"><gradient kind="linear" tile-mode="mirror"><stop offset="0" color="#F0ABFC"/><stop offset="0.5" color="#A78BFA"/><stop offset="1" color="#DDD6FE"/></gradient></stroke>
+        </line>
+      </lens>
+
+      <lens name="lime-route" x="612" y="74" ops="rotate(90)">
+        <line width="488">
+          <stroke width="22" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="13" cap="round"><solid color="#4D7C0F"/></stroke>
+          <stroke width="4" cap="round"><gradient kind="linear"><stop offset="0" color="#ECFCCB"/><stop offset="0.5" color="#A3E635"/><stop offset="1" color="#D9F99D"/></gradient></stroke>
+        </line>
+      </lens>
+
+      <lens name="amber-spur" x="615" y="255" ops="rotate(-24)">
+        <line width="207">
+          <stroke width="17" cap="round"><solid color="#020617" opacity="0.9"/></stroke>
+          <stroke width="10" cap="round"><solid color="#F97316"/></stroke>
+          <stroke width="3" cap="round" dash-array="16 7"><solid color="#FFEDD5"/></stroke>
+        </line>
+      </lens>
+
+      <ellipse name="station-west" x="118" y="284" width="30" height="30" fill="#ECFEFF">
+        <stroke width="11" align="outside"><solid color="#0891B2"/></stroke>
+        <stroke width="3" align="inside"><solid color="#0F172A"/></stroke>
+      </ellipse>
+      <text x="92" y="326" width="160" font-size="12" fill="#A5F3FC">WEST ARCHIVE</text>
+
+      <ellipse name="station-harbor" x="310" y="270" width="22" height="22" fill="#ECFEFF">
+        <stroke width="8" align="outside"><solid color="#0891B2"/></stroke>
+      </ellipse>
+      <text x="276" y="310" width="150" font-size="12" fill="#A5F3FC">HARBOR 04</text>
+
+      <ellipse name="station-central" x="594" y="274" width="42" height="42">
+        <fill>
+          <gradient kind="radial"><stop offset="0" color="#FFFFFF"/><stop offset="1" color="#C4B5FD"/></gradient>
+        </fill>
+        <stroke width="18" align="outside">
+          <solid color="#6D28D9"/>
+          <gradient kind="linear" from="0 0" to="1 1" opacity="0.7" blend-mode="screen"><stop offset="0" color="#22D3EE"/><stop offset="1" color="#A3E635"/></gradient>
+        </stroke>
+        <stroke width="4" align="inside"><solid color="#0F172A"/></stroke>
+        <text x="center" y="center" font-size="11" fill="#0F172A">CX</text>
+      </ellipse>
+      <rect x="520" y="340" width="190" height="48" fill="#111827">
+        <stroke width="2" align="inside" join="bevel"><gradient kind="linear"><stop offset="0" color="#22D3EE"/><stop offset="0.5" color="#A78BFA"/><stop offset="1" color="#A3E635"/></gradient></stroke>
+        <text x="center" y="center" font-size="13" fill="#FFFFFF">CENTRAL EXCHANGE</text>
+      </rect>
+
+      <ellipse name="station-garden" x="602" y="92" width="24" height="24" fill="#F7FEE7">
+        <stroke width="9" align="outside"><solid color="#65A30D"/></stroke>
+      </ellipse>
+      <text x="646" y="92" width="150" font-size="12" fill="#D9F99D">NIGHT GARDEN</text>
+
+      <ellipse name="station-orbit" x="602" y="486" width="24" height="24" fill="#F7FEE7">
+        <stroke width="9" align="outside"><solid color="#65A30D"/></stroke>
+      </ellipse>
+      <text x="646" y="486" width="160" font-size="12" fill="#D9F99D">ORBIT SOUTH</text>
+
+      <ellipse name="station-violet" x="338" y="420" width="24" height="24" fill="#FAF5FF">
+        <stroke width="9" align="outside"><solid color="#7C3AED"/></stroke>
+      </ellipse>
+      <text x="244" y="454" width="190" font-size="12" fill="#E9D5FF">VIOLET MARKET</text>
+
+      <ellipse name="station-terminal" x="790" y="198" width="28" height="28" fill="#FFF7ED">
+        <stroke width="10" align="outside"><solid color="#EA580C"/></stroke>
+        <stroke width="2" align="inside"><solid color="#431407"/></stroke>
+      </ellipse>
+      <text x="820" y="170" width="120" font-size="12" fill="#FED7AA">TERMINAL N9</text>
+
+      <group name="interchange-beacon" x="704" y="244" opacity="0.9">
+        <ellipse width="16" height="16" fill="#FFFFFF">
+          <stroke width="15" align="outside"><solid color="#F97316" opacity="0.16"/></stroke>
+          <stroke width="7" align="outside"><solid color="#F97316"/></stroke>
+        </ellipse>
+        <text x="30" y="12" width="180" font-size="11" fill="#FDBA74">TRANSFER WINDOW · 4 MIN</text>
+      </group>
+
+      <text x="32" y="602" width="340" font-size="10" fill="#475569">GRID REF 37.5665N / 126.9780E</text>
+      <text x="650" y="602" width="270" font-size="10" fill="#475569">UPDATED 23:48:12 / LIVE</text>
+    </container>
+
+    <rect name="legend-panel" x="1042" y="172" width="306" height="646">
+      <fill>
+        <solid color="#080F1A"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.42">
+          <stop offset="0" color="#172554"/>
+          <stop offset="1" color="#080F1A"/>
+        </gradient>
+      </fill>
+      <stroke width="12" align="outside" join="round"><solid color="#020617" opacity="0.72"/></stroke>
+      <stroke width="2" align="inside" join="bevel"><solid color="#334155"/></stroke>
+
+      <text x="28" y="26" width="250" font-size="17" fill="#FFFFFF">NIGHT SERVICE</text>
+      <text x="28" y="58" width="250" font-size="11" fill="#64748B">4 LINES · 18 STATIONS · 2 TRANSFERS</text>
+
+      <container x="28" y="112" width="250" height="214" layout="flex" direction="column" gap="14">
+        <rect width="250" height="42" fill="#0F172A">
+          <line x="16" y="21" width="54"><stroke width="8" cap="round"><solid color="#22D3EE"/></stroke></line>
+          <text x="90" y="12" width="140" font-size="13" fill="#CFFAFE">Aqua / all night</text>
+        </rect>
+        <rect width="250" height="42" fill="#0F172A">
+          <line x="16" y="21" width="54"><stroke width="8" cap="round"><solid color="#8B5CF6"/></stroke></line>
+          <text x="90" y="12" width="140" font-size="13" fill="#EDE9FE">Violet / express</text>
+        </rect>
+        <rect width="250" height="42" fill="#0F172A">
+          <line x="16" y="21" width="54"><stroke width="8" cap="round"><solid color="#A3E635"/></stroke></line>
+          <text x="90" y="12" width="140" font-size="13" fill="#ECFCCB">Lime / orbital</text>
+        </rect>
+        <rect width="250" height="42" fill="#0F172A">
+          <line x="16" y="21" width="54"><stroke width="8" cap="round"><solid color="#F97316"/></stroke></line>
+          <text x="90" y="12" width="140" font-size="13" fill="#FFEDD5">Amber / shuttle</text>
+        </rect>
+      </container>
+
+      <line x="28" y="362" width="250"><stroke width="1" dash-array="3 8"><solid color="#475569"/></stroke></line>
+      <text x="28" y="390" width="250" font-size="12" fill="#94A3B8">SERVICE STATUS</text>
+      <ellipse x="28" y="432" width="14" height="14" fill="#34D399"><stroke width="8" align="outside"><solid color="#34D399" opacity="0.15"/></stroke></ellipse>
+      <text x="58" y="425" width="210" font-size="13" fill="#A7F3D0">All routes operational</text>
+      <ellipse x="28" y="480" width="14" height="14" fill="#F59E0B"/>
+      <text x="58" y="473" width="210" font-size="13" fill="#FDE68A">Central: 4 min transfer</text>
+
+      <rect x="28" y="536" width="250" height="74">
+        <fill>
+          <solid color="#312E81"/>
+          <gradient kind="linear" from="0 0" to="1 1" blend-mode="screen"><stop offset="0" color="#8B5CF6"/><stop offset="1" color="#2563EB"/></gradient>
+        </fill>
+        <stroke width="6" align="outside" join="round"><solid color="#8B5CF6" opacity="0.18"/></stroke>
+        <text x="18" y="14" width="214" font-size="11" fill="#DDD6FE">NEXT NETWORK RESET</text>
+        <text x="18" y="40" width="214" font-size="19" fill="#FFFFFF">04:42:18</text>
+      </rect>
+    </rect>
+
+    <text x="62" y="852" width="650" font-size="11" fill="#64748B">NOCTURNE TRANSIT AUTHORITY · MAP IS DIAGRAMMATIC · NOT TO SCALE</text>
+    <text x="1042" y="852" width="306" font-size="11" fill="#64748B">N7 / CONTROL ROOM</text>
+  </container>
+</grida>

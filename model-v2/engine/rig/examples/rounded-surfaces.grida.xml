@@ -1,0 +1,167 @@
+<grida version="0">
+  <container name="rounded-surfaces" width="1440" height="900" clips="true">
+    <fill>
+      <solid color="#050816"/>
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.92">
+        <stop offset="0" color="#111A3A"/>
+        <stop offset="0.48" color="#090D1D"/>
+        <stop offset="1" color="#02030A"/>
+      </gradient>
+      <gradient kind="radial" transform="1.5 0 0 1.5 -0.55 -0.58" opacity="0.54" blend-mode="screen">
+        <stop offset="0" color="#A855F7"/>
+        <stop offset="0.45" color="#4F46E5" opacity="0.4509804"/>
+        <stop offset="1" color="#020617" opacity="0"/>
+      </gradient>
+    </fill>
+    <container name="masthead" x="72" y="48" width="1296" height="42" layout="flex" main="space-between" cross="center">
+      <text width="360" font-size="17" fill="#F8FAFC">GRIDA / ROUNDED SURFACES</text>
+      <text width="460" font-size="14" fill="#A5B4FC">ONE OUTLINE · EVERY PAINT · EVERY STROKE</text>
+      <ellipse x="end 16" y="center" width="10" height="10" flow="absolute" fill="#34D399">
+        <stroke width="8" align="outside">
+          <solid color="#34D399" opacity="0.18039216"/>
+        </stroke>
+        <stroke>
+          <solid color="#ECFDF5"/>
+        </stroke>
+      </ellipse>
+    </container>
+    <line x="span 72 72" y="112">
+      <stroke width="2" cap="round" dash-array="2 14">
+        <gradient kind="linear" from="0 0" to="1 0" tile-mode="mirror">
+          <stop offset="0" color="#F472B6"/>
+          <stop offset="0.5" color="#A78BFA"/>
+          <stop offset="1" color="#22D3EE"/>
+        </gradient>
+      </stroke>
+    </line>
+    <container name="continuous-stage" x="72" y="148" width="1296" height="650" corner-radius="56" corner-smoothing="0.72" clips="true">
+      <fill>
+        <solid color="#0B1024"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.9">
+          <stop offset="0" color="#1E1B4B"/>
+          <stop offset="0.5" color="#10172F"/>
+          <stop offset="1" color="#07111D"/>
+        </gradient>
+        <image src="../../../../fixtures/images/512.jpg" opacity="0.12" blend-mode="soft-light"/>
+        <gradient kind="radial" transform="1.3 0 0 1.3 0.18 -0.5" opacity="0.42" blend-mode="screen">
+          <stop offset="0" color="#22D3EE"/>
+          <stop offset="0.5" color="#2563EB" opacity="0.34901962"/>
+          <stop offset="1" color="#020617" opacity="0"/>
+        </gradient>
+      </fill>
+      <stroke width="20" align="outside">
+        <solid color="#020617" opacity="0.7607843"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.26" blend-mode="screen">
+          <stop offset="0" color="#F472B6"/>
+          <stop offset="0.5" color="#8B5CF6"/>
+          <stop offset="1" color="#22D3EE"/>
+        </gradient>
+      </stroke>
+      <stroke width="3">
+        <gradient kind="linear" from="0 0" to="1 1">
+          <stop offset="0" color="#FBCFE8"/>
+          <stop offset="0.5" color="#DDD6FE"/>
+          <stop offset="1" color="#A5F3FC"/>
+        </gradient>
+      </stroke>
+      <stroke>
+        <solid color="#FFFFFF" opacity="0.21960784"/>
+      </stroke>
+      <ellipse name="clipped-aura" x="910" y="-260" width="620" height="620" opacity="0.42">
+        <fill>
+          <gradient kind="radial" transform="1.15 0 0 1.15 -0.08 -0.08" blend-mode="screen">
+            <stop offset="0" color="#FDF2F8"/>
+            <stop offset="0.36" color="#F472B6"/>
+            <stop offset="0.7" color="#7C3AED" opacity="0.7019608"/>
+            <stop offset="1" color="#172554" opacity="0"/>
+          </gradient>
+        </fill>
+      </ellipse>
+      <ellipse name="clipped-orbit" x="-210" y="430" width="520" height="520" opacity="0.34">
+        <fill>
+          <gradient kind="sweep" blend-mode="screen">
+            <stop offset="0" color="#22D3EE"/>
+            <stop offset="0.34" color="#2563EB"/>
+            <stop offset="0.68" color="#8B5CF6"/>
+            <stop offset="1" color="#22D3EE"/>
+          </gradient>
+        </fill>
+      </ellipse>
+      <text x="48" y="42" width="760" font-size="18" fill="#C4B5FD">THE BOX IS STILL THE PAINT SPACE</text>
+      <text x="48" y="76" width="880" font-size="48" fill="#F8FAFC">Corners become
+first-class geometry.</text>
+      <text x="50" y="198" width="760" font-size="18" fill="#CBD5E1">Fill coverage, clipped descendants, and repeated strokes all derive from one authored outline.</text>
+      <container name="corner-gallery" x="48" y="270" width="1200" height="286" layout="flex" gap="24">
+        <rect name="asymmetric-card" width="384" height="286" corner-radius="44 12 44 12">
+          <fill>
+            <solid color="#3B0764"/>
+            <gradient kind="linear" from="0 0" to="1 1" opacity="0.88" blend-mode="screen">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="0.52" color="#9333EA"/>
+              <stop offset="1" color="#4F46E5"/>
+            </gradient>
+          </fill>
+          <stroke width="12" align="outside">
+            <solid color="#A855F7" opacity="0.2"/>
+          </stroke>
+          <stroke width="2">
+            <solid color="#F5D0FE" opacity="0.72156864"/>
+          </stroke>
+          <text x="28" y="28" width="320" font-size="14" fill="#F5D0FE">01 / FOUR CORNERS</text>
+          <text x="28" y="78" width="320" font-size="30" fill="#FFFFFF">Asymmetric, still semantic.</text>
+          <text x="28" y="190" width="320" font-size="15" fill="#E9D5FF">44 12 44 12 · TL TR BR BL</text>
+        </rect>
+        <rect name="elliptical-card" width="384" height="286" corner-radius="52 18 38 10 / 24 44 16 34">
+          <fill>
+            <solid color="#082F49"/>
+            <gradient kind="linear" from="0 0" to="1 1" opacity="0.86" blend-mode="screen">
+              <stop offset="0" color="#22D3EE"/>
+              <stop offset="0.52" color="#2563EB"/>
+              <stop offset="1" color="#312E81"/>
+            </gradient>
+          </fill>
+          <stroke width="12" align="outside">
+            <solid color="#22D3EE" opacity="0.18039216"/>
+          </stroke>
+          <stroke width="3" dash-array="12 9">
+            <gradient kind="linear" tile-mode="mirror">
+              <stop offset="0" color="#CFFAFE"/>
+              <stop offset="1" color="#A5B4FC"/>
+            </gradient>
+          </stroke>
+          <text x="28" y="28" width="320" font-size="14" fill="#CFFAFE">02 / ELLIPTICAL</text>
+          <text x="28" y="78" width="320" font-size="30" fill="#FFFFFF">Independent rx / ry.</text>
+          <text x="28" y="190" width="326" font-size="15" fill="#BAE6FD">Horizontal / vertical radii remain source.</text>
+        </rect>
+        <rect name="continuous-card" width="384" height="286" corner-radius="38" corner-smoothing="0.86">
+          <fill>
+            <solid color="#052E16"/>
+            <gradient kind="linear" from="0 0" to="1 1" opacity="0.9" blend-mode="screen">
+              <stop offset="0" color="#34D399"/>
+              <stop offset="0.5" color="#0D9488"/>
+              <stop offset="1" color="#164E63"/>
+            </gradient>
+          </fill>
+          <stroke width="14" align="outside">
+            <solid color="#34D399" opacity="0.18039216"/>
+          </stroke>
+          <stroke width="3">
+            <gradient kind="linear">
+              <stop offset="0" color="#ECFDF5"/>
+              <stop offset="1" color="#A5F3FC"/>
+            </gradient>
+          </stroke>
+          <text x="28" y="28" width="320" font-size="14" fill="#D1FAE5">03 / CONTINUOUS</text>
+          <text x="28" y="78" width="320" font-size="30" fill="#FFFFFF">Surgical smoothing.</text>
+          <text x="28" y="190" width="320" font-size="15" fill="#A7F3D0">One scalar; shape identity survives.</text>
+        </rect>
+      </container>
+      <container x="48" y="590" width="1200" height="36" layout="flex" main="space-between" cross="center">
+        <text width="360" font-size="13" fill="#94A3B8">CIRCULAR · ELLIPTICAL · CONTINUOUS</text>
+        <text width="500" font-size="13" fill="#CBD5E1">AUTHORED VALUES STAY UNRESOLVED</text>
+        <text width="280" font-size="13" fill="#67E8F9">DRAFT 0 / RENDERED</text>
+      </container>
+    </container>
+    <text x="72" y="838" width="1296" font-size="15" fill="#64748B">corner-radius + corner-smoothing · local geometry before transforms · rectangular paint coordinates</text>
+  </container>
+</grida>

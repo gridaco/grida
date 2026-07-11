@@ -1,0 +1,258 @@
+<grida version="0">
+  <container name="pulse-analytics" width="1440" height="960" clips="true">
+    <fill>
+      <solid color="#060A10"/>
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.52">
+        <stop offset="0" color="#111827"/>
+        <stop offset="0.5" color="#07111D"/>
+        <stop offset="1" color="#020617"/>
+      </gradient>
+    </fill>
+
+    <ellipse x="1150" y="-210" width="520" height="520" opacity="0.32">
+      <fill>
+        <gradient kind="radial">
+          <stop offset="0" color="#22D3EE"/>
+          <stop offset="0.45" color="#0E7490" opacity="0.5"/>
+          <stop offset="1" color="#020617" opacity="0"/>
+        </gradient>
+      </fill>
+    </ellipse>
+
+    <container name="sidebar" x="24" y="24" width="214" height="912">
+      <fill>
+        <solid color="#0B1220"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.4">
+          <stop offset="0" color="#172554"/>
+          <stop offset="1" color="#0B1220"/>
+        </gradient>
+      </fill>
+      <stroke width="8" align="outside" join="round">
+        <solid color="#020617" opacity="0.72"/>
+      </stroke>
+      <stroke align="inside" join="bevel">
+        <solid color="#334155"/>
+      </stroke>
+
+      <ellipse x="24" y="24" width="42" height="42">
+        <fill>
+          <gradient kind="sweep">
+            <stop offset="0" color="#22D3EE"/>
+            <stop offset="0.34" color="#A3E635"/>
+            <stop offset="0.68" color="#8B5CF6"/>
+            <stop offset="1" color="#22D3EE"/>
+          </gradient>
+        </fill>
+        <stroke width="5" align="outside"><solid color="#FFFFFF" opacity="0.1"/></stroke>
+      </ellipse>
+      <text x="80" y="30" width="112" font-size="19" fill="#FFFFFF">PULSE</text>
+      <text x="24" y="82" width="164" font-size="11" fill="#64748B">OPERATIONS / 7A</text>
+
+      <container name="navigation" x="24" y="132" width="166" height="298" layout="flex" direction="column" gap="10">
+        <rect width="166" height="46">
+          <fill>
+            <solid color="#0E7490"/>
+            <gradient kind="linear" from="0 0" to="1 0" opacity="0.72" blend-mode="screen">
+              <stop offset="0" color="#22D3EE"/>
+              <stop offset="1" color="#2563EB"/>
+            </gradient>
+          </fill>
+          <stroke width="2" align="inside" join="bevel"><solid color="#A5F3FC" opacity="0.72"/></stroke>
+          <ellipse x="14" y="17" width="12" height="12" fill="#ECFEFF"/>
+          <text x="42" y="13" width="106" font-size="14" fill="#FFFFFF">Overview</text>
+        </rect>
+        <rect width="166" height="46" fill="#111827">
+          <ellipse x="14" y="17" width="12" height="12" fill="#64748B"/>
+          <text x="42" y="13" width="106" font-size="14" fill="#94A3B8">Revenue</text>
+        </rect>
+        <rect width="166" height="46" fill="#111827">
+          <ellipse x="14" y="17" width="12" height="12" fill="#64748B"/>
+          <text x="42" y="13" width="106" font-size="14" fill="#94A3B8">Audience</text>
+        </rect>
+        <rect width="166" height="46" fill="#111827">
+          <ellipse x="14" y="17" width="12" height="12" fill="#64748B"/>
+          <text x="42" y="13" width="106" font-size="14" fill="#94A3B8">Automations</text>
+        </rect>
+        <rect width="166" height="46" fill="#111827">
+          <ellipse x="14" y="17" width="12" height="12" fill="#64748B"/>
+          <text x="42" y="13" width="106" font-size="14" fill="#94A3B8">Settings</text>
+        </rect>
+      </container>
+
+      <rect name="workspace-card" x="24" y="716" width="166" height="166" fill="#07111D">
+        <stroke width="2" align="inside" join="bevel" dash-array="10 7">
+          <gradient kind="linear" tile-mode="mirror">
+            <stop offset="0" color="#22D3EE"/>
+            <stop offset="0.5" color="#8B5CF6"/>
+            <stop offset="1" color="#A3E635"/>
+          </gradient>
+        </stroke>
+        <text x="16" y="18" width="134" font-size="11" fill="#64748B">ACTIVE WORKSPACE</text>
+        <text x="16" y="48" width="134" font-size="18" fill="#FFFFFF">Northstar</text>
+        <text x="16" y="82" width="134" font-size="12" fill="#94A3B8">12 collaborators</text>
+        <ellipse x="16" y="120" width="14" height="14" fill="#34D399">
+          <stroke width="8" align="outside"><solid color="#34D399" opacity="0.14"/></stroke>
+        </ellipse>
+        <text x="42" y="116" width="100" font-size="12" fill="#A7F3D0">All systems live</text>
+      </rect>
+    </container>
+
+    <container name="main" x="266" y="24" width="1150" height="912">
+      <container name="topbar" width="1150" height="54" layout="flex" main="space-between" cross="center">
+        <container width="430" height="52">
+          <text width="420" font-size="23" fill="#FFFFFF">Good morning, Maya.</text>
+          <text y="31" width="420" font-size="12" fill="#64748B">Here is the network pulse for Monday.</text>
+        </container>
+        <container width="352" height="46" layout="flex" cross="center" gap="12">
+          <rect width="196" height="40" fill="#0B1220">
+            <stroke align="inside" join="bevel"><solid color="#334155"/></stroke>
+            <text x="16" y="11" width="164" font-size="12" fill="#94A3B8">/  Search signals</text>
+          </rect>
+          <ellipse width="40" height="40" fill="#111827">
+            <stroke align="inside"><solid color="#475569"/></stroke>
+            <text x="center" y="center" font-size="14" fill="#E2E8F0">••</text>
+          </ellipse>
+          <ellipse width="40" height="40">
+            <fill>
+              <gradient kind="linear" from="0 0" to="1 1">
+                <stop offset="0" color="#A78BFA"/>
+                <stop offset="1" color="#2563EB"/>
+              </gradient>
+            </fill>
+            <text x="center" y="center" font-size="13" fill="#FFFFFF">MK</text>
+          </ellipse>
+        </container>
+      </container>
+
+      <container name="metrics" y="82" width="1150" height="150" layout="flex" gap="18">
+        <rect width="274" height="150">
+          <fill>
+            <solid color="#0B1220"/>
+            <gradient kind="linear" from="0 0" to="1 1" opacity="0.46">
+              <stop offset="0" color="#164E63"/>
+              <stop offset="1" color="#0B1220"/>
+            </gradient>
+          </fill>
+          <stroke align="inside" join="bevel"><solid color="#155E75"/></stroke>
+          <text x="20" y="18" width="220" font-size="12" fill="#67E8F9">NET REVENUE</text>
+          <text x="20" y="52" width="220" font-size="34" fill="#FFFFFF">$284.6K</text>
+          <ellipse x="20" y="116" width="10" height="10" fill="#34D399"/>
+          <text x="40" y="108" width="194" font-size="12" fill="#A7F3D0">+18.4% vs last cycle</text>
+        </rect>
+        <rect width="274" height="150" fill="#0B1220">
+          <stroke align="inside" join="bevel"><solid color="#312E81"/></stroke>
+          <text x="20" y="18" width="220" font-size="12" fill="#C4B5FD">ACTIVE SIGNALS</text>
+          <text x="20" y="52" width="220" font-size="34" fill="#FFFFFF">18,429</text>
+          <ellipse x="20" y="116" width="10" height="10" fill="#A3E635"/>
+          <text x="40" y="108" width="194" font-size="12" fill="#D9F99D">1,204 newly qualified</text>
+        </rect>
+        <rect width="274" height="150" fill="#0B1220">
+          <stroke align="inside" join="bevel"><solid color="#7C2D12"/></stroke>
+          <text x="20" y="18" width="220" font-size="12" fill="#FDBA74">CONVERSION</text>
+          <text x="20" y="52" width="220" font-size="34" fill="#FFFFFF">42.8%</text>
+          <ellipse x="20" y="116" width="10" height="10" fill="#F97316"/>
+          <text x="40" y="108" width="194" font-size="12" fill="#FED7AA">+3.1 points this week</text>
+        </rect>
+        <rect width="274" height="150">
+          <fill>
+            <solid color="#0B1220"/>
+            <gradient kind="radial" transform="1.4 0 0 1.4 -0.5 -0.5" opacity="0.48">
+              <stop offset="0" color="#6D28D9"/>
+              <stop offset="1" color="#0B1220"/>
+            </gradient>
+          </fill>
+          <stroke align="inside" join="bevel"><solid color="#6D28D9"/></stroke>
+          <text x="20" y="18" width="220" font-size="12" fill="#E9D5FF">AUTOMATION HOURS</text>
+          <text x="20" y="52" width="220" font-size="34" fill="#FFFFFF">1,906</text>
+          <ellipse x="20" y="116" width="10" height="10" fill="#C084FC"/>
+          <text x="40" y="108" width="194" font-size="12" fill="#E9D5FF">Saved across 32 flows</text>
+        </rect>
+      </container>
+
+      <rect name="signal-chart" y="254" width="770" height="434" fill="#0B1220">
+        <stroke width="8" align="outside" join="round"><solid color="#020617" opacity="0.5"/></stroke>
+        <stroke align="inside" join="bevel"><solid color="#1E293B"/></stroke>
+        <text x="24" y="22" width="360" font-size="18" fill="#FFFFFF">Signal velocity</text>
+        <text x="24" y="52" width="360" font-size="12" fill="#64748B">Qualified events · trailing 8 weeks</text>
+        <text x="620" y="24" width="120" font-size="12" fill="#A7F3D0">●  +24.8%</text>
+
+        <line x="28" y="118" width="714"><stroke width="1"><solid color="#334155" opacity="0.55"/></stroke></line>
+        <line x="28" y="190" width="714"><stroke width="1"><solid color="#334155" opacity="0.55"/></stroke></line>
+        <line x="28" y="262" width="714"><stroke width="1"><solid color="#334155" opacity="0.55"/></stroke></line>
+        <line x="28" y="334" width="714"><stroke width="1"><solid color="#334155" opacity="0.55"/></stroke></line>
+
+        <container x="52" y="108" width="666" height="258" layout="flex" cross="end" main="space-between">
+          <rect width="46" height="92"><fill><gradient kind="linear" from="0 1" to="0 0"><stop offset="0" color="#0E7490"/><stop offset="1" color="#22D3EE"/></gradient></fill></rect>
+          <rect width="46" height="124"><fill><gradient kind="linear" from="0 1" to="0 0"><stop offset="0" color="#0E7490"/><stop offset="1" color="#22D3EE"/></gradient></fill></rect>
+          <rect width="46" height="108"><fill><gradient kind="linear" from="0 1" to="0 0"><stop offset="0" color="#0E7490"/><stop offset="1" color="#22D3EE"/></gradient></fill></rect>
+          <rect width="46" height="168"><fill><gradient kind="linear" from="0 1" to="0 0"><stop offset="0" color="#4338CA"/><stop offset="1" color="#A78BFA"/></gradient></fill></rect>
+          <rect width="46" height="152"><fill><gradient kind="linear" from="0 1" to="0 0"><stop offset="0" color="#4338CA"/><stop offset="1" color="#A78BFA"/></gradient></fill></rect>
+          <rect width="46" height="206"><fill><gradient kind="linear" from="0 1" to="0 0"><stop offset="0" color="#6D28D9"/><stop offset="1" color="#F472B6"/></gradient></fill></rect>
+          <rect width="46" height="226"><fill><gradient kind="linear" from="0 1" to="0 0"><stop offset="0" color="#6D28D9"/><stop offset="1" color="#F472B6"/></gradient></fill></rect>
+          <rect width="46" height="246"><fill><gradient kind="linear" from="0 1" to="0 0"><stop offset="0" color="#15803D"/><stop offset="1" color="#A3E635"/></gradient></fill></rect>
+        </container>
+        <container x="52" y="382" width="666" height="20" layout="flex" main="space-between">
+          <text width="46" font-size="10" fill="#64748B">W18</text>
+          <text width="46" font-size="10" fill="#64748B">W19</text>
+          <text width="46" font-size="10" fill="#64748B">W20</text>
+          <text width="46" font-size="10" fill="#64748B">W21</text>
+          <text width="46" font-size="10" fill="#64748B">W22</text>
+          <text width="46" font-size="10" fill="#64748B">W23</text>
+          <text width="46" font-size="10" fill="#64748B">W24</text>
+          <text width="46" font-size="10" fill="#A3E635">NOW</text>
+        </container>
+      </rect>
+
+      <container name="right-rail" x="790" y="254" width="360" height="434" layout="flex" direction="column" gap="18">
+        <rect width="360" height="208" fill="#0B1220">
+          <stroke align="inside" join="bevel"><solid color="#1E293B"/></stroke>
+          <text x="20" y="18" width="250" font-size="16" fill="#FFFFFF">System health</text>
+          <ellipse x="286" y="18" width="42" height="42" fill="#052E16">
+            <stroke width="2" align="inside"><solid color="#34D399"/></stroke>
+            <text x="center" y="center" font-size="11" fill="#A7F3D0">99</text>
+          </ellipse>
+          <text x="20" y="64" width="230" font-size="12" fill="#94A3B8">Ingestion</text>
+          <line x="118" y="72" width="190"><stroke width="8" cap="round"><solid color="#1E293B"/></stroke><stroke width="5" cap="round"><gradient kind="linear"><stop offset="0" color="#22D3EE"/><stop offset="1" color="#34D399"/></gradient></stroke></line>
+          <text x="20" y="104" width="230" font-size="12" fill="#94A3B8">Automation</text>
+          <line x="118" y="112" width="170"><stroke width="8" cap="round"><solid color="#1E293B"/></stroke><stroke width="5" cap="round"><solid color="#A3E635"/></stroke></line>
+          <text x="20" y="144" width="230" font-size="12" fill="#94A3B8">Delivery</text>
+          <line x="118" y="152" width="182"><stroke width="8" cap="round"><solid color="#1E293B"/></stroke><stroke width="5" cap="round"><solid color="#A78BFA"/></stroke></line>
+          <text x="20" y="178" width="310" font-size="11" fill="#64748B">No incidents in the last 14 days</text>
+        </rect>
+
+        <rect width="360" height="208" fill="#0B1220">
+          <stroke align="inside" join="bevel"><solid color="#1E293B"/></stroke>
+          <text x="20" y="18" width="260" font-size="16" fill="#FFFFFF">Live activity</text>
+          <ellipse x="20" y="62" width="12" height="12" fill="#22D3EE"/>
+          <text x="46" y="55" width="286" font-size="12" fill="#CBD5E1">Northstar score recalculated</text>
+          <text x="46" y="76" width="286" font-size="10" fill="#64748B">12 seconds ago</text>
+          <ellipse x="20" y="112" width="12" height="12" fill="#A3E635"/>
+          <text x="46" y="105" width="286" font-size="12" fill="#CBD5E1">24 contacts qualified</text>
+          <text x="46" y="126" width="286" font-size="10" fill="#64748B">3 minutes ago</text>
+          <ellipse x="20" y="162" width="12" height="12" fill="#A78BFA"/>
+          <text x="46" y="155" width="286" font-size="12" fill="#CBD5E1">Campaign orbit completed</text>
+          <text x="46" y="176" width="286" font-size="10" fill="#64748B">18 minutes ago</text>
+        </rect>
+      </container>
+
+      <rect name="insight-strip" y="710" width="1150" height="176">
+        <fill>
+          <solid color="#0B1220"/>
+          <gradient kind="linear" from="0 0" to="1 0" opacity="0.48">
+            <stop offset="0" color="#164E63"/>
+            <stop offset="0.5" color="#312E81"/>
+            <stop offset="1" color="#3B0764"/>
+          </gradient>
+        </fill>
+        <stroke width="2" align="inside" join="bevel"><solid color="#475569"/></stroke>
+        <text x="26" y="24" width="190" font-size="12" fill="#A5F3FC">AI INSIGHT / 09:42</text>
+        <text x="26" y="60" width="720" font-size="24" fill="#FFFFFF">Expansion signals are clustering 18% earlier.</text>
+        <text x="26" y="102" width="700" font-size="13" fill="#CBD5E1">Shift the enterprise nurture trigger from day 21 to day 17 to meet the new behavioral curve.</text>
+        <rect x="900" y="54" width="214" height="64" fill="#E2E8F0">
+          <stroke width="6" align="outside" join="round"><solid color="#22D3EE" opacity="0.18"/></stroke>
+          <text x="center" y="center" font-size="14" fill="#0F172A">REVIEW ACTION  &gt;</text>
+        </rect>
+      </rect>
+    </container>
+  </container>
+</grida>

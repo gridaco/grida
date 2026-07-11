@@ -1,0 +1,50 @@
+<grida version="0">
+  <container name="rich-text-specimen" width="1280" height="800" corner-radius="40" clips="true">
+    <fill>
+      <solid color="#060914"/>
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.9">
+        <stop offset="0" color="#111B3A"/>
+        <stop offset="0.52" color="#120D2D"/>
+        <stop offset="1" color="#05070D"/>
+      </gradient>
+      <gradient kind="radial" transform="1.2 0 0 1.2 -0.58 -0.5" opacity="0.36" blend-mode="screen">
+        <stop offset="0" color="#7C3AED"/>
+        <stop offset="0.45" color="#2563EB" opacity="0.45"/>
+        <stop offset="1" color="#020617" opacity="0"/>
+      </gradient>
+    </fill>
+    <ellipse x="960" y="-170" width="470" height="470" opacity="0.5">
+      <fill>
+        <gradient kind="sweep" blend-mode="screen">
+          <stop offset="0" color="#F472B6"/>
+          <stop offset="0.36" color="#8B5CF6"/>
+          <stop offset="0.7" color="#22D3EE"/>
+          <stop offset="1" color="#F472B6"/>
+        </gradient>
+      </fill>
+    </ellipse>
+    <text name="eyebrow" x="72" y="58" width="700" font-size="15" font-weight="700" fill="#A5B4FC">GRIDA XML / ONE STRING · COMPLETE RUNS · EXACT WHITESPACE</text>
+    <text name="headline" x="72" y="118" width="1136" font-size="72" fill="#F8FAFC">Type has one string,
+<tspan font-size="90" font-weight="850"><fill><gradient kind="linear" from="0 0" to="1 1"><stop offset="0" color="#F9A8D4"/><stop offset="0.48" color="#C4B5FD"/><stop offset="1" color="#67E8F9"/></gradient></fill>many voices.</tspan></text>
+    <text name="manifesto" x="76" y="350" width="850" font-size="22" fill="#CBD5E1"><tspan font-weight="700" fill="#FFFFFF">Flat runs.</tspan> Styles stay inspectable, offsets stay derived, and <tspan font-style="italic" fill="#A5F3FC">authored  spacing</tspan> stays exactly where it was written.</text>
+    <rect name="syntax-card" x="72" y="472" width="1136" height="206" corner-radius="28">
+      <fill>
+        <solid color="#0B1020" opacity="0.92"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.24" blend-mode="screen">
+          <stop offset="0" color="#7C3AED"/>
+          <stop offset="1" color="#0891B2"/>
+        </gradient>
+      </fill>
+      <stroke width="1" align="inside">
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.7">
+          <stop offset="0" color="#C4B5FD"/>
+          <stop offset="1" color="#67E8F9"/>
+        </gradient>
+      </stroke>
+      <text x="34" y="30" width="1068" font-size="16" font-weight="700" fill="#818CF8">CANONICAL SOURCE</text>
+      <text x="34" y="74" width="1068" font-size="19" fill="#94A3B8">&lt;text font-size=&quot;32&quot;&gt;Ship &lt;tspan font-weight=&quot;700&quot; fill=&quot;#67E8F9&quot;&gt;boldly&lt;/tspan&gt;.&lt;/text&gt;</text>
+      <text x="34" y="132" width="1068" font-size="17" fill="#64748B">UTF-8 ranges are derived after XML decoding: <tspan font-weight="700" fill="#E2E8F0">café · naïve · λ</tspan> / no byte offsets in source.</text>
+    </rect>
+    <text x="72" y="730" width="1136" font-size="14" fill="#64748B">NEUTRAL TAGS, SEMANTIC DATA · NO &lt;b&gt;, &lt;i&gt;, OR style=&quot;…&quot; MINI-LANGUAGE</text>
+  </container>
+</grida>

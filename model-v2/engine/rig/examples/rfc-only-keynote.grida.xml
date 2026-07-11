@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<grida version="0">
+  <container name="NEON NATIVE 2027 keynote" width="960" height="540" clips="true">
+    <fill>
+      <solid color="#050714"/>
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.95">
+        <stop offset="0" color="#181D4A"/>
+        <stop offset="0.48" color="#0D1028"/>
+        <stop offset="1" color="#04050C"/>
+      </gradient>
+      <gradient kind="radial" transform="1.7 0 0 1.7 0.28 -0.72" opacity="0.62" blend-mode="screen">
+        <stop offset="0" color="#FF5CC8" opacity="0.9"/>
+        <stop offset="0.42" color="#845EF7" opacity="0.48"/>
+        <stop offset="1" color="#000000" opacity="0"/>
+      </gradient>
+      <gradient kind="linear" from="-0.2 1" to="0.9 0" opacity="0.2" blend-mode="screen">
+        <stop offset="0" color="#35F2D0" opacity="0.75"/>
+        <stop offset="0.5" color="#5C7CFA" opacity="0.18"/>
+        <stop offset="1" color="#000000" opacity="0"/>
+      </gradient>
+    </fill>
+    <stroke width="1" align="inside" join="miter">
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.7">
+        <stop offset="0" color="#70FFF0"/>
+        <stop offset="0.5" color="#8B5CF6"/>
+        <stop offset="1" color="#FF66C4"/>
+      </gradient>
+    </stroke>
+
+    <rect name="left guide" x="48" y="48" width="1" height="444" fill="#8191D6" opacity="0.34"/>
+    <line name="upper measure" x="48" y="48" width="864" opacity="0.32">
+      <stroke width="1" align="center" dash-array="2 10">
+        <solid color="#A9B7FF"/>
+      </stroke>
+    </line>
+    <line name="lower measure" x="48" y="492" width="864" opacity="0.22">
+      <stroke width="1" align="center" dash-array="2 10">
+        <solid color="#70FFF0"/>
+      </stroke>
+    </line>
+
+    <rect name="refracted beam" x="716" y="-112" width="148" height="748" rotation="18" opacity="0.18">
+      <fill>
+        <gradient kind="linear" from="0 0" to="1 0" tile-mode="mirror" blend-mode="screen">
+          <stop offset="0" color="#000000" opacity="0"/>
+          <stop offset="0.38" color="#6CFFF0" opacity="0.5"/>
+          <stop offset="0.58" color="#C77DFF" opacity="0.85"/>
+          <stop offset="1" color="#000000" opacity="0"/>
+        </gradient>
+      </fill>
+    </rect>
+    <rect name="beam edge" x="786" y="-110" width="2" height="748" rotation="18" fill="#7CFFF1" opacity="0.24"/>
+
+    <group name="conference signal" x="786" y="260" opacity="0.96">
+      <lens name="tilted orbit" ops="rotate(-18) scale(1,0.58)">
+        <ellipse x="-218" y="-218" width="436" height="436">
+          <fill/>
+          <stroke width="2" align="center" dash-array="9 15">
+            <gradient kind="sweep" opacity="0.9">
+              <stop offset="0" color="#57F7E5"/>
+              <stop offset="0.34" color="#6979FF"/>
+              <stop offset="0.7" color="#FF5CC8"/>
+              <stop offset="1" color="#57F7E5"/>
+            </gradient>
+          </stroke>
+        </ellipse>
+      </lens>
+
+      <line x="-188" y="0" width="376" opacity="0.4">
+        <stroke width="1" align="center" dash-array="3 9">
+          <solid color="#8CA8FF"/>
+        </stroke>
+      </line>
+      <line x="-188" y="0" width="376" rotation="90" opacity="0.28">
+        <stroke width="1" align="center" dash-array="3 9">
+          <solid color="#70FFF0"/>
+        </stroke>
+      </line>
+
+      <ellipse name="signal core" x="-132" y="-132" width="264" height="264">
+        <fill>
+          <solid color="#090D25"/>
+          <gradient kind="radial" transform="1.25 0 0 1.25 -0.18 -0.2" opacity="0.96">
+            <stop offset="0" color="#2DE2D0"/>
+            <stop offset="0.44" color="#4263EB"/>
+            <stop offset="1" color="#180A39"/>
+          </gradient>
+          <gradient kind="diamond" transform="0.82 0 0 0.82 0.09 0.09" opacity="0.48" blend-mode="screen">
+            <stop offset="0" color="#FFFFFF" opacity="0.7"/>
+            <stop offset="0.36" color="#A78BFA" opacity="0.3"/>
+            <stop offset="1" color="#000000" opacity="0"/>
+          </gradient>
+        </fill>
+        <stroke width="18" align="outside">
+          <gradient kind="linear" from="0.08 0.1" to="0.92 0.9">
+            <stop offset="0" color="#61FFF0"/>
+            <stop offset="0.5" color="#735CFF"/>
+            <stop offset="1" color="#FF66C4"/>
+          </gradient>
+        </stroke>
+        <stroke width="2" align="inside">
+          <solid color="#FFFFFF" opacity="0.42"/>
+          <gradient kind="linear" from="0 1" to="1 0" opacity="0.75" blend-mode="screen">
+            <stop offset="0" color="#70FFF0"/>
+            <stop offset="1" color="#FF9ADC"/>
+          </gradient>
+        </stroke>
+        <text x="center" y="center -28" font-size="58" fill="#FFFFFF">27</text>
+        <text x="center" y="center 38" font-size="13" fill="#B9FFF4">SEOUL</text>
+      </ellipse>
+
+      <ellipse name="cyan satellite" x="151" y="-91" width="18" height="18" fill="#63FFEA">
+        <stroke width="7" align="outside">
+          <solid color="#63FFEA" opacity="0.16"/>
+        </stroke>
+      </ellipse>
+      <ellipse name="pink satellite" x="-178" y="108" width="12" height="12" fill="#FF66C4">
+        <stroke width="6" align="outside">
+          <solid color="#FF66C4" opacity="0.2"/>
+        </stroke>
+      </ellipse>
+      <rect name="phase tick" x="-184" y="-128" width="46" height="4" rotation="-24" fill="#B5A7FF"/>
+    </group>
+
+    <container name="conference label" x="72" y="64" width="540" height="28" layout="flex" direction="row" gap="12" cross="center">
+      <rect width="30" height="4" fill="#63FFEA"/>
+      <text font-size="14" fill="#C5D0FF">NEON / NATIVE — CREATIVE TECHNOLOGY SUMMIT</text>
+      <line width="72" opacity="0.5">
+        <stroke width="1" align="center">
+          <gradient kind="linear" from="0 0.5" to="1 0.5">
+            <stop offset="0" color="#8EA1FF"/>
+            <stop offset="1" color="#FF66C4" opacity="0"/>
+          </gradient>
+        </stroke>
+      </line>
+    </container>
+
+    <text name="title lead" x="72" y="132" font-size="70" fill="#F5F7FF">MAKE</text>
+    <text name="title emphasis" x="72" y="210" width="560" height="auto" font-size="68">
+      <fill>
+        <solid color="#EDE9FE"/>
+        <gradient kind="linear" from="0 0.5" to="1 0.5" opacity="0.94" blend-mode="screen">
+          <stop offset="0" color="#62F8E6"/>
+          <stop offset="0.52" color="#8B78FF"/>
+          <stop offset="1" color="#FF72C8"/>
+        </gradient>
+      </fill>
+      <stroke width="1.5" align="outside">
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.72">
+          <stop offset="0" color="#D8FFFA"/>
+          <stop offset="1" color="#FFB8E3"/>
+        </gradient>
+      </stroke>THE UNSEEN</text>
+
+    <text name="keynote promise" x="76" y="316" width="500" height="auto" font-size="20" fill="#C2C9E8">Where design, code, sound, and synthetic media become one instrument.</text>
+    <text name="speaker" x="76" y="382" font-size="14" fill="#7FF5E6">OPENING KEYNOTE / MINA VALE</text>
+
+    <container name="event details" x="72" y="430" width="650" height="54" layout="flex" direction="row" gap="20" cross="center">
+      <rect width="4" height="54">
+        <fill>
+          <gradient kind="linear" from="0 0" to="0 1">
+            <stop offset="0" color="#63FFEA"/>
+            <stop offset="1" color="#FF66C4"/>
+          </gradient>
+        </fill>
+      </rect>
+
+      <container width="132" height="54" layout="flex" direction="column" gap="3" main="center">
+        <text font-size="12" fill="#8291C4">DATE</text>
+        <text font-size="16" fill="#F4F6FF">17—19 OCTOBER</text>
+      </container>
+
+      <line width="28" rotation="90" opacity="0.38">
+        <stroke width="1" align="center">
+          <solid color="#8796C9"/>
+        </stroke>
+      </line>
+
+      <container width="112" height="54" layout="flex" direction="column" gap="3" main="center">
+        <text font-size="12" fill="#8291C4">PLACE</text>
+        <text font-size="16" fill="#F4F6FF">SEOUL / KR</text>
+      </container>
+
+      <line width="28" rotation="90" opacity="0.38">
+        <stroke width="1" align="center">
+          <solid color="#8796C9"/>
+        </stroke>
+      </line>
+
+      <container width="210" height="54" layout="flex" direction="column" gap="3" main="center">
+        <text font-size="12" fill="#8291C4">SESSION</text>
+        <text font-size="16" fill="#F4F6FF">STAGE 01 / 09:30</text>
+      </container>
+    </container>
+  </container>
+</grida>

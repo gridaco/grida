@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<grida version="0">
+  <container name="Orbit analytics dashboard" width="960" height="640" layout="flex" direction="row" cross="stretch" fill="#080D19">
+    <!-- Primary navigation -->
+    <container name="Sidebar" width="216" height="auto" layout="flex" direction="column" cross="stretch" padding="20" gap="12" fill="#0A0F1C">
+      <stroke width="1" align="inside">
+        <solid color="#25314A"/>
+      </stroke>
+
+      <container name="Brand" width="auto" height="38" layout="flex" direction="row" cross="center" gap="12">
+        <ellipse name="Orbit mark" width="34" height="34">
+          <fill>
+            <gradient kind="linear" from="0 0" to="1 1">
+              <stop offset="0" color="#A78BFA"/>
+              <stop offset="1" color="#2563EB"/>
+            </gradient>
+          </fill>
+          <stroke width="4" align="outside">
+            <solid color="#172554" opacity="0.5"/>
+          </stroke>
+          <stroke width="1" align="inside">
+            <gradient kind="linear" from="0 0" to="1 1">
+              <stop offset="0" color="#EDE9FE"/>
+              <stop offset="1" color="#60A5FA"/>
+            </gradient>
+          </stroke>
+          <text x="center" y="center" font-size="16" fill="#FFFFFF">O</text>
+        </ellipse>
+        <text font-size="18" fill="#F8FAFC">ORBIT</text>
+      </container>
+
+      <text name="Navigation label" font-size="11" fill="#64748B">WORKSPACE</text>
+
+      <ellipse name="Overview navigation" width="176" height="42">
+        <fill>
+          <solid color="#172554"/>
+          <gradient kind="linear" from="0 0.5" to="1 0.5" opacity="0.9">
+            <stop offset="0" color="#6D28D9"/>
+            <stop offset="1" color="#2563EB" opacity="0.8"/>
+          </gradient>
+        </fill>
+        <stroke width="1" align="inside">
+          <solid color="#A78BFA" opacity="0.55"/>
+        </stroke>
+        <ellipse x="14" y="center" width="10" height="10" fill="#FFFFFF"/>
+        <text x="36" y="center" font-size="13" fill="#FFFFFF">Overview</text>
+      </ellipse>
+
+      <container name="Revenue navigation" width="176" height="42">
+        <ellipse x="15" y="center" width="8" height="8" fill="#475569"/>
+        <text x="36" y="center" font-size="13" fill="#94A3B8">Revenue</text>
+      </container>
+
+      <container name="Audience navigation" width="176" height="42">
+        <ellipse x="15" y="center" width="8" height="8" fill="#475569"/>
+        <text x="36" y="center" font-size="13" fill="#94A3B8">Audience</text>
+      </container>
+
+      <container name="Reports navigation" width="176" height="42">
+        <ellipse x="15" y="center" width="8" height="8" fill="#475569"/>
+        <text x="36" y="center" font-size="13" fill="#94A3B8">Reports</text>
+      </container>
+
+      <container name="Flexible sidebar spacer" width="auto" height="0" grow="1"/>
+
+      <container name="Sync status" width="auto" height="70" fill="#101827">
+        <stroke width="1" align="inside">
+          <solid color="#26354D"/>
+        </stroke>
+        <ellipse x="16" y="17" width="9" height="9" fill="#34D399">
+          <stroke width="3" align="outside">
+            <solid color="#065F46" opacity="0.35"/>
+          </stroke>
+        </ellipse>
+        <text x="34" y="13" font-size="12" fill="#E2E8F0">Data synced</text>
+        <text x="16" y="39" font-size="10" fill="#64748B">Updated 2 minutes ago</text>
+      </container>
+    </container>
+
+    <!-- Main workspace -->
+    <container name="Workspace" width="600" height="auto" grow="1" layout="flex" direction="column" cross="stretch" padding="24" gap="18" fill="#0B1220">
+      <container name="Dashboard header" width="auto" height="48" layout="flex" direction="row" main="space-between" cross="center">
+        <container name="Header copy" width="320" height="auto" layout="flex" direction="column" gap="3">
+          <text font-size="22" fill="#F8FAFC">Analytics overview</text>
+          <text font-size="11" fill="#64748B">Performance across your active workspace</text>
+        </container>
+
+        <container name="Header controls" width="130" height="34" layout="flex" direction="row" gap="12" cross="center">
+          <ellipse name="Live status" width="84" height="32" fill="#10241F">
+            <stroke width="1" align="inside">
+              <solid color="#166534"/>
+            </stroke>
+            <ellipse x="12" y="center" width="8" height="8" fill="#34D399"/>
+            <text x="28" y="center" font-size="11" fill="#86EFAC">LIVE</text>
+          </ellipse>
+          <ellipse name="User avatar" width="34" height="34">
+            <fill>
+              <gradient kind="linear" from="0 0" to="1 1">
+                <stop offset="0" color="#F59E0B"/>
+                <stop offset="1" color="#EF4444"/>
+              </gradient>
+            </fill>
+            <stroke width="2" align="outside">
+              <solid color="#1E293B"/>
+            </stroke>
+            <text x="center" y="center" font-size="11" fill="#FFFFFF">RK</text>
+          </ellipse>
+        </container>
+      </container>
+
+      <!-- Metric cards -->
+      <container name="Key metrics" width="auto" height="126" layout="flex" direction="row" gap="14" cross="stretch">
+        <container name="Revenue metric" width="200" height="126" grow="1">
+          <fill>
+            <solid color="#172554"/>
+            <gradient kind="linear" from="0 0" to="1 1" opacity="0.78">
+              <stop offset="0" color="#7C3AED"/>
+              <stop offset="1" color="#2563EB" opacity="0.65"/>
+            </gradient>
+          </fill>
+          <stroke width="1" align="inside">
+            <gradient kind="linear" from="0 0" to="1 1">
+              <stop offset="0" color="#C4B5FD" opacity="0.65"/>
+              <stop offset="1" color="#60A5FA" opacity="0.25"/>
+            </gradient>
+          </stroke>
+          <text x="18" y="16" font-size="11" fill="#DDD6FE">NET REVENUE</text>
+          <text x="18" y="44" font-size="28" fill="#FFFFFF">$84.2K</text>
+          <text x="18" y="91" font-size="11" fill="#BBF7D0">+12.4% this month</text>
+          <ellipse x="end 18" y="16" width="30" height="30" fill="#FFFFFF" opacity="0.14">
+            <text x="center" y="center" font-size="15" fill="#FFFFFF">+</text>
+          </ellipse>
+        </container>
+
+        <container name="Conversion metric" width="200" height="126" grow="1" fill="#111A2A">
+          <stroke width="1" align="inside">
+            <solid color="#26354D"/>
+          </stroke>
+          <text x="18" y="16" font-size="11" fill="#94A3B8">CONVERSION</text>
+          <text x="18" y="44" font-size="28" fill="#F8FAFC">7.86%</text>
+          <text x="18" y="91" font-size="11" fill="#67E8F9">+0.8 pts vs prior</text>
+          <ellipse x="end 18" y="16" width="30" height="30" fill="#083344">
+            <ellipse x="center" y="center" width="10" height="10" fill="#22D3EE"/>
+          </ellipse>
+        </container>
+
+        <container name="Active users metric" width="200" height="126" grow="1" fill="#111A2A">
+          <stroke width="1" align="inside">
+            <solid color="#26354D"/>
+          </stroke>
+          <text x="18" y="16" font-size="11" fill="#94A3B8">ACTIVE USERS</text>
+          <text x="18" y="44" font-size="28" fill="#F8FAFC">12,480</text>
+          <text x="18" y="91" font-size="11" fill="#FCD34D">2,104 online now</text>
+          <ellipse x="end 18" y="16" width="30" height="30" fill="#422006">
+            <ellipse x="center" y="center" width="10" height="10" fill="#FBBF24"/>
+          </ellipse>
+        </container>
+      </container>
+
+      <!-- Responsive lower split -->
+      <container name="Insights" width="auto" height="280" grow="1" layout="flex" direction="row" gap="18" cross="stretch">
+        <container name="Revenue chart" width="420" height="280" grow="1" fill="#101827" clips="true">
+          <stroke width="1" align="inside">
+            <solid color="#26354D"/>
+          </stroke>
+
+          <text x="22" y="18" font-size="16" fill="#F1F5F9">Revenue momentum</text>
+          <text x="22" y="43" font-size="10" fill="#64748B">Daily net revenue in USD</text>
+          <ellipse x="end 20" y="17" width="92" height="30" fill="#172033">
+            <stroke width="1" align="inside">
+              <solid color="#334155"/>
+            </stroke>
+            <text x="center" y="center" font-size="10" fill="#CBD5E1">LAST 7 DAYS</text>
+          </ellipse>
+
+          <line x="span 24 24" y="110">
+            <stroke width="1" align="center">
+              <solid color="#334155" opacity="0.55"/>
+            </stroke>
+          </line>
+          <line x="span 24 24" y="165">
+            <stroke width="1" align="center">
+              <solid color="#334155" opacity="0.55"/>
+            </stroke>
+          </line>
+          <line x="span 24 24" y="220">
+            <stroke width="1" align="center">
+              <solid color="#334155" opacity="0.55"/>
+            </stroke>
+          </line>
+          <line x="span 24 24" y="275">
+            <stroke width="1" align="center">
+              <solid color="#334155" opacity="0.55"/>
+            </stroke>
+          </line>
+          <line x="span 24 24" y="150">
+            <stroke width="1" align="center" cap="round" dash-array="5 5">
+              <solid color="#A78BFA" opacity="0.6"/>
+            </stroke>
+          </line>
+
+          <rect x="36" y="end 45" width="34" height="94" fill="#26354D"/>
+          <rect x="92" y="end 45" width="34" height="132" fill="#334766"/>
+          <rect x="148" y="end 45" width="34" height="112" fill="#2C3C58"/>
+          <rect x="204" y="end 45" width="34" height="166" fill="#3B4D70"/>
+          <rect x="260" y="end 45" width="34" height="144" fill="#405676"/>
+          <rect x="316" y="end 45" width="34" height="210">
+            <fill>
+              <gradient kind="linear" from="0.5 1" to="0.5 0">
+                <stop offset="0" color="#2563EB"/>
+                <stop offset="1" color="#8B5CF6"/>
+              </gradient>
+            </fill>
+            <stroke width="1" align="inside">
+              <solid color="#C4B5FD" opacity="0.5"/>
+            </stroke>
+          </rect>
+          <rect x="372" y="end 45" width="34" height="184" fill="#3B4D70"/>
+
+          <text x="44" y="end 18" font-size="9" fill="#64748B">M</text>
+          <text x="100" y="end 18" font-size="9" fill="#64748B">T</text>
+          <text x="156" y="end 18" font-size="9" fill="#64748B">W</text>
+          <text x="212" y="end 18" font-size="9" fill="#64748B">T</text>
+          <text x="268" y="end 18" font-size="9" fill="#64748B">F</text>
+          <text x="324" y="end 18" font-size="9" fill="#A78BFA">S</text>
+          <text x="380" y="end 18" font-size="9" fill="#64748B">S</text>
+        </container>
+
+        <container name="Insight rail" width="216" height="auto" layout="flex" direction="column" gap="16" cross="stretch">
+          <container name="System health" width="216" height="164" fill="#101827">
+            <stroke width="1" align="inside">
+              <solid color="#26354D"/>
+            </stroke>
+            <text x="18" y="18" font-size="14" fill="#F1F5F9">System health</text>
+            <ellipse x="18" y="61" width="9" height="9" fill="#34D399"/>
+            <text x="36" y="57" font-size="11" fill="#CBD5E1">API</text>
+            <text x="end 18" y="57" font-size="10" fill="#6EE7B7">99.99%</text>
+            <ellipse x="18" y="91" width="9" height="9" fill="#34D399"/>
+            <text x="36" y="87" font-size="11" fill="#CBD5E1">Events</text>
+            <text x="end 18" y="87" font-size="10" fill="#6EE7B7">Healthy</text>
+            <ellipse x="18" y="121" width="9" height="9" fill="#FBBF24"/>
+            <text x="36" y="117" font-size="11" fill="#CBD5E1">Exports</text>
+            <text x="end 18" y="117" font-size="10" fill="#FCD34D">Queued</text>
+          </container>
+
+          <container name="Top channels" width="216" height="160" grow="1" fill="#101827">
+            <stroke width="1" align="inside">
+              <solid color="#26354D"/>
+            </stroke>
+            <text x="18" y="18" font-size="14" fill="#F1F5F9">Top channels</text>
+
+            <text x="18" y="50" font-size="10" fill="#94A3B8">Direct</text>
+            <text x="end 18" y="50" font-size="10" fill="#CBD5E1">48%</text>
+            <rect x="span 18 18" y="69" height="6" fill="#1E293B"/>
+            <rect x="18" y="69" width="86" height="6" fill="#8B5CF6"/>
+
+            <text x="18" y="91" font-size="10" fill="#94A3B8">Paid search</text>
+            <text x="end 18" y="91" font-size="10" fill="#CBD5E1">31%</text>
+            <rect x="span 18 18" y="110" height="6" fill="#1E293B"/>
+            <rect x="18" y="110" width="56" height="6" fill="#22D3EE"/>
+
+            <text x="18" y="132" font-size="10" fill="#94A3B8">Social</text>
+            <text x="end 18" y="132" font-size="10" fill="#CBD5E1">21%</text>
+            <rect x="span 18 18" y="151" height="6" fill="#1E293B"/>
+            <rect x="18" y="151" width="38" height="6" fill="#F59E0B"/>
+          </container>
+        </container>
+      </container>
+    </container>
+  </container>
+</grida>

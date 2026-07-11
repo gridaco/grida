@@ -1,0 +1,212 @@
+<grida version="0">
+  <container name="prism-launch" width="1440" height="900" clips="true">
+    <fill>
+      <solid color="#050816"/>
+      <image src="../../../../fixtures/images/512.jpg" fit="fill" opacity="0.16" blend-mode="soft-light"/>
+      <gradient kind="diamond" transform="1.25 0 0 1.1 -0.18 -0.08" opacity="0.9">
+        <stop offset="0" color="#6D28D9"/>
+        <stop offset="0.42" color="#172554"/>
+        <stop offset="1" color="#020617"/>
+      </gradient>
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.52" blend-mode="screen">
+        <stop offset="0" color="#F472B6" opacity="0.5"/>
+        <stop offset="0.48" color="#8B5CF6" opacity="0.18"/>
+        <stop offset="1" color="#22D3EE" opacity="0.08"/>
+      </gradient>
+    </fill>
+    <stroke width="3">
+      <gradient kind="linear" from="0 0" to="1 1" opacity="0.6">
+        <stop offset="0" color="#F9A8D4"/>
+        <stop offset="0.5" color="#C4B5FD"/>
+        <stop offset="1" color="#67E8F9"/>
+      </gradient>
+    </stroke>
+
+    <ellipse name="violet-orbit" x="1018" y="-164" width="520" height="520" flip-y="true" opacity="0.72">
+      <fill>
+        <gradient kind="radial" tile-mode="mirror" transform="1.2 0 0 1.2 -0.15 -0.12">
+          <stop offset="0" color="#FDF2F8"/>
+          <stop offset="0.3" color="#F472B6"/>
+          <stop offset="0.68" color="#7C3AED"/>
+          <stop offset="1" color="#172554"/>
+        </gradient>
+      </fill>
+      <stroke width="18" align="inside" dash-array="8 16">
+        <solid color="#FFFFFF" opacity="0.18"/>
+      </stroke>
+      <stroke width="2" align="inside">
+        <solid color="#FFFFFF" opacity="0.48"/>
+      </stroke>
+    </ellipse>
+
+    <container name="masthead" x="72" y="48" width="1296" height="44" layout="flex" main="space-between" cross="center">
+      <text width="260" font-size="17" fill="#FFFFFF">PRISM / 2027</text>
+      <text width="520" font-size="13" fill="#DDD6FE">DESIGN SYSTEMS FOR LIVING SOFTWARE</text>
+      <text width="210" font-size="13" fill="#A5F3FC">SEOUL · 09:30 KST</text>
+    </container>
+
+    <line name="header-rule" x="span 72 72" y="112">
+      <stroke width="7" cap="round">
+        <solid color="#8B5CF6" opacity="0.16"/>
+      </stroke>
+      <stroke width="2" cap="round" dash-array="2 14">
+        <gradient kind="linear" from="0.18 0.5" to="0.82 0.5" tile-mode="mirror">
+          <stop offset="0" color="#F472B6"/>
+          <stop offset="0.5" color="#A78BFA"/>
+          <stop offset="1" color="#22D3EE"/>
+        </gradient>
+      </stroke>
+    </line>
+
+    <container name="hero-copy" x="78" y="166" width="748" height="630">
+      <rect name="edition-label" width="264" height="38">
+        <fill>
+          <solid color="#6D28D9"/>
+          <gradient kind="linear" from="0 0" to="1 1" blend-mode="screen">
+            <stop offset="0" color="#F472B6"/>
+            <stop offset="0.55" color="#8B5CF6"/>
+            <stop offset="1" color="#2563EB"/>
+          </gradient>
+        </fill>
+        <stroke width="8" align="outside" join="bevel">
+          <solid color="#8B5CF6" opacity="0.22"/>
+        </stroke>
+        <stroke join="bevel">
+          <solid color="#FFFFFF" opacity="0.72"/>
+        </stroke>
+        <text x="center" y="center" font-size="13" fill="#FFFFFF">OPENING KEYNOTE · STAGE 01</text>
+      </rect>
+
+      <text name="headline" y="78" width="720" font-size="78" fill="#F8FAFC">MAKE THE
+SOURCE VISIBLE.</text>
+      <text name="subhead" y="298" width="610" font-size="22" fill="#CBD5E1">A new medium for interfaces, motion, and authored intelligence—built from one inspectable tree.</text>
+
+      <container name="speaker" y="398" width="620" height="72" layout="flex" cross="center" gap="18">
+        <ellipse width="58" height="58">
+          <fill>
+            <gradient kind="sweep" transform="0.9 0 0 0.9 0.05 0.05">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="0.36" color="#8B5CF6"/>
+              <stop offset="0.72" color="#22D3EE"/>
+              <stop offset="1" color="#F472B6"/>
+            </gradient>
+          </fill>
+          <stroke width="7" align="outside">
+            <solid color="#FFFFFF" opacity="0.12"/>
+          </stroke>
+          <text x="center" y="center" font-size="16" fill="#FFFFFF">AK</text>
+        </ellipse>
+        <container width="420" height="62">
+          <text y="4" width="400" font-size="19" fill="#FFFFFF">ARI KIM</text>
+          <text y="34" width="400" font-size="13" fill="#A5B4FC">FOUNDER · SYSTEMS DESIGNER</text>
+        </container>
+      </container>
+
+      <container name="actions" y="510" width="660" height="70" layout="flex" cross="center" gap="20">
+        <rect width="302" height="64">
+          <fill>
+            <solid color="#7C3AED"/>
+            <gradient kind="linear" from="0 0" to="1 1" blend-mode="screen">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="0.5" color="#A855F7"/>
+              <stop offset="1" color="#2563EB"/>
+            </gradient>
+          </fill>
+          <stroke width="12" align="outside" join="round">
+            <gradient kind="radial" opacity="0.28" blend-mode="screen">
+              <stop offset="0" color="#F9A8D4"/>
+              <stop offset="0.58" color="#A78BFA"/>
+              <stop offset="1" color="#2563EB" opacity="0"/>
+            </gradient>
+          </stroke>
+          <stroke width="2" align="inside" join="bevel">
+            <solid color="#FFFFFF" opacity="0.8"/>
+          </stroke>
+          <text x="center" y="center" font-size="15" fill="#FFFFFF">RESERVE A SEAT  &gt;</text>
+        </rect>
+        <rect width="260" height="64" fill="#0F172A">
+          <stroke width="2" align="center" join="bevel" dash-array="12 8">
+            <gradient kind="linear" tile-mode="mirror">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="0.5" color="#A78BFA"/>
+              <stop offset="1" color="#22D3EE"/>
+            </gradient>
+          </stroke>
+          <text x="center" y="center" font-size="15" fill="#E2E8F0">VIEW PROGRAM</text>
+        </rect>
+      </container>
+    </container>
+
+    <container name="signal-panel" x="894" y="214" width="456" height="508" clips="true">
+      <fill>
+        <solid color="#080C18" opacity="0.5019608"/>
+        <gradient kind="linear" from="0 0" to="1 1" opacity="0.72">
+          <stop offset="0" color="#312E81"/>
+          <stop offset="0.52" color="#172554"/>
+          <stop offset="1" color="#020617"/>
+        </gradient>
+        <image src="../../../../fixtures/images/border-diamonds.png" fit="fill" opacity="0.1" blend-mode="screen"/>
+      </fill>
+      <stroke width="16" align="outside" join="round">
+        <solid color="#020617" opacity="0.72"/>
+      </stroke>
+      <stroke width="3" align="center" join="bevel">
+        <gradient kind="linear" from="0 0" to="1 1">
+          <stop offset="0" color="#FBCFE8"/>
+          <stop offset="0.5" color="#C4B5FD"/>
+          <stop offset="1" color="#A5F3FC"/>
+        </gradient>
+      </stroke>
+
+      <text x="30" y="28" width="260" font-size="14" fill="#C4B5FD">LIVE SIGNAL / 04</text>
+      <text x="30" y="62" width="340" font-size="30" fill="#FFFFFF">A scene you can read.</text>
+
+      <lens name="signal-ribbon" x="34" y="142" opacity="0.92" ops="rotate(-7) skew-x(-9)">
+        <rect width="360" height="88">
+          <fill>
+            <gradient kind="linear" from="0.08 0.5" to="0.92 0.5" tile-mode="mirror">
+              <stop offset="0" color="#F472B6"/>
+              <stop offset="0.34" color="#8B5CF6"/>
+              <stop offset="0.68" color="#2563EB"/>
+              <stop offset="1" color="#22D3EE"/>
+            </gradient>
+          </fill>
+          <stroke width="2" align="inside" join="bevel">
+            <solid color="#FFFFFF" opacity="0.58"/>
+          </stroke>
+          <text x="center" y="center" font-size="18" fill="#FFFFFF">TREE &gt; INTENT &gt; PIXELS</text>
+        </rect>
+      </lens>
+
+      <container x="30" y="278" width="396" height="164" layout="flex" wrap="true" gap="16" main="space-between" cross="center">
+        <rect width="182" height="70" fill="#111827">
+          <stroke align="inside" join="bevel"><solid color="#8B5CF6"/></stroke>
+          <text x="18" y="14" width="148" font-size="12" fill="#A5B4FC">LAYERS</text>
+          <text x="18" y="38" width="148" font-size="19" fill="#FFFFFF">ORDERED</text>
+        </rect>
+        <rect width="182" height="70" fill="#111827">
+          <stroke align="inside" join="bevel"><solid color="#22D3EE"/></stroke>
+          <text x="18" y="14" width="148" font-size="12" fill="#67E8F9">LAYOUT</text>
+          <text x="18" y="38" width="148" font-size="19" fill="#FFFFFF">RESPONSIVE</text>
+        </rect>
+        <rect width="182" height="70" fill="#111827">
+          <stroke align="inside" join="bevel"><solid color="#F472B6"/></stroke>
+          <text x="18" y="14" width="148" font-size="12" fill="#F9A8D4">SOURCE</text>
+          <text x="18" y="38" width="148" font-size="19" fill="#FFFFFF">INSPECTABLE</text>
+        </rect>
+        <rect width="182" height="70" fill="#111827">
+          <stroke align="inside" join="bevel"><solid color="#A3E635"/></stroke>
+          <text x="18" y="14" width="148" font-size="12" fill="#BEF264">STATUS</text>
+          <text x="18" y="38" width="148" font-size="19" fill="#FFFFFF">LIVE</text>
+        </rect>
+      </container>
+    </container>
+
+    <group name="footer" x="78" y="836" opacity="0.82">
+      <ellipse width="12" height="12" fill="#34D399">
+        <stroke width="8" align="outside"><solid color="#34D399" opacity="0.16"/></stroke>
+      </ellipse>
+      <text x="28" y="-3" width="700" font-size="13" fill="#CBD5E1">ONE FILE · ONE TREE · NO HIDDEN STYLE LANGUAGE</text>
+    </group>
+  </container>
+</grida>
