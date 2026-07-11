@@ -1,14 +1,33 @@
 ---
-title: Paragraph Feature Roadmap
+title: Paragraph and Text Layout
+description: "Specifications, focused studies, and implementation coverage for paragraph and typography behavior."
 tags:
   - internal
   - wg
   - typography
   - text
   - fonts
+format: md
 ---
 
-# Paragraph Feature Roadmap
+# Paragraph and Text Layout
+
+## Specifications
+
+- [Universal Shaped Text Layout](./text-layout) defines the canonical
+  resolution contract shared by geometry-sensitive consumers.
+
+## Focused studies
+
+- [Font fallback](./impl-font-fallback)
+- [Italic and oblique](./impl-italic)
+- [Optical size automation](./impl-opsz-auto)
+- [Emoji placeholder rendering](./impl-emoji-placeholder)
+
+## Coverage inventory
+
+The checklist below records implementation coverage. It does not define
+measurement, shaping, line, glyph, or editing geometry semantics.
 
 **Core / Modeling**
 
@@ -65,7 +84,7 @@ tags:
   - [x] text-decoration-thickness (only supports %)
   - [ ] text-decoration-skip-ink - https://github.com/rust-skia/rust-skia/issues/1187
   - [ ] known limitations https://github.com/gridaco/grida/issues/416
-- [x] [Variable axes](https://github.com/gridaco/grida/blob/canary/docs/reference/open-type-variable-axes.md)
+- [x] [Variable axes](../../reference/open-type-variable-axes)
   - [x] `wght`
   - [x] `wdth`
   - [x] `slnt`
@@ -84,7 +103,7 @@ tags:
   - [x] `YTAS`
   - [x] `YTDE`
   - [x] `YTFI`
-- [x] [open type featuers](https://github.com/gridaco/grida/blob/canary/docs/reference/open-type-features.md)
+- [x] [OpenType features](../../reference/open-type-features)
 
 **Text Editor**
 

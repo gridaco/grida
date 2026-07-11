@@ -355,6 +355,12 @@ flat `tspan` is only a contextual run and inherits every omitted run property
 from the owning `text`, not from its preceding sibling. Draft 0 uses explicit
 kebab-case attributes and defines no `style` mini-language.
 
+This registry inventories authored XML properties only. The [Universal Shaped
+Text Layout](../feat-paragraph/text-layout) RFD owns their eventual shaping,
+font resolution, line construction, UTF-8 mapping, metrics, and resolved
+bounds; adding a property here must project into that one resolution contract,
+not create a second measurement or rendering path.
+
 | Candidate XML property      | Valid on        | Production concept                        | Inspiration | Status          |
 | --------------------------- | --------------- | ----------------------------------------- | ----------- | --------------- |
 | `font-family`               | `text`, `tspan` | Font family                               | CSS         | **Placeholder** |

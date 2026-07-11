@@ -1009,8 +1009,16 @@ resizing the primitive does not rewrite a child's authored bindings.
 ### Text
 
 `text` is the scene node. It owns the text box, paragraph properties, default
-text style, node fill stack, and repeated node stroke geometries. Its content
-is one flat sequence of direct character data and contextual `tspan` runs:
+text style, node fill stack, and repeated node stroke geometries.
+
+The [Universal Shaped Text Layout](../feat-paragraph/text-layout) RFD owns the
+shaping, font resolution, line construction, UTF-8 mapping, metrics, and
+resolved bounds produced from that source. This section defines only the XML
+text intent and its mapping into that contract. Grida XML never serializes the
+resolved text-layout artifact.
+
+Its content is one flat sequence of direct character data and contextual
+`tspan` runs:
 
 ```text
 text    := node-fill? stroke* segment*
@@ -1260,10 +1268,12 @@ author chose: node kinds, hierarchy, bindings, size intent, text, paint,
 layout relationships, and explicit lens operations.
 
 A resolver combines that source with an explicit environment—viewport,
-fonts, and resources—to produce a separate resolved scene. Resolved boxes,
-world transforms, measured glyph runs, visual bounds, materialized vector
-points, and paint commands belong to that derived output. They are not fields
-of Grida XML merely because a renderer can compute them.
+fonts, and resources—to produce a separate resolved scene. Text shaping and
+geometry follow the single-result contract in [Universal Shaped Text
+Layout](../feat-paragraph/text-layout). Resolved boxes, world transforms,
+measured glyph runs, visual bounds, materialized vector points, and paint
+commands belong to that derived output. They are not fields of Grida XML
+merely because a renderer can compute them.
 
 This separation has three consequences:
 
