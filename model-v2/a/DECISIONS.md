@@ -174,6 +174,14 @@ cross-platform within ε — unsatisfiable with real fonts (a 1-ULP
 advance difference flips a line count; no ε absorbs a line-height
 jump). Pick the posture.
 
+**Current proof.** With a host font, the engine now gives resolver, drawlist,
+and paint one Skia Paragraph-produced immutable glyph layout; paint replays its
+glyph IDs and exact list-owned fonts without reshaping. Fontless probes use the
+explicitly named stub and emit no glyphs. This closes the architectural
+measurement/paint mismatch, not DEC-4: the host-font bridge claims no
+cross-platform determinism, deliberately disables fallback, fixes paragraph
+direction to LTR, and does not yet provide complete caret mapping.
+
 | option                                       | notes                                                                                                                                                                                                                                                                                         |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **pin a deterministic shaper** ← recommended | one versioned shaping stack, bit-exact per version; T-3 survives as an INV-per-shaper-version; Figma ships its own text stack for exactly this reason; CRDT/multiplayer + server rendering need stable line counts; cost: we own the pipeline, shaper upgrades become format-versioned events |

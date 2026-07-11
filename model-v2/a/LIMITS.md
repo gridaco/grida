@@ -21,7 +21,7 @@ limitation (not built / can't hold as stated).
 | ------ | ------------- | --------------------------------- | ----------------- | -------------------------------- | -------------- | ----------- | ---------- | ------------------------------- |
 | frame  | ✅            | ✅ children/flex                  | ✅ rigid (🎬)     | 📜 (boxed path, F-1 class)       | ✅             | ✅          | —          |                                 |
 | shape  | ✅            | ✅ parametric + free children     | ✅                | ✅ (F-1/2/4 + 🎬)                | ✅             | ✅          | —          | rect/ellipse/line only in lab   |
-| text   | ✅            | ✅ flowed (lab metric)            | ✅ (🎬)           | 📜 mirrors uniformly (DEC-9 sub) | ✅             | n/a         | —          | real shaping = the big ⛔ below |
+| text   | ✅            | ✅ flowed (oracle-backed)         | ✅ (🎬)           | 📜 mirrors uniformly (DEC-9 sub) | ✅             | n/a         | —          | Skia Paragraph path; B-1 open   |
 | vector | ⛔ not in lab | 📜 mapped (E-A9, write side open) | 📜                | 📜 flip bits, points untouched   | 📜             | n/a         | —          | B2 lock set before phase 3      |
 | image  | ⛔ not in lab | 📜 fitted (engine ships BoxFit)   | 📜                | 📜 paint mirrors (DEC-9)         | 📜             | n/a         | —          | low risk: paint seam exists     |
 | embed  | ⛔ not in lab | 📜 flowed                         | 📜                | 🔶                               | 📜             | n/a         | —          | the live-web valve (COMPAT)     |
@@ -68,7 +68,13 @@ code" to built: pivot-per-kind (B1) tested, `T·R·F` innermost declared
   geometry by a full line-height no ε can absorb. Figma ships its own
   text stack for exactly this reason. Decision owed: pin a deterministic
   shaper (bit-exact policy) or re-scope T-3 to per-platform goldens.
-  The lab's exact metric made E1–E4 evidence structurally blind to this.
+  The lab's exact metric made E1–E4 evidence structurally blind to this. The
+  engine now proves one shared measurement/draw artifact with a host-font Skia
+  Paragraph path, but that bridge is not cross-platform deterministic and
+  records only a process-local font environment. It deliberately has fallback
+  disabled, accepts only a width constraint, fixes direction to LTR, and
+  reports unresolved glyphs without yet returning the RFD's typed resolution
+  failure. It closes the architecture mismatch, not B-1 or DEC-4.
 - **B-2 · f32 at far-canvas.** ULP(1e7) = 1.0px, so N-1's "error bounded
   at ±1e7" cannot hold in a normative-f32 pipeline (Blink uses 1/64
   fixed-point; Figma accepts limited range). Decision owed: declared
@@ -127,10 +133,11 @@ parents (write it: skipped from union).
 `bool` (needs pathops), `vector` (E-A9 lock first), `image`/`embed`/
 `tray` payloads, ~~`flip_x/flip_y`~~ (BUILT — E-A14, 11 tests; only the
 gesture policy DEC-9 is open), 3D lens ops (encoding reserved only), grid mode,
-attributed text runs, `max_lines`/`ellipsis` fields, percent pins,
-anchor-to-node (`wire`), incremental invalidator, real text shaper,
-stable IR ids. Each is _named_ in a.md §12, the REPORT lose column, or
-this census — nothing in this list is silent.
+`max_lines`/`ellipsis` fields, percent pins, anchor-to-node (`wire`),
+incremental invalidator, a pinned production text oracle, general font
+fallback/bidi, complete source↔cluster/caret mapping, stable IR ids. Each is
+_named_ in a.md §12, the REPORT lose column, or this census — nothing in this
+list is silent.
 
 ## Cost note (found by the census, engine-relevant)
 

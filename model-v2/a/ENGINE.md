@@ -245,13 +245,23 @@ deterministic in text; Figma ships its own text stack precisely to be
 simulations pin float operation order and instruction choices to keep
 replicas bit-identical `[PEER]`.
 
-**Evidence on file.** The seam already exists: oracles are explicit
-resolve inputs (`fonts`, `resources` in the signature) `[MEASURED]`.
-The lab text metric is a stub and the spike renders real glyphs against
-stub measurement — the mismatch is deliberately visible `[MEASURED]`.
-B-1 (wrap decisions are discrete; no ε absorbs a line-height jump) and
-B-5 (bool needs pathops inside measure) are the two blockers this layer
-services `[MEASURED]` (LIMITS).
+**Evidence on file.** The text seam is concrete: the resolver accepts an
+explicit `TextLayoutOracle`; the host-font frame path uses Skia Paragraph to
+produce one immutable final-width glyph layout; the drawlist gives that same
+artifact to the fill and every stroke; and paint replays its glyph IDs and
+exact list-owned fonts without reshaping `[MEASURED]`. The artifact records its
+oracle/environment, input constraint, assigned box, semantic font identity,
+line topology, and logical/ink bounds; bounds and damage consume it directly
+`[MEASURED]`. Fontless probes use the explicit `stub@lab-0`, which emits line
+metrics and no glyph runs
+`[MEASURED]`. This proves shared consumption for the implemented sizing,
+painting, bounds, and damage paths—not cross-platform determinism or universal
+conformance. DEC-4 remains open; the current bridge deliberately disables font
+fallback and fixes paragraph direction to LTR `[MEASURED]`. Pick remains
+box-based, while editing/caret geometry and faithful export are not
+implemented. B-1 (wrap decisions are discrete; no ε absorbs a line-height
+jump) and B-5 (bool needs pathops inside measure) remain the two blockers this
+layer services `[MEASURED]` (LIMITS).
 
 **Major contracts** (decision-independent: DEC-4 picks the shaper,
 DEC-5 the numbers, DEC-6 the bool posture — these sockets hold under
@@ -264,10 +274,11 @@ any answer):
   is document-visible; an oracle upgrade is a format event, never a
   silent drift. Golden corpora per version; CI pins each version's
   outputs.
-- **ENG-4.3 · bit-exact within a version** `[CONTRACT]` — same oracle
-  version + same inputs ⇒ same outputs on every platform (one Rust
-  codebase across native/wasm is the enabling asset). This is what
-  makes ENG-1.1 and ENG-5.2 testable as bit-equality.
+- **ENG-4.3 · determinism posture is explicit** `[CONTRACT]` — oracle
+  identity names the comparison domain. DEC-4 decides whether that domain is
+  cross-platform bit-exact or platform-scoped; until then, the Skia Paragraph
+  bridge claims neither. ENG-1.1 and ENG-5.2 use bit-equality only within the
+  declared oracle environment.
 - **ENG-4.4 · the numeric profile is declared** `[CONTRACT]` — there IS
   a documented profile (precision, range, operation-order rules) the
   resolver and oracles conform to; DEC-5 fills in the numbers. Bugs
@@ -275,14 +286,14 @@ any answer):
   quietly tolerated.
 - **ENG-4.5 · measure-phase oracles are budgeted and cacheable**
   `[CONTRACT]` — phase-M oracle calls (shaping, pathops) are keyed by
-  `(content, constraints, oracle version)` for memoization under
+  `(content, constraints, environment, oracle version)` for memoization under
   ENG-1.4, and their cost is measured per frame — the phase-M budget is
   a number, not a hope.
 
-**Growth path.** stub metric (today, declared) → pinned shaper behind
-ENG-4.1–4.3 (unblocks B-1/T-3 as INV-per-version) → pathops in
-phase M with an ENG-4.5 budget (unblocks B-5/bool) → image/decode
-metrics under the same versioning.
+**Growth path.** explicit fontless stub + host-font Skia Paragraph bridge
+(today, measured) → the pinned or platform-scoped production oracle chosen by
+DEC-4 → pathops in phase M with an ENG-4.5 budget (unblocks B-5/bool) →
+image/decode metrics under the same versioning.
 
 **Open studies.** OS-4a: shaper candidates under the ENG-4.3 constraint
 — instrument: cross-platform golden corpus diff (feeds DEC-4, does not
@@ -377,12 +388,13 @@ green), so several of these are `[MEASURED]` rather than aspirational.
   the pipeline seam first, then pick/query, then interaction/journal —
   each gated by shot+replay parity. The spike re-host **is** this
   landing, rehearsed `[MEASURED]`.
-- **S-2 · dependency-direction law** `[CONTRACT]` — arrows never
-  reverse: model (no skia/winit/wasm-bindgen) ← engine (model + skia;
-  `use skia_safe` confined to `paint.rs` + `bin/gate.rs`) ← hosts
-  (engine + winit/egui/GL). Compiler-enforced, not reviewer-enforced.
-  Proven: `anchor-lab` builds feature-less, `anchor-engine` adds only
-  skia, the spike holds all chrome `[MEASURED]`.
+- **S-2 · dependency-direction law** `[CONTRACT]` — arrows never reverse:
+  model (no skia/winit/wasm-bindgen) ← engine (model with skia) ← hosts (engine
+  with winit/egui/GL). Raster semantics stay in `paint.rs`; shaping stays in
+  `text_layout.rs`; frame/cache/host code may own or route Skia surfaces and
+  resources without duplicating either semantic stage. Compiler-enforced, not
+  reviewer-enforced. Proven: `anchor-lab` builds feature-less,
+  `anchor-engine` adds only skia, the spike holds all chrome `[MEASURED]`.
 - **S-3 · one write door, one read door** `[CONTRACT]` — every mutation
   is a typed `Op` through `apply` (the journal's unit); every read is
   the resolved tier (via `query`) or the text IR. No tool reaches into

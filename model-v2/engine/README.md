@@ -11,8 +11,9 @@ The contracts it encodes are catalogued in [`../a/ENGINE.md`](../a/ENGINE.md)
 This is a **day-1 skeleton**: every contract has a code socket and a guarding
 test, and the spike ([`../a/spike-canvas`](../a/spike-canvas)) is **re-hosted**
 onto it — painting, hit-testing, gestures, and damage all flow through the
-engine. Growth (incremental resolve, tiles, a broadphase index, a real shaper)
-is deferred to named studies; the sockets are here so that growth is additive.
+engine. Growth (incremental resolve, tiles, a broadphase index, and a pinned
+production text oracle) is deferred to named studies; the sockets are here so
+that growth is additive.
 
 ## Run
 
@@ -65,19 +66,32 @@ phase. Each edge contributes its own conservative visual outset. A rounded or
 smoothed container/rectangle projects one shared outline into fill coverage,
 descendant clipping, and every repeated stroke while non-solid paint
 coordinates retain the full rectangular paint box. Degenerate paint-box axes
-use Draft 0's centered one-pixel coordinate fallback. Text measurement and
-the drawlist share one run-aware line topology: fragments retain font size,
-weight, style, x advance, and effective paints, while every run paint uses the
+use Draft 0's centered one-pixel coordinate fallback. With a host font,
+resolution uses Skia Paragraph to produce one immutable `Arc<TextLayout>` after
+the text node's final width is known. That artifact records its oracle and
+environment, input width constraint, final assigned box, line-break kinds,
+UTF-8 cluster starts, semantic font identities, glyph IDs and positions, and
+logical and ink bounds. Empty source owns one terminal line with default-font
+metrics but no invented source or ink. The drawlist shares the same `Arc` with
+the fill and every stroke and owns the exact per-resolution fonts behind the
+artifact's local replay keys; paint never reshapes or reconstructs them. Text
+world bounds start from glyph ink, and damage compares the complete text
+artifact even when its box is unchanged. Every run paint still uses the
 resolved full text-node box. Variable fonts receive the authored `wght` axis;
 single-face hosts use documented synthetic fallbacks only when needed.
 
 This remains a proving engine rather than a claim that every future RFD area is
 complete. Current limits are:
 
-- resolution and paint share explicit-line and constrained-wrap topology, but
-  the lab still measures with its deterministic `0.6/1.2` metric while Skia
-  paints a host typeface; a real shared shaper and glyph-ink bounds remain an
-  engine promotion task;
+- the host-font path is a Skia Paragraph bridge, not the deterministic oracle
+  still open in DEC-4: its font environment identity is process-local, its
+  constraint input is width-only, font fallback is deliberately disabled, and
+  paragraph direction is fixed to LTR. Unresolved glyphs produce an explicit
+  resolver report, but this proving resolver still returns the diagnostic
+  artifact rather than the RFD's final typed-failure API. Complete bidi,
+  source/cluster/caret mapping, paragraph controls, and cross-platform identity
+  remain open. Fontless probes explicitly use `stub@lab-0`; it emits line
+  metrics but no glyph runs or text pixels;
 - derived group/lens flex-slot growth still needs an explicit
   slot-versus-geometry model rule;
 - image-paint free transforms, tiling, filters, and quarter-turns are outside
@@ -90,10 +104,10 @@ complete. Current limits are:
   honor non-miter join state; Draft 0 therefore rejects nonuniform widths with
   nonzero smoothing or nondefault join/miter geometry instead of silently
   dropping authored intent;
-- `PaintCtx` is an already-resolved executor cache: the low-level infallible
-  painter emits no pixels for an unregistered image RID. A host claiming strict
-  materialization must preflight resources; `grida_xml_render` does so and
-  reports authored plus resolved locations;
+- `PaintCtx` is the host resource environment for text resolution and image
+  paint. The low-level infallible painter emits no pixels for an unregistered
+  image RID. A host claiming strict materialization must preflight resources;
+  `grida_xml_render` does so and reports authored plus resolved locations;
 - the lab's ordered `Vec<Stroke>` implements the accepted extension, while the
   production scene/archive model still has one stroke geometry per node.
 
@@ -179,7 +193,8 @@ mutating authored state is the open engine RFD: [`ANIMATION.md`](./ANIMATION.md)
 | stage purity + the oracle law        | (whole pipeline) | ENG-0         | the gate's differential + determinism runs                                                                                       |
 | Draft 0 source consumer seam         | parse → frame    | ENG-0 / S-2   | `tests/grida_xml.rs`, `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs` |
 | drawlist (pure, diffable projection) | `drawlist.rs`    | ENG-2.1       | `tests/drawlist.rs` (order · pruning · color · verbatim world · determinism)                                                     |
-| paint executor (only skia module)    | `paint.rs`       | ENG-2.1       | `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs` (pixel probes)        |
+| text shaping + shared glyph layout   | `text_layout.rs` | ENG-4.1/4.5   | `../a/lab/tests/text_layout.rs`, `tests/text.rs`                                                                                 |
+| raster executor                      | `paint.rs`       | ENG-2.1       | `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs` (pixel probes)        |
 | one frame entry                      | `frame.rs`       | ENG-2.4       | spike live loop + gate                                                                                                           |
 | damage as data                       | `damage.rs`      | ENG-2.2       | `tests/damage.rs` (identity empty · single-op locality)                                                                          |
 | spatial read tier                    | `query.rs`       | ENG-3         | `tests/query.rs` (`hit_point ≡ pick` over a grid)                                                                                |
@@ -198,18 +213,21 @@ full lab suite green throughout.
 
 ## The re-host, concretely
 
-The spike's scene painter is deleted; it calls `drawlist::build` +
-`paint::execute`. Pick/hover go through `query`. All gesture ops go through
-`apply` and are recorded in the `journal` (undo stays document snapshots —
-ENG-5.5). `--record` writes `.replay` corpus files; the panel shows the
-per-frame damage count.
+The spike's scene painter is deleted; it calls `frame::resolve_and_build` +
+`paint::execute`. The lower-level `drawlist::build_glyphless` entry is reserved
+for deterministic lab and structural probes. Live pick, hover, handles, and
+gestures resolve through the same host-font oracle as paint; spatial queries go
+through `query`. All gesture ops go through `apply` and are recorded in the
+`journal` (undo stays document snapshots — ENG-5.5). `--record` writes
+`.replay` corpus files; the panel shows the per-frame damage count.
 
 The gate's replay, differential/cache, and benchmark sections remain green.
-Its four legacy screenshots currently report the deliberate Draft 0 semantic
-delta: frames no longer receive invented ink, and authored parent strokes paint
-after children. Those pre-change goldens have not been blessed or silently
-rewritten; they need an explicit oracle rebaseline after the new painter order
-is accepted for the spike corpus.
+Its four legacy screenshots currently report deliberate semantic deltas:
+frames no longer receive invented ink, authored parent strokes paint after
+children, and host-font text now uses shaped metrics and positioned-glyph
+replay. Those pre-change goldens have not been blessed or silently rewritten;
+they need an explicit oracle rebaseline after the new painter and text oracle
+are accepted for the spike corpus.
 
 ## Scope fence (named, not silent)
 
@@ -219,5 +237,6 @@ studies, each behind a socket that is already here: incremental resolve
 (OS-1a/1b — `DirtyClass` exists, the engine ignores it and full-resolves) ·
 tiles / partial repaint (OS-2a — damage is data only) · layer promotion (OS-2b
 — re-measure the legacy finding) · broadphase BVH (OS-3a/3b — behind `query`)
-· real shaper (OS-4a / DEC-4) · pathops-in-measure (OS-4b / DEC-6) · CRDT /
-cross-session replay (OS-5b/5c — walled on stable ids, a.md §12).
+· pinned text oracle and complete fallback/bidi/caret mapping (OS-4a / DEC-4) ·
+pathops-in-measure (OS-4b / DEC-6) · CRDT / cross-session replay (OS-5b/5c —
+walled on stable ids, a.md §12).
