@@ -13,8 +13,9 @@
 //! between the two modes.
 
 use crate::math::{rotated_aabb_size, Affine, RectF};
-use crate::measure::measure_text_payload;
 use crate::model::*;
+use crate::text_layout::{TextLayout, TextLayoutOracle, STUB_TEXT_LAYOUT_ORACLE};
+use std::sync::Arc;
 use taffy::prelude::{auto, length, AvailableSpace, TaffyTree};
 use taffy::style::{
     AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, JustifyContent, Style,
@@ -84,6 +85,8 @@ pub struct Resolved {
     pub(crate) local: Vec<Option<Affine>>,
     pub(crate) world: Vec<Option<Affine>>,
     pub(crate) world_aabb: Vec<Option<RectF>>,
+    /// Final-width text layout. `None` for non-text and unresolved nodes.
+    pub(crate) text_layouts: Vec<Option<Arc<TextLayout>>>,
     pub reports: Vec<Report>,
 }
 
@@ -94,6 +97,7 @@ impl Resolved {
             local: vec![None; cap],
             world: vec![None; cap],
             world_aabb: vec![None; cap],
+            text_layouts: vec![None; cap],
             reports: Vec::new(),
         }
     }
@@ -122,6 +126,14 @@ impl Resolved {
     pub fn aabb_opt(&self, id: NodeId) -> Option<RectF> {
         self.world_aabb.get(id as usize).copied().flatten()
     }
+    pub fn text_layout_of(&self, id: NodeId) -> &Arc<TextLayout> {
+        self.text_layouts[id as usize]
+            .as_ref()
+            .expect("node has no resolved text layout")
+    }
+    pub fn text_layout_opt(&self, id: NodeId) -> Option<&Arc<TextLayout>> {
+        self.text_layouts.get(id as usize)?.as_ref()
+    }
     /// Number of slots in the resolved columns (matches the document's
     /// arena capacity) — the upper bound for a full-column walk. Distinct
     /// from [`Self::resolved_count`], which counts only the `Some` entries.
@@ -144,6 +156,7 @@ impl Resolved {
 
 struct Ctx<'a> {
     doc: &'a Document,
+    text_layout: &'a dyn TextLayoutOracle,
     opts: ResolveOptions,
     out: Resolved,
     /// Derived-box kinds: union rect of children in node-local space,
@@ -159,8 +172,18 @@ struct Ctx<'a> {
 }
 
 pub fn resolve(doc: &Document, opts: &ResolveOptions) -> Resolved {
+    resolve_with_text_layout(doc, opts, &STUB_TEXT_LAYOUT_ORACLE)
+}
+
+/// Resolve with an explicit text-layout authority.
+pub fn resolve_with_text_layout(
+    doc: &Document,
+    opts: &ResolveOptions,
+    text_layout: &dyn TextLayoutOracle,
+) -> Resolved {
     let mut cx = Ctx {
         doc,
+        text_layout,
         opts: *opts,
         out: Resolved::with_capacity(doc.capacity()),
         union_cache: vec![None; doc.capacity()],
@@ -176,6 +199,38 @@ pub fn resolve(doc: &Document, opts: &ResolveOptions) -> Resolved {
     // (the InitialContainer special regime, regularized — X-SELF-5 break).
     let root_box = place_by_bindings(doc.root, (vp.w, vp.h), &mut cx);
     commit(doc.root, root_box, &mut cx);
+
+    // Store one final artifact per text node using the width that survived
+    // layout, stretch, and clamps. No later stage may independently reflow it.
+    for index in 0..doc.capacity() {
+        let id = index as NodeId;
+        let Some(node) = doc.get_opt(id) else {
+            continue;
+        };
+        let Some(text) = node.payload.as_text() else {
+            continue;
+        };
+        let Some(box_in_parent) = cx.out.box_opt(id) else {
+            continue;
+        };
+        let layout = cx
+            .text_layout
+            .layout(text, Some(box_in_parent.w))
+            .with_assigned_box(RectF {
+                x: 0.0,
+                y: 0.0,
+                w: box_in_parent.w,
+                h: box_in_parent.h,
+            });
+        if layout.unresolved_glyphs > 0 {
+            cx.out.reports.push(Report::ErrorByRule {
+                node: id,
+                field: "text",
+                rule: "text layout contains unresolved glyphs",
+            });
+        }
+        cx.out.text_layouts[index] = Some(layout);
+    }
 
     // Phase T (world composition) + Phase B (bounds), after the tree of
     // boxes and locals is complete.
@@ -273,7 +328,7 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
             // floating-point floor can otherwise invent a wrap.
             None
         };
-        h = Some(measure_text_payload(text, wrap_width).1);
+        h = Some(cx.text_layout.layout(text, wrap_width).height);
     }
 
     let mut hv = h.unwrap_or_else(|| {
@@ -365,9 +420,11 @@ fn intent_extent_x(id: NodeId, cx: &mut Ctx) -> Option<f32> {
     match node.header.width {
         SizeIntent::Fixed(v) => Some(v),
         SizeIntent::Auto => match &node.payload {
-            payload if payload.as_text().is_some() => {
-                Some(measure_text_payload(payload.as_text().expect("matched text"), None).0)
-            }
+            payload if payload.as_text().is_some() => Some(
+                cx.text_layout
+                    .layout(payload.as_text().expect("matched text"), None)
+                    .width,
+            ),
             Payload::Frame { .. } => Some(hug_size(id, cx).0),
             _ => None,
         },
@@ -1119,13 +1176,13 @@ fn flex_layout(
                         AvailableSpace::Definite(w) => Some(w),
                         _ => None,
                     });
-                    let (w, h) = measure_text_payload(
+                    let text_layout = cx.text_layout.layout(
                         t.0.as_text().expect("text measure context carries text"),
                         constraint,
                     );
                     taffy::geometry::Size {
-                        width: known.width.unwrap_or(w),
-                        height: known.height.unwrap_or(h),
+                        width: known.width.unwrap_or(text_layout.width),
+                        height: known.height.unwrap_or(text_layout.height),
                     }
                 }
                 None => taffy::geometry::Size {
@@ -1260,17 +1317,36 @@ fn compute_world_aabb(id: NodeId, cx: &mut Ctx) -> Option<RectF> {
     let world = cx.out.world[id as usize].unwrap();
     let own_box = cx.out.box_in_parent[id as usize].unwrap();
     let stroke_outsets = effective_stroke_outsets(node);
-    let local_rect = RectF {
-        x: -stroke_outsets.left,
-        y: -stroke_outsets.top,
-        w: own_box.w + stroke_outsets.left + stroke_outsets.right,
-        h: own_box.h + stroke_outsets.top + stroke_outsets.bottom,
+    // Text owns glyph ink, not its assigned layout box. The layout box still
+    // drives placement and paint-coordinate normalization, while visual
+    // bounds begin at the oracle's base ink and expand by the same authored
+    // stroke coverage as every other outline. No base ink means there is no
+    // glyph outline for a stroke to cover (not even for an empty terminal
+    // line), so it remains a zero-area local bound.
+    let base_local_rect = if node.payload.as_text().is_some() {
+        cx.out
+            .text_layout_opt(id)
+            .expect("resolved text has a final text-layout artifact")
+            .ink_bounds
+    } else {
+        Some(RectF {
+            x: 0.0,
+            y: 0.0,
+            w: own_box.w,
+            h: own_box.h,
+        })
     };
+    let local_rect = base_local_rect.map(|base| RectF {
+        x: base.x - stroke_outsets.left,
+        y: base.y - stroke_outsets.top,
+        w: base.w + stroke_outsets.left + stroke_outsets.right,
+        h: base.h + stroke_outsets.top + stroke_outsets.bottom,
+    });
 
     let mut aabb = match node.payload {
         // Derived kinds: bounds come from children only (D-1).
         Payload::Group | Payload::Lens { .. } => None,
-        _ => Some(local_rect.transformed_aabb(&world)),
+        _ => Some(local_rect.unwrap_or(RectF::EMPTY).transformed_aabb(&world)),
     };
     // The painter clips descendants in the container's transformed local
     // rectangle, but not the container's own fill or strokes. Intersect child

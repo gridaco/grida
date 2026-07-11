@@ -323,7 +323,7 @@ fn line_stroke_bounds_expand_conservatively_around_the_degenerate_axis() {
 }
 
 #[test]
-fn text_miter_limit_is_included_in_conservative_visual_bounds() {
+fn fontless_stub_text_does_not_invent_glyph_or_stroke_ink() {
     let mut builder = DocBuilder::new();
     let mut header = Header::new(SizeIntent::Auto, SizeIntent::Auto);
     header.x = AxisBinding::start(20.0);
@@ -342,11 +342,11 @@ fn text_miter_limit_is_included_in_conservative_visual_bounds() {
     let resolved = run(&builder.build());
     assert_rect(
         resolved.aabb_of(text),
-        16.0,
-        16.0,
-        14.0,
         20.0,
-        "text miter extent is conservatively bounded",
+        20.0,
+        0.0,
+        0.0,
+        "a glyphless layout has no outline for its text stroke to cover",
     );
 }
 

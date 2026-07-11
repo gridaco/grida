@@ -2,9 +2,9 @@
 
 The standalone proving crate for the `anchor` model
 ([`../../models/a.md`](../../models/a.md)) — lab subset: `frame`, `shape`
-(rect/ellipse/line), `text` (deterministic 0.6/1.2 metric), `group`,
-`lens` (2D ops). **Not** a member of the repo workspace; promotion into
-`crates/` happens at phase 4 only.
+(rect/ellipse/line), `text` (oracle-backed, with a deterministic 0.6/1.2 stub),
+`group`, `lens` (2D ops). **Not** a member of the repo workspace; promotion
+into `crates/` happens at phase 4 only.
 
 ```sh
 cargo test                      # conformance + format-contract suites
@@ -22,7 +22,10 @@ Map:
 - `src/resolve.rs` — the four-phase resolver (§6); `RotationInFlow` flag
   (E1); §8 `Report`s; Taffy 0.9 per-container runs with the two
   dependency guards (rounding off; grow stripped in indefinite-main
-  intrinsic passes)
+  intrinsic passes); stores one final-width text-layout artifact per text node
+- `src/text_layout.rs` — backend-independent line/glyph artifact and
+  `TextLayoutOracle`; the compatibility `resolve` path uses the explicitly
+  named glyphless stub, while an engine injects its shaping implementation
 - `src/ops.rs` — gesture ops with typed errors + write-count doctrine
 - `src/textir.rs` — the agent text IR parser + canonical printer (E3)
 - `src/grida_xml.rs` — strict Draft 0 `.grida.xml` parser/writer boundary
@@ -62,8 +65,8 @@ flat `<tspan>` children lower to the production-shaped UTF-8
 `AttributedString` model and never become scene nodes. Omitted run fills fall
 back to the text node's ordered paints, while `fill="#…"` and one literal-first
 structured `<fill>` preserve explicit run overrides, including rich paint
-stacks and explicit emptiness. The deterministic metric is run-aware for font
-size; weight and italic remain metric-neutral but survive into paint. Run
+stacks and explicit emptiness. The deterministic stub metric is run-aware for
+font size; weight and italic remain metric-neutral but survive into paint. Run
 strokes stay rejected until their single production geometry can reconcile
 with Draft 0's repeatable stroke topology.
 

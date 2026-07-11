@@ -16,4 +16,5 @@ pub mod ops;
 pub mod pick;
 pub mod resolve;
 pub mod svgout;
+pub mod text_layout;
 pub mod textir;
