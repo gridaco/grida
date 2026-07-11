@@ -262,7 +262,7 @@ fn per_side_strokes_expand_each_visual_bound_independently() {
 fn unsupported_rectangular_stroke_states_do_not_expand_visual_bounds() {
     let cases = [ShapeDesc::Ellipse, ShapeDesc::Rect];
     for desc in cases {
-        let (mut doc, shape) = stroked_shape(desc, StrokeAlign::Outside, 1.0);
+        let (mut doc, shape) = stroked_shape(desc.clone(), StrokeAlign::Outside, 1.0);
         doc.get_mut(shape).strokes[0].width = StrokeWidth::Rectangular(RectangularStrokeWidth {
             stroke_top_width: 2.0,
             stroke_right_width: 4.0,

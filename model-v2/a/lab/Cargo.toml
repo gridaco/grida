@@ -11,14 +11,16 @@ publish = false
 
 [features]
 # `serde` (default OFF) makes `Op` / `ResizeDrag` / `Axis` serializable — the
-# op-log wire for engine replay. Kept optional so the default lab pulls only
-# taffy + quick-xml (the model crate stays dependency-lean).
+# op-log wire for engine replay. Kept optional so serialization remains an
+# explicit dependency choice for this standalone proving crate.
 serde = ["dep:serde"]
 
 [dependencies]
 taffy = "0.9.2"
 quick-xml = "0.37"
+kurbo = "0.13"
 serde = { version = "1.0", optional = true, features = ["derive"] }
+svgtypes = "0.16"
 
 [profile.release]
 debug = true

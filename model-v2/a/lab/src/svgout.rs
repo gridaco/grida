@@ -94,6 +94,10 @@ fn escape_text(value: &str) -> String {
         .replace('>', "&gt;")
 }
 
+fn escape_attr(value: &str) -> String {
+    escape_text(value).replace('"', "&quot;")
+}
+
 pub fn render(doc: &Document, resolved: &Resolved, opts: &SvgOptions) -> Result<String, SvgError> {
     let mut out = String::new();
     let _ = writeln!(
@@ -206,6 +210,26 @@ fn paint(
                     b.w,
                     mat(world),
                     stroke
+                );
+            }
+            ShapeDesc::Path(path) => {
+                let fill = fill.attributes("fill");
+                let transform = world.then(&Affine::scale(b.w, b.h));
+                let fill_rule = match path.fill_rule {
+                    FillRule::NonZero => "nonzero",
+                    FillRule::EvenOdd => "evenodd",
+                };
+                let _ = writeln!(
+                    out,
+                    r#"  <path d="{}" transform="{}" fill-rule="{}" {}/>"#,
+                    // SVG snapshot/export is an explicit foreign-language
+                    // boundary and therefore parses its own validated SVG d.
+                    // Internal bounds, damage, drawlist, and paint use only
+                    // the shared rational-conic artifact.
+                    escape_attr(path.d.as_ref()),
+                    mat(&transform),
+                    fill_rule,
+                    fill
                 );
             }
         },

@@ -13,6 +13,7 @@ pub mod math;
 pub mod measure;
 pub mod model;
 pub mod ops;
+pub mod path;
 pub mod pick;
 pub mod resolve;
 pub mod svgout;

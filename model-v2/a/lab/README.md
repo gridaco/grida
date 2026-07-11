@@ -2,9 +2,9 @@
 
 The standalone proving crate for the `anchor` model
 ([`../../models/a.md`](../../models/a.md)) — lab subset: `frame`, `shape`
-(rect/ellipse/line), `text` (oracle-backed, with a deterministic 0.6/1.2 stub),
-`group`, `lens` (2D ops). **Not** a member of the repo workspace; promotion
-into `crates/` happens at phase 4 only.
+(rect/ellipse/line/path), `text` (oracle-backed, with a deterministic 0.6/1.2
+stub), `group`, `lens` (2D ops). **Not** a member of the repo workspace;
+promotion into `crates/` happens at phase 4 only.
 
 ```sh
 cargo test                      # conformance + format-contract suites
@@ -26,6 +26,8 @@ Map:
 - `src/text_layout.rs` — backend-independent line/glyph artifact and
   `TextLayoutOracle`; the compatibility `resolve` path uses the explicitly
   named glyphless stub, while an engine injects its shaping implementation
+- `src/path.rs` — strict SVG path-data analysis, bounded rational-conic arc
+  lowering, tight unit bounds, and one resolved box-mapped path artifact
 - `src/ops.rs` — gesture ops with typed errors + write-count doctrine
 - `src/textir.rs` — the agent text IR parser + canonical printer (E3)
 - `src/grida_xml.rs` — strict Draft 0 `.grida.xml` parser/writer boundary
@@ -50,7 +52,7 @@ target/property combinations, and model states that cannot round-trip fail
 with contextual errors instead of being ignored or repaired.
 
 The proof subset has one node vocabulary: `<container>`, direct `<rect>`,
-`<ellipse>`, and `<line>` primitives, `width`/`height`,
+`<ellipse>`, `<line>`, and unit-reference `<path>` primitives, `width`/`height`,
 `min-width`/`max-width`/`min-height`/`max-height`, and `aspect-ratio`.
 `<shape>` is reserved and `kind` is not a render-node attribute. Historical
 `<frame>`, `<shape kind="…">`, `w`/`h`, `min-w`/`max-w`/`min-h`/`max-h`, and
@@ -93,11 +95,14 @@ stroke syntax.
 `textir::try_print` reports richer state it cannot represent; the compatibility
 `textir::print` wrapper never silently narrows that state.
 
-A boxed `<rect>`, `<ellipse>`, or `<line>` may own free-positioned children in
-its local box. This is composition only: it gains no flex attributes,
-descendants do not feed back into the primitive's declared box or parent layout
-contribution, and `<text>` remains a leaf. Filesystem I/O, resources, and
-rasterization remain host concerns.
+A boxed `<rect>`, `<ellipse>`, `<line>`, or `<path>` may own free-positioned
+children in its local box. This is composition only: it gains no flex
+attributes, descendants do not feed back into the primitive's declared box or
+parent layout contribution, and `<text>` remains a leaf. A path's complete SVG
+`d` grammar is validated against fixed `0 0 1 1` realized geometry, then
+mapped once into the final box; that resolved command artifact supplies bounds
+and rendering without reparsing or independently rescaling geometry.
+Filesystem I/O, resources, and rasterization remain host concerns.
 
 Known lab simplifications (declared in the REPORT's lose column):
 children as ordered `Vec` (no fractional index), per-container Taffy

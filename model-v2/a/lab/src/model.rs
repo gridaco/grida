@@ -1,6 +1,6 @@
 //! The `anchor` document model — lab subset of `model-v2/models/a.md`.
 //!
-//! Kinds implemented: frame, shape (rect/ellipse/line), text, group, lens.
+//! Kinds implemented: frame, shape (rect/ellipse/line/path), text, group, lens.
 //! Omitted for the lab (noted in the report): tray, image, embed, vector,
 //! bool — none of them exercise a geometry mechanism the five above don't.
 //!
@@ -12,7 +12,10 @@
 //!   the lab subset.
 
 use crate::math::Affine;
+pub use crate::path::FillRule;
+use crate::path::PathArtifact;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 pub type NodeId = u32;
 
@@ -280,12 +283,14 @@ pub struct LayoutBehavior {
     pub gap_cross: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ShapeDesc {
     Rect,
     Ellipse,
     /// The box's horizontal midline; height intent must be Fixed(0) (a.md §3.2).
     Line,
+    /// Validated SVG path data in the fixed unit reference box.
+    Path(Arc<PathArtifact>),
 }
 
 /// Ordered, applied in sequence, post-resolution (a.md §3.3). 2D subset.
@@ -1204,13 +1209,15 @@ pub struct Stroke {
 }
 
 impl Stroke {
-    /// Language/model defaults depend only on whether the source outline is
-    /// open. A line has no meaningful inside/outside and therefore centers
-    /// its default stroke; every closed Draft 0 outline defaults inside.
+    /// Box primitives default inside. Lines and paths default center: lines
+    /// have no interior, while paths may contain open and closed contours.
     pub fn default_for(payload: &Payload) -> Option<Stroke> {
         let align = match payload {
             Payload::Shape {
                 desc: ShapeDesc::Line,
+            }
+            | Payload::Shape {
+                desc: ShapeDesc::Path(_),
             } => StrokeAlign::Center,
             Payload::Frame { .. }
             | Payload::Shape {
@@ -1252,6 +1259,14 @@ impl Stroke {
     /// from expanding bounds for pixels the drawlist cannot emit.
     pub fn renderable_for(&self, payload: &Payload, corner_smoothing: CornerSmoothing) -> bool {
         if !self.visible() {
+            return false;
+        }
+        if matches!(
+            payload,
+            Payload::Shape {
+                desc: ShapeDesc::Path(path)
+            } if !path.all_contours_closed && self.align != StrokeAlign::Center
+        ) {
             return false;
         }
         match self.width.normalized() {

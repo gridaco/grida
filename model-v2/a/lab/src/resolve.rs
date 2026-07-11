@@ -14,6 +14,7 @@
 
 use crate::math::{rotated_aabb_size, Affine, RectF};
 use crate::model::*;
+use crate::path::{materialize, ResolvedPathArtifact};
 use crate::text_layout::{TextLayout, TextLayoutOracle, STUB_TEXT_LAYOUT_ORACLE};
 use std::sync::Arc;
 use taffy::prelude::{auto, length, AvailableSpace, TaffyTree};
@@ -87,6 +88,9 @@ pub struct Resolved {
     pub(crate) world_aabb: Vec<Option<RectF>>,
     /// Final-width text layout. `None` for non-text and unresolved nodes.
     pub(crate) text_layouts: Vec<Option<Arc<TextLayout>>>,
+    /// Box-mapped path commands and bounds, quantized once for every internal
+    /// consumer while retaining the validated unit-reference source.
+    pub(crate) resolved_paths: Vec<Option<Arc<ResolvedPathArtifact>>>,
     pub reports: Vec<Report>,
 }
 
@@ -98,6 +102,7 @@ impl Resolved {
             world: vec![None; cap],
             world_aabb: vec![None; cap],
             text_layouts: vec![None; cap],
+            resolved_paths: vec![None; cap],
             reports: Vec::new(),
         }
     }
@@ -133,6 +138,14 @@ impl Resolved {
     }
     pub fn text_layout_opt(&self, id: NodeId) -> Option<&Arc<TextLayout>> {
         self.text_layouts.get(id as usize)?.as_ref()
+    }
+    pub fn resolved_path_of(&self, id: NodeId) -> &Arc<ResolvedPathArtifact> {
+        self.resolved_paths[id as usize]
+            .as_ref()
+            .expect("node has no resolved path artifact")
+    }
+    pub fn resolved_path_opt(&self, id: NodeId) -> Option<&Arc<ResolvedPathArtifact>> {
+        self.resolved_paths.get(id as usize)?.as_ref()
     }
     /// Number of slots in the resolved columns (matches the document's
     /// arena capacity) — the upper bound for a full-column walk. Distinct
@@ -230,6 +243,32 @@ pub fn resolve_with_text_layout(
             });
         }
         cx.out.text_layouts[index] = Some(layout);
+    }
+
+    // Path syntax was analyzed once at the model boundary. Resolution maps
+    // every coordinate through the final box exactly once; paint, bounds, and
+    // damage then consume that same rounded command stream.
+    for index in 0..doc.capacity() {
+        let id = index as NodeId;
+        let Some(node) = doc.get_opt(id) else {
+            continue;
+        };
+        let Payload::Shape {
+            desc: ShapeDesc::Path(artifact),
+        } = &node.payload
+        else {
+            continue;
+        };
+        if let Some(box_in_parent) = cx.out.box_opt(id) {
+            match materialize(Arc::clone(artifact), box_in_parent.w, box_in_parent.h) {
+                Ok(path) => cx.out.resolved_paths[index] = Some(path),
+                Err(_) => cx.out.reports.push(Report::ErrorByRule {
+                    node: id,
+                    field: "path",
+                    rule: "resolved path coordinates exceed finite f32 geometry",
+                }),
+            }
+        }
     }
 
     // Phase T (world composition) + Phase B (bounds), after the tree of
@@ -1265,6 +1304,12 @@ fn effective_stroke_outsets(node: &Node) -> StrokeOutsets {
             desc: ShapeDesc::Line
         }
     );
+    let is_path = matches!(
+        &node.payload,
+        Payload::Shape {
+            desc: ShapeDesc::Path(_)
+        }
+    );
     let mut outsets = StrokeOutsets::default();
     for stroke in node
         .strokes
@@ -1281,7 +1326,7 @@ fn effective_stroke_outsets(node: &Node) -> StrokeOutsets {
                 StrokeAlign::Outside => 1.0,
             }
         };
-        if node.payload.as_text().is_some() && stroke.join == StrokeJoin::Miter {
+        if (node.payload.as_text().is_some() || is_path) && stroke.join == StrokeJoin::Miter {
             factor *= stroke.miter_limit;
         }
         outsets.include(StrokeOutsets {
@@ -1328,6 +1373,13 @@ fn compute_world_aabb(id: NodeId, cx: &mut Ctx) -> Option<RectF> {
             .text_layout_opt(id)
             .expect("resolved text has a final text-layout artifact")
             .ink_bounds
+    } else if matches!(
+        &node.payload,
+        Payload::Shape {
+            desc: ShapeDesc::Path(_)
+        }
+    ) {
+        cx.out.resolved_path_opt(id).map(|path| path.local_bounds)
     } else {
         Some(RectF {
             x: 0.0,
@@ -1343,9 +1395,12 @@ fn compute_world_aabb(id: NodeId, cx: &mut Ctx) -> Option<RectF> {
         h: base.h + stroke_outsets.top + stroke_outsets.bottom,
     });
 
-    let mut aabb = match node.payload {
+    let mut aabb = match &node.payload {
         // Derived kinds: bounds come from children only (D-1).
         Payload::Group | Payload::Lens { .. } => None,
+        Payload::Shape {
+            desc: ShapeDesc::Path(_),
+        } if local_rect.is_none() => None,
         _ => Some(local_rect.unwrap_or(RectF::EMPTY).transformed_aabb(&world)),
     };
     // The painter clips descendants in the container's transformed local

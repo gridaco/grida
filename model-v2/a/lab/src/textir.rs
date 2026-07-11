@@ -8,11 +8,13 @@
 //! a binary-format concern; recorded as an E3 finding).
 
 use crate::model::*;
+use crate::path;
 use quick_xml::events::attributes::Attributes;
 use quick_xml::events::{BytesDecl, BytesStart, Event};
 use quick_xml::Reader;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseError(pub String);
@@ -704,15 +706,28 @@ fn supports_fill(payload: &Payload) -> bool {
     ) || matches!(
         payload,
         Payload::Shape {
-            desc: ShapeDesc::Rect | ShapeDesc::Ellipse
+            desc: ShapeDesc::Rect | ShapeDesc::Ellipse | ShapeDesc::Path(_)
         }
     )
+}
+
+fn path_aware_kind_name(payload: &Payload) -> &'static str {
+    if matches!(
+        payload,
+        Payload::Shape {
+            desc: ShapeDesc::Path(_)
+        }
+    ) {
+        "path"
+    } else {
+        payload.kind_name()
+    }
 }
 
 fn grida_xml_default_fills(payload: &Payload) -> Paints {
     match payload {
         Payload::Shape {
-            desc: ShapeDesc::Rect | ShapeDesc::Ellipse,
+            desc: ShapeDesc::Rect | ShapeDesc::Ellipse | ShapeDesc::Path(_),
         }
         | Payload::Text { .. }
         | Payload::AttributedText { .. } => Paints::solid(Color::BLACK),
@@ -793,7 +808,7 @@ fn parse_stroke_width(value: &str, payload: &Payload) -> Result<StrokeWidth, Par
             if !supports_per_side {
                 return err(format!(
                     "four-value stroke width is valid only on <container> and <rect>, not <{}>",
-                    payload.kind_name()
+                    path_aware_kind_name(payload)
                 ));
             }
             let top = parse_non_negative(top, "stroke width top", true)?;
@@ -824,7 +839,7 @@ fn parse_stroke(
     let mut stroke = Stroke::default_for(payload).ok_or_else(|| {
         ParseError(format!(
             "<stroke> is not valid on <{}>",
-            payload.kind_name()
+            path_aware_kind_name(payload)
         ))
     })?;
     stroke.paints = paints;
@@ -842,36 +857,44 @@ fn parse_stroke(
             desc: ShapeDesc::Line
         }
     );
-    let is_rect = matches!(
+    let path = match payload {
+        Payload::Shape {
+            desc: ShapeDesc::Path(path),
+        } => Some(path),
+        _ => None,
+    };
+    let supports_join = matches!(
         payload,
         Payload::Frame { .. }
             | Payload::Shape {
                 desc: ShapeDesc::Rect
             }
-    );
+    ) || path.is_some();
     let supports_dash = matches!(
         payload,
         Payload::Frame { .. }
             | Payload::Shape {
-                desc: ShapeDesc::Rect | ShapeDesc::Ellipse | ShapeDesc::Line
+                desc: ShapeDesc::Rect | ShapeDesc::Ellipse | ShapeDesc::Line | ShapeDesc::Path(_)
             }
     );
 
     if let Some(value) = attributes.remove("cap") {
-        if !is_line {
-            return err("stroke attribute `cap` is valid only on <line>");
+        if !is_line && path.is_none() {
+            return err("stroke attribute `cap` is valid only on <line> and <path>");
         }
         stroke.cap = parse_stroke_cap(&value)?;
     }
     if let Some(value) = attributes.remove("join") {
-        if !is_rect {
-            return err("stroke attribute `join` is valid only on <container> and <rect>");
+        if !supports_join {
+            return err("stroke attribute `join` is valid only on <container>, <rect>, and <path>");
         }
         stroke.join = parse_stroke_join(&value)?;
     }
     if let Some(value) = attributes.remove("miter-limit") {
-        if !is_rect {
-            return err("stroke attribute `miter-limit` is valid only on <container> and <rect>");
+        if !supports_join {
+            return err(
+                "stroke attribute `miter-limit` is valid only on <container>, <rect>, and <path>",
+            );
         }
         stroke.miter_limit = parse_positive(&value, "stroke miter-limit", true)?;
     }
@@ -883,6 +906,11 @@ fn parse_stroke(
     }
     if is_line && stroke.align != StrokeAlign::Center {
         return err("a <line> stroke must use align=\"center\"");
+    }
+    if path.is_some_and(|path| !path.all_contours_closed) && stroke.align != StrokeAlign::Center {
+        return err(
+            "a <path> stroke may use inside/outside alignment only when every drawable contour is explicitly closed",
+        );
     }
     if matches!(stroke.width, StrokeWidth::Rectangular(_)) {
         if !corner_smoothing.is_zero() {
@@ -1318,7 +1346,9 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                     return err("<frame> belongs to historical textir; use <container>");
                 }
                 if grida_xml && tag == "shape" {
-                    return err("<shape> is reserved in Draft 0; use <rect>, <ellipse>, or <line>");
+                    return err(
+                        "<shape> is reserved in Draft 0; use <rect>, <ellipse>, <line>, or <path>",
+                    );
                 }
                 let is_authored_root = grida_xml && stack.is_empty() && render_root.is_none();
                 if is_authored_root && tag != "container" {
@@ -1348,11 +1378,14 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                     (Dialect::GridaXml, "rect") => ("shape", Some(ShapeDesc::Rect)),
                     (Dialect::GridaXml, "ellipse") => ("shape", Some(ShapeDesc::Ellipse)),
                     (Dialect::GridaXml, "line") => ("shape", Some(ShapeDesc::Line)),
+                    (Dialect::GridaXml, "path") => ("path", None),
                     _ => (tag.as_str(), None),
                 };
                 let mut header = Header::new(SizeIntent::Auto, SizeIntent::Auto);
                 let mut layout = LayoutBehavior::default();
                 let mut shape_kind: Option<ShapeDesc> = direct_shape_kind;
+                let mut path_d: Option<String> = None;
+                let mut path_fill_rule = FillRule::NonZero;
                 let mut font_size = 16.0f32;
                 let mut font_weight = TextStyleRec::DEFAULT_FONT_WEIGHT;
                 let mut font_style_italic = false;
@@ -1377,11 +1410,18 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                 let mut shape_only_attr: Option<String> = None;
                 let mut text_only_attr: Option<String> = None;
                 let mut lens_only_attr: Option<String> = None;
+                let mut path_only_attr: Option<String> = None;
                 let strict = grida_xml;
 
-                for attr in el.attributes() {
+                let mut source_attributes = el.attributes();
+                source_attributes.with_checks(false);
+                let mut seen_source_attributes = BTreeSet::new();
+                for attr in source_attributes {
                     let attr = attr.map_err(|e| ParseError(format!("attr: {e}")))?;
                     let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
+                    if !seen_source_attributes.insert(key.clone()) {
+                        return err(format!("duplicate `{key}` on <{tag}>"));
+                    }
                     let val = attr
                         .unescape_value()
                         .map_err(|e| ParseError(format!("attr value: {e}")))?
@@ -1655,9 +1695,29 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                             lens_only_attr.get_or_insert_with(|| key.clone());
                             lens_ops = parse_lens_ops(&val, strict)?;
                         }
+                        "d" if grida_xml => {
+                            path_only_attr.get_or_insert_with(|| key.clone());
+                            path_d = Some(val);
+                        }
+                        "fill-rule" if grida_xml => {
+                            path_only_attr.get_or_insert_with(|| key.clone());
+                            path_fill_rule = match val.as_str() {
+                                "nonzero" => FillRule::NonZero,
+                                "evenodd" => FillRule::EvenOdd,
+                                _ => {
+                                    return err(format!(
+                                        "fill-rule on <path> must be `nonzero` or `evenodd`, found `{val}`"
+                                    ))
+                                }
+                            };
+                        }
                         "fill" => {
                             let fillable = matches!(node_tag, "frame" | "text")
-                                || matches!(shape_kind, Some(ShapeDesc::Rect | ShapeDesc::Ellipse));
+                                || node_tag == "path"
+                                || matches!(
+                                    shape_kind.as_ref(),
+                                    Some(ShapeDesc::Rect | ShapeDesc::Ellipse)
+                                );
                             if strict && !fillable {
                                 return err(format!("fill is not valid on <{tag}>"));
                             }
@@ -1713,6 +1773,11 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                             return err(format!("attribute `{attr}` is only valid on <lens>"));
                         }
                     }
+                    if node_tag != "path" {
+                        if let Some(attr) = path_only_attr {
+                            return err(format!("attribute `{attr}` is only valid on <path>"));
+                        }
+                    }
                     if layout.mode != LayoutMode::Flex {
                         if let Some(attr) = flex_only_attr {
                             return err(format!("attribute `{attr}` requires layout=\"flex\""));
@@ -1733,11 +1798,13 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                             "<{tag}> has a derived origin and cannot use Span bindings"
                         ));
                     }
-                    if aspect_seen && node_tag != "shape" {
-                        return err("aspect-ratio is only valid on <rect> and <ellipse>");
+                    if aspect_seen && !matches!(node_tag, "shape" | "path") {
+                        return err(
+                            "aspect-ratio is only valid on <rect> and <ellipse>, or on <path>",
+                        );
                     }
                     let supports_corners =
-                        node_tag == "frame" || matches!(shape_kind, Some(ShapeDesc::Rect));
+                        node_tag == "frame" || matches!(shape_kind.as_ref(), Some(ShapeDesc::Rect));
                     if (corner_radius_seen || corner_smoothing_seen) && !supports_corners {
                         return err(format!(
                             "corner-radius and corner-smoothing are only valid on <container> and <rect>, not <{tag}>"
@@ -1764,8 +1831,8 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                             "a span y binding cannot also declare height/min-height/max-height",
                         );
                     }
-                    if node_tag == "shape" {
-                        match shape_kind {
+                    if matches!(node_tag, "shape" | "path") {
+                        match shape_kind.as_ref() {
                             Some(ShapeDesc::Rect | ShapeDesc::Ellipse) => {
                                 let width_supplied = matches!(
                                     (header.width, header.x),
@@ -1806,6 +1873,26 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                                     return err("<line> must not declare aspect-ratio");
                                 }
                             }
+                            Some(ShapeDesc::Path(_)) => unreachable!("path is analyzed below"),
+                            None if node_tag == "path" => {
+                                let width_supplied = matches!(
+                                    (header.width, header.x),
+                                    (SizeIntent::Fixed(_), _) | (_, AxisBinding::Span { .. })
+                                );
+                                let height_supplied = matches!(
+                                    (header.height, header.y),
+                                    (SizeIntent::Fixed(_), _) | (_, AxisBinding::Span { .. })
+                                );
+                                let valid = matches!(
+                                    (width_supplied, height_supplied, aspect_seen),
+                                    (true, true, false) | (true, false, true) | (false, true, true)
+                                );
+                                if !valid {
+                                    return err(
+                                        "<path> requires both axes supplied by a fixed size or Span, or exactly one supplied axis plus aspect-ratio",
+                                    );
+                                }
+                            }
                             None => {}
                         }
                     }
@@ -1822,12 +1909,21 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                         }
                     }
                     "shape" => {
-                        let desc =
-                            shape_kind.ok_or_else(|| ParseError("<shape> requires kind".into()))?;
+                        let desc = shape_kind
+                            .take()
+                            .ok_or_else(|| ParseError("<shape> requires kind".into()))?;
                         if matches!(desc, ShapeDesc::Line) {
                             header.height = SizeIntent::Fixed(0.0); // §3.2 locked
                         }
                         Payload::Shape { desc }
+                    }
+                    "path" => {
+                        let d = path_d.ok_or_else(|| ParseError("<path> requires `d`".into()))?;
+                        let artifact = path::analyze(d, path_fill_rule)
+                            .map_err(|error| ParseError(format!("<path> d: {error}")))?;
+                        Payload::Shape {
+                            desc: ShapeDesc::Path(artifact),
+                        }
                     }
                     "text" => Payload::Text {
                         content: String::new(), // filled at End
@@ -2206,7 +2302,10 @@ enum FillEmission<'a> {
 
 fn grida_xml_fill_emission(node: &Node) -> Result<FillEmission<'_>, String> {
     if !supports_fill(&node.payload) && !node.fills.is_empty() {
-        return Err(format!("<{}> cannot carry fills", node.payload.kind_name()));
+        return Err(format!(
+            "<{}> cannot carry fills",
+            path_aware_kind_name(&node.payload)
+        ));
     }
     let default = grida_xml_default_fills(&node.payload);
     if node.fills == default {
@@ -2312,12 +2411,118 @@ fn validate_corner_style_for_write(node: &Node, grida_xml: bool) -> Result<(), S
     if !supports_corners {
         return Err(format!(
             "<{}> cannot carry corner-radius or corner-smoothing",
-            node.payload.kind_name()
+            path_aware_kind_name(&node.payload)
         ));
     }
     if !node.corner_smoothing.is_zero() && !node.corner_radius.is_circular() {
         return Err(format!(
             "node {} uses nonzero corner-smoothing with elliptical radii; Draft 0 cannot render that state losslessly",
+            node.id
+        ));
+    }
+    Ok(())
+}
+
+fn validate_path_box_for_write(node: &Node) -> Result<(), String> {
+    if !matches!(
+        &node.payload,
+        Payload::Shape {
+            desc: ShapeDesc::Path(_)
+        }
+    ) {
+        return Ok(());
+    }
+
+    let validate_size = |intent: SizeIntent, axis: &str| match intent {
+        SizeIntent::Auto => Ok(()),
+        SizeIntent::Fixed(value) if value.is_finite() && value >= 0.0 => Ok(()),
+        SizeIntent::Fixed(_) => Err(format!(
+            "<path> {axis} must be a finite non-negative number"
+        )),
+    };
+    validate_size(node.header.width, "width")?;
+    validate_size(node.header.height, "height")?;
+
+    let validate_binding = |binding: AxisBinding, axis: &str| {
+        let finite = match binding {
+            AxisBinding::Pin { offset, .. } => offset.is_finite(),
+            AxisBinding::Span { start, end } => start.is_finite() && end.is_finite(),
+        };
+        if finite {
+            Ok(())
+        } else {
+            Err(format!("<path> {axis} binding must contain finite numbers"))
+        }
+    };
+    validate_binding(node.header.x, "x")?;
+    validate_binding(node.header.y, "y")?;
+
+    for (name, value) in [
+        ("min-width", node.header.min_width),
+        ("max-width", node.header.max_width),
+        ("min-height", node.header.min_height),
+        ("max-height", node.header.max_height),
+    ] {
+        if value.is_some_and(|value| !value.is_finite() || value < 0.0) {
+            return Err(format!(
+                "<path> {name} must be a finite non-negative number"
+            ));
+        }
+    }
+
+    if matches!(node.header.x, AxisBinding::Span { .. })
+        && (matches!(node.header.width, SizeIntent::Fixed(_))
+            || node.header.min_width.is_some()
+            || node.header.max_width.is_some())
+    {
+        return Err("a span x binding cannot also declare width/min-width/max-width".into());
+    }
+    if matches!(node.header.y, AxisBinding::Span { .. })
+        && (matches!(node.header.height, SizeIntent::Fixed(_))
+            || node.header.min_height.is_some()
+            || node.header.max_height.is_some())
+    {
+        return Err("a span y binding cannot also declare height/min-height/max-height".into());
+    }
+
+    let has_aspect = match node.header.aspect_ratio {
+        None => false,
+        Some((a, b)) if a.is_finite() && b.is_finite() && a > 0.0 && b > 0.0 => true,
+        Some(_) => {
+            return Err("<path> aspect-ratio terms must be finite and greater than zero".into())
+        }
+    };
+    let width_supplied = matches!(node.header.width, SizeIntent::Fixed(_))
+        || matches!(node.header.x, AxisBinding::Span { .. });
+    let height_supplied = matches!(node.header.height, SizeIntent::Fixed(_))
+        || matches!(node.header.y, AxisBinding::Span { .. });
+    if !matches!(
+        (width_supplied, height_supplied, has_aspect),
+        (true, true, false) | (true, false, true) | (false, true, true)
+    ) {
+        return Err(
+            "<path> requires both axes supplied by a fixed size or Span, or exactly one supplied axis plus aspect-ratio"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_path_for_write(node: &Node) -> Result<(), String> {
+    let Payload::Shape {
+        desc: ShapeDesc::Path(artifact),
+    } = &node.payload
+    else {
+        return Ok(());
+    };
+    validate_path_box_for_write(node)?;
+    let validated = path::analyze(Arc::clone(&artifact.d), artifact.fill_rule)
+        .map_err(|error| format!("node {} has invalid path data: {error}", node.id))?;
+    // Reanalysis starts from the same authored d and must reproduce every
+    // derived field consumed by bounds, damage, and paint.
+    if validated.as_ref() != artifact.as_ref() {
+        return Err(format!(
+            "node {} has a path artifact inconsistent with its authored d",
             node.id
         ));
     }
@@ -2670,7 +2875,7 @@ pub(crate) fn validate_stroke_for_write(
     corner_smoothing: CornerSmoothing,
 ) -> Result<(), String> {
     let default = Stroke::default_for(payload)
-        .ok_or_else(|| format!("<{}> cannot carry strokes", payload.kind_name()))?;
+        .ok_or_else(|| format!("<{}> cannot carry strokes", path_aware_kind_name(payload)))?;
     match stroke.width {
         StrokeWidth::None => {}
         StrokeWidth::Uniform(width) => {
@@ -2739,6 +2944,16 @@ pub(crate) fn validate_stroke_for_write(
                 );
             }
         }
+        Payload::Shape {
+            desc: ShapeDesc::Path(path),
+        } => {
+            if !path.all_contours_closed && stroke.align != StrokeAlign::Center {
+                return Err(
+                    "a <path> stroke may use inside/outside alignment only when every drawable contour is explicitly closed"
+                        .into(),
+                );
+            }
+        }
         Payload::Text { .. } | Payload::AttributedText { .. } => {
             if stroke.cap != default.cap
                 || stroke.join != default.join
@@ -2763,7 +2978,7 @@ pub(crate) fn validate_stroke_for_write(
         if !supports_per_side {
             return Err(format!(
                 "<{}> cannot carry per-side stroke width",
-                payload.kind_name()
+                path_aware_kind_name(payload)
             ));
         }
         if !corner_smoothing.is_zero() {
@@ -2816,6 +3031,8 @@ fn write_stroke(
         payload,
         Payload::Shape {
             desc: ShapeDesc::Line
+        } | Payload::Shape {
+            desc: ShapeDesc::Path(_)
         }
     ) && stroke.cap != default.cap
     {
@@ -2826,6 +3043,9 @@ fn write_stroke(
         Payload::Frame { .. }
             | Payload::Shape {
                 desc: ShapeDesc::Rect
+            }
+            | Payload::Shape {
+                desc: ShapeDesc::Path(_)
             }
     ) {
         if stroke.join != default.join {
@@ -2873,6 +3093,19 @@ fn print_node(
     let node = doc.get(id);
     let indent = "  ".repeat(depth);
     let grida_xml = dialect == Dialect::GridaXml;
+    if !grida_xml
+        && matches!(
+            &node.payload,
+            Payload::Shape {
+                desc: ShapeDesc::Path(_)
+            }
+        )
+    {
+        return Err(format!(
+            "node {} is a path historical E3 TextIr cannot represent",
+            node.id
+        ));
+    }
     let tag = match (dialect, &node.payload) {
         (Dialect::GridaXml, Payload::Frame { .. }) => "container",
         (
@@ -2893,6 +3126,12 @@ fn print_node(
                 desc: ShapeDesc::Line,
             },
         ) => "line",
+        (
+            Dialect::GridaXml,
+            Payload::Shape {
+                desc: ShapeDesc::Path(_),
+            },
+        ) => "path",
         _ => node.payload.kind_name(),
     };
     validate_corner_style_for_write(node, grida_xml)?;
@@ -3066,11 +3305,18 @@ fn print_node(
             }
         }
         Payload::Shape { desc } => {
-            if !grida_xml {
+            if let ShapeDesc::Path(artifact) = desc {
+                debug_assert!(grida_xml, "historical path rejected above");
+                push_attr(out, "d", artifact.d.as_ref());
+                if artifact.fill_rule == FillRule::EvenOdd {
+                    push_attr(out, "fill-rule", "evenodd");
+                }
+            } else if !grida_xml {
                 let kind = match desc {
                     ShapeDesc::Rect => "rect",
                     ShapeDesc::Ellipse => "ellipse",
                     ShapeDesc::Line => "line",
+                    ShapeDesc::Path(_) => unreachable!(),
                 };
                 push_attr(out, "kind", kind);
             }

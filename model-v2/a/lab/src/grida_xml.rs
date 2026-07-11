@@ -194,13 +194,15 @@ fn semantic_node_eq(
 /// render-root rule and the implicit viewport root make silently serializing a
 /// forest or a mutated document root lossy.
 pub fn print(doc: &Document) -> Result<String, PrintError> {
-    // Validate stroke scalars before the structural self-comparison below.
-    // IEEE NaN is not equal to itself, so derived equality would otherwise
-    // misreport an invalid side width as a corrupt scene tree.
+    // Validate path artifacts/boxes and stroke scalars before the structural
+    // self-comparison below. IEEE NaN is not equal to itself, so derived
+    // equality would otherwise misreport invalid authored state as a corrupt
+    // scene tree.
     for id in 0..doc.capacity() as NodeId {
         let Some(node) = doc.get_opt(id) else {
             continue;
         };
+        textir::validate_path_for_write(node).map_err(PrintError::InvalidDocument)?;
         for stroke in &node.strokes {
             textir::validate_stroke_for_write(stroke, &node.payload, node.corner_smoothing)
                 .map_err(PrintError::InvalidDocument)?;
