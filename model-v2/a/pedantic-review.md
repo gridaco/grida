@@ -35,7 +35,7 @@ pops to 100 px at θ=3° (scene `stretch`; 70 px jump). The lab's
 text measure closure — an **unstated rule that is currently
 load-bearing** for both "zero overlap by construction" and "single-pass
 acyclic" (the bedrock lens derived the same gap from the applicability
-matrix alone: §8 says grow/self_align are unconditionally "effective"
+matrix alone: §8 says `grow`/`self_align` are unconditionally "effective"
 in flow, which is false for θ≠0). _Resolution:_ promote the policy to
 spec text: for θ≠0 in-flow children, `self_align:Stretch` and
 layout-imposed re-measure are ignored-by-rule **with report**; same

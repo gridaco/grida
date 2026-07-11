@@ -112,17 +112,17 @@ child size modes × grow — baked against Chromium, scored as spectrum.
 
 ## 5. Measured content (`T-*`)
 
-| id        | case                                                                                                                                                                                                    | tag                            |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| T-1       | Fixed-width text wraps; auto-width text measures single-line max; height auto = measured height                                                                                                         | INV                            |
-| T-2       | max_lines/ellipsis alter _paint and reported natural size_ per declared rule — and "unset vs 0" is structurally distinct (today's `max_lines: Some(0) ≡ None` fbs-default hack must be unrepresentable) | INV (sentinel-freedom witness) |
-| T-3       | Same document + same font set → identical measured geometry across runs and platforms within N-3                                                                                                        | INV                            |
-| T-4       | Missing font: declared fallback chain; geometry deterministic under the fallback; a document must not silently change when a font later appears — declared staleness policy                             | POL                            |
-| T-5       | Vector/network bounds as box source: editing a vertex updates box, bindings re-resolve against the new box                                                                                              | INV                            |
-| **edges** |                                                                                                                                                                                                         |                                |
-| T-E1      | Empty string, whitespace-only, single glyph taller than line-height, BiDi/RTL text runs (text-internal only — the canvas has no RTL layout axis, declared)                                              | POL                            |
-| T-E2      | Text with height smaller than one line + vertical alignment: clip positioning per the documented top/center/bottom offset math                                                                          | INV                            |
-| T-E3      | Ellipsis override semantics: unset → "…", empty string → no ellipsis — structurally distinct states                                                                                                     | INV                            |
+| id        | case                                                                                                                                                                                                        | tag                            |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| T-1       | Fixed-width text wraps; auto-width text measures single-line max; height auto = measured height                                                                                                             | INV                            |
+| T-2       | `max_lines`/`ellipsis` alter _paint and reported natural size_ per declared rule — and "unset vs 0" is structurally distinct (today's `max_lines: Some(0) ≡ None` fbs-default hack must be unrepresentable) | INV (sentinel-freedom witness) |
+| T-3       | Same document + same font set → identical measured geometry across runs and platforms within N-3                                                                                                            | INV                            |
+| T-4       | Missing font: declared fallback chain; geometry deterministic under the fallback; a document must not silently change when a font later appears — declared staleness policy                                 | POL                            |
+| T-5       | Vector/network bounds as box source: editing a vertex updates box, bindings re-resolve against the new box                                                                                                  | INV                            |
+| **edges** |                                                                                                                                                                                                             |                                |
+| T-E1      | Empty string, whitespace-only, single glyph taller than line-height, BiDi/RTL text runs (text-internal only — the canvas has no RTL layout axis, declared)                                                  | POL                            |
+| T-E2      | Text with height smaller than one line + vertical alignment: clip positioning per the documented top/center/bottom offset math                                                                              | INV                            |
+| T-E3      | Ellipsis override semantics: unset → "…", empty string → no ellipsis — structurally distinct states                                                                                                         | INV                            |
 
 ## 6. Derived boxes: groups & booleans (`D-*`)
 
