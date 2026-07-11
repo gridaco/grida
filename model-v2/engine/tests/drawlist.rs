@@ -2,7 +2,7 @@
 //! tests guard ordering, balanced scopes, pruning, authored paint transfer,
 //! and verbatim resolver transforms.
 
-use anchor_engine::drawlist::{build, ItemKind};
+use anchor_engine::drawlist::{build_glyphless, ItemKind};
 use anchor_lab::model::*;
 use anchor_lab::resolve::{resolve, ResolveOptions, RotationInFlow};
 
@@ -119,7 +119,7 @@ fn scene() -> (Document, NodeId, NodeId) {
 fn traversal_order_and_pruning() {
     let (doc, _f, _r) = scene();
     let resolved = resolve(&doc, &opts());
-    let list = build(&doc, &resolved);
+    let list = build_glyphless(&doc, &resolved);
 
     let tags: Vec<&str> = list.items.iter().map(|it| tag(&it.kind)).collect();
     // frame(fill,stroke), rect, ellipse, line stroke, group-child rect, text;
@@ -142,7 +142,7 @@ fn traversal_order_and_pruning() {
 fn paint_stacks_materialize_without_kind_fallbacks() {
     let (doc, _f, _r) = scene();
     let resolved = resolve(&doc, &opts());
-    let list = build(&doc, &resolved);
+    let list = build_glyphless(&doc, &resolved);
 
     // Frame fill = the node's #ff0000, opaque.
     let ItemKind::RectFill { ref paints, .. } = list.items[0].kind else {
@@ -167,7 +167,7 @@ fn paint_stacks_materialize_without_kind_fallbacks() {
 fn world_is_copied_verbatim_not_recomputed() {
     let (doc, f, _r) = scene();
     let resolved = resolve(&doc, &opts());
-    let list = build(&doc, &resolved);
+    let list = build_glyphless(&doc, &resolved);
     // The frame's item carries the resolver's world transform unchanged.
     assert_eq!(list.items[0].world, resolved.world_of(f));
 }
@@ -176,7 +176,10 @@ fn world_is_copied_verbatim_not_recomputed() {
 fn build_is_deterministic() {
     let (doc, _f, _r) = scene();
     let resolved = resolve(&doc, &opts());
-    assert_eq!(build(&doc, &resolved), build(&doc, &resolved));
+    assert_eq!(
+        build_glyphless(&doc, &resolved),
+        build_glyphless(&doc, &resolved)
+    );
 }
 
 #[test]
@@ -205,7 +208,7 @@ fn fill_children_and_strokes_are_wrapped_by_balanced_scopes() {
     doc.get_mut(child).fills = Paints::solid("#00FF00".into());
 
     let resolved = resolve(&doc, &opts());
-    let list = build(&doc, &resolved);
+    let list = build_glyphless(&doc, &resolved);
     assert_eq!(
         list.items
             .iter()
@@ -246,7 +249,7 @@ fn repeated_strokes_keep_geometry_and_paint_order() {
     doc.get_mut(rect).strokes = vec![lower.clone(), upper.clone()];
 
     let resolved = resolve(&doc, &opts());
-    let list = build(&doc, &resolved);
+    let list = build_glyphless(&doc, &resolved);
     let strokes = list
         .items
         .iter()
@@ -281,7 +284,7 @@ fn frame_and_line_have_no_implicit_ink() {
     // Even a programmatic compatibility fill does not become line ink.
     doc.get_mut(line).fills = Paints::solid("#FF0000".into());
     let resolved = resolve(&doc, &opts());
-    assert!(build(&doc, &resolved).items.is_empty());
+    assert!(build_glyphless(&doc, &resolved).items.is_empty());
 }
 
 #[test]
@@ -308,7 +311,7 @@ fn ineffective_strokes_emit_no_item_and_visible_paints_keep_order() {
     doc.get_mut(rect).strokes = vec![zero_width, empty, visible];
 
     let resolved = resolve(&doc, &opts());
-    let list = build(&doc, &resolved);
+    let list = build_glyphless(&doc, &resolved);
     let [item] = list.items.as_slice() else {
         panic!("exactly one effective stroke should materialize");
     };
@@ -344,7 +347,7 @@ fn unsupported_rectangular_stroke_states_emit_no_draw_item() {
         let doc = builder.build();
         let resolved = resolve(&doc, &opts());
         assert!(
-            build(&doc, &resolved).items.is_empty(),
+            build_glyphless(&doc, &resolved).items.is_empty(),
             "{desc:?} must not emit lossy rectangular stroke geometry"
         );
     }

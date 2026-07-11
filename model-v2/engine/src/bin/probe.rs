@@ -1,6 +1,6 @@
 //! probe — the autonomous render-perf harness (deterministic CPU raster).
 //!
-//! Drives the real `resolve -> drawlist::build -> paint::execute` seam across
+//! Drives the real `frame::resolve_and_build -> paint::execute` seam across
 //! three axes — VIEW (pan/zoom, no doc mutation), MUTATION (one node/frame),
 //! ANIMATION (N nodes/frame) — at several scene sizes, reporting per-STAGE
 //! distributions (min/p50/p95/p99/max/mean) with fps at mean AND p99. 120fps =
@@ -27,11 +27,15 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use anchor_engine::cache::SceneCache;
-use anchor_engine::{damage, frame::render, paint::PaintCtx};
+use anchor_engine::{
+    damage,
+    frame::{render, resolve_and_build},
+    paint::PaintCtx,
+};
 use anchor_lab::math::{Affine, RectF};
 use anchor_lab::model::*;
 use anchor_lab::ops::{self, dirty_class, Op, PhaseMask};
-use anchor_lab::resolve::{resolve, ResolveOptions, RotationInFlow};
+use anchor_lab::resolve::{ResolveOptions, RotationInFlow};
 
 const W: f32 = 1360.0;
 const H: f32 = 900.0;
@@ -237,8 +241,7 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
     let mut surface = skia_safe::surfaces::raster_n32_premul((W as i32, H as i32)).unwrap();
 
     // Reference resolve/drawlist for the VIEW-redundancy audit (A4).
-    let ref_resolved = resolve(&doc, &opts());
-    let ref_list = anchor_engine::drawlist::build(&doc, &ref_resolved);
+    let (ref_resolved, ref_list) = resolve_and_build(&doc, &opts(), ctx);
     // Rotation is a paint-only transform under DEC-0 (grounded in the
     // classifier, not the scenario name).
     if sc.name == "mutate_rotate" {
@@ -351,20 +354,17 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
             f_ns.push(full);
             changed.push(dmg.changed.len());
 
-            match sc.axis {
-                Axis::View => {
-                    // A4: on a VIEW frame the doc is unchanged → resolve+build
-                    // are provably redundant. This is the whole premise.
-                    if damage::diff(&ref_resolved, &resolved).is_empty() && list == ref_list {
-                        redundant_view_frames += 1;
-                    }
-                    // A2: the camera must change frame-to-frame (no no-op frame
-                    // measuring an un-moved view).
-                    if view != prev_view {
-                        nonempty_view_frames += 1;
-                    }
+            if sc.axis == Axis::View {
+                // A4: on a VIEW frame the doc is unchanged → resolve+build
+                // are provably redundant. This is the whole premise.
+                if damage::diff(&ref_resolved, &resolved).is_empty() && list == ref_list {
+                    redundant_view_frames += 1;
                 }
-                _ => {}
+                // A2: the camera must change frame-to-frame (no no-op frame
+                // measuring an un-moved view).
+                if view != prev_view {
+                    nonempty_view_frames += 1;
+                }
             }
         }
 

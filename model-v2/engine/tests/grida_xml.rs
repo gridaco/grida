@@ -4,7 +4,7 @@
 
 mod support;
 
-use anchor_engine::drawlist::{self, Item, ItemKind};
+use anchor_engine::drawlist::{build_glyphless, Item, ItemKind};
 use anchor_engine::paint::PaintCtx;
 use anchor_lab::grida_xml;
 use anchor_lab::math::Affine;
@@ -40,7 +40,9 @@ fn assert_rect_fill(item: &Item, world: Affine, width: f32, height: f32, argb: u
 fn draft0_nested_rects_materialize_in_the_drawlist() {
     let doc = grida_xml::parse(SOURCE).expect("Draft 0 fixture parses");
     let resolved = resolve(&doc, &options());
-    let list = drawlist::build(&doc, &resolved);
+    // This structural fixture has no text; the glyphless lab projection is the
+    // explicit pure-stage subject. The following test covers the frame path.
+    let list = build_glyphless(&doc, &resolved);
 
     // The structural <grida> envelope and implicit document root emit no ink.
     // The authored container and nested rectangles emit only their authored

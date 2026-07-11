@@ -205,7 +205,7 @@ pub fn paint_hud_dpr(
             // Ink readout (E-A7, demoted post-DEC-0): sizing never moves
             // with rotation anymore; the readout explains box vs INK.
             let node = doc.get(id);
-            if let Some(tf) = &ctx.font {
+            if let Some(tf) = ctx.font() {
                 let b = resolved.box_of(id);
                 let aabb = resolved.aabb_of(id);
                 let label = if node.header.rotation != 0.0 {

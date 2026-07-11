@@ -17,9 +17,10 @@ use anchor_lab::math::{Affine, RectF};
 use anchor_lab::model::Document;
 use anchor_lab::ops::{apply, Op, OpResult};
 use anchor_lab::resolve::{resolve, ResolveOptions, Resolved, RotationInFlow};
+use anchor_lab::text_layout::TextLayout;
 use anchor_lab::textir;
 
-use crate::oracle::OracleTags;
+use crate::oracle::{OracleTags, TEXT_STUB};
 
 const MAGIC: &str = "#anchor-replay v0";
 const IR_MARK: &str = "--- ir ---";
@@ -154,20 +155,29 @@ pub fn parse_string(text: &str) -> Result<Replay, String> {
     })
 }
 
-/// Play a replay: apply each op with a FRESH resolve under the replay's own
-/// options (mirrors the editor loop), returning the final document and the
-/// result sequence. Deterministic by ENG-0.3 — playing twice is bit-identical.
-pub fn play(replay: &Replay) -> (Document, Vec<OpResult>) {
+/// Play a replay under its recorded oracle and options.
+///
+/// Replay v0 can reproduce only the deterministic lab text metric: it carries
+/// no font manifest capable of reconstructing a Skia Paragraph environment.
+/// Any other tag therefore fails closed instead of silently resolving under
+/// the stub and claiming faithful replay.
+pub fn play(replay: &Replay) -> Result<(Document, Vec<OpResult>), String> {
+    if replay.tags.text != TEXT_STUB {
+        return Err(format!(
+            "unsupported replay text oracle {:?}; replay v0 supports only {:?}",
+            replay.tags.text, TEXT_STUB
+        ));
+    }
     let mut doc = replay.doc.clone();
     let mut results = Vec::with_capacity(replay.ops.len());
     for op in &replay.ops {
         let r = resolve(&doc, &replay.opts);
         results.push(apply(&mut doc, &r, op));
     }
-    (doc, results)
+    Ok((doc, results))
 }
 
-/// Bit-for-bit equality of two resolved tiers across all four columns — the
+/// Bit-for-bit equality of two resolved tiers across all five columns — the
 /// determinism oracle. `==` would pass -0.0/0.0 and fail NaN==NaN; bits are
 /// exact, which is what "same computation" means.
 pub fn resolved_bits_eq(a: &Resolved, b: &Resolved) -> bool {
@@ -187,21 +197,82 @@ pub fn resolved_bits_eq(a: &Resolved, b: &Resolved) -> bool {
         if !opt_rect_eq(a.aabb_opt(id), b.aabb_opt(id)) {
             return false;
         }
+        if !opt_text_layout_eq(a.text_layout_opt(id), b.text_layout_opt(id)) {
+            return false;
+        }
     }
     true
+}
+
+fn scalar_eq(a: f32, b: f32) -> bool {
+    a.to_bits() == b.to_bits()
+}
+
+fn rect_eq(a: RectF, b: RectF) -> bool {
+    scalar_eq(a.x, b.x) && scalar_eq(a.y, b.y) && scalar_eq(a.w, b.w) && scalar_eq(a.h, b.h)
 }
 
 fn opt_rect_eq(a: Option<RectF>, b: Option<RectF>) -> bool {
     match (a, b) {
         (None, None) => true,
-        (Some(a), Some(b)) => {
-            a.x.to_bits() == b.x.to_bits()
-                && a.y.to_bits() == b.y.to_bits()
-                && a.w.to_bits() == b.w.to_bits()
-                && a.h.to_bits() == b.h.to_bits()
-        }
+        (Some(a), Some(b)) => rect_eq(a, b),
         _ => false,
     }
+}
+
+fn opt_scalar_eq(a: Option<f32>, b: Option<f32>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(a), Some(b)) => scalar_eq(a, b),
+        _ => false,
+    }
+}
+
+fn opt_text_layout_eq(
+    a: Option<&std::sync::Arc<TextLayout>>,
+    b: Option<&std::sync::Arc<TextLayout>>,
+) -> bool {
+    let (Some(a), Some(b)) = (a, b) else {
+        return a.is_none() && b.is_none();
+    };
+    a.oracle == b.oracle
+        && a.environment == b.environment
+        && opt_scalar_eq(a.width_constraint, b.width_constraint)
+        && rect_eq(a.assigned_box, b.assigned_box)
+        && scalar_eq(a.width, b.width)
+        && scalar_eq(a.height, b.height)
+        && a.lines.len() == b.lines.len()
+        && a.lines.iter().zip(&b.lines).all(|(a, b)| {
+            a.text == b.text
+                && a.byte_range == b.byte_range
+                && a.source_range == b.source_range
+                && a.end == b.end
+                && scalar_eq(a.left, b.left)
+                && scalar_eq(a.width, b.width)
+                && scalar_eq(a.top, b.top)
+                && scalar_eq(a.height, b.height)
+                && scalar_eq(a.baseline, b.baseline)
+                && scalar_eq(a.ascent, b.ascent)
+                && scalar_eq(a.descent, b.descent)
+        })
+        && a.glyph_runs.len() == b.glyph_runs.len()
+        && a.glyph_runs.iter().zip(&b.glyph_runs).all(|(a, b)| {
+            a.line_index == b.line_index
+                && a.source_run == b.source_run
+                && a.font == b.font
+                && a.font_identity == b.font_identity
+                && a.glyphs.len() == b.glyphs.len()
+                && a.glyphs.iter().zip(&b.glyphs).all(|(a, b)| {
+                    a.id == b.id
+                        && a.cluster == b.cluster
+                        && scalar_eq(a.x, b.x)
+                        && scalar_eq(a.y, b.y)
+                        && opt_rect_eq(a.bounds, b.bounds)
+                })
+        })
+        && opt_rect_eq(a.logical_bounds, b.logical_bounds)
+        && opt_rect_eq(a.ink_bounds, b.ink_bounds)
+        && a.unresolved_glyphs == b.unresolved_glyphs
 }
 
 fn opt_aff_eq(a: Option<Affine>, b: Option<Affine>) -> bool {

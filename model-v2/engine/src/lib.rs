@@ -10,8 +10,8 @@
 //! (ENG-0…ENG-5); each module names the contract it serves.
 //!
 //! Host chrome (winit/egui/GL) lives in the host (the spike, later
-//! `crates/grida`), never here. `use skia_safe` is confined to
-//! [`paint`] — the one place raster lives (ENGINE.md S-1).
+//! `crates/grida`), never here. Raster access is confined to [`paint`];
+//! [`text_layout`] may use Skia Paragraph only as an explicit shaping oracle.
 
 pub mod cache;
 pub mod damage;
@@ -23,4 +23,5 @@ pub mod oracle;
 pub mod paint;
 pub mod query;
 pub mod replay;
+mod text_layout;
 pub mod trace;

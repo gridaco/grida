@@ -4,14 +4,18 @@
 //! bitmap-can't-rescale boundary), and doc-dirty re-raster.
 
 use anchor_engine::cache::{composited_to_bytes, SceneCache};
-use anchor_engine::drawlist::build;
+use anchor_engine::drawlist::build_glyphless;
+use anchor_engine::frame;
 use anchor_engine::paint::{raster_to_bytes, PaintCtx};
 use anchor_lab::math::Affine;
 use anchor_lab::model::*;
 use anchor_lab::resolve::{resolve, ResolveOptions, RotationInFlow};
+use skia_safe::{surfaces, Color as SkColor, FontMgr};
 
 const W: i32 = 1360;
 const H: i32 = 900;
+const INTER: &[u8] =
+    include_bytes!("../../../fixtures/fonts/Inter/Inter-VariableFont_opsz,wght.ttf");
 
 fn opts() -> ResolveOptions {
     ResolveOptions {
@@ -22,6 +26,13 @@ fn opts() -> ResolveOptions {
 
 fn ctx() -> PaintCtx {
     PaintCtx::new(None)
+}
+
+fn font_ctx() -> PaintCtx {
+    let typeface = FontMgr::new()
+        .new_from_data(INTER, None)
+        .expect("bundled Inter typeface");
+    PaintCtx::new(Some(typeface))
 }
 
 /// root + a handful of free shapes (one rotated) at known world positions.
@@ -47,10 +58,51 @@ fn scene() -> Document {
     doc
 }
 
+fn text_scene() -> Document {
+    let mut builder = DocBuilder::new();
+    let mut header = Header::new(SizeIntent::Fixed(260.0), SizeIntent::Auto);
+    header.x = AxisBinding::start(80.0);
+    header.y = AxisBinding::start(90.0);
+    let text = builder.add(
+        0,
+        header,
+        Payload::Text {
+            content: "Cache office AV".into(),
+            font_size: 32.0,
+        },
+    );
+    let mut doc = builder.build();
+    doc.get_mut(text).fills = Paints::solid(Color::BLACK);
+    doc
+}
+
 fn fresh_bytes(doc: &Document, view: &Affine) -> Vec<u8> {
     let r = resolve(doc, &opts());
-    let list = build(doc, &r);
+    let list = build_glyphless(doc, &r);
     raster_to_bytes(&list, view, W, H, &ctx())
+}
+
+fn fresh_frame_bytes(doc: &Document, view: &Affine, ctx: &PaintCtx) -> Vec<u8> {
+    let mut surface = surfaces::raster_n32_premul((W, H)).expect("raster surface");
+    surface.canvas().clear(SkColor::WHITE);
+    frame::render(surface.canvas(), doc, &opts(), view, ctx);
+    anchor_engine::paint::read_pixels(&mut surface, W, H)
+}
+
+fn cached_frame_bytes(
+    cache: &mut SceneCache,
+    doc: &Document,
+    view: &Affine,
+    ctx: &PaintCtx,
+    doc_dirty: bool,
+) -> (Vec<u8>, bool) {
+    let mut surface = surfaces::raster_n32_premul((W, H)).expect("raster surface");
+    surface.canvas().clear(SkColor::WHITE);
+    let rerastered = cache.frame(surface.canvas(), doc, &opts(), view, ctx, doc_dirty);
+    (
+        anchor_engine::paint::read_pixels(&mut surface, W, H),
+        rerastered,
+    )
 }
 
 #[test]
@@ -58,8 +110,9 @@ fn cache_cold_matches_fresh() {
     let doc = scene();
     let view = Affine::translate(200.0, 150.0);
     let mut cache = SceneCache::new(W, H);
+    let context = ctx();
     // First frame is a cache-cold re-raster at `view`.
-    let got = composited_to_bytes(&mut cache, &doc, &opts(), &view, &ctx(), false, W, H);
+    let got = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, false, W, H);
     assert_eq!(got, fresh_bytes(&doc, &view), "cache-cold must equal fresh");
 }
 
@@ -70,9 +123,15 @@ fn integer_pan_blit_matches_fresh() {
     let panned = Affine::translate(250.0, 180.0); // +50,+30 — integer, within margin
 
     let mut cache = SceneCache::new(W, H);
+    let context = ctx();
     // Prime at ref_view (cold), then pan: the second frame is a pure blit.
-    let _ = composited_to_bytes(&mut cache, &doc, &opts(), &ref_view, &ctx(), false, W, H);
-    let got = composited_to_bytes(&mut cache, &doc, &opts(), &panned, &ctx(), false, W, H);
+    let (_, cold_reraster) = cached_frame_bytes(&mut cache, &doc, &ref_view, &context, false);
+    let (got, panned_reraster) = cached_frame_bytes(&mut cache, &doc, &panned, &context, false);
+    assert!(cold_reraster, "the first frame must populate the cache");
+    assert!(
+        !panned_reraster,
+        "an in-margin pan with one stable context must be a pure blit"
+    );
 
     assert_eq!(
         got,
@@ -94,9 +153,10 @@ fn zoom_forces_reraster_and_matches_fresh() {
         f: 150.0,
     };
     let mut cache = SceneCache::new(W, H);
-    let _ = composited_to_bytes(&mut cache, &doc, &opts(), &ref_view, &ctx(), false, W, H);
+    let context = ctx();
+    let _ = composited_to_bytes(&mut cache, &doc, &opts(), &ref_view, &context, false, W, H);
     // Different zoom → a bitmap blit would be wrong; the cache must re-raster.
-    let got = composited_to_bytes(&mut cache, &doc, &opts(), &zoomed, &ctx(), false, W, H);
+    let got = composited_to_bytes(&mut cache, &doc, &opts(), &zoomed, &context, false, W, H);
     assert_eq!(
         got,
         fresh_bytes(&doc, &zoomed),
@@ -109,7 +169,8 @@ fn doc_dirty_forces_reraster_and_matches_fresh() {
     let mut doc = scene();
     let view = Affine::translate(200.0, 150.0);
     let mut cache = SceneCache::new(W, H);
-    let _ = composited_to_bytes(&mut cache, &doc, &opts(), &view, &ctx(), false, W, H);
+    let context = ctx();
+    let _ = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, false, W, H);
 
     // Mutate: move the first shape. With doc_dirty the cache rebuilds + re-rasters.
     let r = resolve(&doc, &opts());
@@ -123,10 +184,96 @@ fn doc_dirty_forces_reraster_and_matches_fresh() {
     )
     .unwrap();
 
-    let got = composited_to_bytes(&mut cache, &doc, &opts(), &view, &ctx(), true, W, H);
+    let got = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, true, W, H);
     assert_eq!(
         got,
         fresh_bytes(&doc, &view),
         "a dirty re-raster must reflect the mutation"
     );
+}
+
+#[test]
+fn cache_builds_text_with_the_same_shaping_oracle_as_a_fresh_frame() {
+    let doc = text_scene();
+    let context = font_ctx();
+    let view = Affine::IDENTITY;
+    let mut cache = SceneCache::new(W, H);
+
+    let cached = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, false, W, H);
+    let fresh = fresh_frame_bytes(&doc, &view, &context);
+    assert_eq!(cached, fresh);
+    assert!(cached.chunks_exact(4).any(|pixel| pixel[0] < 100));
+}
+
+#[test]
+fn changing_the_context_font_invalidates_cached_text_without_document_dirtiness() {
+    let doc = text_scene();
+    let view = Affine::IDENTITY;
+    let mut cache = SceneCache::new(W, H);
+    let mut context = font_ctx();
+
+    let (shaped, cold_reraster) = cached_frame_bytes(&mut cache, &doc, &view, &context, false);
+    let (_, clean_reraster) = cached_frame_bytes(&mut cache, &doc, &view, &context, false);
+    assert!(cold_reraster);
+    assert!(
+        !clean_reraster,
+        "an unchanged environment must reuse its image"
+    );
+    assert!(shaped.chunks_exact(4).any(|pixel| pixel[0] < 100));
+
+    context.set_font(None);
+    let (fontless, font_reraster) = cached_frame_bytes(&mut cache, &doc, &view, &context, false);
+    assert!(
+        font_reraster,
+        "changing the shaping environment must rebuild the drawlist"
+    );
+    assert_eq!(fontless, fresh_frame_bytes(&doc, &view, &context));
+    assert_ne!(fontless, shaped);
+}
+
+#[test]
+fn changing_resolve_options_invalidates_the_cached_resolved_scene() {
+    let doc = scene();
+    let context = ctx();
+    let view = Affine::IDENTITY;
+    let mut cache = SceneCache::new(W, H);
+    let mut surface = surfaces::raster_n32_premul((W, H)).expect("raster surface");
+    let base = opts();
+
+    assert!(cache.frame(surface.canvas(), &doc, &base, &view, &context, false));
+    assert!(!cache.frame(surface.canvas(), &doc, &base, &view, &context, false));
+
+    let viewport_changed = ResolveOptions {
+        viewport: (base.viewport.0 + 100.0, base.viewport.1),
+        ..base
+    };
+    assert!(cache.frame(
+        surface.canvas(),
+        &doc,
+        &viewport_changed,
+        &view,
+        &context,
+        false,
+    ));
+    assert!(!cache.frame(
+        surface.canvas(),
+        &doc,
+        &viewport_changed,
+        &view,
+        &context,
+        false,
+    ));
+
+    let rotation_changed = ResolveOptions {
+        rotation_in_flow: RotationInFlow::AabbParticipates,
+        ..viewport_changed
+    };
+    assert!(cache.frame(
+        surface.canvas(),
+        &doc,
+        &rotation_changed,
+        &view,
+        &context,
+        false,
+    ));
 }

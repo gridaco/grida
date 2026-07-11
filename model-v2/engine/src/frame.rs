@@ -7,11 +7,12 @@
 
 use anchor_lab::math::Affine;
 use anchor_lab::model::Document;
-use anchor_lab::resolve::{resolve, ResolveOptions, Resolved};
+use anchor_lab::resolve::{resolve_with_text_layout, ResolveOptions, Resolved};
 use std::time::Instant;
 
-use crate::drawlist::{build, DrawList};
+use crate::drawlist::{build_with_text_fonts, DrawList};
 use crate::paint::{execute, PaintCtx};
+use crate::text_layout::SkiaTextLayoutOracle;
 
 /// Per-frame timings for the three pipeline seams (nanoseconds). Populated
 /// by the same spans [`crate::trace`] reads when the `trace` feature is on;
@@ -21,6 +22,43 @@ pub struct FrameStats {
     pub resolve_ns: u128,
     pub build_ns: u128,
     pub execute_ns: u128,
+}
+
+/// Resolve a document with the host text environment and build a replayable
+/// drawlist that owns every exact font selected during shaping.
+///
+/// This is the public non-rasterizing stage boundary. Callers that need stage
+/// retained lists or custom surfaces use it instead of combining the glyphless
+/// compatibility resolver with [`crate::drawlist::build_glyphless`].
+pub fn resolve_and_build(
+    doc: &Document,
+    opts: &ResolveOptions,
+    ctx: &PaintCtx,
+) -> (Resolved, DrawList) {
+    let (resolved, list, _) = resolve_and_build_profiled(doc, opts, ctx);
+    (resolved, list)
+}
+
+fn resolve_and_build_profiled(
+    doc: &Document,
+    opts: &ResolveOptions,
+    ctx: &PaintCtx,
+) -> (Resolved, DrawList, FrameStats) {
+    let t0 = Instant::now();
+    let text_layout = SkiaTextLayoutOracle::new(ctx);
+    let resolved = resolve_with_text_layout(doc, opts, &text_layout);
+    let t1 = Instant::now();
+    let list = build_with_text_fonts(doc, &resolved, text_layout.font_registry());
+    let t2 = Instant::now();
+    (
+        resolved,
+        list,
+        FrameStats {
+            resolve_ns: (t1 - t0).as_nanos(),
+            build_ns: (t2 - t1).as_nanos(),
+            execute_ns: 0,
+        },
+    )
 }
 
 /// The one frame entry: `resolve -> build -> execute`, immediate, no caches
@@ -36,17 +74,9 @@ pub fn render(
     view: &Affine,
     ctx: &PaintCtx,
 ) -> (Resolved, DrawList, FrameStats) {
+    let (resolved, list, mut stats) = resolve_and_build_profiled(doc, opts, ctx);
     let t0 = Instant::now();
-    let resolved = resolve(doc, opts);
-    let t1 = Instant::now();
-    let list = build(doc, &resolved);
-    let t2 = Instant::now();
     execute(canvas, &list, view, ctx);
-    let t3 = Instant::now();
-    let stats = FrameStats {
-        resolve_ns: (t1 - t0).as_nanos(),
-        build_ns: (t2 - t1).as_nanos(),
-        execute_ns: (t3 - t2).as_nanos(),
-    };
+    stats.execute_ns = t0.elapsed().as_nanos();
     (resolved, list, stats)
 }

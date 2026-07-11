@@ -57,6 +57,11 @@ fn slot_changed(prev: &Resolved, next: &Resolved, id: NodeId) -> bool {
         || prev.local_opt(id) != next.local_opt(id)
         || prev.world_opt(id) != next.world_opt(id)
         || prev.aabb_opt(id) != next.aabb_opt(id)
+        // Text pixels can change without moving the node or changing its ink
+        // envelope: a different exact font, glyph id, cluster topology, or
+        // positioned run is still material damage. Compare the complete
+        // backend-independent artifact rather than guessing from geometry.
+        || prev.text_layout_opt(id) != next.text_layout_opt(id)
 }
 
 fn union_rect(acc: Option<RectF>, r: RectF) -> RectF {

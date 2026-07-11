@@ -1,19 +1,19 @@
-//! ENG-2.1 · the display list — a pure, diffable projection of the
-//! resolved tier into paint primitives. `build(doc, resolved) -> DrawList`
-//! (step 5) reads the resolved columns and the document's authored paint
-//! intent; it never touches
-//! skia. The camera is NOT baked in — the executor ([`crate::paint`])
-//! takes the view transform, so the same drawlist paints at any zoom and
-//! the host stays free.
+//! ENG-2.1 · the display list — a pure, diffable projection of resolved
+//! geometry and authored paint intent. The engine frame boundary supplies the
+//! exact fonts accompanying shaped text. [`build_glyphless`] exists only for
+//! deterministic lab and structural probes whose resolver deliberately emits
+//! no glyphs. Neither path performs I/O or raster work. The camera is not baked
+//! in, so one drawlist paints at any zoom.
 
 use anchor_lab::math::Affine;
-use anchor_lab::measure::layout_text_payload;
 use anchor_lab::model::{
     CornerSmoothing, Document, NodeId, Paints, Payload, RectangularCornerRadius, ShapeDesc, Stroke,
-    TextStyleRec,
 };
 use anchor_lab::resolve::Resolved;
+use anchor_lab::text_layout::TextLayout;
 use std::sync::Arc;
+
+use crate::text_layout::TextFontRegistry;
 
 /// One paint primitive, carrying the world transform copied verbatim from
 /// `resolved.world_of(node)` (never recomputed — pixel identity depends
@@ -25,27 +25,39 @@ pub struct Item {
     pub kind: ItemKind,
 }
 
-/// One materialized styled fragment. Its x-position is the deterministic
-/// model advance, while its paints are the effective run override or node
-/// fallback. Every paint still evaluates in the full resolved text box.
+/// Paint ownership for one resolved text layout.
+///
+/// Shaping ignores paint values, but attributed run boundaries remain indexed
+/// in the resolved glyph runs. An outer `None` denotes uniform text, while an
+/// attributed entry of `None` inherits node paints and `Some([])` means
+/// explicit no ink. Keeping those states distinct lets invalid attributed run
+/// ownership fail closed instead of being mistaken for uniform-text fallback.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TextFragment {
-    pub text: String,
-    pub x: f32,
-    pub advance: f32,
-    pub style: TextStyleRec,
-    pub paints: Paints,
+pub struct TextPaints {
+    pub node: Paints,
+    pub runs: Option<Vec<Option<Paints>>>,
 }
 
-/// One materialized visual text line. The model's deterministic measurement
-/// owns line and run topology; the drawlist carries that exact topology into
-/// paint so wrapping and explicit empty lines cannot be reinterpreted by the
-/// backend.
-#[derive(Debug, Clone, PartialEq)]
-pub struct TextLine {
-    pub text: String,
-    pub fragments: Vec<TextFragment>,
-    pub baseline_y: f32,
+impl TextPaints {
+    /// Resolve paints only when glyph ownership matches the authored topology.
+    pub fn for_source_run(&self, source_run: Option<usize>) -> Option<&Paints> {
+        match (&self.runs, source_run) {
+            (None, None) => Some(&self.node),
+            (Some(runs), Some(index)) => runs
+                .get(index)
+                .map(|paints| paints.as_ref().unwrap_or(&self.node)),
+            _ => None,
+        }
+    }
+
+    fn has_visible_ink(&self) -> bool {
+        match &self.runs {
+            None => !self.node.is_empty(),
+            Some(runs) => runs
+                .iter()
+                .any(|paints| !paints.as_ref().unwrap_or(&self.node).is_empty()),
+        }
+    }
 }
 
 /// The display-list vocabulary. Scope commands are explicit so subtree opacity
@@ -78,7 +90,8 @@ pub enum ItemKind {
         paints: Paints,
     },
     TextFill {
-        lines: Arc<[TextLine]>,
+        layout: Arc<TextLayout>,
+        paints: TextPaints,
         paint_w: f32,
         paint_h: f32,
     },
@@ -104,7 +117,7 @@ pub enum ItemKind {
         stroke: Stroke,
     },
     TextStroke {
-        lines: Arc<[TextLine]>,
+        layout: Arc<TextLayout>,
         paint_w: f32,
         paint_h: f32,
         stroke: Stroke,
@@ -116,6 +129,17 @@ pub enum ItemKind {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DrawList {
     pub items: Vec<Item>,
+    /// Exact fonts referenced by glyph-bearing text items. Kept opaque outside
+    /// the engine: display-list consumers replay keys only through this list.
+    text_fonts: Option<Arc<TextFontRegistry>>,
+}
+
+impl DrawList {
+    pub(crate) fn text_fonts(&self) -> &TextFontRegistry {
+        self.text_fonts
+            .as_deref()
+            .expect("glyph-bearing drawlist has no text font registry")
+    }
 }
 
 /// Materialize only paints that can contribute pixels. The authored stack is
@@ -145,53 +169,65 @@ fn push(items: &mut Vec<Item>, node: NodeId, world: Affine, kind: ItemKind) {
     items.push(Item { node, world, kind });
 }
 
-fn materialize_text_lines(
-    payload: &Payload,
-    node_fills: &Paints,
-    resolved_width: f32,
-) -> Arc<[TextLine]> {
+fn materialize_text_paints(payload: &Payload, node_fills: &Paints) -> TextPaints {
     let text = payload
         .as_text()
-        .expect("text materialization requires text");
-    layout_text_payload(text, Some(resolved_width))
-        .into_iter()
-        .map(|line| TextLine {
-            text: line.text,
-            fragments: line
-                .fragments
-                .into_iter()
-                .map(|fragment| {
-                    let authored_paints = fragment
-                        .run_index
-                        .and_then(|index| text.runs.and_then(|runs| runs.get(index)))
-                        .and_then(|run| run.fills.as_ref())
-                        .unwrap_or(node_fills);
-                    TextFragment {
-                        text: fragment.text,
-                        x: fragment.x,
-                        advance: fragment.advance,
-                        style: fragment.style,
-                        paints: visible_paints(authored_paints),
-                    }
-                })
-                .collect(),
-            baseline_y: line.baseline_y,
-        })
-        .collect::<Vec<_>>()
-        .into()
+        .expect("text paint materialization requires text");
+    let runs = text.runs.map(|runs| {
+        runs.iter()
+            .map(|run| run.fills.as_ref().map(visible_paints))
+            .collect()
+    });
+    TextPaints {
+        node: visible_paints(node_fills),
+        runs,
+    }
 }
 
-/// Project the resolved tier into an ordered primitive stream — the pure
-/// `resolve -> drawlist` stage. Traversal is exactly the spike painter's
+/// Project a glyphless lab-resolved tier into an ordered primitive stream.
+///
+/// Real rendering must enter through [`crate::frame::resolve_and_build`] or
+/// [`crate::frame::render`]. Traversal is exactly the spike painter's
 /// (`paint_node`): a hidden subtree (`world_opt == None`) prunes; the root and
 /// derived kinds (group/lens) emit no ink but their children are still visited.
 /// Node opacity scopes fill, descendants, and strokes. A frame's clip scopes
 /// descendants only. Geometry is local-space, positioned by `world` — copied
 /// verbatim, never recomputed. The camera is applied later by the executor.
-pub fn build(doc: &Document, resolved: &Resolved) -> DrawList {
+pub fn build_glyphless(doc: &Document, resolved: &Resolved) -> DrawList {
+    build_inner(doc, resolved, None)
+}
+
+/// Project a resolved tier produced by the engine text oracle, retaining the
+/// exact registry that minted every [`anchor_lab::text_layout::TextFontKey`].
+pub(crate) fn build_with_text_fonts(
+    doc: &Document,
+    resolved: &Resolved,
+    text_fonts: Arc<TextFontRegistry>,
+) -> DrawList {
+    build_inner(doc, resolved, Some(text_fonts))
+}
+
+fn build_inner(
+    doc: &Document,
+    resolved: &Resolved,
+    text_fonts: Option<Arc<TextFontRegistry>>,
+) -> DrawList {
     let mut items = Vec::new();
     emit(doc, resolved, doc.root, &mut items);
-    DrawList { items }
+    let has_glyphs = items.iter().any(|item| match &item.kind {
+        ItemKind::TextFill { layout, .. } | ItemKind::TextStroke { layout, .. } => {
+            !layout.glyph_runs.is_empty()
+        }
+        _ => false,
+    });
+    assert!(
+        !has_glyphs || text_fonts.is_some(),
+        "glyph-bearing resolved text requires its exact font registry"
+    );
+    DrawList {
+        items,
+        text_fonts: if has_glyphs { text_fonts } else { None },
+    }
 }
 
 fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) {
@@ -200,10 +236,14 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
     };
     let node = doc.get(id);
     let b = resolved.box_of(id);
-    let text_lines = node
+    let text_layout = node
         .payload
         .as_text()
-        .map(|_| materialize_text_lines(&node.payload, &node.fills, b.w));
+        .map(|_| Arc::clone(resolved.text_layout_of(id)));
+    let text_paints = node
+        .payload
+        .as_text()
+        .map(|_| materialize_text_paints(&node.payload, &node.fills));
 
     let opacity_scope = node.header.opacity != 1.0;
     if opacity_scope {
@@ -263,18 +303,20 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                 }
             }
             Payload::Text { .. } | Payload::AttributedText { .. } => {
-                let lines = text_lines.as_ref().expect("text fill has line topology");
-                if lines
-                    .iter()
-                    .flat_map(|line| &line.fragments)
-                    .any(|fragment| !fragment.paints.is_empty())
-                {
+                let paints = text_paints
+                    .as_ref()
+                    .expect("text fill has a paint fallback table");
+                if paints.has_visible_ink() {
                     push(
                         items,
                         id,
                         world,
                         ItemKind::TextFill {
-                            lines: lines.clone(),
+                            layout: text_layout
+                                .as_ref()
+                                .expect("text fill has resolved layout")
+                                .clone(),
+                            paints: paints.clone(),
                             paint_w: b.w,
                             paint_h: b.h,
                         },
@@ -351,9 +393,9 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                     stroke,
                 },
                 Payload::Text { .. } | Payload::AttributedText { .. } => ItemKind::TextStroke {
-                    lines: text_lines
+                    layout: text_layout
                         .as_ref()
-                        .expect("visible text stroke has line topology")
+                        .expect("visible text stroke has resolved layout")
                         .clone(),
                     paint_w: b.w,
                     paint_h: b.h,
@@ -367,5 +409,46 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
 
     if opacity_scope {
         push(items, id, world, ItemKind::EndOpacity);
+    }
+}
+
+#[cfg(test)]
+mod text_paint_tests {
+    use super::TextPaints;
+    use anchor_lab::model::{Color, Paints};
+
+    #[test]
+    fn uniform_text_uses_node_paints_only_for_uniform_ownership() {
+        let node = Paints::solid(Color::BLACK);
+        let paints = TextPaints {
+            node: node.clone(),
+            runs: None,
+        };
+
+        assert_eq!(paints.for_source_run(None), Some(&node));
+        assert_eq!(paints.for_source_run(Some(0)), None);
+    }
+
+    #[test]
+    fn attributed_text_fails_closed_without_valid_run_ownership() {
+        let node = Paints::solid(Color::BLACK);
+        let override_paints = Paints::solid("#FF0000".into());
+        let paints = TextPaints {
+            node: node.clone(),
+            runs: Some(vec![
+                None,
+                Some(override_paints.clone()),
+                Some(Paints::default()),
+            ]),
+        };
+
+        assert_eq!(paints.for_source_run(Some(0)), Some(&node));
+        assert_eq!(paints.for_source_run(Some(1)), Some(&override_paints));
+        assert!(paints
+            .for_source_run(Some(2))
+            .expect("valid explicit-empty run")
+            .is_empty());
+        assert_eq!(paints.for_source_run(None), None);
+        assert_eq!(paints.for_source_run(Some(3)), None);
     }
 }

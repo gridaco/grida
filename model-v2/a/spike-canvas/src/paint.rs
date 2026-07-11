@@ -1,8 +1,8 @@
 //! Typeface acquisition for the spike. The SCENE is painted by the engine
-//! (`anchor_engine::paint::execute` via `drawlist::build`) — the spike no
-//! longer owns a scene painter. This module only supplies the resolved
-//! typeface that the engine executor and the HUD text share, as an engine
-//! [`PaintCtx`].
+//! (`frame::resolve_and_build` followed by `anchor_engine::paint::execute`) —
+//! the spike no longer owns a scene painter. This module only supplies the
+//! resolved typeface that the engine executor and the HUD text share, as an
+//! engine [`PaintCtx`].
 
 use anchor_engine::paint::PaintCtx;
 

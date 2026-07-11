@@ -4,12 +4,14 @@
 //! stands on. Ops are recorded against the NORMALIZED doc (ids the round-trip
 //! law pins), found here by name.
 
-use anchor_engine::oracle::OracleTags;
+use anchor_engine::oracle::{OracleTags, TEXT_SKPARAGRAPH};
 use anchor_engine::replay::{parse_string, play, resolved_bits_eq, write_string};
 use anchor_lab::model::*;
 use anchor_lab::ops::{apply, Axis, Op, ResizeDrag};
-use anchor_lab::resolve::{resolve, ResolveOptions, RotationInFlow};
+use anchor_lab::resolve::{resolve, resolve_with_text_layout, ResolveOptions, RotationInFlow};
+use anchor_lab::text_layout::{StubTextLayoutOracle, TextLayout, TextLayoutOracle};
 use anchor_lab::textir;
+use std::sync::Arc;
 
 fn opts() -> ResolveOptions {
     ResolveOptions {
@@ -90,12 +92,25 @@ fn round_trips_through_text() {
 }
 
 #[test]
+fn replay_fails_closed_when_its_recorded_text_oracle_is_not_reproducible() {
+    let (doc, ops) = recorded();
+    let tags = OracleTags {
+        text: TEXT_SKPARAGRAPH.to_owned(),
+    };
+    let replay = parse_string(&write_string(&doc, &ops, &tags, &opts())).unwrap();
+
+    let error = play(&replay).expect_err("replay v0 has no persisted font environment");
+    assert!(error.contains(TEXT_SKPARAGRAPH));
+    assert!(error.contains("supports only"));
+}
+
+#[test]
 fn playing_twice_is_bit_identical() {
     let (doc, ops) = recorded();
     let replay = parse_string(&write_string(&doc, &ops, &OracleTags::default(), &opts())).unwrap();
 
-    let (d1, res1) = play(&replay);
-    let (d2, res2) = play(&replay);
+    let (d1, res1) = play(&replay).unwrap();
+    let (d2, res2) = play(&replay).unwrap();
 
     assert_eq!(
         textir::print(&d1),
@@ -119,7 +134,7 @@ fn playing_twice_is_bit_identical() {
 fn play_equals_direct_application() {
     let (doc, ops) = recorded();
     let replay = parse_string(&write_string(&doc, &ops, &OracleTags::default(), &opts())).unwrap();
-    let (played, _) = play(&replay);
+    let (played, _) = play(&replay).unwrap();
 
     // Apply the same ops directly to the same start — play must match.
     let mut direct = replay.doc.clone();
@@ -128,4 +143,39 @@ fn play_equals_direct_application() {
         let _ = apply(&mut direct, &r, op);
     }
     assert_eq!(textir::print(&played), textir::print(&direct));
+}
+
+struct EnvironmentOracle(&'static str);
+
+impl TextLayoutOracle for EnvironmentOracle {
+    fn layout(&self, text: TextPayloadRef<'_>, max_width: Option<f32>) -> Arc<TextLayout> {
+        let layout = StubTextLayoutOracle.layout(text, max_width);
+        Arc::new(TextLayout {
+            environment: self.0.to_owned(),
+            ..layout.as_ref().clone()
+        })
+    }
+}
+
+#[test]
+fn resolved_bit_equality_includes_the_text_layout_column() {
+    let mut builder = DocBuilder::new();
+    let text = builder.add(
+        0,
+        Header::new(SizeIntent::Fixed(100.0), SizeIntent::Auto),
+        Payload::Text {
+            content: "same geometry".into(),
+            font_size: 12.0,
+        },
+    );
+    let document = builder.build();
+    let a = resolve_with_text_layout(&document, &opts(), &EnvironmentOracle("font-a@test"));
+    let b = resolve_with_text_layout(&document, &opts(), &EnvironmentOracle("font-b@test"));
+
+    assert_eq!(a.box_of(text), b.box_of(text));
+    assert_eq!(a.aabb_of(text), b.aabb_of(text));
+    assert!(
+        !resolved_bits_eq(&a, &b),
+        "a replay comparison must not discard text resolution identity"
+    );
 }

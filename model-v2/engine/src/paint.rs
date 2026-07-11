@@ -1,12 +1,13 @@
-//! ENG-2.1 · the paint executor — the ONLY module that touches skia
-//! (containment rule S-1; a later core/paint crate split is then
-//! mechanical). `execute(canvas, drawlist, view, ctx)` (step 6) replays a
+//! ENG-2.1 · the paint executor — the only module that touches Skia's raster
+//! API. [`crate::text_layout`] uses Skia Paragraph strictly as the shaping
+//! oracle. `execute(canvas, drawlist, view, ctx)` (step 6) replays a
 //! [`DrawList`](crate::drawlist::DrawList) onto a skia `Canvas`,
 //! composing `view.then(&item.world)` per item in the exact mathematical
 //! form the current spike painter uses — pixel identity is a property of
 //! doing the same float ops in the same order, not a tolerance.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anchor_lab::math::Affine;
 use anchor_lab::model::{
@@ -16,38 +17,66 @@ use anchor_lab::model::{
     StrokeJoin, StrokeWidth, SweepGradientPaint, TileMode,
 };
 use skia_safe::canvas::{SaveLayerFlags, SaveLayerRec};
-use skia_safe::font_arguments::{variation_position::Coordinate, VariationPosition};
 use skia_safe::gradient_shader::{Gradient, GradientColors, Interpolation};
 use skia_safe::{
     image::CachingHint, path_effect::PathEffect, shaders, stroke_rec::InitStyle, Blender, Canvas,
-    ClipOp, Color, CubicResampler, Data, Font, FontArguments, FourByteTag, Image, ImageInfo,
-    Matrix, Paint, PaintCap, PaintJoin, PaintStyle, Path, PathBuilder, PathDirection, PathOp,
-    RRect, Rect, SamplingOptions, Shader, StrokeRec, Typeface,
+    ClipOp, Color, CubicResampler, Data, Font, Image, ImageInfo, Matrix, Paint, PaintCap,
+    PaintJoin, PaintStyle, Path, PathBuilder, PathDirection, PathOp, Point, RRect, Rect,
+    SamplingOptions, Shader, StrokeRec,
 };
 
-use crate::drawlist::{DrawList, ItemKind, TextFragment, TextLine};
+use crate::drawlist::{DrawList, ItemKind};
 
-/// Host-supplied paint state the pure drawlist does not carry: resolved fonts
-/// and decoded image resources. Images are keyed by the authored RID so path
-/// resolution remains a host concern and the drawlist stays I/O-free.
-#[derive(Default)]
+/// Host-supplied resources: the typeface offered to text resolution and decoded
+/// images used at paint time. Exact shaped fonts live with the drawlist; images
+/// stay keyed by authored RID so path resolution remains a host concern.
 pub struct PaintCtx {
-    pub font: Option<skia_safe::Typeface>,
+    id: u64,
+    resource_revision: u64,
+    font: Option<skia_safe::Typeface>,
     images: BTreeMap<String, Image>,
 }
 
 impl PaintCtx {
     pub fn new(font: Option<skia_safe::Typeface>) -> Self {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(1);
         Self {
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            resource_revision: 0,
             font,
             images: BTreeMap::new(),
         }
+    }
+
+    pub(crate) fn identity(&self) -> (u64, u64) {
+        (self.id, self.resource_revision)
+    }
+
+    fn bump_resource_revision(&mut self) {
+        self.resource_revision = self
+            .resource_revision
+            .checked_add(1)
+            .expect("paint context revision exhausted");
+    }
+
+    /// Typeface offered to text resolution. The value is immutable through a
+    /// shared reference so a cache cannot miss an environment change.
+    pub fn font(&self) -> Option<&skia_safe::Typeface> {
+        self.font.as_ref()
+    }
+
+    /// Replace the host typeface and invalidate every cache keyed by this
+    /// context. Existing drawlists keep their exact resolved fonts.
+    pub fn set_font(&mut self, font: Option<skia_safe::Typeface>) {
+        self.font = font;
+        self.bump_resource_revision();
     }
 
     /// Register an already-decoded image under the exact authored resource id.
     pub fn insert_image(&mut self, rid: impl Into<String>, image: Image) {
         let image = image.with_default_mipmaps().unwrap_or(image);
         self.images.insert(rid.into(), image);
+        self.bump_resource_revision();
     }
 
     /// Eagerly decode encoded PNG/JPEG/WebP bytes and register them under `rid`.
@@ -71,18 +100,18 @@ impl PaintCtx {
     }
 }
 
+impl Default for PaintCtx {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
 #[cfg(test)]
 mod paint_ctx_tests {
-    use super::{sk_paint, text_font, PaintBox, PaintCtx};
-    use crate::drawlist::TextFragment;
+    use super::{sk_paint, PaintBox, PaintCtx};
     use anchor_lab::model::{
-        Color as ModelColor, GradientStop, LinearGradientPaint, Paint as ModelPaint, Paints,
-        TextStyleRec,
+        Color as ModelColor, GradientStop, LinearGradientPaint, Paint as ModelPaint,
     };
-    use skia_safe::{FontMgr, FourByteTag};
-
-    const INTER: &[u8] =
-        include_bytes!("../../../fixtures/fonts/Inter/Inter-VariableFont_opsz,wght.ttf");
 
     #[test]
     fn encoded_resources_are_eager_raster_images() {
@@ -121,60 +150,6 @@ mod paint_ctx_tests {
         )
         .expect("valid gradient paint");
         assert_eq!(paint.alpha_f().to_bits(), opacity.to_bits());
-    }
-
-    #[test]
-    fn styled_font_preserves_numeric_weight_through_variable_axis() {
-        let typeface = FontMgr::new()
-            .new_from_data(INTER, None)
-            .expect("bundled variable Inter");
-        let ctx = PaintCtx::new(Some(typeface));
-        let fragment = TextFragment {
-            text: "A".into(),
-            x: 0.0,
-            advance: 12.0,
-            style: TextStyleRec {
-                font_size: 20.0,
-                font_weight: 725,
-                font_style_italic: false,
-            },
-            paints: Paints::default(),
-        };
-        let font = text_font(&fragment, &ctx).expect("host font");
-        assert!(
-            !font.is_embolden(),
-            "variable weight must not use boolean fallback"
-        );
-        let wght = FourByteTag::from_chars('w', 'g', 'h', 't');
-        let position = font
-            .typeface()
-            .variation_design_position()
-            .expect("variable position");
-        let weight = position
-            .iter()
-            .find(|coordinate| coordinate.axis == wght)
-            .expect("wght coordinate");
-        assert_eq!(weight.value, 725.0);
-    }
-
-    #[test]
-    fn italic_style_uses_documented_single_face_fallback() {
-        let typeface = FontMgr::new()
-            .new_from_data(INTER, None)
-            .expect("bundled variable Inter");
-        let ctx = PaintCtx::new(Some(typeface));
-        let fragment = TextFragment {
-            text: "A".into(),
-            x: 0.0,
-            advance: 12.0,
-            style: TextStyleRec {
-                font_size: 20.0,
-                font_weight: 400,
-                font_style_italic: true,
-            },
-            paints: Paints::default(),
-        };
-        assert_eq!(text_font(&fragment, &ctx).unwrap().skew_x(), -0.25);
     }
 }
 
@@ -927,65 +902,44 @@ fn draw_native_centered_stroke(
     }
 }
 
-fn variable_text_typeface(base: &Typeface, fragment: &TextFragment) -> (Typeface, bool) {
-    let wght = FourByteTag::from_chars('w', 'g', 'h', 't');
-    let opsz = FourByteTag::from_chars('o', 'p', 's', 'z');
-    let mut coordinates = Vec::new();
-    let mut has_weight_axis = false;
-    for axis in base.variation_design_parameters().unwrap_or_default() {
-        if axis.tag == wght {
-            has_weight_axis = true;
-            coordinates.push(Coordinate {
-                axis: wght,
-                value: (fragment.style.font_weight as f32).clamp(axis.min, axis.max),
-            });
-        } else if axis.tag == opsz {
-            coordinates.push(Coordinate {
-                axis: opsz,
-                value: fragment.style.font_size.clamp(axis.min, axis.max),
-            });
-        }
-    }
-    if coordinates.is_empty() {
-        return (base.clone(), false);
-    }
-    let arguments = FontArguments::new().set_variation_design_position(VariationPosition {
-        coordinates: &coordinates,
-    });
-    match base.clone_with_arguments(&arguments) {
-        Some(typeface) => (typeface, has_weight_axis),
-        None => (base.clone(), false),
+#[derive(Default)]
+struct GlyphScratch {
+    ids: Vec<u16>,
+    positions: Vec<Point>,
+}
+
+impl GlyphScratch {
+    fn with_run(
+        &mut self,
+        run: &anchor_lab::text_layout::TextGlyphRun,
+        list: &DrawList,
+        mut use_run: impl FnMut(&Font, &[u16], &[Point]),
+    ) {
+        self.ids.clear();
+        self.positions.clear();
+        self.ids.extend(run.glyphs.iter().map(|glyph| glyph.id));
+        self.positions
+            .extend(run.glyphs.iter().map(|glyph| Point::new(glyph.x, glyph.y)));
+        let font = list.text_fonts().font(run.font);
+        use_run(&font, &self.ids, &self.positions);
     }
 }
 
-fn text_font(fragment: &TextFragment, ctx: &PaintCtx) -> Option<Font> {
-    let base = ctx.font.as_ref()?;
-    let (typeface, weight_axis_applied) = variable_text_typeface(base, fragment);
-    let mut font = Font::new(typeface, fragment.style.font_size);
-    if !weight_axis_applied {
-        // Non-variable proving-host fallback. The model and drawlist retain the
-        // exact numeric weight even though this fallback has only one heavier
-        // synthetic state.
-        font.set_embolden(fragment.style.font_weight >= 600);
-    }
-    if fragment.style.font_style_italic && !base.is_italic() {
-        // The proving host owns one face. A deterministic synthetic skew is a
-        // paint fallback, not the model semantics, when no italic face exists.
-        font.set_skew_x(-0.25);
-    }
-    Some(font)
-}
-
-fn text_path(lines: &[TextLine], ctx: &PaintCtx) -> Path {
+fn text_path(
+    layout: &anchor_lab::text_layout::TextLayout,
+    list: &DrawList,
+    scratch: &mut GlyphScratch,
+) -> Path {
     let mut builder = PathBuilder::new();
-    for line in lines {
-        for fragment in &line.fragments {
-            if let Some(font) = text_font(fragment, ctx) {
-                let path =
-                    Path::from_str(fragment.text.as_str(), (fragment.x, line.baseline_y), &font);
-                builder.add_path(&path);
+    for run in &layout.glyph_runs {
+        scratch.with_run(run, list, |font, glyphs, positions| {
+            for (glyph, position) in glyphs.iter().zip(positions) {
+                if let Some(path) = font.get_path(*glyph) {
+                    let path = path.make_transform(&Matrix::translate((position.x, position.y)));
+                    builder.add_path(&path);
+                }
             }
-        }
+        });
     }
     builder.snapshot()
 }
@@ -1004,6 +958,7 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
 
     let initial_save_count = canvas.save_count();
     let mut scopes = Vec::new();
+    let mut glyph_scratch = GlyphScratch::default();
     for item in &list.items {
         match &item.kind {
             ItemKind::BeginOpacity { opacity } => {
@@ -1093,27 +1048,29 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
                 });
             }
             ItemKind::TextFill {
-                lines,
+                layout,
+                paints,
                 paint_w,
                 paint_h,
             } => {
                 with_local_transform(canvas, view, &item.world, || {
                     let paint_box = PaintBox::from_size(*paint_w, *paint_h);
-                    for line in lines.iter() {
-                        for fragment in &line.fragments {
-                            if let Some(font) = text_font(fragment, ctx) {
-                                for model in fragment.paints.iter() {
+                    for run in &layout.glyph_runs {
+                        glyph_scratch.with_run(run, list, |font, glyphs, positions| {
+                            if let Some(run_paints) = paints.for_source_run(run.source_run) {
+                                for model in run_paints.iter() {
                                     if let Some(paint) = sk_paint(model, paint_box, ctx) {
-                                        canvas.draw_str(
-                                            fragment.text.as_str(),
-                                            (fragment.x, line.baseline_y),
-                                            &font,
+                                        canvas.draw_glyphs_at(
+                                            glyphs,
+                                            positions,
+                                            Point::new(0.0, 0.0),
+                                            font,
                                             &paint,
                                         );
                                     }
                                 }
                             }
-                        }
+                        });
                     }
                 });
             }
@@ -1201,7 +1158,7 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
                 });
             }
             ItemKind::TextStroke {
-                lines,
+                layout,
                 paint_w,
                 paint_h,
                 stroke,
@@ -1210,21 +1167,20 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
                     let paint_box = PaintBox::from_size(*paint_w, *paint_h);
                     if stroke.align == StrokeAlign::Center {
                         draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
-                            for line in lines.iter() {
-                                for fragment in &line.fragments {
-                                    if let Some(font) = text_font(fragment, ctx) {
-                                        canvas.draw_str(
-                                            fragment.text.as_str(),
-                                            (fragment.x, line.baseline_y),
-                                            &font,
-                                            paint,
-                                        );
-                                    }
-                                }
+                            for run in &layout.glyph_runs {
+                                glyph_scratch.with_run(run, list, |font, glyphs, positions| {
+                                    canvas.draw_glyphs_at(
+                                        glyphs,
+                                        positions,
+                                        Point::new(0.0, 0.0),
+                                        font,
+                                        paint,
+                                    );
+                                });
                             }
                         });
                     } else {
-                        let source = text_path(lines, ctx);
+                        let source = text_path(layout, list, &mut glyph_scratch);
                         draw_stroke(canvas, &source, stroke, paint_box, ctx);
                     }
                 });

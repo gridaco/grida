@@ -2,9 +2,9 @@
 //! `--shot out.png [state]` renders headless to PNG (self-verification);
 //! `--bench` prints resolve+paint timings.
 //!
-//! The loop is the thesis: `document -> resolve (full) -> paint`,
-//! immediate, no caches — the lab resolver is fast enough that the
-//! editor holds no derived state at all (see TEXTBOOK.md).
+//! The loop is the thesis: `document -> resolve + drawlist -> paint`,
+//! immediate, no caches. Live geometry and paint share the host-font text
+//! oracle, while the editor still holds no derived state (see TEXTBOOK.md).
 
 mod camera;
 mod interaction;
@@ -12,6 +12,8 @@ mod paint;
 mod scene;
 mod shell;
 
+use anchor_engine::drawlist::DrawList;
+use anchor_engine::paint::PaintCtx;
 use anchor_lab::model::{Document, NodeId};
 use anchor_lab::ops::Op;
 use anchor_lab::resolve::{resolve, ResolveOptions, Resolved};
@@ -28,6 +30,21 @@ pub fn resolve_doc(doc: &Document) -> Resolved {
             viewport: RESOLVE_VIEWPORT,
             ..Default::default()
         },
+    )
+}
+
+/// Resolve with the spike's host font environment and retain the exact shaped
+/// fonts in the resulting display list. Rendering paths use this boundary;
+/// [`resolve_doc`] remains the deterministic glyphless helper for recorded
+/// scripts and benchmarks.
+pub fn resolve_and_build_doc(doc: &Document, ctx: &PaintCtx) -> (Resolved, DrawList) {
+    anchor_engine::frame::resolve_and_build(
+        doc,
+        &ResolveOptions {
+            viewport: RESOLVE_VIEWPORT,
+            ..Default::default()
+        },
+        ctx,
     )
 }
 
@@ -129,7 +146,8 @@ fn record(path: &str, state: &str) {
 
 /// Headless render: paint the starter scene (after an optional scripted
 /// state) into a raster surface and encode PNG — no window, no GL. The SCENE
-/// is painted by the engine pipeline (`drawlist::build` -> `paint::execute`);
+/// is painted by the engine pipeline (`frame::resolve_and_build` ->
+/// `paint::execute`);
 /// the HUD is spike chrome on top. These shots are the gate's goldens.
 fn shot(path: &str, state: &str) {
     let (mut doc, artboard) = scene::starter();
@@ -144,15 +162,14 @@ fn shot(path: &str, state: &str) {
 
     let (w, h) = (1360, 900);
     let mut surface = skia_safe::surfaces::raster_n32_premul((w, h)).expect("raster surface");
-    let resolved = resolve_doc(&doc);
+    let ctx = paint::paint_ctx();
+    let (resolved, list) = resolve_and_build_doc(&doc, &ctx);
     let mut cam = Camera::new();
     let ab = resolved.aabb_of(artboard);
     cam.fit((ab.x, ab.y, ab.w, ab.h), (w as f32, h as f32), 48.0);
 
     let canvas = surface.canvas();
     canvas.clear(skia_safe::Color::from_argb(255, 0xF7, 0xF8, 0xF9));
-    let ctx = paint::paint_ctx();
-    let list = anchor_engine::drawlist::build(&doc, &resolved);
     anchor_engine::paint::execute(canvas, &list, &cam.view(), &ctx);
     shell::hud::paint_hud(canvas, &doc, &resolved, &cam, selection, None, &ctx);
 
@@ -192,7 +209,10 @@ fn bench() {
             let t0 = Instant::now();
             let resolved = resolve_doc(doc);
             let t1 = Instant::now();
-            let list = anchor_engine::drawlist::build(doc, &resolved);
+            // This benchmark intentionally preserves the deterministic,
+            // glyphless lab-stage baseline. Live and shot rendering use the
+            // shaped `resolve_and_build_doc` path above.
+            let list = anchor_engine::drawlist::build_glyphless(doc, &resolved);
             let t2 = Instant::now();
             let canvas = surface.canvas();
             canvas.clear(skia_safe::Color::WHITE);

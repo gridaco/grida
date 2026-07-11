@@ -19,7 +19,7 @@ use std::process::Command;
 use std::time::Instant;
 
 use anchor_engine::cache::{composited_to_bytes, SceneCache};
-use anchor_engine::{drawlist, paint, replay};
+use anchor_engine::{drawlist, frame, paint, replay};
 use anchor_lab::math::Affine;
 use anchor_lab::model::*;
 use anchor_lab::resolve::{resolve, ResolveOptions, RotationInFlow};
@@ -118,8 +118,8 @@ fn gate_replays() -> bool {
                 continue;
             }
         };
-        let (d1, res1) = replay::play(&rep);
-        let (d2, res2) = replay::play(&rep);
+        let (d1, res1) = replay::play(&rep).expect("corpus oracle must be supported");
+        let (d2, res2) = replay::play(&rep).expect("corpus oracle must be supported");
         let deterministic = anchor_lab::textir::print(&d1) == anchor_lab::textir::print(&d2)
             && replay::resolved_bits_eq(&resolve(&d1, &rep.opts), &resolve(&d2, &rep.opts))
             && res1 == res2;
@@ -168,9 +168,8 @@ fn gate_diff() -> bool {
                 continue;
             }
         };
-        let (doc, _) = replay::play(&rep);
-        let resolved = resolve(&doc, &opts);
-        let list = drawlist::build(&doc, &resolved);
+        let (doc, _) = replay::play(&rep).expect("corpus oracle must be supported");
+        let (_, list) = frame::resolve_and_build(&doc, &opts, &ctx);
         let a = paint::raster_to_bytes(&list, &view, w, h, &ctx);
         let b = paint::raster_to_bytes(&list, &view, w, h, &ctx);
         let same = a == b;
@@ -196,8 +195,8 @@ fn gate_diff() -> bool {
         let _ = composited_to_bytes(&mut cache, &doc, &opts, &view, &ctx, false, w, h); // cold
         let blit = composited_to_bytes(&mut cache, &doc, &opts, &panned, &ctx, false, w, h);
         let fresh = {
-            let r = resolve(&doc, &opts);
-            paint::raster_to_bytes(&drawlist::build(&doc, &r), &panned, w, h, &ctx)
+            let (_, list) = frame::resolve_and_build(&doc, &opts, &ctx);
+            paint::raster_to_bytes(&list, &panned, w, h, &ctx)
         };
         let cache_ok = blit == fresh;
         println!(
@@ -315,7 +314,9 @@ fn bench_doc(doc: &Document, opts: &ResolveOptions) -> (f64, f64) {
         let t0 = Instant::now();
         let resolved = resolve(doc, opts);
         let t1 = Instant::now();
-        let _ = drawlist::build(doc, &resolved);
+        // The replay benchmark deliberately measures the deterministic lab
+        // oracle. Shaped rendering enters through `frame::resolve_and_build`.
+        let _ = drawlist::build_glyphless(doc, &resolved);
         let t2 = Instant::now();
         r_min = r_min.min((t1 - t0).as_secs_f64() * 1e6);
         b_min = b_min.min((t2 - t1).as_secs_f64() * 1e6);

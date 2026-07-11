@@ -24,7 +24,7 @@ use crate::interaction::{
 };
 use crate::paint::paint_ctx;
 use crate::shell::hud::{self, HandleKind};
-use crate::{resolve_doc, scene};
+use crate::{resolve_and_build_doc, scene};
 use anchor_engine::paint::PaintCtx;
 
 pub struct App {
@@ -52,7 +52,7 @@ pub struct App {
     pub ctx: PaintCtx,
     pub dpr: f32,
     pub last_frame_ms: f32,
-    /// Per-stage frame breakdown (ms): [resolve, scene, flush, egui, gpu, swap].
+    /// Per-stage frame breakdown (ms): [resolve+list, scene, flush, egui, gpu, swap].
     /// `gpu` is a `glFinish` — the REAL GPU work (blocks until done), so `swap`
     /// after it is pure vsync idle, not work. This separates "the display is
     /// pacing us" (fine) from "we are slow" (a problem) — the distinction my
@@ -165,8 +165,15 @@ pub fn run(init: WindowInit) {
 }
 
 impl App {
+    /// Live geometry must use the same host-font oracle as live painting.
+    /// The returned drawlist is intentionally discarded when a pointer or
+    /// editor query needs only the resolved tier.
+    fn resolve_live(&self) -> Resolved {
+        resolve_and_build_doc(&self.doc, &self.ctx).0
+    }
+
     fn fit_artboard(&mut self) {
-        let resolved = resolve_doc(&self.doc);
+        let resolved = self.resolve_live();
         let ab = resolved.aabb_of(self.artboard);
         let size = self.window.inner_size();
         self.camera.fit(
@@ -252,7 +259,7 @@ impl App {
             });
             return;
         }
-        let resolved = resolve_doc(&self.doc);
+        let resolved = self.resolve_live();
 
         // Handle grab on the current selection wins over picking.
         if let Some(sel) = self.selection {
@@ -282,7 +289,7 @@ impl App {
     }
 
     fn begin_handle_drag(&mut self, kind: HandleKind, id: NodeId) {
-        let resolved = resolve_doc(&self.doc);
+        let resolved = self.resolve_live();
         match kind {
             HandleKind::Rotate => {
                 self.push_undo();
@@ -366,7 +373,7 @@ impl App {
                 let id = *id;
                 let last = *last_screen;
                 *last_screen = self.cursor;
-                let resolved = resolve_doc(&self.doc);
+                let resolved = self.resolve_live();
                 let p0 = parent_point(&self.doc, &resolved, &self.camera, id, last);
                 let p1 = parent_point(&self.doc, &resolved, &self.camera, id, self.cursor);
                 let b = resolved.box_of(id);
@@ -396,7 +403,7 @@ impl App {
             Fsm::Dragging(Drag::ResizeEdge { id, drag }) => {
                 let id = *id;
                 let drag = *drag;
-                let resolved = resolve_doc(&self.doc);
+                let resolved = self.resolve_live();
                 let p = parent_point(&self.doc, &resolved, &self.camera, id, self.cursor);
                 let target = match drag.axis {
                     Axis::X => p.0,
@@ -410,7 +417,7 @@ impl App {
             Fsm::Dragging(Drag::ResizeCorner { id, dx, dy }) => {
                 let id = *id;
                 let (dx, dy) = (*dx, *dy);
-                let r1 = resolve_doc(&self.doc);
+                let r1 = self.resolve_live();
                 let p = parent_point(&self.doc, &r1, &self.camera, id, self.cursor);
                 let rx = self.apply_op(
                     &r1,
@@ -420,7 +427,7 @@ impl App {
                         target: p.0,
                     },
                 );
-                let r2 = resolve_doc(&self.doc);
+                let r2 = self.resolve_live();
                 let p = parent_point(&self.doc, &r2, &self.camera, id, self.cursor);
                 let ry = self.apply_op(
                     &r2,
@@ -452,7 +459,7 @@ impl App {
                     deg = (deg / 15.0).round() * 15.0;
                 }
                 let derived = *derived;
-                let resolved = resolve_doc(&self.doc);
+                let resolved = self.resolve_live();
                 let r = if derived {
                     self.apply_op(&resolved, Op::RotateDerivedCenterFeel { id, deg })
                 } else {
@@ -464,7 +471,7 @@ impl App {
             }
             _ => {
                 // Idle / Pressed: hover tracking only.
-                let resolved = resolve_doc(&self.doc);
+                let resolved = self.resolve_live();
                 let (wx, wy) = self.camera.screen_to_world(self.cursor);
                 self.hover = Query::new(&self.doc, &resolved)
                     .hit_point(wx, wy)
@@ -514,7 +521,7 @@ impl App {
                 if let Some(id) = self.selection {
                     let name = self.name_of(id);
                     self.push_undo();
-                    let resolved = resolve_doc(&self.doc);
+                    let resolved = self.resolve_live();
                     match self.apply_op(&resolved, Op::Delete { id }) {
                         Ok(n) => {
                             self.after_structural();
@@ -555,7 +562,7 @@ impl App {
                     };
                     self.push_undo();
                     let before = self.doc.get(id).header.clone();
-                    let resolved = resolve_doc(&self.doc);
+                    let resolved = self.resolve_live();
                     let rx = self.apply_op(
                         &resolved,
                         Op::SetX {
@@ -599,7 +606,7 @@ impl App {
             Key::Character(ref c) if primary && self.modifiers.shift_key() && c.as_str() == "g" => {
                 if let Some(id) = self.selection {
                     let name = self.name_of(id);
-                    let resolved = resolve_doc(&self.doc);
+                    let resolved = self.resolve_live();
                     self.push_undo();
                     match self.apply_op(&resolved, Op::Ungroup { id }) {
                         Ok(n) => {
@@ -657,17 +664,16 @@ impl App {
         // stage sum does not. If gap >> draw, the problem is not rendering.
         let gap = t0.duration_since(self.frame_clock).as_secs_f32() * 1000.0;
         self.frame_clock = t0;
-        let resolved = resolve_doc(&self.doc);
+        let (resolved, list) = resolve_and_build_doc(&self.doc, &self.ctx);
         self.last_damage = match &self.last_resolved {
             Some(prev) => anchor_engine::damage::diff(prev, &resolved).changed.len(),
             None => 0,
         };
-        let t_resolve = ms(t0);
+        let t_resolve_build = ms(t0);
 
         let t1 = std::time::Instant::now();
         let canvas = self.gpu.surface.canvas();
         canvas.clear(skia_safe::Color::from_argb(255, 0xF7, 0xF8, 0xF9));
-        let list = anchor_engine::drawlist::build(&self.doc, &resolved);
         anchor_engine::paint::execute(canvas, &list, &self.camera.view(), &self.ctx);
         hud::paint_hud_dpr(
             canvas,
@@ -707,7 +713,14 @@ impl App {
         let t_swap = ms(t4);
 
         self.last_frame_ms = ms(t0);
-        self.bd = [t_resolve, t_scene, t_flush, t_egui, t_gpufinish, t_swap];
+        self.bd = [
+            t_resolve_build,
+            t_scene,
+            t_flush,
+            t_egui,
+            t_gpufinish,
+            t_swap,
+        ];
         self.frame_count += 1;
 
         // Per-run frame log (opt-in `ANCHOR_FRAMELOG=1`). Truncated on the first
@@ -732,10 +745,10 @@ impl App {
             let dragging = matches!(self.fsm, Fsm::Dragging(_));
             let _ = writeln!(
                 w,
-                "f{:<6} gap {:7.2}ms ({:6.1}fps)  draw {:6.2} = res {:.2} scene {:.2} flush {:.2} egui {:.2} gpu {:.2} vsync {:.2}  | pan={} drag={} cursor=({:.0},{:.0}) damage={} zoom={:.2}",
+                "f{:<6} gap {:7.2}ms ({:6.1}fps)  draw {:6.2} = res+list {:.2} scene {:.2} flush {:.2} egui {:.2} gpu {:.2} vsync {:.2}  | pan={} drag={} cursor=({:.0},{:.0}) damage={} zoom={:.2}",
                 self.frame_count, gap, 1000.0 / gap.max(0.001),
                 self.last_frame_ms,
-                t_resolve, t_scene, t_flush, t_egui, t_gpufinish, t_swap,
+                t_resolve_build, t_scene, t_flush, t_egui, t_gpufinish, t_swap,
                 panning as u8, dragging as u8,
                 self.cursor.0, self.cursor.1, self.last_damage, self.camera.zoom,
             );
@@ -796,7 +809,7 @@ impl App {
         if !self.ir_dirty {
             self.ir_draft = anchor_lab::textir::print(&self.doc);
         }
-        let resolved = resolve_doc(&self.doc);
+        let resolved = self.resolve_live();
 
         egui::Panel::right("spike-panel")
             .exact_size(380.0)
@@ -825,7 +838,7 @@ impl App {
                 );
                 ui.label(
                     egui::RichText::new(format!(
-                        "  resolve {:.2} · scene {:.2} · flush {:.2} · egui {:.2} · GPU {:.2} · vsync {:.2}",
+                        "  resolve+list {:.2} · scene {:.2} · flush {:.2} · egui {:.2} · GPU {:.2} · vsync {:.2}",
                         self.bd[0], self.bd[1], self.bd[2], self.bd[3], self.bd[4], self.bd[5],
                     ))
                     .monospace()
