@@ -53,6 +53,13 @@ current production model. It reuses the existing stroke geometry plus `Paints`
 pair but requires the production engine and archive to own an ordered list of
 those pairs; the seam is recorded explicitly below.
 
+For paths, the existing contracts do not present one uniform model: one form
+stores raw coordinates and derives intrinsic geometry, while another defines a
+canonical shape mapped into a layout box. Draft 0 selects the latter and fixes
+its reference rectangle to `0 0 1 1`. This is an explicit compatibility choice,
+not an attempt to average the two forms or hide a raw-path conversion behind
+XML-only state.
+
 Grida XML projects that model as an authored language:
 
 1. XML uses familiar, semantic names when CSS, SVG, HTML, or Flutter already
@@ -102,7 +109,7 @@ a contextual source construct even though it is not a scene node.
 | `tspan`           | `StyledTextRun`                       | No        | **Draft 0**     | Flat direct child of `text`; contextual run, never a scene node           |
 | `lens`            | Source transform wrapper              | Yes       | **Draft 0**     | Grida source construct; resolves through group/transform semantics        |
 | `image`           | Image node outside paint channels     | No        | **Placeholder** | HTML/SVG; contextual with the existing image-paint element                |
-| `path`            | Raw, render-oriented SVG path         | Yes       | **Placeholder** | SVG; use `d`, not an implementation-shaped `data` attribute               |
+| `path`            | Box-mapped unit-space path            | Yes       | **Draft 0**     | Full SVG path-data grammar in the fixed `0 0 1 1` reference rectangle     |
 | `polygon`         | Arbitrary closed polygon              | Yes       | **Placeholder** | SVG; explicit coordinate list                                             |
 | `regular-polygon` | Parametric regular polygon            | Yes       | **Placeholder** | Explicit name; point-count grammar still needs validation rules           |
 | `star`            | Parametric regular star polygon       | Yes       | **Placeholder** | Familiar design-tool name; inner radius and point count are parametric    |
@@ -132,18 +139,20 @@ defaults, contradictions, and resolution behavior.
 | `version`                  | `grida`                                                             | XML                  | Selects the exact language version; currently exactly `0`     |
 | `name`                     | All Draft 0 render elements                                         | HTML/SVG             | Human-readable label; not durable identity                    |
 | `x`, `y`                   | Non-root Draft 0 render elements; omitted for in-flow flex children | SVG/CSS              | Local position binding, including start/end/center/span forms |
-| `width`                    | `container`, `rect`, `ellipse`, `line`, `text`                      | CSS/SVG              | Authored width or element-specific `auto`                     |
-| `height`                   | `container`, `rect`, `ellipse`, `text`; never `line`                | CSS/SVG              | Authored height or element-specific `auto`                    |
-| `min-width`, `max-width`   | `container`, `rect`, `ellipse`, `line`, `text`                      | CSS                  | Width constraints                                             |
-| `min-height`, `max-height` | `container`, `rect`, `ellipse`, `text`; never `line`                | CSS                  | Height constraints                                            |
-| `aspect-ratio`             | `rect`, `ellipse`                                                   | CSS                  | Supplies one otherwise unresolved box axis                    |
+| `width`                    | `container`, `rect`, `ellipse`, `line`, `path`, `text`              | CSS/SVG              | Authored width or element-specific `auto`                     |
+| `height`                   | `container`, `rect`, `ellipse`, `path`, `text`; never `line`        | CSS/SVG              | Authored height or element-specific `auto`                    |
+| `min-width`, `max-width`   | `container`, `rect`, `ellipse`, `line`, `path`, `text`              | CSS                  | Width constraints                                             |
+| `min-height`, `max-height` | `container`, `rect`, `ellipse`, `path`, `text`; never `line`        | CSS                  | Height constraints                                            |
+| `aspect-ratio`             | `rect`, `ellipse`, `path`                                           | CSS                  | Supplies one otherwise unresolved box axis                    |
 | `corner-radius`            | `container`, `rect`                                                 | CSS/Flutter          | One or four circular or elliptical corner radii               |
 | `corner-smoothing`         | `container`, `rect`                                                 | Design tools         | Continuous smoothing of circular rounded corners              |
 | `rotation`                 | All Draft 0 render elements                                         | Flutter/design tools | Clockwise visual rotation in degrees                          |
 | `flip-x`, `flip-y`         | All Draft 0 render elements                                         | Design tools         | Native visual reflection                                      |
 | `opacity`                  | All Draft 0 render elements                                         | CSS/SVG              | Composites the node and descendants                           |
 | `hidden`                   | All Draft 0 render elements                                         | HTML                 | Removes the subtree from layout and painting                  |
-| `fill`                     | `container`, `rect`, `ellipse`, `text`; contextual `tspan`          | SVG                  | One-solid node fill or explicit run-fill override             |
+| `fill`                     | `container`, `rect`, `ellipse`, `path`, `text`; contextual `tspan`  | SVG                  | One-solid node fill or explicit run-fill override             |
+| `d`                        | `path`                                                              | SVG                  | Complete path-data grammar in the fixed unit rectangle        |
+| `fill-rule`                | `path`                                                              | SVG/CSS              | `nonzero` or `evenodd`; defaults to `nonzero`                 |
 | `clips`                    | `container`                                                         | Flutter/design tools | Clips descendant content to the container shape               |
 | `font-size`                | `text`, `tspan`                                                     | CSS/SVG              | Positive finite logical-pixel default or run override         |
 | `font-weight`              | `text`, `tspan`                                                     | CSS                  | Integer weight from 1 through 1000                            |
@@ -179,6 +188,19 @@ zero radii as dormant intent. Oversized ordinary radii use one edge-sum-based
 proportional factor; nonzero smoothing uses the production profile's
 per-corner half-short-side cap. Neither resolved form is rewritten in source.
 
+For `path`, `d` is required and uses the complete SVG path-data grammar in a
+fixed `0 0 1 1` reference rectangle. Validation is against exact tight curve
+geometry, which must stay within the closed unit box. The geometry maps
+nonuniformly to the resolved declared box before fill and stroke construction;
+it is never measured or tight-fitted. `fill-rule` defaults to `nonzero` and
+also accepts `evenodd`. Paints use the full resolved box, children remain
+box-local and unclipped, and the default fill is black. Path strokes accept
+only scalar width; center is the default and is required whenever any contour
+is open. Resolution maps the command stream once; bounds and all paint channels
+consume that exact mapped geometry. Numeric unrepresentability is a resolution
+failure, never permission to clamp, substitute the declared box, or retain
+partial path ink.
+
 ## Scene-backed property placeholders
 
 These tables reserve discussion slots for properties in the canonical scene
@@ -208,16 +230,23 @@ handle. `transform` also cannot be admitted until its relationship to native
 | `sweep-angle`          | `ellipse` arc/ring        | Clockwise angular extent                        | Flutter              | **Placeholder** |
 | `points`               | `polygon`                 | SVG coordinate-pair list                        | SVG                  | **Placeholder** |
 | `point-count`          | `regular-polygon`, `star` | Integer count, at least three                   | Design tools         | **Placeholder** |
-| `d`                    | `path`                    | SVG path-data grammar                           | SVG                  | **Placeholder** |
-| `fill-rule`            | `path` and vector regions | `nonzero` or `evenodd`                          | SVG/CSS              | **Design**      |
+| `view-box`             | `path`                    | Optional stable non-unit reference rectangle    | SVG                  | **Design**      |
+| `fill-rule`            | Future vector regions     | `nonzero` or `evenodd`                          | SVG/CSS              | **Design**      |
 | `operation`            | `boolean`                 | `union`, `intersection`, `difference`, or `xor` | Design tools         | **Design**      |
 | `marker-start`         | `line`, `path`, `vector`  | Marker preset or future marker reference        | SVG                  | **Placeholder** |
 | `marker-end`           | `line`, `path`, `vector`  | Marker preset or future marker reference        | SVG                  | **Placeholder** |
 
 The runtime currently calls the ellipse extent `angle`; `sweep-angle` is the
-clearer authored candidate because it states what the number means. Likewise,
-raw path data should use SVG's established `d` rather than exposing the
-runtime field name `data`.
+clearer authored candidate because it states what the number means. Draft 0
+already uses SVG's established `d` name for box-mapped path commands rather
+than exposing a storage-oriented `data` name.
+
+`view-box` remains deferred. If introduced, it would let imported coordinates
+retain a stable non-unit reference rectangle, but that rectangle must be
+authored intent with positive extents and must never be re-derived from path
+tight bounds after an edit. Its omission, canonical writer behavior, and
+interaction with the fixed unit form need one versioned rule before the
+attribute can be accepted.
 
 ### Scene image
 
@@ -245,20 +274,20 @@ resource behavior must be shared by scene images and image paints. The same
 Some production properties are ordered or structured values and should remain
 XML children rather than become mini-languages inside attributes.
 
-| Property element     | Valid parent                                    | Status      | Contract direction                                                                |
-| -------------------- | ----------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
-| `fill`               | `container`, `rect`, `ellipse`, `text`, `tspan` | **Draft 0** | Expanded ordered `Paints`; singular and literal-first when under `tspan`          |
-| `stroke`             | `container`, `rect`, `ellipse`, `line`, `text`  | **Draft 0** | Repeatable geometry owning ordered `Paints`; empty only with non-default geometry |
-| `solid`              | `fill` or `stroke`                              | **Draft 0** | Typed solid paint                                                                 |
-| `gradient`           | `fill` or `stroke`                              | **Draft 0** | Typed gradient family with required `kind` and `stop` children                    |
-| `image`              | `fill` or `stroke`                              | **Draft 0** | Contextual image paint                                                            |
-| `stop`               | `gradient`                                      | **Draft 0** | Ordered offset/color pair                                                         |
-| `effects`            | Effect-capable node                             | **Design**  | Typed effect values; ordering and multiplicity are unresolved                     |
-| `tspan`              | `text`                                          | **Draft 0** | Flat contextual run with exact non-empty character data and explicit overrides    |
-| `network`            | `vector`                                        | **Design**  | Editable vertices, Bézier segments, loops, regions, and region fills              |
-| `resources`          | Document-level declaration scope                | **Design**  | Portable logical IDs and packaged/external resource policy                        |
-| `component`, `use`   | Document definitions and scene                  | **Design**  | Reusable authored widgets and instances                                           |
-| Animation vocabulary | Document, node, or property scope               | **Design**  | Requires a dedicated timing and addressing RFD                                    |
+| Property element     | Valid parent                                            | Status      | Contract direction                                                                |
+| -------------------- | ------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| `fill`               | `container`, `rect`, `ellipse`, `path`, `text`, `tspan` | **Draft 0** | Expanded ordered `Paints`; singular and literal-first when under `tspan`          |
+| `stroke`             | `container`, `rect`, `ellipse`, `line`, `path`, `text`  | **Draft 0** | Repeatable geometry owning ordered `Paints`; empty only with non-default geometry |
+| `solid`              | `fill` or `stroke`                                      | **Draft 0** | Typed solid paint                                                                 |
+| `gradient`           | `fill` or `stroke`                                      | **Draft 0** | Typed gradient family with required `kind` and `stop` children                    |
+| `image`              | `fill` or `stroke`                                      | **Draft 0** | Contextual image paint                                                            |
+| `stop`               | `gradient`                                              | **Draft 0** | Ordered offset/color pair                                                         |
+| `effects`            | Effect-capable node                                     | **Design**  | Typed effect values; ordering and multiplicity are unresolved                     |
+| `tspan`              | `text`                                                  | **Draft 0** | Flat contextual run with exact non-empty character data and explicit overrides    |
+| `network`            | `vector`                                                | **Design**  | Editable vertices, Bézier segments, loops, regions, and region fills              |
+| `resources`          | Document-level declaration scope                        | **Design**  | Portable logical IDs and packaged/external resource policy                        |
+| `component`, `use`   | Document definitions and scene                          | **Design**  | Reusable authored widgets and instances                                           |
+| Animation vocabulary | Document, node, or property scope                       | **Design**  | Requires a dedicated timing and addressing RFD                                    |
 
 ### Paint attribute registry
 
@@ -293,11 +322,11 @@ defaults. These scoped attributes are normative in Draft 0:
 | Attribute     | Value                                      | Valid targets                                    | Purpose                                      |
 | ------------- | ------------------------------------------ | ------------------------------------------------ | -------------------------------------------- |
 | `width`       | one or exactly four non-negative numbers   | every `stroke`; four only on `container`, `rect` | Uniform or top-right-bottom-left width       |
-| `align`       | `inside`, `center`, or `outside`           | every `stroke`; line must be `center`            | Placement relative to the original outline   |
-| `cap`         | `butt`, `round`, or `square`               | `line`                                           | Open-contour endpoint shape                  |
-| `join`        | `miter`, `round`, or `bevel`               | `container`, `rect`                              | Joined-contour corner shape                  |
-| `miter-limit` | positive finite number                     | `container`, `rect`                              | Miter-to-bevel cutoff ratio                  |
-| `dash-array`  | space-separated non-negative finite values | `container`, `rect`, `ellipse`, `line`           | Repeating dash-gap lengths in logical pixels |
+| `align`       | `inside`, `center`, or `outside`           | every `stroke`; open geometry must be `center`   | Placement relative to the original outline   |
+| `cap`         | `butt`, `round`, or `square`               | `line`, `path`                                   | Open-contour endpoint shape                  |
+| `join`        | `miter`, `round`, or `bevel`               | `container`, `rect`, `path`                      | Joined-contour corner shape                  |
+| `miter-limit` | positive finite number                     | `container`, `rect`, `path`                      | Miter-to-bevel cutoff ratio                  |
+| `dash-array`  | space-separated non-negative finite values | `container`, `rect`, `ellipse`, `line`, `path`   | Repeating dash-gap lengths in logical pixels |
 
 The production model already separates one stroke `Paints` stack from one
 stroke geometry. One XML `stroke`, using only attributes supported by its
@@ -318,8 +347,8 @@ Four equal positive values normalize to the uniform state; four zeros and a
 scalar zero normalize to the no-width state. A canonical writer omits uniform
 `1`, uses one number for every other uniform or no-width state, and writes all
 four values only when they differ. Applicability is validated before this
-normalization, so four values remain invalid on an ellipse, line, or text even
-when equal.
+normalization, so four values remain invalid on an ellipse, line, path, or
+text even when equal.
 
 The four local-side widths produce one outer-minus-inner coverage ring with one
 shared ordered paint stack. `inside`, `center`, and `outside` use outward and
@@ -446,6 +475,7 @@ choosing a name alone.
 | Area                          | Production requirement                                    | Questions the syntax must answer                                                    |
 | ----------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | Editable vector network       | Vertices, cubic tangents, segments, loops, filled regions | Stable local IDs or indices; open/closed contours; region fill stacks; validation   |
+| Non-unit path reference box   | Stable authored coordinate rectangle                      | Optional syntax; positive extents; normalization; canonical writer behavior         |
 | Variable-width stroke         | Ordered `(u, half-width)` samples                         | Nested stops versus compact list; interpolation; endpoints; base-width interaction  |
 | Run strokes                   | Per-run stroke paints, width, and alignment               | Reconcile singular production geometry with repeatable XML stroke topology          |
 | Masks                         | Geometry, alpha, and luminance mask nodes                 | Which sibling is the mask; scope; consumption; stacking; clipping interaction       |
@@ -478,7 +508,9 @@ named by the Draft 0 RFD:
 | Production smooth paths begin dash traversal at the top-edge midpoint.                                       | Draft 0 consistently begins every rectangle at the top-left curve's top-edge join; geometry is identical, but dashed smoothed strokes have a different phase. |
 | The scene model can hold malformed gradients that Draft 0 deliberately cannot spell.                         | A writer rejects too few stops, invalid or descending offsets, and coincident linear endpoints instead of repairing, sorting, clamping, or perturbing them.   |
 | Scene semantics and packed-archive coverage do not yet cover the same node set.                              | An authored element must not promise `.grida` round-trip until both contracts represent it.                                                                   |
-| Raw-path fill rules and post-layout transform origins are not uniform across scene and archive contracts.    | `fill-rule`, `transform`, and `transform-origin` remain deferred until one meaning survives both rendering and persistence.                                   |
+| Scene and archive contracts expose both raw intrinsic paths and normalized box-mapped paths.                 | Draft 0 selects the box-mapped form; a raw-only target must gain a stable mapping or reject `path` rather than claim lossy support.                           |
+| One durable canonical-shape contract permits non-unit path data to be scaled to its tight fit.               | Draft 0 deliberately rejects that fallback: non-unit geometry is invalid, and no reader may erase padding or remap untouched contours by auto-fitting it.     |
+| Path fill-rule persistence is not uniform across scene and archive contracts.                                | Draft 0 requires `nonzero` and `evenodd` to survive reading, rendering, inspection, and rewriting; hard-coding one rule is not conforming.                    |
 | Draft 0 `hidden` removes a subtree from layout and paint.                                                    | A materializer must preserve that stronger behavior even when a target model names visibility differently.                                                    |
 | Solid-paint alpha is stored in color, while Draft 0 exposes common paint `opacity`.                          | The documented 8-bit quantization is a boundary rule, not a parallel solid-opacity property.                                                                  |
 | Production `AttributedString` stores flat contiguous UTF-8 byte ranges.                                      | XML concatenates mixed text in document order and derives ranges at character boundaries; authored offsets and nested runs are neither needed nor accepted.   |

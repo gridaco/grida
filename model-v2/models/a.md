@@ -197,14 +197,36 @@ ShapeDescriptor =
   | RegularPolygon { points: u32 }
   | Star { points: u32, inner_ratio: f32 }
   | Polygon { points: [(f32, f32)] }        // normalized 0..1, scaled to box
-  | Path { d: string }                       // normalized 0..1, scaled to box
+  | Path { d: string, fill_rule: NonZero | EvenOdd = NonZero }
+                                              // full SVG path grammar in fixed 0 0 1 1 space
   | Line                                     // the box's horizontal midline; height intent must be Fixed(0)
 ```
 
-`vector` is deliberately _not_ a descriptor: its network is absolute-local
-editable geometry, hence a measured box. `shape/Path` (render-only,
-normalized) vs `vector` (editable, measured) is the same split the format
-draft already makes.
+`Path` is declared-box geometry, not intrinsically measured SVG content. The
+exact tight geometry represented by `d` must stay within the closed unit
+rectangle. Resolution maps `(u, v)` to `(u × width, v × height)` before fill
+or stroke coverage is constructed, with independent axis scales. Layout,
+span, aspect-ratio, grow, and stretch therefore change the realized outline
+without rewriting `d`; stroke widths and dash lengths remain px-stable. Paints
+use the full resolved box, and path children use ordinary box-local
+coordinates rather than the unit path space. The path does not clip them.
+Resolution materializes one box-mapped command artifact and derives
+conservative local bounds from that exact command stream. Paint, repeated
+strokes, damage, and bounds share it; they do not each rescale `d` or its unit
+bounds. A mapping that exceeds the resolved numeric domain is an explicit
+resolution error and contributes no partial path ink.
+
+Raw intrinsic coordinates and continually re-derived tight bounds are not a
+second `Path` mode. They would give one kind two box sources, make geometry
+edits change layout contribution, and make flex-assigned sizes ambiguous.
+Tight-fitting raw coordinates also destroys intentional padding, fails on a
+zero-extent axis, and remaps untouched contours when one extremum changes. A
+future non-unit reference rectangle may be additive, but it must be stable
+authored intent and never a tight-bounds cache serialized as source.
+
+`vector` is deliberately _not_ a descriptor: its network is editable geometry
+rather than a compact render path. `shape/Path` remains the render-oriented,
+box-mapped form.
 
 A shape's child list is composition, not measurement or layout. The
 parametric primitive paints first; ordered children then paint in the shape's
@@ -307,7 +329,8 @@ Phase T — transforms
   all:            world = parent_world ∘ local
 
 Phase B — bounds
-  oriented corners → world AABBs → render-bounds inflation (unchanged)
+  shape/Path: realized unit tight geometry → local base bounds
+  all: local bounds → world AABBs → conservative stroke/effect inflation
 ```
 
 No cycles: measure never reads position; AABB contribution never reads
@@ -458,6 +481,8 @@ the resolved tier is today's geometry cache).
 - `NodeGeoData.schema_transform`/`rotation` duality — the tier-2 record holds
   resolved values only.
 - Six shape node kinds → one `shape` kind + descriptor.
+- Raw intrinsic path sizing → one declared box plus unit-space `Path`
+  realization; no tight-bounds path mode.
 - `InitialContainer` as a node kind — a viewport-bound `frame`.
 
 ## 12. Open items this model defers
@@ -467,3 +492,5 @@ rotated absolute pins (§2.1 note); grid mode; anchor-to-node (WG Level 4 —
 `Pin` grows a target ref, additive); attributed-text run encoding inside
 `TextPayload`; `bool` operand semantics (does a `bool` child render
 standalone — kept as today); tray's exact root-treatment semantics.
+An optional non-unit path reference rectangle is also deferred; if added, it
+must preserve the same declared-box mapping and stable-reference law.

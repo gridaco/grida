@@ -47,7 +47,7 @@ It is its own vocabulary, not an SVG profile or an HTML serialization.
 Draft 0 is deliberately small. It establishes the document boundary, the box
 and nesting model, a minimal primitive set, ordered typed paint, multiple
 stroke geometries, per-side box strokes, rounded box geometry, text boxes with
-flat attributed runs, free bindings, and flex layout. Later drafts can add
+flat attributed runs, unit-space paths, free bindings, and flex layout. Later drafts can add
 effects, vector geometry, resource declarations, advanced typography, and
 reuse facilities without changing the central tree model.
 
@@ -140,6 +140,7 @@ instructions are not; text uses ordinary escaped XML character data.
 | `rect`      | Declared                        | Yes             | Parametric rectangle realized in its box            |
 | `ellipse`   | Declared                        | Yes             | Parametric ellipse realized in its box              |
 | `line`      | Declared width; zero-height box | Yes             | Horizontal local line, orientable by rotation       |
+| `path`      | Declared                        | Yes             | SVG path commands in a fixed unit reference box     |
 | `text`      | Measured under box constraints  | No              | Unicode text with optional flat attributed runs     |
 | `group`     | Derived from child bounds       | Yes             | Logical subtree with an explicit local origin       |
 | `lens`      | Derived from child bounds       | Yes             | Group whose ordered operations affect painting only |
@@ -174,7 +175,9 @@ shape-with-text node exists or is implied.
 ## Scalar and coordinate conventions
 
 - Numbers are finite decimal values with no unit suffix. Geometry numbers are
-  logical pixels.
+  logical pixels except where a property defines a normalized reference
+  space; path data uses the fixed unit rectangle from `(0, 0)` through
+  `(1, 1)`.
 - The local origin is the top-left of a boxed node. Positive x points right;
   positive y points down.
 - Widths and heights are non-negative. Binding offsets may be negative.
@@ -209,6 +212,8 @@ Only attributes applicable to an element may appear on that element.
 | `rotation`                | finite number                             | `0`        | Visual rotation about box center; about origin for derived kinds |
 | `flip-x`, `flip-y`        | `true` or `false`                         | `false`    | Reflects paint horizontally or vertically before rotation        |
 | `fill`                    | `#RGB` or `#RRGGBB`                       | none       | Canonical compact form for one ordinary solid fill               |
+| `d`                       | SVG path-data string                      | required   | Defines a `path` in the fixed unit reference rectangle           |
+| `fill-rule`               | `nonzero` or `evenodd`                    | `nonzero`  | Selects path interior construction                               |
 | `font-size`               | positive finite number                    | `16`       | Default size on `text`; optional run override on `tspan`         |
 | `font-weight`             | integer from `1` through `1000`           | `400`      | Default weight on `text`; optional run override on `tspan`       |
 | `font-style`              | `normal` or `italic`                      | `normal`   | Default style on `text`; optional run override on `tspan`        |
@@ -236,8 +241,8 @@ rotated; neither operation writes a matrix or negative extent into source.
 `fill="#fff"` means exactly one visible, fully opaque, normal-blend solid
 paint. It is not legacy syntax: it is the canonical compact form for the most
 common fill. On a render node it cannot coexist with the structured `<fill>`
-channel. Node `fill` is valid on `container`, `rect`, `ellipse`, and `text`; it
-is invalid on `line`, `group`, and `lens`. Contextually, `fill` on `tspan` is a
+channel. Node `fill` is valid on `container`, `rect`, `ellipse`, `path`, and
+`text`; it is invalid on `line`, `group`, and `lens`. Contextually, `fill` on `tspan` is a
 single-solid run override rather than a second node paint channel. Omitting it
 leaves the run attached to the `text` node's fill stack.
 
@@ -285,10 +290,10 @@ This is the canonical expanded form for a rich fill:
 
 A node's structural paint children must precede character data and render-node
 children. When both channels occur, the optional `fill` element comes first,
-followed by zero or more `stroke` elements. `container`, `rect`, `ellipse`, and
-`text` accept fills and strokes. `line` accepts strokes only. `group` and
-`lens` accept neither. The contextual `tspan` exception accepts one `fill` as
-its literal first child and no `stroke`.
+followed by zero or more `stroke` elements. `container`, `rect`, `ellipse`,
+`path`, and `text` accept fills and strokes. `line` accepts strokes only.
+`group` and `lens` accept neither. The contextual `tspan` exception accepts one
+`fill` as its literal first child and no `stroke`.
 
 The direct paint vocabulary is:
 
@@ -310,11 +315,11 @@ because its direct children are the structured stop ramp.
 Omitting both the `fill` attribute and the `<fill>` child element applies the
 element's language default:
 
-| Element                   | Default fill paint stack            |
-| ------------------------- | ----------------------------------- |
-| `container`               | empty                               |
-| `rect`, `ellipse`, `text` | one opaque normal-blend black solid |
-| `line`, `group`, `lens`   | not fillable                        |
+| Element                           | Default fill paint stack            |
+| --------------------------------- | ----------------------------------- |
+| `container`                       | empty                               |
+| `rect`, `ellipse`, `path`, `text` | one opaque normal-blend black solid |
+| `line`, `group`, `lens`           | not fillable                        |
 
 `tspan` has no independent language-default paint stack. Omitted run fill
 means `None` and therefore uses the owning `text` node's effective fill stack;
@@ -371,21 +376,22 @@ multi-stroke keeps one shape, one layout identity, and one editable outline.
 
 The Draft 0 stroke geometry is:
 
-| Attribute     | Value                                      | Default                      | Valid targets                                    |
-| ------------- | ------------------------------------------ | ---------------------------- | ------------------------------------------------ |
-| `width`       | one or four non-negative finite pixels     | `1`                          | every `stroke`; four only on `container`, `rect` |
-| `align`       | `inside`, `center`, or `outside`           | `inside`; `center` on `line` | every `stroke`; line must be `center`            |
-| `cap`         | `butt`, `round`, or `square`               | `butt`                       | `line`                                           |
-| `join`        | `miter`, `round`, or `bevel`               | `miter`                      | `container`, `rect`                              |
-| `miter-limit` | positive finite number                     | `4`                          | `container`, `rect`                              |
-| `dash-array`  | space-separated non-negative finite values | absent, meaning solid        | `container`, `rect`, `ellipse`, `line`           |
+| Attribute     | Value                                      | Default                                 | Valid targets                                    |
+| ------------- | ------------------------------------------ | --------------------------------------- | ------------------------------------------------ |
+| `width`       | one or four non-negative finite pixels     | `1`                                     | every `stroke`; four only on `container`, `rect` |
+| `align`       | `inside`, `center`, or `outside`           | `inside`; `center` on `line` and `path` | every `stroke`; open geometry must be `center`   |
+| `cap`         | `butt`, `round`, or `square`               | `butt`                                  | `line`, `path`                                   |
+| `join`        | `miter`, `round`, or `bevel`               | `miter`                                 | `container`, `rect`, `path`                      |
+| `miter-limit` | positive finite number                     | `4`                                     | `container`, `rect`, `path`                      |
+| `dash-array`  | space-separated non-negative finite values | absent, meaning solid                   | `container`, `rect`, `ellipse`, `line`, `path`   |
 
 When present, `dash-array` contains at least one value and is not all zero.
 Odd-length arrays repeat once to make an even dash-gap cycle. An attribute on a
 target outside this table is an error rather than dormant state. A `line` is an
 open path and accepts only `align="center"`, because inside and outside are not
-defined for it. Variable-width profiles, dash offset, and endpoint markers are
-later vocabulary.
+defined for it. A `path` has the same centered default; `inside` or `outside`
+is valid only when every contour is closed. Variable-width profiles, dash
+offset, and endpoint markers are later vocabulary.
 
 #### Uniform and per-side width
 
@@ -981,12 +987,12 @@ and the default stroke list is empty.
 
 ### Primitive elements
 
-Draft 0 recognizes the direct primitive elements `rect`, `ellipse`, and
-`line`. They do not accept a `kind` attribute.
+Draft 0 recognizes the direct primitive elements `rect`, `ellipse`, `line`,
+and `path`. They do not accept a `kind` attribute.
 
-- `rect` and `ellipse` require each axis to be supplied by either a fixed
-  numeric size or a `span` binding. `aspect-ratio` may supply exactly one
-  otherwise-unsupplied axis.
+- `rect`, `ellipse`, and `path` require each axis to be supplied by either a
+  fixed numeric size or a `span` binding. `aspect-ratio` may supply exactly
+  one otherwise-unsupplied axis.
 - `rect` may round and smooth its rectangular outline. These properties affect
   its fill and strokes, but do not implicitly clip its children.
 - `line` requires either fixed numeric `width` or an x-axis `span`. Its
@@ -1005,6 +1011,123 @@ model.
 The primitive and its children share the primitive's local box, but are
 otherwise independent. Changing a child does not rewrite the primitive, and
 resizing the primitive does not rewrite a child's authored bindings.
+
+#### Path geometry
+
+`path` is a declared-box shape, not intrinsically measured SVG content. Its
+required `d` attribute uses the complete SVG path-data grammar: absolute and
+relative commands, lines, cubic and quadratic curves, elliptical arcs,
+multiple contours, and close-path commands are all available. The grammar is
+borrowed; SVG's surrounding viewport model is not.
+
+Path commands are authored in one fixed reference rectangle: `0 0 1 1`. The
+exact tight geometry of every drawable contour must remain within that closed
+unit rectangle. Validation uses the realized curve extrema, not merely
+endpoints or control-point coordinates. A curve whose control point leaves the
+unit rectangle is therefore valid if the curve itself stays inside; a curve
+that overshoots is invalid even when every endpoint is inside.
+
+For a resolved box of width `W` and height `H`, each reference-space point
+`(u, v)` realizes as `(u × W, v × H)`. The two axes scale independently. This
+geometry mapping happens before fill and stroke coverage are constructed, so
+layout resize changes the outline without rewriting `d`, while stroke widths,
+dash lengths, and other style lengths remain logical-pixel values. The same
+rule applies when span bindings, aspect-ratio resolution, flex growth, or
+cross-axis stretching determine the final box.
+
+The fill rule is `nonzero` by default and may be changed with
+`fill-rule="evenodd"`. Omitted fill produces the ordinary primitive default of
+one opaque black solid. Repeated strokes use the same realized outline and may
+use scalar width, cap, join, miter limit, and dash array. A path stroke defaults
+to center alignment. Inside or outside alignment requires every contour to be
+closed; a path containing any open contour must use center. Per-side stroke
+width is invalid because a path has no four box sides to which those widths
+could attach.
+
+Every path paint, including gradients and images, evaluates against the full
+resolved rectangular box rather than the path's tight ink bounds; fill and
+stroke coverage still follows the realized outline. The path does not
+establish a descendant clip. Children use the same resolved box-local
+coordinate space as children of `rect` and `ellipse`; they do not inherit the
+unit path coordinate space. The realized path's tight geometry seeds visual
+bounds, effective strokes are included conservatively, and damage covers the
+result, while the declared box remains the path's layout contribution. Hit
+testing and editor selection policy are consumer concerns; Grida XML defines
+no separate authored hit region.
+
+```xml
+<path
+  width="120"
+  height="80"
+  d="M 0 0 H 1 V 1 H 0 Z M 0.25 0.25 H 0.75 V 0.75 H 0.25 Z"
+  fill="#7C3AED"
+  fill-rule="evenodd"
+>
+  <stroke width="3" align="inside" join="round">
+    <solid color="#DDD6FE"/>
+  </stroke>
+  <text x="center" y="center" fill="#FFFFFF">A</text>
+</path>
+```
+
+#### Considered path coordinate models
+
+The fixed unit rectangle is accepted because it keeps path geometry on the
+same side of the layout boundary as every other primitive: the box negotiates
+with layout, and the path is a pure function of that box. Resize never rewrites
+the command stream, `x` and `y` always place the box's top-left origin, and a
+small edit to one curve cannot silently redefine the coordinate system for
+all other contours.
+
+Raw intrinsic coordinates with tight-bounds measurement are rejected as the
+canonical model. [SVG path data](https://www.w3.org/TR/SVG2/paths.html#PathData)
+uses the current user coordinate system, while
+[`viewBox`](https://www.w3.org/TR/SVG2/coords.html#ViewBoxAttribute) defines a
+mapping on a viewport; a raw path has no intrinsic viewport of its own.
+Treating its tight bounds as a Grida box
+would make path edits change layout contribution, permit a nonzero content
+origin unlike other boxed primitives, and leave flex-assigned sizes with no
+defined relationship to the painted outline. Tight-fitting raw geometry into
+the assigned box is also rejected: intentional padding disappears, zero-width
+or zero-height geometry has no scale, and changing one curve extremum remaps
+every untouched contour. Those failures are structural, not parser details.
+
+An optional `view-box="min-x min-y width height"` is a plausible later
+ergonomic extension for lossless copying of arbitrary SVG coordinate values.
+It is deferred because the unit form already expresses the geometry without a
+second reference rectangle, and admitting it requires stable-reference,
+positive-extent, validation, and canonical-writer rules. If introduced, the
+reference rectangle must be authored intent and must never be continuously
+re-derived from tight bounds. `view-box` is unknown syntax in Draft 0.
+
+#### Lessons retained
+
+- The declared box is the sole surface that negotiates with layout; path
+  geometry realizes into it and never becomes a competing measurement.
+- A reference space is source intent. Whether the fixed unit rectangle or a
+  future explicit rectangle, it must not be recomputed from changing tight
+  bounds.
+- Geometry maps before coverage is constructed, so fills retain their
+  box-relative coordinates and stroke widths and dash lengths remain
+  pixel-stable.
+- One resolved path artifact must supply painting, tight geometry bounds, and
+  damage. Independent reparsing or geometry reconstruction may not produce
+  divergent answers.
+- Reference-to-box mapping is a resolution operation and happens once in the
+  resolver's numeric domain. Visual bounds must conservatively enclose that
+  exact mapped command stream; independently scaling source-space bounds is
+  not equivalent at finite precision.
+- A numeric environment that cannot represent a valid mapped command stream
+  must report a resolution failure. It must not clamp controls, retain
+  non-finite geometry, substitute box bounds, or paint only a surviving subset.
+- Source equality and visual equality are different contracts. The source tier
+  retains authored `d`; a resolved visual comparison may ignore relative versus
+  absolute spelling only after both forms produce the same command stream,
+  fill rule, closure state, and conservative bounds.
+- Raw intrinsic paths and box-mapped paths are different models. A boundary
+  must convert explicitly or reject; it must not relabel one as the other.
+- Fill rule is part of path material identity. It survives parsing,
+  resolution, rendering, inspection, and rewriting with the path geometry.
 
 ### Text
 
@@ -1314,6 +1437,10 @@ declared Draft 0 scene or reports a typed failure. It must reject:
 - a stroke width with neither one nor four values, a negative or non-finite
   side, four values on a non-box target, or a per-side width combined with
   nonzero corner smoothing, a non-miter join, or a non-default miter limit;
+- a `path` without `d`, malformed SVG path data, path geometry whose exact
+  tight bounds leave the closed unit rectangle, an unknown `fill-rule`, a
+  four-value path stroke width, or non-center stroke alignment on a path with
+  any open contour;
 - non-finite numbers, negative dimensions, or malformed colors;
 - malformed `corner-radius` lists, negative radii, `corner-smoothing` outside
   `[0, 1]`, either corner property on an inapplicable element, or nonzero
@@ -1354,7 +1481,10 @@ only on <container> and <rect>`. Useful text diagnostics include `empty <tspan>
 is invalid; put empty text on <text> or remove the run`, `nested <tspan> is
 invalid; runs must be flat direct children of <text>`, `<fill> inside <tspan>
 must be the literal first child; no whitespace may precede it`, and `size is
-not Grida XML; use font-size`.
+not Grida XML; use font-size`. Useful path diagnostics identify the failing
+command or number and distinguish grammar from geometry, for example `path d:
+invalid arc flag at byte 19`, `path geometry exceeds the unit box on the right:
+max-x is 1.08`, and `outside path stroke requires every contour to be closed`.
 
 ## Conformance
 
@@ -1371,7 +1501,8 @@ A conforming reader:
    the semantic level, including stroke order, paint order, inactive paints,
    equal-offset stops, empty fill stacks where omission changes semantics,
    per-character resolved text style and run-fill override state, and empty
-   strokes with non-default geometry.
+   strokes with non-default geometry. It must preserve path commands,
+   contour closure, and fill rule without replacing them with tight-fit output.
 3. **MUST NOT** accept an unknown construct by ignoring or coercing it.
 4. **MUST** distinguish a parse failure from a resolution failure. A
    well-formed intent document can still fail to resolve in an insufficient
@@ -1383,8 +1514,8 @@ A conforming writer:
 
 1. **MUST** emit `grida version="0"` with exactly one `container` child.
 2. **MUST** emit the canonical Draft 0 node and attribute names, including
-   `container`, `rect`, `ellipse`, `line`, `tspan`, `width`, `height`, and
-   `font-size` rather than historical aliases.
+   `container`, `rect`, `ellipse`, `line`, `path`, `tspan`, `width`, `height`,
+   `d`, and `font-size` rather than historical aliases.
 3. **MUST** apply the canonical fill partition: omit the default, use the
    `fill` attribute for one ordinary solid, and use the `fill` element for all
    other non-empty stacks or required explicit emptiness. The same partition
@@ -1400,7 +1531,9 @@ A conforming writer:
    kind-specific gradient element names, `<shape>`, or a generic `paint`
    envelope.
 7. **MUST** encode XML text and attribute values correctly and emit only
-   finite, valid values.
+   finite, valid values. It must emit path data in the authored unit reference
+   space without tight-fitting it to observed ink, omit the default
+   `fill-rule="nonzero"`, and emit `fill-rule="evenodd"` when selected.
 8. **MUST** derive text run boundaries from the one backing UTF-8 string, merge
    adjacent runs with identical complete style and paint-override state, emit
    no default-valued typography attributes on `text`, emit
@@ -1416,7 +1549,7 @@ A conforming writer:
     corner-radius axis, omit the slash when every `rx` equals its `ry`, and
     omit each corner attribute when its value is the zero default.
 11. **MUST NOT** serialize resolved-only values, including normalized effective
-    corner radii, as if they were source intent.
+    corner radii or materialized path points, as if they were source intent.
 12. **SHOULD** produce stable, human-readable indentation outside mixed text
     content and stable attribute ordering, although neither is semantic in
     Draft 0.
@@ -1430,38 +1563,47 @@ A conforming resolver and renderer:
 2. **MUST** apply free bindings, text measurement, auto sizing, and flex
    ownership according to this RFD, including size constraints and aspect
    ratios.
-3. **MUST** preserve source order in painting, with the node's fill first,
+3. **MUST** map path geometry from the fixed unit rectangle nonuniformly into
+   the final resolved box before constructing fill or stroke coverage. It must
+   preserve logical-pixel stroke and dash lengths, apply the declared fill
+   rule, seed visual bounds from realized tight geometry, conservatively
+   include effective strokes, and cover those bounds in damage. Mapping,
+   bounds, fill, and every stroke must consume one resolved command artifact;
+   an implementation must not independently rescale source bounds or reparse
+   `d`. If its numeric domain cannot represent that artifact, resolution must
+   fail explicitly without partial path ink.
+4. **MUST** preserve source order in painting, with the node's fill first,
    children in document order, and repeated parent strokes from first to last.
-4. **MUST** derive each stroke independently from the node's original outline
+5. **MUST** derive each stroke independently from the node's original outline
    and composite that stroke's visible paints in bottom-to-top order. It must
    not merge distinct stroke geometries into one paint stack.
-5. **MUST** resolve rectangular stroke widths as one outer-minus-inner ring
+6. **MUST** resolve rectangular stroke widths as one outer-minus-inner ring
    using the declared local-side widths and alignment fractions. It must treat
    an overconsumed inner box as an empty contour, include each side's actual
    outward extent in visual bounds, and leave the layout box unchanged.
-6. **MUST** use one proportional edge-sum factor for ordinary rounded-box
+7. **MUST** use one proportional edge-sum factor for ordinary rounded-box
    overlap normalization and the per-corner half-short-side cap for nonzero
    smoothing. It must then use the same resulting outline as the source for
    fill coverage, every stroke, and a container's descendant clip. The
    rectangular paint box must remain unchanged.
-7. **MUST** composite every visible paint in its declared bottom-to-top order,
+8. **MUST** composite every visible paint in its declared bottom-to-top order,
    applying each paint's opacity and blend mode to that paint only.
-8. **MUST** evaluate gradient geometry in the declared unit paint space and
+9. **MUST** evaluate gradient geometry in the declared unit paint space and
    map it to the resolved paint box without rewriting source coordinates.
-9. **MUST** resolve image identifiers through the declared resource
-   environment and surface missing or undecodable resources as resolution
-   failures rather than silently dropping their paint layers.
-10. **MUST** shape `text` and its flat `tspan` segments as one backing string,
+10. **MUST** resolve image identifiers through the declared resource
+    environment and surface missing or undecodable resources as resolution
+    failures rather than silently dropping their paint layers.
+11. **MUST** shape `text` and its flat `tspan` segments as one backing string,
     use the node fill when a run has no override, and preserve explicit empty
     and ordered run-fill stacks. Every node and run fill uses the resolved full
     text-node paint box; paint coordinates do not restart per run.
-11. **MUST** include every effective stroke in resolved visual bounds without
+12. **MUST** include every effective stroke in resolved visual bounds without
     changing the node's layout box.
-12. **MUST** apply rotation and native flips as visual-only transforms and
+13. **MUST** apply rotation and native flips as visual-only transforms and
     apply clipping and opacity to the declared subtree.
-13. **MUST NOT** mutate the source document as a side effect of resolving or
+14. **MUST NOT** mutate the source document as a side effect of resolving or
     rendering it.
-14. **MUST** make the resolution environment explicit enough that a resolved
+15. **MUST** make the resolution environment explicit enough that a resolved
     result can be attributed to a viewport, font set, and resource set.
 
 A processor that intentionally supports only part of Draft 0 may describe
@@ -1470,12 +1612,13 @@ must not silently discard the unsupported remainder.
 
 ## Deferred requirements
 
-Draft 0 does not define paths or vector networks, variable-width strokes, dash
-offset, endpoint markers, effects, scene image nodes, resource declaration or
-packaging syntax, advanced image placement, image filters, rich color spaces,
-advanced typography, per-run strokes, semantic text annotations, grid layout,
-animation, or durable node identity. Their eventual addition must preserve the
-one-tree, local-space, intent-only model established here.
+Draft 0 does not define editable vector networks, non-unit path reference
+rectangles, variable-width strokes, dash offset, endpoint markers, effects,
+scene image nodes, resource declaration or packaging syntax, advanced image
+placement, image filters, rich color spaces, advanced typography, per-run
+strokes, semantic text annotations, grid layout, animation, or durable node
+identity. Their eventual addition must preserve the one-tree, local-space,
+intent-only model established here.
 
 Reusable paint definitions and references are also deferred. Inline paint
 values remain sufficient and canonical; a later reference system must define
