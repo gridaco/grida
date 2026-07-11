@@ -24,6 +24,8 @@ fn tag(k: &ItemKind) -> &'static str {
         ItemKind::OvalFill { .. } => "ovalfill",
         ItemKind::OvalStroke { .. } => "ovalstroke",
         ItemKind::LineStroke { .. } => "linestroke",
+        ItemKind::PathFill { .. } => "pathfill",
+        ItemKind::PathStroke { .. } => "pathstroke",
         ItemKind::TextFill { .. } => "textfill",
         ItemKind::TextStroke { .. } => "textstroke",
     }
@@ -325,7 +327,7 @@ fn ineffective_strokes_emit_no_item_and_visible_paints_keep_order() {
 fn unsupported_rectangular_stroke_states_emit_no_draw_item() {
     for desc in [ShapeDesc::Ellipse, ShapeDesc::Rect] {
         let mut builder = DocBuilder::new();
-        let payload = Payload::Shape { desc };
+        let payload = Payload::Shape { desc: desc.clone() };
         let shape = builder.add(
             0,
             Header::new(SizeIntent::Fixed(40.0), SizeIntent::Fixed(30.0)),

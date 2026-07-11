@@ -62,6 +62,18 @@ fn slot_changed(prev: &Resolved, next: &Resolved, id: NodeId) -> bool {
         // positioned run is still material damage. Compare the complete
         // backend-independent artifact rather than guessing from geometry.
         || prev.text_layout_opt(id) != next.text_layout_opt(id)
+        // A path can change commands or fill rule without changing its box or
+        // even its tight bounds. Its shared box-mapped artifact is therefore
+        // part of resolved visual identity, just like shaped text.
+        || path_changed(prev, next, id)
+}
+
+fn path_changed(prev: &Resolved, next: &Resolved, id: NodeId) -> bool {
+    match (prev.resolved_path_opt(id), next.resolved_path_opt(id)) {
+        (None, None) => false,
+        (Some(before), Some(after)) => !before.same_visual_geometry(after),
+        _ => true,
+    }
 }
 
 fn union_rect(acc: Option<RectF>, r: RectF) -> RectF {

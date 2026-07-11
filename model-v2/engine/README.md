@@ -37,8 +37,8 @@ This engine consumes the Draft 0 proof through the model crate's public,
 pure `anchor_lab::grida_xml::parse(&str)` boundary. There is deliberately no
 XML-specific engine API: a host reads the file once, parses it into the same
 `Document` value used everywhere else, then passes that value to
-`frame::render`. The engine library performs no path I/O and never reparses a
-document in the frame loop.
+`frame::render`. The engine library performs no filesystem I/O and never
+reparses a document in the frame loop.
 
 The source boundary materializes the Draft 0 XML-facing property registry:
 versioned envelope, direct node taxonomy, responsive bindings and constraints,
@@ -53,6 +53,13 @@ record and normalized corner smoothing. Text uses canonical `font-size` plus
 flat direct-child `tspan` runs. Those runs materialize as complete UTF-8 byte
 ranges with numeric weight, normal/italic style, and optional ordered
 `Paints` overrides; omission still means node-fill fallback.
+
+`path` uses the complete SVG path-data grammar in a fixed unit reference box
+and retains `nonzero` or `evenodd` fill identity. Resolution maps its analyzed
+command stream into the final declared box exactly once. Tight bounds, damage,
+drawlist fills, and every repeated stroke share that box-mapped artifact;
+gradients and image paints still use the full declared paint box. Path children
+remain ordinary box-local content between the parent fill and strokes.
 
 The drawlist and painter execute the same topology: node fill, clipped children,
 then repeated parent strokes. Lines have no fill or implicit ink; containers
@@ -110,6 +117,9 @@ complete. Current limits are:
   `grida_xml_render` does so and reports authored plus resolved locations;
 - the lab's ordered `Vec<Stroke>` implements the accepted extension, while the
   production scene/archive model still has one stroke geometry per node.
+- production scene/archive path contracts still expose incompatible raw and
+  canonical box-mapped forms, do not uniformly preserve fill rule, and do not
+  yet round-trip this Draft 0 path contract.
 
 Checked-in files use the canonical grammar. The minimal consumer fixture and
 pixel probes live at `rig/fixtures/nested-rects.grida.xml` and
@@ -130,6 +140,9 @@ and rich paints without duplicating scene geometry.
 `rig/examples/rich-text.grida.xml` is the attributed-text specimen: mixed
 sizes, weights, italic style, solid and gradient run fills, exact whitespace,
 and derived UTF-8 ranges in one inspectable string.
+`rig/fixtures/unit-path.grida.xml` is the focused path oracle: an even-odd unit
+path with ordered fills and repeated strokes. The complete editorial showcase
+also includes a nested, rich-painted path specimen.
 
 The thin host binary renders a file to PNG. It defaults to a 1280x720 viewport;
 pass explicit positive dimensions for responsive inputs:
@@ -162,6 +175,9 @@ cargo run --bin grida_xml_render -- \
 
 cargo run --bin grida_xml_render -- \
   rig/fixtures/nested-rects.grida.xml target/grida-xml-nested-rects.png 96 80
+
+cargo run --bin grida_xml_render -- \
+  rig/fixtures/unit-path.grida.xml target/grida-xml-unit-path.png 96 80
 ```
 
 The CLI owns filesystem access, resource bases, image decoding, a
@@ -188,22 +204,22 @@ mutating authored state is the open engine RFD: [`ANIMATION.md`](./ANIMATION.md)
 
 ## Contract → module → guarding test
 
-| concern                              | module           | contract      | guarding test                                                                                                                    |
-| ------------------------------------ | ---------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| stage purity + the oracle law        | (whole pipeline) | ENG-0         | the gate's differential + determinism runs                                                                                       |
-| Draft 0 source consumer seam         | parse → frame    | ENG-0 / S-2   | `tests/grida_xml.rs`, `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs` |
-| drawlist (pure, diffable projection) | `drawlist.rs`    | ENG-2.1       | `tests/drawlist.rs` (order · pruning · color · verbatim world · determinism)                                                     |
-| text shaping + shared glyph layout   | `text_layout.rs` | ENG-4.1/4.5   | `../a/lab/tests/text_layout.rs`, `tests/text.rs`                                                                                 |
-| raster executor                      | `paint.rs`       | ENG-2.1       | `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs` (pixel probes)        |
-| one frame entry                      | `frame.rs`       | ENG-2.4       | spike live loop + gate                                                                                                           |
-| damage as data                       | `damage.rs`      | ENG-2.2       | `tests/damage.rs` (identity empty · single-op locality)                                                                          |
-| spatial read tier                    | `query.rs`       | ENG-3         | `tests/query.rs` (`hit_point ≡ pick` over a grid)                                                                                |
-| journal (op-log)                     | `journal.rs`     | ENG-5.1       | `tests/journal.rs`                                                                                                               |
-| replay (corpus, determinism)         | `replay.rs`      | ENG-5.2/5.3   | `tests/replay.rs` + `rig/corpus/*.replay` via the gate                                                                           |
-| cache identity                       | `ident.rs`       | ENG-2.3/1.4   | `tests/ident.rs` (generation-stamped key)                                                                                        |
-| oracle version tags                  | `oracle.rs`      | ENG-4.2       | the `.replay` header                                                                                                             |
-| gated observability                  | `trace.rs`       | S-6           | `cargo check --features trace`                                                                                                   |
-| the rig                              | `bin/gate.rs`    | ENG-0.2 / S-5 | it _is_ the gate                                                                                                                 |
+| concern                              | module           | contract      | guarding test                                                                                                                                      |
+| ------------------------------------ | ---------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| stage purity + the oracle law        | (whole pipeline) | ENG-0         | the gate's differential + determinism runs                                                                                                         |
+| Draft 0 source consumer seam         | parse → frame    | ENG-0 / S-2   | `tests/grida_xml.rs`, `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs`, `tests/paths.rs` |
+| drawlist (pure, diffable projection) | `drawlist.rs`    | ENG-2.1       | `tests/drawlist.rs` (order · pruning · color · verbatim world · determinism)                                                                       |
+| text shaping + shared glyph layout   | `text_layout.rs` | ENG-4.1/4.5   | `../a/lab/tests/text_layout.rs`, `tests/text.rs`                                                                                                   |
+| raster executor                      | `paint.rs`       | ENG-2.1       | `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs`, `tests/paths.rs` (pixel probes)        |
+| one frame entry                      | `frame.rs`       | ENG-2.4       | spike live loop + gate                                                                                                                             |
+| damage as data                       | `damage.rs`      | ENG-2.2       | `tests/damage.rs` (identity empty · single-op locality)                                                                                            |
+| spatial read tier                    | `query.rs`       | ENG-3         | `tests/query.rs` (`hit_point ≡ pick` over a grid)                                                                                                  |
+| journal (op-log)                     | `journal.rs`     | ENG-5.1       | `tests/journal.rs`                                                                                                                                 |
+| replay (corpus, determinism)         | `replay.rs`      | ENG-5.2/5.3   | `tests/replay.rs` + `rig/corpus/*.replay` via the gate                                                                                             |
+| cache identity                       | `ident.rs`       | ENG-2.3/1.4   | `tests/ident.rs` (generation-stamped key)                                                                                                          |
+| oracle version tags                  | `oracle.rs`      | ENG-4.2       | the `.replay` header                                                                                                                               |
+| gated observability                  | `trace.rs`       | S-6           | `cargo check --features trace`                                                                                                                     |
+| the rig                              | `bin/gate.rs`    | ENG-0.2 / S-5 | it _is_ the gate                                                                                                                                   |
 
 The model-crate side of the setup lives in [`../a/lab`](../a/lab): the typed
 `Op` + `apply` dispatcher + `DirtyClass` (`ops.rs`), the per-slot `generations`

@@ -392,6 +392,27 @@ presentations, and programmable graphics.</text>
         </stroke>
         <text x="center" y="center" font-size="14" fill="#CFFAFE">STROKES × NATIVE</text>
       </rect>
+      <path name="unit-path-chip" width="220" height="48" align="center" d="M .06 0 H .94 L 1 .5 L .94 1 H .06 L 0 .5 Z">
+        <fill>
+          <solid color="#111827"/>
+          <gradient kind="linear" from="0 0" to="1 1" opacity="0.32" blend-mode="screen">
+            <stop offset="0" color="#F472B6"/>
+            <stop offset="0.5" color="#8B5CF6"/>
+            <stop offset="1" color="#22D3EE"/>
+          </gradient>
+          <image src="../../../../fixtures/images/512.jpg" fit="fill" opacity="0.1" blend-mode="soft-light"/>
+        </fill>
+        <stroke width="7" align="outside" join="round">
+          <solid color="#8B5CF6" opacity="0.2"/>
+        </stroke>
+        <stroke width="2" join="round">
+          <gradient kind="linear" from="0 0" to="1 1">
+            <stop offset="0" color="#F9A8D4"/>
+            <stop offset="1" color="#67E8F9"/>
+          </gradient>
+        </stroke>
+        <text x="center" y="center" font-size="14" fill="#EDE9FE">PATH × BOXED</text>
+      </path>
     </container>
     <rect name="hidden-source-variant" x="72" y="72" width="320" height="180" hidden="true" fill="#FF00FF"/>
   </container>

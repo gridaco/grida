@@ -16,13 +16,14 @@ use anchor_lab::model::{
     RectangularCornerRadius, RectangularStrokeWidth, ResourceRef, Stroke, StrokeAlign, StrokeCap,
     StrokeJoin, StrokeWidth, SweepGradientPaint, TileMode,
 };
+use anchor_lab::path::{FillRule, PathCommand, ResolvedPathArtifact};
 use skia_safe::canvas::{SaveLayerFlags, SaveLayerRec};
 use skia_safe::gradient_shader::{Gradient, GradientColors, Interpolation};
 use skia_safe::{
     image::CachingHint, path_effect::PathEffect, shaders, stroke_rec::InitStyle, Blender, Canvas,
     ClipOp, Color, CubicResampler, Data, Font, Image, ImageInfo, Matrix, Paint, PaintCap,
-    PaintJoin, PaintStyle, Path, PathBuilder, PathDirection, PathOp, Point, RRect, Rect,
-    SamplingOptions, Shader, StrokeRec,
+    PaintJoin, PaintStyle, Path, PathBuilder, PathDirection, PathFillType, PathOp, Point, RRect,
+    Rect, SamplingOptions, Shader, StrokeRec,
 };
 
 use crate::drawlist::{DrawList, ItemKind};
@@ -822,6 +823,91 @@ fn line_path(x1: f32, y1: f32, x2: f32, y2: f32) -> Path {
     builder.snapshot()
 }
 
+/// Project the already box-mapped, backend-independent command stream into
+/// Skia. Resolution performed the only coordinate mapping, so bounds and
+/// rasterization consume bit-identical f32 geometry.
+fn backend_path(path: &ResolvedPathArtifact) -> Path {
+    let fill_type = match path.fill_rule {
+        FillRule::NonZero => PathFillType::Winding,
+        FillRule::EvenOdd => PathFillType::EvenOdd,
+    };
+    let mut builder = PathBuilder::new_with_fill_type(fill_type);
+    for command in path.commands.iter() {
+        match *command {
+            PathCommand::MoveTo { x, y } => {
+                builder.move_to((x, y));
+            }
+            PathCommand::LineTo { x, y } => {
+                builder.line_to((x, y));
+            }
+            PathCommand::QuadTo { x1, y1, x, y } => {
+                builder.quad_to((x1, y1), (x, y));
+            }
+            PathCommand::CubicTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => {
+                builder.cubic_to((x1, y1), (x2, y2), (x, y));
+            }
+            PathCommand::ConicTo {
+                x1,
+                y1,
+                x,
+                y,
+                weight,
+            } => {
+                builder.conic_to((x1, y1), (x, y), weight);
+            }
+            PathCommand::Close => {
+                builder.close();
+            }
+        }
+    }
+    builder.snapshot()
+}
+
+#[cfg(test)]
+mod backend_path_tests {
+    use std::sync::Arc;
+
+    use super::backend_path;
+    use anchor_lab::path::{analyze, materialize, FillRule};
+
+    #[test]
+    fn analytical_arc_bounds_match_the_materialized_conics() {
+        let cases = [
+            "M .5 0 A .5 .5 0 0 1 1 .5 A .5 .5 0 0 1 .5 1 A .5 .5 0 0 1 0 .5 A .5 .5 0 0 1 .5 0 Z",
+            "M .2 .5 A .35 .2 37 0 1 .8 .5",
+            "M .2 .2 A .4 .3 25 0 1 .8 .7",
+            "M .5 .5 A .000001 .000001 0 0 1 .500001 .500001",
+        ];
+        for d in cases {
+            let artifact = analyze(d, FillRule::NonZero)
+                .unwrap_or_else(|error| panic!("arc corpus must be valid: {d}: {error}"));
+            let (width, height) = (137.0, 83.0);
+            let resolved = materialize(Arc::clone(&artifact), width, height)
+                .expect("arc corpus must fit its finite resolved box");
+            let actual = backend_path(&resolved).compute_tight_bounds();
+            let expected = resolved.local_bounds;
+            let epsilon = 2.0e-4;
+            assert!(actual.left >= expected.x - epsilon, "{d}: left escaped");
+            assert!(actual.top >= expected.y - epsilon, "{d}: top escaped");
+            assert!(
+                actual.right <= expected.x + expected.w + epsilon,
+                "{d}: right escaped"
+            );
+            assert!(
+                actual.bottom <= expected.y + expected.h + epsilon,
+                "{d}: bottom escaped"
+            );
+        }
+    }
+}
+
 fn draw_stroke(
     canvas: &Canvas,
     source: &Path,
@@ -1047,6 +1133,13 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
                     }
                 });
             }
+            ItemKind::PathFill { w, h, path, paints } => {
+                with_local_transform(canvas, view, &item.world, || {
+                    let paint_box = PaintBox::from_size(*w, *h);
+                    let geometry = backend_path(path);
+                    draw_painted_geometry(canvas, &geometry, paints, paint_box, ctx);
+                });
+            }
             ItemKind::TextFill {
                 layout,
                 paints,
@@ -1154,6 +1247,19 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
                             paint_box,
                             ctx,
                         );
+                    }
+                });
+            }
+            ItemKind::PathStroke { w, h, path, stroke } => {
+                with_local_transform(canvas, view, &item.world, || {
+                    let paint_box = PaintBox::from_size(*w, *h);
+                    let geometry = backend_path(path);
+                    if stroke.align == StrokeAlign::Center {
+                        draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
+                            canvas.draw_path(&geometry, paint);
+                        });
+                    } else {
+                        draw_stroke(canvas, &geometry, stroke, paint_box, ctx);
                     }
                 });
             }

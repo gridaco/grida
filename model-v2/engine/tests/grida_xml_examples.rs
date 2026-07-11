@@ -14,11 +14,17 @@ use std::path::Path;
 
 type Example = (&'static str, &'static str, &'static str, (i32, i32));
 
-const CANONICAL_EXAMPLES: [Example; 7] = [
+const CANONICAL_EXAMPLES: [Example; 8] = [
     (
         "nested-rects",
         "rig/fixtures/nested-rects.grida.xml",
         include_str!("../rig/fixtures/nested-rects.grida.xml"),
+        (96, 80),
+    ),
+    (
+        "unit-path",
+        "rig/fixtures/unit-path.grida.xml",
+        include_str!("../rig/fixtures/unit-path.grida.xml"),
         (96, 80),
     ),
     (

@@ -9,6 +9,7 @@ use anchor_lab::math::Affine;
 use anchor_lab::model::{
     CornerSmoothing, Document, NodeId, Paints, Payload, RectangularCornerRadius, ShapeDesc, Stroke,
 };
+use anchor_lab::path::ResolvedPathArtifact;
 use anchor_lab::resolve::Resolved;
 use anchor_lab::text_layout::TextLayout;
 use std::sync::Arc;
@@ -89,6 +90,12 @@ pub enum ItemKind {
         h: f32,
         paints: Paints,
     },
+    PathFill {
+        w: f32,
+        h: f32,
+        path: Arc<ResolvedPathArtifact>,
+        paints: Paints,
+    },
     TextFill {
         layout: Arc<TextLayout>,
         paints: TextPaints,
@@ -114,6 +121,12 @@ pub enum ItemKind {
         y2: f32,
         paint_w: f32,
         paint_h: f32,
+        stroke: Stroke,
+    },
+    PathStroke {
+        w: f32,
+        h: f32,
+        path: Arc<ResolvedPathArtifact>,
         stroke: Stroke,
     },
     TextStroke {
@@ -294,6 +307,16 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                             h: b.h,
                             paints,
                         }),
+                        ShapeDesc::Path(_) => {
+                            resolved
+                                .resolved_path_opt(id)
+                                .map(|path| ItemKind::PathFill {
+                                    w: b.w,
+                                    h: b.h,
+                                    path: Arc::clone(path),
+                                    paints,
+                                })
+                        }
                         // Lines have no fill channel and no implicit ink.
                         ShapeDesc::Line => None,
                     };
@@ -363,6 +386,15 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
             .iter()
             .filter_map(|stroke| visible_stroke(stroke, &node.payload, node.corner_smoothing))
         {
+            if matches!(
+                &node.payload,
+                Payload::Shape {
+                    desc: ShapeDesc::Path(_)
+                }
+            ) && resolved.resolved_path_opt(id).is_none()
+            {
+                continue;
+            }
             let kind = match &node.payload {
                 Payload::Frame { .. }
                 | Payload::Shape {
@@ -390,6 +422,14 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                     y2: 0.0,
                     paint_w: b.w,
                     paint_h: b.h,
+                    stroke,
+                },
+                Payload::Shape {
+                    desc: ShapeDesc::Path(_),
+                } => ItemKind::PathStroke {
+                    w: b.w,
+                    h: b.h,
+                    path: Arc::clone(resolved.resolved_path_of(id)),
                     stroke,
                 },
                 Payload::Text { .. } | Payload::AttributedText { .. } => ItemKind::TextStroke {

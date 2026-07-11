@@ -16,6 +16,7 @@
 use anchor_lab::math::{Affine, RectF};
 use anchor_lab::model::Document;
 use anchor_lab::ops::{apply, Op, OpResult};
+use anchor_lab::path::{PathCommand, ResolvedPathArtifact};
 use anchor_lab::resolve::{resolve, ResolveOptions, Resolved, RotationInFlow};
 use anchor_lab::text_layout::TextLayout;
 use anchor_lab::textir;
@@ -177,7 +178,7 @@ pub fn play(replay: &Replay) -> Result<(Document, Vec<OpResult>), String> {
     Ok((doc, results))
 }
 
-/// Bit-for-bit equality of two resolved tiers across all five columns — the
+/// Bit-for-bit equality of two resolved tiers across all six columns — the
 /// determinism oracle. `==` would pass -0.0/0.0 and fail NaN==NaN; bits are
 /// exact, which is what "same computation" means.
 pub fn resolved_bits_eq(a: &Resolved, b: &Resolved) -> bool {
@@ -198,6 +199,9 @@ pub fn resolved_bits_eq(a: &Resolved, b: &Resolved) -> bool {
             return false;
         }
         if !opt_text_layout_eq(a.text_layout_opt(id), b.text_layout_opt(id)) {
+            return false;
+        }
+        if !opt_resolved_path_eq(a.resolved_path_opt(id), b.resolved_path_opt(id)) {
             return false;
         }
     }
@@ -273,6 +277,95 @@ fn opt_text_layout_eq(
         && opt_rect_eq(a.logical_bounds, b.logical_bounds)
         && opt_rect_eq(a.ink_bounds, b.ink_bounds)
         && a.unresolved_glyphs == b.unresolved_glyphs
+}
+
+fn opt_resolved_path_eq(
+    a: Option<&std::sync::Arc<ResolvedPathArtifact>>,
+    b: Option<&std::sync::Arc<ResolvedPathArtifact>>,
+) -> bool {
+    let (Some(a), Some(b)) = (a, b) else {
+        return a.is_none() && b.is_none();
+    };
+    a.fill_rule == b.fill_rule
+        && a.all_contours_closed == b.all_contours_closed
+        && rect_eq(a.local_bounds, b.local_bounds)
+        && a.commands.len() == b.commands.len()
+        && a.commands
+            .iter()
+            .zip(b.commands.iter())
+            .all(|(a, b)| path_command_eq(*a, *b))
+}
+
+fn path_command_eq(a: PathCommand, b: PathCommand) -> bool {
+    match (a, b) {
+        (PathCommand::MoveTo { x: ax, y: ay }, PathCommand::MoveTo { x: bx, y: by })
+        | (PathCommand::LineTo { x: ax, y: ay }, PathCommand::LineTo { x: bx, y: by }) => {
+            scalar_eq(ax, bx) && scalar_eq(ay, by)
+        }
+        (
+            PathCommand::QuadTo {
+                x1: ax1,
+                y1: ay1,
+                x: ax,
+                y: ay,
+            },
+            PathCommand::QuadTo {
+                x1: bx1,
+                y1: by1,
+                x: bx,
+                y: by,
+            },
+        ) => scalar_eq(ax1, bx1) && scalar_eq(ay1, by1) && scalar_eq(ax, bx) && scalar_eq(ay, by),
+        (
+            PathCommand::CubicTo {
+                x1: ax1,
+                y1: ay1,
+                x2: ax2,
+                y2: ay2,
+                x: ax,
+                y: ay,
+            },
+            PathCommand::CubicTo {
+                x1: bx1,
+                y1: by1,
+                x2: bx2,
+                y2: by2,
+                x: bx,
+                y: by,
+            },
+        ) => {
+            scalar_eq(ax1, bx1)
+                && scalar_eq(ay1, by1)
+                && scalar_eq(ax2, bx2)
+                && scalar_eq(ay2, by2)
+                && scalar_eq(ax, bx)
+                && scalar_eq(ay, by)
+        }
+        (
+            PathCommand::ConicTo {
+                x1: ax1,
+                y1: ay1,
+                x: ax,
+                y: ay,
+                weight: aw,
+            },
+            PathCommand::ConicTo {
+                x1: bx1,
+                y1: by1,
+                x: bx,
+                y: by,
+                weight: bw,
+            },
+        ) => {
+            scalar_eq(ax1, bx1)
+                && scalar_eq(ay1, by1)
+                && scalar_eq(ax, bx)
+                && scalar_eq(ay, by)
+                && scalar_eq(aw, bw)
+        }
+        (PathCommand::Close, PathCommand::Close) => true,
+        _ => false,
+    }
 }
 
 fn opt_aff_eq(a: Option<Affine>, b: Option<Affine>) -> bool {

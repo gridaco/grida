@@ -6,6 +6,7 @@
 
 use anchor_engine::oracle::{OracleTags, TEXT_SKPARAGRAPH};
 use anchor_engine::replay::{parse_string, play, resolved_bits_eq, write_string};
+use anchor_lab::grida_xml;
 use anchor_lab::model::*;
 use anchor_lab::ops::{apply, Axis, Op, ResizeDrag};
 use anchor_lab::resolve::{resolve, resolve_with_text_layout, ResolveOptions, RotationInFlow};
@@ -178,4 +179,27 @@ fn resolved_bit_equality_includes_the_text_layout_column() {
         !resolved_bits_eq(&a, &b),
         "a replay comparison must not discard text resolution identity"
     );
+}
+
+#[test]
+fn resolved_bit_equality_includes_path_geometry_and_fill_rule_not_source_spelling() {
+    let source = |d: &str, fill_rule: &str| {
+        grida_xml::parse(&format!(
+            r#"<grida version="0"><container width="100" height="100"><path width="100" height="100" d="{d}"{fill_rule}/></container></grida>"#
+        ))
+        .unwrap()
+    };
+    let horizontal = source("M 0 0 H 1 V 1 Z", "");
+    let equivalent = source("m 0 0 h 1 v 1 z", "");
+    let vertical = source("M 0 0 V 1 H 1 Z", "");
+    let evenodd = source("M 0 0 H 1 V 1 Z", r#" fill-rule="evenodd""#);
+
+    let horizontal = resolve(&horizontal, &opts());
+    let equivalent = resolve(&equivalent, &opts());
+    let vertical = resolve(&vertical, &opts());
+    let evenodd = resolve(&evenodd, &opts());
+    assert_eq!(horizontal.aabb_of(2), vertical.aabb_of(2));
+    assert!(resolved_bits_eq(&horizontal, &equivalent));
+    assert!(!resolved_bits_eq(&horizontal, &vertical));
+    assert!(!resolved_bits_eq(&horizontal, &evenodd));
 }

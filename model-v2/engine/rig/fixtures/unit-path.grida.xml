@@ -1,0 +1,12 @@
+<grida version="0">
+  <container name="unit-path" width="96" height="80" fill="#FFFFFF">
+    <path name="donut" x="8" y="8" width="80" height="64" d="M .05 .05 H .95 V .95 H .05 Z M .35 .35 H .65 V .65 H .35 Z" fill-rule="evenodd" fill="#EF4444">
+      <stroke width="6" join="round">
+        <solid color="#2563EB"/>
+      </stroke>
+      <stroke width="2" join="round">
+        <solid color="#FFFFFF"/>
+      </stroke>
+    </path>
+  </container>
+</grida>
