@@ -32,7 +32,7 @@ fn tag(k: &ItemKind) -> &'static str {
 fn solid_stroke(color: Color, width: f32, align: StrokeAlign) -> Stroke {
     Stroke {
         paints: Paints::solid(color),
-        width,
+        width: StrokeWidth::Uniform(width),
         align,
         cap: StrokeCap::Butt,
         join: StrokeJoin::Miter,
@@ -316,4 +316,36 @@ fn ineffective_strokes_emit_no_item_and_visible_paints_keep_order() {
         panic!("effective rect stroke");
     };
     assert_eq!(stroke.paints, Paints::solid("#0000FF".into()));
+}
+
+#[test]
+fn unsupported_rectangular_stroke_states_emit_no_draw_item() {
+    for desc in [ShapeDesc::Ellipse, ShapeDesc::Rect] {
+        let mut builder = DocBuilder::new();
+        let payload = Payload::Shape { desc };
+        let shape = builder.add(
+            0,
+            Header::new(SizeIntent::Fixed(40.0), SizeIntent::Fixed(30.0)),
+            payload.clone(),
+        );
+        let mut stroke = Stroke::default_for(&payload).unwrap();
+        stroke.paints = Paints::solid(Color::BLACK);
+        stroke.width = StrokeWidth::Rectangular(RectangularStrokeWidth {
+            stroke_top_width: 2.0,
+            stroke_right_width: 4.0,
+            stroke_bottom_width: 6.0,
+            stroke_left_width: 8.0,
+        });
+        builder.node_mut(shape).strokes.push(stroke);
+        if desc == ShapeDesc::Rect {
+            builder.node_mut(shape).corner_smoothing = CornerSmoothing(0.5);
+        }
+
+        let doc = builder.build();
+        let resolved = resolve(&doc, &opts());
+        assert!(
+            build(&doc, &resolved).items.is_empty(),
+            "{desc:?} must not emit lossy rectangular stroke geometry"
+        );
+    }
 }

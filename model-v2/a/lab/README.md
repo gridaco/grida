@@ -56,6 +56,17 @@ primitive tags are not accepted there.
 The proof parser also requires non-negative `grow`, `gap`, and `padding`;
 historical `textir` retains its experiment-era numeric behavior.
 
+Grida XML text uses canonical `font-size`, numeric `font-weight`, and
+`font-style="normal|italic"`; historical TextIr alone keeps `size`. Direct,
+flat `<tspan>` children lower to the production-shaped UTF-8
+`AttributedString` model and never become scene nodes. Omitted run fills fall
+back to the text node's ordered paints, while `fill="#…"` and one literal-first
+structured `<fill>` preserve explicit run overrides, including rich paint
+stacks and explicit emptiness. The deterministic metric is run-aware for font
+size; weight and italic remain metric-neutral but survive into paint. Run
+strokes stay rejected until their single production geometry can reconcile
+with Draft 0's repeatable stroke topology.
+
 Fill-bearing nodes carry one ordered `Paints` value matching the production
 paint contract. `fill="#fff"` is the canonical ordinary singleton-solid form;
 singular `<fill>` owns every richer stack and explicit emptiness. Typed

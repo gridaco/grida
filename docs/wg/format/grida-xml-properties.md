@@ -87,7 +87,8 @@ diagnose them as unknown syntax.
 
 The table covers the production node set as well as XML-only source constructs.
 “Children” means render-node children, not typed property children such as
-`fill`, `stroke`, or gradient `stop` elements.
+`fill`, `stroke`, or gradient `stop` elements. `tspan` is listed explicitly as
+a contextual source construct even though it is not a scene node.
 
 | XML element       | Production concept                    | Children  | Status          | Source and use                                                            |
 | ----------------- | ------------------------------------- | --------- | --------------- | ------------------------------------------------------------------------- |
@@ -97,7 +98,8 @@ The table covers the production node set as well as XML-only source constructs.
 | `rect`            | Rectangle                             | Yes       | **Draft 0**     | SVG; direct primitive                                                     |
 | `ellipse`         | Ellipse, ring, or arc                 | Yes       | **Draft 0**     | SVG base primitive; arc parameters are placeholders                       |
 | `line`            | Line                                  | Yes       | **Draft 0**     | SVG; stroke-only primitive with repeatable stroke geometries              |
-| `text`            | Text span; later, attributed text     | No        | **Draft 0**     | SVG/HTML; nested `span` syntax is not defined                             |
+| `text`            | Text or attributed-text node          | No        | **Draft 0**     | Owns one text box, paragraph/default style, and node paints               |
+| `tspan`           | `StyledTextRun`                       | No        | **Draft 0**     | Flat direct child of `text`; contextual run, never a scene node           |
 | `lens`            | Source transform wrapper              | Yes       | **Draft 0**     | Grida source construct; resolves through group/transform semantics        |
 | `image`           | Image node outside paint channels     | No        | **Placeholder** | HTML/SVG; contextual with the existing image-paint element                |
 | `path`            | Raw, render-oriented SVG path         | Yes       | **Placeholder** | SVG; use `d`, not an implementation-shaped `data` attribute               |
@@ -113,10 +115,11 @@ The table covers the production node set as well as XML-only source constructs.
 | _none_            | Initial viewport container            | Root      | **Derived**     | The `grida` envelope and render root materialize this host boundary       |
 | _none_            | Error/import placeholder              | No        | **Derived**     | Diagnostic result, never canonical authored content                       |
 
-Attributed text should preferably remain `<text>` with familiar HTML/SVG-like
-`<span>` children rather than introduce a second top-level text kind. That is
-a direction, not grammar: whitespace, run boundaries, inheritance, and
-per-run paint must be specified first.
+Attributed text remains one `<text>` node with direct, flat `<tspan>` children.
+`tspan` contains exact character data plus an optional literal-first `fill`
+property; it has no scene identity, box, transform, opacity, layout, or render
+children. `<span>` is not an alias and a reader must never support both
+spellings.
 
 ## Draft 0 attribute registry
 
@@ -134,13 +137,17 @@ defaults, contradictions, and resolution behavior.
 | `min-width`, `max-width`   | `container`, `rect`, `ellipse`, `line`, `text`                      | CSS                  | Width constraints                                             |
 | `min-height`, `max-height` | `container`, `rect`, `ellipse`, `text`; never `line`                | CSS                  | Height constraints                                            |
 | `aspect-ratio`             | `rect`, `ellipse`                                                   | CSS                  | Supplies one otherwise unresolved box axis                    |
+| `corner-radius`            | `container`, `rect`                                                 | CSS/Flutter          | One or four circular or elliptical corner radii               |
+| `corner-smoothing`         | `container`, `rect`                                                 | Design tools         | Continuous smoothing of circular rounded corners              |
 | `rotation`                 | All Draft 0 render elements                                         | Flutter/design tools | Clockwise visual rotation in degrees                          |
 | `flip-x`, `flip-y`         | All Draft 0 render elements                                         | Design tools         | Native visual reflection                                      |
 | `opacity`                  | All Draft 0 render elements                                         | CSS/SVG              | Composites the node and descendants                           |
 | `hidden`                   | All Draft 0 render elements                                         | HTML                 | Removes the subtree from layout and painting                  |
-| `fill`                     | `container`, `rect`, `ellipse`, `text`                              | SVG                  | Canonical compact form for one ordinary solid fill            |
+| `fill`                     | `container`, `rect`, `ellipse`, `text`; contextual `tspan`          | SVG                  | One-solid node fill or explicit run-fill override             |
 | `clips`                    | `container`                                                         | Flutter/design tools | Clips descendant content to the container shape               |
-| `size`                     | `text`                                                              | Flutter              | Draft 0 font size; see the `font-size` naming issue below     |
+| `font-size`                | `text`, `tspan`                                                     | CSS/SVG              | Positive finite logical-pixel default or run override         |
+| `font-weight`              | `text`, `tspan`                                                     | CSS                  | Integer weight from 1 through 1000                            |
+| `font-style`               | `text`, `tspan`                                                     | CSS                  | `normal` or `italic`                                          |
 | `ops`                      | `lens`                                                              | CSS/SVG              | Ordered 2D transform functions                                |
 | `layout`                   | `container`                                                         | CSS                  | Selects `none` or `flex`                                      |
 | `direction`                | `container` with `layout="flex"`                                    | CSS                  | Main-axis direction                                           |
@@ -153,6 +160,25 @@ defaults, contradictions, and resolution behavior.
 | `grow`                     | In-flow child of a flex container                                   | CSS/Flutter          | Main-axis growth factor                                       |
 | `align`                    | In-flow child of a flex container                                   | CSS/Flutter          | Per-child cross-axis override                                 |
 
+`font-size`, `font-weight`, and `font-style` default on `text` to `16`, `400`,
+and `normal`. The same attributes on `tspan` override the owning `text`
+default for that run; omission inherits from `text`, never a preceding run.
+`size` and a generic `style` attribute are not Grida XML spellings.
+
+The [rounded box geometry contract](./grida-xml#rounded-box-geometry) defines
+the exact grammar. In registry form, `corner-radius` is one or exactly four
+non-negative finite horizontal radii, optionally followed by `/` and an
+independent one-or-four-value vertical list. Four-value order is top-left,
+top-right, bottom-right, bottom-left. `corner-smoothing` is finite in `[0, 1]`.
+Both attributes default to zero and apply only to `container` and `rect`.
+
+The canonical writer shortens an all-equal axis list to one value, otherwise
+emits all four; it omits the slash when every horizontal and vertical radius
+pair is equal. It omits zero defaults, but preserves nonzero smoothing with
+zero radii as dormant intent. Oversized ordinary radii use one edge-sum-based
+proportional factor; nonzero smoothing uses the production profile's
+per-corner half-short-side cap. Neither resolved form is rewritten in source.
+
 ## Scene-backed property placeholders
 
 These tables reserve discussion slots for properties in the canonical scene
@@ -160,16 +186,14 @@ model. They do not claim the proposed XML spelling is final.
 
 ### Identity, compositing, transform, and box geometry
 
-| Candidate XML property | Valid on                                                   | Production concept                       | Inspiration  | Status          |
-| ---------------------- | ---------------------------------------------------------- | ---------------------------------------- | ------------ | --------------- |
-| `id`                   | Every authored render node                                 | Durable user node identity               | HTML/SVG     | **Design**      |
-| `locked`               | Every authored render node, if persisted                   | Editor lock metadata                     | Design tools | **Design**      |
-| `blend-mode`           | Every compositing render node                              | Layer blend mode, including pass-through | CSS          | **Placeholder** |
-| `mask-type`            | A node that acts as a mask source                          | Geometry, alpha, or luminance mask       | CSS/SVG      | **Design**      |
-| `transform`            | Render nodes                                               | Post-layout 2D affine transform          | CSS/SVG      | **Design**      |
-| `transform-origin`     | Boxed render nodes                                         | Post-layout transform pivot              | CSS          | **Design**      |
-| `corner-radius`        | `container`, `rect`, `image`, polygonal and boolean shapes | Uniform or per-corner radius             | CSS/Flutter  | **Placeholder** |
-| `corner-smoothing`     | `container`, `rect`, `image`                               | Continuous/smoothed corners              | Design tools | **Placeholder** |
+| Candidate XML property | Valid on                                 | Production concept                       | Inspiration  | Status          |
+| ---------------------- | ---------------------------------------- | ---------------------------------------- | ------------ | --------------- |
+| `id`                   | Every authored render node               | Durable user node identity               | HTML/SVG     | **Design**      |
+| `locked`               | Every authored render node, if persisted | Editor lock metadata                     | Design tools | **Design**      |
+| `blend-mode`           | Every compositing render node            | Layer blend mode, including pass-through | CSS          | **Placeholder** |
+| `mask-type`            | A node that acts as a mask source        | Geometry, alpha, or luminance mask       | CSS/SVG      | **Design**      |
+| `transform`            | Render nodes                             | Post-layout 2D affine transform          | CSS/SVG      | **Design**      |
+| `transform-origin`     | Boxed render nodes                       | Post-layout transform pivot              | CSS          | **Design**      |
 
 `id` must map to durable authored identity, not the runtime's transient node
 handle. `transform` also cannot be admitted until its relationship to native
@@ -221,20 +245,20 @@ resource behavior must be shared by scene images and image paints. The same
 Some production properties are ordered or structured values and should remain
 XML children rather than become mini-languages inside attributes.
 
-| Property element     | Valid parent                                   | Status      | Contract direction                                                                |
-| -------------------- | ---------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
-| `fill`               | `container`, `rect`, `ellipse`, `text`         | **Draft 0** | One expanded fill channel; ordered `Paints`, first bottommost                     |
-| `stroke`             | `container`, `rect`, `ellipse`, `line`, `text` | **Draft 0** | Repeatable geometry owning ordered `Paints`; empty only with non-default geometry |
-| `solid`              | `fill` or `stroke`                             | **Draft 0** | Typed solid paint                                                                 |
-| `gradient`           | `fill` or `stroke`                             | **Draft 0** | Typed gradient family with required `kind` and `stop` children                    |
-| `image`              | `fill` or `stroke`                             | **Draft 0** | Contextual image paint                                                            |
-| `stop`               | `gradient`                                     | **Draft 0** | Ordered offset/color pair                                                         |
-| `effects`            | Effect-capable node                            | **Design**  | Typed effect values; ordering and multiplicity are unresolved                     |
-| `span`               | `text`                                         | **Design**  | Attributed run with inherited or overridden text properties                       |
-| `network`            | `vector`                                       | **Design**  | Editable vertices, Bézier segments, loops, regions, and region fills              |
-| `resources`          | Document-level declaration scope               | **Design**  | Portable logical IDs and packaged/external resource policy                        |
-| `component`, `use`   | Document definitions and scene                 | **Design**  | Reusable authored widgets and instances                                           |
-| Animation vocabulary | Document, node, or property scope              | **Design**  | Requires a dedicated timing and addressing RFD                                    |
+| Property element     | Valid parent                                    | Status      | Contract direction                                                                |
+| -------------------- | ----------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| `fill`               | `container`, `rect`, `ellipse`, `text`, `tspan` | **Draft 0** | Expanded ordered `Paints`; singular and literal-first when under `tspan`          |
+| `stroke`             | `container`, `rect`, `ellipse`, `line`, `text`  | **Draft 0** | Repeatable geometry owning ordered `Paints`; empty only with non-default geometry |
+| `solid`              | `fill` or `stroke`                              | **Draft 0** | Typed solid paint                                                                 |
+| `gradient`           | `fill` or `stroke`                              | **Draft 0** | Typed gradient family with required `kind` and `stop` children                    |
+| `image`              | `fill` or `stroke`                              | **Draft 0** | Contextual image paint                                                            |
+| `stop`               | `gradient`                                      | **Draft 0** | Ordered offset/color pair                                                         |
+| `effects`            | Effect-capable node                             | **Design**  | Typed effect values; ordering and multiplicity are unresolved                     |
+| `tspan`              | `text`                                          | **Draft 0** | Flat contextual run with exact non-empty character data and explicit overrides    |
+| `network`            | `vector`                                        | **Design**  | Editable vertices, Bézier segments, loops, regions, and region fills              |
+| `resources`          | Document-level declaration scope                | **Design**  | Portable logical IDs and packaged/external resource policy                        |
+| `component`, `use`   | Document definitions and scene                  | **Design**  | Reusable authored widgets and instances                                           |
+| Animation vocabulary | Document, node, or property scope               | **Design**  | Requires a dedicated timing and addressing RFD                                    |
 
 ### Paint attribute registry
 
@@ -266,14 +290,14 @@ Each `stroke` is one geometry with direct typed paint children. An empty paint
 list is valid only when at least one geometry value differs from the target's
 defaults. These scoped attributes are normative in Draft 0:
 
-| Attribute     | Value                                      | Valid targets                          | Purpose                                      |
-| ------------- | ------------------------------------------ | -------------------------------------- | -------------------------------------------- |
-| `width`       | non-negative finite number                 | every `stroke`                         | Uniform logical-pixel width                  |
-| `align`       | `inside`, `center`, or `outside`           | every `stroke`; line must be `center`  | Placement relative to the original outline   |
-| `cap`         | `butt`, `round`, or `square`               | `line`                                 | Open-contour endpoint shape                  |
-| `join`        | `miter`, `round`, or `bevel`               | `container`, `rect`                    | Joined-contour corner shape                  |
-| `miter-limit` | positive finite number                     | `container`, `rect`                    | Miter-to-bevel cutoff ratio                  |
-| `dash-array`  | space-separated non-negative finite values | `container`, `rect`, `ellipse`, `line` | Repeating dash-gap lengths in logical pixels |
+| Attribute     | Value                                      | Valid targets                                    | Purpose                                      |
+| ------------- | ------------------------------------------ | ------------------------------------------------ | -------------------------------------------- |
+| `width`       | one or exactly four non-negative numbers   | every `stroke`; four only on `container`, `rect` | Uniform or top-right-bottom-left width       |
+| `align`       | `inside`, `center`, or `outside`           | every `stroke`; line must be `center`            | Placement relative to the original outline   |
+| `cap`         | `butt`, `round`, or `square`               | `line`                                           | Open-contour endpoint shape                  |
+| `join`        | `miter`, `round`, or `bevel`               | `container`, `rect`                              | Joined-contour corner shape                  |
+| `miter-limit` | positive finite number                     | `container`, `rect`                              | Miter-to-bevel cutoff ratio                  |
+| `dash-array`  | space-separated non-negative finite values | `container`, `rect`, `ellipse`, `line`           | Repeating dash-gap lengths in logical pixels |
 
 The production model already separates one stroke `Paints` stack from one
 stroke geometry. One XML `stroke`, using only attributes supported by its
@@ -283,54 +307,105 @@ elements are an accepted extension to an ordered list of those pairs; the
 current production model still needs that multiplicity before it can
 materialize more than one without loss.
 
+### Per-side width grammar
+
+One `width` number selects uniform stroke width. Exactly four numbers select
+rectangular widths in top, right, bottom, left order and are valid only for a
+`container` or `rect`. Two- and three-number expansion, commas, units, negative
+values, and non-finite values are invalid. The omitted default is uniform `1`.
+
+Four equal positive values normalize to the uniform state; four zeros and a
+scalar zero normalize to the no-width state. A canonical writer omits uniform
+`1`, uses one number for every other uniform or no-width state, and writes all
+four values only when they differ. Applicability is validated before this
+normalization, so four values remain invalid on an ellipse, line, or text even
+when equal.
+
+The four local-side widths produce one outer-minus-inner coverage ring with one
+shared ordered paint stack. `inside`, `center`, and `outside` use outward and
+inward fractions `(0, 1)`, `(1/2, 1/2)`, and `(1, 0)`, respectively. Each
+corner's outer radius adds the outward fraction of its adjacent horizontal and
+vertical widths; its inner radius subtracts the inward fractions and clamps
+each result to zero. A zero or negative inner-box extent makes the inner
+contour empty, saturating coverage to the outer contour without rewriting
+source widths.
+
+Ordinary circular and elliptical corner radii and continuous `dash-array`
+traversal remain valid. A zero-width side has no coverage but still advances
+the dash metric. Per-side widths currently require zero corner smoothing,
+`join="miter"`, and `miter-limit="4"`; other combinations are rejected rather
+than accepted as state the rectangular renderer cannot honor.
+
 ### Deferred stroke geometry
 
-| Candidate XML property | Valid on                                    | Production concept                           | Status          |
-| ---------------------- | ------------------------------------------- | -------------------------------------------- | --------------- |
-| Per-side width grammar | `container`, `rect`, and future image boxes | Rectangular stroke widths                    | **Design**      |
-| Width-profile grammar  | Future `vector`                             | Ordered normalized-position/half-width stops | **Design**      |
-| `dash-offset`          | `stroke`                                    | Phase offset into the dash cycle             | **Design**      |
-| `marker-start`         | Open path-like stroke geometry              | Endpoint marker preset or reference          | **Placeholder** |
-| `marker-end`           | Open path-like stroke geometry              | Endpoint marker preset or reference          | **Placeholder** |
+| Candidate XML property | Valid on                       | Production concept                           | Status          |
+| ---------------------- | ------------------------------ | -------------------------------------------- | --------------- |
+| Width-profile grammar  | Future `vector`                | Ordered normalized-position/half-width stops | **Design**      |
+| `dash-offset`          | `stroke`                       | Phase offset into the dash cycle             | **Design**      |
+| `marker-start`         | Open path-like stroke geometry | Endpoint marker preset or reference          | **Placeholder** |
+| `marker-end`           | Open path-like stroke geometry | Endpoint marker preset or reference          | **Placeholder** |
 
-Per-side widths and variable-width profiles need nested or shorthand grammar
-of their own; neither should be forced into an opaque comma-separated
-attribute merely to make it look CSS-like.
+Variable-width profiles need structured grammar of their own and should not be
+forced into an opaque comma-separated attribute merely to look CSS-like.
 
-## Text property placeholders
+## Text attributes and property placeholders
 
-Uniform text maps naturally to CSS names. Rich text should use the same names
-on future `span` children, with inheritance and override rules defined once.
+`text` owns the paragraph, default text style, and node paints. A direct,
+flat `tspan` is only a contextual run and inherits every omitted run property
+from the owning `text`, not from its preceding sibling. Draft 0 uses explicit
+kebab-case attributes and defines no `style` mini-language.
 
-| Candidate XML property      | Valid on       | Production concept                        | Inspiration | Status          |
-| --------------------------- | -------------- | ----------------------------------------- | ----------- | --------------- |
-| `font-family`               | `text`, `span` | Font family                               | CSS         | **Placeholder** |
-| `font-size`                 | `text`, `span` | Font size                                 | CSS/SVG     | **Design**      |
-| `font-weight`               | `text`, `span` | Font weight                               | CSS         | **Placeholder** |
-| `font-stretch`              | `text`, `span` | Font width                                | CSS         | **Placeholder** |
-| `font-style`                | `text`, `span` | Normal or italic style                    | CSS         | **Placeholder** |
-| `font-kerning`              | `text`, `span` | Kerning switch                            | CSS         | **Placeholder** |
-| `font-optical-sizing`       | `text`, `span` | Optical sizing mode                       | CSS         | **Placeholder** |
-| `font-feature-settings`     | `text`, `span` | OpenType feature-tag values               | CSS         | **Design**      |
-| `font-variation-settings`   | `text`, `span` | Variable-font axis values                 | CSS         | **Design**      |
-| `letter-spacing`            | `text`, `span` | Letter spacing                            | CSS         | **Placeholder** |
-| `word-spacing`              | `text`, `span` | Word spacing                              | CSS         | **Placeholder** |
-| `line-height`               | `text`, `span` | Fixed or proportional line height         | CSS         | **Placeholder** |
-| `text-transform`            | `text`, `span` | Case transformation                       | CSS         | **Placeholder** |
-| `text-align`                | `text`         | Horizontal paragraph alignment            | CSS         | **Placeholder** |
-| `text-align-vertical`       | Boxed `text`   | Top, center, or bottom placement          | Flutter     | **Placeholder** |
-| `max-lines`                 | `text`         | Paragraph line clamp                      | Flutter     | **Placeholder** |
-| `text-overflow`             | `text`         | Clip, ellipsis, or authored marker string | CSS/Flutter | **Design**      |
-| `text-decoration-line`      | `text`, `span` | Underline, overline, or line-through      | CSS         | **Placeholder** |
-| `text-decoration-style`     | `text`, `span` | Solid, double, dotted, dashed, or wavy    | CSS         | **Placeholder** |
-| `text-decoration-color`     | `text`, `span` | Decoration color override                 | CSS         | **Placeholder** |
-| `text-decoration-thickness` | `text`, `span` | Decoration thickness                      | CSS         | **Placeholder** |
-| `text-decoration-skip-ink`  | `text`, `span` | Glyph-ink skipping                        | CSS         | **Placeholder** |
+| Candidate XML property      | Valid on        | Production concept                        | Inspiration | Status          |
+| --------------------------- | --------------- | ----------------------------------------- | ----------- | --------------- |
+| `font-family`               | `text`, `tspan` | Font family                               | CSS         | **Placeholder** |
+| `font-size`                 | `text`, `tspan` | Positive finite font size                 | CSS/SVG     | **Draft 0**     |
+| `font-weight`               | `text`, `tspan` | Integer weight from 1 through 1000        | CSS         | **Draft 0**     |
+| `font-stretch`              | `text`, `tspan` | Font width                                | CSS         | **Placeholder** |
+| `font-style`                | `text`, `tspan` | `normal` or `italic`                      | CSS         | **Draft 0**     |
+| `font-kerning`              | `text`, `tspan` | Kerning switch                            | CSS         | **Placeholder** |
+| `font-optical-sizing`       | `text`, `tspan` | Optical sizing mode                       | CSS         | **Placeholder** |
+| `font-feature-settings`     | `text`, `tspan` | OpenType feature-tag values               | CSS         | **Design**      |
+| `font-variation-settings`   | `text`, `tspan` | Variable-font axis values                 | CSS         | **Design**      |
+| `letter-spacing`            | `text`, `tspan` | Letter spacing                            | CSS         | **Placeholder** |
+| `word-spacing`              | `text`, `tspan` | Word spacing                              | CSS         | **Placeholder** |
+| `line-height`               | `text`, `tspan` | Fixed or proportional line height         | CSS         | **Placeholder** |
+| `text-transform`            | `text`, `tspan` | Case transformation                       | CSS         | **Placeholder** |
+| `text-align`                | `text`          | Horizontal paragraph alignment            | CSS         | **Placeholder** |
+| `text-align-vertical`       | Boxed `text`    | Top, center, or bottom placement          | Flutter     | **Placeholder** |
+| `max-lines`                 | `text`          | Paragraph line clamp                      | Flutter     | **Placeholder** |
+| `text-overflow`             | `text`          | Clip, ellipsis, or authored marker string | CSS/Flutter | **Design**      |
+| `text-decoration-line`      | `text`, `tspan` | Underline, overline, or line-through      | CSS         | **Placeholder** |
+| `text-decoration-style`     | `text`, `tspan` | Solid, double, dotted, dashed, or wavy    | CSS         | **Placeholder** |
+| `text-decoration-color`     | `text`, `tspan` | Decoration color override                 | CSS         | **Placeholder** |
+| `text-decoration-thickness` | `text`, `tspan` | Decoration thickness                      | CSS         | **Placeholder** |
+| `text-decoration-skip-ink`  | `text`, `tspan` | Glyph-ink skipping                        | CSS         | **Placeholder** |
 
-Draft 0 currently calls font size `size`. Before typography is expanded, the
-RFD must either rename it to the more established `font-size` in a versioned
-change or explicitly defend `size` as the sole canonical spelling. Accepting
-both indefinitely would violate the one-spelling rule.
+The Draft 0 defaults are `font-size="16"`, `font-weight="400"`, and
+`font-style="normal"`. `size` is invalid and is never accepted alongside or
+as an alias for `font-size`; a canonical writer omits all three defaults on
+`text`. Every other style row above remains unknown syntax until its status
+advances; production defaults supply those unexposed `TextStyleRec` fields
+during materialization.
+
+Character data and direct `tspan` data concatenate in document order into one
+production `AttributedString`. Run boundaries are derived as UTF-8 byte
+offsets; authors do not spell them. Runs cover the entire string contiguously
+and merge when complete style and paint-override state match. Empty `tspan` is
+invalid, while an empty `text` uses the production `0..0` default-run special
+case.
+
+Run fills project `StyledTextRun.fills` rather than a parallel color field.
+Omitted run fill maps to `None` and node-fill fallback. The `fill` attribute
+maps to an explicit one-solid stack. A singular literal-first `<fill>` child
+uses the existing ordered paint grammar; `<fill/>` maps to an explicit empty
+stack, and non-empty typed children remain bottom-to-top. Attribute and child
+are mutually exclusive. Gradient and image coordinates use the resolved full
+text-node paint box, never a per-`tspan` fragment box.
+
+HTML tags (`b`, `strong`, `i`, `em`, and similar), `<span>`, and SVG `tspan`
+positioning are intentionally not aliases. The production run model contains
+visual style, not the semantic/accessibility annotation needed to preserve
+HTML meaning, and Grida run geometry does not independently position chunks.
 
 CSS `vertical-align` is intentionally not proposed for paragraph-box vertical
 placement: its web meaning concerns inline/baseline alignment. Flutter's
@@ -366,8 +441,7 @@ choosing a name alone.
 | ----------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | Editable vector network       | Vertices, cubic tangents, segments, loops, filled regions | Stable local IDs or indices; open/closed contours; region fill stacks; validation   |
 | Variable-width stroke         | Ordered `(u, half-width)` samples                         | Nested stops versus compact list; interpolation; endpoints; base-width interaction  |
-| Per-side box geometry         | Four stroke widths and four elliptical corner radii       | CSS shorthand reuse versus explicit children; normalization; mixed units            |
-| Attributed text               | Text plus styled byte ranges and per-run paints           | `<span>` nesting; Unicode offsets; whitespace; inheritance; overlapping runs        |
+| Run strokes                   | Per-run stroke paints, width, and alignment               | Reconcile singular production geometry with repeatable XML stroke topology          |
 | Masks                         | Geometry, alpha, and luminance mask nodes                 | Which sibling is the mask; scope; consumption; stacking; clipping interaction       |
 | Effects                       | Typed singleton and repeated effect slots                 | Cross-type order; multiplicity; compositing bounds; visibility and blend metadata   |
 | Image resources and placement | Logical IDs, hashes, fit, affine placement, tiling        | Packaging; base URI; network policy; intrinsic size; missing-resource behavior      |
@@ -389,18 +463,26 @@ This registry does not itself change the canonical scene or archive contracts.
 The following seams constrain conformance or require the explicit extension
 named by the Draft 0 RFD:
 
-| Seam                                                                                                         | Why it matters to Grida XML                                                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The current scene contract stores one stroke geometry with one ordered `Paints`, while Draft 0 repeats them. | One stroke maps directly; multiple strokes require an ordered list and must not be merged or hidden as duplicate scene nodes.                               |
-| The scene model can hold malformed gradients that Draft 0 deliberately cannot spell.                         | A writer rejects too few stops, invalid or descending offsets, and coincident linear endpoints instead of repairing, sorting, clamping, or perturbing them. |
-| Scene semantics and packed-archive coverage do not yet cover the same node set.                              | An authored element must not promise `.grida` round-trip until both contracts represent it.                                                                 |
-| Raw-path fill rules and post-layout transform origins are not uniform across scene and archive contracts.    | `fill-rule`, `transform`, and `transform-origin` remain deferred until one meaning survives both rendering and persistence.                                 |
-| Draft 0 `hidden` removes a subtree from layout and paint.                                                    | A materializer must preserve that stronger behavior even when a target model names visibility differently.                                                  |
-| Solid-paint alpha is stored in color, while Draft 0 exposes common paint `opacity`.                          | The documented 8-bit quantization is a boundary rule, not a parallel solid-opacity property.                                                                |
-| Draft 0 uses `size` for text while established style vocabularies use `font-size`.                           | The language must choose one canonical spelling before expanding typography.                                                                                |
-| Responsive bindings and per-child alignment carry more source intent than a resolved Cartesian scene.        | A resolved scene can consume their result but must not be mistaken for a lossless rewrite of the authored source.                                           |
-| Names, locks, durable identity, guides, and connections belong to different persistence concerns.            | `id`, `name`, and `locked` need explicit authored-versus-editor rules; a root fill already covers visual background without deciding editor-only metadata.  |
-| `lens` operations and native flips may lower through more general transforms.                                | Materialization can preserve pixels without promising a lossless inverse decomposition; source round-trip requires an intent-preserving representation.     |
+| Seam                                                                                                         | Why it matters to Grida XML                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The current scene contract stores one stroke geometry with one ordered `Paints`, while Draft 0 repeats them. | One stroke maps directly; multiple strokes require an ordered list and must not be merged or hidden as duplicate scene nodes.                                 |
+| The durable stroke-width boundary collapses four equal sides to a uniform or no-width state.                 | Draft 0 uses the same normalization and never emits an all-equal four-value canonical form.                                                                   |
+| Production per-side coverage ignores corner smoothing and non-miter join choice.                             | Draft 0 rejects nonzero smoothing, round or bevel joins, and non-default miter limits on a per-side stroke rather than preserving lossy state.                |
+| Production smooth corners circularize elliptical radius pairs.                                               | Draft 0 rejects nonzero smoothing when any `rx` and `ry` differ; smoothed ellipses remain unavailable pending lossless renderer support.                      |
+| Production smooth paths begin dash traversal at the top-edge midpoint.                                       | Draft 0 consistently begins every rectangle at the top-left curve's top-edge join; geometry is identical, but dashed smoothed strokes have a different phase. |
+| The scene model can hold malformed gradients that Draft 0 deliberately cannot spell.                         | A writer rejects too few stops, invalid or descending offsets, and coincident linear endpoints instead of repairing, sorting, clamping, or perturbing them.   |
+| Scene semantics and packed-archive coverage do not yet cover the same node set.                              | An authored element must not promise `.grida` round-trip until both contracts represent it.                                                                   |
+| Raw-path fill rules and post-layout transform origins are not uniform across scene and archive contracts.    | `fill-rule`, `transform`, and `transform-origin` remain deferred until one meaning survives both rendering and persistence.                                   |
+| Draft 0 `hidden` removes a subtree from layout and paint.                                                    | A materializer must preserve that stronger behavior even when a target model names visibility differently.                                                    |
+| Solid-paint alpha is stored in color, while Draft 0 exposes common paint `opacity`.                          | The documented 8-bit quantization is a boundary rule, not a parallel solid-opacity property.                                                                  |
+| Production `AttributedString` stores flat contiguous UTF-8 byte ranges.                                      | XML concatenates mixed text in document order and derives ranges at character boundaries; authored offsets and nested runs are neither needed nor accepted.   |
+| The packed archive collapses an empty run-fill vector to an absent override.                                 | Draft 0 distinguishes explicit `<fill/>` no ink from omitted node-fill fallback; packing must reject it or preserve presence before claiming round-trip.      |
+| Production attributed paint currently resolves run fills against `(width, width)`.                           | Draft 0 requires the resolved full text-node width and height, matching node fills; the square paint box is an implementation bug, not XML semantics.         |
+| `StyledTextRun` has one optional stroke stack plus one width and alignment.                                  | It cannot losslessly project repeatable independent XML stroke geometries, so Draft 0 rejects run strokes rather than merging or hiding them.                 |
+| Production attributed runs carry visual style but no semantic/accessibility annotation.                      | Draft 0 rejects HTML semantic tags instead of pretending bold or italic styling preserves their meaning.                                                      |
+| Responsive bindings and per-child alignment carry more source intent than a resolved Cartesian scene.        | A resolved scene can consume their result but must not be mistaken for a lossless rewrite of the authored source.                                             |
+| Names, locks, durable identity, guides, and connections belong to different persistence concerns.            | `id`, `name`, and `locked` need explicit authored-versus-editor rules; a root fill already covers visual background without deciding editor-only metadata.    |
+| `lens` operations and native flips may lower through more general transforms.                                | Materialization can preserve pixels without promising a lossless inverse decomposition; source round-trip requires an intent-preserving representation.       |
 
 When the language, runtime, and archive disagree, a processor must limit its
 claimed subset or make the model change explicit. It must never create a

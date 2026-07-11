@@ -7,8 +7,9 @@
 //! Lab simplifications, all declared:
 //! - node ids are `u32`; children are an ordered `Vec` on the parent
 //!   (fractional-index ordering is not under test here);
-//! - `SurfaceStyle` carries ordered fills and ordered stroke applications;
-//!   corners and effects remain outside the lab subset.
+//! - surface style carries ordered fills and ordered stroke applications plus
+//!   production-shaped rectangular corner geometry; effects remain outside
+//!   the lab subset.
 
 use crate::math::Affine;
 use std::collections::BTreeMap;
@@ -177,6 +178,85 @@ pub struct EdgeInsets {
     pub left: f32,
 }
 
+/// One elliptical corner radius in local box coordinates.
+///
+/// This deliberately mirrors the production Grida model: `rx` and `ry` stay
+/// independent even though smooth corners currently require circular radii at
+/// the renderer boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Radius {
+    pub rx: f32,
+    pub ry: f32,
+}
+
+impl Radius {
+    pub fn circular(value: f32) -> Self {
+        Self {
+            rx: value,
+            ry: value,
+        }
+    }
+
+    pub fn is_zero(self) -> bool {
+        self.rx == 0.0 && self.ry == 0.0
+    }
+
+    pub fn is_circular(self) -> bool {
+        self.rx == self.ry
+    }
+}
+
+/// Per-corner elliptical radii. Field names follow the production model;
+/// serialization order is TL, TR, BR, BL.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RectangularCornerRadius {
+    pub tl: Radius,
+    pub tr: Radius,
+    pub bl: Radius,
+    pub br: Radius,
+}
+
+impl RectangularCornerRadius {
+    pub fn all(radius: Radius) -> Self {
+        Self {
+            tl: radius,
+            tr: radius,
+            bl: radius,
+            br: radius,
+        }
+    }
+
+    pub fn circular(value: f32) -> Self {
+        Self::all(Radius::circular(value))
+    }
+
+    pub fn is_zero(self) -> bool {
+        self.tl.is_zero() && self.tr.is_zero() && self.bl.is_zero() && self.br.is_zero()
+    }
+
+    pub fn is_circular(self) -> bool {
+        self.tl.is_circular()
+            && self.tr.is_circular()
+            && self.bl.is_circular()
+            && self.br.is_circular()
+    }
+}
+
+/// Grida's normalized continuous-corner control. The source boundary validates
+/// the production range `[0, 1]`; the model remains a plain value container.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct CornerSmoothing(pub f32);
+
+impl CornerSmoothing {
+    pub fn value(self) -> f32 {
+        self.0
+    }
+
+    pub fn is_zero(self) -> bool {
+        self.0 == 0.0
+    }
+}
+
 impl EdgeInsets {
     pub fn all(v: f32) -> Self {
         EdgeInsets {
@@ -218,6 +298,168 @@ pub enum LensOp {
     Matrix { m: [f32; 6] },
 }
 
+/// Production-shaped subset of Grida's complete text style record.
+///
+/// The lab intentionally carries only the fields its deterministic text
+/// metric and Draft 0 XML boundary currently understand. Adding a field here
+/// commits both the source grammar and the resolver to preserving it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TextStyleRec {
+    pub font_size: f32,
+    pub font_weight: u32,
+    pub font_style_italic: bool,
+}
+
+impl TextStyleRec {
+    pub const DEFAULT_FONT_SIZE: f32 = 16.0;
+    pub const DEFAULT_FONT_WEIGHT: u32 = 400;
+
+    pub fn from_font_size(font_size: f32) -> Self {
+        Self {
+            font_size,
+            ..Self::default()
+        }
+    }
+}
+
+impl Default for TextStyleRec {
+    fn default() -> Self {
+        Self {
+            font_size: Self::DEFAULT_FONT_SIZE,
+            font_weight: Self::DEFAULT_FONT_WEIGHT,
+            font_style_italic: false,
+        }
+    }
+}
+
+/// One contiguous attributed-text run.
+///
+/// Offsets are UTF-8 byte offsets into [`AttributedString::text`], matching
+/// the production Rust and FlatBuffers contract. `fills: None` inherits the
+/// text node's paint stack; `Some(Paints::default())` is an explicit empty
+/// override and therefore remains distinct.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StyledTextRun {
+    pub start: u32,
+    pub end: u32,
+    pub style: TextStyleRec,
+    pub fills: Option<Paints>,
+}
+
+/// Backing text plus a flat, complete partition into styled ranges.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AttributedString {
+    pub text: String,
+    pub runs: Vec<StyledTextRun>,
+}
+
+impl AttributedString {
+    /// Construct uniform attributed text. Empty text carries production's
+    /// single `0..0` sentinel run so its default style remains representable.
+    pub fn new(text: impl Into<String>, style: TextStyleRec) -> Self {
+        let text = text.into();
+        let end = u32::try_from(text.len()).expect("attributed text exceeds u32 byte offsets");
+        Self {
+            text,
+            runs: vec![StyledTextRun {
+                start: 0,
+                end,
+                style,
+                fills: None,
+            }],
+        }
+    }
+
+    /// Validate and construct an attributed string from pre-built runs.
+    pub fn from_runs(text: impl Into<String>, runs: Vec<StyledTextRun>) -> Result<Self, String> {
+        let value = Self {
+            text: text.into(),
+            runs,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
+    /// Runs are a contiguous, non-overlapping UTF-8 partition of the text.
+    pub fn validate(&self) -> Result<(), String> {
+        let text_len = u32::try_from(self.text.len())
+            .map_err(|_| "attributed text exceeds u32 byte offsets".to_string())?;
+        if self.runs.is_empty() {
+            return Err("attributed text requires at least one styled run".into());
+        }
+        if self.runs[0].start != 0 {
+            return Err("the first styled run must start at byte offset 0".into());
+        }
+        if self.runs.last().expect("checked nonempty").end != text_len {
+            return Err("the final styled run must end at the text byte length".into());
+        }
+        for (index, run) in self.runs.iter().enumerate() {
+            let empty_sentinel =
+                self.text.is_empty() && self.runs.len() == 1 && run.start == 0 && run.end == 0;
+            if run.start >= run.end && !empty_sentinel {
+                return Err(format!(
+                    "styled run {index} must have a non-empty byte range"
+                ));
+            }
+            if !self.text.is_char_boundary(run.start as usize)
+                || !self.text.is_char_boundary(run.end as usize)
+            {
+                return Err(format!(
+                    "styled run {index} does not end on UTF-8 character boundaries"
+                ));
+            }
+            if let Some(next) = self.runs.get(index + 1) {
+                if run.end != next.start {
+                    return Err(format!(
+                        "styled runs {index} and {} are not contiguous",
+                        index + 1
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn run_text(&self, run: &StyledTextRun) -> &str {
+        &self.text[run.start as usize..run.end as usize]
+    }
+
+    /// Remove boundaries that have no model-level difference. Explicit fill
+    /// inheritance and explicit empty/painted overrides remain distinct.
+    pub fn merge_adjacent_runs(&mut self) {
+        if self.runs.len() < 2 {
+            return;
+        }
+        let mut merged = Vec::with_capacity(self.runs.len());
+        merged.push(self.runs[0].clone());
+        for run in &self.runs[1..] {
+            let previous = merged.last_mut().expect("seeded above");
+            if previous.style == run.style && previous.fills == run.fills {
+                previous.end = run.end;
+            } else {
+                merged.push(run.clone());
+            }
+        }
+        self.runs = merged;
+    }
+
+    pub fn is_uniform_default(&self, default_style: TextStyleRec) -> bool {
+        self.runs
+            .iter()
+            .all(|run| run.style == default_style && run.fills.is_none())
+    }
+}
+
+/// Borrowed text view shared by the uniform and attributed payload variants.
+#[derive(Debug, Clone, Copy)]
+pub struct TextPayloadRef<'a> {
+    pub text: &'a str,
+    pub default_style: TextStyleRec,
+    /// `None` denotes the uniform text payload; attributed text always carries
+    /// its validated, complete run list.
+    pub runs: Option<&'a [StyledTextRun]>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Payload {
     Frame {
@@ -230,6 +472,10 @@ pub enum Payload {
     Text {
         content: String,
         font_size: f32,
+    },
+    AttributedText {
+        attributed_string: AttributedString,
+        default_style: TextStyleRec,
     },
     Group,
     Lens {
@@ -257,9 +503,28 @@ impl Payload {
         match self {
             Payload::Frame { .. } => "frame",
             Payload::Shape { .. } => "shape",
-            Payload::Text { .. } => "text",
+            Payload::Text { .. } | Payload::AttributedText { .. } => "text",
             Payload::Group => "group",
             Payload::Lens { .. } => "lens",
+        }
+    }
+
+    pub fn as_text(&self) -> Option<TextPayloadRef<'_>> {
+        match self {
+            Payload::Text { content, font_size } => Some(TextPayloadRef {
+                text: content,
+                default_style: TextStyleRec::from_font_size(*font_size),
+                runs: None,
+            }),
+            Payload::AttributedText {
+                attributed_string,
+                default_style,
+            } => Some(TextPayloadRef {
+                text: &attributed_string.text,
+                default_style: *default_style,
+                runs: Some(&attributed_string.runs),
+            }),
+            _ => None,
         }
     }
 }
@@ -816,6 +1081,113 @@ impl StrokeJoin {
     }
 }
 
+/// Concrete top/right/bottom/left stroke widths for rectangular outlines.
+///
+/// The field shape mirrors Grida's production `RectangularStrokeWidth`; all
+/// values are resolved logical pixels rather than optional source overrides.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RectangularStrokeWidth {
+    pub stroke_top_width: f32,
+    pub stroke_right_width: f32,
+    pub stroke_bottom_width: f32,
+    pub stroke_left_width: f32,
+}
+
+impl RectangularStrokeWidth {
+    pub fn all(width: f32) -> Self {
+        Self {
+            stroke_top_width: width,
+            stroke_right_width: width,
+            stroke_bottom_width: width,
+            stroke_left_width: width,
+        }
+    }
+
+    pub fn is_uniform(self) -> bool {
+        self.stroke_top_width == self.stroke_right_width
+            && self.stroke_right_width == self.stroke_bottom_width
+            && self.stroke_bottom_width == self.stroke_left_width
+    }
+
+    pub fn is_none(self) -> bool {
+        self.stroke_top_width == 0.0
+            && self.stroke_right_width == 0.0
+            && self.stroke_bottom_width == 0.0
+            && self.stroke_left_width == 0.0
+    }
+
+    pub fn max(self) -> f32 {
+        self.stroke_top_width
+            .max(self.stroke_right_width)
+            .max(self.stroke_bottom_width)
+            .max(self.stroke_left_width)
+    }
+
+    pub fn values(self) -> [f32; 4] {
+        [
+            self.stroke_top_width,
+            self.stroke_right_width,
+            self.stroke_bottom_width,
+            self.stroke_left_width,
+        ]
+    }
+}
+
+/// Resolved stroke width geometry, projected from Grida's production model.
+/// `Rectangular` is valid only for rectangular box outlines; source readers
+/// normalize equal sides back to the corresponding scalar form.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum StrokeWidth {
+    #[default]
+    None,
+    Uniform(f32),
+    Rectangular(RectangularStrokeWidth),
+}
+
+impl StrokeWidth {
+    pub fn normalized(self) -> Self {
+        match self {
+            StrokeWidth::None => StrokeWidth::None,
+            StrokeWidth::Uniform(0.0) => StrokeWidth::None,
+            StrokeWidth::Uniform(width) => StrokeWidth::Uniform(width),
+            StrokeWidth::Rectangular(widths) if widths.is_uniform() => {
+                StrokeWidth::Uniform(widths.stroke_top_width).normalized()
+            }
+            StrokeWidth::Rectangular(widths) => StrokeWidth::Rectangular(widths),
+        }
+    }
+
+    pub fn is_none(self) -> bool {
+        match self {
+            StrokeWidth::None => true,
+            StrokeWidth::Uniform(width) => width == 0.0,
+            StrokeWidth::Rectangular(widths) => widths.is_none(),
+        }
+    }
+
+    pub fn max(self) -> f32 {
+        match self {
+            StrokeWidth::None => 0.0,
+            StrokeWidth::Uniform(width) => width,
+            StrokeWidth::Rectangular(widths) => widths.max(),
+        }
+    }
+
+    pub fn rectangular(self) -> RectangularStrokeWidth {
+        match self {
+            StrokeWidth::None => RectangularStrokeWidth::all(0.0),
+            StrokeWidth::Uniform(width) => RectangularStrokeWidth::all(width),
+            StrokeWidth::Rectangular(widths) => widths,
+        }
+    }
+}
+
+impl From<f32> for StrokeWidth {
+    fn from(width: f32) -> Self {
+        StrokeWidth::Uniform(width)
+    }
+}
+
 /// One independently covered stroke application. The paint stack remains the
 /// existing ordered [`Paints`] model: entry zero is bottommost within this
 /// geometry, and repeated `Stroke` values are themselves painted in list
@@ -823,7 +1195,7 @@ impl StrokeJoin {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Stroke {
     pub paints: Paints,
-    pub width: f32,
+    pub width: StrokeWidth,
     pub align: StrokeAlign,
     pub cap: StrokeCap,
     pub join: StrokeJoin,
@@ -844,12 +1216,13 @@ impl Stroke {
             | Payload::Shape {
                 desc: ShapeDesc::Rect | ShapeDesc::Ellipse,
             }
-            | Payload::Text { .. } => StrokeAlign::Inside,
+            | Payload::Text { .. }
+            | Payload::AttributedText { .. } => StrokeAlign::Inside,
             Payload::Group | Payload::Lens { .. } => return None,
         };
         Some(Stroke {
             paints: Paints::default(),
-            width: 1.0,
+            width: StrokeWidth::Uniform(1.0),
             align,
             cap: StrokeCap::Butt,
             join: StrokeJoin::Miter,
@@ -860,7 +1233,7 @@ impl Stroke {
 
     pub fn geometry_is_default_for(&self, payload: &Payload) -> bool {
         Self::default_for(payload).is_some_and(|default| {
-            self.width == default.width
+            self.width.normalized() == default.width.normalized()
                 && self.align == default.align
                 && self.cap == default.cap
                 && self.join == default.join
@@ -870,7 +1243,33 @@ impl Stroke {
     }
 
     pub fn visible(&self) -> bool {
-        self.width > 0.0 && self.paints.iter().any(Paint::visible)
+        self.width.max() > 0.0 && self.paints.iter().any(Paint::visible)
+    }
+
+    /// Whether the current proving renderer can materialize this stroke
+    /// without dropping geometry state. The XML boundary rejects these
+    /// combinations; this second fence keeps programmatically-built documents
+    /// from expanding bounds for pixels the drawlist cannot emit.
+    pub fn renderable_for(&self, payload: &Payload, corner_smoothing: CornerSmoothing) -> bool {
+        if !self.visible() {
+            return false;
+        }
+        match self.width.normalized() {
+            StrokeWidth::Rectangular(_) => {
+                matches!(
+                    payload,
+                    Payload::Frame { .. }
+                        | Payload::Shape {
+                            desc: ShapeDesc::Rect
+                        }
+                ) && corner_smoothing.is_zero()
+                    && self.cap == StrokeCap::Butt
+                    && self.join == StrokeJoin::Miter
+                    && self.miter_limit == 4.0
+            }
+            StrokeWidth::None => false,
+            StrokeWidth::Uniform(_) => true,
+        }
     }
 }
 
@@ -938,6 +1337,8 @@ pub struct Node {
     pub header: Header,
     pub payload: Payload,
     pub children: Vec<NodeId>,
+    pub corner_radius: RectangularCornerRadius,
+    pub corner_smoothing: CornerSmoothing,
     pub fills: Paints,
     pub strokes: Vec<Stroke>,
 }
@@ -1162,6 +1563,8 @@ impl DocBuilder {
                     clips_content: false,
                 },
                 children: vec![],
+                corner_radius: RectangularCornerRadius::default(),
+                corner_smoothing: CornerSmoothing::default(),
                 fills: Paints::default(),
                 strokes: vec![],
             },
@@ -1189,6 +1592,8 @@ impl DocBuilder {
                 header,
                 payload,
                 children: vec![],
+                corner_radius: RectangularCornerRadius::default(),
+                corner_smoothing: CornerSmoothing::default(),
                 fills: Paints::default(),
                 strokes: vec![],
             },

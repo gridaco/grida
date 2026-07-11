@@ -11,7 +11,7 @@ use anchor_engine::frame;
 use anchor_engine::paint::PaintCtx;
 use anchor_lab::grida_xml;
 use anchor_lab::math::Affine;
-use anchor_lab::model::{Document, NodeId, Paint, ResourceRef};
+use anchor_lab::model::{Document, NodeId, Paint, Payload, ResourceRef};
 use anchor_lab::resolve::{Report, ResolveOptions, Resolved};
 use skia_safe::{surfaces, Color, EncodedImageFormat, FontMgr, FontStyle};
 
@@ -63,7 +63,27 @@ fn collect_visible_image_resources(
             out.push((id, image.image.clone()));
         }
     }
-    for stroke in node.strokes.iter().filter(|stroke| stroke.visible()) {
+    if let Payload::AttributedText {
+        attributed_string, ..
+    } = &node.payload
+    {
+        for paint in attributed_string
+            .runs
+            .iter()
+            .filter_map(|run| run.fills.as_ref())
+            .flat_map(|fills| fills.iter())
+            .filter(|paint| paint.visible())
+        {
+            if let Paint::Image(image) = paint {
+                out.push((id, image.image.clone()));
+            }
+        }
+    }
+    for stroke in node
+        .strokes
+        .iter()
+        .filter(|stroke| stroke.renderable_for(&node.payload, node.corner_smoothing))
+    {
         for paint in stroke.paints.iter().filter(|paint| paint.visible()) {
             if let Paint::Image(image) = paint {
                 out.push((id, image.image.clone()));
@@ -219,10 +239,38 @@ mod tests {
     use super::{ensure_resolved_without_errors, load_image_resources, local_resource_path};
     use anchor_engine::paint::PaintCtx;
     use anchor_lab::grida_xml;
+    use anchor_lab::model::{
+        AttributedString, DocBuilder, Header, ImagePaint, Paint, Paints, Payload, SizeIntent,
+        StyledTextRun, TextStyleRec,
+    };
     use anchor_lab::resolve::{resolve, ResolveOptions};
 
     fn fixture_input() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("rig/fixtures/nested-rects.grida.xml")
+    }
+
+    fn attributed_image_document(rid: &str) -> anchor_lab::model::Document {
+        let style = TextStyleRec::default();
+        let attributed_string = AttributedString::from_runs(
+            "x",
+            vec![StyledTextRun {
+                start: 0,
+                end: 1,
+                style,
+                fills: Some(Paints::new([Paint::Image(ImagePaint::from_rid(rid))])),
+            }],
+        )
+        .unwrap();
+        let mut builder = DocBuilder::new();
+        builder.add(
+            0,
+            Header::new(SizeIntent::Fixed(32.0), SizeIntent::Fixed(32.0)),
+            Payload::AttributedText {
+                attributed_string,
+                default_style: style,
+            },
+        );
+        builder.build()
     }
 
     #[test]
@@ -269,6 +317,27 @@ mod tests {
         let mut ctx = PaintCtx::new(None);
         load_image_resources(&fixture_input(), &doc, &mut ctx).unwrap();
         assert!(ctx.contains_image(rid));
+    }
+
+    #[test]
+    fn image_resources_are_discovered_in_attributed_run_fills() {
+        let rid = "../../../../fixtures/images/border-diamonds.png";
+        let document = attributed_image_document(rid);
+        let mut ctx = PaintCtx::new(None);
+        load_image_resources(&fixture_input(), &document, &mut ctx).unwrap();
+        assert!(ctx.contains_image(rid));
+    }
+
+    #[test]
+    fn missing_attributed_run_image_reports_its_authored_resource() {
+        let document = attributed_image_document("./missing-run-image.png");
+        let error = load_image_resources(&fixture_input(), &document, &mut PaintCtx::new(None))
+            .unwrap_err();
+        assert!(error.contains("image `./missing-run-image.png`"), "{error}");
+        assert!(
+            error.contains("rig/fixtures/./missing-run-image.png"),
+            "{error}"
+        );
     }
 
     #[test]

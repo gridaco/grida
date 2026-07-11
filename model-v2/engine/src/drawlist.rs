@@ -7,8 +7,11 @@
 //! the host stays free.
 
 use anchor_lab::math::Affine;
-use anchor_lab::measure::{layout_text_lines, LINE_H};
-use anchor_lab::model::{Document, NodeId, Paints, Payload, ShapeDesc, Stroke};
+use anchor_lab::measure::layout_text_payload;
+use anchor_lab::model::{
+    CornerSmoothing, Document, NodeId, Paints, Payload, RectangularCornerRadius, ShapeDesc, Stroke,
+    TextStyleRec,
+};
 use anchor_lab::resolve::Resolved;
 use std::sync::Arc;
 
@@ -22,12 +25,26 @@ pub struct Item {
     pub kind: ItemKind,
 }
 
+/// One materialized styled fragment. Its x-position is the deterministic
+/// model advance, while its paints are the effective run override or node
+/// fallback. Every paint still evaluates in the full resolved text box.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextFragment {
+    pub text: String,
+    pub x: f32,
+    pub advance: f32,
+    pub style: TextStyleRec,
+    pub paints: Paints,
+}
+
 /// One materialized visual text line. The model's deterministic measurement
-/// owns line topology; the drawlist carries that exact topology into paint so
-/// wrapping and explicit empty lines cannot be reinterpreted by the backend.
+/// owns line and run topology; the drawlist carries that exact topology into
+/// paint so wrapping and explicit empty lines cannot be reinterpreted by the
+/// backend.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextLine {
     pub text: String,
+    pub fragments: Vec<TextFragment>,
     pub baseline_y: f32,
 }
 
@@ -44,11 +61,15 @@ pub enum ItemKind {
     BeginClipRect {
         w: f32,
         h: f32,
+        corner_radius: RectangularCornerRadius,
+        corner_smoothing: CornerSmoothing,
     },
     EndClip,
     RectFill {
         w: f32,
         h: f32,
+        corner_radius: RectangularCornerRadius,
+        corner_smoothing: CornerSmoothing,
         paints: Paints,
     },
     OvalFill {
@@ -58,14 +79,14 @@ pub enum ItemKind {
     },
     TextFill {
         lines: Arc<[TextLine]>,
-        font_size: f32,
         paint_w: f32,
         paint_h: f32,
-        paints: Paints,
     },
     RectStroke {
         w: f32,
         h: f32,
+        corner_radius: RectangularCornerRadius,
+        corner_smoothing: CornerSmoothing,
         stroke: Stroke,
     },
     OvalStroke {
@@ -84,7 +105,6 @@ pub enum ItemKind {
     },
     TextStroke {
         lines: Arc<[TextLine]>,
-        font_size: f32,
         paint_w: f32,
         paint_h: f32,
         stroke: Stroke,
@@ -104,8 +124,12 @@ fn visible_paints(paints: &Paints) -> Paints {
     Paints::new(paints.iter().filter(|paint| paint.visible()).cloned())
 }
 
-fn visible_stroke(stroke: &Stroke) -> Option<Stroke> {
-    if stroke.width <= 0.0 {
+fn visible_stroke(
+    stroke: &Stroke,
+    payload: &Payload,
+    corner_smoothing: CornerSmoothing,
+) -> Option<Stroke> {
+    if !stroke.renderable_for(payload, corner_smoothing) {
         return None;
     }
     let paints = visible_paints(&stroke.paints);
@@ -121,15 +145,37 @@ fn push(items: &mut Vec<Item>, node: NodeId, world: Affine, kind: ItemKind) {
     items.push(Item { node, world, kind });
 }
 
-fn materialize_text_lines(content: &str, font_size: f32, resolved_width: f32) -> Arc<[TextLine]> {
-    let first_baseline = font_size * 0.85;
-    let line_advance = font_size * LINE_H;
-    layout_text_lines(content, font_size, Some(resolved_width))
+fn materialize_text_lines(
+    payload: &Payload,
+    node_fills: &Paints,
+    resolved_width: f32,
+) -> Arc<[TextLine]> {
+    let text = payload
+        .as_text()
+        .expect("text materialization requires text");
+    layout_text_payload(text, Some(resolved_width))
         .into_iter()
-        .enumerate()
-        .map(|(index, text)| TextLine {
-            text,
-            baseline_y: first_baseline + index as f32 * line_advance,
+        .map(|line| TextLine {
+            text: line.text,
+            fragments: line
+                .fragments
+                .into_iter()
+                .map(|fragment| {
+                    let authored_paints = fragment
+                        .run_index
+                        .and_then(|index| text.runs.and_then(|runs| runs.get(index)))
+                        .and_then(|run| run.fills.as_ref())
+                        .unwrap_or(node_fills);
+                    TextFragment {
+                        text: fragment.text,
+                        x: fragment.x,
+                        advance: fragment.advance,
+                        style: fragment.style,
+                        paints: visible_paints(authored_paints),
+                    }
+                })
+                .collect(),
+            baseline_y: line.baseline_y,
         })
         .collect::<Vec<_>>()
         .into()
@@ -154,15 +200,10 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
     };
     let node = doc.get(id);
     let b = resolved.box_of(id);
-    let text_lines = match &node.payload {
-        Payload::Text { content, font_size }
-            if node.fills.iter().any(|paint| paint.visible())
-                || node.strokes.iter().any(Stroke::visible) =>
-        {
-            Some(materialize_text_lines(content, *font_size, b.w))
-        }
-        _ => None,
-    };
+    let text_lines = node
+        .payload
+        .as_text()
+        .map(|_| materialize_text_lines(&node.payload, &node.fills, b.w));
 
     let opacity_scope = node.header.opacity != 1.0;
     if opacity_scope {
@@ -190,6 +231,8 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                         ItemKind::RectFill {
                             w: b.w,
                             h: b.h,
+                            corner_radius: node.corner_radius,
+                            corner_smoothing: node.corner_smoothing,
                             paints,
                         },
                     );
@@ -202,6 +245,8 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                         ShapeDesc::Rect => Some(ItemKind::RectFill {
                             w: b.w,
                             h: b.h,
+                            corner_radius: node.corner_radius,
+                            corner_smoothing: node.corner_smoothing,
                             paints,
                         }),
                         ShapeDesc::Ellipse => Some(ItemKind::OvalFill {
@@ -217,22 +262,21 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                     }
                 }
             }
-            Payload::Text { font_size, .. } => {
-                let paints = visible_paints(&node.fills);
-                if !paints.is_empty() {
+            Payload::Text { .. } | Payload::AttributedText { .. } => {
+                let lines = text_lines.as_ref().expect("text fill has line topology");
+                if lines
+                    .iter()
+                    .flat_map(|line| &line.fragments)
+                    .any(|fragment| !fragment.paints.is_empty())
+                {
                     push(
                         items,
                         id,
                         world,
                         ItemKind::TextFill {
-                            lines: text_lines
-                                .as_ref()
-                                .expect("visible text fill has line topology")
-                                .clone(),
-                            font_size: *font_size,
+                            lines: lines.clone(),
                             paint_w: b.w,
                             paint_h: b.h,
-                            paints,
                         },
                     );
                 }
@@ -250,7 +294,17 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
         }
     );
     if clip_scope {
-        push(items, id, world, ItemKind::BeginClipRect { w: b.w, h: b.h });
+        push(
+            items,
+            id,
+            world,
+            ItemKind::BeginClipRect {
+                w: b.w,
+                h: b.h,
+                corner_radius: node.corner_radius,
+                corner_smoothing: node.corner_smoothing,
+            },
+        );
     }
 
     for &c in &node.children {
@@ -262,7 +316,11 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
     }
 
     if id != doc.root && !node.payload.box_is_derived() {
-        for stroke in node.strokes.iter().filter_map(visible_stroke) {
+        for stroke in node
+            .strokes
+            .iter()
+            .filter_map(|stroke| visible_stroke(stroke, &node.payload, node.corner_smoothing))
+        {
             let kind = match &node.payload {
                 Payload::Frame { .. }
                 | Payload::Shape {
@@ -270,6 +328,8 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                 } => ItemKind::RectStroke {
                     w: b.w,
                     h: b.h,
+                    corner_radius: node.corner_radius,
+                    corner_smoothing: node.corner_smoothing,
                     stroke,
                 },
                 Payload::Shape {
@@ -290,12 +350,11 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                     paint_h: b.h,
                     stroke,
                 },
-                Payload::Text { font_size, .. } => ItemKind::TextStroke {
+                Payload::Text { .. } | Payload::AttributedText { .. } => ItemKind::TextStroke {
                     lines: text_lines
                         .as_ref()
                         .expect("visible text stroke has line topology")
                         .clone(),
-                    font_size: *font_size,
                     paint_w: b.w,
                     paint_h: b.h,
                     stroke,

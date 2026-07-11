@@ -173,6 +173,8 @@ fn mm7_add_delete_restores() {
             header: shape(10.0, 10.0).0,
             payload: shape(10.0, 10.0).1,
             children: vec![],
+            corner_radius: RectangularCornerRadius::default(),
+            corner_smoothing: CornerSmoothing::default(),
             fills: Paints::default(),
             strokes: vec![],
         },

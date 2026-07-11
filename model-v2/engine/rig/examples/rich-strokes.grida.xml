@@ -13,7 +13,7 @@
       <stroke width="3" join="round">
         <solid color="#FFFFFF" opacity="0.8"/>
       </stroke>
-      <text x="center" y="center" width="500" size="32" fill="#FFFFFF">One shape · three strokes</text>
+      <text x="center" y="center" width="500" font-size="32" fill="#FFFFFF">One shape · three strokes</text>
     </rect>
   </container>
 </grida>

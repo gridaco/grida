@@ -64,26 +64,34 @@ fn svg_fill(node: &Node) -> Result<SvgFill, SvgError> {
             node.id
         )));
     }
-    match node.fills.as_slice() {
+    svg_fill_paints(&node.fills, &format!("node {}", node.id))
+}
+
+fn svg_fill_paints(paints: &Paints, owner: &str) -> Result<SvgFill, SvgError> {
+    match paints.as_slice() {
         [] => Ok(SvgFill::None),
         [Paint::Solid(solid)] if solid.blend_mode == BlendMode::Normal => Ok(SvgFill::Solid {
             color: solid.color,
             active: solid.active,
         }),
         [Paint::Solid(_)] => Err(SvgError(format!(
-            "node {} uses a solid blend mode the SVG snapshot subset cannot represent",
-            node.id
+            "{owner} uses a solid blend mode the SVG snapshot subset cannot represent"
         ))),
         [_] => Err(SvgError(format!(
-            "node {} uses a rich paint the SVG snapshot subset cannot represent",
-            node.id
+            "{owner} uses a rich paint the SVG snapshot subset cannot represent"
         ))),
         paints => Err(SvgError(format!(
-            "node {} has {} paints; the SVG snapshot subset supports at most one solid",
-            node.id,
+            "{owner} has {} paints; the SVG snapshot subset supports at most one solid",
             paints.len()
         ))),
     }
+}
+
+fn escape_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 pub fn render(doc: &Document, resolved: &Resolved, opts: &SvgOptions) -> Result<String, SvgError> {
@@ -127,6 +135,12 @@ fn paint(
     };
     let world = &world;
     let b = resolved.box_of(id);
+    if !node.corner_radius.is_zero() || !node.corner_smoothing.is_zero() {
+        return Err(SvgError(format!(
+            "node {} uses corner geometry the SVG snapshot subset cannot represent losslessly",
+            node.id
+        )));
+    }
     if node.header.opacity != 1.0 {
         return Err(SvgError(format!(
             "node {} uses subtree opacity the SVG snapshot subset cannot represent",
@@ -204,11 +218,60 @@ fn paint(
                 mat(world),
                 font_size,
                 fill,
-                content
-                    .replace('&', "&amp;")
-                    .replace('<', "&lt;")
-                    .replace('>', "&gt;")
+                escape_text(content)
             );
+        }
+        Payload::AttributedText {
+            attributed_string,
+            default_style,
+        } => {
+            attributed_string
+                .validate()
+                .map_err(|error| SvgError(format!("node {}: {error}", node.id)))?;
+            let fill = fill.attributes("fill");
+            let italic = if default_style.font_style_italic {
+                r#" font-style="italic""#
+            } else {
+                ""
+            };
+            let _ = write!(
+                out,
+                r#"  <text x="0" y="{}" transform="{}" font-size="{}" font-weight="{}"{} {}>"#,
+                default_style.font_size,
+                mat(world),
+                default_style.font_size,
+                default_style.font_weight,
+                italic,
+                fill,
+            );
+            for (index, run) in attributed_string.runs.iter().enumerate() {
+                let run_fill = run
+                    .fills
+                    .as_ref()
+                    .map(|fills| svg_fill_paints(fills, &format!("node {} run {index}", node.id)))
+                    .transpose()?;
+                let run_text = escape_text(attributed_string.run_text(run));
+                let needs_tspan = run.style != *default_style || run_fill.is_some();
+                if !needs_tspan {
+                    let _ = write!(out, "{run_text}");
+                    continue;
+                }
+                let _ = write!(
+                    out,
+                    r#"<tspan font-size="{}" font-weight="{}""#,
+                    run.style.font_size, run.style.font_weight
+                );
+                if run.style.font_style_italic {
+                    let _ = write!(out, r#" font-style="italic""#);
+                } else if default_style.font_style_italic {
+                    let _ = write!(out, r#" font-style="normal""#);
+                }
+                if let Some(run_fill) = run_fill {
+                    let _ = write!(out, " {}", run_fill.attributes("fill"));
+                }
+                let _ = write!(out, ">{run_text}</tspan>");
+            }
+            let _ = writeln!(out, "</text>");
         }
         Payload::Group | Payload::Lens { .. } => {}
     }

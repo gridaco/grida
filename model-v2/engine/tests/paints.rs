@@ -3,41 +3,12 @@
 //! reftests: model/order is asserted as data and rendering at stable interior
 //! points is asserted with probes.
 
-use anchor_engine::drawlist::{DrawList, ItemKind};
-use anchor_engine::frame;
+mod support;
+
+use anchor_engine::drawlist::ItemKind;
 use anchor_engine::paint::PaintCtx;
-use anchor_lab::grida_xml;
-use anchor_lab::math::Affine;
 use anchor_lab::model::Paint;
-use anchor_lab::resolve::ResolveOptions;
-use skia_safe::{
-    image::CachingHint, surfaces, AlphaType, Color, ColorType, IPoint, Image, ImageInfo,
-};
-
-fn render(source: &str, width: i32, height: i32, ctx: &PaintCtx) -> (Image, DrawList) {
-    let doc = grida_xml::parse(source).expect("paint fixture parses");
-    let mut surface = surfaces::raster_n32_premul((width, height)).expect("raster surface");
-    surface.canvas().clear(Color::WHITE);
-    let options = ResolveOptions {
-        viewport: (width as f32, height as f32),
-        ..Default::default()
-    };
-    let (_, list, _) = frame::render(surface.canvas(), &doc, &options, &Affine::IDENTITY, ctx);
-    (surface.image_snapshot(), list)
-}
-
-fn rgba_at(image: &Image, x: i32, y: i32) -> [u8; 4] {
-    let info = ImageInfo::new((1, 1), ColorType::RGBA8888, AlphaType::Unpremul, None);
-    let mut rgba = [0u8; 4];
-    assert!(image.read_pixels(
-        &info,
-        &mut rgba,
-        4,
-        IPoint::new(x, y),
-        CachingHint::Disallow,
-    ));
-    rgba
-}
+use support::render_xml as render;
 
 #[test]
 fn drawlist_keeps_visible_paints_in_bottom_to_top_order() {
@@ -78,11 +49,11 @@ fn later_paints_composite_above_earlier_paints() {
 </container></grida>
 "##;
     let (image, _) = render(source, 100, 50, &PaintCtx::new(None));
-    let blue_over_red = rgba_at(&image, 25, 25);
+    let blue_over_red = image.at(25, 25);
     assert!((127..=128).contains(&blue_over_red[0]), "{blue_over_red:?}");
     assert_eq!(blue_over_red[1], 0);
     assert!((127..=128).contains(&blue_over_red[2]), "{blue_over_red:?}");
-    assert_eq!(rgba_at(&image, 75, 25), [255, 0, 0, 255]);
+    assert_eq!(image.at(75, 25), [255, 0, 0, 255]);
 }
 
 #[test]
@@ -97,7 +68,7 @@ fn bottom_blend_mode_does_not_leak_into_later_paints() {
 </container></grida>
 "##;
     let (image, _) = render(source, 40, 40, &PaintCtx::new(None));
-    let pixel = rgba_at(&image, 20, 20);
+    let pixel = image.at(20, 20);
     assert!((63..=64).contains(&pixel[0]), "{pixel:?}");
     assert_eq!(pixel[1], 0);
     assert!((127..=128).contains(&pixel[2]), "{pixel:?}");
@@ -116,13 +87,13 @@ fn linear_and_radial_gradients_use_the_local_unit_box() {
 </container></grida>
 "##;
     let (image, _) = render(source, 100, 150, &PaintCtx::new(None));
-    let left = rgba_at(&image, 5, 20);
-    let right = rgba_at(&image, 95, 20);
+    let left = image.at(5, 20);
+    let right = image.at(95, 20);
     assert!(left[0] > left[2], "left={left:?}");
     assert!(right[2] > right[0], "right={right:?}");
 
-    let center = rgba_at(&image, 50, 100);
-    let edge = rgba_at(&image, 2, 100);
+    let center = image.at(50, 100);
+    let edge = image.at(2, 100);
     assert!(center[0] > edge[0], "center={center:?} edge={edge:?}");
 }
 
@@ -136,7 +107,7 @@ fn gradient_opacity_modulates_only_its_paint() {
 </container></grida>
 "##;
     let (image, _) = render(source, 40, 40, &PaintCtx::new(None));
-    let pixel = rgba_at(&image, 20, 20);
+    let pixel = image.at(20, 20);
     for channel in &pixel[..3] {
         assert!((127..=128).contains(channel), "{pixel:?}");
     }
@@ -158,8 +129,8 @@ fn gradient_transform_is_composed_in_unit_space_before_box_scale() {
     let (image, _) = render(source, 100, 90, &PaintCtx::new(None));
     for x in [10, 49, 60, 75, 95] {
         assert_eq!(
-            rgba_at(&image, x, 20),
-            rgba_at(&image, x, 70),
+            image.at(x, 20),
+            image.at(x, 70),
             "unit-space transform diverged at x={x}"
         );
     }
@@ -184,10 +155,10 @@ fn linear_gradient_tile_modes_have_distinct_outside_domain_behavior() {
 </container></grida>
 "##;
     let (image, _) = render(source, 100, 80, &PaintCtx::new(None));
-    let clamp = rgba_at(&image, 12, 10);
-    let repeated = rgba_at(&image, 12, 30);
-    let mirror = rgba_at(&image, 12, 50);
-    let decal = rgba_at(&image, 12, 70);
+    let clamp = image.at(12, 10);
+    let repeated = image.at(12, 30);
+    let mirror = image.at(12, 50);
+    let decal = image.at(12, 70);
     assert!(clamp[0] > 248 && clamp[2] < 8, "clamp={clamp:?}");
     assert!(repeated[2] > repeated[0], "repeated={repeated:?}");
     assert!(mirror[0] > mirror[2], "mirror={mirror:?}");
@@ -209,8 +180,8 @@ fn paint_visibility_and_blend_mode_are_per_entry() {
 </container></grida>
 "##;
     let (image, _) = render(source, 100, 40, &PaintCtx::new(None));
-    assert_eq!(rgba_at(&image, 20, 20), [0, 255, 0, 255]);
-    let multiplied = rgba_at(&image, 80, 20);
+    assert_eq!(image.at(20, 20), [0, 255, 0, 255]);
+    let multiplied = image.at(80, 20);
     assert!(
         multiplied[0] < 8 && multiplied[1] < 8 && multiplied[2] < 8,
         "{multiplied:?}"
@@ -230,9 +201,9 @@ fn sweep_and_diamond_gradient_shader_paths_render() {
 </container></grida>
 "##;
     let (image, _) = render(source, 130, 60, &PaintCtx::new(None));
-    assert_ne!(rgba_at(&image, 45, 30), rgba_at(&image, 30, 45));
-    let center = rgba_at(&image, 100, 30);
-    let edge = rgba_at(&image, 72, 30);
+    assert_ne!(image.at(45, 30), image.at(30, 45));
+    let center = image.at(100, 30);
+    let edge = image.at(72, 30);
     assert!(center[0] > edge[0], "center={center:?} edge={edge:?}");
 }
 
@@ -251,6 +222,6 @@ fn image_fit_is_resolved_from_host_resources() {
     let mut ctx = PaintCtx::new(None);
     ctx.insert_encoded(RID, IMAGE).unwrap();
     let (image, _) = render(&source, 370, 90, &ctx);
-    assert_eq!(rgba_at(&image, 10, 45), [0, 255, 0, 255]);
-    assert_ne!(rgba_at(&image, 200, 45), [0, 255, 0, 255]);
+    assert_eq!(image.at(10, 45), [0, 255, 0, 255]);
+    assert_ne!(image.at(200, 45), [0, 255, 0, 255]);
 }

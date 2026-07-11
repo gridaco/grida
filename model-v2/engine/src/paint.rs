@@ -11,18 +11,21 @@ use std::collections::BTreeMap;
 use anchor_lab::math::Affine;
 use anchor_lab::model::{
     Alignment, BlendMode, BoxFit, DiamondGradientPaint, GradientStop, ImageFilters, ImagePaint,
-    ImagePaintFit, LinearGradientPaint, Paint as ModelPaint, RadialGradientPaint, ResourceRef,
-    Stroke, StrokeAlign, StrokeCap, StrokeJoin, SweepGradientPaint, TileMode,
+    ImagePaintFit, LinearGradientPaint, Paint as ModelPaint, Paints, RadialGradientPaint,
+    RectangularCornerRadius, RectangularStrokeWidth, ResourceRef, Stroke, StrokeAlign, StrokeCap,
+    StrokeJoin, StrokeWidth, SweepGradientPaint, TileMode,
 };
 use skia_safe::canvas::{SaveLayerFlags, SaveLayerRec};
+use skia_safe::font_arguments::{variation_position::Coordinate, VariationPosition};
 use skia_safe::gradient_shader::{Gradient, GradientColors, Interpolation};
 use skia_safe::{
     image::CachingHint, path_effect::PathEffect, shaders, stroke_rec::InitStyle, Blender, Canvas,
-    Color, CubicResampler, Data, Font, Image, ImageInfo, Matrix, Paint, PaintCap, PaintJoin,
-    PaintStyle, Path, PathBuilder, PathDirection, PathOp, Rect, SamplingOptions, Shader, StrokeRec,
+    ClipOp, Color, CubicResampler, Data, Font, FontArguments, FourByteTag, Image, ImageInfo,
+    Matrix, Paint, PaintCap, PaintJoin, PaintStyle, Path, PathBuilder, PathDirection, PathOp,
+    RRect, Rect, SamplingOptions, Shader, StrokeRec, Typeface,
 };
 
-use crate::drawlist::{DrawList, ItemKind, TextLine};
+use crate::drawlist::{DrawList, ItemKind, TextFragment, TextLine};
 
 /// Host-supplied paint state the pure drawlist does not carry: resolved fonts
 /// and decoded image resources. Images are keyed by the authored RID so path
@@ -70,10 +73,16 @@ impl PaintCtx {
 
 #[cfg(test)]
 mod paint_ctx_tests {
-    use super::{sk_paint, PaintBox, PaintCtx};
+    use super::{sk_paint, text_font, PaintBox, PaintCtx};
+    use crate::drawlist::TextFragment;
     use anchor_lab::model::{
-        Color as ModelColor, GradientStop, LinearGradientPaint, Paint as ModelPaint,
+        Color as ModelColor, GradientStop, LinearGradientPaint, Paint as ModelPaint, Paints,
+        TextStyleRec,
     };
+    use skia_safe::{FontMgr, FourByteTag};
+
+    const INTER: &[u8] =
+        include_bytes!("../../../fixtures/fonts/Inter/Inter-VariableFont_opsz,wght.ttf");
 
     #[test]
     fn encoded_resources_are_eager_raster_images() {
@@ -113,12 +122,74 @@ mod paint_ctx_tests {
         .expect("valid gradient paint");
         assert_eq!(paint.alpha_f().to_bits(), opacity.to_bits());
     }
+
+    #[test]
+    fn styled_font_preserves_numeric_weight_through_variable_axis() {
+        let typeface = FontMgr::new()
+            .new_from_data(INTER, None)
+            .expect("bundled variable Inter");
+        let ctx = PaintCtx::new(Some(typeface));
+        let fragment = TextFragment {
+            text: "A".into(),
+            x: 0.0,
+            advance: 12.0,
+            style: TextStyleRec {
+                font_size: 20.0,
+                font_weight: 725,
+                font_style_italic: false,
+            },
+            paints: Paints::default(),
+        };
+        let font = text_font(&fragment, &ctx).expect("host font");
+        assert!(
+            !font.is_embolden(),
+            "variable weight must not use boolean fallback"
+        );
+        let wght = FourByteTag::from_chars('w', 'g', 'h', 't');
+        let position = font
+            .typeface()
+            .variation_design_position()
+            .expect("variable position");
+        let weight = position
+            .iter()
+            .find(|coordinate| coordinate.axis == wght)
+            .expect("wght coordinate");
+        assert_eq!(weight.value, 725.0);
+    }
+
+    #[test]
+    fn italic_style_uses_documented_single_face_fallback() {
+        let typeface = FontMgr::new()
+            .new_from_data(INTER, None)
+            .expect("bundled variable Inter");
+        let ctx = PaintCtx::new(Some(typeface));
+        let fragment = TextFragment {
+            text: "A".into(),
+            x: 0.0,
+            advance: 12.0,
+            style: TextStyleRec {
+                font_size: 20.0,
+                font_weight: 400,
+                font_style_italic: true,
+            },
+            paints: Paints::default(),
+        };
+        assert_eq!(text_font(&fragment, &ctx).unwrap().skew_x(), -0.25);
+    }
 }
 
 /// Row-major `Affine` -> skia `Matrix`, byte-identical to the spike
 /// painter's `skia_matrix` (SVG a b c d e f order).
 fn skia_matrix(t: &Affine) -> Matrix {
     Matrix::new_all(t.a, t.c, t.e, t.b, t.d, t.f, 0.0, 0.0, 1.0)
+}
+
+fn with_local_transform(canvas: &Canvas, view: &Affine, world: &Affine, draw: impl FnOnce()) {
+    let total = view.then(world);
+    canvas.save();
+    canvas.set_matrix(&skia_matrix(&total).into());
+    draw();
+    canvas.restore();
 }
 
 fn sk_blend_mode(mode: BlendMode) -> skia_safe::BlendMode {
@@ -373,19 +444,30 @@ fn normalized_dash_array(values: &[f32]) -> Option<Vec<f32>> {
     Some(normalized)
 }
 
+fn uniform_stroke_width(stroke: &Stroke) -> Option<f32> {
+    match stroke.width.normalized() {
+        StrokeWidth::None => None,
+        StrokeWidth::Uniform(width) => Some(width),
+        StrokeWidth::Rectangular(_) => None,
+    }
+}
+
 /// Convert a stroke application into filled geometry so every existing paint
 /// variant (including images and gradients) follows the same ordered painter
 /// path. Open contours are necessarily centered; inside/outside are defined
 /// only for closed outlines.
 fn stroke_geometry(source: &Path, stroke: &Stroke) -> Path {
+    let Some(width) = uniform_stroke_width(stroke) else {
+        return Path::new();
+    };
     let align = if source.is_last_contour_closed() {
         stroke.align
     } else {
         StrokeAlign::Center
     };
     let stroke_width = match align {
-        StrokeAlign::Center => stroke.width,
-        StrokeAlign::Inside | StrokeAlign::Outside => stroke.width * 2.0,
+        StrokeAlign::Center => width,
+        StrokeAlign::Inside | StrokeAlign::Outside => width * 2.0,
     };
 
     let mut path_to_stroke = source.clone();
@@ -434,6 +516,323 @@ fn rect_path(w: f32, h: f32) -> Path {
     builder.snapshot()
 }
 
+fn ordinary_rrect_path_at(rect: Rect, radius: &RectangularCornerRadius) -> Path {
+    let rrect = RRect::new_rect_radii(
+        rect,
+        &[
+            (radius.tl.rx, radius.tl.ry).into(),
+            (radius.tr.rx, radius.tr.ry).into(),
+            (radius.br.rx, radius.br.ry).into(),
+            (radius.bl.rx, radius.bl.ry).into(),
+        ],
+    );
+    // Point 0 is where the top-left curve joins the top edge. Keeping the
+    // authored clockwise origin makes dash traversal deterministic.
+    Path::rrect_with_start_index(rrect, PathDirection::CW, 0)
+}
+
+fn ordinary_rrect_path(w: f32, h: f32, radius: &RectangularCornerRadius) -> Path {
+    ordinary_rrect_path_at(Rect::from_wh(w, h), radius)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SmoothCornerParams {
+    radius: f32,
+    extent: f32,
+    a: f32,
+    b: f32,
+    c: f32,
+    d: f32,
+    bezier_angle: f32,
+}
+
+fn smooth_corner_params(radius: f32, smoothing: f32, shortest_side: f32) -> SmoothCornerParams {
+    let smoothing = smoothing.clamp(0.0, 1.0);
+    let radius = radius.min(shortest_side / 2.0).max(0.0);
+    let extent = ((1.0 + smoothing) * radius).min(shortest_side / 2.0);
+    let (circle_angle, bezier_angle) = if radius > shortest_side / 4.0 {
+        let change = (radius - shortest_side / 4.0) / (shortest_side / 4.0);
+        (
+            90.0 * (1.0 - smoothing * (1.0 - change)),
+            45.0 * smoothing * (1.0 - change),
+        )
+    } else {
+        (90.0 * (1.0 - smoothing), 45.0 * smoothing)
+    };
+
+    let bezier_radians = bezier_angle.to_radians();
+    let circle_radians = circle_angle.to_radians();
+    let tangent = bezier_radians.tan();
+    let longest = radius * (bezier_radians / 2.0).tan();
+    let arc_chord = (circle_radians / 2.0).sin() * radius * 2.0_f32.sqrt();
+    let c = longest * bezier_radians.cos();
+    let d = c * tangent;
+    let b = ((extent - arc_chord) - (1.0 + tangent) * c) / 3.0;
+
+    SmoothCornerParams {
+        radius,
+        extent,
+        a: 2.0 * b,
+        b,
+        c,
+        d,
+        bezier_angle,
+    }
+}
+
+/// Mirror the production engine's orthogonal smooth-corner construction.
+///
+/// That construction is circular-only today, so the XML boundary rejects
+/// nonzero smoothing when any authored `rx != ry`. The defensive `min` here
+/// retains production behavior for programmatically-built documents that do
+/// not pass through the XML validator.
+fn smooth_rrect_path(w: f32, h: f32, radius: &RectangularCornerRadius, smoothing: f32) -> Path {
+    let shortest_side = w.min(h);
+    let tl = smooth_corner_params(radius.tl.rx.min(radius.tl.ry), smoothing, shortest_side);
+    let tr = smooth_corner_params(radius.tr.rx.min(radius.tr.ry), smoothing, shortest_side);
+    let br = smooth_corner_params(radius.br.rx.min(radius.br.ry), smoothing, shortest_side);
+    let bl = smooth_corner_params(radius.bl.rx.min(radius.bl.ry), smoothing, shortest_side);
+    let mut builder = PathBuilder::new();
+
+    // Start where the top-left curve joins the top edge, then wind clockwise.
+    // This preserves the documented dash origin while tracing the same curve
+    // as the production path, which starts midway along that top edge.
+    builder.move_to((tl.extent.min(w / 2.0), 0.0));
+    builder.line_to(((w - tr.extent).max(w / 2.0), 0.0));
+
+    if tr.radius > 0.0 {
+        builder.cubic_to(
+            (w - (tr.extent - tr.a), 0.0),
+            (w - (tr.extent - tr.a - tr.b), 0.0),
+            (w - (tr.extent - tr.a - tr.b - tr.c), tr.d),
+        );
+        builder.arc_to(
+            Rect::from_xywh(w - tr.radius * 2.0, 0.0, tr.radius * 2.0, tr.radius * 2.0),
+            270.0 + tr.bezier_angle,
+            90.0 - 2.0 * tr.bezier_angle,
+            false,
+        );
+        builder.cubic_to(
+            (w, tr.extent - tr.a - tr.b),
+            (w, tr.extent - tr.a),
+            (w, tr.extent.min(h / 2.0)),
+        );
+    }
+
+    builder.line_to((w, (h - br.extent).max(h / 2.0)));
+    if br.radius > 0.0 {
+        builder.cubic_to(
+            (w, h - (br.extent - br.a)),
+            (w, h - (br.extent - br.a - br.b)),
+            (w - br.d, h - (br.extent - br.a - br.b - br.c)),
+        );
+        builder.arc_to(
+            Rect::from_xywh(
+                w - br.radius * 2.0,
+                h - br.radius * 2.0,
+                br.radius * 2.0,
+                br.radius * 2.0,
+            ),
+            br.bezier_angle,
+            90.0 - 2.0 * br.bezier_angle,
+            false,
+        );
+        builder.cubic_to(
+            (w - (br.extent - br.a - br.b), h),
+            (w - (br.extent - br.a), h),
+            ((w - br.extent).max(w / 2.0), h),
+        );
+    }
+
+    builder.line_to((bl.extent.min(w / 2.0), h));
+    if bl.radius > 0.0 {
+        builder.cubic_to(
+            (bl.extent - bl.a, h),
+            (bl.extent - bl.a - bl.b, h),
+            (bl.extent - bl.a - bl.b - bl.c, h - bl.d),
+        );
+        builder.arc_to(
+            Rect::from_xywh(0.0, h - bl.radius * 2.0, bl.radius * 2.0, bl.radius * 2.0),
+            90.0 + bl.bezier_angle,
+            90.0 - 2.0 * bl.bezier_angle,
+            false,
+        );
+        builder.cubic_to(
+            (0.0, h - (bl.extent - bl.a - bl.b)),
+            (0.0, h - (bl.extent - bl.a)),
+            (0.0, (h - bl.extent).max(h / 2.0)),
+        );
+    }
+
+    builder.line_to((0.0, tl.extent.min(h / 2.0)));
+    if tl.radius > 0.0 {
+        builder.cubic_to(
+            (0.0, tl.extent - tl.a),
+            (0.0, tl.extent - tl.a - tl.b),
+            (tl.d, tl.extent - tl.a - tl.b - tl.c),
+        );
+        builder.arc_to(
+            Rect::from_xywh(0.0, 0.0, tl.radius * 2.0, tl.radius * 2.0),
+            180.0 + tl.bezier_angle,
+            90.0 - 2.0 * tl.bezier_angle,
+            false,
+        );
+        builder.cubic_to(
+            (tl.extent - tl.a - tl.b, 0.0),
+            (tl.extent - tl.a, 0.0),
+            (tl.extent.min(w / 2.0), 0.0),
+        );
+    }
+
+    builder.close();
+    builder.snapshot()
+}
+
+fn rounded_rect_path(w: f32, h: f32, radius: &RectangularCornerRadius, smoothing: f32) -> Path {
+    if radius.is_zero() {
+        rect_path(w, h)
+    } else if smoothing == 0.0 {
+        ordinary_rrect_path(w, h, radius)
+    } else {
+        smooth_rrect_path(w, h, radius, smoothing)
+    }
+}
+
+fn expand_rect_by_widths(rect: Rect, widths: RectangularStrokeWidth, fraction: f32) -> Rect {
+    Rect::from_ltrb(
+        rect.left - widths.stroke_left_width * fraction,
+        rect.top - widths.stroke_top_width * fraction,
+        rect.right + widths.stroke_right_width * fraction,
+        rect.bottom + widths.stroke_bottom_width * fraction,
+    )
+}
+
+/// Insets without allowing Skia's `Rect::from_ltrb` normalization to turn an
+/// overconsumed inner box inside out. Once either axis is exhausted the inner
+/// contour is empty and the ring saturates to its outer contour.
+fn inset_rect_by_widths(rect: Rect, widths: RectangularStrokeWidth, fraction: f32) -> Option<Rect> {
+    let left = rect.left + widths.stroke_left_width * fraction;
+    let top = rect.top + widths.stroke_top_width * fraction;
+    let right = rect.right - widths.stroke_right_width * fraction;
+    let bottom = rect.bottom - widths.stroke_bottom_width * fraction;
+    (left < right && top < bottom).then(|| Rect::from_ltrb(left, top, right, bottom))
+}
+
+fn offset_radii_by_widths(
+    radius: &RectangularCornerRadius,
+    widths: RectangularStrokeWidth,
+    fraction: f32,
+) -> RectangularCornerRadius {
+    let mut adjusted = *radius;
+    adjusted.tl.rx = (adjusted.tl.rx + widths.stroke_left_width * fraction).max(0.0);
+    adjusted.tl.ry = (adjusted.tl.ry + widths.stroke_top_width * fraction).max(0.0);
+    adjusted.tr.rx = (adjusted.tr.rx + widths.stroke_right_width * fraction).max(0.0);
+    adjusted.tr.ry = (adjusted.tr.ry + widths.stroke_top_width * fraction).max(0.0);
+    adjusted.br.rx = (adjusted.br.rx + widths.stroke_right_width * fraction).max(0.0);
+    adjusted.br.ry = (adjusted.br.ry + widths.stroke_bottom_width * fraction).max(0.0);
+    adjusted.bl.rx = (adjusted.bl.rx + widths.stroke_left_width * fraction).max(0.0);
+    adjusted.bl.ry = (adjusted.bl.ry + widths.stroke_bottom_width * fraction).max(0.0);
+    adjusted
+}
+
+fn rectangular_stroke_contours(
+    w: f32,
+    h: f32,
+    widths: RectangularStrokeWidth,
+    radius: &RectangularCornerRadius,
+    align: StrokeAlign,
+) -> (Path, Option<Path>) {
+    let base = Rect::from_wh(w, h);
+    let (outward, inward) = match align {
+        StrokeAlign::Inside => (0.0, 1.0),
+        StrokeAlign::Center => (0.5, 0.5),
+        StrokeAlign::Outside => (1.0, 0.0),
+    };
+    let outer_rect = expand_rect_by_widths(base, widths, outward);
+    let outer_radius = offset_radii_by_widths(radius, widths, outward);
+    let outer = ordinary_rrect_path_at(outer_rect, &outer_radius);
+    let inner = inset_rect_by_widths(base, widths, inward).map(|inner_rect| {
+        let inner_radius = offset_radii_by_widths(radius, widths, -inward);
+        ordinary_rrect_path_at(inner_rect, &inner_radius)
+    });
+    (outer, inner)
+}
+
+fn rectangular_stroke_ring(outer: &Path, inner: Option<&Path>) -> Path {
+    match inner {
+        Some(inner) => skia_safe::op(outer, inner, PathOp::Difference).unwrap_or_default(),
+        None => outer.clone(),
+    }
+}
+
+fn rectangular_stroke_centerline(
+    w: f32,
+    h: f32,
+    widths: RectangularStrokeWidth,
+    radius: &RectangularCornerRadius,
+    align: StrokeAlign,
+) -> Option<Path> {
+    let base = Rect::from_wh(w, h);
+    let (rect, radius) = match align {
+        StrokeAlign::Inside => (
+            inset_rect_by_widths(base, widths, 0.5)?,
+            offset_radii_by_widths(radius, widths, -0.5),
+        ),
+        StrokeAlign::Center => (base, *radius),
+        StrokeAlign::Outside => (
+            expand_rect_by_widths(base, widths, 0.5),
+            offset_radii_by_widths(radius, widths, 0.5),
+        ),
+    };
+    Some(ordinary_rrect_path_at(rect, &radius))
+}
+
+/// Project Grida's rectangular stroke-width union into one filled ring.
+/// Solid strokes use the exact outer-minus-inner ring. Dashed strokes advance
+/// once around a shared centerline at the maximum side width, then intersect
+/// that outline with the ring so zero/thin sides suppress coverage without
+/// resetting dash phase.
+fn rectangular_stroke_geometry(
+    w: f32,
+    h: f32,
+    radius: &RectangularCornerRadius,
+    widths: RectangularStrokeWidth,
+    stroke: &Stroke,
+) -> Path {
+    if widths.is_none() {
+        return Path::new();
+    }
+    let (outer, inner) = rectangular_stroke_contours(w, h, widths, radius, stroke.align);
+    let ring = rectangular_stroke_ring(&outer, inner.as_ref());
+    let Some(values) = stroke.dash_array.as_deref() else {
+        return ring;
+    };
+    if values.is_empty() {
+        return ring;
+    }
+    let Some(intervals) = normalized_dash_array(values) else {
+        return Path::new();
+    };
+    let centerline =
+        rectangular_stroke_centerline(w, h, widths, radius, stroke.align).unwrap_or(outer);
+    let Some(effect) = PathEffect::dash(&intervals, 0.0) else {
+        return Path::new();
+    };
+    let filter_rec = StrokeRec::new(InitStyle::Hairline);
+    let Some((dashed, _)) = effect.filter_path(&centerline, &filter_rec, centerline.bounds())
+    else {
+        return Path::new();
+    };
+    let mut record = StrokeRec::new(InitStyle::Hairline);
+    record.set_stroke_style(widths.max(), false);
+    record.set_stroke_params(PaintCap::Butt, PaintJoin::Miter, stroke.miter_limit);
+    let mut builder = PathBuilder::new();
+    if !record.apply_to_path(&mut builder, &dashed.snapshot()) {
+        return Path::new();
+    }
+    skia_safe::op(&builder.snapshot(), &ring, PathOp::Intersect).unwrap_or_default()
+}
+
 fn oval_path(w: f32, h: f32) -> Path {
     let mut builder = PathBuilder::new();
     // Explicit start index keeps dash origin at the rightmost point across
@@ -456,14 +855,38 @@ fn draw_stroke(
     ctx: &PaintCtx,
 ) {
     let geometry = stroke_geometry(source, stroke);
+    draw_painted_geometry(canvas, &geometry, &stroke.paints, paint_box, ctx);
+}
+
+fn draw_painted_geometry(
+    canvas: &Canvas,
+    geometry: &Path,
+    paints: &Paints,
+    paint_box: PaintBox,
+    ctx: &PaintCtx,
+) {
     if geometry.is_empty() {
         return;
     }
-    for model in stroke.paints.iter() {
+    for model in paints.iter() {
         if let Some(paint) = sk_paint(model, paint_box, ctx) {
-            canvas.draw_path(&geometry, &paint);
+            canvas.draw_path(geometry, &paint);
         }
     }
+}
+
+fn draw_rectangular_stroke(
+    canvas: &Canvas,
+    w: f32,
+    h: f32,
+    radius: &RectangularCornerRadius,
+    widths: RectangularStrokeWidth,
+    stroke: &Stroke,
+    paint_box: PaintBox,
+    ctx: &PaintCtx,
+) {
+    let geometry = rectangular_stroke_geometry(w, h, radius, widths, stroke);
+    draw_painted_geometry(canvas, &geometry, &stroke.paints, paint_box, ctx);
 }
 
 /// Use Skia's native stroke rasterization for centered strokes. Converting a
@@ -475,9 +898,10 @@ fn native_stroke_paint(
     paint_box: PaintBox,
     ctx: &PaintCtx,
 ) -> Option<Paint> {
+    let width = uniform_stroke_width(stroke)?;
     let mut paint = sk_paint(model, paint_box, ctx)?;
     paint.set_style(PaintStyle::Stroke);
-    paint.set_stroke_width(stroke.width);
+    paint.set_stroke_width(width);
     paint.set_stroke_cap(sk_stroke_cap(stroke.cap));
     paint.set_stroke_join(sk_stroke_join(stroke.join));
     paint.set_stroke_miter(stroke.miter_limit);
@@ -503,11 +927,65 @@ fn draw_native_centered_stroke(
     }
 }
 
-fn text_path(lines: &[TextLine], font: &Font) -> Path {
+fn variable_text_typeface(base: &Typeface, fragment: &TextFragment) -> (Typeface, bool) {
+    let wght = FourByteTag::from_chars('w', 'g', 'h', 't');
+    let opsz = FourByteTag::from_chars('o', 'p', 's', 'z');
+    let mut coordinates = Vec::new();
+    let mut has_weight_axis = false;
+    for axis in base.variation_design_parameters().unwrap_or_default() {
+        if axis.tag == wght {
+            has_weight_axis = true;
+            coordinates.push(Coordinate {
+                axis: wght,
+                value: (fragment.style.font_weight as f32).clamp(axis.min, axis.max),
+            });
+        } else if axis.tag == opsz {
+            coordinates.push(Coordinate {
+                axis: opsz,
+                value: fragment.style.font_size.clamp(axis.min, axis.max),
+            });
+        }
+    }
+    if coordinates.is_empty() {
+        return (base.clone(), false);
+    }
+    let arguments = FontArguments::new().set_variation_design_position(VariationPosition {
+        coordinates: &coordinates,
+    });
+    match base.clone_with_arguments(&arguments) {
+        Some(typeface) => (typeface, has_weight_axis),
+        None => (base.clone(), false),
+    }
+}
+
+fn text_font(fragment: &TextFragment, ctx: &PaintCtx) -> Option<Font> {
+    let base = ctx.font.as_ref()?;
+    let (typeface, weight_axis_applied) = variable_text_typeface(base, fragment);
+    let mut font = Font::new(typeface, fragment.style.font_size);
+    if !weight_axis_applied {
+        // Non-variable proving-host fallback. The model and drawlist retain the
+        // exact numeric weight even though this fallback has only one heavier
+        // synthetic state.
+        font.set_embolden(fragment.style.font_weight >= 600);
+    }
+    if fragment.style.font_style_italic && !base.is_italic() {
+        // The proving host owns one face. A deterministic synthetic skew is a
+        // paint fallback, not the model semantics, when no italic face exists.
+        font.set_skew_x(-0.25);
+    }
+    Some(font)
+}
+
+fn text_path(lines: &[TextLine], ctx: &PaintCtx) -> Path {
     let mut builder = PathBuilder::new();
     for line in lines {
-        let path = Path::from_str(line.text.as_str(), (0.0, line.baseline_y), font);
-        builder.add_path(&path);
+        for fragment in &line.fragments {
+            if let Some(font) = text_font(fragment, ctx) {
+                let path =
+                    Path::from_str(fragment.text.as_str(), (fragment.x, line.baseline_y), &font);
+                builder.add_path(&path);
+            }
+        }
     }
     builder.snapshot()
 }
@@ -515,8 +993,8 @@ fn text_path(lines: &[TextLine], font: &Font) -> Path {
 /// Replay a [`DrawList`] onto a skia canvas under `view`. Drawing items compose
 /// `view.then(&item.world)` and set that matrix absolutely. Balanced scope
 /// commands persist across drawing items: opacity opens a backdrop-preserving
-/// group layer, while a content clip saves the node-local rectangular clip
-/// until `EndClip`.
+/// group layer, while a content clip saves the node-local box outline until
+/// `EndClip`.
 pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum Scope {
@@ -527,7 +1005,6 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
     let initial_save_count = canvas.save_count();
     let mut scopes = Vec::new();
     for item in &list.items {
-        let total = view.then(&item.world);
         match &item.kind {
             ItemKind::BeginOpacity { opacity } => {
                 // Copy the current backdrop into the group layer so descendant
@@ -555,10 +1032,21 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
                     canvas.restore();
                 }
             }
-            ItemKind::BeginClipRect { w, h } => {
+            ItemKind::BeginClipRect {
+                w,
+                h,
+                corner_radius,
+                corner_smoothing,
+            } => {
+                let total = view.then(&item.world);
                 canvas.save();
                 canvas.set_matrix(&skia_matrix(&total).into());
-                canvas.clip_rect(Rect::from_wh(*w, *h), None, false);
+                if corner_radius.is_zero() {
+                    canvas.clip_rect(Rect::from_wh(*w, *h), None, false);
+                } else {
+                    let path = rounded_rect_path(*w, *h, corner_radius, corner_smoothing.value());
+                    canvas.clip_path(&path, ClipOp::Intersect, true);
+                }
                 scopes.push(Scope::Clip);
             }
             ItemKind::EndClip => {
@@ -568,80 +1056,123 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
                     canvas.restore();
                 }
             }
-            ItemKind::RectFill { w, h, paints } => {
-                canvas.save();
-                canvas.set_matrix(&skia_matrix(&total).into());
-                let paint_box = PaintBox::from_size(*w, *h);
-                for model in paints.iter() {
-                    if let Some(paint) = sk_paint(model, paint_box, ctx) {
-                        canvas.draw_rect(Rect::from_wh(*w, *h), &paint);
-                    }
-                }
-                canvas.restore();
-            }
-            ItemKind::OvalFill { w, h, paints } => {
-                canvas.save();
-                canvas.set_matrix(&skia_matrix(&total).into());
-                let paint_box = PaintBox::from_size(*w, *h);
-                for model in paints.iter() {
-                    if let Some(paint) = sk_paint(model, paint_box, ctx) {
-                        canvas.draw_oval(Rect::from_wh(*w, *h), &paint);
-                    }
-                }
-                canvas.restore();
-            }
-            ItemKind::TextFill {
-                lines,
-                font_size,
-                paint_w,
-                paint_h,
+            ItemKind::RectFill {
+                w,
+                h,
+                corner_radius,
+                corner_smoothing,
                 paints,
             } => {
-                canvas.save();
-                canvas.set_matrix(&skia_matrix(&total).into());
-                if let Some(tf) = &ctx.font {
-                    let font = Font::new(tf.clone(), *font_size);
-                    let paint_box = PaintBox::from_size(*paint_w, *paint_h);
-                    for model in paints.iter() {
-                        if let Some(paint) = sk_paint(model, paint_box, ctx) {
-                            for line in lines.iter() {
-                                canvas.draw_str(
-                                    line.text.as_str(),
-                                    (0.0, line.baseline_y),
-                                    &font,
-                                    &paint,
-                                );
+                with_local_transform(canvas, view, &item.world, || {
+                    let paint_box = PaintBox::from_size(*w, *h);
+                    if corner_radius.is_zero() {
+                        for model in paints.iter() {
+                            if let Some(paint) = sk_paint(model, paint_box, ctx) {
+                                canvas.draw_rect(Rect::from_wh(*w, *h), &paint);
+                            }
+                        }
+                    } else {
+                        let path =
+                            rounded_rect_path(*w, *h, corner_radius, corner_smoothing.value());
+                        for model in paints.iter() {
+                            if let Some(paint) = sk_paint(model, paint_box, ctx) {
+                                canvas.draw_path(&path, &paint);
                             }
                         }
                     }
-                }
-                canvas.restore();
+                });
             }
-            ItemKind::RectStroke { w, h, stroke } => {
-                canvas.save();
-                canvas.set_matrix(&skia_matrix(&total).into());
-                let paint_box = PaintBox::from_size(*w, *h);
-                if stroke.align == StrokeAlign::Center {
-                    draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
-                        canvas.draw_rect(Rect::from_wh(*w, *h), paint);
-                    });
-                } else {
-                    draw_stroke(canvas, &rect_path(*w, *h), stroke, paint_box, ctx);
-                }
-                canvas.restore();
+            ItemKind::OvalFill { w, h, paints } => {
+                with_local_transform(canvas, view, &item.world, || {
+                    let paint_box = PaintBox::from_size(*w, *h);
+                    for model in paints.iter() {
+                        if let Some(paint) = sk_paint(model, paint_box, ctx) {
+                            canvas.draw_oval(Rect::from_wh(*w, *h), &paint);
+                        }
+                    }
+                });
+            }
+            ItemKind::TextFill {
+                lines,
+                paint_w,
+                paint_h,
+            } => {
+                with_local_transform(canvas, view, &item.world, || {
+                    let paint_box = PaintBox::from_size(*paint_w, *paint_h);
+                    for line in lines.iter() {
+                        for fragment in &line.fragments {
+                            if let Some(font) = text_font(fragment, ctx) {
+                                for model in fragment.paints.iter() {
+                                    if let Some(paint) = sk_paint(model, paint_box, ctx) {
+                                        canvas.draw_str(
+                                            fragment.text.as_str(),
+                                            (fragment.x, line.baseline_y),
+                                            &font,
+                                            &paint,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            ItemKind::RectStroke {
+                w,
+                h,
+                corner_radius,
+                corner_smoothing,
+                stroke,
+            } => {
+                with_local_transform(canvas, view, &item.world, || {
+                    let paint_box = PaintBox::from_size(*w, *h);
+                    match stroke.width.normalized() {
+                        StrokeWidth::None => {}
+                        StrokeWidth::Rectangular(widths) => draw_rectangular_stroke(
+                            canvas,
+                            *w,
+                            *h,
+                            corner_radius,
+                            widths,
+                            stroke,
+                            paint_box,
+                            ctx,
+                        ),
+                        StrokeWidth::Uniform(_) => {
+                            if corner_radius.is_zero() && stroke.align == StrokeAlign::Center {
+                                draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
+                                    canvas.draw_rect(Rect::from_wh(*w, *h), paint);
+                                });
+                            } else {
+                                let path = rounded_rect_path(
+                                    *w,
+                                    *h,
+                                    corner_radius,
+                                    corner_smoothing.value(),
+                                );
+                                if stroke.align == StrokeAlign::Center {
+                                    draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
+                                        canvas.draw_path(&path, paint);
+                                    });
+                                } else {
+                                    draw_stroke(canvas, &path, stroke, paint_box, ctx);
+                                }
+                            }
+                        }
+                    }
+                });
             }
             ItemKind::OvalStroke { w, h, stroke } => {
-                canvas.save();
-                canvas.set_matrix(&skia_matrix(&total).into());
-                let paint_box = PaintBox::from_size(*w, *h);
-                if stroke.align == StrokeAlign::Center {
-                    draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
-                        canvas.draw_oval(Rect::from_wh(*w, *h), paint);
-                    });
-                } else {
-                    draw_stroke(canvas, &oval_path(*w, *h), stroke, paint_box, ctx);
-                }
-                canvas.restore();
+                with_local_transform(canvas, view, &item.world, || {
+                    let paint_box = PaintBox::from_size(*w, *h);
+                    if stroke.align == StrokeAlign::Center {
+                        draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
+                            canvas.draw_oval(Rect::from_wh(*w, *h), paint);
+                        });
+                    } else {
+                        draw_stroke(canvas, &oval_path(*w, *h), stroke, paint_box, ctx);
+                    }
+                });
             }
             ItemKind::LineStroke {
                 x1,
@@ -652,53 +1183,51 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
                 paint_h,
                 stroke,
             } => {
-                canvas.save();
-                canvas.set_matrix(&skia_matrix(&total).into());
-                let paint_box = PaintBox::from_size(*paint_w, *paint_h);
-                if stroke.align == StrokeAlign::Center {
-                    draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
-                        canvas.draw_line((*x1, *y1), (*x2, *y2), paint);
-                    });
-                } else {
-                    draw_stroke(
-                        canvas,
-                        &line_path(*x1, *y1, *x2, *y2),
-                        stroke,
-                        paint_box,
-                        ctx,
-                    );
-                }
-                canvas.restore();
+                with_local_transform(canvas, view, &item.world, || {
+                    let paint_box = PaintBox::from_size(*paint_w, *paint_h);
+                    if stroke.align == StrokeAlign::Center {
+                        draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
+                            canvas.draw_line((*x1, *y1), (*x2, *y2), paint);
+                        });
+                    } else {
+                        draw_stroke(
+                            canvas,
+                            &line_path(*x1, *y1, *x2, *y2),
+                            stroke,
+                            paint_box,
+                            ctx,
+                        );
+                    }
+                });
             }
             ItemKind::TextStroke {
                 lines,
-                font_size,
                 paint_w,
                 paint_h,
                 stroke,
             } => {
-                canvas.save();
-                canvas.set_matrix(&skia_matrix(&total).into());
-                if let Some(tf) = &ctx.font {
-                    let font = Font::new(tf.clone(), *font_size);
+                with_local_transform(canvas, view, &item.world, || {
                     let paint_box = PaintBox::from_size(*paint_w, *paint_h);
                     if stroke.align == StrokeAlign::Center {
                         draw_native_centered_stroke(stroke, paint_box, ctx, |paint| {
                             for line in lines.iter() {
-                                canvas.draw_str(
-                                    line.text.as_str(),
-                                    (0.0, line.baseline_y),
-                                    &font,
-                                    paint,
-                                );
+                                for fragment in &line.fragments {
+                                    if let Some(font) = text_font(fragment, ctx) {
+                                        canvas.draw_str(
+                                            fragment.text.as_str(),
+                                            (fragment.x, line.baseline_y),
+                                            &font,
+                                            paint,
+                                        );
+                                    }
+                                }
                             }
                         });
                     } else {
-                        let source = text_path(lines, &font);
+                        let source = text_path(lines, ctx);
                         draw_stroke(canvas, &source, stroke, paint_box, ctx);
                     }
-                }
-                canvas.restore();
+                });
             }
         }
     }

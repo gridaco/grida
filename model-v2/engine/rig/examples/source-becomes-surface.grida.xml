@@ -26,8 +26,8 @@
       </gradient>
     </stroke>
     <container name="masthead" x="72" y="48" width="1456" height="44" layout="flex" main="space-between" cross="center">
-      <text name="wordmark" width="280" size="18" fill="#FFFFFF">GRIDA / XML</text>
-      <text name="edition" width="500" size="14" fill="#C4B5FD">AUTHORING SURFACE · DRAFT 0</text>
+      <text name="wordmark" width="280" font-size="18" fill="#FFFFFF">GRIDA / XML</text>
+      <text name="edition" width="500" font-size="14" fill="#C4B5FD">AUTHORING SURFACE · DRAFT 0</text>
       <text name="viewport-label" width="300" fill="#F8FAFC">1600 × 1000 / LIVE</text>
       <ellipse name="live-dot" x="end 314" y="center" width="10" height="10" flow="absolute" fill="#34D399">
         <stroke width="8" align="outside">
@@ -66,9 +66,9 @@
         <stroke join="bevel">
           <solid color="#FFFFFF" opacity="0.8"/>
         </stroke>
-        <text x="center" y="center" size="14" fill="#FFFFFF">FILE-FIRST DESIGN IR</text>
+        <text x="center" y="center" font-size="14" fill="#FFFFFF">FILE-FIRST DESIGN IR</text>
       </rect>
-      <text name="headline" y="72" width="720" size="72" fill="#F8FAFC"><stroke width="1.5" align="outside">
+      <text name="headline" y="72" width="720" font-size="72" fill="#F8FAFC"><stroke width="1.5" align="outside">
           <gradient kind="linear" from="0 0" to="1 1" opacity="0.68">
             <stop offset="0" color="#F9A8D4"/>
             <stop offset="0.48" color="#C4B5FD"/>
@@ -76,7 +76,7 @@
           </gradient>
         </stroke>MATERIAL,
 NOT MYSTERY.</text>
-      <text name="dek" y="286" width="650" size="20" fill="#CBD5E1">One inspectable tree for live interfaces,
+      <text name="dek" y="286" width="650" font-size="20" fill="#CBD5E1">One inspectable tree for live interfaces,
 presentations, and programmable graphics.</text>
       <container name="actions" y="384" width="auto" height="auto" layout="flex" cross="center" gap="20">
         <rect name="primary-action" width="300" height="64">
@@ -148,16 +148,16 @@ presentations, and programmable graphics.</text>
       </lens>
       <container name="syntax-rack" y="570" width="620" height="52" layout="flex" wrap="true" main="space-between" cross="center" gap="8 12">
         <ellipse width="132" height="30" fill="#1E1B4B">
-          <text x="center" y="center" size="12" fill="#DDD6FE">ORDERED PAINT</text>
+          <text x="center" y="center" font-size="12" fill="#DDD6FE">ORDERED PAINT</text>
         </ellipse>
         <ellipse width="132" height="30" fill="#172554">
-          <text x="center" y="center" size="12" fill="#BFDBFE">FLEX + FREE</text>
+          <text x="center" y="center" font-size="12" fill="#BFDBFE">FLEX + FREE</text>
         </ellipse>
         <ellipse width="132" height="30" fill="#083344">
-          <text x="center" y="center" size="12" fill="#A5F3FC">MULTI-STROKE</text>
+          <text x="center" y="center" font-size="12" fill="#A5F3FC">MULTI-STROKE</text>
         </ellipse>
         <ellipse width="132" height="30" fill="#052E16">
-          <text x="center" y="center" size="12" fill="#BBF7D0">AGENT-READY</text>
+          <text x="center" y="center" font-size="12" fill="#BBF7D0">AGENT-READY</text>
         </ellipse>
       </container>
       <group name="capability-legend" y="632" opacity="0.82">
@@ -169,7 +169,7 @@ presentations, and programmable graphics.</text>
             <solid color="#F7FEE7"/>
           </stroke>
         </ellipse>
-        <text x="34" width="620" size="15" fill="#CBD5E1">ONE TREE · RESPONSIVE BOXES · PRODUCTION PAINTS</text>
+        <text x="34" width="620" font-size="15" fill="#CBD5E1">ONE TREE · RESPONSIVE BOXES · PRODUCTION PAINTS</text>
       </group>
     </container>
     <container name="material-lab" x="850" y="150" width="678" height="680" clips="true">
@@ -326,14 +326,14 @@ presentations, and programmable graphics.</text>
             </stroke>
           </ellipse>
         </rect>
-        <text x="center" y="center" size="24"><fill/><stroke width="1.5" align="center">
+        <text x="center" y="center" font-size="24"><fill/><stroke width="1.5" align="center">
             <gradient kind="linear" from="0 0" to="1 1">
               <stop offset="0" color="#F9A8D4"/>
               <stop offset="0.5" color="#FFFFFF"/>
               <stop offset="1" color="#67E8F9"/>
             </gradient>
           </stroke>IR</text>
-        <text x="center" y="360" size="14" fill="#CFFAFE">PAINT · LAYOUT · TYPE</text>
+        <text x="center" y="360" font-size="14" fill="#CFFAFE">PAINT · LAYOUT · TYPE</text>
       </ellipse>
       <line name="instrument-line" x="64" y="586" width="550" rotation="-6">
         <stroke width="10" cap="round">
@@ -353,7 +353,7 @@ presentations, and programmable graphics.</text>
             <solid color="#34D399" opacity="0.2"/>
           </stroke>
         </ellipse>
-        <text x="28" width="500" size="13" fill="#D1FAE5">MATERIALIZED THROUGH THE SAME ENGINE PAINT MODEL</text>
+        <text x="28" width="500" font-size="13" fill="#D1FAE5">MATERIALIZED THROUGH THE SAME ENGINE PAINT MODEL</text>
       </group>
     </container>
     <container name="status-dock" x="72" y="872" width="1456" height="80" layout="flex" wrap="true" main="space-between" cross="center" gap="20 12" padding="16 20 16 20" fill="#090E1A">
@@ -368,8 +368,8 @@ presentations, and programmable graphics.</text>
         </gradient>
       </stroke>
       <container name="live-pipeline" width="600" height="48" grow="1" align="center" layout="flex" direction="column" main="center" gap="2">
-        <text width="520" size="11" fill="#A3E635">LIVE PIPELINE</text>
-        <text width="560" size="15" fill="#E2E8F0">SOURCE  &gt;  RESOLVE  &gt;  DRAWLIST  &gt;  PAINT</text>
+        <text width="520" font-size="11" fill="#A3E635">LIVE PIPELINE</text>
+        <text width="560" font-size="15" fill="#E2E8F0">SOURCE  &gt;  RESOLVE  &gt;  DRAWLIST  &gt;  PAINT</text>
       </container>
       <rect name="ordered-paints-chip" width="220" height="48" align="center" fill="#111827">
         <stroke width="2" align="center" join="round">
@@ -378,7 +378,7 @@ presentations, and programmable graphics.</text>
             <stop offset="1" color="#8B5CF6"/>
           </gradient>
         </stroke>
-        <text x="center" y="center" size="14" fill="#F5D0FE">PAINTS × ORDERED</text>
+        <text x="center" y="center" font-size="14" fill="#F5D0FE">PAINTS × ORDERED</text>
       </rect>
       <rect name="native-strokes-chip" width="220" height="48" align="center" fill="#111827">
         <stroke width="7" align="outside" join="round">
@@ -390,7 +390,7 @@ presentations, and programmable graphics.</text>
             <stop offset="1" color="#22D3EE"/>
           </gradient>
         </stroke>
-        <text x="center" y="center" size="14" fill="#CFFAFE">STROKES × NATIVE</text>
+        <text x="center" y="center" font-size="14" fill="#CFFAFE">STROKES × NATIVE</text>
       </rect>
     </container>
     <rect name="hidden-source-variant" x="72" y="72" width="320" height="180" hidden="true" fill="#FF00FF"/>

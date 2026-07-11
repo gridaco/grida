@@ -42,7 +42,7 @@ fn binding_forms_auto_sizes_and_common_visual_attributes_materialize() {
     <rect x="center" y="center 3" width="14" height="15"/>
     <rect x="span 1 2" y="start 4" height="16"/>
     <ellipse x="start 5" y="span 3 4" width="17"/>
-    <text width="auto" height="auto" size="21" opacity="1" hidden="false">x</text>
+    <text width="auto" height="auto" font-size="21" opacity="1" hidden="false">x</text>
     <container width="auto" height="auto" clips="false"/>
   </container>
 </grida>
@@ -139,7 +139,10 @@ fn binding_forms_auto_sizes_and_common_visual_attributes_materialize() {
     assert!(printed.contains("hidden=\"true\""), "{printed}");
     assert!(!printed.contains("hidden=\"false\""), "{printed}");
     assert!(!printed.contains("clips=\"false\""), "{printed}");
-    assert!(printed.contains("<text size=\"21\">x</text>"), "{printed}");
+    assert!(
+        printed.contains("<text font-size=\"21\">x</text>"),
+        "{printed}"
+    );
 }
 
 #[test]

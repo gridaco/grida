@@ -9,7 +9,7 @@
         </gradient>
         <image src="../../../../fixtures/images/border-diamonds.png" opacity="0.15"/>
       </fill>
-      <text x="24" y="24" width="272" size="28" fill="#FFFFFF">Ordered fills</text>
+      <text x="24" y="24" width="272" font-size="28" fill="#FFFFFF">Ordered fills</text>
       <text x="24" y="72" width="272" fill="#E0E7FF">solid + gradient + image</text>
     </rect>
     <rect name="radial-card" width="280" height="228">
@@ -20,7 +20,7 @@
           <stop offset="1" color="#7C2D12"/>
         </gradient>
       </fill>
-      <text x="24" y="24" width="232" size="22" fill="#FFFFFF">Unit-space radial</text>
+      <text x="24" y="24" width="232" font-size="22" fill="#FFFFFF">Unit-space radial</text>
       <ellipse x="108" y="116" width="64" height="64">
         <fill>
           <gradient kind="sweep">

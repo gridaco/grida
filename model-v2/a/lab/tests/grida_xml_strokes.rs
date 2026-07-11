@@ -38,7 +38,7 @@ fn repeated_strokes_preserve_geometry_paint_and_source_order() {
     assert_eq!(road.strokes.len(), 2);
 
     let bottom = &road.strokes[0];
-    assert_eq!(bottom.width, 12.0);
+    assert_eq!(bottom.width, StrokeWidth::Uniform(12.0));
     assert_eq!(bottom.align, StrokeAlign::Outside);
     assert_eq!(bottom.join, StrokeJoin::Round);
     assert_eq!(bottom.miter_limit, 6.0);
@@ -50,7 +50,7 @@ fn repeated_strokes_preserve_geometry_paint_and_source_order() {
     assert!(matches!(bottom.paints[0], Paint::Solid(_)));
 
     let top = &road.strokes[1];
-    assert_eq!(top.width, 3.0);
+    assert_eq!(top.width, StrokeWidth::Uniform(3.0));
     assert_eq!(top.align, StrokeAlign::Inside);
     assert_eq!(top.paints.len(), 2);
     assert!(matches!(top.paints[0], Paint::Solid(_)));
@@ -83,7 +83,7 @@ fn stroke_defaults_are_target_specific_and_round_trip() {
     let doc = grida_xml::parse(source).unwrap();
     for name in ["rect", "ellipse", "text"] {
         let stroke = &doc.get(named(&doc, name)).strokes[0];
-        assert_eq!(stroke.width, 1.0, "{name}");
+        assert_eq!(stroke.width, StrokeWidth::Uniform(1.0), "{name}");
         assert_eq!(stroke.align, StrokeAlign::Inside, "{name}");
         assert_eq!(stroke.cap, StrokeCap::Butt, "{name}");
         assert_eq!(stroke.join, StrokeJoin::Miter, "{name}");
@@ -166,7 +166,7 @@ fn default_empty_stroke_is_invalid_but_non_default_empty_geometry_survives() {
     .expect("non-default empty geometry remains authored state");
     let stroke = &doc.get(named(&doc, "dormant")).strokes[0];
     assert!(stroke.paints.is_empty());
-    assert_eq!(stroke.width, 2.0);
+    assert_eq!(stroke.width, StrokeWidth::Uniform(2.0));
     let printed = grida_xml::print(&doc).unwrap();
     assert!(printed.contains("<stroke width=\"2\"/>"), "{printed}");
     assert_eq!(doc, grida_xml::parse(&printed).unwrap());
@@ -297,7 +297,7 @@ fn writer_omits_default_empty_stroke_and_refuses_invalid_stroke_state() {
 
     let payload = doc.get(r).payload.clone();
     let mut invalid = Stroke::default_for(&payload).unwrap();
-    invalid.width = -1.0;
+    invalid.width = StrokeWidth::Uniform(-1.0);
     invalid
         .paints
         .push(Paint::Solid(SolidPaint::new(Color::BLACK)));

@@ -13,7 +13,7 @@
 //! between the two modes.
 
 use crate::math::{rotated_aabb_size, Affine, RectF};
-use crate::measure::measure_text;
+use crate::measure::measure_text_payload;
 use crate::model::*;
 use taffy::prelude::{auto, length, AvailableSpace, TaffyTree};
 use taffy::style::{
@@ -217,15 +217,13 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
     let mut h = span_h;
     let text_auto_height = h.is_none()
         && matches!(node.header.height, SizeIntent::Auto)
-        && matches!(&node.payload, Payload::Text { .. });
+        && node.payload.as_text().is_some();
 
     if w.is_none() {
         w = intent_extent_x(id, cx);
     }
     if h.is_none() && !text_auto_height {
-        // A span-resolved width IS a wrap constraint (census finding: the
-        // canonical Span{0,0} fill must re-wrap like Fixed/stretched widths).
-        h = intent_extent_y(id, span_w, cx);
+        h = intent_extent_y(id, cx);
     }
 
     // aspect_ratio resolves an under-specified axis only (G-5).
@@ -261,7 +259,7 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
     );
     if text_auto_height {
         let node = cx.doc.get(id);
-        let Payload::Text { content, font_size } = &node.payload else {
+        let Some(text) = node.payload.as_text() else {
             unreachable!("text_auto_height is set only for text")
         };
         let wrap_width = if span_w.is_some()
@@ -275,7 +273,7 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
             // floating-point floor can otherwise invent a wrap.
             None
         };
-        h = Some(measure_text(content, *font_size, wrap_width).1);
+        h = Some(measure_text_payload(text, wrap_width).1);
     }
 
     let mut hv = h.unwrap_or_else(|| {
@@ -367,29 +365,22 @@ fn intent_extent_x(id: NodeId, cx: &mut Ctx) -> Option<f32> {
     match node.header.width {
         SizeIntent::Fixed(v) => Some(v),
         SizeIntent::Auto => match &node.payload {
-            Payload::Text { content, font_size } => Some(measure_text(content, *font_size, None).0),
+            payload if payload.as_text().is_some() => {
+                Some(measure_text_payload(payload.as_text().expect("matched text"), None).0)
+            }
             Payload::Frame { .. } => Some(hug_size(id, cx).0),
             _ => None,
         },
     }
 }
 
-/// Natural height per kind; text height depends on the resolved width
-/// (Fixed width or a Span-resolved width ⇒ wrap constraint; Auto ⇒
-/// unconstrained single line). The census found the Span arm missing —
-/// Span{0,0} is the canonical free-context fill and must re-wrap.
-fn intent_extent_y(id: NodeId, span_w: Option<f32>, cx: &mut Ctx) -> Option<f32> {
+/// Natural height per kind. Auto-height text is deliberately absent here: it
+/// remeasures after final width constraints in [`extent_of`].
+fn intent_extent_y(id: NodeId, cx: &mut Ctx) -> Option<f32> {
     let node = cx.doc.get(id);
     match node.header.height {
         SizeIntent::Fixed(v) => Some(v),
         SizeIntent::Auto => match &node.payload {
-            Payload::Text { content, font_size } => {
-                let constraint = span_w.or(match node.header.width {
-                    SizeIntent::Fixed(w) => Some(w),
-                    SizeIntent::Auto => None,
-                });
-                Some(measure_text(content, *font_size, constraint).1)
-            }
             Payload::Frame { .. } => Some(hug_size(id, cx).1),
             _ => None,
         },
@@ -750,7 +741,7 @@ fn commit(id: NodeId, box_rect: RectF, cx: &mut Ctx) {
         Payload::Frame { layout, .. } => ChildProgram::Frame(*layout),
         Payload::Shape { .. } => ChildProgram::Free,
         Payload::Group | Payload::Lens { .. } => ChildProgram::Derived,
-        Payload::Text { .. } => ChildProgram::Leaf,
+        Payload::Text { .. } | Payload::AttributedText { .. } => ChildProgram::Leaf,
     };
     match child_program {
         ChildProgram::Frame(layout) => {
@@ -886,10 +877,7 @@ fn report_flow_fields_inert(id: NodeId, cx: &mut Ctx) {
 // Flex via taffy (per-container run)
 // ---------------------------------------------------------------------------
 
-struct TextCtx {
-    content: String,
-    font_size: f32,
-}
+struct TextCtx(Payload);
 
 struct FlexOut {
     container: (f32, f32),
@@ -971,7 +959,7 @@ fn flex_layout(
             style.max_size.height = length(v);
         }
 
-        let is_text = matches!(child.payload, Payload::Text { .. });
+        let is_text = child.payload.as_text().is_some();
         let basis: (f32, f32);
         let taffy_child = if contribute_aabb {
             // Fixed AABB contribution computed from resolved size only (§5).
@@ -984,10 +972,7 @@ fn flex_layout(
         } else if is_text {
             // Measured kind: taffy drives re-measure at layout-imposed
             // extents (L-5) through the measure closure.
-            let (content, font_size) = match &child.payload {
-                Payload::Text { content, font_size } => (content.clone(), *font_size),
-                _ => unreachable!(),
-            };
+            let text_payload = child.payload.clone();
             match child.header.width {
                 SizeIntent::Fixed(v) => style.size.width = length(v),
                 SizeIntent::Auto => style.size.width = auto(),
@@ -1006,7 +991,7 @@ fn flex_layout(
                 }
             }
             basis = (0.0, 0.0); // unused for θ=0 slots
-            tree.new_leaf_with_context(style, TextCtx { content, font_size })
+            tree.new_leaf_with_context(style, TextCtx(text_payload))
                 .unwrap()
         } else {
             let b = extent_of(*child_id, None, cx);
@@ -1134,7 +1119,10 @@ fn flex_layout(
                         AvailableSpace::Definite(w) => Some(w),
                         _ => None,
                     });
-                    let (w, h) = measure_text(&t.content, t.font_size, constraint);
+                    let (w, h) = measure_text_payload(
+                        t.0.as_text().expect("text measure context carries text"),
+                        constraint,
+                    );
                     taffy::geometry::Size {
                         width: known.width.unwrap_or(w),
                         height: known.height.unwrap_or(h),
@@ -1192,38 +1180,61 @@ fn compose_world(id: NodeId, parent_world: Affine, cx: &mut Ctx) {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct StrokeOutsets {
+    top: f32,
+    right: f32,
+    bottom: f32,
+    left: f32,
+}
+
+impl StrokeOutsets {
+    fn include(&mut self, other: StrokeOutsets) {
+        self.top = self.top.max(other.top);
+        self.right = self.right.max(other.right);
+        self.bottom = self.bottom.max(other.bottom);
+        self.left = self.left.max(other.left);
+    }
+}
+
 /// Maximum outward coverage contributed by authored strokes in node-local
 /// coordinates. Layout remains based on the source box; only visual bounds
-/// read this expansion. Open line strokes are centered by definition, so their
-/// cap/join details are conservatively covered by half the width on every side.
-fn effective_stroke_outset(node: &Node) -> f32 {
+/// read this expansion. Repeated stroke geometries overlap independently, so
+/// each edge takes their maximum outward reach rather than summing widths.
+fn effective_stroke_outsets(node: &Node) -> StrokeOutsets {
     let is_line = matches!(
         &node.payload,
         Payload::Shape {
             desc: ShapeDesc::Line
         }
     );
-    node.strokes
+    let mut outsets = StrokeOutsets::default();
+    for stroke in node
+        .strokes
         .iter()
-        .filter(|stroke| stroke.visible())
-        .map(|stroke| {
-            if is_line {
-                stroke.width / 2.0
-            } else {
-                let base = match stroke.align {
-                    StrokeAlign::Inside => 0.0,
-                    StrokeAlign::Center => stroke.width / 2.0,
-                    StrokeAlign::Outside => stroke.width,
-                };
-                if matches!(node.payload, Payload::Text { .. }) && stroke.join == StrokeJoin::Miter
-                {
-                    base * stroke.miter_limit
-                } else {
-                    base
-                }
+        .filter(|stroke| stroke.renderable_for(&node.payload, node.corner_smoothing))
+    {
+        let widths = stroke.width.rectangular();
+        let mut factor = if is_line {
+            0.5
+        } else {
+            match stroke.align {
+                StrokeAlign::Inside => 0.0,
+                StrokeAlign::Center => 0.5,
+                StrokeAlign::Outside => 1.0,
             }
-        })
-        .fold(0.0, f32::max)
+        };
+        if node.payload.as_text().is_some() && stroke.join == StrokeJoin::Miter {
+            factor *= stroke.miter_limit;
+        }
+        outsets.include(StrokeOutsets {
+            top: widths.stroke_top_width * factor,
+            right: widths.stroke_right_width * factor,
+            bottom: widths.stroke_bottom_width * factor,
+            left: widths.stroke_left_width * factor,
+        });
+    }
+    outsets
 }
 
 fn intersect_aabbs(a: RectF, b: RectF) -> Option<RectF> {
@@ -1248,12 +1259,12 @@ fn compute_world_aabb(id: NodeId, cx: &mut Ctx) -> Option<RectF> {
     cx.out.world[id as usize]?; // hidden subtree
     let world = cx.out.world[id as usize].unwrap();
     let own_box = cx.out.box_in_parent[id as usize].unwrap();
-    let stroke_outset = effective_stroke_outset(node);
+    let stroke_outsets = effective_stroke_outsets(node);
     let local_rect = RectF {
-        x: -stroke_outset,
-        y: -stroke_outset,
-        w: own_box.w + stroke_outset * 2.0,
-        h: own_box.h + stroke_outset * 2.0,
+        x: -stroke_outsets.left,
+        y: -stroke_outsets.top,
+        w: own_box.w + stroke_outsets.left + stroke_outsets.right,
+        h: own_box.h + stroke_outsets.top + stroke_outsets.bottom,
     };
 
     let mut aabb = match node.payload {

@@ -10,7 +10,7 @@ const COMPOSED: &str = r#"
 <grida version="0">
   <container width="800" height="450">
     <rect x="100" y="50" width="200" height="100">
-      <text x="10" y="12" size="10">content</text>
+      <text x="10" y="12" font-size="10">content</text>
     </rect>
   </container>
 </grida>
@@ -257,8 +257,8 @@ fn numeric_domains_are_checked_at_parse_time() {
             "width must be non-negative",
         ),
         (
-            r#"<grida version="0"><container><text size="0">x</text></container></grida>"#,
-            "size must be greater than zero",
+            r#"<grida version="0"><container><text font-size="0">x</text></container></grida>"#,
+            "font-size must be greater than zero",
         ),
         (
             r#"<grida version="0"><container><text opacity="1.1">x</text></container></grida>"#,
@@ -676,6 +676,8 @@ fn print_roundtrip_ignores_arena_ids_but_not_tree_integrity() {
                 desc: ShapeDesc::Rect,
             },
             children: vec![],
+            corner_radius: RectangularCornerRadius::default(),
+            corner_smoothing: CornerSmoothing::default(),
             fills: Paints::default(),
             strokes: vec![],
         },
@@ -694,6 +696,8 @@ fn print_roundtrip_ignores_arena_ids_but_not_tree_integrity() {
             clips_content: false,
         },
         children: vec![],
+        corner_radius: RectangularCornerRadius::default(),
+        corner_smoothing: CornerSmoothing::default(),
         fills: Paints::default(),
         strokes: vec![],
     };

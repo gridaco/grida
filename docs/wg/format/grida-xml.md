@@ -46,16 +46,18 @@ It is its own vocabulary, not an SVG profile or an HTML serialization.
 
 Draft 0 is deliberately small. It establishes the document boundary, the box
 and nesting model, a minimal primitive set, ordered typed paint, multiple
-stroke geometries, text boxes, free bindings, and flex layout. Later drafts
-can add effects, vector geometry, resource declarations, typography, and
+stroke geometries, per-side box strokes, rounded box geometry, text boxes with
+flat attributed runs, free bindings, and flex layout. Later drafts can add
+effects, vector geometry, resource declarations, advanced typography, and
 reuse facilities without changing the central tree model.
 
 ## Design requirements
 
 1. **One obvious tree.** Outside explicitly typed property subtrees such as
-   `fill` and `stroke`, element nesting is scene nesting. Source order is
-   painter order among sibling nodes, stroke geometries, and paints within a
-   channel. A node's children live in that node's local coordinate space.
+   `fill` and `stroke`, and the contextual `tspan` text-run element, element
+   nesting is scene nesting. Source order is painter order among sibling nodes,
+   stroke geometries, and paints within a channel. A node's children live in
+   that node's local coordinate space.
 2. **Composition instead of combined node kinds.** Every Draft 0 render
    element except `text` can contain children. A rectangle containing text is
    written as a `rect` containing a `text` element, not as a special
@@ -77,6 +79,10 @@ reuse facilities without changing the central tree model.
    remain structured. Each stroke geometry owns the same ordered paint value,
    while repetition is a declared extension to the current production
    single-geometry scene model.
+8. **Flat, explicit attributed text.** `text` owns the paragraph, default text
+   style, and node paint. A direct `tspan` child changes explicit kebab-case
+   run properties for only its own characters. It is neither a scene node nor
+   an embedded HTML or SVG positioning language.
 
 ## File identity
 
@@ -128,20 +134,23 @@ instructions are not; text uses ordinary escaped XML character data.
 
 ### Core node taxonomy
 
-| Element     | Box source                      | Children | Meaning                                             |
-| ----------- | ------------------------------- | -------- | --------------------------------------------------- |
-| `container` | Declared; `auto` may hug        | Yes      | Boxed composition and the sole flex-layout owner    |
-| `rect`      | Declared                        | Yes      | Parametric rectangle realized in its box            |
-| `ellipse`   | Declared                        | Yes      | Parametric ellipse realized in its box              |
-| `line`      | Declared width; zero-height box | Yes      | Horizontal local line, orientable by rotation       |
-| `text`      | Measured under box constraints  | No       | Unicode text flowed into an auto or fixed text box  |
-| `group`     | Derived from child bounds       | Yes      | Logical subtree with an explicit local origin       |
-| `lens`      | Derived from child bounds       | Yes      | Group whose ordered operations affect painting only |
+| Element     | Box source                      | Render children | Meaning                                             |
+| ----------- | ------------------------------- | --------------- | --------------------------------------------------- |
+| `container` | Declared; `auto` may hug        | Yes             | Boxed composition and the sole flex-layout owner    |
+| `rect`      | Declared                        | Yes             | Parametric rectangle realized in its box            |
+| `ellipse`   | Declared                        | Yes             | Parametric ellipse realized in its box              |
+| `line`      | Declared width; zero-height box | Yes             | Horizontal local line, orientable by rotation       |
+| `text`      | Measured under box constraints  | No              | Unicode text with optional flat attributed runs     |
+| `group`     | Derived from child bounds       | Yes             | Logical subtree with an explicit local origin       |
+| `lens`      | Derived from child bounds       | Yes             | Group whose ordered operations affect painting only |
 
-`text` is the only leaf in Draft 0. Every other node accepts an ordered list
-of render-node children, including each primitive element. A paintable parent
-paints its fill first, then its children in document order, then its own
-strokes. Later siblings paint above earlier siblings.
+`text` accepts no render-node children. It alone may contain direct, flat
+`tspan` contexts in addition to character data and its leading paint
+properties. `tspan` is not a render node and does not have a box, identity,
+transform, opacity, layer position, or child scene. Every other node accepts an
+ordered list of render-node children, including each primitive element. A
+paintable parent paints its fill first, then its children in document order,
+then its own strokes. Later siblings paint above earlier siblings.
 
 `shape` is a reserved element name, not a Draft 0 render element. It is held
 for a possible future custom-shape definition. This reservation assigns no
@@ -155,7 +164,7 @@ child:
 
 ```xml
 <rect width="240" height="64" fill="#7C3AED">
-  <text x="center" y="center" size="18" fill="#FFFFFF">Continue</text>
+  <text x="center" y="center" font-size="18" fill="#FFFFFF">Continue</text>
 </rect>
 ```
 
@@ -185,7 +194,7 @@ still unknown syntax to a Draft 0 reader.
 
 ## Common authored attributes
 
-Only attributes applicable to a node may appear on that node.
+Only attributes applicable to an element may appear on that element.
 
 | Attribute                 | Value                                     | Default    | Contract                                                         |
 | ------------------------- | ----------------------------------------- | ---------- | ---------------------------------------------------------------- |
@@ -195,9 +204,14 @@ Only attributes applicable to a node may appear on that node.
 | `min-width`, `min-height` | non-negative finite number                | none       | Sets a lower bound on a non-derived box axis                     |
 | `max-width`, `max-height` | non-negative finite number                | none       | Sets an upper bound on a non-derived box axis                    |
 | `aspect-ratio`            | positive finite `width:height` pair       | none       | Resolves one otherwise under-specified box axis                  |
+| `corner-radius`           | one or four radii, optionally elliptical  | `0`        | Rounds the outline of a `container` or `rect`                    |
+| `corner-smoothing`        | finite number in `[0, 1]`                 | `0`        | Smooths circular corners on a `container` or `rect`              |
 | `rotation`                | finite number                             | `0`        | Visual rotation about box center; about origin for derived kinds |
 | `flip-x`, `flip-y`        | `true` or `false`                         | `false`    | Reflects paint horizontally or vertically before rotation        |
 | `fill`                    | `#RGB` or `#RRGGBB`                       | none       | Canonical compact form for one ordinary solid fill               |
+| `font-size`               | positive finite number                    | `16`       | Default size on `text`; optional run override on `tspan`         |
+| `font-weight`             | integer from `1` through `1000`           | `400`      | Default weight on `text`; optional run override on `tspan`       |
+| `font-style`              | `normal` or `italic`                      | `normal`   | Default style on `text`; optional run override on `tspan`        |
 | `opacity`                 | finite number in `[0, 1]`                 | `1`        | Composites the node and its descendants                          |
 | `hidden`                  | `true` or `false`                         | `false`    | Removes the subtree from layout and painting                     |
 | `flow`                    | `in` or `absolute`                        | `in`       | Opts a child into or out of a flex parent's flow                 |
@@ -221,9 +235,11 @@ rotated; neither operation writes a matrix or negative extent into source.
 
 `fill="#fff"` means exactly one visible, fully opaque, normal-blend solid
 paint. It is not legacy syntax: it is the canonical compact form for the most
-common fill. It cannot coexist with the structured `<fill>` channel. `fill` is
-valid on `container`, `rect`, `ellipse`, and `text`; it is invalid on `line`,
-`group`, and `lens`.
+common fill. On a render node it cannot coexist with the structured `<fill>`
+channel. Node `fill` is valid on `container`, `rect`, `ellipse`, and `text`; it
+is invalid on `line`, `group`, and `lens`. Contextually, `fill` on `tspan` is a
+single-solid run override rather than a second node paint channel. Omitting it
+leaves the run attached to the `text` node's fill stack.
 
 ## Paint channels and vocabulary
 
@@ -242,6 +258,11 @@ geometry, and each occurrence owns one paint channel. Neither is a render node
 or an extra compositing layer. Typed paint children are ordered bottom to top:
 the first is painted first, and each later paint composites above the
 accumulated result.
+
+A contextual `tspan` may carry one optional run-fill override using the same
+`fill` attribute-or-channel partition and the same ordered `Paints` value. It
+does not introduce a second paint abstraction. Omission means node-fill
+fallback rather than an independent run default.
 
 This is the canonical expanded form for a rich fill:
 
@@ -266,7 +287,8 @@ A node's structural paint children must precede character data and render-node
 children. When both channels occur, the optional `fill` element comes first,
 followed by zero or more `stroke` elements. `container`, `rect`, `ellipse`, and
 `text` accept fills and strokes. `line` accepts strokes only. `group` and
-`lens` accept neither.
+`lens` accept neither. The contextual `tspan` exception accepts one `fill` as
+its literal first child and no `stroke`.
 
 The direct paint vocabulary is:
 
@@ -294,10 +316,14 @@ element's language default:
 | `rect`, `ellipse`, `text` | one opaque normal-blend black solid |
 | `line`, `group`, `lens`   | not fillable                        |
 
+`tspan` has no independent language-default paint stack. Omitted run fill
+means `None` and therefore uses the owning `text` node's effective fill stack;
+an explicit empty run fill means no glyph ink for that run.
+
 `<fill/>` differs from omission on primitives and text: it suppresses the
 default black paint. A reader also accepts a structured one-solid channel, but
-there is one canonical writer representation. The writer applies these rules
-in order:
+there is one canonical writer representation. For a node fill, the writer
+applies these rules in order:
 
 1. If the fill stack equals the element default, omit both forms.
 2. If it is exactly one visible, fully opaque, normal-blend solid, emit the
@@ -343,35 +369,142 @@ multi-stroke keeps one shape, one layout identity, and one editable outline.
 </rect>
 ```
 
-The uniform Draft 0 stroke geometry is:
+The Draft 0 stroke geometry is:
 
-| Attribute     | Value                                      | Default                      | Valid targets                          |
-| ------------- | ------------------------------------------ | ---------------------------- | -------------------------------------- |
-| `width`       | non-negative finite logical pixels         | `1`                          | every `stroke`                         |
-| `align`       | `inside`, `center`, or `outside`           | `inside`; `center` on `line` | every `stroke`; line must be `center`  |
-| `cap`         | `butt`, `round`, or `square`               | `butt`                       | `line`                                 |
-| `join`        | `miter`, `round`, or `bevel`               | `miter`                      | `container`, `rect`                    |
-| `miter-limit` | positive finite number                     | `4`                          | `container`, `rect`                    |
-| `dash-array`  | space-separated non-negative finite values | absent, meaning solid        | `container`, `rect`, `ellipse`, `line` |
+| Attribute     | Value                                      | Default                      | Valid targets                                    |
+| ------------- | ------------------------------------------ | ---------------------------- | ------------------------------------------------ |
+| `width`       | one or four non-negative finite pixels     | `1`                          | every `stroke`; four only on `container`, `rect` |
+| `align`       | `inside`, `center`, or `outside`           | `inside`; `center` on `line` | every `stroke`; line must be `center`            |
+| `cap`         | `butt`, `round`, or `square`               | `butt`                       | `line`                                           |
+| `join`        | `miter`, `round`, or `bevel`               | `miter`                      | `container`, `rect`                              |
+| `miter-limit` | positive finite number                     | `4`                          | `container`, `rect`                              |
+| `dash-array`  | space-separated non-negative finite values | absent, meaning solid        | `container`, `rect`, `ellipse`, `line`           |
 
 When present, `dash-array` contains at least one value and is not all zero.
 Odd-length arrays repeat once to make an even dash-gap cycle. An attribute on a
 target outside this table is an error rather than dormant state. A `line` is an
 open path and accepts only `align="center"`, because inside and outside are not
-defined for it. Per-side widths, variable-width profiles, dash offset, and
-endpoint markers are later vocabulary.
+defined for it. Variable-width profiles, dash offset, and endpoint markers are
+later vocabulary.
 
-Stroke width is distributed relative to the source outline. `center` places
-half the width on each side; `inside` places the full width toward the filled
-region; `outside` places it away from the filled region. For text, that region
-is each shaped glyph's filled outline, including the inverse direction around
-counters. Line caps and rectangular joins use the declared `cap`, `join`, and
-`miter-limit` values.
+#### Uniform and per-side width
+
+The `width` attribute is the lexical form of the existing stroke-width choice;
+it is not a second geometry abstraction. One number is a uniform width.
+Exactly four numbers are rectangular widths in top, right, bottom, left order:
+
+```xml
+<stroke width="6">
+  <solid color="#2563EB"/>
+</stroke>
+
+<stroke width="2 8 12 4" align="outside">
+  <solid color="#7C3AED"/>
+</stroke>
+```
+
+Every number is a non-negative finite logical-pixel value. Lists of two or
+three numbers, commas, units, and empty lists are invalid. The four-value form
+is valid only on `container` and `rect`, even when all four values happen to be
+equal; applicability is checked before value normalization. Side names refer
+to the node's untransformed local box and are not permuted in source by flips,
+rotation, or ancestor transforms.
+
+Omitted `width` means the uniform default `1`. A reader normalizes four equal
+positive values to the uniform state and four zero values to the no-width
+state. A canonical writer omits uniform `1`, writes every other positive
+uniform width as one number, writes a present no-width state as `width="0"`,
+and writes four values only when they differ. Thus `width="3 3 3 3"` is
+accepted on a box but canonicalizes to `width="3"`; `width="0 0 0 0"`
+canonicalizes to `width="0"`. A zero-width painted stroke remains authored
+intent and is not deleted merely because it has no current coverage.
+
+Each repeated `stroke` owns its width independently. A four-value width does
+not alter, inherit from, or accumulate with any earlier stroke. Its direct
+typed paints all share one resulting ring; Draft 0 does not attach separate
+paint stacks to the four sides.
+
+Let `t`, `r`, `b`, and `l` be the resolved top, right, bottom, and left widths.
+Alignment supplies the outward and inward fractions used to construct the
+stroke's outer and inner contours:
+
+| Alignment | Outward fraction | Inward fraction |
+| --------- | ---------------- | --------------- |
+| `inside`  | `0`              | `1`             |
+| `center`  | `1/2`            | `1/2`           |
+| `outside` | `1`              | `0`             |
+
+The outer box expands each local side by its width times the outward fraction;
+the inner box insets it by its width times the inward fraction. At a corner
+with horizontal-adjacent width `h`, vertical-adjacent width `v`, and source
+radius `(rx, ry)`, the two contour radii are:
+
+- outer: `(rx + outward * h, ry + outward * v)`;
+- inner: `(max(0, rx - inward * h), max(0, ry - inward * v))`.
+
+For example, the top-left corner uses `h = l` and `v = t`; the bottom-right
+uses `h = r` and `v = b`. Each outer and inner contour then applies the
+ordinary rounded-rectangle non-overlap rule. These operations resolve
+coverage only; they never rewrite the four authored widths or resize the
+layout box.
+
+Responsive geometry can resolve smaller than its authored stroke widths, so
+overconsumption is not a parse error. If either inner-box extent is zero or
+negative after the insets, the inner contour is empty and coverage saturates
+to the outer contour instead of producing inverted geometry.
+
+Per-side widths support every stroke alignment, ordinary circular or
+elliptical corner radii, and `dash-array`. Dash traversal remains one
+continuous clockwise contour. A zero-width side suppresses coverage on that
+side but does not remove its length from the dash metric or restart the dash
+pattern.
+
+Two current compatibility boundaries are strict rather than lossy:
+
+- a per-side width requires `corner-smoothing="0"`, because the existing
+  per-side ring cannot follow a smoothed source outline;
+- it admits only the default `join="miter"` and `miter-limit="4"`, because
+  round and bevel joins and non-default miter limits are not independently
+  represented by the existing rectangular ring.
+
+These restrictions apply even when a conflicting value would currently have
+no visible effect. A reader or writer must reject the combination rather than
+retain state that rendering ignores. Uniform-width strokes retain the full
+`join` and `miter-limit` grammar already defined above.
+
+##### Considered width syntax
+
+1. **One-or-four values on `width` — accepted.** It preserves the common
+   scalar form, makes rectangular width a surgical one-token-per-side edit,
+   and maps directly to the uniform-or-rectangular model choice.
+2. **A base width plus named side overrides — rejected as canonical.** It
+   exposes unresolved fallback state and permits many equivalent spellings.
+3. **Four `top-width`, `right-width`, `bottom-width`, and `left-width`
+   attributes — rejected.** They are explicit but disproportionately verbose
+   for four scalar values and would introduce a second width vocabulary.
+4. **A nested `width` or `sides` element — rejected.** It adds structural
+   geometry among direct paint children without representing another model
+   object.
+5. **CSS two- and three-value expansion — rejected.** Draft 0 requires either
+   one value or all four so no value is duplicated by an implicit positional
+   rule.
+6. **A separate `widths` attribute — rejected.** Singular and plural names for
+   one model choice would weaken the one-spelling rule.
+
+Uniform stroke width is distributed relative to the source outline. `center`
+places half the width on each side; `inside` places the full width toward the
+filled region; `outside` places it away from the filled region. For text, that
+region is each shaped glyph's filled outline, including the inverse direction
+around counters. Line caps and uniform rectangular joins use the declared
+`cap`, `join`, and `miter-limit` values.
 
 Dash traversal begins at the line's local start point, at a rectangle's
 top-left corner moving clockwise, and at an ellipse's rightmost point moving
-clockwise. The first dash begins at that origin because Draft 0 has no dash
-offset. Each distinct contour restarts the pattern.
+clockwise. On a rounded rectangle, the rectangular origin becomes the point
+where the top-left corner curve joins the top edge, still moving toward the
+top-right. The first dash begins at that origin because Draft 0 has no dash
+offset. Each distinct contour restarts the pattern. A zero-width side of a
+per-side stroke still advances this traversal before the following side.
 
 Stroke elements are ordered in painter order: the first stroke is bottommost
 and the last is topmost. Paints within each stroke are independently ordered
@@ -745,6 +878,80 @@ already determined and never invents a scale transform. Using an aspect ratio
 where neither axis can provide the other, or redundantly declaring it when
 both axes are already supplied, is an error.
 
+### Rounded box geometry
+
+`container` and `rect` accept `corner-radius` and `corner-smoothing`. Both
+properties modify the node's original rectangular outline; they do not create
+a second shape, resize the layout box, or change the rectangular coordinate
+space used by its paints.
+
+`corner-radius` contains one or exactly four non-negative finite logical-pixel
+values. One value applies to every corner. Four values are ordered top-left,
+top-right, bottom-right, bottom-left. An optional slash followed by an
+independent one-or-four-value list makes the radii elliptical: values before
+the slash are horizontal radii (`rx`), and values after it are vertical radii
+(`ry`). Without a slash, each vertical radius equals its corresponding
+horizontal radius.
+
+```xml
+<rect width="320" height="180" corner-radius="24"/>
+<rect width="320" height="180" corner-radius="32 20 12 4"/>
+<rect width="320" height="180" corner-radius="32 20 12 4 / 18 12 8 4"/>
+```
+
+Lists of two or three values are invalid; Draft 0 deliberately avoids the
+positional expansion rules of CSS shorthand. A slash must have a valid list on
+both sides and may appear only once. A canonical writer separates values with
+one ASCII space and spells the separator as `/`. The default is four zero
+radius pairs. If either effective component of a pair is zero, that corner is
+square.
+
+Corner names refer to the node's untransformed local box. Native flips,
+rotation, and ancestor transforms apply to the completed outline afterward;
+they never rewrite or permute the authored top-left, top-right, bottom-right,
+and bottom-left values.
+
+For an ordinary rounded outline (`corner-smoothing="0"`), overlapping authored
+radii resolve with one proportional scale factor for all eight radius
+components. Let `W` and `H` be the resolved width and height. The factor is the
+minimum of `1` and each applicable edge ratio:
+
+- `W / (rx_top-left + rx_top-right)`;
+- `W / (rx_bottom-left + rx_bottom-right)`;
+- `H / (ry_top-left + ry_bottom-left)`;
+- `H / (ry_top-right + ry_bottom-right)`.
+
+An edge ratio whose radius sum is zero imposes no constraint. Multiplying all
+radii by this one factor prevents overlap while preserving their relative
+proportions. Normalization is a resolved geometry operation: it never rewrites
+the authored `corner-radius` value.
+
+`corner-smoothing` is a finite scalar in `[0, 1]`; `0` is the ordinary
+elliptical rounded-rectangle outline. Nonzero values request progressively
+smoothed corners. The current production smoothing renderer is circular-only:
+it collapses each elliptical `(rx, ry)` pair to a circle. Draft 0 therefore
+rejects a nonzero `corner-smoothing` when any corner has unequal horizontal and
+vertical radii, rather than silently changing authored geometry. Smoothed
+elliptical corners remain unavailable pending lossless renderer support.
+Nonzero smoothing with four zero radius pairs is valid dormant intent and
+remains serializable even though it has no visible effect.
+
+For a nonzero smoothing value, Draft 0 follows the existing production
+smoothed-box profile instead: each circular radius is independently capped to
+half the box's shorter side before constructing its curve. Unlike ordinary
+edge-sum normalization, that cap may change a lone large corner and does not
+rescale the other authored corners. It is resolved geometry, never a source
+rewrite. Keeping this difference explicit projects the current Grida model and
+renderer without pretending the ordinary and continuous-corner algorithms are
+the same operation.
+
+The same resolved outline is the source for a node's fill, every repeated
+stroke, and a container's descendant clip when `clips="true"`. Each stroke is
+still derived independently from that original outline. Paint coordinates
+continue to use the full rectangular node box, including transparent space
+outside the rounded coverage; rounding or smoothing never shrinks or warps the
+paint box.
+
 ## Box semantics by element
 
 ### Container
@@ -767,9 +974,10 @@ box, then add the container's left and top padding; therefore `x="0"` and
 
 A container may carry a fill and repeated strokes and may clip descendant
 paint with `clips="true"`. Its fill is painted first. Its children are then
-painted under the descendant clip, if enabled; after that clip is removed, the
-container's strokes are painted last. The default container fill is empty and
-the default stroke list is empty.
+painted under the descendant clip, if enabled; that clip uses the container's
+resolved rounded or smoothed outline. After the descendant clip is removed,
+the container's strokes are painted last. The default container fill is empty
+and the default stroke list is empty.
 
 ### Primitive elements
 
@@ -779,6 +987,8 @@ Draft 0 recognizes the direct primitive elements `rect`, `ellipse`, and
 - `rect` and `ellipse` require each axis to be supplied by either a fixed
   numeric size or a `span` binding. `aspect-ratio` may supply exactly one
   otherwise-unsupplied axis.
+- `rect` may round and smooth its rectangular outline. These properties affect
+  its fill and strokes, but do not implicitly clip its children.
 - `line` requires either fixed numeric `width` or an x-axis `span`. Its
   authored and resolved height is zero, so `height` and a y-axis `span` are
   invalid. It is the horizontal segment from local `(0, 0)` to `(width, 0)`
@@ -798,21 +1008,139 @@ resizing the primitive does not rewrite a child's authored bindings.
 
 ### Text
 
-The character data directly inside `text` is its content. `text` cannot
-contain render elements. It may begin with the structural `fill` property and
-zero or more `stroke` properties, which are neither character content nor
-render children. Formatting whitespace before and between those leading
-properties is ignored. After the final property closes—or immediately after
-the opening tag when there is no property—every character is text content,
-including whitespace. A canonical writer therefore places the first intended
-character immediately after the final property's closing tag, rather than
-pretty-printing an unintended newline. Entity references are decoded as XML
-character data.
+`text` is the scene node. It owns the text box, paragraph properties, default
+text style, node fill stack, and repeated node stroke geometries. Its content
+is one flat sequence of direct character data and contextual `tspan` runs:
 
-Text accepts `size`, a positive font size in logical pixels. Draft 0 leaves
-font selection to the declared resolution environment; a resolved artifact
-records the result of shaping with that environment rather than writing it
-back into the source.
+```text
+text    := node-fill? stroke* segment*
+segment := character-data | tspan
+tspan   := run-fill? non-empty character-data
+node-fill := fill
+run-fill := fill
+```
+
+There may be at most one leading `fill`; `stroke` is repeatable. Once the first
+character-data segment or `tspan` begins, no node property may follow. A
+`tspan` must be a direct child of `text`, cannot itself contain `tspan`, and may
+contain no element other than its optional singular leading `fill`. It is not
+a scene node: `id`, `name`, `x`, `y`, `width`, `height`, `rotation`, `opacity`,
+layout attributes, render children, and SVG chunk-positioning attributes such
+as `dx`, `dy`, and per-chunk `rotate` are invalid on it.
+
+Whitespace is exact character content, not formatting, once content begins.
+Formatting whitespace before and between leading node properties is ignored.
+After the last leading property closes—or immediately after the opening tag
+when there is no property—every direct character is content, including spaces,
+tabs, and newlines before, between, or after `tspan` children. Every character
+inside `tspan` is likewise content. XML entity references are decoded before
+the string and ranges are formed. XML comments contribute no characters. An
+empty `tspan` is invalid after XML decoding; a whitespace-only `tspan` is
+non-empty and significant. This means pretty indentation inside mixed text
+changes the design, so a canonical writer keeps intended content adjacent to
+its tags:
+
+```xml
+<text font-size="32" fill="#F8FAFC">Ship <tspan font-weight="700" fill="#7C3AED">boldly</tspan>.</text>
+```
+
+`text` establishes a complete default run style. Draft 0 exposes only these
+typographic attributes on `text` and `tspan`:
+
+| Attribute     | Value                           | `text` default | `tspan` behavior                 |
+| ------------- | ------------------------------- | -------------- | -------------------------------- |
+| `font-size`   | positive finite logical pixels  | `16`           | overrides the default run size   |
+| `font-weight` | integer from `1` through `1000` | `400`          | overrides the default run weight |
+| `font-style`  | `normal` or `italic`            | `normal`       | overrides the default run style  |
+
+An omitted `tspan` attribute inherits from `text`, never from the preceding
+run or sibling. The `size` spelling is invalid; `font-size` is the one
+canonical spelling. Draft 0 leaves font-family selection and every unexposed
+production text-style field to the declared resolution environment and its
+defaults. A resolved artifact records the shaping result without writing it
+back into source. A canonical writer omits all three default values on `text`.
+
+There is no `style` mini-language. `<span>` is not an alias for `tspan`, and
+HTML semantic or presentational elements such as `b`, `strong`, `i`, `em`, and
+`small` are invalid. The production attributed-string model has no matching
+semantic or accessibility annotation to preserve, so inferring meaning from
+such tags would be lossy. Authors express the supported visual fact directly,
+for example `font-weight="700"` or `font-style="italic"`. `tspan` borrows the
+familiar name, not SVG's independently positioned text-chunk model.
+
+#### Considered rich-text syntax
+
+1. **`text` with direct, flat `tspan` runs — accepted.** It projects the flat
+   production attributed string and keeps run overrides explicit.
+2. **HTML semantic or presentational tags — rejected as canonical.** A separate
+   import dialect may deliberately lower them to visual run properties, but
+   Grida XML cannot preserve semantics the production model does not own and a
+   canonical writer never emits them.
+3. **Nested `tspan` — rejected in Draft 0.** Production runs are flat byte
+   ranges, and nested source boundaries cannot be reconstructed after adjacent
+   equivalent runs merge. A later version would need additional preserved
+   structure rather than pretending the nesting survived.
+4. **`style="…"` — rejected.** A CSS-like declaration string would create a
+   second nested grammar with weaker validation and diagnostics than explicit
+   kebab-case attributes.
+
+#### Attributed-string materialization
+
+Materialization concatenates direct `text` character data and each `tspan`'s
+character data in document order into one UTF-8 backing string. Authors never
+spell run offsets. For each non-empty segment, the materializer derives an
+inclusive start and exclusive end as UTF-8 byte offsets at character
+boundaries. Direct character data receives the complete `text` default style;
+`tspan` data receives that same complete style with its explicit overrides.
+The resulting runs are ordered, contiguous, non-overlapping, and cover the
+entire backing string. Adjacent runs are merged only when their complete style
+and run-paint override state are identical. An empty `text` materializes to the
+production empty-string special case with one default `0..0` run.
+
+Node `fill` remains the ordered fallback paint stack for the whole text node.
+Direct text and a `tspan` without `fill` materialize with
+`StyledTextRun.fills = None`, which means node-fill fallback. `fill="#RRGGBB"`
+on `tspan` materializes as `Some([solid])`, preserving an explicit single-solid
+override even when its pixels currently match the node fill. This is the
+compact per-run fill spelling.
+
+A `tspan` may instead begin with one singular `<fill>` property containing the
+same ordered typed `Paints` as a node fill. It must be the literal first child:
+no character data, comment, or formatting whitespace may precede it. Once it
+closes, every character is content. The `fill` attribute and property are
+mutually exclusive, and no `fill` may follow character content. Omission maps
+to `fills = None`, an empty `<fill/>` maps to `Some([])` and therefore explicit
+no ink, and a non-empty property maps to `Some(ordered paints)`. The canonical
+writer uses the `fill` attribute for one ordinary solid override and uses the
+property for explicit emptiness or every other stack, exactly matching the
+node-fill partition:
+
+```xml
+<text font-size="32" fill="#F8FAFC">A<tspan><fill><gradient kind="linear" from="0 0" to="1 0"><stop offset="0" color="#7C3AED"/><stop offset="1" color="#2563EB"/></gradient></fill> gradient run</tspan><tspan><fill/>masked</tspan></text>
+```
+
+The current packed `.grida` encoder/decoder collapses an empty run-fill vector
+to an absent one. That persistence boundary cannot yet round-trip `<fill/>`:
+restoring the node fill would change explicit no ink into visible ink. A
+converter must reject that state or declare a non-round-tripping subset until
+the archive preserves presence independently from vector length; it must not
+silently normalize `Some([])` to `None`.
+
+Structured run-fill gradient and image coordinates resolve against the
+resolved full text-node paint box, exactly as node fills do. They do not
+restart in each `tspan` fragment or use a fragment's glyph bounds. The current
+production attributed renderer passes `(width, width)` as the paint box for
+run fills and strokes; using width for height is an implementation
+incompatibility to fix against the resolved text-node width and height, not a
+distinct XML coordinate system.
+
+Node-level repeated strokes remain valid on `text` and apply to its shaped
+glyph contours. Draft 0 defines no `tspan` stroke syntax. Production
+`StyledTextRun` has only one optional stroke `Paints` stack and one optional
+width/alignment geometry, while Grida XML stroke topology permits repeated,
+independent geometries. Those models cannot losslessly project each other, so
+a writer must reject a production run-stroke override and the language must
+defer run strokes until that multiplicity seam is resolved.
 
 Text is a box, not a point label:
 
@@ -915,9 +1243,9 @@ circle, and text nested directly under a primitive element:
           <stop offset="1" color="#60A5FA"/>
         </gradient>
       </stroke>
-      <text x="center" y="center" size="18" fill="#FFFFFF">01</text>
+      <text x="center" y="center" font-size="18" fill="#FFFFFF">01</text>
     </ellipse>
-    <text width="520" height="auto" size="40" fill="#FFFFFF">Design responsive 2D content that wraps predictably.</text>
+    <text width="520" height="auto" font-size="40" fill="#FFFFFF">Design <tspan font-weight="700" font-style="italic" fill="#A78BFA">responsive</tspan> 2D content that wraps predictably.</text>
   </container>
 </grida>
 ```
@@ -961,7 +1289,7 @@ declared Draft 0 scene or reports a typed failure. It must reject:
 - attributes used on a node kind where they do not apply;
 - a typed paint outside `fill` or `stroke`, a `stop` outside `gradient`, a
   nested `fill` or `stroke`, a duplicate `fill`, or a structural paint child
-  placed after text or render children;
+  placed after text content, a `tspan`, or render children;
 - simultaneous use of the `fill` attribute and `fill` element on one node;
 - unknown paint tags or paint attributes, a generic `paint` envelope, an
   invalid paint blend mode, or a non-boolean paint visibility value;
@@ -973,11 +1301,24 @@ declared Draft 0 scene or reports a typed failure. It must reject:
   whose geometry equals its target defaults, a stroke attribute invalid for its
   target, invalid stroke geometry, a non-centered line stroke, or a malformed
   dash array;
+- a stroke width with neither one nor four values, a negative or non-finite
+  side, four values on a non-box target, or a per-side width combined with
+  nonzero corner smoothing, a non-miter join, or a non-default miter limit;
 - non-finite numbers, negative dimensions, or malformed colors;
-- non-positive font sizes or aspect-ratio terms, negative growth, gap, or
+- malformed `corner-radius` lists, negative radii, `corner-smoothing` outside
+  `[0, 1]`, either corner property on an inapplicable element, or nonzero
+  smoothing paired with any elliptical corner;
+- a `tspan` outside `text`, a nested or empty `tspan`, a render element inside
+  `text`, or any element other than one leading `fill` inside `tspan`;
+- simultaneous `fill` attribute and child on `tspan`, duplicate run `fill`, or
+  a run `fill` placed after any character data or comment;
+- `<span>`, HTML text tags, a `style` attribute, `size`, or SVG chunk-position
+  attributes on `tspan`;
+- non-positive font sizes, non-integer or out-of-range font weights, unknown
+  font styles, non-positive aspect-ratio terms, negative growth, gap, or
   padding values, or opacity outside `[0, 1]`;
-- render elements inside `text`, or non-whitespace character data inside a
-  non-text node;
+- non-whitespace character data inside an element other than `text` or
+  `tspan`;
 - contradictory geometry such as a fixed width alongside an x-axis span.
 
 Unsupported future versions must fail as unsupported versions. A Draft 0
@@ -990,9 +1331,20 @@ state the expected grammar, and distinguish syntax, semantic validation, and
 resource resolution. For example, a misplaced image should say that image
 paints belong directly under `fill` or `stroke`; a gradient without `kind`
 should list the four accepted values; a descending stop should identify the
-two offsets; an unsupported second stroke should identify the target model's
-single-geometry limit; and a missing image file should report its authored
-`src` rather than presenting the failure as malformed XML.
+two offsets; a malformed corner-radius should identify the failing side of the
+slash and require one or four values; a malformed per-side width should name
+the failing top, right, bottom, or left value; a smoothing or join conflict
+should identify the per-side stroke it cannot represent; an unsupported second
+stroke should identify the target model's single-geometry limit; and a missing
+image file should report its authored `src` rather than presenting the failure
+as malformed XML. Useful width diagnostics include `stroke width takes 1 or
+exactly 4 numbers in top right bottom left order; got 3`, `stroke width right
+must be a non-negative finite number`, and `four-value stroke width is valid
+only on <container> and <rect>`. Useful text diagnostics include `empty <tspan>
+is invalid; put empty text on <text> or remove the run`, `nested <tspan> is
+invalid; runs must be flat direct children of <text>`, `<fill> inside <tspan>
+must be the literal first child; no whitespace may precede it`, and `size is
+not Grida XML; use font-size`.
 
 ## Conformance
 
@@ -1007,8 +1359,9 @@ A conforming reader:
    this RFD.
 2. **MUST** preserve node order, text content, and authored intent exactly at
    the semantic level, including stroke order, paint order, inactive paints,
-   equal-offset stops, empty fill stacks where omission changes semantics, and
-   empty strokes with non-default geometry.
+   equal-offset stops, empty fill stacks where omission changes semantics,
+   per-character resolved text style and run-fill override state, and empty
+   strokes with non-default geometry.
 3. **MUST NOT** accept an unknown construct by ignoring or coercing it.
 4. **MUST** distinguish a parse failure from a resolution failure. A
    well-formed intent document can still fail to resolve in an insufficient
@@ -1020,22 +1373,43 @@ A conforming writer:
 
 1. **MUST** emit `grida version="0"` with exactly one `container` child.
 2. **MUST** emit the canonical Draft 0 node and attribute names, including
-   `container`, `rect`, `ellipse`, `line`, `width`, and `height` rather than
-   historical aliases.
+   `container`, `rect`, `ellipse`, `line`, `tspan`, `width`, `height`, and
+   `font-size` rather than historical aliases.
 3. **MUST** apply the canonical fill partition: omit the default, use the
    `fill` attribute for one ordinary solid, and use the `fill` element for all
-   other non-empty stacks or required explicit emptiness.
+   other non-empty stacks or required explicit emptiness. The same partition
+   applies to an explicit `tspan` run-fill override.
 4. **MUST** normalize a default empty stroke pair to omission, preserve an
    empty stroke with non-default geometry, and emit every remaining stroke in
    bottom-to-top order with its typed paints in bottom-to-top order.
-5. **MUST** emit a gradient's required `kind`; it **MUST NOT** emit the four
+5. **MUST** normalize equal per-side widths to the uniform or no-width state,
+   omit uniform width `1`, emit other uniform values as one number, and emit
+   exactly four top-right-bottom-left values only for unequal rectangular
+   widths.
+6. **MUST** emit a gradient's required `kind`; it **MUST NOT** emit the four
    kind-specific gradient element names, `<shape>`, or a generic `paint`
    envelope.
-6. **MUST** encode XML text and attribute values correctly and emit only
+7. **MUST** encode XML text and attribute values correctly and emit only
    finite, valid values.
-7. **MUST NOT** serialize resolved-only values as if they were source intent.
-8. **SHOULD** produce stable, human-readable indentation and stable attribute
-   ordering, although neither is semantic in Draft 0.
+8. **MUST** derive text run boundaries from the one backing UTF-8 string, merge
+   adjacent runs with identical complete style and paint-override state, emit
+   no default-valued typography attributes on `text`, emit
+   direct character data for each maximal run equal to the `text` default with
+   no run-fill override, and emit one flat `tspan` for every other maximal run.
+   A `tspan` carries only typographic attributes that differ from the `text`
+   default plus its fill override; it is never nested or empty, and authored
+   byte offsets are never emitted.
+9. **MUST NOT** pretty-indent mixed text content, because inserted spaces or
+   newlines are semantic. It must also reject an unsupported production run
+   style or run stroke rather than silently dropping it.
+10. **MUST** emit the shortest exact one-or-four-value representation for each
+    corner-radius axis, omit the slash when every `rx` equals its `ry`, and
+    omit each corner attribute when its value is the zero default.
+11. **MUST NOT** serialize resolved-only values, including normalized effective
+    corner radii, as if they were source intent.
+12. **SHOULD** produce stable, human-readable indentation outside mixed text
+    content and stable attribute ordering, although neither is semantic in
+    Draft 0.
 
 ### Resolver and renderer
 
@@ -1051,20 +1425,33 @@ A conforming resolver and renderer:
 4. **MUST** derive each stroke independently from the node's original outline
    and composite that stroke's visible paints in bottom-to-top order. It must
    not merge distinct stroke geometries into one paint stack.
-5. **MUST** composite every visible paint in its declared bottom-to-top order,
+5. **MUST** resolve rectangular stroke widths as one outer-minus-inner ring
+   using the declared local-side widths and alignment fractions. It must treat
+   an overconsumed inner box as an empty contour, include each side's actual
+   outward extent in visual bounds, and leave the layout box unchanged.
+6. **MUST** use one proportional edge-sum factor for ordinary rounded-box
+   overlap normalization and the per-corner half-short-side cap for nonzero
+   smoothing. It must then use the same resulting outline as the source for
+   fill coverage, every stroke, and a container's descendant clip. The
+   rectangular paint box must remain unchanged.
+7. **MUST** composite every visible paint in its declared bottom-to-top order,
    applying each paint's opacity and blend mode to that paint only.
-6. **MUST** evaluate gradient geometry in the declared unit paint space and
+8. **MUST** evaluate gradient geometry in the declared unit paint space and
    map it to the resolved paint box without rewriting source coordinates.
-7. **MUST** resolve image identifiers through the declared resource
+9. **MUST** resolve image identifiers through the declared resource
    environment and surface missing or undecodable resources as resolution
    failures rather than silently dropping their paint layers.
-8. **MUST** include every effective stroke in resolved visual bounds without
-   changing the node's layout box.
-9. **MUST** apply rotation and native flips as visual-only transforms and
-   apply clipping and opacity to the declared subtree.
-10. **MUST NOT** mutate the source document as a side effect of resolving or
+10. **MUST** shape `text` and its flat `tspan` segments as one backing string,
+    use the node fill when a run has no override, and preserve explicit empty
+    and ordered run-fill stacks. Every node and run fill uses the resolved full
+    text-node paint box; paint coordinates do not restart per run.
+11. **MUST** include every effective stroke in resolved visual bounds without
+    changing the node's layout box.
+12. **MUST** apply rotation and native flips as visual-only transforms and
+    apply clipping and opacity to the declared subtree.
+13. **MUST NOT** mutate the source document as a side effect of resolving or
     rendering it.
-11. **MUST** make the resolution environment explicit enough that a resolved
+14. **MUST** make the resolution environment explicit enough that a resolved
     result can be attributed to a viewport, font set, and resource set.
 
 A processor that intentionally supports only part of Draft 0 may describe
@@ -1073,12 +1460,12 @@ must not silently discard the unsupported remainder.
 
 ## Deferred requirements
 
-Draft 0 does not define paths or vector networks, per-side or variable-width
-strokes, dash offset, endpoint markers, effects, scene image nodes, resource
-declaration or packaging syntax, advanced image placement, image filters, rich
-color spaces, rich text runs, grid layout, animation, or durable node identity.
-Their eventual addition must preserve the one-tree, local-space, intent-only
-model established here.
+Draft 0 does not define paths or vector networks, variable-width strokes, dash
+offset, endpoint markers, effects, scene image nodes, resource declaration or
+packaging syntax, advanced image placement, image filters, rich color spaces,
+advanced typography, per-run strokes, semantic text annotations, grid layout,
+animation, or durable node identity. Their eventual addition must preserve the
+one-tree, local-space, intent-only model established here.
 
 Reusable paint definitions and references are also deferred. Inline paint
 values remain sufficient and canonical; a later reference system must define

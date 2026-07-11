@@ -164,7 +164,7 @@ fn row_flex_self_stretch_preserves_the_lines_locked_zero_height() {
     header.self_align = SelfAlign::Stretch;
     let line = builder.add(container, header, payload.clone());
     let mut stroke = Stroke::default_for(&payload).unwrap();
-    stroke.width = 10.0;
+    stroke.width = StrokeWidth::Uniform(10.0);
     stroke.paints = Paints::solid(Color::BLACK);
     builder.node_mut(line).strokes.push(stroke);
 
@@ -192,7 +192,7 @@ fn stroked_shape(desc: ShapeDesc, align: StrokeAlign, width: f32) -> (Document, 
     let payload = Payload::Shape { desc };
     let mut stroke = Stroke::default_for(&payload).expect("shape supports strokes");
     stroke.paints = Paints::solid(Color::BLACK);
-    stroke.width = width;
+    stroke.width = StrokeWidth::Uniform(width);
     stroke.align = align;
     let shape = builder.add(0, header, payload);
     builder.node_mut(shape).strokes.push(stroke);
@@ -225,6 +225,62 @@ fn effective_strokes_expand_visual_bounds_without_changing_layout_bounds() {
             width,
             height,
             "stroke expands visual bounds",
+        );
+    }
+}
+
+#[test]
+fn per_side_strokes_expand_each_visual_bound_independently() {
+    let (mut doc, shape) = stroked_shape(ShapeDesc::Rect, StrokeAlign::Outside, 1.0);
+    doc.get_mut(shape).strokes[0].width = StrokeWidth::Rectangular(RectangularStrokeWidth {
+        stroke_top_width: 2.0,
+        stroke_right_width: 4.0,
+        stroke_bottom_width: 6.0,
+        stroke_left_width: 8.0,
+    });
+
+    let resolved = run(&doc);
+    assert_rect(
+        resolved.box_of(shape),
+        10.0,
+        20.0,
+        100.0,
+        50.0,
+        "per-side stroke does not affect layout box",
+    );
+    assert_rect(
+        resolved.aabb_of(shape),
+        2.0,
+        18.0,
+        112.0,
+        58.0,
+        "per-side stroke contributes asymmetric visual outsets",
+    );
+}
+
+#[test]
+fn unsupported_rectangular_stroke_states_do_not_expand_visual_bounds() {
+    let cases = [ShapeDesc::Ellipse, ShapeDesc::Rect];
+    for desc in cases {
+        let (mut doc, shape) = stroked_shape(desc, StrokeAlign::Outside, 1.0);
+        doc.get_mut(shape).strokes[0].width = StrokeWidth::Rectangular(RectangularStrokeWidth {
+            stroke_top_width: 2.0,
+            stroke_right_width: 4.0,
+            stroke_bottom_width: 6.0,
+            stroke_left_width: 8.0,
+        });
+        if desc == ShapeDesc::Rect {
+            doc.get_mut(shape).corner_smoothing = CornerSmoothing(0.5);
+        }
+
+        let resolved = run(&doc);
+        assert_rect(
+            resolved.aabb_of(shape),
+            10.0,
+            20.0,
+            100.0,
+            50.0,
+            "unsupported rectangular stroke state has no visual coverage",
         );
     }
 }
@@ -279,7 +335,7 @@ fn text_miter_limit_is_included_in_conservative_visual_bounds() {
     let text = builder.add(0, header, payload.clone());
     let mut stroke = Stroke::default_for(&payload).unwrap();
     stroke.paints = Paints::solid(Color::BLACK);
-    stroke.width = 2.0;
+    stroke.width = StrokeWidth::Uniform(2.0);
     stroke.align = StrokeAlign::Center;
     builder.node_mut(text).strokes.push(stroke);
 
@@ -310,7 +366,7 @@ fn ineffective_strokes_do_not_expand_visual_bounds() {
     );
 
     doc.get_mut(shape).strokes[0].paints = Paints::solid(Color::BLACK);
-    doc.get_mut(shape).strokes[0].width = 0.0;
+    doc.get_mut(shape).strokes[0].width = StrokeWidth::None;
     let resolved = run(&doc);
     assert_rect(
         resolved.aabb_of(shape),

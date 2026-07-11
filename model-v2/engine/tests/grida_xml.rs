@@ -2,16 +2,14 @@
 //! reaches the existing pure stages and the one frame entry without an
 //! XML-specific engine API. The fixture is deliberately probe-friendly.
 
+mod support;
+
 use anchor_engine::drawlist::{self, Item, ItemKind};
-use anchor_engine::frame;
 use anchor_engine::paint::PaintCtx;
 use anchor_lab::grida_xml;
 use anchor_lab::math::Affine;
-use anchor_lab::model::{Color as ModelColor, Paints};
+use anchor_lab::model::{Color as ModelColor, CornerSmoothing, Paints, RectangularCornerRadius};
 use anchor_lab::resolve::{resolve, ResolveOptions};
-use skia_safe::{
-    image::CachingHint, surfaces, AlphaType, Color, ColorType, IPoint, Image, ImageInfo,
-};
 
 const SOURCE: &str = include_str!("../rig/fixtures/nested-rects.grida.xml");
 const WIDTH: i32 = 96;
@@ -31,25 +29,11 @@ fn assert_rect_fill(item: &Item, world: Affine, width: f32, height: f32, argb: u
         ItemKind::RectFill {
             w: width,
             h: height,
+            corner_radius: RectangularCornerRadius::default(),
+            corner_smoothing: CornerSmoothing::default(),
             paints: Paints::solid(ModelColor(argb)),
         }
     );
-}
-
-fn rgba_at(image: &Image, x: i32, y: i32) -> [u8; 4] {
-    let info = ImageInfo::new((1, 1), ColorType::RGBA8888, AlphaType::Unpremul, None);
-    let mut rgba = [0u8; 4];
-    assert!(
-        image.read_pixels(
-            &info,
-            &mut rgba,
-            4,
-            IPoint::new(x, y),
-            CachingHint::Disallow,
-        ),
-        "read RGBA probe at ({x}, {y})"
-    );
-    rgba
 }
 
 #[test]
@@ -81,26 +65,15 @@ fn draft0_nested_rects_materialize_in_the_drawlist() {
 
 #[test]
 fn draft0_nested_rects_render_through_the_frame_entry() {
-    let doc = grida_xml::parse(SOURCE).expect("Draft 0 fixture parses");
-    let mut surface = surfaces::raster_n32_premul((WIDTH, HEIGHT)).expect("raster surface");
-    surface.canvas().clear(Color::WHITE);
-
     let paint_ctx = PaintCtx::new(None);
-    let (_, list, _) = frame::render(
-        surface.canvas(),
-        &doc,
-        &options(),
-        &Affine::IDENTITY,
-        &paint_ctx,
-    );
+    let (image, list) = support::render_xml(SOURCE, WIDTH, HEIGHT, &paint_ctx);
     assert_eq!(list.items.len(), 3, "the frame used the expected drawlist");
 
     // Force RGBA8888 readback so the assertions do not depend on native N32
     // channel order. Every point is well inside a solid region, away from AA.
-    let image = surface.image_snapshot();
-    assert_eq!(rgba_at(&image, 8, 8), [255, 255, 255, 255]);
-    assert_eq!(rgba_at(&image, 20, 20), [255, 0, 0, 255]);
-    assert_eq!(rgba_at(&image, 40, 36), [0, 0, 255, 255]);
-    assert_eq!(rgba_at(&image, 70, 52), [255, 0, 0, 255]);
-    assert_eq!(rgba_at(&image, 88, 72), [255, 255, 255, 255]);
+    assert_eq!(image.at(8, 8), [255, 255, 255, 255]);
+    assert_eq!(image.at(20, 20), [255, 0, 0, 255]);
+    assert_eq!(image.at(40, 36), [0, 0, 255, 255]);
+    assert_eq!(image.at(70, 52), [255, 0, 0, 255]);
+    assert_eq!(image.at(88, 72), [255, 255, 255, 255]);
 }

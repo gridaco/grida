@@ -117,6 +117,7 @@ fn semantic_node_eq(
             })
             .cloned()
             .map(|mut stroke| {
+                stroke.width = stroke.width.normalized();
                 if let Some(values) = &mut stroke.dash_array {
                     if values.len() % 2 == 1 {
                         let repeated = values.clone();
@@ -127,8 +128,49 @@ fn semantic_node_eq(
             })
             .collect::<Vec<_>>()
     };
+    // Invalid non-finite corner values must survive the structural self-check
+    // long enough for the source writer to return the focused validation
+    // error. Ordinary equality still applies to every finite value (`-0` and
+    // `0` remain semantically equal).
+    let corner_num_eq =
+        |a: f32, b: f32| a == b || (a.is_nan() && b.is_nan() && a.to_bits() == b.to_bits());
+    let radius_eq = |a: crate::model::Radius, b: crate::model::Radius| {
+        corner_num_eq(a.rx, b.rx) && corner_num_eq(a.ry, b.ry)
+    };
+    let corner_radius_eq = |a: crate::model::RectangularCornerRadius,
+                            b: crate::model::RectangularCornerRadius| {
+        radius_eq(a.tl, b.tl)
+            && radius_eq(a.tr, b.tr)
+            && radius_eq(a.br, b.br)
+            && radius_eq(a.bl, b.bl)
+    };
+    let payload_eq = |a: &crate::model::Payload, b: &crate::model::Payload| {
+        let (Some(a_text), Some(b_text)) = (a.as_text(), b.as_text()) else {
+            return a == b;
+        };
+        if a_text.text != b_text.text || a_text.default_style != b_text.default_style {
+            return false;
+        }
+        let normalized = |value: crate::model::TextPayloadRef<'_>| {
+            let mut attributed = match value.runs {
+                Some(runs) => crate::model::AttributedString {
+                    text: value.text.to_owned(),
+                    runs: runs.to_vec(),
+                },
+                None => crate::model::AttributedString::new(value.text, value.default_style),
+            };
+            attributed.merge_adjacent_runs();
+            attributed
+        };
+        normalized(a_text) == normalized(b_text)
+    };
     if a_node.header != b_node.header
-        || a_node.payload != b_node.payload
+        || !payload_eq(&a_node.payload, &b_node.payload)
+        || !corner_radius_eq(a_node.corner_radius, b_node.corner_radius)
+        || !corner_num_eq(
+            a_node.corner_smoothing.value(),
+            b_node.corner_smoothing.value(),
+        )
         || a_node.fills != b_node.fills
         || canonical_strokes(a_node) != canonical_strokes(b_node)
         || a_node.children.len() != b_node.children.len()
@@ -152,6 +194,18 @@ fn semantic_node_eq(
 /// render-root rule and the implicit viewport root make silently serializing a
 /// forest or a mutated document root lossy.
 pub fn print(doc: &Document) -> Result<String, PrintError> {
+    // Validate stroke scalars before the structural self-comparison below.
+    // IEEE NaN is not equal to itself, so derived equality would otherwise
+    // misreport an invalid side width as a corrupt scene tree.
+    for id in 0..doc.capacity() as NodeId {
+        let Some(node) = doc.get_opt(id) else {
+            continue;
+        };
+        for stroke in &node.strokes {
+            textir::validate_stroke_for_write(stroke, &node.payload, node.corner_smoothing)
+                .map_err(PrintError::InvalidDocument)?;
+        }
+    }
     if !semantic_document_eq(doc, doc) {
         return Err(PrintError::InvalidDocument(
             "scene tree contains a dead, duplicate, cyclic, unreachable, or mis-parented node"
@@ -167,6 +221,8 @@ pub fn print(doc: &Document) -> Result<String, PrintError> {
 
     let canonical_root = root.header == expected.header
         && root.payload == expected.payload
+        && root.corner_radius == expected.corner_radius
+        && root.corner_smoothing == expected.corner_smoothing
         && root.fills == expected.fills
         && root.strokes == expected.strokes
         && doc.parent_of(doc.root).is_none();
