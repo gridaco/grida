@@ -12,6 +12,8 @@ keywords:
   - gradients
   - image fills
   - multiple strokes
+  - component reuse
+  - multi-file rendering
 tags:
   - internal
   - wg
@@ -47,9 +49,16 @@ It is its own vocabulary, not an SVG profile or an HTML serialization.
 Draft 0 is deliberately small. It establishes the document boundary, the box
 and nesting model, a minimal primitive set, ordered typed paint, multiple
 stroke geometries, per-side box strokes, rounded box geometry, text boxes with
-flat attributed runs, unit-space paths, free bindings, and flex layout. Later drafts can add
-effects, vector geometry, resource declarations, advanced typography, and
-reuse facilities without changing the central tree model.
+flat attributed runs, unit-space paths, free bindings, and flex layout. Later
+drafts can add effects, vector geometry, resource declarations, advanced
+typography, and reuse facilities without changing the central tree model. The
+selected multi-file direction is developed separately in the [Grida XML
+modules and static component reuse](./grida-xml-modules) RFD; none of that
+proposal is Draft 0 syntax. The proposed typed scalar API for those components
+is a further Version 2 delta in [Grida XML component
+parameters](./grida-xml-component-parameters). Exact named render projection is
+a Version 3 delta in [Grida XML component
+slots](./grida-xml-component-slots).
 
 ## Design requirements
 
@@ -107,7 +116,7 @@ A Draft 0 document has this shape:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <grida version="0">
-  <container width="960" height="540">
+  <container x="span 0 0" y="span 0 0">
     <!-- one scene tree -->
   </container>
 </grida>
@@ -121,11 +130,19 @@ layout behavior. It must carry exactly `version="0"` and exactly one element
 child. That child must be a `container` and is the document's render root.
 Comments and formatting whitespace do not count as render roots.
 
-Because the render root has no visual parent, it must omit the parent-relative
-attributes `x`, `y`, `flow`, `grow`, and `align`.
-At resolution, a non-painting viewport parent places the render root's local
-origin at viewport `(0, 0)`. A fixed root extent is not scaled to the viewport;
-it may be smaller than or overflow that environment.
+At resolution, the render root is the sole child of a definite, non-painting
+initial viewport container. Its `x` and `y` therefore use the ordinary binding
+grammar against that viewport. The explicit full-viewport form is
+`x="span 0 0" y="span 0 0"`; as with every span, the corresponding
+`width`/`height` and min/max constraints must be omitted. The same materialized
+scene may then resolve at different viewport extents without rewriting source
+intent.
+
+Omitted root bindings remain start-pinned at zero, and omitted or explicit
+`auto` sizes retain ordinary container-hug semantics. A fixed root extent is
+not scaled to the viewport; it may be smaller than or overflow that
+environment. `flow`, `grow`, and `align` remain invalid on the render root
+because the initial viewport container does not own flex layout.
 
 Draft 0 defines no XML namespace and no extension namespace. Namespace-based
 extensions require a later version rather than being accepted as inert data.
@@ -555,6 +572,7 @@ for gradients and image placement.
 | ------------------- | ----------------------------------- | ---------------------------------- | --------------------------------------------- |
 | `container`, `rect` | rectangular interior                | rectangular perimeter              | resolved local layout box                     |
 | `ellipse`           | elliptical interior                 | elliptical perimeter               | resolved local layout box                     |
+| `path`              | box-mapped path fill region         | box-mapped path contours           | resolved local layout box                     |
 | `line`              | none                                | authored local line segment        | resolved segment box with degenerate fallback |
 | `text`              | shaped glyph interiors, not its box | shaped glyph contours, not its box | resolved local text layout box                |
 
@@ -869,16 +887,17 @@ remains in flow.
 ### Size constraints and aspect ratio
 
 Minimum and maximum constraints apply to `container`, `rect`, `ellipse`,
-`line`, and `text`. They are invalid on `group` and `lens`, whose boxes are
-derived. Resolution first obtains an axis from its binding, declared intent,
-measurement, or layout, then clamps it to the applicable maximum and minimum.
+`line`, `path`, and `text`. They are invalid on `group` and `lens`, whose boxes
+are derived. Resolution first obtains an axis from its binding, declared
+intent, measurement, or layout, then clamps it to the applicable maximum and
+minimum.
 The minimum wins when a minimum exceeds its paired maximum. If constraining a
 text width changes its wrapping width, text is measured again before its final
 height is chosen. Because a line's height is definitionally zero,
 `min-height` and `max-height` are invalid on `<line>`.
 
-In Draft 0, `aspect-ratio="w:h"` applies only to `rect` and `ellipse`. It
-contains two positive numbers and supplies exactly one otherwise
+In Draft 0, `aspect-ratio="w:h"` applies only to `rect`, `ellipse`, and `path`.
+It contains two positive numbers and supplies exactly one otherwise
 under-specified axis from the other. It never distorts two extents that are
 already determined and never invents a scale transform. Using an aspect ratio
 where neither axis can provide the other, or redundantly declaring it when
@@ -1417,6 +1436,7 @@ declared Draft 0 scene or reports a typed failure. It must reject:
 - an envelope other than `grida`;
 - a missing version or any version other than exactly `0`;
 - no render root, more than one render root, or a root other than `container`;
+- `flow`, `grow`, or `align` on the render root;
 - unknown elements, attributes, enum values, or lens operations;
 - the reserved `<shape>` element or `kind` on a render node;
 - attributes used on a node kind where they do not apply;
@@ -1626,17 +1646,32 @@ identity, scope, failure behavior, and override semantics without creating a
 second canonical spelling for the same inline value.
 
 Reusable author-defined widgets/components are a required future capability.
-A later version must define both component definition and use/instantiation,
-including identity, scoping, overrides, and resolution behavior. Draft 0
-defines neither a `component` nor a `use` element; a current-version reader
-must reject both rather than inventing premature semantics.
+The [Grida XML modules and static component reuse](./grida-xml-modules) RFD
+proposes top-level boxed definitions and self-contained
+`<use href="…#…">` references, with source linking and materialization kept
+above ordinary scene resolution. It also records identity, lexical resource
+origin, cycles, and source-writing requirements. The [Grida XML component
+parameters](./grida-xml-component-parameters) RFD separately proposes typed
+scalar `prop` declarations, explicit `arg` children, and exact bindings for
+Version 2. The [Grida XML component slots](./grida-xml-component-slots) RFD
+proposes Version 3 empty named `<slot>` declarations and direct render roots
+under `use` carrying the contextual `slot` assignment relationship.
+
+Those proposals remain later-version contracts. Draft 0 defines neither
+`component`, `use`, `prop`, `arg`, nor any component binding syntax, and a
+current-version reader must reject them rather than interpreting the proposed
+syntax early. Draft 0 also grants no meaning to the Version 3 `<slot>`
+declaration or contextual `slot` assignment attribute, nor to invented
+`content` or `children` elements. Brace characters remain ordinary Draft 0
+character data or attribute characters wherever that position's existing
+value grammar admits them; Draft 0 never interprets braces as bindings.
 
 The reserved `shape` name may support custom-shape definitions in a later
 version, but Draft 0 does not decide whether it names a definition or an
 instance, where definitions live, how geometry is expressed, or how reuse
 works. Adding any such behavior is a versioned language change.
 
-## Open questions before Draft 1
+## Open questions beyond Draft 0
 
 - Which advanced stroke geometries and effects are small enough to become
   stable source vocabulary without weakening the typed-paint model?

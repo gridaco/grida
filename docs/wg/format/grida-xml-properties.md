@@ -24,6 +24,12 @@ format: md
 **Status:** Design inventory; companion to the [Grida XML Draft 0
 RFD](./grida-xml).
 
+Later-version reuse vocabulary is specified by the [modules and static
+component reuse](./grida-xml-modules), [component
+parameters](./grida-xml-component-parameters), and [component
+slots](./grida-xml-component-slots) RFDs. Those rows remain **Design** until
+their language versions are accepted; Draft 0 continues to reject them.
+
 This page is the canonical inventory of XML-facing property names and their
 valid targets. It is not, by itself, a grammar extension. Only rows marked
 **Draft 0** are accepted by a Draft 0 reader. **Placeholder** and **Design**
@@ -84,7 +90,7 @@ Grida XML projects that model as an authored language:
 | --------------- | --------------------------------------------------------------------------- |
 | **Draft 0**     | Normative syntax accepted by the current RFD                                |
 | **Placeholder** | Production concept exists; proposed XML name and target are held for design |
-| **Design**      | Capability is required or plausible, but even its XML shape is unresolved   |
+| **Design**      | Selected or unresolved later-version design; not operative Draft 0 syntax   |
 | **Derived**     | Runtime, archive, or resolved data that should not be authored directly     |
 
 Placeholder rows are deliberately non-operative. A Draft 0 reader must still
@@ -94,33 +100,40 @@ diagnose them as unknown syntax.
 
 The table covers the production node set as well as XML-only source constructs.
 “Children” means render-node children, not typed property children such as
-`fill`, `stroke`, or gradient `stop` elements. `tspan` is listed explicitly as
-a contextual source construct even though it is not a scene node.
+`fill`, `stroke`, or gradient `stop` elements. “Assigned” means Version 3
+direct render roots projected to a component declaration rather than ordinary
+children owned by `use`. `tspan` and `slot` are listed explicitly as contextual
+source constructs even though neither is a scene node.
 
-| XML element       | Production concept                    | Children  | Status          | Source and use                                                            |
-| ----------------- | ------------------------------------- | --------- | --------------- | ------------------------------------------------------------------------- |
-| `grida`           | Document envelope                     | One root  | **Draft 0**     | XML; carries only `version`                                               |
-| `container`       | Container                             | Yes       | **Draft 0**     | Flutter/HTML; boxed composition and layout owner                          |
-| `group`           | Group                                 | Yes       | **Draft 0**     | SVG `g`; derived bounds, no own geometry                                  |
-| `rect`            | Rectangle                             | Yes       | **Draft 0**     | SVG; direct primitive                                                     |
-| `ellipse`         | Ellipse, ring, or arc                 | Yes       | **Draft 0**     | SVG base primitive; arc parameters are placeholders                       |
-| `line`            | Line                                  | Yes       | **Draft 0**     | SVG; stroke-only primitive with repeatable stroke geometries              |
-| `text`            | Text or attributed-text node          | No        | **Draft 0**     | Owns one text box, paragraph/default style, and node paints               |
-| `tspan`           | `StyledTextRun`                       | No        | **Draft 0**     | Flat direct child of `text`; contextual run, never a scene node           |
-| `lens`            | Source transform wrapper              | Yes       | **Draft 0**     | Grida source construct; resolves through group/transform semantics        |
-| `image`           | Image node outside paint channels     | No        | **Placeholder** | HTML/SVG; contextual with the existing image-paint element                |
-| `path`            | Box-mapped unit-space path            | Yes       | **Draft 0**     | Full SVG path-data grammar in the fixed `0 0 1 1` reference rectangle     |
-| `polygon`         | Arbitrary closed polygon              | Yes       | **Placeholder** | SVG; explicit coordinate list                                             |
-| `regular-polygon` | Parametric regular polygon            | Yes       | **Placeholder** | Explicit name; point-count grammar still needs validation rules           |
-| `star`            | Parametric regular star polygon       | Yes       | **Placeholder** | Familiar design-tool name; inner radius and point count are parametric    |
-| `vector`          | Editable vector network               | Yes       | **Design**      | No established XML vocabulary for vertices, handles, and filled regions   |
-| `boolean`         | Boolean path operation                | Yes       | **Design**      | Child ownership and live-versus-flattened behavior must be fixed          |
-| `markdown`        | Opaque Markdown embed                 | No        | **Design**      | Runtime feature; source escaping, resources, and security need a contract |
-| `html`            | Opaque HTML/CSS embed                 | No        | **Design**      | Runtime feature; embedding HTML inside XML needs an explicit boundary     |
-| `tray`            | Canvas/editor organizational tray     | Yes       | **Design**      | Production node, but not yet justified as a portable authored primitive   |
-| `shape`           | Future custom-shape definition or use | Undecided | **Design**      | Reserved by the Draft 0 RFD; no current rendering semantics               |
-| _none_            | Initial viewport container            | Root      | **Derived**     | The `grida` envelope and render root materialize this host boundary       |
-| _none_            | Error/import placeholder              | No        | **Derived**     | Diagnostic result, never canonical authored content                       |
+| XML element       | Production concept                    | Children  | Status          | Source and use                                                              |
+| ----------------- | ------------------------------------- | --------- | --------------- | --------------------------------------------------------------------------- |
+| `grida`           | Document envelope                     | One root  | **Draft 0**     | XML; carries only `version`                                                 |
+| `component`       | Boxed source definition               | Yes       | **Design**      | Top-level, non-painting definition with `container` semantics               |
+| `use`             | Source component instance             | Assigned  | **Design**      | Versioned component reference; Version 3 may carry direct assignment roots  |
+| `prop`            | Component scalar declaration          | No        | **Design**      | Leading contextual child of a Version 2 `component`; never renders          |
+| `arg`             | Component scalar argument             | No        | **Design**      | Contextual property child of a Version 2 `use`; never a render child        |
+| `slot`            | Component insertion marker            | No        | **Design**      | Empty named Version 3 declaration at a render-child position; never renders |
+| `container`       | Container                             | Yes       | **Draft 0**     | Flutter/HTML; boxed composition and layout owner                            |
+| `group`           | Group                                 | Yes       | **Draft 0**     | SVG `g`; derived bounds, no own geometry                                    |
+| `rect`            | Rectangle                             | Yes       | **Draft 0**     | SVG; direct primitive                                                       |
+| `ellipse`         | Ellipse, ring, or arc                 | Yes       | **Draft 0**     | SVG base primitive; arc parameters are placeholders                         |
+| `line`            | Line                                  | Yes       | **Draft 0**     | SVG; stroke-only primitive with repeatable stroke geometries                |
+| `text`            | Text or attributed-text node          | No        | **Draft 0**     | Owns one text box, paragraph/default style, and node paints                 |
+| `tspan`           | `StyledTextRun`                       | No        | **Draft 0**     | Flat direct child of `text`; contextual run, never a scene node             |
+| `lens`            | Source transform wrapper              | Yes       | **Draft 0**     | Grida source construct; resolves through group/transform semantics          |
+| `image`           | Image node outside paint channels     | No        | **Placeholder** | HTML/SVG; contextual with the existing image-paint element                  |
+| `path`            | Box-mapped unit-space path            | Yes       | **Draft 0**     | Full SVG path-data grammar in the fixed `0 0 1 1` reference rectangle       |
+| `polygon`         | Arbitrary closed polygon              | Yes       | **Placeholder** | SVG; explicit coordinate list                                               |
+| `regular-polygon` | Parametric regular polygon            | Yes       | **Placeholder** | Explicit name; point-count grammar still needs validation rules             |
+| `star`            | Parametric regular star polygon       | Yes       | **Placeholder** | Familiar design-tool name; inner radius and point count are parametric      |
+| `vector`          | Editable vector network               | Yes       | **Design**      | No established XML vocabulary for vertices, handles, and filled regions     |
+| `boolean`         | Boolean path operation                | Yes       | **Design**      | Child ownership and live-versus-flattened behavior must be fixed            |
+| `markdown`        | Opaque Markdown embed                 | No        | **Design**      | Runtime feature; source escaping, resources, and security need a contract   |
+| `html`            | Opaque HTML/CSS embed                 | No        | **Design**      | Runtime feature; embedding HTML inside XML needs an explicit boundary       |
+| `tray`            | Canvas/editor organizational tray     | Yes       | **Design**      | Production node, but not yet justified as a portable authored primitive     |
+| `shape`           | Future custom-shape definition or use | Undecided | **Design**      | Reserved by the Draft 0 RFD; no current rendering semantics                 |
+| _none_            | Initial viewport container            | Root      | **Derived**     | The `grida` envelope and render root materialize this host boundary         |
+| _none_            | Error/import placeholder              | No        | **Derived**     | Diagnostic result, never canonical authored content                         |
 
 Attributed text remains one `<text>` node with direct, flat `<tspan>` children.
 `tspan` contains exact character data plus an optional literal-first `fill`
@@ -134,40 +147,40 @@ This is the compact applicability index for syntax already defined by the
 [Draft 0 RFD](./grida-xml). The RFD remains normative for value grammar,
 defaults, contradictions, and resolution behavior.
 
-| Attribute                  | Valid on                                                            | Inspiration          | Purpose                                                       |
-| -------------------------- | ------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------- |
-| `version`                  | `grida`                                                             | XML                  | Selects the exact language version; currently exactly `0`     |
-| `name`                     | All Draft 0 render elements                                         | HTML/SVG             | Human-readable label; not durable identity                    |
-| `x`, `y`                   | Non-root Draft 0 render elements; omitted for in-flow flex children | SVG/CSS              | Local position binding, including start/end/center/span forms |
-| `width`                    | `container`, `rect`, `ellipse`, `line`, `path`, `text`              | CSS/SVG              | Authored width or element-specific `auto`                     |
-| `height`                   | `container`, `rect`, `ellipse`, `path`, `text`; never `line`        | CSS/SVG              | Authored height or element-specific `auto`                    |
-| `min-width`, `max-width`   | `container`, `rect`, `ellipse`, `line`, `path`, `text`              | CSS                  | Width constraints                                             |
-| `min-height`, `max-height` | `container`, `rect`, `ellipse`, `path`, `text`; never `line`        | CSS                  | Height constraints                                            |
-| `aspect-ratio`             | `rect`, `ellipse`, `path`                                           | CSS                  | Supplies one otherwise unresolved box axis                    |
-| `corner-radius`            | `container`, `rect`                                                 | CSS/Flutter          | One or four circular or elliptical corner radii               |
-| `corner-smoothing`         | `container`, `rect`                                                 | Design tools         | Continuous smoothing of circular rounded corners              |
-| `rotation`                 | All Draft 0 render elements                                         | Flutter/design tools | Clockwise visual rotation in degrees                          |
-| `flip-x`, `flip-y`         | All Draft 0 render elements                                         | Design tools         | Native visual reflection                                      |
-| `opacity`                  | All Draft 0 render elements                                         | CSS/SVG              | Composites the node and descendants                           |
-| `hidden`                   | All Draft 0 render elements                                         | HTML                 | Removes the subtree from layout and painting                  |
-| `fill`                     | `container`, `rect`, `ellipse`, `path`, `text`; contextual `tspan`  | SVG                  | One-solid node fill or explicit run-fill override             |
-| `d`                        | `path`                                                              | SVG                  | Complete path-data grammar in the fixed unit rectangle        |
-| `fill-rule`                | `path`                                                              | SVG/CSS              | `nonzero` or `evenodd`; defaults to `nonzero`                 |
-| `clips`                    | `container`                                                         | Flutter/design tools | Clips descendant content to the container shape               |
-| `font-size`                | `text`, `tspan`                                                     | CSS/SVG              | Positive finite logical-pixel default or run override         |
-| `font-weight`              | `text`, `tspan`                                                     | CSS                  | Integer weight from 1 through 1000                            |
-| `font-style`               | `text`, `tspan`                                                     | CSS                  | `normal` or `italic`                                          |
-| `ops`                      | `lens`                                                              | CSS/SVG              | Ordered 2D transform functions                                |
-| `layout`                   | `container`                                                         | CSS                  | Selects `none` or `flex`                                      |
-| `direction`                | `container` with `layout="flex"`                                    | CSS                  | Main-axis direction                                           |
-| `wrap`                     | `container` with `layout="flex"`                                    | CSS                  | Enables or disables wrapping                                  |
-| `gap`                      | `container` with `layout="flex"`                                    | CSS                  | Main/cross spacing                                            |
-| `padding`                  | `container`                                                         | CSS/Flutter          | Insets the content box                                        |
-| `main`                     | `container` with `layout="flex"`                                    | Flutter              | Main-axis distribution                                        |
-| `cross`                    | `container` with `layout="flex"`                                    | Flutter              | Cross-axis alignment                                          |
-| `flow`                     | Child of a flex container                                           | CSS                  | Selects in-flow or absolute participation                     |
-| `grow`                     | In-flow child of a flex container                                   | CSS/Flutter          | Main-axis growth factor                                       |
-| `align`                    | In-flow child of a flex container                                   | CSS/Flutter          | Per-child cross-axis override                                 |
+| Attribute                  | Valid on                                                           | Inspiration          | Purpose                                                    |
+| -------------------------- | ------------------------------------------------------------------ | -------------------- | ---------------------------------------------------------- |
+| `version`                  | `grida`                                                            | XML                  | Selects the exact language version; currently exactly `0`  |
+| `name`                     | All Draft 0 render elements                                        | HTML/SVG             | Human-readable label; not durable identity                 |
+| `x`, `y`                   | Draft 0 render elements; omitted for in-flow flex children         | SVG/CSS              | Start/end/center/span binding; root target is the viewport |
+| `width`                    | `container`, `rect`, `ellipse`, `line`, `path`, `text`             | CSS/SVG              | Authored width or element-specific `auto`                  |
+| `height`                   | `container`, `rect`, `ellipse`, `path`, `text`; never `line`       | CSS/SVG              | Authored height or element-specific `auto`                 |
+| `min-width`, `max-width`   | `container`, `rect`, `ellipse`, `line`, `path`, `text`             | CSS                  | Width constraints                                          |
+| `min-height`, `max-height` | `container`, `rect`, `ellipse`, `path`, `text`; never `line`       | CSS                  | Height constraints                                         |
+| `aspect-ratio`             | `rect`, `ellipse`, `path`                                          | CSS                  | Supplies one otherwise unresolved box axis                 |
+| `corner-radius`            | `container`, `rect`                                                | CSS/Flutter          | One or four circular or elliptical corner radii            |
+| `corner-smoothing`         | `container`, `rect`                                                | Design tools         | Continuous smoothing of circular rounded corners           |
+| `rotation`                 | All Draft 0 render elements                                        | Flutter/design tools | Clockwise visual rotation in degrees                       |
+| `flip-x`, `flip-y`         | All Draft 0 render elements                                        | Design tools         | Native visual reflection                                   |
+| `opacity`                  | All Draft 0 render elements                                        | CSS/SVG              | Composites the node and descendants                        |
+| `hidden`                   | All Draft 0 render elements                                        | HTML                 | Removes the subtree from layout and painting               |
+| `fill`                     | `container`, `rect`, `ellipse`, `path`, `text`; contextual `tspan` | SVG                  | One-solid node fill or explicit run-fill override          |
+| `d`                        | `path`                                                             | SVG                  | Complete path-data grammar in the fixed unit rectangle     |
+| `fill-rule`                | `path`                                                             | SVG/CSS              | `nonzero` or `evenodd`; defaults to `nonzero`              |
+| `clips`                    | `container`                                                        | Flutter/design tools | Clips descendant content to the container shape            |
+| `font-size`                | `text`, `tspan`                                                    | CSS/SVG              | Positive finite logical-pixel default or run override      |
+| `font-weight`              | `text`, `tspan`                                                    | CSS                  | Integer weight from 1 through 1000                         |
+| `font-style`               | `text`, `tspan`                                                    | CSS                  | `normal` or `italic`                                       |
+| `ops`                      | `lens`                                                             | CSS/SVG              | Ordered 2D transform functions                             |
+| `layout`                   | `container`                                                        | CSS                  | Selects `none` or `flex`                                   |
+| `direction`                | `container` with `layout="flex"`                                   | CSS                  | Main-axis direction                                        |
+| `wrap`                     | `container` with `layout="flex"`                                   | CSS                  | Enables or disables wrapping                               |
+| `gap`                      | `container` with `layout="flex"`                                   | CSS                  | Main/cross spacing                                         |
+| `padding`                  | `container`                                                        | CSS/Flutter          | Insets the content box                                     |
+| `main`                     | `container` with `layout="flex"`                                   | Flutter              | Main-axis distribution                                     |
+| `cross`                    | `container` with `layout="flex"`                                   | Flutter              | Cross-axis alignment                                       |
+| `flow`                     | Child of a flex container                                          | CSS                  | Selects in-flow or absolute participation                  |
+| `grow`                     | In-flow child of a flex container                                  | CSS/Flutter          | Main-axis growth factor                                    |
+| `align`                    | In-flow child of a flex container                                  | CSS/Flutter          | Per-child cross-axis override                              |
 
 `font-size`, `font-weight`, and `font-style` default on `text` to `16`, `400`,
 and `normal`. The same attributes on `tspan` override the owning `text`
@@ -201,6 +214,79 @@ consume that exact mapped geometry. Numeric unrepresentability is a resolution
 failure, never permission to clamp, substitute the declared box, or retain
 partial path ink.
 
+## Proposed later-version module vocabulary
+
+The [module and component RFD](./grida-xml-modules) proposes this source-only
+vocabulary. These rows are not operative Draft 0 grammar.
+
+| Element or attribute    | Valid on                | Proposed contract                                                               |
+| ----------------------- | ----------------------- | ------------------------------------------------------------------------------- |
+| `component`             | Direct child of `grida` | Non-painting boxed definition with the ordinary `container` grammar             |
+| `id`                    | `component`             | Unique lowercase kebab-case export symbol in that source unit                   |
+| `use`                   | Render-child position   | One source instance materialized as the referenced ordinary container subtree   |
+| `href`                  | `use`                   | Required local or source-relative reference with a component-ID fragment        |
+| `name`                  | `use`                   | Optional human-readable instance label; not definition or durable node identity |
+| `x`, `y`                | `use` in free placement | Non-span parent-relative binding of the component container                     |
+| `flow`, `grow`, `align` | `use` under flex layout | Flex participation of the component container                                   |
+| `hidden`                | `use`                   | Instance gate that removes that use from layout and paint when true             |
+
+Component definitions precede an optional one-container scene root. A source
+may therefore be a component library, a render entry, or both. Every component
+reference requires an explicit fragment, including local references such as
+`href="#button"`; there is no default component export or implicit scene-root
+export in the proposal.
+
+`use` intentionally does not accept width, height, paints, opacity, transforms,
+or arbitrary component properties in the static Draft 1 proposal. The boxed
+definition owns those values. The [component-parameter
+RFD](./grida-xml-component-parameters) proposes intentional scalar
+customization through `prop`/`arg` in Version 2; Version 1 continues to reject
+them.
+
+### Proposed Version 2 scalar parameter vocabulary
+
+These rows summarize the [component-parameter
+RFD](./grida-xml-component-parameters). They remain non-operative design
+syntax until accepted and implemented.
+
+| Element or form      | Valid on or in                                | Proposed contract                                                   |
+| -------------------- | --------------------------------------------- | ------------------------------------------------------------------- |
+| `prop`               | Leading direct child of Version 2 `component` | Empty typed scalar declaration; no layout or painter position       |
+| `name`               | `prop`, `arg`                                 | Lowercase kebab-case component-local API member name                |
+| `type`               | `prop`                                        | Required closed scalar category                                     |
+| `default`            | `prop`                                        | Optional definition-owned literal; omission makes the prop required |
+| `values`             | `prop type="enum"`                            | Required non-empty set of accepted enum tokens                      |
+| `arg`                | Direct child of Version 2 `use`               | Empty explicit argument; still not a render child                   |
+| `value`              | `arg`                                         | Required literal or exact outer-prop forwarding binding             |
+| `{prop-name}`        | Compatible established scalar value position  | Complete-value binding; attributes do not support interpolation     |
+| Text binding segment | Direct `text` or `tspan` character content    | Inserts one string value as characters without reparsing            |
+
+Version 2 defines no universal null, expression language, or parameterized
+attribute presence. A use may contain `arg` property children but still may
+not contain render children. Version 3 projection is specified separately and
+does not backport slot declarations, assignment attributes, or render children
+into Version 2.
+
+### Proposed Version 3 named slot vocabulary
+
+These rows summarize the [component-slot RFD](./grida-xml-component-slots).
+They remain non-operative design syntax until accepted as a stable language
+version.
+
+| Element or form     | Valid on or in                                      | Proposed contract                                                            |
+| ------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `<slot>`            | Render-child position in a Version 3 component      | Empty named projection marker; no layout or painter position                 |
+| `name`              | `<slot>`                                            | Required unique component-local lowercase kebab-case slot name               |
+| Assignment root     | Direct render child of Version 3 `use` after `arg*` | Caller-authored ordinary root projected at the named marker                  |
+| `slot` relationship | Direct assignment root only                         | Required declared target name; consumed by projection and never materialized |
+
+The `slot` assignment relationship is contextual source metadata, not an
+ordinary render property. It is invalid on a node outside the direct
+assignment position, is absent from the Draft 0 attribute registry, and never
+appears in the ordinary materialized scene. Version 3 has no wrapper,
+unnamed/default slot, fallback, requiredness, or explicit-empty form. Versions
+0, 1, and 2 continue to reject all slot syntax.
+
 ## Scene-backed property placeholders
 
 These tables reserve discussion slots for properties in the canonical scene
@@ -220,6 +306,9 @@ model. They do not claim the proposed XML spelling is final.
 `id` must map to durable authored identity, not the runtime's transient node
 handle. `transform` also cannot be admitted until its relationship to native
 `rotation`, `flip-x`, `flip-y`, and `lens ops` has one canonical answer.
+The proposed `id` on top-level `component` is a separate module-local export
+symbol; it does not make `id` valid on render nodes or settle durable node and
+instance identity.
 
 ### Primitive geometry
 
@@ -286,7 +375,10 @@ XML children rather than become mini-languages inside attributes.
 | `tspan`              | `text`                                                  | **Draft 0** | Flat contextual run with exact non-empty character data and explicit overrides    |
 | `network`            | `vector`                                                | **Design**  | Editable vertices, Bézier segments, loops, regions, and region fills              |
 | `resources`          | Document-level declaration scope                        | **Design**  | Portable logical IDs and packaged/external resource policy                        |
-| `component`, `use`   | Document definitions and scene                          | **Design**  | Reusable authored widgets and instances                                           |
+| `component`          | Direct child of a later-version `grida` envelope        | **Design**  | Named, non-painting boxed definition with ordinary `container` semantics          |
+| `use`                | Render-child position in a later-version source         | **Design**  | Source-relative component-ID instance; no independent paint wrapper               |
+| `prop`, `arg`        | Version 2 component definition and use                  | **Design**  | Proposed typed scalar API; complete contract lives in the parameter RFD           |
+| `slot`               | Render-child position inside a Version 3 component      | **Design**  | Empty named projection marker; complete contract lives in the component-slot RFD  |
 | Animation vocabulary | Document, node, or property scope                       | **Design**  | Requires a dedicated timing and addressing RFD                                    |
 
 ### Paint attribute registry
@@ -472,21 +564,21 @@ These are not ordinary missing attributes. Each needs a focused RFD because
 its structure, identity, or evaluation rules cannot be made reliable by
 choosing a name alone.
 
-| Area                          | Production requirement                                    | Questions the syntax must answer                                                    |
-| ----------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Editable vector network       | Vertices, cubic tangents, segments, loops, filled regions | Stable local IDs or indices; open/closed contours; region fill stacks; validation   |
-| Non-unit path reference box   | Stable authored coordinate rectangle                      | Optional syntax; positive extents; normalization; canonical writer behavior         |
-| Variable-width stroke         | Ordered `(u, half-width)` samples                         | Nested stops versus compact list; interpolation; endpoints; base-width interaction  |
-| Run strokes                   | Per-run stroke paints, width, and alignment               | Reconcile singular production geometry with repeatable XML stroke topology          |
-| Masks                         | Geometry, alpha, and luminance mask nodes                 | Which sibling is the mask; scope; consumption; stacking; clipping interaction       |
-| Effects                       | Typed singleton and repeated effect slots                 | Cross-type order; multiplicity; compositing bounds; visibility and blend metadata   |
-| Image resources and placement | Logical IDs, hashes, fit, affine placement, tiling        | Packaging; base URI; network policy; intrinsic size; missing-resource behavior      |
-| Boolean operations            | Live child geometry and operation enum                    | Ordered operands; child ownership; nesting; flattening; paint inheritance           |
-| Transform model               | Native rotation, affine transforms, origin, source lens   | One canonical authored form; layout-versus-paint transform; decomposition stability |
-| Components and reuse          | Definitions, instances, overrides, identity               | Definition scope; `use`; slots; overrides; cycles; resource and animation binding   |
-| Animation                     | Time-varying values and motion-graphics behavior          | Addressing, interpolation, timelines, expressions, easing, events, serialization    |
-| Embedded Markdown/HTML        | Opaque render-only content                                | Escaping, sanitization, fonts/resources, intrinsic sizing, deterministic rendering  |
-| Durable identity              | Stable user IDs distinct from runtime handles             | Uniqueness scope; copy/paste; merge; references; agent-generated IDs                |
+| Area                          | Production requirement                                       | Questions the syntax must answer                                                    |
+| ----------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Editable vector network       | Vertices, cubic tangents, segments, loops, filled regions    | Stable local IDs or indices; open/closed contours; region fill stacks; validation   |
+| Non-unit path reference box   | Stable authored coordinate rectangle                         | Optional syntax; positive extents; normalization; canonical writer behavior         |
+| Variable-width stroke         | Ordered `(u, half-width)` samples                            | Nested stops versus compact list; interpolation; endpoints; base-width interaction  |
+| Run strokes                   | Per-run stroke paints, width, and alignment                  | Reconcile singular production geometry with repeatable XML stroke topology          |
+| Masks                         | Geometry, alpha, and luminance mask nodes                    | Which sibling is the mask; scope; consumption; stacking; clipping interaction       |
+| Effects                       | Typed singleton and repeated effect slots                    | Cross-type order; multiplicity; compositing bounds; visibility and blend metadata   |
+| Image resources and placement | Logical IDs, hashes, fit, affine placement, tiling           | Packaging; base URI; network policy; intrinsic size; missing-resource behavior      |
+| Boolean operations            | Live child geometry and operation enum                       | Ordered operands; child ownership; nesting; flattening; paint inheritance           |
+| Transform model               | Native rotation, affine transforms, origin, source lens      | One canonical authored form; layout-versus-paint transform; decomposition stability |
+| Components and reuse          | Named definitions, `use`, scalar props, and named projection | Durable use/member identity; deep overrides; archive persistence; animation binding |
+| Animation                     | Time-varying values and motion-graphics behavior             | Addressing, interpolation, timelines, expressions, easing, events, serialization    |
+| Embedded Markdown/HTML        | Opaque render-only content                                   | Escaping, sanitization, fonts/resources, intrinsic sizing, deterministic rendering  |
+| Durable identity              | Stable user IDs distinct from runtime handles                | Uniqueness scope; copy/paste; merge; references; agent-generated IDs                |
 
 The vector-network and width-profile grammars are the clearest examples of
 where new syntax must be invented. Treating either as a JSON-shaped `data`
