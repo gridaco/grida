@@ -1429,16 +1429,10 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                     match key.as_str() {
                         "name" => header.name = Some(val),
                         "x" => {
-                            if is_authored_root {
-                                return err("the authored root <container> cannot declare `x`");
-                            }
                             x_seen = true;
                             header.x = parse_binding(&val, "x")?;
                         }
                         "y" => {
-                            if is_authored_root {
-                                return err("the authored root <container> cannot declare `y`");
-                            }
                             y_seen = true;
                             header.y = parse_binding(&val, "y")?;
                         }
@@ -3164,7 +3158,9 @@ fn print_node(
         match node.header.width {
             SizeIntent::Fixed(v) => push_attr(out, width_attr, &fmt_num(v)),
             SizeIntent::Auto => {
-                if matches!(node.payload, Payload::Frame { .. }) {
+                if matches!(node.payload, Payload::Frame { .. })
+                    && !matches!(node.header.x, AxisBinding::Span { .. })
+                {
                     push_attr(out, width_attr, "auto");
                 }
                 // text: auto is the kind default — omitted
@@ -3183,7 +3179,9 @@ fn print_node(
                 }
             }
             SizeIntent::Auto => {
-                if matches!(node.payload, Payload::Frame { .. }) {
+                if matches!(node.payload, Payload::Frame { .. })
+                    && !matches!(node.header.y, AxisBinding::Span { .. })
+                {
                     push_attr(out, height_attr, "auto");
                 }
             }

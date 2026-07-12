@@ -392,13 +392,7 @@ fn xml_declaration_is_single_and_before_the_envelope() {
 
 #[test]
 fn authored_root_and_shape_constraints_are_structural() {
-    for attr in [
-        "x=\"1\"",
-        "y=\"1\"",
-        "flow=\"absolute\"",
-        "grow=\"1\"",
-        "align=\"center\"",
-    ] {
+    for attr in ["flow=\"absolute\"", "grow=\"1\"", "align=\"center\""] {
         let source = format!("<grida version=\"0\"><container {attr}/></grida>");
         let error = grida_xml::parse(&source).unwrap_err();
         assert!(error.to_string().contains("authored root <container>"));
@@ -480,6 +474,96 @@ fn authored_root_and_shape_constraints_are_structural() {
         assert!(
             error.to_string().contains(expected),
             "expected `{expected}` in `{error}`"
+        );
+    }
+}
+
+/// The authored scene is a free child of the implicit, definite viewport
+/// frame. Root bindings therefore use the ordinary binding model; explicit
+/// Span keeps viewport-fill intent inspectable without changing `auto`/hug.
+#[test]
+fn authored_root_bindings_resolve_against_the_viewport_and_roundtrip() {
+    let source = r#"
+<grida version="0">
+  <container name="viewport scene" x="span 12 20" y="span 8 16" clips="true">
+    <container name="nested span" x="span 5 7" y="span 3 9"/>
+  </container>
+</grida>
+"#;
+    let doc = grida_xml::parse(source).expect("root bindings parse");
+    let printed = grida_xml::print(&doc).expect("root bindings print");
+    let reparsed = grida_xml::parse(&printed).expect("root bindings reparse");
+    assert_eq!(doc, reparsed);
+
+    let root = doc.get(doc.root).children[0];
+    let nested = doc.get(root).children[0];
+    assert_eq!(
+        doc.get(root).header.x,
+        AxisBinding::Span {
+            start: 12.0,
+            end: 20.0
+        }
+    );
+    assert_eq!(
+        doc.get(root).header.y,
+        AxisBinding::Span {
+            start: 8.0,
+            end: 16.0
+        }
+    );
+    assert!(printed.contains(
+        "<container name=\"viewport scene\" x=\"span 12 20\" y=\"span 8 16\" clips=\"true\">"
+    ));
+    assert!(!printed.contains("x=\"span 12 20\" y=\"span 8 16\" width="));
+    assert!(printed.contains("<container name=\"nested span\" x=\"span 5 7\" y=\"span 3 9\"/>"));
+
+    for (viewport, expected_root, expected_nested) in [
+        (
+            (1280.0, 720.0),
+            (12.0, 8.0, 1248.0, 696.0),
+            (5.0, 3.0, 1236.0, 684.0),
+        ),
+        (
+            (390.0, 844.0),
+            (12.0, 8.0, 358.0, 820.0),
+            (5.0, 3.0, 346.0, 808.0),
+        ),
+    ] {
+        let resolved = resolve(
+            &doc,
+            &ResolveOptions {
+                viewport,
+                ..Default::default()
+            },
+        );
+        assert!(resolved.reports.is_empty(), "{:?}", resolved.reports);
+        assert_eq!(resolved.xywh(root), expected_root);
+        assert_eq!(resolved.xywh(nested), expected_nested);
+    }
+
+    for (bindings, expected) in [
+        (r#"x="10" y="12""#, (10.0, 12.0, 100.0, 50.0)),
+        (r#"x="end 10" y="end 12""#, (1170.0, 658.0, 100.0, 50.0)),
+        (r#"x="center -5" y="center 6""#, (585.0, 341.0, 100.0, 50.0)),
+    ] {
+        let source = format!(
+            "<grida version=\"0\"><container {bindings} width=\"100\" height=\"50\"/></grida>"
+        );
+        let doc = grida_xml::parse(&source).expect("root pin binding parses");
+        let root = doc.get(doc.root).children[0];
+        let resolved = resolve(
+            &doc,
+            &ResolveOptions {
+                viewport: (1280.0, 720.0),
+                ..Default::default()
+            },
+        );
+        assert!(resolved.reports.is_empty(), "{:?}", resolved.reports);
+        assert_eq!(resolved.xywh(root), expected);
+        let printed = grida_xml::print(&doc).expect("root pin binding prints");
+        assert_eq!(
+            doc,
+            grida_xml::parse(&printed).expect("root pin binding reparses")
         );
     }
 }
@@ -609,7 +693,7 @@ fn print_rejects_documents_outside_the_draft0_root_contract() {
     let authored_root = invalid_authored_root
         .get(invalid_authored_root.root)
         .children[0];
-    invalid_authored_root.get_mut(authored_root).header.x = AxisBinding::start(10.0);
+    invalid_authored_root.get_mut(authored_root).header.flow = Flow::Absolute;
     assert!(matches!(
         grida_xml::print(&invalid_authored_root),
         Err(PrintError::InvalidDocument(_))
