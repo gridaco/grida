@@ -31,6 +31,9 @@ Map:
 - `src/ops.rs` — gesture ops with typed errors + write-count doctrine
 - `src/textir.rs` — the agent text IR parser + canonical printer (E3)
 - `src/grida_xml.rs` — strict Draft 0 `.grida.xml` parser/writer boundary
+- `src/grida_xml_source.rs` — pure retained Version 1/2/3 source-program
+  linker, typed scalar specializer, named static slot projector, and
+  ordinary-scene materializer; hosts supply immutable dependency snapshots
 - `src/svgout.rs` — SVG snapshots of resolved documents
 - `src/math.rs` / `src/measure.rs` — affine + deterministic text metric
 - `tests/` — the conformance-derived suites; `tests/common/mod.rs` helpers
@@ -103,6 +106,50 @@ parent layout contribution, and `<text>` remains a leaf. A path's complete SVG
 mapped once into the final box; that resolved command artifact supplies bounds
 and rendering without reparsing or independently rescaling geometry.
 Filesystem I/O, resources, and rasterization remain host concerns.
+
+## Retained Version 1/2/3 source programs
+
+`grida_xml_source` is a separate source-level boundary above Draft 0. It
+retains immutable source snapshots, resolves Version 1 `component`/`use`
+references through a host-supplied pure provider, rejects expansion cycles,
+implements Version 2's closed typed scalar prop/argument model, and adds
+Version 3 named static render-slot projection. Assignments splice at their
+definition-owned marker in caller order; absent assignments erase the marker.
+There is no default slot, fallback, requiredness, wrapper, or render-model slot
+node.
+
+It materializes one ordinary component-blind `Document`. The outcome also
+contains per-node source/use provenance, specialization selection/origin
+provenance, one slot-projection provenance record per declared slot per use
+(including empty projections), and a resource manifest whose opaque runtime
+RIDs distinguish equal relative image strings from different source origins.
+Assigned trees retain their caller source, scalar scope, resource base, and
+authored-node provenance. Projection failures retain the innermost slot and
+assignment sites in addition to the complete use chain. The module performs no
+file or image I/O.
+
+Version 3 may link Version 1, 2, or 3 components, but render assignments are
+accepted only by Version 3 targets. Version 1/2 callers cannot link Version 3
+definitions. These compatibility checks happen at the source-program boundary
+without reinterpreting an older source grammar.
+
+This does not broaden `grida_xml::parse`, change `grida_xml::VERSION`, add
+component variants to the node model, or make materialized copies canonical
+source. Draft 0 passed through this higher source-program boundary receives
+the same origin-aware runtime image rekeying; direct `grida_xml::parse` and
+`print` retain their exact Draft 0 contract.
+
+The current operation links only the closure reachable from an entry scene.
+It does not yet accept an explicitly requested component export as a root or
+perform complete-library validation from every export. Source-local validation
+searches at most 4,096 declared-domain witness states per parameterized
+component and fails explicitly at that bound. Retaining exact source snapshots
+provides source-preserving access, but this module does not yet provide
+same-location, canonical source-unit, or canonical multi-file writer modes. It
+therefore makes no canonical-writing claim. Draft 0 parse errors are currently
+string-only, so a specialization failure retains the complete candidate
+binding set for its failing specialization or projected subtree rather than a
+minimal causal subset.
 
 Known lab simplifications (declared in the REPORT's lose column):
 children as ordered `Vec` (no fractional index), per-container Taffy

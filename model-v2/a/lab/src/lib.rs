@@ -9,6 +9,7 @@
 //! Standalone by design; promoted into `crates/` only at phase 4.
 
 pub mod grida_xml;
+pub mod grida_xml_source;
 pub mod math;
 pub mod measure;
 pub mod model;
