@@ -1,0 +1,5 @@
+<grida version="2">
+  <component id="swatch" name="Swatch" width="40" height="24" fill="{tone}">
+    <prop name="tone" type="color"/>
+  </component>
+</grida>

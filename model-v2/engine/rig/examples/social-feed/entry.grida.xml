@@ -1,0 +1,268 @@
+<grida version="3">
+  <!-- Demo-only fictional identities and content; both photo assets were generated for this fixture. -->
+  <component id="story-item" width="92" height="108">
+    <prop name="label" type="string"/>
+    <prop name="initial" type="string"/>
+    <prop name="avatar-color" type="color"/>
+
+    <ellipse x="2" width="88" height="88">
+      <fill>
+        <gradient kind="linear" from="0 1" to="1 0">
+          <stop offset="0" color="#F59E0B"/>
+          <stop offset="0.5" color="#EC4899"/>
+          <stop offset="1" color="#7C3AED"/>
+        </gradient>
+      </fill>
+      <ellipse x="3" y="3" width="82" height="82" fill="#FFFFFF">
+        <ellipse x="3" y="3" width="76" height="76" fill="{avatar-color}">
+          <text x="center" y="center" font-size="14" font-weight="700" fill="#FFFFFF">{initial}</text>
+        </ellipse>
+      </ellipse>
+    </ellipse>
+    <text x="center" y="94" font-size="10" fill="#262626">{label}</text>
+  </component>
+
+  <component id="suggestion-row" width="320" height="52">
+    <prop name="account" type="string"/>
+    <prop name="detail" type="string"/>
+    <prop name="initial" type="string"/>
+    <prop name="avatar-color" type="color"/>
+
+    <ellipse y="6" width="40" height="40" fill="{avatar-color}">
+      <text x="center" y="center" font-size="12" font-weight="700" fill="#FFFFFF">{initial}</text>
+    </ellipse>
+    <text x="52" y="6" width="190" font-size="13" font-weight="700" fill="#0F0F0F">{account}</text>
+    <text x="52" y="26" width="210" font-size="11" fill="#737373">{detail}</text>
+    <text x="end 0" y="12" width="50" font-size="11" font-weight="700" fill="#0095F6">Follow</text>
+  </component>
+
+  <container name="folio-desktop-feed" x="span 0 0" y="span 0 0" clips="true" fill="#FFFFFF">
+    <container name="left-rail" y="span 0 0" width="480" fill="#FFFFFF">
+      <rect name="folio-mark" x="24" y="32" width="24" height="24" corner-radius="7">
+        <fill>
+          <gradient kind="linear" from="0 1" to="1 0">
+            <stop offset="0" color="#F59E0B"/>
+            <stop offset="0.5" color="#EC4899"/>
+            <stop offset="1" color="#7C3AED"/>
+          </gradient>
+        </fill>
+        <ellipse x="6" y="6" width="12" height="12">
+          <fill/>
+          <stroke width="2">
+            <solid color="#FFFFFF"/>
+          </stroke>
+        </ellipse>
+        <ellipse x="17" y="4" width="3" height="3" fill="#FFFFFF"/>
+      </rect>
+
+      <container name="navigation" x="24" y="center -1" width="30" height="430">
+        <path
+          name="home"
+          y="0"
+          width="26"
+          height="26"
+          d="M .08 .45 L .5 .08 L .92 .45 L .92 .92 L .62 .92 L .62 .62 L .38 .62 L .38 .92 L .08 .92 Z"
+          fill="#0F0F0F"
+        />
+
+        <rect name="watch" y="52" width="26" height="24" corner-radius="5">
+          <fill/>
+          <stroke width="2">
+            <solid color="#0F0F0F"/>
+          </stroke>
+          <path width="26" height="24" d="M .4 .28 L .74 .5 L .4 .72 Z" fill="#0F0F0F"/>
+        </rect>
+
+        <path name="send" y="104" width="26" height="26" d="M .08 .46 L .92 .08 L .63 .92 L .46 .58 Z">
+          <fill/>
+          <stroke width="2" join="round">
+            <solid color="#0F0F0F"/>
+          </stroke>
+        </path>
+        <ellipse x="18" y="100" width="16" height="16" fill="#FF3040">
+          <text x="center" y="center" font-size="9" font-weight="700" fill="#FFFFFF">3</text>
+        </ellipse>
+
+        <ellipse name="search" y="156" width="22" height="22">
+          <fill/>
+          <stroke width="2">
+            <solid color="#0F0F0F"/>
+          </stroke>
+        </ellipse>
+        <line x="18" y="174" width="12" rotation="45">
+          <stroke width="2" cap="round">
+            <solid color="#0F0F0F"/>
+          </stroke>
+        </line>
+
+        <path
+          name="activity"
+          y="208"
+          width="26"
+          height="26"
+          d="M .5 .9 C .4 .78 .08 .56 .08 .3 C .08 .12 .22 .05 .36 .05 C .44 .05 .49 .1 .5 .16 C .51 .1 .56 .05 .64 .05 C .78 .05 .92 .12 .92 .3 C .92 .56 .6 .78 .5 .9 Z"
+        >
+          <fill/>
+          <stroke width="2" join="round">
+            <solid color="#0F0F0F"/>
+          </stroke>
+        </path>
+        <ellipse x="21" y="204" width="7" height="7" fill="#FF3040"/>
+
+        <rect x="11" y="260" width="4" height="26" corner-radius="2" fill="#0F0F0F"/>
+        <rect y="271" width="26" height="4" corner-radius="2" fill="#0F0F0F"/>
+
+        <rect name="insights" y="312" width="26" height="26" corner-radius="4">
+          <fill/>
+          <stroke width="2">
+            <solid color="#0F0F0F"/>
+          </stroke>
+          <rect x="6" y="13" width="3" height="7" fill="#0F0F0F"/>
+          <rect x="12" y="8" width="3" height="12" fill="#0F0F0F"/>
+          <rect x="18" y="4" width="3" height="16" fill="#0F0F0F"/>
+        </rect>
+
+        <ellipse y="364" width="28" height="28">
+          <fill>
+            <gradient kind="linear" from="0 1" to="1 0">
+              <stop offset="0" color="#0E7490"/>
+              <stop offset="1" color="#A78BFA"/>
+            </gradient>
+          </fill>
+          <text x="center" y="center" font-size="10" font-weight="700" fill="#FFFFFF">O</text>
+        </ellipse>
+      </container>
+
+      <container name="rail-footer" x="24" y="end 24" width="30" height="52">
+        <rect y="2" width="26" height="3" corner-radius="2" fill="#0F0F0F"/>
+        <rect y="11" width="26" height="3" corner-radius="2" fill="#0F0F0F"/>
+        <rect y="20" width="26" height="3" corner-radius="2" fill="#0F0F0F"/>
+        <ellipse x="2" y="36" width="7" height="7">
+          <fill/>
+          <stroke width="2"><solid color="#0F0F0F"/></stroke>
+        </ellipse>
+        <ellipse x="17" y="36" width="7" height="7">
+          <fill/>
+          <stroke width="2"><solid color="#0F0F0F"/></stroke>
+        </ellipse>
+        <rect x="9" y="46" width="7" height="7">
+          <fill/>
+          <stroke width="2"><solid color="#0F0F0F"/></stroke>
+        </rect>
+      </container>
+    </container>
+
+    <container name="stories" x="center -106" y="30" width="612" height="108" layout="flex" direction="row" gap="12">
+      <use href="#story-item"><arg name="label" value="amber"/><arg name="initial" value="A"/><arg name="avatar-color" value="#EA580C"/></use>
+      <use href="#story-item"><arg name="label" value="softgrid"/><arg name="initial" value="S"/><arg name="avatar-color" value="#7C3AED"/></use>
+      <use href="#story-item"><arg name="label" value="mori"/><arg name="initial" value="M"/><arg name="avatar-color" value="#0F766E"/></use>
+      <use href="#story-item"><arg name="label" value="atlas"/><arg name="initial" value="A"/><arg name="avatar-color" value="#2563EB"/></use>
+      <use href="#story-item"><arg name="label" value="north"/><arg name="initial" value="N"/><arg name="avatar-color" value="#BE123C"/></use>
+      <use href="#story-item"><arg name="label" value="noon"/><arg name="initial" value="N"/><arg name="avatar-color" value="#A16207"/></use>
+    </container>
+
+    <container
+      name="timeline"
+      x="center -106"
+      y="166"
+      width="468"
+      height="1640"
+      layout="flex"
+      direction="column"
+      gap="20"
+    >
+      <use href="./post-card.grida.xml#post-card" name="coastal-post">
+        <arg name="author" value="lumen.archive"/>
+        <arg name="avatar" value="L"/>
+        <arg name="avatar-color" value="#1D4ED8"/>
+        <arg name="location" value="Alba Coast"/>
+        <arg name="caption" value="A quiet structure catching the last orange light."/>
+        <arg name="likes" value="4,812"/>
+        <arg name="comments" value="62"/>
+        <arg name="time" value="3 h"/>
+        <arg name="timestamp" value="3 HOURS AGO"/>
+
+        <container slot="media" name="coastal-cabin-media" x="span 0 0" y="span 0 0" clips="true">
+          <fill>
+            <solid color="#D7E2EC"/>
+            <image src="./assets/post-coastal-cabin.webp" fit="cover"/>
+          </fill>
+          <rect x="end 12" y="12" width="42" height="24" corner-radius="12" fill="#000000" opacity="0.62">
+            <text x="center" y="center" font-size="10" font-weight="700" fill="#FFFFFF">1 / 3</text>
+          </rect>
+        </container>
+      </use>
+
+      <use href="./post-card.grida.xml#post-card" name="studio-post">
+        <arg name="author" value="object.room"/>
+        <arg name="avatar" value="O"/>
+        <arg name="avatar-color" value="#EA580C"/>
+        <arg name="location" value="Studio 04"/>
+        <arg name="caption" value="Studies in glow, reflection, and patient geometry."/>
+        <arg name="likes" value="1,206"/>
+        <arg name="comments" value="18"/>
+        <arg name="time" value="6 h"/>
+        <arg name="timestamp" value="6 HOURS AGO"/>
+
+        <container slot="media" name="orange-studio-media" x="span 0 0" y="span 0 0" clips="true">
+          <fill>
+            <solid color="#E7DDD1"/>
+            <image src="./assets/post-orange-studio.webp" fit="cover"/>
+          </fill>
+        </container>
+      </use>
+    </container>
+
+    <container name="suggestions" x="center 460" y="32" width="320" height="500">
+      <container name="current-profile" width="320" height="52">
+        <ellipse y="6" width="44" height="44">
+          <fill>
+            <gradient kind="linear" from="0 1" to="1 0">
+              <stop offset="0" color="#0E7490"/>
+              <stop offset="1" color="#A78BFA"/>
+            </gradient>
+          </fill>
+          <text x="center" y="center" font-size="13" font-weight="700" fill="#FFFFFF">O</text>
+        </ellipse>
+        <text x="56" y="7" width="180" font-size="13" font-weight="700" fill="#0F0F0F">orbit.index</text>
+        <text x="56" y="28" width="180" font-size="12" fill="#737373">Orbit Index</text>
+        <text x="end 0" y="15" width="48" font-size="11" font-weight="700" fill="#0095F6">Switch</text>
+      </container>
+
+      <text y="64" width="200" font-size="13" font-weight="700" fill="#737373">Suggested for you</text>
+      <text x="end 0" y="64" width="44" font-size="11" font-weight="700" fill="#0F0F0F">See all</text>
+
+      <container y="88" width="320" height="260" layout="flex" direction="column">
+        <use href="#suggestion-row"><arg name="account" value="terra.type"/><arg name="detail" value="Followed by softgrid"/><arg name="initial" value="T"/><arg name="avatar-color" value="#0F766E"/></use>
+        <use href="#suggestion-row"><arg name="account" value="noon.objects"/><arg name="detail" value="New to folio"/><arg name="initial" value="N"/><arg name="avatar-color" value="#A16207"/></use>
+        <use href="#suggestion-row"><arg name="account" value="paper.signal"/><arg name="detail" value="Followed by atlas"/><arg name="initial" value="P"/><arg name="avatar-color" value="#7C3AED"/></use>
+        <use href="#suggestion-row"><arg name="account" value="softframe.studio"/><arg name="detail" value="Suggested for you"/><arg name="initial" value="S"/><arg name="avatar-color" value="#BE123C"/></use>
+        <use href="#suggestion-row"><arg name="account" value="field.atlas"/><arg name="detail" value="Followed by mori"/><arg name="initial" value="F"/><arg name="avatar-color" value="#2563EB"/></use>
+      </container>
+
+      <text y="386" width="320" font-size="11" fill="#A8A8A8">About · Help · Press · API · Jobs · Privacy · Terms
+Locations · Language · Verified
+
+© 2026 FOLIO</text>
+    </container>
+
+    <rect name="messages-pill" x="end 40" y="end 22" width="220" height="48" corner-radius="24" fill="#FFFFFF">
+      <stroke width="1" align="inside">
+        <solid color="#DBDBDB"/>
+      </stroke>
+      <path x="16" y="12" width="24" height="24" d="M .08 .46 L .92 .08 L .63 .92 L .46 .58 Z">
+        <fill/>
+        <stroke width="2" join="round">
+          <solid color="#0F0F0F"/>
+        </stroke>
+      </path>
+      <ellipse x="33" y="8" width="16" height="16" fill="#FF3040">
+        <text x="center" y="center" font-size="9" font-weight="700" fill="#FFFFFF">3</text>
+      </ellipse>
+      <text x="56" y="14" width="90" font-size="13" font-weight="700" fill="#0F0F0F">Messages</text>
+      <ellipse x="156" y="12" width="24" height="24" fill="#0F766E"/>
+      <ellipse x="174" y="12" width="24" height="24" fill="#7C3AED"/>
+      <ellipse x="192" y="12" width="24" height="24" fill="#EA580C"/>
+    </rect>
+  </container>
+</grida>

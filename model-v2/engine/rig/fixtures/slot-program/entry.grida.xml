@@ -1,0 +1,9 @@
+<grida version="3">
+  <container width="112" height="48">
+    <use href="./post-shell.grida.xml#post-shell" name="filled" x="4" y="4">
+      <rect slot="content" name="green" width="32" height="24" fill="#22C55E"/>
+      <rect slot="content" name="blue" x="16" width="32" height="24" fill="#2563EB"/>
+    </use>
+    <use href="./post-shell.grida.xml#post-shell" name="empty" x="60" y="4"/>
+  </container>
+</grida>

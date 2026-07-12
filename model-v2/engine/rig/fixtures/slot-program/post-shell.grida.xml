@@ -1,0 +1,9 @@
+<grida version="3">
+  <component id="post-shell" width="48" height="40">
+    <rect name="header" width="48" height="8" fill="#E11D48"/>
+    <container name="body" y="8" width="48" height="24">
+      <slot name="content"/>
+    </container>
+    <rect name="footer" y="32" width="48" height="8" fill="#E11D48"/>
+  </component>
+</grida>

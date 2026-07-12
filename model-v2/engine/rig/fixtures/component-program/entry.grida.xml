@@ -1,0 +1,10 @@
+<grida version="2">
+  <container name="surface" width="96" height="40" fill="#FFFFFF">
+    <use href="./swatch.grida.xml#swatch" name="red-instance" x="8" y="8">
+      <arg name="tone" value="#FF0000"/>
+    </use>
+    <use href="./swatch.grida.xml#swatch" name="blue-instance" x="40" y="8">
+      <arg name="tone" value="#0000FF"/>
+    </use>
+  </container>
+</grida>

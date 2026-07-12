@@ -1,0 +1,74 @@
+<grida version="3">
+  <component id="post-card" name="Desktop social post" width="468" height="780">
+    <prop name="author" type="string"/>
+    <prop name="avatar" type="string"/>
+    <prop name="avatar-color" type="color"/>
+    <prop name="location" type="string"/>
+    <prop name="caption" type="string"/>
+    <prop name="likes" type="string"/>
+    <prop name="comments" type="string"/>
+    <prop name="time" type="string"/>
+    <prop name="timestamp" type="string"/>
+
+    <container name="post-header" width="468" height="52">
+      <ellipse name="avatar" y="8" width="32" height="32" fill="{avatar-color}">
+        <text x="center" y="center" font-size="11" font-weight="700" fill="#FFFFFF">{avatar}</text>
+      </ellipse>
+      <text name="author" x="44" y="7" width="120" font-size="13" font-weight="700" fill="#0F0F0F">{author}</text>
+      <text name="time" x="170" y="7" width="60" font-size="13" fill="#737373">· {time}</text>
+      <text name="location" x="44" y="27" width="250" font-size="11" fill="#737373">{location}</text>
+      <text name="more" x="end 0" y="8" width="30" font-size="18" fill="#0F0F0F">•••</text>
+    </container>
+
+    <container name="media-frame" y="52" width="468" height="585" clips="true" fill="#EFEFEF">
+      <slot name="media"/>
+    </container>
+
+    <container name="pager" y="646" width="468" height="8">
+      <ellipse x="228" width="6" height="6" fill="#0095F6"/>
+      <ellipse x="238" y="1" width="4" height="4" fill="#C7C7C7"/>
+    </container>
+
+    <container name="post-actions" y="662" width="468" height="28">
+      <path
+        name="like"
+        width="24"
+        height="24"
+        d="M .5 .9 C .4 .78 .08 .56 .08 .3 C .08 .12 .22 .05 .36 .05 C .44 .05 .49 .1 .5 .16 C .51 .1 .56 .05 .64 .05 C .78 .05 .92 .12 .92 .3 C .92 .56 .6 .78 .5 .9 Z"
+      >
+        <fill/>
+        <stroke width="2" join="round">
+          <solid color="#0F0F0F"/>
+        </stroke>
+      </path>
+      <text x="30" y="3" width="54" font-size="12" font-weight="700" fill="#0F0F0F">{likes}</text>
+
+      <ellipse name="comment" x="88" y="2" width="20" height="19">
+        <fill/>
+        <stroke width="2">
+          <solid color="#0F0F0F"/>
+        </stroke>
+      </ellipse>
+      <text x="116" y="3" width="30" font-size="12" font-weight="700" fill="#0F0F0F">{comments}</text>
+
+      <path name="share" x="150" width="24" height="24" d="M .08 .46 L .92 .08 L .63 .92 L .46 .58 Z">
+        <fill/>
+        <stroke width="2" join="round">
+          <solid color="#0F0F0F"/>
+        </stroke>
+      </path>
+
+      <path name="save" x="end 0" width="20" height="24" d="M .14 .08 L .86 .08 L .86 .92 L .5 .69 L .14 .92 Z">
+        <fill/>
+        <stroke width="2" join="round">
+          <solid color="#0F0F0F"/>
+        </stroke>
+      </path>
+    </container>
+
+    <text name="caption" y="708" width="468" font-size="13" fill="#262626"><tspan font-weight="700" fill="#0F0F0F">{author}</tspan> {caption}</text>
+    <text name="translation" y="744" width="120" font-size="11" font-weight="700" fill="#0F0F0F">See translation</text>
+    <text name="timestamp" y="766" width="160" font-size="10" fill="#737373">{timestamp}</text>
+    <rect name="divider" y="779" width="468" height="1" fill="#DBDBDB"/>
+  </component>
+</grida>

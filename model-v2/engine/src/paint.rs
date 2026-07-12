@@ -30,7 +30,9 @@ use crate::drawlist::{DrawList, ItemKind};
 
 /// Host-supplied resources: the typeface offered to text resolution and decoded
 /// images used at paint time. Exact shaped fonts live with the drawlist; images
-/// stay keyed by authored RID so path resolution remains a host concern.
+/// stay keyed by the model's logical RID so authored-source resolution remains
+/// a host concern. A retained source program may lower an authored RID to an
+/// origin-aware runtime RID before this boundary.
 pub struct PaintCtx {
     id: u64,
     resource_revision: u64,
@@ -73,7 +75,7 @@ impl PaintCtx {
         self.bump_resource_revision();
     }
 
-    /// Register an already-decoded image under the exact authored resource id.
+    /// Register an already-decoded image under the exact model resource id.
     pub fn insert_image(&mut self, rid: impl Into<String>, image: Image) {
         let image = image.with_default_mipmaps().unwrap_or(image);
         self.images.insert(rid.into(), image);
