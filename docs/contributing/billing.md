@@ -93,6 +93,18 @@ stripe listen --forward-to localhost:3000/webhooks/stripe
 
 Copy the printed `whsec_…` into `STRIPE_WEBHOOK_SECRET`. Per-`stripe listen` session — restart resets it.
 
+**Hosted / self-host deployments.** `stripe listen` forwards _every_ event to your machine, so local dev needs no event list. A real Stripe webhook endpoint delivers only the event types you enable — so when you deploy, create an endpoint (Stripe Dashboard → Developers → Webhooks) at `https://<your-domain>/webhooks/stripe`, copy its signing secret into `STRIPE_WEBHOOK_SECRET`, and subscribe every event class below. All of them feed the billing projector or the AI-credit flow, so enable the full set.
+
+| Class            | Events                                                                                            | Drives                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| **Checkout**     | `checkout.session.completed`                                                                      | AI-credit top-up + auto-reload enablement   |
+| **Customer**     | `customer.created`, `customer.updated`                                                            | Stripe-customer ↔ org binding               |
+| **Subscription** | `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted` | plan state + auto-reload teardown on cancel |
+| **Invoice**      | `invoice.payment_succeeded`, `invoice.payment_failed`                                             | subscription renew / dunning state          |
+| **Disputes**     | `charge.dispute.created`, `charge.dispute.updated`, `charge.dispute.closed`                       | chargeback handling                         |
+
+The Metronome endpoint (step 8) is the same in production — the same `/webhooks/metronome` path on your own domain, with its signing secret in `METRONOME_WEBHOOK_SECRET`.
+
 ### 7. Metronome webhooks (cloudflared tunnel)
 
 The Stripe CLI can forward to localhost; Metronome can't — it requires a public HTTPS endpoint. Use a Cloudflare named tunnel configured **locally** to forward `/webhooks/*` only. Nothing about the tunnel is git-tracked — the config lives in your `~/.cloudflared/` directory and the hostname is one of yours.
