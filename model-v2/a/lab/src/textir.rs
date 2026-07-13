@@ -9,6 +9,7 @@
 
 use crate::model::*;
 use crate::path;
+use crate::renderability;
 use quick_xml::events::attributes::Attributes;
 use quick_xml::events::{BytesDecl, BytesStart, Event};
 use quick_xml::Reader;
@@ -565,11 +566,6 @@ fn parse_gradient(
             {
                 return err("linear gradient endpoints overflow after lowering to model alignment");
             }
-            if xy1 == xy2 {
-                return err(
-                    "linear gradient from and to must differ after lowering to model alignment",
-                );
-            }
             let tile_mode = match attributes.remove("tile-mode") {
                 Some(value) => parse_tile_mode(&value)?,
                 None => TileMode::Clamp,
@@ -642,7 +638,7 @@ fn parse_paint_element(
 ) -> Result<Paint, ParseError> {
     let tag = String::from_utf8_lossy(el.name().as_ref()).to_string();
     let attributes = collect_attributes(el)?;
-    match (tag.as_str(), is_empty) {
+    let paint = match (tag.as_str(), is_empty) {
         ("solid", true) => parse_solid(attributes),
         ("image", true) => parse_image_paint(attributes),
         ("gradient", false) => {
@@ -656,7 +652,9 @@ fn parse_paint_element(
             err("kind-specific gradient tags are not Draft 0; use <gradient kind=\"…\">")
         }
         _ => err(format!("unknown paint element <{tag}> in <{channel_tag}>")),
-    }
+    }?;
+    renderability::validate_paint(&paint).map_err(|error| ParseError(error.to_string()))?;
+    Ok(paint)
 }
 
 fn parse_paint_channel(
@@ -1804,10 +1802,10 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                             "corner-radius and corner-smoothing are only valid on <container> and <rect>, not <{tag}>"
                         ));
                     }
-                    if !corner_smoothing.is_zero() && !corner_radius.is_circular() {
-                        return err(
-                            "nonzero corner-smoothing requires circular corner radii (rx must equal ry) in Draft 0",
-                        );
+                    if let Err(reason) =
+                        renderability::validate_smooth_corner_radii(corner_radius, corner_smoothing)
+                    {
+                        return err(reason.to_string());
                     }
                     if matches!(header.x, AxisBinding::Span { .. })
                         && (width_seen || header.min_width.is_some() || header.max_width.is_some())
@@ -1927,6 +1925,8 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                     "lens" => Payload::Lens { ops: lens_ops },
                     _ => return err(format!("unknown element <{tag}>")),
                 };
+                renderability::validate_geometry(&header, &payload)
+                    .map_err(|error| ParseError(error.to_string()))?;
 
                 let id = next_id;
                 next_id += 1;
@@ -2408,7 +2408,9 @@ fn validate_corner_style_for_write(node: &Node, grida_xml: bool) -> Result<(), S
             path_aware_kind_name(&node.payload)
         ));
     }
-    if !node.corner_smoothing.is_zero() && !node.corner_radius.is_circular() {
+    if renderability::validate_smooth_corner_radii(node.corner_radius, node.corner_smoothing)
+        .is_err()
+    {
         return Err(format!(
             "node {} uses nonzero corner-smoothing with elliptical radii; Draft 0 cannot render that state losslessly",
             node.id
@@ -2523,23 +2525,13 @@ pub(crate) fn validate_path_for_write(node: &Node) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_common_paint(opacity: f32, tag: &str) -> Result<(), String> {
-    if !opacity.is_finite() || !(0.0..=1.0).contains(&opacity) {
-        return Err(format!(
-            "<{tag}> opacity must be finite and between 0 and 1"
-        ));
-    }
-    Ok(())
-}
-
 fn push_common_paint_attrs(
     out: &mut String,
     active: bool,
     opacity: f32,
     blend_mode: BlendMode,
-    tag: &str,
+    _tag: &str,
 ) -> Result<(), String> {
-    validate_common_paint(opacity, tag)?;
     if !active {
         push_attr(out, "visible", "false");
     }
@@ -2552,50 +2544,11 @@ fn push_common_paint_attrs(
     Ok(())
 }
 
-fn validate_gradient_stops(stops: &[GradientStop], tag: &str) -> Result<(), String> {
-    if stops.len() < 2 {
-        return Err(format!("<{tag}> requires at least two stops"));
-    }
-    let mut previous = None;
-    for stop in stops {
-        if !stop.offset.is_finite() || !(0.0..=1.0).contains(&stop.offset) {
-            return Err(format!(
-                "<{tag}> stop offset must be finite and between 0 and 1"
-            ));
-        }
-        if previous.is_some_and(|offset| stop.offset < offset) {
-            return Err(format!("<{tag}> stop offsets must be nondecreasing"));
-        }
-        previous = Some(stop.offset);
-    }
-    Ok(())
-}
-
-fn validate_affine(transform: crate::math::Affine, tag: &str) -> Result<(), String> {
-    if [
-        transform.a,
-        transform.b,
-        transform.c,
-        transform.d,
-        transform.e,
-        transform.f,
-    ]
-    .iter()
-    .any(|value| !value.is_finite())
-    {
-        return Err(format!(
-            "<{tag}> transform must contain only finite numbers"
-        ));
-    }
-    Ok(())
-}
-
 fn push_transform_attr(
     out: &mut String,
     transform: crate::math::Affine,
-    tag: &str,
+    _tag: &str,
 ) -> Result<(), String> {
-    validate_affine(transform, tag)?;
     if transform != crate::math::Affine::IDENTITY {
         push_attr(
             out,
@@ -2616,11 +2569,10 @@ fn push_transform_attr(
 
 fn write_gradient_stops(
     stops: &[GradientStop],
-    tag: &str,
+    _tag: &str,
     depth: usize,
     out: &mut String,
 ) -> Result<(), String> {
-    validate_gradient_stops(stops, tag)?;
     let indent = "  ".repeat(depth);
     for stop in stops {
         let _ = write!(out, "{indent}<stop");
@@ -2723,6 +2675,7 @@ fn write_gradient(paint: &Paint, depth: usize, out: &mut String) -> Result<(), S
 }
 
 fn write_paint(paint: &Paint, depth: usize, out: &mut String) -> Result<(), String> {
+    renderability::validate_paint(paint).map_err(|error| error.to_string())?;
     let indent = "  ".repeat(depth);
     match paint {
         Paint::Solid(solid) => {
@@ -2751,22 +2704,10 @@ fn write_paint(paint: &Paint, depth: usize, out: &mut String) -> Result<(), Stri
                     return Err("Draft 0 XML cannot represent a hash image resource".into());
                 }
             };
-            if image.quarter_turns != 0 {
-                return Err("Draft 0 XML cannot represent image quarter-turns".into());
-            }
-            if image.alignment != Alignment::CENTER {
-                return Err("Draft 0 XML cannot represent non-centered image alignment".into());
-            }
-            if image.filters != ImageFilters::default() {
-                return Err("Draft 0 XML cannot represent image filters".into());
-            }
             let fit = match image.fit {
                 ImagePaintFit::Fit(fit) => fit,
-                ImagePaintFit::Transform(_) => {
-                    return Err("Draft 0 XML cannot represent transformed image fit".into());
-                }
-                ImagePaintFit::Tile(_) => {
-                    return Err("Draft 0 XML cannot represent tiled image fit".into());
+                ImagePaintFit::Transform(_) | ImagePaintFit::Tile(_) => {
+                    unreachable!("render capability validation accepts only named image fits")
                 }
             };
             let _ = write!(out, "{indent}<image");
@@ -2863,131 +2804,6 @@ fn normalized_dash_array(values: &[f32]) -> Vec<f32> {
     }
 }
 
-pub(crate) fn validate_stroke_for_write(
-    stroke: &Stroke,
-    payload: &Payload,
-    corner_smoothing: CornerSmoothing,
-) -> Result<(), String> {
-    let default = Stroke::default_for(payload)
-        .ok_or_else(|| format!("<{}> cannot carry strokes", path_aware_kind_name(payload)))?;
-    match stroke.width {
-        StrokeWidth::None => {}
-        StrokeWidth::Uniform(width) => {
-            if !width.is_finite() || width < 0.0 {
-                return Err("<stroke> width must be finite and non-negative".into());
-            }
-        }
-        StrokeWidth::Rectangular(widths) => {
-            for (side, width) in ["top", "right", "bottom", "left"]
-                .into_iter()
-                .zip(widths.values())
-            {
-                if !width.is_finite() || width < 0.0 {
-                    return Err(format!(
-                        "<stroke> width {side} must be finite and non-negative"
-                    ));
-                }
-            }
-        }
-    }
-    if !stroke.miter_limit.is_finite() || stroke.miter_limit <= 0.0 {
-        return Err("<stroke> miter-limit must be finite and positive".into());
-    }
-    if let Some(values) = &stroke.dash_array {
-        if values.is_empty()
-            || values
-                .iter()
-                .any(|value| !value.is_finite() || *value < 0.0)
-            || values.iter().all(|value| *value == 0.0)
-        {
-            return Err(
-                "<stroke> dash-array must contain non-negative finite values and not be all zero"
-                    .into(),
-            );
-        }
-    }
-
-    match payload {
-        Payload::Shape {
-            desc: ShapeDesc::Line,
-        } => {
-            if stroke.align != StrokeAlign::Center {
-                return Err("a <line> stroke must use align=\"center\"".into());
-            }
-            if stroke.join != default.join || stroke.miter_limit != default.miter_limit {
-                return Err("a <line> stroke cannot carry join or miter-limit state".into());
-            }
-        }
-        Payload::Frame { .. }
-        | Payload::Shape {
-            desc: ShapeDesc::Rect,
-        } => {
-            if stroke.cap != default.cap {
-                return Err("a container/rect stroke cannot carry cap state".into());
-            }
-        }
-        Payload::Shape {
-            desc: ShapeDesc::Ellipse,
-        } => {
-            if stroke.cap != default.cap
-                || stroke.join != default.join
-                || stroke.miter_limit != default.miter_limit
-            {
-                return Err(
-                    "an ellipse stroke cannot carry cap, join, or miter-limit state".into(),
-                );
-            }
-        }
-        Payload::Shape {
-            desc: ShapeDesc::Path(path),
-        } => {
-            if !path.all_contours_closed && stroke.align != StrokeAlign::Center {
-                return Err(
-                    "a <path> stroke may use inside/outside alignment only when every drawable contour is explicitly closed"
-                        .into(),
-                );
-            }
-        }
-        Payload::Text { .. } | Payload::AttributedText { .. } => {
-            if stroke.cap != default.cap
-                || stroke.join != default.join
-                || stroke.miter_limit != default.miter_limit
-                || stroke.dash_array.is_some()
-            {
-                return Err(
-                    "a text stroke cannot carry cap, join, miter-limit, or dash-array state".into(),
-                );
-            }
-        }
-        Payload::Group | Payload::Lens { .. } => unreachable!("checked above"),
-    }
-    if matches!(stroke.width.normalized(), StrokeWidth::Rectangular(_)) {
-        let supports_per_side = matches!(payload, Payload::Frame { .. })
-            || matches!(
-                payload,
-                Payload::Shape {
-                    desc: ShapeDesc::Rect
-                }
-            );
-        if !supports_per_side {
-            return Err(format!(
-                "<{}> cannot carry per-side stroke width",
-                path_aware_kind_name(payload)
-            ));
-        }
-        if !corner_smoothing.is_zero() {
-            return Err("per-side stroke width requires corner-smoothing=\"0\" in Draft 0".into());
-        }
-        if stroke.join != default.join || stroke.miter_limit != default.miter_limit {
-            return Err(
-                "per-side stroke width requires the default join=\"miter\" and miter-limit=\"4\" in Draft 0"
-                    .into(),
-            );
-        }
-    }
-    Ok(())
-}
-
 fn stroke_is_omitted(stroke: &Stroke, payload: &Payload) -> bool {
     stroke.paints.is_empty() && stroke.geometry_is_default_for(payload)
 }
@@ -3000,7 +2816,8 @@ fn write_stroke(
     inline: bool,
     out: &mut String,
 ) -> Result<(), String> {
-    validate_stroke_for_write(stroke, payload, corner_smoothing)?;
+    renderability::validate_stroke(stroke, payload, corner_smoothing)
+        .map_err(|error| error.to_string())?;
     if stroke_is_omitted(stroke, payload) {
         return Ok(());
     }
@@ -3129,6 +2946,8 @@ fn print_node(
         _ => node.payload.kind_name(),
     };
     validate_corner_style_for_write(node, grida_xml)?;
+    renderability::validate_geometry(&node.header, &node.payload)
+        .map_err(|error| error.to_string())?;
     let width_attr = if grida_xml { "width" } else { "w" };
     let height_attr = if grida_xml { "height" } else { "h" };
     let (min_width_attr, max_width_attr, min_height_attr, max_height_attr, aspect_attr) =
@@ -3400,7 +3219,8 @@ fn print_node(
         Dialect::TextIr => vec![],
         Dialect::GridaXml => {
             for stroke in &node.strokes {
-                validate_stroke_for_write(stroke, &node.payload, node.corner_smoothing)?;
+                renderability::validate_stroke(stroke, &node.payload, node.corner_smoothing)
+                    .map_err(|error| error.to_string())?;
             }
             node.strokes
                 .iter()

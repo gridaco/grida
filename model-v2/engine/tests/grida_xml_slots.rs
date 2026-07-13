@@ -7,7 +7,7 @@
 #[allow(dead_code)]
 mod support;
 
-use anchor_engine::drawlist::build_glyphless;
+use anchor_engine::drawlist::build_glyphless_unchecked;
 use anchor_engine::frame;
 use anchor_engine::paint::PaintCtx;
 use anchor_lab::grida_xml_source::{self, SourceProvider, SourceSnapshot};
@@ -189,7 +189,7 @@ fn version3_slots_materialize_before_the_component_blind_frame() {
     // The display list is already slot-blind. Its ordinary painter order is
     // definition header, caller roots in assignment order, then definition
     // footer, followed by the empty instance's header and footer.
-    let list = build_glyphless(&output.document, &resolved);
+    let list = build_glyphless_unchecked(&output.document, &resolved);
     assert_eq!(
         list.items.iter().map(|item| item.node).collect::<Vec<_>>(),
         [
@@ -205,14 +205,15 @@ fn version3_slots_materialize_before_the_component_blind_frame() {
     let paint_ctx = PaintCtx::new(None);
     let mut surface = surfaces::raster_n32_premul((WIDTH, HEIGHT)).expect("raster surface");
     surface.canvas().clear(Color::BLACK);
-    let (_, frame_list, _) = frame::render(
+    let (product, _) = frame::render(
         surface.canvas(),
         &output.document,
         &options(),
         &Affine::IDENTITY,
         &paint_ctx,
-    );
-    assert_eq!(frame_list, list);
+    )
+    .expect("valid slot-program frame");
+    assert_eq!(product.drawlist(), &list);
     assert_eq!(surface.canvas().save_count(), 1, "canvas state leaked");
 
     let image = support::RgbaImage::from_image(&surface.image_snapshot());

@@ -143,7 +143,7 @@ fn gate_replays() -> bool {
 /// Every render optimization ships a row here proving `optimized(input) ==
 /// reference(input)` — a fast-but-wrong cache aborts the build before anyone
 /// reads a speedup. Today it holds ZERO optimization rows (each lands with its
-/// win); it instead pins the L2 reference oracle itself — `raster_to_bytes`
+/// win); it instead pins the L2 reference oracle itself — checked frame raster
 /// must be deterministic (ENG-0.3), so every future pixel row can trust it.
 fn gate_diff() -> bool {
     println!("\n[diff] oracle-law differential (ENG-0.2)");
@@ -169,9 +169,14 @@ fn gate_diff() -> bool {
             }
         };
         let (doc, _) = replay::play(&rep).expect("corpus oracle must be supported");
-        let (_, list) = frame::resolve_and_build(&doc, &opts, &ctx);
-        let a = paint::raster_to_bytes(&list, &view, w, h, &ctx);
-        let b = paint::raster_to_bytes(&list, &view, w, h, &ctx);
+        let product = frame::resolve_and_build(&doc, &opts, &ctx)
+            .expect("gate corpus frame must pass paint preflight");
+        let a = product
+            .raster_to_bytes(&view, w, h, &ctx)
+            .expect("gate context is unchanged");
+        let b = product
+            .raster_to_bytes(&view, w, h, &ctx)
+            .expect("gate context is unchanged");
         let same = a == b;
         println!(
             "  {name:10} reference {}",
@@ -192,11 +197,16 @@ fn gate_diff() -> bool {
             ..view
         };
         let mut cache = SceneCache::new(w, h);
-        let _ = composited_to_bytes(&mut cache, &doc, &opts, &view, &ctx, false, w, h); // cold
-        let blit = composited_to_bytes(&mut cache, &doc, &opts, &panned, &ctx, false, w, h);
+        let _ = composited_to_bytes(&mut cache, &doc, &opts, &view, &ctx, false, w, h)
+            .expect("gate cache-cold frame must pass paint preflight");
+        let blit = composited_to_bytes(&mut cache, &doc, &opts, &panned, &ctx, false, w, h)
+            .expect("gate cached frame must pass paint preflight");
         let fresh = {
-            let (_, list) = frame::resolve_and_build(&doc, &opts, &ctx);
-            paint::raster_to_bytes(&list, &panned, w, h, &ctx)
+            let product = frame::resolve_and_build(&doc, &opts, &ctx)
+                .expect("gate fresh frame must pass paint preflight");
+            product
+                .raster_to_bytes(&panned, w, h, &ctx)
+                .expect("gate context is unchanged")
         };
         let cache_ok = blit == fresh;
         println!(
@@ -316,7 +326,7 @@ fn bench_doc(doc: &Document, opts: &ResolveOptions) -> (f64, f64) {
         let t1 = Instant::now();
         // The replay benchmark deliberately measures the deterministic lab
         // oracle. Shaped rendering enters through `frame::resolve_and_build`.
-        let _ = drawlist::build_glyphless(doc, &resolved);
+        let _ = drawlist::build_glyphless_unchecked(doc, &resolved);
         let t2 = Instant::now();
         r_min = r_min.min((t1 - t0).as_secs_f64() * 1e6);
         b_min = b_min.min((t2 - t1).as_secs_f64() * 1e6);

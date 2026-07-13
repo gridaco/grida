@@ -1,0 +1,35 @@
+<grida version="4">
+  <component
+    id="profile-card"
+    width="320"
+    height="96"
+    layout="flex"
+    cross="center"
+    gap="16"
+    padding="16"
+    corner-radius="16"
+    fill="#FFFFFF"
+  >
+    <ellipse id="avatar" width="64" height="64" fill="#7C3AED"/>
+    <text id="display-name" width="136" font-size="18">Ada River</text>
+    <slot name="action"/>
+  </component>
+
+  <container
+    id="directory"
+    width="352"
+    height="224"
+    layout="flex"
+    direction="column"
+    gap="16"
+    padding="16"
+    fill="#F2F4F7"
+  >
+    <use id="first-card" href="#profile-card">
+      <text id="first-action" slot="action" width="48" font-size="14">Follow</text>
+    </use>
+    <use id="second-card" href="#profile-card">
+      <text id="second-action" slot="action" width="56" font-size="14">Message</text>
+    </use>
+  </container>
+</grida>

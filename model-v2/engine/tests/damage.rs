@@ -1,10 +1,13 @@
-//! ENG-2.2 · damage is a data diff of two resolved tiers. Identical tiers
-//! produce no damage; a single independent move damages exactly that node
-//! (the locality the incremental resolver will exploit — OS-1a).
+//! ENG-2.2 · legacy `diff` covers resolved-tier geometry while `diff_frame`
+//! compares complete immutable frame products. Identical frames produce no
+//! damage; local geometry, artifacts, paint, environment, and painter-order
+//! changes remain attributed to covering nodes.
 
 use std::sync::Arc;
 
-use anchor_engine::damage::diff;
+use anchor_engine::damage::{diff, diff_frame};
+use anchor_engine::frame;
+use anchor_engine::paint::PaintCtx;
 use anchor_lab::math::RectF;
 use anchor_lab::model::*;
 use anchor_lab::ops::{apply, Op};
@@ -198,4 +201,21 @@ fn material_text_artifact_changes_damage_even_when_geometry_is_identical() {
         assert_eq!(damage.changed, vec![text]);
         assert!(damage.union_world.is_some());
     }
+}
+
+#[test]
+fn painter_order_changes_damage_every_reordered_item() {
+    let (mut document, first, second) = scene();
+    document.get_mut(first).fills = Paints::solid("#DC2626".into());
+    document.get_mut(second).fills = Paints::solid("#2563EB".into());
+    let context = PaintCtx::new(None);
+    let before = frame::resolve_and_build(&document, &opts(), &context).expect("valid frame");
+    assert_eq!(before.drawlist().items.len(), 2);
+    document.get_mut(document.root).children.swap(0, 1);
+    let after = frame::resolve_and_build(&document, &opts(), &context).expect("valid frame");
+
+    let damage = diff_frame(&before, &after);
+    assert_eq!(damage.changed, vec![first, second]);
+    let bounds = damage.union_world.expect("reordered ink has coverage");
+    assert!(bounds.w > 0.0 && bounds.h > 0.0);
 }

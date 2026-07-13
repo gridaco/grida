@@ -4,11 +4,14 @@
 //! bitmap-can't-rescale boundary), and doc-dirty re-raster.
 
 use anchor_engine::cache::{composited_to_bytes, SceneCache};
-use anchor_engine::drawlist::build_glyphless;
+use anchor_engine::damage::diff_frame;
+use anchor_engine::drawlist::build_glyphless_unchecked;
 use anchor_engine::frame;
-use anchor_engine::paint::{raster_to_bytes, PaintCtx};
+use anchor_engine::paint::{raster_to_bytes_unchecked, PaintCtx};
+use anchor_engine::replay::resolved_bits_eq;
 use anchor_lab::math::Affine;
 use anchor_lab::model::*;
+use anchor_lab::properties::{PropertyKey, PropertyTarget, PropertyValue, PropertyValues};
 use anchor_lab::resolve::{resolve, ResolveOptions, RotationInFlow};
 use skia_safe::{surfaces, Color as SkColor, FontMgr};
 
@@ -76,16 +79,32 @@ fn text_scene() -> Document {
     doc
 }
 
+fn image_scene() -> (Document, NodeId) {
+    let mut builder = DocBuilder::new();
+    let mut header = Header::new(SizeIntent::Fixed(120.0), SizeIntent::Fixed(80.0));
+    header.x = AxisBinding::start(40.0);
+    header.y = AxisBinding::start(40.0);
+    let node = builder.add(
+        0,
+        header,
+        Payload::Shape {
+            desc: ShapeDesc::Rect,
+        },
+    );
+    builder.node_mut(node).fills = Paints::new([Paint::Image(ImagePaint::from_rid("asset"))]);
+    (builder.build(), node)
+}
+
 fn fresh_bytes(doc: &Document, view: &Affine) -> Vec<u8> {
     let r = resolve(doc, &opts());
-    let list = build_glyphless(doc, &r);
-    raster_to_bytes(&list, view, W, H, &ctx())
+    let list = build_glyphless_unchecked(doc, &r);
+    raster_to_bytes_unchecked(&list, view, W, H, &ctx())
 }
 
 fn fresh_frame_bytes(doc: &Document, view: &Affine, ctx: &PaintCtx) -> Vec<u8> {
     let mut surface = surfaces::raster_n32_premul((W, H)).expect("raster surface");
     surface.canvas().clear(SkColor::WHITE);
-    frame::render(surface.canvas(), doc, &opts(), view, ctx);
+    frame::render(surface.canvas(), doc, &opts(), view, ctx).expect("valid fresh frame");
     anchor_engine::paint::read_pixels(&mut surface, W, H)
 }
 
@@ -98,7 +117,27 @@ fn cached_frame_bytes(
 ) -> (Vec<u8>, bool) {
     let mut surface = surfaces::raster_n32_premul((W, H)).expect("raster surface");
     surface.canvas().clear(SkColor::WHITE);
-    let rerastered = cache.frame(surface.canvas(), doc, &opts(), view, ctx, doc_dirty);
+    let rerastered = cache
+        .frame(surface.canvas(), doc, &opts(), view, ctx, doc_dirty)
+        .expect("valid cached frame");
+    (
+        anchor_engine::paint::read_pixels(&mut surface, W, H),
+        rerastered,
+    )
+}
+
+fn cached_value_frame_bytes(
+    cache: &mut SceneCache,
+    doc: &Document,
+    values: &PropertyValues,
+    view: &Affine,
+    ctx: &PaintCtx,
+) -> (Vec<u8>, bool) {
+    let mut surface = surfaces::raster_n32_premul((W, H)).expect("raster surface");
+    surface.canvas().clear(SkColor::WHITE);
+    let rerastered = cache
+        .frame_with_values(surface.canvas(), doc, values, &opts(), view, ctx, false)
+        .unwrap();
     (
         anchor_engine::paint::read_pixels(&mut surface, W, H),
         rerastered,
@@ -112,7 +151,8 @@ fn cache_cold_matches_fresh() {
     let mut cache = SceneCache::new(W, H);
     let context = ctx();
     // First frame is a cache-cold re-raster at `view`.
-    let got = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, false, W, H);
+    let got = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, false, W, H)
+        .expect("valid cached frame");
     assert_eq!(got, fresh_bytes(&doc, &view), "cache-cold must equal fresh");
 }
 
@@ -154,9 +194,11 @@ fn zoom_forces_reraster_and_matches_fresh() {
     };
     let mut cache = SceneCache::new(W, H);
     let context = ctx();
-    let _ = composited_to_bytes(&mut cache, &doc, &opts(), &ref_view, &context, false, W, H);
+    let _ = composited_to_bytes(&mut cache, &doc, &opts(), &ref_view, &context, false, W, H)
+        .expect("valid cached frame");
     // Different zoom → a bitmap blit would be wrong; the cache must re-raster.
-    let got = composited_to_bytes(&mut cache, &doc, &opts(), &zoomed, &context, false, W, H);
+    let got = composited_to_bytes(&mut cache, &doc, &opts(), &zoomed, &context, false, W, H)
+        .expect("valid cached frame");
     assert_eq!(
         got,
         fresh_bytes(&doc, &zoomed),
@@ -170,7 +212,8 @@ fn doc_dirty_forces_reraster_and_matches_fresh() {
     let view = Affine::translate(200.0, 150.0);
     let mut cache = SceneCache::new(W, H);
     let context = ctx();
-    let _ = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, false, W, H);
+    let _ = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, false, W, H)
+        .expect("valid cached frame");
 
     // Mutate: move the first shape. With doc_dirty the cache rebuilds + re-rasters.
     let r = resolve(&doc, &opts());
@@ -184,7 +227,8 @@ fn doc_dirty_forces_reraster_and_matches_fresh() {
     )
     .unwrap();
 
-    let got = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, true, W, H);
+    let got = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, true, W, H)
+        .expect("valid dirty cached frame");
     assert_eq!(
         got,
         fresh_bytes(&doc, &view),
@@ -199,7 +243,8 @@ fn cache_builds_text_with_the_same_shaping_oracle_as_a_fresh_frame() {
     let view = Affine::IDENTITY;
     let mut cache = SceneCache::new(W, H);
 
-    let cached = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, false, W, H);
+    let cached = composited_to_bytes(&mut cache, &doc, &opts(), &view, &context, false, W, H)
+        .expect("valid cached text frame");
     let fresh = fresh_frame_bytes(&doc, &view, &context);
     assert_eq!(cached, fresh);
     assert!(cached.chunks_exact(4).any(|pixel| pixel[0] < 100));
@@ -240,40 +285,275 @@ fn changing_resolve_options_invalidates_the_cached_resolved_scene() {
     let mut surface = surfaces::raster_n32_premul((W, H)).expect("raster surface");
     let base = opts();
 
-    assert!(cache.frame(surface.canvas(), &doc, &base, &view, &context, false));
-    assert!(!cache.frame(surface.canvas(), &doc, &base, &view, &context, false));
+    assert!(cache
+        .frame(surface.canvas(), &doc, &base, &view, &context, false)
+        .unwrap());
+    assert!(!cache
+        .frame(surface.canvas(), &doc, &base, &view, &context, false)
+        .unwrap());
 
     let viewport_changed = ResolveOptions {
         viewport: (base.viewport.0 + 100.0, base.viewport.1),
         ..base
     };
-    assert!(cache.frame(
-        surface.canvas(),
-        &doc,
-        &viewport_changed,
-        &view,
-        &context,
-        false,
-    ));
-    assert!(!cache.frame(
-        surface.canvas(),
-        &doc,
-        &viewport_changed,
-        &view,
-        &context,
-        false,
-    ));
+    assert!(cache
+        .frame(
+            surface.canvas(),
+            &doc,
+            &viewport_changed,
+            &view,
+            &context,
+            false,
+        )
+        .unwrap());
+    assert!(!cache
+        .frame(
+            surface.canvas(),
+            &doc,
+            &viewport_changed,
+            &view,
+            &context,
+            false,
+        )
+        .unwrap());
 
     let rotation_changed = ResolveOptions {
         rotation_in_flow: RotationInFlow::AabbParticipates,
         ..viewport_changed
     };
-    assert!(cache.frame(
-        surface.canvas(),
+    assert!(cache
+        .frame(
+            surface.canvas(),
+            &doc,
+            &rotation_changed,
+            &view,
+            &context,
+            false,
+        )
+        .unwrap());
+}
+
+#[test]
+fn changed_effective_values_invalidate_without_document_dirtiness() {
+    let doc = scene();
+    let node = doc.root + 1;
+    let target = PropertyTarget::new(doc.key_of(node).unwrap(), PropertyKey::Fills);
+    let blue = PropertyValues::new(
         &doc,
-        &rotation_changed,
-        &view,
-        &context,
-        false,
-    ));
+        [(
+            target,
+            PropertyValue::Paints(Paints::solid("#2563EB".into())),
+        )],
+    )
+    .unwrap();
+    let red = PropertyValues::new(
+        &doc,
+        [(
+            target,
+            PropertyValue::Paints(Paints::solid("#DC2626".into())),
+        )],
+    )
+    .unwrap();
+    let context = ctx();
+    let view = Affine::IDENTITY;
+    let mut cache = SceneCache::new(W, H);
+
+    let (blue_bytes, cold) = cached_value_frame_bytes(&mut cache, &doc, &blue, &view, &context);
+    let (_, reused) = cached_value_frame_bytes(&mut cache, &doc, &blue, &view, &context);
+    let (red_bytes, changed) = cached_value_frame_bytes(&mut cache, &doc, &red, &view, &context);
+
+    assert!(cold);
+    assert!(
+        !reused,
+        "the same immutable values reuse the retained scene"
+    );
+    assert!(
+        changed,
+        "effective values invalidate without a document dirty hint"
+    );
+    assert_ne!(blue_bytes, red_bytes);
+}
+
+#[test]
+fn a_fresh_document_arena_invalidates_even_with_empty_values() {
+    let doc = scene();
+    let clone = doc.clone();
+    let context = ctx();
+    let view = Affine::IDENTITY;
+    let mut cache = SceneCache::new(W, H);
+    let mut surface = surfaces::raster_n32_premul((W, H)).unwrap();
+
+    assert!(cache
+        .frame(surface.canvas(), &doc, &opts(), &view, &context, false)
+        .unwrap());
+    assert!(!cache
+        .frame(surface.canvas(), &doc, &opts(), &view, &context, false)
+        .unwrap());
+    assert!(cache
+        .frame(surface.canvas(), &clone, &opts(), &view, &context, false,)
+        .unwrap());
+    assert!(!cache
+        .frame(surface.canvas(), &clone, &opts(), &view, &context, false,)
+        .unwrap());
+}
+
+#[test]
+fn same_rid_replacement_is_environment_damage_and_invalidates_the_cache() {
+    const CHECKER: &[u8] = include_bytes!("../../../fixtures/images/checker.png");
+    const STRIPES: &[u8] = include_bytes!("../../../fixtures/images/stripes.png");
+
+    let (document, node) = image_scene();
+    let view = Affine::IDENTITY;
+    let mut context = ctx();
+    context.insert_encoded("asset", CHECKER).unwrap();
+    let before_environment = context.environment_key();
+    let before = frame::resolve_and_build(&document, &opts(), &context).expect("valid frame");
+    assert_eq!(before.environment(), before_environment);
+    let mut cache = SceneCache::new(W, H);
+    let (before_pixels, cold) = cached_frame_bytes(&mut cache, &document, &view, &context, false);
+    assert!(cold);
+
+    context.insert_encoded("asset", STRIPES).unwrap();
+    let after_environment = context.environment_key();
+    let after = frame::resolve_and_build(&document, &opts(), &context).expect("valid frame");
+    assert_eq!(after.environment(), after_environment);
+    assert!(resolved_bits_eq(before.resolved(), after.resolved()));
+    assert_eq!(
+        before.drawlist(),
+        after.drawlist(),
+        "the logical RID did not change"
+    );
+
+    let environment_damage = diff_frame(&before, &after);
+    assert_eq!(environment_damage.changed, vec![node]);
+    assert!(environment_damage.union_world.is_some());
+
+    let (after_pixels, rerastered) =
+        cached_frame_bytes(&mut cache, &document, &view, &context, false);
+    assert!(
+        rerastered,
+        "resource revision invalidates without doc dirtiness"
+    );
+    assert_ne!(before_pixels, after_pixels);
+}
+
+#[test]
+fn failed_rebuild_preserves_destination_and_previous_cache_entry() {
+    let valid = scene();
+    let view = Affine::IDENTITY;
+    let context = ctx();
+    let mut cache = SceneCache::new(W, H);
+
+    let mut first_surface = surfaces::raster_n32_premul((W, H)).unwrap();
+    first_surface.canvas().clear(SkColor::WHITE);
+    assert!(cache
+        .frame(
+            first_surface.canvas(),
+            &valid,
+            &opts(),
+            &view,
+            &context,
+            false,
+        )
+        .unwrap());
+    let first = anchor_engine::paint::read_pixels(&mut first_surface, W, H);
+
+    let mut invalid = valid.clone();
+    let node = invalid.root + 1;
+    invalid.get_mut(node).fills = Paints::new([Paint::LinearGradient(LinearGradientPaint {
+        transform: Affine {
+            a: 1e-20,
+            b: 1e-20,
+            c: 0.0,
+            d: 1e-20,
+            e: 0.0,
+            f: 0.0,
+        },
+        stops: vec![
+            GradientStop {
+                offset: 0.0,
+                color: Color::BLACK,
+            },
+            GradientStop {
+                offset: 1.0,
+                color: Color(0xFFFF_FFFF),
+            },
+        ],
+        ..Default::default()
+    })]);
+
+    let mut failed_surface = surfaces::raster_n32_premul((W, H)).unwrap();
+    failed_surface.canvas().clear(SkColor::MAGENTA);
+    let before_failure = anchor_engine::paint::read_pixels(&mut failed_surface, W, H);
+    cache
+        .frame(
+            failed_surface.canvas(),
+            &invalid,
+            &opts(),
+            &view,
+            &context,
+            true,
+        )
+        .expect_err("invalid replacement frame must fail before cache commit");
+    let after_failure = anchor_engine::paint::read_pixels(&mut failed_surface, W, H);
+    assert_eq!(after_failure, before_failure, "destination canvas changed");
+
+    let mut reused_surface = surfaces::raster_n32_premul((W, H)).unwrap();
+    reused_surface.canvas().clear(SkColor::WHITE);
+    assert!(!cache
+        .frame(
+            reused_surface.canvas(),
+            &valid,
+            &opts(),
+            &view,
+            &context,
+            false,
+        )
+        .unwrap());
+    assert_eq!(
+        anchor_engine::paint::read_pixels(&mut reused_surface, W, H),
+        first,
+        "failed rebuild replaced the prior retained frame"
+    );
+
+    let mut missing_image = valid.clone();
+    let node = missing_image.root + 1;
+    missing_image.get_mut(node).fills =
+        Paints::new([Paint::Image(ImagePaint::from_rid("missing"))]);
+    let mut image_failure_surface = surfaces::raster_n32_premul((W, H)).unwrap();
+    image_failure_surface.canvas().clear(SkColor::CYAN);
+    let before_image_failure = anchor_engine::paint::read_pixels(&mut image_failure_surface, W, H);
+    cache
+        .frame(
+            image_failure_surface.canvas(),
+            &missing_image,
+            &opts(),
+            &view,
+            &context,
+            true,
+        )
+        .expect_err("missing image must fail checked cache execution");
+    assert_eq!(
+        anchor_engine::paint::read_pixels(&mut image_failure_surface, W, H),
+        before_image_failure,
+        "image execution failure changed the destination"
+    );
+
+    let mut final_surface = surfaces::raster_n32_premul((W, H)).unwrap();
+    final_surface.canvas().clear(SkColor::WHITE);
+    assert!(!cache
+        .frame(
+            final_surface.canvas(),
+            &valid,
+            &opts(),
+            &view,
+            &context,
+            false,
+        )
+        .unwrap());
+    assert_eq!(
+        anchor_engine::paint::read_pixels(&mut final_surface, W, H),
+        first,
+        "image execution failure replaced the prior retained frame"
+    );
 }

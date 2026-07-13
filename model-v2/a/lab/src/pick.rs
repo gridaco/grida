@@ -9,47 +9,51 @@
 
 use crate::model::*;
 use crate::resolve::Resolved;
+use crate::rounded_box;
 
 /// Hairline kinds (a zero-height line, a zero-extent box mid-gesture) get
 /// a symmetric hit slop in LOCAL px so they stay grabbable.
 const HAIRLINE_SLOP: f32 = 3.0;
 
-pub fn pick(doc: &Document, resolved: &Resolved, x: f32, y: f32) -> Option<NodeId> {
-    hit_subtree(doc, resolved, doc.root, (x, y)).map(|hit| promote(doc, hit))
+/// Hit-test one immutable resolved frame. This is the canonical narrowphase;
+/// it has no authored document or effective-value input that can be paired
+/// with the wrong frame.
+pub fn pick(resolved: &Resolved, x: f32, y: f32) -> Option<NodeId> {
+    hit_subtree(resolved, resolved.query_root()?, (x, y))
 }
 
-fn hit_subtree(doc: &Document, r: &Resolved, id: NodeId, p: (f32, f32)) -> Option<NodeId> {
+fn hit_subtree(r: &Resolved, id: NodeId, p: (f32, f32)) -> Option<NodeId> {
     r.world_opt(id)?; // hidden subtree
-    let node = doc.get(id);
+    let query = r.query_node_opt(id)?;
     // Children first, topmost-first (paint order = document order).
     // A container clip scopes descendants only: outside it, skip the child
     // traversal but still test the container's own fill/strokes below. The
     // inverse world transform makes this exact for rotated/flipped containers
     // and naturally enforces every clip encountered along the ancestor walk.
-    let children_visible = if matches!(
-        &node.payload,
-        Payload::Frame {
-            clips_content: true,
-            ..
-        }
-    ) {
+    let children_visible = query.content_clip.is_none_or(|clip| {
         r.world_of(id).invert().is_some_and(|inverse| {
             let (lx, ly) = inverse.apply(p);
             let b = r.box_of(id);
-            lx >= 0.0 && lx <= b.w && ly >= 0.0 && ly <= b.h
+            rounded_box::contains(
+                b.w,
+                b.h,
+                clip.corner_radius,
+                clip.corner_smoothing,
+                (lx, ly),
+            )
         })
-    } else {
-        true
-    };
+    });
     if children_visible {
-        for &c in node.children.iter().rev() {
-            if let Some(hit) = hit_subtree(doc, r, c, p) {
-                return Some(hit);
+        for &child in query.children.iter().rev() {
+            if let Some(hit) = hit_subtree(r, child, p) {
+                // Transparent-select promotes through every derived ancestor
+                // while recursion unwinds, leaving the outermost one selected.
+                return Some(if query.box_is_derived { id } else { hit });
             }
         }
     }
     // Own ink: derived kinds have none (their bounds come from children).
-    if node.payload.box_is_derived() {
+    if query.box_is_derived {
         return None;
     }
     let inv = r.world_of(id).invert()?;
@@ -70,17 +74,4 @@ fn hit_subtree(doc: &Document, r: &Resolved, id: NodeId, p: (f32, f32)) -> Optio
     } else {
         None
     }
-}
-
-/// Transparent-select: the OUTERMOST derived ancestor claims the hit.
-fn promote(doc: &Document, hit: NodeId) -> NodeId {
-    let mut chosen = hit;
-    let mut cur = hit;
-    while let Some(parent) = doc.parent_of(cur) {
-        if doc.get(parent).payload.box_is_derived() {
-            chosen = parent;
-        }
-        cur = parent;
-    }
-    chosen
 }

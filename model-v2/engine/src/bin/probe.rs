@@ -1,6 +1,6 @@
 //! probe — the autonomous render-perf harness (deterministic CPU raster).
 //!
-//! Drives the real `frame::resolve_and_build -> paint::execute` seam across
+//! Drives the real `frame::resolve_and_build -> FrameProduct::execute` seam across
 //! three axes — VIEW (pan/zoom, no doc mutation), MUTATION (one node/frame),
 //! ANIMATION (N nodes/frame) — at several scene sizes, reporting per-STAGE
 //! distributions (min/p50/p95/p99/max/mean) with fps at mean AND p99. 120fps =
@@ -241,7 +241,8 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
     let mut surface = skia_safe::surfaces::raster_n32_premul((W as i32, H as i32)).unwrap();
 
     // Reference resolve/drawlist for the VIEW-redundancy audit (A4).
-    let (ref_resolved, ref_list) = resolve_and_build(&doc, &opts(), ctx);
+    let reference =
+        resolve_and_build(&doc, &opts(), ctx).expect("benchmark scene must pass paint preflight");
     // Rotation is a paint-only transform under DEC-0 (grounded in the
     // classifier, not the scenario name).
     if sc.name == "mutate_rotate" {
@@ -260,7 +261,7 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
     }
 
     let target = ids[0];
-    let mut prev = ref_resolved.clone();
+    let mut previous = reference.clone();
     let mut view = base;
     let mut pan = 0.0f32;
     let mut pan_dir = 1.0f32;
@@ -297,7 +298,7 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
                     let dx = if frame % 40 < 20 { 3.0 } else { -3.0 };
                     let _ = ops::apply(
                         &mut doc,
-                        &prev,
+                        previous.resolved(),
                         &Op::MoveBy {
                             id: target,
                             dx,
@@ -307,12 +308,16 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
                 }
                 "mutate_rotate" => {
                     let deg = (frame % 30) as f32; // 0..30 sweep, paint-only
-                    let _ = ops::apply(&mut doc, &prev, &Op::SetRotation { id: target, deg });
+                    let _ = ops::apply(
+                        &mut doc,
+                        previous.resolved(),
+                        &Op::SetRotation { id: target, deg },
+                    );
                 }
                 "mutate_color" => {
-                    // NOTE: fill is not an Op (no set_fill in the lab). This
-                    // deliberately exercises the missing paint-damage channel:
-                    // damage::diff sees NO geometry change though the pixels do.
+                    // Fill is not an Op (no set_fill in the lab). This direct
+                    // mutation deliberately exercises complete frame damage:
+                    // geometry stays fixed while drawlist and pixels change.
                     let hex = ["4A90D9", "E2574C", "57B894"][frame % 3];
                     doc.get_mut(target).fills = Paints::solid(format!("#{hex}").into());
                 }
@@ -323,7 +328,8 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
                 if sc.name.starts_with("anim_transform") {
                     let deg = (frame % 30) as f32;
                     for &id in &ids[..k] {
-                        let _ = ops::apply(&mut doc, &prev, &Op::SetRotation { id, deg });
+                        let _ =
+                            ops::apply(&mut doc, previous.resolved(), &Op::SetRotation { id, deg });
                     }
                 } else {
                     let hex = ["4A90D9", "E2574C", "57B894"][frame % 3];
@@ -338,14 +344,15 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
         let canvas = surface.canvas();
         canvas.clear(skia_safe::Color::WHITE);
         let t = Instant::now();
-        let (resolved, list, stats) = render(canvas, &doc, &opts(), &view, ctx);
+        let (product, stats) = render(canvas, &doc, &opts(), &view, ctx)
+            .expect("benchmark scene must pass paint preflight");
         let full = t.elapsed().as_nanos();
 
         // black_box the pure outputs so LLVM can't hoist resolve/build.
-        black_box(list.items.len());
-        black_box(resolved.resolved_count());
+        black_box(product.drawlist().items.len());
+        black_box(product.resolved().resolved_count());
 
-        let dmg = damage::diff(&prev, &resolved);
+        let dmg = damage::diff_frame(&previous, &product);
 
         if frame >= WARMUP {
             r_ns.push(stats.resolve_ns);
@@ -357,7 +364,7 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
             if sc.axis == Axis::View {
                 // A4: on a VIEW frame the doc is unchanged → resolve+build
                 // are provably redundant. This is the whole premise.
-                if damage::diff(&ref_resolved, &resolved).is_empty() && list == ref_list {
+                if damage::diff_frame(&reference, &product).is_empty() {
                     redundant_view_frames += 1;
                 }
                 // A2: the camera must change frame-to-frame (no no-op frame
@@ -368,7 +375,7 @@ fn run(sc: &Scenario, n: usize, frames: usize, ctx: &PaintCtx) -> Result {
             }
         }
 
-        prev = resolved;
+        previous = product;
     }
 
     // ── trust guards (panic, not fake numbers) ──
@@ -443,7 +450,9 @@ fn run_cached(name: &'static str, n: usize, frames: usize, ctx: &PaintCtx) -> (D
         let canvas = surface.canvas();
         canvas.clear(skia_safe::Color::WHITE);
         let t = Instant::now();
-        let did = cache.frame(canvas, &doc, &opts(), &view, ctx, false);
+        let did = cache
+            .frame(canvas, &doc, &opts(), &view, ctx, false)
+            .expect("benchmark scene must pass paint preflight");
         let elapsed = t.elapsed().as_nanos();
         black_box(did);
         if frame >= WARMUP {

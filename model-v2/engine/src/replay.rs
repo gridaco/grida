@@ -178,9 +178,10 @@ pub fn play(replay: &Replay) -> Result<(Document, Vec<OpResult>), String> {
     Ok((doc, results))
 }
 
-/// Bit-for-bit equality of two resolved tiers across all six columns — the
-/// determinism oracle. `==` would pass -0.0/0.0 and fail NaN==NaN; bits are
-/// exact, which is what "same computation" means.
+/// Bit-for-bit equality of two resolved tiers across the hot columns, content
+/// artifacts, and spatial traversal/clip snapshot — the determinism oracle.
+/// `==` would pass -0.0/0.0 and fail NaN==NaN; bits are exact, which is what
+/// "same computation" means.
 pub fn resolved_bits_eq(a: &Resolved, b: &Resolved) -> bool {
     if a.slot_count() != b.slot_count() {
         return false;
@@ -205,7 +206,7 @@ pub fn resolved_bits_eq(a: &Resolved, b: &Resolved) -> bool {
             return false;
         }
     }
-    true
+    a.query_snapshot_bits_eq(b)
 }
 
 fn scalar_eq(a: f32, b: f32) -> bool {

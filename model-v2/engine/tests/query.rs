@@ -2,10 +2,13 @@
 //! is selected: `hit_point` equals `anchor_lab::pick::pick` at every point of
 //! a sweep (the walk is the oracle), and `nodes_in_rect` finds AABB overlaps.
 
-use anchor_engine::query::Query;
+use anchor_engine::{frame, paint::PaintCtx, query::Query};
 use anchor_lab::math::RectF;
 use anchor_lab::model::*;
 use anchor_lab::pick::pick;
+use anchor_lab::properties::{
+    PropertyKey, PropertyTarget, PropertyValue, PropertyValues, ValueView,
+};
 use anchor_lab::resolve::{resolve, ResolveOptions, RotationInFlow};
 
 fn opts() -> ResolveOptions {
@@ -58,7 +61,7 @@ fn scene() -> (Document, NodeId, NodeId, NodeId) {
 fn hit_point_matches_pick_over_grid() {
     let (doc, ..) = scene();
     let r = resolve(&doc, &opts());
-    let q = Query::new(&doc, &r);
+    let q = Query::new(&r);
 
     let mut gx = 0.0;
     while gx <= 500.0 {
@@ -66,7 +69,7 @@ fn hit_point_matches_pick_over_grid() {
         while gy <= 500.0 {
             assert_eq!(
                 q.hit_point(gx, gy),
-                pick(&doc, &r, gx, gy),
+                pick(&r, gx, gy),
                 "hit_point must equal pick at ({gx},{gy})"
             );
             gy += 15.0;
@@ -79,7 +82,7 @@ fn hit_point_matches_pick_over_grid() {
 fn nodes_in_rect_selects_overlaps() {
     let (doc, s1, ..) = scene();
     let r = resolve(&doc, &opts());
-    let q = Query::new(&doc, &r);
+    let q = Query::new(&r);
 
     let near = q.nodes_in_rect(RectF {
         x: 45.0,
@@ -96,4 +99,61 @@ fn nodes_in_rect_selects_overlaps() {
         h: 5.0,
     });
     assert!(!far.contains(&s1), "rect far from s1 should not include s1");
+}
+
+#[test]
+fn frame_query_owns_effective_clip_and_traversal_state() {
+    let mut builder = DocBuilder::new();
+    let mut clip_header = Header::new(SizeIntent::Fixed(80.0), SizeIntent::Fixed(80.0));
+    clip_header.x = AxisBinding::start(10.0);
+    clip_header.y = AxisBinding::start(10.0);
+    let clip = builder.add(
+        0,
+        clip_header,
+        Payload::Frame {
+            layout: LayoutBehavior::default(),
+            clips_content: true,
+        },
+    );
+    let child = builder.add(
+        clip,
+        Header::new(SizeIntent::Fixed(80.0), SizeIntent::Fixed(80.0)),
+        Payload::Shape {
+            desc: ShapeDesc::Rect,
+        },
+    );
+    let mut document = builder.build();
+    let values = PropertyValues::new(
+        &document,
+        [(
+            PropertyTarget::new(document.key_of(clip).unwrap(), PropertyKey::CornerRadius),
+            PropertyValue::CornerRadius(RectangularCornerRadius::circular(30.0)),
+        )],
+    )
+    .unwrap();
+    let view = ValueView::new(&document, &values).unwrap();
+    let context = PaintCtx::new(None);
+    let product = frame::resolve_and_build_view(&view, &opts(), &context)
+        .expect("valid effective-value frame");
+
+    // Mutate every authored fact the old query seam reread. The retained frame
+    // remains self-contained: no API accepts this newer document or another
+    // ValueView alongside its resolved columns.
+    document.get_mut(clip).corner_radius = RectangularCornerRadius::default();
+    if let Payload::Frame { clips_content, .. } = &mut document.get_mut(clip).payload {
+        *clips_content = false;
+    }
+    document.get_mut(clip).children.clear();
+
+    let query = product.query();
+    assert_eq!(
+        query.hit_point(11.0, 11.0),
+        Some(clip),
+        "the captured rounded clip still excludes its child"
+    );
+    assert_eq!(
+        query.hit_point(50.0, 50.0),
+        Some(child),
+        "the captured traversal still reaches the child"
+    );
 }

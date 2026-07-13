@@ -186,17 +186,20 @@ fn checked_in_examples_resolve_resources_and_render() {
             viewport: (width as f32, height as f32),
             ..Default::default()
         };
-        let (resolved, drawlist, _) =
-            frame::render(surface.canvas(), &doc, &options, &Affine::IDENTITY, &ctx);
+        let (product, _) = frame::render(surface.canvas(), &doc, &options, &Affine::IDENTITY, &ctx)
+            .expect("valid checked-in example frame");
         assert!(
-            !resolved.reports.iter().any(|report| matches!(
+            !product.resolved().reports.iter().any(|report| matches!(
                 report,
                 Report::IgnoredByRule { .. } | Report::ErrorByRule { .. }
             )),
             "{name}: unresolved intent: {:?}",
-            resolved.reports
+            product.resolved().reports
         );
-        assert!(!drawlist.items.is_empty(), "{name}: empty drawlist");
+        assert!(
+            !product.drawlist().items.is_empty(),
+            "{name}: empty drawlist"
+        );
         assert_eq!(
             surface.canvas().save_count(),
             1,

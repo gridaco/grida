@@ -695,9 +695,7 @@ fn required_props_do_not_acquire_invented_values_during_source_validation() {
         grida_xml_source::materialize(snapshot("entry", "memory:/", &incompatible), &mut provider)
             .unwrap_err();
     assert_eq!(error.phase, ErrorPhase::Specialize);
-    assert!(error
-        .message
-        .contains("nonzero corner-smoothing requires circular corner radii"));
+    assert!(error.message.contains("requires circular corner radii"));
     assert_eq!(error.specialization_sites.len(), 1);
     assert_eq!(error.specialization_sites[0].prop, "smoothing");
 }

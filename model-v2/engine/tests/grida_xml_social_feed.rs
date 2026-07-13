@@ -154,16 +154,17 @@ fn desktop_social_feed_keeps_shared_shells_caller_media_and_loaded_resources() {
             .expect("checked-in social media asset decodes");
         assert!(paint_ctx.contains_image(&resource.runtime_rid));
     }
-    let (_, drawlist, _) = frame::render(
+    let (product, _) = frame::render(
         surface.canvas(),
         &output.document,
         &options(),
         &Affine::IDENTITY,
         &paint_ctx,
-    );
-    assert!(!drawlist.items.is_empty());
+    )
+    .expect("valid social-feed frame");
+    assert!(!product.drawlist().items.is_empty());
     let mut drawn_image_rids = BTreeSet::new();
-    for item in &drawlist.items {
+    for item in &product.drawlist().items {
         let ItemKind::RectFill { paints, .. } = &item.kind else {
             continue;
         };

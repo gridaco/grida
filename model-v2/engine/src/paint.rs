@@ -1,10 +1,13 @@
 //! ENG-2.1 · the paint executor — the only module that touches Skia's raster
 //! API. [`crate::text_layout`] uses Skia Paragraph strictly as the shaping
-//! oracle. `execute(canvas, drawlist, view, ctx)` (step 6) replays a
+//! oracle. `execute_unchecked(canvas, drawlist, view, ctx)` replays a
 //! [`DrawList`](crate::drawlist::DrawList) onto a skia `Canvas`,
 //! composing `view.then(&item.world)` per item in the exact mathematical
 //! form the current spike painter uses — pixel identity is a property of
-//! doing the same float ops in the same order, not a tolerance.
+//! doing the same float ops in the same order, not a tolerance. Complete
+//! [`FrameProduct`](crate::frame::FrameProduct) rendering enters through its
+//! checked execution method; the raw function here is for glyphless structural
+//! probes and internal retained-list replay only.
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -17,6 +20,8 @@ use anchor_lab::model::{
     StrokeJoin, StrokeWidth, SweepGradientPaint, TileMode,
 };
 use anchor_lab::path::{FillRule, PathCommand, ResolvedPathArtifact};
+use anchor_lab::renderability::{self, RenderabilityError};
+use anchor_lab::rounded_box::smooth_corner_params;
 use skia_safe::canvas::{SaveLayerFlags, SaveLayerRec};
 use skia_safe::gradient_shader::{Gradient, GradientColors, Interpolation};
 use skia_safe::{
@@ -28,6 +33,157 @@ use skia_safe::{
 
 use crate::drawlist::{DrawList, ItemKind};
 
+/// The gradient family whose local matrix could not be represented by the
+/// raster backend for one resolved paint box.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GradientKind {
+    Linear,
+    Radial,
+    Sweep,
+    Diamond,
+}
+
+impl std::fmt::Display for GradientKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            GradientKind::Linear => "linear",
+            GradientKind::Radial => "radial",
+            GradientKind::Sweep => "sweep",
+            GradientKind::Diamond => "diamond",
+        })
+    }
+}
+
+/// Semantic use of a paint stack in the exact draw item that failed backend
+/// capability validation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaintUseContext {
+    Fill,
+    Stroke,
+    TextRun { source_run: Option<usize> },
+}
+
+impl std::fmt::Display for PaintUseContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PaintUseContext::Fill => f.write_str("fill"),
+            PaintUseContext::Stroke => f.write_str("stroke"),
+            PaintUseContext::TextRun {
+                source_run: Some(run),
+            } => write!(f, "text source run {run}"),
+            PaintUseContext::TextRun { source_run: None } => f.write_str("uniform text run"),
+        }
+    }
+}
+
+/// One exact drawlist gradient has no invertible local matrix in the pinned
+/// backend. The paint index is explicitly post-visibility-filtering; authored
+/// inactive or zero-opacity entries are absent from the drawlist.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GradientPreflightReason {
+    InvalidPaint(RenderabilityError),
+    BackendMatrixNotInvertible,
+    BackendShaderConstructionFailed,
+}
+
+/// One exact drawlist gradient failed capability validation. The paint index
+/// is explicitly post-visibility-filtering; authored inactive or zero-opacity
+/// entries are absent from the drawlist.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GradientPreflightError {
+    pub node: anchor_lab::model::NodeId,
+    pub gradient: GradientKind,
+    pub context: PaintUseContext,
+    pub draw_item: usize,
+    pub visible_paint_index: usize,
+    pub reason: GradientPreflightReason,
+}
+
+impl std::fmt::Display for GradientPreflightError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} gradient on node {} {} visible paint {} in draw item {}: ",
+            self.gradient, self.node, self.context, self.visible_paint_index, self.draw_item
+        )?;
+        match &self.reason {
+            GradientPreflightReason::InvalidPaint(error) => error.fmt(f),
+            GradientPreflightReason::BackendMatrixNotInvertible => {
+                f.write_str("no invertible backend matrix exists for its resolved paint box")
+            }
+            GradientPreflightReason::BackendShaderConstructionFailed => {
+                f.write_str("the backend could not construct the gradient shader")
+            }
+        }
+    }
+}
+
+impl std::error::Error for GradientPreflightError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImagePreflightReason {
+    MissingResource,
+    UnsupportedModelState,
+    TotalMatrixNotInvertible,
+    ShaderConstructionFailed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImagePreflightError {
+    pub node: anchor_lab::model::NodeId,
+    pub context: PaintUseContext,
+    pub rid: String,
+    pub draw_item: usize,
+    pub visible_paint_index: usize,
+    pub reason: ImagePreflightReason,
+}
+
+impl std::fmt::Display for ImagePreflightError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "image `{}` on node {} {} visible paint {} in draw item {}: ",
+            self.rid, self.node, self.context, self.visible_paint_index, self.draw_item
+        )?;
+        f.write_str(match self.reason {
+            ImagePreflightReason::MissingResource => "resource is not loaded in this paint context",
+            ImagePreflightReason::UnsupportedModelState => {
+                "image paint state is unsupported by the proving renderer"
+            }
+            ImagePreflightReason::TotalMatrixNotInvertible => {
+                "view, world, and image-fit matrices do not compose to an invertible backend matrix"
+            }
+            ImagePreflightReason::ShaderConstructionFailed => {
+                "the backend could not construct the image shader"
+            }
+        })
+    }
+}
+
+impl std::error::Error for ImagePreflightError {}
+
+static NEXT_PAINT_CONTEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Opaque identity of one complete host paint environment.
+///
+/// The context incarnation distinguishes independent hosts; the checked
+/// revision changes whenever fonts or decoded images change, including an
+/// overwrite under the same logical resource id. Damage and caches compare
+/// this value without depending on [`PaintCtx`] itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PaintEnvironmentKey {
+    context: u64,
+    revision: u64,
+}
+
+fn fresh_paint_context_id() -> u64 {
+    NEXT_PAINT_CONTEXT_ID
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+            next.checked_add(1)
+        })
+        .expect("paint context identity space exhausted")
+}
+
 /// Host-supplied resources: the typeface offered to text resolution and decoded
 /// images used at paint time. Exact shaped fonts live with the drawlist; images
 /// stay keyed by the model's logical RID so authored-source resolution remains
@@ -35,29 +191,33 @@ use crate::drawlist::{DrawList, ItemKind};
 /// origin-aware runtime RID before this boundary.
 pub struct PaintCtx {
     id: u64,
-    resource_revision: u64,
+    revision: u64,
     font: Option<skia_safe::Typeface>,
     images: BTreeMap<String, Image>,
 }
 
 impl PaintCtx {
     pub fn new(font: Option<skia_safe::Typeface>) -> Self {
-        static NEXT_ID: AtomicU64 = AtomicU64::new(1);
         Self {
-            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-            resource_revision: 0,
+            id: fresh_paint_context_id(),
+            revision: 0,
             font,
             images: BTreeMap::new(),
         }
     }
 
-    pub(crate) fn identity(&self) -> (u64, u64) {
-        (self.id, self.resource_revision)
+    /// Snapshot the current opaque environment identity for cache and damage
+    /// comparison. It carries no resource contents and performs no I/O.
+    pub fn environment_key(&self) -> PaintEnvironmentKey {
+        PaintEnvironmentKey {
+            context: self.id,
+            revision: self.revision,
+        }
     }
 
-    fn bump_resource_revision(&mut self) {
-        self.resource_revision = self
-            .resource_revision
+    fn bump_revision(&mut self) {
+        self.revision = self
+            .revision
             .checked_add(1)
             .expect("paint context revision exhausted");
     }
@@ -71,15 +231,20 @@ impl PaintCtx {
     /// Replace the host typeface and invalidate every cache keyed by this
     /// context. Existing drawlists keep their exact resolved fonts.
     pub fn set_font(&mut self, font: Option<skia_safe::Typeface>) {
+        // Exhaustion must fail before the environment changes; otherwise the
+        // same key could name two different resource states.
+        self.bump_revision();
         self.font = font;
-        self.bump_resource_revision();
     }
 
     /// Register an already-decoded image under the exact model resource id.
     pub fn insert_image(&mut self, rid: impl Into<String>, image: Image) {
         let image = image.with_default_mipmaps().unwrap_or(image);
-        self.images.insert(rid.into(), image);
-        self.bump_resource_revision();
+        let rid = rid.into();
+        // BTreeMap insertion has no recoverable failure after this point, so
+        // reserve the new environment identity before mutating the map.
+        self.bump_revision();
+        self.images.insert(rid, image);
     }
 
     /// Eagerly decode encoded PNG/JPEG/WebP bytes and register them under `rid`.
@@ -115,6 +280,7 @@ mod paint_ctx_tests {
     use anchor_lab::model::{
         Color as ModelColor, GradientStop, LinearGradientPaint, Paint as ModelPaint,
     };
+    use std::panic::{catch_unwind, AssertUnwindSafe};
 
     #[test]
     fn encoded_resources_are_eager_raster_images() {
@@ -126,6 +292,31 @@ mod paint_ctx_tests {
             !image.is_lazy_generated(),
             "resource registration must finish pixel decode before rendering"
         );
+    }
+
+    #[test]
+    fn revision_exhaustion_cannot_mutate_the_environment() {
+        const IMAGE: &[u8] = include_bytes!("../../../fixtures/images/border-diamonds.png");
+        const FONT: &[u8] =
+            include_bytes!("../../../fixtures/fonts/Inter/Inter-VariableFont_opsz,wght.ttf");
+
+        let mut images = PaintCtx::new(None);
+        images.revision = u64::MAX;
+        let image = skia_safe::Image::from_encoded(skia_safe::Data::new_copy(IMAGE)).unwrap();
+        let image_key = images.environment_key();
+        assert!(catch_unwind(AssertUnwindSafe(|| images.insert_image("new", image))).is_err());
+        assert_eq!(images.environment_key(), image_key);
+        assert!(!images.contains_image("new"));
+
+        let mut fonts = PaintCtx::new(None);
+        fonts.revision = u64::MAX;
+        let typeface = skia_safe::FontMgr::new()
+            .new_from_data(FONT, None)
+            .expect("bundled Inter typeface");
+        let font_key = fonts.environment_key();
+        assert!(catch_unwind(AssertUnwindSafe(|| fonts.set_font(Some(typeface)))).is_err());
+        assert_eq!(fonts.environment_key(), font_key);
+        assert!(fonts.font().is_none());
     }
 
     #[test]
@@ -255,6 +446,323 @@ fn paint_box_matrix(paint_box: PaintBox, transform: &Affine) -> Matrix {
     matrix
 }
 
+fn gradient_transform(model: &ModelPaint) -> Option<(GradientKind, &Affine)> {
+    match model {
+        ModelPaint::LinearGradient(gradient) => Some((GradientKind::Linear, &gradient.transform)),
+        ModelPaint::RadialGradient(gradient) => Some((GradientKind::Radial, &gradient.transform)),
+        ModelPaint::SweepGradient(gradient) => Some((GradientKind::Sweep, &gradient.transform)),
+        ModelPaint::DiamondGradient(gradient) => Some((GradientKind::Diamond, &gradient.transform)),
+        ModelPaint::Solid(_) | ModelPaint::Image(_) => None,
+    }
+}
+
+fn preflight_paints(
+    node: anchor_lab::model::NodeId,
+    draw_item: usize,
+    context: PaintUseContext,
+    paints: &Paints,
+    paint_box: PaintBox,
+) -> Result<(), GradientPreflightError> {
+    for (visible_paint_index, model) in paints.iter().enumerate() {
+        let Some((gradient, transform)) = gradient_transform(model) else {
+            continue;
+        };
+        if let Err(error) = renderability::validate_paint(model) {
+            return Err(GradientPreflightError {
+                node,
+                gradient,
+                context,
+                draw_item,
+                visible_paint_index,
+                reason: GradientPreflightReason::InvalidPaint(error),
+            });
+        }
+        if paint_box_matrix(paint_box, transform).invert().is_none() {
+            return Err(GradientPreflightError {
+                node,
+                gradient,
+                context,
+                draw_item,
+                visible_paint_index,
+                reason: GradientPreflightReason::BackendMatrixNotInvertible,
+            });
+        }
+        let shader_exists = match model {
+            ModelPaint::LinearGradient(model) => linear_gradient_shader(model, paint_box).is_some(),
+            ModelPaint::RadialGradient(model) => radial_gradient_shader(model, paint_box).is_some(),
+            ModelPaint::SweepGradient(model) => sweep_gradient_shader(model, paint_box).is_some(),
+            ModelPaint::DiamondGradient(model) => {
+                diamond_gradient_shader(model, paint_box).is_some()
+            }
+            ModelPaint::Solid(_) | ModelPaint::Image(_) => unreachable!(),
+        };
+        if !shader_exists {
+            return Err(GradientPreflightError {
+                node,
+                gradient,
+                context,
+                draw_item,
+                visible_paint_index,
+                reason: GradientPreflightReason::BackendShaderConstructionFailed,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Prove that every gradient which can be evaluated by this exact drawlist has
+/// an invertible backend-local matrix for its resolved paint box. This is
+/// deliberately later than authored paint validation: multiplying a finite,
+/// mathematically invertible transform by a concrete box can rescue or defeat
+/// binary32 backend representability.
+pub(crate) fn preflight_gradients(list: &DrawList) -> Result<(), GradientPreflightError> {
+    for (draw_item, item) in list.items.iter().enumerate() {
+        match &item.kind {
+            ItemKind::RectFill { w, h, paints, .. }
+            | ItemKind::OvalFill { w, h, paints }
+            | ItemKind::PathFill { w, h, paints, .. } => preflight_paints(
+                item.node,
+                draw_item,
+                PaintUseContext::Fill,
+                paints,
+                PaintBox::from_size(*w, *h),
+            )?,
+            ItemKind::TextFill {
+                layout,
+                paints,
+                paint_w,
+                paint_h,
+            } => {
+                let paint_box = PaintBox::from_size(*paint_w, *paint_h);
+                for run in &layout.glyph_runs {
+                    let Some(run_paints) = paints.for_source_run(run.source_run) else {
+                        continue;
+                    };
+                    preflight_paints(
+                        item.node,
+                        draw_item,
+                        PaintUseContext::TextRun {
+                            source_run: run.source_run,
+                        },
+                        run_paints,
+                        paint_box,
+                    )?;
+                }
+            }
+            ItemKind::RectStroke { w, h, stroke, .. }
+            | ItemKind::OvalStroke { w, h, stroke }
+            | ItemKind::PathStroke { w, h, stroke, .. } => preflight_paints(
+                item.node,
+                draw_item,
+                PaintUseContext::Stroke,
+                &stroke.paints,
+                PaintBox::from_size(*w, *h),
+            )?,
+            ItemKind::LineStroke {
+                paint_w,
+                paint_h,
+                stroke,
+                ..
+            } => preflight_paints(
+                item.node,
+                draw_item,
+                PaintUseContext::Stroke,
+                &stroke.paints,
+                PaintBox::from_size(*paint_w, *paint_h),
+            )?,
+            ItemKind::TextStroke {
+                layout,
+                paint_w,
+                paint_h,
+                stroke,
+                ..
+            } => {
+                if !layout.glyph_runs.is_empty() {
+                    preflight_paints(
+                        item.node,
+                        draw_item,
+                        PaintUseContext::Stroke,
+                        &stroke.paints,
+                        PaintBox::from_size(*paint_w, *paint_h),
+                    )?;
+                }
+            }
+            ItemKind::BeginOpacity { .. }
+            | ItemKind::EndOpacity
+            | ItemKind::BeginClipRect { .. }
+            | ItemKind::EndClip => {}
+        }
+    }
+    Ok(())
+}
+
+fn image_rid(model: &ImagePaint) -> &str {
+    match &model.image {
+        ResourceRef::Rid(rid) | ResourceRef::Hash(rid) => rid,
+    }
+}
+
+fn image_model_supported(model: &ImagePaint) -> bool {
+    model.quarter_turns == 0
+        && model.alignment == Alignment::CENTER
+        && model.filters == ImageFilters::default()
+        && matches!(model.fit, ImagePaintFit::Fit(_))
+}
+
+fn preflight_image_paints(
+    item: &crate::drawlist::Item,
+    draw_item: usize,
+    context: PaintUseContext,
+    paints: &Paints,
+    paint_box: PaintBox,
+    view: &Affine,
+    ctx: &PaintCtx,
+) -> Result<(), ImagePreflightError> {
+    for (visible_paint_index, paint) in paints.iter().enumerate() {
+        let ModelPaint::Image(model) = paint else {
+            continue;
+        };
+        let rid = image_rid(model);
+        let fail = |reason| ImagePreflightError {
+            node: item.node,
+            context,
+            rid: rid.to_owned(),
+            draw_item,
+            visible_paint_index,
+            reason,
+        };
+        if !image_model_supported(model) {
+            return Err(fail(ImagePreflightReason::UnsupportedModelState));
+        }
+        let image = ctx
+            .image(rid)
+            .ok_or_else(|| fail(ImagePreflightReason::MissingResource))?;
+        let local = image_fit_matrix(
+            image,
+            paint_box,
+            match model.fit {
+                ImagePaintFit::Fit(fit) => fit,
+                ImagePaintFit::Transform(_) | ImagePaintFit::Tile(_) => unreachable!(),
+            },
+        );
+        let geometry = view.then(&item.world);
+        let geometry_is_finite = [
+            geometry.a, geometry.b, geometry.c, geometry.d, geometry.e, geometry.f,
+        ]
+        .iter()
+        .all(|value| value.is_finite());
+        let determinant = f64::from(geometry.a) * f64::from(geometry.d)
+            - f64::from(geometry.b) * f64::from(geometry.c);
+        let ctm = skia_matrix(&geometry);
+        if !geometry_is_finite
+            || (determinant != 0.0 && Matrix::concat(&ctm, &local).invert().is_none())
+        {
+            return Err(fail(ImagePreflightReason::TotalMatrixNotInvertible));
+        }
+        if image_shader(model, paint_box, ctx).is_none() {
+            return Err(fail(ImagePreflightReason::ShaderConstructionFailed));
+        }
+    }
+    Ok(())
+}
+
+/// Checked-execution image capability fence. Unlike gradient-local preflight,
+/// image sampling depends on the final CTM, so this runs for the requested
+/// view immediately before replay.
+pub(crate) fn preflight_images(
+    list: &DrawList,
+    view: &Affine,
+    ctx: &PaintCtx,
+) -> Result<(), ImagePreflightError> {
+    for (draw_item, item) in list.items.iter().enumerate() {
+        match &item.kind {
+            ItemKind::RectFill { w, h, paints, .. }
+            | ItemKind::OvalFill { w, h, paints }
+            | ItemKind::PathFill { w, h, paints, .. } => preflight_image_paints(
+                item,
+                draw_item,
+                PaintUseContext::Fill,
+                paints,
+                PaintBox::from_size(*w, *h),
+                view,
+                ctx,
+            )?,
+            ItemKind::TextFill {
+                layout,
+                paints,
+                paint_w,
+                paint_h,
+            } => {
+                let paint_box = PaintBox::from_size(*paint_w, *paint_h);
+                for run in &layout.glyph_runs {
+                    if let Some(run_paints) = paints.for_source_run(run.source_run) {
+                        preflight_image_paints(
+                            item,
+                            draw_item,
+                            PaintUseContext::TextRun {
+                                source_run: run.source_run,
+                            },
+                            run_paints,
+                            paint_box,
+                            view,
+                            ctx,
+                        )?;
+                    }
+                }
+            }
+            ItemKind::RectStroke { w, h, stroke, .. }
+            | ItemKind::OvalStroke { w, h, stroke }
+            | ItemKind::PathStroke { w, h, stroke, .. } => preflight_image_paints(
+                item,
+                draw_item,
+                PaintUseContext::Stroke,
+                &stroke.paints,
+                PaintBox::from_size(*w, *h),
+                view,
+                ctx,
+            )?,
+            ItemKind::LineStroke {
+                paint_w,
+                paint_h,
+                stroke,
+                ..
+            } => preflight_image_paints(
+                item,
+                draw_item,
+                PaintUseContext::Stroke,
+                &stroke.paints,
+                PaintBox::from_size(*paint_w, *paint_h),
+                view,
+                ctx,
+            )?,
+            ItemKind::TextStroke {
+                layout,
+                paint_w,
+                paint_h,
+                stroke,
+                ..
+            } => {
+                if !layout.glyph_runs.is_empty() {
+                    preflight_image_paints(
+                        item,
+                        draw_item,
+                        PaintUseContext::Stroke,
+                        &stroke.paints,
+                        PaintBox::from_size(*paint_w, *paint_h),
+                        view,
+                        ctx,
+                    )?;
+                }
+            }
+            ItemKind::BeginOpacity { .. }
+            | ItemKind::EndOpacity
+            | ItemKind::BeginClipRect { .. }
+            | ItemKind::EndClip => {}
+        }
+    }
+    Ok(())
+}
+
 /// Convert the model's centered-normalized gradient point to UV for Skia.
 /// The f64 intermediate avoids overflowing or needlessly rounding finite f32
 /// model values before the result returns to Skia's f32 coordinate space.
@@ -364,16 +872,28 @@ fn sk_paint(model: &ModelPaint, paint_box: PaintBox, ctx: &PaintCtx) -> Option<P
             paint.set_color(Color::new(solid.color.argb()));
         }
         ModelPaint::LinearGradient(model) => {
-            paint.set_shader(linear_gradient_shader(model, paint_box)?);
+            paint.set_shader(
+                linear_gradient_shader(model, paint_box)
+                    .expect("preflighted linear gradient shader construction failed"),
+            );
         }
         ModelPaint::RadialGradient(model) => {
-            paint.set_shader(radial_gradient_shader(model, paint_box)?);
+            paint.set_shader(
+                radial_gradient_shader(model, paint_box)
+                    .expect("preflighted radial gradient shader construction failed"),
+            );
         }
         ModelPaint::SweepGradient(model) => {
-            paint.set_shader(sweep_gradient_shader(model, paint_box)?);
+            paint.set_shader(
+                sweep_gradient_shader(model, paint_box)
+                    .expect("preflighted sweep gradient shader construction failed"),
+            );
         }
         ModelPaint::DiamondGradient(model) => {
-            paint.set_shader(diamond_gradient_shader(model, paint_box)?);
+            paint.set_shader(
+                diamond_gradient_shader(model, paint_box)
+                    .expect("preflighted diamond gradient shader construction failed"),
+            );
         }
         ModelPaint::Image(model) => {
             paint.set_shader(image_shader(model, paint_box, ctx)?);
@@ -511,51 +1031,6 @@ fn ordinary_rrect_path_at(rect: Rect, radius: &RectangularCornerRadius) -> Path 
 
 fn ordinary_rrect_path(w: f32, h: f32, radius: &RectangularCornerRadius) -> Path {
     ordinary_rrect_path_at(Rect::from_wh(w, h), radius)
-}
-
-#[derive(Debug, Clone, Copy)]
-struct SmoothCornerParams {
-    radius: f32,
-    extent: f32,
-    a: f32,
-    b: f32,
-    c: f32,
-    d: f32,
-    bezier_angle: f32,
-}
-
-fn smooth_corner_params(radius: f32, smoothing: f32, shortest_side: f32) -> SmoothCornerParams {
-    let smoothing = smoothing.clamp(0.0, 1.0);
-    let radius = radius.min(shortest_side / 2.0).max(0.0);
-    let extent = ((1.0 + smoothing) * radius).min(shortest_side / 2.0);
-    let (circle_angle, bezier_angle) = if radius > shortest_side / 4.0 {
-        let change = (radius - shortest_side / 4.0) / (shortest_side / 4.0);
-        (
-            90.0 * (1.0 - smoothing * (1.0 - change)),
-            45.0 * smoothing * (1.0 - change),
-        )
-    } else {
-        (90.0 * (1.0 - smoothing), 45.0 * smoothing)
-    };
-
-    let bezier_radians = bezier_angle.to_radians();
-    let circle_radians = circle_angle.to_radians();
-    let tangent = bezier_radians.tan();
-    let longest = radius * (bezier_radians / 2.0).tan();
-    let arc_chord = (circle_radians / 2.0).sin() * radius * 2.0_f32.sqrt();
-    let c = longest * bezier_radians.cos();
-    let d = c * tangent;
-    let b = ((extent - arc_chord) - (1.0 + tangent) * c) / 3.0;
-
-    SmoothCornerParams {
-        radius,
-        extent,
-        a: 2.0 * b,
-        b,
-        c,
-        d,
-        bezier_angle,
-    }
 }
 
 /// Mirror the production engine's orthogonal smooth-corner construction.
@@ -1032,12 +1507,13 @@ fn text_path(
     builder.snapshot()
 }
 
-/// Replay a [`DrawList`] onto a skia canvas under `view`. Drawing items compose
-/// `view.then(&item.world)` and set that matrix absolutely. Balanced scope
-/// commands persist across drawing items: opacity opens a backdrop-preserving
-/// group layer, while a content clip saves the node-local box outline until
-/// `EndClip`.
-pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) {
+/// Replay a raw [`DrawList`] without a frame-environment check.
+///
+/// This low-level entry exists for glyphless structural probes and internal
+/// retained-list replay. A host rendering a complete semantic frame must call
+/// [`crate::frame::FrameProduct::execute`], which refuses a context whose
+/// incarnation or resource revision differs from the one captured at build.
+pub fn execute_unchecked(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum Scope {
         Opacity,
@@ -1271,6 +1747,9 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
                 paint_h,
                 stroke,
             } => {
+                if layout.glyph_runs.is_empty() {
+                    continue;
+                }
                 with_local_transform(canvas, view, &item.world, || {
                     let paint_box = PaintBox::from_size(*paint_w, *paint_h);
                     if stroke.align == StrokeAlign::Center {
@@ -1302,16 +1781,25 @@ pub fn execute(canvas: &Canvas, list: &DrawList, view: &Affine, ctx: &PaintCtx) 
     canvas.restore_to_count(initial_save_count);
 }
 
-/// Render a drawlist to a fresh raster surface and return its premultiplied
-/// pixel bytes — the reference for differential pixel tests (`gate_diff` L2).
+/// Render a raw drawlist to a fresh raster surface without a frame-environment
+/// check and return its premultiplied pixel bytes. This is the low-level
+/// reference for glyphless differential probes; complete products use
+/// [`crate::frame::FrameProduct::raster_to_bytes`].
+///
 /// Bytes, NOT PNG: the encoder is not the system under test, and byte
 /// equality is exact (ENG-0.3), not a tolerance. `font: None` in the gate
 /// removes font-availability nondeterminism.
-pub fn raster_to_bytes(list: &DrawList, view: &Affine, w: i32, h: i32, ctx: &PaintCtx) -> Vec<u8> {
+pub fn raster_to_bytes_unchecked(
+    list: &DrawList,
+    view: &Affine,
+    w: i32,
+    h: i32,
+    ctx: &PaintCtx,
+) -> Vec<u8> {
     let mut surface = skia_safe::surfaces::raster_n32_premul((w, h)).expect("raster surface");
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
-    execute(canvas, list, view, ctx);
+    execute_unchecked(canvas, list, view, ctx);
     read_pixels(&mut surface, w, h)
 }
 

@@ -29,7 +29,7 @@ fn options() -> ResolveOptions {
 fn one_path_artifact_drives_fill_and_repeated_strokes() {
     let document = grida_xml::parse(SOURCE).expect("unit path fixture parses");
     let resolved = resolve(&document, &options());
-    let list = anchor_engine::drawlist::build_glyphless(&document, &resolved);
+    let list = anchor_engine::drawlist::build_glyphless_unchecked(&document, &resolved);
 
     assert_eq!(list.items.len(), 4, "container, fill, then two strokes");
     let ItemKind::PathFill {
@@ -106,8 +106,8 @@ fn equivalent_path_spelling_is_not_visual_damage() {
     let result = damage::diff(&before_resolved, &after_resolved);
     assert!(result.is_empty());
     assert_eq!(
-        anchor_engine::drawlist::build_glyphless(&before, &before_resolved),
-        anchor_engine::drawlist::build_glyphless(&after, &after_resolved),
+        anchor_engine::drawlist::build_glyphless_unchecked(&before, &before_resolved),
+        anchor_engine::drawlist::build_glyphless_unchecked(&after, &after_resolved),
         "equivalent source spelling must not invalidate the visual display list"
     );
 }
@@ -123,7 +123,7 @@ fn path_children_paint_between_the_fill_and_parent_strokes() {
             ..Default::default()
         },
     );
-    let list = anchor_engine::drawlist::build_glyphless(&document, &resolved);
+    let list = anchor_engine::drawlist::build_glyphless_unchecked(&document, &resolved);
 
     assert!(matches!(list.items[0].kind, ItemKind::PathFill { .. }));
     assert!(matches!(list.items[1].kind, ItemKind::RectFill { .. }));

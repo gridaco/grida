@@ -5,6 +5,7 @@
 
 use std::num::NonZeroU32;
 
+use anchor_engine::frame::FrameProduct;
 use anchor_engine::journal::Journal;
 use anchor_engine::query::Query;
 use anchor_lab::model::{Document, NodeId};
@@ -69,10 +70,10 @@ pub struct App {
     want_framelog: bool,
     frame_log: Option<std::io::BufWriter<std::fs::File>>,
     frame_clock: std::time::Instant,
-    /// Previous frame's resolved tier and the count of nodes that changed
-    /// against it (ENG-2.2 damage) — shown in the panel; not yet used to
-    /// scope repaint (OS-2a).
-    last_resolved: Option<Resolved>,
+    /// Previous complete frame product and declared paint environment.
+    /// ENG-2.2 damage is shown in the panel but not yet used to scope repaint
+    /// (OS-2a).
+    last_frame: Option<FrameProduct>,
     pub last_damage: usize,
 
     // panels (egui overlay on the shared GL context)
@@ -144,7 +145,7 @@ pub fn run(init: WindowInit) {
         want_framelog: std::env::var("ANCHOR_FRAMELOG").is_ok(),
         frame_log: None,
         frame_clock: std::time::Instant::now(),
-        last_resolved: None,
+        last_frame: None,
         last_damage: 0,
         egui_ctx,
         egui_winit,
@@ -169,7 +170,10 @@ impl App {
     /// The returned drawlist is intentionally discarded when a pointer or
     /// editor query needs only the resolved tier.
     fn resolve_live(&self) -> Resolved {
-        resolve_and_build_doc(&self.doc, &self.ctx).0
+        let (resolved, _, _) = resolve_and_build_doc(&self.doc, &self.ctx)
+            .expect("spike scene must pass paint preflight")
+            .into_parts();
+        resolved
     }
 
     fn fit_artboard(&mut self) {
@@ -273,7 +277,7 @@ impl App {
         }
 
         let (wx, wy) = self.camera.screen_to_world(self.cursor);
-        match Query::new(&self.doc, &resolved).hit_point(wx, wy) {
+        match Query::new(&resolved).hit_point(wx, wy) {
             Some(hit) if hit != self.doc.root => {
                 self.selection = Some(hit);
                 self.fsm = Fsm::Pressed {
@@ -473,7 +477,7 @@ impl App {
                 // Idle / Pressed: hover tracking only.
                 let resolved = self.resolve_live();
                 let (wx, wy) = self.camera.screen_to_world(self.cursor);
-                self.hover = Query::new(&self.doc, &resolved)
+                self.hover = Query::new(&resolved)
                     .hit_point(wx, wy)
                     .filter(|h| *h != self.doc.root);
             }
@@ -664,21 +668,27 @@ impl App {
         // stage sum does not. If gap >> draw, the problem is not rendering.
         let gap = t0.duration_since(self.frame_clock).as_secs_f32() * 1000.0;
         self.frame_clock = t0;
-        let (resolved, list) = resolve_and_build_doc(&self.doc, &self.ctx);
-        self.last_damage = match &self.last_resolved {
-            Some(prev) => anchor_engine::damage::diff(prev, &resolved).changed.len(),
+        let product = resolve_and_build_doc(&self.doc, &self.ctx)
+            .expect("spike scene must pass paint preflight");
+        self.last_damage = match &self.last_frame {
+            Some(previous) => anchor_engine::damage::diff_frame(previous, &product)
+                .changed
+                .len(),
             None => 0,
         };
+        let resolved = product.resolved();
         let t_resolve_build = ms(t0);
 
         let t1 = std::time::Instant::now();
         let canvas = self.gpu.surface.canvas();
         canvas.clear(skia_safe::Color::from_argb(255, 0xF7, 0xF8, 0xF9));
-        anchor_engine::paint::execute(canvas, &list, &self.camera.view(), &self.ctx);
+        product
+            .execute(canvas, &self.camera.view(), &self.ctx)
+            .expect("live frame uses the unchanged host paint environment");
         hud::paint_hud_dpr(
             canvas,
             &self.doc,
-            &resolved,
+            resolved,
             &self.camera,
             self.selection,
             self.hover,
@@ -755,7 +765,7 @@ impl App {
             let _ = w.flush();
         }
 
-        self.last_resolved = Some(resolved);
+        self.last_frame = Some(product);
     }
 
     // ── panels (egui) ───────────────────────────────────────────────

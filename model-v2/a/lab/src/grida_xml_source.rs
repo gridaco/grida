@@ -3,8 +3,9 @@
 //! [`crate::grida_xml`] remains the exact Draft 0 `&str -> Document`
 //! contract. This sibling owns source identity, dependency resolution,
 //! Version 1 component linking, Version 2 typed scalar specialization, Version
-//! 3 named static slot projection, and lowering back to that ordinary Draft 0
-//! contract. It performs no filesystem or resource I/O.
+//! 3 named static slot projection, Version 4 durable authored addresses, and
+//! lowering back to that ordinary Draft 0 contract. It performs no filesystem
+//! or resource I/O.
 
 // Source errors are cold-path values that intentionally retain structured
 // resolution, specialization, and projection provenance. Boxing every result
@@ -12,11 +13,11 @@
 #![allow(clippy::result_large_err)]
 
 use crate::grida_xml;
-use crate::model::{Color, Document, NodeId, Payload, ShapeDesc};
+use crate::model::{Color, Document, NodeId, NodeKey, Payload, ShapeDesc};
 use quick_xml::events::attributes::Attributes;
 use quick_xml::events::{BytesDecl, BytesStart, Event};
 use quick_xml::Reader;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{btree_map, BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::sync::Arc;
 
@@ -87,6 +88,7 @@ pub enum SourceVersion {
     Draft1,
     Version2,
     Version3,
+    Version4,
 }
 
 impl SourceVersion {
@@ -96,12 +98,20 @@ impl SourceVersion {
             SourceVersion::Draft1 => "1",
             SourceVersion::Version2 => "2",
             SourceVersion::Version3 => "3",
+            SourceVersion::Version4 => "4",
         }
     }
 }
 
 fn has_scalar_specialization(version: SourceVersion) -> bool {
-    matches!(version, SourceVersion::Version2 | SourceVersion::Version3)
+    matches!(
+        version,
+        SourceVersion::Version2 | SourceVersion::Version3 | SourceVersion::Version4
+    )
+}
+
+fn has_static_slots(version: SourceVersion) -> bool {
+    matches!(version, SourceVersion::Version3 | SourceVersion::Version4)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,6 +142,8 @@ pub struct AuthoredUseSite {
 pub struct SourceError {
     pub phase: ErrorPhase,
     pub source: String,
+    /// Immediate local source location when the failing syntax owns one.
+    pub span: Option<SourceSpan>,
     pub component: Option<String>,
     pub use_chain: Vec<UseSite>,
     /// The immediate authored edge when resolution failed before a canonical
@@ -154,6 +166,7 @@ impl SourceError {
         Self {
             phase: ErrorPhase::Parse,
             source: source.into(),
+            span: None,
             component: None,
             use_chain: vec![],
             authored_use: None,
@@ -161,6 +174,12 @@ impl SourceError {
             slot_projection: None,
             message: message.into(),
         }
+    }
+
+    fn parse_at(source: &str, span: SourceSpan, message: impl Into<String>) -> Self {
+        let mut error = Self::parse(source, message);
+        error.span = Some(span);
+        error
     }
 
     fn at_phase(
@@ -173,6 +192,7 @@ impl SourceError {
         Self {
             phase,
             source: source.into(),
+            span: None,
             component: component.map(str::to_owned),
             use_chain: use_chain.to_vec(),
             authored_use: None,
@@ -206,6 +226,9 @@ impl SourceError {
 impl std::fmt::Display for SourceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "grida_xml_source {:?} in {}", self.phase, self.source)?;
+        if let Some(span) = self.span {
+            write!(f, ":{}", span.start)?;
+        }
         if let Some(component) = &self.component {
             write!(f, "#{component}")?;
         }
@@ -255,6 +278,80 @@ impl std::fmt::Display for ComponentIdentity {
     }
 }
 
+/// Lexical owner of one Version 4 render member or component occurrence.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AuthoredOwner {
+    Scene { source: String },
+    Component(ComponentIdentity),
+}
+
+/// A component definition's render root is already named by its export and
+/// therefore uses a structural identity. Every other Version 4 render member
+/// carries an authored lowercase-kebab id.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AuthoredMemberId {
+    ComponentRoot,
+    Id(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AuthoredMember {
+    pub owner: AuthoredOwner,
+    pub id: AuthoredMemberId,
+}
+
+/// One durable authored `<use>` occurrence in an outer-to-inner path.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AuthoredUseOccurrence {
+    pub owner: AuthoredOwner,
+    pub id: String,
+}
+
+/// Canonical address of one materialized ordinary node.
+///
+/// Source spans, names, element positions, and arena slots are deliberately
+/// absent. `use_path` is ordered outermost to innermost.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MaterializedNodeAddress {
+    pub member: AuthoredMember,
+    pub use_path: Vec<AuthoredUseOccurrence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AddressLookupError {
+    UnknownAddress { address: MaterializedNodeAddress },
+    StaleAddress { address: MaterializedNodeAddress },
+    UnknownNode { node: NodeKey },
+    NodeHasNoDurableAddress { node: NodeKey },
+}
+
+impl std::fmt::Display for AddressLookupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AddressLookupError::UnknownAddress { address } => {
+                write!(f, "unknown materialized address {address:?}")
+            }
+            AddressLookupError::StaleAddress { address } => {
+                write!(
+                    f,
+                    "materialized address no longer names a live node: {address:?}"
+                )
+            }
+            AddressLookupError::UnknownNode { node } => {
+                write!(
+                    f,
+                    "node key is not live in this materialized program: {node:?}"
+                )
+            }
+            AddressLookupError::NodeHasNoDurableAddress { node } => {
+                write!(f, "node has no durable Version 4 address: {node:?}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for AddressLookupError {}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UseSite {
     pub source: String,
@@ -303,7 +400,7 @@ pub struct ValueOrigin {
     pub source: String,
     pub span: SourceSpan,
     /// The XML-decoded literal at its ultimate declaration/default or argument
-    /// site, before Version 2/3 brace escapes are collapsed.
+    /// site, before Version 2–4 brace escapes are collapsed.
     pub authored: String,
 }
 
@@ -331,6 +428,9 @@ pub struct BindingTarget {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaterializedBindingOccurrence {
     pub target: BindingTarget,
+    /// Slot in the initial materialization snapshot. This provenance record
+    /// is not a live runtime handle; after document mutation, compile through
+    /// the Version 4 address map rather than reusing this bare slot.
     pub node: NodeId,
 }
 
@@ -397,6 +497,8 @@ pub struct SlotProjectionErrorSite {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaterializedSlotAssignment {
     pub site: SlotAssignmentSite,
+    /// Slot in the initial materialization snapshot; see
+    /// [`MaterializedBindingOccurrence::node`].
     pub node: NodeId,
 }
 
@@ -468,10 +570,94 @@ impl SourceProgram {
 pub struct MaterializedProgram {
     pub document: Document,
     pub program: SourceProgram,
+    /// Initial-materialization source snapshots keyed by arena slot. These
+    /// records support diagnostics for that lowering pass; they are not live
+    /// identities after mutation. Version 4 live lookup uses the private
+    /// generation-stamped address maps exposed by [`Self::addresses`],
+    /// [`Self::node_for_address`], and [`Self::address_for_node`].
     pub provenance: BTreeMap<NodeId, NodeProvenance>,
     pub resources: Vec<ResourceManifestEntry>,
     pub specializations: Vec<SpecializationProvenance>,
     pub slot_projections: Vec<SlotProjectionProvenance>,
+    addresses_by_node: BTreeMap<NodeKey, MaterializedNodeAddress>,
+    nodes_by_address: BTreeMap<MaterializedNodeAddress, NodeKey>,
+}
+
+/// Live durable addresses remaining in a materialized program.
+///
+/// `MaterializedProgram::document` is intentionally mutable. Removing or
+/// replacing a materialized node leaves its retained source address stale;
+/// this iterator omits that entry while [`MaterializedProgram::node_for_address`]
+/// continues to report the precise stale-address failure for direct lookup.
+pub struct LiveAddresses<'a> {
+    document: &'a Document,
+    inner: btree_map::Iter<'a, MaterializedNodeAddress, NodeKey>,
+}
+
+impl<'a> Iterator for LiveAddresses<'a> {
+    type Item = (&'a MaterializedNodeAddress, NodeKey);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner
+            .by_ref()
+            .find(|(_, node)| self.document.contains_key(**node))
+            .map(|(address, node)| (address, *node))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl ExactSizeIterator for LiveAddresses<'_> {
+    fn len(&self) -> usize {
+        self.inner
+            .clone()
+            .filter(|(_, node)| self.document.contains_key(**node))
+            .count()
+    }
+}
+
+impl std::iter::FusedIterator for LiveAddresses<'_> {}
+
+impl MaterializedProgram {
+    /// Enumerate only addresses whose generation-stamped node remains live.
+    pub fn addresses(&self) -> LiveAddresses<'_> {
+        LiveAddresses {
+            document: &self.document,
+            inner: self.nodes_by_address.iter(),
+        }
+    }
+
+    pub fn node_for_address(
+        &self,
+        address: &MaterializedNodeAddress,
+    ) -> Result<NodeKey, AddressLookupError> {
+        let node = self.nodes_by_address.get(address).copied().ok_or_else(|| {
+            AddressLookupError::UnknownAddress {
+                address: address.clone(),
+            }
+        })?;
+        if !self.document.contains_key(node) {
+            return Err(AddressLookupError::StaleAddress {
+                address: address.clone(),
+            });
+        }
+        Ok(node)
+    }
+
+    pub fn address_for_node(
+        &self,
+        node: NodeKey,
+    ) -> Result<&MaterializedNodeAddress, AddressLookupError> {
+        if !self.document.contains_key(node) {
+            return Err(AddressLookupError::UnknownNode { node });
+        }
+        self.addresses_by_node
+            .get(&node)
+            .ok_or(AddressLookupError::NodeHasNoDurableAddress { node })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -741,6 +927,59 @@ fn valid_component_id(value: &str) -> bool {
                 .bytes()
                 .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
     })
+}
+
+fn validate_version4_ids(
+    source: &str,
+    owner: &str,
+    root: &Element,
+    component_root: bool,
+) -> Result<(), SourceError> {
+    fn visit(
+        source: &str,
+        owner: &str,
+        element: &Element,
+        skip_current: bool,
+        seen: &mut BTreeSet<String>,
+    ) -> Result<(), SourceError> {
+        let requires_id =
+            !skip_current && (is_render_element(&element.name) || element.name == "use");
+        if requires_id {
+            let id = element.attribute("id").ok_or_else(|| {
+                SourceError::parse_at(
+                    source,
+                    element.span,
+                    format!(
+                        "Version 4 <{}> requires a durable lowercase-kebab `id` in {owner}",
+                        element.name
+                    ),
+                )
+            })?;
+            if !valid_component_id(id) {
+                return Err(SourceError::parse_at(
+                    source,
+                    element.span,
+                    format!(
+                        "Version 4 id `{id}` on <{}> must be lowercase kebab-case",
+                        element.name
+                    ),
+                ));
+            }
+            if !seen.insert(id.to_owned()) {
+                return Err(SourceError::parse_at(
+                    source,
+                    element.span,
+                    format!("duplicate Version 4 member/use id `{id}` in {owner}"),
+                ));
+            }
+        }
+        for child in element.element_children() {
+            visit(source, owner, child, false, seen)?;
+        }
+        Ok(())
+    }
+
+    visit(source, owner, root, component_root, &mut BTreeSet::new())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1250,6 +1489,7 @@ pub fn parse_source(snapshot: SourceSnapshot) -> Result<SourceUnit, SourceError>
         "1" => SourceVersion::Draft1,
         "2" => SourceVersion::Version2,
         "3" => SourceVersion::Version3,
+        "4" => SourceVersion::Version4,
         version => {
             return Err(SourceError::parse(
                 snapshot.identity(),
@@ -1304,6 +1544,14 @@ pub fn parse_source(snapshot: SourceSnapshot) -> Result<SourceUnit, SourceError>
                         format!("duplicate component `{id}` in the same source unit"),
                     ));
                 }
+                if version == SourceVersion::Version4 {
+                    validate_version4_ids(
+                        snapshot.identity(),
+                        &format!("component {}#{id}", snapshot.identity()),
+                        element,
+                        true,
+                    )?;
+                }
                 components.push(parse_component(snapshot.identity(), version, element)?);
             }
             Content::Element(element) if element.name == "container" => {
@@ -1312,6 +1560,14 @@ pub fn parse_source(snapshot: SourceSnapshot) -> Result<SourceUnit, SourceError>
                         snapshot.identity(),
                         "a source unit may contain at most one scene root",
                     ));
+                }
+                if version == SourceVersion::Version4 {
+                    validate_version4_ids(
+                        snapshot.identity(),
+                        &format!("scene {}", snapshot.identity()),
+                        element,
+                        false,
+                    )?;
                 }
                 validate_render_tree(snapshot.identity(), version, element, false, false)?;
             }
@@ -1412,7 +1668,7 @@ fn parse_component(
                 if !has_scalar_specialization(version) {
                     return Err(SourceError::parse(
                         source,
-                        "<prop> requires Grida XML Version 2 or 3",
+                        "<prop> requires Grida XML Version 2, 3, or 4",
                     ));
                 }
                 if body_started {
@@ -1477,16 +1733,19 @@ fn validate_slot_declaration(
     element: &Element,
     inside_component: bool,
 ) -> Result<(), SourceError> {
-    if version != SourceVersion::Version3 {
+    if !has_static_slots(version) {
         return Err(SourceError::parse(
             source,
-            "<slot> requires Grida XML Version 3",
+            "<slot> requires Grida XML Version 3 or 4",
         ));
     }
     if !inside_component {
         return Err(SourceError::parse(
             source,
-            "<slot> is valid only in a Version 3 component render body",
+            format!(
+                "<slot> is valid only in a Version {} component render body",
+                version.as_str()
+            ),
         ));
     }
     if !accepts_render_children(&parent.name) {
@@ -1522,21 +1781,31 @@ fn validate_slot_assignment_attribute(
         if slot.is_some() {
             return Err(SourceError::parse(
                 source,
-                "`slot` is valid only on a direct Version 3 <use> render assignment",
+                format!(
+                    "`slot` is valid only on a direct Version {} <use> render assignment",
+                    if version == SourceVersion::Version4 {
+                        "4"
+                    } else {
+                        "3"
+                    }
+                ),
             ));
         }
         return Ok(());
     }
-    if version != SourceVersion::Version3 {
+    if !has_static_slots(version) {
         return Err(SourceError::parse(
             source,
-            "render slot assignments require Grida XML Version 3",
+            "render slot assignments require Grida XML Version 3 or 4",
         ));
     }
     let name = slot.ok_or_else(|| {
         SourceError::parse(
             source,
-            "each direct Version 3 <use> render assignment requires `slot`",
+            format!(
+                "each direct Version {} <use> render assignment requires `slot`",
+                version.as_str()
+            ),
         )
     })?;
     if !valid_component_id(name) {
@@ -1648,6 +1917,9 @@ fn validate_use(
         if attribute.name == "slot" && assignment_root {
             continue;
         }
+        if attribute.name == "id" && version == SourceVersion::Version4 {
+            continue;
+        }
         if !allowed.contains(&attribute.name.as_str()) {
             return Err(SourceError::parse(
                 source,
@@ -1715,7 +1987,7 @@ fn validate_use(
                 }
             }
         }
-        SourceVersion::Version3 => {
+        SourceVersion::Version3 | SourceVersion::Version4 => {
             let mut names = BTreeSet::new();
             let mut assignments_started = false;
             for child in &element.children {
@@ -1724,7 +1996,10 @@ fn validate_use(
                     Content::Text(_) => {
                         return Err(SourceError::parse(
                             source,
-                            "Version 3 <use> accepts leading <arg> children followed by direct render assignments",
+                            format!(
+                                "Version {} <use> accepts leading <arg> children followed by direct render assignments",
+                                version.as_str()
+                            ),
                         ));
                     }
                     Content::Element(argument)
@@ -1759,7 +2034,10 @@ fn validate_use(
                     Content::Element(argument) if argument.name == "arg" => {
                         return Err(SourceError::parse(
                             source,
-                            "Version 3 <arg> children must precede every render assignment",
+                            format!(
+                                "Version {} <arg> children must precede every render assignment",
+                                version.as_str()
+                            ),
                         ));
                     }
                     Content::Element(assignment) => {
@@ -1778,8 +2056,8 @@ fn validate_use(
                             return Err(SourceError::parse(
                                 source,
                                 format!(
-                                    "Version 3 <use> render assignments must be direct render roots, found <{}>",
-                                    assignment.name
+                                    "Version {} <use> render assignments must be direct render roots, found <{}>",
+                                    version.as_str(), assignment.name
                                 ),
                             ));
                         }
@@ -2081,7 +2359,12 @@ fn validate_unit_as_draft0_templates(unit: &SourceUnit) -> Result<(), SourceErro
     if let Some(scene) = &unit.scene {
         validate_template(
             unit.snapshot.identity(),
-            template_element(scene, false, &BTreeMap::new()),
+            template_element(
+                scene,
+                false,
+                unit.version == SourceVersion::Version4,
+                &BTreeMap::new(),
+            ),
         )?;
         validate_assignment_templates(
             unit.snapshot.identity(),
@@ -2102,12 +2385,17 @@ fn validate_assignment_templates(
     element: &Element,
     witnesses: &BTreeMap<String, String>,
 ) -> Result<(), SourceError> {
-    if element.name == "use" && version == SourceVersion::Version3 {
+    if element.name == "use" && has_static_slots(version) {
         for assignment in element
             .element_children()
             .filter(|element| element.name != "arg")
         {
-            let mut projected = template_element(assignment, false, witnesses);
+            let mut projected = template_element(
+                assignment,
+                false,
+                version == SourceVersion::Version4,
+                witnesses,
+            );
             projected.attributes.retain(|attribute| {
                 !matches!(attribute.name.as_str(), "slot" | "flow" | "grow" | "align")
             });
@@ -2211,7 +2499,12 @@ fn validate_component_templates(
             *states += 1;
             let result = validate_template(
                 unit.snapshot.identity(),
-                template_element(&component.element, true, witnesses),
+                template_element(
+                    &component.element,
+                    true,
+                    unit.version == SourceVersion::Version4,
+                    witnesses,
+                ),
             )
             .and_then(|_| {
                 validate_assignment_templates(
@@ -2280,7 +2573,7 @@ fn validate_component_templates(
 
 fn template_scalar_value(attribute: &Attribute, witnesses: &BTreeMap<String, String>) -> String {
     match scan_attribute(&attribute.value)
-        .expect("Version 2/3 bindings validated before template lowering")
+        .expect("Version 2–4 bindings validated before template lowering")
     {
         AttributeExpression::Literal(value) => value,
         AttributeExpression::Binding(name) => witnesses
@@ -2292,7 +2585,7 @@ fn template_scalar_value(attribute: &Attribute, witnesses: &BTreeMap<String, Str
 
 fn template_text(value: &str, witnesses: &BTreeMap<String, String>) -> String {
     scan_bindings(value)
-        .expect("Version 2/3 text bindings validated before template lowering")
+        .expect("Version 2–4 text bindings validated before template lowering")
         .into_iter()
         .map(|segment| match segment {
             BindingSegment::Literal(value) => value,
@@ -2307,6 +2600,7 @@ fn template_text(value: &str, witnesses: &BTreeMap<String, String>) -> String {
 fn template_element(
     element: &Element,
     component_root: bool,
+    strip_durable_ids: bool,
     witnesses: &BTreeMap<String, String>,
 ) -> Element {
     if element.name == "use" {
@@ -2340,7 +2634,13 @@ fn template_element(
     let attributes = element
         .attributes
         .iter()
-        .filter(|attribute| attribute.name != "slot" && (!component_root || attribute.name != "id"))
+        .filter(|attribute| {
+            attribute.name != "slot"
+                && (!component_root || attribute.name != "id")
+                && (!strip_durable_ids
+                    || attribute.name != "id"
+                    || !is_render_element(&element.name))
+        })
         .map(|attribute| Attribute {
             name: attribute.name.clone(),
             value: if witnesses.is_empty()
@@ -2364,7 +2664,10 @@ fn template_element(
             }
             Content::Text(text) => Some(Content::Text(text.clone())),
             Content::Element(element) => Some(Content::Element(template_element(
-                element, false, witnesses,
+                element,
+                false,
+                strip_durable_ids,
+                witnesses,
             ))),
         })
         .collect();
@@ -2382,6 +2685,7 @@ struct ExpandedElement {
     attributes: Vec<Attribute>,
     children: Vec<ExpandedContent>,
     provenance: NodeProvenance,
+    address: Option<MaterializedNodeAddress>,
     bindings: Vec<ExpandedBinding>,
     slot_assignments: Vec<ExpandedSlotAssignment>,
 }
@@ -2717,6 +3021,7 @@ struct Linker<'a, P> {
     resolutions: BTreeMap<(String, String), String>,
     component_stack: Vec<ComponentIdentity>,
     use_chain: Vec<UseSite>,
+    durable_use_path: Vec<Option<AuthoredUseOccurrence>>,
     resources: Vec<ResourceManifestEntry>,
     resource_keys: BTreeMap<(String, String), String>,
     specializations: Vec<SpecializationProvenance>,
@@ -2735,6 +3040,7 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
             resolutions: BTreeMap::new(),
             component_stack: vec![],
             use_chain: vec![],
+            durable_use_path: vec![],
             resources: vec![],
             resource_keys: BTreeMap::new(),
             specializations: vec![],
@@ -2791,11 +3097,15 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
             ));
         }
         let mut provenance = BTreeMap::new();
+        let mut addresses_by_node = BTreeMap::new();
+        let mut nodes_by_address = BTreeMap::new();
         attach_node_provenance(
             &root,
             &document,
             authored_roots[0],
             &mut provenance,
+            &mut addresses_by_node,
+            &mut nodes_by_address,
             &mut self.specializations,
             &mut self.slot_projections,
         )
@@ -2809,6 +3119,15 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
                 None,
                 &[],
                 "materialized source contains nodes unreachable through the provenance tree",
+            ));
+        }
+        if version == SourceVersion::Version4 && addresses_by_node.len() + 1 != document.len() {
+            return Err(SourceError::at_phase(
+                ErrorPhase::Materialize,
+                &self.entry,
+                None,
+                &[],
+                "Version 4 materialization requires one durable address for every ordinary node except the implicit document root",
             ));
         }
         let slot_projections = self
@@ -2856,6 +3175,46 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
             resources: self.resources,
             specializations: self.specializations,
             slot_projections,
+            addresses_by_node,
+            nodes_by_address,
+        })
+    }
+
+    fn durable_address(
+        &self,
+        context: &ExpansionContext,
+        element: &Element,
+    ) -> Option<MaterializedNodeAddress> {
+        if context.version != SourceVersion::Version4
+            || !(is_render_element(&element.name) || element.name == "component")
+        {
+            return None;
+        }
+        let owner = context
+            .component
+            .clone()
+            .map(AuthoredOwner::Component)
+            .unwrap_or_else(|| AuthoredOwner::Scene {
+                source: context.source.clone(),
+            });
+        let id = if element.name == "component" {
+            AuthoredMemberId::ComponentRoot
+        } else {
+            AuthoredMemberId::Id(
+                element
+                    .attribute("id")
+                    .expect("Version 4 render ids validated")
+                    .to_owned(),
+            )
+        };
+        let use_path = self
+            .durable_use_path
+            .iter()
+            .cloned()
+            .collect::<Option<Vec<_>>>()?;
+        Some(MaterializedNodeAddress {
+            member: AuthoredMember { owner, id },
+            use_path,
         })
     }
 
@@ -2871,10 +3230,17 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
             component: context.component.clone(),
             use_chain: self.use_chain.clone(),
         };
+        let address = self.durable_address(context, element);
         let mut attributes = Vec::with_capacity(element.attributes.len());
         let mut bindings = vec![];
         for attribute in &element.attributes {
             if attribute.name == "slot" {
+                continue;
+            }
+            if attribute.name == "id"
+                && context.version == SourceVersion::Version4
+                && (is_render_element(&element.name) || element.name == "component")
+            {
                 continue;
             }
             let mut scalar = self.materialize_attribute(
@@ -2959,6 +3325,7 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
             attributes,
             children,
             provenance,
+            address,
             bindings,
             slot_assignments: vec![],
         })
@@ -2979,7 +3346,10 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
                     .as_ref()
                     .map(|component| component.id.as_str()),
                 &self.use_chain,
-                format!("slot `{name}` has no containing Version 3 component use"),
+                format!(
+                    "slot `{name}` has no containing Version {} component use",
+                    context.version.as_str()
+                ),
             )
         })?;
         if context.component.as_ref() != Some(&instantiation.component) {
@@ -3094,6 +3464,7 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
                     SourceVersion::Version3,
                     SourceVersion::Draft1 | SourceVersion::Version2 | SourceVersion::Version3
                 )
+                | (SourceVersion::Version4, SourceVersion::Version4)
         );
         if !compatible {
             return Err(SourceError::at_phase(
@@ -3134,6 +3505,20 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
             target: target.clone(),
             name,
         };
+        let durable_use =
+            (caller_version == SourceVersion::Version4).then(|| AuthoredUseOccurrence {
+                owner: caller
+                    .component
+                    .clone()
+                    .map(AuthoredOwner::Component)
+                    .unwrap_or_else(|| AuthoredOwner::Scene {
+                        source: caller.source.clone(),
+                    }),
+                id: use_element
+                    .attribute("id")
+                    .expect("Version 4 use ids validated")
+                    .to_owned(),
+            });
         let mut current_chain = self.use_chain.clone();
         current_chain.push(site.clone());
         if let Some(index) = self.component_stack.iter().position(|item| item == &target) {
@@ -3178,14 +3563,19 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
             .filter(|element| element.name != "arg")
             .cloned()
             .collect::<Vec<_>>();
-        if !assignment_elements.is_empty() && target_version != SourceVersion::Version3 {
+        if !assignment_elements.is_empty() && !has_static_slots(target_version) {
+            let required_target = if caller_version == SourceVersion::Version4 {
+                "Version 4"
+            } else {
+                "Version 3"
+            };
             return Err(SourceError::at_phase(
                 ErrorPhase::Link,
                 source,
                 Some(component_id),
                 &current_chain,
                 format!(
-                    "render slot assignments require a Version 3 target; `{component_id}` is Version {}",
+                    "render slot assignments require a {required_target} target; `{component_id}` is Version {}",
                     target_version.as_str()
                 ),
             ));
@@ -3194,7 +3584,7 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
         for assignment in assignment_elements {
             let name = assignment
                 .attribute("slot")
-                .expect("Version 3 assignment source validated");
+                .expect("slot assignment source validated");
             if definition.slot(name).is_none() {
                 return Err(SourceError::at_phase(
                     ErrorPhase::Link,
@@ -3220,7 +3610,7 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
                     context: caller.clone(),
                 });
         }
-        let slots = (target_version == SourceVersion::Version3).then(|| {
+        let slots = has_static_slots(target_version).then(|| {
             Arc::new(SlotInstantiation {
                 component: target.clone(),
                 use_chain: current_chain.clone(),
@@ -3229,6 +3619,7 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
         });
         self.component_stack.push(target.clone());
         self.use_chain.push(site);
+        self.durable_use_path.push(durable_use);
         let environment = self.specialize_component(
             source,
             caller_version,
@@ -3251,6 +3642,7 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
                 slots,
             )
         });
+        self.durable_use_path.pop();
         self.use_chain.pop();
         self.component_stack.pop();
         result
@@ -3296,7 +3688,7 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
             {
                 let value = argument.attribute("value").expect("argument validated");
                 if let AttributeExpression::Binding(prop) = scan_attribute(value)
-                    .expect("Version 2/3 argument bindings validated before expansion")
+                    .expect("Version 2–4 argument bindings validated before expansion")
                 {
                     root.bindings.push(ExpandedBinding {
                         specialization: outer_specialization,
@@ -3962,8 +4354,10 @@ impl<'a, P: SourceProvider> Linker<'a, P> {
 }
 
 /// Link and materialize one render entry through a host-supplied pure source
-/// provider. Draft 0 input is accepted as a one-unit program. Version 1/2/3
-/// input resolves only the closure reachable from the entry scene.
+/// provider. Draft 0 input is accepted as a one-unit program. Version 1/2/3/4
+/// input resolves only the closure reachable from the entry scene. Version 4
+/// links only Version 4 sources and requires every ordinary materialized node
+/// except the implicit document root to have one durable address.
 pub fn materialize<P: SourceProvider>(
     entry: SourceSnapshot,
     provider: &mut P,
@@ -4029,6 +4423,8 @@ fn attach_node_provenance(
     document: &Document,
     node_id: NodeId,
     out: &mut BTreeMap<NodeId, NodeProvenance>,
+    addresses_by_node: &mut BTreeMap<NodeKey, MaterializedNodeAddress>,
+    nodes_by_address: &mut BTreeMap<MaterializedNodeAddress, NodeKey>,
     specializations: &mut [SpecializationProvenance],
     slot_projections: &mut [PendingSlotProjection],
 ) -> Result<(), String> {
@@ -4052,6 +4448,22 @@ fn attach_node_provenance(
         return Err(format!(
             "materialized node {node_id} received duplicate provenance"
         ));
+    }
+    if let Some(address) = &element.address {
+        let key = document
+            .key_of(node_id)
+            .ok_or_else(|| format!("materialized node {node_id} is not live"))?;
+        if addresses_by_node.insert(key, address.clone()).is_some() {
+            return Err(format!(
+                "materialized node {node_id} received more than one durable address"
+            ));
+        }
+        if let Some(previous) = nodes_by_address.insert(address.clone(), key) {
+            return Err(format!(
+                "durable address {address:?} is ambiguous between nodes {} and {node_id}",
+                previous.id()
+            ));
+        }
     }
     for marker in &element.slot_assignments {
         let projection = slot_projections
@@ -4109,6 +4521,8 @@ fn attach_node_provenance(
             document,
             child_id,
             out,
+            addresses_by_node,
+            nodes_by_address,
             specializations,
             slot_projections,
         )?;

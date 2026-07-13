@@ -4,7 +4,7 @@
 
 mod support;
 
-use anchor_engine::drawlist::{build_glyphless, DrawList, ItemKind};
+use anchor_engine::drawlist::{build_glyphless_unchecked, DrawList, ItemKind};
 use anchor_engine::frame;
 use anchor_engine::paint::PaintCtx;
 use anchor_lab::grida_xml;
@@ -52,13 +52,15 @@ fn render_document_full(
         viewport: (width as f32, height as f32),
         ..Default::default()
     };
-    let (resolved, list, _) = frame::render(
+    let (product, _) = frame::render(
         surface.canvas(),
         document,
         &options,
         &Affine::IDENTITY,
         &paint_ctx(),
-    );
+    )
+    .expect("valid text frame");
+    let (resolved, list, _) = product.into_parts();
     (
         RgbaImage::from_image(&surface.image_snapshot()),
         resolved,
@@ -102,7 +104,7 @@ fn drawlist_materializes_shared_wrapping_and_explicit_empty_lines() {
     let source = "<grida version=\"0\"><container width=\"60\" height=\"60\"><text width=\"30\" font-size=\"10\" fill=\"#000000\">aa bb cc\nx\n</text></container></grida>";
     let doc = grida_xml::parse(source).unwrap();
     let resolved = resolve(&doc, &ResolveOptions::default());
-    let list = build_glyphless(&doc, &resolved);
+    let list = build_glyphless_unchecked(&doc, &resolved);
     let lines = list
         .items
         .iter()
@@ -129,7 +131,7 @@ fn fill_and_repeated_strokes_share_one_text_line_topology() {
     let source = r##"<grida version="0"><container width="80" height="40"><text width="60" font-size="10" fill="#000000"><stroke width="1" align="center"><solid color="#FF0000"/></stroke><stroke width="2" align="outside"><solid color="#0000FF"/></stroke>aa bb cc</text></container></grida>"##;
     let doc = grida_xml::parse(source).unwrap();
     let resolved = resolve(&doc, &ResolveOptions::default());
-    let list = build_glyphless(&doc, &resolved);
+    let list = build_glyphless_unchecked(&doc, &resolved);
     let topologies = list
         .items
         .iter()
@@ -220,7 +222,7 @@ fn attributed_drawlist_preserves_run_metrics_style_and_fill_fallback() {
         80.0,
     );
     let resolved = resolve(&document, &ResolveOptions::default());
-    let list = build_glyphless(&document, &resolved);
+    let list = build_glyphless_unchecked(&document, &resolved);
     let (layout, paints, paint_w, paint_h) = list
         .items
         .iter()
@@ -293,7 +295,7 @@ fn attributed_wrap_and_auto_height_share_run_aware_line_metrics() {
     );
     let resolved = resolve(&document, &ResolveOptions::default());
     assert_eq!(resolved.box_of(text_id).h, 36.0);
-    let list = build_glyphless(&document, &resolved);
+    let list = build_glyphless_unchecked(&document, &resolved);
     let lines = list
         .items
         .iter()

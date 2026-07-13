@@ -2,7 +2,8 @@
 //! model ([`anchor_lab`], consumed as a library — the same relationship
 //! `crates/grida` will have with the model crate after the migration).
 //!
-//! This crate is the pipeline: `document -> resolve -> drawlist -> paint`
+//! This crate is the pipeline:
+//! `(document + immutable effective values) -> resolve -> drawlist -> paint`
 //! (the browser's staged-and-pure discipline) plus the read tier
 //! (`query`), time-as-data (`journal`/`replay`), and the sockets every
 //! future optimization plugs into (`damage`, `ident`, `oracle`). The

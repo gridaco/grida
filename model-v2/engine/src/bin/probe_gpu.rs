@@ -328,7 +328,9 @@ mod imp {
                 {
                     let canvas = gpu.surface.canvas();
                     canvas.clear(skia_safe::Color::WHITE);
-                    cache.frame(canvas, &doc, &opts(), &view, &ctx, false);
+                    cache
+                        .frame(canvas, &doc, &opts(), &view, &ctx, false)
+                        .expect("GPU probe scene must pass paint preflight");
                 }
                 gpu.gr_context.flush_and_submit();
                 let elapsed = t.elapsed().as_nanos();

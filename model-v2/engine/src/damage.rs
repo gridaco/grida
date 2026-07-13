@@ -1,17 +1,20 @@
-//! ENG-2.2 · damage as data. `diff(prev, next) -> Damage` (step 11)
-//! compares two resolved tiers column-by-column with exact f32 equality
-//! — justified because the pipeline is order-deterministic (ENG-0.3), so
-//! "unchanged" is bit-identity, not an epsilon guess. Damage flows
-//! forward only (resolve diff -> drawlist diff -> screen rects); no stage
-//! invents or widens it. Day 1 it is asserted and shown (HUD line), not
-//! yet consumed for partial repaint (that is OS-2a).
+//! ENG-2.2 · damage as data. [`diff_frame`] compares the actual resolved and
+//! drawlist products with exact equality, so geometry, paint-only values,
+//! opacity scopes, text/path artifacts, and painter ordering all flow into one
+//! covering result. [`diff`] remains the geometry-only compatibility primitive.
+//! Damage is asserted and shown, not yet consumed for partial repaint (OS-2a).
 
 use anchor_lab::math::RectF;
 use anchor_lab::model::NodeId;
 use anchor_lab::resolve::Resolved;
+use std::collections::{BTreeMap, BTreeSet};
 
-/// What changed between two resolves: the touched nodes and the world-space
-/// rect that bounds their before+after ink (covers appear/disappear).
+use crate::drawlist::{DrawList, Item, ItemKind};
+use crate::frame::FrameProduct;
+
+/// What changed between two frame products: the touched nodes and the
+/// world-space rect that bounds their before+after ink (covers
+/// appear/disappear).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Damage {
     pub changed: Vec<NodeId>,
@@ -32,22 +35,127 @@ impl Damage {
 /// is asserted and shown (HUD), not yet consumed for partial repaint (OS-2a).
 pub fn diff(prev: &Resolved, next: &Resolved) -> Damage {
     let n = prev.slot_count().max(next.slot_count());
-    let mut changed = Vec::new();
-    let mut union_world: Option<RectF> = None;
+    let mut changed = BTreeSet::new();
     for id in 0..n as NodeId {
         if slot_changed(prev, next, id) {
-            changed.push(id);
-            // Cover the node's ink in BOTH states (appear/disappear/move).
-            if let Some(r) = prev.aabb_opt(id) {
-                union_world = Some(union_rect(union_world, r));
-            }
-            if let Some(r) = next.aabb_opt(id) {
-                union_world = Some(union_rect(union_world, r));
+            changed.insert(id);
+        }
+    }
+    finish_damage(prev, next, changed)
+}
+
+/// Diff complete frame products. Resolved columns cover geometry, text, and
+/// paths; per-node drawlist groups cover paints, opacity scopes, clips,
+/// strokes, and painter order. The product-owned paint environment additionally
+/// covers resource readiness and replacing bytes behind one logical id.
+pub fn diff_frame(prev: &FrameProduct, next: &FrameProduct) -> Damage {
+    let mut changed = frame_changed_nodes(
+        prev.resolved(),
+        prev.drawlist(),
+        next.resolved(),
+        next.drawlist(),
+    );
+    if prev.environment() != next.environment() {
+        changed.extend(prev.drawlist().items.iter().map(|item| item.node));
+        changed.extend(next.drawlist().items.iter().map(|item| item.node));
+    }
+    finish_damage(prev.resolved(), next.resolved(), changed)
+}
+
+fn frame_changed_nodes(
+    prev_resolved: &Resolved,
+    prev_list: &DrawList,
+    next_resolved: &Resolved,
+    next_list: &DrawList,
+) -> BTreeSet<NodeId> {
+    let n = prev_resolved.slot_count().max(next_resolved.slot_count());
+    let mut changed = BTreeSet::new();
+    for id in 0..n as NodeId {
+        if slot_changed(prev_resolved, next_resolved, id) {
+            changed.insert(id);
+        }
+    }
+
+    let prev_groups = group_items(prev_list);
+    let next_groups = group_items(next_list);
+    let mut appearance_changed = BTreeSet::new();
+    for id in prev_groups.keys().chain(next_groups.keys()) {
+        if prev_groups.get(id) != next_groups.get(id) {
+            appearance_changed.insert(*id);
+        }
+    }
+    changed.extend(appearance_changed.iter().copied());
+
+    // Remove nodes whose own item group already changed, then compare the
+    // remaining `(node, ordinal-within-node)` permutation. Inserting an
+    // opacity scope for a parent therefore marks the parent without falsely
+    // marking every shifted descendant, while a genuine painter-order change
+    // still marks every item whose relative position moved.
+    let prev_positions = item_positions(prev_list, &appearance_changed);
+    let next_positions = item_positions(next_list, &appearance_changed);
+    for token in prev_positions.keys().chain(next_positions.keys()) {
+        if prev_positions.get(token) != next_positions.get(token) {
+            changed.insert(token.0);
+        }
+    }
+
+    // The exact font registry is list-owned rather than repeated on each text
+    // item. A registry change therefore damages the text nodes that consume
+    // it even when their backend-independent item data is identical.
+    if !prev_list.same_text_fonts(next_list) {
+        for item in prev_list.items.iter().chain(&next_list.items) {
+            if matches!(
+                &item.kind,
+                ItemKind::TextFill { .. } | ItemKind::TextStroke { .. }
+            ) {
+                changed.insert(item.node);
             }
         }
     }
+
+    changed
+}
+
+fn group_items(list: &DrawList) -> BTreeMap<NodeId, Vec<&Item>> {
+    let mut groups = BTreeMap::<NodeId, Vec<&Item>>::new();
+    for item in &list.items {
+        groups.entry(item.node).or_default().push(item);
+    }
+    groups
+}
+
+fn item_positions(
+    list: &DrawList,
+    excluded: &BTreeSet<NodeId>,
+) -> BTreeMap<(NodeId, usize), usize> {
+    let mut ordinals = BTreeMap::<NodeId, usize>::new();
+    let mut positions = BTreeMap::new();
+    let mut position = 0;
+    for item in &list.items {
+        if excluded.contains(&item.node) {
+            continue;
+        }
+        let ordinal = ordinals.entry(item.node).or_default();
+        positions.insert((item.node, *ordinal), position);
+        *ordinal += 1;
+        position += 1;
+    }
+    positions
+}
+
+fn finish_damage(prev: &Resolved, next: &Resolved, changed: BTreeSet<NodeId>) -> Damage {
+    let mut union_world = None;
+    for &id in &changed {
+        // Cover the node's ink in BOTH states (appear/disappear/move).
+        if let Some(r) = prev.aabb_opt(id) {
+            union_world = Some(union_rect(union_world, r));
+        }
+        if let Some(r) = next.aabb_opt(id) {
+            union_world = Some(union_rect(union_world, r));
+        }
+    }
     Damage {
-        changed,
+        changed: changed.into_iter().collect(),
         union_world,
     }
 }

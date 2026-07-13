@@ -137,6 +137,32 @@ fn gradient_transform_is_composed_in_unit_space_before_box_scale() {
 }
 
 #[test]
+fn linear_gradient_just_above_backend_degeneracy_threshold_remains_a_ramp() {
+    // Skia degenerates lengths <= 2^-15 before applying the local matrix.
+    // This 2^-14 ramp remains valid, then a 2^14 unit-space transform expands
+    // it across the full paint box so stable interior pixels can probe it.
+    let source = r##"
+<grida version="0"><container width="100" height="20">
+  <rect width="100" height="20"><fill>
+    <gradient kind="linear" from="0 0.5" to="0.00006103515625 0.5" transform="16384 0 0 1 0 0">
+      <stop offset="0" color="#FF0000"/><stop offset="1" color="#0000FF"/>
+    </gradient>
+  </fill></rect>
+</container></grida>
+"##;
+    let (image, _) = render(source, 100, 20, &PaintCtx::new(None));
+    let left = image.at(5, 10);
+    let middle = image.at(50, 10);
+    let right = image.at(95, 10);
+    assert!(left[0] > 220 && left[2] < 35, "left={left:?}");
+    assert!(
+        (100..=155).contains(&middle[0]) && (100..=155).contains(&middle[2]),
+        "middle={middle:?}"
+    );
+    assert!(right[2] > 220 && right[0] < 35, "right={right:?}");
+}
+
+#[test]
 fn linear_gradient_tile_modes_have_distinct_outside_domain_behavior() {
     let source = r##"
 <grida version="0"><container width="100" height="80"><fill><solid color="#00FF00"/></fill>

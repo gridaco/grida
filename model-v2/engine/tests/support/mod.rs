@@ -80,12 +80,14 @@ pub fn render_xml_on(
         viewport: (width as f32, height as f32),
         ..Default::default()
     };
-    let (_, list, _) = frame::render(surface.canvas(), &doc, &options, &Affine::IDENTITY, ctx);
+    let (product, _) = frame::render(surface.canvas(), &doc, &options, &Affine::IDENTITY, ctx)
+        .expect("valid fixture frame");
     assert_eq!(
         surface.canvas().save_count(),
         1,
         "display-list scopes leaked canvas state"
     );
     let image = RgbaImage::from_image(&surface.image_snapshot());
-    (image, list)
+    let (_, drawlist, _) = product.into_parts();
+    (image, drawlist)
 }

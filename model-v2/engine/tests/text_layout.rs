@@ -9,7 +9,7 @@ use std::sync::Arc;
 use anchor_engine::drawlist::{DrawList, ItemKind};
 use anchor_engine::frame;
 use anchor_engine::oracle::TEXT_SKPARAGRAPH;
-use anchor_engine::paint::{raster_to_bytes, PaintCtx};
+use anchor_engine::paint::{raster_to_bytes_unchecked, PaintCtx};
 use anchor_lab::math::Affine;
 use anchor_lab::model::{
     AttributedString, Color, DocBuilder, Document, Header, Paints, Payload, SizeIntent, Stroke,
@@ -58,18 +58,20 @@ fn render_with_context(document: &Document, context: &PaintCtx) -> (Resolved, Dr
         viewport: (640.0, 480.0),
         ..Default::default()
     };
-    let (resolved, list, _) = frame::render(
+    let (product, _) = frame::render(
         surface.canvas(),
         document,
         &options,
         &Affine::IDENTITY,
         context,
-    );
+    )
+    .expect("valid text-layout frame");
     assert_eq!(
         surface.canvas().save_count(),
         1,
         "glyph replay must leave the canvas scope balanced"
     );
+    let (resolved, list, _) = product.into_parts();
     (resolved, list)
 }
 
@@ -372,9 +374,9 @@ fn shaped_drawlist_retains_exact_fonts_after_its_shaping_context_is_gone() {
     let (_, list) = render(&document);
 
     let fontless_context = PaintCtx::new(None);
-    let first = raster_to_bytes(&list, &Affine::IDENTITY, 640, 480, &fontless_context);
+    let first = raster_to_bytes_unchecked(&list, &Affine::IDENTITY, 640, 480, &fontless_context);
     let unrelated_context = PaintCtx::new(Some(inter_typeface()));
-    let second = raster_to_bytes(&list, &Affine::IDENTITY, 640, 480, &unrelated_context);
+    let second = raster_to_bytes_unchecked(&list, &Affine::IDENTITY, 640, 480, &unrelated_context);
 
     assert_eq!(first, second, "paint contexts cannot reinterpret font keys");
     assert!(first.chunks_exact(4).any(|pixel| pixel[0] < 100));
@@ -389,13 +391,16 @@ fn public_non_rasterizing_stage_returns_replayable_shaped_text() {
         ..Default::default()
     };
 
-    let (resolved, list) = frame::resolve_and_build(&document, &options, &shaping_context);
+    let product = frame::resolve_and_build(&document, &options, &shaping_context)
+        .expect("valid text-layout frame");
+    let (resolved, list, _) = product.into_parts();
     let layout = resolved.text_layout_of(text_id);
     assert_eq!(layout.oracle, TEXT_SKPARAGRAPH);
     assert!(!layout.glyph_runs.is_empty());
 
     let fontless_replay_context = PaintCtx::new(None);
-    let pixels = raster_to_bytes(&list, &Affine::IDENTITY, 640, 480, &fontless_replay_context);
+    let pixels =
+        raster_to_bytes_unchecked(&list, &Affine::IDENTITY, 640, 480, &fontless_replay_context);
     assert!(
         pixels.chunks_exact(4).any(|pixel| pixel[0] < 100),
         "the returned drawlist must own every font needed for later replay"

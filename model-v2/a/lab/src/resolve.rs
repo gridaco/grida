@@ -15,6 +15,7 @@
 use crate::math::{rotated_aabb_size, Affine, RectF};
 use crate::model::*;
 use crate::path::{materialize, ResolvedPathArtifact};
+use crate::properties::ValueView;
 use crate::text_layout::{TextLayout, TextLayoutOracle, STUB_TEXT_LAYOUT_ORACLE};
 use std::sync::Arc;
 use taffy::prelude::{auto, length, AvailableSpace, TaffyTree};
@@ -74,11 +75,51 @@ pub enum Report {
     },
 }
 
+/// Effective descendant-clip geometry captured by resolution for the spatial
+/// read tier. Paint and query therefore consume the same clip decision without
+/// querying authored state or an independently pairable [`ValueView`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct ResolvedContentClip {
+    pub(crate) corner_radius: RectangularCornerRadius,
+    pub(crate) corner_smoothing: CornerSmoothing,
+}
+
+const NO_QUERY_CLIP: u32 = u32::MAX;
+const NO_QUERY_NODE: u32 = u32::MAX;
+
+/// Compact immutable traversal state needed by the narrowphase. Child order,
+/// transparent-select behavior, and effective clipping are frame outputs, not
+/// late reads from a possibly newer or differently evaluated document.
+///
+/// Children and clips live in frame-owned flat pools. Keeping only offsets in
+/// this per-slot column avoids one heap-owning `Vec` and one full corner record
+/// for every node while preserving a self-contained query snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ResolvedQueryNode {
+    children_start: u32,
+    children_len: u32,
+    content_clip: u32,
+    pub(crate) box_is_derived: bool,
+}
+
+const UNRESOLVED_QUERY_NODE: ResolvedQueryNode = ResolvedQueryNode {
+    children_start: NO_QUERY_NODE,
+    children_len: 0,
+    content_clip: NO_QUERY_CLIP,
+    box_is_derived: false,
+};
+
+pub(crate) struct ResolvedQueryNodeView<'a> {
+    pub(crate) children: &'a [NodeId],
+    pub(crate) box_is_derived: bool,
+    pub(crate) content_clip: Option<ResolvedContentClip>,
+}
+
 /// The resolved tier is **SOA**: index-aligned columns over the node
 /// arena (`NodeId` = index), written once per resolve, read every frame
 /// by paint/HUD/pick — the hot half of the hot/cold split (cold intent
 /// stays AoS in the arena). `None` = not resolved (hidden subtree).
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Resolved {
     /// Unrotated box in parent space (derived kinds: the placed union box).
     pub(crate) box_in_parent: Vec<Option<RectF>>,
@@ -91,6 +132,13 @@ pub struct Resolved {
     /// Box-mapped path commands and bounds, quantized once for every internal
     /// consumer while retaining the validated unit-reference source.
     pub(crate) resolved_paths: Vec<Option<Arc<ResolvedPathArtifact>>>,
+    /// Root and per-node traversal facts for the spatial narrowphase. These
+    /// snapshot the exact structure and effective clip state used by this
+    /// resolution, so query never pairs the hot columns with another view.
+    pub(crate) query_root: Option<NodeId>,
+    pub(crate) query_nodes: Vec<ResolvedQueryNode>,
+    pub(crate) query_children: Vec<NodeId>,
+    pub(crate) query_clips: Vec<ResolvedContentClip>,
     pub reports: Vec<Report>,
 }
 
@@ -103,6 +151,10 @@ impl Resolved {
             world_aabb: vec![None; cap],
             text_layouts: vec![None; cap],
             resolved_paths: vec![None; cap],
+            query_root: None,
+            query_nodes: vec![UNRESOLVED_QUERY_NODE; cap],
+            query_children: Vec::with_capacity(cap.saturating_sub(1)),
+            query_clips: Vec::new(),
             reports: Vec::new(),
         }
     }
@@ -147,6 +199,72 @@ impl Resolved {
     pub fn resolved_path_opt(&self, id: NodeId) -> Option<&Arc<ResolvedPathArtifact>> {
         self.resolved_paths.get(id as usize)?.as_ref()
     }
+    pub(crate) fn query_root(&self) -> Option<NodeId> {
+        self.query_root
+    }
+    pub(crate) fn query_node_opt(&self, id: NodeId) -> Option<ResolvedQueryNodeView<'_>> {
+        let node = self.query_nodes.get(id as usize)?;
+        if node.children_start == NO_QUERY_NODE {
+            return None;
+        }
+        let start = node.children_start as usize;
+        let end = start + node.children_len as usize;
+        let content_clip = (node.content_clip != NO_QUERY_CLIP)
+            .then(|| self.query_clips[node.content_clip as usize]);
+        Some(ResolvedQueryNodeView {
+            children: &self.query_children[start..end],
+            box_is_derived: node.box_is_derived,
+            content_clip,
+        })
+    }
+    /// Bit-exact equality of the resolved spatial traversal/clip snapshot.
+    /// Kept as a closed comparison so downstream determinism oracles do not
+    /// need access to the private narrowphase representation.
+    pub fn query_snapshot_bits_eq(&self, other: &Resolved) -> bool {
+        fn scalar(a: f32, b: f32) -> bool {
+            a.to_bits() == b.to_bits()
+        }
+        fn clip(a: ResolvedContentClip, b: ResolvedContentClip) -> bool {
+            let a_radii = [
+                a.corner_radius.tl.rx,
+                a.corner_radius.tl.ry,
+                a.corner_radius.tr.rx,
+                a.corner_radius.tr.ry,
+                a.corner_radius.br.rx,
+                a.corner_radius.br.ry,
+                a.corner_radius.bl.rx,
+                a.corner_radius.bl.ry,
+                a.corner_smoothing.value(),
+            ];
+            let b_radii = [
+                b.corner_radius.tl.rx,
+                b.corner_radius.tl.ry,
+                b.corner_radius.tr.rx,
+                b.corner_radius.tr.ry,
+                b.corner_radius.br.rx,
+                b.corner_radius.br.ry,
+                b.corner_radius.bl.rx,
+                b.corner_radius.bl.ry,
+                b.corner_smoothing.value(),
+            ];
+            a_radii.into_iter().zip(b_radii).all(|(a, b)| scalar(a, b))
+        }
+        self.query_root == other.query_root
+            && self.query_nodes.len() == other.query_nodes.len()
+            && self.query_children == other.query_children
+            && self.query_clips.len() == other.query_clips.len()
+            && self
+                .query_clips
+                .iter()
+                .copied()
+                .zip(other.query_clips.iter().copied())
+                .all(|(a, b)| clip(a, b))
+            && self
+                .query_nodes
+                .iter()
+                .zip(&other.query_nodes)
+                .all(|(a, b)| a == b)
+    }
     /// Number of slots in the resolved columns (matches the document's
     /// arena capacity) — the upper bound for a full-column walk. Distinct
     /// from [`Self::resolved_count`], which counts only the `Some` entries.
@@ -168,7 +286,7 @@ impl Resolved {
 }
 
 struct Ctx<'a> {
-    doc: &'a Document,
+    view: &'a ValueView<'a>,
     text_layout: &'a dyn TextLayoutOracle,
     opts: ResolveOptions,
     out: Resolved,
@@ -185,7 +303,7 @@ struct Ctx<'a> {
 }
 
 pub fn resolve(doc: &Document, opts: &ResolveOptions) -> Resolved {
-    resolve_with_text_layout(doc, opts, &STUB_TEXT_LAYOUT_ORACLE)
+    resolve_view(&ValueView::base(doc), opts)
 }
 
 /// Resolve with an explicit text-layout authority.
@@ -194,14 +312,33 @@ pub fn resolve_with_text_layout(
     opts: &ResolveOptions,
     text_layout: &dyn TextLayoutOracle,
 ) -> Resolved {
+    resolve_view_with_text_layout(&ValueView::base(doc), opts, text_layout)
+}
+
+/// Resolve one validated authored-plus-property view.
+pub fn resolve_view(view: &ValueView<'_>, opts: &ResolveOptions) -> Resolved {
+    resolve_view_with_text_layout(view, opts, &STUB_TEXT_LAYOUT_ORACLE)
+}
+
+/// Resolve one validated value view with an explicit text-layout authority.
+pub fn resolve_view_with_text_layout(
+    view: &ValueView<'_>,
+    opts: &ResolveOptions,
+    text_layout: &dyn TextLayoutOracle,
+) -> Resolved {
+    let doc = view.document();
+    if !view.active(doc.root) {
+        return Resolved::with_capacity(doc.capacity());
+    }
     let mut cx = Ctx {
-        doc,
+        view,
         text_layout,
         opts: *opts,
         out: Resolved::with_capacity(doc.capacity()),
         union_cache: vec![None; doc.capacity()],
         ops_cache: vec![None; doc.capacity()],
     };
+    cx.out.query_root = Some(doc.root);
     let vp = RectF {
         x: 0.0,
         y: 0.0,
@@ -285,12 +422,12 @@ pub fn resolve_with_text_layout(
 /// Resolved extent of a node (its unrotated box size), independent of
 /// position. `parent_extent` is needed only by Span bindings.
 fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f32, f32) {
-    let node = cx.doc.get(id);
+    let node = cx.view.document().get(id);
 
     if node.payload.box_is_derived() {
         // width/height intents are ignored-by-rule on derived kinds (§8).
-        if !matches!(node.header.width, SizeIntent::Auto)
-            || !matches!(node.header.height, SizeIntent::Auto)
+        if !matches!(cx.view.authored_width(id), SizeIntent::Auto)
+            || !matches!(cx.view.authored_height(id), SizeIntent::Auto)
         {
             cx.out.reports.push(Report::IgnoredByRule {
                 node: id,
@@ -304,14 +441,20 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
 
     // Span owns the axis extent (§2.1); SizeIntent on a spanned axis is
     // ignored-by-rule.
-    let span_w = span_extent(id, node.header.x, parent_extent.map(|e| e.0), "x", cx);
-    let span_h = span_extent(id, node.header.y, parent_extent.map(|e| e.1), "y", cx);
+    let span_w = span_extent(id, cx.view.x(id), parent_extent.map(|e| e.0), "x", cx);
+    let span_h = span_extent(id, cx.view.y(id), parent_extent.map(|e| e.1), "y", cx);
 
+    let is_line = matches!(
+        node.payload,
+        Payload::Shape {
+            desc: ShapeDesc::Line
+        }
+    );
     let mut w = span_w;
-    let mut h = span_h;
-    let text_auto_height = h.is_none()
-        && matches!(node.header.height, SizeIntent::Auto)
-        && node.payload.as_text().is_some();
+    let mut h = if is_line { Some(0.0) } else { span_h };
+    let text_auto_height = node.payload.as_text().is_some()
+        && h.is_none()
+        && matches!(cx.view.height_unchecked(id), SizeIntent::Auto);
 
     if w.is_none() {
         w = intent_extent_x(id, cx);
@@ -321,7 +464,15 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
     }
 
     // aspect_ratio resolves an under-specified axis only (G-5).
-    if let Some((ar_w, ar_h)) = node.header.aspect_ratio {
+    let aspect_ratio = matches!(
+        node.payload,
+        Payload::Shape {
+            desc: ShapeDesc::Rect | ShapeDesc::Ellipse | ShapeDesc::Path(_)
+        }
+    )
+    .then(|| cx.view.aspect_ratio_unchecked(id))
+    .flatten();
+    if let Some((ar_w, ar_h)) = aspect_ratio {
         if ar_w > 0.0 && ar_h > 0.0 {
             match (w, h) {
                 (Some(wv), None) => h = Some(wv * ar_h / ar_w),
@@ -347,17 +498,17 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
         id,
         "width",
         wv,
-        node.header.min_width,
-        node.header.max_width,
+        cx.view.min_width_unchecked(id),
+        cx.view.max_width_unchecked(id),
         cx,
     );
     if text_auto_height {
-        let node = cx.doc.get(id);
+        let node = cx.view.document().get(id);
         let Some(text) = node.payload.as_text() else {
             unreachable!("text_auto_height is set only for text")
         };
         let wrap_width = if span_w.is_some()
-            || matches!(node.header.width, SizeIntent::Fixed(_))
+            || matches!(cx.view.width_unchecked(id), SizeIntent::Fixed(_))
             || width_before_clamp.is_some_and(|before| wv < before)
         {
             Some(wv)
@@ -381,14 +532,16 @@ fn extent_of(id: NodeId, parent_extent: Option<(f32, f32)>, cx: &mut Ctx) -> (f3
 
     // Height clamps apply after any width-driven text re-measure. Min beats
     // max on both axes (G-4 declared rule).
-    hv = clamp_axis(
-        id,
-        "height",
-        hv,
-        node.header.min_height,
-        node.header.max_height,
-        cx,
-    );
+    if !is_line {
+        hv = clamp_axis(
+            id,
+            "height",
+            hv,
+            cx.view.min_height_unchecked(id),
+            cx.view.max_height_unchecked(id),
+            cx,
+        );
+    }
     (wv, hv)
 }
 
@@ -455,8 +608,8 @@ fn span_extent(
 
 /// Natural width per kind, None when the kind has no natural width.
 fn intent_extent_x(id: NodeId, cx: &mut Ctx) -> Option<f32> {
-    let node = cx.doc.get(id);
-    match node.header.width {
+    let node = cx.view.document().get(id);
+    match cx.view.width_unchecked(id) {
         SizeIntent::Fixed(v) => Some(v),
         SizeIntent::Auto => match &node.payload {
             payload if payload.as_text().is_some() => Some(
@@ -473,8 +626,8 @@ fn intent_extent_x(id: NodeId, cx: &mut Ctx) -> Option<f32> {
 /// Natural height per kind. Auto-height text is deliberately absent here: it
 /// remeasures after final width constraints in [`extent_of`].
 fn intent_extent_y(id: NodeId, cx: &mut Ctx) -> Option<f32> {
-    let node = cx.doc.get(id);
-    match node.header.height {
+    let node = cx.view.document().get(id);
+    match cx.view.height_unchecked(id) {
         SizeIntent::Fixed(v) => Some(v),
         SizeIntent::Auto => match &node.payload {
             Payload::Frame { .. } => Some(hug_size(id, cx).1),
@@ -485,18 +638,15 @@ fn intent_extent_y(id: NodeId, cx: &mut Ctx) -> Option<f32> {
 
 /// Hug (frame + Auto): the frame's natural content size (L-E1: padding box).
 fn hug_size(id: NodeId, cx: &mut Ctx) -> (f32, f32) {
-    let node = cx.doc.get(id);
-    let layout = match &node.payload {
-        Payload::Frame { layout, .. } => *layout,
-        _ => unreachable!("hug_size on non-frame"),
-    };
+    let node = cx.view.document().get(id);
+    let layout = cx.view.layout(id);
     match layout.mode {
         LayoutMode::Flex => {
-            let definite_w = match node.header.width {
+            let definite_w = match cx.view.width_unchecked(id) {
                 SizeIntent::Fixed(v) => Some(v),
                 SizeIntent::Auto => None,
             };
-            let definite_h = match node.header.height {
+            let definite_h = match cx.view.height_unchecked(id) {
                 SizeIntent::Fixed(v) => Some(v),
                 SizeIntent::Auto => None,
             };
@@ -512,11 +662,11 @@ fn hug_size(id: NodeId, cx: &mut Ctx) -> (f32, f32) {
             let mut max_x: f32 = 0.0;
             let mut max_y: f32 = 0.0;
             for child_id in children {
-                if !cx.doc.get(child_id).header.active {
+                if !cx.view.active(child_id) {
                     continue;
                 }
                 let (cw, ch) = extent_of(child_id, None, cx);
-                let is_derived = cx.doc.get(child_id).payload.box_is_derived();
+                let is_derived = cx.view.document().get(child_id).payload.box_is_derived();
                 let u = if is_derived {
                     cx.union_cache[child_id as usize].unwrap_or(RectF::EMPTY)
                 } else {
@@ -527,9 +677,8 @@ fn hug_size(id: NodeId, cx: &mut Ctx) -> (f32, f32) {
                         h: ch,
                     }
                 };
-                let child = cx.doc.get(child_id);
-                let ox = start_offset_or_report(child_id, child.header.x, "x", cx);
-                let oy = start_offset_or_report(child_id, child.header.y, "y", cx);
+                let ox = start_offset_or_report(child_id, cx.view.x(child_id), "x", cx);
+                let oy = start_offset_or_report(child_id, cx.view.y(child_id), "y", cx);
                 let aabb = if cx.opts.rotation_in_flow == RotationInFlow::VisualOnly {
                     // V-3 (dec0-visual-only.md): CSS-pure hug — measurement
                     // ignores rotation/flips; the child contributes its
@@ -545,8 +694,8 @@ fn hug_size(id: NodeId, cx: &mut Ctx) -> (f32, f32) {
                     // child's own pivot (census fix: derived kinds pivot at
                     // the origin, not the box center), composition mirroring
                     // commit exactly (flip included).
-                    let theta = child.header.rotation;
-                    let (cfx, cfy) = (child.header.flip_x, child.header.flip_y);
+                    let theta = cx.view.rotation(child_id);
+                    let (cfx, cfy) = (cx.view.flip_x(child_id), cx.view.flip_y(child_id));
                     let local = if is_derived {
                         Affine::translate(ox, oy)
                             .then(&Affine::rotate_deg(theta))
@@ -603,10 +752,10 @@ fn start_offset_or_report(
 /// writes re-target (ops::set_x works in deltas).
 fn place_by_bindings(id: NodeId, parent_extent: (f32, f32), cx: &mut Ctx) -> RectF {
     let (w, h) = extent_of(id, Some(parent_extent), cx);
-    let node = cx.doc.get(id);
+    let node = cx.view.document().get(id);
     if node.payload.box_is_derived() {
         let u = cx.union_cache[id as usize].unwrap_or(RectF::EMPTY);
-        let ox = match node.header.x {
+        let ox = match cx.view.x(id) {
             AxisBinding::Pin {
                 anchor: AnchorEdge::Start,
                 offset,
@@ -628,7 +777,7 @@ fn place_by_bindings(id: NodeId, parent_extent: (f32, f32), cx: &mut Ctx) -> Rec
                 start
             }
         };
-        let oy = match node.header.y {
+        let oy = match cx.view.y(id) {
             AxisBinding::Pin {
                 anchor: AnchorEdge::Start,
                 offset,
@@ -658,7 +807,7 @@ fn place_by_bindings(id: NodeId, parent_extent: (f32, f32), cx: &mut Ctx) -> Rec
             h,
         };
     }
-    let x = match node.header.x {
+    let x = match cx.view.x(id) {
         AxisBinding::Pin {
             anchor: AnchorEdge::Start,
             offset,
@@ -673,7 +822,7 @@ fn place_by_bindings(id: NodeId, parent_extent: (f32, f32), cx: &mut Ctx) -> Rec
         } => (parent_extent.0 - w) / 2.0 + offset,
         AxisBinding::Span { start, .. } => start,
     };
-    let y = match node.header.y {
+    let y = match cx.view.y(id) {
         AxisBinding::Pin {
             anchor: AnchorEdge::Start,
             offset,
@@ -701,10 +850,10 @@ fn union_of_derived(id: NodeId, cx: &mut Ctx) -> RectF {
     if let Some(u) = cx.union_cache[id as usize] {
         return u;
     }
-    let children: Vec<NodeId> = cx.doc.get(id).children.clone();
+    let children: Vec<NodeId> = cx.view.document().get(id).children.clone();
     let mut union: Option<RectF> = None;
     for child_id in children {
-        if !cx.doc.get(child_id).header.active {
+        if !cx.view.active(child_id) {
             continue;
         }
         // Children of derived-box parents resolve against no extent:
@@ -712,15 +861,14 @@ fn union_of_derived(id: NodeId, cx: &mut Ctx) -> RectF {
         let (cw, ch) = extent_of(child_id, None, cx);
         // Derived children: pins place the ORIGIN; the box = origin + own
         // union offset (census fix: nested unions must not swallow it).
-        let derived_off = if cx.doc.get(child_id).payload.box_is_derived() {
+        let derived_off = if cx.view.document().get(child_id).payload.box_is_derived() {
             let u = cx.union_cache[child_id as usize].unwrap_or(RectF::EMPTY);
             (u.x, u.y)
         } else {
             (0.0, 0.0)
         };
-        let child = cx.doc.get(child_id);
-        let ox = start_offset_or_report(child_id, child.header.x, "x", cx) + derived_off.0;
-        let oy = start_offset_or_report(child_id, child.header.y, "y", cx) + derived_off.1;
+        let ox = start_offset_or_report(child_id, cx.view.x(child_id), "x", cx) + derived_off.0;
+        let oy = start_offset_or_report(child_id, cx.view.y(child_id), "y", cx) + derived_off.1;
         let child_box = RectF {
             x: ox,
             y: oy,
@@ -792,9 +940,44 @@ fn fold_lens_ops(ops: &[LensOp], u: RectF) -> Affine {
 /// `box_rect` is the node's unrotated box in parent space (derived kinds:
 /// where the union box lands).
 fn commit(id: NodeId, box_rect: RectF, cx: &mut Ctx) {
-    let node = cx.doc.get(id);
-    let theta = node.header.rotation;
-    let (fx, fy) = (node.header.flip_x, node.header.flip_y);
+    let node = cx.view.document().get(id);
+    let theta = cx.view.rotation(id);
+    let (fx, fy) = (cx.view.flip_x(id), cx.view.flip_y(id));
+
+    let content_clip = if matches!(node.payload, Payload::Frame { .. }) && cx.view.clips_content(id)
+    {
+        Some(ResolvedContentClip {
+            corner_radius: cx.view.corner_radius(id),
+            corner_smoothing: cx.view.corner_smoothing_unchecked(id),
+        })
+    } else {
+        None
+    };
+    let children_start = u32::try_from(cx.out.query_children.len())
+        .expect("resolved query child pool exceeds the NodeId address space");
+    assert_ne!(
+        children_start, NO_QUERY_NODE,
+        "resolved query child pool exhausted"
+    );
+    let children_len = u32::try_from(node.children.len())
+        .expect("one resolved node has more children than NodeId can address");
+    cx.out.query_children.extend_from_slice(&node.children);
+    let content_clip = match content_clip {
+        Some(clip) => {
+            let index = u32::try_from(cx.out.query_clips.len())
+                .expect("resolved query clip pool exceeds the NodeId address space");
+            assert_ne!(index, NO_QUERY_CLIP, "resolved query clip pool exhausted");
+            cx.out.query_clips.push(clip);
+            index
+        }
+        None => NO_QUERY_CLIP,
+    };
+    cx.out.query_nodes[id as usize] = ResolvedQueryNode {
+        children_start,
+        children_len,
+        box_is_derived: node.payload.box_is_derived(),
+        content_clip,
+    };
 
     let local = if node.payload.box_is_derived() {
         // Pivot = the node's own local origin (§5); the origin is recovered
@@ -833,8 +1016,8 @@ fn commit(id: NodeId, box_rect: RectF, cx: &mut Ctx) {
         Derived,
         Leaf,
     }
-    let child_program = match &cx.doc.get(id).payload {
-        Payload::Frame { layout, .. } => ChildProgram::Frame(*layout),
+    let child_program = match &cx.view.document().get(id).payload {
+        Payload::Frame { .. } => ChildProgram::Frame(cx.view.layout(id)),
         Payload::Shape { .. } => ChildProgram::Free,
         Payload::Group | Payload::Lens { .. } => ChildProgram::Derived,
         Payload::Text { .. } | Payload::AttributedText { .. } => ChildProgram::Leaf,
@@ -848,7 +1031,7 @@ fn commit(id: NodeId, box_rect: RectF, cx: &mut Ctx) {
         }
         ChildProgram::Derived => {}
         ChildProgram::Leaf => {
-            if !cx.doc.get(id).children.is_empty() {
+            if !cx.view.document().get(id).children.is_empty() {
                 cx.out.reports.push(Report::ErrorByRule {
                     node: id,
                     field: "children",
@@ -863,11 +1046,11 @@ fn layout_frame_children(id: NodeId, layout: LayoutBehavior, extent: (f32, f32),
     match layout.mode {
         LayoutMode::None => layout_free_children(id, extent, layout.padding, cx),
         LayoutMode::Flex => {
-            let children: Vec<NodeId> = cx.doc.get(id).children.clone();
+            let children: Vec<NodeId> = cx.view.document().get(id).children.clone();
             let out = flex_layout(id, layout, (Some(extent.0), Some(extent.1)), cx);
             for (child_id, slot, basis) in out.slots {
-                let child = cx.doc.get(child_id);
-                let theta = child.header.rotation;
+                let child = cx.view.document().get(child_id);
+                let theta = cx.view.rotation(child_id);
                 let rotated = theta.rem_euclid(360.0) != 0.0;
                 let is_derived = child.payload.box_is_derived();
                 let b = if is_derived {
@@ -880,7 +1063,10 @@ fn layout_frame_children(id: NodeId, layout: LayoutBehavior, extent: (f32, f32),
                         // Post-transform union center (R·F — same composition
                         // as commit) lands on the slot center.
                         let d = Affine::rotate_deg(theta)
-                            .then(&Affine::flip(child.header.flip_x, child.header.flip_y))
+                            .then(&Affine::flip(
+                                cx.view.flip_x(child_id),
+                                cx.view.flip_y(child_id),
+                            ))
                             .apply((u.x + u.w / 2.0, u.y + u.h / 2.0));
                         RectF {
                             x: scx - d.0 + u.x,
@@ -915,8 +1101,7 @@ fn layout_frame_children(id: NodeId, layout: LayoutBehavior, extent: (f32, f32),
             // Absolute children: excluded from flow, resolve against the
             // parent box (L-4).
             for child_id in children {
-                let child = cx.doc.get(child_id);
-                if !child.header.active || child.header.flow != Flow::Absolute {
+                if !cx.view.active(child_id) || cx.view.flow(child_id) != Flow::Absolute {
                     continue;
                 }
                 let b = place_by_bindings(child_id, extent, cx);
@@ -936,9 +1121,9 @@ fn layout_free_children(id: NodeId, extent: (f32, f32), padding: EdgeInsets, cx:
         (extent.0 - padding.left - padding.right).max(0.0),
         (extent.1 - padding.top - padding.bottom).max(0.0),
     );
-    let children: Vec<NodeId> = cx.doc.get(id).children.clone();
+    let children: Vec<NodeId> = cx.view.document().get(id).children.clone();
     for child_id in children {
-        if !cx.doc.get(child_id).header.active {
+        if !cx.view.active(child_id) {
             continue;
         }
         report_flow_fields_inert(child_id, cx);
@@ -952,15 +1137,14 @@ fn layout_free_children(id: NodeId, extent: (f32, f32), padding: EdgeInsets, cx:
 /// §8: x/y and grow/self_align are inert outside their contexts — report
 /// non-default values so tests can assert the matrix is enforced.
 fn report_flow_fields_inert(id: NodeId, cx: &mut Ctx) {
-    let h = &cx.doc.get(id).header;
-    if h.grow != 0.0 {
+    if cx.view.grow(id) != 0.0 {
         cx.out.reports.push(Report::IgnoredByRule {
             node: id,
             field: "grow",
             rule: "no layout parent",
         });
     }
-    if h.self_align != SelfAlign::Auto {
+    if cx.view.self_align(id) != SelfAlign::Auto {
         cx.out.reports.push(Report::IgnoredByRule {
             node: id,
             field: "self_align",
@@ -987,7 +1171,7 @@ fn flex_layout(
     definite: (Option<f32>, Option<f32>),
     cx: &mut Ctx,
 ) -> FlexOut {
-    let children: Vec<NodeId> = cx.doc.get(id).children.clone();
+    let children: Vec<NodeId> = cx.view.document().get(id).children.clone();
 
     let mut tree: TaffyTree<TextCtx> = TaffyTree::new();
     // L-7 (declared POL): resolution is unquantized; pixel snapping is a
@@ -1008,19 +1192,21 @@ fn flex_layout(
     let mut entries: Vec<(NodeId, taffy::NodeId, (f32, f32))> = Vec::new();
 
     for child_id in &children {
-        let child = cx.doc.get(*child_id);
-        if !child.header.active || child.header.flow == Flow::Absolute {
+        let child = cx.view.document().get(*child_id);
+        if !cx.view.active(*child_id) || cx.view.flow(*child_id) == Flow::Absolute {
             continue;
         }
         // §8: x/y are ignored-by-rule under flow (layout owns them).
-        if child.header.x != AxisBinding::default() || child.header.y != AxisBinding::default() {
+        if cx.view.x(*child_id) != AxisBinding::default()
+            || cx.view.y(*child_id) != AxisBinding::default()
+        {
             cx.out.reports.push(Report::IgnoredByRule {
                 node: *child_id,
                 field: "x/y",
                 rule: "in-flow under flex: layout owns position",
             });
         }
-        let theta = child.header.rotation;
+        let theta = cx.view.rotation(*child_id);
         let rotated = theta.rem_euclid(360.0) != 0.0;
         let contribute_aabb =
             rotated && cx.opts.rotation_in_flow == RotationInFlow::AabbParticipates;
@@ -1029,11 +1215,11 @@ fn flex_layout(
             // leaf display: taffy default (flex); Block distorts intrinsic sizing
             flex_shrink: 0.0, // X-SELF-8: canvas items don't shrink implicitly
             flex_grow: if main_is_definite {
-                child.header.grow
+                cx.view.grow(*child_id)
             } else {
                 0.0
             },
-            align_self: match child.header.self_align {
+            align_self: match cx.view.self_align(*child_id) {
                 SelfAlign::Auto => None,
                 SelfAlign::Start => Some(AlignSelf::Start),
                 SelfAlign::Center => Some(AlignSelf::Center),
@@ -1042,17 +1228,30 @@ fn flex_layout(
             },
             ..Style::default()
         };
-        if let Some(v) = child.header.min_width {
-            style.min_size.width = length(v);
-        }
-        if let Some(v) = child.header.max_width {
-            style.max_size.width = length(v);
-        }
-        if let Some(v) = child.header.min_height {
-            style.min_size.height = length(v);
-        }
-        if let Some(v) = child.header.max_height {
-            style.max_size.height = length(v);
+        let box_is_derived = child.payload.box_is_derived();
+        let is_line = matches!(
+            child.payload,
+            Payload::Shape {
+                desc: ShapeDesc::Line
+            }
+        );
+        if !box_is_derived {
+            if let Some(v) = cx.view.min_width_unchecked(*child_id) {
+                style.min_size.width = length(v);
+            }
+            if let Some(v) = cx.view.max_width_unchecked(*child_id) {
+                style.max_size.width = length(v);
+            }
+            // Line height is geometry-locked to zero, so height constraints
+            // are not registered properties for that kind.
+            if !is_line {
+                if let Some(v) = cx.view.min_height_unchecked(*child_id) {
+                    style.min_size.height = length(v);
+                }
+                if let Some(v) = cx.view.max_height_unchecked(*child_id) {
+                    style.max_size.height = length(v);
+                }
+            }
         }
 
         let is_text = child.payload.as_text().is_some();
@@ -1069,18 +1268,18 @@ fn flex_layout(
             // Measured kind: taffy drives re-measure at layout-imposed
             // extents (L-5) through the measure closure.
             let text_payload = child.payload.clone();
-            match child.header.width {
+            match cx.view.width_unchecked(*child_id) {
                 SizeIntent::Fixed(v) => style.size.width = length(v),
                 SizeIntent::Auto => style.size.width = auto(),
             }
-            match child.header.height {
+            match cx.view.height_unchecked(*child_id) {
                 SizeIntent::Fixed(v) => style.size.height = length(v),
                 SizeIntent::Auto => style.size.height = auto(),
             }
             // Per-child stretch is an explicit cross-axis fill override, even
             // when text authored a fixed cross size. Container-level stretch
             // still applies only to the Auto values left above.
-            if child.header.self_align == SelfAlign::Stretch {
+            if cx.view.self_align(*child_id) == SelfAlign::Stretch {
                 match layout.direction {
                     Direction::Row => style.size.height = auto(),
                     Direction::Column => style.size.width = auto(),
@@ -1095,29 +1294,29 @@ fn flex_layout(
             style.size.width = length(b.0);
             style.size.height = length(b.1);
             // An explicit per-child stretch overrides even a fixed cross size.
-            // Container-level stretch applies only when the authored cross
+            // Container-level stretch applies only when the effective cross
             // size remains Auto; retaining the resolved basis as Definite here
-            // would erase that authored intent before Taffy sees it.
-            let authored_cross_is_auto = match layout.direction {
-                Direction::Row => matches!(child.header.height, SizeIntent::Auto),
-                Direction::Column => matches!(child.header.width, SizeIntent::Auto),
-            };
+            // would erase that effective intent before Taffy sees it.
             // A line's vertical extent is geometry, not a flex-owned box
             // axis. Even explicit self-stretch cannot turn its locked zero
             // height into a non-degenerate paint box in a row container.
-            let line_height_is_locked = layout.direction == Direction::Row
-                && matches!(
-                    &child.payload,
-                    Payload::Shape {
-                        desc: ShapeDesc::Line
+            let line_height_is_locked = layout.direction == Direction::Row && is_line;
+            let cross_is_auto = !box_is_derived
+                && match layout.direction {
+                    Direction::Row if line_height_is_locked => false,
+                    Direction::Row => {
+                        matches!(cx.view.height_unchecked(*child_id), SizeIntent::Auto)
                     }
-                );
+                    Direction::Column => {
+                        matches!(cx.view.width_unchecked(*child_id), SizeIntent::Auto)
+                    }
+                };
             let stretches_cross = !line_height_is_locked
-                && (child.header.self_align == SelfAlign::Stretch
-                    || (!child.payload.box_is_derived()
-                        && child.header.self_align == SelfAlign::Auto
+                && (cx.view.self_align(*child_id) == SelfAlign::Stretch
+                    || (!box_is_derived
+                        && cx.view.self_align(*child_id) == SelfAlign::Auto
                         && layout.cross_align == CrossAlign::Stretch
-                        && authored_cross_is_auto));
+                        && cross_is_auto));
             if stretches_cross {
                 match layout.direction {
                     Direction::Row => style.size.height = auto(),
@@ -1268,7 +1467,7 @@ fn compose_world(id: NodeId, parent_world: Affine, cx: &mut Ctx) {
         Some(ops) => world.then(&ops),
         None => world,
     };
-    let children: Vec<NodeId> = cx.doc.get(id).children.clone();
+    let children: Vec<NodeId> = cx.view.document().get(id).children.clone();
     for c in children {
         if cx.out.local[c as usize].is_some() {
             compose_world(c, child_basis, cx);
@@ -1297,7 +1496,10 @@ impl StrokeOutsets {
 /// coordinates. Layout remains based on the source box; only visual bounds
 /// read this expansion. Repeated stroke geometries overlap independently, so
 /// each edge takes their maximum outward reach rather than summing widths.
-fn effective_stroke_outsets(node: &Node) -> StrokeOutsets {
+fn effective_stroke_outsets(id: NodeId, node: &Node, view: &ValueView<'_>) -> StrokeOutsets {
+    if matches!(node.payload, Payload::Group | Payload::Lens { .. }) {
+        return StrokeOutsets::default();
+    }
     let is_line = matches!(
         &node.payload,
         Payload::Shape {
@@ -1311,10 +1513,21 @@ fn effective_stroke_outsets(node: &Node) -> StrokeOutsets {
         }
     );
     let mut outsets = StrokeOutsets::default();
-    for stroke in node
-        .strokes
+    let corner_smoothing = if matches!(
+        node.payload,
+        Payload::Frame { .. }
+            | Payload::Shape {
+                desc: ShapeDesc::Rect
+            }
+    ) {
+        view.corner_smoothing_unchecked(id)
+    } else {
+        CornerSmoothing::default()
+    };
+    for stroke in view
+        .strokes_unchecked(id)
         .iter()
-        .filter(|stroke| stroke.renderable_for(&node.payload, node.corner_smoothing))
+        .filter(|stroke| stroke.renderable_for(&node.payload, corner_smoothing))
     {
         let widths = stroke.width.rectangular();
         let mut factor = if is_line {
@@ -1357,11 +1570,11 @@ fn intersect_aabbs(a: RectF, b: RectF) -> Option<RectF> {
 }
 
 fn compute_world_aabb(id: NodeId, cx: &mut Ctx) -> Option<RectF> {
-    let node = cx.doc.get(id);
+    let node = cx.view.document().get(id);
     cx.out.world[id as usize]?; // hidden subtree
     let world = cx.out.world[id as usize].unwrap();
     let own_box = cx.out.box_in_parent[id as usize].unwrap();
-    let stroke_outsets = effective_stroke_outsets(node);
+    let stroke_outsets = effective_stroke_outsets(id, node, cx.view);
     // Text owns glyph ink, not its assigned layout box. The layout box still
     // drives placement and paint-coordinate normalization, while visual
     // bounds begin at the oracle's base ink and expand by the same authored
@@ -1409,22 +1622,16 @@ fn compute_world_aabb(id: NodeId, cx: &mut Ctx) -> Option<RectF> {
     // conservative over-approximation of pixels that can actually survive.
     // A rotated clip remains conservative here; exact polygon clipping is a
     // pick/narrowphase responsibility.
-    let child_clip = matches!(
-        &node.payload,
-        Payload::Frame {
-            clips_content: true,
-            ..
-        }
-    )
-    .then(|| {
-        RectF {
-            x: 0.0,
-            y: 0.0,
-            w: own_box.w,
-            h: own_box.h,
-        }
-        .transformed_aabb(&world)
-    });
+    let child_clip = (matches!(&node.payload, Payload::Frame { .. }) && cx.view.clips_content(id))
+        .then(|| {
+            RectF {
+                x: 0.0,
+                y: 0.0,
+                w: own_box.w,
+                h: own_box.h,
+            }
+            .transformed_aabb(&world)
+        });
     let children: Vec<NodeId> = node.children.clone();
     for c in children {
         let child_aabb = compute_world_aabb(c, cx).and_then(|bounds| {

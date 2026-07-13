@@ -9,7 +9,7 @@
 //! approximate candidates but never changes what gets selected.
 
 use anchor_lab::math::RectF;
-use anchor_lab::model::{Document, NodeId};
+use anchor_lab::model::NodeId;
 use anchor_lab::resolve::Resolved;
 
 /// The spatial read tier — the one door for point-hit, marquee, and cull.
@@ -19,19 +19,19 @@ use anchor_lab::resolve::Resolved;
 /// narrowphase [`anchor_lab::pick`], never here — an index may over-
 /// approximate candidates but never changes what is selected.
 pub struct Query<'a> {
-    pub doc: &'a Document,
     pub resolved: &'a Resolved,
 }
 
 impl<'a> Query<'a> {
-    pub fn new(doc: &'a Document, resolved: &'a Resolved) -> Self {
-        Query { doc, resolved }
+    /// Build the spatial read tier from its complete immutable input.
+    pub fn new(resolved: &'a Resolved) -> Self {
+        Query { resolved }
     }
 
     /// Topmost node under a world point — delegates the narrowphase, so what
     /// gets selected is defined in one place (`pick`), not re-derived here.
     pub fn hit_point(&self, x: f32, y: f32) -> Option<NodeId> {
-        anchor_lab::pick::pick(self.doc, self.resolved, x, y)
+        anchor_lab::pick::pick(self.resolved, x, y)
     }
 
     /// Nodes whose world AABB overlaps `rect` — marquee candidates. Over-

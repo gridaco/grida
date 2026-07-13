@@ -133,12 +133,12 @@ fn pick_is_oriented_not_aabb() {
 
     // box center always hits
     let (cx, cy) = (260.0, 212.0);
-    assert_eq!(pick(&doc, &r, cx, cy), Some(id));
+    assert_eq!(pick(&r, cx, cy), Some(id));
     // a point inside the AABB but OUTSIDE the oriented box must miss
     // (thin 45deg bar: the AABB corner region is empty space)
     let aabb = r.aabb_of(id);
     let corner = (aabb.x + 4.0, aabb.y + 4.0);
-    assert_eq!(pick(&doc, &r, corner.0, corner.1), Some(doc.root));
+    assert_eq!(pick(&r, corner.0, corner.1), Some(doc.root));
 }
 
 #[test]
@@ -151,9 +151,9 @@ fn pick_topmost_wins() {
     let doc = b.build();
     let r = resolve(&doc, &opts());
     // overlap region: later sibling paints on top and wins the pick
-    assert_eq!(pick(&doc, &r, 175.0, 175.0), Some(over));
+    assert_eq!(pick(&r, 175.0, 175.0), Some(over));
     // non-overlapped part of the lower one still hits it
-    assert_eq!(pick(&doc, &r, 110.0, 110.0), Some(under));
+    assert_eq!(pick(&r, 110.0, 110.0), Some(under));
 }
 
 #[test]
@@ -171,7 +171,7 @@ fn pick_promotes_to_outermost_group() {
     let r = resolve(&doc, &opts());
     let _ = (inner, leaf);
     // clicking the leaf's ink selects the OUTERMOST group
-    assert_eq!(pick(&doc, &r, 120.0, 120.0), Some(outer));
+    assert_eq!(pick(&r, 120.0, 120.0), Some(outer));
 }
 
 #[test]
@@ -193,9 +193,9 @@ fn pick_hits_lens_content_post_ops() {
     let r = resolve(&doc, &opts());
 
     // the PRE-ops position is empty space (ops moved the ink away)...
-    assert_eq!(pick(&doc, &r, 330.0, 330.0), Some(doc.root));
+    assert_eq!(pick(&r, 330.0, 330.0), Some(doc.root));
     // ...the POST-ops position hits, and promotes to the lens
-    assert_eq!(pick(&doc, &r, 530.0, 330.0), Some(l));
+    assert_eq!(pick(&r, 530.0, 330.0), Some(l));
 }
 
 #[test]
@@ -212,7 +212,7 @@ fn pick_hairline_line_is_grabbable() {
     );
     let doc = b.build();
     let r = resolve(&doc, &opts());
-    assert_eq!(pick(&doc, &r, 180.0, 401.5), Some(line));
+    assert_eq!(pick(&r, 180.0, 401.5), Some(line));
 }
 
 #[test]
@@ -236,14 +236,14 @@ fn pick_respects_the_exact_transformed_clip_of_every_ancestor() {
 
     let inside_clip = r.world_of(child).apply((10.0, 10.0));
     assert_eq!(
-        pick(&doc, &r, inside_clip.0, inside_clip.1),
+        pick(&r, inside_clip.0, inside_clip.1),
         Some(child),
         "the visible part of the child remains pickable"
     );
 
     let outside_clip = r.world_of(child).apply((30.0, 10.0));
     assert_eq!(
-        pick(&doc, &r, outside_clip.0, outside_clip.1),
+        pick(&r, outside_clip.0, outside_clip.1),
         Some(doc.root),
         "the child is not pickable through its rotated ancestor clip"
     );

@@ -15,9 +15,57 @@ use crate::math::Affine;
 pub use crate::path::FillRule;
 use crate::path::PathArtifact;
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 pub type NodeId = u32;
+
+static NEXT_ARENA_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Process-local identity of one concrete document arena.
+///
+/// This is a runtime storage fact, not authored document identity and never a
+/// serialized value. A document clone receives a fresh arena id so keys cannot
+/// be carried into a clone that may subsequently diverge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ArenaId(u64);
+
+fn fresh_arena_id() -> ArenaId {
+    let id = NEXT_ARENA_ID
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+            next.checked_add(1)
+        })
+        .expect("document arena identity space exhausted");
+    ArenaId(id)
+}
+
+/// One live arena identity.
+///
+/// A bare [`NodeId`] is only a slot. `NodeKey` also carries the slot's
+/// generation, so retaining a key across deletion can never alias a later
+/// occupant of the same slot. Keys are minted and validated only by
+/// [`Document`]; their fields stay opaque so callers cannot manufacture a
+/// supposedly-live identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NodeKey {
+    arena: ArenaId,
+    id: NodeId,
+    generation: u32,
+}
+
+impl NodeKey {
+    pub fn arena(self) -> ArenaId {
+        self.arena
+    }
+
+    pub fn id(self) -> NodeId {
+        self.id
+    }
+
+    pub fn generation(self) -> u32 {
+        self.generation
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AnchorEdge {
@@ -1365,7 +1413,7 @@ pub struct Node {
 /// tier is SOA in `resolve::Resolved`). This kills the O(n) `parent_of`
 /// scan the map-based lab store had — the same defect class as the
 /// legacy engine's pointer-chasing lookups.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Document {
     slots: Vec<Option<Node>>,
     /// Parent link column, index-aligned with `slots`. Maintained by the
@@ -1374,14 +1422,28 @@ pub struct Document {
     /// Generation per slot (ENG-2.3), index-aligned with `slots`:
     /// incremented when a slot is tombstoned, so a future reused slot
     /// cannot alias a prior node's cache identity (`engine::ident::Key`).
-    /// The arena is append-only today (`add_child` asserts a fresh slot),
-    /// so every live node sits at generation 0 and the column is the
-    /// dormant guard the cache tier will key on. A storage artifact —
+    /// `add_child` accepts only a vacant slot and preserves its current
+    /// generation, so reuse creates a distinct live key. A storage artifact
     /// ignored by the semantic `PartialEq`, like tombstones.
     generations: Vec<u32>,
+    /// Runtime identity of this exact arena. Excluded from semantic equality
+    /// and refreshed by `Clone`; see [`NodeKey`].
+    arena: ArenaId,
     /// Scene root: a frame whose bindings span the viewport (a.md §3 — the
     /// InitialContainer regularized).
     pub root: NodeId,
+}
+
+impl Clone for Document {
+    fn clone(&self) -> Self {
+        Self {
+            slots: self.slots.clone(),
+            parents: self.parents.clone(),
+            generations: self.generations.clone(),
+            arena: fresh_arena_id(),
+            root: self.root,
+        }
+    }
 }
 
 /// Semantic equality: same root, same alive nodes, same parenting.
@@ -1409,6 +1471,27 @@ impl Document {
     pub fn get_opt(&self, id: NodeId) -> Option<&Node> {
         self.slots.get(id as usize).and_then(|s| s.as_ref())
     }
+
+    /// Mint a generation-stamped identity only for a currently live slot.
+    pub fn key_of(&self, id: NodeId) -> Option<NodeKey> {
+        self.get_opt(id).map(|_| NodeKey {
+            arena: self.arena,
+            id,
+            generation: self.generations[id as usize],
+        })
+    }
+
+    /// Whether `key` still identifies the same live arena occupant.
+    pub fn contains_key(&self, key: NodeKey) -> bool {
+        key.arena == self.arena
+            && self.get_opt(key.id).is_some()
+            && self.generations.get(key.id as usize).copied() == Some(key.generation)
+    }
+
+    /// Read one node only when both its slot and generation remain live.
+    pub fn node_for_key(&self, key: NodeKey) -> Option<&Node> {
+        self.contains_key(key).then(|| self.get(key.id))
+    }
     /// O(1) — the parent column, not a scan.
     pub fn parent_of(&self, id: NodeId) -> Option<NodeId> {
         self.parents.get(id as usize).copied().flatten()
@@ -1425,8 +1508,9 @@ impl Document {
         self.slots.len()
     }
 
-    /// The slot's generation (ENG-2.3) — pair with the [`NodeId`] to form
-    /// an `engine::ident::Key`. Out-of-range ids read 0.
+    /// Diagnostic/test observation of the slot's generation (ENG-2.3).
+    /// Runtime identity must be minted through [`Self::key_of`], which also
+    /// includes the arena incarnation. Out-of-range ids read 0.
     pub fn gen_of(&self, id: NodeId) -> u32 {
         self.generations.get(id as usize).copied().unwrap_or(0)
     }
@@ -1444,9 +1528,12 @@ impl Document {
     /// place a slot dies — both remove paths funnel through it, so the
     /// generation guard can never be bypassed.
     fn vacate(&mut self, id: NodeId) {
+        let next_generation = self.generations[id as usize]
+            .checked_add(1)
+            .expect("node generation space exhausted");
         self.slots[id as usize] = None;
         self.parents[id as usize] = None;
-        self.generations[id as usize] += 1;
+        self.generations[id as usize] = next_generation;
     }
 
     /// Structural insert: registers the node at `node.id` and attaches it
@@ -1460,7 +1547,10 @@ impl Document {
         );
         let id = node.id;
         self.ensure_slot(id);
-        debug_assert!(self.slots[id as usize].is_none(), "slot occupied");
+        assert!(
+            self.slots[id as usize].is_none(),
+            "cannot replace occupied node slot {id} without vacating it"
+        );
         self.slots[id as usize] = Some(node);
         self.parents[id as usize] = Some(parent);
         self.get_mut(parent).children.push(id);
@@ -1470,10 +1560,23 @@ impl Document {
     /// Structural remove: detaches `id` from its parent and tombstones the
     /// whole subtree. Returns the number of nodes removed.
     pub fn remove_subtree(&mut self, id: NodeId) -> usize {
+        self.assert_subtree_generations_available(id);
         if let Some(p) = self.parent_of(id) {
             self.get_mut(p).children.retain(|c| *c != id);
         }
         self.tombstone_rec(id)
+    }
+
+    fn assert_subtree_generations_available(&self, id: NodeId) {
+        let Some(node) = self.get_opt(id) else {
+            return;
+        };
+        self.generations[id as usize]
+            .checked_add(1)
+            .expect("node generation space exhausted");
+        for &child in &node.children {
+            self.assert_subtree_generations_available(child);
+        }
     }
     fn tombstone_rec(&mut self, id: NodeId) -> usize {
         let children = match self.get_opt(id) {
@@ -1543,6 +1646,7 @@ impl Document {
             slots,
             parents,
             generations: vec![0; cap],
+            arena: fresh_arena_id(),
             root,
         }
     }
@@ -1633,5 +1737,93 @@ impl DocBuilder {
 impl Default for DocBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::*;
+
+    #[test]
+    fn exhausted_generation_fails_before_detaching_the_subtree() {
+        let mut builder = DocBuilder::new();
+        let child = builder.add(
+            0,
+            Header::new(SizeIntent::Fixed(1.0), SizeIntent::Fixed(1.0)),
+            Payload::Shape {
+                desc: ShapeDesc::Rect,
+            },
+        );
+        let mut document = builder.build();
+        document.generations[child as usize] = u32::MAX;
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            document.remove_subtree(child);
+        }));
+        assert!(result.is_err());
+        assert!(document.get_opt(child).is_some());
+        assert_eq!(document.parent_of(child), Some(document.root));
+        assert_eq!(document.get(document.root).children, [child]);
+        assert_eq!(document.gen_of(child), u32::MAX);
+    }
+
+    #[test]
+    fn exhausted_generation_fails_before_vacating_a_single_slot() {
+        let mut builder = DocBuilder::new();
+        let child = builder.add(
+            0,
+            Header::new(SizeIntent::Fixed(1.0), SizeIntent::Fixed(1.0)),
+            Payload::Shape {
+                desc: ShapeDesc::Rect,
+            },
+        );
+        let mut document = builder.build();
+        document.generations[child as usize] = u32::MAX;
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            document.remove_slot(child);
+        }));
+        assert!(result.is_err());
+        assert!(document.get_opt(child).is_some());
+        assert_eq!(document.parent_of(child), Some(document.root));
+        assert_eq!(document.gen_of(child), u32::MAX);
+    }
+
+    #[test]
+    fn occupied_slot_insertion_fails_without_aliasing_the_retained_key() {
+        let mut builder = DocBuilder::new();
+        let child = builder.add(
+            0,
+            Header::new(SizeIntent::Fixed(1.0), SizeIntent::Fixed(2.0)),
+            Payload::Shape {
+                desc: ShapeDesc::Rect,
+            },
+        );
+        let mut document = builder.build();
+        let retained_key = document.key_of(child).unwrap();
+        let retained_node = document.get(child).clone();
+        let retained_children = document.get(document.root).children.clone();
+        let replacement = Node {
+            id: child,
+            header: Header::new(SizeIntent::Fixed(30.0), SizeIntent::Fixed(40.0)),
+            payload: Payload::Shape {
+                desc: ShapeDesc::Ellipse,
+            },
+            children: vec![],
+            corner_radius: RectangularCornerRadius::default(),
+            corner_smoothing: CornerSmoothing::default(),
+            fills: Paints::default(),
+            strokes: vec![],
+        };
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            document.add_child(document.root, replacement);
+        }));
+        assert!(result.is_err());
+        assert!(document.contains_key(retained_key));
+        assert_eq!(document.node_for_key(retained_key), Some(&retained_node));
+        assert_eq!(document.parent_of(child), Some(document.root));
+        assert_eq!(document.get(document.root).children, retained_children);
+        assert_eq!(document.gen_of(child), retained_key.generation());
     }
 }

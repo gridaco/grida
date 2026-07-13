@@ -301,14 +301,15 @@ fn run() -> Result<(), String> {
         .ok_or_else(|| "no platform-default typeface is available".to_string())?;
     let mut paint_ctx = PaintCtx::new(Some(font));
     load_image_resources(&program, &mut paint_ctx)?;
-    let (resolved, _, _) = frame::render(
+    let (product, _) = frame::render(
         surface.canvas(),
         doc,
         &options,
         &Affine::IDENTITY,
         &paint_ctx,
-    );
-    ensure_resolved_without_errors(&program, &resolved)?;
+    )
+    .map_err(|error| format!("frame construction failed: {error}"))?;
+    ensure_resolved_without_errors(&program, product.resolved())?;
 
     let image = surface.image_snapshot();
     let png = image
@@ -609,7 +610,8 @@ mod tests {
             },
             &Affine::IDENTITY,
             &ctx,
-        );
+        )
+        .expect("valid multi-source image frame");
         let pixels = read_pixels(&mut surface, 50, 20);
         let region = |x: usize| {
             (0..20)

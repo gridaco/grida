@@ -318,9 +318,9 @@ fn bad_paint_values_are_rejected_without_coercion() {
         ("<gradient kind=\"linear\"><stop offset=\"0\" color=\"#000\" visible=\"false\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "visible"),
         ("<gradient kind=\"linear\"><stop offset=\"0\" color=\"#000\" opacity=\"-0.1\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "between 0 and 1"),
         ("<gradient kind=\"linear\"><stop offset=\"0\" color=\"#000\"/></gradient>", "at least two stops"),
-        ("<gradient kind=\"linear\" from=\"0 0\" to=\"0 0\"><stop offset=\"0\" color=\"#000\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "from and to must differ"),
-        ("<gradient kind=\"linear\" from=\"0 0\" to=\"5e-324 0\"><stop offset=\"0\" color=\"#000\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "after lowering to model alignment"),
-        ("<gradient kind=\"linear\" from=\"0 0\" to=\"0.00000001 0\"><stop offset=\"0\" color=\"#000\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "after lowering to model alignment"),
+        ("<gradient kind=\"linear\" from=\"0 0\" to=\"0 0\"><stop offset=\"0\" color=\"#000\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "farther apart"),
+        ("<gradient kind=\"linear\" from=\"0 0\" to=\"5e-324 0\"><stop offset=\"0\" color=\"#000\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "farther apart"),
+        ("<gradient kind=\"linear\" from=\"0 0\" to=\"0.00000001 0\"><stop offset=\"0\" color=\"#000\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "farther apart"),
         ("<gradient kind=\"linear\" from=\"3.4028235e38 0\" to=\"0 0\"><stop offset=\"0\" color=\"#000\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "overflow after lowering"),
         ("<gradient kind=\"linear\"><stop offset=\"0.8\" color=\"#000\"/><stop offset=\"0.2\" color=\"#fff\"/></gradient>", "nondecreasing"),
         ("<gradient kind=\"radial\"><stop offset=\"-1\" color=\"#000\"/><stop offset=\"1\" color=\"#fff\"/></gradient>", "between 0 and 1"),
@@ -335,6 +335,42 @@ fn bad_paint_values_are_rejected_without_coercion() {
             "expected {expected}: {error}"
         );
     }
+}
+
+#[test]
+fn gradient_renderability_boundary_is_enforced_during_source_ingestion() {
+    let source = |paint: &str| {
+        format!(
+            "<grida version=\"0\"><container><rect width=\"1\" height=\"1\"><fill>{paint}</fill></rect></container></grida>"
+        )
+    };
+    let stops = "<stop offset=\"0\" color=\"#000\"/><stop offset=\"1\" color=\"#fff\"/>";
+
+    let singular = source(&format!(
+        "<gradient kind=\"radial\" transform=\"1 2 2 4 8 9\">{stops}</gradient>"
+    ));
+    let error = grida_xml::parse(&singular).unwrap_err();
+    assert!(
+        error.to_string().contains("transform must be invertible"),
+        "{error}"
+    );
+
+    for distance in ["0.0000152587890625", "0.000030517578125"] {
+        let degenerate = source(&format!(
+            "<gradient kind=\"linear\" from=\"0 0.5\" to=\"{distance} 0.5\">{stops}</gradient>"
+        ));
+        let error = grida_xml::parse(&degenerate).unwrap_err();
+        assert!(
+            error.to_string().contains("farther apart"),
+            "distance={distance}: {error}"
+        );
+    }
+
+    let renderable = source(&format!(
+        "<gradient kind=\"linear\" from=\"0 0.5\" to=\"0.00006103515625 0.5\">{stops}</gradient>"
+    ));
+    grida_xml::parse(&renderable)
+        .expect("a linear gradient above Skia's degeneracy threshold remains valid source");
 }
 
 #[test]
@@ -427,7 +463,7 @@ fn writer_refuses_unspellable_gradient_model_state_without_repair() {
     gradient.xy2 = gradient.xy1;
     assert!(matches!(
         grida_xml::print(&coincident),
-        Err(PrintError::InvalidDocument(message)) if message.contains("from and to must differ")
+        Err(PrintError::InvalidDocument(message)) if message.contains("farther apart")
     ));
 }
 

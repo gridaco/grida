@@ -9,6 +9,7 @@
 //! input belong exclusively to [`crate::textir`].
 
 use crate::model::{DocBuilder, Document, NodeId};
+use crate::renderability;
 use crate::textir;
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -204,8 +205,8 @@ pub fn print(doc: &Document) -> Result<String, PrintError> {
         };
         textir::validate_path_for_write(node).map_err(PrintError::InvalidDocument)?;
         for stroke in &node.strokes {
-            textir::validate_stroke_for_write(stroke, &node.payload, node.corner_smoothing)
-                .map_err(PrintError::InvalidDocument)?;
+            renderability::validate_stroke(stroke, &node.payload, node.corner_smoothing)
+                .map_err(|error| PrintError::InvalidDocument(error.to_string()))?;
         }
     }
     if !semantic_document_eq(doc, doc) {

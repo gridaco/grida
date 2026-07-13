@@ -4,11 +4,12 @@
 //! GPU via `Canvas::new_surface`) covering the viewport plus a margin, then
 //! re-composites it under camera PANS with a single blit — turning the
 //! O(nodes) `execute` wall into an O(1) image draw. It re-rasters only on a
-//! document, resolve-option, or resource-environment change; a ZOOM change (a
-//! bitmap can't be crisply rescaled — that is the re-raster boundary, ENG-2
-//! growth); or a pan beyond the cached margin. The cached drawlist is reused
-//! across clean camera re-rasters, so a camera-only frame never re-resolves or
-//! re-builds either (the retained-drawlist win folded in).
+//! runtime-document incarnation, effective-value, resolve-option, or
+//! paint-environment change; a ZOOM change (a bitmap can't be crisply rescaled
+//! — that is the re-raster boundary, ENG-2 growth); or a pan beyond the cached
+//! margin. The cached drawlist is reused across clean camera re-rasters, so a
+//! camera-only frame never re-resolves or re-builds either (the
+//! retained-drawlist win folded in).
 //!
 //! Correctness (gate_diff L2): for an INTEGER-pixel pan the composite is
 //! byte-identical to a fresh render — a shape translated by a whole pixel
@@ -17,17 +18,58 @@
 //! gate proves the integer case, which is the contract.
 
 use anchor_lab::math::Affine;
-use anchor_lab::model::Document;
+use anchor_lab::model::{Document, NodeKey};
+use anchor_lab::properties::{PropertyError, PropertyValues, ValueView};
 use anchor_lab::resolve::{ResolveOptions, RotationInFlow};
 use skia_safe::{Canvas, Color, FilterMode, Image, ImageInfo, MipmapMode, SamplingOptions};
 
 use crate::drawlist::DrawList;
-use crate::frame::resolve_and_build;
-use crate::paint::{execute, PaintCtx};
+use crate::frame::{resolve_and_build_view, FrameBuildError, FrameExecutionError};
+use crate::paint::{execute_unchecked, PaintCtx, PaintEnvironmentKey};
 
 /// Extra content rastered around the viewport, so small pans blit without a
 /// re-raster. Larger margin = fewer re-raster hitches, more offscreen memory.
 const MARGIN: f32 = 256.0;
+
+/// Failure before a value-aware cached frame can reach the destination
+/// canvas. Property validation precedes resolution; frame construction then
+/// preflights the exact drawlist and resolved paint boxes.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SceneCacheError {
+    Property(PropertyError),
+    FrameBuild(FrameBuildError),
+    FrameExecution(FrameExecutionError),
+}
+
+impl std::fmt::Display for SceneCacheError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SceneCacheError::Property(error) => error.fmt(f),
+            SceneCacheError::FrameBuild(error) => error.fmt(f),
+            SceneCacheError::FrameExecution(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for SceneCacheError {}
+
+impl From<PropertyError> for SceneCacheError {
+    fn from(error: PropertyError) -> Self {
+        SceneCacheError::Property(error)
+    }
+}
+
+impl From<FrameBuildError> for SceneCacheError {
+    fn from(error: FrameBuildError) -> Self {
+        SceneCacheError::FrameBuild(error)
+    }
+}
+
+impl From<FrameExecutionError> for SceneCacheError {
+    fn from(error: FrameExecutionError) -> Self {
+        SceneCacheError::FrameExecution(error)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ResolveOptionsKey {
@@ -59,10 +101,17 @@ pub struct SceneCache {
     /// Resource environment under which the drawlist was resolved and rastered.
     /// The drawlist retains exact text fonts, but a different or revised host
     /// context requests a new semantic resolution rather than stale reuse.
-    ctx_id: Option<(u64, u64)>,
+    environment_key: Option<PaintEnvironmentKey>,
     /// Layout options are part of resolved-scene identity even when the camera
     /// and document are unchanged.
     opts_key: Option<ResolveOptionsKey>,
+    /// Arena-scoped scene identity. Exact empty values are shared by all
+    /// static documents, so values alone cannot detect document replacement.
+    scene_key: Option<NodeKey>,
+    /// Exact immutable effective values used to build `list`. Comparing the
+    /// data itself keeps correctness independent from a caller-supplied dirty
+    /// hint; the empty set is the static path's canonical cache key.
+    values_key: PropertyValues,
 }
 
 impl SceneCache {
@@ -73,8 +122,10 @@ impl SceneCache {
             ref_view: Affine::IDENTITY,
             vw,
             vh,
-            ctx_id: None,
+            environment_key: None,
             opts_key: None,
+            scene_key: None,
+            values_key: PropertyValues::default(),
         }
     }
 
@@ -90,7 +141,51 @@ impl SceneCache {
         view: &Affine,
         ctx: &PaintCtx,
         doc_dirty: bool,
-    ) -> bool {
+    ) -> Result<bool, SceneCacheError> {
+        let values = PropertyValues::default();
+        self.frame_view(
+            canvas,
+            &ValueView::base(doc),
+            &values,
+            opts,
+            view,
+            ctx,
+            doc_dirty,
+        )
+    }
+
+    /// Composite one frame with immutable effective property values. Invalid
+    /// or stale targets fail before cache comparison or raster work. A changed
+    /// value set rebuilds the retained drawlist even when `doc_dirty` is
+    /// false.
+    pub fn frame_with_values(
+        &mut self,
+        canvas: &Canvas,
+        doc: &Document,
+        values: &PropertyValues,
+        opts: &ResolveOptions,
+        view: &Affine,
+        ctx: &PaintCtx,
+        doc_dirty: bool,
+    ) -> Result<bool, SceneCacheError> {
+        let value_view = ValueView::new(doc, values)?;
+        self.frame_view(canvas, &value_view, values, opts, view, ctx, doc_dirty)
+    }
+
+    fn frame_view(
+        &mut self,
+        canvas: &Canvas,
+        values: &ValueView<'_>,
+        values_key: &PropertyValues,
+        opts: &ResolveOptions,
+        view: &Affine,
+        ctx: &PaintCtx,
+        doc_dirty: bool,
+    ) -> Result<bool, SceneCacheError> {
+        let document = values.document();
+        let scene_key = document
+            .key_of(document.root)
+            .expect("a render document has one live implicit root");
         let dx = view.e - self.ref_view.e;
         let dy = view.f - self.ref_view.f;
         let same_zoom = view.a == self.ref_view.a
@@ -99,8 +194,10 @@ impl SceneCache {
             && view.d == self.ref_view.d;
         let rebuild_list = doc_dirty
             || self.list.is_none()
-            || self.ctx_id != Some(ctx.identity())
-            || self.opts_key != Some(opts.into());
+            || self.environment_key != Some(ctx.environment_key())
+            || self.opts_key != Some(opts.into())
+            || self.scene_key != Some(scene_key)
+            || self.values_key != *values_key;
         let reraster = self.image.is_none()
             || rebuild_list
             || !same_zoom
@@ -108,7 +205,7 @@ impl SceneCache {
             || dy.abs() > MARGIN;
 
         if reraster {
-            self.raster(canvas, doc, opts, view, ctx, rebuild_list);
+            self.raster(canvas, values, values_key, opts, view, ctx, rebuild_list)?;
         }
 
         // Blit the cached image at the (now possibly zero) integer pan offset.
@@ -118,7 +215,7 @@ impl SceneCache {
         // one src pixel (byte-exact); it never silently blurs at non-integer.
         let sampling = SamplingOptions::new(FilterMode::Nearest, MipmapMode::None);
         canvas.draw_image_with_sampling_options(img, (-MARGIN + dx, -MARGIN + dy), sampling, None);
-        reraster
+        Ok(reraster)
     }
 
     /// (Re)render the scene into a fresh backend-matched offscreen image sized
@@ -127,17 +224,34 @@ impl SceneCache {
     fn raster(
         &mut self,
         canvas: &Canvas,
-        doc: &Document,
+        values: &ValueView<'_>,
+        values_key: &PropertyValues,
         opts: &ResolveOptions,
         view: &Affine,
         ctx: &PaintCtx,
         rebuild_list: bool,
-    ) {
-        if rebuild_list {
-            let (_, list) = resolve_and_build(doc, opts, ctx);
-            self.list = Some(list);
-        }
-        let list = self.list.as_ref().unwrap();
+    ) -> Result<(), SceneCacheError> {
+        let rebuilt = if rebuild_list {
+            let product = resolve_and_build_view(values, opts, ctx)?;
+            let (_, list, environment) = product.into_parts();
+            Some((list, environment))
+        } else {
+            None
+        };
+        let environment_key = rebuilt
+            .as_ref()
+            .map(|(_, environment)| *environment)
+            .unwrap_or_else(|| ctx.environment_key());
+        let list = rebuilt
+            .as_ref()
+            .map(|(list, _)| list)
+            .or(self.list.as_ref())
+            .expect("a clean cache re-raster retains its drawlist");
+
+        let mut shifted = *view;
+        shifted.e += MARGIN;
+        shifted.f += MARGIN;
+        crate::paint::preflight_images(list, &shifted, ctx).map_err(FrameExecutionError::from)?;
 
         let m = MARGIN as i32;
         let info = ImageInfo::new_n32_premul((self.vw + 2 * m, self.vh + 2 * m), None);
@@ -146,21 +260,36 @@ impl SceneCache {
             .expect("backend-matched offscreen surface");
         let oc = off.canvas();
         oc.clear(Color::WHITE);
-        let mut shifted = *view;
-        shifted.e += MARGIN;
-        shifted.f += MARGIN;
-        execute(oc, list, &shifted, ctx);
+        assert_eq!(
+            environment_key,
+            ctx.environment_key(),
+            "retained drawlist paint environment changed before cache replay"
+        );
+        execute_unchecked(oc, list, &shifted, ctx);
 
-        self.image = Some(off.image_snapshot());
+        let image = off.image_snapshot();
+
+        // Commit every cache field only after build, preflight, and offscreen
+        // replay have all succeeded. A fallible rebuild therefore leaves the
+        // prior retained frame usable and the destination canvas untouched.
+        if let Some((list, _)) = rebuilt {
+            self.list = Some(list);
+        }
+        self.image = Some(image);
         self.ref_view = *view;
-        self.ctx_id = Some(ctx.identity());
+        self.environment_key = Some(environment_key);
         self.opts_key = Some(opts.into());
+        let document = values.document();
+        self.scene_key = document.key_of(document.root);
+        self.values_key = values_key.clone();
+        Ok(())
     }
 }
 
 /// Render one composited frame to a fresh raster surface and return its bytes —
 /// the optimized side of the gate_diff L2 row. Pairs with
-/// [`crate::paint::raster_to_bytes`] (the reference). A fresh cache is passed so
+/// [`crate::paint::raster_to_bytes_unchecked`] (the low-level reference). A
+/// fresh cache is passed so
 /// the first frame is a cache-cold re-raster; call twice with panned views to
 /// exercise the blit path.
 pub fn composited_to_bytes(
@@ -172,10 +301,29 @@ pub fn composited_to_bytes(
     doc_dirty: bool,
     w: i32,
     h: i32,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, SceneCacheError> {
     let mut surface = skia_safe::surfaces::raster_n32_premul((w, h)).expect("raster surface");
     let canvas = surface.canvas();
     canvas.clear(Color::WHITE);
-    cache.frame(canvas, doc, opts, view, ctx, doc_dirty);
-    crate::paint::read_pixels(&mut surface, w, h)
+    cache.frame(canvas, doc, opts, view, ctx, doc_dirty)?;
+    Ok(crate::paint::read_pixels(&mut surface, w, h))
+}
+
+/// Value-aware counterpart to [`composited_to_bytes`].
+pub fn composited_to_bytes_with_values(
+    cache: &mut SceneCache,
+    doc: &Document,
+    values: &PropertyValues,
+    opts: &ResolveOptions,
+    view: &Affine,
+    ctx: &PaintCtx,
+    doc_dirty: bool,
+    w: i32,
+    h: i32,
+) -> Result<Vec<u8>, SceneCacheError> {
+    let mut surface = skia_safe::surfaces::raster_n32_premul((w, h)).expect("raster surface");
+    let canvas = surface.canvas();
+    canvas.clear(Color::WHITE);
+    cache.frame_with_values(canvas, doc, values, opts, view, ctx, doc_dirty)?;
+    Ok(crate::paint::read_pixels(&mut surface, w, h))
 }

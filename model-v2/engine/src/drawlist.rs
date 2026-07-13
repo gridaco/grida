@@ -1,6 +1,6 @@
 //! ENG-2.1 · the display list — a pure, diffable projection of resolved
 //! geometry and authored paint intent. The engine frame boundary supplies the
-//! exact fonts accompanying shaped text. [`build_glyphless`] exists only for
+//! exact fonts accompanying shaped text. [`build_glyphless_unchecked`] exists only for
 //! deterministic lab and structural probes whose resolver deliberately emits
 //! no glyphs. Neither path performs I/O or raster work. The camera is not baked
 //! in, so one drawlist paints at any zoom.
@@ -10,6 +10,7 @@ use anchor_lab::model::{
     CornerSmoothing, Document, NodeId, Paints, Payload, RectangularCornerRadius, ShapeDesc, Stroke,
 };
 use anchor_lab::path::ResolvedPathArtifact;
+use anchor_lab::properties::ValueView;
 use anchor_lab::resolve::Resolved;
 use anchor_lab::text_layout::TextLayout;
 use std::sync::Arc;
@@ -153,6 +154,10 @@ impl DrawList {
             .as_deref()
             .expect("glyph-bearing drawlist has no text font registry")
     }
+
+    pub(crate) fn same_text_fonts(&self, other: &Self) -> bool {
+        self.text_fonts == other.text_fonts
+    }
 }
 
 /// Materialize only paints that can contribute pixels. The authored stack is
@@ -206,8 +211,15 @@ fn materialize_text_paints(payload: &Payload, node_fills: &Paints) -> TextPaints
 /// Node opacity scopes fill, descendants, and strokes. A frame's clip scopes
 /// descendants only. Geometry is local-space, positioned by `world` — copied
 /// verbatim, never recomputed. The camera is applied later by the executor.
-pub fn build_glyphless(doc: &Document, resolved: &Resolved) -> DrawList {
+pub fn build_glyphless_unchecked(doc: &Document, resolved: &Resolved) -> DrawList {
     build_inner(doc, resolved, None)
+}
+
+/// Project the exact authored-plus-effective-value view that produced
+/// `resolved`. This is the value-aware structural probe counterpart to
+/// [`crate::frame::resolve_and_build_view`].
+pub fn build_glyphless_view_unchecked(view: &ValueView<'_>, resolved: &Resolved) -> DrawList {
+    build_inner(view, resolved, None)
 }
 
 /// Project a resolved tier produced by the engine text oracle, retaining the
@@ -220,13 +232,115 @@ pub(crate) fn build_with_text_fonts(
     build_inner(doc, resolved, Some(text_fonts))
 }
 
-fn build_inner(
-    doc: &Document,
+/// Effective-value counterpart to [`build_with_text_fonts`]. Both paths use
+/// one monomorphized projection below; the authored path reads the document
+/// directly instead of paying a dynamic registry lookup at every paint item.
+pub(crate) fn build_with_text_fonts_view(
+    view: &ValueView<'_>,
+    resolved: &Resolved,
+    text_fonts: Arc<TextFontRegistry>,
+) -> DrawList {
+    build_inner(view, resolved, Some(text_fonts))
+}
+
+/// The drawlist's complete authored/effective read surface. Keeping this
+/// private makes the optimization non-semantic: there is one projection
+/// algorithm and no second public paint contract.
+trait DrawValues {
+    fn document(&self) -> &Document;
+    fn opacity(&self, id: NodeId) -> f32;
+    fn clips_content(&self, id: NodeId) -> bool;
+    fn corner_radius(&self, id: NodeId) -> RectangularCornerRadius;
+    fn corner_smoothing(&self, id: NodeId) -> CornerSmoothing;
+    fn fills(&self, id: NodeId) -> &Paints;
+    fn strokes(&self, id: NodeId) -> &[Stroke];
+}
+
+impl DrawValues for Document {
+    #[inline]
+    fn document(&self) -> &Document {
+        self
+    }
+
+    #[inline]
+    fn opacity(&self, id: NodeId) -> f32 {
+        self.get(id).header.opacity
+    }
+
+    #[inline]
+    fn clips_content(&self, id: NodeId) -> bool {
+        match self.get(id).payload {
+            Payload::Frame { clips_content, .. } => clips_content,
+            _ => unreachable!("drawlist requests clips-content only for frames"),
+        }
+    }
+
+    #[inline]
+    fn corner_radius(&self, id: NodeId) -> RectangularCornerRadius {
+        self.get(id).corner_radius
+    }
+
+    #[inline]
+    fn corner_smoothing(&self, id: NodeId) -> CornerSmoothing {
+        self.get(id).corner_smoothing
+    }
+
+    #[inline]
+    fn fills(&self, id: NodeId) -> &Paints {
+        &self.get(id).fills
+    }
+
+    #[inline]
+    fn strokes(&self, id: NodeId) -> &[Stroke] {
+        &self.get(id).strokes
+    }
+}
+
+impl DrawValues for ValueView<'_> {
+    #[inline]
+    fn document(&self) -> &Document {
+        ValueView::document(self)
+    }
+
+    #[inline]
+    fn opacity(&self, id: NodeId) -> f32 {
+        ValueView::opacity(self, id)
+    }
+
+    #[inline]
+    fn clips_content(&self, id: NodeId) -> bool {
+        ValueView::clips_content(self, id)
+    }
+
+    #[inline]
+    fn corner_radius(&self, id: NodeId) -> RectangularCornerRadius {
+        ValueView::corner_radius(self, id)
+    }
+
+    #[inline]
+    fn corner_smoothing(&self, id: NodeId) -> CornerSmoothing {
+        ValueView::corner_smoothing(self, id)
+    }
+
+    #[inline]
+    fn fills(&self, id: NodeId) -> &Paints {
+        ValueView::fills(self, id)
+    }
+
+    #[inline]
+    fn strokes(&self, id: NodeId) -> &[Stroke] {
+        ValueView::strokes(self, id)
+    }
+}
+
+fn build_inner<V: DrawValues + ?Sized>(
+    values: &V,
     resolved: &Resolved,
     text_fonts: Option<Arc<TextFontRegistry>>,
 ) -> DrawList {
+    let doc = values.document();
     let mut items = Vec::new();
-    emit(doc, resolved, doc.root, &mut items);
+    emit(values, resolved, doc.root, &mut items);
     let has_glyphs = items.iter().any(|item| match &item.kind {
         ItemKind::TextFill { layout, .. } | ItemKind::TextStroke { layout, .. } => {
             !layout.glyph_runs.is_empty()
@@ -243,10 +357,16 @@ fn build_inner(
     }
 }
 
-fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) {
+fn emit<V: DrawValues + ?Sized>(
+    values: &V,
+    resolved: &Resolved,
+    id: NodeId,
+    items: &mut Vec<Item>,
+) {
     let Some(world) = resolved.world_opt(id) else {
         return; // hidden subtree — pruned, children not visited
     };
+    let doc = values.document();
     let node = doc.get(id);
     let b = resolved.box_of(id);
     let text_layout = node
@@ -256,18 +376,12 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
     let text_paints = node
         .payload
         .as_text()
-        .map(|_| materialize_text_paints(&node.payload, &node.fills));
+        .map(|_| materialize_text_paints(&node.payload, values.fills(id)));
 
-    let opacity_scope = node.header.opacity != 1.0;
+    let opacity = values.opacity(id);
+    let opacity_scope = opacity != 1.0;
     if opacity_scope {
-        push(
-            items,
-            id,
-            world,
-            ItemKind::BeginOpacity {
-                opacity: node.header.opacity,
-            },
-        );
+        push(items, id, world, ItemKind::BeginOpacity { opacity });
     }
 
     // Root is the backdrop; derived kinds have no ink. Both still recurse and
@@ -275,8 +389,10 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
     if id != doc.root && !node.payload.box_is_derived() {
         match &node.payload {
             Payload::Frame { .. } => {
-                let paints = visible_paints(&node.fills);
+                let paints = visible_paints(values.fills(id));
                 if !paints.is_empty() {
+                    let corner_radius = values.corner_radius(id);
+                    let corner_smoothing = values.corner_smoothing(id);
                     push(
                         items,
                         id,
@@ -284,22 +400,28 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                         ItemKind::RectFill {
                             w: b.w,
                             h: b.h,
-                            corner_radius: node.corner_radius,
-                            corner_smoothing: node.corner_smoothing,
+                            corner_radius,
+                            corner_smoothing,
                             paints,
                         },
                     );
                 }
             }
+            // Lines have no fill channel, and `Fills` is intentionally
+            // inapplicable to them in the closed registry. Do not perform a
+            // speculative fill read before selecting the shape variant.
+            Payload::Shape {
+                desc: ShapeDesc::Line,
+            } => {}
             Payload::Shape { desc } => {
-                let paints = visible_paints(&node.fills);
+                let paints = visible_paints(values.fills(id));
                 if !paints.is_empty() {
                     let kind = match desc {
                         ShapeDesc::Rect => Some(ItemKind::RectFill {
                             w: b.w,
                             h: b.h,
-                            corner_radius: node.corner_radius,
-                            corner_smoothing: node.corner_smoothing,
+                            corner_radius: values.corner_radius(id),
+                            corner_smoothing: values.corner_smoothing(id),
                             paints,
                         }),
                         ShapeDesc::Ellipse => Some(ItemKind::OvalFill {
@@ -317,8 +439,7 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                                     paints,
                                 })
                         }
-                        // Lines have no fill channel and no implicit ink.
-                        ShapeDesc::Line => None,
+                        ShapeDesc::Line => unreachable!("line matched before fill lookup"),
                     };
                     if let Some(kind) = kind {
                         push(items, id, world, kind);
@@ -351,14 +472,10 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
         }
     }
 
-    let clip_scope = matches!(
-        node.payload,
-        Payload::Frame {
-            clips_content: true,
-            ..
-        }
-    );
+    let clip_scope = matches!(node.payload, Payload::Frame { .. }) && values.clips_content(id);
     if clip_scope {
+        let corner_radius = values.corner_radius(id);
+        let corner_smoothing = values.corner_smoothing(id);
         push(
             items,
             id,
@@ -366,14 +483,14 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
             ItemKind::BeginClipRect {
                 w: b.w,
                 h: b.h,
-                corner_radius: node.corner_radius,
-                corner_smoothing: node.corner_smoothing,
+                corner_radius,
+                corner_smoothing,
             },
         );
     }
 
     for &c in &node.children {
-        emit(doc, resolved, c, items);
+        emit(values, resolved, c, items);
     }
 
     if clip_scope {
@@ -381,10 +498,17 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
     }
 
     if id != doc.root && !node.payload.box_is_derived() {
-        for stroke in node
-            .strokes
+        let corner_smoothing = match &node.payload {
+            Payload::Frame { .. }
+            | Payload::Shape {
+                desc: ShapeDesc::Rect,
+            } => values.corner_smoothing(id),
+            _ => CornerSmoothing::default(),
+        };
+        for stroke in values
+            .strokes(id)
             .iter()
-            .filter_map(|stroke| visible_stroke(stroke, &node.payload, node.corner_smoothing))
+            .filter_map(|stroke| visible_stroke(stroke, &node.payload, corner_smoothing))
         {
             if matches!(
                 &node.payload,
@@ -402,8 +526,8 @@ fn emit(doc: &Document, resolved: &Resolved, id: NodeId, items: &mut Vec<Item>) 
                 } => ItemKind::RectStroke {
                     w: b.w,
                     h: b.h,
-                    corner_radius: node.corner_radius,
-                    corner_smoothing: node.corner_smoothing,
+                    corner_radius: values.corner_radius(id),
+                    corner_smoothing,
                     stroke,
                 },
                 Payload::Shape {

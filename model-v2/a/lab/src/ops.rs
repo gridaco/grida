@@ -263,8 +263,8 @@ impl ResizeDrag {
 /// Writes per call: extent (1) + position (1, free context only — under
 /// flex, layout owns position and the write set shrinks to extent+flip)
 /// + flip (1, only when the crossing state changed). Crossing back across
-/// the anchor toggles the flip off again: a drag out and back is the
-/// identity on the document.
+///   the anchor toggles the flip off again: a drag out and back is the
+///   identity on the document.
 pub fn resize_drag(
     doc: &mut Document,
     resolved: &Resolved,
