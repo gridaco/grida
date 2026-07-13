@@ -644,10 +644,11 @@ A conforming Version 4 reader and materializer:
 
 ## Deferred work
 
-Animation remains governed by the [Grida XML animation question set](./grida-xml-animation).
-That work still needs to decide time representation, source placement,
-target-reference spelling, keyframes, interpolation, easing, composition,
-events, static processing, resource behavior, and playback.
+Native animation grammar is explicitly deferred by the [Grida XML animation
+RFD](./grida-xml-animation). Any future proposal must state its time model,
+source placement, target-reference spelling, keyframes, interpolation, easing,
+composition, event posture, static processing, resource behavior, and playback
+boundary.
 
 Durable identity for paint layers, strokes, gradient stops, text runs, path or
 vector members, and lens-operation parameters is also deferred. Until each

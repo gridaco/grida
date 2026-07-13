@@ -1,5 +1,11 @@
 ---
 title: "SVG Import Mapping"
+description: "Current static SVG-to-Grida mapping, its usvg normalization boundary, and remaining model gaps."
+keywords:
+  - svg import
+  - usvg
+  - grida ir
+  - import mapping
 format: md
 tags:
   - internal
@@ -10,11 +16,22 @@ tags:
 
 # SVG Import Mapping
 
-SVG → Grida IR property mapping and TODO tracker.
+This page records the static SVG → Grida IR property projection and its known
+gaps. The projection uses
+[usvg](https://github.com/linebender/resvg/tree/main/crates/usvg) for
+pre-processing.
 
-**Implementation:** `crates/grida/src/import/svg/` (uses [usvg](https://github.com/nicbeuc/resvg) for pre-processing).
+This page describes the **static projection**. usvg simplifies the SVG DOM
+before that projection sees it: `<use>` is resolved, CSS is computed, `<defs>`
+are inlined, and transforms are flattened. The tables below map that simplified
+tree, not raw SVG.
 
-usvg simplifies the SVG DOM before we see it: `<use>` is resolved, CSS is computed, `<defs>` are inlined, transforms are flattened. Our mapping is from the usvg simplified tree, not raw SVG.
+Animation cannot use that normalized tree as its only source of truth. The
+selected [SVG Animation Profile 0](../feat-svg/animation) and cumulative
+[Profile 1](../feat-svg/animation-keyframes) require a separate frontend to
+retain animation-bearing source and one-to-one target identity before static
+normalization. Animated processing is a separate conformance surface from the
+static importer described here.
 
 ## Elements
 
@@ -36,7 +53,6 @@ usvg simplifies the SVG DOM before we see it: `<use>` is resolved, CSS is comput
 | `<defs>`                                                               | (resolved by usvg)   | --                       | ✅     | Transparent — usvg inlines              |
 | `<foreignObject>`                                                      | --                   | --                       | ❌     | Not supported                           |
 | `<switch>`                                                             | --                   | --                       | ❌     | Not supported                           |
-| SMIL animations                                                        | --                   | --                       | 🚫     | Out of scope (static import)            |
 
 ## Paint
 

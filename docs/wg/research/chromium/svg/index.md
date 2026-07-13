@@ -1,11 +1,13 @@
 ---
 title: "Chromium SVG Rendering Research"
+description: "Source-grounded notes on Blink's SVG DOM, layout, paint, animation, resources, and compositing paths."
 tags:
   - internal
   - research
   - chromium
   - rendering
   - svg
+format: md
 ---
 
 # Chromium SVG Rendering Research
@@ -99,25 +101,25 @@ A bird's-eye view of which Blink subsystems treat SVG identically to HTML
 and which have SVG-specific paths. "Shared" means the same code runs for
 both; "different" means SVG has its own implementation in parallel.
 
-| Subsystem                                   | SVG vs HTML                                                                                                                                                     |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Process / thread model                      | **Same** — main thread for parse/style/layout/paint; cc/Viz unchanged                                                                                           |
-| Parser frontend                             | **Same** parser, with SVG-aware namespace handling                                                                                                              |
-| DOM base classes                            | **Same** (`Node`, `Element`); `SVGElement` extends `Element` directly                                                                                           |
-| Selector matching, cascade, `ComputedStyle` | **Same**; SVG has an `SVGComputedStyle` sub-struct hung off `ComputedStyle` for `fill`/`stroke`/`marker-*`/etc.                                                 |
-| `LayoutObject` base                         | **Same**                                                                                                                                                        |
-| Layout algorithm                            | **Different** for SVG shapes/containers/resources (`UpdateSVGLayout`); **same** (LayoutNG) for SVG `<text>` and `<foreignObject>`                               |
-| Paint property trees (PrePaint)             | **Same**                                                                                                                                                        |
-| Painters                                    | **Different** family (`SVG*Painter`); **same** output type (`PaintRecord`)                                                                                      |
-| `cc::PaintOpBuffer` IR                      | **Same** — once recorded, "SVG-ness" is gone                                                                                                                    |
-| Compositor (`cc/`)                          | **Same** — agnostic to source                                                                                                                                   |
-| Viz / display compositor                    | **Same**                                                                                                                                                        |
-| Animation engines                           | **Two coexist**: CSS / Web Animations (shared with HTML); SMIL (SVG-only). SMIL takes precedence per spec.                                                      |
-| Resource references via `url(#id)`          | **SVG-only** — HTML has no equivalent resource graph                                                                                                            |
-| Hit testing                                 | **Different** algorithm (path-based with `pointer-events` rules); **same** dispatch                                                                             |
-| Accessibility                               | **Mostly shared** — same `AXNodeObject` machinery, with SVG-aware role mapping                                                                                  |
-| As-image rendering                          | **SVG-only** (`SVGImage` + `SVGImageForContainer`)                                                                                                              |
-| `requestAnimationFrame` lifecycle           | **Same** — SMIL is sampled by `Page::Animator::ServiceScriptedAnimations` at the top of every `BeginMainFrame`, before rAF callbacks and the document lifecycle |
+| Subsystem                                   | SVG vs HTML                                                                                                                                                                                                                         |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Process / thread model                      | **Same** — main thread for parse/style/layout/paint; cc/Viz unchanged                                                                                                                                                               |
+| Parser frontend                             | **Same** parser, with SVG-aware namespace handling                                                                                                                                                                                  |
+| DOM base classes                            | **Same** (`Node`, `Element`); `SVGElement` extends `Element` directly                                                                                                                                                               |
+| Selector matching, cascade, `ComputedStyle` | **Same**; SVG has an `SVGComputedStyle` sub-struct hung off `ComputedStyle` for `fill`/`stroke`/`marker-*`/etc.                                                                                                                     |
+| `LayoutObject` base                         | **Same**                                                                                                                                                                                                                            |
+| Layout algorithm                            | **Different** for SVG shapes/containers/resources (`UpdateSVGLayout`); **same** (LayoutNG) for SVG `<text>` and `<foreignObject>`                                                                                                   |
+| Paint property trees (PrePaint)             | **Same**                                                                                                                                                                                                                            |
+| Painters                                    | **Different** family (`SVG*Painter`); **same** output type (`PaintRecord`)                                                                                                                                                          |
+| `cc::PaintOpBuffer` IR                      | **Same** — once recorded, "SVG-ness" is gone                                                                                                                                                                                        |
+| Compositor (`cc/`)                          | **Same** — agnostic to source                                                                                                                                                                                                       |
+| Viz / display compositor                    | **Same**                                                                                                                                                                                                                            |
+| Animation engines                           | **Two coexist**: CSS / Web Animations (shared with HTML) and SVG/SMIL. SMIL CSS-property results enter at author origin; CSS animations and transitions compose at their higher cascade origins.                                    |
+| Resource references via `url(#id)`          | **SVG-only** — HTML has no equivalent resource graph                                                                                                                                                                                |
+| Hit testing                                 | **Different** algorithm (path-based with `pointer-events` rules); **same** dispatch                                                                                                                                                 |
+| Accessibility                               | **Mostly shared** — same `AXNodeObject` machinery, with SVG-aware role mapping                                                                                                                                                      |
+| As-image rendering                          | **SVG-only** (`SVGImage` + `SVGImageForContainer`)                                                                                                                                                                                  |
+| `requestAnimationFrame` lifecycle           | **Integrated, but separate** — on unthrottled animation frames, `PageAnimator::ServiceScriptedAnimations` reaches scheduled SMIL service before CSS/Web Animation event dispatch and rAF callbacks; the document lifecycle follows. |
 
 For more detail per subsystem, see the topical docs above.
 
@@ -188,10 +190,12 @@ next BeginMainFrame:
   Commit                          → cc → raster → Viz → present
 ```
 
-For an animated value (SMIL or Web Animations), the sample writes into
-`animVal` instead of baseVal (see
-[animated-properties-idl.md](./animated-properties-idl.md)) but the
-downstream invalidation path is the same.
+When an SVG DOM target exists, SMIL updates its typed `animVal`; when the target
+also corresponds to a CSS property, it additionally installs the sampled
+author-origin declaration. Motion animation uses a separate transform slot.
+Each path feeds property-specific invalidation.
+See [animation-and-smil.md](./animation-and-smil.md) and
+[animated-properties-idl.md](./animated-properties-idl.md).
 
 See also [`../dirty-flag-management.md`](../dirty-flag-management.md) for
 the cross-Blink invalidation taxonomy.
@@ -203,20 +207,20 @@ used in the Blink/Chromium codebase. The parent
 [`../glossary.md`](../glossary.md) covers compositor (`cc/viz`) terms;
 this glossary covers SVG-side and rendering-pipeline-wide terms.
 
-| Term                          | What it means here                                                                                                                                                                   |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **"Renderer" (process)**      | The OS process hosting Blink. Named historically — does **not** mean pixel rendering. Actual rasterization happens in cc raster workers and Viz.                                     |
-| **"Rendering" (verb)**        | Standards: producing pixels. Blink-internal: usually the whole pipeline. Disambiguate by context.                                                                                    |
-| **"Layout" (in SVG context)** | Geometry resolution — paths, transforms, bounding boxes. Not "where boxes go." HTML layout is box flow; SVG layout is `UpdateSVGLayout`.                                             |
-| **"Paint"**                   | Recording `PaintOp`s into a `PaintRecord`. **Does not** produce pixels. Only cc raster + Skia produce pixels.                                                                        |
-| **"Composite"**               | Overloaded. Blogs: any post-Layout work. cc: layer + tile + raster + draw. Viz: cross-renderer aggregation. Always disambiguate.                                                     |
-| **"Render tree"**             | Deprecated WebKit term for the layout tree. Don't use; say "layout tree" or "`LayoutObject` tree."                                                                                   |
-| **`PaintLayer`**              | Blink concept for stacking-context grouping during paint. **Not** a `cc::Layer`.                                                                                                     |
-| **`cc::Layer`**               | The compositor's atom of compositing. Often (but not always) corresponds to a `PaintLayer`.                                                                                          |
-| **"Composited" (an element)** | Has its own `cc::Layer` that can be transformed/animated without re-paint.                                                                                                           |
-| **`baseVal` / `animVal`**     | SVG IDL surface for the declared vs. currently-animated value of an animatable attribute. Rendering reads `animVal`. See [animated-properties-idl.md](./animated-properties-idl.md). |
-| **"Sandwich"**                | SMIL's per-`(element, attribute)` priority stack of currently-active animations. See [animation-and-smil.md](./animation-and-smil.md).                                               |
-| **"Tear-off"**                | JS-exposed wrapper around an internal SVG value (`SVGLengthTearOff`, `SVGTransformTearOff`, …) that holds a back-pointer to its owning element so mutations propagate.               |
-| **`<defs>`**                  | A hidden SVG container for resources (`LayoutSVGHiddenContainer`). Children participate in style/layout but not paint.                                                               |
-| **Presentation attribute**    | An SVG attribute that aliases to a CSS property (`fill="red"` ↔ `fill: red`). Folded into the cascade at low specificity.                                                            |
-| **`objectBoundingBox` units** | Resource-coordinate mode where `[0, 1]²` maps to the referencing element's bounding box, not user space. Affects gradients, patterns, clipPaths, masks, filters.                     |
+| Term                          | What it means here                                                                                                                                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **"Renderer" (process)**      | The OS process hosting Blink. Named historically — does **not** mean pixel rendering. Actual rasterization happens in cc raster workers and Viz.                                                                                                        |
+| **"Rendering" (verb)**        | Standards: producing pixels. Blink-internal: usually the whole pipeline. Disambiguate by context.                                                                                                                                                       |
+| **"Layout" (in SVG context)** | Geometry resolution — paths, transforms, bounding boxes. Not "where boxes go." HTML layout is box flow; SVG layout is `UpdateSVGLayout`.                                                                                                                |
+| **"Paint"**                   | Recording `PaintOp`s into a `PaintRecord`. **Does not** produce pixels. Only cc raster + Skia produce pixels.                                                                                                                                           |
+| **"Composite"**               | Overloaded. Blogs: any post-Layout work. cc: layer + tile + raster + draw. Viz: cross-renderer aggregation. Always disambiguate.                                                                                                                        |
+| **"Render tree"**             | Deprecated WebKit term for the layout tree. Don't use; say "layout tree" or "`LayoutObject` tree."                                                                                                                                                      |
+| **`PaintLayer`**              | Blink concept for stacking-context grouping during paint. **Not** a `cc::Layer`.                                                                                                                                                                        |
+| **`cc::Layer`**               | The compositor's atom of compositing. Often (but not always) corresponds to a `PaintLayer`.                                                                                                                                                             |
+| **"Composited" (an element)** | Has its own `cc::Layer` that can be transformed/animated without re-paint.                                                                                                                                                                              |
+| **`baseVal` / `animVal`**     | SVG IDL surface for declared vs. currently animated XML-property values. CSS-property SMIL instead contributes animated author-origin style, and motion uses a separate transform slot. See [animated-properties-idl.md](./animated-properties-idl.md). |
+| **"Sandwich"**                | SMIL's per-`(element, attribute)` priority stack of currently-active animations. See [animation-and-smil.md](./animation-and-smil.md).                                                                                                                  |
+| **"Tear-off"**                | JS-exposed wrapper around an internal SVG value (`SVGLengthTearOff`, `SVGTransformTearOff`, …) that holds a back-pointer to its owning element so mutations propagate.                                                                                  |
+| **`<defs>`**                  | A hidden SVG container for resources (`LayoutSVGHiddenContainer`). Children participate in style/layout but not paint.                                                                                                                                  |
+| **Presentation attribute**    | An SVG attribute that aliases to a CSS property (`fill="red"` ↔ `fill: red`). Folded into the cascade at low specificity.                                                                                                                               |
+| **`objectBoundingBox` units** | Resource-coordinate mode where `[0, 1]²` maps to the referencing element's bounding box, not user space. Affects gradients, patterns, clipPaths, masks, filters.                                                                                        |

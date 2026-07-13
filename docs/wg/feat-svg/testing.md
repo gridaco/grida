@@ -1,5 +1,11 @@
 ---
 title: SVG Testing
+description: "Static SVG reftest corpora, pixel-diff methodology, and explicit-time animation conformance."
+keywords:
+  - svg testing
+  - reftest
+  - pixel diff
+  - animation conformance
 format: md
 tags:
   - internal
@@ -11,7 +17,8 @@ tags:
 
 # SVG Testing
 
-This document describes the testing methodology and tools used to evaluate SVG rendering accuracy in Grida Canvas.
+This document describes a test methodology for evaluating SVG rendering
+accuracy.
 
 ## Test Suites
 
@@ -63,6 +70,22 @@ The Oxygen icon set provides real-world SVG icon testing with:
 
 **Configuration:** Uses `reftest.toml` with glob pattern `scalable/**/*.svg` to match nested SVG files.
 
+## Animated-profile conformance
+
+The static corpora above continue to evaluate animation-bearing files as base
+scenes. That is separate from conformance to [SVG Animation Profile
+0](./animation) and its cumulative [Profile 1 keyframe/easing
+extension](./animation-keyframes), which sample an explicit document time.
+
+Animated-profile conformance runs must use value assertions first, then
+scene/query assertions, then pixel comparison against an explicitly sought
+browser frame and the applicable web-platform-tests. Wall-clock screenshot
+timing is not an oracle. A compatibility result must record the profile
+revision, fixture/corpus revision, browser build, exact sample time, and static
+materializer revision. The profile defines the required boundary, failure,
+source-preservation, and seek-independence test laws; this page does not
+duplicate that matrix.
+
 ## Measuring Method: Pixel Diffing
 
 We use pixel-by-pixel comparison to measure rendering accuracy against reference images.
@@ -79,9 +102,3 @@ We use pixel-by-pixel comparison to measure rendering accuracy against reference
 - **Similarity Score:** 0.0 (completely different) to 1.0 (identical)
 - **Difference Percentage:** Percentage of pixels that differ (0.0-100.0%)
 - **Alpha Masking:** By default, SVG tests use alpha masking, which excludes fully-transparent pixels from score calculation. This prevents large transparent regions from skewing the mismatch ratio and makes small visible errors more significant relative to the visible content.
-
-## Internal Tools: Reftest
-
-The `reftest` command in `grida_dev` is the primary testing tool for SVG rendering evaluation. It renders SVG files to PNG, compares them against reference images using pixel diffing, and generates similarity scores and visual diff images. Results are organized into score-based categories (S99, S95, S90, S75, err) with comprehensive JSON reports.
-
-See `crates/grida_dev/TESTING.md` for detailed usage instructions, configuration options, and command-line reference.

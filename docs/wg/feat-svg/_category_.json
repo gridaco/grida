@@ -1,3 +1,7 @@
 {
-  "label": "SVG"
+  "label": "SVG",
+  "link": {
+    "type": "doc",
+    "id": "wg/feat-svg/index"
+  }
 }

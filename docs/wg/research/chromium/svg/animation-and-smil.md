@@ -1,253 +1,291 @@
 ---
 title: "Chromium SVG Animation and SMIL"
+description: "How Blink samples, composes, cascades, invalidates, and schedules SVG/SMIL and CSS/Web Animations."
 tags:
   - internal
   - research
   - chromium
   - rendering
   - svg
+format: md
 ---
 
 # Chromium SVG Animation and SMIL
 
-How Blink animates SVG. Two engines coexist: SMIL (`<animate>`, `<set>`,
-`<animateTransform>`, `<animateMotion>`) and the standard CSS / Web Animations
-machinery. Both can target the same element; SMIL takes precedence per spec.
+How Blink animates SVG. Blink has a dedicated SVG/SMIL timing and composition
+engine alongside the standard CSS/Web Animations engine. They share the
+document lifecycle but do not collapse into one animation implementation.
 
-## Two engines, one element
+Source observations in this note were verified against Chromium
+`7385b4cc05a381629080a2435ce519f673758bf2` (2026-04-27).
 
-| Engine                          | Targets                                                                  | Output destination                                                                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| SMIL                            | SVG attributes (CSS properties or non-CSS like `points`, `d`, `viewBox`) | `animVal` slot (see [animated-properties-idl.md](./animated-properties-idl.md)), then folded into `ComputedStyle` for presentation attributes |
-| CSS animations / Web Animations | CSS properties                                                           | `ComputedStyle` directly via the standard `core/animation/` engine                                                                            |
+## Specification status
 
-When both engines target the same property, **SMIL's `animVal` wins** and the
-CSS animation effect is suppressed for that property. Implemented by sampling
-SMIL first and gating CSS animation effect application on whether SMIL is
-contributing for the attribute.
+The current SVG animation specification is the [SVG Animations Level 2
+Editor's Draft of 14 September 2025](https://svgwg.org/specs/animations/).
+It identifies itself as work in progress. Except where it supplies SVG-specific
+rules, it delegates normative behavior to the 2001 [SMIL Animation
+Recommendation](https://www.w3.org/TR/2001/REC-smil-animation-20010904/).
+
+The [SVG Integration Editor's Draft](https://svgwg.org/specs/integration/) is
+also work in progress and contains unresolved editorial questions. Chromium
+source and web-platform tests are therefore needed to describe implemented
+browser behavior; the drafts alone are not implementation evidence.
+
+## Two engines and several result paths
+
+| Animation source                                | Targets                                    | Blink result path                                                                                                                     |
+| ----------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| SVG/SMIL                                        | Recognized CSS property                    | Sampled value is serialized into `SVGElement::AnimatedSMILStyleProperties`, then consumed by normal style resolution at author origin |
+| SVG/SMIL                                        | SVG DOM attribute                          | Typed `SVGAnimatedPropertyBase::animVal` through `SVGElement::SetAnimatedAttribute`, followed by property-specific invalidation       |
+| SVG/SMIL                                        | Presentation attribute exposing both paths | CSS-property and SVG DOM `animVal` paths are updated independently                                                                    |
+| `<animateMotion>`                               | Motion transform                           | Separate `AnimateMotionTransform`, followed by transform, paint-property, layout, or resource invalidation as needed                  |
+| CSS Animations, CSS Transitions, Web Animations | CSS properties                             | Shared `core/animation` interpolations enter `StyleCascade` at animation or transition origin and produce `ComputedStyle`             |
+
+For a property exposed through CSS, the SMIL result is an author-origin
+declaration. CSS/Web Animation interpolations are subsequently applied at
+animation origin, and transitions at transition origin. An active CSS/Web
+Animation therefore composes over the SMIL-derived underlying value. Blink
+does not suppress a CSS animation merely because SMIL targets the same CSS
+property.
+
+The phrase “SMIL override style” in Blink comments describes its placement
+among ordinary author rules. It does not give SMIL a cascade origin above CSS
+Animations or CSS Transitions. Non-CSS SVG attributes remain outside the CSS
+and Web Animations property path.
+
+Relevant flow:
+
+```text
+SVGAnimateElement::ApplyResultsToTarget
+  ├── CSS property
+  │     └── AnimatedSMILStyleProperties
+  │           └── StyleResolver::MatchAllRules (author origin)
+  │                 └── ApplyAnimatedStyle
+  │                       ├── CSS/Web Animation origin
+  │                       └── CSS Transition origin
+  └── SVG DOM property
+        └── SVGElement::SetAnimatedAttribute
+              └── typed animVal + SvgAttributeChanged invalidation
+```
+
+### Target-property resolution
+
+`SVGAnimateElement::ResolveTargetProperty` first asks the target for an SVG DOM
+property and records any associated CSS property ID. If there is no SVG DOM
+property, it tries the CSS-only animated-property path.
+
+SVG Animations Level 2 does not support `attributeType`; its auto-resolution
+rule searches CSS properties first, then target attributes. Blink still parses
+legacy `attributeType`, but a recognized CSS property takes the CSS path
+regardless of the legacy value. `attributeType="CSS"` makes an otherwise
+non-CSS target invalid.
 
 ## SMIL data model
 
-```
-SMILTimeContainer                    one per outer <svg>
-  ├── AnimationClock                 presentation_time
-  └── Schedule of timed elements     priority queue keyed by next event time
+```text
+SVGSVGElement
+  └── SMILTimeContainer
+        ├── presentation/reference/update times
+        ├── scheduling state and wakeup timer
+        ├── animated target set
+        └── priority queue of timed elements
 
-SVGSMILElement                       base for <animate>, <set>, ...
-  ├── interval list                  begin/end pairs derived from begin/end/dur/repeatCount/...
-  ├── current state                  active / inactive / frozen
-  └── targetElement()                what it animates
+SVGSMILElement
+  ├── sorted begin/end instance-time lists
+  ├── current and previous SMILInterval
+  ├── parsed sync/event conditions
+  ├── active/frozen state and repeat progress
+  └── target element and attribute
 
-ElementSMILAnimations                attached to the target element
-  └── HeapHashMap<QualifiedName, SMILAnimationSandwich>
+ElementSMILAnimations                 attached to a target
+  └── map<QualifiedName, SMILAnimationSandwich>
 
-SMILAnimationSandwich                per-(target, attribute)
-  └── Vector<SVGSMILElement>          priority-sorted active elements
-```
-
-```cpp
-// third_party/blink/renderer/core/svg/animation/svg_smil_element.h
-class CORE_EXPORT SVGSMILElement : public SVGElement, public SVGTests {
- public:
-  SMILTimeContainer* TimeContainer() const { return time_container_.Get(); }
-  bool HasValidTarget() const;
-  SVGElement* targetElement() const { return target_element_.Get(); }
-
-  enum FillMode { kFillRemove, kFillFreeze };
-  FillMode Fill() const { return static_cast<FillMode>(fill_); }
-
-  void UpdateInterval(SMILTime presentation_time);
-  EventDispatchMask UpdateActiveState(SMILTime, bool skip_repeat);
-  bool IsHigherPriorityThan(const SVGSMILElement* other,
-                            SMILTime presentation_time) const;
-  bool IsContributing(SMILTime elapsed) const;
-  // ...
-};
+SMILAnimationSandwich                one target/attribute pair
+  └── priority-sorted active SVGSMILElements
 ```
 
-```cpp
-// third_party/blink/renderer/core/svg/animation/element_smil_animations.h
-class ElementSMILAnimations : public GarbageCollected<ElementSMILAnimations> {
- public:
-  void AddAnimation(const QualifiedName& attribute, SVGAnimationElement*);
-  void RemoveAnimation(const QualifiedName& attribute, SVGAnimationElement*);
-  bool HasAnimations() const { return !sandwiches_.empty(); }
-  bool Apply(SMILTime elapsed);
+Every `SVGSVGElement` constructs an `SMILTimeContainer`, and every connected
+`<svg>` registers with `SVGDocumentExtensions`. An `SVGSMILElement` binds to
+the container of its nearest `ownerSVGElement`.
 
- private:
-  HeapHashMap<QualifiedName, Member<SMILAnimationSandwich>> sandwiches_;
-};
-```
+These are not independent nested SMIL time spaces. Containers synchronize to
+the document timeline through `SMILTimeContainer::SynchronizeToDocumentTimeline`,
+consistent with SVG's rule that nested `<svg>` elements do not define a new
+document begin.
 
-## The sandwich model
+`SVGSMILElement` does not hold one immutable interval list computed at parse
+time. It stores instance times and conditions; `UpdateInterval` resolves and
+revalidates intervals as attributes, syncbases, events, or script-created
+instance times change.
 
-Per SMIL: when multiple animation elements target the same `(element,
-attribute)` pair, they form a _sandwich_ — a priority-ordered stack where
-later-started intervals have higher priority. At any given `presentation_time`,
-the sandwich's active subset is composed top-down per the additive/accumulate
-semantics, and the result is written to `animVal`.
+## Sandwich composition
 
-```
-<svg>
-  <rect id="r" fill="yellow">
-    <set attributeName="fill" to="blue"     begin="1s; 3s" dur="1s"/>
-    <set attributeName="fill" to="lightblue" begin="1.5s"  dur="2s"/>
+Several SVG animation elements targeting the same `(element, attribute)` form
+a sandwich. The active sandwich is priority-sorted. Later interval begin time
+has higher priority; equal begin time is broken by later document order.
+
+`ApplyAnimationValues` scans downward from the highest-priority effect until it
+finds an effect that overwrites its underlying value, discards effects below
+that point, initializes a typed underlying value, then applies the remaining
+effects from lower to higher priority. This supports replacement, addition,
+and per-repeat accumulation.
+
+```xml
+<svg xmlns="http://www.w3.org/2000/svg">
+  <rect fill="yellow">
+    <set attributeName="fill" to="blue" begin="1s; 3s" dur="1s"/>
+    <set attributeName="fill" to="lightblue" begin="1.5s" dur="2s"/>
   </rect>
 </svg>
-
-t=0    →  no active animations          → fill = yellow (baseVal)
-t=1    →  set#1 active                  → fill = blue
-t=1.5  →  set#1 + set#2, set#2 wins     → fill = lightblue
-t=2    →  set#2 active alone            → fill = lightblue
-t=3    →  set#1 restarts (higher prio)  → fill = blue
-t=4    →  no active animations          → fill = yellow
 ```
 
-Composition modes:
+At overlapping times, interval priority and composition determine the result;
+plain source order alone is not a complete model. The destination of the final
+sampled value is one of the CSS, SVG DOM, or motion-transform paths described
+above, not invariably an `animVal` slot.
 
-- `additive="replace"` (default) — top of sandwich wins; lower priorities
-  are ignored.
-- `additive="sum"` — base value + this element's contribution + lower
-  priorities' contributions, summed.
-- `accumulate="sum"` — per-iteration accumulation across `repeatCount`
-  cycles.
+## Frame service and invalidation
 
-## Per-frame service
+During `PageAnimator::ServiceScriptedAnimations`, each unthrottled
+`LocalFrameView` services SMIL before CSS/Web Animation event tasks and
+`requestAnimationFrame` callbacks. The subsequent document lifecycle consumes
+the new values.
 
-SMIL is sampled at the **top** of each `BeginMainFrame`, before rAF callbacks
-and before the document lifecycle. The dispatch is a little non-obvious:
+```text
+Page::Animator().ServiceScriptedAnimations(time)
+  └── LocalFrameView::ServiceScrollAnimations(time)
+        └── SVGDocumentExtensions::ServiceSmilOnAnimationFrame(document)
+              └── SMILTimeContainer::ServiceAnimations()
+                    ├── sample elapsed presentation time
+                    ├── update intervals and active stacks
+                    ├── apply per-target sandwiches
+                    └── request another visual frame or arm a future wakeup
 
-```
-Page::Animate(monotonic_frame_begin_time)
-  └── Page::Animator().ServiceScriptedAnimations(time)
-        ├── For each LocalFrameView: ServiceScrollAnimations(time)
-        │     └── SVGDocumentExtensions::ServiceSmilOnAnimationFrame(doc)
-        │           └── SMILTimeContainer::ServiceAnimations()
-        │                 ├── Advance presentation_time
-        │                 ├── Update each scheduled timed element's interval
-        │                 └── For each sandwich:
-        │                       ├── UpdateActiveAnimationStack
-        │                       └── ApplyAnimationValues
-        │                             → SVGElement::SetAnimatedAttribute
-        └── ScriptedAnimationController: run rAF callbacks
+CSS/Web Animation event tasks and requestAnimationFrame callbacks
 
-Page::UpdateLifecycle           ← style → layout → prepaint → paint
+document lifecycle
+  └── style -> layout -> prepaint -> paint
 ```
 
-`LocalFrameView::ServiceScrollAnimations` does more than its name suggests —
-it samples SMIL and scroll-driven animations along with scroll animations.
-`SetAnimatedAttribute` writes into the property's `animVal` slot, then queues
-style invalidation. The next style recalc folds the sampled value into
-`ComputedStyle` for presentation attributes; layout reads it directly for
-non-CSS attributes (`points`, `d`, `viewBox`, `transform`, ...).
+CSS-property results request local style recalculation. SVG DOM results call
+the target property's `SvgAttributeChanged`, which may invalidate style,
+geometry/layout, transforms, paint properties, or referenced SVG resources.
+Motion animation follows its own transform invalidation path.
 
-## Interval timing
+`SMILTimeContainer::ServiceAnimations` treats an unexpected continuous-frame
+lag above 60 seconds as a scheduling discontinuity and adjusts its presentation
+time base. That is lifecycle resilience, not an alternative authored timing
+model.
 
-A timed element's `begin` and `end` attributes can each be a list of times,
-events, sync-base references, or a wallclock — combined into intervals.
+## Timing conditions
 
-### Wallclock and offset values
+Blink's SMIL implementation supports several sources of instance times:
 
-```
-<animate begin="2s; 5s" end="4s; 6s" .../>
-```
+- offset clock values;
+- sync-base begin/end conditions;
+- repeat conditions; and
+- event-base conditions.
 
-Two intervals: `[2s, 4s]` and `[5s, 6s]`. Computed once at parse time.
+Offset values are parsed into sorted instance-time lists. `UpdateInterval`
+resolves current intervals during service and revalidates them through
+`DiscardOrRevalidateCurrentInterval` when the lists or dependencies change.
 
-### Sync-base timing
+For a sync-base such as `begin="a.end+0.5s"`, a condition observes the other
+timed element and reschedules the dependent element when its interval changes.
 
-```
-<animate id="a" begin="0s" dur="1s"/>
-<animate id="b" begin="a.end+0.5s" dur="1s"/>
-```
+For an event condition, `Condition::ConnectEventBase` resolves the event-base
+element and installs a `ConditionEventListener`. When invoked, it adds an
+event-origin instance time and reschedules the timed element.
+`SVGSMILElement::AddedEventListener` is not this general connection path; it
+only maintains bookkeeping for the nonstandard `repeatn` event.
 
-`b` chains off `a.end`. Implemented as a dependency graph: when `a`'s
-interval changes, `b`'s `Reschedule` is called to recompute its interval list.
+Blink recognizes `accesskey(...)` syntax but does not connect it. The current
+implementation has no wallclock timing path. Parsed syntax and executable
+timing support therefore must not be conflated.
 
-### Event-based timing
+`restart`, `repeatCount`, `repeatDur`, and `fill` participate in interval and
+contribution state. With `fill="freeze"`, the effect remains contributing after
+its active interval; with `fill="remove"`, the sandwich falls through to lower
+effects or the base value.
 
-```
-<animate begin="rect.click" .../>
-```
+## CSS and Web Animations on SVG
 
-`SVGSMILElement::AddedEventListener` hooks the source during interval
-resolution. When the event fires, the timed element's interval list is
-extended and `Reschedule` updates the queue.
+CSS Animations, CSS Transitions, and script-created Web Animations use the
+shared `core/animation` effect and timeline machinery. Their active
+interpolations enter `StyleCascade` at animation or transition origin and
+produce the resulting `ComputedStyle`.
 
-### `restart` and `repeatCount`
+The machinery is shared, but the full path is not SVG-blind. SVG has
+target-specific handling for transform semantics, `<use>` instances, resource
+descendants, and compositor eligibility. Web Animations target CSS properties.
+SVG attributes without CSS counterparts, such as `points` and `viewBox`,
+remain on SMIL or direct DOM mutation paths. Path data `d` is a CSS property in
+current Blink and can participate in CSS/Web Animations.
 
-- `restart="always|whenNotActive|never"` — controls whether a new begin time
-  can preempt or restart the current run.
-- `repeatCount="N|indefinite"` and `repeatDur="..."` — control iteration.
+## Compositor eligibility
 
-### `fill` (frozen vs removed)
+SVG SMIL itself is sampled and applied on Blink's main thread. CSS/Web
+Animations targeting SVG may run on the compositor when they animate supported
+compositable properties and pass paint-property-tree and SVG-specific checks.
 
-- `fill="freeze"` — last animated value is held after the active interval
-  ends (sandwich keeps the element contributing).
-- `fill="remove"` — element stops contributing; sandwich drops to the next
-  priority or back to `baseVal`.
+The presence of any SMIL animation on the target causes
+`CompositorAnimations::CheckCanStartSVGElementOnCompositor` to return
+`kTargetHasIncompatibleAnimations`. That prevents a CSS/Web Animation on the
+same target from starting on the compositor even though its cascade result is
+still valid on the main thread.
 
-## CSS animations and Web Animations on SVG
+General SVG exclusions include `<use>` instances and SVG resource subtrees.
+Transform animation has additional exclusions for nested SVG viewport
+containers, non-unit effective zoom, additional container translation, and
+transforms that affect `vector-effect` behavior.
 
-SVG elements participate in the standard CSS animation engine:
+An accelerated CSS/Web Animation continues to run in Blink on the main thread
+so computed style and lifecycle state remain current, while the compositor
+produces visual updates. `CompositorAnimationDelegate` reports playback-state
+changes and the authoritative start time; the compositor does not send every
+interpolated visual value back to Blink.
 
-- `@keyframes` rules can target SVG elements like any other element.
-- `transition: fill 200ms` on an SVG `<rect>` works.
-- `Element.animate({ fill: ['red', 'blue'] }, ...)` works via the Web
-  Animations API.
+## Animation inside `SVGImage`
 
-These all flow through `core/animation/` (`KeyframeEffect`, `AnimationTimeline`,
-`Animation`) and write directly to `ComputedStyle`. There is no SVG-specific
-codepath.
+`SVGImage` owns an isolated document and `Page`. When an observer is present
+and does not request pausing, `SVGImage::ServiceAnimations` services scripted
+animations, updates lifecycle through prepaint while deliberately skipping
+paint, and updates main-thread animations directly.
 
-**Restriction.** Web Animations only target CSS properties. You cannot animate
-`rect.x.baseVal.value` from Web Animations — only via SMIL or by manually
-mutating the property in JS.
+The same image machinery can serve HTML `<img>` and CSS `<image>` contexts.
+SVG Integration's animated-image mode covers both when animation is allowed; a
+referencing context may instead require static-image mode. SVG image documents
+do not execute script and do not have composited animations.
 
-## Compositor-thread animations
+## Source locations
 
-Transform and opacity animations on SVG elements can promote to the
-compositor thread (impl-side animation) just like HTML elements, provided the
-element has a `cc::Layer`. Most SVG content does not have its own layer (it
-paints into the parent's record), so impl-thread animation on inline SVG
-content is uncommon — but `<svg>` roots and elements with `will-change:
-transform` can be animated impl-side.
-
-When impl-side animation runs, the compositor's interpolated value is sent
-back to the main thread (Blink) so `getComputedStyle` and `animationend`
-events stay accurate.
-
-## Animations inside `SVGImage`
-
-An `SVGImage` document (SVG used as `<img>`, `background-image`, etc. — see
-[svg-as-image.md](./svg-as-image.md)) runs its own mini lifecycle. SMIL inside
-runs only when:
-
-1. The host is animating (e.g., on a frame tick), AND
-2. The spec allows animation for the image use-case. Per the SVG Integration
-   spec, `<img>` plays animations; CSS background images do not by default.
-
-The host triggers SMIL service inside the image via
-`Page::Animator().ServiceScriptedAnimations` on the image's isolated `Page`
-(see `core/svg/graphics/svg_image.cc`).
-
-## Files
-
-| File                                           | Role                                                              |
-| ---------------------------------------------- | ----------------------------------------------------------------- |
-| `core/svg/animation/svg_smil_element.h`        | Base class for `<animate>`, `<set>`, etc. — interval timing model |
-| `core/svg/animation/element_smil_animations.h` | Per-target sandwich registry                                      |
-| `core/svg/animation/smil_animation_sandwich.h` | The sandwich composition algorithm                                |
-| `core/svg/animation/smil_time_container.h`     | Per-`<svg>` timeline; `ServiceAnimations` entry                   |
-| `core/svg/svg_document_extensions.h`           | `ServiceSmilOnAnimationFrame` — entry from `LocalFrameView`       |
-| `core/page/page_animator.cc`                   | `ServiceScriptedAnimations` — top-of-frame dispatch               |
-| `core/animation/`                              | Standard CSS / Web Animations engine (shared with HTML)           |
+| Path under `third_party/blink/renderer/`        | Role                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------------------ |
+| `core/svg/animation/svg_smil_element.{h,cc}`    | Instance times, interval state, conditions, priority, contribution state |
+| `core/svg/animation/element_smil_animations.h`  | Per-target sandwich registry                                             |
+| `core/svg/animation/smil_animation_sandwich.cc` | Priority stack and typed composition                                     |
+| `core/svg/animation/smil_time_container.{h,cc}` | Timeline synchronization, service, and scheduling                        |
+| `core/svg/animation/smil_animation_value.h`     | Typed sandwich value carrier                                             |
+| `core/svg/svg_animation_element.{h,cc}`         | Keyframes, calc modes, interpolation parameters                          |
+| `core/svg/svg_animate_element.{h,cc}`           | Target resolution, typed parsing, CSS/DOM result application             |
+| `core/svg/svg_animate_transform_element.{h,cc}` | Transform-list animation                                                 |
+| `core/svg/svg_animate_motion_element.{h,cc}`    | Motion-path animation and result application                             |
+| `core/svg/svg_element.cc`                       | Animated DOM value and motion-transform application/invalidation         |
+| `core/svg/svg_document_extensions.{h,cc}`       | Document-level SMIL registration and service entry                       |
+| `core/svg/svg_svg_element.cc`                   | Per-`<svg>` time-container ownership                                     |
+| `core/frame/local_frame_view.cc`                | Frame-level SMIL service call                                            |
+| `core/page/page_animator.cc`                    | Top-level scripted-animation ordering                                    |
+| `core/css/resolver/style_resolver.cc`           | SMIL declarations and CSS animation/transition cascade integration       |
+| `core/css/resolver/cascade_origin.h`            | Author, animation, and transition origin ordering                        |
+| `core/animation/compositor_animations.cc`       | SVG compositor eligibility                                               |
+| `core/svg/graphics/svg_image.cc`                | Isolated SVG image animation lifecycle                                   |
 
 ## See also
 
-- [animated-properties-idl.md](./animated-properties-idl.md) — `baseVal` /
-  `animVal`, the slot SMIL writes into.
-- [pipeline.md](./pipeline.md) — where SMIL sampling sits in the per-frame
-  flow.
-- [`../dirty-flag-management.md`](../dirty-flag-management.md) — invalidation
-  shape for animation writes.
+- [animated-properties-idl.md](./animated-properties-idl.md) — `baseVal`,
+  `animVal`, and SVG property tear-offs.
+- [pipeline.md](./pipeline.md) — the wider document lifecycle around sampling.
+- [svg-as-image.md](./svg-as-image.md) — isolated SVG image documents.
+- [`../dirty-flag-management.md`](../dirty-flag-management.md) — downstream
+  invalidation categories.
