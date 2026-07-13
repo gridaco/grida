@@ -37,7 +37,10 @@ import type {
   ImageModel,
 } from "ai";
 import { embed, experimental_generateVideo, wrapProvider } from "ai";
-import { models as ai_models } from "@grida/ai-models";
+import {
+  models as ai_models,
+  type GridaCallProviderOptions,
+} from "@grida/ai-models";
 import type { VideoGenerateRequest, VideoGenerateResult } from "@grida/agent";
 import Replicate from "replicate";
 import OpenAI from "openai";
@@ -161,6 +164,14 @@ export { BillingMetronomeError };
 // into `./models`. Only the boolean crosses out — never the key.
 export { isByokActive };
 export type { ModelTier };
+
+// The producer contract for `providerOptions.grida` lives in `@grida/ai-models`
+// — the one package both this seam and the framework-free `@grida/agent` share
+// — so every billed call site (editor OR package) is compiled against ONE key
+// definition. Re-exported here so editor call sites keep importing it from the
+// seam; `extractContext` (below) reads the same shape via `GridaProviderOptions`.
+export { gridaProviderOptions } from "@grida/ai-models";
+export type { GridaCallProviderOptions };
 
 // ===========================================================================
 // Core seam — gate → run → ingest
@@ -313,61 +324,14 @@ export function costMillsFromTokenUsage(
 // Vercel AI SDK adapter — `grida` provider
 // ===========================================================================
 
-type GridaProviderOptions = {
-  organizationId?: number;
-  feature?: string;
-  transactionId?: string;
-  /**
-   * Explicit cost in mills — used by the image-model middleware since
-   * AI SDK image gen doesn't expose token usage. The route handler
-   * computes cost from request params (n, size, quality) against the
-   * cost card and threads it through.
-   */
-  costMills?: number;
-  /** See {@link GridaCallContext.awaitIngest}. */
-  awaitIngest?: boolean;
-};
-
-/**
- * The call-site (producer) contract for a billed seam call.
- *
- * `providerOptions` in the AI SDK is an OPEN `Record<string, Record<string,
- * JSONValue>>`, so a hand-written `{ grida: {...} }` literal type-checks with
- * ANY keys — which is exactly how a snake_cased `organization_id` shipped past
- * `tsc` and failed only at runtime in {@link extractContext}. This is the typed
- * producer contract: `organizationId` and `feature` — the two fields the
- * middleware requires — are MANDATORY, so a missing or misspelled key is a
- * compile error at the call site, not a runtime `MissingOrgIdError`.
- *
- * Deliberately stricter than the internal (read-side) {@link GridaProviderOptions},
- * which stays all-optional because the middleware reads it defensively. Strict
- * in what we produce, lenient in what we accept.
- *
- * Always build the payload with {@link gridaProviderOptions}; never hand-write
- * the `grida` provider-options object.
- */
-export type GridaCallProviderOptions = {
-  organizationId: number;
-  feature: string;
-  transactionId?: string;
-  costMills?: number;
-  awaitIngest?: boolean;
-};
-
-/**
- * Build the `{ grida }` provider-options payload the billing middleware reads.
- *
- * Use at EVERY billed call site instead of a bare `{ grida: {...} }` literal:
- * the typed parameter turns a misspelled/snake_cased/omitted `organizationId`
- * into a compile error. Generic in the argument so the returned literal keeps
- * its exact shape (no phantom optional `| undefined`) and stays assignable to
- * the AI SDK `providerOptions` slot.
- */
-export function gridaProviderOptions<T extends GridaCallProviderOptions>(
-  options: T
-): { grida: T } {
-  return { grida: options };
-}
+// Read-side view: what the billing middleware defensively reads back off
+// `providerOptions.grida`. DERIVED from the producer contract so the field
+// NAMES have a single definition — rename `organizationId` in
+// `GridaCallProviderOptions` and both the builder (produce side) and
+// `extractContext` (read side) stop compiling in lockstep, which is exactly the
+// producer↔consumer link whose absence let a snake_cased key ship. All-optional
+// because the middleware validates presence/shape at runtime (see extractContext).
+type GridaProviderOptions = Partial<GridaCallProviderOptions>;
 
 type ExtractedContext = GridaCallContext & { costMills?: number };
 

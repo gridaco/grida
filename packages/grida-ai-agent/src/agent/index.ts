@@ -45,6 +45,10 @@ import {
 import { renderSkillIndex } from "../skills/skill-tool";
 import { AgentVision } from "../vision";
 import { AgentGen } from "../gen";
+import {
+  gridaProviderOptions,
+  type GridaCallProviderOptions,
+} from "@grida/ai-models";
 import type {
   SkillBodyCache,
   SkillBodyLoader,
@@ -180,11 +184,7 @@ export function createAgent(opts: CreateAgentOptions) {
         model: opts.model_factory(tier, options.model_id),
         providerOptions: {
           ...settings.providerOptions,
-          grida: {
-            organization_id: options.organization_id,
-            feature: options.feature ?? "agent/chat",
-            transaction_id: options.transaction_id,
-          },
+          ...gridaAttribution(options),
           anthropic: {
             ...settings.providerOptions?.anthropic,
             thinking: { type: "adaptive" },
@@ -209,6 +209,39 @@ export function createAgent(opts: CreateAgentOptions) {
       messages: hoistToolResultImages(messages),
     }),
     stopWhen: stepCountIs(8),
+  });
+}
+
+/**
+ * Build the billing seam's `grida` provider-options fragment for a turn.
+ *
+ * Injected via the shared typed builder ({@link gridaProviderOptions}), never a
+ * bare `{ grida: {...} }` literal — a bare literal is how a snake_cased
+ * `organization_id` key once shipped past `tsc` and failed only at runtime with
+ * `MissingOrgIdError`.
+ *
+ * `organization_id` is optional on {@link AgentCallOptions} because the BYOK /
+ * desktop host runs on a bare provider with NO billing middleware — there is no
+ * seam to attribute, so this returns `{}` and no `grida` key is emitted. On the
+ * hosted (billed) path the route always threads a verified id (GRIDA-SEC-003 /
+ * `requireOrganizationId`), so the builder branch always runs there; and if a
+ * billed call ever reached the seam without one, its middleware correctly
+ * throws `MissingOrgIdError` rather than billing a bogus org.
+ *
+ * Exported so the exact key mapping (camelCase, tier-independent) is unit-pinned
+ * without standing up a model — the class of bug this fixes is a wrong key, and
+ * the guard for a wrong key is a test that reads the emitted key.
+ */
+export function gridaAttribution(
+  options: AgentCallOptions
+): { grida: GridaCallProviderOptions } | Record<string, never> {
+  if (options.organization_id === undefined) return {};
+  return gridaProviderOptions({
+    organizationId: options.organization_id,
+    feature: options.feature ?? "agent/chat",
+    ...(options.transaction_id !== undefined
+      ? { transactionId: options.transaction_id }
+      : {}),
   });
 }
 

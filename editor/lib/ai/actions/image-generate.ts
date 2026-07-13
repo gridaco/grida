@@ -18,7 +18,12 @@ import imageSize from "image-size";
 import { service_role } from "@/lib/supabase/server";
 import ai from "@/lib/ai";
 import { computeImageCostMills } from "@/lib/ai/image-cost";
-import { methods, withAiAuth, type AiActionResult } from "@/lib/ai/server";
+import {
+  methods,
+  withAiAuth,
+  gridaProviderOptions,
+  type AiActionResult,
+} from "@/lib/ai/server";
 
 export type GenerateAiImageInput = {
   prompt: string;
@@ -188,12 +193,10 @@ async function generateImageWithSize({
     size,
     aspectRatio: aspect_ratio,
     n: 1,
-    providerOptions: {
-      grida: {
-        organizationId,
-        feature: "ai/image/generate",
-        costMills,
-      },
-    },
+    providerOptions: gridaProviderOptions({
+      organizationId,
+      feature: "ai/image/generate",
+      costMills,
+    }),
   });
 }
