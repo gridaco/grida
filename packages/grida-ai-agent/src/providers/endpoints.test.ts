@@ -121,6 +121,67 @@ describe("validateEndpointProviderConfig", () => {
     expect(resolved).not.toHaveProperty("overrides");
   });
 
+  it("preserves exact image MIME declarations through validation and resolution", () => {
+    const result = validateEndpointProviderConfig({
+      ...OLLAMA,
+      models: [
+        {
+          id: "vision",
+          overrides: {
+            imageInputMimes: ["IMAGE/PNG", "ImAgE/SvG+XmL"],
+          },
+        },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.config.models[0].overrides?.imageInputMimes).toEqual([
+      "image/png",
+      "image/svg+xml",
+    ]);
+    expect(
+      resolveEndpointModel(result.config.models[0]).imageInputMimes
+    ).toEqual(["image/png", "image/svg+xml"]);
+  });
+
+  it("never derives exact image MIME declarations from broad multimodal capability", () => {
+    const result = validateEndpointProviderConfig({
+      ...OLLAMA,
+      models: [{ id: "broad-only", overrides: { multimodal: true } }],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(
+      resolveEndpointModel(result.config.models[0]).imageInputMimes
+    ).toBeUndefined();
+  });
+
+  it("rejects misplaced, malformed, duplicate, and oversized exact image MIME declarations", () => {
+    const validate = (imageInputMimes: unknown) =>
+      validateEndpointProviderConfig({
+        ...OLLAMA,
+        models: [{ id: "vision", overrides: { imageInputMimes } }],
+      }).ok;
+
+    expect(
+      validateEndpointProviderConfig({
+        ...OLLAMA,
+        models: [{ id: "vision", imageInputMimes: ["image/png"] }],
+      }).ok
+    ).toBe(false);
+    expect(validate("image/png")).toBe(false);
+    expect(validate(["TEXT/PLAIN"])).toBe(false);
+    expect(validate(["IMAGE/"])).toBe(false);
+    expect(validate(["IMAGE/*"])).toBe(false);
+    expect(validate(["image/png", "IMAGE/PNG"])).toBe(false);
+    expect(validate(Array.from({ length: 17 }, (_, i) => `image/x-${i}`))).toBe(
+      false
+    );
+    expect(validate([`image/${"x".repeat(123)}`])).toBe(false);
+  });
+
   it("rejects malformed overrides", () => {
     expect(
       validateEndpointProviderConfig({
@@ -181,6 +242,25 @@ describe("mergeProbedModels — the detection-owned merge contract", () => {
     expect(result.models[1]).toEqual({ id: "unprobed:7b", tool_call: true });
   });
 
+  it("probe refresh preserves human-declared exact image MIME types", () => {
+    const result = mergeProbedModels(
+      [
+        {
+          id: "vision",
+          tool_call: false,
+          overrides: { imageInputMimes: ["image/png", "image/webp"] },
+        },
+      ],
+      [{ id: "vision", tool_call: true }]
+    );
+
+    expect(result.models[0].tool_call).toBe(true);
+    expect(result.models[0].overrides?.imageInputMimes).toEqual([
+      "image/png",
+      "image/webp",
+    ]);
+  });
+
   it("appends newly discovered models and reports no-op merges", () => {
     const result = mergeProbedModels(
       [{ id: "known:8b", tool_call: true }],
@@ -236,12 +316,17 @@ describe("EndpointProvidersStore", () => {
         {
           id: "capped:31b",
           contextWindow: 262_144,
-          overrides: { contextWindow: 32_768 },
+          overrides: {
+            contextWindow: 32_768,
+            imageInputMimes: ["image/png"],
+          },
         },
       ],
     });
-    const models = await store.registeredModels();
+    const fresh = new EndpointProvidersStore(baseDir);
+    const models = await fresh.registeredModels();
     expect(models[0].contextWindow).toBe(32_768);
+    expect(models[0].imageInputMimes).toEqual(["image/png"]);
   });
 
   it("delete is idempotent", async () => {

@@ -76,18 +76,77 @@ collapses, resolves out, or becomes a provider-native block.
 
 Three distinct shapes, deliberately:
 
-| Shape             | Body location                             | Use when                                                                                                             |
-| ----------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `file-ref`        | Path / URL / content-id; body NOT inlined | The file is in an already-authorized scope; the agent reads it via `read` or `web_fetch` when it needs the contents. |
-| `directory-ref`   | Host-bound scope; descendants NOT copied  | The user grants the session bounded access to an existing directory tree without making it the working directory.    |
-| `file-attachment` | Inline bytes (base64 or binary)           | The model has multi-modal capability and should see a copied file's bytes directly.                                  |
+| Shape             | Body location                                        | Use when                                                                                                             |
+| ----------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `file-ref`        | Path / URL / content-id; body NOT delivered directly | The file is in an already-authorized scope; the agent reads it via `read` or `web_fetch` when it needs the contents. |
+| `directory-ref`   | Host-bound scope; descendants NOT copied             | The user grants the session bounded access to an existing directory tree without making it the working directory.    |
+| `file-attachment` | Inline bytes or a provider-fetchable URL             | The active provider should receive the file content directly as a native input block.                                |
 
 For files, the host MAY map the same drag-and-drop gesture to either
 `file-ref` or `file-attachment`. A code-agent host typically prefers
 "drag = file-ref" (preserves the agent's tool-driven reading flow). A
 design-agent host typically prefers "drag image = attachment" (the
 model sees the image directly). A directory drop always produces a
-`directory-ref`.
+`directory-ref` when a bounded reference can be authorized; otherwise
+the compositor rejects it.
+
+### Resource routing policy
+
+Attachment versus reference is a **routing decision**, not an intrinsic
+property of a paste, drop, picker, or Library item. A conforming
+compositor makes that decision once, before materialization, from four
+separate inputs:
+
+| Layer                 | Question it answers                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Representation facts  | What exists now: bytes, an agent-visible path, a URL, or a host-mintable handle?                                     |
+| Preference policy     | Among legal routes, should this surface prefer a reference or a direct attachment?                                   |
+| Consumer capabilities | Do the delivery encoder and active provider declare this MIME and representation? Is tool-visible scratch available? |
+| Independent authority | May the host expose the referenced resource to this session, with what access?                                       |
+
+The generating rule is: **describe the available representations,
+evaluate the configured preferences in order, reject infeasible routes,
+then materialize exactly one typed route**. User-interface cards are a
+view of that result; their incidental fields MUST NOT be inspected later
+to rediscover whether the resource was an attachment or a reference.
+
+Preference is configurable because different agent surfaces have
+different useful defaults. A design surface may prefer provider-native
+image attachments, while a code agent may prefer live references. The
+configuration changes preference only. It cannot manufacture a
+representation, claim encoder or provider support, or grant filesystem
+authority.
+
+The following constraints override every preference configuration:
+
+- A directory is reference-only. It cannot be routed as inline bytes or
+  recursively copied to scratch.
+- Copied bytes with no stable path, URL, or host capability cannot be
+  described as a live reference. Clipboard image bytes therefore remain
+  an attachment even under a reference-first policy.
+- A reference route requires an independently authorized scope. Agent
+  supervision or permission mode does not widen that scope.
+- A provider-native attachment requires declared support from both the
+  delivery encoder and the active provider for its MIME and representation
+  (inline bytes or provider-fetchable URL). Exact MIME capabilities MUST be
+  used when known. An implementation MUST NOT infer support beyond those
+  declarations; a broad label such as “multimodal” does not by itself widen
+  the accepted set.
+- Scratch delivery is admitted against the final turn's aggregate byte, file,
+  and path budget. Every seed source merged into that turn reserves capacity;
+  an implementation SHOULD reject an impossible batch before reading all of
+  its bodies and MUST keep the user's draft when final preflight fails.
+- One resource has one primary route. A compositor MUST NOT silently
+  duplicate it as both attachment and reference, or silently switch to a
+  semantically different route after materialization fails.
+
+This separation keeps source provenance useful without making source
+labels magical. A drop can carry evidence that a trusted host may mint a
+scope; the word “drop” alone never grants access. Likewise, a Library URL
+may be routed as a live URL reference, which the agent chooses whether to
+fetch, or as a provider-native URL attachment, which the provider fetches as
+part of direct delivery. The representation is the same; the selected route
+and required capabilities differ, while the source adapter remains unchanged.
 
 ### File-ref with range
 
@@ -176,11 +235,12 @@ alone. See [permission scopes](./session.md#permission-scopes).
 
 ### Multi-modal handling
 
-Attached images, PDFs, audio, video go to the model as
-**provider-native multi-modal parts**. The agent system shells them
-through; the provider adapter re-encodes if needed. The model sees
-them in the format its provider supports — Anthropic's image block,
-OpenAI's `image_url`, etc.
+Eligible attached images, PDFs, audio, and video MAY go to the model as
+**provider-native multi-modal parts**. Direct delivery may carry inline bytes
+or a provider-fetchable URL. The delivery encoder and active provider must
+declare support for the representation and MIME; the provider adapter
+re-encodes only within that declared capability. Otherwise lowering uses the
+descriptor path described below.
 
 ### Binary the model does not understand
 
@@ -443,7 +503,7 @@ Per part type:
 | `text`            | Inline text                                      | `{ type: "text", text }`                                         | Text, verbatim.                                                                                                                                                                                                            |
 | `file-ref`        | Chip / link with file name and optional `:lines` | `{ type: "file-ref", ref }`                                      | A tool-addressable descriptor by default. A range-carrying ref lowers only the selected range; a deliberately resolved image MAY become a provider-native image block. The model never sees the literal `@path`.           |
 | `directory-ref`   | Folder chip / link                               | `{ type: "directory-ref", ref }`                                 | A compact descriptor naming the tool-addressable directory scope. Descendant contents are never inlined by lowering.                                                                                                       |
-| `file-attachment` | Thumbnail or file chip                           | `{ type: "file-attachment", data, mime, name, … }`               | Provider-native multi-modal block when the provider supports the mime type; descriptor placeholder otherwise.                                                                                                              |
+| `file-attachment` | Thumbnail or file chip                           | `{ type: "file-attachment", data?, url?, mime, name, … }`        | Provider-native multi-modal block when the delivery encoder and provider declare support for the MIME and representation; descriptor placeholder otherwise.                                                                |
 | `command`         | Resolved chip / palette result                   | `{ type: "command", id, args }`                                  | **Nothing** when the command is host-action-only. Otherwise the command's result lowered as text/file parts (e.g. `/read foo.ts` → the file's contents). The literal `/foo` is never sent.                                 |
 | `mention` (skill) | Chip / pill in the input                         | `{ type: "mention", target }`                                    | **Nothing** in the user message; the [skill body](./skills.md) loads via the normal `skill` tool flow.                                                                                                                     |
 | `mention` (file)  | Same                                             | Same                                                             | Lowered as a `file-ref` (and from there per the file-ref row).                                                                                                                                                             |

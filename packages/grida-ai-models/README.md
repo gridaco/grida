@@ -7,6 +7,12 @@ size validation. It does not create provider clients, make network requests,
 enforce billing, or decide access. Its scope ends at exported objects, types,
 and lookup helpers.
 
+## Anti-goals
+
+- Not a provider router or provider client.
+- Not an inference engine for capabilities a provider did not publish.
+- Not a catalogue of any particular application's encoder formats.
+
 ## Related
 
 - [Model pricing docs](https://grida.co/docs/models/pricing)
@@ -64,6 +70,10 @@ Each `ModelSpec` contains:
 - `short_label` — optional, manually-curated compact name for space-constrained
   UI (e.g. `"Opus 4.8"`); falls back to `label` when unset
 - `multimodal`
+- `imageInputMimes` — exact provider-documented image MIME types accepted as
+  native model input. This list is independent of `multimodal`: a broad
+  capability never manufactures exact formats, and consumers intersect it with
+  the representations they can actually produce.
 - `tool_call` — whether the model supports native tool/function calling
   (explicit on every entry; the agent loop is tool-heavy)
 - `contextWindow`
@@ -84,7 +94,9 @@ gateways. A `CustomModelSpec` needs only an `id`; `normalize` fills
 conservative defaults (8k context, tool-calling assumed) and
 `resolve(id, custom)` looks an id up over catalogue ∪ custom (the catalogue
 wins on collision). `cost` is optional on custom specs by design — a local
-model is first-class without a price card.
+model is first-class without a price card. Custom hosts may declare
+`imageInputMimes`; absence normalizes to an empty list even when `multimodal` is
+true, while a non-empty exact declaration implies broad multimodal support.
 
 ```ts
 const spec = models.text.registry.resolve("llama3.1:8b", customSpecs);

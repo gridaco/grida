@@ -56,6 +56,19 @@ export type ScratchSeedEntry =
   | { path: string; base64: string };
 
 /**
+ * Canonical `scratch_seed` request ceilings.
+ *
+ * `maxTotalBytes` is the aggregate body size after decoding: UTF-8 bytes for
+ * `text` entries and decoded bytes for canonical base64 entries. These are wire
+ * protocol invariants, not host or UI policy. The server remains authoritative;
+ * callers may use the same immutable values for early request preflight.
+ */
+export const SCRATCH_SEED_LIMITS = Object.freeze({
+  maxFiles: 64,
+  maxTotalBytes: 8 * 1024 * 1024,
+} as const);
+
+/**
  * A user's Allow/Deny on a paused supervised approval (RFC `permission modes`,
  * Phase 2). It rides the resume run-request body as a FIRST-CLASS field — not
  * smuggled inside a mutated assistant message — exactly like `mode`/`model_id`.

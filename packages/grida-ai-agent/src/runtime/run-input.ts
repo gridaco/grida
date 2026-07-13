@@ -9,11 +9,12 @@
 
 import crypto from "node:crypto";
 import { models } from "@grida/ai-models";
-import type {
-  AgentModelId,
-  AgentRunMessagePart,
-  ApprovalAnswer,
-  ScratchSeedEntry,
+import {
+  SCRATCH_SEED_LIMITS,
+  type AgentModelId,
+  type AgentRunMessagePart,
+  type ApprovalAnswer,
+  type ScratchSeedEntry,
 } from "../protocol/run";
 import {
   AGENT_DEFAULT_MODE,
@@ -323,14 +324,14 @@ function parseScratchSeed(raw: unknown): {
 } {
   if (raw === undefined) return {};
   if (!Array.isArray(raw)) return { error: "scratch_seed must be an array" };
-  const MAX_FILES = 64;
-  const MAX_TOTAL = 8 * 1024 * 1024; // ~8 MB total (decoded); bounds abuse
   const out: ScratchSeedEntry[] = [];
   const paths = new Set<string>();
   let total = 0;
   for (const e of raw) {
-    if (out.length >= MAX_FILES) {
-      return { error: `scratch_seed exceeds ${MAX_FILES} files` };
+    if (out.length >= SCRATCH_SEED_LIMITS.maxFiles) {
+      return {
+        error: `scratch_seed exceeds ${SCRATCH_SEED_LIMITS.maxFiles} files`,
+      };
     }
     if (e == null || typeof e !== "object") {
       return { error: "scratch_seed contains a malformed entry" };
@@ -352,8 +353,10 @@ function parseScratchSeed(raw: unknown): {
     // Cost decoded bytes, not JSON/base64 code units. Text is UTF-8 on disk.
     if (typeof text === "string") {
       total += new TextEncoder().encode(text).byteLength;
-      if (total > MAX_TOTAL) {
-        return { error: `scratch_seed exceeds ${MAX_TOTAL} decoded bytes` };
+      if (total > SCRATCH_SEED_LIMITS.maxTotalBytes) {
+        return {
+          error: `scratch_seed exceeds ${SCRATCH_SEED_LIMITS.maxTotalBytes} decoded bytes`,
+        };
       }
       out.push({ path, text });
     } else if (typeof base64 === "string") {
@@ -362,8 +365,10 @@ function parseScratchSeed(raw: unknown): {
         return { error: `scratch_seed entry ${path} has invalid base64` };
       }
       total += bytes;
-      if (total > MAX_TOTAL) {
-        return { error: `scratch_seed exceeds ${MAX_TOTAL} decoded bytes` };
+      if (total > SCRATCH_SEED_LIMITS.maxTotalBytes) {
+        return {
+          error: `scratch_seed exceeds ${SCRATCH_SEED_LIMITS.maxTotalBytes} decoded bytes`,
+        };
       }
       out.push({ path, base64 });
     }

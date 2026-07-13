@@ -11,18 +11,17 @@
  * Two pure steps, framework-free and unit-tested:
  *   - {@link readFileAsBase64} — a `File` → base64 (no downscale; a raw byte
  *     copy) with a size cap. The single browser step (`File.arrayBuffer`).
- *   - {@link extractOperableFiles} — composer `file-attachment` parts → the
+ *   - {@link lowerOperableFiles} — typed prepared resources → the
  *     `scratch_seed` entries + the `USER_FILE_ATTACHMENTS` context part that
  *     TELLS the agent the files are waiting in scratch.
  *
- * The discriminator between a perceive-image attachment and an operable-file
- * attachment is `payload.base64`: images carry an inline data-`url` (see
- * `image-attachment.ts`); operable files carry their bytes in `payload.base64`
- * and no `url`, so {@link ./image-attachment.toFileUiParts} skips them and this
- * module claims them.
+ * {@link extractOperableFiles} retains the former payload-discriminator API as
+ * a compatibility adapter. New callers classify once through the resource
+ * policy/router and call the typed lowerer directly.
  */
 
 import {
+  SCRATCH_SEED_LIMITS,
   USER_FILE_ATTACHMENTS,
   type ScratchSeedEntry,
   type UserFileAttachmentsData,
@@ -31,19 +30,23 @@ import type { ContextPart } from "./build-agent-send";
 import { decodedBytes } from "./image-attachment";
 
 export type OperableFilePolicy = {
-  /** Per-file byte ceiling. Matches the host's total `scratch_seed` budget, so a
-   *  single file can fill it; several files share it (the host drops the overflow). */
+  /** Per-file byte ceiling. A single file may fill the whole batch budget. */
   readonly maxBytes: number;
+  /** Atomic `scratch_seed` file-count ceiling enforced by the host. */
+  readonly maxFiles: number;
+  /** Atomic decoded-byte budget shared by every seed in one turn. */
+  readonly maxTotalBytes: number;
 };
 
 /**
- * One conservative v1 cap. `maxBytes` ~8 MB matches the host's `parseScratchSeed`
- * total budget (`MAX_TOTAL`) — the host bounds the aggregate; this bounds a
- * single pick so a huge file is rejected client-side with feedback rather than
- * silently truncated on the wire.
+ * The server-owned wire contract supplies the atomic count and decoded-byte
+ * ceilings. A single file may fill that entire aggregate budget, so the same
+ * canonical total is also the composer's per-file preflight ceiling.
  */
 export const OPERABLE_FILE_POLICY: OperableFilePolicy = {
-  maxBytes: 8 * 1024 * 1024,
+  maxBytes: SCRATCH_SEED_LIMITS.maxTotalBytes,
+  maxFiles: SCRATCH_SEED_LIMITS.maxFiles,
+  maxTotalBytes: SCRATCH_SEED_LIMITS.maxTotalBytes,
 };
 
 /** An encoded, scratch-ready operable file (base64 bytes + accounting). */
@@ -56,6 +59,12 @@ export type EncodedOperableFile = {
   base64: string;
 };
 
+/** An encoded file after the composer/router has assigned its stable identity. */
+export type EncodedOperableResource = EncodedOperableFile & {
+  /** Stable within the composer message; used to derive a collision-safe path. */
+  id: string;
+};
+
 /**
  * Read a `File` into a base64 payload for a scratch upload. No downscale/re-encode
  * (unlike an image): a byte-exact copy so a PDF/zip round-trips intact. Returns
@@ -64,7 +73,7 @@ export type EncodedOperableFile = {
  */
 export async function readFileAsBase64(
   file: File,
-  policy: OperableFilePolicy = OPERABLE_FILE_POLICY
+  policy: Pick<OperableFilePolicy, "maxBytes"> = OPERABLE_FILE_POLICY
 ): Promise<EncodedOperableFile | null> {
   if (file.size > policy.maxBytes) return null;
   try {
@@ -114,45 +123,70 @@ export type OperableFilesExtract = {
   context: ContextPart | null;
 };
 
+export type OperableFilesLowerOptions = {
+  /** Paths already claimed by another seed batch merged into the same turn. */
+  reservedPaths?: readonly string[];
+};
+
 /**
- * Split a composer message's `file-attachment` parts into scratch-upload entries
- * + the context part that names them for the model. Only parts carrying
- * `payload.base64` (operable files) are claimed; perceive images (inline `url`)
- * are left for `toFileUiParts`. Scratch paths are sanitized to one safe segment
- * and deduped within the batch. Pure.
+ * Lower already-classified operable files into the two run-input products.
+ *
+ * Classification and byte reading belong upstream. This function is the pure
+ * typed seam after routing: it only assigns safe scratch paths and builds the
+ * matching lean context descriptor in the same order as `files`.
  */
-export function extractOperableFiles(
-  parts: readonly AttachmentPartLike[]
+export function lowerOperableFiles(
+  encoded: readonly EncodedOperableResource[],
+  options: Readonly<OperableFilesLowerOptions> = {}
 ): OperableFilesExtract {
-  const taken = new Set<string>();
+  const taken = new Set(options.reservedPaths ?? []);
   const scratchSeed: ScratchSeedEntry[] = [];
   const files: UserFileAttachmentsData["files"][number][] = [];
-  for (const p of parts) {
-    if (p.type !== "file-attachment") continue;
-    const base64 = p.payload?.base64;
-    if (typeof base64 !== "string" || base64.length === 0) continue;
-    const name = p.name ?? "file";
-    const path = safeScratchName(name, p.id, taken);
-    scratchSeed.push({ path, base64 });
+  for (const file of encoded) {
+    const path = safeScratchName(file.name, file.id, taken);
+    scratchSeed.push({ path, base64: file.base64 });
     files.push({
-      name,
-      mime: p.mime || "application/octet-stream",
-      // Bind the descriptor to the bytes actually sent. The producer verifies
-      // this exact decoded count before staging/persistence.
-      size: decodedBytes(base64),
+      name: file.name,
+      mime: file.mime || "application/octet-stream",
+      size: file.size,
       path,
     });
   }
   if (scratchSeed.length === 0) return { scratchSeed: [], context: null };
   return {
     scratchSeed,
-    // LEAN facts, no instructions (mirrors `buildTemplateContext`): the agent's
-    // `scratch_capability` prompt owns "how to reach scratch"; this says WHAT.
     context: {
       type: USER_FILE_ATTACHMENTS,
       data: { location: "scratch", files },
     },
   };
+}
+
+/**
+ * Split a composer message's `file-attachment` parts into scratch-upload entries
+ * + the context part that names them for the model. Only parts carrying
+ * `payload.base64` (operable files) are claimed; perceive images (inline `url`)
+ * are left for `toFileUiParts`. Scratch paths are sanitized to one safe segment
+ * and deduped within the batch. Compatibility adapter; new code should use
+ * {@link lowerOperableFiles}. Pure.
+ */
+export function extractOperableFiles(
+  parts: readonly AttachmentPartLike[]
+): OperableFilesExtract {
+  const encoded: EncodedOperableResource[] = [];
+  for (const p of parts) {
+    if (p.type !== "file-attachment") continue;
+    const base64 = p.payload?.base64;
+    if (typeof base64 !== "string" || base64.length === 0) continue;
+    encoded.push({
+      id: p.id ?? "attachment",
+      name: p.name ?? "file",
+      mime: p.mime || "application/octet-stream",
+      size: decodedBytes(base64),
+      base64,
+    });
+  }
+  return lowerOperableFiles(encoded);
 }
 
 /**

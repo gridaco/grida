@@ -65,6 +65,7 @@ import {
   chatError,
   desktopAgentTransport,
   isSessionBusy,
+  ScratchSeedBudget,
   StreamAttachOwner,
   useChatSession,
   useCoreTurnSync,
@@ -178,6 +179,10 @@ function AgentPaneContent({
   // user's text; the bundle rides scratch (WG `scratch.md`). Cleared on auto-send.
   const seedSentRef = useRef(false);
   const scratchSeed = seedSentRef.current ? undefined : handoff?.scratch_seed;
+  const scratchReservation = useMemo(
+    () => ScratchSeedBudget.reserve(scratchSeed),
+    [scratchSeed]
+  );
   const contexts = seedSentRef.current
     ? undefined
     : buildTemplateContext(handoff?.template_context);
@@ -427,20 +432,19 @@ function AgentPaneContent({
     endpoints,
   });
 
+  // Exact native image formats come from the catalogue or an explicit custom
+  // endpoint declaration. The broad `multimodal` flag never widens this set.
+  const providerFileMimes = useMemo(
+    () => registered_models.resolve(modelId, endpoints)?.imageInputMimes ?? [],
+    [modelId, endpoints]
+  );
+
   // Permission/supervision posture (RFC `permission modes`). Seeds from the
   // active session's stored mode; rides each send as `body.mode`.
   const { mode, setMode } = useModePickerState({
     current_id: chatSession.current_id,
     sessions: chatSession.sessions,
   });
-
-  // Whether the active model accepts image input — memoized so the
-  // registry lookup doesn't re-scan on every render (only when the model
-  // or endpoint list changes).
-  const multimodal = useMemo(
-    () => registered_models.resolve(modelId, endpoints)?.multimodal ?? false,
-    [modelId, endpoints]
-  );
 
   // The active session row carries the rolled-up cost the context meter
   // surfaces alongside the (real) window %.
@@ -866,7 +870,8 @@ function AgentPaneContent({
           isStreaming={isStreaming}
           busy={busy}
           onStop={stop}
-          multimodal={multimodal}
+          providerFileMimes={providerFileMimes}
+          scratchReservation={scratchReservation}
           toolbar={
             <>
               <DesktopModePicker value={mode} onValueChange={setMode} />

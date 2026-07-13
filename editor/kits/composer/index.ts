@@ -11,6 +11,8 @@ export {
   ComposerTriggerMenu,
 } from "./composer-defaults";
 
+export { ComposerTransfer } from "./composer-transfer";
+
 export type {
   ComposerAttachment,
   ComposerAttachmentFilter,

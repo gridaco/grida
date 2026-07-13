@@ -5,7 +5,36 @@ import {
   isSupportedImageType,
   planResize,
   toFileUiParts,
+  trustedLibraryImageUrl,
 } from "./image-attachment";
+
+describe("trustedLibraryImageUrl", () => {
+  const base = "https://project.supabase.co";
+
+  it("accepts only public-storage objects on the configured Library origin", () => {
+    expect(
+      trustedLibraryImageUrl(
+        `${base}/storage/v1/object/public/library/example.png`,
+        base
+      )?.href
+    ).toBe(`${base}/storage/v1/object/public/library/example.png`);
+    expect(
+      trustedLibraryImageUrl(`${base}/storage/v1/object/private/x.png`, base)
+    ).toBeNull();
+    expect(
+      trustedLibraryImageUrl(
+        "https://attacker.test/storage/v1/object/public/library/x.png",
+        base
+      )
+    ).toBeNull();
+    expect(
+      trustedLibraryImageUrl(
+        "http://project.supabase.co/storage/v1/object/public/library/x.png",
+        base
+      )
+    ).toBeNull();
+  });
+});
 
 describe("planResize", () => {
   it("keeps dimensions already within the longest-edge budget", () => {

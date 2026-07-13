@@ -33,7 +33,6 @@ import {
   UploadIcon,
 } from "lucide-react";
 import type { FileUIPart } from "ai";
-import type { DirectoryScopeDescriptor } from "@grida/agent";
 import { Button } from "@app/ui/components/button";
 import {
   DropdownMenu,
@@ -46,23 +45,25 @@ import {
   ComposerAttachmentCards,
   ComposerContent,
   ComposerProvider,
+  ComposerTransfer,
   ComposerTriggerMenu,
   useComposer,
   type ComposerCatalog,
   type ComposerMessage,
 } from "@/kits/composer";
 import {
-  AgentDirectoryReference,
-  encodeImageFile,
-  extractOperableFiles,
-  isSupportedImageType,
-  readFileAsBase64,
-  toFileUiParts,
+  InputResourcePolicy,
+  InputResourceRouter,
+  OPERABLE_FILE_POLICY,
+  PreparedResourceLedger,
+  ScratchSeedBudget,
   type SendExtras,
 } from "@/lib/agent-chat";
-import { getDesktopBridge } from "@/lib/desktop/bridge";
+import { useDesktopBridge } from "@/lib/desktop/bridge";
 import { AgentLibraryAttachmentPicker } from "./agent-library-attachment-picker";
 import type { DesignLibraryPin } from "./design-search";
+
+const NO_PROVIDER_FILE_MIMES: readonly string[] = [];
 
 /**
  * A `/`-command that runs an action (e.g. `/compact`) instead of being
@@ -105,11 +106,14 @@ export type AgentComposerInputProps = {
   placeholder?: string;
   autofocus?: boolean;
   /**
-   * Whether the active model accepts image input. When false, pasted/dropped
-   * images are rejected at ingest (with a notice) and stripped at submit.
-   * Defaults to `true`.
+   * Exact provider-native MIME capability declared by the selected runtime and
+   * model seam. A broad `multimodal` flag is intentionally insufficient: when
+   * omitted, direct provider attachments are unavailable.
    */
-  multimodal?: boolean;
+  providerFileMimes?: readonly string[];
+  /** Exact MIME types the selected provider can fetch from a remote URL.
+   * Empty by default: model MIME support alone never implies network fetch. */
+  providerUrlFileMimes?: readonly string[];
   /**
    * Whether non-image files may be staged into session scratch. Workspace-less
    * chat surfaces pass `false`: they have no tool-visible scratch binding, so
@@ -124,6 +128,16 @@ export type AgentComposerInputProps = {
    * paste/drop cannot stage content that would be silently discarded.
    */
   attach?: boolean;
+  /**
+   * Ordered attachment/reference preferences. Feasibility still comes from the
+   * active model, scratch binding, and trusted host adapters. Defaults to the
+   * behavior-preserving policy; callers can opt into reference-first routing
+   * without replacing source handlers.
+   */
+  resourcePolicy?: InputResourcePolicy.Config;
+  /** Scratch capacity already claimed by another payload merged into this
+   * turn (for example a first-turn template bundle). */
+  scratchReservation?: ScratchSeedBudget.Reservation;
   /**
    * Allows a submit with empty text/files when the host has out-of-band context
    * to attach to the turn.
@@ -168,9 +182,12 @@ function AgentComposerInner({
   onStop,
   placeholder = "Ask anything…",
   autofocus,
-  multimodal = true,
+  providerFileMimes = NO_PROVIDER_FILE_MIMES,
+  providerUrlFileMimes = NO_PROVIDER_FILE_MIMES,
   operableFiles = true,
   attach = true,
+  resourcePolicy = InputResourcePolicy.CURRENT,
+  scratchReservation = ScratchSeedBudget.NONE,
   allowEmptySubmit = false,
   toolbar,
   className,
@@ -181,6 +198,7 @@ function AgentComposerInner({
   const isBusy = busy ?? isStreaming;
   const composer = useComposer();
   const { addAttachment } = composer;
+  const desktopBridge = useDesktopBridge();
 
   const actionById = useMemo(() => {
     const map = new Map<string, ComposerCommandAction>();
@@ -190,8 +208,8 @@ function AgentComposerInner({
 
   // In-flight file encoding (image downscale OR base64 of an operable upload).
   // Tracked through a ref (read synchronously by `submit`, which races the async
-  // `onFiles`) and mirrored to state (to disable the send button). A counter, not
-  // a boolean, so concurrent picks don't clear the flag while another runs.
+  // resource preparation) and mirrored to state (to disable the send button).
+  // A counter, not a boolean, so queued picks don't clear it too early.
   const encodingCountRef = useRef(0);
   const [isEncodingFiles, setIsEncodingFiles] = useState(false);
 
@@ -211,139 +229,154 @@ function AgentComposerInner({
     []
   );
 
-  // Paste / drop / "+"-pick files. A supported raster image inlines as a
-  // perceive-only attachment (the model sees pixels); EVERY other file (PDF,
-  // zip, svg, …) is base64'd and marked operable — it rides `scratch_seed` into
-  // the session scratch at submit, where the agent reads it BY PATH. The split
-  // is by mime (`isSupportedImageType` → perceive; else → scratch upload).
-  const onFiles = useCallback(
-    async (files: File[]) => {
-      const images = files.filter((f) => isSupportedImageType(f.type));
-      const others = files.filter((f) => !isSupportedImageType(f.type));
-      // A non-vision model still takes operable uploads (read by tools, not
-      // perceived) — only the image half is gated.
-      if (images.length > 0 && !multimodal) {
-        notify("This model can't read images.");
-      }
-      if (others.length > 0 && !operableFiles) {
-        notify("This chat can only attach images.");
-      }
-      const perceivable = multimodal ? images : [];
-      const operable = operableFiles ? others : [];
-      // Mark encode in-flight BEFORE the first await so a pick-then-Enter can't
-      // slip a submit past the still-encoding attachments (see `submit`).
-      encodingCountRef.current += 1;
-      setIsEncodingFiles(true);
-      try {
-        // Encode concurrently — each file is independent. `encodeImageFile` /
-        // `readFileAsBase64` return null on failure/oversize (dropped below).
-        const [encodedImages, encodedFiles] = await Promise.all([
-          Promise.all(perceivable.map((file) => encodeImageFile(file))),
-          Promise.all(operable.map((file) => readFileAsBase64(file))),
-        ]);
-        let added = 0;
-        for (const item of encodedImages) {
-          if (!item) continue;
-          addAttachment({
-            name: item.name,
-            mime: item.mime,
-            size: item.size,
-            url: item.url,
-          });
-          added += 1;
-        }
-        for (const item of encodedFiles) {
-          if (!item) continue;
-          // Operable file: bytes ride in `payload.base64` (no `url`), so
-          // `toFileUiParts` skips it and `extractOperableFiles` claims it.
-          addAttachment({
-            name: item.name,
-            mime: item.mime,
-            size: item.size,
-            payload: { base64: item.base64 },
-          });
-          added += 1;
-        }
-        const attempted = perceivable.length + operable.length;
-        if (added > 0) {
-          // Keep the image-gate caveat when it applies; else clear stale notices.
-          if (
-            !(images.length > 0 && !multimodal) &&
-            !(others.length > 0 && !operableFiles)
-          ) {
-            notify(null);
-          }
-        } else if (attempted > 0) {
-          notify("Couldn't add the file — it may be too large or unreadable.");
-        }
-      } finally {
-        encodingCountRef.current -= 1;
-        if (encodingCountRef.current === 0) setIsEncodingFiles(false);
-      }
-    },
-    [multimodal, operableFiles, addAttachment, notify]
-  );
+  const preparedResources = useRef(new PreparedResourceLedger());
+  const preparationTail = useRef<Promise<void>>(Promise.resolve());
+  const resourceSequence = useRef(0);
+  const nextResourceId = useCallback((source: string) => {
+    resourceSequence.current += 1;
+    return `${source}-${resourceSequence.current}`;
+  }, []);
 
-  // Folder drop → opaque, host-minted, read-only directory reference. The live
-  // disk-backed File crosses the contextBridge into preload, where Electron
-  // resolves its OS path and immediately exchanges it for a daemon descriptor;
-  // this renderer never sees the absolute path and never enumerates/copies the
-  // directory into scratch.
-  const onDirectories = useCallback(
-    async (directories: File[]) => {
-      if (!operableFiles) {
-        notify("This chat can't attach folders.");
-        return;
-      }
-      const attachDirectory = getDesktopBridge()?.agent.attach_directory;
-      if (!attachDirectory) {
-        notify("Folder references require Grida Desktop.");
-        return;
-      }
-      encodingCountRef.current += 1;
-      setIsEncodingFiles(true);
-      try {
-        const attached = await Promise.allSettled(
-          directories.map((directory) => attachDirectory(directory))
-        );
-        let added = 0;
-        for (const result of attached) {
-          if (result.status !== "fulfilled") continue;
-          const ref: DirectoryScopeDescriptor = result.value;
-          const attachment = addAttachment(
-            {
-              kind: "directory",
-              name: ref.name,
-              ref,
-            },
-            {
-              filter: (incoming, existing) =>
-                incoming.kind !== "directory" ||
-                !existing.some(
-                  (item) =>
-                    item.kind === "directory" && item.ref.id === incoming.ref.id
-                ),
+  // Feasibility is dynamic and separate from the selected preference policy.
+  // In particular, a File from paste/drop/picker is bytes-only until a trusted
+  // file-scope contract exists; folders can use today's opaque directory scope.
+  const attachDirectory = operableFiles
+    ? desktopBridge?.agent.attach_directory
+    : undefined;
+  const resourceEnvironment = useMemo<InputResourceRouter.Environment>(
+    () => ({
+      // The runtime has path-aware filesystem tools but no general URL reader.
+      reference: { path: true, url: false, attachDirectory },
+      attachment: {
+        provider: {
+          inlineMimes: providerFileMimes,
+          remoteUrlMimes: providerUrlFileMimes,
+        },
+        ...(operableFiles
+          ? {
+              scratch: {
+                maxFileBytes: OPERABLE_FILE_POLICY.maxBytes,
+                maxFiles: OPERABLE_FILE_POLICY.maxFiles,
+                maxTotalBytes: OPERABLE_FILE_POLICY.maxTotalBytes,
+                reservation: scratchReservation,
+              },
             }
-          );
-          if (attachment) added += 1;
-        }
-        notify(
-          added > 0
-            ? null
-            : "Couldn't add the folder — it may no longer be available."
+          : {}),
+      },
+    }),
+    [
+      attachDirectory,
+      operableFiles,
+      providerFileMimes,
+      providerUrlFileMimes,
+      scratchReservation,
+    ]
+  );
+
+  // The card owns display only. The resource ledger, keyed by the stable card
+  // id assigned by ComposerCore, owns the exact route and prepared body.
+  const addPreparedResource = useCallback(
+    (resource: InputResourceRouter.PreparedResource): boolean => {
+      const attachment = addAttachment(InputResourceRouter.card(resource), {
+        filter: () =>
+          !resource.dedupeKey ||
+          !preparedResources.current.hasDedupeKey(resource.dedupeKey),
+      });
+      if (!attachment) return false;
+      preparedResources.current.bind(attachment.id, resource);
+      return true;
+    },
+    [addAttachment]
+  );
+
+  // Reconcile defensive cleanup if the composer is cleared by a future owner.
+  useEffect(() => {
+    preparedResources.current.reconcile(
+      composer.snapshot.attachments.map((attachment) => attachment.id)
+    );
+  }, [composer.snapshot.attachments]);
+
+  const prepareResources = useCallback(
+    async (inputs: InputResourceRouter.Input[]) => {
+      if (inputs.length === 0) return;
+      // Mark preparation in-flight before the first await so pick-then-Enter
+      // cannot submit while a resource is still being materialized.
+      encodingCountRef.current += 1;
+      setIsEncodingFiles(true);
+      const work = preparationTail.current.then(async () => {
+        const results = await InputResourceRouter.prepareBatch(
+          inputs,
+          resourceEnvironment,
+          resourcePolicy,
+          preparedResources.current.all()
         );
+        let added = 0;
+        const failures: ResourcePreparationFailure[] = [];
+        inputs.forEach((input, index) => {
+          const result = results[index];
+          if (!result) return;
+          if (result.status === "accept") {
+            if (addPreparedResource(result.resource)) added += 1;
+          } else {
+            failures.push({ input, reason: result.reason });
+          }
+        });
+        notify(
+          resourcePreparationNotice(failures, added, {
+            folderReferencesEnabled: operableFiles,
+            hasDesktopBridge: desktopBridge !== null,
+          })
+        );
+      });
+      preparationTail.current = work.catch(() => undefined);
+      try {
+        await work;
       } finally {
         encodingCountRef.current -= 1;
         if (encodingCountRef.current === 0) setIsEncodingFiles(false);
       }
     },
-    [addAttachment, notify, operableFiles]
+    [
+      addPreparedResource,
+      desktopBridge,
+      notify,
+      operableFiles,
+      resourceEnvironment,
+      resourcePolicy,
+    ]
   );
 
-  // "+" upload: a hidden file input feeding the same `onFiles` pipeline as
-  // paste/drop (image → perceive, other → scratch upload). The input stays
-  // mounted as a sibling of the menu so selecting a file doesn't unmount it
-  // mid-gesture.
+  // Paste/drop retain gesture provenance in one ordered envelope. The generic
+  // composer does no attachment policy; this agent adapter describes each raw
+  // resource and sends it through the same configured router.
+  const onTransfer = useCallback(
+    (event: ComposerTransfer.Event) => {
+      const inputs: InputResourceRouter.Input[] = [];
+      for (const resource of event.resources) {
+        if (resource.kind === "file") {
+          inputs.push({
+            kind: "browser-file",
+            id: nextResourceId(event.source),
+            source: event.source,
+            file: resource.file,
+          });
+        } else if (event.source === "drop") {
+          inputs.push({
+            kind: "browser-directory",
+            id: nextResourceId(event.source),
+            source: event.source,
+            directory: resource.file,
+          });
+        }
+      }
+      void prepareResources(inputs);
+    },
+    [nextResourceId, prepareResources]
+  );
+
+  // "+" upload feeds the same router with explicit picker provenance. The input
+  // stays mounted as a sibling of the menu so selecting a file doesn't unmount
+  // it mid-gesture.
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openUpload = useCallback(() => {
     fileInputRef.current?.click();
@@ -353,62 +386,40 @@ function AgentComposerInner({
       const files = Array.from(e.target.files ?? []);
       // Reset so re-picking the same file still fires `change`.
       e.target.value = "";
-      if (files.length > 0) void onFiles(files);
+      if (files.length > 0) {
+        void prepareResources(
+          files.map((file) => ({
+            kind: "browser-file",
+            id: nextResourceId("picker"),
+            source: "picker",
+            file,
+          }))
+        );
+      }
     },
-    [onFiles]
+    [nextResourceId, prepareResources]
   );
 
   const [libraryOpen, setLibraryOpen] = useState(false);
   const onLibraryPicked = useCallback(
     (pins: DesignLibraryPin[]) => {
-      if (!multimodal) {
-        notify("This model can't read Library images.");
-        return;
-      }
-      let added = 0;
-      let unsupported = 0;
-      for (const pin of pins) {
-        if (!isSupportedImageType(pin.mime)) {
-          unsupported += 1;
-          continue;
-        }
-        const attachment = addAttachment(
-          {
-            id: `library-${pin.id}`,
-            name: pin.title,
-            mime: pin.mime,
-            url: pin.url,
-            payload: { source: "library", id: pin.id },
-          },
-          {
-            filter: (incoming, existing) =>
-              incoming.kind === "directory" ||
-              !existing.some(
-                (item) =>
-                  item.kind !== "directory" &&
-                  item.payload?.source === "library" &&
-                  item.payload.id === incoming.payload?.id
-              ),
-          }
-        );
-        if (attachment) added += 1;
-      }
-      if (unsupported > 0) {
-        notify(
-          added > 0
-            ? "Some Library items weren't added because their format isn't supported."
-            : "These Library items can't be attached to this model."
-        );
-      } else if (added > 0) {
-        notify(null);
-      }
+      void prepareResources(
+        pins.map((pin) => ({
+          kind: "library-file",
+          id: pin.id,
+          source: "library",
+          name: pin.title,
+          mimeType: pin.mime,
+          url: pin.url,
+        }))
+      );
     },
-    [addAttachment, multimodal, notify]
+    [prepareResources]
   );
 
   const submit = () => {
-    // Hold a submit while file encoding is still in flight — otherwise a
-    // pick-then-Enter races the async `onFiles` and sends without the
+    // Hold a submit while resource preparation is still in flight — otherwise a
+    // pick-then-Enter races the async router and sends without the
     // attachment. Keep the editor content so the user can retry.
     if (encodingCountRef.current > 0) {
       notify("Still adding the file — one moment…");
@@ -433,59 +444,70 @@ function AgentComposerInner({
       .map((p) => (p as { id: string }).id)
       .filter((id) => actionById.has(id));
     if (actions.length > 0) {
+      preparedResources.current.clear();
       composer.clear();
       for (const id of actions) void actionById.get(id)!.run();
       return;
     }
-    const text = lowerPrompt(message);
-    // Perceive-only image attachments; stripped when the model can't see them
-    // (e.g. switched to a non-multimodal model after attaching).
-    const images = toFileUiParts(message.parts);
-    const files = multimodal ? images : [];
-    const droppedImages = images.length > 0 && files.length === 0;
-    // Operable (non-image) uploads → scratch bytes + a marker naming them for
-    // the model (WG `scratch.md` / `binary.md`).
-    const { scratchSeed, context } = extractOperableFiles(message.parts);
-    const hasUploads = scratchSeed.length > 0;
-    const directoryContext = AgentDirectoryReference.extract(message.parts);
-    const hasDirectories = directoryContext !== null;
-    const contexts = [context, directoryContext].filter(
-      (item): item is NonNullable<typeof item> => item !== null
+
+    const selected = preparedResources.current.select(
+      message.meta.attachments.map((attachment) => attachment.id)
     );
-    const extras: SendExtras | undefined =
-      hasUploads || hasDirectories
-        ? {
-            ...(hasUploads ? { scratchSeed } : {}),
-            contexts,
-          }
-        : undefined;
-    if (
-      !text.trim() &&
-      files.length === 0 &&
-      !hasUploads &&
-      !hasDirectories &&
-      !allowEmptySubmit
-    ) {
-      if (droppedImages) notify("This model can't read images.");
+    if (selected.status === "missing") {
+      notify("Attachments need to be added again before sending.");
       return;
     }
-    // Neither perceive images nor scratch uploads can ride the text-only queue:
+    const lowered = InputResourceRouter.lower(selected.resources, {
+      provider: resourceEnvironment.attachment.provider,
+      scratch: resourceEnvironment.attachment.scratch,
+    });
+    const blockingRejections = lowered.rejected.filter(
+      (rejection) => rejection.reason !== "provider-capability-unavailable"
+    );
+    if (blockingRejections.length > 0) {
+      notify(resourceLoweringNotice(blockingRejections));
+      return;
+    }
+    const text = lowerPrompt(message, lowered.references);
+    const hasOutOfBandResources =
+      lowered.files.length > 0 || lowered.extras !== undefined;
+    const droppedImages = lowered.rejected.some(
+      (rejection) => rejection.reason === "provider-capability-unavailable"
+    );
+    if (!text.trim() && !hasOutOfBandResources && !allowEmptySubmit) {
+      if (droppedImages) {
+        notify(
+          "Direct image attachment isn't available for the selected model/provider."
+        );
+      }
+      return;
+    }
+    // Provider files, scratch uploads, and registered directory contexts cannot
+    // ride the text-only queue. Path/URL references can: they are honestly
+    // lowered into the queued prompt text.
     // block on the combined busy signal (streaming OR compaction OR core-busy) —
     // the queue controller would enqueue text only and silently drop them. Don't
     // clear, so the user keeps their attachments until the session is idle.
-    if (isBusy && (files.length > 0 || hasUploads || hasDirectories)) {
+    if (isBusy && hasOutOfBandResources) {
       notify(
         "Can't send attachments while the session is busy — wait until it's idle."
       );
       return;
     }
+    preparedResources.current.clear();
     composer.clear();
-    // Text still sends; if images were stripped (non-vision model) say so rather
-    // than dropping them silently. Otherwise clear any stale notice.
+    // Text still sends; if undeclared provider attachments were stripped, say
+    // so rather than dropping them silently. Otherwise clear any stale notice.
     notify(
-      droppedImages ? "Images weren't sent — this model can't read them." : null
+      droppedImages
+        ? "Images weren't sent — direct attachment isn't available for the selected model/provider."
+        : null
     );
-    void onSubmit(text, files.length > 0 ? files : undefined, extras);
+    void onSubmit(
+      text,
+      lowered.files.length > 0 ? lowered.files : undefined,
+      lowered.extras
+    );
   };
 
   return (
@@ -496,12 +518,16 @@ function AgentComposerInner({
       )}
     >
       <ComposerTriggerMenu />
-      <ComposerAttachmentCards className="px-3 pt-2" />
+      <ComposerAttachmentCards
+        className="px-3 pt-2"
+        onRemoveAttachment={(attachment) =>
+          preparedResources.current.remove(attachment.id)
+        }
+      />
       <ComposerContent
         autofocus={autofocus}
         onSubmitRequest={submit}
-        onFiles={attach ? onFiles : undefined}
-        onDirectories={attach ? onDirectories : undefined}
+        onTransfer={attach ? onTransfer : undefined}
         placeholder={placeholder}
         className="px-3 pt-2"
         editorClassName="min-h-9 max-h-48 overflow-y-auto text-sm"
@@ -514,7 +540,7 @@ function AgentComposerInner({
             attach affordance is never culled as the composer narrows. The
             hidden file input is a sibling of the menu, not a child, so it
             stays mounted when the menu closes on select. No `accept` filter:
-            images inline (perceive), everything else rides scratch. */}
+            the configured agent resource policy decides each route. */}
         {attach && (
           <div className="shrink-0">
             <input
@@ -599,26 +625,161 @@ function AgentComposerInner({
  *   - any `/`-command (skill) requests as a hint so the agent loads the
  *     named skill via its `skill` tool.
  */
-function lowerPrompt(message: ComposerMessage): string {
-  const paths = new Set<string>();
+function lowerPrompt(
+  message: ComposerMessage,
+  references: readonly InputResourceRouter.Reference[] = []
+): string {
+  const workspacePaths = new Set<string>();
+  const referencePaths = new Set<string>();
+  const urls = new Map<string, string>();
   const skills = new Set<string>();
   for (const part of message.parts) {
     if (part.type === "mention" && part.target.path) {
-      paths.add(part.target.path);
+      workspacePaths.add(part.target.path);
     } else if (part.type === "file-ref") {
-      paths.add(part.ref.path);
+      workspacePaths.add(part.ref.path);
     } else if (part.type === "command") {
       skills.add(part.id);
     }
   }
+  for (const reference of references) {
+    if (reference.kind === "path") {
+      const paths =
+        reference.space === "workspace" ? workspacePaths : referencePaths;
+      paths.add(reference.path);
+    } else {
+      urls.set(reference.url, reference.name);
+    }
+  }
   const sections = [message.meta.text.trim()];
-  if (paths.size > 0) {
+  if (workspacePaths.size > 0) {
     sections.push(
-      `Referenced files:\n${[...paths].map((p) => `- ${p}`).join("\n")}`
+      `Referenced workspace files:\n${[...workspacePaths]
+        .map((path) => `- ${path}`)
+        .join("\n")}`
+    );
+  }
+  if (referencePaths.size > 0) {
+    sections.push(
+      `Referenced external files:\n${[...referencePaths]
+        .map((path) => `- ${path}`)
+        .join("\n")}`
+    );
+  }
+  if (urls.size > 0) {
+    sections.push(
+      `Referenced resources:\n${[...urls]
+        .map(([url, name]) => `- ${name}: ${url}`)
+        .join("\n")}`
     );
   }
   if (skills.size > 0) {
     sections.push(`Use these skills: ${[...skills].join(", ")}.`);
   }
   return sections.filter((s) => s.length > 0).join("\n\n");
+}
+
+type ResourcePreparationFailure = {
+  input: InputResourceRouter.Input;
+  reason: InputResourceRouter.PreparationFailure;
+};
+
+function resourcePreparationNotice(
+  failures: readonly ResourcePreparationFailure[],
+  added: number,
+  options: {
+    folderReferencesEnabled: boolean;
+    hasDesktopBridge: boolean;
+  }
+): string | null {
+  if (failures.length === 0) return null;
+  const reasons = new Set(failures.map((failure) => failure.reason));
+  const some = added > 0;
+
+  if (reasons.size === 1 && reasons.has("provider-capability-unavailable")) {
+    const libraryOnly = failures.every(
+      (failure) => failure.input.kind === "library-file"
+    );
+    if (some) {
+      return "Some images weren't added because direct attachment isn't available for the selected model/provider.";
+    }
+    return libraryOnly
+      ? "Direct Library image attachment isn't available for the selected model/provider."
+      : "Direct image attachment isn't available for the selected model/provider.";
+  }
+  if (reasons.size === 1 && reasons.has("scratch-unavailable")) {
+    return some
+      ? "Some files weren't added because this chat has no scratch space."
+      : "This chat can only attach images.";
+  }
+  if (
+    reasons.size === 1 &&
+    reasons.has("reference-capability-unavailable") &&
+    failures.every((failure) => failure.input.kind === "browser-directory")
+  ) {
+    if (!options.folderReferencesEnabled) {
+      return some
+        ? "Some folders weren't added because this chat can't attach folders."
+        : "This chat can't attach folders.";
+    }
+    if (!options.hasDesktopBridge) {
+      return some
+        ? "Some folders weren't added because folder references require Grida Desktop."
+        : "Folder references require Grida Desktop.";
+    }
+    return some
+      ? "Some folders weren't added because references aren't available."
+      : "Folder references aren't available in this Desktop version.";
+  }
+  if (
+    reasons.size === 1 &&
+    reasons.has("directory-reference-failed") &&
+    failures.every((failure) => failure.input.kind === "browser-directory")
+  ) {
+    return some
+      ? "Some folders weren't added because access couldn't be registered."
+      : "Couldn't attach the folder — access couldn't be registered.";
+  }
+  if (reasons.size === 1 && reasons.has("file-too-large")) {
+    return some
+      ? "Some files weren't added because they're too large."
+      : "Couldn't add the file — it's too large.";
+  }
+  if (reasons.size === 1 && reasons.has("scratch-file-count-exceeded")) {
+    return some
+      ? "Some files weren't added because this turn already has too many scratch files."
+      : "Too many files for one turn — add fewer and try again.";
+  }
+  if (reasons.size === 1 && reasons.has("scratch-budget-exceeded")) {
+    return some
+      ? "Some files weren't added because this turn's scratch budget is full."
+      : "These files exceed this turn's scratch budget — add fewer and try again.";
+  }
+  if (reasons.size === 1 && reasons.has("representation-unavailable")) {
+    return some
+      ? "Some items weren't added because their format isn't supported."
+      : "These items can't be attached with the current policy.";
+  }
+  return some
+    ? "Some attachments couldn't be added."
+    : "Couldn't add the attachment — it may be unavailable or unreadable.";
+}
+
+function resourceLoweringNotice(
+  rejections: readonly InputResourceRouter.Lowered["rejected"][number][]
+): string {
+  const reasons = new Set(rejections.map((rejection) => rejection.reason));
+  if (reasons.has("scratch-file-count-exceeded")) {
+    return "Too many attached files for one turn — remove some and try again.";
+  }
+  if (reasons.has("scratch-budget-exceeded")) {
+    return "Attached files exceed this turn's scratch budget — remove some and try again.";
+  }
+  if (reasons.has("scratch-unavailable")) {
+    return "These files need scratch space, which isn't available in this chat.";
+  }
+  if (reasons.has("file-too-large")) {
+    return "An attached file is too large — remove it and try again.";
+  }
+  return "Attachments need to be added again before sending.";
 }

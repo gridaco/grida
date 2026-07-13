@@ -26,26 +26,29 @@ import { isByokProviderId } from "./provider-ids";
 export type EndpointModelSpec = models.text.registry.CustomModelSpec;
 
 /**
- * Sticky human corrections for a model entry. Detection refresh NEVER
- * writes these — they exist for the "the endpoint reports a wrong value"
- * case and are set by hand-editing `endpoints.json` (or by the settings
- * inputs shown when detection has nothing). Resolution order:
- * override → detected → registry default.
+ * Sticky human declarations and corrections for a model entry. Detection
+ * refresh NEVER writes these — they cover both "the endpoint reports a
+ * wrong value" and exact capabilities the probe cannot observe. They are
+ * set by hand-editing `endpoints.json` (or by settings inputs). Detected
+ * fields resolve override → detected → registry default; exact image MIME
+ * types resolve declaration → registry default with no inferred middle step.
  */
 export type EndpointModelOverrides = Pick<
   EndpointModelSpec,
-  "contextWindow" | "tool_call" | "multimodal"
+  "contextWindow" | "tool_call" | "multimodal" | "imageInputMimes"
 >;
 
 /**
  * A model as STORED on an endpoint config. The top-level capability
  * fields (`tool_call`, `contextWindow`, `multimodal`) are
  * detection-owned: probe refresh overwrites them freely. Human
- * corrections live in {@link EndpointModelOverrides} so a refresh can
- * never clobber them. Resolve with {@link resolveEndpointModel} before
- * feeding the registry.
+ * declarations and corrections live in {@link EndpointModelOverrides}
+ * so a refresh can never clobber them. Exact image MIME types are
+ * human-owned only: current probes cannot detect them, and broad
+ * `multimodal` capability never manufactures them. Resolve with
+ * {@link resolveEndpointModel} before feeding the registry.
  */
-export type EndpointModelEntry = EndpointModelSpec & {
+export type EndpointModelEntry = Omit<EndpointModelSpec, "imageInputMimes"> & {
   overrides?: EndpointModelOverrides;
 };
 
@@ -74,8 +77,8 @@ export type EndpointProviderConfig = {
   default_model_id?: string;
 };
 
-/** Apply {@link EndpointModelOverrides} onto the detected fields —
- *  override → detected (→ registry default downstream). */
+/** Apply {@link EndpointModelOverrides} onto a stored model. Detected fields
+ *  use override → detected; exact image MIME types have no detected value. */
 export function resolveEndpointModel(
   entry: EndpointModelEntry
 ): EndpointModelSpec {
@@ -85,6 +88,10 @@ export function resolveEndpointModel(
     contextWindow: overrides?.contextWindow ?? detected.contextWindow,
     tool_call: overrides?.tool_call ?? detected.tool_call,
     multimodal: overrides?.multimodal ?? detected.multimodal,
+    imageInputMimes:
+      overrides?.imageInputMimes === undefined
+        ? undefined
+        : [...overrides.imageInputMimes],
   };
 }
 
@@ -242,6 +249,11 @@ const MAX_MODEL_ID_LEN = 128;
 const MAX_LABEL_LEN = 64;
 const MAX_BASE_URL_LEN = 2048;
 const MAX_TOKEN_LIMIT = 100_000_000;
+const MAX_IMAGE_INPUT_MIMES = 16;
+const MAX_IMAGE_INPUT_MIME_LEN = 128;
+// RFC token characters, excluding `*`: this field declares exact media
+// types, never a wildcard media range. Values are canonicalized to lowercase.
+const IMAGE_INPUT_MIME_PATTERN = /^image\/[!#$%&'+\-.^_`|~0-9A-Za-z]+$/;
 
 export type EndpointConfigValidation =
   | { ok: true; config: EndpointProviderConfig }
@@ -352,6 +364,12 @@ function validateModelEntry(raw: unknown): ModelEntryValidation {
   }
   const flags = validateCapabilityFields(m, "model");
   if (!flags.ok) return flags;
+  if (m.imageInputMimes !== undefined) {
+    return {
+      ok: false,
+      error: "model imageInputMimes must be declared in model overrides",
+    };
+  }
 
   let overrides: EndpointModelOverrides | undefined;
   if (m.overrides !== undefined) {
@@ -363,15 +381,22 @@ function validateModelEntry(raw: unknown): ModelEntryValidation {
       return { ok: false, error: "model overrides must be an object" };
     }
     const o = m.overrides as Record<string, unknown>;
-    // Overrides carry only the detection-owned fields — no `outputLimit`.
+    // Overrides carry sticky capability declarations/corrections — no
+    // output limit or cost card.
     const oFlags = validateCapabilityFields(o, "model overrides", [
       "contextWindow",
     ]);
     if (!oFlags.ok) return oFlags;
+    const imageInputMimes = validateImageInputMimes(
+      o.imageInputMimes,
+      "model overrides"
+    );
+    if (!imageInputMimes.ok) return imageInputMimes;
     overrides = {
       multimodal: o.multimodal as boolean | undefined,
       tool_call: o.tool_call as boolean | undefined,
       contextWindow: o.contextWindow as number | undefined,
+      imageInputMimes: imageInputMimes.value,
     };
     if (Object.values(overrides).every((v) => v === undefined)) {
       overrides = undefined;
@@ -393,6 +418,50 @@ function validateModelEntry(raw: unknown): ModelEntryValidation {
       // price card would feed cost UI with invented numbers.
     },
   };
+}
+
+type ImageInputMime = NonNullable<EndpointModelSpec["imageInputMimes"]>[number];
+
+function validateImageInputMimes(
+  raw: unknown,
+  scope: string
+):
+  | { ok: true; value: readonly ImageInputMime[] | undefined }
+  | { ok: false; error: string } {
+  if (raw === undefined) return { ok: true, value: undefined };
+  if (!Array.isArray(raw) || raw.length > MAX_IMAGE_INPUT_MIMES) {
+    return {
+      ok: false,
+      error: `${scope} imageInputMimes must be an array of ≤ ${MAX_IMAGE_INPUT_MIMES} exact image MIME types`,
+    };
+  }
+  const value: ImageInputMime[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (typeof item !== "string" || item.length > MAX_IMAGE_INPUT_MIME_LEN) {
+      return {
+        ok: false,
+        error: `${scope} imageInputMimes entries must match image/<subtype> and be ≤ ${MAX_IMAGE_INPUT_MIME_LEN} ASCII characters`,
+      };
+    }
+    const normalized = item.toLowerCase();
+    if (!IMAGE_INPUT_MIME_PATTERN.test(normalized)) {
+      return {
+        ok: false,
+        error: `${scope} imageInputMimes entries must match image/<subtype> and be ≤ ${MAX_IMAGE_INPUT_MIME_LEN} ASCII characters`,
+      };
+    }
+    const mime = normalized as ImageInputMime;
+    if (seen.has(mime)) {
+      return {
+        ok: false,
+        error: `${scope} imageInputMimes contains duplicate ${mime}`,
+      };
+    }
+    seen.add(mime);
+    value.push(mime);
+  }
+  return { ok: true, value };
 }
 
 function validateCapabilityFields(

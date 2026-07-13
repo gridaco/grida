@@ -50,6 +50,7 @@ export {
 } from "./protocol/endpoints";
 export {
   AGENT_SESSION_AGENT,
+  SCRATCH_SEED_LIMITS,
   type AgentModelId,
   type AgentRunMessage,
   type AgentRunMessagePart,

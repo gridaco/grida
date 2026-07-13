@@ -10,6 +10,7 @@ import {
   type NormalizedMessage,
 } from "./run-input";
 import { buildModelMessages } from "./message-view";
+import { SCRATCH_SEED_LIMITS } from "../protocol/run";
 
 let tempDir: string;
 let opened: OpenedSessionsDb;
@@ -443,6 +444,62 @@ describe("parseRunBody", () => {
       { path: "notes.txt", text: "hello" },
       { path: "doc.pdf", base64: "AAAA" },
     ]);
+  });
+
+  it("accepts the canonical scratch_seed file-count limit and rejects one more", async () => {
+    const messages = [{ role: "user", parts: [{ type: "text", text: "hi" }] }];
+    const entries = Array.from(
+      { length: SCRATCH_SEED_LIMITS.maxFiles },
+      (_, index) => ({ path: `seed-${index}.txt`, text: "" })
+    );
+
+    const accepted = await parseRunBody(
+      { messages, scratch_seed: entries },
+      deps as never
+    );
+    expect(accepted).not.toBeInstanceOf(Response);
+
+    const rejected = await parseRunBody(
+      {
+        messages,
+        scratch_seed: [
+          ...entries,
+          { path: "one-over-the-limit.txt", text: "" },
+        ],
+      },
+      deps as never
+    );
+    expect(rejected).toBeInstanceOf(Response);
+    expect(rejected instanceof Response ? rejected.status : 200).toBe(400);
+  });
+
+  it("accepts the canonical scratch_seed decoded-byte limit and rejects one more", async () => {
+    const messages = [{ role: "user", parts: [{ type: "text", text: "hi" }] }];
+    const atLimit = Buffer.alloc(SCRATCH_SEED_LIMITS.maxTotalBytes).toString(
+      "base64"
+    );
+    const overLimit = Buffer.alloc(
+      SCRATCH_SEED_LIMITS.maxTotalBytes + 1
+    ).toString("base64");
+
+    const accepted = await parseRunBody(
+      {
+        messages,
+        scratch_seed: [{ path: "at-limit.bin", base64: atLimit }],
+      },
+      deps as never
+    );
+    expect(accepted).not.toBeInstanceOf(Response);
+
+    const rejected = await parseRunBody(
+      {
+        messages,
+        scratch_seed: [{ path: "over-limit.bin", base64: overLimit }],
+      },
+      deps as never
+    );
+    expect(rejected).toBeInstanceOf(Response);
+    expect(rejected instanceof Response ? rejected.status : 200).toBe(400);
   });
 
   it.each([

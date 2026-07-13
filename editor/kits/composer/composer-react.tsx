@@ -165,6 +165,7 @@ export function ComposerContent({
   triggerMenuId,
   autofocus,
   onSubmitRequest,
+  onTransfer,
   onFiles,
   onDirectories,
   ...props
@@ -174,6 +175,13 @@ export function ComposerContent({
   editorClassName?: string;
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
+  /**
+   * Preferred source-aware transfer callback. Receives one envelope per paste or
+   * drop, retaining gesture provenance, resource kind, ordering, and the original
+   * browser `File` objects. When provided it supersedes the legacy `onFiles` and
+   * `onDirectories` callbacks for that gesture.
+   */
+  onTransfer?: (event: ComposerTransfer.Event) => void;
   /**
    * Forward files pasted or dropped onto the editor — ALL types (images and
    * arbitrary files alike). The kit stays policy-agnostic: it only hands over the
@@ -203,6 +211,8 @@ export function ComposerContent({
   const editorRef = useRef<Editor | null>(null);
   // The editor is created once; read the latest callback through a ref so a
   // re-rendered consumer's handler is always the one invoked.
+  const onTransferRef = useRef(onTransfer);
+  onTransferRef.current = onTransfer;
   const onFilesRef = useRef(onFiles);
   onFilesRef.current = onFiles;
   const onDirectoriesRef = useRef(onDirectories);
@@ -235,15 +245,25 @@ export function ComposerContent({
         });
       },
       handlePaste(_view, event) {
-        const handler = onFilesRef.current;
-        if (!handler) return false;
-        const files = ComposerTransfer.pasteFiles(event.clipboardData);
-        if (files.length === 0) return false;
-        handler(files);
+        const transfer = ComposerTransfer.fromPaste(event.clipboardData);
+        if (transfer.resources.length === 0) return false;
+        if (onTransferRef.current) {
+          onTransferRef.current(transfer);
+          return true;
+        }
+        const { files } = ComposerTransfer.split(transfer);
+        if (!onFilesRef.current || files.length === 0) return false;
+        onFilesRef.current(files);
         return true;
       },
       handleDrop(_view, event) {
-        const dropped = ComposerTransfer.splitDrop(event.dataTransfer);
+        const transfer = ComposerTransfer.fromDrop(event.dataTransfer);
+        if (transfer.resources.length === 0) return false;
+        if (onTransferRef.current) {
+          onTransferRef.current(transfer);
+          return true;
+        }
+        const dropped = ComposerTransfer.split(transfer);
         let handled = false;
         if (dropped.files.length > 0 && onFilesRef.current) {
           onFilesRef.current(dropped.files);

@@ -13,6 +13,17 @@ type DirectoryPartLike = {
 };
 
 export namespace AgentDirectoryReference {
+  /** Lower validated, host-minted descriptors without reclassifying them. */
+  export function fromDescriptors(
+    descriptors: readonly DirectoryScopeDescriptor[]
+  ): ContextPart | null {
+    if (descriptors.length === 0) return null;
+    return {
+      type: USER_DIRECTORY_REFERENCES,
+      data: { directories: [...descriptors] },
+    };
+  }
+
   export function extract(
     parts: readonly DirectoryPartLike[]
   ): ContextPart | null {
@@ -20,15 +31,12 @@ export namespace AgentDirectoryReference {
       if (part.type !== "directory-ref" || !isDescriptor(part.ref)) return [];
       return [part.ref];
     });
-    return directories.length > 0
-      ? {
-          type: USER_DIRECTORY_REFERENCES,
-          data: { directories },
-        }
-      : null;
+    return fromDescriptors(directories);
   }
 
-  function isDescriptor(value: unknown): value is DirectoryScopeDescriptor {
+  export function isDescriptor(
+    value: unknown
+  ): value is DirectoryScopeDescriptor {
     if (!value || typeof value !== "object") return false;
     const ref = value as Record<string, unknown>;
     return (

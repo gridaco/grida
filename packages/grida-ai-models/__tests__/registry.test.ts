@@ -10,6 +10,7 @@ describe("models.text.registry.normalize", () => {
       id: "llama3.1:8b",
       label: "llama3.1:8b",
       multimodal: false,
+      imageInputMimes: [],
       tool_call: true,
       contextWindow: registry.CUSTOM_MODEL_DEFAULTS.contextWindow,
       outputLimit: registry.CUSTOM_MODEL_DEFAULTS.outputLimit,
@@ -32,6 +33,21 @@ describe("models.text.registry.normalize", () => {
     expect(spec.contextWindow).toBe(131_072);
     expect(spec.outputLimit).toBe(8_192);
     expect(spec.multimodal).toBe(true);
+  });
+
+  it("preserves exact image formats without deriving them from multimodal", () => {
+    const broadOnly = registry.normalize({
+      id: "broad-only",
+      multimodal: true,
+    });
+    const exact = registry.normalize({
+      id: "exact",
+      imageInputMimes: ["image/png", "image/tiff"],
+    });
+
+    expect(broadOnly.imageInputMimes).toEqual([]);
+    expect(exact.imageInputMimes).toEqual(["image/png", "image/tiff"]);
+    expect(exact.multimodal).toBe(true);
   });
 
   it("treats an empty label as absent", () => {
@@ -59,6 +75,19 @@ describe("models.text.registry.resolve", () => {
     expect(spec?.contextWindow).toBe(
       registry.CUSTOM_MODEL_DEFAULTS.contextWindow
     );
+    expect(spec?.imageInputMimes).toEqual([]);
+  });
+
+  it("exposes a registered model's exact image formats", () => {
+    const spec = registry.resolve("vision-local", [
+      {
+        id: "vision-local",
+        multimodal: true,
+        imageInputMimes: ["image/png"],
+      },
+    ]);
+
+    expect(spec?.imageInputMimes).toEqual(["image/png"]);
   });
 
   it("catalogue wins over a colliding custom entry", () => {
