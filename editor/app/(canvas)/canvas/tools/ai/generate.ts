@@ -110,10 +110,17 @@ export async function generate({
   (async () => {
     const { partialOutputStream } = streamText({
       model,
-      providerOptions: gridaProviderOptions({
-        organizationId,
-        feature: "canvas/generate",
-      }),
+      // `organizationId` is optional only for the dev-tool harness (see the
+      // param doc); the real /canvas path always threads a verified id. When
+      // present, build the payload type-safely; when the harness omits it,
+      // preserve the documented behavior — the seam throws MissingOrgIdError.
+      providerOptions:
+        organizationId === undefined
+          ? { grida: { feature: "canvas/generate" } }
+          : gridaProviderOptions({
+              organizationId,
+              feature: "canvas/generate",
+            }),
       ...model_config,
       system,
       ...(message
