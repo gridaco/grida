@@ -1,13 +1,15 @@
-//! ENG-2.4 socket · the one frame entry point. `render(...)` (step 6)
-//! runs `resolve -> build -> execute` and returns one immutable
-//! [`FrameProduct`] plus timings — the host clears the canvas and paints its
-//! own chrome around this, never the other way round (the compositor owns
-//! pacing; the host adapts). Kept a single seam so the fragmented tick/redraw
-//! rot the legacy `FrameLoop` unified never regrows.
+//! ENG-2.4 socket · the frame-construction boundary. [`render_request`] is the
+//! canonical host policy seam when a frame may be Base or Sample; [`render`]
+//! is its static convenience, and [`render_view`] is the lower seam for a
+//! caller that already owns one validated effective-value view. Every entry
+//! converges on `resolve -> build -> execute` and returns one immutable
+//! [`FrameProduct`] plus timings. The host clears the canvas and paints its own
+//! chrome around this; the compositor owns pacing.
 
+use anchor_lab::animation::{AnimationProgram, SampleError, SampleTime};
 use anchor_lab::math::Affine;
 use anchor_lab::model::Document;
-use anchor_lab::properties::ValueView;
+use anchor_lab::properties::{PropertyValues, ValueView};
 use anchor_lab::resolve::{
     resolve_view_with_text_layout, resolve_with_text_layout, ResolveOptions, Resolved,
 };
@@ -17,6 +19,78 @@ use crate::drawlist::{build_with_text_fonts, build_with_text_fonts_view, DrawLis
 use crate::paint::{raster_to_bytes_unchecked, PaintCtx, PaintEnvironmentKey};
 use crate::query::Query;
 use crate::text_layout::SkiaTextLayoutOracle;
+
+/// One explicit semantic frame policy. Base never samples; Sample always
+/// samples the supplied immutable program at the supplied document time.
+#[derive(Debug, Clone, Copy)]
+pub enum FrameRequest<'a> {
+    Base,
+    Sample {
+        program: &'a AnimationProgram,
+        time: SampleTime,
+    },
+}
+
+/// One request after the policy seam has been evaluated exactly once. Kept
+/// crate-private so frame and cache paths cannot drift in Base/Sample
+/// semantics while the public API remains the authored request.
+pub(crate) enum EvaluatedFrameRequest {
+    Base,
+    Sample { values: PropertyValues },
+}
+
+impl FrameRequest<'_> {
+    pub(crate) fn evaluate(
+        self,
+        document: &Document,
+    ) -> Result<EvaluatedFrameRequest, SampleError> {
+        match self {
+            FrameRequest::Base => Ok(EvaluatedFrameRequest::Base),
+            FrameRequest::Sample { program, time } => {
+                let values = program.sample(document, time)?;
+                Ok(EvaluatedFrameRequest::Sample { values })
+            }
+        }
+    }
+}
+
+/// Failure at the policy seam. Sampling completes before frame construction,
+/// so a Sample error cannot issue a canvas command or produce a partial frame.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FrameRequestError {
+    Sample(SampleError),
+    Frame(FrameError),
+}
+
+impl std::fmt::Display for FrameRequestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FrameRequestError::Sample(error) => error.fmt(f),
+            FrameRequestError::Frame(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for FrameRequestError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            FrameRequestError::Sample(error) => Some(error),
+            FrameRequestError::Frame(error) => Some(error),
+        }
+    }
+}
+
+impl From<SampleError> for FrameRequestError {
+    fn from(error: SampleError) -> Self {
+        FrameRequestError::Sample(error)
+    }
+}
+
+impl From<FrameError> for FrameRequestError {
+    fn from(error: FrameError) -> Self {
+        FrameRequestError::Frame(error)
+    }
+}
 
 /// A retained frame was asked to raster under a host resource environment
 /// other than the one used to resolve and build it.
@@ -205,11 +279,14 @@ impl FrameProduct {
     }
 }
 
-/// Per-frame timings for the three pipeline seams (nanoseconds). Populated
+/// Per-frame timings for the four pipeline seams (nanoseconds). `sample_ns`
+/// includes Sample request evaluation and effective-view validation; it is
+/// zero for Base requests and for callers entering after sampling. Populated
 /// by the same spans [`crate::trace`] reads when the `trace` feature is on;
 /// always cheap enough to compute unconditionally here.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FrameStats {
+    pub sample_ns: u128,
     pub resolve_ns: u128,
     pub build_ns: u128,
     pub execute_ns: u128,
@@ -240,6 +317,18 @@ pub fn resolve_and_build_view(
     resolve_and_build_view_profiled(view, opts, ctx).map(|(product, _)| product)
 }
 
+/// Resolve and build one explicit Base or Sample request. The sampled branch
+/// produces the existing immutable `PropertyValues` contract, validates one
+/// `ValueView`, and then joins the ordinary full reference path.
+pub fn resolve_and_build_request(
+    doc: &Document,
+    request: FrameRequest<'_>,
+    opts: &ResolveOptions,
+    ctx: &PaintCtx,
+) -> Result<FrameProduct, FrameRequestError> {
+    resolve_and_build_request_profiled(doc, request, opts, ctx).map(|(product, _)| product)
+}
+
 fn resolve_and_build_profiled(
     doc: &Document,
     opts: &ResolveOptions,
@@ -259,6 +348,7 @@ fn resolve_and_build_profiled(
             environment: ctx.environment_key(),
         },
         FrameStats {
+            sample_ns: 0,
             resolve_ns: (t1 - t0).as_nanos(),
             build_ns: (t2 - t1).as_nanos(),
             execute_ns: 0,
@@ -285,11 +375,36 @@ fn resolve_and_build_view_profiled(
             environment: ctx.environment_key(),
         },
         FrameStats {
+            sample_ns: 0,
             resolve_ns: (t1 - t0).as_nanos(),
             build_ns: (t2 - t1).as_nanos(),
             execute_ns: 0,
         },
     ))
+}
+
+fn resolve_and_build_request_profiled(
+    doc: &Document,
+    request: FrameRequest<'_>,
+    opts: &ResolveOptions,
+    ctx: &PaintCtx,
+) -> Result<(FrameProduct, FrameStats), FrameRequestError> {
+    let sample_started = Instant::now();
+    match request.evaluate(doc)? {
+        EvaluatedFrameRequest::Base => resolve_and_build_profiled(doc, opts, ctx)
+            .map_err(FrameError::from)
+            .map_err(FrameRequestError::from),
+        EvaluatedFrameRequest::Sample { values } => {
+            let view = ValueView::new(doc, &values)
+                .expect("AnimationProgram::sample returns document-validated PropertyValues");
+            let sample_ns = sample_started.elapsed().as_nanos();
+            let (product, mut stats) = resolve_and_build_view_profiled(&view, opts, ctx)
+                .map_err(FrameError::from)
+                .map_err(FrameRequestError::from)?;
+            stats.sample_ns = sample_ns;
+            Ok((product, stats))
+        }
+    }
 }
 
 /// The one frame entry: `resolve -> build -> execute`, immediate, no caches
@@ -325,6 +440,27 @@ pub fn render_view(
     let (product, mut stats) = resolve_and_build_view_profiled(values, opts, ctx)?;
     let t0 = Instant::now();
     product.execute(canvas, view, ctx)?;
+    stats.execute_ns = t0.elapsed().as_nanos();
+    Ok((product, stats))
+}
+
+/// The explicit-policy frame entry. Sampling, value validation, resolution,
+/// and draw-list construction all complete before checked execution touches
+/// the destination canvas.
+pub fn render_request(
+    canvas: &skia_safe::Canvas,
+    doc: &Document,
+    request: FrameRequest<'_>,
+    opts: &ResolveOptions,
+    view: &Affine,
+    ctx: &PaintCtx,
+) -> Result<(FrameProduct, FrameStats), FrameRequestError> {
+    let (product, mut stats) = resolve_and_build_request_profiled(doc, request, opts, ctx)?;
+    let t0 = Instant::now();
+    product
+        .execute(canvas, view, ctx)
+        .map_err(FrameError::from)
+        .map_err(FrameRequestError::from)?;
     stats.execute_ns = t0.elapsed().as_nanos();
     Ok((product, stats))
 }

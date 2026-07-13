@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540">
+  <!-- Static shell: an inspectable rectangle-only motion dashboard. -->
+  <rect x="0" y="0" width="960" height="540" fill="#070b17"/>
+  <rect x="24" y="24" width="912" height="492" rx="28" fill="#0d1426"/>
+  <rect x="56" y="56" width="152" height="10" rx="5" fill="#334155"/>
+  <rect x="56" y="82" width="88" height="6" rx="3" fill="#1e293b"/>
+  <rect x="790" y="52" width="112" height="36" rx="18" fill="#19233a"/>
+  <rect x="806" y="66" width="48" height="8" rx="4" fill="#94a3b8"/>
+
+  <!-- The principal surface enters from the left and resolves into place. -->
+  <rect id="hero" x="-500" y="120" width="500" height="188" rx="24" fill="#6d28d9" opacity="0">
+    <animate attributeName="x" from="-500" to="56" begin="0s" dur="0.9s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" begin="0s" dur="0.55s" fill="freeze"/>
+  </rect>
+  <rect x="88" y="154" width="0" height="12" rx="6" fill="#ede9fe">
+    <animate attributeName="width" from="0" to="260" begin="0.35s" dur="0.7s" fill="freeze"/>
+  </rect>
+  <rect x="88" y="184" width="0" height="8" rx="4" fill="#c4b5fd">
+    <animate attributeName="width" from="0" to="178" begin="0.48s" dur="0.62s" fill="freeze"/>
+  </rect>
+  <rect x="88" y="248" width="0" height="30" rx="15" fill="#ffffff" opacity="0">
+    <animate attributeName="width" from="0" to="124" begin="0.7s" dur="0.55s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" begin="0.76s" dur="0.32s" fill="freeze"/>
+  </rect>
+
+  <!-- A compact live card slides in from the right. -->
+  <rect id="live-card" x="980" y="120" width="320" height="188" rx="24" fill="#111c34">
+    <animate attributeName="x" from="980" to="584" begin="0.18s" dur="0.88s" fill="freeze"/>
+  </rect>
+  <rect x="616" y="151" width="56" height="56" rx="18" fill="#ec4899" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" begin="1.02s" dur="0.25s" fill="freeze"/>
+  </rect>
+  <rect x="690" y="154" width="0" height="10" rx="5" fill="#f8fafc">
+    <animate attributeName="width" from="0" to="150" begin="1.06s" dur="0.55s" fill="freeze"/>
+  </rect>
+  <rect x="690" y="180" width="0" height="7" rx="3.5" fill="#64748b">
+    <animate attributeName="width" from="0" to="104" begin="1.12s" dur="0.46s" fill="freeze"/>
+  </rect>
+  <rect x="616" y="243" width="256" height="14" rx="7" fill="#24324f" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" begin="1.02s" dur="0.2s" fill="freeze"/>
+  </rect>
+  <rect id="live-progress" x="616" y="243" width="0" height="14" rx="7" fill="#22d3ee">
+    <animate attributeName="width" from="0" to="220" begin="1.2s" dur="1.7s" fill="freeze"/>
+  </rect>
+
+  <!-- Three metrics lift into the lower grid. -->
+  <rect x="56" y="560" width="264" height="148" rx="22" fill="#111c34" opacity="0">
+    <animate attributeName="y" from="560" to="336" begin="1.1s" dur="0.68s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" begin="1.1s" dur="0.34s" fill="freeze"/>
+  </rect>
+  <rect x="348" y="560" width="264" height="148" rx="22" fill="#111c34" opacity="0">
+    <animate attributeName="y" from="560" to="336" begin="1.28s" dur="0.68s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" begin="1.28s" dur="0.34s" fill="freeze"/>
+  </rect>
+  <rect x="640" y="560" width="264" height="148" rx="22" fill="#111c34" opacity="0">
+    <animate attributeName="y" from="560" to="336" begin="1.46s" dur="0.68s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" begin="1.46s" dur="0.34s" fill="freeze"/>
+  </rect>
+
+  <!-- Chart columns animate both y and height so their baselines stay fixed. -->
+  <rect x="84" y="450" width="28" height="0" rx="8" fill="#8b5cf6">
+    <animate attributeName="y" from="450" to="398" begin="1.62s" dur="0.52s" fill="freeze"/>
+    <animate attributeName="height" from="0" to="52" begin="1.62s" dur="0.52s" fill="freeze"/>
+  </rect>
+  <rect x="124" y="450" width="28" height="0" rx="8" fill="#a78bfa">
+    <animate attributeName="y" from="450" to="374" begin="1.72s" dur="0.58s" fill="freeze"/>
+    <animate attributeName="height" from="0" to="76" begin="1.72s" dur="0.58s" fill="freeze"/>
+  </rect>
+  <rect x="164" y="450" width="28" height="0" rx="8" fill="#c4b5fd">
+    <animate attributeName="y" from="450" to="388" begin="1.82s" dur="0.56s" fill="freeze"/>
+    <animate attributeName="height" from="0" to="62" begin="1.82s" dur="0.56s" fill="freeze"/>
+  </rect>
+  <rect x="204" y="450" width="28" height="0" rx="8" fill="#ddd6fe">
+    <animate attributeName="y" from="450" to="358" begin="1.92s" dur="0.62s" fill="freeze"/>
+    <animate attributeName="height" from="0" to="92" begin="1.92s" dur="0.62s" fill="freeze"/>
+  </rect>
+
+  <!-- A root-level href target proves non-parent targeting. -->
+  <rect x="388" y="604" width="184" height="10" rx="5" fill="#24324f" opacity="0">
+    <animate attributeName="y" from="604" to="380" begin="1.28s" dur="0.68s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" begin="1.28s" dur="0.34s" fill="freeze"/>
+  </rect>
+  <rect id="signal" x="388" y="380" width="0" height="10" rx="5" fill="#34d399"/>
+  <animate href="#signal" attributeName="width" from="0" to="184" begin="2.0s" dur="0.9s" fill="freeze"/>
+
+  <!-- Remove restores the authored invisible base after two exact repeats. -->
+  <rect id="scanner" x="660" y="450" width="44" height="4" rx="2" fill="#f59e0b" opacity="0">
+    <animate attributeName="x" from="660" to="838" begin="2.15s" dur="0.72s" repeatCount="2" fill="remove"/>
+    <animate attributeName="opacity" from="0" to="1" begin="2.15s" dur="0.72s" repeatCount="2" fill="remove"/>
+  </rect>
+</svg>

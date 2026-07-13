@@ -8,6 +8,7 @@
 //!
 //! Standalone by design; promoted into `crates/` only at phase 4.
 
+pub mod animation;
 pub mod grida_xml;
 pub mod grida_xml_source;
 pub mod math;
@@ -20,6 +21,7 @@ pub mod properties;
 pub mod renderability;
 pub mod resolve;
 pub mod rounded_box;
+pub mod svg_animation;
 pub mod svgout;
 pub mod text_layout;
 pub mod textir;

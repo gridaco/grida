@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540">
+  <!--
+    Profile 1 keyframe/easing specimen. Review exact samples at 0s;
+    0.25s, 0.75s; 1s; 1.25s, 1.75s; 2s; 2.5s, 3s, 3.5s; and 4s.
+    At 100fps these are frames 0, 25, 75, 100, 125, 175, 200, 250,
+    300, 350, and 400. Sample 4.25s/frame 425 to verify the endpoint.
+  -->
+
+  <!-- Shell. -->
+  <rect x="0" y="0" width="960" height="540" fill="#070b17"/>
+  <rect x="24" y="24" width="912" height="492" rx="28" fill="#0d1426"/>
+
+  <!-- Neutral master clock: constant velocity over the same key times. -->
+  <rect x="56" y="48" width="848" height="64" rx="18" fill="#111c34"/>
+  <rect x="76" y="70" width="24" height="20" rx="10" fill="#334155"/>
+  <rect x="82" y="78" width="12" height="4" rx="2" fill="#cbd5e1"/>
+  <rect x="120" y="76" width="720" height="8" rx="4" fill="#24324f"/>
+  <rect x="120" y="76" width="0" height="8" fill="#cbd5e1">
+    <animate
+      attributeName="width"
+      values="0;180;360;720"
+      keyTimes="0;0.25;0.5;1"
+      calcMode="linear"
+      dur="4s"
+      fill="freeze"
+    />
+  </rect>
+  <rect x="119" y="68" width="2" height="24" fill="#64748b"/>
+  <rect x="299" y="68" width="2" height="24" fill="#64748b"/>
+  <rect x="479" y="68" width="2" height="24" fill="#64748b"/>
+  <rect x="839" y="68" width="2" height="24" fill="#64748b"/>
+
+  <!-- Three aligned lanes share output stations at 0, 160, 560, and 720. -->
+  <rect x="56" y="128" width="848" height="96" rx="20" fill="#111c34"/>
+  <rect x="56" y="240" width="848" height="96" rx="20" fill="#111c34"/>
+  <rect x="56" y="352" width="848" height="96" rx="20" fill="#111c34"/>
+
+  <!-- Shared station guides are behind the rails, leaving their edges probeable. -->
+  <rect x="119" y="120" width="2" height="336" fill="#334155" opacity="0.7"/>
+  <rect x="279" y="120" width="2" height="336" fill="#334155" opacity="0.7"/>
+  <rect x="679" y="120" width="2" height="336" fill="#334155" opacity="0.7"/>
+  <rect x="839" y="120" width="2" height="336" fill="#334155" opacity="0.7"/>
+  <rect x="114" y="116" width="12" height="8" rx="4" fill="#64748b"/>
+  <rect x="274" y="116" width="12" height="8" rx="4" fill="#64748b"/>
+  <rect x="674" y="116" width="12" height="8" rx="4" fill="#64748b"/>
+  <rect x="834" y="116" width="12" height="8" rx="4" fill="#64748b"/>
+
+  <!-- Uneven linear keyframes: slow, fast, then slow across 1s, 1s, and 2s. -->
+  <rect x="120" y="162" width="720" height="28" rx="14" fill="#24324f"/>
+  <rect x="120" y="166" width="0" height="20" fill="#22d3ee">
+    <animate
+      attributeName="width"
+      values="0;160;560;720"
+      keyTimes="0;0.25;0.5;1"
+      calcMode="linear"
+      dur="4s"
+      fill="freeze"
+    />
+  </rect>
+  <rect x="76" y="174" width="24" height="4" rx="2" fill="#22d3ee"/>
+
+  <!-- Symmetric ease-in/out on every segment: quarters lag, then lead linear. -->
+  <rect x="120" y="274" width="720" height="28" rx="14" fill="#24324f"/>
+  <rect x="120" y="278" width="0" height="20" fill="#a78bfa">
+    <animate
+      attributeName="width"
+      values="0;160;560;720"
+      keyTimes="0;0.25;0.5;1"
+      calcMode="spline"
+      keySplines="0.5 0 0.5 1;0.5 0 0.5 1;0.5 0 0.5 1"
+      dur="4s"
+      fill="freeze"
+    />
+  </rect>
+  <rect x="76" y="282" width="5" height="12" rx="2.5" fill="#a78bfa"/>
+  <rect x="85" y="278" width="5" height="20" rx="2.5" fill="#a78bfa"/>
+  <rect x="94" y="282" width="5" height="12" rx="2.5" fill="#a78bfa"/>
+
+  <!--
+    Each segment changes character: strong ease-in, fast departure, then a
+    long hold-and-catch-up curve. This lane must not share one global spline.
+  -->
+  <rect x="120" y="386" width="720" height="28" rx="14" fill="#24324f"/>
+  <rect x="120" y="390" width="0" height="20" fill="#ec4899">
+    <animate
+      attributeName="width"
+      values="0;160;560;720"
+      keyTimes="0;0.25;0.5;1"
+      calcMode="spline"
+      keySplines="0.8 0 1 1;0 0.75 0.25 1;1 0 0.25 0.25"
+      dur="4s"
+      fill="freeze"
+    />
+  </rect>
+  <rect x="76" y="400" width="6" height="4" rx="2" fill="#ec4899"/>
+  <rect x="85" y="394" width="6" height="10" rx="3" fill="#ec4899"/>
+  <rect x="94" y="384" width="6" height="20" rx="3" fill="#ec4899"/>
+
+  <!-- Pixel-safe color key and endpoint: all rectangles remain inside the shell. -->
+  <rect x="56" y="476" width="848" height="16" rx="8" fill="#0a1020"/>
+  <rect x="76" y="482" width="72" height="4" rx="2" fill="#22d3ee"/>
+  <rect x="160" y="482" width="72" height="4" rx="2" fill="#a78bfa"/>
+  <rect x="244" y="482" width="72" height="4" rx="2" fill="#ec4899"/>
+  <rect x="824" y="478" width="16" height="12" rx="6" fill="#cbd5e1"/>
+</svg>

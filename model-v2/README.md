@@ -3,15 +3,18 @@
 Workbench for the fundamental redesign of the Grida node model: how a node's
 geometry, position, size, rotation/transform, and layout participation are
 represented — in the **Rust engine** (`crates/grida`) and the **format spec**
-(`format/grida.fbs`). Other seams (TS editor, WASM bindings, importers) follow
-after the model lands; they are out of scope here.
+(`format/grida.fbs`). The proving stack has since grown source-format, engine,
+and host harnesses needed to test that model end to end, including Grida XML
+ingestion and explicit-time SVG animation. Those remain contained proofs;
+production TS/editor, WASM, importer, renderer, and runtime migration are still
+out of scope here.
 
 > **Branch note.** This directory lives on the `model-v2-anchor` branch as a
 > working snapshot — tracking issue:
 > [gridaco/grida#957](https://github.com/gridaco/grida/issues/957) (pinned).
-> The plan: finish the feel pass on the spike, then propose an RFC with this
-> branch as the textbook, then start the legacy migration/rebuild (weeks
-> out). Nothing here ships; no production code is touched by this branch.
+> Current implementation status and module boundaries are recorded in
+> [`engine/ANIMATION.md`](./engine/ANIMATION.md). Nothing here ships; no
+> production code is touched by this branch.
 
 ## Run
 
@@ -40,12 +43,12 @@ them — problems first, then candidates, then spec.
 
 ## Phase discipline
 
-| phase                   | artifact                                                       | status                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Problems & harnesses | `problems.md`, `harnesses.md`, `study.md`                      | stable draft                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| 2. Candidate models     | `paradigm.md`, `axes.md`, `models/*`, `finale.md`, `triage.md` | **DECIDED — `anchor`** (+5 triage amendments)                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| 3. Spec                 | normative doc + `grida.fbs` draft                              | **experiments RUN, model PROVEN** — E1–E10 complete with verdicts; **DEC-0 decided: VISUAL-ONLY rotation (the CSS framing), CSS-pure sizing** ([`a/dec0-visual-only.md`](./a/dec0-visual-only.md)); flips built (E-A14, cross-zero resize); conformance lab; native interactive spike ([`a/spike-canvas/`](./a/spike-canvas/)); open calls parked in [`a/DECISIONS.md`](./a/DECISIONS.md). Remaining: fold deltas into a normative rewrite of `models/a.md` + WG graduation |
-| 4. Runtime              | `crates/grida` implementation                                  | **day-1 engine skeleton BUILT** — [`engine/`](./engine) (`anchor-engine`): the `resolve → drawlist → paint` pipeline + query/journal/replay/damage sockets, spike re-hosted onto it, gate green (shots byte-identical, replay deterministic, budgets baselined); contracts in [`a/ENGINE.md`](./a/ENGINE.md). Migration into `crates/grida` follows; the spike's [`TEXTBOOK.md`](./a/spike-canvas/TEXTBOOK.md) is the reference                                             |
+| phase                   | artifact                                                       | status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Problems & harnesses | `problems.md`, `harnesses.md`, `study.md`                      | stable draft                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2. Candidate models     | `paradigm.md`, `axes.md`, `models/*`, `finale.md`, `triage.md` | **DECIDED — `anchor`** (+5 triage amendments)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 3. Spec                 | normative doc + `grida.fbs` draft                              | **experiments RUN, model PROVEN** — E1–E10 complete with verdicts; **DEC-0 decided: VISUAL-ONLY rotation (the CSS framing), CSS-pure sizing** ([`a/dec0-visual-only.md`](./a/dec0-visual-only.md)); flips built (E-A14, cross-zero resize); conformance lab; native interactive spike ([`a/spike-canvas/`](./a/spike-canvas/)); open calls parked in [`a/DECISIONS.md`](./a/DECISIONS.md). Remaining: fold deltas into a normative rewrite of `models/a.md` + WG graduation                                                                  |
+| 4. Runtime              | `crates/grida` implementation                                  | **proving engine BUILT** — [`engine/`](./engine) (`anchor-engine`): the `resolve → drawlist → paint` pipeline + query/journal/replay/damage sockets, spike re-hosted onto it, gate green (shots byte-identical, replay deterministic, budgets baselined). The bounded explicit-time SVG animation checkpoint adds pure sampling, Base/Sample frame integration, exact-time rendering, a caller-owned playback clock, and a controlled native host; see [`engine/ANIMATION.md`](./engine/ANIMATION.md). Production migration remains separate |
 
 Ground rules:
 

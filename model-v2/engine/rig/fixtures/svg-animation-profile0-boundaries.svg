@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="32">
+  <rect id="probe" x="20" y="8" width="12" height="16" fill="#7c3aed">
+    <animate
+      attributeName="x"
+      from="20"
+      to="36"
+      begin="0.000000010s"
+      dur="0.000000008s"
+      repeatCount="2"
+      fill="freeze"
+    />
+  </rect>
+</svg>

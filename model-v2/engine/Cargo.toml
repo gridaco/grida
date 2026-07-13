@@ -23,6 +23,7 @@ native-gl-context = ["dep:glutin", "dep:gl", "dep:raw-window-handle"]
 # serde feature ON: the op-log wire for replay (`Op` becomes serializable).
 anchor-lab = { path = "../a/lab", features = ["serde"] }
 serde_json = "1.0"
+sha2 = "0.10"
 
 # Same exact version + features as anchor-spike / grida_dev so the shared
 # target dir reuses the compiled skia-safe artifact instead of rebuilding

@@ -1,698 +1,587 @@
 # ANIMATION — explicit time through the anchor engine
 
-**Status:** Open animation RFD. No animation syntax, timing model, program,
-sampler, interpolation, composition, or playback API is adopted. The
-pre-animation identity, typed-property, and immutable effective-value
-foundation is specified separately; it contains no time semantics.
+**Status:** Accepted engine contract; the bounded reference sampler,
+caller-owned playback clock, offline renderer, and native live-host harness are
+complete in the model-v2 proving stack. Browser/WPT differential conformance,
+animation replay, production-engine migration, and product playback remain
+pending.
 
-This is the engine-side companion to the
-[Grida XML animation RFD](https://grida.co/docs/wg/format/grida-xml-animation).
-That RFD asks what animation means in authored source. This document asks how
-an answer can pass through the engine without breaking its existing purity,
-determinism, query, damage, and replay contracts.
+This document binds authored animation frontends to the current model-v2
+engine. The first frontend is the cumulative [SVG Animation Profile
+0](https://grida.co/docs/wg/feat-svg/animation) and [Profile
+1](https://grida.co/docs/wg/feat-svg/animation-keyframes) family. Native Grida
+XML animation is
+[deferred](https://grida.co/docs/wg/format/grida-xml-animation).
 
-The proposal is subordinate to the current [engine contracts](../a/ENGINE.md)
-and uses the existing [measurement doctrine](./MEASURE.md). If it conflicts
-with either, the conflict must be resolved explicitly rather than hidden in an
-animation-specific path.
+The binding is subordinate to the [engine contracts](../a/ENGINE.md), the
+[measurement doctrine](./MEASURE.md), and the implemented
+[effective-values contract](./EFFECTIVE-VALUES.md). It does not define source
+syntax.
 
-It is deliberately implementation-facing. It may name the current engine
-stages and candidate Rust types; it does not define `.grida.xml` syntax or make
-format decisions on the format RFD's behalf.
+## Decision
 
-The implemented input boundary this proposal must reuse is specified in
-[`EFFECTIVE-VALUES.md`](./EFFECTIVE-VALUES.md).
-
-## Short answer
-
-Animation should enter the engine as **an explicit sample-time input to a pure,
-typed sampling stage**:
+Animation enters the engine as one explicit sample-time input to a pure, typed
+sampling stage:
 
 ```text
-authored Document + authored animation model
-                         |
-                         v
-                  compile / validate       (not per frame)
-                         |
-                         v
-Document + AnimationProgram + SampleTime + declared environment
-                         |
-                         v
-                      sample
-                         |
-                         v
-       immutable typed PropertyValues
-                         |
-                         v
-          resolve -> drawlist -> raster / composite
-                     |
-                     +----> query / hit test / damage
+frontend-owned retained source
+              |
+              | compile and validate outside the frame loop
+              v
+       immutable AnimationProgram
+              |
+authored Document + SampleTime
+              |
+              v
+            sample
+              |
+              v
+  immutable typed PropertyValues
+              |
+              v
+ resolve -> drawlist -> checked raster/composite
+     |          |
+     +----------+----> query / hit test / damage / cache
 ```
 
-The host owns clocks, playback controls, and frame pacing. It maps those facts
-to one explicit `SampleTime` for a frame. The engine never reads a wall clock
-to determine visual state, never writes sampled values back into the authored
-document, and never lets the painter sample animation independently.
+The first format-neutral boundary is the compiled `AnimationProgram`, not the
+authored animation tree. Each frontend owns its source representation, target
+resolution rules, diagnostics, and source preservation. Compilation lowers
+accepted source semantics to the same typed program.
 
-The first implementation should run the full reference pipeline after every
-sample. Incremental sampling, scoped resolve, partial repaint, and
-compositor-only execution are later optimizations, each differential-tested
-against that permanent reference path.
+The host owns its monotonic clock, playback controls, and whether animation
+demands another frame. It may map explicit `HostTime` values through the
+source-neutral `PlaybackClock` harness, but it still supplies exactly one final
+`SampleTime` for an animated frame. Final display pacing remains the
+compositor's responsibility under ENG-2.4. The engine never reads a wall clock
+to choose visual state, never writes sampled values into `Document`, and never
+allows resolve, query, or paint to sample independently.
 
-## What exists today
+## Checkpoint status — 2026-07-14
 
-The anchor engine remains static, but its pre-animation value boundary now
-exists:
+This checkpoint proves one deliberately bounded vertical slice. “Implemented”
+below means executable in the model-v2 proving stack; it does not mean shipped
+in the production engine.
 
-- `frame::render` takes a `Document`, resolve options, a view, and paint
-  context, then runs `resolve -> build -> execute`;
-- `PropertyValues` is the immutable, sorted, unique map from arena-scoped
-  generational node-property targets to exact typed effective values;
-- `ValueView` validates that map and makes an absent entry read the authored
-  base value;
-- value-aware resolve, frame, drawlist, and cache entries consume one
-  `ValueView`, while their static entries are exact `ValueView::base` wrappers;
-- resolution captures the traversal and effective clip state needed by query,
-  so the spatial read tier accepts only `Resolved` rather than a separately
-  pairable document or value view;
-- `damage::diff_frame` compares immutable `FrameProduct`s, so fills, opacity,
-  strokes, clips, painter order, text, path, and paint-environment changes
-  cannot disappear behind unchanged geometry;
-- `PaintEnvironmentKey` identifies one host resource/font context plus its
-  checked revision, and each `FrameProduct` carries the key belonging to that
-  frame and refuses raster execution under a different key;
-- the retained scene cache keys both the runtime document incarnation and the
-  exact `PropertyValues` and `PaintEnvironmentKey`;
-- its uses of `std::time::Instant` measure stage duration only; there is no
-  semantic time input;
-- `journal` and `replay` record document operations. ENG-5's “time as data” is
-  edit history, not visual animation time;
-- the probe's `anim_*` cases mutate the source document between measured
-  frames. They are useful workloads, but they are not an animation model or
-  sampler;
-- `damage::diff` remains the geometry-only compatibility primitive; callers
-  that claim visual damage use complete `damage::diff_frame` products.
-  Geometry-only tests may continue to exercise `diff` directly.
+| Area                              | Status                      | Exact boundary                                                                                                                                                                                                                    |
+| --------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SVG source contract               | Accepted                    | Cumulative Profiles 0 and 1: finite replacement animation of rectangle `x`, `y`, `width`, `height`, and `opacity`; linear keyframes and per-segment cubic Bézier easing                                                           |
+| Semantic sampler                  | Implemented                 | Format-neutral signed sample time, finite scalar tracks, immutable programs, checked timing, exact rational offsets/easing, and atomic `PropertyValues`; no colors, transforms, paints, composition, events, or indefinite timing |
+| SVG frontend                      | Implemented                 | Retained source, source-located diagnostics, strict whole-document compilation, and a narrow identity-preserving rectangle materializer; not general SVG import                                                                   |
+| Engine frame seam                 | Implemented                 | Explicit Base/Sample requests feed one ordinary resolve, draw-list, query, damage, cache, and checked-paint path                                                                                                                  |
+| Playback clock                    | Implemented                 | Pure caller-owned host-time mapping with pause, seek, rate, direction, and deterministic terminal behavior; no clock reads, scheduler, callbacks, or loop policy                                                                  |
+| Offline visual host               | Implemented                 | Exact-time PNG sequence plus JSON/CSV manifests; MP4/GIF assembly remains external presentation tooling                                                                                                                           |
+| Native live host                  | Implemented proving harness | Play/pause, restart, scrub, time display, resize, GPU presentation, and terminal quiescence; fixed host redraw timer substitutes for a compositor, and event-loop behavior has manual rather than automated UI evidence           |
+| Browser/WPT differential          | Pending                     | Internal value, scene, query, damage, cache, and pixel evidence exists; no browser-build-pinned differential result exists yet                                                                                                    |
+| Animation replay                  | Pending                     | Existing edit journal/replay does not record an animation program, sample time, or sampled frame request                                                                                                                          |
+| Native Grida XML animation        | Deliberately deferred       | `.grida.xml` remains a static source format; this work adds no second animation syntax                                                                                                                                            |
+| Production engine/product runtime | Unchanged                   | No production SVG importer, renderer, compositor, scheduler, playback UI, autoplay policy, or media synchronization was modified                                                                                                  |
 
-None of those types sample time or describe animation. There is still no
-animation program, sampler, interpolation, composition, or playback runtime.
+## Module topology and responsibilities
 
-## Scope
-
-This RFD covers:
-
-- the boundary between authored animation and an executable program;
-- deterministic sampling at an arbitrary time;
-- how sampled values enter resolve, drawlist, query, and damage;
-- host/engine responsibility for clocks and scheduling;
-- reference and optimized execution paths;
-- replay, oracle versioning, tests, and measurement.
-
-It does not decide:
-
-- XML element or attribute names;
-- whether animation is nested under a target or stored in a timeline graph;
-- duration, easing, repeat, fill behavior, synchronization, or event syntax;
-- which properties are animatable;
-- editor timeline UX;
-- SVG import/export policy;
-- autoplay or trust policy for a host application.
-
-Those are source-language or product questions. The engine architecture must
-be able to host their eventual answers without silently inventing its own.
-
-## Vocabulary
-
-The names below separate facts that must not collapse into one value:
-
-- **base value** — the authored value before animation contributes;
-- **sample time** — the explicit position on a timeline requested by the host;
-- **authored animation** — format-neutral animation intent retained for
-  editing and serialization;
-- **animation program** — a validated, typed execution form compiled from
-  authored animation;
-- **track/effect** — one time-varying contribution to one target property;
-- **sampled value** — a value produced for one property at one sample time;
-- **sample overlay** — the future sampler's sparse `PropertyValues` output for
-  a frame;
-- **sampled scene** — the resolved scene produced from base values plus the
-  overlay;
-- **impact class** — the phases a changed sampled value invalidates, such as
-  measure, layout, transform, bounds, paint, or resource state.
-
-Names are provisional. The separations are not: authored state, executable
-state, sampled state, and resolved state have different lifetimes and owners.
-
-## Proposed engine laws
-
-The labels in this section are proposals, not additions to the accepted
-contracts in `ENGINE.md`.
-
-### A-1 · explicit time `[PROPOSED]`
-
-Every visual sample is a function of declared inputs, including time. No
-sampler, resolver, drawlist builder, painter, resource resolver, or query reads
-an ambient clock. Instrumentation may use `Instant`; semantics may not.
-
-The representation of `SampleTime` is open. It should make boundary decisions
-deterministic, which argues against an unqualified `f32` seconds value. Integer
-ticks with a declared time scale, integer microseconds, and a rational value
-remain candidates.
-
-### A-2 · authored state is immutable while sampling `[PROPOSED]`
-
-Sampling never mutates the source `Document` and never serializes a sampled
-frame back as authored truth. Editing a base value or keyframe is an authored
-operation; advancing playback is not.
-
-This rules out the probe's current mutation loop as the semantic
-implementation. It remains a valid load generator until a real program exists.
-
-### A-3 · sampling is pure and arbitrarily seekable `[PROPOSED]`
-
-For the same document, program, environment, oracle versions, and sample time,
-sampling produces bit-identical output. Sampling time `t` directly produces
-the same result as playing continuously to `t`.
-
-Stateful playback helpers may cache prior samples, but their output must be
-differentially equal to the stateless reference sampler.
-
-### A-4 · animation extends the typed property registry `[PROPOSED]`
-
-The pre-animation foundation already requires registered property keys, exact
-value types, applicability, base access, validation, deterministic equality,
-and conservative impact classes. An animation program targets that registry;
-it does not create reflective string paths or a parallel value model.
-
-Animation must add, for each admitted animatable key:
-
-- interpolation and discrete-fallback rules;
-- allowed composition operations; and
-- any animation-specific deterministic encoding/oracle version.
-
-The XML vocabulary may map source names to this registry, but must not create a
-second set of interpolation semantics.
-
-### A-5 · one sample feeds every downstream consumer `[PROPOSED]`
-
-Resolve, drawlist construction, hit testing, bounds, culling, damage, export,
-and inspection observe the same sampled values at the same time. Paint may not
-sample a second time, and query may not read only the base document while paint
-shows an animated result.
-
-### A-6 · the host owns playback and pacing `[PROPOSED]`
-
-The host owns wall-clock selection, pause/play, playback rate, seek, loop
-policy, presentation scheduling, and the decision to request another frame.
-The engine evaluates the time it is given. This extends ENG-2.4 rather than
-creating a second frame loop inside animation.
-
-The engine may return scheduling facts—whether continuous effects are active
-or the next exact time a discrete effect can change—but it does not call a
-timer or request animation frames itself.
-
-### A-7 · reference paths remain permanent `[PROPOSED]`
-
-The full sampler, full resolver, full drawlist build, and full raster path are
-the correctness oracle. Incremental and compositor paths must prove:
+The dependency direction is one-way:
 
 ```text
-optimized(document, program, time, environment)
-    == reference(document, program, time, environment)
+SVG profile documents
+        |
+        v
+anchor_lab::svg_animation  ---- source ownership / compilation
+        |
+        v
+anchor_lab::animation      ---- format-neutral semantic sampling
+        |
+        v
+PropertyValues
+        |
+        v
+anchor_engine::frame/cache ---- one coherent frame
+        ^
+        |
+host-owned PlaybackClock
+        |
+        +---- offline renderer
+        +---- native proving player
 ```
 
-Equality is evaluated at the strongest applicable tier: sampled values,
-resolved columns, drawlist, queries, damage coverage, and pixels.
+| Unit                               | Owns                                                                                                                                                                                       | Must not own                                                                                    | Consumption status                                                                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| SVG profile documents              | Accepted source semantics and conformance laws                                                                                                                                             | Engine types, module layout, or product policy                                                  | Normative source contract                                                                                                              |
+| `anchor_lab::svg_animation`        | Retained SVG source, namespace/source inventory, diagnostics, target resolution, profile validation, and lowering; its static-shell adapter materializes only the proving rectangle subset | Playback, wall clocks, frame scheduling, rasterization, or silent general-SVG normalization     | Frontend proving boundary; production reuse requires connection to the real SVG materializer rather than promotion of the narrow shell |
+| `anchor_lab::animation`            | Signed semantic time, checked intervals, canonical scalar curves/easing, typed tracks, immutable programs, and atomic projection to the existing property registry                         | SVG grammar, source locations, filesystem/network access, host clocks, scheduling, or rendering | Reusable semantic kernel for the admitted scalar/replacement family                                                                    |
+| `anchor_engine::frame` and `cache` | The explicit Base/Sample policy, sample-once frame construction, value-keyed cache identity, transactional execution, and coherence across resolve/query/damage/pixels                     | Source parsing, ambient time, host controls, or source-specific fallback                        | Reusable engine seam                                                                                                                   |
+| `anchor_engine::playback_clock`    | Pure mapping from caller-supplied monotonic host time into a closed document-time range                                                                                                    | `Instant`, source/program/document/frame types, redraw requests, callbacks, looping, or UI      | Reusable optional host primitive, not a runtime                                                                                        |
+| `svg_animation_render`             | File I/O, cadence selection, exact sample enumeration, PNG/report publication, and host-side transaction boundaries                                                                        | Source semantics, interpolation, or product playback policy                                     | Diagnostic host tool; not an engine library boundary                                                                                   |
+| Native spike transport/player      | Host transport policy, `Instant` ownership, controls, redraw demand, resize, GPU presentation, and compositor stand-in pacing                                                              | New animation semantics or an engine-level `Runtime` abstraction                                | Disposable integration harness; only demonstrated laws migrate                                                                         |
 
-### A-8 · animation semantics are versioned oracles `[PROPOSED]`
+Nothing below a host depends on the offline renderer or native player. The two
+hosts deliberately exercise the same compiled program, explicit time, and
+frame seam through different pacing policies. Future consumers should compose
+those narrow pieces rather than inherit either proving host wholesale.
 
-Interpolation, easing, effect composition, property registration, and boundary
-rounding are content oracles. Replays and conformance artifacts must identify
-the versions under which their expected samples were produced, just as the
-engine already versions text and future path/image oracles.
+## Implemented reference path
 
-## The data boundary
+The proving stack now implements the bounded reference path:
 
-Animation needs three representations, not one catch-all tree.
+- `SampleTime`, checked timing, typed tracks, immutable `AnimationProgram`,
+  exact rational keyframe offsets, per-segment easing, and once-rounded
+  rational-to-binary32 interpolation live with the model and property registry;
+- the retained SVG frontend resolves namespaces, preserves the source snapshot,
+  materializes an identity-preserving rectangle scene, and compiles the full
+  selected Profile 0 or Profile 1 inventory before sampling;
+- `PropertyTarget` combines an arena-scoped generational `NodeKey` with one
+  closed `PropertyKey`;
+- `PropertyValues` is an immutable, sorted, unique map of exact typed values;
+- `ValueView` validates the map and reads an absent entry as the authored base;
+- one `ValueView` feeds resolve and draw-list construction;
+- query consumes the resulting `Resolved` product, not a separately pairable
+  document or value map;
+- `FrameProduct` and `damage::diff_frame` carry the visual state needed to
+  detect geometry, paint, order, clip, text, and resource changes;
+- `SceneCache` already keys the exact `PropertyValues` and paint environment;
+- checked frame execution is transactional and rejects a changed resource
+  environment before drawing;
+- `FrameRequest` exposes explicit Base and Sample policies for the full frame;
+- `SceneCache::frame_request` samples before cache comparison and keys the exact
+  resulting `PropertyValues`, never time;
+- caller-owned `PlaybackClock` state maps explicit monotonic host timestamps to
+  document time without depending on source, program, frame, Skia, or scheduler
+  types; and
+- `svg_animation_render` materializes and compiles once, then writes independent
+  exact-time PNG samples for host-side video or GIF assembly.
 
-### 1. Authored animation
+There is still no ambient engine clock, scheduler, event timing, or optimized
+animation execution. A `PlaybackClock` value is state explicitly owned and
+called by the host; it never imports or reads `Instant`. Existing `Instant` use
+measures stage duration only. Journal time describes edit history, and probe
+cases that mutate documents between frames are workloads, not animation.
 
-The source/model layer retains editable intent: keyframes, timing, references,
-and source ordering. The engine should not receive raw XML nodes and should
-never parse `.grida.xml` in a frame.
+The proving SVG static materializer is intentionally narrower than general SVG
+import: one SVG-namespace root with positive unitless dimensions, direct
+rectangle children, solid hexadecimal fills, rectangle opacity/radii, no
+viewBox, and no transforms. This is an implementation limit of the first
+identity-preserving host, not an expansion or contraction of either profile's
+animation semantics. Unsupported static SVG fails explicitly. The retained
+source compiler still rejects unsupported animation, script, event-handler,
+and CSS animation mechanisms as a whole.
 
-This representation does not exist in the model today. Adding it is a model
-change and must be designed with the format RFD; the engine cannot honestly
-implement animation by hiding an XML-shaped side table in `paint.rs`.
+## Engine laws
 
-### 2. Compiled `AnimationProgram`
+### 1. Time is declared data
 
-A format-neutral compile step resolves and validates what can be decided
-without a sample time:
+`SampleTime` is a signed 64-bit nanosecond offset from the source profile's
+timeline origin. Construction and arithmetic are checked. A source frontend
+must either convert its authored clocks exactly or reject them.
 
-- target identity and property keys;
-- keyframe value types;
-- normalized offsets and easing functions;
-- effect ordering and composition modes;
-- static dependency and synchronization graphs;
-- property impact classes;
-- resource handles that do not require per-frame discovery.
+No stage may read system, monotonic, audio, display, or request-animation-frame
+time. A host may derive `SampleTime` from any of those clocks, but the derived
+integer is the complete semantic input for the frame.
 
-Compilation should happen on load and after relevant authored edits, not on
-every frame. Invalid targets, cycles, unsupported composition, incompatible
-values, and malformed timing should produce structured diagnostics here rather
-than disappear during paint.
+### 2. Sampling is pure and seekable
 
-Whether compilation belongs to the model crate or an engine module remains
-open. Its input and output must be format-neutral either way.
+For one document snapshot, animation program, and sample time, sampling always
+returns the same `PropertyValues` or the same error. Prior samples, playback
+direction, nominal frame rate, and skipped frames cannot affect the result.
 
-### 3. Existing sparse `PropertyValues`
+Sequential playback to `t` and a direct seek to `t` are equivalent. A sampler
+does not retain an active interval cursor as semantic state. It may cache work
+only behind a differential test against stateless sampling.
 
-The pre-animation foundation already supplies the exact data contract a future
-reference sampler must produce: immutable `PropertyValues`, keyed by an
-arena-scoped generational node identity and typed property key. An absent entry
-means “use the authored base value” through `ValueView`. The values are
-ephemeral frame input, not a cloned or mutated `Document`.
+### 3. Authored state is immutable
 
-A sparse overlay makes the null-animation law cheap and explicit:
+Compilation and sampling never modify base values, hierarchy, the retained
+source snapshot, or the materialized `Document`. Sampled values exist only in
+the returned `PropertyValues` and derived immutable frame products.
+
+An editor changes authored source through ordinary editing operations. It does
+not promote one sampled frame into source unless an explicit bake operation is
+requested.
+
+### 4. The program is typed before sampling
+
+`AnimationProgram` is immutable and contains only validated live property
+targets, canonical typed curves, checked timing, and validated per-segment
+interpolation. The frame loop does not parse XML, resolve IDs, parse numbers,
+perform I/O, discover property types, or choose fallback behavior.
+
+The program records the document/materialization identity against which its
+targets were compiled. Sampling against another incarnation, a stale
+generation, or an inapplicable property fails the whole sample.
+
+### 5. One sample feeds the whole frame
+
+Sampling completes before resolve. The resulting `PropertyValues` passes
+through `PropertyValues::new` and one `ValueView`, then the ordinary full
+reference pipeline. Layout, geometry, clips, draw items, query, damage, and
+pixels therefore observe the same sampled scene.
+
+No paint-only animation side channel is allowed. A geometry animation cannot
+update pixels while leaving hit testing or damage at the base geometry.
+
+### 6. Frame policy is explicit
+
+The frame request is a sum type: `Base` or `Sample(program, time)`. Only an
+explicit `Base` request selects `ValueView::base(document)`. A Sample request
+with a missing program or time is an error; failed compilation cannot silently
+fall back to Base.
+
+Base is distinct from sampling an animation program at time zero. An empty
+program sampled at any valid time returns empty `PropertyValues` and is exactly
+equivalent to the existing static path.
+
+### 7. Failure is whole-frame and transactional
+
+Compile errors produce no program. Sample errors produce no partial
+`PropertyValues`. Frame-build or checked-execution errors produce no partial
+canvas output and preserve the prior retained cache entry.
+
+Unsupported animation may still have a declared Base rendering policy at the
+frontend. It never becomes a partially sampled frame through the engine.
+
+## Core data boundary
+
+The exact Rust layout is an implementation detail, but the model has these
+irreducible facts:
 
 ```text
-sample(empty_program, any_time) == PropertyValues::default()
-resolve(ValueView::new(document, empty_values)) == resolve(document)
+SampleTime
+  nanoseconds: i64
+
+AnimationProgram
+  document identity
+  profile/compiler identity
+  sorted unique tracks
+
+Track
+  source diagnostic identity
+  PropertyTarget
+  checked interval and repeat count
+  post-interval fill behavior
+  canonical typed scalar curve
+    exact rational keyframe offsets
+    stored binary32 keyframe values
+    one easing operation per segment
 ```
 
-The reference storage is a plain deterministic ordered map with duplicate,
-type, applicability, value-domain, arena, and generation validation. A future
-sampler must produce this contract rather than introduce a parallel
-`SampledValues` abstraction. SOA, track-local caches, and change masks remain
-measured optimizations behind the same observable values.
+Track order is deterministic. Program construction rejects duplicate targets
+whenever the active source profile does not define composition for them. A
+program cannot contain a reflective field path, source-language value string,
+serialized runtime key, callback, resource loader, or clock handle.
 
-## Node identity is decided; subobject identity remains bounded
+`PropertyValue` remains the only effective-value representation. Animation
+does not introduce `AnimatedValue`, a document overlay, or a second property
+registry. Profile-specific track value types are allowed internally to make
+illegal interpolation unrepresentable, but their sampled output must be one
+exact existing `PropertyValue` accepted by the registry.
 
-The Version 4 source contract now separates authored owner/member identity,
-ordered component-use occurrence paths, typed property keys, and
-arena-incarnation-scoped generational runtime keys. An executable node-property
-target can therefore compile without serializing `NodeId` or a runtime key.
+## SVG Animation Profile 0 binding
 
-Animation still must answer:
+Profile 0 admits one `<animate>` per `<rect>` property for `x`, `y`, `width`,
+`height`, or `opacity`. Its frontend performs SVG namespace parsing, source
+inventory, parent or same-document-fragment targeting, one-to-one
+materialization checks, clock parsing, and diagnostics before constructing the
+program.
 
-- whether nested animation may target only its containing node;
-- whether cross-target references exist;
-- what source spelling carries a structured target and how copy/paste retargets
-  animation; and
-- whether a target may be a paint layer, gradient stop, text range, lens
-  operation, or only one of the registered node-level aggregate values.
+The projection uses existing model values:
 
-Paint, stroke, stop, run, and lens-operation indexes remain invalid durable
-targets. Each needs member identity before animation can target it directly.
+| SVG property | Engine target          | Sampled value                                           |
+| ------------ | ---------------------- | ------------------------------------------------------- |
+| `x`          | `PropertyKey::X`       | `PropertyValue::AxisBinding(AxisBinding::start(value))` |
+| `y`          | `PropertyKey::Y`       | `PropertyValue::AxisBinding(AxisBinding::start(value))` |
+| `width`      | `PropertyKey::Width`   | `PropertyValue::SizeIntent(SizeIntent::Fixed(value))`   |
+| `height`     | `PropertyKey::Height`  | `PropertyValue::SizeIntent(SizeIntent::Fixed(value))`   |
+| `opacity`    | `PropertyKey::Opacity` | `PropertyValue::Number(value)`                          |
 
-## Sampling and resolve order
+This is a projection, not a change to the engine model. SVG `x`, `y`, `width`,
+and `height` are admitted only where static materialization preserves their
+user-coordinate values unchanged in the corresponding start-pinned or fixed
+scene property. A target whose animated geometry is scaled, transformed,
+converted, expanded through `<use>`, or baked into another field is rejected by
+Profile 0. Compilation cannot silently rewrite endpoints because that would
+break the profile's bit-exact source endpoint law.
 
-The general reference order is:
+Paint animation is intentionally absent. SVG `fill` would currently replace
+the aggregate `PropertyKey::Fills` paint stack, while paint layers and gradient
+stops do not have individual durable targets. Inventing a separate color slot
+for animation would violate the existing ordered `Paints` model. A later paint
+profile must either define whole-stack replacement honestly or first establish
+durable paint-member identity.
 
-1. sample typed effects at the requested time;
-2. compose contributions with the authored base value;
-3. expose the resulting overlay to resolve;
-4. resolve layout, transforms, bounds, clips, and other derived state;
-5. build one drawlist from that sampled resolved state;
-6. execute the drawlist;
-7. serve queries from that same sampled resolved state.
+Likewise, `animateTransform` is not mapped to the existing `Rotation`
+property. SVG transform-list order, pivot, and composition do not equal a
+box-centered rotation scalar. Supporting it requires a compatible transform
+model rather than a convenient lossy mapping.
 
-Sampling must precede resolve for layout-affecting properties. A paint-only or
-compositor-eligible property may later skip work, but that is an optimization
-selected from its impact class, not a different semantic path.
+## Global keyframe and easing kernel
 
-The effective-value view resolves the prior model incompatibility: layout,
-transform, bounds, draw-list projection, and spatial queries can consume one
-immutable typed overlay while the authored `Document` remains unchanged.
-Animation still owes the pure sampler that produces that overlay at a declared
-time.
+Keyframes and easing are format-neutral engine primitives. A scalar track has
+one canonical `ScalarCurve`: a first keyframe followed by ordered segments,
+where each segment owns its terminal keyframe and easing. Attaching easing to
+the interval removes the possibility of mismatched parallel keyframe and
+easing arrays. The old two-endpoint constructors are exact sugar for a
+two-keyframe linear curve; there is no second interpolation path.
 
-## A candidate frame seam
+A multi-keyframe curve begins at exact offset zero, ends at exact offset one,
+and has strictly increasing reduced rational offsets. A one-keyframe curve is
+the sole constant representation and normalizes its semantically inert offset
+to zero. Keyframe values retain their authored binary32 bits. Exact keyframe,
+repeat, and frozen boundaries return those bits without interpolation.
 
-The following is an architectural probe, not an accepted Rust API:
+Each interval currently supports linear or cubic Bézier easing. The global
+cubic primitive requires finite controls and x controls in `[0, 1]`, making
+the time function monotonic; finite y controls may overshoot for property
+families that can represent it. Track construction validates every keyframe
+and the cubic property-space control hull, so sampling cannot escape the
+target property's domain.
 
-```rust
-pub struct FrameInput<'a> {
-    pub document: &'a Document,
-    pub animation: Option<&'a AnimationProgram>,
-    pub sample_time: SampleTime,
-    pub resolve: &'a ResolveOptions,
-    pub view: &'a Affine,
-    pub resources: &'a ResourceSnapshot,
-}
+Cubic sampling is pinned rather than delegated to a platform math library.
+Stored binary32 controls become exact rationals. Diagonal curves and exact
+inverse hits take exact fast paths; otherwise inversion uses 128 exact dyadic
+bisections, then property interpolation rounds once to binary32, ties-to-even.
+The result depends only on the program and `SampleTime`, not on a tolerance,
+frame history, CPU math library, or source frontend.
 
-pub struct FrameOutput {
-    pub sampled: SampleSummary,
-    pub resolved: Resolved,
-    pub drawlist: DrawList,
-    pub damage: Damage,
-    pub schedule: AnimationSchedule,
-    pub stats: FrameStats,
-}
+## SVG Animation Profile 1 binding
+
+[Profile 1](https://grida.co/docs/wg/feat-svg/animation-keyframes) projects SVG
+`values`, `keyTimes`, `calcMode="linear|spline"`, and `keySplines` into that
+same curve. `values` follows SVG precedence over `from` and `to`; omitted key
+times become exact equal rational intervals. SVG narrows every spline control,
+including y, to `[0, 1]` before constructing the more general engine easing.
+`calcMode="discrete"` and `paced` remain explicit profile errors.
+
+This is deliberately a frontend projection. It adds no SVG value strings,
+list grammar, or XML ownership to the engine kernel, and native Grida XML may
+later project a different source spelling into the same curve.
+
+## Sample procedure
+
+For the full reference path, sampling performs these steps in deterministic
+order:
+
+1. verify program and document identity;
+2. visit tracks in their canonical target order;
+3. derive contribution state from checked integer time arithmetic;
+4. if inactive with `remove`, emit no entry;
+5. if frozen, emit the exact final keyframe;
+6. otherwise select the unique keyframe interval, derive exact rational local
+   progress, apply its easing, and perform once-rounded binary32 interpolation;
+7. construct and validate one `PropertyValues`; and
+8. pass one `ValueView` through full resolve, draw-list build, frame preflight,
+   checked execution, query, and damage.
+
+For an internal repeat boundary, both profiles begin the next iteration at
+progress zero. At the final active end, `remove` emits no entry and `freeze`
+emits the exact final keyframe. These cases must not depend on a
+floating-point modulus.
+
+The static/base entry points remain exact wrappers around the same pipeline.
+They do not compile or sample animation implicitly.
+
+## Host boundary
+
+The host owns:
+
+- the real monotonic clock and its conversion to integer `HostTime`;
+- play, pause, seek, direction, rate, and loop UI;
+- frame requests, throttling, and visibility policy;
+- media synchronization;
+- reduced-motion or autoplay policy; and
+- export cadence and duration.
+
+The host passes a final `SampleTime`; it does not pass a clock object. The
+engine owns:
+
+- validation of the compiled program against the document;
+- deterministic sampling;
+- typed value construction;
+- the full frame and query pipeline; and
+- errors that identify the source track and runtime property target.
+
+Playback policy is therefore replaceable without changing sampled semantics.
+
+### Playback-clock harness
+
+`PlaybackClock` is the optional reference mapping between host and document
+time. It owns one explicit closed `PlaybackRange`, a positive reduced-rational
+`PlaybackRate`, a separate direction, and either a paused position or one
+stable playing anchor. It starts paused and accepts the host timestamp on every
+sample or control operation.
+
+For a playing anchor, document-time magnitude advances by
+
+```text
+floor((host_now - anchor_host) × rate_numerator / rate_denominator)
 ```
 
-`frame::render` remains the sole orchestration seam. The important change is
-not these field names; it is that one explicit sample and one declared
-environment flow through the whole frame.
-
-The static call path should remain an exact special case. A null program must
-not subtly alter geometry, ordering, queries, pixels, or performance-sensitive
-allocation behavior.
-
-## Property impact and invalidation
-
-Every registered property needs a conservative, testable impact class. A
-candidate vocabulary extends the current M/L/T/B dirty vocabulary:
-
-| impact    | examples, subject to the property RFD | required reference work                          |
-| --------- | ------------------------------------- | ------------------------------------------------ |
-| measure   | font size, text content               | measure and dependent layout                     |
-| layout    | width, gap, alignment                 | affected layout scope and downstream transforms  |
-| transform | translation, rotation, scale          | world transform and descendant bounds            |
-| bounds    | stroke width, blur radius             | visual bounds, culling, and damage               |
-| paint     | color, opacity, gradient stop         | drawlist/pixel change even if geometry is stable |
-| resource  | image or font reference               | explicit resource state and dependent phases     |
-
-The examples are illustrative; the format RFD decides what is animatable.
-Impact may be a bitset because one property can affect several phases.
-
-The sampler should report the exact set of changed `(target, property)` pairs
-between two requested samples. Later incremental stages may consume that set.
-Day one may ignore it and run the full pipeline, but the data should be visible
-to probes and tests.
-
-## Composition belongs in the sampler
-
-Several effects may contribute to one property. Base-value selection,
-replacement, addition, accumulation, source/effect order, held values, and
-discrete fallback therefore belong to one typed composition step before
-resolve.
-
-Even if the first language permits only one replace effect per property, the
-program should represent “replace” explicitly. It should not make source order
-an accidental composition algorithm that later becomes impossible to change.
-Unsupported composition modes should fail compilation with a useful diagnostic.
-
-## Transform and motion
-
-Transform animation must resolve at a declared position relative to layout,
-the authored local transform, ancestor transforms, and any future motion path.
-The sampler cannot simply hand a final matrix to paint if hit testing and child
-geometry are expected to move with it.
-
-Matrix-entry interpolation, transform-list interpolation, decomposed
-interpolation, and motion-path orientation are still format/model decisions.
-Whichever is selected becomes a versioned typed interpolator and must feed the
-same resolved transform used by query and drawlist construction.
-
-## Paint and resource animation
-
-Paint animation must project the engine's typed paint model rather than build a
-parallel “animation color” abstraction. A track should target a paint property
-through the same property registry used for base values—for example, a solid
-paint's color or opacity—if and only if that property is admitted as animatable.
-
-Resource identity and resource readiness are explicit environment inputs.
-Sampling must not initiate path I/O, network I/O, image decoding, or font
-loading. An animation that changes a resource reference either selects among
-already resolved handles under defined semantics or is rejected/deferred until
-the resource model specifies it.
-
-Animated image media is a separate problem: choosing a frame inside a GIF or
-video resource is not automatically the same mechanism as animating a scene
-property. The two may share `SampleTime`, but should not be conflated by this
-RFD.
-
-## Damage, caching, and compositor lowering
-
-The reference `damage::diff_frame` already compares complete immutable
-`FrameProduct`s. It covers effective paint-only changes and geometry, and
-compares the product-owned opaque `PaintEnvironmentKey`; a mismatch
-conservatively damages every node owning draw items before or after. This
-covers resource readiness, same-RID byte replacement, and font-context
-revision without coupling damage to `PaintCtx`. Animation must retain those
-contracts and additionally account for:
-
-- before and after visual bounds;
-- drawlist item changes and ordering;
-- resource readiness changes;
-- disappearance and appearance at timing boundaries.
-
-The first animation implementation may still run the full reference pipeline.
-Later partial repaint may narrow damage while remaining observationally equal
-to `diff_frame`. No painter invents damage after the fact.
-
-Cache keys must depend on the document/program generations, oracle versions,
-opaque paint-environment key, and relevant sampled values—not wall-clock time.
-Two different times that produce the same sampled value under the same
-environment should be able to reuse the same derived result.
-
-Transform and opacity tracks may eventually be lowered to a compositor. That
-path is legal only when it is observationally equivalent to the reference
-sampled scene for pixels, bounds, query, and export. If the main thread and the
-compositor can disagree about the sampled state, lowering has crossed the
-engine's semantic boundary.
-
-## Scheduling and frame rate
-
-Source timing describes values as a function of time; it does not prescribe a
-fixed frame rate. Interactive hosts sample near presentation opportunities.
-Deterministic exporters choose an explicit sequence of times. Both must get the
-same value at the same time.
-
-The compiled program may expose:
-
-- whether any effect changes continuously in an interval;
-- the next boundary at which a discrete or inactive effect can change;
-- whether the program is finished, held, indefinite, or awaiting an external
-  timeline input.
-
-Those facts help the host avoid needless frames. They are outputs, not hidden
-timers. Event-, scroll-, audio-, or data-driven timelines require additional
-declared timeline inputs; none are assumed by the wall-clock design above.
-
-## Queries and inspection
-
-All spatial queries take a sampled `Resolved` tier or a frame snapshot that
-owns one. At time `t`, hit testing, marquee, snapping, culling, minimap, and
-selection geometry must agree with what is painted at `t`.
-
-Inspection additionally needs both sides of the split:
-
-- authored/base values for editing and serialization;
-- sampled values for explaining the visible result.
-
-The read API should make the choice explicit. A generic `get_value` that
-sometimes returns base and sometimes sampled state would make editor behavior
-dependent on playback state in invisible ways.
-
-## Journal and replay
-
-Document journals and animation playback record different facts:
-
-- a journal records edits to authored state, such as inserting a keyframe or
-  changing a duration;
-- a playback trace records sample times or external timeline inputs;
-- ordinary playback must not emit one document operation per displayed frame.
-
-For a deterministic animation repro, replay needs the initial document,
-authored operations, oracle tags, resources/environment, and either:
-
-1. the exact sequence of requested sample times; or
-2. playback-control events plus a fully specified clock-to-timeline mapping.
-
-The first is the simpler engine conformance artifact. The second is useful for
-host pacing investigations but includes host behavior outside the pure sampler.
-
-The replay format will need animation-program and interpolation oracle tags
-before animated fixtures can claim bit-identical results.
-
-## Reference implementation first
-
-The build order should preserve the engine's oracle law.
-
-### Pre-animation foundation — no time semantics
-
-- define durable authored/member/use-occurrence addresses;
-- compile node-property targets to arena-scoped generational keys;
-- define the closed typed node-property registry;
-- pass an immutable empty effective-value set through resolve, drawlist,
-  resolved query state, damage, cache, and frame;
-- prove static fixtures, drawlists, queries, replays, and pixels are unchanged;
-  and
-- keep the static API as a thin empty-value call.
-
-This foundation requires no `SampleTime` and invents no XML animation.
-
-### Phase 0 — explicit time and a null animation program
-
-- decide and define `SampleTime` without reading an ambient clock;
-- define a format-neutral empty animation program;
-- prove that sampling the empty program at every valid time produces the empty
-  effective-value set; and
-- retain the pre-animation static-equivalence oracle.
-
-### Phase 1 — typed replace-only kernel
-
-- add a format-neutral authored animation model and stable target contract;
-- compile to typed tracks outside the frame loop;
-- implement a stateless reference sampler;
-- start with a deliberately small registered property set whose base access,
-  interpolation, and impact are fully defined;
-- run full resolve, full drawlist build, and full paint for every sample.
-
-Numbers, colors, opacity, and transforms are plausible candidates, not an
-adopted list. Each must survive the registry and resolver design before entry.
-
-### Phase 2 — layout and paint completeness
-
-- validate sampled layout, transform, bounds, paint, and query transitions
-  against the existing `PropertyValues`/`ValueView` reference seam;
-- define missing-resource and resource-change behavior;
-- add deterministic export sampling.
-
-### Phase 3 — richer semantics
-
-- add multiple-effect composition only after ordering is specified;
-- add iterations, holds, synchronization, and non-document timelines only as
-  their source semantics become normative;
-- add motion paths and richer typed interpolation behind versioned oracles.
-
-### Phase 4 — measured optimization
-
-- incremental track sampling and change masks;
-- impact-scoped resolve and drawlist updates;
-- paint-aware partial damage;
-- compositor lowering for proven-eligible effects;
-- scheduling hints and cache policies.
-
-Every item in this phase needs a differential test against phases 1–3 and a
-measurement that shows why the complexity pays for itself.
-
-## Candidate module ownership
-
-No file layout is adopted, but the current engine suggests these strict seams:
-
-| concern                       | likely owner                          |
-| ----------------------------- | ------------------------------------- |
-| typed program and sampler     | one initial `animation` module        |
-| frame orchestration           | `frame`                               |
-| effective-value resolve seam  | existing `PropertyValues`/`ValueView` |
-| sampled/resolved change data  | `damage::diff_frame`                  |
-| drawlist projection           | `drawlist`                            |
-| mechanical raster execution   | `paint`                               |
-| sampled spatial reads         | `query`                               |
-| conformance playback          | `replay`                              |
-| interpolation/version stamps  | `oracle`                              |
-| CPU work measurement          | `probe`                               |
-| real-window scheduling/pacing | host/compositor and frame log         |
-
-`paint` is intentionally not the owner of animation semantics. The module
-boundary should remain small at first: one coherent sampler/registry unit is
-easier to specify and test than a directory of abstractions chosen before the
-kernel exists.
-
-## Tests required before claiming support
-
-The reference path needs focused laws, not only videos or golden frames:
-
-1. **Null equivalence:** an empty program at any time equals today's static
-   pipeline at every observable tier.
-2. **Source immutability:** sampling any sequence of times leaves authored
-   document bytes and semantic equality unchanged.
-3. **Seek equivalence:** direct sample at `t` equals continuous playback to
-   `t`.
-4. **Frame-rate independence:** different prior sample sequences produce the
-   same output at the same `t`.
-5. **Boundary exactness:** begin, keyframe, repeat, and end boundaries select
-   the specified side exactly.
-6. **Typed rejection:** invalid target/property/value combinations fail at
-   compile time with structured diagnostics.
-7. **Composition order:** each admitted mode has table-driven base/effect
-   stack cases.
-8. **Phase coherence:** query and paint observe the same sampled transform,
-   bounds, visibility, and order.
-9. **Damage coverage:** every pixel-changing sample transition is covered,
-   including paint-only changes.
-10. **Replay determinism:** the same document, program, environment, oracle
-    versions, and sample-time trace are bit-identical across runs.
-11. **Optimization equivalence:** every incremental or compositor result
-    equals the full reference result.
-
-Visual reftests remain valuable for interpolation and composition, but must be
-paired with sampled-value and resolved-tier assertions so a failure identifies
-the semantic stage that diverged.
-
-## Measurement changes
-
-Once a real program exists, `probe` should stop calling direct document
-mutation “animation” and measure the actual sampling seam. Candidate axes are:
-
-- number of authored tracks and number active at the sample time;
-- percentage of nodes animated;
-- impact class: paint, transform, bounds, layout, and measure;
-- keyframe count and easing cost;
-- same-time resampling, monotonic playback, and random seeking;
-- full reference versus each optimization.
-
-`FrameStats` should expose sampling time separately. Program compilation should
-have its own load/edit measurement and must not be folded into per-frame cost.
-The existing frame log remains the tool for real-window pacing; a fast sampler
-does not prove smooth presentation.
-
-## Open decisions before code
-
-Implementation should not begin until the owning RFD or model contract answers
-the decisions needed for the selected first slice:
-
-1. What exact type and unit represents `SampleTime`?
-2. What source syntax carries local and cross-node targets?
-3. What is the format-neutral authored animation model?
-4. Which registered properties form the first **animatable** subset?
-5. What interpolation, boundary, easing, and discrete rules apply to them?
-6. Is day-one composition replace-only, and how is conflicting source rejected
-   or ordered?
-7. How are resource availability and resource-valued properties represented?
-8. What static sample does a non-playing processor request?
-9. Which oracle versions are stamped into animation conformance and replay
-   artifacts?
+using checked integer domains. Intermediate samples never re-anchor or
+accumulate frame deltas. Actual rate or direction changes reconcile under the
+old settings and re-anchor at the emitted integer `SampleTime`; seek is the
+only discontinuity. Repeated host timestamps are valid, decreasing timestamps
+fail transactionally, and reaching either directional endpoint emits that
+exact endpoint before pausing. `play` while held at that endpoint is a no-op;
+the harness does not infer rewind or loop policy.
+
+The harness deliberately has no inferred duration, loop, ping-pong, autoplay,
+event, callback, `Instant`, animation-program, frame-request, renderer, or
+scheduler behavior. The caller composes its result explicitly:
+
+```text
+host clock -> HostTime -> PlaybackClock -> SampleTime
+                                      -> FrameRequest::Sample
+```
+
+The native spike's separate `AnimationApp` is the concrete proving caller. It
+compiles once, derives an explicit range from the compiled track inventory,
+owns the `Instant` epoch and animation-demand policy, presents the zero sample
+before starting real time, renders one request per sampled time, and becomes
+idle after presenting the terminal sample. The proving stack has no compositor
+yet, so this app temporarily supplies the redraw timer and present loop that
+ENG-2.4 ultimately assigns to that compositor. This host is integration
+evidence, not a generic engine `Runtime` API or migration precedent for display
+pacing.
+
+## Damage, cache, query, and replay
+
+Time itself is not a scene-cache key. The sampled `PropertyValues` is the
+visual input already present in the cache key. Two times that yield identical
+values may correctly reuse the same resolved and raster state; two times with
+different values cannot alias.
+
+`damage::diff_frame` compares sampled before/after `FrameProduct`s. It does not
+infer damage from elapsed time or animation metadata. Existing property impact
+flags may guide a future optimization only after it proves equality with the
+complete frame diff.
+
+Query receives the `Resolved` product from the sampled frame. It never samples
+again and never combines one frame's geometry with another frame's values.
+
+A future deterministic animation-frame replay must record the document/program
+identity, exact `SampleTime`, declared environment, and relevant oracle
+versions. It must never record “wait 16 ms.” The current journal/replay path
+covers edit history only and has no animation-frame integration.
+
+## Diagnostics
+
+Compile diagnostics belong to the source frontend and carry source locations.
+They identify the unsupported element or attribute, target-resolution failure,
+invalid timing/value, duplicate effect, and accepted profile form.
+
+Program construction and source compilation reject initially stale targets,
+timing overflow, invalid interpolation state, wrong value kinds, inapplicable
+properties, and invalid source domains before a program can exist. Sampling
+then revalidates document identity and every emitted target against the current
+document. The current sample-time error surface therefore reports a
+document-identity mismatch or failure to validate the complete effective-value
+set, including a target that became stale after compilation. Future
+track-level runtime failures, if any are introduced, must carry the source
+track and `PropertyTarget`; a document-level identity mismatch has no
+applicable track or target.
+
+Errors are data. Rendering logs may add context, but parsing error strings is
+never part of control flow.
+
+## Conformance laws
+
+The following tests bind the first implementation:
+
+- no-animation Base, empty-program Sample, and the current static frame are
+  equal for values, resolved data, draw list, query, damage, cache, and pixels;
+- Base and Sample-at-zero differ when a track begins at zero;
+- source and `Document` remain byte/value identical across arbitrary sampling;
+- direct seek equals every prior sample sequence at the same time;
+- begin, internal-repeat, and final-end boundaries are tested immediately
+  before, at, and after the exact integer boundary;
+- parsed keyframes, exact key-time hits, repeat boundaries, and frozen final
+  keyframes are bit-exact;
+- uneven rational offsets use exact segment-local progress, and implicit equal
+  offsets agree with their explicit rational spelling;
+- linear two-endpoint tracks are bit-identical sugar over the canonical curve;
+- each segment owns its easing; diagonal cubic curves equal linear sampling,
+  exact inverse hits return exact y, and non-trivial curves have pinned golden
+  binary32 results;
+- duplicate targets, stale targets, cross-document programs, type/domain
+  failures, and unsupported source yield no partial frame;
+- layout-affecting tracks change resolved geometry, query, damage, and pixels
+  coherently;
+- opacity changes draw output and complete frame damage without changing
+  authored values.
+
+Before any browser-compatibility claim, relevant explicitly sought browser
+frames and web-platform tests must provide tolerance-based differential
+evidence for the admitted SVG subset, separate from the selected profile's
+bit-exact internal oracle. That differential evidence is not part of this
+checkpoint.
+
+The full sample-and-resolve path is permanent. Any incremental sampler, scoped
+resolve, partial repaint, scheduling hint, or compositor lowering ships with a
+differential test against it.
+
+The reference evidence is split by failure class:
+
+- `../a/lab/tests/animation.rs` covers checked time, timing boundaries, typed
+  tracks, keyframes, per-segment easing, document identity, atomic failure, and
+  exact once-rounded binary32 interpolation;
+- `../a/lab/tests/svg_animation.rs` covers retained source, namespaces,
+  parent/fragment targets, strict grammar and side-channel rejection,
+  duplicates, exact clocks and key times, direct binary32 source rounding,
+  spline grammar, profile inheritance, and the checked fixtures;
+- `tests/animation.rs` covers the public Base/Sample frame and cache seams,
+  geometry/query/pixel coherence, opacity/damage behavior, empty equivalence,
+  playback-clock composition, and transactional failure; and
+- `tests/playback_clock.rs` covers dense/sparse equivalence, exact fractional
+  rate, pause/resume/seek continuity, direction changes, endpoint stopping,
+  extreme integer domains, and atomic refusal without a renderer or source
+  frontend; and
+- `../a/spike-canvas/src/shell/player_transport.rs` directly covers autoplay,
+  exact-present-before-resume, play/pause, terminal replay, restart, seek,
+  scrub, and presented-state transitions. Its adjacent `player.rs` tests range
+  derivation and display-time formatting; the native event loop itself remains
+  manual visual evidence.
+
+The checked-in visual host renders both
+`rig/examples/svg-animation-profile0-demo.svg` and
+`rig/examples/svg-animation-profile1-keyframes.svg` at exact
+integer-nanosecond cadences. The Profile 1 specimen aligns an uneven linear
+track, a repeated symmetric spline, and independently eased segments against
+the same keyframe stations. PNG sequences and manifests are diagnostic
+evidence rather than reftests; browser and WPT oracles remain pending and will
+use tolerant, explicitly sought differentials as required by the source
+profile.
 
 ## Rejected shortcuts
 
-- **Mutate `Document` once per frame.** This destroys the base/sample split,
-  bloats journals, complicates editing, and makes direct seeking stateful.
-- **Sample inside `paint`.** Layout, bounds, query, damage, and export would
-  disagree with pixels.
-- **Use string property paths throughout the runtime.** Validation becomes
-  late and every subsystem can invent different type/interpolation behavior.
-- **Read `Instant::now()` in engine semantics.** Tests, seek, export, and replay
-  become nondeterministic. `Instant` remains valid for measurement only.
-- **Treat the current `anim_*` probe as the implementation.** It measures
-  repeated mutation cost and proves neither timing nor sampling semantics.
-- **Start with compositor-only animation.** It optimizes one property class
-  before a sampled-scene oracle exists and risks visible/query disagreement.
-- **Serialize sampled values as source.** It discards authored intent and makes
-  round trips depend on the time at which they occurred.
-- **Call edit replay an animation timeline.** Operation history and visual
-  sampling are complementary inputs with different semantics.
+- Mutating `Document` once per frame destroys the base/effective distinction
+  and makes seeking, editing, cache identity, and replay ambiguous.
+- Reading a wall clock in resolve or paint lets one frame contain several
+  times and makes tests nondeterministic.
+- Accumulating frame deltas in playback makes output depend on requested frame
+  cadence and loses exact fractional-rate progress.
+- Giving the playback clock callbacks, rendering, or scheduling would merge a
+  replaceable host policy with semantic time mapping.
+- Sampling in the painter leaves layout, hit testing, culling, clips, and
+  damage stale.
+- Keeping only normalized static SVG loses animation syntax, targets, and
+  diagnostics; a static normalizer cannot be animation truth.
+- Treating all properties as interpolable moves type errors into the frame
+  loop and creates renderer-dependent behavior.
+- Mapping SVG transform or fill animation to convenient parallel scalars would
+  contradict the existing transform and ordered-paint models.
+- Starting with incremental or compositor execution removes the independent
+  correctness oracle before semantics are stable.
 
-## Relationship to the source-language RFD
+## Deferred engine work
 
-The format RFD remains the authority for authored semantics. Its decisions
-should eventually fill the open slots here:
+Later source profiles may require discrete and paced interpolation, step or
+spring easing, effect stacks, addition and accumulation, transforms, colors
+and paint members, motion paths, indefinite and event timing, nested
+timelines, or resource-valued effects. Each addition must extend the typed
+program and effective-value projection without weakening the laws above.
 
-| source-language decision     | engine consequence                                      |
-| ---------------------------- | ------------------------------------------------------- |
-| target identity and nesting  | program target keys and compile invalidation            |
-| time representation          | `SampleTime` and boundary arithmetic                    |
-| keyframes and easing         | normalized typed tracks and interpolator oracles        |
-| property registry            | typed base access, interpolation, impact classification |
-| effect ordering/composition  | contribution stack                                      |
-| timeline and synchronization | program dependency graph and scheduling facts           |
-| processing/static modes      | explicit sample policy and refusal behavior             |
-| resources and trust          | declared environment and validation                     |
+Production-engine migration and optimized execution are separate decisions.
+The model-v2 implementation proves the contract first; it does not silently
+alter the current production SVG importer or renderer.
 
-Conversely, the engine imposes two constraints the source design should treat
-as day-one requirements: arbitrary-time deterministic sampling, and a clean
-separation between authored base values and ephemeral sampled values.
+Animation-aware deterministic replay, a compositor-owned scheduler, product
+transport/runtime policy, and automated native-player UI coverage are likewise
+deferred. The fixed redraw timer and native control surface are proving-host
+scaffolding, not implied engine APIs.

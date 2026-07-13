@@ -5,8 +5,8 @@ edition = "2021"
 publish = false
 description = "E10 — the feel spike: a native Skia canvas driven by the anchor model (model-v2). Consumes anchor-lab as a library, the same relationship the phase-4 migration will have."
 
-# Standalone on purpose (model-v2 containment) — not a member of the
-# repo workspace, not committed. See ../a/README.md ledger row E10.
+# Standalone on purpose (model-v2 containment) — not a member of the repo
+# workspace. It remains a tracked proving harness; see ../a/README.md row E10.
 [workspace]
 
 [dependencies]

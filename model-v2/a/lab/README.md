@@ -35,6 +35,12 @@ Map:
   linker, typed scalar specializer, named static slot projector, durable
   authored-address index, and ordinary-scene materializer; hosts supply
   immutable dependency snapshots
+- `src/animation.rs` — format-neutral checked sample time, canonical scalar
+  keyframe curves, per-segment easing, exact binary32 interpolation, and atomic
+  `PropertyValues` sampling
+- `src/svg_animation.rs` — retained SVG Animation Profiles 0 and 1 source,
+  identity-preserving rectangle materialization, target resolution, and strict
+  source-located compilation
 - `src/properties.rs` — closed node-property registry, immutable sorted value
   sets, and the validated `ValueView` consumed by resolution and the engine;
   picking reads only the effective traversal and clips captured in `Resolved`
@@ -45,6 +51,25 @@ Map:
 - `src/svgout.rs` — SVG snapshots of resolved documents
 - `src/math.rs` / `src/measure.rs` — affine + deterministic text metric
 - `tests/` — the conformance-derived suites; `tests/common/mod.rs` helpers
+
+## SVG Animation Profiles 0 and 1
+
+The first animation proof uses actual SVG source without adding animated state
+to `Document`. The retained frontend accepts a deliberately narrow static shell
+(one SVG viewport and direct rectangles), compiles the complete selected
+`<animate>` profile once, then samples any signed nanosecond time into the same
+immutable `PropertyValues` used by every static effective-value consumer.
+
+Profile 0 is the linear `from`/`to` baseline. Profile 1 cumulatively adds SVG
+`values`, exact rational `keyTimes`, and linear or per-segment cubic Bézier
+easing through `keySplines`. Both lower to the same canonical scalar curve;
+the two-endpoint API is only linear-curve sugar. The sampler uses checked
+integer interval arithmetic, exact rational interval selection and cubic
+inversion, and property interpolation rounded once to IEEE-754 binary32,
+ties-to-even. Programs bind to one live document arena and generation-stamped
+targets; duplicates, stale or cross-document targets, invalid combined values,
+and unsupported source fail atomically. Playback, filesystem I/O,
+rasterization, and video assembly remain host concerns.
 
 ## Draft 0 `.grida.xml`
 

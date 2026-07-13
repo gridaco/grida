@@ -171,6 +171,21 @@ fn direct_primitives_are_exclusive_to_grida_xml() {
 }
 
 #[test]
+fn grida_xml_rejects_unreserved_native_animation_syntax() {
+    for source in [
+        r#"<grida version="0"><container><rect width="80" height="80"><animate property="x" from="0" to="240" dur="600ms"/></rect></container></grida>"#,
+        r#"<grida version="0"><container><animations><animation target="card" property="x" duration="600ms"/></animations></container></grida>"#,
+        r#"<grida version="0"><container><rect width="80" height="80" dur="600ms"/></container></grida>"#,
+    ] {
+        let error = grida_xml::parse(source).unwrap_err();
+        assert!(
+            error.to_string().contains("unknown"),
+            "native animation syntax must fail explicitly: {error}"
+        );
+    }
+}
+
+#[test]
 fn canonical_print_escapes_attribute_values() {
     let source = r#"<grida version="0"><container name="A &amp; &quot;B&quot;" width="10" height="10"/></grida>"#;
     let doc = grida_xml::parse(source).unwrap();

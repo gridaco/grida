@@ -33,7 +33,130 @@ cargo run --release --bin gate
 
 # visual proof of the pre-animation effective-value seam
 cargo run --bin effective_values_demo -- target/grida-effective-values-demo.png
+
+# Profile 0 source through the cumulative Profile 1 renderer
+cargo run --release --bin svg_animation_render -- \
+  rig/examples/svg-animation-profile0-demo.svg \
+  target/svg-animation-profile0 50 4000
+
+# Profile 1 keyframes and easing (100 fps, 4.5 seconds)
+cargo run --release --bin svg_animation_render -- \
+  rig/examples/svg-animation-profile1-keyframes.svg \
+  target/svg-animation-profile1-keyframes 100 4500
 ```
+
+## SVG Animation Profiles 0 and 1
+
+The first animation reference path is implemented without adding animation
+state to the document or painter. A retained SVG source compiles once into an
+immutable, document-bound `AnimationProgram`; each explicit `SampleTime`
+produces the existing validated `PropertyValues`, then joins the ordinary
+resolve, draw-list, query, damage, cache, and checked-paint path. Base and
+Sample are explicit `FrameRequest` variants. The cache keys sampled values,
+not time.
+
+The dated status matrix, dependency direction, and per-module responsibility
+boundaries live in [`ANIMATION.md`](./ANIMATION.md). That document is the
+implementation checkpoint; the WG profile pages remain source-language
+contracts and intentionally do not describe this crate topology.
+
+Profile 0 is the two-keyframe linear baseline. The cumulative Profile 1 adds
+ordered `values`, exact rational `keyTimes`, and per-segment cubic Bézier
+`keySplines`. They lower to one format-neutral scalar-curve primitive; the
+engine has no SVG-shaped keyframe representation and no parallel endpoint
+sampler. Exact keyframe and frozen boundaries preserve authored binary32 bits.
+Cubic inversion is a pinned exact-rational operation, so direct seeks do not
+depend on playback history or platform easing libraries.
+
+### Playback clock harness
+
+`playback_clock` is a compact host-time adapter, not a product player. A
+caller-owned `PlaybackClock` maps explicit monotonic `HostTime` values to the
+same `SampleTime` accepted by `FrameRequest::Sample`. It uses one stable anchor,
+an explicit closed range, exact rational rate, and separate direction; pause,
+seek, rate changes, reverse playback, and terminal stopping are deterministic
+under irregular frame cadence. Playing again at the active terminal is a
+paused no-op rather than an implicit rewind or loop.
+
+The module depends on no source format, animation program, document, frame,
+Skia, callback, scheduler, or system clock. A host performs the only
+composition:
+
+```rust
+let time = playback.sample_time(host_now)?;
+let request = FrameRequest::Sample { program, time };
+```
+
+Looping, autoplay, UI, media synchronization, and continuous-redraw policy are
+outside this harness. `tests/playback_clock.rs` tests its pure state machine;
+`tests/animation.rs` proves that its output is identical to a direct seek
+through resolved geometry, query, damage, pixels, and effective-value cache
+identity.
+
+The native spike supplies one deliberately disposable live host around that
+boundary:
+
+```sh
+cd ../a/spike-canvas
+cargo run --release -- \
+  --play-svg ../../engine/rig/examples/svg-animation-profile1-keyframes.svg
+```
+
+Its separate `AnimationApp` owns `Instant`, redraw pacing, controls, resize,
+GPU presentation, and terminal quiescence. These remain host policy rather
+than an engine runtime abstraction. Because the proving stack has no
+compositor yet, its redraw timer temporarily stands in for the display pacing
+ENG-2.4 assigns to the eventual compositor; only explicit time mapping and
+animation demand are migration-worthy.
+
+The proving static SVG materializer is deliberately narrow: one SVG-namespace
+root with positive unitless dimensions, direct rectangles, solid hexadecimal
+fills, rectangle opacity and radii, and no viewBox or transforms. This keeps
+all five admitted animated properties (`x`, `y`, `width`, `height`, and
+`opacity`) identity-mapped into the current model. Unsupported scene structure
+fails instead of being normalized behind the profile's endpoint contract.
+Retained dynamic side channels such as `<set>`, `<script>`, `<style>`, and
+event attributes may still expose the ordinary Base document, but make Sample
+compilation fail. The production SVG importer is unchanged.
+
+`rig/fixtures/svg-animation-profile0-boundaries.svg` is the exact nanosecond
+repeat-boundary oracle. `rig/examples/svg-animation-profile0-demo.svg` is the
+960×540 visual specimen and exercises every admitted property, delayed begins,
+repeats, remove/freeze, parent targeting, and root-level `href` targeting.
+
+`rig/fixtures/svg-animation-profile1-keyframe-boundaries.svg` adds uneven
+key-time, repeat, and freeze boundaries. Its visual sibling
+`rig/examples/svg-animation-profile1-keyframes.svg` aligns linear, shared
+spline, and independently eased segments against the same stations.
+
+The renderer publishes a bounded, zero-padded PNG sequence through a
+normal-error transaction, plus `frames/manifest.json` and `frames/frames.csv`.
+The JSON records source and compiler identity, viewport, exact cadence, and
+every frame's SHA-256. A returned failure preserves the prior complete report;
+the two-rename directory swap does not claim process-crash atomicity. Video
+assembly stays host tooling:
+
+```sh
+ffmpeg -hide_banner -loglevel error -y \
+  -framerate 50 -start_number 0 \
+  -i 'target/svg-animation-profile0/frames/frame-%04d.png' \
+  -map_metadata -1 -an -c:v libx264 -preset slow -crf 18 \
+  -pix_fmt yuv420p -movflags +faststart \
+  -fflags +bitexact -flags:v +bitexact -threads 1 \
+  'target/svg-animation-profile0/svg-animation-profile0.mp4'
+
+ffmpeg -hide_banner -loglevel error -y \
+  -framerate 50 -start_number 0 \
+  -i 'target/svg-animation-profile0/frames/frame-%04d.png' \
+  -filter_complex \
+  '[0:v]fps=25,scale=640:-2:flags=lanczos,split[g0][g1];[g0]palettegen=max_colors=256:stats_mode=full[p];[g1][p]paletteuse=dither=bayer:bayer_scale=3' \
+  -loop 0 -an \
+  'target/svg-animation-profile0/svg-animation-profile0.gif'
+```
+
+The PNG sequence is the deterministic sample artifact. MP4/GIF output is a
+presentation derivative. Explicit browser seeking and the applicable WPT
+differential corpus remain the open half of the visual/conformance chunk.
 
 ## Versioned `.grida.xml` ingestion
 
@@ -110,6 +233,11 @@ single-face hosts use documented synthetic fallbacks only when needed.
 This remains a proving engine rather than a claim that every future RFD area is
 complete. Current limits are:
 
+- SVG Animation Profiles 0 and 1 currently share only the narrow
+  identity-preserving rectangle materializer described above; general static
+  SVG import, browser/WPT differential coverage, product playback and frame
+  scheduling, additional SVG animation elements and value families, and
+  production migration remain separate work;
 - the host-font path is a Skia Paragraph bridge, not the deterministic oracle
   still open in DEC-4: its font environment identity is process-local, its
   constraint input is width-only, font fallback is deliberately disabled, and
@@ -277,8 +405,8 @@ How the engine _stores_ its data — each memory/data-layout detail decided
 against verified browser prior art (`cc`/Blink/Stylo/Skia), validity-tagged
 ALIGNED / ADOPTED / SOCKET — is [`DATA-MODEL.md`](./DATA-MODEL.md).
 
-How a future sampler could produce the existing `PropertyValues` contract at
-an explicit time without mutating authored state is the open engine RFD:
+The implemented reference sampler contract—explicit time into existing
+`PropertyValues` without mutating authored state—is:
 [`ANIMATION.md`](./ANIMATION.md).
 
 The implemented, strictly pre-animation identity/value/frame/query/damage/cache
@@ -286,23 +414,25 @@ contract is [`EFFECTIVE-VALUES.md`](./EFFECTIVE-VALUES.md).
 
 ## Contract → module → guarding test
 
-| concern                              | module           | contract      | guarding test                                                                                                                                                                                                                                 |
-| ------------------------------------ | ---------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| stage purity + the oracle law        | (whole pipeline) | ENG-0         | the gate's differential + determinism runs                                                                                                                                                                                                    |
-| versioned source consumer seam       | link → frame     | ENG-0 / S-2   | `tests/grida_xml.rs`, `tests/grida_xml_source.rs`, `tests/grida_xml_slots.rs`, `tests/grida_xml_social_feed.rs`, `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs`, `tests/paths.rs` |
-| effective property values            | model → frame    | ENG-0/2/3     | `tests/values.rs` (empty equivalence · layout/transform · paint · bounds · visibility · query · pixels)                                                                                                                                       |
-| drawlist (pure, diffable projection) | `drawlist.rs`    | ENG-2.1       | `tests/drawlist.rs` (order · pruning · color · verbatim world · determinism)                                                                                                                                                                  |
-| text shaping + shared glyph layout   | `text_layout.rs` | ENG-4.1/4.5   | `../a/lab/tests/text_layout.rs`, `tests/text.rs`                                                                                                                                                                                              |
-| raster executor                      | `paint.rs`       | ENG-2.1       | `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs`, `tests/paths.rs` (pixel probes)                                                                                                   |
-| one frame entry                      | `frame.rs`       | ENG-2.4       | `tests/frame.rs` (checked paint environment) · spike live loop · gate                                                                                                                                                                         |
-| damage as data                       | `damage.rs`      | ENG-2.2       | `tests/damage.rs`, `tests/values.rs`, `tests/cache.rs` (geometry · paint-only · opacity · painter order · environment · covering bounds)                                                                                                      |
-| spatial read tier                    | `query.rs`       | ENG-3         | `tests/query.rs` (`hit_point ≡ pick` · retained traversal/clip snapshot)                                                                                                                                                                      |
-| journal (op-log)                     | `journal.rs`     | ENG-5.1       | `tests/journal.rs`                                                                                                                                                                                                                            |
-| replay (corpus, determinism)         | `replay.rs`      | ENG-5.2/5.3   | `tests/replay.rs` + `rig/corpus/*.replay` via the gate                                                                                                                                                                                        |
-| cache identity                       | `ident.rs`       | ENG-2.3/1.4   | `tests/ident.rs`, `tests/cache.rs` (arena + slot + generation · exact values · paint environment · document replacement)                                                                                                                      |
-| oracle version tags                  | `oracle.rs`      | ENG-4.2       | the `.replay` header                                                                                                                                                                                                                          |
-| gated observability                  | `trace.rs`       | S-6           | `cargo check --features trace`                                                                                                                                                                                                                |
-| the rig                              | `bin/gate.rs`    | ENG-0.2 / S-5 | it _is_ the gate                                                                                                                                                                                                                              |
+| concern                              | module                     | contract      | guarding test                                                                                                                                                                                                                                 |
+| ------------------------------------ | -------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| stage purity + the oracle law        | (whole pipeline)           | ENG-0         | the gate's differential + determinism runs                                                                                                                                                                                                    |
+| versioned source consumer seam       | link → frame               | ENG-0 / S-2   | `tests/grida_xml.rs`, `tests/grida_xml_source.rs`, `tests/grida_xml_slots.rs`, `tests/grida_xml_social_feed.rs`, `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs`, `tests/paths.rs` |
+| effective property values            | model → frame              | ENG-0/2/3     | `tests/values.rs` (empty equivalence · layout/transform · paint · bounds · visibility · query · pixels)                                                                                                                                       |
+| explicit-time animation              | SVG → values → frame/cache | ANIMATION     | `../a/lab/tests/animation.rs`, `../a/lab/tests/svg_animation.rs`, `tests/animation.rs` (time · exact interpolation · strict compile · Base/Sample · query · damage · cache · pixels)                                                          |
+| host-to-document time mapping        | `playback_clock.rs`        | ANIMATION     | `tests/playback_clock.rs`, `tests/animation.rs` (virtual time · controls · cadence independence · endpoint behavior · direct-seek equality)                                                                                                   |
+| drawlist (pure, diffable projection) | `drawlist.rs`              | ENG-2.1       | `tests/drawlist.rs` (order · pruning · color · verbatim world · determinism)                                                                                                                                                                  |
+| text shaping + shared glyph layout   | `text_layout.rs`           | ENG-4.1/4.5   | `../a/lab/tests/text_layout.rs`, `tests/text.rs`                                                                                                                                                                                              |
+| raster executor                      | `paint.rs`                 | ENG-2.1       | `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs`, `tests/paths.rs` (pixel probes)                                                                                                   |
+| one frame entry                      | `frame.rs`                 | ENG-2.4       | `tests/frame.rs` (checked paint environment) · spike live loop · gate                                                                                                                                                                         |
+| damage as data                       | `damage.rs`                | ENG-2.2       | `tests/damage.rs`, `tests/values.rs`, `tests/cache.rs` (geometry · paint-only · opacity · painter order · environment · covering bounds)                                                                                                      |
+| spatial read tier                    | `query.rs`                 | ENG-3         | `tests/query.rs` (`hit_point ≡ pick` · retained traversal/clip snapshot)                                                                                                                                                                      |
+| journal (op-log)                     | `journal.rs`               | ENG-5.1       | `tests/journal.rs`                                                                                                                                                                                                                            |
+| replay (corpus, determinism)         | `replay.rs`                | ENG-5.2/5.3   | `tests/replay.rs` + `rig/corpus/*.replay` via the gate                                                                                                                                                                                        |
+| cache identity                       | `ident.rs`                 | ENG-2.3/1.4   | `tests/ident.rs`, `tests/cache.rs` (arena + slot + generation · exact values · paint environment · document replacement)                                                                                                                      |
+| oracle version tags                  | `oracle.rs`                | ENG-4.2       | the `.replay` header                                                                                                                                                                                                                          |
+| gated observability                  | `trace.rs`                 | S-6           | `cargo check --features trace`                                                                                                                                                                                                                |
+| the rig                              | `bin/gate.rs`              | ENG-0.2 / S-5 | it _is_ the gate                                                                                                                                                                                                                              |
 
 The model-crate side of the setup lives in [`../a/lab`](../a/lab): the typed
 `Op` + `apply` dispatcher + `DirtyClass` (`ops.rs`), the arena-scoped per-slot

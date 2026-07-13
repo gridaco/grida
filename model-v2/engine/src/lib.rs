@@ -22,6 +22,7 @@ pub mod ident;
 pub mod journal;
 pub mod oracle;
 pub mod paint;
+pub mod playback_clock;
 pub mod query;
 pub mod replay;
 mod text_layout;

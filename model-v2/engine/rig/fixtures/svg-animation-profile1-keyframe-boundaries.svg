@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="32">
+  <rect id="probe" x="4" y="8" width="4" height="16" fill="#7c3aed">
+    <animate
+      attributeName="width"
+      values="4;20;52"
+      keyTimes="0;0.25;1"
+      calcMode="spline"
+      keySplines="0 0 1 1;0,0,1,1"
+      begin="0.000000010s"
+      dur="0.000000016s"
+      repeatCount="2"
+      fill="freeze"
+    />
+  </rect>
+</svg>

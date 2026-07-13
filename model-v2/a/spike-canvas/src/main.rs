@@ -1,4 +1,5 @@
-//! E10 — the feel spike. `cargo run --release` opens the window;
+//! E10 — the feel spike. `cargo run --release` opens the editor window;
+//! `--play-svg <input.svg>` opens the isolated live animation host;
 //! `--shot out.png [state]` renders headless to PNG (self-verification);
 //! `--bench` prints resolve+paint timings.
 //!
@@ -53,6 +54,17 @@ pub fn resolve_and_build_doc(
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|argument| argument == "--play-svg") {
+        let Some(path) = args.get(i + 1) else {
+            eprintln!("usage: anchor-spike --play-svg <input.svg>");
+            std::process::exit(2);
+        };
+        if let Err(error) = shell::play_svg(std::path::Path::new(path)) {
+            eprintln!("anchor-spike: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if let Some(i) = args.iter().position(|a| a == "--shot") {
         let path = args.get(i + 1).cloned().unwrap_or("spike.png".into());
         // The state arg is positional but optional; a following flag is not it.

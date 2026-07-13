@@ -19,6 +19,9 @@ serde = ["dep:serde"]
 taffy = "0.9.2"
 quick-xml = "0.37"
 kurbo = "0.13"
+num-bigint = "0.4"
+num-rational = "0.4"
+num-traits = "0.2"
 serde = { version = "1.0", optional = true, features = ["derive"] }
 svgtypes = "0.16"
 

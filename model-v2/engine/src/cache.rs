@@ -17,6 +17,7 @@
 //! visual approximation the live editor accepts, re-rastering on settle); the
 //! gate proves the integer case, which is the contract.
 
+use anchor_lab::animation::SampleError;
 use anchor_lab::math::Affine;
 use anchor_lab::model::{Document, NodeKey};
 use anchor_lab::properties::{PropertyError, PropertyValues, ValueView};
@@ -24,7 +25,10 @@ use anchor_lab::resolve::{ResolveOptions, RotationInFlow};
 use skia_safe::{Canvas, Color, FilterMode, Image, ImageInfo, MipmapMode, SamplingOptions};
 
 use crate::drawlist::DrawList;
-use crate::frame::{resolve_and_build_view, FrameBuildError, FrameExecutionError};
+use crate::frame::{
+    resolve_and_build_view, EvaluatedFrameRequest, FrameBuildError, FrameExecutionError,
+    FrameRequest,
+};
 use crate::paint::{execute_unchecked, PaintCtx, PaintEnvironmentKey};
 
 /// Extra content rastered around the viewport, so small pans blit without a
@@ -68,6 +72,44 @@ impl From<FrameBuildError> for SceneCacheError {
 impl From<FrameExecutionError> for SceneCacheError {
     fn from(error: FrameExecutionError) -> Self {
         SceneCacheError::FrameExecution(error)
+    }
+}
+
+/// Failure at the explicit Base/Sample cache seam. Sampling completes before
+/// cache comparison or destination drawing.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SceneCacheRequestError {
+    Sample(SampleError),
+    Cache(SceneCacheError),
+}
+
+impl std::fmt::Display for SceneCacheRequestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SceneCacheRequestError::Sample(error) => error.fmt(f),
+            SceneCacheRequestError::Cache(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for SceneCacheRequestError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            SceneCacheRequestError::Sample(error) => Some(error),
+            SceneCacheRequestError::Cache(error) => Some(error),
+        }
+    }
+}
+
+impl From<SampleError> for SceneCacheRequestError {
+    fn from(error: SampleError) -> Self {
+        SceneCacheRequestError::Sample(error)
+    }
+}
+
+impl From<SceneCacheError> for SceneCacheRequestError {
+    fn from(error: SceneCacheError) -> Self {
+        SceneCacheRequestError::Cache(error)
     }
 }
 
@@ -152,6 +194,28 @@ impl SceneCache {
             ctx,
             doc_dirty,
         )
+    }
+
+    /// Composite one explicit Base or Sample request. Time itself never enters
+    /// the cache key: the sampled `PropertyValues` is the complete visual key.
+    pub fn frame_request(
+        &mut self,
+        canvas: &Canvas,
+        doc: &Document,
+        request: FrameRequest<'_>,
+        opts: &ResolveOptions,
+        view: &Affine,
+        ctx: &PaintCtx,
+        doc_dirty: bool,
+    ) -> Result<bool, SceneCacheRequestError> {
+        match request.evaluate(doc)? {
+            EvaluatedFrameRequest::Base => self
+                .frame(canvas, doc, opts, view, ctx, doc_dirty)
+                .map_err(Into::into),
+            EvaluatedFrameRequest::Sample { values } => self
+                .frame_with_values(canvas, doc, &values, opts, view, ctx, doc_dirty)
+                .map_err(Into::into),
+        }
     }
 
     /// Composite one frame with immutable effective property values. Invalid

@@ -13,10 +13,33 @@ cd model-v2/a/spike-canvas
 cargo run --release            # the window
 cargo run --release -- --bench # resolve+paint timings
 cargo run --release -- --shot out.png [crosszero|ungroup|rot45]
+
+# live SVG animation host
+cargo run --release -- \
+  --play-svg ../../engine/rig/examples/svg-animation-profile1-keyframes.svg
 ```
 
 First build reuses the repo's compiled skia via the shared target dir
 (`.cargo/config.toml`).
+
+## Live animation harness
+
+`--play-svg` is an isolated `AnimationApp`, not a mode inside the editor app
+and not a product player. It compiles the supported SVG profile once, maps one
+host-owned monotonic clock through `PlaybackClock`, renders one explicit
+`FrameRequest::Sample` per redraw, and stops requesting frames after painting
+the exact terminal sample. It presents the zero sample once before starting
+real time. The bottom transport has Restart and Play/Pause buttons, a seek bar,
+and the current/total time. While playing, dragging the seek bar pauses playback
+and resumes it after release; an already-paused source stays paused, and seeking
+to the end remains stopped. Space pauses or resumes, `R` or Home restarts, and
+Escape quits.
+
+The window host owns `Instant`, pacing, resize, fit, controls, GPU flush, and
+presentation. None of those enter `anchor-engine`; the portable boundary
+remains `HostTime -> PlaybackClock -> SampleTime`. Its redraw timer is a
+temporary stand-in for the compositor pacing required by ENG-2.4, not a
+production scheduling API.
 
 ## The feel checklist
 
