@@ -10,6 +10,7 @@ import {
   model,
   costMillsFromTokenUsage,
   costUsdFromTokenUsage,
+  gridaProviderOptions,
   withAiAuth,
   type AiActionResult,
   type ProviderUsage,
@@ -126,12 +127,10 @@ export async function runChat(input: RunChatInput): Promise<RunChatResponse> {
       const { text, usage } = await generateText({
         model: languageModel,
         messages,
-        providerOptions: {
-          grida: {
-            organizationId: orgId,
-            feature: "ai/chat",
-          },
-        },
+        providerOptions: gridaProviderOptions({
+          organizationId: orgId,
+          feature: "ai/chat",
+        }),
       });
 
       const providerUsage = toProviderUsage(usage);

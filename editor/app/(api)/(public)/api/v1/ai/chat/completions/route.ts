@@ -25,7 +25,7 @@
  */
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { verifyGgToken } from "@/lib/auth/gg-token";
-import { grida } from "@/lib/ai/server";
+import { grida, gridaProviderOptions } from "@/lib/ai/server";
 import {
   decodeRequest,
   encodeCompletion,
@@ -64,13 +64,11 @@ export async function POST(request: Request) {
     const model = grida.languageModel(req.model) as LanguageModelV3;
     const callOptions = {
       ...decoded.callOptions,
-      providerOptions: {
-        grida: {
-          organizationId: claims.org,
-          feature: "v1/ai/chat",
-          awaitIngest: false,
-        },
-      },
+      providerOptions: gridaProviderOptions({
+        organizationId: claims.org,
+        feature: "v1/ai/chat",
+        awaitIngest: false,
+      }),
     };
 
     if (!decoded.stream) {

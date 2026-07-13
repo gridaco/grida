@@ -21,7 +21,7 @@ import type { ImageGenerateResult } from "@grida/agent";
 import { verifyGgToken } from "@/lib/auth/gg-token";
 import ai from "@/lib/ai";
 import { computeImageCostMills } from "@/lib/ai/image-cost";
-import { methods } from "@/lib/ai/server";
+import { methods, gridaProviderOptions } from "@/lib/ai/server";
 import {
   fromUnknownError,
   modelNotFound,
@@ -102,11 +102,11 @@ export async function POST(request: Request) {
       aspectRatio: req.aspect_ratio as `${number}:${number}` | undefined,
       seed: req.seed ?? undefined,
       providerOptions: {
-        grida: {
+        ...gridaProviderOptions({
           organizationId: claims.org,
           feature: "v1/ai/images",
           costMills,
-        },
+        }),
         ...(originProvider && quality ? { [originProvider]: { quality } } : {}),
       },
     });
