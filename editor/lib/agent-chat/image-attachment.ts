@@ -22,6 +22,8 @@ export type ImageAttachmentPolicy = {
   readonly maxEdge: number;
   /** Target max decoded bytes after encoding; drives downscale + quality. */
   readonly maxBytes: number;
+  /** Maximum wait for a URL-backed Library image to load and decode. */
+  readonly loadTimeoutMs: number;
 };
 
 /**
@@ -34,6 +36,7 @@ export const IMAGE_ATTACHMENT_POLICY: ImageAttachmentPolicy = {
   acceptMimes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
   maxEdge: 1568,
   maxBytes: 5 * 1024 * 1024,
+  loadTimeoutMs: 15_000,
 };
 
 /** MIME types the canvas encoder can emit when pass-through is unavailable. */
@@ -216,10 +219,28 @@ export async function encodeLibraryImageUrl(
   const image = new Image();
   image.crossOrigin = "anonymous";
   image.decoding = "async";
+  let loadTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearLoadTimer = () => {
+    if (loadTimer === null) return;
+    clearTimeout(loadTimer);
+    loadTimer = null;
+  };
   try {
     await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error("image URL could not be decoded"));
+      let settled = false;
+      const finish = (settle: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearLoadTimer();
+        settle();
+      };
+      loadTimer = setTimeout(
+        () => finish(() => reject(new Error("image URL load timed out"))),
+        policy.loadTimeoutMs
+      );
+      image.onload = () => finish(resolve);
+      image.onerror = () =>
+        finish(() => reject(new Error("image URL could not be decoded")));
       image.src = parsed.href;
     });
     if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return null;
@@ -234,6 +255,7 @@ export async function encodeLibraryImageUrl(
   } catch {
     return null;
   } finally {
+    clearLoadTimer();
     image.onload = null;
     image.onerror = null;
     image.src = "";
