@@ -27,7 +27,12 @@ import {
   type ReactNode,
 } from "react";
 import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
-import { CONTEXT_MARKERS, USER_TEMPLATE_SELECTION } from "@grida/agent";
+import {
+  CONTEXT_MARKERS,
+  USER_DIRECTORY_REFERENCES,
+  USER_FILE_ATTACHMENTS,
+  USER_TEMPLATE_SELECTION,
+} from "@grida/agent";
 import { cn } from "@app/ui/lib/utils";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
@@ -180,12 +185,46 @@ export function ChatMessageView({
                     data?: Record<string, unknown>;
                   };
                   const isTemplate = part.type === USER_TEMPLATE_SELECTION;
+                  const isFiles = part.type === USER_FILE_ATTACHMENTS;
+                  const isDirectories = part.type === USER_DIRECTORY_REFERENCES;
                   const d = part.data ?? {};
                   const title =
                     typeof d.title === "string" ? d.title : undefined;
                   const slides =
                     typeof d.slides === "number" ? d.slides : undefined;
-                  const Icon = isTemplate ? LayoutTemplateIcon : PaperclipIcon;
+                  // Uploaded-file marker: name the chip by the file(s) in scratch.
+                  const fileNames = (
+                    Array.isArray(d.files) ? d.files : []
+                  ).flatMap((f) =>
+                    f && typeof (f as { name?: unknown }).name === "string"
+                      ? [(f as { name: string }).name]
+                      : []
+                  );
+                  const directoryNames = (
+                    Array.isArray(d.directories) ? d.directories : []
+                  ).flatMap((directory) =>
+                    directory &&
+                    typeof (directory as { name?: unknown }).name === "string"
+                      ? [(directory as { name: string }).name]
+                      : []
+                  );
+                  const Icon = isTemplate
+                    ? LayoutTemplateIcon
+                    : isDirectories
+                      ? FolderTreeIcon
+                      : PaperclipIcon;
+                  const label =
+                    isTemplate && title
+                      ? `${title} template`
+                      : isFiles
+                        ? fileNames.length === 1
+                          ? fileNames[0]
+                          : `${fileNames.length} files`
+                        : isDirectories
+                          ? directoryNames.length === 1
+                            ? directoryNames[0]
+                            : `${directoryNames.length} folders`
+                          : CONTEXT_MARKERS[part.type];
                   return (
                     // Index key: a sent user message's parts are immutable and
                     // never reorder (same reasoning as the images below).
@@ -194,14 +233,15 @@ export function ChatMessageView({
                       className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs shadow-sm"
                     >
                       <Icon className="size-3.5 text-muted-foreground" />
-                      <span className="font-medium">
-                        {isTemplate && title
-                          ? `${title} template`
-                          : CONTEXT_MARKERS[part.type]}
-                      </span>
+                      <span className="font-medium">{label}</span>
                       {isTemplate && slides !== undefined && (
                         <span className="text-muted-foreground">
                           · {slides} slides
+                        </span>
+                      )}
+                      {isDirectories && (
+                        <span className="text-muted-foreground">
+                          · read only
                         </span>
                       )}
                     </span>

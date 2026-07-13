@@ -7,7 +7,7 @@ import {
   CommandItem,
   CommandList,
 } from "@app/ui/components/command";
-import { ImageIcon, XIcon } from "lucide-react";
+import { FolderIcon, ImageIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import { type ReactNode, useEffect, useRef } from "react";
 import {
@@ -20,8 +20,11 @@ import {
 
 function isImageAttachment(
   attachment: ComposerAttachment
-): attachment is ComposerAttachment & { url: string } {
+): attachment is Exclude<ComposerAttachment, { kind: "directory" }> & {
+  url: string;
+} {
   return (
+    attachment.kind !== "directory" &&
     !!attachment.mime?.startsWith("image/") &&
     attachment.mime !== "image/svg+xml" &&
     !!attachment.url
@@ -29,6 +32,7 @@ function isImageAttachment(
 }
 
 function getAttachmentTypeLabel(attachment: ComposerAttachment): string {
+  if (attachment.kind === "directory") return "FOLDER · READ ONLY";
   const mimeSubtype = attachment.mime?.split("/")[1]?.split("+")[0];
   const extension = attachment.name.includes(".")
     ? attachment.name.split(".").pop()
@@ -192,6 +196,32 @@ function ComposerAttachmentCard({
   attachment: ComposerAttachment;
   onRemove: () => void;
 }) {
+  if (attachment.kind === "directory") {
+    return (
+      <div className="flex h-12 max-w-52 min-w-40 items-center gap-2 rounded-md border border-border bg-background px-2 py-1 shadow-xs">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-blue-600">
+          <FolderIcon className="size-4" />
+        </div>
+        <span className="min-w-0 flex-1">
+          <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-tight">
+            {attachment.name}
+          </span>
+          <span className="mt-0.5 block text-muted-foreground text-xs leading-tight">
+            {getAttachmentTypeLabel(attachment)}
+          </span>
+        </span>
+        <button
+          aria-label={`Remove ${attachment.name}`}
+          className="self-start -mt-0.5 -mr-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:opacity-80"
+          onClick={onRemove}
+          type="button"
+        >
+          <XIcon className="size-2.5" />
+        </button>
+      </div>
+    );
+  }
+
   if (isImageAttachment(attachment)) {
     return (
       <div className="group relative size-20 overflow-hidden rounded-md border border-border bg-muted">

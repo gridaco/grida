@@ -28,6 +28,7 @@ import type {
   SessionStatus,
   GridaGatewaySession,
   GridaGatewaySessionStatus,
+  DirectoryScopeDescriptor,
 } from "@grida/agent";
 import type {
   DaemonHandshakeResponse,
@@ -367,6 +368,13 @@ export type DesktopBridge = {
     generate: (req: VideoGenerateRequest) => Promise<VideoGenerateResult>;
   };
   agent: {
+    /**
+     * Turn an OS-backed directory `File` from a real drop into an opaque,
+     * read-only agent scope. Optional on protocol 1: older desktop binaries and
+     * browser hosts omit it. The absolute path is resolved inside Electron's
+     * preload and never returns to renderer code.
+     */
+    attach_directory?: (file: File) => Promise<DirectoryScopeDescriptor>;
     run: (
       opts: AgentRunOptions,
       onChunk: (chunk: AgentUIMessageChunk) => void

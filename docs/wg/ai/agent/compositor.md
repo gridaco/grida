@@ -1,6 +1,6 @@
 ---
 title: Compositor
-description: User intent representation. The multipart user-message shape, file references vs attachments, inline commands, mentions, editor context, attachment handling, and the lowering rules that turn what the user composes into what the model sees.
+description: User intent representation. The multipart user-message shape, file and directory references vs attachments, inline commands, mentions, editor context, attachment handling, and the lowering rules that turn what the user composes into what the model sees.
 keywords:
   [
     agent-system,
@@ -9,6 +9,8 @@ keywords:
     user-message,
     multipart,
     file-ref,
+    directory-ref,
+    folder-drop,
     attachments,
     mentions,
     commands,
@@ -56,6 +58,7 @@ A user message is a **structured multipart object**, not a string:
   parts: [
     { type: "text",            text: "look at this svg and the spec" },
     { type: "file-ref",        ref: { kind: "path", path: "designs/icon.svg" } },
+    { type: "directory-ref",   ref: { kind: "scope", id: "dir_…", name: "reference-material" } },
     { type: "file-attachment", data: "<base64>", mime: "image/png", name: "screenshot.png" },
     { type: "command",         id: "/search", args: { query: "icon set" } },
     { type: "mention",         target: { kind: "skill", name: "canvas-docs-svg-kit" } },
@@ -69,20 +72,22 @@ in sequence. The model sees a structured input — except where the
 [lowering rules](#templating-user-view-vs-model-view) say a part
 collapses, resolves out, or becomes a provider-native block.
 
-## File references vs file attachments
+## File references, directory references, and file attachments
 
-Two distinct shapes, deliberately:
+Three distinct shapes, deliberately:
 
-| Shape             | Body location                             | Use when                                                                                                          |
-| ----------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `file-ref`        | Path / URL / content-id; body NOT inlined | The file is in the workspace; the agent reads it via `read` or `web_fetch` when it needs the contents.            |
-| `file-attachment` | Inline bytes (base64 or binary)           | The file is outside the workspace; the model has multi-modal capability; the model should see the bytes directly. |
+| Shape             | Body location                             | Use when                                                                                                             |
+| ----------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `file-ref`        | Path / URL / content-id; body NOT inlined | The file is in an already-authorized scope; the agent reads it via `read` or `web_fetch` when it needs the contents. |
+| `directory-ref`   | Host-bound scope; descendants NOT copied  | The user grants the session bounded access to an existing directory tree without making it the working directory.    |
+| `file-attachment` | Inline bytes (base64 or binary)           | The model has multi-modal capability and should see a copied file's bytes directly.                                  |
 
-The host MAY map the same drag-and-drop gesture to either shape. A
-code-agent host typically prefers "drag = file-ref" (preserves the
-agent's tool-driven reading flow). A design-agent host typically
-prefers "drag image = attachment" (the model sees the image
-directly).
+For files, the host MAY map the same drag-and-drop gesture to either
+`file-ref` or `file-attachment`. A code-agent host typically prefers
+"drag = file-ref" (preserves the agent's tool-driven reading flow). A
+design-agent host typically prefers "drag image = attachment" (the
+model sees the image directly). A directory drop always produces a
+`directory-ref`.
 
 ### File-ref with range
 
@@ -104,6 +109,70 @@ selected this code." The lowering layer inlines only the selected
 lines, not the whole file. Editor surfaces that already speak the
 file path / line range (IDEs, code editors) SHOULD use this shape
 rather than [editor context](#editor-context).
+
+### Directory references
+
+A directory is never a `file-attachment`. Recursively copying a
+directory into attachment storage or [scratch](./scratch.md) changes
+its identity, duplicates durable user data, and turns an access grant
+into an import. A compositor instead represents the selected tree as
+a `directory-ref`:
+
+```ts
+{
+  type: "directory-ref",
+  ref: {
+    kind: "scope",
+    id: "dir_…",
+    name: "reference-material"
+  }
+}
+```
+
+The `id` is an opaque reference to a host-held scope. It is neither an
+absolute path nor a transferable bearer credential. `name` is display
+metadata and MUST NOT participate in authorization. The persisted part
+records the user's intent to reference the directory; the host-held
+scope is the authority that makes the reference usable.
+
+The acquisition and authority rules are:
+
+- **An explicit trusted gesture mints the scope.** Dropping a directory
+  from the operating system, selecting it in a native picker, or granting
+  a browser-mediated directory capability counts as affirmative read
+  authorization for that tree. Text that merely looks like a local path
+  does not.
+- **The selected tree is exact.** The host resolves the selected root
+  without expanding it to a repository, parent directory, or sibling
+  tree. Every access through the reference MUST be containment-checked
+  at operation time; symlinks and path aliases MUST NOT widen the
+  scope.
+- **The default grant is read-only and session-scoped.** It remains
+  subject to the host's sensitive-read denies. The gesture does not add
+  the directory to writable roots and does not change the session's
+  working directory.
+- **Contents are discovered lazily.** The model receives a compact,
+  tool-addressable descriptor. It lists, searches, and reads descendants
+  through filesystem tools as needed; the compositor MUST NOT enumerate
+  the whole tree, inline its contents, or seed it into scratch.
+- **Existing authority is reused.** A directory already inside an
+  authorized workspace is represented against that workspace rather
+  than minting an overlapping external scope.
+
+Attaching a directory and working in a directory are different user
+intents. Promoting the reference to a workspace, or otherwise granting
+write access, requires a separate explicit action. Under the
+[directory-rooted execution](./foundations.md#directory-rooted-execution)
+model, making it the working root starts a new session; a host that
+supports additional writable roots MUST still obtain a distinct write
+grant. The original drop alone is never sufficient write authority.
+
+The part MAY survive in the transcript after its scope is revoked,
+unavailable, or moved. In that state the compositor renders an
+unavailable reference and the runtime fails closed. Resuming the same
+session MAY re-establish its session grant; replaying the message into a
+new session or fork MUST NOT create authority from the persisted part
+alone. See [permission scopes](./session.md#permission-scopes).
 
 ### Multi-modal handling
 
@@ -320,6 +389,7 @@ classes:
 | Audio          | Multi-modal where supported; transcription tool route otherwise.                                                    |
 | Video          | Multi-modal where supported; descriptor + frame-extractor tool otherwise.                                           |
 | Binary unknown | Always a path-ref or descriptor, never inlined. The model sees a name, mime, size.                                  |
+| Directory      | Always a `directory-ref`; never recursively copied, archived, or staged into scratch by implication.                |
 
 The agent always has a fallback path. Any attachment the model
 cannot read directly SHOULD still be reachable through `read` or
@@ -371,7 +441,8 @@ Per part type:
 | Part              | User view (rich UI / TUI)                        | Persisted shape                                                  | Model view (after lowering)                                                                                                                                                                                                |
 | ----------------- | ------------------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `text`            | Inline text                                      | `{ type: "text", text }`                                         | Text, verbatim.                                                                                                                                                                                                            |
-| `file-ref`        | Chip / link with file name and optional `:lines` | `{ type: "file-ref", ref }`                                      | The file's contents inlined as text (or the selected range only). For images, a provider-native image block. The model never sees the literal `@path`.                                                                     |
+| `file-ref`        | Chip / link with file name and optional `:lines` | `{ type: "file-ref", ref }`                                      | A tool-addressable descriptor by default. A range-carrying ref lowers only the selected range; a deliberately resolved image MAY become a provider-native image block. The model never sees the literal `@path`.           |
+| `directory-ref`   | Folder chip / link                               | `{ type: "directory-ref", ref }`                                 | A compact descriptor naming the tool-addressable directory scope. Descendant contents are never inlined by lowering.                                                                                                       |
 | `file-attachment` | Thumbnail or file chip                           | `{ type: "file-attachment", data, mime, name, … }`               | Provider-native multi-modal block when the provider supports the mime type; descriptor placeholder otherwise.                                                                                                              |
 | `command`         | Resolved chip / palette result                   | `{ type: "command", id, args }`                                  | **Nothing** when the command is host-action-only. Otherwise the command's result lowered as text/file parts (e.g. `/read foo.ts` → the file's contents). The literal `/foo` is never sent.                                 |
 | `mention` (skill) | Chip / pill in the input                         | `{ type: "mention", target }`                                    | **Nothing** in the user message; the [skill body](./skills.md) loads via the normal `skill` tool flow.                                                                                                                     |
@@ -469,6 +540,10 @@ A conforming compositor MUST:
 
 - Emit user messages as structured multipart objects.
 - Distinguish `file-ref` from `file-attachment`.
+- Represent a referenced directory as a bounded `directory-ref`, never
+  as recursively copied attachment or scratch data.
+- Treat a directory drop or reference as session-scoped read authority only;
+  require a separate explicit grant for workspace or write authority.
 - Carry a byte- or line-range on `file-ref` when the user's selection
   is a slice of a file.
 - Resolve commands at submission time; never let the model parse a

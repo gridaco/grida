@@ -37,6 +37,7 @@ import type {
   VideoGenerateResult,
 } from "./protocol/video";
 import type { AgentUIMessageChunk } from "./protocol/wire";
+import type { DirectoryScopeDescriptor } from "./protocol/context";
 import type {
   ChatMessageWithParts,
   ChatSessionRow,
@@ -122,6 +123,19 @@ export namespace AgentTransport {
    * recent, workspaces) by inheritance + the agent tenant's groups below.
    */
   export class Client extends DaemonTransport.Client {
+    /**
+     * GRIDA-SEC-004 — mint an opaque, read-only directory reference. The raw
+     * host path belongs ONLY on this acquisition call: Desktop preload obtains
+     * it from Electron `webUtils.getPathForFile(File)` or a native picker. Chat
+     * messages and run options persist/transport only the returned descriptor.
+     */
+    readonly directory_scopes = {
+      attach: async (path: string): Promise<DirectoryScopeDescriptor> =>
+        await this.postJson<DirectoryScopeDescriptor>("/directory-scopes", {
+          path,
+        }),
+    } as const;
+
     readonly secrets = {
       has: async (providerId: string): Promise<boolean> => {
         const res = await this.postJson<{ has: boolean }>("/secrets/has", {

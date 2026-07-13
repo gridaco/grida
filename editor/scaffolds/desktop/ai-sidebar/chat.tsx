@@ -638,6 +638,7 @@ export function AISidebarChat({
               : "Ask the assistant to edit the SVG…"
           }
           multimodal={multimodal}
+          operableFiles={isWorkspace}
           toolbar={
             <>
               <DesktopModelPicker

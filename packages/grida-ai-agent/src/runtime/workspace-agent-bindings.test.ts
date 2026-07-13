@@ -612,3 +612,99 @@ describe("WorkspaceAgentFsBackend — additional reachable roots (scratch)", () 
     expect(realPasswd).not.toBe("x");
   });
 });
+
+describe("createWorkspaceAgentBindings — read-only directory references", () => {
+  let baseDir: string;
+  let referenceRoot: string;
+  let outsideRoot: string;
+  let registry: WorkspaceRegistry;
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-dir-ref-bind-"));
+    referenceRoot = path.join(baseDir, "reference-material");
+    outsideRoot = path.join(baseDir, "outside");
+    await fs.mkdir(path.join(referenceRoot, "nested"), { recursive: true });
+    await fs.mkdir(outsideRoot);
+    await fs.writeFile(
+      path.join(referenceRoot, "nested", "marker.txt"),
+      "E2E_MARKER"
+    );
+    await fs.writeFile(path.join(outsideRoot, "secret.txt"), "DO_NOT_READ");
+    registry = new WorkspaceRegistry(path.join(baseDir, "registry"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  async function bindings() {
+    const id = "dir_11111111-1111-4111-8111-111111111111";
+    return await createWorkspaceAgentBindings(
+      {
+        directory_scopes: [
+          {
+            id,
+            name: "reference-material",
+            root: await fs.realpath(referenceRoot),
+            path: `/__references__/${id}`,
+          },
+        ],
+        mode: "auto",
+      },
+      { workspace_registry: registry, shell_execution_allowed: true }
+    );
+  }
+
+  it("mounts a workspace-less tree lazily for list/read/grep and exposes no shell", async () => {
+    const result = await bindings();
+    expect(result).not.toBeNull();
+    expect(result?.command).toBeUndefined();
+    // Directory contents are not copied or eagerly hydrated.
+    expect(result?.fs.list()).toEqual([]);
+
+    const root = await result!.fs.list_directory_fresh({ path: "/" });
+    expect(root.folders).toContain("/__references__");
+    const mount = "/__references__/dir_11111111-1111-4111-8111-111111111111";
+    const listed = await result!.fs.list_directory_fresh({ path: mount });
+    expect(listed.folders).toEqual([`${mount}/nested`]);
+    expect(
+      await result!.fs.read_fresh(`${mount}/nested/marker.txt`)
+    ).toMatchObject({ content: "E2E_MARKER" });
+    expect(
+      await result!.fs.grep_fresh({ pattern: "E2E_MARKER", path_prefix: mount })
+    ).toMatchObject({
+      matches: [
+        { path: `${mount}/nested/marker.txt`, line: 1, text: "E2E_MARKER" },
+      ],
+    });
+  });
+
+  it("refuses edits", async () => {
+    const result = await bindings();
+    const mount = "/__references__/dir_11111111-1111-4111-8111-111111111111";
+    const markerPath = `${mount}/nested/marker.txt`;
+    await result!.fs.read_fresh(markerPath);
+    expect(
+      result!.fs.write(markerPath, { content: "MUTATED", expected_version: 0 })
+    ).toMatchObject({ ok: false, reason: "read_only" });
+    expect(
+      await fs.readFile(
+        path.join(referenceRoot, "nested", "marker.txt"),
+        "utf8"
+      )
+    ).toBe("E2E_MARKER");
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "does not follow an escaping symlink",
+    async () => {
+      const result = await bindings();
+      const mount = "/__references__/dir_11111111-1111-4111-8111-111111111111";
+      await fs.symlink(
+        path.join(outsideRoot, "secret.txt"),
+        path.join(referenceRoot, "escape.txt")
+      );
+      expect(await result!.fs.read_fresh(`${mount}/escape.txt`)).toBeNull();
+    }
+  );
+});

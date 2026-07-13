@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { FileUIPart } from "ai";
-import { USER_TEMPLATE_SELECTION } from "@grida/agent";
+import { USER_FILE_ATTACHMENTS, USER_TEMPLATE_SELECTION } from "@grida/agent";
 import {
   buildAgentSend,
   buildTemplateContext,
@@ -185,6 +185,51 @@ describe("buildAgentSend — context token parts (WG compositor.md §templating)
       { text: "hi" },
       { body: { session_id: "s1", model_id: "m1" } }
     );
+  });
+
+  it("merges per-turn attachment bytes and durable descriptors with closure context", () => {
+    const sendMessage = vi.fn<SendMessageFn>();
+    const send = buildAgentSend({
+      sendMessage,
+      sessionId: "s1",
+      modelId: "m1",
+      scratchSeed: [{ path: "template.canvas", text: "{}" }],
+      contexts: buildTemplateContext({ title: "Pitch", slides: 4 }),
+    });
+
+    send("inspect it", undefined, {
+      scratchSeed: [{ path: "upload-report.pdf", base64: "AQID" }],
+      contexts: [
+        {
+          type: USER_FILE_ATTACHMENTS,
+          data: {
+            location: "scratch",
+            files: [
+              {
+                name: "Report.pdf",
+                mime: "application/pdf",
+                size: 3,
+                path: "upload-report.pdf",
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const message = sendMessage.mock.calls[0][0] as {
+      role: string;
+      parts: Array<{ type: string }>;
+    };
+    expect(message.parts.map((part) => part.type)).toEqual([
+      "text",
+      USER_TEMPLATE_SELECTION,
+      USER_FILE_ATTACHMENTS,
+    ]);
+    expect(sendMessage.mock.calls[0][1]?.body?.scratch_seed).toEqual([
+      { path: "template.canvas", text: "{}" },
+      { path: "upload-report.pdf", base64: "AQID" },
+    ]);
   });
 });
 

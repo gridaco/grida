@@ -11,6 +11,14 @@
 
 import { browse, search } from "@/app/(library)/library/actions";
 import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import { IMAGE_ATTACHMENT_POLICY } from "@/lib/agent-chat";
+
+/** A first-party Library pin carries the source MIME in addition to the agent
+ *  tool's provider-neutral result shape. Composer attachments need it to build
+ *  an honest provider-native file part without guessing from the URL. */
+export type DesignLibraryPin = AgentDesignSearch.DesignSearchResult & {
+  mime: string;
+};
 
 /** Host-fixed result count — not an agent knob (TOOL-DESIGN doctrine). */
 const MAX_RESULTS = 24;
@@ -35,6 +43,18 @@ function toPin(o: {
   };
 }
 
+function toLibraryPin(o: {
+  id: string;
+  title?: string | null;
+  alt?: string | null;
+  url: string;
+  width: number;
+  height: number;
+  mimetype: string;
+}): DesignLibraryPin {
+  return { ...toPin(o), mime: o.mimetype };
+}
+
 /** Run the library search; throw on failure (the card shows an error state).
  *  One-shot (first {@link MAX_RESULTS}) — the compact ai-sidebar pick card. */
 export async function resolveDesignSearch(
@@ -49,6 +69,11 @@ export async function resolveDesignSearch(
  *  undefined when the backend can't estimate it. */
 export type DesignSearchPage = {
   items: AgentDesignSearch.DesignSearchResult[];
+  count: number | undefined;
+};
+
+export type DesignLibraryPage = {
+  items: DesignLibraryPin[];
   count: number | undefined;
 };
 
@@ -67,8 +92,14 @@ export async function resolveDesignSearchPage(
  *  gallery's fetch. Same {@link DesignSearchPage} shape as the query path so a
  *  gallery can page through either identically. */
 export async function resolveDesignBrowsePage(
-  range: [number, number]
-): Promise<DesignSearchPage> {
-  const { data, count } = await browse({ range });
-  return { items: data.map(toPin), count: count ?? undefined };
+  range: [number, number],
+  options: { attachmentImagesOnly?: boolean } = {}
+): Promise<DesignLibraryPage> {
+  const { data, count } = await browse({
+    range,
+    ...(options.attachmentImagesOnly
+      ? { mimetypes: [...IMAGE_ATTACHMENT_POLICY.acceptMimes] }
+      : {}),
+  });
+  return { items: data.map(toLibraryPin), count: count ?? undefined };
 }

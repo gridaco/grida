@@ -34,7 +34,10 @@
 import type { ChatMessageWithParts } from "../session/rows";
 import { compactionBoundary } from "../session/boundary";
 import { AgentVision } from "../vision";
-import { CONTEXT_MARKERS } from "../protocol/context";
+import {
+  CONTEXT_MARKERS,
+  USER_DIRECTORY_REFERENCES,
+} from "../protocol/context";
 import { normalizeSdkToolPartFields } from "../protocol/tool-part-fields";
 
 export type ModelUIMessage = {
@@ -57,7 +60,12 @@ export type ModelUIMessage = {
  * just `[summary, …anything after]`.
  */
 export function buildModelMessages(
-  visible: ChatMessageWithParts[]
+  visible: ChatMessageWithParts[],
+  opts: {
+    /** Live host grants for this session. Omitted by generic callers that only
+     * need structural lowering; the runtime always supplies it. */
+    availableDirectoryScopeIds?: ReadonlySet<string>;
+  } = {}
 ): ModelUIMessage[] {
   const boundary = compactionBoundary(visible);
 
@@ -96,7 +104,10 @@ export function buildModelMessages(
       pendingSummary = pendingSummary ?? compaction;
       continue;
     }
-    const parts = lowerParts(m.parts, { elideImages: i < liveStart });
+    const parts = lowerParts(m.parts, {
+      elideImages: i < liveStart,
+      availableDirectoryScopeIds: opts.availableDirectoryScopeIds,
+    });
     if (m.role === "user" && pendingSummary !== null) {
       parts.unshift({
         type: "text",
@@ -158,7 +169,10 @@ function findCompactionSummary(m: ChatMessageWithParts): string | null {
 
 function lowerParts(
   parts: ChatMessageWithParts["parts"],
-  opts: { elideImages: boolean } = { elideImages: false }
+  opts: {
+    elideImages: boolean;
+    availableDirectoryScopeIds?: ReadonlySet<string>;
+  } = { elideImages: false }
 ): unknown[] {
   const out: unknown[] = [];
   for (const p of parts) {
@@ -193,7 +207,8 @@ function lowerParts(
     // whole part (the recorder persists `data: part`) and the payload is `data.data`.
     const marker = CONTEXT_MARKERS[type];
     if (marker) {
-      const payload = (data as { data?: unknown }).data ?? null;
+      const persistedPayload = (data as { data?: unknown }).data ?? null;
+      const payload = lowerContextPayload(type, persistedPayload, opts);
       const body = payload == null ? "" : JSON.stringify(payload, null, 2);
       out.push({ type: "text", text: `<${marker}>\n${body}\n</${marker}>` });
       continue;
@@ -243,6 +258,41 @@ function lowerParts(
     // Other data-* parts are UI-only — not model-relevant. Drop.
   }
   return out;
+}
+
+/**
+ * Add model-only liveness to directory descriptors without mutating the
+ * durable message part. The transcript records intent; only the host registry
+ * can say whether that intent is currently operable for this session. Generic
+ * structural callers omit the availability set and retain the legacy payload.
+ */
+function lowerContextPayload(
+  type: string,
+  payload: unknown,
+  opts: { availableDirectoryScopeIds?: ReadonlySet<string> }
+): unknown {
+  if (
+    type !== USER_DIRECTORY_REFERENCES ||
+    opts.availableDirectoryScopeIds === undefined ||
+    payload == null ||
+    typeof payload !== "object"
+  ) {
+    return payload;
+  }
+  const availableDirectoryScopeIds = opts.availableDirectoryScopeIds;
+  const directories = (payload as { directories?: unknown }).directories;
+  if (!Array.isArray(directories)) return payload;
+  return {
+    ...(payload as Record<string, unknown>),
+    directories: directories.map((directory) => {
+      if (directory == null || typeof directory !== "object") return directory;
+      const id = (directory as { id?: unknown }).id;
+      return {
+        ...(directory as Record<string, unknown>),
+        available: typeof id === "string" && availableDirectoryScopeIds.has(id),
+      };
+    }),
+  };
 }
 
 /**

@@ -1,7 +1,8 @@
 import type {
-  ComposerAttachment,
+  ComposerAttachmentInput,
   ComposerAttachmentFilter,
   ComposerCatalog,
+  ComposerFileAttachment,
   ComposerFileReference,
 } from "@/kits/composer";
 
@@ -191,15 +192,23 @@ export const demoCatalog: ComposerCatalog = {
 
 export const demoAttachmentFilters = {
   byReference: ((incoming, existing) => {
-    const incomingKey = incoming.path ?? incoming.url ?? incoming.name;
+    const incomingKey = attachmentReferenceKey(incoming);
     return !existing.some((attachment) => {
-      const existingKey = attachment.path ?? attachment.url ?? attachment.name;
+      const existingKey = attachmentReferenceKey(attachment);
       return existingKey === incomingKey;
     });
   }) satisfies ComposerAttachmentFilter,
 };
 
-export function toAttachment(file: MockItem): Omit<ComposerAttachment, "id"> {
+function attachmentReferenceKey(attachment: ComposerAttachmentInput): string {
+  return attachment.kind === "directory"
+    ? attachment.ref.path
+    : (attachment.path ?? attachment.url ?? attachment.name);
+}
+
+export function toAttachment(
+  file: MockItem
+): Omit<ComposerFileAttachment, "id"> {
   return {
     name: file.name,
     path: file.path,

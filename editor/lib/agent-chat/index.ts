@@ -82,9 +82,19 @@ export {
   type EncodedImageAttachment,
 } from "./image-attachment";
 export {
+  OPERABLE_FILE_POLICY,
+  readFileAsBase64,
+  extractOperableFiles,
+  type OperableFilePolicy,
+  type EncodedOperableFile,
+  type OperableFilesExtract,
+} from "./file-attachment";
+export { AgentDirectoryReference } from "./directory-reference";
+export {
   buildAgentSend,
   buildTemplateContext,
   type AgentSendBody,
   type ContextPart,
+  type SendExtras,
   type TemplateContextMeta,
 } from "./build-agent-send";

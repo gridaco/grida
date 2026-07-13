@@ -313,10 +313,47 @@ describe("ComposerCore", () => {
     expect(core.getSnapshot().attachments).toHaveLength(2);
   });
 
+  it("emits an honest directory-ref without copying it as a file attachment", () => {
+    const core = new ComposerCore();
+    core.addAttachment({
+      kind: "directory",
+      name: "reference-material",
+      ref: {
+        kind: "scope",
+        id: "dir_opaque",
+        name: "reference-material",
+        path: "/__references__/dir_opaque",
+        access: "read",
+      },
+    });
+
+    expect(core.createMessage({ submitted_at: 1 })).toMatchObject({
+      parts: [
+        {
+          type: "directory-ref",
+          ref: {
+            kind: "scope",
+            id: "dir_opaque",
+            name: "reference-material",
+            path: "/__references__/dir_opaque",
+            access: "read",
+          },
+        },
+      ],
+    });
+    expect(core.createMessage({ submitted_at: 1 })?.parts).not.toContainEqual(
+      expect.objectContaining({ type: "file-attachment" })
+    );
+  });
+
   it("lets consumers filter duplicate attachments", () => {
     const core = new ComposerCore();
     const filter: ComposerAttachmentFilter = (incoming, existing) =>
-      !existing.some((attachment) => attachment.path === incoming.path);
+      incoming.kind === "directory" ||
+      !existing.some(
+        (attachment) =>
+          attachment.kind !== "directory" && attachment.path === incoming.path
+      );
 
     const first = core.addAttachment(
       {

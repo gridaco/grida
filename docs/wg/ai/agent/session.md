@@ -267,6 +267,10 @@ Behavior:
   not the workspace. If the host wants a workspace-snapshot fork,
   it layers it on the message metadata (same hook as
   side-effect rewind).
+- Session-scoped permissions and host-held reference grants. Copied
+  message parts can describe a referenced resource, but they do not
+  mint authority in the child session. The user or host policy must
+  grant it independently.
 - The parent's in-flight run, if any. A fork CANNOT be taken off a
   running turn; the user MUST wait for the parent's turn to finish
   or abort.
@@ -711,6 +715,16 @@ The session row carries a `permissions_json` blob for the session
 scope. The project scope's storage is up to the host (a project-level
 config file, a per-user DB, both); the guide only requires it exists
 separately from session scope.
+
+A compositor [`directory-ref`](./compositor.md#directory-references)
+creates a session-scoped **read** grant when acquired through a trusted
+user gesture. The host MAY persist enough authority metadata to restore
+that grant when the same session resumes, and the user MAY revoke it at
+any time. The persisted message part is only a reference: it MUST NOT
+mint or restore authority by itself, and it MUST remain inspectable when
+the grant is unavailable. It never becomes a project permission merely
+because the part was persisted. A write grant or workspace promotion is
+a separate permission decision.
 
 **Three scopes, not one.** A single ruleset elides the difference
 between "I trust this for this conversation" and "I trust this

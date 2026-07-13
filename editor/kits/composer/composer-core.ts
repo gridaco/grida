@@ -13,7 +13,10 @@ export type ComposerMention = {
   payload?: Record<string, unknown>;
 };
 
-export type ComposerAttachment = {
+export type ComposerFileAttachment = {
+  /** Omitted on legacy/file call sites; directories carry the required
+   *  `"directory"` discriminator below. */
+  kind?: "file";
   id: string;
   name: string;
   mime?: string;
@@ -23,9 +26,31 @@ export type ComposerAttachment = {
   payload?: Record<string, unknown>;
 };
 
-export type ComposerAttachmentInput = Omit<ComposerAttachment, "id"> & {
-  id?: string;
+/** Host-minted, read-only directory scope. `path` is the agent-visible virtual
+ * mount (never the host absolute path); `id` is opaque. */
+export type ComposerDirectoryScopeReference = {
+  kind: "scope";
+  id: string;
+  name: string;
+  path: string;
+  access: "read";
 };
+
+export type ComposerDirectoryAttachment = {
+  kind: "directory";
+  /** Composer-local attachment id; distinct from the opaque scope id. */
+  id: string;
+  name: string;
+  ref: ComposerDirectoryScopeReference;
+};
+
+export type ComposerAttachment =
+  | ComposerFileAttachment
+  | ComposerDirectoryAttachment;
+
+export type ComposerAttachmentInput =
+  | (Omit<ComposerFileAttachment, "id"> & { id?: string })
+  | (Omit<ComposerDirectoryAttachment, "id"> & { id?: string });
 
 export type ComposerAttachmentFilter = (
   incoming: ComposerAttachmentInput,
@@ -107,6 +132,11 @@ export type ComposerFileAttachmentPart = {
   payload?: Record<string, unknown>;
 };
 
+export type ComposerDirectoryRefPart = {
+  type: "directory-ref";
+  ref: ComposerDirectoryScopeReference;
+};
+
 export type ComposerEditorContextPart = ComposerEditorContext & {
   type: "editor-context";
 };
@@ -117,6 +147,7 @@ export type ComposerPart =
   | ComposerMentionPart
   | ComposerFileRefPart
   | ComposerFileAttachmentPart
+  | ComposerDirectoryRefPart
   | ComposerEditorContextPart;
 
 export type ComposerMessage = {
@@ -642,17 +673,27 @@ export class ComposerCore {
     state.parts.push(part);
   }
 
-  private attachmentParts(): ComposerFileAttachmentPart[] {
-    return this.snapshot.attachments.map((attachment) => ({
-      type: "file-attachment",
-      id: attachment.id,
-      name: attachment.name,
-      mime: attachment.mime,
-      size: attachment.size,
-      path: attachment.path,
-      url: attachment.url,
-      payload: attachment.payload,
-    }));
+  private attachmentParts(): Array<
+    ComposerFileAttachmentPart | ComposerDirectoryRefPart
+  > {
+    return this.snapshot.attachments.map((attachment) => {
+      if (attachment.kind === "directory") {
+        return {
+          type: "directory-ref",
+          ref: { ...attachment.ref },
+        };
+      }
+      return {
+        type: "file-attachment",
+        id: attachment.id,
+        name: attachment.name,
+        mime: attachment.mime,
+        size: attachment.size,
+        path: attachment.path,
+        url: attachment.url,
+        payload: attachment.payload,
+      };
+    });
   }
 
   private contextParts(): ComposerEditorContextPart[] {

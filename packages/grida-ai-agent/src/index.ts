@@ -54,9 +54,20 @@ export {
   type AgentRunMessage,
   type AgentRunMessagePart,
   type AgentRunOptions,
+  type ScratchSeedEntry,
 } from "./protocol/run";
 export { normalizeSdkToolPartFields } from "./protocol/tool-part-fields";
-export { CONTEXT_MARKERS, USER_TEMPLATE_SELECTION } from "./protocol/context";
+export {
+  CONTEXT_MARKERS,
+  DIRECTORY_SCOPE_MOUNT_ROOT,
+  USER_TEMPLATE_SELECTION,
+  USER_FILE_ATTACHMENTS,
+  USER_DIRECTORY_REFERENCES,
+  type DirectoryScopeDescriptor,
+  type UserDirectoryReferencesData,
+  type UserFileAttachmentDescriptor,
+  type UserFileAttachmentsData,
+} from "./protocol/context";
 export {
   AGENT_MODES,
   AGENT_DEFAULT_MODE,

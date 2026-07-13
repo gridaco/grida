@@ -46,13 +46,13 @@ import {
 } from "masonic";
 import { CheckIcon, Loader2Icon, PlusIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
-import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
 import {
   DESIGN_SEARCH_PAGE,
   resolveDesignBrowsePage,
+  type DesignLibraryPin,
 } from "@/scaffolds/desktop/shared/design-search";
 
-type Pin = AgentDesignSearch.DesignSearchResult;
+type Pin = DesignLibraryPin;
 
 /** Stop paging past this many thumbnails — the home gallery is a starting point,
  *  not the full library browser, and unbounded DOM would bloat the page. */
@@ -64,7 +64,13 @@ const PickContext = createContext<{
   onPick: (pin: Pin) => void;
   selectedIds: Set<string>;
   disabled: boolean;
-}>({ onPick: () => {}, selectedIds: new Set(), disabled: false });
+  compact: boolean;
+}>({
+  onPick: () => {},
+  selectedIds: new Set(),
+  disabled: false,
+  compact: false,
+});
 
 /** One masonry cell — masonic passes `{ data, width }`; we size to the pin's
  *  aspect ratio (no per-item measurement). The card body is a plain container
@@ -72,7 +78,7 @@ const PickContext = createContext<{
  *  Add button toggles the pick. A selected cell gets a primary ring, and its Add
  *  button stays visible as "Added" so multi-select is legible. */
 function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
-  const { onPick, selectedIds, disabled } = useContext(PickContext);
+  const { onPick, selectedIds, disabled, compact } = useContext(PickContext);
   const selected = selectedIds.has(pin.id);
   const aspect = pin.width && pin.height ? pin.width / pin.height : 1;
   const height = width / aspect;
@@ -81,10 +87,12 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
       title={pin.title}
       style={{ width, height }}
       className={cn(
-        "group relative block overflow-hidden rounded-lg border-2 transition",
-        selected
-          ? "border-primary ring-2 ring-primary/40"
-          : "border-transparent"
+        "group relative block overflow-hidden transition",
+        compact ? "rounded-md" : "rounded-lg border-2 border-transparent",
+        selected &&
+          (compact
+            ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+            : "border-primary ring-2 ring-primary/40")
       )}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -107,7 +115,10 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
         onClick={() => onPick(pin)}
         title={selected ? "Remove from composer" : "Add to composer"}
         className={cn(
-          "absolute right-1.5 top-1.5 flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium shadow transition disabled:opacity-50",
+          "absolute flex items-center justify-center rounded-full text-xs font-medium shadow transition disabled:opacity-50",
+          compact
+            ? "right-1 top-1 size-6"
+            : "right-1.5 top-1.5 gap-1 px-2 py-1",
           selected
             ? "bg-primary text-primary-foreground"
             : "bg-background/90 text-foreground opacity-0 hover:bg-background group-hover:opacity-100 focus-visible:opacity-100"
@@ -116,12 +127,12 @@ function ReferenceCard({ data: pin, width }: { data: Pin; width: number }) {
         {selected ? (
           <>
             <CheckIcon className="size-3.5" />
-            Added
+            {!compact && "Added"}
           </>
         ) : (
           <>
             <PlusIcon className="size-3.5" />
-            Add
+            {!compact && "Add"}
           </>
         )}
       </button>
@@ -142,18 +153,27 @@ const SKELETON_HEIGHTS = [
  *  `mb-3`), so the layout is already in place as real pins stream in rather than
  *  a centered spinner popping out of nowhere. Purely decorative → `aria-hidden`;
  *  the pulse is lightly staggered per column for a more natural shimmer. */
-function GallerySkeleton() {
+function GallerySkeleton({ compact }: { compact: boolean }) {
   return (
     <div
       aria-hidden
       className="animate-in fade-in duration-300"
-      style={{ columnWidth: "180px", columnGap: "12px" }}
+      style={{
+        columnWidth: compact ? "128px" : "180px",
+        columnGap: compact ? "8px" : "12px",
+      }}
     >
       {SKELETON_HEIGHTS.map((h, i) => (
         <div
           key={i}
-          className="mb-3 w-full animate-pulse rounded-lg bg-muted"
-          style={{ height: h, animationDelay: `${(i % 6) * 120}ms` }}
+          className={cn(
+            "w-full animate-pulse bg-muted",
+            compact ? "mb-2 rounded-md" : "mb-3 rounded-lg"
+          )}
+          style={{
+            height: compact ? Math.round(h * 0.7) : h,
+            animationDelay: `${(i % 6) * 120}ms`,
+          }}
         />
       ))}
     </div>
@@ -169,6 +189,8 @@ export const ReferenceGallery = memo(function ReferenceGallery({
   selectedIds,
   disabled = false,
   scrollContainerRef,
+  compact = false,
+  attachmentImagesOnly = false,
 }: {
   onPick: (pin: Pin) => void;
   /** Ids currently in the composer's picked-references tray — selected cells
@@ -178,6 +200,13 @@ export const ReferenceGallery = memo(function ReferenceGallery({
   /** The home's single page-scroll container — the gallery virtualizes against
    *  it (offset by the content above) instead of owning its own scroll. */
   scrollContainerRef: RefObject<HTMLDivElement | null>;
+  /** Dense, borderless cards for bounded picker dialogs. Home keeps the larger
+   *  editorial cards by default. */
+  compact?: boolean;
+  /** Query only model-attachable raster images. Filtering at the Library query
+   *  keeps pagination/counts honest; filtering rendered pages would skip rows
+   *  and make the infinite-loader cursor drift. */
+  attachmentImagesOnly?: boolean;
 }) {
   const [items, setItems] = useState<Pin[]>([]);
   const [count, setCount] = useState<number | undefined>(undefined);
@@ -198,7 +227,9 @@ export const ReferenceGallery = memo(function ReferenceGallery({
   useEffect(() => {
     let live = true;
     loadingRef.current = true;
-    void resolveDesignBrowsePage([0, DESIGN_SEARCH_PAGE - 1])
+    void resolveDesignBrowsePage([0, DESIGN_SEARCH_PAGE - 1], {
+      attachmentImagesOnly,
+    })
       .then(({ items: page, count: total }) => {
         if (!live) return;
         setCount(total);
@@ -216,7 +247,7 @@ export const ReferenceGallery = memo(function ReferenceGallery({
     return () => {
       live = false;
     };
-  }, [appendPage]);
+  }, [appendPage, attachmentImagesOnly]);
 
   const maybeLoadMore = useInfiniteLoader<Pin, LoadMoreItemsCallback<Pin>>(
     async (startIndex, stopIndex) => {
@@ -224,10 +255,10 @@ export const ReferenceGallery = memo(function ReferenceGallery({
       loadingRef.current = true;
       setLoadingMore(true);
       try {
-        const { items: page, count: total } = await resolveDesignBrowsePage([
-          startIndex,
-          stopIndex - 1,
-        ]);
+        const { items: page, count: total } = await resolveDesignBrowsePage(
+          [startIndex, stopIndex - 1],
+          { attachmentImagesOnly }
+        );
         setCount(total);
         appendPage(page);
       } catch {
@@ -294,10 +325,10 @@ export const ReferenceGallery = memo(function ReferenceGallery({
 
   const positioner = usePositioner({
     width: Math.max(0, width),
-    columnWidth: 180,
-    columnGutter: 12,
-    rowGutter: 12,
-    maxColumnCount: 6,
+    columnWidth: compact ? 128 : 180,
+    columnGutter: compact ? 8 : 12,
+    rowGutter: compact ? 8 : 12,
+    maxColumnCount: compact ? 10 : 6,
   });
   const resizeObserver = useResizeObserver(positioner);
 
@@ -305,8 +336,8 @@ export const ReferenceGallery = memo(function ReferenceGallery({
   // masonry cell and defeat memoization — only a real pick/selection/disabled
   // change should.
   const pickContext = useMemo(
-    () => ({ onPick, selectedIds, disabled }),
-    [onPick, selectedIds, disabled]
+    () => ({ onPick, selectedIds, disabled, compact }),
+    [onPick, selectedIds, disabled, compact]
   );
 
   const grid = useMasonry<Pin>({
@@ -330,7 +361,9 @@ export const ReferenceGallery = memo(function ReferenceGallery({
         </p>
       )}
 
-      {!seeded && items.length === 0 && !error && <GallerySkeleton />}
+      {!seeded && items.length === 0 && !error && (
+        <GallerySkeleton compact={compact} />
+      )}
 
       <PickContext.Provider value={pickContext}>{grid}</PickContext.Provider>
 

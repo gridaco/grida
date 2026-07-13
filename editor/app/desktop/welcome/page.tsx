@@ -598,6 +598,10 @@ export default function DesktopWelcomePage() {
                     onSubmit={start}
                     isStreaming={false}
                     onStop={NOOP}
+                    // Welcome uses the reference tray ("Start from an idea"), not
+                    // composer attachments — its `start` ignores files/uploads, so
+                    // hide the "+" rather than offer a dead control.
+                    attach={false}
                     allowEmptySubmit={pickedTemplate != null}
                     autofocus
                     placeholder={

@@ -27,6 +27,7 @@ import {
   type ComposerTrigger,
 } from "./composer-core";
 import { ComposerTiptap } from "./composer-tiptap";
+import { ComposerTransfer } from "./composer-transfer";
 import "./composer-content.css";
 
 type ComposerContextValue = {
@@ -164,7 +165,8 @@ export function ComposerContent({
   triggerMenuId,
   autofocus,
   onSubmitRequest,
-  onImageFiles,
+  onFiles,
+  onDirectories,
   ...props
 }: Omit<HTMLAttributes<HTMLDivElement>, "onSubmit"> & {
   placeholder?: string;
@@ -173,13 +175,23 @@ export function ComposerContent({
   triggerMenuId?: string;
   onSubmitRequest?: () => void;
   /**
-   * Forward `image/*` files pasted or dropped onto the editor. The kit stays
-   * policy-agnostic: it only hands over the raw `File[]`; the consumer decides
-   * what counts (e.g. excludes SVG), how to encode, and whether to attach. When
-   * provided AND image files are present, the gesture is consumed (text/HTML
-   * paste with no image files always falls through to the editor unchanged).
+   * Forward files pasted or dropped onto the editor — ALL types (images and
+   * arbitrary files alike). The kit stays policy-agnostic: it only hands over the
+   * raw `File[]`; the consumer decides what counts (e.g. excludes SVG), how to
+   * encode (perceive-inline image vs scratch upload), and whether to attach. When
+   * provided AND files are present, the gesture is consumed; a text/HTML paste
+   * with no files always falls through to the editor unchanged.
    */
-  onImageFiles?: (files: File[]) => void;
+  onFiles?: (files: File[]) => void;
+  /**
+   * Forward directories dropped from the operating system. Directory entries
+   * are separated from ordinary files through `DataTransfer.items` entry
+   * metadata — never MIME/size heuristics — and the original disk-backed
+   * `File` reaches the callback unchanged. A host such as Electron can turn
+   * that trusted gesture into an opaque read scope. Clipboard paste never
+   * invokes this callback.
+   */
+  onDirectories?: (directories: File[]) => void;
 }) {
   const {
     core,
@@ -191,8 +203,10 @@ export function ComposerContent({
   const editorRef = useRef<Editor | null>(null);
   // The editor is created once; read the latest callback through a ref so a
   // re-rendered consumer's handler is always the one invoked.
-  const onImageFilesRef = useRef(onImageFiles);
-  onImageFilesRef.current = onImageFiles;
+  const onFilesRef = useRef(onFiles);
+  onFilesRef.current = onFiles;
+  const onDirectoriesRef = useRef(onDirectories);
+  onDirectoriesRef.current = onDirectories;
   const extensions = useMemo(
     () => ComposerTiptap.extensions({ placeholder }),
     [placeholder]
@@ -221,20 +235,25 @@ export function ComposerContent({
         });
       },
       handlePaste(_view, event) {
-        const handler = onImageFilesRef.current;
+        const handler = onFilesRef.current;
         if (!handler) return false;
-        const files = imageFilesFromTransfer(event.clipboardData);
+        const files = ComposerTransfer.pasteFiles(event.clipboardData);
         if (files.length === 0) return false;
         handler(files);
         return true;
       },
       handleDrop(_view, event) {
-        const handler = onImageFilesRef.current;
-        if (!handler) return false;
-        const files = imageFilesFromTransfer(event.dataTransfer);
-        if (files.length === 0) return false;
-        handler(files);
-        return true;
+        const dropped = ComposerTransfer.splitDrop(event.dataTransfer);
+        let handled = false;
+        if (dropped.files.length > 0 && onFilesRef.current) {
+          onFilesRef.current(dropped.files);
+          handled = true;
+        }
+        if (dropped.directories.length > 0 && onDirectoriesRef.current) {
+          onDirectoriesRef.current(dropped.directories);
+          handled = true;
+        }
+        return handled;
       },
     },
     onCreate({ editor }) {
@@ -299,17 +318,6 @@ export function ComposerContent({
       <EditorContent editor={editor} />
     </div>
   );
-}
-
-/** Pull `image/*` files out of a paste/drop `DataTransfer`. Both clipboard
- * pastes (screenshots) and file drops surface them on `.files`. */
-function imageFilesFromTransfer(data: DataTransfer | null): File[] {
-  if (!data) return [];
-  const out: File[] = [];
-  for (const file of Array.from(data.files ?? [])) {
-    if (file.type.startsWith("image/")) out.push(file);
-  }
-  return out;
 }
 
 function toViewSnapshot(snapshot: ComposerSnapshot): ComposerViewSnapshot {

@@ -13,6 +13,7 @@ import type {
   AgentModelId,
   AgentRunMessagePart,
   ApprovalAnswer,
+  ScratchSeedEntry,
 } from "../protocol/run";
 import {
   AGENT_DEFAULT_MODE,
@@ -27,6 +28,14 @@ import {
   type EndpointProvidersStore,
 } from "../providers/endpoints";
 import { isGgProviderId } from "../protocol/provider-ids";
+import {
+  DIRECTORY_SCOPE_MOUNT_ROOT,
+  USER_DIRECTORY_REFERENCES,
+  USER_FILE_ATTACHMENTS,
+  type DirectoryScopeDescriptor,
+  type UserDirectoryReferencesData,
+  type UserFileAttachmentsData,
+} from "../protocol/context";
 // Neutral (no node/SDK) import — just the synthetic-model-id contract.
 import { isAgentProviderModel } from "../agent-provider/types";
 
@@ -65,10 +74,17 @@ export type RunRequest = {
    * Files to seed into the session's per-session scratch dir BEFORE the model
    * turn (WG `scratch.md` / `binary.md`): an attachment lands in scratch, NOT
    * the user's workspace. Flat single-segment paths only (containment enforced
-   * at write by `writeScratchFile`). Carried on the FIRST turn — e.g. a picked
-   * slides template's unzipped `.canvas` bundle. Bounded in {@link parseRunBody}.
+   * at write by `writeScratchFile`); text or base64-binary entries. Bounded in
+   * {@link parseRunBody}. E.g. a picked slides template's `.canvas` bundle, or an
+   * uploaded PDF/zip/image the agent reads by path.
    */
-  scratch_seed?: Array<{ path: string; text: string }>;
+  scratch_seed?: Array<ScratchSeedEntry>;
+  /**
+   * Canonical directory descriptors inferred from the fired user message's
+   * fresh context part. This is NOT a duplicate run-body field: the runtime
+   * claims these ids against the host registry before persisting the turn.
+   */
+  directory_scopes?: DirectoryScopeDescriptor[];
   session_id?: string;
 };
 
@@ -103,6 +119,30 @@ export async function parseRunBody(
       {
         error:
           "messages must be an array of {role, content} or {role, parts} objects",
+      },
+      { status: 400 }
+    );
+  }
+  const scratchSeed = parseScratchSeed(b.scratch_seed);
+  if (scratchSeed.error) {
+    return Response.json(
+      { error: scratchSeed.error, code: "invalid-scratch-seed" },
+      { status: 400 }
+    );
+  }
+  const attachmentError = validateAttachmentSeeds(messages, scratchSeed.value);
+  if (attachmentError) {
+    return Response.json(
+      { error: attachmentError, code: "invalid-file-attachments" },
+      { status: 400 }
+    );
+  }
+  const directoryReferences = parseDirectoryReferences(messages);
+  if (directoryReferences.error) {
+    return Response.json(
+      {
+        error: directoryReferences.error,
+        code: "invalid-directory-references",
       },
       { status: 400 }
     );
@@ -171,6 +211,15 @@ export async function parseRunBody(
     workspaceId = b.workspace_id;
     workspaceRoot = ws.root;
   }
+  if (directoryReferences.value && modelId && isAgentProviderModel(modelId)) {
+    return Response.json(
+      {
+        error: "directory references are not supported by external agents",
+        code: "directory-references-unsupported-provider",
+      },
+      { status: 409 }
+    );
+  }
   return {
     messages,
     tier,
@@ -194,7 +243,8 @@ export async function parseRunBody(
     // 400 — and `store.answerApproval` re-validates it against the persisted
     // pending approval regardless, so a forged answer is a no-op.
     approval_answer: coerceApprovalAnswer(b.approval_answer),
-    scratch_seed: parseScratchSeed(b.scratch_seed),
+    scratch_seed: scratchSeed.value,
+    directory_scopes: directoryReferences.value,
     session_id:
       typeof b.session_id === "string" && b.session_id.length > 0
         ? b.session_id
@@ -203,36 +253,220 @@ export async function parseRunBody(
 }
 
 /**
+ * Validate and collect directory descriptors from the LAST user message only.
+ * The client resends history; old/forked reference parts are durable facts but
+ * must never be reinterpreted as fresh authority. Exact descriptor validation
+ * also prevents a raw host path or write access from being smuggled into the
+ * model-visible marker before the registry compares it to canonical facts.
+ */
+function parseDirectoryReferences(messages: NormalizedMessage[]): {
+  value?: DirectoryScopeDescriptor[];
+  error?: string;
+} {
+  const user = messages.findLast((message) => message.role === "user");
+  if (!user) return {};
+  const directories: DirectoryScopeDescriptor[] = [];
+  const ids = new Set<string>();
+  for (const part of user.parts) {
+    if (part.type !== USER_DIRECTORY_REFERENCES) continue;
+    if (!isUserDirectoryReferencesData(part.data)) {
+      return { error: `${USER_DIRECTORY_REFERENCES} has a malformed payload` };
+    }
+    for (const descriptor of part.data.directories) {
+      if (ids.has(descriptor.id)) {
+        return { error: `directory reference is duplicated: ${descriptor.id}` };
+      }
+      ids.add(descriptor.id);
+      directories.push(descriptor);
+    }
+  }
+  return { value: directories.length > 0 ? directories : undefined };
+}
+
+function isUserDirectoryReferencesData(
+  value: unknown
+): value is UserDirectoryReferencesData {
+  if (value == null || typeof value !== "object") return false;
+  const data = value as { directories?: unknown };
+  if (!Array.isArray(data.directories) || data.directories.length === 0) {
+    return false;
+  }
+  return data.directories.every((entry) => {
+    if (entry == null || typeof entry !== "object") return false;
+    const descriptor = entry as Record<string, unknown>;
+    if (
+      descriptor.kind !== "scope" ||
+      typeof descriptor.id !== "string" ||
+      !/^dir_[0-9a-f-]{36}$/i.test(descriptor.id) ||
+      typeof descriptor.name !== "string" ||
+      descriptor.name.length === 0 ||
+      descriptor.name.length > 255 ||
+      descriptor.access !== "read"
+    ) {
+      return false;
+    }
+    return descriptor.path === `${DIRECTORY_SCOPE_MOUNT_ROOT}/${descriptor.id}`;
+  });
+}
+
+/**
  * Bound + validate `scratch_seed` — client-provided files to write into the
  * session scratch before the turn (WG `scratch.md`). Caps file count and total
  * size so a client cannot balloon scratch; per-file path containment is enforced
- * at write time by `writeScratchFile` (one safe segment). Malformed entries are
- * dropped; over-cap truncates. Empty ⇒ undefined.
+ * at write time by `writeScratchFile` (one safe segment). The set is accepted
+ * or rejected as a whole: silently dropping/truncating one entry could persist
+ * an attachment descriptor whose body never landed. Empty ⇒ undefined.
  */
-function parseScratchSeed(
-  raw: unknown
-): Array<{ path: string; text: string }> | undefined {
-  if (!Array.isArray(raw)) return undefined;
+function parseScratchSeed(raw: unknown): {
+  value?: ScratchSeedEntry[];
+  error?: string;
+} {
+  if (raw === undefined) return {};
+  if (!Array.isArray(raw)) return { error: "scratch_seed must be an array" };
   const MAX_FILES = 64;
-  const MAX_TOTAL = 8 * 1024 * 1024; // ~8M chars — a deck is ~20KB; bounds abuse
-  const out: Array<{ path: string; text: string }> = [];
+  const MAX_TOTAL = 8 * 1024 * 1024; // ~8 MB total (decoded); bounds abuse
+  const out: ScratchSeedEntry[] = [];
+  const paths = new Set<string>();
   let total = 0;
   for (const e of raw) {
-    if (out.length >= MAX_FILES) break;
-    if (
-      e == null ||
-      typeof e !== "object" ||
-      typeof (e as { path?: unknown }).path !== "string" ||
-      typeof (e as { text?: unknown }).text !== "string"
-    ) {
-      continue;
+    if (out.length >= MAX_FILES) {
+      return { error: `scratch_seed exceeds ${MAX_FILES} files` };
     }
-    const entry = e as { path: string; text: string };
-    total += entry.text.length;
-    if (total > MAX_TOTAL) break;
-    out.push({ path: entry.path, text: entry.text });
+    if (e == null || typeof e !== "object") {
+      return { error: "scratch_seed contains a malformed entry" };
+    }
+    const path = (e as { path?: unknown }).path;
+    if (typeof path !== "string" || !isSafeScratchPath(path)) {
+      return { error: `scratch_seed has an unsafe path: ${String(path)}` };
+    }
+    if (paths.has(path)) {
+      return { error: `scratch_seed has a duplicate path: ${path}` };
+    }
+    const text = (e as { text?: unknown }).text;
+    const base64 = (e as { base64?: unknown }).base64;
+    if ((typeof text === "string") === (typeof base64 === "string")) {
+      return {
+        error: `scratch_seed entry ${path} must contain exactly one of text or base64`,
+      };
+    }
+    // Cost decoded bytes, not JSON/base64 code units. Text is UTF-8 on disk.
+    if (typeof text === "string") {
+      total += new TextEncoder().encode(text).byteLength;
+      if (total > MAX_TOTAL) {
+        return { error: `scratch_seed exceeds ${MAX_TOTAL} decoded bytes` };
+      }
+      out.push({ path, text });
+    } else if (typeof base64 === "string") {
+      const bytes = base64DecodedBytes(base64);
+      if (bytes === null) {
+        return { error: `scratch_seed entry ${path} has invalid base64` };
+      }
+      total += bytes;
+      if (total > MAX_TOTAL) {
+        return { error: `scratch_seed exceeds ${MAX_TOTAL} decoded bytes` };
+      }
+      out.push({ path, base64 });
+    }
+    paths.add(path);
   }
-  return out.length > 0 ? out : undefined;
+  return { value: out.length > 0 ? out : undefined };
+}
+
+/** Flat, portable path segment. Reject both POSIX and Windows separators. */
+function isSafeScratchPath(path: string): boolean {
+  return (
+    path.length > 0 &&
+    path !== "." &&
+    path !== ".." &&
+    !path.includes("/") &&
+    !path.includes("\\") &&
+    !path.includes("\0")
+  );
+}
+
+/**
+ * Bind the durable attachment facts on the fired user turn to the transient
+ * seed bodies. Resent history is intentionally ignored: old descriptor parts
+ * remain durable while their session scratch was seeded on the original turn.
+ */
+function validateAttachmentSeeds(
+  messages: NormalizedMessage[],
+  scratchSeed: ScratchSeedEntry[] | undefined
+): string | null {
+  const user = messages.findLast((message) => message.role === "user");
+  if (!user) return null;
+  const seedByPath = new Map(
+    (scratchSeed ?? []).map((seed) => [seed.path, seed])
+  );
+  const described = new Set<string>();
+  for (const part of user.parts) {
+    if (part.type !== USER_FILE_ATTACHMENTS) continue;
+    const payload = part.data;
+    if (!isUserFileAttachmentsData(payload)) {
+      return `${USER_FILE_ATTACHMENTS} has a malformed data payload`;
+    }
+    for (const file of payload.files) {
+      if (described.has(file.path)) {
+        return `attachment path is described more than once: ${file.path}`;
+      }
+      described.add(file.path);
+      const seed = seedByPath.get(file.path);
+      if (!seed)
+        return `attachment body is missing from scratch_seed: ${file.path}`;
+      const size =
+        "text" in seed
+          ? new TextEncoder().encode(seed.text).byteLength
+          : base64DecodedBytes(seed.base64);
+      if (size === null || size !== file.size) {
+        return `attachment size does not match scratch_seed: ${file.path}`;
+      }
+    }
+  }
+  return null;
+}
+
+function isUserFileAttachmentsData(
+  value: unknown
+): value is UserFileAttachmentsData {
+  if (value == null || typeof value !== "object") return false;
+  const data = value as { location?: unknown; files?: unknown };
+  if (
+    data.location !== "scratch" ||
+    !Array.isArray(data.files) ||
+    data.files.length === 0
+  ) {
+    return false;
+  }
+  return data.files.every((file) => {
+    if (file == null || typeof file !== "object") return false;
+    const f = file as Record<string, unknown>;
+    return (
+      typeof f.name === "string" &&
+      f.name.length > 0 &&
+      typeof f.mime === "string" &&
+      f.mime.length > 0 &&
+      typeof f.size === "number" &&
+      Number.isSafeInteger(f.size) &&
+      f.size >= 0 &&
+      typeof f.path === "string" &&
+      isSafeScratchPath(f.path)
+    );
+  });
+}
+
+/**
+ * Decoded byte size of a bare base64 string (≈ len·3/4 − padding). Returns
+ * `null` for a non-base64 string (bad length or illegal chars) — callers treat
+ * `null` as "reject" so a malformed payload never seeds a garbage scratch file.
+ */
+function base64DecodedBytes(b64: string): number | null {
+  if (b64.length === 0) return 0;
+  if (b64.length % 4 !== 0) return null;
+  // Node's decoder is deliberately permissive. A canonical round-trip rejects
+  // illegal alphabet, misplaced/excess padding, whitespace, and non-zero
+  // discarded bits (e.g. `AB==`) while remaining linear for multi-MB bodies.
+  const decoded = Buffer.from(b64, "base64");
+  return decoded.toString("base64") === b64 ? decoded.byteLength : null;
 }
 
 async function isRegisteredModelId(

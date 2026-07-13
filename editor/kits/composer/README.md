@@ -69,6 +69,7 @@ function ComposerBox() {
 - Mentions from a caller-provided catalog.
 - File attachments as message parts.
 - Inline file references.
+- Opaque, read-only directory references (never recursive attachments).
 - Minimal formatting: bullet lists, ordered lists, inline code, and code blocks.
 - Empty submissions are rejected by default.
 - Core accepts duplicate attachment inputs and assigns unique attachment ids; consumers can pass an attachment filter when they want deduping.
@@ -98,6 +99,19 @@ Use the provider/controller for behavior:
 - `setContexts(contexts)`
 - `submit({ submitted_at })`
 - `clear()`
+
+`ComposerContent` accepts `onFiles(files)` for paste/drop gestures that contain
+browser `File` objects. The kit forwards every file type and consumes the
+gesture; the caller decides whether a file becomes provider-native media,
+scratch-backed input, or is rejected. File pickers and Library browsing remain
+caller-owned UI.
+
+For operating-system folder drops, pass `onDirectories(directories)`. The kit
+uses `DataTransfer.items` entry metadata to separate directories from ordinary
+files (including unknown-MIME files) and forwards the original disk-backed
+`File` unchanged. It never enumerates the tree. A capable host exchanges that
+trusted handle for an opaque `directory-ref`; browsers without such a host can
+reject the gesture without copying the directory into attachment storage.
 
 Use CSS variables for the default editor skin:
 

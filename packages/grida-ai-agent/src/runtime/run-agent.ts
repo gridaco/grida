@@ -38,7 +38,10 @@ import type { ResolvedProvider } from "../providers";
 import type { WorkspaceRegistry } from "@grida/daemon/server";
 import { nodeSkillBodyLoader } from "../skills/discovery";
 import type { SkillBodyCache, SkillIndex } from "../skills/types";
-import { createWorkspaceAgentBindings } from "./workspace-agent-bindings";
+import {
+  createWorkspaceAgentBindings,
+  type DirectoryScopeBinding,
+} from "./workspace-agent-bindings";
 
 export type AgentRunRequest = {
   /**
@@ -68,6 +71,12 @@ export type AgentRunRequest = {
    * (standalone-doc path).
    */
   workspace_root?: string;
+  /**
+   * Host-authorized, session-scoped directory reads. The `root` field is
+   * server-internal and is mounted only at each descriptor's virtual `path`;
+   * it never becomes a shell cwd or writable root.
+   */
+  directory_scopes?: readonly DirectoryScopeBinding[];
   /**
    * Permission/supervision posture (RFC `permission modes`). Drives the shell
    * gate in the command backend; ignored when `workspaceRoot` is absent (no
@@ -181,7 +190,9 @@ export async function runAgent(
     library?: boolean;
   }
 ): Promise<Response> {
-  // Wire bindings only when the request carries workspace context.
+  // Wire bindings when the request carries workspace context OR host-authorized
+  // directory references. A reference-only session gets structured fs tools,
+  // but no command backend, scratch, project skills, or writable workspace.
   // The "no-bindings" mode preserves the existing SVG-editor flow
   // where the client holds the live editor and resolves tool calls
   // locally — server-side bindings there would double-execute.
