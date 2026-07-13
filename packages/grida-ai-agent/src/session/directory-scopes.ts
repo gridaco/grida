@@ -73,6 +73,7 @@ export class DirectoryScopeRegistry {
   private readonly pending = new Map<string, PendingScope>();
   private readonly claimed = new Map<string, ClaimedScope>();
   private readonly sessions = new Map<string, Set<string>>();
+  private pending_reservations = 0;
   private readonly protected_roots: readonly string[];
   private readonly pending_ttl_ms: number;
   private readonly max_pending: number;
@@ -99,72 +100,82 @@ export class DirectoryScopeRegistry {
    */
   async attach(rawPath: string): Promise<DirectoryScopeDescriptor> {
     this.pruneExpired();
-    if (this.pending.size >= this.max_pending) {
+    if (this.pending.size + this.pending_reservations >= this.max_pending) {
       throw new DirectoryScopeError(
         "directory-scope-pending-limit",
         "too many unclaimed directory references"
       );
     }
+    // Reserve synchronously, before any filesystem await, so concurrent
+    // gestures cannot all pass the bound before one commits to `pending`.
+    this.pending_reservations += 1;
 
-    let root: string;
     try {
-      root = await fs.realpath(rawPath);
-    } catch {
-      throw new DirectoryScopeError(
-        "directory-scope-invalid-path",
-        "directory path could not be resolved"
-      );
-    }
-
-    let stat: Awaited<ReturnType<typeof fs.stat>>;
-    try {
-      stat = await fs.stat(root);
-    } catch {
-      throw new DirectoryScopeError(
-        "directory-scope-invalid-path",
-        "directory path could not be inspected"
-      );
-    }
-    if (!stat.isDirectory()) {
-      throw new DirectoryScopeError(
-        "directory-scope-not-directory",
-        "selected path is not a directory"
-      );
-    }
-
-    for (const protectedPath of this.protected_roots) {
-      const protectedRoot = await fs
-        .realpath(protectedPath)
-        .catch(() => path.resolve(protectedPath));
-      // Reject BOTH directions. Selecting a protected root (or a child) is an
-      // obvious secret read; selecting an ancestor would expose the same tree
-      // through descendant traversal. This in-process check keeps the deny true
-      // even where the outer OS sandbox is unavailable.
-      if (
-        containsPath(protectedRoot, root) ||
-        containsPath(root, protectedRoot)
-      ) {
+      let root: string;
+      try {
+        root = await fs.realpath(rawPath);
+      } catch {
         throw new DirectoryScopeError(
-          "directory-scope-protected-root",
-          "selected directory overlaps a protected host directory"
+          "directory-scope-invalid-path",
+          "directory path could not be resolved"
         );
       }
-    }
 
-    const id = `dir_${crypto.randomUUID()}`;
-    const descriptor: DirectoryScopeDescriptor = {
-      kind: "scope",
-      id,
-      name: path.basename(root) || root,
-      path: `${DIRECTORY_SCOPE_MOUNT_ROOT}/${id}`,
-      access: "read",
-    };
-    this.pending.set(id, {
-      ...descriptor,
-      root,
-      expires_at: this.now() + this.pending_ttl_ms,
-    });
-    return { ...descriptor };
+      let stat: Awaited<ReturnType<typeof fs.stat>>;
+      try {
+        stat = await fs.stat(root);
+      } catch {
+        throw new DirectoryScopeError(
+          "directory-scope-invalid-path",
+          "directory path could not be inspected"
+        );
+      }
+      if (!stat.isDirectory()) {
+        throw new DirectoryScopeError(
+          "directory-scope-not-directory",
+          "selected path is not a directory"
+        );
+      }
+
+      for (const protectedPath of this.protected_roots) {
+        // Deliberately resolve on every attachment gesture. A protected path
+        // may be created or retargeted as a symlink while this registry lives;
+        // caching its first identity would make the deny stale.
+        const protectedRoot = await fs
+          .realpath(protectedPath)
+          .catch(() => path.resolve(protectedPath));
+        // Reject BOTH directions. Selecting a protected root (or a child) is an
+        // obvious secret read; selecting an ancestor would expose the same tree
+        // through descendant traversal. This in-process check keeps the deny true
+        // even where the outer OS sandbox is unavailable.
+        if (
+          containsPath(protectedRoot, root) ||
+          containsPath(root, protectedRoot)
+        ) {
+          throw new DirectoryScopeError(
+            "directory-scope-protected-root",
+            "selected directory overlaps a protected host directory"
+          );
+        }
+      }
+
+      const id = `dir_${crypto.randomUUID()}`;
+      const descriptor: DirectoryScopeDescriptor = {
+        kind: "scope",
+        id,
+        name: path.basename(root) || root,
+        path: `${DIRECTORY_SCOPE_MOUNT_ROOT}/${id}`,
+        access: "read",
+      };
+      this.pending.set(id, {
+        ...descriptor,
+        root,
+        expires_at: this.now() + this.pending_ttl_ms,
+      });
+      return { ...descriptor };
+    } finally {
+      this.pending_reservations -= 1;
+    }
   }
 
   /**

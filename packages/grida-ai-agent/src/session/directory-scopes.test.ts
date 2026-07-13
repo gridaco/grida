@@ -103,6 +103,27 @@ describe("DirectoryScopeRegistry", () => {
     }
   });
 
+  it.skipIf(process.platform === "win32")(
+    "re-resolves protected roots for every attachment gesture",
+    async () => {
+      const safe = path.join(root, "safe");
+      const protectedLink = path.join(root, "protected-link");
+      await fs.mkdir(safe);
+      const registry = new DirectoryScopeRegistry({
+        secrets_root: userData,
+        protected_roots: [protectedLink],
+      });
+
+      // The missing protected path initially falls back to its lexical path.
+      await registry.attach(safe);
+      // Its filesystem identity can change during the registry's lifetime.
+      await fs.symlink(picked, protectedLink);
+      await expect(registry.attach(picked)).rejects.toMatchObject({
+        code: "directory-scope-protected-root",
+      });
+    }
+  );
+
   it("bounds pending grants and releases expired capacity", async () => {
     let now = 1_000;
     const registry = new DirectoryScopeRegistry({
@@ -117,6 +138,33 @@ describe("DirectoryScopeRegistry", () => {
     });
 
     now += 101;
+    await expect(registry.attach(picked)).resolves.toMatchObject({
+      kind: "scope",
+    });
+  });
+
+  it("reserves pending capacity across concurrent validation and releases failures", async () => {
+    const registry = new DirectoryScopeRegistry({
+      secrets_root: userData,
+      max_pending: 1,
+    });
+
+    const first = registry.attach(picked);
+    await expect(registry.attach(picked)).rejects.toMatchObject({
+      code: "directory-scope-pending-limit",
+    });
+    registry.claim("ses_a", [await first]);
+
+    const invalid = registry.attach(path.join(root, "missing"));
+    const blocked = registry.attach(picked);
+    await Promise.all([
+      expect(invalid).rejects.toMatchObject({
+        code: "directory-scope-invalid-path",
+      }),
+      expect(blocked).rejects.toMatchObject({
+        code: "directory-scope-pending-limit",
+      }),
+    ]);
     await expect(registry.attach(picked)).resolves.toMatchObject({
       kind: "scope",
     });

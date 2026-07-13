@@ -198,27 +198,13 @@ function ComposerAttachmentCard({
 }) {
   if (attachment.kind === "directory") {
     return (
-      <div className="flex h-12 max-w-52 min-w-40 items-center gap-2 rounded-md border border-border bg-background px-2 py-1 shadow-xs">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-blue-600">
-          <FolderIcon className="size-4" />
-        </div>
-        <span className="min-w-0 flex-1">
-          <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-tight">
-            {attachment.name}
-          </span>
-          <span className="mt-0.5 block text-muted-foreground text-xs leading-tight">
-            {getAttachmentTypeLabel(attachment)}
-          </span>
-        </span>
-        <button
-          aria-label={`Remove ${attachment.name}`}
-          className="self-start -mt-0.5 -mr-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:opacity-80"
-          onClick={onRemove}
-          type="button"
-        >
-          <XIcon className="size-2.5" />
-        </button>
-      </div>
+      <AttachmentCardShell
+        icon={<FolderIcon className="size-4" />}
+        iconClassName="text-blue-600"
+        label={getAttachmentTypeLabel(attachment)}
+        name={attachment.name}
+        onRemove={onRemove}
+      />
     );
   }
 
@@ -246,20 +232,49 @@ function ComposerAttachmentCard({
   }
 
   return (
+    <AttachmentCardShell
+      icon={<ImageIcon className="size-4" />}
+      iconClassName="text-orange-600"
+      label={getAttachmentTypeLabel(attachment)}
+      name={attachment.name}
+      onRemove={onRemove}
+    />
+  );
+}
+
+function AttachmentCardShell({
+  icon,
+  iconClassName,
+  label,
+  name,
+  onRemove,
+}: {
+  icon: ReactNode;
+  iconClassName: string;
+  label: string;
+  name: string;
+  onRemove: () => void;
+}) {
+  return (
     <div className="flex h-12 max-w-52 min-w-40 items-center gap-2 rounded-md border border-border bg-background px-2 py-1 shadow-xs">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-orange-600">
-        <ImageIcon className="size-4" />
+      <div
+        className={cn(
+          "flex size-9 shrink-0 items-center justify-center rounded-md bg-muted",
+          iconClassName
+        )}
+      >
+        {icon}
       </div>
       <span className="min-w-0 flex-1">
         <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-tight">
-          {attachment.name}
+          {name}
         </span>
         <span className="mt-0.5 block text-muted-foreground text-xs leading-tight">
-          {getAttachmentTypeLabel(attachment)}
+          {label}
         </span>
       </span>
       <button
-        aria-label={`Remove ${attachment.name}`}
+        aria-label={`Remove ${name}`}
         className="self-start -mt-0.5 -mr-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:opacity-80"
         onClick={onRemove}
         type="button"
