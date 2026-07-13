@@ -328,6 +328,47 @@ type GridaProviderOptions = {
   awaitIngest?: boolean;
 };
 
+/**
+ * The call-site (producer) contract for a billed seam call.
+ *
+ * `providerOptions` in the AI SDK is an OPEN `Record<string, Record<string,
+ * JSONValue>>`, so a hand-written `{ grida: {...} }` literal type-checks with
+ * ANY keys — which is exactly how a snake_cased `organization_id` shipped past
+ * `tsc` and failed only at runtime in {@link extractContext}. This is the typed
+ * producer contract: `organizationId` and `feature` — the two fields the
+ * middleware requires — are MANDATORY, so a missing or misspelled key is a
+ * compile error at the call site, not a runtime `MissingOrgIdError`.
+ *
+ * Deliberately stricter than the internal (read-side) {@link GridaProviderOptions},
+ * which stays all-optional because the middleware reads it defensively. Strict
+ * in what we produce, lenient in what we accept.
+ *
+ * Always build the payload with {@link gridaProviderOptions}; never hand-write
+ * the `grida` provider-options object.
+ */
+export type GridaCallProviderOptions = {
+  organizationId: number;
+  feature: string;
+  transactionId?: string;
+  costMills?: number;
+  awaitIngest?: boolean;
+};
+
+/**
+ * Build the `{ grida }` provider-options payload the billing middleware reads.
+ *
+ * Use at EVERY billed call site instead of a bare `{ grida: {...} }` literal:
+ * the typed parameter turns a misspelled/snake_cased/omitted `organizationId`
+ * into a compile error. Generic in the argument so the returned literal keeps
+ * its exact shape (no phantom optional `| undefined`) and stays assignable to
+ * the AI SDK `providerOptions` slot.
+ */
+export function gridaProviderOptions<T extends GridaCallProviderOptions>(
+  options: T
+): { grida: T } {
+  return { grida: options };
+}
+
 type ExtractedContext = GridaCallContext & { costMills?: number };
 
 function readGridaOptions(

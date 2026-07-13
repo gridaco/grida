@@ -12,7 +12,11 @@ import {
 } from "ai";
 import { createStreamableValue } from "@ai-sdk/rsc";
 import { request_schema, type StreamingResponse } from "./schema";
-import { grida, model as tieredModel } from "@/lib/ai/server";
+import {
+  grida,
+  model as tieredModel,
+  gridaProviderOptions,
+} from "@/lib/ai/server";
 import assert from "assert";
 
 export type UserAttachment = {
@@ -106,9 +110,10 @@ export async function generate({
   (async () => {
     const { partialOutputStream } = streamText({
       model,
-      providerOptions: {
-        grida: { organizationId, feature: "canvas/generate" },
-      },
+      providerOptions: gridaProviderOptions({
+        organizationId,
+        feature: "canvas/generate",
+      }),
       ...model_config,
       system,
       ...(message

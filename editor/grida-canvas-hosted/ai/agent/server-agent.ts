@@ -6,7 +6,7 @@ import {
 } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { canvas_use } from "../tools/canvas-use";
-import { model } from "@/lib/ai/server";
+import { model, gridaProviderOptions } from "@/lib/ai/server";
 
 const tools = {
   [canvas_use.tools_spec.name_platform_sys_tool_ai_fetch_preflight]:
@@ -78,10 +78,10 @@ export const canvasDesignAgent = new ToolLoopAgent<
     ...settings,
     providerOptions: {
       ...settings.providerOptions,
-      grida: {
-        organization_id: options.organization_id,
+      ...gridaProviderOptions({
+        organizationId: options.organization_id,
         feature: options.feature ?? "canvas/agent/chat",
-      },
+      }),
       openai: {
         ...settings.providerOptions?.openai,
         reasoningEffort: "medium",

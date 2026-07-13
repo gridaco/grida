@@ -13,7 +13,12 @@
 import { generateObject } from "ai";
 import { z } from "zod/v3";
 import { supported_field_types } from "@/k/supported_field_types";
-import { model, withAiAuth, type ActionResult } from "@/lib/ai/server";
+import {
+  model,
+  withAiAuth,
+  gridaProviderOptions,
+  type ActionResult,
+} from "@/lib/ai/server";
 import type { FormInputType } from "@/grida-forms-hosted/types";
 
 /**
@@ -82,9 +87,10 @@ export async function generateFormFieldSchema(
     async (organizationId) => {
       const { object } = await generateObject({
         model: model("nano"),
-        providerOptions: {
-          grida: { organizationId, feature: "forms/schema/generate" },
-        },
+        providerOptions: gridaProviderOptions({
+          organizationId,
+          feature: "forms/schema/generate",
+        }),
         schema: formFieldSchema,
         system:
           "Generate a form field definition based on the user's description. " +
