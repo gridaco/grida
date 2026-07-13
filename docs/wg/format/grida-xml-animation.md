@@ -24,6 +24,14 @@ format: md
 **Status:** Open RFD — question framing only. No syntax, timing model, or
 runtime behavior in this document is adopted.
 
+Two prerequisites are now decided outside this animation RFD. [Grida XML
+durable addressing](./grida-xml-addressing) defines Version 4 authored
+owner/member IDs, component occurrence paths, typed property targets, compiled
+runtime handles, and an immutable sparse effective-value boundary. The
+underlying property registry remains distinct from the future **animatable**
+subset. These decisions remove identity and document-mutation as blockers; they
+do not choose animation syntax or behavior.
+
 ## The question
 
 Should declarative animation be part of the first stable Grida XML language,
@@ -54,18 +62,19 @@ static scene language does not accidentally choose among them by omission.
 Animation is not only “values changing over time.” It affects several
 foundational contracts:
 
-- whether a property has one value or distinct authored and sampled values;
+- how animation populates the accepted authored and effective-value tiers;
 - whether animation is nested with its target or stored in a separate
   timeline graph;
-- whether nodes need durable target identity;
+- how the accepted structured node target is spelled, owned, and copied;
 - whether layout observes animated geometry;
 - how multiple animations combine on one property;
 - what a static renderer, thumbnailer, exporter, or agent sees;
 - whether time- and event-dependent source remains deterministic and safe.
 
-Adding those distinctions after a stable static format may require a second
-property model, a second identity scheme, or a second canonical source shape.
-Raising them now does not require implementing all of animation now.
+The durable-addressing RFD has closed the property-tier and node-identity
+questions. Deferring the remaining distinctions could still require a second
+canonical source shape. Raising them now does not require implementing all of
+animation now.
 
 ## What SVG contributes to the question
 
@@ -157,7 +166,7 @@ tradeoffs:
 | ------------------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
 | Animation child of target | Local, readable, SVG-like                   | How are animation property children distinguished from render children?     |
 | Structured keyframes      | One grammar for arbitrary ramps             | Is it unnecessarily verbose for the common two-value case?                  |
-| Separate timeline graph   | Central sequencing and cross-target editing | What durable target identity does `target` use?                             |
+| Separate timeline graph   | Central sequencing and cross-target editing | How does `target` spell the accepted structured node address?               |
 | Named reusable animation  | Reuse across nodes or instances             | Are overrides and instance-local time worth a definition system on day one? |
 
 The RFD should not select a spelling until the value, timing, targeting, and
@@ -168,20 +177,20 @@ rather than resolve those model decisions.
 
 ### 1. Base value and sampled value
 
-- Does every animatable property have an authored base value and a separate
-  sampled value?
+- Does an active animation always produce an entry in the accepted effective
+  value map, even when that entry equals the authored base?
 - Is sampling a pure function of `(document, environment, time)`, or may prior
   playback state affect the result?
-- When no animation contributes, does the sampled value equal the base value
-  exactly?
+- When an animation ceases contributing, when is its effective entry removed,
+  and may fill behavior keep the last contribution?
 - When an editor changes a property during playback, is it editing the base,
   the selected keyframe, an animation-relative offset, or a new override?
 - Can a canonical writer ever serialize a sampled frame, or only authored
   animation intent?
 - What does inspection show: base, sampled, both, or an explicit mode?
 
-The SVG base/current split suggests that conflating the two is unsafe. It does
-not decide what Grida's public vocabulary should be.
+Grida has accepted the same safe separation in its static/effective boundary.
+Animation still needs to define contribution lifetime and public vocabulary.
 
 ### 2. Timeline ownership
 
@@ -270,15 +279,19 @@ bedrock question, even if day-one syntax permits only replacement.
 - Is an animation always nested under and implicitly targets its parent?
 - Can it target another node, paint, gradient stop, text run, component
   parameter, or effect?
-- If cross-targeting exists, what stable authored identity names the target?
-- Are property paths textual names, typed child selectors, or durable schema
-  identifiers?
+- Cross-targeted nodes now have the structured Version 4 address from the
+  [durable-addressing RFD](./grida-xml-addressing); what source spelling should
+  carry that address remains open.
+- Node properties now use typed registry keys rather than reflective runtime
+  field paths. Durable addressing for paint, stop, text-run, and other
+  subobjects remains deferred.
 - What happens when the target is deleted, renamed, moved, or instantiated
   through a component?
 - Does copying a subtree copy, retarget, share, or detach its animations?
 
-Avoiding external targeting initially reduces the identity burden, but may
-make synchronization and timeline editing awkward. The tradeoff remains open.
+Avoiding external targeting initially may still simplify source syntax, but it
+is no longer required to compensate for missing node identity. The source and
+copying tradeoffs remain open.
 
 ### 9. Transform and motion-path specialization
 
@@ -411,11 +424,12 @@ smallest scope that preserves the invariants Grida cannot afford to retrofit.
 A normative animation proposal should not begin until it can answer, with
 examples and counterexamples:
 
-1. What are the base-value and sampled-value tiers?
+1. How does animation populate the already-separated base and effective-value
+   tiers?
 2. What timeline and deterministic-seeking model is canonical?
 3. What is the day-one animatable property registry?
 4. How do effects on the same property compose?
-5. How are targets identified and copied?
+5. How does animation spell, own, and copy the accepted structured targets?
 6. Which animation constructs can affect layout, resources, or trust?
 7. What does every static consumer render?
 8. Which syntax is canonical, and why is it easier to author and diagnose than

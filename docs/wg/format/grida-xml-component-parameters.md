@@ -37,7 +37,8 @@ reuse](./grida-xml-modules) owns source units, boxed component definitions,
 `use`, linking, materialization, and component provenance. This RFD specifies
 only the parameterization delta. [Grida XML component
 slots](./grida-xml-component-slots) separately owns the Version 3 named render
-projection delta.
+projection delta. [Grida XML durable addressing](./grida-xml-addressing) owns
+the later Version 4 member/use identity delta.
 
 ## Decision summary
 
@@ -725,6 +726,10 @@ This RFD adds no durable source-node, use-occurrence, or descendant identity.
 Prop provenance uses the source and use boundaries already required by the
 module contract; it does not pretend a runtime node handle is durable authored
 identity.
+
+Version 4 subsequently adds explicit render-member and use IDs through the
+[durable-addressing RFD](./grida-xml-addressing). It does not reinterpret a
+Version 2 binding, source span, or materialized occurrence as identity.
 
 ## Cycles and processing limits
 

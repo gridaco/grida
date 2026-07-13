@@ -454,6 +454,19 @@ exceptional construct (a `TransformGroup`-like node) instead?
 what is an animatable channel, where do evaluated animation values live
 relative to stored values, and does animated geometry re-enter layout?
 
+**Foundation decided (2026-07-13).** Durable source occurrences compile to
+arena-scoped generational node keys plus one key from a closed typed property
+registry. Immutable sparse `PropertyValues` form a separate evaluated tier,
+and the same `ValueView` enters measurement/layout before transform, bounds, and
+drawlist. Resolution snapshots the exact traversal and effective clip state for
+resolved-only query; raster execution checks the frame's captured resource
+environment. Empty values are exactly the static scene; evaluation never writes
+back. Resolved state, the ordered drawlist, and the resource-environment identity
+form one frame product for complete damage and cache comparison. This
+deliberately does **not** decide the animatable subset, interpolation,
+composition, timing, or whether a future post-layout transform lane joins the
+registry.
+
 **Why it's hard.**
 
 - Interpolation is only well-defined over decomposed values; animating a

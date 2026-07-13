@@ -111,8 +111,11 @@ node-data-layout.md`'s "ComputedStyle is reference-counted" is now stale — it
    memory-scaling win). Pairs with a `RareData` cold/hot split on `Header`.
 3. **Wide-gamut color** — `Color` → `f32×4` + a color-space tag, folded into the
    color-management day-1 gap (the audit's item).
-4. **Damage paint channel** — `damage::diff` is geometry-only; a fill/opacity
-   channel is a prerequisite for Win 2 consuming it (already flagged).
+4. **Consume complete damage** — `damage::diff_frame` now compares immutable
+   frame products containing resolved, drawlist, and paint-environment state,
+   including resource revisions under stable logical IDs. Win 2 still needs
+   to consume that complete damage for scoped repaint; the reference channel
+   itself is **[ADOPTED]**.
 
 ## References
 

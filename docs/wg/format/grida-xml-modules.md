@@ -37,9 +37,15 @@ projection is proposed separately as a Version 3 delta in [Grida XML component
 slots](./grida-xml-component-slots). Deep overrides require still-later design.
 None of that later syntax is silently extensible Version 1 syntax.
 
+[Grida XML durable addressing](./grida-xml-addressing) accepts the next exact
+delta: Version 4 requires IDs on render members and uses and turns the retained
+use chain into a durable occurrence path. It leaves this Version 1 grammar and
+its span-based diagnostic provenance unchanged.
+
 **Companion specifications:** [Grida XML](./grida-xml), [Grida XML component
-parameters](./grida-xml-component-parameters), and [Grida XML component
-slots](./grida-xml-component-slots).
+parameters](./grida-xml-component-parameters), [Grida XML component
+slots](./grida-xml-component-slots), and [Grida XML durable
+addressing](./grida-xml-addressing).
 
 ## Decision summary
 
@@ -161,6 +167,10 @@ parameters](./grida-xml-component-parameters). That proposal does not alter
 this Version 1 boundary. The [component-slot
 RFD](./grida-xml-component-slots) separately proposes exact Version 3 named
 direct projection. It likewise does not alter Version 1.
+
+The [durable-addressing RFD](./grida-xml-addressing) separately defines exact
+Version 4 owner/member identity and use-occurrence paths. Version 1 provenance
+remains diagnostic and does not become a generated durable identity.
 
 ## Vocabulary
 
@@ -470,7 +480,10 @@ resolution. Every materialized node remains attributable to:
 - the ordered use chain through which it entered the entry scene.
 
 That provenance is diagnostic and source-preservation data. It is not an
-authored transform, layout property, or globally stable node identifier.
+authored transform, layout property, or globally stable node identifier in
+Versions 1 through 3. Version 4 adds explicit IDs and derives its durable
+address from those authored facts rather than promoting spans or traversal
+positions.
 
 ### Validation closures
 

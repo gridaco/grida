@@ -22,6 +22,7 @@ Tracking docs for the Grida IR schema and how external formats map into it.
 | [Grida XML modules](./grida-xml-modules)                           | Open linking/component RFD with a proving implementation     |
 | [Grida XML component parameters](./grida-xml-component-parameters) | Open typed prop/arg RFD with a proving implementation        |
 | [Grida XML component slots](./grida-xml-component-slots)           | Open named slot projection RFD with a proving implementation |
+| [Grida XML durable addressing](./grida-xml-addressing)             | Version 4 node/use identity and typed effective-value RFD    |
 | [Grida XML animation](./grida-xml-animation)                       | Open day-one animation question set for `.grida.xml`         |
 
 ## Import mappings

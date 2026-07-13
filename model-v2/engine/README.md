@@ -1,10 +1,11 @@
 # anchor-engine — the phase-4 canvas engine skeleton
 
-The pipeline the `crates/grida` migration will read: `document → resolve →
-drawlist → paint`, plus the read tier (`query`), time-as-data
-(`journal`/`replay`), and the sockets every future optimization plugs into
-(`damage`, `ident`, `oracle`). It consumes [`anchor-lab`](../a/lab) as a
-library — the same relationship the migration will have with the model crate.
+The pipeline the `crates/grida` migration will read: `(document + immutable
+effective values) → resolve → drawlist → paint`, plus the read tier
+(`query`), time-as-data (`journal`/`replay`), and the sockets every future
+optimization plugs into (`damage`, `ident`, `oracle`). It consumes
+[`anchor-lab`](../a/lab) as a library — the same relationship the migration
+will have with the model crate.
 The contracts it encodes are catalogued in [`../a/ENGINE.md`](../a/ENGINE.md)
 (ENG-0…ENG-5, S-1…S-7); each module names the contract it serves.
 
@@ -24,23 +25,34 @@ cd model-v2/engine && cargo test
 # the trace arm must keep compiling
 cargo check --features trace
 
-# the legacy re-host gate: replay determinism, differential/cache checks,
-# benchmark budgets, and the pre-Draft-0 screenshot oracle
-# (needs the spike built first — it owns the legacy golden pixels)
+# the re-host gate: replay determinism, differential/cache checks,
+# benchmark budgets, and the deterministic screenshot oracle
+# (needs the spike built first — it owns the golden pixels)
 (cd ../a/spike-canvas && cargo build --release)
 cargo run --release --bin gate
+
+# visual proof of the pre-animation effective-value seam
+cargo run --bin effective_values_demo -- target/grida-effective-values-demo.png
 ```
 
 ## Versioned `.grida.xml` ingestion
 
 There is deliberately no XML-specific engine API. Draft 0 still has the
 model crate's pure `anchor_lab::grida_xml::parse(&str)` boundary. The retained
-source-program boundary additionally parses and links Version 1/2/3 source
-units, specializes Version 2/3 scalar props, projects Version 3 named render
-slots, and materializes the same ordinary `Document` used everywhere else. A
-host supplies immutable source snapshots, then passes only that concrete
+source-program boundary additionally parses and links Version 1–4 source
+units, specializes Version 2–4 scalar props, projects Version 3/4 named render
+slots, retains Version 4 durable occurrence addresses, and materializes the
+same ordinary `Document` used everywhere else. A host supplies immutable
+source snapshots, then passes only that concrete
 document to `frame::render`. The engine library performs no filesystem I/O and
 never reparses a document in the frame loop.
+
+The canonical frame seam assumes that a document reached it through source
+parsing or the model's shared renderability validation. Its gradient and image
+preflights deliberately close later facts—resolved paint boxes, pinned-backend
+arithmetic and shader construction, loaded resources, and the final view—but
+are not an exhaustive validator for arbitrary hand-built invalid stroke,
+corner, path, or image-model state.
 
 The local-file host resolves component dependencies from each containing
 source's canonical base, retains node/use/specialization/slot-projection
@@ -110,9 +122,9 @@ complete. Current limits are:
 - derived group/lens flex-slot growth still needs an explicit
   slot-versus-geometry model rule;
 - image-paint free transforms, tiling, filters, and quarter-turns are outside
-  Draft 0 XML; default/fallback/required slot policies, durable
-  instance/member identity, full-library validation, and canonical multi-file
-  writing remain future work;
+  Draft 0 XML; default/fallback/required slot policies, durable nested
+  paint/stroke/stop/run identity, full-library validation, and canonical
+  multi-file writing remain future work;
 - the production smooth-corner construction is circular-only; Draft 0 rejects
   smoothed elliptical radii rather than silently changing their authored
   geometry, and defines production's per-corner half-short-side cap separately
@@ -123,15 +135,21 @@ complete. Current limits are:
   dropping authored intent;
 - `PaintCtx` is the host resource environment for text resolution and image
   paint. The low-level infallible painter emits no pixels for an unregistered
-  image RID. A host claiming strict materialization must preflight resources;
-  `grida_xml_render` does so and reports authored plus resolved locations;
+  image RID. Checked frame execution instead rejects missing or unsupported
+  image paints and view-dependent noninvertible image sampling matrices before
+  touching the destination canvas; a singular geometry transform remains valid
+  collapsed coverage. A host claiming strict materialization must also
+  preflight filesystem/decode resources; `grida_xml_render` does so and reports
+  authored plus resolved locations. Its
+  opaque checked `PaintEnvironmentKey` lets damage and cache observe readiness,
+  font changes, and same-RID byte replacement;
 - the lab's ordered `Vec<Stroke>` implements the accepted extension, while the
   production scene/archive model still has one stroke geometry per node.
 - production scene/archive path contracts still expose incompatible raw and
   canonical box-mapped forms, do not uniformly preserve fill rule, and do not
   yet round-trip this Draft 0 path contract.
 
-Checked-in Draft 0 files use the canonical grammar; Version 1–3 fixtures use
+Checked-in Draft 0 files use the canonical grammar; Version 1–4 fixtures use
 the selected proving grammar of their open RFDs. The minimal consumer fixture
 and pixel probes live at `rig/fixtures/nested-rects.grida.xml` and
 `tests/grida_xml.rs`. `rig/examples/dynamic-slide.grida.xml` demonstrates flex,
@@ -162,6 +180,10 @@ component-blind pixel output.
 library are the focused named-slot oracle: definition-owned header/footer
 order, caller-owned projected roots, one empty projection, ordinary-scene
 lowering, and component-blind interior pixel probes.
+`rig/fixtures/durable-addressing.grida.xml` is the Version 4 identity oracle:
+every authored ordinary node has one owner/member/use-occurrence address, and
+the engine integration compiles one occurrence to an arena-scoped typed
+property target before evaluating it through the ordinary frame pipeline.
 `rig/examples/social-feed/entry.grida.xml` and `post-card.grida.xml` form the
 real-world Version 3 showcase: one viewport-spanning, breakpoint-free scene
 uses center/end/span bindings for its rail, stories, timeline, suggestions,
@@ -255,8 +277,12 @@ How the engine _stores_ its data — each memory/data-layout detail decided
 against verified browser prior art (`cc`/Blink/Stylo/Skia), validity-tagged
 ALIGNED / ADOPTED / SOCKET — is [`DATA-MODEL.md`](./DATA-MODEL.md).
 
-How explicit sample time and animated values could enter this pipeline without
-mutating authored state is the open engine RFD: [`ANIMATION.md`](./ANIMATION.md).
+How a future sampler could produce the existing `PropertyValues` contract at
+an explicit time without mutating authored state is the open engine RFD:
+[`ANIMATION.md`](./ANIMATION.md).
+
+The implemented, strictly pre-animation identity/value/frame/query/damage/cache
+contract is [`EFFECTIVE-VALUES.md`](./EFFECTIVE-VALUES.md).
 
 ## Contract → module → guarding test
 
@@ -264,42 +290,46 @@ mutating authored state is the open engine RFD: [`ANIMATION.md`](./ANIMATION.md)
 | ------------------------------------ | ---------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | stage purity + the oracle law        | (whole pipeline) | ENG-0         | the gate's differential + determinism runs                                                                                                                                                                                                    |
 | versioned source consumer seam       | link → frame     | ENG-0 / S-2   | `tests/grida_xml.rs`, `tests/grida_xml_source.rs`, `tests/grida_xml_slots.rs`, `tests/grida_xml_social_feed.rs`, `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs`, `tests/paths.rs` |
+| effective property values            | model → frame    | ENG-0/2/3     | `tests/values.rs` (empty equivalence · layout/transform · paint · bounds · visibility · query · pixels)                                                                                                                                       |
 | drawlist (pure, diffable projection) | `drawlist.rs`    | ENG-2.1       | `tests/drawlist.rs` (order · pruning · color · verbatim world · determinism)                                                                                                                                                                  |
 | text shaping + shared glyph layout   | `text_layout.rs` | ENG-4.1/4.5   | `../a/lab/tests/text_layout.rs`, `tests/text.rs`                                                                                                                                                                                              |
 | raster executor                      | `paint.rs`       | ENG-2.1       | `tests/paints.rs`, `tests/strokes.rs`, `tests/rectangular_strokes.rs`, `tests/text.rs`, `tests/corners.rs`, `tests/paths.rs` (pixel probes)                                                                                                   |
-| one frame entry                      | `frame.rs`       | ENG-2.4       | spike live loop + gate                                                                                                                                                                                                                        |
-| damage as data                       | `damage.rs`      | ENG-2.2       | `tests/damage.rs` (identity empty · single-op locality)                                                                                                                                                                                       |
-| spatial read tier                    | `query.rs`       | ENG-3         | `tests/query.rs` (`hit_point ≡ pick` over a grid)                                                                                                                                                                                             |
+| one frame entry                      | `frame.rs`       | ENG-2.4       | `tests/frame.rs` (checked paint environment) · spike live loop · gate                                                                                                                                                                         |
+| damage as data                       | `damage.rs`      | ENG-2.2       | `tests/damage.rs`, `tests/values.rs`, `tests/cache.rs` (geometry · paint-only · opacity · painter order · environment · covering bounds)                                                                                                      |
+| spatial read tier                    | `query.rs`       | ENG-3         | `tests/query.rs` (`hit_point ≡ pick` · retained traversal/clip snapshot)                                                                                                                                                                      |
 | journal (op-log)                     | `journal.rs`     | ENG-5.1       | `tests/journal.rs`                                                                                                                                                                                                                            |
 | replay (corpus, determinism)         | `replay.rs`      | ENG-5.2/5.3   | `tests/replay.rs` + `rig/corpus/*.replay` via the gate                                                                                                                                                                                        |
-| cache identity                       | `ident.rs`       | ENG-2.3/1.4   | `tests/ident.rs` (generation-stamped key)                                                                                                                                                                                                     |
+| cache identity                       | `ident.rs`       | ENG-2.3/1.4   | `tests/ident.rs`, `tests/cache.rs` (arena + slot + generation · exact values · paint environment · document replacement)                                                                                                                      |
 | oracle version tags                  | `oracle.rs`      | ENG-4.2       | the `.replay` header                                                                                                                                                                                                                          |
 | gated observability                  | `trace.rs`       | S-6           | `cargo check --features trace`                                                                                                                                                                                                                |
 | the rig                              | `bin/gate.rs`    | ENG-0.2 / S-5 | it _is_ the gate                                                                                                                                                                                                                              |
 
 The model-crate side of the setup lives in [`../a/lab`](../a/lab): the typed
-`Op` + `apply` dispatcher + `DirtyClass` (`ops.rs`), the per-slot `generations`
-column (`model.rs`), the non-panicking `Resolved` opt accessors (`resolve.rs`),
-and the optional `serde` feature (the op-log wire) — each additive, with the
-full lab suite green throughout.
+`Op` + `apply` dispatcher + `DirtyClass` (`ops.rs`), the arena-scoped per-slot
+generation identity (`model.rs`), the closed property registry and immutable
+`ValueView` (`properties.rs`), the non-panicking `Resolved` opt accessors
+(`resolve.rs`), and the optional `serde` feature (the op-log wire) — each
+additive, with the full lab suite green throughout.
 
 ## The re-host, concretely
 
-The spike's scene painter is deleted; it calls `frame::resolve_and_build` +
-`paint::execute`. The lower-level `drawlist::build_glyphless` entry is reserved
-for deterministic lab and structural probes. Live pick, hover, handles, and
-gestures resolve through the same host-font oracle as paint; spatial queries go
-through `query`. All gesture ops go through `apply` and are recorded in the
-`journal` (undo stays document snapshots — ENG-5.5). `--record` writes
-`.replay` corpus files; the panel shows the per-frame damage count.
+The spike's scene painter is deleted; it calls `frame::resolve_and_build` then
+checked `FrameProduct::execute`. The lower-level `drawlist::build_glyphless_unchecked`,
+`paint::execute_unchecked`, and `paint::raster_to_bytes_unchecked` entries are
+reserved for deterministic structural probes and internal retained-list replay.
+Live pick, hover, handles, and gestures read the frame's resolved traversal and
+effective clip snapshot; spatial queries cannot accept a second document or
+value view. All gesture ops go through `apply` and are recorded in the `journal`
+(undo stays document snapshots — ENG-5.5). `--record` writes `.replay` corpus
+files; the panel shows the per-frame damage count.
 
-The gate's replay, differential/cache, and benchmark sections remain green.
-Its four legacy screenshots currently report deliberate semantic deltas:
-frames no longer receive invented ink, authored parent strokes paint after
-children, and host-font text now uses shaped metrics and positioned-glyph
-replay. Those pre-change goldens have not been blessed or silently rewritten;
-they need an explicit oracle rebaseline after the new painter and text oracle
-are accepted for the spike corpus.
+The screenshot oracle was explicitly rebaselined after accepting three
+historical semantic corrections: frames no longer receive invented ink,
+authored parent strokes paint after children, and text uses shaped metrics and
+positioned-glyph replay. The shot paint context now loads the repository's
+bundled Inter face, so its four goldens are deterministic across host font
+configurations. Replay, differential/cache, screenshot, and benchmark gates
+are green together.
 
 ## Scope fence (named, not silent)
 

@@ -31,9 +31,17 @@ Map:
 - `src/ops.rs` — gesture ops with typed errors + write-count doctrine
 - `src/textir.rs` — the agent text IR parser + canonical printer (E3)
 - `src/grida_xml.rs` — strict Draft 0 `.grida.xml` parser/writer boundary
-- `src/grida_xml_source.rs` — pure retained Version 1/2/3 source-program
-  linker, typed scalar specializer, named static slot projector, and
-  ordinary-scene materializer; hosts supply immutable dependency snapshots
+- `src/grida_xml_source.rs` — pure retained Version 1/2/3/4 source-program
+  linker, typed scalar specializer, named static slot projector, durable
+  authored-address index, and ordinary-scene materializer; hosts supply
+  immutable dependency snapshots
+- `src/properties.rs` — closed node-property registry, immutable sorted value
+  sets, and the validated `ValueView` consumed by resolution and the engine;
+  picking reads only the effective traversal and clips captured in `Resolved`
+- `src/renderability.rs` — shared whole-state geometry, paint, corner, and
+  stroke capability validation for source and effective values
+- `src/rounded_box.rs` — normalized ordinary and smooth-corner geometry shared
+  by query containment and engine paths
 - `src/svgout.rs` — SVG snapshots of resolved documents
 - `src/math.rs` / `src/measure.rs` — affine + deterministic text metric
 - `tests/` — the conformance-derived suites; `tests/common/mod.rs` helpers
@@ -107,7 +115,7 @@ mapped once into the final box; that resolved command artifact supplies bounds
 and rendering without reparsing or independently rescaling geometry.
 Filesystem I/O, resources, and rasterization remain host concerns.
 
-## Retained Version 1/2/3 source programs
+## Retained Version 1/2/3/4 source programs
 
 `grida_xml_source` is a separate source-level boundary above Draft 0. It
 retains immutable source snapshots, resolves Version 1 `component`/`use`
@@ -133,6 +141,29 @@ accepted only by Version 3 targets. Version 1/2 callers cannot link Version 3
 definitions. These compatibility checks happen at the source-program boundary
 without reinterpreting an older source grammar.
 
+Version 4 callers may link and render-assign only Version 4 component sources;
+Version 1–3 callers still cannot link Version 4 definitions. This intentional
+compatibility break gives every valid Version 4 materialization a complete
+durable-identity closure: every ordinary node except the implicit document
+root has exactly one `MaterializedNodeAddress`. Versions 1–3 retain their
+existing compatibility matrix unchanged.
+
+Version 4 retains the Version 3 grammar and adds durable authored identity.
+Every render element and `<use>` has a lowercase-kebab `id`; a component's
+existing export `id` continues to identify the component, while its render
+root has the structural `ComponentRoot` member identity. Render-member and
+use-occurrence ids share one namespace within each lexical scene/component
+owner. Versions 0–3 do not accept or generate these ids.
+
+A `MaterializedNodeAddress` is a typed authored member plus an outer-to-inner
+path of typed authored use occurrences. It contains no source span, element
+position, name, or arena slot. `MaterializedProgram` indexes both directions
+between that address and a live `NodeKey`; duplicate addresses fail
+materialization, and deletion makes the retained address fail closed as
+stale. `addresses()` enumerates only generation-valid live pairs after public
+document mutation; direct lookup of a retained removed address still reports
+`StaleAddress`. Older-version nodes have no durable address.
+
 This does not broaden `grida_xml::parse`, change `grida_xml::VERSION`, add
 component variants to the node model, or make materialized copies canonical
 source. Draft 0 passed through this higher source-program boundary receives
@@ -150,6 +181,73 @@ therefore makes no canonical-writing claim. Draft 0 parse errors are currently
 string-only, so a specialization failure retains the complete candidate
 binding set for its failing specialization or projected subtree rather than a
 minimal causal subset.
+
+## Node property values
+
+`NodeKey` is `(arena, slot, generation)` with opaque fields and
+`Document`-only minting/validation. Independently built documents have
+different arena identities. `Document::clone` deliberately mints a new arena
+identity too: semantic equality remains true, but values must be rebound to
+the clone before use. Tombstoning increments generations with checked
+arithmetic before removal.
+
+`PropertyValues::new(&Document, entries)` produces an immutable `BTreeMap`
+projection with sorted unique `PropertyTarget { node: NodeKey, property }`
+keys. Construction and `ValueView::new` reject duplicate or stale targets,
+wrong value variants, inapplicable keys, non-finite numbers, invalid ranges,
+invalid nested paint/stroke domains, and invalid whole-node effective geometry,
+corner, stroke, and paint combinations. The model-owned `renderability`
+module is the shared capability fence for source writing and effective values.
+Map absence reads authored base.
+`OptionalNumber(None)` and `OptionalAspectRatio(None)` explicitly clear a
+registered nullable value and therefore remain distinct from map absence.
+
+`ValueView::base(&Document)` is the empty projection. `resolve_view` reads the
+validated view; the existing `resolve` and `resolve_with_text_layout` functions
+are exact thin wrappers over `ValueView::base`. Resolution also snapshots child
+order, transparent-select behavior, and effective descendant-clip geometry in
+`Resolved`. `pick(&Resolved, ...)` therefore has no document or value-view input
+that can be paired with the wrong evaluation. The view's closed typed accessors
+are public for renderer consumers; the arbitrary key-to-variant matcher remains
+internal to the facade.
+
+Impact legend: M = measure, L = layout, T = transform, B = bounds, P = paint,
+R = resource. Sets are conservative.
+
+| keys                     | `PropertyValue` variant | applicability                          | impact      |
+| ------------------------ | ----------------------- | -------------------------------------- | ----------- |
+| `X`, `Y`                 | `AxisBinding`           | every node                             | M/L/T/B/P   |
+| `Width`                  | `SizeIntent`            | frame, rect, ellipse, line, path, text | M/L/T/B/P   |
+| `Height`                 | `SizeIntent`            | frame, rect, ellipse, path, text       | M/L/T/B/P   |
+| `MinWidth`, `MaxWidth`   | `OptionalNumber`        | frame, rect, ellipse, line, path, text | M/L/T/B/P   |
+| `MinHeight`, `MaxHeight` | `OptionalNumber`        | frame, rect, ellipse, path, text       | M/L/T/B/P   |
+| `AspectRatio`            | `OptionalAspectRatio`   | rect, ellipse, path                    | M/L/T/B/P   |
+| `Active`                 | `Boolean`               | every node                             | M/L/T/B/P/R |
+| `Rotation`               | `Number`                | every node                             | M/L/T/B/P   |
+| `FlipX`, `FlipY`         | `Boolean`               | every node                             | M/L/T/B/P   |
+| `Flow`                   | `Flow`                  | every node                             | M/L/T/B/P   |
+| `Grow`                   | `Number`                | every node                             | M/L/T/B/P   |
+| `SelfAlign`              | `SelfAlign`             | every node                             | M/L/T/B/P   |
+| `Opacity`                | `Number`                | every node                             | P           |
+| `Layout`                 | `Layout`                | frame                                  | M/L/T/B/P   |
+| `ClipsContent`           | `Boolean`               | frame                                  | B/P         |
+| `CornerRadius`           | `CornerRadius`          | frame or rect                          | B/P         |
+| `CornerSmoothing`        | `Number`                | frame or rect                          | B/P         |
+| `Fills`                  | `Paints`                | fill-paintable node                    | P/R         |
+| `Strokes`                | `Strokes(Vec<Stroke>)`  | stroke-paintable node                  | B/P/R       |
+
+The registry is the supported node-level set, not a claim that every model
+field is projectable. Text content/style, shape descriptors, lens operations,
+and nested paint/stroke/stop members remain outside it.
+
+## Anti-goals
+
+- No string paths, reflective field access, or host-defined property provider.
+- No structural values: payload kind, parent, children, and order remain
+  authored document facts.
+- No generated identities for Versions 0–3 and no arena identity in source.
+- No nested paint/stroke/stop targets before those subobjects have durable
+  identity.
 
 Known lab simplifications (declared in the REPORT's lose column):
 children as ordered `Vec` (no fractional index), per-container Taffy

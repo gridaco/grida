@@ -693,8 +693,8 @@ back does not restore discarded state.
 
 All gradient geometry is defined in the unit paint box `[0,1] × [0,1]`, with
 `(0,0)` at top-left and `(1,1)` at bottom-right. The optional
-`transform="a b c d e f"` is a finite affine transform in that unit space,
-represented as:
+`transform="a b c d e f"` is a finite, mathematically invertible affine
+transform in that unit space, represented as:
 
 ```text
 [ a c e ]
@@ -706,11 +706,28 @@ its translation and scale with this transform, including the declared
 degenerate-axis fallback, so gradient geometry remains independent of the
 node's pixel size.
 
+Mathematical invertibility is the authored-state invariant. Once layout has
+produced the actual paint box, an evaluator must also verify that the exact
+paint-box/transform composition is invertible in its backend representation.
+Extreme finite transforms can be representable for one box and not another;
+box scale may rescue or defeat their numerical conditioning. An evaluator
+must also prove that its selected implementation can construct every gradient
+kind, including custom/runtime-effect kinds. It must report any contextual
+failure before drawing the frame. It must not rewrite the transform, omit the
+gradient, or treat the source document as syntactically invalid. Applying one
+uniform capability rule to every gradient kind preserves kind-switch behavior;
+it does not claim that every backend kind reaches failure through the same
+factory path.
+
 A linear gradient additionally carries `from="u v"` and `to="u v"`. They
 default to `0 0.5` and `1 0.5`. Each requires exactly two finite values; values
-outside `[0,1]` are allowed to place an endpoint outside the paint box, but the
-two endpoints must differ. They are first-class linear-kind state, not a
-second spelling of the transform.
+outside `[0,1]` are allowed to place an endpoint outside the paint box. After
+the model's centered-alignment lowering and binary32 unit-space projection,
+the endpoint distance must be greater than `2^-15`. Coincident, quantized-
+coincident, and shorter ramps are invalid because the current proving backend
+otherwise replaces them with a degenerate color shader before applying the
+declared transform. They are first-class linear-kind state, not a second
+spelling of the transform.
 
 The remaining base geometries are fixed before the transform:
 
@@ -753,11 +770,15 @@ paint model or XML vocabulary.
 #### Compatibility quarantine: unconstrained gradient model state
 
 The current paint data types can hold gradient values that Draft 0 deliberately
-rejects: fewer than two stops, out-of-range or descending stop offsets, and
-coincident linear endpoints. Those states have no valid Grida XML spelling. A
+rejects: fewer than two stops, out-of-range or descending stop offsets,
+mathematically non-invertible transforms, and linear endpoints at or below the
+declared degeneracy threshold. Those states have no valid Grida XML spelling. A
 canonical writer must report the failed invariant and must not invent stops,
-sort or clamp offsets, or perturb an endpoint. Complete model-to-XML round-trip
-requires these invariants to be established in the common paint model first.
+sort or clamp offsets, replace a transform, or perturb an endpoint. Complete
+model-to-XML round-trip requires these invariants to be established in the
+common paint model first. Backend failure after composition with a pathological
+resolved paint box is not part of this quarantine: the authored gradient
+remains valid and frame evaluation reports the contextual capability failure.
 
 #### Compatibility quarantine: gradient editing model
 
@@ -806,6 +827,18 @@ A strict materializer reports the failing authored identifier and, when one
 exists, its resolved location. It must not silently discard the image paint and
 claim a complete resolved result. An interactive host may display a diagnostic
 placeholder while keeping the unresolved state explicit.
+
+Image sampling also has an evaluation-time numeric condition. Immediately
+before drawing, a strict evaluator composes the requested view, the image
+owner's resolved world transform, and the image-fit transform using the
+backend's numeric representation. When the geometry transform itself is
+invertible but that complete sampling matrix is not, evaluation fails with the
+node, paint context, and resource identifier before any frame pixels are
+emitted. A different view may rescue or defeat an extreme fit matrix, so this
+check cannot be reduced to XML validation or permanently attached to a view-
+independent frame product. Singular geometry transforms remain valid collapsed
+coverage; they are not reported as image failures merely because they have no
+2D inverse.
 
 The meaning of `image` is contextual. Inside `fill` or `stroke` it is always a
 paint. Outside those channels it occupies the scene-element namespace, where a
@@ -1448,7 +1481,8 @@ declared Draft 0 scene or reports a typed failure. It must reject:
   invalid paint blend mode, or a non-boolean paint visibility value;
 - a gradient with a missing or unknown `kind`, an attribute not valid for its
   kind, fewer than two stops, a stop outside `[0,1]`, descending stop offsets,
-  coincident linear endpoints, or a malformed gradient affine;
+  a non-invertible gradient affine, or linear endpoints at or below the
+  declared unit-space degeneracy threshold;
 - an empty image `src` or unsupported image fit;
 - a fill on `line`, any fill or stroke on `group` or `lens`, an empty stroke
   whose geometry equals its target defaults, a stroke attribute invalid for its
@@ -1637,8 +1671,10 @@ rectangles, variable-width strokes, dash offset, endpoint markers, effects,
 scene image nodes, resource declaration or packaging syntax, advanced image
 placement, image filters, rich color spaces, advanced typography, per-run
 strokes, semantic text annotations, grid layout, animation, or durable node
-identity. Their eventual addition must preserve the one-tree, local-space,
-intent-only model established here.
+identity. The later [durable-addressing RFD](./grida-xml-addressing) accepts
+required render/use identity for exact Version 4 while leaving Draft 0
+unchanged. Every other eventual addition must preserve the one-tree,
+local-space, intent-only model established here.
 
 Reusable paint definitions and references are also deferred. Inline paint
 values remain sufficient and canonical; a later reference system must define
@@ -1677,8 +1713,9 @@ works. Adding any such behavior is a versioned language change.
   stable source vocabulary without weakening the typed-paint model?
 - How are fonts and external image resources declared or packaged so that
   resolution remains portable while relative identifiers remain authorable?
-- What durable identity contract supports agent edits and component
-  instances without turning transient runtime handles into file facts?
+- What durable member identity and selector grammar should address paints,
+  strokes, gradient stops, text runs, vector members, and lens operations
+  without using unstable list indexes?
 - Which resolved inspection form should accompany the intent source without
   being mistaken for it?
 - Does the compound `.grida.xml` suffix remain the best long-term authored

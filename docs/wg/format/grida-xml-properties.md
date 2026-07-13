@@ -30,6 +30,11 @@ parameters](./grida-xml-component-parameters), and [component
 slots](./grida-xml-component-slots) RFDs. Those rows remain **Design** until
 their language versions are accepted; Draft 0 continues to reject them.
 
+The [durable-addressing RFD](./grida-xml-addressing) accepts a Version 4
+identity and typed effective-value boundary. Version 4 inherits the earlier
+component vocabulary, but it does not change which rows Draft 0 accepts and
+does not make a registered property animatable.
+
 This page is the canonical inventory of XML-facing property names and their
 valid targets. It is not, by itself, a grammar extension. Only rows marked
 **Draft 0** are accepted by a Draft 0 reader. **Placeholder** and **Design**
@@ -89,6 +94,7 @@ Grida XML projects that model as an authored language:
 | Status          | Meaning                                                                     |
 | --------------- | --------------------------------------------------------------------------- |
 | **Draft 0**     | Normative syntax accepted by the current RFD                                |
+| **Version 4**   | Accepted only by the exact Version 4 source contract                        |
 | **Placeholder** | Production concept exists; proposed XML name and target are held for design |
 | **Design**      | Selected or unresolved later-version design; not operative Draft 0 syntax   |
 | **Derived**     | Runtime, archive, or resolved data that should not be authored directly     |
@@ -287,6 +293,75 @@ appears in the ordinary materialized scene. Version 3 has no wrapper,
 unnamed/default slot, fallback, requiredness, or explicit-empty form. Versions
 0, 1, and 2 continue to reject all slot syntax.
 
+### Version 4 durable identity vocabulary
+
+These rows summarize the accepted [durable-addressing
+RFD](./grida-xml-addressing). Version 4 inherits the complete Version 3
+language but links only Version 4 component sources so every materialized
+authored node has a complete address.
+
+| Attribute or identity | Valid on or in                       | Version 4 contract                                                         |
+| --------------------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| `id`                  | Every authored render element        | Required literal lowercase-kebab member ID, unique in its lexical owner    |
+| `id`                  | Every `use`                          | Required caller-owned occurrence ID in the same owner-local namespace      |
+| `id`                  | `component`                          | Existing source-unit export ID; qualifies the owner containing `Root`      |
+| `root`                | Abstract component member addressing | Distinguished identity only; not an authored attribute                     |
+| `name`                | Render elements and `use`            | Optional human label; never an identity fallback                           |
+| occurrence path       | Materialized component descendants   | Ordered outer-to-inner sequence of caller-owner plus authored-use-ID pairs |
+
+Versions 0 through 3 do not accept this new render/use `id` syntax and never
+receive generated durable addresses.
+
+### Version 4 effective-value registry
+
+Version 4 also fixes the node-level semantic properties that may enter one
+immutable effective-value evaluation. This is not new authored animation
+syntax and registration does not mean a property is animatable. A missing
+entry reads the materialized base value; optional states live inside the exact
+value type rather than a universal `null`.
+
+Keys name model properties, not alternative source spellings. Compact and
+expanded fills both project `fills`; source `hidden` projects the inverse
+`active` value; the flex attributes collectively project one `layout` value.
+
+Impact legend: M = measure, L = layout, T = transform, B = bounds, P = paint,
+and R = resource.
+
+| Semantic key               | Exact value type      | Valid target                                                 | Base projection                               | Impact      |
+| -------------------------- | --------------------- | ------------------------------------------------------------ | --------------------------------------------- | ----------- |
+| `x`, `y`                   | `AxisBinding`         | Every node                                                   | Materialized axis binding                     | M/L/T/B/P   |
+| `width`                    | `SizeIntent`          | `container`, `rect`, `ellipse`, `line`, `path`, `text`       | Fixed or auto width intent                    | M/L/T/B/P   |
+| `height`                   | `SizeIntent`          | `container`, `rect`, `ellipse`, `path`, `text`; never `line` | Fixed or auto height intent                   | M/L/T/B/P   |
+| `min-width`, `max-width`   | `OptionalNumber`      | `container`, `rect`, `ellipse`, `line`, `path`, `text`       | Optional width constraint                     | M/L/T/B/P   |
+| `min-height`, `max-height` | `OptionalNumber`      | `container`, `rect`, `ellipse`, `path`, `text`; never `line` | Optional height constraint                    | M/L/T/B/P   |
+| `aspect-ratio`             | `OptionalAspectRatio` | `rect`, `ellipse`, `path`                                    | Optional width/height ratio                   | M/L/T/B/P   |
+| `active`                   | `Boolean`             | Every node                                                   | Positive activity; inverse of `hidden`        | M/L/T/B/P/R |
+| `rotation`                 | `Number`              | Every node                                                   | Clockwise degrees                             | M/L/T/B/P   |
+| `flip-x`, `flip-y`         | `Boolean`             | Every node                                                   | Native mirror flags                           | M/L/T/B/P   |
+| `flow`                     | `Flow`                | Every node                                                   | In-flow or absolute participation             | M/L/T/B/P   |
+| `grow`                     | `Number`              | Every node                                                   | Main-axis growth factor                       | M/L/T/B/P   |
+| `self-align`               | `SelfAlign`           | Every node                                                   | Per-child alignment from `align`              | M/L/T/B/P   |
+| `opacity`                  | `Number`              | Every node                                                   | Node/subtree opacity                          | P           |
+| `layout`                   | `Layout`              | `container`/frame                                            | Complete normalized layout behavior           | M/L/T/B/P   |
+| `clips-content`            | `Boolean`             | `container`/frame                                            | Content-clip flag from `clips`                | B/P         |
+| `corner-radius`            | `CornerRadius`        | `container`/frame and `rect`                                 | Four-corner elliptical radii                  | B/P         |
+| `corner-smoothing`         | `Number`              | `container`/frame and `rect`                                 | Smoothing factor                              | B/P         |
+| `fills`                    | `Paints`              | Fill-paintable frame, rect, ellipse, path, and text          | Complete ordered fills                        | P/R         |
+| `strokes`                  | `Strokes`             | Stroke-paintable frame, shape, and text                      | Complete ordered stroke geometries and paints | B/P/R       |
+
+Rotation is any finite number. Growth is finite and non-negative. Opacity and
+corner smoothing are finite in `[0, 1]`. Fixed sizes and present constraints
+are finite and non-negative; a present aspect ratio contains two finite
+positive numbers. Aggregate layout, corner, fill, and stroke values retain all
+of their static nested and renderer-capability validation. Cross-property
+rules are checked against the complete effective node state, so an otherwise
+valid replacement cannot combine with an authored value to create a state the
+renderer would silently omit. Keys with R impact may select logical resources
+but never perform loading; resource readiness and bytes belong to a separately
+revisioned evaluation environment. The exact addressing,
+applicability, nullability, validation, and static-equivalence laws are
+normative in [Grida XML durable addressing](./grida-xml-addressing).
+
 ## Scene-backed property placeholders
 
 These tables reserve discussion slots for properties in the canonical scene
@@ -296,19 +371,24 @@ model. They do not claim the proposed XML spelling is final.
 
 | Candidate XML property | Valid on                                 | Production concept                       | Inspiration  | Status          |
 | ---------------------- | ---------------------------------------- | ---------------------------------------- | ------------ | --------------- |
-| `id`                   | Every authored render node               | Durable user node identity               | HTML/SVG     | **Design**      |
+| `id`                   | Every authored render node               | Durable owner-local member identity      | HTML/SVG     | **Version 4**   |
 | `locked`               | Every authored render node, if persisted | Editor lock metadata                     | Design tools | **Design**      |
 | `blend-mode`           | Every compositing render node            | Layer blend mode, including pass-through | CSS          | **Placeholder** |
 | `mask-type`            | A node that acts as a mask source        | Geometry, alpha, or luminance mask       | CSS/SVG      | **Design**      |
 | `transform`            | Render nodes                             | Post-layout 2D affine transform          | CSS/SVG      | **Design**      |
 | `transform-origin`     | Boxed render nodes                       | Post-layout transform pivot              | CSS          | **Design**      |
 
-`id` must map to durable authored identity, not the runtime's transient node
-handle. `transform` also cannot be admitted until its relationship to native
+Version 4 `id` maps to durable authored identity, not the runtime's transient
+node handle. It is required, literal, lowercase-kebab, and unique within its
+scene or component owner. The same Version 4 spelling on `use` identifies the
+caller-owned occurrence; the component export `id` remains a separate
+module-local symbol. Component roots use the distinguished root-member
+identity rather than a second attribute. The exact address and occurrence-path
+contract is defined by [Grida XML durable addressing](./grida-xml-addressing).
+
+`transform` also cannot be admitted until its relationship to native
 `rotation`, `flip-x`, `flip-y`, and `lens ops` has one canonical answer.
-The proposed `id` on top-level `component` is a separate module-local export
-symbol; it does not make `id` valid on render nodes or settle durable node and
-instance identity.
+Versions 0 through 3 continue to reject `id` on render nodes and `use`.
 
 ### Primitive geometry
 
@@ -404,6 +484,21 @@ section](./grida-xml#paint-channels-and-vocabulary).
 `opacity` is contextual: on a gradient or image it remains a floating-point
 paint property, while on `solid` and `stop` it materializes through color
 alpha as described by the RFD's quantization rule.
+
+A gradient `transform` must be finite and mathematically invertible. Linear
+endpoints remain valid outside the unit box, but after centered-alignment
+lowering their binary32 unit-space distance must be greater than `2^-15`;
+shorter ramps are rejected rather than silently narrowed to the backend's
+degenerate-color fallback. The same authored-state checks apply to source,
+canonical writing, and a replacement `Paints` value.
+
+This does not promise that every transform is numerically invertible after a
+particular resolved paint box is composed in a raster backend. Evaluation must
+check that exact composed matrix and construct the selected gradient
+implementation before publishing the frame. Extremely small or large values
+can be accepted here yet fail for one box and succeed for another; such a
+failure is contextual frame evaluation, not source repair or a second paint-
+validity rule.
 
 ## Stroke geometry attribute registry
 
@@ -575,10 +670,10 @@ choosing a name alone.
 | Image resources and placement | Logical IDs, hashes, fit, affine placement, tiling           | Packaging; base URI; network policy; intrinsic size; missing-resource behavior      |
 | Boolean operations            | Live child geometry and operation enum                       | Ordered operands; child ownership; nesting; flattening; paint inheritance           |
 | Transform model               | Native rotation, affine transforms, origin, source lens      | One canonical authored form; layout-versus-paint transform; decomposition stability |
-| Components and reuse          | Named definitions, `use`, scalar props, and named projection | Durable use/member identity; deep overrides; archive persistence; animation binding |
-| Animation                     | Time-varying values and motion-graphics behavior             | Addressing, interpolation, timelines, expressions, easing, events, serialization    |
+| Components and reuse          | Named definitions, `use`, scalar props, and named projection | Deep overrides; archive persistence; live-instance editing                          |
+| Animation                     | Time-varying values and motion-graphics behavior             | Interpolation, timelines, expressions, easing, events, composition, serialization   |
 | Embedded Markdown/HTML        | Opaque render-only content                                   | Escaping, sanitization, fonts/resources, intrinsic sizing, deterministic rendering  |
-| Durable identity              | Stable user IDs distinct from runtime handles                | Uniqueness scope; copy/paste; merge; references; agent-generated IDs                |
+| Subobject identity            | Paint, stroke, stop, run, vector, and lens-operation members | Stable member IDs; list edits; copy/paste; references; canonical writing            |
 
 The vector-network and width-profile grammars are the clearest examples of
 where new syntax must be invented. Treating either as a JSON-shaped `data`
@@ -591,28 +686,28 @@ This registry does not itself change the canonical scene or archive contracts.
 The following seams constrain conformance or require the explicit extension
 named by the Draft 0 RFD:
 
-| Seam                                                                                                         | Why it matters to Grida XML                                                                                                                                   |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The current scene contract stores one stroke geometry with one ordered `Paints`, while Draft 0 repeats them. | One stroke maps directly; multiple strokes require an ordered list and must not be merged or hidden as duplicate scene nodes.                                 |
-| The durable stroke-width boundary collapses four equal sides to a uniform or no-width state.                 | Draft 0 uses the same normalization and never emits an all-equal four-value canonical form.                                                                   |
-| Production per-side coverage ignores corner smoothing and non-miter join choice.                             | Draft 0 rejects nonzero smoothing, round or bevel joins, and non-default miter limits on a per-side stroke rather than preserving lossy state.                |
-| Production smooth corners circularize elliptical radius pairs.                                               | Draft 0 rejects nonzero smoothing when any `rx` and `ry` differ; smoothed ellipses remain unavailable pending lossless renderer support.                      |
-| Production smooth paths begin dash traversal at the top-edge midpoint.                                       | Draft 0 consistently begins every rectangle at the top-left curve's top-edge join; geometry is identical, but dashed smoothed strokes have a different phase. |
-| The scene model can hold malformed gradients that Draft 0 deliberately cannot spell.                         | A writer rejects too few stops, invalid or descending offsets, and coincident linear endpoints instead of repairing, sorting, clamping, or perturbing them.   |
-| Scene semantics and packed-archive coverage do not yet cover the same node set.                              | An authored element must not promise `.grida` round-trip until both contracts represent it.                                                                   |
-| Scene and archive contracts expose both raw intrinsic paths and normalized box-mapped paths.                 | Draft 0 selects the box-mapped form; a raw-only target must gain a stable mapping or reject `path` rather than claim lossy support.                           |
-| One durable canonical-shape contract permits non-unit path data to be scaled to its tight fit.               | Draft 0 deliberately rejects that fallback: non-unit geometry is invalid, and no reader may erase padding or remap untouched contours by auto-fitting it.     |
-| Path fill-rule persistence is not uniform across scene and archive contracts.                                | Draft 0 requires `nonzero` and `evenodd` to survive reading, rendering, inspection, and rewriting; hard-coding one rule is not conforming.                    |
-| Draft 0 `hidden` removes a subtree from layout and paint.                                                    | A materializer must preserve that stronger behavior even when a target model names visibility differently.                                                    |
-| Solid-paint alpha is stored in color, while Draft 0 exposes common paint `opacity`.                          | The documented 8-bit quantization is a boundary rule, not a parallel solid-opacity property.                                                                  |
-| Production `AttributedString` stores flat contiguous UTF-8 byte ranges.                                      | XML concatenates mixed text in document order and derives ranges at character boundaries; authored offsets and nested runs are neither needed nor accepted.   |
-| The packed archive collapses an empty run-fill vector to an absent override.                                 | Draft 0 distinguishes explicit `<fill/>` no ink from omitted node-fill fallback; packing must reject it or preserve presence before claiming round-trip.      |
-| Production attributed paint currently resolves run fills against `(width, width)`.                           | Draft 0 requires the resolved full text-node width and height, matching node fills; the square paint box is an implementation bug, not XML semantics.         |
-| `StyledTextRun` has one optional stroke stack plus one width and alignment.                                  | It cannot losslessly project repeatable independent XML stroke geometries, so Draft 0 rejects run strokes rather than merging or hiding them.                 |
-| Production attributed runs carry visual style but no semantic/accessibility annotation.                      | Draft 0 rejects HTML semantic tags instead of pretending bold or italic styling preserves their meaning.                                                      |
-| Responsive bindings and per-child alignment carry more source intent than a resolved Cartesian scene.        | A resolved scene can consume their result but must not be mistaken for a lossless rewrite of the authored source.                                             |
-| Names, locks, durable identity, guides, and connections belong to different persistence concerns.            | `id`, `name`, and `locked` need explicit authored-versus-editor rules; a root fill already covers visual background without deciding editor-only metadata.    |
-| `lens` operations and native flips may lower through more general transforms.                                | Materialization can preserve pixels without promising a lossless inverse decomposition; source round-trip requires an intent-preserving representation.       |
+| Seam                                                                                                         | Why it matters to Grida XML                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The current scene contract stores one stroke geometry with one ordered `Paints`, while Draft 0 repeats them. | One stroke maps directly; multiple strokes require an ordered list and must not be merged or hidden as duplicate scene nodes.                                                                                      |
+| The durable stroke-width boundary collapses four equal sides to a uniform or no-width state.                 | Draft 0 uses the same normalization and never emits an all-equal four-value canonical form.                                                                                                                        |
+| Production per-side coverage ignores corner smoothing and non-miter join choice.                             | Draft 0 rejects nonzero smoothing, round or bevel joins, and non-default miter limits on a per-side stroke rather than preserving lossy state.                                                                     |
+| Production smooth corners circularize elliptical radius pairs.                                               | Draft 0 rejects nonzero smoothing when any `rx` and `ry` differ; smoothed ellipses remain unavailable pending lossless renderer support.                                                                           |
+| Production smooth paths begin dash traversal at the top-edge midpoint.                                       | Draft 0 consistently begins every rectangle at the top-left curve's top-edge join; geometry is identical, but dashed smoothed strokes have a different phase.                                                      |
+| The scene model can hold malformed or backend-degenerate gradients that Draft 0 deliberately cannot spell.   | A reader and writer reject too few stops, invalid or descending offsets, non-invertible transforms, and linear endpoint distances at or below `2^-15` instead of repairing, sorting, clamping, or perturbing them. |
+| Scene semantics and packed-archive coverage do not yet cover the same node set.                              | An authored element must not promise `.grida` round-trip until both contracts represent it.                                                                                                                        |
+| Scene and archive contracts expose both raw intrinsic paths and normalized box-mapped paths.                 | Draft 0 selects the box-mapped form; a raw-only target must gain a stable mapping or reject `path` rather than claim lossy support.                                                                                |
+| One durable canonical-shape contract permits non-unit path data to be scaled to its tight fit.               | Draft 0 deliberately rejects that fallback: non-unit geometry is invalid, and no reader may erase padding or remap untouched contours by auto-fitting it.                                                          |
+| Path fill-rule persistence is not uniform across scene and archive contracts.                                | Draft 0 requires `nonzero` and `evenodd` to survive reading, rendering, inspection, and rewriting; hard-coding one rule is not conforming.                                                                         |
+| Draft 0 `hidden` removes a subtree from layout and paint.                                                    | A materializer must preserve that stronger behavior even when a target model names visibility differently.                                                                                                         |
+| Solid-paint alpha is stored in color, while Draft 0 exposes common paint `opacity`.                          | The documented 8-bit quantization is a boundary rule, not a parallel solid-opacity property.                                                                                                                       |
+| Production `AttributedString` stores flat contiguous UTF-8 byte ranges.                                      | XML concatenates mixed text in document order and derives ranges at character boundaries; authored offsets and nested runs are neither needed nor accepted.                                                        |
+| The packed archive collapses an empty run-fill vector to an absent override.                                 | Draft 0 distinguishes explicit `<fill/>` no ink from omitted node-fill fallback; packing must reject it or preserve presence before claiming round-trip.                                                           |
+| Production attributed paint currently resolves run fills against `(width, width)`.                           | Draft 0 requires the resolved full text-node width and height, matching node fills; the square paint box is an implementation bug, not XML semantics.                                                              |
+| `StyledTextRun` has one optional stroke stack plus one width and alignment.                                  | It cannot losslessly project repeatable independent XML stroke geometries, so Draft 0 rejects run strokes rather than merging or hiding them.                                                                      |
+| Production attributed runs carry visual style but no semantic/accessibility annotation.                      | Draft 0 rejects HTML semantic tags instead of pretending bold or italic styling preserves their meaning.                                                                                                           |
+| Responsive bindings and per-child alignment carry more source intent than a resolved Cartesian scene.        | A resolved scene can consume their result but must not be mistaken for a lossless rewrite of the authored source.                                                                                                  |
+| Names, locks, durable identity, guides, and connections belong to different persistence concerns.            | `id`, `name`, and `locked` need explicit authored-versus-editor rules; a root fill already covers visual background without deciding editor-only metadata.                                                         |
+| `lens` operations and native flips may lower through more general transforms.                                | Materialization can preserve pixels without promising a lossless inverse decomposition; source round-trip requires an intent-preserving representation.                                                            |
 
 When the language, runtime, and archive disagree, a processor must limit its
 claimed subset or make the model change explicit. It must never create a

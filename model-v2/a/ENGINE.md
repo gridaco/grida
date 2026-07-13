@@ -44,11 +44,11 @@ sockets** any answer plugs into.
 ## ENG-0 · the meta-layer: stage purity and the oracle law
 
 The one asset every layer below trades on: **the pipeline is a chain of
-pure stages**. `document → resolve → drawlist → raster/composite`, plus
-the read tier (`pick`, spatial queries) off the resolved columns. The
-lab already holds the first link (`resolve(document, fonts, resources,
-viewport) → Resolved` is a pure function `[MEASURED]`); phase 4 extends
-the chain, never breaks it.
+pure stages**. `(document + immutable effective values) → resolve → drawlist
+→ raster/composite`, plus the read tier (`pick`, spatial queries) off the
+resolved columns. An empty effective-value set reads the authored document
+exactly. The lab holds the first link as a pure function `[MEASURED]`; phase 4
+extends the chain, never breaks it.
 
 - **ENG-0.1 · stage purity** `[CONTRACT]` — every stage is a pure
   function of the previous stage plus declared inputs. No stage reads
@@ -152,20 +152,30 @@ model before adopting.
 
 **Major contracts.**
 
-- **ENG-2.1 · drawlist is a pure stage** `[CONTRACT]` —
-  `resolved → drawlist` is deterministic and diffable, exactly like
-  resolve (ENG-0.1). Paint reads the resolved tier and the drawlist —
-  never the document.
-- **ENG-2.2 · damage flows forward only** `[CONTRACT]` — op → dirty
-  class (ENG-1.2) → resolved-tier diff → drawlist diff → screen rects.
-  No stage invents damage; no stage widens it silently. Damage is data,
-  loggable and assertable per frame.
-- **ENG-2.3 · generational cache keys** `[CONTRACT]` — cache identity
-  is `(slot, generation)`, never the bare NodeId. The lab arena
-  tombstones deleted slots but does not yet promise non-reuse
-  `[MEASURED]` — day 1: add the generation counter (or an explicit
-  append-only promise) so a reused slot can never alias another node's
-  cached raster/layout artifacts.
+- **ENG-2.1 · drawlist is a pure stage** `[CONTRACT]` — the same immutable
+  effective model view plus its `Resolved` product deterministically projects
+  one diffable drawlist, exactly like resolve (ENG-0.1). The raster executor
+  reads only that drawlist and declared resources; it never re-reads authored
+  properties or independently applies effective values. A complete frame
+  checks that the resource-environment incarnation and revision still match
+  the key captured at build before replay begins.
+- **ENG-2.2 · damage flows forward only** `[CONTRACT]` — authored op or
+  effective-value change → declared impact class → resolved-tier diff plus
+  drawlist diff → screen rects. Resolved state, the ordered drawlist, and the
+  declared resource-environment revision travel as one immutable frame
+  product; complete damage compares two products rather than separately
+  pairable parts. Changing bytes or readiness under one logical RID must
+  invalidate retained raster state and conservatively damage its consumers.
+  The impact class may skip work only after an optimization proves equality
+  with the complete product diff. No stage invents damage or silently drops a
+  paint-only change. Damage is data, loggable and assertable per frame.
+- **ENG-2.3 · arena-scoped generational cache keys** `[CONTRACT]` — cache
+  identity is `(arena incarnation, slot, generation)`, never a bare NodeId or
+  a slot/generation pair detached from its arena. Slot generation prevents
+  reuse inside one arena; arena incarnation prevents a fresh materialization
+  or divergent document clone from validating an old key whose slot and
+  generation happen to match. Generation increment never wraps. The runtime
+  identity remains a storage artifact, not authored identity.
 - **ENG-2.4 · the compositor owns pacing** `[CONTRACT]` — one frame
   entry point schedules input → resolve → paint → present; hosts adapt
   to it, not vice versa. The legacy `FrameLoop` unification is the
@@ -197,11 +207,12 @@ at large N `[PEER]`. Browsers hit-test by paint-order tree walk — the
 editor case (marquee, snap, cull, minimap) outgrows that quickly
 `[PEER]`.
 
-**Evidence on file.** The read tier is already SOA: `world_aabb` is a
-flat column indexed by NodeId `[MEASURED]` — literally the input array
-a broadphase wants. `pick` exists as a model concern (oriented
-inverse-world test, lens post-ops, transparent-select promotion to the
-outermost derived) with a linear walk `[MEASURED]` — correct, and the
+**Evidence on file.** The read tier is already SOA: `world_aabb` is a flat
+column indexed by NodeId `[MEASURED]` — literally the input array a broadphase
+wants. Resolution also snapshots child order, transparent-select behavior, and
+effective descendant clips. `pick` consumes only that resolved frame and owns
+the oriented inverse-world test, lens post-ops, transparent-select promotion to
+the outermost derived, and the linear walk `[MEASURED]` — correct, and the
 permanent narrowphase + oracle.
 
 **Major contracts.**
@@ -221,9 +232,10 @@ permanent narrowphase + oracle.
   narrowphase (today's `pick.rs`), NOT in consumers and NOT in the
   index. An index swap must never change what gets selected.
 - **ENG-3.4 · spatial reads read the read tier only** `[CONTRACT]` —
-  the index is built from resolved columns (`world_aabb`), never from
-  intent. It rebuilds/refits from a resolve diff (ENG-2.2's damage
-  feed), so it can never disagree with what was resolved.
+  the index and narrowphase read resolved columns and the resolved traversal/
+  clip snapshot, never a separately pairable document or effective-value view.
+  The index rebuilds/refits from a resolve diff (ENG-2.2's damage feed), so it
+  can never disagree with what was resolved.
 
 **Growth path.** linear walk behind the API (today, correct) →
 per-frame rebuilt BVH over the SOA column (morton/LBVH — the column
@@ -317,9 +329,10 @@ delta-form, enumerated write-sets, "a drag ends as if written once" is
 law `[MEASURED]`. The spike ships snapshot undo (documents are values)
 `[MEASURED]`. The C-matrix demonstrated field-level merges in tests but
 has NEVER met a real replicated backend — named in the REPORT lose
-column `[MEASURED]`. Stable identity is the named gap: NodeId is a
-session-stable arena slot; format/IR stable ids are open (a.md §12)
-`[MEASURED]`.
+column `[MEASURED]`. Grida XML Version 4 now defines durable structured source
+addresses separately from arena-scoped runtime keys `[MEASURED]`; the current
+operation and replay wires remain slot-addressed and therefore in-process
+only.
 
 **Major contracts.**
 
@@ -336,10 +349,12 @@ session-stable arena slot; format/IR stable ids are open (a.md §12)
   (structure-aware op fuzzing), and conformance fixture. No parallel
   bespoke trace formats.
 - **ENG-5.4 · stable identity precedes distribution** `[CONTRACT]` —
-  ops address nodes by stable id. Session-local slot ids suffice for
-  in-process history; the format-level id story (a.md §12) must lock
-  BEFORE any cross-session replay, persistence-of-history, or
-  multiplayer claim. Until then those features are walled, not fudged.
+  distributed ops address nodes by stable authored identity. Session-local
+  slot ids suffice for in-process history. Version 4 locks the source and
+  component-occurrence address shape, but no cross-session replay,
+  persistence-of-history, or multiplayer claim exists until operation and
+  replay schemas deliberately adopt that contract. Those features remain
+  walled, not inferred from the source parser.
 - **ENG-5.5 · snapshots are the honest floor** `[CONTRACT]` — history =
   invertible op log where proven, document snapshots where not (the
   spike's posture). An op is only "invertible" once its inverse is

@@ -1,9 +1,9 @@
 # ANIMATION — explicit time through the anchor engine
 
-**Status:** Open engine RFD. This document proposes an implementation shape
-and the contracts that shape would need. No animation syntax, timing model,
-property registry, or runtime API is adopted yet, and no implementation exists
-in the engine today.
+**Status:** Open animation RFD. No animation syntax, timing model, program,
+sampler, interpolation, composition, or playback API is adopted. The
+pre-animation identity, typed-property, and immutable effective-value
+foundation is specified separately; it contains no time semantics.
 
 This is the engine-side companion to the
 [Grida XML animation RFD](https://grida.co/docs/wg/format/grida-xml-animation).
@@ -19,6 +19,9 @@ animation-specific path.
 It is deliberately implementation-facing. It may name the current engine
 stages and candidate Rust types; it does not define `.grida.xml` syntax or make
 format decisions on the format RFD's behalf.
+
+The implemented input boundary this proposal must reuse is specified in
+[`EFFECTIVE-VALUES.md`](./EFFECTIVE-VALUES.md).
 
 ## Short answer
 
@@ -38,7 +41,7 @@ Document + AnimationProgram + SampleTime + declared environment
                       sample
                          |
                          v
-             sparse typed SampledValues
+       immutable typed PropertyValues
                          |
                          v
           resolve -> drawlist -> raster / composite
@@ -52,16 +55,34 @@ to determine visual state, never writes sampled values back into the authored
 document, and never lets the painter sample animation independently.
 
 The first implementation should run the full reference pipeline after every
-sample. Incremental sampling, scoped resolve, paint-only damage, and
+sample. Incremental sampling, scoped resolve, partial repaint, and
 compositor-only execution are later optimizations, each differential-tested
 against that permanent reference path.
 
 ## What exists today
 
-The anchor engine is static:
+The anchor engine remains static, but its pre-animation value boundary now
+exists:
 
 - `frame::render` takes a `Document`, resolve options, a view, and paint
   context, then runs `resolve -> build -> execute`;
+- `PropertyValues` is the immutable, sorted, unique map from arena-scoped
+  generational node-property targets to exact typed effective values;
+- `ValueView` validates that map and makes an absent entry read the authored
+  base value;
+- value-aware resolve, frame, drawlist, and cache entries consume one
+  `ValueView`, while their static entries are exact `ValueView::base` wrappers;
+- resolution captures the traversal and effective clip state needed by query,
+  so the spatial read tier accepts only `Resolved` rather than a separately
+  pairable document or value view;
+- `damage::diff_frame` compares immutable `FrameProduct`s, so fills, opacity,
+  strokes, clips, painter order, text, path, and paint-environment changes
+  cannot disappear behind unchanged geometry;
+- `PaintEnvironmentKey` identifies one host resource/font context plus its
+  checked revision, and each `FrameProduct` carries the key belonging to that
+  frame and refuses raster execution under a different key;
+- the retained scene cache keys both the runtime document incarnation and the
+  exact `PropertyValues` and `PaintEnvironmentKey`;
 - its uses of `std::time::Instant` measure stage duration only; there is no
   semantic time input;
 - `journal` and `replay` record document operations. ENG-5's “time as data” is
@@ -69,12 +90,12 @@ The anchor engine is static:
 - the probe's `anim_*` cases mutate the source document between measured
   frames. They are useful workloads, but they are not an animation model or
   sampler;
-- `damage::diff` compares resolved geometry columns. A paint-only animation
-  can change pixels while current damage remains empty.
+- `damage::diff` remains the geometry-only compatibility primitive; callers
+  that claim visual damage use complete `damage::diff_frame` products.
+  Geometry-only tests may continue to exercise `diff` directly.
 
-Therefore there was no dedicated “how to build animation” document before
-this RFD. The existing sockets are useful, but none should be mistaken for an
-implemented animation runtime.
+None of those types sample time or describe animation. There is still no
+animation program, sampler, interpolation, composition, or playback runtime.
 
 ## Scope
 
@@ -112,7 +133,8 @@ The names below separate facts that must not collapse into one value:
   authored animation;
 - **track/effect** — one time-varying contribution to one target property;
 - **sampled value** — a value produced for one property at one sample time;
-- **sample overlay** — the sparse set of sampled values for a frame;
+- **sample overlay** — the future sampler's sparse `PropertyValues` output for
+  a frame;
 - **sampled scene** — the resolved scene produced from base values plus the
   overlay;
 - **impact class** — the phases a changed sampled value invalidates, such as
@@ -155,20 +177,18 @@ the same result as playing continuously to `t`.
 Stateful playback helpers may cache prior samples, but their output must be
 differentially equal to the stateless reference sampler.
 
-### A-4 · properties and values are typed `[PROPOSED]`
+### A-4 · animation extends the typed property registry `[PROPOSED]`
 
-An animation program targets a registered property key and carries the value
-type that property accepts. The runtime does not use reflective string paths
-to write arbitrary document fields.
+The pre-animation foundation already requires registered property keys, exact
+value types, applicability, base access, validation, deterministic equality,
+and conservative impact classes. An animation program targets that registry;
+it does not create reflective string paths or a parallel value model.
 
-One registry should own, for each animatable property:
+Animation must add, for each admitted animatable key:
 
-- the base-value type and accessor;
-- validation rules;
 - interpolation and discrete-fallback rules;
-- allowed composition operations;
-- its impact class;
-- equality and deterministic encoding behavior.
+- allowed composition operations; and
+- any animation-specific deterministic encoding/oracle version.
 
 The XML vocabulary may map source names to this registry, but must not create a
 second set of interpolation semantics.
@@ -246,42 +266,45 @@ than disappear during paint.
 Whether compilation belongs to the model crate or an engine module remains
 open. Its input and output must be format-neutral either way.
 
-### 3. Sparse `SampledValues`
+### 3. Existing sparse `PropertyValues`
 
-The reference sampler produces a sparse overlay keyed by resolved target
-identity and typed property key. An absent entry means “use the base value.”
-The overlay is ephemeral frame data, not a cloned or mutated `Document`.
+The pre-animation foundation already supplies the exact data contract a future
+reference sampler must produce: immutable `PropertyValues`, keyed by an
+arena-scoped generational node identity and typed property key. An absent entry
+means “use the authored base value” through `ValueView`. The values are
+ephemeral frame input, not a cloned or mutated `Document`.
 
 A sparse overlay makes the null-animation law cheap and explicit:
 
 ```text
-sample(empty_program, any_time) == empty_overlay
-resolve(document, empty_overlay) == resolve(document_today)
+sample(empty_program, any_time) == PropertyValues::default()
+resolve(ValueView::new(document, empty_values)) == resolve(document)
 ```
 
-The exact storage layout is open. A first implementation should favor a plain,
-inspectable ordered value over a cache-friendly but opaque structure. SOA,
-track-local caches, and change masks come only after measurements.
+The reference storage is a plain deterministic ordered map with duplicate,
+type, applicability, value-domain, arena, and generation validation. A future
+sampler must produce this contract rather than introduce a parallel
+`SampledValues` abstraction. SOA, track-local caches, and change masks remain
+measured optimizations behind the same observable values.
 
-## Identity is a blocker, not an implementation detail
+## Node identity is decided; subobject identity remains bounded
 
-An executable track needs a stable target. The current `NodeId` is an engine
-slot identity and must not silently become the serialized animation identity.
-Parse-assigned IDs are sufficient for some in-memory tests, but not obviously
-for source edits, subtree copies, component instances, cross-target timelines,
-or durable replay.
+The Version 4 source contract now separates authored owner/member identity,
+ordered component-use occurrence paths, typed property keys, and
+arena-incarnation-scoped generational runtime keys. An executable node-property
+target can therefore compile without serializing `NodeId` or a runtime key.
 
-Before implementation, the format/model work must answer at least:
+Animation still must answer:
 
 - whether nested animation may target only its containing node;
 - whether cross-target references exist;
-- what survives parse/print, copy/paste, and component instantiation;
-- how a compiled target is invalidated when authored identity changes;
-- whether a target may be a paint layer, gradient stop, text range, or only a
-  scene node.
+- what source spelling carries a structured target and how copy/paste retargets
+  animation; and
+- whether a target may be a paint layer, gradient stop, text range, lens
+  operation, or only one of the registered node-level aggregate values.
 
-The engine may compile durable authored identity to a generational runtime key,
-but it must preserve the distinction between the two domains.
+Paint, stroke, stop, run, and lens-operation indexes remain invalid durable
+targets. Each needs member identity before animation can target it directly.
 
 ## Sampling and resolve order
 
@@ -299,12 +322,11 @@ Sampling must precede resolve for layout-affecting properties. A paint-only or
 compositor-eligible property may later skip work, but that is an optimization
 selected from its impact class, not a different semantic path.
 
-This exposes the first concrete incompatibility with the current model API:
-`anchor_lab::resolve(&Document, &ResolveOptions)` has no sampled-value input.
-Layout-aware animation requires either a format-neutral overlay input or an
-equivalent typed value-provider seam in the model resolver. That model change
-must be agreed explicitly; the engine should not mutate a temporary document
-to avoid it.
+The effective-value view resolves the prior model incompatibility: layout,
+transform, bounds, draw-list projection, and spatial queries can consume one
+immutable typed overlay while the authored `Document` remains unchanged.
+Animation still owes the pure sampler that produces that overlay at a declared
+time.
 
 ## A candidate frame seam
 
@@ -404,23 +426,27 @@ RFD.
 
 ## Damage, caching, and compositor lowering
 
-The current geometry-only `damage::diff` is insufficient for animation. A
-complete reference diff needs to cover:
+The reference `damage::diff_frame` already compares complete immutable
+`FrameProduct`s. It covers effective paint-only changes and geometry, and
+compares the product-owned opaque `PaintEnvironmentKey`; a mismatch
+conservatively damages every node owning draw items before or after. This
+covers resource readiness, same-RID byte replacement, and font-context
+revision without coupling damage to `PaintCtx`. Animation must retain those
+contracts and additionally account for:
 
-- changed sampled properties, including paint-only values;
 - before and after visual bounds;
 - drawlist item changes and ordering;
 - resource readiness changes;
 - disappearance and appearance at timing boundaries.
 
-The first correct implementation can conservatively repaint the viewport.
-Once paint-aware damage exists, damage may narrow while remaining a forward
-product of sample and resolve diffs. No painter invents damage after the fact.
+The first animation implementation may still run the full reference pipeline.
+Later partial repaint may narrow damage while remaining observationally equal
+to `diff_frame`. No painter invents damage after the fact.
 
 Cache keys must depend on the document/program generations, oracle versions,
-resource snapshot, and relevant sampled values—not wall-clock time. Two
-different times that produce the same sampled value should be able to reuse
-the same derived result.
+opaque paint-environment key, and relevant sampled values—not wall-clock time.
+Two different times that produce the same sampled value under the same
+environment should be able to reuse the same derived result.
 
 Transform and opacity tracks may eventually be lowered to a compositor. That
 path is legal only when it is observationally equivalent to the reference
@@ -486,15 +512,26 @@ before animated fixtures can claim bit-identical results.
 
 The build order should preserve the engine's oracle law.
 
-### Phase 0 — install a null seam
+### Pre-animation foundation — no time semantics
 
-- define an explicit `SampleTime` input without choosing source syntax;
-- pass an empty overlay through the frame pipeline;
+- define durable authored/member/use-occurrence addresses;
+- compile node-property targets to arena-scoped generational keys;
+- define the closed typed node-property registry;
+- pass an immutable empty effective-value set through resolve, drawlist,
+  resolved query state, damage, cache, and frame;
 - prove static fixtures, drawlists, queries, replays, and pixels are unchanged;
-- keep the current static API as a thin compatibility call if useful.
+  and
+- keep the static API as a thin empty-value call.
 
-This phase is only legitimate after the sample-time representation is decided.
-It should not invent XML animation.
+This foundation requires no `SampleTime` and invents no XML animation.
+
+### Phase 0 — explicit time and a null animation program
+
+- decide and define `SampleTime` without reading an ambient clock;
+- define a format-neutral empty animation program;
+- prove that sampling the empty program at every valid time produces the empty
+  effective-value set; and
+- retain the pre-animation static-equivalence oracle.
 
 ### Phase 1 — typed replace-only kernel
 
@@ -510,9 +547,8 @@ adopted list. Each must survive the registry and resolver design before entry.
 
 ### Phase 2 — layout and paint completeness
 
-- feed sampled values into measure/layout through the agreed model seam;
-- add paint-aware and bounds-aware damage;
-- make all query APIs consume the sampled resolved tier;
+- validate sampled layout, transform, bounds, paint, and query transitions
+  against the existing `PropertyValues`/`ValueView` reference seam;
 - define missing-resource and resource-change behavior;
 - add deterministic export sampling.
 
@@ -538,19 +574,19 @@ measurement that shows why the complexity pays for itself.
 
 No file layout is adopted, but the current engine suggests these strict seams:
 
-| concern                       | likely owner                         |
-| ----------------------------- | ------------------------------------ |
-| typed program and sampler     | one initial `animation` module       |
-| frame orchestration           | `frame`                              |
-| sampled-value resolve seam    | model resolver plus engine call site |
-| sampled/resolved change data  | `damage`                             |
-| drawlist projection           | `drawlist`                           |
-| mechanical raster execution   | `paint`                              |
-| sampled spatial reads         | `query`                              |
-| conformance playback          | `replay`                             |
-| interpolation/version stamps  | `oracle`                             |
-| CPU work measurement          | `probe`                              |
-| real-window scheduling/pacing | host/compositor and frame log        |
+| concern                       | likely owner                          |
+| ----------------------------- | ------------------------------------- |
+| typed program and sampler     | one initial `animation` module        |
+| frame orchestration           | `frame`                               |
+| effective-value resolve seam  | existing `PropertyValues`/`ValueView` |
+| sampled/resolved change data  | `damage::diff_frame`                  |
+| drawlist projection           | `drawlist`                            |
+| mechanical raster execution   | `paint`                               |
+| sampled spatial reads         | `query`                               |
+| conformance playback          | `replay`                              |
+| interpolation/version stamps  | `oracle`                              |
+| CPU work measurement          | `probe`                               |
+| real-window scheduling/pacing | host/compositor and frame log         |
 
 `paint` is intentionally not the owner of animation semantics. The module
 boundary should remain small at first: one coherent sampler/registry unit is
@@ -611,18 +647,16 @@ Implementation should not begin until the owning RFD or model contract answers
 the decisions needed for the selected first slice:
 
 1. What exact type and unit represents `SampleTime`?
-2. What durable authored identity can an animation target?
+2. What source syntax carries local and cross-node targets?
 3. What is the format-neutral authored animation model?
-4. Which properties form the first typed registry, and what are their impact
-   classes?
+4. Which registered properties form the first **animatable** subset?
 5. What interpolation, boundary, easing, and discrete rules apply to them?
 6. Is day-one composition replace-only, and how is conflicting source rejected
    or ordered?
-7. What overlay/value-provider seam may the model resolver consume?
-8. How are resource availability and resource-valued properties represented?
-9. What static sample does a non-playing processor request?
-10. Which oracle versions are stamped into animation conformance and replay
-    artifacts?
+7. How are resource availability and resource-valued properties represented?
+8. What static sample does a non-playing processor request?
+9. Which oracle versions are stamped into animation conformance and replay
+   artifacts?
 
 ## Rejected shortcuts
 

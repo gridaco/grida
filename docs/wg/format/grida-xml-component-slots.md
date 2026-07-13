@@ -34,7 +34,9 @@ reuse](./grida-xml-modules) owns source units, boxed component definitions,
 `use`, linking, materialization, and component provenance. [Grida XML component
 parameters](./grida-xml-component-parameters) owns Version 2 scalar props,
 arguments, bindings, and lexical scalar scope. This RFD specifies only the
-Version 3 render-slot delta.
+Version 3 render-slot delta. [Grida XML durable
+addressing](./grida-xml-addressing) owns the later Version 4 member/use
+identity and occurrence-path delta.
 
 ## Decision summary
 
@@ -408,6 +410,12 @@ assignment root changes only that caller's supplied content.
 Version 3 introduces no durable use, slot-occurrence, assignment-root, or
 projected-descendant ID. Source locations, child indices, and transient runtime
 handles must not be presented as durable authored identity.
+
+Version 4 subsequently requires explicit render-member and use IDs. During
+slot projection it retains the assignment root's caller owner and appends the
+receiving use to its durable occurrence path; it does not promote a Version 3
+source location or child index into identity. See [Grida XML durable
+addressing](./grida-xml-addressing).
 
 ## Source preservation and canonical writing
 
