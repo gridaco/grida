@@ -22,6 +22,8 @@ export type ImageAttachmentPolicy = {
   readonly maxEdge: number;
   /** Target max decoded bytes after encoding; drives downscale + quality. */
   readonly maxBytes: number;
+  /** Maximum wait for a URL-backed Library image to load and decode. */
+  readonly loadTimeoutMs: number;
 };
 
 /**
@@ -34,7 +36,15 @@ export const IMAGE_ATTACHMENT_POLICY: ImageAttachmentPolicy = {
   acceptMimes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
   maxEdge: 1568,
   maxBytes: 5 * 1024 * 1024,
+  loadTimeoutMs: 15_000,
 };
+
+/** MIME types the canvas encoder can emit when pass-through is unavailable. */
+export const IMAGE_TRANSCODE_OUTPUT_MIMES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+] as const;
 
 /**
  * A raster image type we inline as multimodal (SVG excluded — it's text).
@@ -98,7 +108,8 @@ type AttachmentPartLike = {
  * Map composer `file-attachment` parts to AI-SDK `FileUIPart`s — the shape
  * `sendMessage({ text, files })` accepts. Only inlined raster images with a
  * data/URL survive; everything else is dropped (defense in depth alongside
- * the ingest-time gate). Pure.
+ * the ingest-time gate). Compatibility adapter for payload-shaped callers;
+ * typed resource routing lowers provider files directly. Pure.
  */
 export function toFileUiParts(
   parts: readonly AttachmentPartLike[],
@@ -139,9 +150,11 @@ export type EncodedImageAttachment = {
  */
 export async function encodeImageFile(
   file: File,
-  policy: ImageAttachmentPolicy = IMAGE_ATTACHMENT_POLICY
+  policy: ImageAttachmentPolicy = IMAGE_ATTACHMENT_POLICY,
+  outputMimes: readonly string[] = policy.acceptMimes
 ): Promise<EncodedImageAttachment | null> {
   if (!isSupportedImageType(file.type, policy)) return null;
+  if (outputMimes.length === 0) return null;
 
   let bitmap: ImageBitmap;
   try {
@@ -156,7 +169,7 @@ export async function encodeImageFile(
     const needsResize = target.width !== width || target.height !== height;
 
     // Fast path — small enough and under the byte budget: ship original bytes.
-    if (!needsResize) {
+    if (!needsResize && outputMimes.includes(file.type)) {
       const original = await readAsDataUrl(file);
       const originalBytes = original ? decodedBytes(original) : 0;
       if (original && originalBytes <= policy.maxBytes) {
@@ -169,42 +182,159 @@ export async function encodeImageFile(
       }
     }
 
-    const canvas = document.createElement("canvas");
-    canvas.width = target.width || width;
-    canvas.height = target.height || height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-
-    // PNG first (lossless); fall back down a short JPEG quality ladder until
-    // the payload fits the budget. Last attempt ships even if still over (better
-    // a large image than none — the server guard is the hard backstop). Each
-    // toDataURL is expensive, so keep the ladder short and cache the winner's
-    // decoded size for the return.
-    const ladder: Array<{ mime: string; quality?: number }> = [
-      { mime: "image/png" },
-      { mime: "image/jpeg", quality: 0.75 },
-      { mime: "image/jpeg", quality: 0.5 },
-    ];
-    let chosen: { mime: string; url: string; size: number } | null = null;
-    for (const step of ladder) {
-      const url = canvas.toDataURL(step.mime, step.quality);
-      if (!url.startsWith("data:")) continue;
-      chosen = { mime: step.mime, url, size: decodedBytes(url) };
-      if (chosen.size <= policy.maxBytes) break;
-    }
-    if (!chosen) return null;
-
-    const ext = chosen.mime === "image/png" ? "png" : "jpg";
-    return {
-      name: renameExt(file.name, ext),
-      mime: chosen.mime,
-      size: chosen.size,
-      url: chosen.url,
-    };
+    return encodeRasterSource(
+      bitmap,
+      width,
+      height,
+      file.name,
+      policy,
+      outputMimes
+    );
   } finally {
     bitmap.close?.();
   }
+}
+
+/**
+ * Materialize a Library image URL into inline bytes without granting the model
+ * or provider a remote-fetch capability. Loading uses the browser's `img-src`
+ * perimeter (the Desktop CSP allowlists only first-party Library storage), not
+ * `fetch`/`connect-src`; `crossOrigin=anonymous` keeps canvas readback explicit.
+ * The image is always re-encoded, so the returned part is a bounded data URL.
+ */
+export async function encodeLibraryImageUrl(
+  url: string,
+  name: string,
+  declaredMime: string,
+  policy: ImageAttachmentPolicy = IMAGE_ATTACHMENT_POLICY,
+  outputMimes: readonly string[] = policy.acceptMimes,
+  libraryBaseUrl: string = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+): Promise<EncodedImageAttachment | null> {
+  if (!isSupportedImageType(declaredMime, policy) || outputMimes.length === 0) {
+    return null;
+  }
+  const parsed = trustedLibraryImageUrl(url, libraryBaseUrl);
+  if (!parsed) return null;
+
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+  image.decoding = "async";
+  let loadTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearLoadTimer = () => {
+    if (loadTimer === null) return;
+    clearTimeout(loadTimer);
+    loadTimer = null;
+  };
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const finish = (settle: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearLoadTimer();
+        settle();
+      };
+      loadTimer = setTimeout(
+        () => finish(() => reject(new Error("image URL load timed out"))),
+        policy.loadTimeoutMs
+      );
+      image.onload = () => finish(resolve);
+      image.onerror = () =>
+        finish(() => reject(new Error("image URL could not be decoded")));
+      image.src = parsed.href;
+    });
+    if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return null;
+    return encodeRasterSource(
+      image,
+      image.naturalWidth,
+      image.naturalHeight,
+      name,
+      policy,
+      outputMimes
+    );
+  } catch {
+    return null;
+  } finally {
+    clearLoadTimer();
+    image.onload = null;
+    image.onerror = null;
+    image.src = "";
+  }
+}
+
+/** The semantic companion to Desktop's CSP `img-src` carve-out. */
+export function trustedLibraryImageUrl(
+  value: string,
+  libraryBaseUrl: string
+): URL | null {
+  if (!libraryBaseUrl) return null;
+  try {
+    const base = new URL(libraryBaseUrl);
+    const candidate = new URL(value);
+    return (candidate.protocol === "https:" ||
+      candidate.protocol === "http:") &&
+      candidate.protocol === base.protocol &&
+      candidate.origin === base.origin &&
+      candidate.pathname.startsWith("/storage/v1/object/public/")
+      ? candidate
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function encodeRasterSource(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  name: string,
+  policy: ImageAttachmentPolicy,
+  outputMimes: readonly string[]
+): EncodedImageAttachment | null {
+  const target = planResize(width, height, policy.maxEdge);
+  const canvas = document.createElement("canvas");
+  canvas.width = target.width || width;
+  canvas.height = target.height || height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+
+  // PNG first (lossless); fall back down a short JPEG quality ladder until
+  // the payload fits the budget. Each toDataURL is expensive, so keep the
+  // ladder short and cache the winner's decoded size.
+  const ladder: Array<{ mime: string; quality?: number }> = [
+    { mime: "image/png" },
+    { mime: "image/jpeg", quality: 0.75 },
+    { mime: "image/jpeg", quality: 0.5 },
+    { mime: "image/webp", quality: 0.75 },
+  ];
+  let chosen: { mime: string; url: string; size: number } | null = null;
+  for (const step of ladder) {
+    if (!outputMimes.includes(step.mime)) continue;
+    const encodedUrl = canvas.toDataURL(step.mime, step.quality);
+    const actualMime = /^data:([^;,]+)/.exec(encodedUrl)?.[1];
+    if (!actualMime || !outputMimes.includes(actualMime)) continue;
+    chosen = {
+      mime: actualMime,
+      url: encodedUrl,
+      size: decodedBytes(encodedUrl),
+    };
+    if (chosen.size <= policy.maxBytes) break;
+  }
+  if (!chosen || chosen.size > policy.maxBytes) return null;
+
+  const ext =
+    chosen.mime === "image/png"
+      ? "png"
+      : chosen.mime === "image/webp"
+        ? "webp"
+        : "jpg";
+  return {
+    name: renameExt(name, ext),
+    mime: chosen.mime,
+    size: chosen.size,
+    url: chosen.url,
+  };
 }
 
 function readAsDataUrl(blob: Blob): Promise<string | null> {

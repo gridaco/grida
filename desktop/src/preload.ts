@@ -21,6 +21,7 @@ import type {
   AgentRunOptions,
   AgentUIMessageChunk,
   CreateSessionOptions,
+  DirectoryScopeDescriptor,
   PatchSessionOptions,
   SessionListFilter,
 } from "@grida/agent";
@@ -298,6 +299,10 @@ const bridge: DesktopBridge = {
   protocol: DESKTOP_BRIDGE_PROTOCOL,
   app: { version: appVersion, platform: appPlatform },
   caps: {
+    agent: {
+      // This host accepts `{ path, base64 }` scratch seeds on agent runs.
+      scratch_seed_base64: true,
+    },
     native: {
       host_apps: true,
       // Native-OS surfaces — always present in a desktop build.
@@ -543,6 +548,22 @@ const bridge: DesktopBridge = {
   },
 
   agent: {
+    attach_directory: async (file): Promise<DirectoryScopeDescriptor> => {
+      // GRIDA-SEC-004 — keep trusted-gesture provenance and path custody in
+      // preload. `getPathForFile` resolves only an OS-backed File (a JS-created
+      // File yields an empty string); the renderer receives only the daemon's
+      // opaque scope descriptor, never this absolute path.
+      let directoryPath = "";
+      try {
+        directoryPath = webUtils.getPathForFile(file);
+      } catch {
+        // Invalid/non-File values fail closed below; no daemon call is made.
+      }
+      if (!directoryPath) {
+        throw new Error("directory drop is not backed by a local path");
+      }
+      return await agentClient.directory_scopes.attach(directoryPath);
+    },
     run: (opts, onChunk) =>
       // Fresh runs always return a stream (only `reconnect` may return
       // null on 404); cast to the non-nullable shape DesktopBridge expects.

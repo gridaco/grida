@@ -236,7 +236,7 @@ export class AgentFs {
   private hydrate_promise: Promise<void> | null = null;
   private readonly watchers = new Set<AgentFs.Listener>();
 
-  private readonly write_guard?: (path: string) => boolean;
+  private readonly write_guard?: AgentFs.Options["write_guard"];
 
   constructor(
     private readonly backend: AgentFs.Backend,
@@ -500,6 +500,34 @@ export class AgentFs {
   }
 
   /**
+   * Read through to the backend when a path was deliberately left out of the
+   * hydrate index. This is the server-bound path for lazy resources such as a
+   * dropped directory reference: the tree is not walked at session start, but
+   * an explicit `read_file` still resolves the requested descendant.
+   *
+   * A successful backend read is cached with version `0` for the rest of this
+   * fs instance and counts as the required read-before-edit observation. The
+   * host's mutation guard still decides whether that path is editable.
+   */
+  async read_fresh(path: string): Promise<AgentFs.ReadResult | null> {
+    const cached = this.read(path);
+    if (cached !== null) return cached;
+    let content: string | null;
+    try {
+      content = await this.backend.read(path);
+    } catch (err) {
+      console.warn(`[agent-fs] backend.read(${path}) failed:`, err);
+      return null;
+    }
+    if (content === null) return null;
+    const entry = { content, version: 0 };
+    this.files.set(path, entry);
+    this.last_read.set(path, entry.version);
+    this.last_flushed.set(path, content);
+    return entry;
+  }
+
+  /**
    * Read the RAW bytes at `path` straight from the backend — bypassing the
    * hydrated text cache (`read`) and any live binding, because an image must
    * never round-trip through a string. Returns `null` when the path is
@@ -532,13 +560,8 @@ export class AgentFs {
    */
   write(path: string, args: AgentFs.WriteArgs): AgentFs.WriteResult {
     const { content, expected_version } = args;
-    if (this.write_guard?.(path)) {
-      return {
-        ok: false,
-        reason: "protected",
-        message: `${path} is a protected path and can't be written by an edit tool. Use the shell (e.g. git, the package manager) if you need to change it.`,
-      };
-    }
+    const guarded = this.mutationFailure(path, "write");
+    if (guarded) return guarded;
     if (expected_version !== null) {
       const entry = this.lookup(path);
       if (entry === null) {
@@ -572,13 +595,8 @@ export class AgentFs {
   edit(path: string, args: AgentFs.EditArgs): AgentFs.EditResult {
     const { old_string, new_string, replace_all, expected_version } = args;
 
-    if (this.write_guard?.(path)) {
-      return {
-        ok: false,
-        reason: "protected",
-        message: `${path} is a protected path and can't be edited by an edit tool. Use the shell if you need to change it.`,
-      };
-    }
+    const guarded = this.mutationFailure(path, "edit");
+    if (guarded) return guarded;
     const entry = this.lookup(path);
     if (entry === null) {
       return {
@@ -681,6 +699,50 @@ export class AgentFs {
   }
 
   /**
+   * Backend-assisted search for lazily mounted trees. The ordinary in-memory
+   * grep still covers hydrated workspace/binding files; an optional backend
+   * search contributes paths that were intentionally not hydrated. Paths and
+   * matches are de-duplicated because a previously read lazy file may appear
+   * in both views.
+   */
+  async grep_fresh(args: AgentFs.GrepArgs): Promise<AgentFs.GrepResult> {
+    const cached = this.grep(args);
+    if (!this.backend.grep) return cached;
+
+    let fresh: AgentFs.BackendGrepResult;
+    try {
+      fresh = await this.backend.grep(args);
+    } catch (err) {
+      console.warn("[agent-fs] backend.grep failed:", err);
+      return cached;
+    }
+
+    const scanned = new Set(
+      this.list().filter(
+        (path) =>
+          args.path_prefix === undefined || path.startsWith(args.path_prefix)
+      )
+    );
+    for (const path of fresh.paths_scanned) scanned.add(path);
+
+    const matches: AgentFs.GrepMatch[] = [];
+    const seen = new Set<string>();
+    for (const match of [...cached.matches, ...fresh.matches]) {
+      const key = `${match.path}\0${match.line}\0${match.text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      matches.push(match);
+    }
+    matches.sort(
+      (a, b) =>
+        a.path.localeCompare(b.path) ||
+        a.line - b.line ||
+        a.text.localeCompare(b.text)
+    );
+    return { matches, files_scanned: scanned.size };
+  }
+
+  /**
    * Remove a pure file from the fs and the backend. Mounted paths can't
    * be deleted through this API — unmount first if you really mean it.
    */
@@ -721,6 +783,26 @@ export class AgentFs {
     }
     const entry = this.files.get(path);
     return entry ? { content: entry.content, version: entry.version } : null;
+  }
+
+  /** Convert the host's path mutation policy into the tool result vocabulary. */
+  private mutationFailure(
+    path: string,
+    operation: "write" | "edit"
+  ): AgentFs.WriteFailure | null {
+    const guarded = this.write_guard?.(path);
+    if (!guarded) return null;
+    if (guarded !== true) {
+      return { ok: false, reason: guarded.reason, message: guarded.message };
+    }
+    return {
+      ok: false,
+      reason: "protected",
+      message:
+        operation === "write"
+          ? `${path} is a protected path and can't be written by an edit tool. Use the shell (e.g. git, the package manager) if you need to change it.`
+          : `${path} is a protected path and can't be edited by an edit tool. Use the shell if you need to change it.`,
+    };
   }
 
   /**
@@ -899,6 +981,14 @@ export namespace AgentFs {
      */
     list_directory?(path: string): Promise<ListEntries>;
 
+    /**
+     * Search backend-owned paths that are intentionally absent from
+     * {@link list}, such as lazy read-only directory references. The backend
+     * owns traversal bounds and returns the exact virtual paths it inspected so
+     * the fs can merge counts without double-counting cached files.
+     */
+    grep?(args: GrepArgs): Promise<BackendGrepResult>;
+
     /** Read the bytes at `path`, or `null` if no such file. */
     read(path: string): Promise<string | null>;
 
@@ -962,7 +1052,9 @@ export namespace AgentFs {
      * `reason: "protected"`. Injected only on the workspace-bound agent path;
      * omitted on the standalone/client-resolved fs, which keeps its behavior.
      */
-    write_guard?: (path: string) => boolean;
+    write_guard?: (
+      path: string
+    ) => boolean | { reason: "protected" | "read_only"; message: string };
   };
 
   // -------------------------------------------------------------------------
@@ -980,6 +1072,9 @@ export namespace AgentFs {
     // GRIDA-SEC-004 — no-clobber path (see `fs/scope.ts`); only emitted when a
     // host injects a `write_guard` (the workspace-bound agent path).
     "protected",
+    // A host-mounted resource whose bytes are readable but whose authority does
+    // not include mutation (for example a dropped directory reference).
+    "read_only",
   ] as const;
   export type WriteFailureReason = (typeof WRITE_FAILURE_REASONS)[number];
 
@@ -992,6 +1087,7 @@ export namespace AgentFs {
     "no_op",
     // GRIDA-SEC-004 — no-clobber path (see `fs/scope.ts`).
     "protected",
+    "read_only",
   ] as const;
   export type EditFailureReason = (typeof EDIT_FAILURE_REASONS)[number];
 
@@ -1101,6 +1197,12 @@ export namespace AgentFs {
     matches: ReadonlyArray<GrepMatch>;
     /** Number of files scanned (mounts + pure files matching the prefix). */
     files_scanned: number;
+  };
+
+  /** Backend search result used to merge lazy and hydrated path spaces. */
+  export type BackendGrepResult = {
+    matches: ReadonlyArray<GrepMatch>;
+    paths_scanned: ReadonlyArray<string>;
   };
 
   // -------------------------------------------------------------------------
@@ -1423,11 +1525,35 @@ export namespace AgentFs {
     toolCall: { tool_name: string; input: unknown; dynamic?: boolean }
   ): Promise<unknown> {
     if (toolCall.dynamic) return undefined;
-    if (toolCall.tool_name === TOOL_NAMES.list_files) {
-      const { path, offset, limit } = (toolCall.input ?? {}) as ListFilesInput;
-      return await fs.list_directory_fresh({ path, offset, limit });
+    switch (toolCall.tool_name) {
+      case TOOL_NAMES.read_file: {
+        const { path } = toolCall.input as ReadFileInput;
+        const result = await fs.read_fresh(path);
+        return (
+          result ?? {
+            ok: false,
+            reason: "not_found",
+            message: `No file at ${path}.`,
+          }
+        );
+      }
+      case TOOL_NAMES.list_files: {
+        const { path, offset, limit } = (toolCall.input ??
+          {}) as ListFilesInput;
+        return await fs.list_directory_fresh({ path, offset, limit });
+      }
+      case TOOL_NAMES.grep_files: {
+        const { pattern, path_prefix, case_sensitive } =
+          toolCall.input as GrepFilesInput;
+        return await fs.grep_fresh({
+          pattern,
+          path_prefix,
+          case_sensitive,
+        });
+      }
+      default:
+        return resolveToolCall(fs, toolCall);
     }
-    return resolveToolCall(fs, toolCall);
   }
 
   // -------------------------------------------------------------------------

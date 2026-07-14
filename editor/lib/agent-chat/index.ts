@@ -82,9 +82,29 @@ export {
   type EncodedImageAttachment,
 } from "./image-attachment";
 export {
+  OPERABLE_FILE_POLICY,
+  readFileAsBase64,
+  lowerOperableFiles,
+  extractOperableFiles,
+  type OperableFilePolicy,
+  type EncodedOperableFile,
+  type EncodedOperableResource,
+  type OperableFilesLowerOptions,
+  type OperableFilesExtract,
+} from "./file-attachment";
+export { ScratchSeedBudget } from "./scratch-seed-budget";
+export { AgentDirectoryReference } from "./directory-reference";
+export { InputResourcePolicy } from "./input-resource-policy";
+export { InputResourceRouter } from "./input-resource-router";
+export {
+  PreparedResourceLedger,
+  type PreparedResourceSelection,
+} from "./prepared-resource-ledger";
+export {
   buildAgentSend,
   buildTemplateContext,
   type AgentSendBody,
   type ContextPart,
+  type SendExtras,
   type TemplateContextMeta,
 } from "./build-agent-send";

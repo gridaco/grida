@@ -15,6 +15,7 @@
  * protocol unchanged.
  */
 
+import os from "node:os";
 import type { Hono } from "hono";
 import {
   DaemonServer,
@@ -23,11 +24,13 @@ import {
   type DaemonServices,
   type DaemonTenant,
 } from "@grida/daemon/server";
+import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
 import { registerSecretsRoutes } from "./http/routes/secrets";
 import { registerProvidersRoutes } from "./http/routes/providers";
 import { registerImagesRoutes } from "./http/routes/images";
 import { registerVideoRoutes } from "./http/routes/video";
 import { registerAgentRoutes } from "./http/routes/agent";
+import { registerDirectoryScopesRoutes } from "./http/routes/directory-scopes";
 import { registerSessionsRoutes } from "./http/routes/sessions";
 import { registerGridaAuthRoutes } from "./http/routes/gg-auth";
 import { EndpointProvidersStore } from "./providers/endpoints";
@@ -37,6 +40,15 @@ import { SessionsStore } from "./session/store";
 import { AgentRuntime } from "./runtime";
 import { StreamRegistry } from "./runtime/stream-registry";
 import { defaultScratchBase, sweepScratch } from "./session/scratch";
+import { DirectoryScopeRegistry } from "./session/directory-scopes";
+
+export {
+  DirectoryScopeRegistry,
+  DirectoryScopeError,
+  type DirectoryScopeErrorCode,
+  type DirectoryScopeGrant,
+  type DirectoryScopeRegistryOptions,
+} from "./session/directory-scopes";
 
 // Re-exported for hosts that compose or probe the daemon through this
 // package (the CLI, tests). The daemon package is the owner.
@@ -197,6 +209,18 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         user_data_path: services.user_data_path,
       });
       const sessionsStore = new SessionsStore(sessionsDb);
+      // GRIDA-SEC-004 — directory refs are in-memory host capabilities, not
+      // workspace registrations. Preserve the SAME sensitive-read denies as
+      // the outer sandbox in-process so unsupported/unsandboxed hosts cannot
+      // attach HOME secrets (and reject ancestors such as HOME or `/` too).
+      const sensitiveReadRoots = buildDaemonSandboxPolicy({
+        user_data: services.user_data_path,
+        home: os.homedir(),
+      }).filesystem.deny_read;
+      const directoryScopes = new DirectoryScopeRegistry({
+        secrets_root: services.user_data_path,
+        protected_roots: sensitiveReadRoots,
+      });
       // In-flight run registry — shared with the daemon shutdown via the
       // tenant handle's `drain` so stop() reaches the same entries the
       // routes created.
@@ -263,6 +287,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         gg_base_url: gridaGatewayBaseUrl,
         workspace_registry: services.workspaces,
         sessions_store: sessionsStore,
+        directory_scopes: directoryScopes,
         streams,
         // GRIDA-SEC-004: the daemon's own secret dir (auth.json, sessions.db,
         // workspaces.json, recent.json). Threaded to the shell runner so the
@@ -295,7 +320,10 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           include_user_scoped: false,
         },
       });
-      if (caps.agent) registerAgentRoutes(app, runtime);
+      if (caps.agent) {
+        registerDirectoryScopesRoutes(app, directoryScopes);
+        registerAgentRoutes(app, runtime);
+      }
       if (caps.sessions)
         registerSessionsRoutes(app, { store: sessionsStore, runtime });
 
@@ -309,6 +337,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         drain: () => streams.clear(),
         cleanup: () => {
           runtime.dispose();
+          directoryScopes.dispose();
           sessionsStore.close();
         },
       };

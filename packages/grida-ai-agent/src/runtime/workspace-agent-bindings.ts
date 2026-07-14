@@ -40,10 +40,64 @@ import type { Workspace, WorkspaceRegistry } from "@grida/daemon/server";
 
 export type WorkspaceAgentBindingRequest = {
   workspace_root?: string;
+  /** Host-authorized, session-scoped read grants. `root` is host-internal;
+   *  the model addresses the tree only through the virtual `path`. */
+  directory_scopes?: readonly DirectoryScopeBinding[];
   /** Permission/supervision posture; drives the shell gate in the command
    *  backend (RFC `permission modes`). Defaults to `accept-edits`. */
   mode?: AgentMode;
 };
+
+export type DirectoryScopeBinding = {
+  id: string;
+  root: string;
+  name: string;
+  path: string;
+};
+
+export const DIRECTORY_REFERENCE_ROOT = "/__references__";
+
+function directoryReferencePath(id: string): string {
+  return `${DIRECTORY_REFERENCE_ROOT}/${id}`;
+}
+
+function isDirectoryReferencePath(pathname: string): boolean {
+  return (
+    pathname === DIRECTORY_REFERENCE_ROOT ||
+    pathname.startsWith(`${DIRECTORY_REFERENCE_ROOT}/`)
+  );
+}
+
+/** Validate the host grant and derive the virtual mount instead of trusting it. */
+function normalizeDirectoryScopes(
+  scopes: readonly DirectoryScopeBinding[]
+): DirectoryScopeBinding[] {
+  const ids = new Set<string>();
+  return scopes.map((scope) => {
+    if (
+      scope.id.length === 0 ||
+      scope.id === "." ||
+      scope.id === ".." ||
+      scope.id.includes("/") ||
+      scope.id.includes("\\")
+    ) {
+      throw new Error(
+        `invalid directory scope id: ${JSON.stringify(scope.id)}`
+      );
+    }
+    if (ids.has(scope.id)) {
+      throw new Error(`duplicate directory scope id: ${scope.id}`);
+    }
+    ids.add(scope.id);
+    const expectedPath = directoryReferencePath(scope.id);
+    if (scope.path !== expectedPath) {
+      throw new Error(
+        `directory scope ${scope.id} has invalid virtual path: ${scope.path}`
+      );
+    }
+    return { ...scope, path: expectedPath };
+  });
+}
 
 export async function createWorkspaceAgentBindings(
   req: WorkspaceAgentBindingRequest,
@@ -112,11 +166,12 @@ export async function createWorkspaceAgentBindings(
    *  scratch so its files are reachable. Present only when scratch is wired. */
   skill_load_body?: SkillBodyLoader;
 } | null> {
-  if (!req.workspace_root) return null;
-  const workspace = await deps.workspace_registry.findByRoot(
-    req.workspace_root
-  );
-  if (!workspace) {
+  const directoryScopes = normalizeDirectoryScopes(req.directory_scopes ?? []);
+  if (!req.workspace_root && directoryScopes.length === 0) return null;
+  const workspace = req.workspace_root
+    ? await deps.workspace_registry.findByRoot(req.workspace_root)
+    : null;
+  if (req.workspace_root && !workspace) {
     throw new Error(`workspace not found for root: ${req.workspace_root}`);
   }
   // Normalize the scratch root to its REAL path ONCE, here, so every surface
@@ -128,9 +183,10 @@ export async function createWorkspaceAgentBindings(
   // path as an escape — the bug a live run surfaced (`path-escapes-workspace`).
   // The dir exists by now (the runtime ensures it before the turn); fall back to
   // the raw path if realpath can't resolve it.
-  const scratchDir = deps.scratch_dir
-    ? await realpath(deps.scratch_dir).catch(() => deps.scratch_dir!)
-    : undefined;
+  const scratchDir =
+    workspace && deps.scratch_dir
+      ? await realpath(deps.scratch_dir).catch(() => deps.scratch_dir!)
+      : undefined;
   // GRIDA-SEC-004 — the workspace-bound agent fs refuses no-clobber writes
   // (`.git`, lockfiles, rc files, …). The standalone/client-resolved fs gets no
   // guard, so its behavior is unchanged.
@@ -141,9 +197,20 @@ export async function createWorkspaceAgentBindings(
   const fs = new AgentFs(
     new WorkspaceAgentFsBackend(
       workspace,
-      scratchDir ? [{ id: "scratch", root: scratchDir }] : []
+      scratchDir ? [{ id: "scratch", root: scratchDir }] : [],
+      directoryScopes
     ),
-    { write_guard: isProtectedWrite }
+    {
+      write_guard: (pathname) => {
+        if (isDirectoryReferencePath(pathname)) {
+          return {
+            reason: "read_only",
+            message: `${pathname} is a read-only directory reference. Attaching a folder grants read access only; open it as a workspace to edit it.`,
+          };
+        }
+        return isProtectedWrite(pathname);
+      },
+    }
   );
   await fs.hydrate();
   const todos = new AgentTodos();
@@ -151,38 +218,39 @@ export async function createWorkspaceAgentBindings(
   // affirmed containment (or an explicit unsandboxed opt-in). Otherwise the
   // workspace still gets fs + todos, but no `run_command`.
   const mode = req.mode ?? AGENT_DEFAULT_MODE;
-  const command = deps.shell_execution_allowed
-    ? {
-        backend: createAgentCommandBackend(
-          deps.workspace_registry,
-          deps.secrets_root ? [deps.secrets_root] : [],
-          // Scratch is a sanctioned cwd root though it is not a workspace (S5).
-          scratchDir ? [scratchDir] : [],
-          // Flush the agent fs's pending writes before a command runs, so a
-          // script the agent just wrote via write_file is on disk when the
-          // shell reads it (closes the debounced-write vs immediate-read race).
-          () => fs.flush()
-        ),
-        default_workdir: req.workspace_root,
-        scratch_dir: scratchDir,
-        // Supervised gate (RFC `permission modes`, Phase 2). In `accept-edits`
-        // a non-read-only command pauses for Allow/Deny (the tool's
-        // `needsApproval`); a read-only inspection command still auto-runs. In
-        // `auto` the predicate is absent — every command runs without asking.
-        needs_approval:
-          mode === "accept-edits"
-            ? ({ command, args }: { command: string; args: string[] }) =>
-                !isReadOnlyCommand(command, args)
-            : undefined,
-      }
-    : undefined;
+  const command =
+    workspace && req.workspace_root && deps.shell_execution_allowed
+      ? {
+          backend: createAgentCommandBackend(
+            deps.workspace_registry,
+            deps.secrets_root ? [deps.secrets_root] : [],
+            // Scratch is a sanctioned cwd root though it is not a workspace (S5).
+            scratchDir ? [scratchDir] : [],
+            // Flush the agent fs's pending writes before a command runs, so a
+            // script the agent just wrote via write_file is on disk when the
+            // shell reads it (closes the debounced-write vs immediate-read race).
+            () => fs.flush()
+          ),
+          default_workdir: req.workspace_root,
+          scratch_dir: scratchDir,
+          // Supervised gate (RFC `permission modes`, Phase 2). In `accept-edits`
+          // a non-read-only command pauses for Allow/Deny (the tool's
+          // `needsApproval`); a read-only inspection command still auto-runs. In
+          // `auto` the predicate is absent — every command runs without asking.
+          needs_approval:
+            mode === "accept-edits"
+              ? ({ command, args }: { command: string; args: string[] }) =>
+                  !isReadOnlyCommand(command, args)
+              : undefined,
+        }
+      : undefined;
   // Image generation (`generate_image`): wired only when the host enabled the
   // modality, a scratch sink exists (produced bytes land there — S3), and the
   // user actually holds a provider key. The last check mirrors vision's
   // `bytesReadable` gate — never advertise a producer that would refuse every
   // call. The async key probe is cheap (a file read of auth.json).
   let image_gen: AgentGen.ImageGenerator | undefined;
-  if (deps.image_gen_enabled && deps.secrets && scratchDir) {
+  if (workspace && deps.image_gen_enabled && deps.secrets && scratchDir) {
     const secrets = deps.secrets;
     // GRIDA-SEC-006: a live hosted session also satisfies the gate — a
     // signed-in keyless user gets in-chat image generation.
@@ -469,9 +537,49 @@ function decodeDataUrl(url: string): Uint8Array | null {
   }
 }
 
-export class WorkspaceAgentFsBackend implements AgentFs.Backend {
+class DirectoryReferencePathError extends Error {
   constructor(
-    private readonly workspace: Workspace,
+    readonly reason:
+      | "unknown_scope"
+      | "read_only"
+      | "unbound_path"
+      | "unreadable",
+    readonly pathname: string,
+    readonly code?: string
+  ) {
+    super(
+      `directory reference ${reason}: ${pathname}${code ? ` (${code})` : ""}`
+    );
+    this.name = "DirectoryReferencePathError";
+  }
+}
+
+const REFERENCE_GREP_MAX_TRAVERSAL_STEPS = Math.min(SCAN_MAX_FILES, 1_000);
+const REFERENCE_GREP_MAX_MATCHES = 1_000;
+
+type ResolvedAgentScope =
+  | {
+      kind: "workspace";
+      scope: workspaceFs.Scope;
+      rel: string;
+    }
+  | {
+      kind: "additional";
+      scope: workspaceFs.Scope;
+      rel: string;
+    }
+  | {
+      kind: "reference";
+      scope: workspaceFs.Scope;
+      rel: string;
+      mount: string;
+    };
+
+export class WorkspaceAgentFsBackend implements AgentFs.Backend {
+  private readonly directoryScopes: ReadonlyMap<string, DirectoryScopeBinding>;
+
+  constructor(
+    private readonly workspace: Workspace | null,
     /**
      * Additional sanctioned roots the agent may read/write through the fs tools
      * — the session scratch dir today. This is the SAME reach the shell is
@@ -486,8 +594,16 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
      * `read_file` can read it. `view_image` reads bytes straight from the backend
      * so it never needed this; `read_file` reads the hydrated map, so it did.
      */
-    private readonly additionalRoots: ReadonlyArray<workspaceFs.Scope> = []
-  ) {}
+    private readonly additionalRoots: ReadonlyArray<workspaceFs.Scope> = [],
+    directoryScopes: readonly DirectoryScopeBinding[] = []
+  ) {
+    this.directoryScopes = new Map(
+      normalizeDirectoryScopes(directoryScopes).map((scope) => [
+        scope.id,
+        scope,
+      ])
+    );
+  }
 
   /**
    * Enumerate the workspace tree for hydration (issue #786). The scan is
@@ -501,13 +617,9 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   async list(): Promise<string[]> {
     const out: string[] = [];
     // The workspace tree — emitted in the fs tools' logical "/"-rooted form.
-    let truncated = await this.walk(
-      this.workspace,
-      (rel) => "/" + rel,
-      "",
-      0,
-      out
-    );
+    let truncated = this.workspace
+      ? await this.walk(this.workspace, (rel) => "/" + rel, "", 0, out)
+      : false;
     // Additional roots (the session scratch dir) — emitted as ABSOLUTE paths, the
     // form the agent addresses them by (from the scratch capability hint). This
     // hydrates a file SEEDED into scratch by the host (a picked template's
@@ -524,7 +636,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     }
     if (truncated) {
       console.warn(
-        `[agent-fs] hydrate scan hit a cap at ${this.workspace.root} ` +
+        `[agent-fs] hydrate scan hit a cap at ${this.workspace?.root ?? "an additional root"} ` +
           `(${SCAN_MAX_FILES}-file / depth-${SCAN_MAX_DEPTH}); the agent's initial ` +
           `file list is truncated. It can still read any path on demand via the shell.`
       );
@@ -534,29 +646,41 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
 
   async list_directory(pathname: string): Promise<AgentFs.ListEntries> {
     try {
-      const { scope, rel } = this.scopeFor(pathname);
+      if (pathname === DIRECTORY_REFERENCE_ROOT) {
+        return {
+          folders: [...this.directoryScopes.values()]
+            .map((scope) => scope.path)
+            .sort(),
+          files: [],
+        };
+      }
+
+      if (pathname === "/") {
+        const rootEntries = this.workspace
+          ? await this.listScopeDirectory(this.workspace, "", "workspace")
+          : { folders: [], files: [] };
+        if (this.directoryScopes.size > 0) {
+          rootEntries.folders.push(DIRECTORY_REFERENCE_ROOT);
+          rootEntries.folders.sort();
+        }
+        return rootEntries;
+      }
+
+      const resolved = this.scopeFor(pathname);
+      const { scope, rel } = resolved;
       const entries = await workspaceFs.readDir(scope, rel);
-      const workspaceRooted = scope === this.workspace;
       const folders: string[] = [];
       const files: string[] = [];
 
       for (const entry of entries) {
         if (entry.kind === "directory") {
           if (isIgnoredScanDir(entry.name)) continue;
-          folders.push(
-            workspaceRooted
-              ? `/${entry.rel_path.replace(/\\/g, "/")}`
-              : path.join(scope.root, entry.rel_path)
-          );
+          folders.push(this.toAgentPath(resolved, entry.rel_path));
           continue;
         }
         if (entry.kind === "file" || entry.kind === "symlink") {
           if (isIgnoredScanFile(entry.name)) continue;
-          files.push(
-            workspaceRooted
-              ? `/${entry.rel_path.replace(/\\/g, "/")}`
-              : path.join(scope.root, entry.rel_path)
-          );
+          files.push(this.toAgentPath(resolved, entry.rel_path));
         }
       }
 
@@ -567,13 +691,170 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     } catch (err) {
       if (
         isNotFound(err) ||
+        err instanceof DirectoryReferencePathError ||
         isWorkspaceFsCode(err, "not-a-directory") ||
         isWorkspaceFsCode(err, "not-a-file")
       ) {
         return { folders: [], files: [] };
       }
+      if (isDirectoryReferencePath(pathname)) {
+        throw this.referenceAccessError(pathname, err);
+      }
       throw err;
     }
+  }
+
+  private async listScopeDirectory(
+    scope: workspaceFs.Scope,
+    rel: string,
+    kind: "workspace" | "additional"
+  ): Promise<AgentFs.ListEntries> {
+    const entries = await workspaceFs.readDir(scope, rel);
+    const resolved: ResolvedAgentScope = { scope, rel, kind };
+    const folders: string[] = [];
+    const files: string[] = [];
+    for (const entry of entries) {
+      if (entry.kind === "directory") {
+        if (!isIgnoredScanDir(entry.name)) {
+          folders.push(this.toAgentPath(resolved, entry.rel_path));
+        }
+      } else if (
+        (entry.kind === "file" || entry.kind === "symlink") &&
+        !isIgnoredScanFile(entry.name)
+      ) {
+        files.push(this.toAgentPath(resolved, entry.rel_path));
+      }
+    }
+    return { folders: folders.sort(), files: files.sort() };
+  }
+
+  /**
+   * Bounded, literal search over the read-only reference scopes. Reference
+   * trees never participate in hydrate(), so grep must traverse them lazily at
+   * the explicit tool call. Workspace/scratch files remain covered by
+   * AgentFs's in-memory grep and are deliberately not walked again here.
+   */
+  async grep(args: AgentFs.GrepArgs): Promise<AgentFs.BackendGrepResult> {
+    if (args.pattern.length === 0 || this.directoryScopes.size === 0) {
+      return { matches: [], paths_scanned: [] };
+    }
+
+    const targets = this.referenceGrepTargets(args.path_prefix);
+    if (targets.length === 0) {
+      return { matches: [], paths_scanned: [] };
+    }
+
+    const matches: AgentFs.GrepMatch[] = [];
+    const pathsScanned: string[] = [];
+    // A step is either one directory-open attempt or one entry considered.
+    // Text reads are covered by the entry that led to them. Counting the work
+    // before filtering/reading is what keeps binary-heavy and unreadable trees
+    // bounded too; successful text reads alone are not a traversal bound.
+    let traversalSteps = 0;
+    const atTraversalLimit = () =>
+      traversalSteps >= REFERENCE_GREP_MAX_TRAVERSAL_STEPS;
+    const reserveTraversalStep = (): boolean => {
+      if (atTraversalLimit()) return false;
+      traversalSteps += 1;
+      return true;
+    };
+    const needle =
+      args.case_sensitive === false
+        ? args.pattern.toLocaleLowerCase()
+        : args.pattern;
+
+    const inspectFile = async (
+      binding: DirectoryScopeBinding,
+      relPath: string
+    ): Promise<boolean> => {
+      if (matches.length >= REFERENCE_GREP_MAX_MATCHES) {
+        return true;
+      }
+      try {
+        const result = await workspaceFs.readFile(binding, relPath);
+        const agentPath = this.referenceAgentPath(binding, relPath);
+        pathsScanned.push(agentPath);
+        const lines = result.content.split("\n");
+        for (let i = 0; i < lines.length; i += 1) {
+          const text = lines[i];
+          const haystack =
+            args.case_sensitive === false ? text.toLocaleLowerCase() : text;
+          if (haystack.includes(needle)) {
+            matches.push({ path: agentPath, line: i + 1, text });
+            if (matches.length >= REFERENCE_GREP_MAX_MATCHES) return true;
+          }
+        }
+      } catch (err) {
+        // Binary/oversize/unreadable entries are not searchable text. A
+        // containment violation (including an escaping symlink) is also skipped
+        // fail-closed; it never turns into a broader raw-fs read.
+        if (
+          !isAbsentForRead(err) &&
+          !isWorkspaceFsCode(err, "path-escapes-workspace")
+        ) {
+          this.warnReferenceFailure("grep", binding, relPath, err);
+        }
+      }
+      return atTraversalLimit();
+    };
+
+    const walk = async (
+      binding: DirectoryScopeBinding,
+      relPath: string,
+      depth: number
+    ): Promise<boolean> => {
+      if (
+        depth > SCAN_MAX_DEPTH ||
+        matches.length >= REFERENCE_GREP_MAX_MATCHES ||
+        !reserveTraversalStep()
+      ) {
+        return true;
+      }
+
+      try {
+        for await (const entry of workspaceFs.iterateDir(binding, relPath)) {
+          if (!reserveTraversalStep()) return true;
+          if (entry.kind === "directory") {
+            if (isIgnoredScanDir(entry.name)) {
+              if (atTraversalLimit()) return true;
+              continue;
+            }
+            if (await walk(binding, entry.rel_path, depth + 1)) return true;
+            continue;
+          }
+          if (entry.kind === "file" || entry.kind === "symlink") {
+            if (isIgnoredScanFile(entry.name)) {
+              if (atTraversalLimit()) return true;
+              continue;
+            }
+            if (await inspectFile(binding, entry.rel_path)) return true;
+          }
+          if (atTraversalLimit()) return true;
+        }
+      } catch (err) {
+        if (
+          isWorkspaceFsCode(err, "not-a-directory") ||
+          isWorkspaceFsCode(err, "not-a-file")
+        ) {
+          return await inspectFile(binding, relPath);
+        }
+        if (
+          !isNotFound(err) &&
+          !isWorkspaceFsCode(err, "path-escapes-workspace")
+        ) {
+          this.warnReferenceFailure("grep", binding, relPath, err);
+        }
+        return atTraversalLimit();
+      }
+      return atTraversalLimit();
+    };
+
+    for (const target of targets) {
+      if (await walk(target.binding, target.rel, 0)) break;
+    }
+
+    matches.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line);
+    return { matches, paths_scanned: pathsScanned };
   }
 
   async read(path: string): Promise<string | null> {
@@ -587,7 +868,12 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       // codes for content we deliberately don't serve as text (a directory,
       // an oversized file, or a binary/non-utf8 file). Policy violations
       // (path escapes, etc.) still throw.
-      if (isAbsentForRead(err)) return null;
+      if (isAbsentForRead(err) || err instanceof DirectoryReferencePathError) {
+        return null;
+      }
+      if (isDirectoryReferencePath(path)) {
+        throw this.referenceAccessError(path, err);
+      }
       throw err;
     }
   }
@@ -616,19 +902,32 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
             : undefined;
         throw new AgentVision.OversizeError(size);
       }
-      if (isAbsentForRead(err)) return null;
+      if (isAbsentForRead(err) || err instanceof DirectoryReferencePathError) {
+        return null;
+      }
+      if (isDirectoryReferencePath(path)) {
+        throw this.referenceAccessError(path, err);
+      }
       throw err;
     }
   }
 
   async write(path: string, content: string): Promise<void> {
-    const { scope, rel } = this.scopeFor(path);
+    const resolved = this.scopeFor(path);
+    if (resolved.kind === "reference") {
+      throw new DirectoryReferencePathError("read_only", path);
+    }
+    const { scope, rel } = resolved;
     await workspaceFs.writeFile(scope, rel, content);
   }
 
   async delete(path: string): Promise<void> {
     try {
-      const { scope, rel } = this.scopeFor(path);
+      const resolved = this.scopeFor(path);
+      if (resolved.kind === "reference") {
+        throw new DirectoryReferencePathError("read_only", path);
+      }
+      const { scope, rel } = resolved;
       await workspaceFs.deleteFile(scope, rel);
     } catch (err) {
       // Deleting something that isn't a deletable file (missing, or a
@@ -651,17 +950,130 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
    * on-disk path under a reachable root is workspace-relative (the default
    * space). `workspaceFs`'s own realpath containment still rejects escapes.
    */
-  private scopeFor(p: string): { scope: workspaceFs.Scope; rel: string } {
+  private scopeFor(p: string): ResolvedAgentScope {
     if (!p.startsWith("/")) {
       throw new Error(`agent-fs path must start with "/": ${p}`);
     }
-    for (const scope of [this.workspace, ...this.additionalRoots]) {
-      if (p === scope.root) return { scope, rel: "" };
-      if (containsPath(scope.root, p)) {
-        return { scope, rel: path.relative(scope.root, p) };
+
+    if (
+      p === DIRECTORY_REFERENCE_ROOT ||
+      p.startsWith(`${DIRECTORY_REFERENCE_ROOT}/`)
+    ) {
+      const rest = p.slice(DIRECTORY_REFERENCE_ROOT.length + 1);
+      const slash = rest.indexOf("/");
+      const id = slash < 0 ? rest : rest.slice(0, slash);
+      const binding = this.directoryScopes.get(id);
+      if (!binding) {
+        throw new DirectoryReferencePathError("unknown_scope", p);
+      }
+      const rel = slash < 0 ? "" : rest.slice(slash + 1);
+      return {
+        kind: "reference",
+        scope: binding,
+        rel,
+        mount: binding.path,
+      };
+    }
+
+    if (this.workspace) {
+      if (p === this.workspace.root) {
+        return { kind: "workspace", scope: this.workspace, rel: "" };
+      }
+      if (containsPath(this.workspace.root, p)) {
+        return {
+          kind: "workspace",
+          scope: this.workspace,
+          rel: path.relative(this.workspace.root, p),
+        };
       }
     }
-    return { scope: this.workspace, rel: p.slice(1) };
+    for (const scope of this.additionalRoots) {
+      if (p === scope.root) return { kind: "additional", scope, rel: "" };
+      if (containsPath(scope.root, p)) {
+        return {
+          kind: "additional",
+          scope,
+          rel: path.relative(scope.root, p),
+        };
+      }
+    }
+    if (this.workspace) {
+      return { kind: "workspace", scope: this.workspace, rel: p.slice(1) };
+    }
+    throw new DirectoryReferencePathError("unbound_path", p);
+  }
+
+  private toAgentPath(resolved: ResolvedAgentScope, relPath: string): string {
+    const rel = relPath.replace(/\\/g, "/");
+    switch (resolved.kind) {
+      case "workspace":
+        return `/${rel}`;
+      case "additional":
+        return path.join(resolved.scope.root, relPath);
+      case "reference":
+        return rel.length > 0 ? `${resolved.mount}/${rel}` : resolved.mount;
+    }
+  }
+
+  private referenceAgentPath(
+    binding: DirectoryScopeBinding,
+    relPath: string
+  ): string {
+    const rel = relPath.replace(/\\/g, "/").replace(/^\/+/, "");
+    return rel.length > 0 ? `${binding.path}/${rel}` : binding.path;
+  }
+
+  /**
+   * GRIDA-SEC-004 — raw Node errors name the canonical path they failed on.
+   * Directory-reference roots are host-only authority, so replace those errors
+   * at this seam with a typed failure that contains only the model-visible
+   * virtual path and a bounded filesystem code. Never retain the raw error as
+   * `cause`: console formatting may recursively print it. AgentFs's existing
+   * Backend contract catches read/list failures and returns null/empty to those
+   * tools; readBytes has no such fallback, so view_image receives this same
+   * safe typed failure instead of the raw OS error.
+   */
+  private referenceAccessError(
+    virtualPath: string,
+    err: unknown
+  ): DirectoryReferencePathError {
+    return new DirectoryReferencePathError(
+      "unreadable",
+      virtualPath,
+      safeReferenceErrorCode(err)
+    );
+  }
+
+  private warnReferenceFailure(
+    operation: "grep",
+    binding: DirectoryScopeBinding,
+    relPath: string,
+    err: unknown
+  ): void {
+    const virtualPath = this.referenceAgentPath(binding, relPath);
+    console.warn(
+      `[agent-fs] directory reference ${operation} skipped ${JSON.stringify(virtualPath)} (${safeReferenceErrorCode(err)})`
+    );
+  }
+
+  private referenceGrepTargets(
+    pathPrefix: string | undefined
+  ): Array<{ binding: DirectoryScopeBinding; rel: string }> {
+    if (pathPrefix === undefined || pathPrefix === DIRECTORY_REFERENCE_ROOT) {
+      return [...this.directoryScopes.values()].map((binding) => ({
+        binding,
+        rel: "",
+      }));
+    }
+    if (!pathPrefix.startsWith(`${DIRECTORY_REFERENCE_ROOT}/`)) return [];
+    try {
+      const resolved = this.scopeFor(pathPrefix);
+      if (resolved.kind !== "reference") return [];
+      const binding = this.directoryScopes.get(resolved.scope.id);
+      return binding ? [{ binding, rel: resolved.rel }] : [];
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -734,6 +1146,19 @@ function isNotFound(err: unknown): boolean {
 
 function isWorkspaceFsCode(err: unknown, code: workspaceFs.ErrorCode): boolean {
   return err instanceof workspaceFs.Exception && err.detail.code === code;
+}
+
+/** Return only a small diagnostic token; raw error messages/paths are secret. */
+function safeReferenceErrorCode(err: unknown): string {
+  const candidate =
+    err instanceof workspaceFs.Exception
+      ? err.detail.code
+      : typeof err === "object" && err !== null
+        ? (err as { code?: unknown }).code
+        : undefined;
+  return typeof candidate === "string" && /^[a-z0-9_-]{1,64}$/i.test(candidate)
+    ? candidate
+    : "filesystem-error";
 }
 
 /** Raw ENOENT or a workspaceFs code that means "no readable text here". */

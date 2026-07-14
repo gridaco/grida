@@ -5,6 +5,7 @@ export {
 
 export type {
   ConfirmOptions,
+  DesktopAgentCapabilities,
   DesktopBridge,
   DesktopCapabilities,
   DesktopHostAppId,

@@ -11,7 +11,11 @@
  */
 
 import type { FileUIPart, UIMessage } from "ai";
-import { USER_TEMPLATE_SELECTION, type AgentMode } from "@grida/agent";
+import {
+  USER_TEMPLATE_SELECTION,
+  type AgentMode,
+  type ScratchSeedEntry,
+} from "@grida/agent";
 
 /**
  * A registered context token part (WG `compositor.md` §"Templating: user view vs
@@ -22,6 +26,17 @@ import { USER_TEMPLATE_SELECTION, type AgentMode } from "@grida/agent";
  * `CONTEXT_MARKERS`; `data` is the token's lean payload.
  */
 export type ContextPart = { type: string; data: Record<string, unknown> };
+
+/**
+ * Per-send additions to a turn — an operable "+"-uploaded file's scratch bytes
+ * plus the context part that names it for the model. Threaded composer →
+ * turn-queue → the {@link buildAgentSend} closure, and MERGED with any
+ * closure-level (first-turn template) seed/contexts.
+ */
+export type SendExtras = {
+  scratchSeed?: ScratchSeedEntry[];
+  contexts?: ContextPart[];
+};
 
 /** Metadata for a picked slides template — the producer input for a
  *  {@link USER_TEMPLATE_SELECTION} context part ({@link buildTemplateContext}). */
@@ -46,11 +61,11 @@ export type AgentSendBody = {
   mode?: AgentMode;
   /**
    * Files to seed into the session's scratch dir before the model turn (WG
-   * `scratch.md`) — a picked template's unzipped bundle / an upload lands there
-   * (agent-only), NOT the workspace. First turn only; the daemon bounds + writes
-   * them via `writeScratchFile`.
+   * `scratch.md`) — a picked template's unzipped bundle, or a "+"-uploaded file,
+   * lands there (agent-only), NOT the workspace. Text or base64-binary entries;
+   * the daemon bounds + writes them via `writeScratchFile`.
    */
-  scratch_seed?: { path: string; text: string }[];
+  scratch_seed?: ScratchSeedEntry[];
 };
 
 /** Minimal `useChat` `sendMessage` surface this helper needs. */
@@ -74,7 +89,7 @@ export function buildAgentSend(opts: {
    * first send; carried on every `send` this closure makes, so pass a fresh
    * `buildAgentSend` (or omit it) once the seed turn has fired.
    */
-  scratchSeed?: { path: string; text: string }[];
+  scratchSeed?: ScratchSeedEntry[];
   /**
    * Registered context token parts (e.g. a {@link USER_TEMPLATE_SELECTION}) to
    * attach to the message's `parts` — first turn only, gated like `scratchSeed`.
@@ -82,7 +97,17 @@ export function buildAgentSend(opts: {
    * ALONGSIDE the honest user `text` (never fabricated into it).
    */
   contexts?: ContextPart[];
-}): (text: string, files?: FileUIPart[]) => void {
+}): (
+  text: string,
+  files?: FileUIPart[],
+  /**
+   * Per-send extras — a "+"-uploaded file's scratch bytes + the context part that
+   * names it ({@link SendExtras}). Unlike the closure-level `scratchSeed`/`contexts`
+   * (a first-turn template), these ride whatever turn the user attached on, and
+   * are MERGED with the closure-level ones.
+   */
+  extras?: SendExtras
+) => void {
   const {
     sendMessage,
     sessionId,
@@ -92,24 +117,28 @@ export function buildAgentSend(opts: {
     scratchSeed,
     contexts,
   } = opts;
-  return (text, files) => {
+  return (text, files, extras) => {
     const body: AgentSendBody = {
       session_id: sessionId ?? undefined,
       model_id: modelId,
     };
     if (providerId) body.provider_id = providerId;
     if (mode) body.mode = mode;
-    if (scratchSeed && scratchSeed.length > 0) body.scratch_seed = scratchSeed;
-    if (contexts && contexts.length > 0) {
-      // Attach context tokens (a picked template, …) as sibling `parts` next to
-      // the honest user `text` — the `{role, parts}` arm of useChat().sendMessage.
-      // The `data-*` context parts survive the wire via `normalizeWireParts`
-      // (WG compositor.md §templating). Text + images ride as native parts here
-      // too.
+    // Merge the closure-level seed/contexts (a first-turn template) with any
+    // per-send ones (a "+"-uploaded file, attachable on ANY turn).
+    const seed = [...(scratchSeed ?? []), ...(extras?.scratchSeed ?? [])];
+    const ctx = [...(contexts ?? []), ...(extras?.contexts ?? [])];
+    if (seed.length > 0) body.scratch_seed = seed;
+    if (ctx.length > 0) {
+      // Attach context tokens (a picked template, an uploaded-file marker, …) as
+      // sibling `parts` next to the honest user `text` — the `{role, parts}` arm
+      // of useChat().sendMessage. The `data-*` context parts survive the wire via
+      // `normalizeWireParts` (WG compositor.md §templating). Text + images ride as
+      // native parts here too.
       const parts = [
         ...(text ? [{ type: "text", text }] : []),
         ...(files ?? []),
-        ...contexts,
+        ...ctx,
       ] as UIMessage["parts"];
       void sendMessage({ role: "user", parts }, { body });
       return;

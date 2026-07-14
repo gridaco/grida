@@ -133,7 +133,9 @@ function ComposerDemo() {
               fileInputRef={fileInputRef}
               isDraggingOverComposer={isDraggingOverComposer}
               onRemoveAttachment={(attachment) =>
-                revokeTrackedObjectUrl(attachment.url)
+                revokeTrackedObjectUrl(
+                  attachment.kind === "directory" ? undefined : attachment.url
+                )
               }
               onDrop={onComposerDrop}
               onSubmit={submit}

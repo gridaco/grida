@@ -671,6 +671,31 @@ sandboxed shell. `workspaces.create.test.ts` pins traversal-name containment,
 that the created project is empty (an unexpected `seed` body is inert), and the
 no-managed-root refusal.
 
+**Read-only directory references.** A native folder drop adds a deliberately
+narrow host capability without registering the folder as a workspace or copying
+its descendants into session scratch. Preload accepts only an OS-backed `File`
+whose path Electron can resolve, and sends that raw path once to the authenticated
+`POST /directory-scopes` route; the renderer receives only an opaque descriptor
+with a virtual `/__references__/dir_<uuid>` path. The in-memory registry
+canonicalizes the selected root, rejects either-direction overlap with the
+daemon secret root and every sensitive-read root in the outer sandbox policy,
+and bounds unclaimed grants by count and TTL. A run can atomically claim an exact
+descriptor for one session only, before any incoming message or scratch mutation
+is persisted. Persisted descriptors, copied/forked messages, expired grants, and
+host restarts therefore cannot recreate authority; session deletion revokes the
+live grant.
+
+The agent filesystem exposes each claimed root only through lazy
+`list_files`/`read_file`/`grep_files` traversal. It never hydrates the tree, adds
+the root to shell cwd authority, or admits it to scratch/workspace writes;
+`write_file` and `edit_file` return `read_only`. Every descendant operation uses
+the daemon filesystem scope's realpath containment, so an escaping symlink is
+rejected. Raw host paths never enter chat IR, model context, logs, or transport
+responses. `directory-scopes.test.ts`, `run-input.test.ts`,
+`workspace-agent-bindings.test.ts`, and `agent.test.ts` pin acquisition,
+descriptor/session ownership, claim-before-persistence, no-path-persistence,
+lazy reads, read-only mutation, and symlink escape refusal.
+
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 Today:
 
@@ -686,6 +711,9 @@ Today:
 - [packages/grida-ai-agent/src/session/scratch.ts](packages/grida-ai-agent/src/session/scratch.ts) — per-session ephemeral scratch dir (WG `scratch.md`): asserts the shell-writable scratch tree sits OUTSIDE `userData` (the secret root), creates it owner-only (`0700`), and reclaims it (per-session delete + synchronous host-start sweep). `writeScratchFile` lands produced bytes (e.g. `generate_image`) owner-only (`0600`) within the session tree, rejecting any filename that is not a single safe path segment AND opening `O_NOFOLLOW` so a symlink planted at the basename (e.g. by an auto-approved scratch-cwd `run_command`) fails the write instead of redirecting it outside the tree — closing the lexical-check TOCTOU.
 - [packages/grida-daemon/src/path-contains.ts](packages/grida-daemon/src/path-contains.ts) — shared `path.sep`-prefix containment used by the shell runner's workspace/secret-root gates, the scratch containment assert, and `createProject`'s managed-root assert (one source so the discipline can't drift).
 - [packages/grida-ai-agent/src/runtime/run-input.ts](packages/grida-ai-agent/src/runtime/run-input.ts) — wire-message normalization + `coerceApprovalAnswer`/`applyApprovalAnswer` (shape-gates the explicit `approval_answer` body field and routes it to `store.answerApproval`).
+- [packages/grida-ai-agent/src/protocol/context.ts](packages/grida-ai-agent/src/protocol/context.ts) — renderer-safe, persistable directory-reference descriptor vocabulary; the virtual path and read-only access are fixed by the host contract, while the descriptor itself carries no authority.
+- [packages/grida-ai-agent/src/session/directory-scopes.ts](packages/grida-ai-agent/src/session/directory-scopes.ts) and [its contract tests](packages/grida-ai-agent/src/session/directory-scopes.test.ts) — in-memory pending/session grant registry: realpath canonicalization, protected-root overlap refusal, bounded one-shot acquisition, exact atomic claim, exclusive session ownership, and lifecycle revocation.
+- [packages/grida-ai-agent/src/http/routes/directory-scopes.ts](packages/grida-ai-agent/src/http/routes/directory-scopes.ts) and [its perimeter tests](packages/grida-ai-agent/src/http/routes/directory-scopes.test.ts) — sole raw-path ingress, mounted behind the composed daemon's Auth/Origin/Referer perimeter; returns only an opaque descriptor.
 - [packages/grida-ai-agent/src/session/store.ts](packages/grida-ai-agent/src/session/store.ts) — sessions store; `answerApproval` is the server-authoritative supervised-approval gate (answers only a real pending approval, never forges a call).
 - [packages/grida-daemon/src/workspaces.ts](packages/grida-daemon/src/workspaces.ts) — opened workspace registry and root canonicalization.
 - [packages/grida-daemon/src/workspaces/fs.ts](packages/grida-daemon/src/workspaces/fs.ts) — guarded file operations over a containment **scope** (a `{ id, root }`: the workspace, or the session scratch dir — NOT tied to the workspace registry). Every read/write realpath-checks containment to that scope's root, so a symlink escaping the scope is rejected regardless of which scope it is. The streamed-media export (`openFile`, #924) goes through the same `resolveInside` containment (resolved once per request) and then pins the read to a contained file descriptor: it opens the realpath'd target `O_NOFOLLOW` and fstat-streams from that handle, so a symlink swapped in after the check (the realpath→read TOCTOU) fails the open instead of escaping — the same defense as scratch writes. It is deliberately uncapped because streaming has constant memory (the 1 MiB cap exists only to bound the buffered text/base64 readers), which is also why the TOCTOU hardening matters more here.

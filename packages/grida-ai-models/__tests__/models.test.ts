@@ -199,6 +199,44 @@ describe("models.text.byTier", () => {
   });
 });
 
+describe("models.text image-input MIME capabilities", () => {
+  const expectedByCreator = {
+    openai: ["image/png", "image/jpeg", "image/webp", "image/gif"],
+    anthropic: ["image/jpeg", "image/png", "image/gif", "image/webp"],
+    google: [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/heic",
+      "image/heif",
+    ],
+  } as const;
+
+  it("keeps every static entry explicit and consistent with broad support", () => {
+    for (const spec of Object.values(models.text.catalog)) {
+      expect(Array.isArray(spec.imageInputMimes)).toBe(true);
+      expect(spec.imageInputMimes.length === 0 || spec.multimodal).toBe(true);
+    }
+  });
+
+  it("preserves source-backed format differences between creators", () => {
+    for (const spec of Object.values(models.text.catalog)) {
+      const creator = spec.id.split(
+        "/",
+        1
+      )[0] as keyof typeof expectedByCreator;
+      expect(spec.imageInputMimes).toEqual(expectedByCreator[creator]);
+    }
+
+    expect(
+      models.text.catalog["google/gemini-3.5-flash"].imageInputMimes
+    ).toContain("image/heic");
+    expect(
+      models.text.catalog["openai/gpt-5.4-mini"].imageInputMimes
+    ).not.toContain("image/heic");
+  });
+});
+
 describe("models.text.displayLabel", () => {
   it("returns the curated short name when present", () => {
     const spec = models.text.catalog["anthropic/claude-opus-4.8"];

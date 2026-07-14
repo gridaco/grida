@@ -44,7 +44,12 @@ export namespace toolDisplay {
       case AgentFs.TOOL_NAMES.read_file:
         return {
           action: "read",
-          title: isActive(entry) ? "Reading file" : "Read file",
+          title: describeTitle(
+            tone,
+            "Reading file",
+            "Read file",
+            "Failed to read file"
+          ),
           detail: shortPath(path),
           target: path,
           tone,
@@ -53,7 +58,12 @@ export namespace toolDisplay {
       case AgentFs.TOOL_NAMES.edit_file:
         return {
           action: "edit",
-          title: isActive(entry) ? "Editing file" : "Edited file",
+          title: describeTitle(
+            tone,
+            "Editing file",
+            "Edited file",
+            "Failed to edit file"
+          ),
           detail: describeEditDetail(entry, path),
           target: path,
           tone,
@@ -62,7 +72,12 @@ export namespace toolDisplay {
       case AgentFs.TOOL_NAMES.write_file:
         return {
           action: "write",
-          title: isActive(entry) ? "Writing file" : "Wrote file",
+          title: describeTitle(
+            tone,
+            "Writing file",
+            "Wrote file",
+            "Failed to write file"
+          ),
           detail: shortPath(path),
           target: path,
           tone,
@@ -71,7 +86,12 @@ export namespace toolDisplay {
       case AgentFs.TOOL_NAMES.list_files:
         return {
           action: "list",
-          title: isActive(entry) ? "Listing files" : "Listed files",
+          title: describeTitle(
+            tone,
+            "Listing files",
+            "Listed files",
+            "Failed to list files"
+          ),
           detail: describeListDetail(entry),
           tone,
         };
@@ -79,7 +99,12 @@ export namespace toolDisplay {
       case AgentFs.TOOL_NAMES.grep_files:
         return {
           action: "search",
-          title: isActive(entry) ? "Searching files" : "Searched files",
+          title: describeTitle(
+            tone,
+            "Searching files",
+            "Searched files",
+            "Failed to search files"
+          ),
           detail: stringValue(args.pattern),
           tone,
         };
@@ -87,7 +112,12 @@ export namespace toolDisplay {
       case AgentTodos.TOOL_NAMES.todo_write:
         return {
           action: "plan",
-          title: isActive(entry) ? "Updating plan" : "Updated plan",
+          title: describeTitle(
+            tone,
+            "Updating plan",
+            "Updated plan",
+            "Failed to update plan"
+          ),
           detail: describeTodosDetail(entry),
           tone,
         };
@@ -95,7 +125,12 @@ export namespace toolDisplay {
       case AgentVision.TOOL_NAMES.view_image:
         return {
           action: "view_image",
-          title: isActive(entry) ? "Viewing image" : "Viewed image",
+          title: describeTitle(
+            tone,
+            "Viewing image",
+            "Viewed image",
+            "Failed to view image"
+          ),
           detail: shortPath(path),
           target: path,
           tone,
@@ -104,7 +139,12 @@ export namespace toolDisplay {
       case GENERATE_IMAGE:
         return {
           action: "generate_image",
-          title: isActive(entry) ? "Generating image" : "Generated image",
+          title: describeTitle(
+            tone,
+            "Generating image",
+            "Generated image",
+            "Failed to generate image"
+          ),
           detail: describeGenerateImageDetail(entry),
           tone,
         };
@@ -112,7 +152,12 @@ export namespace toolDisplay {
       case "run_command":
         return {
           action: "command",
-          title: isActive(entry) ? "Running command" : "Ran command",
+          title: describeTitle(
+            tone,
+            "Running command",
+            "Ran command",
+            "Command failed"
+          ),
           detail: describeCommandDetail(entry),
           tone,
         };
@@ -120,7 +165,12 @@ export namespace toolDisplay {
       case "question":
         return {
           action: "question",
-          title: isActive(entry) ? "Asking you" : "Asked you",
+          title: describeTitle(
+            tone,
+            "Asking you",
+            "Asked you",
+            "Failed to ask you"
+          ),
           detail: describeQuestionDetail(entry),
           tone,
         };
@@ -128,7 +178,12 @@ export namespace toolDisplay {
       case SKILL:
         return {
           action: "skill",
-          title: isActive(entry) ? "Loading skill" : "Loaded skill",
+          title: describeTitle(
+            tone,
+            "Loading skill",
+            "Loaded skill",
+            "Failed to load skill"
+          ),
           detail: stringValue(args.name),
           tone,
         };
@@ -136,7 +191,12 @@ export namespace toolDisplay {
       case AgentDesignSearch.TOOL_NAME:
         return {
           action: "search",
-          title: isActive(entry) ? "Searching library" : "Searched library",
+          title: describeTitle(
+            tone,
+            "Searching library",
+            "Searched library",
+            "Failed to search library"
+          ),
           detail: stringValue(args.query),
           tone,
         };
@@ -144,7 +204,7 @@ export namespace toolDisplay {
       default:
         return {
           action: "tool",
-          title: isActive(entry) ? "Using tool" : "Used tool",
+          title: describeTitle(tone, "Using tool", "Used tool", "Tool failed"),
           detail: toolName,
           tone,
         };
@@ -156,8 +216,18 @@ export namespace toolDisplay {
 
     const counts = new Map<ToolDisplayAction, number>();
     const files = new Map<ToolDisplayAction, Set<string>>();
+    let running = 0;
+    let failed = 0;
     for (const entry of entries) {
       const desc = describe(entry);
+      if (desc.tone === "running") {
+        running += 1;
+        continue;
+      }
+      if (desc.tone === "warn" || desc.tone === "error") {
+        failed += 1;
+        continue;
+      }
       if (isFileAction(desc.action) && desc.target) {
         const targets = files.get(desc.action) ?? new Set<string>();
         targets.add(desc.target);
@@ -183,9 +253,21 @@ export namespace toolDisplay {
     pushClause(clauses, counts, "question", "asked");
     pushClause(clauses, counts, "skill", "loaded", "skill");
     pushClause(clauses, counts, "tool", "used");
+    pushStatusClause(clauses, running, "running");
+    pushStatusClause(clauses, failed, "failed");
 
     return capitalize(clauses.join(", "));
   }
+}
+
+function describeTitle(
+  tone: ToolDisplayTone,
+  running: string,
+  succeeded: string,
+  failed: string
+): string {
+  if (tone === "running") return running;
+  return tone === "ok" ? succeeded : failed;
 }
 
 function isFileAction(action: ToolDisplayAction): boolean {
@@ -203,6 +285,15 @@ function pushClause(
   if (!count) return;
   const noun = nounOverride ?? nounForAction(action);
   clauses.push(`${verb} ${count} ${pluralize(noun, count)}`);
+}
+
+function pushStatusClause(
+  clauses: string[],
+  count: number,
+  status: "running" | "failed"
+) {
+  if (count === 0) return;
+  clauses.push(`${count} ${pluralize("tool", count)} ${status}`);
 }
 
 function nounForAction(action: ToolDisplayAction): string {

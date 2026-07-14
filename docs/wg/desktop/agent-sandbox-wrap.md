@@ -13,8 +13,9 @@ tags:
 
 > **Status: in flight.** Shipped: the two-mode model (`accept-edits` / `auto`),
 > the retired command allowlist, the enumerated dev-network allowlist, and the
-> filesystem read/write scope (workspace-scoped reads, writable-root writes,
-> no-clobber protected paths). Still design-time: the supervised **approval
+> filesystem read/write scope (scope-bound structured reads,
+> broad-minus-sensitive shell reads, writable-root writes, no-clobber protected
+> paths). Still design-time: the supervised **approval
 > prompt** — the `accept-edits` gate currently _rejects_ a non-read-only command
 > with `needs-approval` rather than surfacing Allow/Deny — and the **per-call
 > srt sub-policy** (its spawn path is parked; the in-process secret-arg check is
@@ -148,10 +149,12 @@ shell," never to "unsandboxed shell." _No containment, no capability._
 ## Filesystem & network model
 
 Three managed shapes define what the agent may touch, **independent of mode**.
-They are enforced at two layers that must agree: the fs tools (the agent's
-logical read/write scope) and the OS sandbox (the kernel floor under any shell
-child). A mode decides _whether a command runs_; these shapes decide _what any
-running command, or any tool, may reach_.
+They are enforced across two layers: the fs tools (the agent's logical
+read/write scope) and the OS sandbox (the kernel floor under any shell child).
+A mode decides _whether a command runs_; these shapes decide _what a running
+command or tool may reach_. Any containment boundary the host claims for the
+whole agent MUST agree at both layers. A narrower structured-tool scope is not
+an all-tools boundary while the shell retains broader access.
 
 **Writable roots.** Writes — by an fs-edit tool or a shell command — land only
 inside a small, explicit set: the **opened workspace(s)** plus an **ephemeral
@@ -162,7 +165,10 @@ runtime needs — are writable by the _host process_, not by the agent's shell
 child; the per-call sub-policy drops them. The current global write set is
 broader than this (it includes the whole home root and the host state dir);
 narrowing the _agent's_ write surface to the writable roots is the formalization
-this model calls for.
+this model calls for. A compositor
+[`directory-ref`](../ai/agent/compositor.md#directory-references) is excluded
+from writable roots unless the user separately promotes it to a workspace or
+grants write authority. The drop gesture alone never widens `fs.write`.
 
 **Read — broad, minus a sensitive deny set.** Reads are allowed everywhere by
 default; the only carve-outs are a **managed glob list of sensitive paths** —
@@ -171,12 +177,21 @@ the host's own BYOK secret file) plus the OS sandbox's built-in escape-vector
 set. This denylist is the _one_ place a hand-managed list is correct: it
 enumerates **secrets to withhold**, so it fails _safe_ (a missing entry
 over-denies nothing) — the mirror image of a command allowlist, which fails
-_open_. Anything the **user explicitly references** — an @-mention, a dropped
-file or folder — is in read scope by construction, even when it sits outside an
-opened workspace. (Today the read-file tool is workspace-scoped, so out-of-scope
-references are unreadable through it; widening the tool's scope to
-broad-minus-sensitive, with user references always included, is part of this
-model.)
+_open_. A resource the user explicitly references is readable through the
+authority appropriate to that reference. In particular, a dropped directory
+acquired as a compositor
+[`directory-ref`](../ai/agent/compositor.md#directory-references) contributes
+its exact tree as a session-scoped logical read scope, even when it sits outside
+an opened workspace; the sensitive deny set still wins. The scope must
+originate from a trusted host gesture, not an arbitrary path supplied by
+renderer content.
+
+That logical scope and the current shell boundary are not the same claim. The
+structured fs tools MUST enforce the directory-ref's exact tree. Under today's
+broad-minus-sensitive shell-read posture, a running shell may already read
+other non-sensitive paths, so the directory-ref is an intent and structured-tool
+boundary, not an OS-level read-privacy boundary. A host may claim exact-tree
+read containment only when its shell sandbox is narrowed to the same roots.
 
 **Protected (no-clobber) paths.** A second managed glob list marks config and
 state that must never be _auto-written_ even when it lives inside a writable
@@ -295,14 +310,18 @@ assurance. What it deliberately does **not** stop, stated plainly:
 
 ## Dynamic policy refresh
 
-Opening a new workspace or ad-hoc file adds a path the policy needs to
-allow.
+Opening a new workspace or ad-hoc file, or acquiring a bounded directory
+reference, adds a path the policy may need to allow. Revoking a reference
+removes that read scope. A newly acquired scope MUST be installed before the
+turn that carries its reference can run; if policy refresh fails, the reference
+is unavailable rather than silently broadened. Neither operation may silently
+add a writable root.
 
 - **macOS.** The current V1 policy relies on broad host roots plus explicit
-  secret-path denies. Narrow workspace/ad-hoc roots are a follow-up.
+  secret-path denies. Narrow workspace/ad-hoc/reference roots are a follow-up.
 - **Linux.** Paths are literal. A future narrowed policy will require `srt`
-  reset plus a daemon sidecar re-spawn when workspace roots change, which
-  drops in-flight agent streams.
+  reset plus a daemon sidecar re-spawn when workspace, ad-hoc, or reference
+  roots change, which drops in-flight agent streams.
 
 ## Windows
 

@@ -139,6 +139,7 @@ describe("@grida/daemon public API", () => {
       expect(typeof WorkspaceRegistry).toBe("function");
       expect(typeof SecretsStore).toBe("function");
       expect(typeof workspaceFs.readDir).toBe("function");
+      expect(typeof workspaceFs.iterateDir).toBe("function");
       expect(containsPath("/a", "/a/b")).toBe(true);
     });
   });

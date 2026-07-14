@@ -1,5 +1,5 @@
 /* eslint-disable jest/no-standalone-expect */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createDaemonFixture, type DaemonFixture } from "./test/daemon-fixture";
@@ -15,6 +15,7 @@ describe("workspaceFs", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await fixture.cleanup();
   });
 
@@ -28,6 +29,53 @@ describe("workspaceFs", () => {
       { name: "notes", rel_path: "notes", kind: "directory" },
       { name: "zeta.txt", rel_path: "zeta.txt", kind: "file" },
     ]);
+  });
+
+  it("iterateDir stops OS enumeration and closes the handle on early return", async () => {
+    for (let index = 0; index < 20; index += 1) {
+      await fixture.write_workspace_file(`entry-${index}.txt`, String(index));
+    }
+
+    const opendir = vi.spyOn(fs, "opendir");
+    const iterator = workspaceFs.iterateDir(fixture.workspace, "");
+    try {
+      await expect(iterator.next()).resolves.toMatchObject({ done: false });
+      expect(opendir).toHaveBeenCalledTimes(1);
+      const dir = await opendir.mock.results[0].value;
+      const read = vi.spyOn(dir, "read");
+      const close = vi.spyOn(dir, "close");
+
+      await expect(iterator.next()).resolves.toMatchObject({ done: false });
+      await expect(iterator.next()).resolves.toMatchObject({ done: false });
+      expect(read).toHaveBeenCalledTimes(2);
+
+      await iterator.return(undefined);
+      expect(close).toHaveBeenCalledTimes(1);
+      await expect(dir.read()).rejects.toMatchObject({
+        code: "ERR_DIR_CLOSED",
+      });
+    } finally {
+      await iterator.return(undefined);
+    }
+  });
+
+  it("iterateDir applies containment and ENOTDIR translation before yielding", async () => {
+    await fixture.write_workspace_file("file.txt", "text");
+    const consume = async (relPath: string) => {
+      for await (const _entry of workspaceFs.iterateDir(
+        fixture.workspace,
+        relPath
+      )) {
+        // The failing paths below never yield.
+      }
+    };
+
+    await expect(consume("../")).rejects.toMatchObject({
+      detail: { code: "path-escapes-workspace" },
+    });
+    await expect(consume("file.txt")).rejects.toMatchObject({
+      detail: { code: "not-a-directory" },
+    });
   });
 
   it("readFile returns text contents inside the workspace", async () => {

@@ -215,8 +215,13 @@ const PAGE = 60;
  */
 export async function browse({
   category,
+  mimetypes,
   range = [0, PAGE - 1],
-}: { category?: string; range?: [number, number] } = {}): Promise<{
+}: {
+  category?: string;
+  mimetypes?: string[];
+  range?: [number, number];
+} = {}): Promise<{
   data: Library.ObjectDetail[];
   count: number | undefined;
 }> {
@@ -226,6 +231,9 @@ export async function browse({
     .select(__select_object_with_author, { count: "estimated" });
   if (category) {
     q.eq("category", category);
+  }
+  if (mimetypes?.length) {
+    q.in("mimetype", mimetypes);
   }
   const { data, error, count } = await q
     .order("score", { ascending: false, nullsFirst: false })

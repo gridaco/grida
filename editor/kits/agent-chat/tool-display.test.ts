@@ -58,6 +58,59 @@ describe("toolDisplay", () => {
     });
   });
 
+  it("does not describe a rejected write as successful", () => {
+    expect(
+      toolDisplay.describe(
+        tool(
+          "1",
+          "write_file",
+          { path: "/__references__/dir_123/marker.txt" },
+          {
+            ok: false,
+            reason: "read_only",
+            message: "Attached folders are read only.",
+          }
+        )
+      )
+    ).toMatchObject({
+      action: "write",
+      title: "Failed to write file",
+      detail: "marker.txt",
+      tone: "warn",
+    });
+  });
+
+  it("does not count failed or running tools as completed work", () => {
+    expect(
+      toolDisplay.summarize([
+        tool("1", "edit_file", { path: "/src/a.ts" }),
+        tool("2", "write_file", { path: "/src/b.ts" }, { ok: false }),
+        {
+          type: "tool-read_file",
+          toolCallId: "3",
+          state: "input-available",
+          input: { path: "/src/c.ts" },
+        } as ToolCallEntry,
+      ])
+    ).toBe("Edited 1 file, 1 tool running, 1 tool failed");
+  });
+
+  it("labels tool protocol errors as failures", () => {
+    expect(
+      toolDisplay.describe({
+        type: "tool-run_command",
+        toolCallId: "1",
+        state: "output-error",
+        input: { command: "pnpm", args: ["typecheck"] },
+        errorText: "Process failed",
+      } as ToolCallEntry)
+    ).toMatchObject({
+      action: "command",
+      title: "Command failed",
+      tone: "error",
+    });
+  });
+
   it("labels image tools with media-specific actions", () => {
     expect(
       toolDisplay.describe(
@@ -100,12 +153,17 @@ describe("toolDisplay", () => {
   });
 });
 
-function tool(id: string, toolName: string, input: unknown): ToolCallEntry {
+function tool(
+  id: string,
+  toolName: string,
+  input: unknown,
+  output: unknown = { ok: true }
+): ToolCallEntry {
   return {
     type: `tool-${toolName}`,
     toolCallId: id,
     input,
-    output: { ok: true },
+    output,
     state: "output-available",
   } as ToolCallEntry;
 }

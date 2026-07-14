@@ -9,13 +9,14 @@
  * absolute path used to be treated as logical and land under a doubled
  * `<root>/<root>/…` path). Workspace containment is still enforced downstream.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { WorkspaceRegistry } from "@grida/daemon/server";
+import { workspaceFs, WorkspaceRegistry } from "@grida/daemon/server";
 import type { SecretsStore } from "@grida/daemon/server";
 import { AgentFs } from "../fs";
+import { AgentVision } from "../vision";
 import {
   WorkspaceAgentFsBackend,
   createWorkspaceAgentBindings,
@@ -611,4 +612,255 @@ describe("WorkspaceAgentFsBackend — additional reachable roots (scratch)", () 
     const realPasswd = await fs.readFile("/etc/passwd", "utf8");
     expect(realPasswd).not.toBe("x");
   });
+});
+
+describe("createWorkspaceAgentBindings — read-only directory references", () => {
+  let baseDir: string;
+  let referenceRoot: string;
+  let outsideRoot: string;
+  let registry: WorkspaceRegistry;
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-dir-ref-bind-"));
+    referenceRoot = path.join(baseDir, "reference-material");
+    outsideRoot = path.join(baseDir, "outside");
+    await fs.mkdir(path.join(referenceRoot, "nested"), { recursive: true });
+    await fs.mkdir(outsideRoot);
+    await fs.writeFile(
+      path.join(referenceRoot, "nested", "marker.txt"),
+      "E2E_MARKER"
+    );
+    await fs.writeFile(path.join(outsideRoot, "secret.txt"), "DO_NOT_READ");
+    registry = new WorkspaceRegistry(path.join(baseDir, "registry"));
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  async function bindings() {
+    const id = "dir_11111111-1111-4111-8111-111111111111";
+    return await createWorkspaceAgentBindings(
+      {
+        directory_scopes: [
+          {
+            id,
+            name: "reference-material",
+            root: await fs.realpath(referenceRoot),
+            path: `/__references__/${id}`,
+          },
+        ],
+        mode: "auto",
+      },
+      { workspace_registry: registry, shell_execution_allowed: true }
+    );
+  }
+
+  it("mounts a workspace-less tree lazily for list/read/grep and exposes no shell", async () => {
+    const result = await bindings();
+    expect(result).not.toBeNull();
+    expect(result?.command).toBeUndefined();
+    // Directory contents are not copied or eagerly hydrated.
+    expect(result?.fs.list()).toEqual([]);
+
+    const root = await result!.fs.list_directory_fresh({ path: "/" });
+    expect(root.folders).toContain("/__references__");
+    const mount = "/__references__/dir_11111111-1111-4111-8111-111111111111";
+    const listed = await result!.fs.list_directory_fresh({ path: mount });
+    expect(listed.folders).toEqual([`${mount}/nested`]);
+    expect(
+      await result!.fs.read_fresh(`${mount}/nested/marker.txt`)
+    ).toMatchObject({ content: "E2E_MARKER" });
+    expect(
+      await result!.fs.grep_fresh({ pattern: "E2E_MARKER", path_prefix: mount })
+    ).toMatchObject({
+      matches: [
+        { path: `${mount}/nested/marker.txt`, line: 1, text: "E2E_MARKER" },
+      ],
+    });
+  });
+
+  it("refuses edits", async () => {
+    const result = await bindings();
+    const mount = "/__references__/dir_11111111-1111-4111-8111-111111111111";
+    const markerPath = `${mount}/nested/marker.txt`;
+    await result!.fs.read_fresh(markerPath);
+    expect(
+      result!.fs.write(markerPath, { content: "MUTATED", expected_version: 0 })
+    ).toMatchObject({ ok: false, reason: "read_only" });
+    expect(
+      await fs.readFile(
+        path.join(referenceRoot, "nested", "marker.txt"),
+        "utf8"
+      )
+    ).toBe("E2E_MARKER");
+  });
+
+  it("never exposes a directory reference's canonical root through failures", async () => {
+    const result = await bindings();
+    const mount = "/__references__/dir_11111111-1111-4111-8111-111111111111";
+    const canonicalRoot = await fs.realpath(referenceRoot);
+    const privatePath = path.join(canonicalRoot, "private.txt");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const osError = (operation: string) =>
+      Object.assign(
+        new Error(`${operation} EACCES: permission denied, '${privatePath}'`),
+        { code: "EACCES", path: privatePath }
+      );
+
+    vi.spyOn(workspaceFs, "readFile").mockRejectedValueOnce(osError("read"));
+    const readOutput = await AgentFs.resolveToolCallAsync(result!.fs, {
+      tool_name: "read_file",
+      input: { path: `${mount}/private.txt` },
+    });
+
+    const readDir = vi.spyOn(workspaceFs, "readDir");
+    readDir.mockRejectedValueOnce(osError("list"));
+    const listOutput = await AgentFs.resolveToolCallAsync(result!.fs, {
+      tool_name: "list_files",
+      input: { path: mount },
+    });
+    vi.spyOn(workspaceFs, "iterateDir").mockImplementation(async function* () {
+      yield* [] as workspaceFs.Entry[];
+      throw osError("grep");
+    });
+    const grepOutput = await AgentFs.resolveToolCallAsync(result!.fs, {
+      tool_name: "grep_files",
+      input: { pattern: "private", path_prefix: mount },
+    });
+
+    vi.spyOn(workspaceFs, "readFileBytes").mockRejectedValueOnce(
+      osError("readBytes")
+    );
+    let viewError: unknown;
+    try {
+      await AgentVision.resolveToolCall(result!.fs, {
+        tool_name: "view_image",
+        input: { path: `${mount}/private.png` },
+      });
+    } catch (err) {
+      viewError = err;
+    }
+
+    expect(readOutput).toMatchObject({ ok: false, reason: "not_found" });
+    expect(listOutput).toMatchObject({ folders: [], files: [] });
+    expect(grepOutput).toMatchObject({ matches: [] });
+    expect(viewError).toMatchObject({
+      name: "DirectoryReferencePathError",
+      reason: "unreadable",
+      pathname: `${mount}/private.png`,
+      code: "EACCES",
+    });
+    expect((viewError as Error & { cause?: unknown }).cause).toBeUndefined();
+
+    const modelFacing = JSON.stringify({
+      readOutput,
+      listOutput,
+      grepOutput,
+      viewError:
+        viewError instanceof Error
+          ? Object.fromEntries(
+              Object.getOwnPropertyNames(viewError).map((key) => [
+                key,
+                (viewError as unknown as Record<string, unknown>)[key],
+              ])
+            )
+          : viewError,
+    });
+    const logged = warn.mock.calls
+      .flat()
+      .map((value) =>
+        value instanceof Error ? (value.stack ?? value.message) : String(value)
+      )
+      .join("\n");
+    expect(modelFacing).not.toContain(canonicalRoot);
+    expect(logged).not.toContain(canonicalRoot);
+  });
+
+  it("bounds reference grep by visited entries, including skipped and failed entries", async () => {
+    const result = await bindings();
+    const mount = "/__references__/dir_11111111-1111-4111-8111-111111111111";
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const entries: workspaceFs.Entry[] = [
+      ...Array.from({ length: 400 }, (_, index) => ({
+        name: `binary-${index}.png`,
+        rel_path: `binary-${index}.png`,
+        kind: "file" as const,
+      })),
+      ...Array.from({ length: 300 }, (_, index) => ({
+        name: `escape-${index}.txt`,
+        rel_path: `escape-${index}.txt`,
+        kind: "symlink" as const,
+      })),
+      ...Array.from({ length: 300 }, (_, index) => ({
+        name: `unreadable-${index}.txt`,
+        rel_path: `unreadable-${index}.txt`,
+        kind: "file" as const,
+      })),
+      {
+        name: "after-cap.txt",
+        rel_path: "after-cap.txt",
+        kind: "file",
+      },
+    ];
+    let yielded = 0;
+    let closed = false;
+    vi.spyOn(workspaceFs, "iterateDir").mockImplementation(async function* () {
+      try {
+        for (const entry of entries) {
+          yielded += 1;
+          yield entry;
+        }
+      } finally {
+        closed = true;
+      }
+    });
+    const readFile = vi
+      .spyOn(workspaceFs, "readFile")
+      .mockImplementation(async (_scope, relPath) => {
+        if (relPath.startsWith("escape-")) {
+          throw new workspaceFs.Exception({
+            code: "path-escapes-workspace",
+            rel_path: relPath,
+          });
+        }
+        if (relPath.startsWith("unreadable-")) {
+          throw Object.assign(new Error("permission denied"), {
+            code: "EACCES",
+          });
+        }
+        if (relPath === "after-cap.txt") {
+          return { content: "MATCH_AFTER_CAP", mtime: 0 };
+        }
+        throw new Error(`unexpected read: ${relPath}`);
+      });
+
+    const output = await result!.fs.grep_fresh({
+      pattern: "MATCH_AFTER_CAP",
+      path_prefix: mount,
+    });
+
+    expect(output.matches).toEqual([]);
+    expect(yielded).toBe(999);
+    expect(closed).toBe(true);
+    expect(readFile).toHaveBeenCalledTimes(599);
+    expect(readFile.mock.calls.some(([, rel]) => rel === "after-cap.txt")).toBe(
+      false
+    );
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "does not follow an escaping symlink",
+    async () => {
+      const result = await bindings();
+      const mount = "/__references__/dir_11111111-1111-4111-8111-111111111111";
+      await fs.symlink(
+        path.join(outsideRoot, "secret.txt"),
+        path.join(referenceRoot, "escape.txt")
+      );
+      expect(await result!.fs.read_fresh(`${mount}/escape.txt`)).toBeNull();
+    }
+  );
 });

@@ -22,6 +22,7 @@ import { WorkspaceRegistry } from "@grida/daemon/server";
 import { openSessionsDb } from "../../session/db";
 import { SessionsStore } from "../../session/store";
 import { createRecorderConsumer } from "../../session/recorder";
+import { DirectoryScopeRegistry } from "../../session/directory-scopes";
 import { AGENT_SESSION_AGENT } from "../../protocol/run";
 import { AgentRuntime } from "../../runtime";
 import { StreamRegistry } from "../../runtime/stream-registry";
@@ -44,6 +45,7 @@ const fakeRunAgent = async (): Promise<Response> =>
 describe("HTTP wire — agent routes (run/stream/abort)", () => {
   let baseDir: string;
   let sessionsStore: SessionsStore;
+  let workspaceRegistry: WorkspaceRegistry;
   let streamRegistry: StreamRegistry;
   let runtime: AgentRuntime;
   let app: Hono;
@@ -55,7 +57,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     await secrets.set("openrouter", "sk-test");
     const db = openSessionsDb({ user_data_path: baseDir });
     sessionsStore = new SessionsStore(db);
-    const workspaceRegistry = new WorkspaceRegistry(baseDir);
+    workspaceRegistry = new WorkspaceRegistry(baseDir);
     // Inject the registry so tests can pre-populate in-flight runs.
     streamRegistry = new StreamRegistry();
     app = new Hono();
@@ -65,6 +67,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       sessions_store: sessionsStore,
       streams: streamRegistry,
       run_agent: fakeRunAgent,
+      scratch_base: path.join(baseDir, "scratch-base"),
       // Shrink the inter-drain cooldown so the core-drain test runs fast.
       drain_cooldown_ms: 20,
     });
@@ -90,6 +93,103 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       body: JSON.stringify({ messages: "nope" }),
     });
     expect(invalid.status).toBe(400);
+  });
+
+  it("stages byte-identical attachment bodies before persisting their descriptors", async () => {
+    const workspaceDir = path.join(baseDir, "workspace");
+    await fs.mkdir(workspaceDir);
+    const workspace = await workspaceRegistry.open(workspaceDir);
+    const session = await sessionsStore.create({
+      agent: AGENT_SESSION_AGENT,
+      workspace_id: workspace.id,
+      workspace_root: workspace.root,
+    });
+    const response = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: session.id,
+        workspace_id: workspace.id,
+        messages: [
+          {
+            id: "u-attachment",
+            role: "user",
+            parts: [
+              { type: "text", text: "inspect this" },
+              {
+                type: "data-user_file_attachments",
+                data: {
+                  location: "scratch",
+                  files: [
+                    {
+                      name: "opaque.bin",
+                      mime: "application/octet-stream",
+                      size: 4,
+                      path: "upload.bin",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        scratch_seed: [{ path: "upload.bin", base64: "AP+Afg==" }],
+      }),
+    });
+    expect(response.status).toBe(200);
+    const staged = await fs.readFile(
+      path.join(
+        baseDir,
+        "scratch-base",
+        "sessions",
+        session.id,
+        "scratch",
+        "upload.bin"
+      )
+    );
+    expect([...staged]).toEqual([0, 255, 128, 126]);
+    const persisted = await sessionsStore.listMessages(session.id);
+    expect(persisted[0].parts[1].type).toBe("data-user_file_attachments");
+    await response.text();
+  });
+
+  it("does not persist an attachment descriptor when scratch is unavailable", async () => {
+    const session = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });
+    const response = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: session.id,
+        messages: [
+          {
+            id: "u-dangling",
+            role: "user",
+            parts: [
+              {
+                type: "data-user_file_attachments",
+                data: {
+                  location: "scratch",
+                  files: [
+                    {
+                      name: "opaque.bin",
+                      mime: "application/octet-stream",
+                      size: 3,
+                      path: "upload.bin",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        scratch_seed: [{ path: "upload.bin", base64: "AQID" }],
+      }),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "scratch-unavailable",
+    });
+    expect(await sessionsStore.listMessages(session.id)).toEqual([]);
   });
 
   it("POST /agent/run streams UIMessageChunk SSE and emits the in-band session id", async () => {
@@ -505,6 +605,172 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       (p) => (p.data as { type?: string }).type === "text"
     );
     expect((textPart!.data as { text: string }).text).toBe("partial");
+  });
+});
+
+describe("HTTP wire — session-scoped directory references", () => {
+  let baseDir: string;
+  let referenceRoot: string;
+  let sessionsStore: SessionsStore;
+  let directoryScopes: DirectoryScopeRegistry;
+  let runtime: AgentRuntime;
+  let app: Hono;
+  let capturedRuns: Array<{
+    messages: Array<{ parts?: Array<{ text?: string }> }>;
+    directory_scopes?: Array<{ id: string; root: string; path: string }>;
+  }>;
+
+  beforeEach(async () => {
+    baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-agent-dir-ref-"));
+    referenceRoot = path.join(baseDir, "reference-material");
+    const hostSecret = path.join(baseDir, "host-secret");
+    await fs.mkdir(referenceRoot);
+    await fs.mkdir(hostSecret);
+    await fs.writeFile(path.join(referenceRoot, "marker.txt"), "REFERENCE_OK");
+
+    const auth = new AuthStore(baseDir);
+    const secrets = new SecretsStore(auth);
+    await secrets.set("openrouter", "sk-test");
+    sessionsStore = new SessionsStore(
+      openSessionsDb({ user_data_path: baseDir })
+    );
+    directoryScopes = new DirectoryScopeRegistry({
+      protected_roots: [hostSecret],
+    });
+    capturedRuns = [];
+    const capturingRunAgent = async (
+      _provider: unknown,
+      req: (typeof capturedRuns)[number]
+    ): Promise<Response> => {
+      capturedRuns.push(req);
+      return new Response(
+        'data: {"type":"text-start","id":"t0"}\n\n' +
+          'data: {"type":"text-delta","id":"t0","delta":"ok"}\n\n' +
+          'data: {"type":"text-end","id":"t0"}\n\n' +
+          "data: [DONE]\n\n",
+        { headers: { "content-type": "text/event-stream" } }
+      );
+    };
+    runtime = new AgentRuntime({
+      secrets,
+      workspace_registry: new WorkspaceRegistry(path.join(baseDir, "registry")),
+      sessions_store: sessionsStore,
+      directory_scopes: directoryScopes,
+      run_agent: capturingRunAgent as never,
+      drain_cooldown_ms: 20,
+    });
+    app = new Hono();
+    registerAgentRoutes(app, runtime);
+  });
+
+  afterEach(async () => {
+    runtime.dispose();
+    directoryScopes.dispose();
+    sessionsStore.close();
+    await fs.rm(baseDir, { recursive: true, force: true });
+  });
+
+  function messageWith(descriptor: Record<string, unknown>, id: string) {
+    return {
+      id,
+      role: "user",
+      parts: [
+        { type: "text", text: "read the reference" },
+        {
+          type: "data-user_directory_references",
+          data: { directories: [descriptor] },
+        },
+      ],
+    };
+  }
+
+  it("claims before persistence, passes the live root only to bindings, and persists no host path", async () => {
+    const descriptor = await directoryScopes.attach(referenceRoot);
+    const response = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages: [messageWith(descriptor, "u-dir")] }),
+    });
+    expect(response.status).toBe(200);
+    const sessionId = sessionIdFromSse(await response.text());
+    expect(sessionId).toBeTruthy();
+
+    expect(directoryScopes.forSession(sessionId)).toHaveLength(1);
+    expect(capturedRuns).toHaveLength(1);
+    expect(capturedRuns[0].directory_scopes).toEqual([
+      expect.objectContaining({
+        id: descriptor.id,
+        root: await fs.realpath(referenceRoot),
+        path: descriptor.path,
+      }),
+    ]);
+    const marker = capturedRuns[0].messages[0].parts?.find((part) =>
+      part.text?.includes("<user_directory_references>")
+    )?.text;
+    expect(marker).toContain('"available": true');
+
+    const persisted = await sessionsStore.listMessages(sessionId);
+    expect(JSON.stringify(persisted)).not.toContain(referenceRoot);
+    expect(persisted[0].parts[1].data).toMatchObject({
+      data: { directories: [descriptor] },
+    });
+  });
+
+  it("does not let a copied or unknown descriptor mint authority in another session", async () => {
+    const descriptor = await directoryScopes.attach(referenceRoot);
+    const first = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });
+    const firstResponse = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: first.id,
+        messages: [messageWith(descriptor, "u-first")],
+      }),
+    });
+    expect(firstResponse.status).toBe(200);
+    await firstResponse.text();
+
+    const fork = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });
+    const replay = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: fork.id,
+        messages: [messageWith(descriptor, "u-replay")],
+      }),
+    });
+    expect(replay.status).toBe(409);
+    expect(await replay.json()).toMatchObject({
+      code: "directory-scope-owned-by-another-session",
+    });
+    expect(await sessionsStore.listMessages(fork.id)).toEqual([]);
+
+    const unknown = await sessionsStore.create({ agent: AGENT_SESSION_AGENT });
+    const unknownId = "dir_99999999-9999-4999-8999-999999999999";
+    const stale = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: unknown.id,
+        messages: [
+          messageWith(
+            {
+              kind: "scope",
+              id: unknownId,
+              name: "fabricated",
+              path: `/__references__/${unknownId}`,
+              access: "read",
+            },
+            "u-unknown"
+          ),
+        ],
+      }),
+    });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({
+      code: "directory-scope-unavailable",
+    });
+    expect(await sessionsStore.listMessages(unknown.id)).toEqual([]);
   });
 });
 

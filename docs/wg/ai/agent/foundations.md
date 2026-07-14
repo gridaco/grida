@@ -96,9 +96,12 @@ An agent runs **on top of a directory**. That directory is one of:
 - A cloud sandbox provisioned for the run.
 - A git worktree the user is on.
 
-The agent's `fs.*` capability is bounded by that root (and any
-additional roots the manifest declares — for example `{user-data}`
-for config writes). It is never bounded by the host's whole
+The agent's `fs.*` capability is bounded by that execution root plus
+explicit additional scopes. Additional scopes come from either the
+manifest (for example `{user-data}` for config writes) or a trusted
+user grant such as a compositor
+[`directory-ref`](./compositor.md#directory-references). They are
+individually permissioned and never imply access to the host's whole
 filesystem.
 
 This is the smallest assumption the rest of the guide leans on:
@@ -111,8 +114,12 @@ This is the smallest assumption the rest of the guide leans on:
 - **Subagent `task` calls** inherit the root unless explicitly
   overridden.
 
-The root is **resolved at session start** and is **immutable** for
-the session's lifetime. A "move to a different directory" is a new
+The execution root is **resolved at session start** and is
+**immutable** for the session's lifetime. Adding or revoking a bounded
+read scope does not change the execution root, current working
+directory, skill-discovery root, project instructions, git context, or
+writable roots. A "move to a different directory" — including
+promotion of a referenced directory to the workspace — is a new
 session.
 
 ## Locked fundamental tools

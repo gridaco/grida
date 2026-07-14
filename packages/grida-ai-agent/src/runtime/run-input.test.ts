@@ -10,6 +10,7 @@ import {
   type NormalizedMessage,
 } from "./run-input";
 import { buildModelMessages } from "./message-view";
+import { SCRATCH_SEED_LIMITS } from "../protocol/run";
 
 let tempDir: string;
 let opened: OpenedSessionsDb;
@@ -282,6 +283,116 @@ describe("parseRunBody", () => {
     });
   });
 
+  it("accepts an opaque directory reference without requiring a workspace", async () => {
+    const descriptor = {
+      kind: "scope",
+      id: "dir_11111111-1111-4111-8111-111111111111",
+      name: "reference-material",
+      path: "/__references__/dir_11111111-1111-4111-8111-111111111111",
+      access: "read",
+    } as const;
+    const parsed = await parseRunBody(
+      {
+        messages: [
+          {
+            id: "u-directory",
+            role: "user",
+            parts: [
+              { type: "text", text: "inspect it" },
+              {
+                type: "data-user_directory_references",
+                data: { directories: [descriptor] },
+              },
+            ],
+          },
+        ],
+      },
+      deps as never
+    );
+    if (parsed instanceof Response) throw new Error("unexpected rejection");
+    expect(parsed.workspace_root).toBeUndefined();
+    expect(parsed.directory_scopes).toEqual([descriptor]);
+  });
+
+  it.each([
+    {
+      id: "dir_11111111-1111-4111-8111-111111111111",
+      name: "reference-material",
+      path: "/Users/alice/reference-material",
+      access: "read",
+      kind: "scope",
+    },
+    {
+      id: "dir_11111111-1111-4111-8111-111111111111",
+      name: "reference-material",
+      path: "/__references__/dir_11111111-1111-4111-8111-111111111111",
+      access: "write",
+      kind: "scope",
+    },
+    {
+      id: "not-an-opaque-id",
+      name: "reference-material",
+      path: "/__references__/not-an-opaque-id",
+      access: "read",
+      kind: "scope",
+    },
+  ])("rejects a malformed directory descriptor: %j", async (descriptor) => {
+    const parsed = await parseRunBody(
+      {
+        messages: [
+          {
+            role: "user",
+            parts: [
+              {
+                type: "data-user_directory_references",
+                data: { directories: [descriptor] },
+              },
+            ],
+          },
+        ],
+      },
+      deps as never
+    );
+    expect(parsed).toBeInstanceOf(Response);
+    expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
+  });
+
+  it("rejects directory references for an external-agent provider", async () => {
+    const id = "dir_11111111-1111-4111-8111-111111111111";
+    const parsed = await parseRunBody(
+      {
+        model_id: "claude-acp",
+        messages: [
+          {
+            role: "user",
+            parts: [
+              {
+                type: "data-user_directory_references",
+                data: {
+                  directories: [
+                    {
+                      kind: "scope",
+                      id,
+                      name: "reference-material",
+                      path: `/__references__/${id}`,
+                      access: "read",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      deps as never
+    );
+    expect(parsed).toBeInstanceOf(Response);
+    expect(parsed instanceof Response ? parsed.status : 200).toBe(409);
+    expect(
+      parsed instanceof Response ? (await parsed.json()).code : undefined
+    ).toBe("directory-references-unsupported-provider");
+  });
+
   it("parses the per-run `interactive` flag (boolean only; else absent)", async () => {
     // The client declares whether it can answer `question` (a `cli run` sets
     // false; a UI client true). Only an explicit boolean counts — anything else
@@ -310,6 +421,214 @@ describe("parseRunBody", () => {
             parts: [{ text: "missing type" }],
           },
         ],
+      },
+      deps as never
+    );
+    expect(parsed).toBeInstanceOf(Response);
+    expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
+  });
+
+  it("parses bounded scratch_seed text + base64 entries", async () => {
+    const parsed = await parseRunBody(
+      {
+        messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
+        scratch_seed: [
+          { path: "notes.txt", text: "hello" },
+          { path: "doc.pdf", base64: "AAAA" },
+        ],
+      },
+      deps as never
+    );
+    if (parsed instanceof Response) throw new Error("unexpected 400");
+    expect(parsed.scratch_seed).toEqual([
+      { path: "notes.txt", text: "hello" },
+      { path: "doc.pdf", base64: "AAAA" },
+    ]);
+  });
+
+  it("accepts the canonical scratch_seed file-count limit and rejects one more", async () => {
+    const messages = [{ role: "user", parts: [{ type: "text", text: "hi" }] }];
+    const entries = Array.from(
+      { length: SCRATCH_SEED_LIMITS.maxFiles },
+      (_, index) => ({ path: `seed-${index}.txt`, text: "" })
+    );
+
+    const accepted = await parseRunBody(
+      { messages, scratch_seed: entries },
+      deps as never
+    );
+    expect(accepted).not.toBeInstanceOf(Response);
+
+    const rejected = await parseRunBody(
+      {
+        messages,
+        scratch_seed: [
+          ...entries,
+          { path: "one-over-the-limit.txt", text: "" },
+        ],
+      },
+      deps as never
+    );
+    expect(rejected).toBeInstanceOf(Response);
+    expect(rejected instanceof Response ? rejected.status : 200).toBe(400);
+  });
+
+  it("accepts the canonical scratch_seed decoded-byte limit and rejects one more", async () => {
+    const messages = [{ role: "user", parts: [{ type: "text", text: "hi" }] }];
+    const atLimit = Buffer.alloc(SCRATCH_SEED_LIMITS.maxTotalBytes).toString(
+      "base64"
+    );
+    const overLimit = Buffer.alloc(
+      SCRATCH_SEED_LIMITS.maxTotalBytes + 1
+    ).toString("base64");
+
+    const accepted = await parseRunBody(
+      {
+        messages,
+        scratch_seed: [{ path: "at-limit.bin", base64: atLimit }],
+      },
+      deps as never
+    );
+    expect(accepted).not.toBeInstanceOf(Response);
+
+    const rejected = await parseRunBody(
+      {
+        messages,
+        scratch_seed: [{ path: "over-limit.bin", base64: overLimit }],
+      },
+      deps as never
+    );
+    expect(rejected).toBeInstanceOf(Response);
+    expect(rejected instanceof Response ? rejected.status : 200).toBe(400);
+  });
+
+  it.each([
+    [{ path: "bad.bin", base64: "not base64!" }],
+    [{ path: "bad-padding.bin", base64: "A===" }],
+    [{ path: "only-padding.bin", base64: "====" }],
+    [{ path: "noncanonical-bits.bin", base64: "AB==" }],
+    [{ path: "", text: "no path" }],
+    [{ text: "no path key" }],
+    [{ path: "empty.bin" }],
+    [
+      { path: "same.bin", base64: "AAAA" },
+      { path: "same.bin", base64: "AQID" },
+    ],
+  ])(
+    "rejects the entire scratch seed when one entry is malformed: %j",
+    async (...scratch_seed) => {
+      const parsed = await parseRunBody(
+        {
+          messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
+          scratch_seed,
+        },
+        deps as never
+      );
+      expect(parsed).toBeInstanceOf(Response);
+      expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
+    }
+  );
+
+  it("rejects the entire scratch_seed when decoded bytes exceed the cap", async () => {
+    // A well-formed base64 string whose decoded size blows the ~8 MB budget must
+    // trip the running total (measured on decoded bytes, not the b64 length).
+    const b64Len = Math.ceil((9 * 1024 * 1024) / 3) * 4; // ~9 MB decoded, padded
+    const huge = "A".repeat(b64Len - 1) + "="; // valid padded base64
+    const parsed = await parseRunBody(
+      {
+        messages: [{ role: "user", parts: [{ type: "text", text: "hi" }] }],
+        scratch_seed: [
+          { path: "small.txt", text: "ok" },
+          { path: "huge.bin", base64: huge },
+        ],
+      },
+      deps as never
+    );
+    expect(parsed).toBeInstanceOf(Response);
+    expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
+  });
+
+  it("binds ordered persisted attachment facts to exact scratch seed bodies", async () => {
+    const parsed = await parseRunBody(
+      {
+        messages: [
+          {
+            id: "u-attachment",
+            role: "user",
+            parts: [
+              { type: "text", text: "inspect these" },
+              {
+                type: "data-user_file_attachments",
+                data: {
+                  location: "scratch",
+                  files: [
+                    {
+                      name: "Document.pdf",
+                      mime: "application/pdf",
+                      size: 3,
+                      path: "upload-1.pdf",
+                    },
+                    {
+                      name: "Notes.txt",
+                      mime: "text/plain",
+                      size: 5,
+                      path: "upload-2.txt",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        scratch_seed: [
+          { path: "upload-1.pdf", base64: "AQID" },
+          { path: "upload-2.txt", text: "hello" },
+        ],
+      },
+      deps as never
+    );
+    if (parsed instanceof Response) throw new Error("unexpected 400");
+    const s = await store.create({ agent: "grida" });
+    await persistIncomingTail(store, s.id, parsed.messages);
+    const persisted = await store.listVisibleMessages(s.id);
+    expect(persisted[0].parts[1].type).toBe("data-user_file_attachments");
+    const model = buildModelMessages(persisted);
+    const marker = model[0].parts[1] as { type: string; text: string };
+    expect(marker.text).toContain("<user_file_attachments>");
+    expect(marker.text).toContain('"path": "upload-1.pdf"');
+    expect(marker.text.indexOf("Document.pdf")).toBeLessThan(
+      marker.text.indexOf("Notes.txt")
+    );
+  });
+
+  it.each([
+    [undefined, "missing body"],
+    [{ path: "upload.pdf", base64: "AQIDBA==" }, "wrong size"],
+  ])("rejects a dangling attachment descriptor (%s)", async (seed, _label) => {
+    const parsed = await parseRunBody(
+      {
+        messages: [
+          {
+            role: "user",
+            parts: [
+              {
+                type: "data-user_file_attachments",
+                data: {
+                  location: "scratch",
+                  files: [
+                    {
+                      name: "Document.pdf",
+                      mime: "application/pdf",
+                      size: 3,
+                      path: "upload.pdf",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+        scratch_seed: seed ? [seed] : undefined,
       },
       deps as never
     );

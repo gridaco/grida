@@ -43,6 +43,32 @@ export type AgentRunMessage = {
 };
 
 /**
+ * One `scratch_seed` entry — a file the client asks the host to write into the
+ * session scratch dir BEFORE the turn (WG `scratch.md` / `binary.md`). Two arms:
+ *   - `{ path, text }`   — a UTF-8 text file (e.g. a `.canvas` bundle member).
+ *   - `{ path, base64 }` — arbitrary bytes, base64-encoded (an uploaded PDF /
+ *     zip / image the agent then reads or extracts by path via its shell).
+ * `path` is a flat single segment; the host bounds the set and enforces
+ * containment at write (`parseScratchSeed` / `writeScratchFile`).
+ */
+export type ScratchSeedEntry =
+  | { path: string; text: string }
+  | { path: string; base64: string };
+
+/**
+ * Canonical `scratch_seed` request ceilings.
+ *
+ * `maxTotalBytes` is the aggregate body size after decoding: UTF-8 bytes for
+ * `text` entries and decoded bytes for canonical base64 entries. These are wire
+ * protocol invariants, not host or UI policy. The server remains authoritative;
+ * callers may use the same immutable values for early request preflight.
+ */
+export const SCRATCH_SEED_LIMITS = Object.freeze({
+  maxFiles: 64,
+  maxTotalBytes: 8 * 1024 * 1024,
+} as const);
+
+/**
  * A user's Allow/Deny on a paused supervised approval (RFC `permission modes`,
  * Phase 2). It rides the resume run-request body as a FIRST-CLASS field — not
  * smuggled inside a mutated assistant message — exactly like `mode`/`model_id`.
@@ -100,14 +126,15 @@ export type AgentRunOptions = {
   approval_answer?: ApprovalAnswer;
   /**
    * Files to seed into the session's scratch dir before the model turn (WG
-   * `scratch.md` / `binary.md`) — an attachment (e.g. a picked slides template's
-   * unzipped `.canvas` bundle) lands in scratch, NOT the user's workspace. Flat
-   * single-segment paths; the host bounds the set and enforces containment at
-   * write (`parseScratchSeed` / `writeScratchFile`). Carried on the FIRST turn;
-   * forwarded verbatim in the run POST body (JSON), so every bridge layer that
+   * `scratch.md` / `binary.md`) — an attachment (a picked slides template's
+   * unzipped `.canvas` bundle, or an uploaded PDF/zip/image) lands in scratch,
+   * NOT the user's workspace. Text or base64-binary entries ({@link
+   * ScratchSeedEntry}); flat single-segment paths; the host bounds the set and
+   * enforces containment at write (`parseScratchSeed` / `writeScratchFile`).
+   * Forwarded verbatim in the run POST body (JSON), so every bridge layer that
    * whitelists run-option fields must also carry it.
    */
-  scratch_seed?: { path: string; text: string }[];
+  scratch_seed?: ScratchSeedEntry[];
   /**
    * Optional persistent session id. When omitted, the agent host creates a
    * new chat session row and returns the id via the transport response.

@@ -11,13 +11,19 @@ export {
   ComposerTriggerMenu,
 } from "./composer-defaults";
 
+export { ComposerTransfer } from "./composer-transfer";
+
 export type {
   ComposerAttachment,
   ComposerAttachmentFilter,
   ComposerAttachmentInput,
   ComposerCatalog,
   ComposerCommand,
+  ComposerDirectoryAttachment,
+  ComposerDirectoryRefPart,
+  ComposerDirectoryScopeReference,
   ComposerEditorContext,
+  ComposerFileAttachment,
   ComposerFileReference,
   ComposerMention,
   ComposerMessage,

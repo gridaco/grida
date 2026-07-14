@@ -173,6 +173,47 @@ describe("buildModelMessages", () => {
     expect((out[0].parts[0] as { text: string }).text).toBe("hi");
   });
 
+  it("annotates directory references from live host authority without mutating persistence", () => {
+    const liveId = "dir_11111111-1111-4111-8111-111111111111";
+    const staleId = "dir_22222222-2222-4222-8222-222222222222";
+    const rows = [
+      msg("m-directory", "user", [
+        part("data-user_directory_references", {
+          type: "data-user_directory_references",
+          data: {
+            directories: [
+              {
+                kind: "scope",
+                id: liveId,
+                name: "live",
+                path: `/__references__/${liveId}`,
+                access: "read",
+              },
+              {
+                kind: "scope",
+                id: staleId,
+                name: "stale",
+                path: `/__references__/${staleId}`,
+                access: "read",
+              },
+            ],
+          },
+        }),
+      ]),
+    ];
+
+    const out = buildModelMessages(rows, {
+      availableDirectoryScopeIds: new Set([liveId]),
+    });
+    const marker = out[0].parts[0] as { text: string };
+    expect(marker.text).toContain('"name": "live"');
+    expect(marker.text).toContain('"available": true');
+    expect(marker.text).toContain('"name": "stale"');
+    expect(marker.text).toContain('"available": false');
+    // `available` is a model-view fact, never durable chat authority.
+    expect(JSON.stringify(rows)).not.toContain('"available"');
+  });
+
   it("resolves a bottom summary: drops the head, reorders the summary to the front", () => {
     // New model: the marker sorts LAST. The boundary is read from tail_start_id,
     // the head before it is dropped, and the summary leads.

@@ -77,6 +77,9 @@ export namespace models {
       cacheWrite?: number;
     }
 
+    /** An exact image media type accepted as model input. */
+    export type ImageInputMime = `image/${string}`;
+
     export interface ModelSpec {
       /** Provider-namespaced model id (`creator/model-name`). */
       id: string;
@@ -90,6 +93,13 @@ export namespace models {
       short_label?: string;
       /** Whether the model accepts image/file inputs. */
       multimodal: boolean;
+      /**
+       * Exact image MIME types accepted natively by the model. This is sourced
+       * independently from {@link multimodal}: a broad multimodal declaration
+       * never manufactures formats, and provider-specific constraints beyond
+       * MIME type still apply.
+       */
+      readonly imageInputMimes: readonly ImageInputMime[];
       /**
        * Whether the model supports native tool/function calling. Explicit
        * on every entry — the agent loop is tool-heavy, so this flag gates
@@ -109,11 +119,39 @@ export namespace models {
       deprecated?: boolean;
     }
 
+    // Provider-family capabilities are kept private so catalogue entries remain
+    // explicit while sharing one source-backed value. Do not derive these from
+    // `multimodal`; a future model may be multimodal without a documented image
+    // input format set.
+    // https://developers.openai.com/api/docs/guides/images-vision#image-input-requirements
+    const OPENAI_IMAGE_INPUT_MIMES = [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/gif",
+    ] as const satisfies readonly ImageInputMime[];
+    // https://platform.claude.com/docs/en/build-with-claude/vision#supported-formats
+    const ANTHROPIC_IMAGE_INPUT_MIMES = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ] as const satisfies readonly ImageInputMime[];
+    // https://ai.google.dev/gemini-api/docs/image-understanding#supported-image-formats
+    const GOOGLE_IMAGE_INPUT_MIMES = [
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/heic",
+      "image/heif",
+    ] as const satisfies readonly ImageInputMime[];
+
     const catalogSpecs = {
       "openai/gpt-5.4-nano": {
         id: "openai/gpt-5.4-nano",
         label: "GPT-5.4 Nano",
         multimodal: true,
+        imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 400_000,
         outputLimit: 128_000,
@@ -123,6 +161,7 @@ export namespace models {
         id: "openai/gpt-5.4-mini",
         label: "GPT-5.4 Mini",
         multimodal: true,
+        imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 400_000,
         outputLimit: 128_000,
@@ -132,6 +171,7 @@ export namespace models {
         id: "openai/gpt-5.5",
         label: "GPT-5.5",
         multimodal: true,
+        imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 1_050_000,
         outputLimit: 128_000,
@@ -141,6 +181,7 @@ export namespace models {
         id: "openai/gpt-5.5-pro",
         label: "GPT-5.5 Pro",
         multimodal: true,
+        imageInputMimes: OPENAI_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 1_050_000,
         outputLimit: 128_000,
@@ -155,6 +196,7 @@ export namespace models {
         label: "Claude Sonnet 5",
         short_label: "Sonnet 5",
         multimodal: true,
+        imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
@@ -165,6 +207,7 @@ export namespace models {
         label: "Claude Sonnet 4.6",
         short_label: "Sonnet 4.6",
         multimodal: true,
+        imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
@@ -176,6 +219,7 @@ export namespace models {
         label: "Claude Opus 4.8",
         short_label: "Opus 4.8",
         multimodal: true,
+        imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
@@ -186,6 +230,7 @@ export namespace models {
         label: "Claude Opus 4.7",
         short_label: "Opus 4.7",
         multimodal: true,
+        imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 1_000_000,
         outputLimit: 128_000,
@@ -198,6 +243,7 @@ export namespace models {
         id: "google/gemini-3.5-flash",
         label: "Gemini 3.5 Flash",
         multimodal: true,
+        imageInputMimes: GOOGLE_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 1_048_576,
         outputLimit: 65_536,
@@ -208,6 +254,7 @@ export namespace models {
         label: "Gemini 3.1 Pro Preview",
         short_label: "Gemini 3.1 Pro",
         multimodal: true,
+        imageInputMimes: GOOGLE_IMAGE_INPUT_MIMES,
         tool_call: true,
         contextWindow: 1_048_576,
         outputLimit: 65_536,
@@ -295,6 +342,12 @@ export namespace models {
         /** Whether the model accepts image/file inputs. Default `false`. */
         multimodal?: boolean;
         /**
+         * Exact image MIME types declared by the model host. Default empty.
+         * A non-empty declaration makes the normalized model multimodal; the
+         * inverse is deliberately not inferred.
+         */
+        readonly imageInputMimes?: readonly ImageInputMime[];
+        /**
          * Whether the model supports native tool/function calling.
          * Default `true` (permissive) — consumers warn rather than block
          * when this is explicitly `false`.
@@ -330,6 +383,7 @@ export namespace models {
        */
       export const CUSTOM_MODEL_DEFAULTS = {
         multimodal: false,
+        imageInputMimes: [] as readonly ImageInputMime[],
         tool_call: true,
         contextWindow: 8_192,
         outputLimit: 4_096,
@@ -337,10 +391,16 @@ export namespace models {
 
       /** Fill a custom spec's gaps with {@link CUSTOM_MODEL_DEFAULTS}. */
       export function normalize(spec: CustomModelSpec): ResolvedModelSpec {
+        const imageInputMimes = spec.imageInputMimes
+          ? [...spec.imageInputMimes]
+          : CUSTOM_MODEL_DEFAULTS.imageInputMimes;
         return {
           id: spec.id,
           label: spec.label && spec.label.length > 0 ? spec.label : spec.id,
-          multimodal: spec.multimodal ?? CUSTOM_MODEL_DEFAULTS.multimodal,
+          multimodal:
+            imageInputMimes.length > 0 ||
+            (spec.multimodal ?? CUSTOM_MODEL_DEFAULTS.multimodal),
+          imageInputMimes,
           tool_call: spec.tool_call ?? CUSTOM_MODEL_DEFAULTS.tool_call,
           contextWindow:
             spec.contextWindow ?? CUSTOM_MODEL_DEFAULTS.contextWindow,

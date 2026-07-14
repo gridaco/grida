@@ -28,6 +28,7 @@ import type {
   SessionStatus,
   GridaGatewaySession,
   GridaGatewaySessionStatus,
+  DirectoryScopeDescriptor,
 } from "@grida/agent";
 import type {
   DaemonHandshakeResponse,
@@ -63,8 +64,19 @@ export type DesktopNativeCapabilities = {
   workspace_watch: boolean;
 };
 
+export type DesktopAgentCapabilities = {
+  /**
+   * The host accepts base64 scratch seeds (`{ path, base64 }`) on agent runs.
+   * Added after protocol 1 shipped; renderers must treat a missing/falsy value
+   * as an old host that accepts text-only scratch seeds.
+   */
+  scratch_seed_base64?: boolean;
+};
+
 export type DesktopCapabilities = {
   native: DesktopNativeCapabilities;
+  /** Optional because protocol-1 hosts shipped before agent capabilities. */
+  agent?: DesktopAgentCapabilities;
 };
 
 export type HandshakeResponse = DaemonHandshakeResponse;
@@ -367,6 +379,13 @@ export type DesktopBridge = {
     generate: (req: VideoGenerateRequest) => Promise<VideoGenerateResult>;
   };
   agent: {
+    /**
+     * Turn an OS-backed directory `File` from a real drop into an opaque,
+     * read-only agent scope. Optional on protocol 1: older desktop binaries and
+     * browser hosts omit it. The absolute path is resolved inside Electron's
+     * preload and never returns to renderer code.
+     */
+    attach_directory?: (file: File) => Promise<DirectoryScopeDescriptor>;
     run: (
       opts: AgentRunOptions,
       onChunk: (chunk: AgentUIMessageChunk) => void

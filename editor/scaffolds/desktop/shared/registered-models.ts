@@ -2,7 +2,7 @@
  * Registered (endpoint) models in the desktop renderer — issue #806.
  *
  * One fetch surface + pure resolution helpers shared by the model
- * picker, the capability gates (multimodal / tool_call), and the context
+ * picker, exact model capability gates, and the context
  * meter, so every consumer resolves a model id the same way: static
  * catalog ∪ user-registered endpoint models via
  * `models.text.registry.resolve`.
@@ -33,7 +33,13 @@ export namespace registered_models {
     modelId: string,
     endpoints: readonly EndpointProviderConfig[]
   ): _models.text.registry.ResolvedModelSpec | undefined {
-    return _models.text.registry.resolve(modelId, specs(endpoints));
+    // A registered endpoint wins the same id collision because sends pin that
+    // endpoint through `providerIdForModel` below. Resolving the static catalog
+    // first would pair endpoint execution with unrelated catalog capabilities.
+    const custom = specs(endpoints).find((spec) => spec.id === modelId);
+    return custom
+      ? _models.text.registry.normalize(custom)
+      : _models.text.registry.resolve(modelId, []);
   }
 
   /**

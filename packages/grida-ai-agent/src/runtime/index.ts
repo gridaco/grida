@@ -36,6 +36,10 @@ import { runAgentProviderTurn } from "./agent-provider-run";
 import { createRecorderConsumer } from "../session/recorder";
 import { titler } from "../session/titler";
 import type { SessionsStore } from "../session/store";
+import {
+  DirectoryScopeError,
+  type DirectoryScopeRegistry,
+} from "../session/directory-scopes";
 import type { ChatModel, MessageUsage } from "../session/rows";
 import { usageTokenTotal } from "../session/cost";
 import {
@@ -164,6 +168,13 @@ export type AgentRuntimeDeps = ResolveDeps & {
   workspace_registry: WorkspaceRegistry;
   sessions_store: SessionsStore;
   /**
+   * GRIDA-SEC-004 — host-held authority behind compositor `directory-ref`
+   * parts. Descriptors in the transcript are inert until this registry claims
+   * the matching trusted gesture for one session. Optional for stripped hosts
+   * and tests; a run carrying a fresh descriptor then fails closed.
+   */
+  directory_scopes?: DirectoryScopeRegistry;
+  /**
    * GRIDA-SEC-004 — the agent host's own secret root (its `userData`, where
    * BYOK `auth.json`, `workspaces.json`, `recent.json`, and the sessions db
    * live). The host process reads it for provider auth, so it is NOT in the
@@ -291,13 +302,10 @@ type StartTurnOptions = {
   /** Whether the requesting client can resolve `design_search` (per-run; absent
    *  ⇒ the host `library` default). */
   library?: RunRequest["library"];
-  /**
-   * Files to seed into the session's scratch dir before the turn (WG
-   * `scratch.md`): a picked template's unzipped bundle / an upload lands there,
-   * not the workspace. Only the direct HTTP run (the first turn) carries it; a
-   * queue drain leaves it absent — scratch was already seeded on turn one.
-   */
-  scratch_seed?: RunRequest["scratch_seed"];
+  /** Prepared scratch dir for a direct run. The bytes are staged before the
+   * incoming user row is persisted; queue drains derive ordinary scratch reach
+   * inside `startTurn` because they carry no transient seed body. */
+  scratch_dir?: string;
   /**
    * The user message this turn fires — the fired-message identity the
    * turn-lifecycle wire carries (RFC `turn-authority`; emitted on the
@@ -314,28 +322,21 @@ type StartTurnOptions = {
 };
 
 async function prepareScratchForTurn(
-  sessionId: string,
-  scratchDir: string | undefined,
+  scratchDir: string,
   secretsRoot: string | undefined,
-  scratchSeed: StartTurnOptions["scratch_seed"]
+  scratchSeed: NonNullable<RunRequest["scratch_seed"]>
 ): Promise<void> {
-  if (!scratchDir) return;
   await ensureScratch(scratchDir, secretsRoot);
-  if (!scratchSeed || scratchSeed.length === 0) return;
-
-  const seeded = await Promise.allSettled(
-    scratchSeed.map((f) =>
-      writeScratchFile(scratchDir, f.path, new TextEncoder().encode(f.text))
-    )
-  );
-  for (const r of seeded) {
-    if (r.status === "rejected") {
-      console.warn(
-        `[agent-host] scratch seed file failed sessionId=${sessionId}: ${String(
-          r.reason
-        )}`
-      );
-    }
+  // Sequential by contract: duplicate paths are rejected at the run boundary,
+  // and deterministic order keeps future seed-source extensions honest.
+  for (const file of scratchSeed) {
+    await writeScratchFile(
+      scratchDir,
+      file.path,
+      "text" in file
+        ? new TextEncoder().encode(file.text)
+        : Buffer.from(file.base64, "base64")
+    );
   }
 }
 
@@ -792,6 +793,34 @@ export class AgentRuntime {
       approval_answer: approvalAnswer,
     } = req;
 
+    // GRIDA-SEC-004 — a persisted `directory-ref` is NOT authority. Claim the
+    // matching one-shot host grant for this exact session before mutating the
+    // prior transcript, staging scratch, or persisting the incoming tail. The
+    // registry compares every descriptor to its canonical host facts and
+    // commits the set atomically; replay/fork/stale ids therefore fail closed.
+    if (req.directory_scopes && req.directory_scopes.length > 0) {
+      const registry = this.deps.directory_scopes;
+      if (!registry) {
+        return Response.json(
+          {
+            error: "directory references are unavailable on this host",
+            code: "directory-scopes-unavailable",
+            session_id: sessionId,
+          },
+          { status: 409 }
+        );
+      }
+      try {
+        registry.claim(sessionId, req.directory_scopes);
+      } catch (err) {
+        if (!(err instanceof DirectoryScopeError)) throw err;
+        return Response.json(
+          { error: err.message, code: err.code, session_id: sessionId },
+          { status: 409 }
+        );
+      }
+    }
+
     // Supervised-approval resume (RFC `permission modes`, Phase 2): if this
     // re-submit carries an Allow/Deny (the explicit `approval_answer` body
     // field), apply it to the persisted part BEFORE anything else — the
@@ -841,6 +870,48 @@ export class AgentRuntime {
       );
     }
 
+    // The durable multipart row may describe scratch-backed attachments, so
+    // the transient bodies MUST exist first. Failure is an HTTP error before
+    // `persistIncomingTail`: a descriptor can never outlive a failed seed.
+    const scratchDir =
+      this.deps.scratch_base &&
+      workspaceRoot &&
+      req.scratch_seed &&
+      req.scratch_seed.length > 0
+        ? scratchRootFor(this.deps.scratch_base, sessionId)
+        : undefined;
+    if (req.scratch_seed && req.scratch_seed.length > 0) {
+      if (!scratchDir) {
+        return Response.json(
+          {
+            error:
+              "scratch-backed files require a workspace-bound session and an enabled scratch base",
+            code: "scratch-unavailable",
+            session_id: sessionId,
+          },
+          { status: 409 }
+        );
+      }
+      try {
+        await prepareScratchForTurn(
+          scratchDir,
+          this.deps.secrets_root,
+          req.scratch_seed
+        );
+      } catch (err) {
+        return Response.json(
+          {
+            error: `failed to stage scratch files: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+            code: "scratch-seed-failed",
+            session_id: sessionId,
+          },
+          { status: 500 }
+        );
+      }
+    }
+
     await persistIncomingTail(this.deps.sessions_store, sessionId, messages);
 
     // Fire-and-forget title generation; writes title only if still the
@@ -880,9 +951,9 @@ export class AgentRuntime {
         interactive: req.interactive,
         // Per-run library-search capability (renderer wires the resolver).
         library: req.library,
-        // First-turn scratch seed (a picked template's unzipped bundle / an
-        // upload) — landed in scratch before the model turn (WG `scratch.md`).
-        scratch_seed: req.scratch_seed,
+        // Direct-run seeds were staged before persistence. Pass the exact root
+        // onward so bindings expose the same files to tools and shell.
+        scratch_dir: scratchDir,
         // The fired message of a direct run is the incoming tail's user
         // message (the client resends history; the tail is the new one). An
         // approval-answer resume continues the PRIOR turn's tool call — it
@@ -933,8 +1004,16 @@ export class AgentRuntime {
       mode,
       interactive,
       library,
-      scratch_seed: scratchSeed,
+      scratch_dir: preparedScratchDir,
     } = opts;
+    // Snapshot the session's live host grants once per turn. Queue drains carry
+    // no client request, so resolving here (rather than from the direct POST)
+    // is what keeps a claimed directory usable on later and queued turns.
+    const directoryScopes =
+      this.deps.directory_scopes?.forSession(sessionId) ?? [];
+    const availableDirectoryScopeIds = new Set(
+      directoryScopes.map((scope) => scope.id)
+    );
 
     // ONE visible-messages snapshot per turn, kicked at reserve time — it
     // serves BOTH consumers: the continuation replay prefix
@@ -1015,13 +1094,12 @@ export class AgentRuntime {
     // `generate_image` (its output dir), so derive it when EITHER is enabled —
     // an images-only host that keeps the shell off still needs it (#920 review).
     const scratchDir =
-      scratchBase &&
+      preparedScratchDir ??
+      (scratchBase &&
       workspaceRoot &&
-      (shellExecutionAllowed ||
-        this.deps.image_gen_enabled === true ||
-        (scratchSeed && scratchSeed.length > 0))
+      (shellExecutionAllowed || this.deps.image_gen_enabled === true)
         ? scratchRootFor(scratchBase, sessionId)
-        : undefined;
+        : undefined);
     // Bindings deps for the run. Typed (not an inline literal) so the
     // GRIDA-SEC-004 `secrets_root` + `shell_execution_allowed` (and `scratch_dir`)
     // thread through `runAgent`'s narrower `{ workspace_registry }` param into
@@ -1056,16 +1134,12 @@ export class AgentRuntime {
         // failed read, and each consumer below falls back to its own read.
         const snapshotVisible = (await turnSnapshot).visible;
 
-        // Create the session scratch dir before ANY provider split so
-        // agent-provider turns and model-provider turns see the same first-turn
-        // template/upload seed. `scratchDir` also exists for shell/image-only
-        // hosts even without a seed.
-        await prepareScratchForTurn(
-          sessionId,
-          scratchDir,
-          secretsRoot,
-          scratchSeed
-        );
+        // Direct-run seed bytes already landed before persistence. Ordinary
+        // shell/image scratch (including queue drains) is still created lazily
+        // here before bindings resolve its real path.
+        if (scratchDir && !preparedScratchDir) {
+          await ensureScratch(scratchDir, secretsRoot);
+        }
 
         // Agent-provider class (issue #813): the external agent owns the loop.
         // Skip compaction/model-factory/tool-injection entirely — just run one
@@ -1076,7 +1150,11 @@ export class AgentRuntime {
           const visible =
             snapshotVisible ??
             (await sessionsStore.listVisibleMessages(sessionId));
-          const preparedMessages = buildModelMessages(visible);
+          const preparedMessages = buildModelMessages(visible, {
+            // External agents do not receive our structured fs binding. A
+            // durable historical descriptor remains inspectable but inert.
+            availableDirectoryScopeIds: new Set(),
+          });
           // Continuity (issue #813): resume the external agent's prior session
           // so it keeps the conversation. Read the id stored last turn, pass it
           // in, and persist the id observed this turn for the NEXT turn.
@@ -1141,7 +1219,9 @@ export class AgentRuntime {
           !compacted && snapshotVisible
             ? snapshotVisible
             : await sessionsStore.listVisibleMessages(sessionId);
-        const preparedMessages = buildModelMessages(visible);
+        const preparedMessages = buildModelMessages(visible, {
+          availableDirectoryScopeIds,
+        });
 
         // Session-static skills + project instructions (discovered once).
         const ctx = await this.sessionContext(sessionId, workspaceRoot);
@@ -1166,6 +1246,7 @@ export class AgentRuntime {
             run_id: runId,
             signal: entry.model_abort.signal,
             workspace_root: workspaceRoot,
+            directory_scopes: directoryScopes,
             mode,
             interactive,
             library,
@@ -1516,6 +1597,7 @@ export class AgentRuntime {
   /** Drop a session's cached static context (call when a session is deleted). */
   forgetSession(sessionId: string): void {
     this.session_contexts.delete(sessionId);
+    this.deps.directory_scopes?.forgetSession(sessionId);
     this.scheduler.forget(sessionId);
     this.fired_messages.delete(sessionId);
   }
