@@ -10,6 +10,9 @@ const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const githubApiVersion = "2022-11-28";
 const githubRequestTimeoutMs = 30_000;
 const githubUploadTimeoutMs = 300_000;
+const githubReleaseVisibilityRetryDelaysMs = Object.freeze([
+  500, 1_000, 2_000, 4_000, 8_000,
+]);
 
 export const DesktopRelease = Object.freeze({
   expectedAssetNames(version) {
@@ -263,6 +266,52 @@ async function sha256(filePath) {
   return `sha256:${hash.digest("hex")}`;
 }
 
+function wait(delayMs) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function confirmDraftIdentity(
+  client,
+  {
+    expectedId,
+    phase = "while assembling",
+    retryDelaysMs,
+    tag,
+    target,
+    waitForRetry = wait,
+  }
+) {
+  for (let attempt = 0; ; attempt += 1) {
+    const selected = DesktopRelease.selectDraft(
+      await client.listReleases(),
+      tag,
+      target
+    );
+    if (selected) {
+      if (selected.id !== expectedId) {
+        throw new Error(
+          `Release identity changed ${phase} ${tag}: expected ${expectedId}, found ${selected.id}`
+        );
+      }
+      return selected;
+    }
+
+    const delayMs = retryDelaysMs[attempt];
+    if (delayMs === undefined) {
+      throw new Error(
+        `Release ${expectedId} did not become visible ${phase} ${tag} after ${attempt + 1} checks`
+      );
+    }
+    if (!Number.isFinite(delayMs) || delayMs < 0) {
+      throw new Error("Release visibility retry delays must be non-negative");
+    }
+    console.log(
+      `Waiting ${delayMs}ms for GitHub to list ${tag} release ${expectedId}`
+    );
+    await waitForRetry(delayMs);
+  }
+}
+
 export async function collectReleaseAssets(directory, expectedNames) {
   const assets = new Map();
   for (const filePath of await walkFiles(directory)) {
@@ -292,7 +341,14 @@ export async function collectReleaseAssets(directory, expectedNames) {
 }
 
 export async function assembleDesktopRelease(options, client) {
-  const { assetsDirectory, notes, prerelease, target, version } = options;
+  const {
+    assetsDirectory,
+    draftVisibility = {},
+    notes,
+    prerelease,
+    target,
+    version,
+  } = options;
   const tag = `v${version}`;
   const expectedNames = DesktopRelease.expectedAssetNames(version);
   const localAssets = await collectReleaseAssets(
@@ -314,16 +370,17 @@ export async function assembleDesktopRelease(options, client) {
     });
   }
 
-  // Re-read after creation. This catches any competing publisher instead of
-  // silently splitting the release across multiple draft IDs.
-  const selected = DesktopRelease.selectDraft(
-    await client.listReleases(),
+  // GitHub's list endpoint can briefly omit a release around mutations.
+  // Retry only that absent state; conflicting, duplicate, published,
+  // immutable, and wrong-target releases still fail immediately.
+  await confirmDraftIdentity(client, {
+    expectedId: release.id,
+    retryDelaysMs:
+      draftVisibility.retryDelaysMs ?? githubReleaseVisibilityRetryDelaysMs,
     tag,
-    target
-  );
-  if (!selected || selected.id !== release.id) {
-    throw new Error(`Release identity changed while assembling ${tag}`);
-  }
+    target,
+    waitForRetry: draftVisibility.wait,
+  });
 
   release = await client.updateDraft(release.id, {
     tag,
@@ -391,14 +448,15 @@ export async function assembleDesktopRelease(options, client) {
     throw new Error(`Remote release metadata verification failed for ${tag}`);
   }
 
-  const finalSelection = DesktopRelease.selectDraft(
-    await client.listReleases(),
+  await confirmDraftIdentity(client, {
+    expectedId: release.id,
+    phase: "after assembling",
+    retryDelaysMs:
+      draftVisibility.retryDelaysMs ?? githubReleaseVisibilityRetryDelaysMs,
     tag,
-    target
-  );
-  if (!finalSelection || finalSelection.id !== release.id) {
-    throw new Error(`Release identity changed after assembling ${tag}`);
-  }
+    target,
+    waitForRetry: draftVisibility.wait,
+  });
   return finalRelease;
 }
 
