@@ -8,9 +8,43 @@ import {
   assembleDesktopRelease,
   collectReleaseAssets,
   DesktopRelease,
+  GitHubReleaseClient,
 } from "./assemble-desktop-release.mjs";
 
 const version = "0.0.8";
+
+async function writeReleaseAssets(directory) {
+  const expected = DesktopRelease.expectedAssetNames(version);
+  for (const [index, name] of expected.entries()) {
+    const nested = path.join(directory, String(index));
+    await mkdir(nested);
+    await writeFile(path.join(nested, name), name);
+  }
+  return collectReleaseAssets(directory, expected);
+}
+
+function createRelease({ assets = [], id = 42 } = {}) {
+  return {
+    id,
+    assets,
+    body: "release notes",
+    draft: true,
+    html_url: "https://example.test/draft",
+    immutable: false,
+    name: `v${version}`,
+    prerelease: false,
+    tag_name: `v${version}`,
+    target_commitish: "expected-sha",
+    upload_url: "https://uploads.example.test/{?name,label}",
+  };
+}
+
+const assemblyOptions = {
+  notes: "release notes",
+  prerelease: false,
+  target: "expected-sha",
+  version,
+};
 
 test("defines the complete cross-platform desktop asset manifest", () => {
   assert.deepEqual(DesktopRelease.expectedAssetNames(version), [
@@ -131,12 +165,7 @@ test("refuses incomplete local artifacts", async () => {
 test("assembles one complete draft through one numeric release ID", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "desktop-release-"));
   try {
-    const expected = DesktopRelease.expectedAssetNames(version);
-    for (const [index, name] of expected.entries()) {
-      const nested = path.join(directory, String(index));
-      await mkdir(nested);
-      await writeFile(path.join(nested, name), name);
-    }
+    await writeReleaseAssets(directory);
 
     const uploads = [];
     const client = {
@@ -195,11 +224,8 @@ test("assembles one complete draft through one numeric release ID", async () => 
 
     const release = await assembleDesktopRelease(
       {
+        ...assemblyOptions,
         assetsDirectory: directory,
-        notes: "release notes",
-        prerelease: false,
-        target: "expected-sha",
-        version,
       },
       client
     );
@@ -208,4 +234,134 @@ test("assembles one complete draft through one numeric release ID", async () => 
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+});
+
+test("reuses verified assets while uploading the rest of an existing draft", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "desktop-release-"));
+  try {
+    const localAssets = await writeReleaseAssets(directory);
+    const [reusedAsset] = localAssets.values();
+    const release = createRelease({
+      assets: [
+        {
+          digest: reusedAsset.digest,
+          id: 1,
+          name: reusedAsset.name,
+          size: reusedAsset.size,
+          state: "uploaded",
+        },
+      ],
+    });
+    const uploads = [];
+    const client = {
+      async listReleases() {
+        return [release];
+      },
+      async createDraft() {
+        assert.fail("an existing draft must be reused");
+      },
+      async updateDraft(releaseId) {
+        assert.equal(releaseId, release.id);
+        return release;
+      },
+      async deleteAsset() {
+        assert.fail("a verified asset must not be deleted");
+      },
+      async uploadAsset(existingRelease, asset) {
+        uploads.push(asset.name);
+        const uploaded = {
+          digest: asset.digest,
+          id: uploads.length + 1,
+          name: asset.name,
+          size: asset.size,
+          state: "uploaded",
+        };
+        existingRelease.assets.push(uploaded);
+        return uploaded;
+      },
+      async getRelease(releaseId) {
+        assert.equal(releaseId, release.id);
+        return release;
+      },
+    };
+
+    const assembled = await assembleDesktopRelease(
+      { ...assemblyOptions, assetsDirectory: directory },
+      client
+    );
+    assert.equal(assembled.id, release.id);
+    assert.equal(uploads.length, localAssets.size - 1);
+    assert.equal(uploads.includes(reusedAsset.name), false);
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
+test("rejects a release identity change after draft creation", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "desktop-release-"));
+  try {
+    await writeReleaseAssets(directory);
+    const created = createRelease({ id: 42 });
+    const replacement = createRelease({ id: 43 });
+    let listCount = 0;
+    const client = {
+      async listReleases() {
+        listCount += 1;
+        return listCount === 1 ? [] : [replacement];
+      },
+      async createDraft() {
+        return created;
+      },
+    };
+
+    await assert.rejects(
+      assembleDesktopRelease(
+        { ...assemblyOptions, assetsDirectory: directory },
+        client
+      ),
+      /Release identity changed while assembling v0\.0\.8/
+    );
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
+test("times out stalled GitHub API requests with request context", async () => {
+  const stalledFetch = (_url, { signal }) =>
+    new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), {
+        once: true,
+      });
+    });
+  const client = new GitHubReleaseClient({
+    repository: "gridaco/grida",
+    token: "test-token",
+    fetchImpl: stalledFetch,
+    requestTimeoutMs: 10,
+  });
+  await assert.rejects(
+    client.request("/repos/gridaco/grida/releases"),
+    /GitHub API GET https:\/\/api\.github\.com\/repos\/gridaco\/grida\/releases timed out after 10ms/
+  );
+});
+
+test("preserves caller cancellation of GitHub API requests", async () => {
+  const caller = new AbortController();
+  const callerReason = new Error("caller cancelled");
+  const client = new GitHubReleaseClient({
+    repository: "gridaco/grida",
+    token: "test-token",
+    fetchImpl: (_url, { signal }) =>
+      new Promise((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), {
+          once: true,
+        });
+      }),
+  });
+
+  const request = client.request("/repos/gridaco/grida/releases", {
+    signal: caller.signal,
+  });
+  caller.abort(callerReason);
+  await assert.rejects(request, (error) => error === callerReason);
 });

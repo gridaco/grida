@@ -8,6 +8,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const githubApiVersion = "2022-11-28";
+const githubRequestTimeoutMs = 30_000;
+const githubUploadTimeoutMs = 300_000;
 
 export const DesktopRelease = Object.freeze({
   expectedAssetNames(version) {
@@ -96,36 +98,84 @@ export const DesktopRelease = Object.freeze({
 });
 
 export class GitHubReleaseClient {
-  constructor({ repository, token, apiUrl = "https://api.github.com" }) {
+  constructor({
+    repository,
+    token,
+    apiUrl = "https://api.github.com",
+    fetchImpl = globalThis.fetch,
+    requestTimeoutMs = githubRequestTimeoutMs,
+  }) {
     if (!repository) throw new Error("GITHUB_REPOSITORY is required");
     if (!token) throw new Error("GITHUB_TOKEN is required");
+    if (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
+      throw new Error("requestTimeoutMs must be a positive number");
+    }
+    if (typeof fetchImpl !== "function") {
+      throw new Error("fetchImpl must be a function");
+    }
     this.repository = repository;
     this.token = token;
     this.apiUrl = apiUrl.replace(/\/$/, "");
+    this.fetchImpl = fetchImpl;
+    this.requestTimeoutMs = requestTimeoutMs;
   }
 
   async request(endpoint, options = {}) {
+    const {
+      signal: callerSignal,
+      timeoutMs = this.requestTimeoutMs,
+      ...fetchOptions
+    } = options;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new Error("timeoutMs must be a positive number");
+    }
     const url = endpoint.startsWith("http")
       ? endpoint
       : `${this.apiUrl}${endpoint}`;
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${this.token}`,
-        "User-Agent": "grida-desktop-release",
-        "X-GitHub-Api-Version": githubApiVersion,
-        ...options.headers,
-      },
-    });
-    if (!response.ok) {
-      const body = (await response.text()).slice(0, 2_000);
-      throw new Error(
-        `GitHub API ${options.method ?? "GET"} ${url} failed (${response.status}): ${body}`
-      );
+    const method = fetchOptions.method ?? "GET";
+    const controller = new AbortController();
+    const timeoutError = new Error(
+      `GitHub API ${method} ${url} timed out after ${timeoutMs}ms`
+    );
+    const timeout = setTimeout(() => controller.abort(timeoutError), timeoutMs);
+    timeout.unref?.();
+
+    const forwardCallerAbort = () => controller.abort(callerSignal.reason);
+    if (callerSignal?.aborted) {
+      forwardCallerAbort();
+    } else {
+      callerSignal?.addEventListener("abort", forwardCallerAbort, {
+        once: true,
+      });
     }
-    if (response.status === 204) return null;
-    return response.json();
+
+    try {
+      const response = await this.fetchImpl(url, {
+        ...fetchOptions,
+        signal: controller.signal,
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${this.token}`,
+          "User-Agent": "grida-desktop-release",
+          "X-GitHub-Api-Version": githubApiVersion,
+          ...fetchOptions.headers,
+        },
+      });
+      if (!response.ok) {
+        const body = (await response.text()).slice(0, 2_000);
+        throw new Error(
+          `GitHub API ${method} ${url} failed (${response.status}): ${body}`
+        );
+      }
+      if (response.status === 204) return null;
+      return await response.json();
+    } catch (error) {
+      if (controller.signal.reason === timeoutError) throw timeoutError;
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      callerSignal?.removeEventListener("abort", forwardCallerAbort);
+    }
   }
 
   async listReleases() {
@@ -193,6 +243,7 @@ export class GitHubReleaseClient {
       },
       body: createReadStream(asset.path),
       duplex: "half",
+      timeoutMs: githubUploadTimeoutMs,
     });
   }
 }
