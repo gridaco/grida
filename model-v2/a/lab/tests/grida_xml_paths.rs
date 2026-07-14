@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anchor_lab::grida_xml;
 use anchor_lab::math::RectF;
 use anchor_lab::model::{
@@ -37,11 +35,11 @@ fn path_is_a_boxed_unit_reference_shape_with_one_shared_artifact() {
     else {
         panic!("expected path shape");
     };
-    assert_eq!(artifact.d.as_ref(), d);
-    assert_eq!(artifact.fill_rule, FillRule::NonZero);
-    assert!(artifact.all_contours_closed);
+    assert_eq!(artifact.d(), d);
+    assert_eq!(artifact.fill_rule(), FillRule::NonZero);
+    assert!(artifact.geometry().all_contours_closed);
     assert_eq!(
-        artifact.unit_bounds,
+        artifact.geometry().unit_bounds,
         RectF {
             x: 0.0,
             y: 0.0,
@@ -53,7 +51,6 @@ fn path_is_a_boxed_unit_reference_shape_with_one_shared_artifact() {
 
     let resolved = resolve(&document, &ResolveOptions::default());
     let resolved_path = resolved.resolved_path_of(id);
-    assert!(Arc::ptr_eq(artifact, &resolved_path.source));
     assert!(matches!(
         resolved_path.commands[0],
         PathCommand::MoveTo { x: 0.0, y: 100.0 }
@@ -126,8 +123,8 @@ fn evenodd_and_source_spelling_round_trip_canonically() {
     else {
         panic!("expected path");
     };
-    assert_eq!(path.fill_rule, FillRule::EvenOdd);
-    assert_eq!(path.d.as_ref(), d);
+    assert_eq!(path.fill_rule(), FillRule::EvenOdd);
+    assert_eq!(path.d(), d);
     assert!(textir::try_print(&document)
         .unwrap_err()
         .to_string()
@@ -138,7 +135,7 @@ fn evenodd_and_source_spelling_round_trip_canonically() {
 fn equivalent_path_spellings_share_visual_identity() {
     let absolute = path::analyze("M 0 0 L 1 0 L 1 1 Z", FillRule::NonZero).unwrap();
     let relative = path::analyze("m0 0h1v1z", FillRule::NonZero).unwrap();
-    assert_ne!(absolute.d, relative.d);
+    assert_ne!(absolute.d(), relative.d());
     assert_ne!(
         absolute, relative,
         "source-tier equality retains authored d"
@@ -150,7 +147,7 @@ fn equivalent_path_spellings_share_visual_identity() {
 
     let arc_absolute = path::analyze("M .5 0 A .5 .5 0 0 1 1 .5", FillRule::NonZero).unwrap();
     let arc_relative = path::analyze("m .5 0 a .5 .5 360 0 1 .5 .5", FillRule::NonZero).unwrap();
-    assert_ne!(arc_absolute.d, arc_relative.d);
+    assert_ne!(arc_absolute.d(), arc_relative.d());
     assert_ne!(arc_absolute, arc_relative);
     assert!(arc_absolute.same_visual_geometry(&arc_relative));
 }
@@ -161,7 +158,7 @@ fn curves_use_realized_extrema_and_arcs_become_bounded_rational_conics() {
     // curve only touches y=0 and is therefore valid.
     let quadratic = path::analyze("M 0 1 Q .5 -1 1 1", FillRule::NonZero).unwrap();
     assert_eq!(
-        quadratic.unit_bounds,
+        quadratic.geometry().unit_bounds,
         RectF {
             x: 0.0,
             y: 0.0,
@@ -180,6 +177,7 @@ fn curves_use_realized_extrema_and_arcs_become_bounded_rational_conics() {
     )
     .unwrap();
     let conics: Vec<_> = circle
+        .geometry()
         .commands
         .iter()
         .filter_map(|command| match command {
@@ -201,9 +199,9 @@ fn curves_use_realized_extrema_and_arcs_become_bounded_rational_conics() {
     for (_, _, _, _, weight) in conics {
         assert!((weight - std::f32::consts::FRAC_1_SQRT_2).abs() < 1.0e-7);
     }
-    assert!(circle.all_contours_closed);
+    assert!(circle.geometry().all_contours_closed);
     assert_eq!(
-        circle.unit_bounds,
+        circle.geometry().unit_bounds,
         RectF {
             x: 0.0,
             y: 0.0,
@@ -231,7 +229,7 @@ fn curves_use_realized_extrema_and_arcs_become_bounded_rational_conics() {
     )
     .unwrap();
     assert_eq!(
-        rotated_ellipse.unit_bounds,
+        rotated_ellipse.geometry().unit_bounds,
         RectF {
             x: 0.25,
             y: 0.0,
@@ -241,6 +239,7 @@ fn curves_use_realized_extrema_and_arcs_become_bounded_rational_conics() {
     );
     assert_eq!(
         rotated_ellipse
+            .geometry()
             .commands
             .iter()
             .filter(|command| matches!(command, PathCommand::ConicTo { .. }))
@@ -253,7 +252,10 @@ fn curves_use_realized_extrema_and_arcs_become_bounded_rational_conics() {
         FillRule::NonZero,
     )
     .unwrap();
-    assert!(matches!(tiny.commands[1], PathCommand::ConicTo { .. }));
+    assert!(matches!(
+        tiny.geometry().commands[1],
+        PathCommand::ConicTo { .. }
+    ));
 
     let extreme_large_arc = path::analyze("M 0 0 A 1e-20 1e-20 37 1 1 1e-45 0", FillRule::NonZero)
         .unwrap_err()
@@ -310,7 +312,7 @@ fn path_reports_focused_source_errors() {
 fn move_only_contours_and_coincident_arcs_do_not_invent_geometry_or_bounds() {
     let path = path::analyze("M 1 1 M 0 0 L 1 1", FillRule::NonZero).unwrap();
     assert_eq!(
-        path.unit_bounds,
+        path.geometry().unit_bounds,
         RectF {
             x: 0.0,
             y: 0.0,
@@ -406,6 +408,34 @@ fn svg_snapshot_maps_the_unit_path_through_its_resolved_box() {
     )
     .unwrap();
     assert!(arc_svg.contains("d=\"M .5 0 A .5 .5 0 0 1 1 .5\""));
+
+    let mut imported_document = grida_xml::parse(&source(
+        "<path x=\"10\" y=\"20\" width=\"200\" height=\"100\" d=\"M 0 0 H 1 V 1 Z\"/>",
+    ))
+    .unwrap();
+    let imported_id = only_path(&imported_document);
+    let imported =
+        path::analyze_in_reference_box("M 0 0 H 200 V 100 Z", FillRule::NonZero, 200.0, 100.0)
+            .unwrap();
+    let Payload::Shape {
+        desc: ShapeDesc::Path(path),
+    } = &mut imported_document.get_mut(imported_id).payload
+    else {
+        panic!("fixture contains a path")
+    };
+    *path = imported;
+    let imported_svg = svgout::render(
+        &imported_document,
+        &resolve(&imported_document, &ResolveOptions::default()),
+        &SvgOptions {
+            show_aabb: false,
+            width: 400.0,
+            height: 300.0,
+        },
+    )
+    .unwrap();
+    assert!(imported_svg
+        .contains("<path d=\"M 0 0 H 200 V 100 Z\" transform=\"matrix(1 0 0 1 10 20)\""));
 }
 
 #[test]
@@ -503,12 +533,18 @@ fn unit_and_huge_mapped_bounds_conservatively_contain_stored_commands() {
         FillRule::NonZero,
     )
     .unwrap();
-    let PathCommand::LineTo { x: unit_end, .. } = line.commands[1] else {
+    let PathCommand::LineTo { x: unit_end, .. } = line.geometry().commands[1] else {
         panic!("expected line endpoint");
     };
-    assert!(line.unit_bounds.x + line.unit_bounds.w >= unit_end);
+    assert!(line.geometry().unit_bounds.x + line.geometry().unit_bounds.w >= unit_end);
 
-    let mapped = path::materialize(line, 30_270_271_994_254_590_000.0_f32, 1.0).unwrap();
+    let mapped = path::materialize(
+        line.geometry(),
+        line.fill_rule(),
+        30_270_271_994_254_590_000.0_f32,
+        1.0,
+    )
+    .unwrap();
     let PathCommand::LineTo { x: mapped_end, .. } = mapped.commands[1] else {
         panic!("expected mapped line endpoint");
     };
@@ -519,14 +555,25 @@ fn unit_and_huge_mapped_bounds_conservatively_contain_stored_commands() {
         FillRule::NonZero,
     )
     .unwrap();
-    let mapped = path::materialize(circle, 19_384_729_239_552.0, 7_193_847_234_560.0).unwrap();
+    let mapped = path::materialize(
+        circle.geometry(),
+        circle.fill_rule(),
+        19_384_729_239_552.0,
+        7_193_847_234_560.0,
+    )
+    .unwrap();
     let rotated_circle = path::analyze(
         "M .5 0 A .5 .5 359 0 1 1 .5 A .5 .5 359 0 1 .5 1 A .5 .5 359 0 1 0 .5 A .5 .5 359 0 1 .5 0 Z",
         FillRule::NonZero,
     )
     .unwrap();
-    let rotated_mapped =
-        path::materialize(rotated_circle, 19_384_729_239_552.0, 7_193_847_234_560.0).unwrap();
+    let rotated_mapped = path::materialize(
+        rotated_circle.geometry(),
+        rotated_circle.fill_rule(),
+        19_384_729_239_552.0,
+        7_193_847_234_560.0,
+    )
+    .unwrap();
     assert_eq!(rotated_mapped, mapped);
     let bounds = mapped.local_bounds;
     let left = f64::from(bounds.x);

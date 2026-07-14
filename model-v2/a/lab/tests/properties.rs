@@ -77,13 +77,31 @@ fn registry_is_closed_unique_and_every_base_accessor_matches_its_value_kind() {
     let children = &document.get(frame).children;
     assert_eq!(children.len(), 7);
 
-    const FRAME_INAPPLICABLE: &[PropertyKey] = &[PropertyKey::AspectRatio];
-    const NON_FRAME: &[PropertyKey] = &[PropertyKey::Layout, PropertyKey::ClipsContent];
-    const NON_ROUNDED: &[PropertyKey] = &[
+    const FRAME_INAPPLICABLE: &[PropertyKey] = &[
+        PropertyKey::AspectRatio,
+        PropertyKey::LensOps,
+        PropertyKey::PathGeometry,
+    ];
+    const NON_FRAME: &[PropertyKey] = &[
+        PropertyKey::Layout,
+        PropertyKey::ClipsContent,
+        PropertyKey::LensOps,
+        PropertyKey::PathGeometry,
+    ];
+    const ELLIPSE_INAPPLICABLE: &[PropertyKey] = &[
         PropertyKey::Layout,
         PropertyKey::ClipsContent,
         PropertyKey::CornerRadius,
         PropertyKey::CornerSmoothing,
+        PropertyKey::LensOps,
+        PropertyKey::PathGeometry,
+    ];
+    const PATH_INAPPLICABLE: &[PropertyKey] = &[
+        PropertyKey::Layout,
+        PropertyKey::ClipsContent,
+        PropertyKey::CornerRadius,
+        PropertyKey::CornerSmoothing,
+        PropertyKey::LensOps,
     ];
     const LINE_INAPPLICABLE: &[PropertyKey] = &[
         PropertyKey::Height,
@@ -95,6 +113,8 @@ fn registry_is_closed_unique_and_every_base_accessor_matches_its_value_kind() {
         PropertyKey::CornerRadius,
         PropertyKey::CornerSmoothing,
         PropertyKey::Fills,
+        PropertyKey::LensOps,
+        PropertyKey::PathGeometry,
     ];
     const TEXT_INAPPLICABLE: &[PropertyKey] = &[
         PropertyKey::AspectRatio,
@@ -102,6 +122,8 @@ fn registry_is_closed_unique_and_every_base_accessor_matches_its_value_kind() {
         PropertyKey::ClipsContent,
         PropertyKey::CornerRadius,
         PropertyKey::CornerSmoothing,
+        PropertyKey::LensOps,
+        PropertyKey::PathGeometry,
     ];
     const DERIVED_INAPPLICABLE: &[PropertyKey] = &[
         PropertyKey::Width,
@@ -117,15 +139,33 @@ fn registry_is_closed_unique_and_every_base_accessor_matches_its_value_kind() {
         PropertyKey::CornerSmoothing,
         PropertyKey::Fills,
         PropertyKey::Strokes,
+        PropertyKey::PathGeometry,
+    ];
+    const GROUP_INAPPLICABLE: &[PropertyKey] = &[
+        PropertyKey::Width,
+        PropertyKey::Height,
+        PropertyKey::MinWidth,
+        PropertyKey::MaxWidth,
+        PropertyKey::MinHeight,
+        PropertyKey::MaxHeight,
+        PropertyKey::AspectRatio,
+        PropertyKey::Layout,
+        PropertyKey::ClipsContent,
+        PropertyKey::CornerRadius,
+        PropertyKey::CornerSmoothing,
+        PropertyKey::Fills,
+        PropertyKey::Strokes,
+        PropertyKey::LensOps,
+        PropertyKey::PathGeometry,
     ];
     let cases: [(&str, NodeId, &[PropertyKey]); 8] = [
         ("frame", frame, FRAME_INAPPLICABLE),
         ("rect", children[0], NON_FRAME),
-        ("ellipse", children[1], NON_ROUNDED),
+        ("ellipse", children[1], ELLIPSE_INAPPLICABLE),
         ("line", children[2], LINE_INAPPLICABLE),
-        ("path", children[3], NON_ROUNDED),
+        ("path", children[3], PATH_INAPPLICABLE),
         ("text", children[4], TEXT_INAPPLICABLE),
-        ("group", children[5], DERIVED_INAPPLICABLE),
+        ("group", children[5], GROUP_INAPPLICABLE),
         ("lens", children[6], DERIVED_INAPPLICABLE),
     ];
 
@@ -982,6 +1022,14 @@ fn impacts_cover_the_declared_downstream_stages() {
         .spec()
         .impact
         .contains(PropertyImpact::BOUNDS | PropertyImpact::PAINT));
+    assert!(PropertyKey::PathGeometry
+        .spec()
+        .impact
+        .contains(PropertyImpact::BOUNDS | PropertyImpact::PAINT));
+    assert!(!PropertyKey::PathGeometry
+        .spec()
+        .impact
+        .contains(PropertyImpact::LAYOUT));
     assert!(PropertyKey::Fills
         .spec()
         .impact

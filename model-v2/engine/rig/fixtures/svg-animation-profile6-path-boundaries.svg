@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="128">
+  <!-- Absolute/relative modes are compatible inside the same command families. -->
+  <path
+    id="smooth"
+    fill="#7c3aed"
+    d="M 16 64 C 16 28 48 16 72 16 C 104 16 128 40 128 64 C 128 96 96 112 72 112 C 40 112 16 88 16 64 Z"
+  >
+    <animate
+      id="smooth-curve"
+      attributeName="d"
+      from="M 16 64 C 16 28 48 16 72 16 C 104 16 128 40 128 64 C 128 96 96 112 72 112 C 40 112 16 88 16 64 Z"
+      to="m 16 64 c 12 -48 48 -48 64 -32 c 24 24 48 12 48 32 c 0 40 -32 48 -56 48 c -32 0 -68 -8 -56 -48 z"
+      dur="2s"
+      calcMode="spline"
+      keyTimes="0;1"
+      keySplines="0.42 0 0.58 1"
+      fill="freeze"
+    />
+  </path>
+
+  <!-- Explicit discrete calculation accepts arbitrary valid path topology and arcs. -->
+  <path
+    id="discrete"
+    fill="#06b6d4"
+    d="M 256 24 A 40 40 0 1 1 256 104 A 40 40 0 1 1 256 24 Z"
+  >
+    <animate
+      id="discrete-values"
+      attributeName="d"
+      values="M 256 24 A 40 40 0 1 1 256 104 A 40 40 0 1 1 256 24 Z;M 256 20 L 304 104 L 208 104 Z;M 224 24 H 288 A 8 8 0 0 1 296 32 V 96 A 8 8 0 0 1 288 104 H 224 A 8 8 0 0 1 216 96 V 32 A 8 8 0 0 1 224 24 Z"
+      keyTimes="0;0.25;0.75"
+      calcMode="discrete"
+      dur="2s"
+      fill="freeze"
+    />
+  </path>
+
+  <!-- H/V and L are distinct SVG command families, so this falls back discretely. -->
+  <path id="mismatch" fill="#22c55e" d="M 376 20 H 472 V 108 H 376 Z">
+    <animate
+      id="family-fallback"
+      attributeName="d"
+      from="M 376 20 H 472 V 108 H 376 Z"
+      to="M 424 16 L 488 64 L 424 112 L 360 64 Z"
+      dur="2s"
+      fill="freeze"
+    />
+  </path>
+</svg>

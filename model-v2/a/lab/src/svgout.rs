@@ -214,19 +214,20 @@ fn paint(
             }
             ShapeDesc::Path(path) => {
                 let fill = fill.attributes("fill");
-                let transform = world.then(&Affine::scale(b.w, b.h));
-                let fill_rule = match path.fill_rule {
+                let (source_width, source_height) = path.source_reference_box();
+                let transform = world.then(&Affine::scale(b.w / source_width, b.h / source_height));
+                let fill_rule = match path.fill_rule() {
                     FillRule::NonZero => "nonzero",
                     FillRule::EvenOdd => "evenodd",
                 };
                 let _ = writeln!(
                     out,
                     r#"  <path d="{}" transform="{}" fill-rule="{}" {}/>"#,
-                    // SVG snapshot/export is an explicit foreign-language
-                    // boundary and therefore parses its own validated SVG d.
+                    // SVG snapshot/export retains validated source d and maps
+                    // its explicit reference box into the resolved path box.
                     // Internal bounds, damage, drawlist, and paint use only
-                    // the shared rational-conic artifact.
-                    escape_attr(path.d.as_ref()),
+                    // canonical geometry.
+                    escape_attr(path.d()),
                     mat(&transform),
                     fill_rule,
                     fill

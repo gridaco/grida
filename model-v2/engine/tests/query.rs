@@ -3,6 +3,7 @@
 //! a sweep (the walk is the oracle), and `nodes_in_rect` finds AABB overlaps.
 
 use anchor_engine::{frame, paint::PaintCtx, query::Query};
+use anchor_lab::animation::SampleTime;
 use anchor_lab::math::RectF;
 use anchor_lab::model::*;
 use anchor_lab::pick::pick;
@@ -10,6 +11,7 @@ use anchor_lab::properties::{
     PropertyKey, PropertyTarget, PropertyValue, PropertyValues, ValueView,
 };
 use anchor_lab::resolve::{resolve, ResolveOptions, RotationInFlow};
+use anchor_lab::svg_animation::{SourceSnapshot, SvgAnimationSource};
 
 fn opts() -> ResolveOptions {
     ResolveOptions {
@@ -156,4 +158,108 @@ fn frame_query_owns_effective_clip_and_traversal_state() {
         Some(child),
         "the captured traversal still reaches the child"
     );
+}
+
+#[test]
+fn ordinary_group_and_lens_still_own_descendant_hits() {
+    let mut builder = DocBuilder::new();
+    let mut group_header = Header::new(SizeIntent::Auto, SizeIntent::Auto);
+    group_header.x = AxisBinding::start(20.0);
+    group_header.y = AxisBinding::start(20.0);
+    let group = builder.add(0, group_header, Payload::Group);
+    builder.add(
+        group,
+        Header::new(SizeIntent::Fixed(20.0), SizeIntent::Fixed(20.0)),
+        Payload::Shape {
+            desc: ShapeDesc::Rect,
+        },
+    );
+
+    let mut lens_header = Header::new(SizeIntent::Auto, SizeIntent::Auto);
+    lens_header.x = AxisBinding::start(100.0);
+    lens_header.y = AxisBinding::start(20.0);
+    let lens = builder.add(
+        0,
+        lens_header,
+        Payload::Lens {
+            ops: vec![LensOp::Translate { x: 40.0, y: 0.0 }],
+        },
+    );
+    builder.add(
+        lens,
+        Header::new(SizeIntent::Fixed(20.0), SizeIntent::Fixed(20.0)),
+        Payload::Shape {
+            desc: ShapeDesc::Rect,
+        },
+    );
+
+    let document = builder.build();
+    let resolved = resolve(&document, &opts());
+    let query = Query::new(&resolved);
+    assert_eq!(query.hit_point(25.0, 25.0), Some(group));
+    assert_eq!(query.hit_point(145.0, 25.0), Some(lens));
+}
+
+#[test]
+fn compiler_only_transform_owner_preserves_source_hit_identity() {
+    let source = SvgAnimationSource::parse(SourceSnapshot::new(
+        "query-transform-owner.svg",
+        r##"
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="72">
+  <rect id="moving" x="10" y="20" width="20" height="20" fill="#2563eb">
+    <animateTransform attributeName="transform" type="translate"
+      from="0 0" to="40 0" dur="1s" fill="freeze"/>
+  </rect>
+</svg>
+"##,
+    ))
+    .unwrap();
+    let program = source.compile_profile4().unwrap();
+    let document = source.document();
+    let rect = (0..document.capacity() as NodeId)
+        .find(|id| {
+            document
+                .get_opt(*id)
+                .and_then(|node| node.header.name.as_deref())
+                == Some("moving")
+        })
+        .expect("named source rectangle exists");
+    let transform_owner = document
+        .parent_of(rect)
+        .expect("transform owner wraps the rectangle");
+    assert!(matches!(
+        document.get(transform_owner).payload,
+        Payload::Lens { .. }
+    ));
+
+    let context = PaintCtx::new(None);
+    let base =
+        frame::resolve_and_build_request(document, frame::FrameRequest::Base, &opts(), &context)
+            .unwrap();
+    let sampled = frame::resolve_and_build_request(
+        document,
+        frame::FrameRequest::Sample {
+            program: &program,
+            time: SampleTime::from_nanoseconds(1_000_000_000),
+        },
+        &opts(),
+        &context,
+    )
+    .unwrap();
+
+    assert_eq!(base.query().hit_point(15.0, 25.0), Some(rect));
+    assert_eq!(sampled.query().hit_point(15.0, 25.0), Some(document.root));
+    assert_eq!(sampled.query().hit_point(55.0, 25.0), Some(rect));
+
+    // Rect/cull queries are raw resolved-node candidate APIs, not source-
+    // identity selection APIs. They deliberately retain both the compiler
+    // wrapper and its geometry child; only point-hit ownership is transparent.
+    let candidates = sampled.query().nodes_in_rect(RectF {
+        x: 54.0,
+        y: 24.0,
+        w: 2.0,
+        h: 2.0,
+    });
+    assert!(candidates.contains(&rect));
+    assert!(candidates.contains(&transform_owner));
 }

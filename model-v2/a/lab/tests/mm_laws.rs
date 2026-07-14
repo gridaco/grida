@@ -168,16 +168,7 @@ fn mm7_add_delete_restores() {
                       // equality ignores the tombstoned tail (MM-7).
     doc2.add_child(
         f,
-        Node {
-            id: new_id,
-            header: shape(10.0, 10.0).0,
-            payload: shape(10.0, 10.0).1,
-            children: vec![],
-            corner_radius: RectangularCornerRadius::default(),
-            corner_smoothing: CornerSmoothing::default(),
-            fills: Paints::default(),
-            strokes: vec![],
-        },
+        Node::new(new_id, shape(10.0, 10.0).0, shape(10.0, 10.0).1),
     );
     let _mid = run(&doc2);
     doc2.remove_subtree(new_id);

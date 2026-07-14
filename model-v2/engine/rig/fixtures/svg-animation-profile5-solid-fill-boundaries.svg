@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="192">
+  <!-- Replacement emits a complete singleton-solid Fills value. -->
+  <rect id="replace" x="16" y="16" width="48" height="48" fill="#101828">
+    <animate
+      id="replace-color"
+      attributeName="fill"
+      values="#7c3aed;#2563eb;#06b6d4"
+      keyTimes="0;0.25;1"
+      dur="4s"
+      fill="freeze"
+    />
+  </rect>
+
+  <!-- Straight RGBA interpolation keeps color independent from alpha. -->
+  <rect id="alpha" x="80" y="16" width="48" height="48" fill="#020617">
+    <animate
+      id="alpha-color"
+      attributeName="fill"
+      from="#ff000000"
+      to="#0000ffff"
+      dur="4s"
+      fill="freeze"
+    />
+  </rect>
+
+  <!-- Add and accumulate remain exact until the final RGBA8 projection. -->
+  <rect id="sandwich" x="144" y="16" width="48" height="48" fill="#100000">
+    <animate
+      id="sandwich-foundation"
+      attributeName="fill"
+      from="#100000"
+      to="#120000"
+      dur="2s"
+      repeatCount="2"
+      fill="freeze"
+      additive="sum"
+      accumulate="sum"
+    />
+    <animate
+      id="sandwich-half-step"
+      attributeName="fill"
+      from="#00000000"
+      to="#01000000"
+      dur="2s"
+      fill="freeze"
+      additive="sum"
+    />
+  </rect>
+
+  <!-- Lone-to samples the live result of the lower color effect. -->
+  <rect id="live-to" x="16" y="96" width="176" height="48" fill="#102030">
+    <animate
+      id="live-lower"
+      attributeName="fill"
+      from="#203040"
+      to="#405060"
+      dur="4s"
+      fill="freeze"
+    />
+    <animate
+      id="live-upper"
+      attributeName="fill"
+      to="#f97316"
+      begin="1s"
+      dur="2s"
+      calcMode="spline"
+      keyTimes="0;1"
+      keySplines="0.2 0.8 0.2 1"
+      fill="remove"
+    />
+  </rect>
+
+  <!-- Lower overflow remains available to a higher effect before final clamp. -->
+  <rect id="late-clamp" x="16" y="160" width="176" height="16" fill="#f00000">
+    <animate
+      id="late-clamp-add"
+      attributeName="fill"
+      from="#20000000"
+      to="#20000000"
+      dur="4s"
+      fill="freeze"
+      additive="sum"
+    />
+    <animate
+      id="late-clamp-live"
+      attributeName="fill"
+      to="#000000"
+      dur="4s"
+      fill="freeze"
+    />
+  </rect>
+</svg>

@@ -55,36 +55,100 @@ pub enum PathCommand {
     Close,
 }
 
-/// One validated path parse, shared verbatim by resolution and rendering.
-#[derive(Debug, Clone)]
-pub struct PathArtifact {
-    pub d: Arc<str>,
+/// Canonical unit-reference geometry, independent of authored syntax and
+/// non-geometric path properties.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PathGeometry {
     pub commands: Arc<[PathCommand]>,
-    pub fill_rule: FillRule,
     pub unit_bounds: RectF,
     pub all_contours_closed: bool,
 }
 
-impl PartialEq for PathArtifact {
-    fn eq(&self, other: &Self) -> bool {
-        self.d == other.d
-            && self.commands == other.commands
-            && self.fill_rule == other.fill_rule
-            && self.unit_bounds == other.unit_bounds
-            && self.all_contours_closed == other.all_contours_closed
+impl PathGeometry {
+    /// Build checked geometry from an already normalized absolute command
+    /// stream. Evaluators use this boundary without inventing source syntax.
+    pub fn from_commands(commands: impl Into<Arc<[PathCommand]>>) -> Result<Arc<Self>, PathError> {
+        let commands = commands.into();
+        let all_contours_closed = validate_commands(&commands)?;
+        let unit_bounds = command_bounds(&commands, true)?;
+        Ok(Arc::new(Self {
+            commands,
+            unit_bounds,
+            all_contours_closed,
+        }))
+    }
+
+    /// Recheck canonical geometry crossing an untrusted model boundary.
+    pub fn validate(&self) -> Result<(), PathError> {
+        let all_contours_closed = validate_commands(&self.commands)?;
+        if all_contours_closed != self.all_contours_closed {
+            return Err(PathError::new(
+                "path closed-contour metadata does not match its commands",
+            ));
+        }
+        let unit_bounds = command_bounds(&self.commands, true)?;
+        if unit_bounds != self.unit_bounds {
+            return Err(PathError::new(
+                "path unit bounds metadata does not match its commands",
+            ));
+        }
+        Ok(())
     }
 }
 
+/// One authored path value. Source spelling, its explicit reference box, and
+/// fill rule remain model data; generated geometry never fabricates them.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PathArtifact {
+    d: Arc<str>,
+    geometry: Arc<PathGeometry>,
+    fill_rule: FillRule,
+    source_reference_box: (f32, f32),
+}
+
 impl PathArtifact {
+    pub fn d(&self) -> &str {
+        &self.d
+    }
+
+    pub fn geometry(&self) -> &Arc<PathGeometry> {
+        &self.geometry
+    }
+
+    pub const fn fill_rule(&self) -> FillRule {
+        self.fill_rule
+    }
+
+    pub fn set_fill_rule(&mut self, fill_rule: FillRule) {
+        self.fill_rule = fill_rule;
+    }
+
+    /// Dimensions in which the retained source `d` is expressed. Grida paths
+    /// use `(1, 1)`; a foreign importer may retain a different explicit box
+    /// while projecting the same canonical unit geometry.
+    pub const fn source_reference_box(&self) -> (f32, f32) {
+        self.source_reference_box
+    }
+
+    pub fn validate(&self) -> Result<(), PathError> {
+        if self.d.trim().is_empty() {
+            return Err(PathError::new("authored path data must not be empty"));
+        }
+        let (width, height) = self.source_reference_box;
+        if !width.is_finite() || width <= 0.0 || !height.is_finite() || height <= 0.0 {
+            return Err(PathError::new(
+                "path source reference box must have finite positive dimensions",
+            ));
+        }
+        self.geometry.validate()
+    }
+
     /// Equality of everything that can change rendered path geometry. The
     /// authored `d` spelling is deliberately excluded: relative commands and
     /// whitespace-only rewrites that normalize to the same absolute commands
     /// are not visual damage.
     pub fn same_visual_geometry(&self, other: &Self) -> bool {
-        self.commands == other.commands
-            && self.fill_rule == other.fill_rule
-            && self.unit_bounds == other.unit_bounds
-            && self.all_contours_closed == other.all_contours_closed
+        self.geometry == other.geometry && self.fill_rule == other.fill_rule
     }
 }
 
@@ -93,7 +157,6 @@ impl PathArtifact {
 /// already undergone the exact f32 multiply by the resolved width/height.
 #[derive(Debug, Clone)]
 pub struct ResolvedPathArtifact {
-    pub source: Arc<PathArtifact>,
     pub commands: Arc<[PathCommand]>,
     pub fill_rule: FillRule,
     pub local_bounds: RectF,
@@ -144,6 +207,47 @@ pub fn analyze(
     d: impl Into<Arc<str>>,
     fill_rule: FillRule,
 ) -> Result<Arc<PathArtifact>, PathError> {
+    analyze_in_reference_box(d, fill_rule, 1.0, 1.0)
+}
+
+/// Validate SVG user-space path data and normalize it into one finite
+/// reference box. This is the import seam for formats such as SVG whose path
+/// coordinates use the viewport rather than Grida's unit-reference model.
+/// Arc lowering happens before this affine normalization, preserving the
+/// source geometry under non-uniform reference boxes.
+pub fn analyze_in_reference_box(
+    d: impl Into<Arc<str>>,
+    fill_rule: FillRule,
+    reference_width: f32,
+    reference_height: f32,
+) -> Result<Arc<PathArtifact>, PathError> {
+    let d = d.into();
+    let geometry =
+        analyze_geometry_in_reference_box(Arc::clone(&d), reference_width, reference_height)?;
+    Ok(Arc::new(PathArtifact {
+        d,
+        geometry,
+        fill_rule,
+        source_reference_box: (reference_width, reference_height),
+    }))
+}
+
+/// Parse SVG path data into canonical geometry without attaching authored
+/// syntax or a fill rule. Animation frontends use this geometry-only seam.
+pub fn analyze_geometry_in_reference_box(
+    d: impl Into<Arc<str>>,
+    reference_width: f32,
+    reference_height: f32,
+) -> Result<Arc<PathGeometry>, PathError> {
+    if !reference_width.is_finite()
+        || reference_width <= 0.0
+        || !reference_height.is_finite()
+        || reference_height <= 0.0
+    {
+        return Err(PathError::new(
+            "path reference box must have finite positive dimensions",
+        ));
+    }
     let d = d.into();
     if d.trim().is_empty() {
         return Err(PathError::new("path data must not be empty"));
@@ -379,23 +483,69 @@ pub fn analyze(
         ));
     }
 
-    let commands = drawable_commands(commands);
-    let bounds = command_bounds(&commands, true)?;
-
-    Ok(Arc::new(PathArtifact {
-        d,
-        commands: commands.into(),
-        fill_rule,
-        unit_bounds: bounds,
-        all_contours_closed,
-    }))
+    let commands = drawable_commands(commands)
+        .into_iter()
+        .map(|command| normalize_reference_command(command, reference_width, reference_height))
+        .collect::<Vec<_>>();
+    let geometry = PathGeometry::from_commands(commands)?;
+    debug_assert_eq!(geometry.all_contours_closed, all_contours_closed);
+    Ok(geometry)
 }
 
-/// Map a validated unit-reference artifact into one resolved local box.
+fn normalize_reference_command(command: PathCommand, width: f32, height: f32) -> PathCommand {
+    match command {
+        PathCommand::MoveTo { x, y } => PathCommand::MoveTo {
+            x: x / width,
+            y: y / height,
+        },
+        PathCommand::LineTo { x, y } => PathCommand::LineTo {
+            x: x / width,
+            y: y / height,
+        },
+        PathCommand::QuadTo { x1, y1, x, y } => PathCommand::QuadTo {
+            x1: x1 / width,
+            y1: y1 / height,
+            x: x / width,
+            y: y / height,
+        },
+        PathCommand::CubicTo {
+            x1,
+            y1,
+            x2,
+            y2,
+            x,
+            y,
+        } => PathCommand::CubicTo {
+            x1: x1 / width,
+            y1: y1 / height,
+            x2: x2 / width,
+            y2: y2 / height,
+            x: x / width,
+            y: y / height,
+        },
+        PathCommand::ConicTo {
+            x1,
+            y1,
+            x,
+            y,
+            weight,
+        } => PathCommand::ConicTo {
+            x1: x1 / width,
+            y1: y1 / height,
+            x: x / width,
+            y: y / height,
+            weight,
+        },
+        PathCommand::Close => PathCommand::Close,
+    }
+}
+
+/// Map validated unit-reference geometry into one resolved local box.
 /// Multiplication occurs exactly once here; later consumers must not rescale
 /// the commands independently.
 pub fn materialize(
-    source: Arc<PathArtifact>,
+    geometry: &PathGeometry,
+    fill_rule: FillRule,
     width: f32,
     height: f32,
 ) -> Result<Arc<ResolvedPathArtifact>, PathError> {
@@ -404,7 +554,8 @@ pub fn materialize(
             "resolved path box must have finite non-negative dimensions",
         ));
     }
-    let commands: Vec<PathCommand> = source
+    geometry.validate()?;
+    let commands: Vec<PathCommand> = geometry
         .commands
         .iter()
         .map(|command| {
@@ -458,10 +609,9 @@ pub fn materialize(
     let local_bounds = command_bounds(&commands, false)?;
     Ok(Arc::new(ResolvedPathArtifact {
         commands: commands.into(),
-        fill_rule: source.fill_rule,
+        fill_rule,
         local_bounds,
-        all_contours_closed: source.all_contours_closed,
-        source,
+        all_contours_closed: geometry.all_contours_closed,
     }))
 }
 
@@ -474,6 +624,133 @@ fn scaled_f32(value: f32, scale: f32) -> Result<f32, PathError> {
             "resolved path coordinates exceed finite f32 geometry",
         ))
     }
+}
+
+/// Validate the normalized command topology expected by every downstream
+/// consumer and derive whether all drawable contours are explicitly closed.
+fn validate_commands(commands: &[PathCommand]) -> Result<bool, PathError> {
+    let mut in_contour = false;
+    let mut contour_has_geometry = false;
+    let mut contour_closed = false;
+    let mut has_geometry = false;
+    let mut all_contours_closed = true;
+
+    let finish_contour = |has_geometry: bool, closed: bool, all_closed: &mut bool| {
+        if has_geometry && !closed {
+            *all_closed = false;
+        }
+    };
+
+    for (index, command) in commands.iter().enumerate() {
+        let finite = match *command {
+            PathCommand::MoveTo { x, y } | PathCommand::LineTo { x, y } => {
+                x.is_finite() && y.is_finite()
+            }
+            PathCommand::QuadTo { x1, y1, x, y } => {
+                x1.is_finite() && y1.is_finite() && x.is_finite() && y.is_finite()
+            }
+            PathCommand::CubicTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => {
+                x1.is_finite()
+                    && y1.is_finite()
+                    && x2.is_finite()
+                    && y2.is_finite()
+                    && x.is_finite()
+                    && y.is_finite()
+            }
+            PathCommand::ConicTo {
+                x1,
+                y1,
+                x,
+                y,
+                weight,
+            } => {
+                x1.is_finite()
+                    && y1.is_finite()
+                    && x.is_finite()
+                    && y.is_finite()
+                    && weight.is_finite()
+                    && weight > 0.0
+            }
+            PathCommand::Close => true,
+        };
+        if !finite {
+            return Err(PathError::new(format!(
+                "path command {index} must contain finite coordinates and a positive finite conic weight"
+            )));
+        }
+
+        match command {
+            PathCommand::MoveTo { .. } => {
+                if in_contour && !contour_has_geometry {
+                    return Err(PathError::new(format!(
+                        "path command {index} starts after a move-only contour"
+                    )));
+                }
+                finish_contour(
+                    contour_has_geometry,
+                    contour_closed,
+                    &mut all_contours_closed,
+                );
+                in_contour = true;
+                contour_has_geometry = false;
+                contour_closed = false;
+            }
+            PathCommand::LineTo { .. }
+            | PathCommand::QuadTo { .. }
+            | PathCommand::CubicTo { .. }
+            | PathCommand::ConicTo { .. } => {
+                if !in_contour {
+                    return Err(PathError::new(format!(
+                        "path drawing command {index} must follow a move command"
+                    )));
+                }
+                if contour_closed {
+                    return Err(PathError::new(format!(
+                        "path drawing command {index} must start a new contour after close"
+                    )));
+                }
+                contour_has_geometry = true;
+                has_geometry = true;
+            }
+            PathCommand::Close => {
+                if !in_contour || !contour_has_geometry {
+                    return Err(PathError::new(format!(
+                        "path close command {index} must follow drawable contour geometry"
+                    )));
+                }
+                if contour_closed {
+                    return Err(PathError::new(format!(
+                        "path close command {index} duplicates a closed contour"
+                    )));
+                }
+                contour_closed = true;
+            }
+        }
+    }
+
+    if in_contour && !contour_has_geometry {
+        return Err(PathError::new(
+            "path command stream must not end with a move-only contour",
+        ));
+    }
+    if !has_geometry {
+        return Err(PathError::new(
+            "path command stream must contain drawable geometry",
+        ));
+    }
+    finish_contour(
+        contour_has_geometry,
+        contour_closed,
+        &mut all_contours_closed,
+    );
+    Ok(all_contours_closed)
 }
 
 /// Remove move-only contours. They have no fill or stroke geometry and must

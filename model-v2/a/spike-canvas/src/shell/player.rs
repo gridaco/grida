@@ -6,6 +6,7 @@
 
 use std::num::NonZeroU32;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anchor_engine::damage::diff_frame;
@@ -14,7 +15,7 @@ use anchor_engine::paint::PaintCtx;
 use anchor_engine::playback_clock::{HostTime, PlaybackRange};
 use anchor_lab::animation::{AnimationProgram, SampleTime};
 use anchor_lab::resolve::ResolveOptions;
-use anchor_lab::svg_animation::{CompiledRectSvgAnimation, RectSvgAnimationSource, SourceSnapshot};
+use anchor_lab::svg_animation::{CompiledSvgAnimation, SourceSnapshot, SvgAnimationSource};
 use glutin::prelude::GlSurface;
 use skia_safe::Color;
 use winit::application::ApplicationHandler;
@@ -29,14 +30,20 @@ use crate::camera::Camera;
 const FRAME_INTERVAL: Duration = Duration::from_nanos(16_666_667);
 const CONTROLS_HEIGHT: f32 = 88.0;
 
+fn compile_latest_profile(
+    identity: impl Into<Arc<str>>,
+    source: impl Into<Arc<str>>,
+) -> Result<CompiledSvgAnimation, String> {
+    SvgAnimationSource::parse(SourceSnapshot::new(identity, source))
+        .map_err(|error| error.to_string())?
+        .into_compiled_latest()
+        .map_err(|error| error.to_string())
+}
+
 pub fn run(path: &Path) -> Result<(), String> {
     let source = std::fs::read_to_string(path)
         .map_err(|error| format!("read {}: {error}", path.display()))?;
-    let compiled =
-        RectSvgAnimationSource::parse(SourceSnapshot::new(path.display().to_string(), source))
-            .map_err(|error| error.to_string())?
-            .into_compiled_profile1()
-            .map_err(|error| error.to_string())?;
+    let compiled = compile_latest_profile(path.display().to_string(), source)?;
     let range = program_range(compiled.animation())?;
 
     let title = path
@@ -147,7 +154,7 @@ enum PlayerShortcut {
 }
 
 struct AnimationApp {
-    compiled: CompiledRectSvgAnimation,
+    compiled: CompiledSvgAnimation,
     transport: PlayerTransport,
     epoch: Instant,
     options: ResolveOptions,
@@ -557,11 +564,29 @@ impl ApplicationHandler for AnimationApp {
 mod tests {
     use super::*;
 
-    fn compile(source: &str) -> CompiledRectSvgAnimation {
-        RectSvgAnimationSource::parse(SourceSnapshot::new("player-test.svg", source))
-            .unwrap()
-            .into_compiled_profile1()
-            .unwrap()
+    fn compile(source: &str) -> CompiledSvgAnimation {
+        compile_latest_profile("player-test.svg", source).unwrap()
+    }
+
+    #[test]
+    fn live_host_compiles_the_latest_cumulative_profile() {
+        let compiled = compile(
+            r##"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60">
+  <rect x="0" y="0" width="10" height="10" fill="#102030">
+    <animate attributeName="fill" from="#102030" to="#abcdef" dur="2s"/>
+  </rect>
+</svg>"##,
+        );
+        assert_eq!(
+            compiled.animation().compiler_id(),
+            anchor_lab::svg_animation::PROFILE6_COMPILER_ID
+        );
+        assert_eq!(compiled.animation().effect_stacks().count(), 1);
+        assert_eq!(compiled.animation().tracks().len(), 1);
+        assert_eq!(
+            compiled.animation().tracks()[0].kind(),
+            anchor_lab::animation::TrackKind::SolidFill
+        );
     }
 
     #[test]

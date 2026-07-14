@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">
+  <rect id="probe" x="8" y="8" width="8" height="16" fill="#16a34a">
+    <!-- Declared first, but its later begin gives it higher priority. -->
+    <animate
+      id="lower-replace"
+      attributeName="x"
+      from="20"
+      to="60"
+      begin="2.5s"
+      dur="4s"
+      fill="freeze"
+      additive="replace"
+      accumulate="none"
+    />
+    <animate
+      id="base-cumulative"
+      attributeName="x"
+      from="2"
+      to="6"
+      dur="1s"
+      repeatCount="3"
+      fill="freeze"
+      additive="sum"
+      accumulate="sum"
+    />
+    <animate
+      id="upper-cumulative"
+      attributeName="x"
+      from="0"
+      to="8"
+      begin="3s"
+      dur="1s"
+      repeatCount="2"
+      fill="freeze"
+      additive="sum"
+      accumulate="sum"
+    />
+    <animate
+      id="upper-temporary"
+      attributeName="x"
+      from="4"
+      to="12"
+      begin="3.5s"
+      dur="1s"
+      fill="remove"
+      additive="sum"
+    />
+  </rect>
+</svg>

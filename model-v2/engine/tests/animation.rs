@@ -7,10 +7,10 @@ use anchor_engine::paint::{read_pixels, PaintCtx};
 use anchor_engine::playback_clock::{HostTime, PlaybackClock, PlaybackRange, PlaybackRate};
 use anchor_engine::replay::resolved_bits_eq;
 use anchor_lab::animation::{AnimationProgram, SampleTime};
-use anchor_lab::math::Affine;
+use anchor_lab::math::{Affine, RectF};
 use anchor_lab::model::{Document, NodeId};
 use anchor_lab::resolve::ResolveOptions;
-use anchor_lab::svg_animation::{RectSvgAnimationSource, SourceSnapshot};
+use anchor_lab::svg_animation::{SourceSnapshot, SvgAnimationSource};
 use skia_safe::{surfaces, Color};
 
 const W: i32 = 120;
@@ -34,10 +34,17 @@ fn named(document: &Document, name: &str) -> NodeId {
         .expect("named SVG rectangle exists")
 }
 
-fn compile(source: &str) -> anchor_lab::svg_animation::CompiledRectSvgAnimation {
-    RectSvgAnimationSource::parse(SourceSnapshot::new("frame-test.svg", source))
+fn compile_profile3(source: &str) -> anchor_lab::svg_animation::CompiledSvgAnimation {
+    SvgAnimationSource::parse(SourceSnapshot::new("frame-profile3-test.svg", source))
         .unwrap()
-        .into_compiled_profile1()
+        .into_compiled_profile3()
+        .unwrap()
+}
+
+fn compile_profile4(source: &str) -> anchor_lab::svg_animation::CompiledSvgAnimation {
+    SvgAnimationSource::parse(SourceSnapshot::new("frame-profile4-test.svg", source))
+        .unwrap()
+        .into_compiled_profile4()
         .unwrap()
 }
 
@@ -48,7 +55,7 @@ fn pixel(bytes: &[u8], x: i32, y: i32) -> &[u8] {
 
 #[test]
 fn empty_sample_is_exactly_the_base_frame() {
-    let compiled = compile(
+    let compiled = compile_profile3(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="120" height="72"><rect x="20" y="16" width="40" height="28" fill="#2563eb"/></svg>"##,
     );
     let empty = AnimationProgram::empty(compiled.document(), "empty-frame@0").unwrap();
@@ -129,7 +136,7 @@ fn unsupported_dynamic_markup_still_has_an_explicit_base_frame() {
 </svg>
 "##;
     let materialized =
-        RectSvgAnimationSource::parse(SourceSnapshot::new("base-only.svg", source)).unwrap();
+        SvgAnimationSource::parse(SourceSnapshot::new("base-only.svg", source)).unwrap();
     assert!(materialized.has_animation_markup());
     assert!(materialized.compile_profile0().is_err());
 
@@ -150,7 +157,7 @@ fn unsupported_dynamic_markup_still_has_an_explicit_base_frame() {
 
 #[test]
 fn geometry_sample_moves_query_damage_and_pixels_together() {
-    let compiled = compile(
+    let compiled = compile_profile3(
         r##"
 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="72">
   <rect id="moving" x="10" y="20" width="24" height="24" fill="#7c3aed">
@@ -199,8 +206,258 @@ fn geometry_sample_moves_query_damage_and_pixels_together() {
 }
 
 #[test]
+fn replacement_sandwich_fallthrough_is_one_coherent_frame() {
+    let compiled = compile_profile3(
+        r##"
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="72">
+  <rect id="probe" x="8" y="20" width="8" height="16" fill="#16a34a">
+    <animate id="higher" attributeName="x" from="72" to="88" begin="2s" dur="1s" fill="remove"/>
+    <animate id="lower" attributeName="x" from="16" to="56" begin="1s" dur="4s" fill="freeze"/>
+  </rect>
+</svg>
+"##,
+    );
+    let probe = named(compiled.document(), "probe");
+    let context = PaintCtx::new(None);
+    let at = |time| {
+        frame::resolve_and_build_request(
+            compiled.document(),
+            FrameRequest::Sample {
+                program: compiled.animation(),
+                time: SampleTime::from_nanoseconds(time),
+            },
+            &options(),
+            &context,
+        )
+        .unwrap()
+    };
+
+    let lower = at(1_500_000_000);
+    let higher = at(2_500_000_000);
+    let revealed = at(3_000_000_000);
+    let frozen = at(5_000_000_000);
+
+    for (product, expected_x, hit_x) in [
+        (&lower, 21.0, 25.0),
+        (&higher, 80.0, 84.0),
+        (&revealed, 36.0, 40.0),
+        (&frozen, 56.0, 60.0),
+    ] {
+        assert_eq!(product.resolved().box_of(probe).x, expected_x);
+        assert_eq!(product.query().hit_point(hit_x, 28.0), Some(probe));
+        let pixels = product
+            .raster_to_bytes(&Affine::IDENTITY, W, H, &context)
+            .unwrap();
+        assert_ne!(pixel(&pixels, hit_x as i32, 28), &[255, 255, 255, 255]);
+    }
+
+    assert_eq!(diff_frame(&lower, &higher).changed, [probe]);
+    assert_eq!(diff_frame(&higher, &revealed).changed, [probe]);
+    assert_eq!(diff_frame(&revealed, &frozen).changed, [probe]);
+    assert_ne!(lower.query().hit_point(84.0, 28.0), Some(probe));
+    assert_ne!(higher.query().hit_point(25.0, 28.0), Some(probe));
+    assert_ne!(revealed.query().hit_point(84.0, 28.0), Some(probe));
+}
+
+#[test]
+fn additive_sandwich_is_one_coherent_layout_query_damage_and_pixel_frame() {
+    let compiled = compile_profile3(include_str!(
+        "../rig/fixtures/svg-animation-profile3-additive-boundaries.svg"
+    ));
+    let probe = named(compiled.document(), "probe");
+    let context = PaintCtx::new(None);
+    let at = |time| {
+        frame::resolve_and_build_request(
+            compiled.document(),
+            FrameRequest::Sample {
+                program: compiled.animation(),
+                time: SampleTime::from_nanoseconds(time),
+            },
+            &options(),
+            &context,
+        )
+        .unwrap()
+    };
+
+    let before_replace = at(2_000_000_000);
+    let replacement = at(2_500_000_000);
+    let before_remove = at(4_499_999_999);
+    let after_remove = at(4_500_000_000);
+    for (product, expected_x) in [
+        (&before_replace, 22.0),
+        (&replacement, 20.0),
+        (&before_remove, 64.0),
+        (&after_remove, 52.0),
+    ] {
+        assert_eq!(product.resolved().box_of(probe).x, expected_x);
+        assert_eq!(
+            product.query().hit_point(expected_x + 4.0, 16.0),
+            Some(probe)
+        );
+        let pixels = product
+            .raster_to_bytes(&Affine::IDENTITY, W, H, &context)
+            .unwrap();
+        assert_ne!(
+            pixel(&pixels, expected_x as i32 + 4, 16),
+            &[255, 255, 255, 255]
+        );
+    }
+
+    assert_eq!(diff_frame(&before_replace, &replacement).changed, [probe]);
+    assert_eq!(diff_frame(&before_remove, &after_remove).changed, [probe]);
+    assert_ne!(
+        before_remove.query().hit_point(68.0, 16.0),
+        after_remove.query().hit_point(68.0, 16.0)
+    );
+}
+
+#[test]
+fn typed_rotation_is_one_coherent_world_query_damage_and_pixel_frame() {
+    let compiled = compile_profile4(
+        r##"
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="72">
+  <rect id="rotating" x="20" y="20" width="20" height="12" fill="#2563eb">
+    <animateTransform attributeName="transform" type="rotate"
+      from="0 30 26" to="90 30 26" dur="1s" fill="freeze"/>
+  </rect>
+</svg>
+"##,
+    );
+    let rotating = named(compiled.document(), "rotating");
+    let transform_owner = compiled
+        .document()
+        .parent_of(rotating)
+        .expect("Profile 4 transform owner wraps the source rectangle");
+    let context = PaintCtx::new(None);
+    let base = frame::resolve_and_build_request(
+        compiled.document(),
+        FrameRequest::Base,
+        &options(),
+        &context,
+    )
+    .unwrap();
+    let sampled = frame::resolve_and_build_request(
+        compiled.document(),
+        FrameRequest::Sample {
+            program: compiled.animation(),
+            time: SampleTime::from_nanoseconds(1_000_000_000),
+        },
+        &options(),
+        &context,
+    )
+    .unwrap();
+
+    assert_eq!(
+        base.resolved().aabb_of(rotating),
+        RectF {
+            x: 20.0,
+            y: 20.0,
+            w: 20.0,
+            h: 12.0,
+        }
+    );
+    assert_eq!(
+        sampled.resolved().world_of(rotating),
+        Affine {
+            a: 0.0,
+            b: 1.0,
+            c: -1.0,
+            d: 0.0,
+            e: 36.0,
+            f: 16.0,
+        }
+    );
+    assert_eq!(
+        sampled.resolved().aabb_of(rotating),
+        RectF {
+            x: 24.0,
+            y: 16.0,
+            w: 12.0,
+            h: 20.0,
+        }
+    );
+
+    assert_eq!(base.query().hit_point(22.0, 22.0), Some(rotating));
+    assert_ne!(sampled.query().hit_point(22.0, 22.0), Some(rotating));
+    assert_eq!(sampled.query().hit_point(26.0, 18.0), Some(rotating));
+
+    let damage = diff_frame(&base, &sampled);
+    assert!(damage.changed.contains(&rotating));
+    assert!(damage.changed.contains(&transform_owner));
+    assert_eq!(
+        damage.union_world,
+        Some(RectF {
+            x: 20.0,
+            y: 16.0,
+            w: 20.0,
+            h: 20.0,
+        })
+    );
+
+    let base_pixels = base
+        .raster_to_bytes(&Affine::IDENTITY, W, H, &context)
+        .unwrap();
+    let sampled_pixels = sampled
+        .raster_to_bytes(&Affine::IDENTITY, W, H, &context)
+        .unwrap();
+    assert_ne!(pixel(&base_pixels, 22, 22), &[255, 255, 255, 255]);
+    assert_eq!(pixel(&sampled_pixels, 22, 22), &[255, 255, 255, 255]);
+    assert_eq!(pixel(&base_pixels, 26, 18), &[255, 255, 255, 255]);
+    assert_ne!(pixel(&sampled_pixels, 26, 18), &[255, 255, 255, 255]);
+}
+
+#[test]
+fn cache_keys_the_winning_value_not_the_effect_identity() {
+    let compiled = compile_profile3(
+        r##"
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="72">
+  <rect x="8" y="20" width="8" height="16" fill="#16a34a">
+    <animate id="lower" attributeName="x" from="40" to="40" begin="0s" dur="10s" fill="freeze"/>
+    <animate id="higher" attributeName="x" from="40" to="40" begin="2s" dur="1s" fill="remove"/>
+  </rect>
+</svg>
+"##,
+    );
+    let context = PaintCtx::new(None);
+    let mut cache = SceneCache::new(W, H);
+    let mut surface = surfaces::raster_n32_premul((W, H)).unwrap();
+
+    assert!(cache
+        .frame_request(
+            surface.canvas(),
+            compiled.document(),
+            FrameRequest::Sample {
+                program: compiled.animation(),
+                time: SampleTime::from_nanoseconds(1_000_000_000),
+            },
+            &options(),
+            &Affine::IDENTITY,
+            &context,
+            false,
+        )
+        .unwrap());
+    assert!(
+        !cache
+            .frame_request(
+                surface.canvas(),
+                compiled.document(),
+                FrameRequest::Sample {
+                    program: compiled.animation(),
+                    time: SampleTime::from_nanoseconds(2_500_000_000),
+                },
+                &options(),
+                &Affine::IDENTITY,
+                &context,
+                false,
+            )
+            .unwrap(),
+        "two effect winners with equal values share the visual cache entry"
+    );
+}
+
+#[test]
 fn keyframes_and_spline_easing_flow_through_the_complete_frame() {
-    let compiled = compile(
+    let compiled = compile_profile3(
         r##"
 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="72">
   <rect id="bar" x="10" y="20" width="0" height="20" fill="#22d3ee">
@@ -277,7 +534,7 @@ fn keyframes_and_spline_easing_flow_through_the_complete_frame() {
 
 #[test]
 fn playback_clock_is_only_a_host_time_adapter_for_the_existing_frame_seam() {
-    let compiled = compile(
+    let compiled = compile_profile3(
         r##"
 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="72">
   <rect id="moving" x="10" y="20" width="20" height="24" fill="#7c3aed">
@@ -426,7 +683,7 @@ fn playback_clock_is_only_a_host_time_adapter_for_the_existing_frame_seam() {
 
 #[test]
 fn opacity_sample_changes_appearance_without_resampling_geometry() {
-    let compiled = compile(
+    let compiled = compile_profile3(
         r##"
 <svg xmlns="http://www.w3.org/2000/svg" width="120" height="72">
   <rect id="fading" x="30" y="20" width="40" height="28" fill="#2563eb">
@@ -472,7 +729,7 @@ fn opacity_sample_changes_appearance_without_resampling_geometry() {
 
 #[test]
 fn sample_failure_is_transactional_at_the_public_canvas_entry() {
-    let compiled = compile(
+    let compiled = compile_profile3(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="120" height="72"><rect width="20" height="20"><animate attributeName="x" from="0" to="40" dur="1s"/></rect></svg>"##,
     );
     let other_document = compiled.document().clone();
@@ -497,7 +754,7 @@ fn sample_failure_is_transactional_at_the_public_canvas_entry() {
 
 #[test]
 fn sample_failure_preserves_the_warm_cache_and_destination() {
-    let compiled = compile(
+    let compiled = compile_profile3(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="120" height="72"><rect x="20" y="16" width="40" height="28" fill="#2563eb"><animate attributeName="x" from="20" to="60" dur="1s"/></rect></svg>"##,
     );
     let other_document = compiled.document().clone();
@@ -558,7 +815,7 @@ fn sample_failure_preserves_the_warm_cache_and_destination() {
 
 #[test]
 fn cache_keys_sampled_values_instead_of_time() {
-    let compiled = compile(
+    let compiled = compile_profile3(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="120" height="72"><rect x="10" y="20" width="20" height="20" fill="#7c3aed"><animate attributeName="x" from="10" to="70" dur="1s" fill="remove"/></rect></svg>"##,
     );
     let context = PaintCtx::new(None);

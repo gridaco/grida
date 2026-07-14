@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="224">
+  <!-- A lone-to effect interpolates from the live lower sandwich value. -->
+  <rect id="scalar-to" x="10" y="184" width="8" height="16" fill="#16a34a">
+    <animate
+      id="scalar-lower"
+      attributeName="x"
+      from="20"
+      to="84"
+      dur="4s"
+      fill="freeze"
+    />
+    <animate
+      id="scalar-to-live"
+      attributeName="x"
+      to="100"
+      begin="1s"
+      dur="2s"
+      fill="remove"
+    />
+  </rect>
+
+  <!-- Additive translation is postmultiplied after the authored scale. -->
+  <rect
+    id="translated"
+    x="4"
+    y="16"
+    width="8"
+    height="8"
+    transform="scale(2 3)"
+    fill="#2563eb"
+  >
+    <animateTransform
+      id="translate-effect"
+      attributeName="transform"
+      type="translate"
+      from="0 0"
+      to="20 10"
+      dur="2s"
+      repeatCount="2"
+      fill="freeze"
+      additive="sum"
+      accumulate="sum"
+    />
+  </rect>
+
+  <!-- Accumulation adds scale components; it does not multiply matrices. -->
+  <rect
+    id="scaled"
+    x="0"
+    y="0"
+    width="8"
+    height="8"
+    transform="translate(136 48)"
+    fill="#f59e0b"
+  >
+    <animateTransform
+      id="scale-effect"
+      attributeName="transform"
+      type="scale"
+      from="1 1"
+      to="2 3"
+      dur="1s"
+      repeatCount="2"
+      fill="freeze"
+      additive="sum"
+      accumulate="sum"
+    />
+  </rect>
+
+  <!-- Replacement rotation cuts the authored translate and keeps its pivot. -->
+  <rect
+    id="rotated"
+    x="8"
+    y="136"
+    width="16"
+    height="8"
+    transform="translate(7 5)"
+    fill="#dc2626"
+  >
+    <animateTransform
+      id="rotate-effect"
+      attributeName="transform"
+      type="rotate"
+      from="0 16 140"
+      to="180 16 140"
+      dur="2s"
+      fill="freeze"
+    />
+  </rect>
+
+  <!-- Mixed transform kinds remain ordered: translate, scale, then rotate. -->
+  <rect
+    id="ordered"
+    x="0"
+    y="0"
+    width="8"
+    height="8"
+    transform="translate(152 88)"
+    fill="#7c3aed"
+  >
+    <animateTransform
+      id="order-scale"
+      attributeName="transform"
+      type="scale"
+      from="1 1"
+      to="2 3"
+      dur="2s"
+      fill="freeze"
+      additive="sum"
+    />
+    <animateTransform
+      id="order-rotate"
+      attributeName="transform"
+      type="rotate"
+      from="0"
+      to="90"
+      dur="2s"
+      fill="freeze"
+      additive="sum"
+    />
+  </rect>
+</svg>

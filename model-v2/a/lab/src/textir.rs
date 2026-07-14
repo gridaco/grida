@@ -15,7 +15,6 @@ use quick_xml::events::{BytesDecl, BytesStart, Event};
 use quick_xml::Reader;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
-use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseError(pub String);
@@ -905,7 +904,9 @@ fn parse_stroke(
     if is_line && stroke.align != StrokeAlign::Center {
         return err("a <line> stroke must use align=\"center\"");
     }
-    if path.is_some_and(|path| !path.all_contours_closed) && stroke.align != StrokeAlign::Center {
+    if path.is_some_and(|path| !path.geometry().all_contours_closed)
+        && stroke.align != StrokeAlign::Center
+    {
         return err(
             "a <path> stroke may use inside/outside alignment only when every drawable contour is explicitly closed",
         );
@@ -1936,16 +1937,10 @@ fn parse_with_dialect(input: &str, dialect: Dialect) -> Result<Document, ParseEr
                     None if grida_xml => grida_xml_default_fills(&payload),
                     None => Paints::default(),
                 };
-                let node = Node {
-                    id,
-                    header,
-                    payload,
-                    children: vec![],
-                    corner_radius,
-                    corner_smoothing,
-                    fills,
-                    strokes: vec![],
-                };
+                let mut node = Node::new(id, header, payload);
+                node.corner_radius = corner_radius;
+                node.corner_smoothing = corner_smoothing;
+                node.fills = fills;
                 nodes.insert(id, node);
                 if let Some(parent) = stack.last() {
                     let pid = parent.id;
@@ -2512,11 +2507,20 @@ pub(crate) fn validate_path_for_write(node: &Node) -> Result<(), String> {
         return Ok(());
     };
     validate_path_box_for_write(node)?;
-    let validated = path::analyze(Arc::clone(&artifact.d), artifact.fill_rule)
+    artifact
+        .validate()
+        .map_err(|error| format!("node {} has invalid path data: {error}", node.id))?;
+    if artifact.source_reference_box() != (1.0, 1.0) {
+        return Err(format!(
+            "node {} path d is not authored in Grida's unit reference box",
+            node.id
+        ));
+    }
+    let validated = path::analyze(artifact.d(), artifact.fill_rule())
         .map_err(|error| format!("node {} has invalid path data: {error}", node.id))?;
     // Reanalysis starts from the same authored d and must reproduce every
     // derived field consumed by bounds, damage, and paint.
-    if validated.as_ref() != artifact.as_ref() {
+    if validated.geometry() != artifact.geometry() {
         return Err(format!(
             "node {} has a path artifact inconsistent with its authored d",
             node.id
@@ -2904,6 +2908,17 @@ fn print_node(
     let node = doc.get(id);
     let indent = "  ".repeat(depth);
     let grida_xml = dialect == Dialect::GridaXml;
+    if node.preserves_descendant_hit_identity() {
+        let format = if grida_xml {
+            "Grida XML"
+        } else {
+            "historical E3 TextIr"
+        };
+        return Err(format!(
+            "node {} is a query-transparent structural wrapper {format} cannot represent",
+            node.id
+        ));
+    }
     if !grida_xml
         && matches!(
             &node.payload,
@@ -3124,8 +3139,8 @@ fn print_node(
         Payload::Shape { desc } => {
             if let ShapeDesc::Path(artifact) = desc {
                 debug_assert!(grida_xml, "historical path rejected above");
-                push_attr(out, "d", artifact.d.as_ref());
-                if artifact.fill_rule == FillRule::EvenOdd {
+                push_attr(out, "d", artifact.d());
+                if artifact.fill_rule() == FillRule::EvenOdd {
                     push_attr(out, "fill-rule", "evenodd");
                 }
             } else if !grida_xml {

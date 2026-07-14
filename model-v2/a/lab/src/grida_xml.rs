@@ -167,6 +167,7 @@ fn semantic_node_eq(
     };
     if a_node.header != b_node.header
         || !payload_eq(&a_node.payload, &b_node.payload)
+        || a_node.preserves_descendant_hit_identity() != b_node.preserves_descendant_hit_identity()
         || !corner_radius_eq(a_node.corner_radius, b_node.corner_radius)
         || !corner_num_eq(
             a_node.corner_smoothing.value(),

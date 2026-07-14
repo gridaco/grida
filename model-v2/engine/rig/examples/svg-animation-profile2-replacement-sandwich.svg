@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540">
+  <rect x="0" y="0" width="960" height="540" fill="#08111f"/>
+  <rect x="48" y="40" width="864" height="460" rx="28" fill="#101c30"/>
+
+  <!-- Geometric title and legend: cyan lower, pink interruption, green result. -->
+  <rect x="72" y="68" width="180" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="72" y="90" width="310" height="8" rx="4" fill="#64748b"/>
+  <rect x="704" y="68" width="52" height="12" rx="6" fill="#22d3ee"/>
+  <rect x="766" y="68" width="52" height="12" rx="6" fill="#f472b6"/>
+  <rect x="828" y="68" width="52" height="12" rx="6" fill="#4ade80"/>
+
+  <!-- The pink band marks the later effect's 2s–3s active interval. -->
+  <rect x="440" y="116" width="160" height="330" rx="16" fill="#f472b6" opacity="0.08"/>
+
+  <!-- Shared rails and exact-time stations. -->
+  <rect x="120" y="170" width="640" height="4" rx="2" fill="#334155"/>
+  <rect x="120" y="290" width="640" height="4" rx="2" fill="#334155"/>
+  <rect x="120" y="410" width="640" height="4" rx="2" fill="#334155"/>
+
+  <rect x="118" y="158" width="4" height="28" rx="2" fill="#64748b"/>
+  <rect x="278" y="158" width="4" height="28" rx="2" fill="#64748b"/>
+  <rect x="438" y="158" width="4" height="28" rx="2" fill="#f472b6"/>
+  <rect x="598" y="158" width="4" height="28" rx="2" fill="#f472b6"/>
+  <rect x="758" y="158" width="4" height="28" rx="2" fill="#64748b"/>
+
+  <rect x="118" y="278" width="4" height="28" rx="2" fill="#64748b"/>
+  <rect x="278" y="278" width="4" height="28" rx="2" fill="#64748b"/>
+  <rect x="438" y="278" width="4" height="28" rx="2" fill="#f472b6"/>
+  <rect x="598" y="278" width="4" height="28" rx="2" fill="#f472b6"/>
+  <rect x="758" y="278" width="4" height="28" rx="2" fill="#64748b"/>
+
+  <rect x="118" y="398" width="4" height="28" rx="2" fill="#64748b"/>
+  <rect x="278" y="398" width="4" height="28" rx="2" fill="#64748b"/>
+  <rect x="438" y="398" width="4" height="28" rx="2" fill="#f472b6"/>
+  <rect x="598" y="398" width="4" height="28" rx="2" fill="#f472b6"/>
+  <rect x="758" y="398" width="4" height="28" rx="2" fill="#64748b"/>
+
+  <!-- Lower effect by itself. -->
+  <rect id="lower-only" x="120" y="146" width="56" height="52" rx="14" fill="#22d3ee">
+    <animate id="lower-only-effect" attributeName="x" from="120" to="760" begin="1s" dur="4s" fill="freeze"/>
+  </rect>
+
+  <!-- Temporary higher-priority effect by itself; base is off-canvas. -->
+  <rect id="higher-only" x="-100" y="266" width="56" height="52" rx="14" fill="#f472b6">
+    <animate id="higher-only-effect" attributeName="x" from="440" to="600" begin="2s" dur="1s" fill="remove"/>
+  </rect>
+
+  <!-- Replacement sandwich: later begin wins, then remove reveals lower now. -->
+  <rect id="composed" x="120" y="386" width="56" height="52" rx="14" fill="#4ade80">
+    <animate
+      id="higher"
+      attributeName="x"
+      from="440"
+      to="600"
+      begin="2s"
+      dur="1s"
+      fill="remove"
+    />
+    <animate
+      id="lower"
+      attributeName="x"
+      from="120"
+      to="760"
+      begin="1s"
+      dur="4s"
+      fill="freeze"
+    />
+  </rect>
+
+  <!-- Static row keys. -->
+  <rect x="72" y="158" width="24" height="24" rx="6" fill="#22d3ee"/>
+  <rect x="72" y="278" width="24" height="24" rx="6" fill="#f472b6"/>
+  <rect x="72" y="398" width="24" height="24" rx="6" fill="#4ade80"/>
+</svg>

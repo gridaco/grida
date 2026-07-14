@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540">
+  <rect width="960" height="540" fill="#080b14"/>
+  <rect x="28" y="28" width="904" height="484" rx="28" fill="#111827"/>
+  <rect x="52" y="52" width="420" height="436" rx="22" fill="#171f31"/>
+  <rect x="492" y="52" width="416" height="204" rx="22" fill="#171f31"/>
+  <rect x="492" y="276" width="416" height="212" rx="22" fill="#171f31"/>
+
+  <rect x="76" y="76" width="74" height="8" rx="4" fill="#7c3aed"/>
+  <rect x="76" y="96" width="156" height="6" rx="3" fill="#334155"/>
+  <rect x="76" y="108" width="108" height="6" rx="3" fill="#273449"/>
+
+  <rect x="516" y="76" width="64" height="8" rx="4" fill="#06b6d4"/>
+  <rect x="516" y="96" width="132" height="6" rx="3" fill="#334155"/>
+  <rect x="516" y="300" width="64" height="8" rx="4" fill="#22c55e"/>
+  <rect x="516" y="320" width="164" height="6" rx="3" fill="#334155"/>
+
+  <!-- Circle → diamond → sparkle. Four M/C/C/C/C/Z keyframes prove smooth cubic interpolation. -->
+  <path
+    id="motion-mark"
+    fill="#7c3aed"
+    d="M 262 128 C 356 128 432 204 432 298 C 432 392 356 468 262 468 C 168 468 92 392 92 298 C 92 204 168 128 262 128 Z"
+  >
+    <animate
+      attributeName="d"
+      values="M 262 128 C 356 128 432 204 432 298 C 432 392 356 468 262 468 C 168 468 92 392 92 298 C 92 204 168 128 262 128 Z;M 262 112 C 300 154 390 250 444 298 C 390 346 300 432 262 474 C 224 432 134 346 80 298 C 134 250 224 154 262 112 Z;M 262 106 C 296 218 350 262 444 298 C 350 334 296 378 262 478 C 228 378 174 334 80 298 C 174 262 228 218 262 106 Z;M 262 128 C 356 128 432 204 432 298 C 432 392 356 468 262 468 C 168 468 92 392 92 298 C 92 204 168 128 262 128 Z"
+      keyTimes="0;0.33;0.66;1"
+      calcMode="spline"
+      keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+      dur="6s"
+      fill="freeze"
+    />
+  </path>
+  <path
+    fill="#c4b5fd"
+    opacity="0.35"
+    d="M 262 228 C 301 228 332 259 332 298 C 332 337 301 368 262 368 C 223 368 192 337 192 298 C 192 259 223 228 262 228 Z"
+  >
+    <animate
+      attributeName="d"
+      from="M 262 228 C 301 228 332 259 332 298 C 332 337 301 368 262 368 C 223 368 192 337 192 298 C 192 259 223 228 262 228 Z"
+      to="m 262 214 c 20 22 64 62 84 84 c -20 22 -64 62 -84 84 c -20 -22 -64 -62 -84 -84 c 20 -22 64 -62 84 -84 z"
+      dur="6s"
+      calcMode="spline"
+      keySplines="0.16 1 0.3 1"
+      fill="freeze"
+    />
+  </path>
+
+  <!-- Whole-value icon states: arcs and different command families are explicit. -->
+  <path
+    id="icon-states"
+    fill="#06b6d4"
+    d="M 600 126 A 52 52 0 1 1 600 230 A 52 52 0 1 1 600 126 Z"
+  >
+    <animate
+      attributeName="d"
+      values="M 600 126 A 52 52 0 1 1 600 230 A 52 52 0 1 1 600 126 Z;M 600 120 L 664 230 L 536 230 Z;M 552 126 H 648 A 8 8 0 0 1 656 134 V 222 A 8 8 0 0 1 648 230 H 552 A 8 8 0 0 1 544 222 V 134 A 8 8 0 0 1 552 126 Z;M 600 126 A 52 52 0 1 1 600 230 A 52 52 0 1 1 600 126 Z"
+      keyTimes="0;0.25;0.5;0.75"
+      calcMode="discrete"
+      dur="6s"
+      fill="freeze"
+    />
+  </path>
+  <rect x="700" y="126" width="168" height="12" rx="6" fill="#273449"/>
+  <rect x="700" y="150" width="126" height="8" rx="4" fill="#334155"/>
+  <rect x="700" y="168" width="148" height="8" rx="4" fill="#334155"/>
+  <rect x="700" y="204" width="92" height="26" rx="13" fill="#164e63"/>
+
+  <!-- H/V and L differ at source topology, so the fallback switches at 3s. -->
+  <path id="family-switch" fill="#22c55e" d="M 548 350 H 668 V 452 H 548 Z">
+    <animate
+      attributeName="d"
+      from="M 548 350 H 668 V 452 H 548 Z"
+      to="M 608 338 L 680 402 L 608 466 L 536 402 Z"
+      dur="6s"
+      fill="freeze"
+    />
+  </path>
+  <rect x="716" y="354" width="140" height="10" rx="5" fill="#273449"/>
+  <rect x="716" y="376" width="116" height="8" rx="4" fill="#334155"/>
+  <rect x="716" y="394" width="152" height="8" rx="4" fill="#334155"/>
+  <rect x="716" y="432" width="112" height="28" rx="14" fill="#14532d"/>
+</svg>

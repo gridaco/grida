@@ -1313,7 +1313,7 @@ impl Stroke {
             payload,
             Payload::Shape {
                 desc: ShapeDesc::Path(path)
-            } if !path.all_contours_closed && self.align != StrokeAlign::Center
+            } if !path.geometry().all_contours_closed && self.align != StrokeAlign::Center
         ) {
             return false;
         }
@@ -1394,16 +1394,63 @@ impl IntoIterator for Paints {
     }
 }
 
+/// Selection ownership when a descendant of a derived-box node is hit.
+///
+/// Ordinary groups and lenses promote the hit to themselves. A structural
+/// wrapper introduced only to carry an engine operation can preserve the
+/// descendant's identity without changing geometry, paint, or broadphase
+/// membership.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum DerivedHitBehavior {
+    #[default]
+    PromoteToSelf,
+    PreserveDescendant,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     pub id: NodeId,
     pub header: Header,
     pub payload: Payload,
     pub children: Vec<NodeId>,
+    derived_hit_behavior: DerivedHitBehavior,
     pub corner_radius: RectangularCornerRadius,
     pub corner_smoothing: CornerSmoothing,
     pub fills: Paints,
     pub strokes: Vec<Stroke>,
+}
+
+impl Node {
+    pub fn new(id: NodeId, header: Header, payload: Payload) -> Self {
+        Self {
+            id,
+            header,
+            payload,
+            children: vec![],
+            derived_hit_behavior: DerivedHitBehavior::default(),
+            corner_radius: RectangularCornerRadius::default(),
+            corner_smoothing: CornerSmoothing::default(),
+            fills: Paints::default(),
+            strokes: vec![],
+        }
+    }
+
+    pub(crate) fn preserve_descendant_hit_identity(&mut self) {
+        assert!(
+            self.payload.box_is_derived(),
+            "only a derived node can preserve a descendant hit"
+        );
+        self.derived_hit_behavior = DerivedHitBehavior::PreserveDescendant;
+    }
+
+    pub(crate) fn promotes_descendant_hit(&self) -> bool {
+        self.payload.box_is_derived()
+            && self.derived_hit_behavior == DerivedHitBehavior::PromoteToSelf
+    }
+
+    pub(crate) fn preserves_descendant_hit_identity(&self) -> bool {
+        self.derived_hit_behavior == DerivedHitBehavior::PreserveDescendant
+    }
 }
 
 /// The document store is a **node arena**: `NodeId` IS the slot index,
@@ -1674,19 +1721,14 @@ impl DocBuilder {
         };
         nodes.insert(
             0,
-            Node {
-                id: 0,
+            Node::new(
+                0,
                 header,
-                payload: Payload::Frame {
+                Payload::Frame {
                     layout: LayoutBehavior::default(),
                     clips_content: false,
                 },
-                children: vec![],
-                corner_radius: RectangularCornerRadius::default(),
-                corner_smoothing: CornerSmoothing::default(),
-                fills: Paints::default(),
-                strokes: vec![],
-            },
+            ),
         );
         DocBuilder {
             nodes,
@@ -1704,19 +1746,7 @@ impl DocBuilder {
         );
         let id = self.next;
         self.next += 1;
-        self.nodes.insert(
-            id,
-            Node {
-                id,
-                header,
-                payload,
-                children: vec![],
-                corner_radius: RectangularCornerRadius::default(),
-                corner_smoothing: CornerSmoothing::default(),
-                fills: Paints::default(),
-                strokes: vec![],
-            },
-        );
+        self.nodes.insert(id, Node::new(id, header, payload));
         self.nodes.get_mut(&parent).unwrap().children.push(id);
         id
     }
@@ -1803,18 +1833,13 @@ mod identity_tests {
         let retained_key = document.key_of(child).unwrap();
         let retained_node = document.get(child).clone();
         let retained_children = document.get(document.root).children.clone();
-        let replacement = Node {
-            id: child,
-            header: Header::new(SizeIntent::Fixed(30.0), SizeIntent::Fixed(40.0)),
-            payload: Payload::Shape {
+        let replacement = Node::new(
+            child,
+            Header::new(SizeIntent::Fixed(30.0), SizeIntent::Fixed(40.0)),
+            Payload::Shape {
                 desc: ShapeDesc::Ellipse,
             },
-            children: vec![],
-            corner_radius: RectangularCornerRadius::default(),
-            corner_smoothing: CornerSmoothing::default(),
-            fills: Paints::default(),
-            strokes: vec![],
-        };
+        );
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             document.add_child(document.root, replacement);
@@ -1825,5 +1850,44 @@ mod identity_tests {
         assert_eq!(document.parent_of(child), Some(document.root));
         assert_eq!(document.get(document.root).children, retained_children);
         assert_eq!(document.gen_of(child), retained_key.generation());
+    }
+}
+
+#[cfg(test)]
+mod query_behavior_tests {
+    use super::*;
+    use crate::{grida_xml, textir};
+
+    #[test]
+    fn compiler_only_hit_behavior_fails_durable_writers() {
+        let mut builder = DocBuilder::new();
+        let frame = builder.add(
+            0,
+            Header::new(SizeIntent::Fixed(100.0), SizeIntent::Fixed(100.0)),
+            Payload::Frame {
+                layout: LayoutBehavior::default(),
+                clips_content: false,
+            },
+        );
+        let lens = builder.add(
+            frame,
+            Header::new(SizeIntent::Auto, SizeIntent::Auto),
+            Payload::Lens { ops: vec![] },
+        );
+        builder.add(
+            lens,
+            Header::new(SizeIntent::Fixed(10.0), SizeIntent::Fixed(10.0)),
+            Payload::Shape {
+                desc: ShapeDesc::Rect,
+            },
+        );
+        let mut document = builder.build();
+        document.get_mut(lens).preserve_descendant_hit_identity();
+
+        let text_error = textir::try_print(&document).unwrap_err().to_string();
+        assert!(text_error.contains("query-transparent"), "{text_error}");
+
+        let xml_error = grida_xml::print(&document).unwrap_err().to_string();
+        assert!(xml_error.contains("query-transparent"), "{xml_error}");
     }
 }

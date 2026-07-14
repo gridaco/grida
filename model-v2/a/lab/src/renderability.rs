@@ -7,6 +7,7 @@
 
 use crate::math::Affine;
 use crate::model::*;
+use crate::path::PathGeometry;
 
 fn payload_name(payload: &Payload) -> &'static str {
     match payload {
@@ -399,49 +400,30 @@ pub fn validate_stroke(
     payload: &Payload,
     corner_smoothing: CornerSmoothing,
 ) -> Result<(), RenderabilityError> {
-    validate_paints(&stroke.paints)?;
+    validate_stroke_impl(stroke, payload, corner_smoothing, None)
+}
+
+/// Validate a stroke against an effective path value while retaining the
+/// authored payload for every non-geometric path property.
+pub(crate) fn validate_stroke_with_path_geometry(
+    stroke: &Stroke,
+    payload: &Payload,
+    corner_smoothing: CornerSmoothing,
+    path_geometry: &PathGeometry,
+) -> Result<(), RenderabilityError> {
+    validate_stroke_impl(stroke, payload, corner_smoothing, Some(path_geometry))
+}
+
+fn validate_stroke_impl(
+    stroke: &Stroke,
+    payload: &Payload,
+    corner_smoothing: CornerSmoothing,
+    path_geometry: Option<&PathGeometry>,
+) -> Result<(), RenderabilityError> {
+    validate_stroke_value(stroke)?;
     let default = Stroke::default_for(payload).ok_or_else(|| {
         RenderabilityError::new(format!("<{}> cannot carry strokes", payload_name(payload)))
     })?;
-    match stroke.width {
-        StrokeWidth::None => {}
-        StrokeWidth::Uniform(width) => {
-            if !width.is_finite() || width < 0.0 {
-                return Err(RenderabilityError::new(
-                    "<stroke> width must be finite and non-negative",
-                ));
-            }
-        }
-        StrokeWidth::Rectangular(widths) => {
-            for (side, width) in ["top", "right", "bottom", "left"]
-                .into_iter()
-                .zip(widths.values())
-            {
-                if !width.is_finite() || width < 0.0 {
-                    return Err(RenderabilityError::new(format!(
-                        "<stroke> width {side} must be finite and non-negative"
-                    )));
-                }
-            }
-        }
-    }
-    if !stroke.miter_limit.is_finite() || stroke.miter_limit <= 0.0 {
-        return Err(RenderabilityError::new(
-            "<stroke> miter-limit must be finite and positive",
-        ));
-    }
-    if let Some(values) = &stroke.dash_array {
-        if values.is_empty()
-            || values
-                .iter()
-                .any(|value| !value.is_finite() || *value < 0.0)
-            || values.iter().all(|value| *value == 0.0)
-        {
-            return Err(RenderabilityError::new(
-                "<stroke> dash-array must contain non-negative finite values and not be all zero",
-            ));
-        }
-    }
 
     match payload {
         Payload::Shape {
@@ -483,7 +465,11 @@ pub fn validate_stroke(
         Payload::Shape {
             desc: ShapeDesc::Path(path),
         } => {
-            if !path.all_contours_closed && stroke.align != StrokeAlign::Center {
+            let all_contours_closed = path_geometry
+                .map_or(path.geometry().all_contours_closed, |path| {
+                    path.all_contours_closed
+                });
+            if !all_contours_closed && stroke.align != StrokeAlign::Center {
                 return Err(RenderabilityError::new(
                     "a <path> stroke may use inside/outside alignment only when every drawable contour is explicitly closed",
                 ));
@@ -527,5 +513,53 @@ pub fn validate_stroke(
             ));
         }
     }
+    Ok(())
+}
+
+/// Validate fields that are intrinsic to a stroke, independent of the
+/// geometry that will carry it. Payload-specific alignment and topology rules
+/// are checked by [`validate_stroke`] against the complete effective state.
+pub(crate) fn validate_stroke_value(stroke: &Stroke) -> Result<(), RenderabilityError> {
+    validate_paints(&stroke.paints)?;
+    match stroke.width {
+        StrokeWidth::None => {}
+        StrokeWidth::Uniform(width) => {
+            if !width.is_finite() || width < 0.0 {
+                return Err(RenderabilityError::new(
+                    "<stroke> width must be finite and non-negative",
+                ));
+            }
+        }
+        StrokeWidth::Rectangular(widths) => {
+            for (side, width) in ["top", "right", "bottom", "left"]
+                .into_iter()
+                .zip(widths.values())
+            {
+                if !width.is_finite() || width < 0.0 {
+                    return Err(RenderabilityError::new(format!(
+                        "<stroke> width {side} must be finite and non-negative"
+                    )));
+                }
+            }
+        }
+    }
+    if !stroke.miter_limit.is_finite() || stroke.miter_limit <= 0.0 {
+        return Err(RenderabilityError::new(
+            "<stroke> miter-limit must be finite and positive",
+        ));
+    }
+    if let Some(values) = &stroke.dash_array {
+        if values.is_empty()
+            || values
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0)
+            || values.iter().all(|value| *value == 0.0)
+        {
+            return Err(RenderabilityError::new(
+                "<stroke> dash-array must contain non-negative finite values and not be all zero",
+            ));
+        }
+    }
+
     Ok(())
 }

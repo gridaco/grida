@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540">
+  <rect width="960" height="540" fill="#050914"/>
+  <rect x="28" y="24" width="904" height="492" rx="28" fill="#0a1222"/>
+
+  <!-- Header and six-second phase rail. -->
+  <rect x="60" y="52" width="34" height="34" rx="10" fill="#7c3aed">
+    <animate attributeName="fill" values="#7c3aed;#2563eb;#06b6d4;#7c3aed" keyTimes="0;0.33;0.66;1" dur="6s" fill="freeze"/>
+  </rect>
+  <rect x="70" y="62" width="14" height="14" rx="4" fill="#f8fafc"/>
+  <rect x="108" y="54" width="214" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="108" y="76" width="326" height="7" rx="3.5" fill="#475569"/>
+  <rect x="60" y="108" width="832" height="16" rx="8" fill="#13213a"/>
+  <rect x="68" y="113" width="270" height="6" rx="3" fill="#7c3aed" opacity="0.7"/>
+  <rect x="338" y="113" width="270" height="6" fill="#2563eb" opacity="0.7"/>
+  <rect x="608" y="113" width="276" height="6" rx="3" fill="#06b6d4" opacity="0.7"/>
+  <rect x="66" y="104" width="5" height="24" rx="2.5" fill="#f8fafc">
+    <animate attributeName="x" from="0" to="816" dur="6s" fill="freeze" additive="sum"/>
+  </rect>
+
+  <!-- Hero: uneven keyframes and spline easing. -->
+  <rect x="60" y="148" width="404" height="214" rx="24" fill="#101d33"/>
+  <rect x="82" y="170" width="134" height="8" rx="4" fill="#cbd5e1"/>
+  <rect x="82" y="188" width="206" height="6" rx="3" fill="#475569"/>
+  <rect x="82" y="220" width="360" height="116" rx="20" fill="#7c3aed">
+    <animate
+      attributeName="fill"
+      values="#7c3aed;#db2777;#2563eb;#06b6d4;#10b981"
+      keyTimes="0;0.18;0.42;0.72;1"
+      calcMode="spline"
+      keySplines="0.2 0.8 0.2 1;0.4 0 0.2 1;0.2 0.8 0.2 1;0.4 0 0.2 1"
+      dur="6s"
+      fill="freeze"
+    />
+  </rect>
+  <rect x="104" y="246" width="150" height="12" rx="6" fill="#ffffff" opacity="0.84"/>
+  <rect x="104" y="270" width="244" height="7" rx="3.5" fill="#ffffff" opacity="0.48"/>
+  <rect x="104" y="287" width="196" height="7" rx="3.5" fill="#ffffff" opacity="0.34"/>
+  <rect x="378" y="246" width="42" height="42" rx="14" fill="#ffffff" opacity="0.78">
+    <animateTransform attributeName="transform" type="rotate" from="0 399 267" to="360 399 267" dur="6s" fill="freeze"/>
+  </rect>
+
+  <!-- Exact additive RGB mixer; transparent effect alpha preserves coverage. -->
+  <rect x="486" y="148" width="406" height="214" rx="24" fill="#101d33"/>
+  <rect x="508" y="170" width="154" height="8" rx="4" fill="#cbd5e1"/>
+  <rect x="508" y="188" width="238" height="6" rx="3" fill="#475569"/>
+  <rect x="508" y="220" width="362" height="116" rx="20" fill="#101018">
+    <animate attributeName="fill" from="#00000000" to="#d946ef00" dur="2s" repeatCount="3" fill="freeze" additive="sum"/>
+    <animate attributeName="fill" from="#00000000" to="#2563eb00" begin="1s" dur="2s" repeatCount="2" fill="freeze" additive="sum"/>
+    <animate attributeName="fill" from="#00000000" to="#06b6d400" begin="2s" dur="4s" fill="freeze" additive="sum"/>
+  </rect>
+  <rect x="532" y="246" width="10" height="64" rx="5" fill="#f0abfc"/>
+  <rect x="552" y="260" width="10" height="50" rx="5" fill="#93c5fd"/>
+  <rect x="572" y="276" width="10" height="34" rx="5" fill="#67e8f9"/>
+  <rect x="608" y="246" width="174" height="10" rx="5" fill="#ffffff" opacity="0.76"/>
+  <rect x="608" y="270" width="218" height="7" rx="3.5" fill="#ffffff" opacity="0.38"/>
+  <rect x="608" y="289" width="146" height="7" rx="3.5" fill="#ffffff" opacity="0.28"/>
+
+  <!-- Live-underlying transition: upper effect begins over a moving lower one. -->
+  <rect x="60" y="384" width="832" height="106" rx="24" fill="#101d33"/>
+  <rect x="82" y="406" width="168" height="8" rx="4" fill="#cbd5e1"/>
+  <rect x="82" y="424" width="228" height="6" rx="3" fill="#475569"/>
+  <rect x="346" y="406" width="524" height="58" rx="18" fill="#1d4ed8">
+    <animate attributeName="fill" values="#1d4ed8;#7c3aed;#db2777" keyTimes="0;0.5;1" dur="6s" fill="freeze"/>
+    <animate
+      attributeName="fill"
+      to="#f97316"
+      begin="2s"
+      dur="2s"
+      calcMode="spline"
+      keyTimes="0;1"
+      keySplines="0.2 0.8 0.2 1"
+      fill="remove"
+    />
+  </rect>
+  <rect x="370" y="424" width="132" height="9" rx="4.5" fill="#ffffff" opacity="0.82"/>
+  <rect x="370" y="443" width="218" height="6" rx="3" fill="#ffffff" opacity="0.42"/>
+  <rect x="810" y="420" width="36" height="30" rx="10" fill="#ffffff" opacity="0.74"/>
+</svg>

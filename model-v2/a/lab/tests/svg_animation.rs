@@ -1,63 +1,70 @@
-//! Retained SVG Animation Profiles 0 and 1 frontend/compiler contract.
+//! Retained SVG Animation Profiles 0–3 frontend/compiler contract.
 
-use anchor_lab::animation::{Easing, SampleTime};
+use anchor_lab::animation::{
+    AnimationProgram, CompositeOperation, Easing, IterationCompositeOperation, SampleTime,
+};
 use anchor_lab::model::{AnchorEdge, AxisBinding, SizeIntent};
 use anchor_lab::properties::{PropertyKey, PropertyValue};
 use anchor_lab::svg_animation::{
-    RectSvgAnimationSource, SourceSnapshot, PROFILE0_COMPILER_ID, PROFILE1_COMPILER_ID,
+    SourceSnapshot, SvgAnimationSource, PROFILE0_COMPILER_ID, PROFILE1_COMPILER_ID,
+    PROFILE2_COMPILER_ID, PROFILE3_COMPILER_ID,
 };
 
 const BOUNDARIES: &str =
     include_str!("../../../engine/rig/fixtures/svg-animation-profile0-boundaries.svg");
 const KEYFRAME_BOUNDARIES: &str =
     include_str!("../../../engine/rig/fixtures/svg-animation-profile1-keyframe-boundaries.svg");
+const SANDWICH_BOUNDARIES: &str =
+    include_str!("../../../engine/rig/fixtures/svg-animation-profile2-sandwich-boundaries.svg");
+const ADDITIVE_BOUNDARIES: &str =
+    include_str!("../../../engine/rig/fixtures/svg-animation-profile3-additive-boundaries.svg");
 const DEMO: &str = include_str!("../../../engine/rig/examples/svg-animation-profile0-demo.svg");
 const KEYFRAME_DEMO: &str =
     include_str!("../../../engine/rig/examples/svg-animation-profile1-keyframes.svg");
+const SANDWICH_DEMO: &str =
+    include_str!("../../../engine/rig/examples/svg-animation-profile2-replacement-sandwich.svg");
+const ADDITIVE_DEMO: &str =
+    include_str!("../../../engine/rig/examples/svg-animation-profile3-motion-mixer.svg");
 
-fn materialize(source: &str) -> RectSvgAnimationSource {
-    RectSvgAnimationSource::parse(SourceSnapshot::new("inline.svg", source)).unwrap()
+fn materialize(source: &str) -> SvgAnimationSource {
+    SvgAnimationSource::parse(SourceSnapshot::new("inline.svg", source)).unwrap()
 }
 
 fn compile_error(source: &str) -> String {
-    match RectSvgAnimationSource::parse(SourceSnapshot::new("invalid.svg", source)) {
+    match SvgAnimationSource::parse(SourceSnapshot::new("invalid.svg", source)) {
         Ok(materialized) => materialized.compile_profile0().unwrap_err().to_string(),
         Err(error) => error.to_string(),
     }
 }
 
 fn compile_profile1_error(source: &str) -> String {
-    match RectSvgAnimationSource::parse(SourceSnapshot::new("invalid-profile1.svg", source)) {
+    match SvgAnimationSource::parse(SourceSnapshot::new("invalid-profile1.svg", source)) {
         Ok(materialized) => materialized.compile_profile1().unwrap_err().to_string(),
         Err(error) => error.to_string(),
     }
 }
 
-fn sampled_scalar(source: &str, time_ns: i64) -> Option<f32> {
-    let materialized = materialize(source);
-    let program = materialized.compile_profile0().unwrap();
-    let target = program.tracks()[0].target();
-    let values = program
-        .sample(
-            materialized.document(),
-            SampleTime::from_nanoseconds(time_ns),
-        )
-        .unwrap();
-    match values.get(target) {
-        Some(PropertyValue::AxisBinding(AxisBinding::Pin {
-            anchor: AnchorEdge::Start,
-            offset,
-        })) => Some(*offset),
-        Some(PropertyValue::SizeIntent(SizeIntent::Fixed(value))) => Some(*value),
-        Some(PropertyValue::Number(value)) => Some(*value),
-        None => None,
-        value => panic!("unexpected sampled Profile 0 value {value:?}"),
+fn compile_profile2_error(source: &str) -> String {
+    match SvgAnimationSource::parse(SourceSnapshot::new("invalid-profile2.svg", source)) {
+        Ok(materialized) => materialized.compile_profile2().unwrap_err().to_string(),
+        Err(error) => error.to_string(),
     }
 }
 
-fn sampled_profile1_scalar(source: &str, time_ns: i64) -> Option<f32> {
+fn compile_profile3_error(source: &str) -> String {
+    match SvgAnimationSource::parse(SourceSnapshot::new("invalid-profile3.svg", source)) {
+        Ok(materialized) => materialized.compile_profile3().unwrap_err().to_string(),
+        Err(error) => error.to_string(),
+    }
+}
+
+fn sampled_scalar_with(
+    source: &str,
+    time_ns: i64,
+    compile: impl FnOnce(&SvgAnimationSource) -> AnimationProgram,
+) -> Option<f32> {
     let materialized = materialize(source);
-    let program = materialized.compile_profile1().unwrap();
+    let program = compile(&materialized);
     let target = program.tracks()[0].target();
     let values = program
         .sample(
@@ -73,8 +80,32 @@ fn sampled_profile1_scalar(source: &str, time_ns: i64) -> Option<f32> {
         Some(PropertyValue::SizeIntent(SizeIntent::Fixed(value))) => Some(*value),
         Some(PropertyValue::Number(value)) => Some(*value),
         None => None,
-        value => panic!("unexpected sampled Profile 1 value {value:?}"),
+        value => panic!("unexpected sampled scalar value {value:?}"),
     }
+}
+
+fn sampled_scalar(source: &str, time_ns: i64) -> Option<f32> {
+    sampled_scalar_with(source, time_ns, |materialized| {
+        materialized.compile_profile0().unwrap()
+    })
+}
+
+fn sampled_profile1_scalar(source: &str, time_ns: i64) -> Option<f32> {
+    sampled_scalar_with(source, time_ns, |materialized| {
+        materialized.compile_profile1().unwrap()
+    })
+}
+
+fn sampled_profile2_scalar(source: &str, time_ns: i64) -> Option<f32> {
+    sampled_scalar_with(source, time_ns, |materialized| {
+        materialized.compile_profile2().unwrap()
+    })
+}
+
+fn sampled_profile3_scalar(source: &str, time_ns: i64) -> Option<f32> {
+    sampled_scalar_with(source, time_ns, |materialized| {
+        materialized.compile_profile3().unwrap()
+    })
 }
 
 #[test]
@@ -213,7 +244,10 @@ fn unsupported_dynamic_markup_is_retained_for_base_but_refused_for_sample() {
         1
     );
     let error = materialized.compile_profile0().unwrap_err().to_string();
-    assert!(error.contains("admits only <animate>"), "{error}");
+    assert!(
+        error.contains("recognizes only <animate> and <animateTransform>"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -284,6 +318,342 @@ fn profile1_is_bit_compatible_with_every_profile0_spelling() {
 }
 
 #[test]
+fn profile2_is_bit_compatible_with_profile1_single_effects() {
+    for (source, times) in [
+        (BOUNDARIES, &[-1, 9, 10, 11, 17, 18, 19, 25, 26, 27][..]),
+        (
+            KEYFRAME_BOUNDARIES,
+            &[
+                -1,
+                0,
+                499_999_999,
+                500_000_000,
+                999_999_999,
+                1_000_000_000,
+                2_000_000_000,
+                3_000_000_000,
+            ][..],
+        ),
+    ] {
+        for &time in times {
+            assert_eq!(
+                sampled_profile2_scalar(source, time).map(f32::to_bits),
+                sampled_profile1_scalar(source, time).map(f32::to_bits),
+                "Profile 2 changed Profile 1 output at {time}ns"
+            );
+        }
+    }
+}
+
+#[test]
+fn profile2_orders_replacement_sandwiches_and_falls_through_exactly() {
+    let materialized = materialize(SANDWICH_BOUNDARIES);
+    let program = materialized.compile_profile2().unwrap();
+    assert_eq!(program.compiler_id(), PROFILE2_COMPILER_ID);
+    assert_eq!(program.tracks().len(), 2);
+    assert_eq!(program.effect_stacks().count(), 1);
+    assert!(program.tracks()[0].source().contains("lower"));
+    assert!(program.tracks()[1].source().contains("higher"));
+
+    let expected = [
+        (0, None),
+        (500_000_000, None),
+        (999_999_999, None),
+        (1_000_000_000, Some(16.0)),
+        (1_000_000_001, Some(16.0)),
+        (1_500_000_000, Some(21.0)),
+        (1_999_999_999, Some(26.0)),
+        (2_000_000_000, Some(72.0)),
+        (2_000_000_001, Some(72.0)),
+        (2_500_000_000, Some(80.0)),
+        (2_999_999_999, Some(88.0)),
+        (3_000_000_000, Some(36.0)),
+        (3_000_000_001, Some(36.0)),
+        (3_500_000_000, Some(41.0)),
+        (4_000_000_000, Some(46.0)),
+        (4_500_000_000, Some(51.0)),
+        (4_999_999_999, Some(56.0)),
+        (5_000_000_000, Some(56.0)),
+        (5_000_000_001, Some(56.0)),
+        (6_000_000_000, Some(56.0)),
+    ];
+    for (time, expected) in expected {
+        let actual = sampled_profile2_scalar(SANDWICH_BOUNDARIES, time);
+        assert_eq!(actual, expected, "at {time}ns");
+    }
+}
+
+#[test]
+fn profile2_uses_later_document_order_only_for_equal_begins() {
+    let source = r#"
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">
+  <rect x="8" y="8" width="8" height="16">
+    <animate id="earlier" attributeName="x" from="72" to="88" begin="1s" dur="4s" fill="freeze"/>
+    <animate id="later" attributeName="x" from="16" to="56" begin="1s" dur="4s" fill="freeze"/>
+  </rect>
+</svg>
+"#;
+    assert_eq!(sampled_profile2_scalar(source, 2_000_000_000), Some(26.0));
+}
+
+#[test]
+fn profile2_repeat_boundaries_do_not_reprioritize_a_lower_effect() {
+    let source = r#"
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">
+  <rect x="8" y="8" width="8" height="16">
+    <animate id="repeater" attributeName="x" from="70" to="90" begin="1s" dur="1s" repeatCount="3" fill="remove"/>
+    <animate id="later-begin" attributeName="x" from="200" to="220" begin="1.5s" dur="2s" fill="remove"/>
+  </rect>
+</svg>
+"#;
+
+    for (time, expected) in [
+        (1_999_999_999, 205.0),
+        (2_000_000_000, 205.0),
+        (2_000_000_001, 205.0),
+        (2_999_999_999, 215.0),
+        (3_000_000_000, 215.0),
+        (3_000_000_001, 215.0),
+        (3_499_999_999, 220.0),
+        (3_500_000_000, 80.0),
+        (3_500_000_001, 80.0),
+    ] {
+        assert_eq!(sampled_profile2_scalar(source, time), Some(expected));
+    }
+}
+
+#[test]
+fn profile2_repeats_sample_exact_boundaries_and_freeze_keeps_masking() {
+    let repeat = r#"
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">
+  <rect x="8" y="8" width="8" height="16">
+    <animate id="higher" attributeName="x" from="70" to="90" begin="2s" dur="1s" repeatCount="2" fill="remove"/>
+    <animate id="lower" attributeName="x" from="10" to="50" begin="1s" dur="5s" fill="freeze"/>
+  </rect>
+</svg>
+"#;
+    for (time, expected) in [
+        (1_999_999_999, 18.0),
+        (2_000_000_000, 70.0),
+        (2_000_000_001, 70.0),
+        (2_999_999_999, 90.0),
+        (3_000_000_000, 70.0),
+        (3_000_000_001, 70.0),
+        (3_999_999_999, 90.0),
+        (4_000_000_000, 34.0),
+        (4_000_000_001, 34.0),
+    ] {
+        assert_eq!(sampled_profile2_scalar(repeat, time), Some(expected));
+    }
+
+    let freeze = repeat.replace("fill=\"remove\"", "fill=\"freeze\"");
+    for time in [4_000_000_000, 4_000_000_001] {
+        assert_eq!(sampled_profile2_scalar(&freeze, time), Some(90.0));
+    }
+    assert_eq!(sampled_profile2_scalar(&freeze, 6_000_000_000), Some(90.0));
+}
+
+#[test]
+fn profile2_remains_replacement_only() {
+    for attribute in ["additive=\"sum\"", "accumulate=\"sum\""] {
+        let source = format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="1" height="1"><animate attributeName="x" from="0" to="1" dur="1s" {attribute}/></rect></svg>"#
+        );
+        let error = compile_profile2_error(&source);
+        assert!(error.contains("must be"), "{error}");
+        assert!(
+            error.contains("replace") || error.contains("none"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn profile3_is_cumulative_and_lowers_svg_composition_to_typed_operations() {
+    for source in [KEYFRAME_BOUNDARIES, SANDWICH_BOUNDARIES] {
+        for time in [
+            -1,
+            0,
+            499_999_999,
+            500_000_000,
+            999_999_999,
+            1_000_000_000,
+            1_500_000_000,
+            1_999_999_999,
+            2_000_000_000,
+            2_500_000_000,
+            2_999_999_999,
+            3_000_000_000,
+            3_500_000_000,
+            4_000_000_000,
+            4_500_000_000,
+            4_999_999_999,
+            5_000_000_000,
+            6_000_000_000,
+        ] {
+            assert_eq!(
+                sampled_profile3_scalar(source, time).map(f32::to_bits),
+                sampled_profile2_scalar(source, time).map(f32::to_bits),
+                "Profile 3 changed Profile 2 output at {time}ns"
+            );
+        }
+    }
+
+    let materialized = materialize(ADDITIVE_BOUNDARIES);
+    let program = materialized.compile_profile3().unwrap();
+    assert_eq!(program.compiler_id(), PROFILE3_COMPILER_ID);
+    assert_eq!(program.tracks().len(), 4);
+    assert_eq!(program.effect_stacks().count(), 1);
+    let sources = program
+        .tracks()
+        .iter()
+        .map(|track| {
+            let source = track.source();
+            let id = [
+                "base-cumulative",
+                "lower-replace",
+                "upper-cumulative",
+                "upper-temporary",
+            ]
+            .into_iter()
+            .find(|id| source.contains(id))
+            .unwrap();
+            (id, track.composite(), track.iteration_composite())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        sources,
+        vec![
+            (
+                "base-cumulative",
+                CompositeOperation::Add,
+                IterationCompositeOperation::Accumulate,
+            ),
+            (
+                "lower-replace",
+                CompositeOperation::Replace,
+                IterationCompositeOperation::Replace,
+            ),
+            (
+                "upper-cumulative",
+                CompositeOperation::Add,
+                IterationCompositeOperation::Accumulate,
+            ),
+            (
+                "upper-temporary",
+                CompositeOperation::Add,
+                IterationCompositeOperation::Replace,
+            ),
+        ]
+    );
+
+    for (time, expected) in [
+        (0, 10.0),
+        (500_000_000, 12.0),
+        (1_000_000_000, 16.0),
+        (1_500_000_000, 18.0),
+        (2_000_000_000, 22.0),
+        (2_500_000_000, 20.0),
+        (3_000_000_000, 25.0),
+        (3_500_000_000, 38.0),
+        (4_000_000_000, 51.0),
+        (4_500_000_000, 52.0),
+        (5_000_000_000, 61.0),
+        (5_500_000_000, 66.0),
+        (6_000_000_000, 71.0),
+        (6_500_000_000, 76.0),
+        (7_000_000_000, 76.0),
+    ] {
+        assert_eq!(
+            sampled_profile3_scalar(ADDITIVE_BOUNDARIES, time),
+            Some(expected),
+            "at {time}ns"
+        );
+    }
+}
+
+#[test]
+fn profile3_lowers_replacement_accumulation_independently() {
+    let source = r#"
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">
+  <rect x="10" y="8" width="8" height="16">
+    <animate attributeName="x" from="20" to="30" dur="1s" repeatCount="3" fill="freeze" additive="replace" accumulate="sum"/>
+  </rect>
+</svg>
+"#;
+    let materialized = materialize(source);
+    let program = materialized.compile_profile3().unwrap();
+    assert_eq!(program.tracks().len(), 1);
+    assert_eq!(program.tracks()[0].composite(), CompositeOperation::Replace);
+    assert_eq!(
+        program.tracks()[0].iteration_composite(),
+        IterationCompositeOperation::Accumulate
+    );
+
+    for (time, expected) in [
+        (0, 20.0),
+        (1_000_000_000, 50.0),
+        (1_500_000_000, 55.0),
+        (3_000_000_000, 90.0),
+    ] {
+        assert_eq!(sampled_profile3_scalar(source, time), Some(expected));
+    }
+}
+
+#[test]
+fn profile3_has_exact_additive_repeat_and_fallthrough_boundaries() {
+    for (time, expected) in [
+        (999_999_999, 14.0),
+        (1_000_000_000, 16.0),
+        (2_499_999_999, 24.0),
+        (2_500_000_000, 20.0),
+        (3_499_999_999, 34.0),
+        (3_500_000_000, 38.0),
+        (4_499_999_999, 64.0),
+        (4_500_000_000, 52.0),
+    ] {
+        assert_eq!(
+            sampled_profile3_scalar(ADDITIVE_BOUNDARIES, time),
+            Some(expected),
+            "at {time}ns"
+        );
+    }
+}
+
+#[test]
+fn profile3_clamps_only_the_final_opacity_sandwich() {
+    let source = r#"
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+  <rect x="8" y="8" width="24" height="24" opacity="0.2">
+    <animate attributeName="opacity" from="0.4" to="0.4" dur="1s" fill="freeze" additive="sum"/>
+    <animate attributeName="opacity" from="0.5" to="0.5" dur="1s" fill="freeze" additive="sum"/>
+  </rect>
+</svg>
+"#;
+    assert_eq!(sampled_profile3_scalar(source, 0), Some(1.0));
+}
+
+#[test]
+fn profile3_rejects_unknown_composition_values_without_weakening_older_profiles() {
+    for (attribute, accepted) in [
+        ("additive=\"multiply\"", "replace"),
+        ("accumulate=\"multiply\"", "none"),
+    ] {
+        let source = format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="1" height="1"><animate attributeName="x" from="0" to="1" dur="1s" {attribute}/></rect></svg>"#
+        );
+        let error = compile_profile3_error(&source);
+        assert!(error.contains(accepted), "{error}");
+        assert!(error.contains("sum"), "{error}");
+    }
+
+    let additive = ADDITIVE_BOUNDARIES.replace("additive=\"sum\"", "additive=\"replace\"");
+    let error = compile_profile2_error(&additive);
+    assert!(error.contains("accumulate"), "{error}");
+    assert!(error.contains("none"), "{error}");
+}
+
+#[test]
 fn profile1_values_and_key_times_lower_to_one_canonical_curve() {
     let source = r#"
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="32">
@@ -303,7 +673,7 @@ fn profile1_values_and_key_times_lower_to_one_canonical_curve() {
     let materialized = materialize(source);
     let program = materialized.compile_profile1().unwrap();
     assert_eq!(program.compiler_id(), PROFILE1_COMPILER_ID);
-    let curve = program.tracks()[0].curve();
+    let curve = program.tracks()[0].scalar_curve().unwrap();
     assert_eq!(curve.keyframe_count(), 3);
     assert_eq!(curve.keyframes().nth(1).unwrap().offset().numerator(), 1);
     assert_eq!(curve.keyframes().nth(1).unwrap().offset().denominator(), 4);
@@ -433,7 +803,7 @@ fn profile1_spline_controls_round_directly_to_binary32() {
 "#;
     let materialized = materialize(source);
     let program = materialized.compile_profile1().unwrap();
-    let easing = program.tracks()[0].curve().segments()[0].easing();
+    let easing = program.tracks()[0].scalar_curve().unwrap().segments()[0].easing();
     let Easing::CubicBezier(spline) = easing else {
         panic!("expected cubic Bézier easing");
     };
@@ -570,7 +940,8 @@ fn profile1_source_limits_close_the_new_list_and_exact_number_domains() {
     ));
     assert_eq!(
         materialize(&source).compile_profile1().unwrap().tracks()[0]
-            .curve()
+            .scalar_curve()
+            .unwrap()
             .keyframe_count(),
         4_096
     );
@@ -824,7 +1195,7 @@ fn sample_is_strict_about_side_channels_targeting_and_grammar() {
 }
 
 #[test]
-fn duplicate_ids_and_duplicate_property_effects_report_both_sites() {
+fn duplicate_ids_and_legacy_profile_duplicate_effects_report_both_sites() {
     let duplicate_id = r#"
 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">
   <rect id="same" width="1" height="1"/>
@@ -843,18 +1214,23 @@ fn duplicate_ids_and_duplicate_property_effects_report_both_sites() {
   </rect>
 </svg>
 "#;
-    let error = compile_error(duplicate_target);
-    assert!(
-        error.contains("duplicates the same rectangle/property"),
-        "{error}"
-    );
-    assert!(error.contains("first animated at 4:"), "{error}");
+    for error in [
+        compile_error(duplicate_target),
+        compile_profile1_error(duplicate_target),
+    ] {
+        assert!(
+            error.contains("duplicates the same node/property"),
+            "{error}"
+        );
+        assert!(error.contains("first animated at 4:"), "{error}");
+    }
+    materialize(duplicate_target).compile_profile2().unwrap();
 }
 
 #[test]
 fn visual_demo_is_a_real_profile0_program_not_a_manual_value_script() {
     let materialized =
-        RectSvgAnimationSource::parse(SourceSnapshot::new("svg-animation-profile0-demo.svg", DEMO))
+        SvgAnimationSource::parse(SourceSnapshot::new("svg-animation-profile0-demo.svg", DEMO))
             .unwrap();
     let program = materialized.compile_profile0().unwrap();
     assert_eq!(materialized.viewport(), (960.0, 540.0));
@@ -891,7 +1267,7 @@ fn visual_demo_is_a_real_profile0_program_not_a_manual_value_script() {
 
 #[test]
 fn keyframe_demo_is_a_real_profile1_program_with_per_segment_easing() {
-    let materialized = RectSvgAnimationSource::parse(SourceSnapshot::new(
+    let materialized = SvgAnimationSource::parse(SourceSnapshot::new(
         "svg-animation-profile1-keyframes.svg",
         KEYFRAME_DEMO,
     ))
@@ -914,7 +1290,8 @@ fn keyframe_demo_is_a_real_profile1_program_with_per_segment_easing() {
             .iter()
             .filter(|track| {
                 track
-                    .curve()
+                    .scalar_curve()
+                    .unwrap()
                     .segments()
                     .iter()
                     .any(|segment| matches!(segment.easing(), Easing::CubicBezier(_)))
@@ -926,11 +1303,152 @@ fn keyframe_demo_is_a_real_profile1_program_with_per_segment_easing() {
         .tracks()
         .iter()
         .find(|track| {
-            let segments = track.curve().segments();
+            let segments = track.scalar_curve().unwrap().segments();
             segments.len() == 3
                 && segments[0].easing() != segments[1].easing()
                 && segments[1].easing() != segments[2].easing()
         })
         .expect("one track proves that easing belongs to each segment");
-    assert_eq!(mixed.curve().keyframe_count(), 4);
+    assert_eq!(mixed.scalar_curve().unwrap().keyframe_count(), 4);
+}
+
+#[test]
+fn sandwich_demo_is_a_real_profile2_program_with_one_composed_target() {
+    let materialized = SvgAnimationSource::parse(SourceSnapshot::new(
+        "svg-animation-profile2-replacement-sandwich.svg",
+        SANDWICH_DEMO,
+    ))
+    .unwrap();
+    let program = materialized.compile_profile2().unwrap();
+    assert_eq!(materialized.viewport(), (960.0, 540.0));
+    assert_eq!(program.compiler_id(), PROFILE2_COMPILER_ID);
+    assert_eq!(program.tracks().len(), 4);
+    let stacks = program.effect_stacks().collect::<Vec<_>>();
+    assert_eq!(stacks.len(), 3);
+    assert_eq!(
+        stacks.iter().filter(|stack| stack.len() == 2).count(),
+        1,
+        "exactly the composed green rail is a replacement sandwich"
+    );
+
+    let target_named = |name: &str| {
+        program
+            .tracks()
+            .iter()
+            .find_map(|track| {
+                let node = materialized.document().node_for_key(track.target().node)?;
+                (node.header.name.as_deref() == Some(name)).then_some(track.target())
+            })
+            .unwrap_or_else(|| panic!("animated demo rail `{name}` exists"))
+    };
+    let lower = target_named("lower-only");
+    let higher = target_named("higher-only");
+    let composed = target_named("composed");
+    let sample = |target, time| {
+        let values = program
+            .sample(materialized.document(), SampleTime::from_nanoseconds(time))
+            .unwrap();
+        match values.get(target) {
+            Some(PropertyValue::AxisBinding(AxisBinding::Pin {
+                anchor: AnchorEdge::Start,
+                offset,
+            })) => Some(*offset),
+            None => None,
+            value => panic!("unexpected demo rail value {value:?}"),
+        }
+    };
+
+    assert_eq!(sample(lower, 1_500_000_000), Some(200.0));
+    assert_eq!(sample(higher, 1_500_000_000), None);
+    assert_eq!(
+        sample(composed, 1_500_000_000),
+        sample(lower, 1_500_000_000)
+    );
+
+    assert_eq!(sample(lower, 2_500_000_000), Some(360.0));
+    assert_eq!(sample(higher, 2_500_000_000), Some(520.0));
+    assert_eq!(
+        sample(composed, 2_500_000_000),
+        sample(higher, 2_500_000_000)
+    );
+
+    assert_eq!(sample(higher, 3_000_000_000), None);
+    assert_eq!(sample(lower, 3_000_000_000), Some(440.0));
+    assert_eq!(
+        sample(composed, 3_000_000_000),
+        sample(lower, 3_000_000_000)
+    );
+
+    assert_eq!(sample(lower, 5_000_000_000), Some(760.0));
+    assert_eq!(
+        sample(composed, 5_000_000_000),
+        sample(lower, 5_000_000_000)
+    );
+}
+
+#[test]
+fn motion_mixer_demo_uses_profile3_composition_for_its_result_lane() {
+    let materialized = SvgAnimationSource::parse(SourceSnapshot::new(
+        "svg-animation-profile3-motion-mixer.svg",
+        ADDITIVE_DEMO,
+    ))
+    .unwrap();
+    let program = materialized.compile_profile3().unwrap();
+    assert_eq!(materialized.viewport(), (960.0, 540.0));
+    assert_eq!(program.compiler_id(), PROFILE3_COMPILER_ID);
+    assert_eq!(program.tracks().len(), 9);
+
+    let result = program
+        .tracks()
+        .iter()
+        .find_map(|track| {
+            let node = materialized.document().node_for_key(track.target().node)?;
+            (node.header.name.as_deref() == Some("result")).then_some(track.target())
+        })
+        .expect("composed result lane exists");
+    let result_stack = program
+        .effect_stacks()
+        .find(|stack| stack[0].target() == result)
+        .expect("result lane has one effect stack");
+    assert_eq!(result_stack.len(), 4);
+    assert_eq!(
+        result_stack
+            .iter()
+            .map(|track| track.composite())
+            .collect::<Vec<_>>(),
+        vec![
+            CompositeOperation::Add,
+            CompositeOperation::Replace,
+            CompositeOperation::Add,
+            CompositeOperation::Add,
+        ]
+    );
+
+    for (time, expected) in [
+        (0, 160.0),
+        (500_000_000, 200.0),
+        (1_000_000_000, 240.0),
+        (1_500_000_000, 280.0),
+        (2_000_000_000, 320.0),
+        (2_500_000_000, 280.0),
+        (3_000_000_000, 320.0),
+        (3_500_000_000, 416.0),
+        (4_000_000_000, 524.0),
+        (4_500_000_000, 536.0),
+        (5_000_000_000, 608.0),
+        (5_500_000_000, 648.0),
+        (6_000_000_000, 688.0),
+        (6_500_000_000, 728.0),
+        (7_000_000_000, 728.0),
+    ] {
+        let values = program
+            .sample(materialized.document(), SampleTime::from_nanoseconds(time))
+            .unwrap();
+        match values.get(result) {
+            Some(PropertyValue::AxisBinding(AxisBinding::Pin { offset, .. })) => {
+                assert_eq!(*offset, expected, "at {time}ns")
+            }
+            value => panic!("unexpected result lane value {value:?}"),
+        }
+    }
 }

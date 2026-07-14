@@ -768,18 +768,13 @@ fn print_roundtrip_ignores_arena_ids_but_not_tree_integrity() {
     let mut sparse = sparse.build();
     sparse.add_child(
         authored_root,
-        Node {
-            id: 9,
-            header: Header::new(SizeIntent::Fixed(10.0), SizeIntent::Fixed(10.0)),
-            payload: Payload::Shape {
+        Node::new(
+            9,
+            Header::new(SizeIntent::Fixed(10.0), SizeIntent::Fixed(10.0)),
+            Payload::Shape {
                 desc: ShapeDesc::Rect,
             },
-            children: vec![],
-            corner_radius: RectangularCornerRadius::default(),
-            corner_smoothing: CornerSmoothing::default(),
-            fills: Paints::default(),
-            strokes: vec![],
-        },
+        ),
     );
     grida_xml::print(&sparse).expect("non-DFS arena ids are storage only");
 
@@ -787,19 +782,14 @@ fn print_roundtrip_ignores_arena_ids_but_not_tree_integrity() {
     let mut relocated_root = canonical.get(canonical.root).clone();
     relocated_root.id = 7;
     relocated_root.children = vec![9];
-    let relocated_container = Node {
-        id: 9,
-        header: Header::new(SizeIntent::Fixed(100.0), SizeIntent::Fixed(100.0)),
-        payload: Payload::Frame {
+    let relocated_container = Node::new(
+        9,
+        Header::new(SizeIntent::Fixed(100.0), SizeIntent::Fixed(100.0)),
+        Payload::Frame {
             layout: LayoutBehavior::default(),
             clips_content: false,
         },
-        children: vec![],
-        corner_radius: RectangularCornerRadius::default(),
-        corner_smoothing: CornerSmoothing::default(),
-        fills: Paints::default(),
-        strokes: vec![],
-    };
+    );
     let relocated = Document::from_map(
         BTreeMap::from([(7, relocated_root), (9, relocated_container)]),
         7,

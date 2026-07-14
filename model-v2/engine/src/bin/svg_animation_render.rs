@@ -9,12 +9,13 @@ use anchor_engine::paint::PaintCtx;
 use anchor_lab::animation::SampleTime;
 use anchor_lab::math::Affine;
 use anchor_lab::resolve::{Report, ResolveOptions};
-use anchor_lab::svg_animation::{RectSvgAnimationSource, SourceSnapshot};
+use anchor_lab::svg_animation::{CompiledSvgAnimation, SourceSnapshot, SvgAnimationSource};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use skia_safe::{surfaces, Color, EncodedImageFormat};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_FPS: u64 = 50;
@@ -295,6 +296,16 @@ impl Drop for StagingDirectory {
     }
 }
 
+fn compile_latest_profile(
+    identity: impl Into<Arc<str>>,
+    source: impl Into<Arc<str>>,
+) -> Result<CompiledSvgAnimation, String> {
+    SvgAnimationSource::parse(SourceSnapshot::new(identity, source))
+        .map_err(|error| error.to_string())?
+        .into_compiled_latest()
+        .map_err(|error| error.to_string())
+}
+
 fn run() -> Result<(), String> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     let [input, output, rest @ ..] = args.as_slice() else {
@@ -314,14 +325,7 @@ fn run() -> Result<(), String> {
     let input_path = Path::new(input);
     let source = std::fs::read_to_string(input_path)
         .map_err(|error| format!("read {}: {error}", input_path.display()))?;
-    let materialized = RectSvgAnimationSource::parse(SourceSnapshot::new(
-        input_path.display().to_string(),
-        source,
-    ))
-    .map_err(|error| error.to_string())?;
-    let compiled = materialized
-        .into_compiled_profile1()
-        .map_err(|error| error.to_string())?;
+    let compiled = compile_latest_profile(input_path.display().to_string(), source)?;
     let (viewport_width, viewport_height) = compiled.viewport();
     let width = raster_extent(viewport_width, "SVG width")?;
     let height = raster_extent(viewport_height, "SVG height")?;
@@ -440,6 +444,29 @@ mod tests {
 
     fn test_directory(label: &str) -> PathBuf {
         std::env::temp_dir().join(format!("grida-svg-animation-{label}-{}", unique_suffix()))
+    }
+
+    #[test]
+    fn offline_host_compiles_the_latest_cumulative_profile() {
+        let compiled = compile_latest_profile(
+            "renderer-test.svg",
+            r##"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60">
+  <rect x="0" y="0" width="10" height="10" fill="#102030">
+    <animate attributeName="fill" from="#102030" to="#abcdef" dur="2s"/>
+  </rect>
+</svg>"##,
+        )
+        .unwrap();
+        assert_eq!(
+            compiled.animation().compiler_id(),
+            anchor_lab::svg_animation::PROFILE6_COMPILER_ID
+        );
+        assert_eq!(compiled.animation().effect_stacks().count(), 1);
+        assert_eq!(compiled.animation().tracks().len(), 1);
+        assert_eq!(
+            compiled.animation().tracks()[0].kind(),
+            anchor_lab::animation::TrackKind::SolidFill
+        );
     }
 
     #[test]

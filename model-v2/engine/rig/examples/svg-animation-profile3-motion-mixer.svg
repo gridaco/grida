@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540">
+  <rect x="0" y="0" width="960" height="540" fill="#07111f"/>
+  <rect x="40" y="32" width="880" height="476" rx="28" fill="#101c30"/>
+
+  <!-- Geometric title, key, and seven-second phase strip. -->
+  <rect x="72" y="58" width="188" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="72" y="80" width="304" height="8" rx="4" fill="#64748b"/>
+  <rect x="714" y="58" width="36" height="12" rx="6" fill="#22d3ee"/>
+  <rect x="760" y="58" width="36" height="12" rx="6" fill="#60a5fa"/>
+  <rect x="806" y="58" width="36" height="12" rx="6" fill="#a78bfa"/>
+  <rect x="852" y="58" width="36" height="12" rx="6" fill="#4ade80"/>
+
+  <rect x="80" y="112" width="286" height="14" rx="7" fill="#22d3ee" opacity="0.72"/>
+  <rect x="366" y="112" width="57" height="14" fill="#60a5fa" opacity="0.72"/>
+  <rect x="423" y="112" width="57" height="14" fill="#a78bfa" opacity="0.72"/>
+  <rect x="480" y="112" width="114" height="14" fill="#f59e0b" opacity="0.72"/>
+  <rect x="594" y="112" width="229" height="14" fill="#60a5fa" opacity="0.72"/>
+  <rect x="823" y="112" width="57" height="14" rx="7" fill="#64748b" opacity="0.72"/>
+  <rect x="78" y="102" width="4" height="34" rx="2" fill="#f8fafc">
+    <animate attributeName="x" from="0" to="800" dur="7s" fill="freeze" additive="sum"/>
+  </rect>
+
+  <!-- Four lanes: foundation, replacement, offsets, and the composed result. -->
+  <rect x="120" y="178" width="720" height="4" rx="2" fill="#334155"/>
+  <rect x="120" y="268" width="720" height="4" rx="2" fill="#334155"/>
+  <rect x="120" y="358" width="720" height="4" rx="2" fill="#334155"/>
+  <rect x="120" y="448" width="720" height="4" rx="2" fill="#334155"/>
+
+  <!-- Exact half-second stations. -->
+  <rect x="158" y="142" width="4" height="326" rx="2" fill="#475569" opacity="0.45"/>
+  <rect x="278" y="142" width="4" height="326" rx="2" fill="#475569" opacity="0.45"/>
+  <rect x="398" y="142" width="4" height="326" rx="2" fill="#475569" opacity="0.45"/>
+  <rect x="518" y="142" width="4" height="326" rx="2" fill="#475569" opacity="0.45"/>
+  <rect x="638" y="142" width="4" height="326" rx="2" fill="#475569" opacity="0.45"/>
+  <rect x="758" y="142" width="4" height="326" rx="2" fill="#475569" opacity="0.45"/>
+
+  <rect x="72" y="166" width="24" height="24" rx="6" fill="#22d3ee"/>
+  <rect x="72" y="256" width="24" height="24" rx="6" fill="#60a5fa"/>
+  <rect x="72" y="346" width="24" height="24" rx="6" fill="#a78bfa"/>
+  <rect x="68" y="432" width="32" height="32" rx="8" fill="#4ade80"/>
+
+  <rect id="foundation" x="160" y="156" width="52" height="48" rx="14" fill="#22d3ee">
+    <animate attributeName="x" from="0" to="80" dur="1s" repeatCount="3" fill="freeze" additive="sum" accumulate="sum"/>
+  </rect>
+
+  <rect id="replacement" x="-80" y="246" width="52" height="48" rx="14" fill="#60a5fa">
+    <animate attributeName="x" from="280" to="600" begin="2.5s" dur="4s" fill="freeze"/>
+  </rect>
+
+  <rect id="offsets" x="160" y="336" width="52" height="48" rx="14" fill="#a78bfa">
+    <animate attributeName="x" from="0" to="64" begin="3s" dur="1s" repeatCount="2" fill="freeze" additive="sum" accumulate="sum"/>
+    <animate attributeName="x" from="24" to="96" begin="3.5s" dur="1s" fill="remove" additive="sum"/>
+  </rect>
+
+  <rect id="result" x="160" y="426" width="52" height="48" rx="14" fill="#4ade80">
+    <!-- Authored first, but its later begin puts it above the foundation. -->
+    <animate attributeName="x" from="280" to="600" begin="2.5s" dur="4s" fill="freeze"/>
+    <animate attributeName="x" from="0" to="80" dur="1s" repeatCount="3" fill="freeze" additive="sum" accumulate="sum"/>
+    <animate attributeName="x" from="0" to="64" begin="3s" dur="1s" repeatCount="2" fill="freeze" additive="sum" accumulate="sum"/>
+    <animate attributeName="x" from="24" to="96" begin="3.5s" dur="1s" fill="remove" additive="sum"/>
+  </rect>
+
+</svg>

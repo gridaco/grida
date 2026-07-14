@@ -16,7 +16,7 @@ cargo run --release -- --shot out.png [crosszero|ungroup|rot45]
 
 # live SVG animation host
 cargo run --release -- \
-  --play-svg ../../engine/rig/examples/svg-animation-profile1-keyframes.svg
+  --play-svg ../../engine/rig/examples/svg-animation-profile6-path-morph-showcase.svg
 ```
 
 First build reuses the repo's compiled skia via the shared target dir

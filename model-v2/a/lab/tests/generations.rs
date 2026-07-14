@@ -49,18 +49,13 @@ fn reused_slot_mints_a_new_generation_without_reviving_the_old_key() {
     let (mut doc, child) = one_child();
     let old = doc.key_of(child).unwrap();
     doc.remove_subtree(child);
-    let replacement = Node {
-        id: child,
-        header: Header::new(SizeIntent::Fixed(2.0), SizeIntent::Fixed(3.0)),
-        payload: Payload::Shape {
+    let replacement = Node::new(
+        child,
+        Header::new(SizeIntent::Fixed(2.0), SizeIntent::Fixed(3.0)),
+        Payload::Shape {
             desc: ShapeDesc::Ellipse,
         },
-        children: vec![],
-        corner_radius: RectangularCornerRadius::default(),
-        corner_smoothing: CornerSmoothing::default(),
-        fills: Paints::default(),
-        strokes: vec![],
-    };
+    );
     doc.add_child(doc.root, replacement);
 
     let current = doc.key_of(child).unwrap();

@@ -34,7 +34,7 @@ cargo run --release --bin gate
 # visual proof of the pre-animation effective-value seam
 cargo run --bin effective_values_demo -- target/grida-effective-values-demo.png
 
-# Profile 0 source through the cumulative Profile 1 renderer
+# Profile 0 source through the latest cumulative renderer
 cargo run --release --bin svg_animation_render -- \
   rig/examples/svg-animation-profile0-demo.svg \
   target/svg-animation-profile0 50 4000
@@ -43,9 +43,34 @@ cargo run --release --bin svg_animation_render -- \
 cargo run --release --bin svg_animation_render -- \
   rig/examples/svg-animation-profile1-keyframes.svg \
   target/svg-animation-profile1-keyframes 100 4500
+
+# Profile 2 replacement sandwich (50 fps, 6.5 seconds)
+cargo run --release --bin svg_animation_render -- \
+  rig/examples/svg-animation-profile2-replacement-sandwich.svg \
+  target/svg-animation-profile2-replacement-sandwich 50 6500
+
+# Profile 3 additive/accumulative motion mixer (2 fps, 7.5 seconds)
+cargo run --release --bin svg_animation_render -- \
+  rig/examples/svg-animation-profile3-motion-mixer.svg \
+  target/svg-animation-profile3-motion-mixer 2 7500
+
+# Profile 4 live-underlying effects and typed transforms (20 fps, 6 seconds)
+cargo run --release --bin svg_animation_render -- \
+  rig/examples/svg-animation-profile4-transform-showcase.svg \
+  target/svg-animation-profile4-transform-showcase 20 6000
+
+# Profile 5 solid-fill color effects (20 fps, 6 seconds)
+cargo run --release --bin svg_animation_render -- \
+  rig/examples/svg-animation-profile5-solid-fill-showcase.svg \
+  target/svg-animation-profile5-solid-fill-showcase 20 6000
+
+# Profile 6 smooth/discrete path geometry (20 fps, 6 seconds)
+cargo run --release --bin svg_animation_render -- \
+  rig/examples/svg-animation-profile6-path-morph-showcase.svg \
+  target/svg-animation-profile6-path-morph-showcase 20 6000
 ```
 
-## SVG Animation Profiles 0 and 1
+## SVG Animation Profiles 0–6
 
 The first animation reference path is implemented without adding animation
 state to the document or painter. A retained SVG source compiles once into an
@@ -67,6 +92,46 @@ engine has no SVG-shaped keyframe representation and no parallel endpoint
 sampler. Exact keyframe and frozen boundaries preserve authored binary32 bits.
 Cubic inversion is a pinned exact-rational operation, so direct seeks do not
 depend on playback history or platform easing libraries.
+
+The cumulative Profile 2 admits multiple replacement effects for one target.
+The SVG frontend orders them by interval begin and then document order; the
+format-neutral program stores target-grouped low-to-high-priority tracks and
+samples only the highest active or frozen contributor. `remove` falls through,
+`freeze` remains, and the authored base appears when no effect contributes.
+
+Profile 3 adds independent effect and iteration composition. SVG
+`additive="sum"` adds an effect over the lower sandwich; `accumulate="sum"`
+adds the curve's terminal keyframe once per completed repeat before sandwich
+composition. A replacement still cuts lower layers, while higher additions
+remain. The kernel reads only compatible authored scalar bases, rounds each
+ordered scalar operation once, fails non-finite geometry atomically, and clamps
+opacity only after the complete sandwich. It still emits one ordinary
+`PropertyValue` per target rather than introducing an animated value model.
+
+Profile 4 expands that kernel with a closed typed effect sum. Scalar lone-`to`
+interpolates from the live lower sandwich on every sample and is never a
+replacement cutoff. Typed translate, scale, and rotate curves interpolate and
+accumulate their parameters before projecting one sampled affine operation.
+Transform replacement creates one ordered operation; addition appends to the
+existing `LensOps` aggregate. The same effective property then feeds ordinary
+resolve, query, damage, cache, and paint.
+
+Profile 5 adds straight legacy-sRGB solid-fill color curves. It targets the
+existing complete ordered `Fills: Paints` property: replacement emits one solid
+paint, while additive and lone-`to` effects require a compatible singleton
+solid lower value. RGBA channels remain exact and unbounded through easing,
+repeat accumulation, and the full effect sandwich, then clamp and quantize once
+to the existing RGBA8 `Color`. No renderer, draw-list, cache, or document paint
+model is duplicated for animation.
+
+Profile 6 adds complete `PathGeometry` replacement without a string mutation
+channel or animation-only renderer. Compatible non-arc command topology lowers
+to a typed `PathCurve`; explicit `calcMode="discrete"` selects arbitrary valid
+path values including arcs; an incompatible non-arc `from`/`to` pair uses one
+eased whole-value switch. Source command families remain distinct even after
+render normalization (`H` is not `L`, `S` is not `C`, and `T` is not `Q`). The
+sampled artifact passes through the existing path property, resolver, tight
+bounds, damage, draw-list, cache, and raster path.
 
 ### Playback clock harness
 
@@ -99,7 +164,7 @@ boundary:
 ```sh
 cd ../a/spike-canvas
 cargo run --release -- \
-  --play-svg ../../engine/rig/examples/svg-animation-profile1-keyframes.svg
+  --play-svg ../../engine/rig/examples/svg-animation-profile6-path-morph-showcase.svg
 ```
 
 Its separate `AnimationApp` owns `Instant`, redraw pacing, controls, resize,
@@ -110,10 +175,11 @@ ENG-2.4 assigns to the eventual compositor; only explicit time mapping and
 animation demand are migration-worthy.
 
 The proving static SVG materializer is deliberately narrow: one SVG-namespace
-root with positive unitless dimensions, direct rectangles, solid hexadecimal
-fills, rectangle opacity and radii, and no viewBox or transforms. This keeps
-all five admitted animated properties (`x`, `y`, `width`, `height`, and
-`opacity`) identity-mapped into the current model. Unsupported scene structure
+root with positive unitless dimensions, direct rectangles or viewport-bounded
+paths, solid hexadecimal fills, shape opacity, rectangle radii, no viewBox, and
+a bounded Profiles 4–6 static transform-list seam. This keeps scalar, solid
+fill, transform-list, and path-geometry targets identity-mapped into the
+current model. Unsupported scene structure
 fails instead of being normalized behind the profile's endpoint contract.
 Retained dynamic side channels such as `<set>`, `<script>`, `<style>`, and
 event attributes may still expose the ordinary Base document, but make Sample
@@ -128,6 +194,38 @@ repeats, remove/freeze, parent targeting, and root-level `href` targeting.
 key-time, repeat, and freeze boundaries. Its visual sibling
 `rig/examples/svg-animation-profile1-keyframes.svg` aligns linear, shared
 spline, and independently eased segments against the same stations.
+
+`rig/fixtures/svg-animation-profile2-sandwich-boundaries.svg` isolates base,
+lower contribution, later-begin replacement, exact-end fallthrough, and frozen
+lower state on one target. Its three-rail visual sibling
+`rig/examples/svg-animation-profile2-replacement-sandwich.svg` separates the
+lower effect, temporary higher effect, and composed result.
+
+`rig/fixtures/svg-animation-profile3-additive-boundaries.svg` isolates typed
+addition and accumulation across repeat, replacement, remove, and freeze
+boundaries. Its four-lane visual sibling
+`rig/examples/svg-animation-profile3-motion-mixer.svg` separates the cumulative
+foundation, delayed replacement, persistent/temporary offsets, and result.
+
+`rig/fixtures/svg-animation-profile4-effects-and-transforms.svg` isolates the
+live lower-sandwich dependency, typed transform interpolation, parameter-level
+accumulation, and ordered postmultiplication. Its visual sibling
+`rig/examples/svg-animation-profile4-transform-showcase.svg` presents those
+laws as separate lanes through the same latest-profile renderer and player.
+
+`rig/fixtures/svg-animation-profile5-solid-fill-boundaries.svg` isolates
+whole-fill replacement, straight alpha/color interpolation, exact additive and
+repeat-accumulative channels, and live-underlying color. Its visual sibling
+`rig/examples/svg-animation-profile5-solid-fill-showcase.svg` presents uneven
+spline color keyframes, an additive RGB mixer, and a live transition.
+
+`rig/fixtures/svg-animation-profile6-path-boundaries.svg` isolates
+absolute/relative compatibility inside one command family, structured spline
+morphing, explicit discrete arc-bearing geometry, and the `H/V` versus `L`
+automatic fallback boundary. Its visual sibling
+`rig/examples/svg-animation-profile6-path-morph-showcase.svg` presents a
+circle-to-sparkle cubic motion mark, whole-icon state switches, and a
+family-mismatch switch through the same latest-profile renderer and player.
 
 The renderer publishes a bounded, zero-padded PNG sequence through a
 normal-error transaction, plus `frames/manifest.json` and `frames/frames.csv`.
@@ -233,9 +331,11 @@ single-face hosts use documented synthetic fallbacks only when needed.
 This remains a proving engine rather than a claim that every future RFD area is
 complete. Current limits are:
 
-- SVG Animation Profiles 0 and 1 currently share only the narrow
-  identity-preserving rectangle materializer described above; general static
-  SVG import, browser/WPT differential coverage, product playback and frame
+- SVG Animation Profiles 0–6 currently share only the narrow
+  identity-preserving shape materializer described above; Profile 4 adds its
+  bounded static-transform owner seam and Profile 6 adds direct viewport-bounded
+  paths, but general static SVG import,
+  broad browser/WPT differential coverage, product playback and frame
   scheduling, additional SVG animation elements and value families, and
   production migration remain separate work;
 - the host-font path is a Skia Paragraph bridge, not the deterministic oracle

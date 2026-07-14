@@ -1349,8 +1349,6 @@ fn backend_path(path: &ResolvedPathArtifact) -> Path {
 
 #[cfg(test)]
 mod backend_path_tests {
-    use std::sync::Arc;
-
     use super::backend_path;
     use anchor_lab::path::{analyze, materialize, FillRule};
 
@@ -1366,7 +1364,7 @@ mod backend_path_tests {
             let artifact = analyze(d, FillRule::NonZero)
                 .unwrap_or_else(|error| panic!("arc corpus must be valid: {d}: {error}"));
             let (width, height) = (137.0, 83.0);
-            let resolved = materialize(Arc::clone(&artifact), width, height)
+            let resolved = materialize(artifact.geometry(), artifact.fill_rule(), width, height)
                 .expect("arc corpus must fit its finite resolved box");
             let actual = backend_path(&resolved).compute_tight_bounds();
             let expected = resolved.local_bounds;

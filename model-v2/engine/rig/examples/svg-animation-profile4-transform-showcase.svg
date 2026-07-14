@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540">
+  <rect x="0" y="0" width="960" height="540" fill="#050b18"/>
+  <rect x="28" y="24" width="904" height="492" rx="28" fill="#0b1628"/>
+
+  <!-- A geometric header keeps this fixture independent from font shaping. -->
+  <rect x="60" y="52" width="34" height="34" rx="10" fill="#22d3ee"/>
+  <rect x="70" y="62" width="14" height="14" rx="4" fill="#07111f"/>
+  <rect x="108" y="54" width="194" height="12" rx="6" fill="#e2e8f0"/>
+  <rect x="108" y="76" width="308" height="7" rx="3.5" fill="#64748b"/>
+  <rect x="736" y="58" width="36" height="12" rx="6" fill="#22d3ee"/>
+  <rect x="782" y="58" width="36" height="12" rx="6" fill="#a78bfa"/>
+  <rect x="828" y="58" width="36" height="12" rx="6" fill="#fb7185"/>
+  <rect x="874" y="58" width="18" height="12" rx="6" fill="#334155"/>
+
+  <!-- One shared six-second phase strip. -->
+  <rect x="60" y="106" width="832" height="16" rx="8" fill="#13223a"/>
+  <rect x="68" y="111" width="260" height="6" rx="3" fill="#22d3ee" opacity="0.64"/>
+  <rect x="328" y="111" width="278" height="6" fill="#a78bfa" opacity="0.64"/>
+  <rect x="606" y="111" width="278" height="6" rx="3" fill="#fb7185" opacity="0.64"/>
+  <rect x="66" y="102" width="5" height="24" rx="2.5" fill="#f8fafc">
+    <animate attributeName="x" from="0" to="816" dur="6s" fill="freeze" additive="sum"/>
+  </rect>
+
+  <!-- Main transform stage. -->
+  <rect x="60" y="142" width="558" height="252" rx="24" fill="#0e1d33"/>
+  <rect x="78" y="160" width="92" height="8" rx="4" fill="#cbd5e1"/>
+  <rect x="78" y="176" width="156" height="6" rx="3" fill="#475569"/>
+
+  <!-- Orbit guides and stations. -->
+  <rect x="198" y="260" width="282" height="4" rx="2" fill="#1e3a55"/>
+  <rect x="337" y="190" width="4" height="144" rx="2" fill="#1e3a55"/>
+  <rect x="218" y="210" width="8" height="8" rx="4" fill="#334155"/>
+  <rect x="454" y="210" width="8" height="8" rx="4" fill="#334155"/>
+  <rect x="218" y="306" width="8" height="8" rx="4" fill="#334155"/>
+  <rect x="454" y="306" width="8" height="8" rx="4" fill="#334155"/>
+
+  <!-- A radar sweep proves pivot rotation. -->
+  <rect x="338" y="258" width="126" height="5" rx="2.5" fill="#22d3ee" opacity="0.28">
+    <animateTransform
+      attributeName="transform"
+      type="rotate"
+      from="0 340 260"
+      to="360 340 260"
+      dur="6s"
+      fill="freeze"
+    />
+  </rect>
+
+  <!-- Four independently materialized satellites share one pivot contract. -->
+  <rect x="332" y="194" width="16" height="16" rx="8" fill="#22d3ee">
+    <animateTransform attributeName="transform" type="rotate" from="0 340 260" to="1080 340 260" dur="6s" fill="freeze"/>
+  </rect>
+  <rect x="444" y="252" width="12" height="12" rx="6" fill="#a78bfa">
+    <animateTransform attributeName="transform" type="rotate" from="0 340 260" to="-720 340 260" dur="6s" fill="freeze"/>
+  </rect>
+  <rect x="242" y="252" width="10" height="10" rx="5" fill="#fb7185">
+    <animateTransform attributeName="transform" type="rotate" from="0 340 260" to="720 340 260" dur="6s" fill="freeze"/>
+  </rect>
+  <rect x="334" y="316" width="12" height="12" rx="6" fill="#4ade80">
+    <animateTransform attributeName="transform" type="rotate" from="0 340 260" to="-1080 340 260" dur="6s" fill="freeze"/>
+  </rect>
+
+  <!-- Authored translate followed by animated scale and rotation. -->
+  <rect x="-42" y="-42" width="84" height="84" rx="24" transform="translate(340 260)" fill="#1d4ed8">
+    <animateTransform
+      attributeName="transform"
+      type="scale"
+      values="0.88;1.10;0.88"
+      keyTimes="0;0.5;1"
+      calcMode="spline"
+      keySplines="0.4 0 0.2 1;0.4 0 0.2 1"
+      dur="2s"
+      repeatCount="3"
+      fill="freeze"
+      additive="sum"
+    />
+    <animateTransform
+      attributeName="transform"
+      type="rotate"
+      values="-8;8;-8"
+      keyTimes="0;0.5;1"
+      dur="2s"
+      repeatCount="3"
+      fill="freeze"
+      additive="sum"
+    />
+  </rect>
+  <rect x="326" y="246" width="28" height="28" rx="9" fill="#7dd3fc"/>
+
+  <!-- Parameter accumulation: every repeat advances another 72 units. -->
+  <rect x="92" y="346" width="474" height="4" rx="2" fill="#243a57"/>
+  <rect x="94" y="333" width="28" height="28" rx="9" fill="#a78bfa">
+    <animateTransform
+      attributeName="transform"
+      type="translate"
+      from="0"
+      to="72"
+      dur="2s"
+      repeatCount="3"
+      fill="freeze"
+      additive="sum"
+      accumulate="sum"
+    />
+  </rect>
+  <rect x="181" y="340" width="5" height="16" rx="2.5" fill="#475569"/>
+  <rect x="253" y="340" width="5" height="16" rx="2.5" fill="#475569"/>
+  <rect x="325" y="340" width="5" height="16" rx="2.5" fill="#475569"/>
+
+  <!-- Right-side transform taxonomy cards. -->
+  <rect x="642" y="142" width="250" height="252" rx="24" fill="#0e1d33"/>
+  <rect x="664" y="160" width="118" height="8" rx="4" fill="#cbd5e1"/>
+  <rect x="664" y="176" width="82" height="6" rx="3" fill="#475569"/>
+
+  <rect x="664" y="204" width="206" height="48" rx="14" fill="#132642"/>
+  <rect x="680" y="226" width="160" height="4" rx="2" fill="#334155"/>
+  <rect x="680" y="216" width="22" height="22" rx="7" fill="#22d3ee">
+    <animateTransform
+      attributeName="transform"
+      type="translate"
+      values="0;132;36;132"
+      keyTimes="0;0.45;0.7;1"
+      calcMode="spline"
+      keySplines="0.2 0.8 0.2 1;0.4 0 0.8 0.2;0.2 0.8 0.2 1"
+      dur="6s"
+      fill="freeze"
+      additive="sum"
+    />
+  </rect>
+
+  <rect x="664" y="264" width="98" height="108" rx="14" fill="#132642"/>
+  <rect x="697" y="298" width="32" height="32" rx="10" fill="#a78bfa">
+    <animateTransform attributeName="transform" type="rotate" from="0 713 314" to="720 713 314" dur="6s" fill="freeze"/>
+  </rect>
+  <rect x="707" y="308" width="12" height="12" rx="4" fill="#ede9fe"/>
+
+  <rect x="772" y="264" width="98" height="108" rx="14" fill="#132642"/>
+  <rect x="-20" y="-20" width="40" height="40" rx="12" transform="translate(821 314)" fill="#fb7185">
+    <animateTransform
+      attributeName="transform"
+      type="scale"
+      values="0.72;1.18;0.72"
+      keyTimes="0;0.5;1"
+      calcMode="spline"
+      keySplines="0.4 0 0.2 1;0.4 0 0.2 1"
+      dur="2s"
+      repeatCount="3"
+      fill="freeze"
+      additive="sum"
+    />
+  </rect>
+
+  <!-- Live-underlying scalar `to`: the second marker chases a moving base. -->
+  <rect x="60" y="414" width="832" height="76" rx="22" fill="#0e1d33"/>
+  <rect x="82" y="432" width="164" height="7" rx="3.5" fill="#cbd5e1"/>
+  <rect x="82" y="449" width="104" height="5" rx="2.5" fill="#475569"/>
+  <rect x="280" y="450" width="574" height="4" rx="2" fill="#243a57"/>
+  <rect x="282" y="439" width="26" height="26" rx="8" fill="#22d3ee" opacity="0.42">
+    <animate attributeName="x" from="0" to="500" dur="6s" fill="freeze" additive="sum"/>
+  </rect>
+  <rect x="282" y="439" width="26" height="26" rx="8" fill="#4ade80">
+    <animate attributeName="x" from="0" to="500" dur="6s" fill="freeze" additive="sum"/>
+    <animate
+      attributeName="x"
+      to="828"
+      begin="2s"
+      dur="2s"
+      calcMode="spline"
+      keyTimes="0;1"
+      keySplines="0.2 0.8 0.2 1"
+      fill="freeze"
+    />
+  </rect>
+  <rect x="572" y="443" width="4" height="18" rx="2" fill="#475569"/>
+  <rect x="824" y="437" width="8" height="30" rx="4" fill="#4ade80" opacity="0.46"/>
+</svg>

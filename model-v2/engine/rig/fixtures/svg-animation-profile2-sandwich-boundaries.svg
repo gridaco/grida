@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">
+  <rect id="probe" x="8" y="8" width="8" height="16" fill="#16a34a">
+    <!-- Declared first, but higher priority because its interval begins later. -->
+    <animate
+      id="higher"
+      attributeName="x"
+      from="72"
+      to="88"
+      begin="2s"
+      dur="1s"
+      fill="remove"
+    />
+
+    <!-- Declared later, but lower priority because its interval began earlier. -->
+    <animate
+      id="lower"
+      attributeName="x"
+      from="16"
+      to="56"
+      begin="1s"
+      dur="4s"
+      fill="freeze"
+    />
+  </rect>
+</svg>

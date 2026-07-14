@@ -46,9 +46,14 @@ fn hit_subtree(r: &Resolved, id: NodeId, p: (f32, f32)) -> Option<NodeId> {
     if children_visible {
         for &child in query.children.iter().rev() {
             if let Some(hit) = hit_subtree(r, child, p) {
-                // Transparent-select promotes through every derived ancestor
-                // while recursion unwinds, leaving the outermost one selected.
-                return Some(if query.box_is_derived { id } else { hit });
+                // Semantic derived nodes promote while recursion unwinds,
+                // leaving the outermost one selected. Structural wrappers
+                // preserve the descendant's source-facing identity.
+                return Some(if query.promotes_descendant_hit {
+                    id
+                } else {
+                    hit
+                });
             }
         }
     }

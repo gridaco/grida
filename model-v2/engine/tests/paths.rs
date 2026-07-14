@@ -43,10 +43,6 @@ fn one_path_artifact_drives_fill_and_repeated_strokes() {
     };
     assert_eq!((*w, *h), (80.0, 64.0));
     assert_eq!(fill_path.fill_rule, FillRule::EvenOdd);
-    assert!((fill_path.source.unit_bounds.x - 0.05).abs() < 1.0e-6);
-    assert!((fill_path.source.unit_bounds.y - 0.05).abs() < 1.0e-6);
-    assert!((fill_path.source.unit_bounds.w - 0.9).abs() < 1.0e-6);
-    assert!((fill_path.source.unit_bounds.h - 0.9).abs() < 1.0e-6);
     assert!((fill_path.local_bounds.x - 4.0).abs() < 1.0e-5);
     assert!((fill_path.local_bounds.y - 3.2).abs() < 1.0e-5);
     assert!((fill_path.local_bounds.w - 72.0).abs() < 1.0e-5);

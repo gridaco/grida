@@ -26,8 +26,9 @@ Map:
 - `src/text_layout.rs` — backend-independent line/glyph artifact and
   `TextLayoutOracle`; the compatibility `resolve` path uses the explicitly
   named glyphless stub, while an engine injects its shaping implementation
-- `src/path.rs` — strict SVG path-data analysis, bounded rational-conic arc
-  lowering, tight unit bounds, and one resolved box-mapped path artifact
+- `src/path.rs` — strict SVG path-data analysis, explicit source reference
+  boxes, bounded rational-conic arc lowering, tight unit bounds, and one
+  resolved box-mapped path artifact
 - `src/ops.rs` — gesture ops with typed errors + write-count doctrine
 - `src/textir.rs` — the agent text IR parser + canonical printer (E3)
 - `src/grida_xml.rs` — strict Draft 0 `.grida.xml` parser/writer boundary
@@ -35,12 +36,13 @@ Map:
   linker, typed scalar specializer, named static slot projector, durable
   authored-address index, and ordinary-scene materializer; hosts supply
   immutable dependency snapshots
-- `src/animation.rs` — format-neutral checked sample time, canonical scalar
-  keyframe curves, per-segment easing, exact binary32 interpolation, and atomic
-  `PropertyValues` sampling
-- `src/svg_animation.rs` — retained SVG Animation Profiles 0 and 1 source,
-  identity-preserving rectangle materialization, target resolution, and strict
-  source-located compilation
+- `src/animation.rs` — format-neutral checked sample time, canonical scalar,
+  color, transform, smooth-path, and discrete curves, per-segment easing,
+  typed effect composition, exact interpolation, and atomic `PropertyValues`
+  sampling
+- `src/svg_animation.rs` — retained SVG Animation Profiles 0–6 source,
+  identity-preserving rectangle/path materialization, target resolution, and
+  strict source-located compilation
 - `src/properties.rs` — closed node-property registry, immutable sorted value
   sets, and the validated `ValueView` consumed by resolution and the engine;
   picking reads only the effective traversal and clips captured in `Resolved`
@@ -52,24 +54,27 @@ Map:
 - `src/math.rs` / `src/measure.rs` — affine + deterministic text metric
 - `tests/` — the conformance-derived suites; `tests/common/mod.rs` helpers
 
-## SVG Animation Profiles 0 and 1
+## SVG Animation Profiles 0–6
 
 The first animation proof uses actual SVG source without adding animated state
 to `Document`. The retained frontend accepts a deliberately narrow static shell
-(one SVG viewport and direct rectangles), compiles the complete selected
+(one SVG viewport with direct rectangles and viewport-bounded paths), compiles the complete selected
 `<animate>` profile once, then samples any signed nanosecond time into the same
 immutable `PropertyValues` used by every static effective-value consumer.
 
-Profile 0 is the linear `from`/`to` baseline. Profile 1 cumulatively adds SVG
-`values`, exact rational `keyTimes`, and linear or per-segment cubic Bézier
-easing through `keySplines`. Both lower to the same canonical scalar curve;
-the two-endpoint API is only linear-curve sugar. The sampler uses checked
-integer interval arithmetic, exact rational interval selection and cubic
-inversion, and property interpolation rounded once to IEEE-754 binary32,
-ties-to-even. Programs bind to one live document arena and generation-stamped
-targets; duplicates, stale or cross-document targets, invalid combined values,
-and unsupported source fail atomically. Playback, filesystem I/O,
-rasterization, and video assembly remain host concerns.
+Profile 0 is the linear scalar baseline. Profile 1 adds keyframes and spline
+easing; Profile 2 adds replacement sandwiches; Profile 3 adds effect and repeat
+composition; Profile 4 adds live-underlying scalar effects and typed
+transforms; Profile 5 adds solid-fill color effects through the existing whole
+`Fills: Paints` property. Profile 6 adds compatible non-arc path interpolation,
+an explicit discrete complete-value curve, and the bounded SVG incompatible
+`from`/`to` fallback through `PathGeometry`. Scalar and path-component
+interpolation is exact-rational and rounds to binary32 per admitted operation.
+Straight RGBA color channels remain exact and unbounded through the complete
+sandwich, then clamp and quantize once to the existing RGBA8 `Color`. Programs
+bind to one live document arena and generation-stamped targets; stale,
+incompatible, or invalid combined values fail atomically. Playback, filesystem
+I/O, rasterization, and video assembly remain host concerns.
 
 ## Draft 0 `.grida.xml`
 
@@ -260,10 +265,14 @@ R = resource. Sets are conservative.
 | `CornerSmoothing`        | `Number`                | frame or rect                          | B/P         |
 | `Fills`                  | `Paints`                | fill-paintable node                    | P/R         |
 | `Strokes`                | `Strokes(Vec<Stroke>)`  | stroke-paintable node                  | B/P/R       |
+| `LensOps`                | `LensOps(Vec<LensOp>)`  | lens                                   | T/B/P       |
+| `PathGeometry`           | `PathGeometry`          | path                                   | B/P         |
 
 The registry is the supported node-level set, not a claim that every model
-field is projectable. Text content/style, shape descriptors, lens operations,
-and nested paint/stroke/stop members remain outside it.
+field is projectable. Text content/style, shape descriptors, individual lens
+operations, authored path spelling/fill rule, and nested paint/stroke/stop
+members remain outside it. `LensOps` and `PathGeometry` replace their complete
+typed values atomically; neither exposes nested component targets.
 
 ## Anti-goals
 

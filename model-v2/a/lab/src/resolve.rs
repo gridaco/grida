@@ -100,6 +100,7 @@ pub(crate) struct ResolvedQueryNode {
     children_len: u32,
     content_clip: u32,
     pub(crate) box_is_derived: bool,
+    pub(crate) promotes_descendant_hit: bool,
 }
 
 const UNRESOLVED_QUERY_NODE: ResolvedQueryNode = ResolvedQueryNode {
@@ -107,11 +108,13 @@ const UNRESOLVED_QUERY_NODE: ResolvedQueryNode = ResolvedQueryNode {
     children_len: 0,
     content_clip: NO_QUERY_CLIP,
     box_is_derived: false,
+    promotes_descendant_hit: false,
 };
 
 pub(crate) struct ResolvedQueryNodeView<'a> {
     pub(crate) children: &'a [NodeId],
     pub(crate) box_is_derived: bool,
+    pub(crate) promotes_descendant_hit: bool,
     pub(crate) content_clip: Option<ResolvedContentClip>,
 }
 
@@ -214,6 +217,7 @@ impl Resolved {
         Some(ResolvedQueryNodeView {
             children: &self.query_children[start..end],
             box_is_derived: node.box_is_derived,
+            promotes_descendant_hit: node.promotes_descendant_hit,
             content_clip,
         })
     }
@@ -391,13 +395,18 @@ pub fn resolve_view_with_text_layout(
             continue;
         };
         let Payload::Shape {
-            desc: ShapeDesc::Path(artifact),
+            desc: ShapeDesc::Path(authored_path),
         } = &node.payload
         else {
             continue;
         };
         if let Some(box_in_parent) = cx.out.box_opt(id) {
-            match materialize(Arc::clone(artifact), box_in_parent.w, box_in_parent.h) {
+            match materialize(
+                cx.view.path_geometry(id),
+                authored_path.fill_rule(),
+                box_in_parent.w,
+                box_in_parent.h,
+            ) {
                 Ok(path) => cx.out.resolved_paths[index] = Some(path),
                 Err(_) => cx.out.reports.push(Report::ErrorByRule {
                     node: id,
@@ -976,6 +985,7 @@ fn commit(id: NodeId, box_rect: RectF, cx: &mut Ctx) {
         children_start,
         children_len,
         box_is_derived: node.payload.box_is_derived(),
+        promotes_descendant_hit: node.promotes_descendant_hit(),
         content_clip,
     };
 
@@ -989,8 +999,8 @@ fn commit(id: NodeId, box_rect: RectF, cx: &mut Ctx) {
         let t = Affine::translate(box_rect.x - u.x, box_rect.y - u.y)
             .then(&Affine::rotate_deg(theta))
             .then(&Affine::flip(fx, fy));
-        if let Payload::Lens { ops } = &node.payload {
-            let folded = fold_lens_ops(ops, u);
+        if matches!(node.payload, Payload::Lens { .. }) {
+            let folded = fold_lens_ops(cx.view.lens_ops(id), u);
             cx.ops_cache[id as usize] = Some(folded);
         }
         t

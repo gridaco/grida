@@ -6,8 +6,10 @@
 //! those subobjects earn durable identity of their own.
 
 use crate::model::*;
+use crate::path::PathGeometry;
 use crate::renderability;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -35,10 +37,12 @@ pub enum PropertyKey {
     CornerSmoothing,
     Fills,
     Strokes,
+    LensOps,
+    PathGeometry,
 }
 
 impl PropertyKey {
-    pub const ALL: [PropertyKey; 23] = [
+    pub const ALL: [PropertyKey; 25] = [
         PropertyKey::X,
         PropertyKey::Y,
         PropertyKey::Width,
@@ -62,6 +66,8 @@ impl PropertyKey {
         PropertyKey::CornerSmoothing,
         PropertyKey::Fills,
         PropertyKey::Strokes,
+        PropertyKey::LensOps,
+        PropertyKey::PathGeometry,
     ];
 
     #[inline]
@@ -86,6 +92,8 @@ pub enum PropertyValueKind {
     CornerRadius,
     Paints,
     Strokes,
+    LensOps,
+    PathGeometry,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -104,6 +112,12 @@ pub enum PropertyValue {
     CornerRadius(RectangularCornerRadius),
     Paints(Paints),
     Strokes(Vec<Stroke>),
+    /// The complete ordered operation list owned by one lens. Individual
+    /// operations remain untargetable until they have durable identities.
+    LensOps(Vec<LensOp>),
+    /// Complete validated path geometry in the node's unit reference box.
+    /// The authored shape kind and box remain structural/model facts.
+    PathGeometry(Arc<PathGeometry>),
 }
 
 impl PropertyValue {
@@ -121,6 +135,8 @@ impl PropertyValue {
             PropertyValue::CornerRadius(_) => PropertyValueKind::CornerRadius,
             PropertyValue::Paints(_) => PropertyValueKind::Paints,
             PropertyValue::Strokes(_) => PropertyValueKind::Strokes,
+            PropertyValue::LensOps(_) => PropertyValueKind::LensOps,
+            PropertyValue::PathGeometry(_) => PropertyValueKind::PathGeometry,
         }
     }
 
@@ -140,12 +156,14 @@ impl PropertyValue {
             PropertyValue::CornerRadius(value) => PropertyValueRef::CornerRadius(*value),
             PropertyValue::Paints(value) => PropertyValueRef::Paints(value),
             PropertyValue::Strokes(value) => PropertyValueRef::Strokes(value),
+            PropertyValue::LensOps(value) => PropertyValueRef::LensOps(value),
+            PropertyValue::PathGeometry(value) => PropertyValueRef::PathGeometry(value),
         }
     }
 }
 
-/// Borrowed property value. Large paint/stroke values stay borrowed while
-/// scalar values remain cheap copies.
+/// Borrowed property value. Large paint/stroke/lens-operation values stay
+/// borrowed while scalar values remain cheap copies.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PropertyValueRef<'a> {
     AxisBinding(AxisBinding),
@@ -160,6 +178,8 @@ pub enum PropertyValueRef<'a> {
     CornerRadius(RectangularCornerRadius),
     Paints(&'a Paints),
     Strokes(&'a [Stroke]),
+    LensOps(&'a [LensOp]),
+    PathGeometry(&'a Arc<PathGeometry>),
 }
 
 impl PropertyValueRef<'_> {
@@ -177,6 +197,8 @@ impl PropertyValueRef<'_> {
             PropertyValueRef::CornerRadius(_) => PropertyValueKind::CornerRadius,
             PropertyValueRef::Paints(_) => PropertyValueKind::Paints,
             PropertyValueRef::Strokes(_) => PropertyValueKind::Strokes,
+            PropertyValueRef::LensOps(_) => PropertyValueKind::LensOps,
+            PropertyValueRef::PathGeometry(_) => PropertyValueKind::PathGeometry,
         }
     }
 
@@ -196,6 +218,8 @@ impl PropertyValueRef<'_> {
             PropertyValueRef::CornerRadius(value) => PropertyValue::CornerRadius(value),
             PropertyValueRef::Paints(value) => PropertyValue::Paints(value.clone()),
             PropertyValueRef::Strokes(value) => PropertyValue::Strokes(value.to_vec()),
+            PropertyValueRef::LensOps(value) => PropertyValue::LensOps(value.to_vec()),
+            PropertyValueRef::PathGeometry(value) => PropertyValue::PathGeometry(Arc::clone(value)),
         }
     }
 }
@@ -255,6 +279,8 @@ pub enum PropertyApplicability {
     RoundedBox,
     FillPaintable,
     StrokePaintable,
+    Lens,
+    Path,
 }
 
 impl PropertyApplicability {
@@ -302,6 +328,13 @@ impl PropertyApplicability {
                     | Payload::Text { .. }
                     | Payload::AttributedText { .. }
             ),
+            PropertyApplicability::Lens => matches!(node.payload, Payload::Lens { .. }),
+            PropertyApplicability::Path => matches!(
+                node.payload,
+                Payload::Shape {
+                    desc: ShapeDesc::Path(_)
+                }
+            ),
         }
     }
 }
@@ -337,6 +370,9 @@ const GEOMETRY: PropertyImpact = PropertyImpact::from_bits(
 );
 const BOUNDS_PAINT: PropertyImpact =
     PropertyImpact::from_bits(PropertyImpact::BOUNDS.bits() | PropertyImpact::PAINT.bits());
+const VISUAL_TRANSFORM: PropertyImpact = PropertyImpact::from_bits(
+    PropertyImpact::TRANSFORM.bits() | PropertyImpact::BOUNDS.bits() | PropertyImpact::PAINT.bits(),
+);
 const PAINT_RESOURCE: PropertyImpact =
     PropertyImpact::from_bits(PropertyImpact::PAINT.bits() | PropertyImpact::RESOURCE.bits());
 const BOUNDS_PAINT_RESOURCE: PropertyImpact = PropertyImpact::from_bits(
@@ -489,6 +525,18 @@ static PROPERTY_REGISTRY: [PropertySpec; PropertyKey::ALL.len()] = [
         value_kind: PropertyValueKind::Strokes,
         applicability: PropertyApplicability::StrokePaintable,
         impact: BOUNDS_PAINT_RESOURCE,
+    },
+    PropertySpec {
+        key: PropertyKey::LensOps,
+        value_kind: PropertyValueKind::LensOps,
+        applicability: PropertyApplicability::Lens,
+        impact: VISUAL_TRANSFORM,
+    },
+    PropertySpec {
+        key: PropertyKey::PathGeometry,
+        value_kind: PropertyValueKind::PathGeometry,
+        applicability: PropertyApplicability::Path,
+        impact: BOUNDS_PAINT,
     },
 ];
 
@@ -706,20 +754,30 @@ impl PropertyValues {
                     })?;
             }
 
-            if keys.contains(&PropertyKey::Strokes) || keys.contains(&PropertyKey::CornerSmoothing)
+            if keys.contains(&PropertyKey::Strokes)
+                || keys.contains(&PropertyKey::CornerSmoothing)
+                || keys.contains(&PropertyKey::PathGeometry)
             {
                 let strokes = match self.entries.get(&target(PropertyKey::Strokes)) {
                     Some(PropertyValue::Strokes(value)) => value.as_slice(),
                     None => node.strokes.as_slice(),
                     Some(_) => unreachable!("entry validation fixes the registered value kind"),
                 };
-                validate_strokes(&node.payload, strokes, corner_smoothing).map_err(|reason| {
-                    PropertyError::InvalidEffectiveState {
+                let effective_path = match self.entries.get(&target(PropertyKey::PathGeometry)) {
+                    Some(PropertyValue::PathGeometry(value)) => Some(value.as_ref()),
+                    None => None,
+                    Some(_) => unreachable!("entry validation fixes the registered value kind"),
+                };
+                validate_strokes(&node.payload, strokes, corner_smoothing, effective_path)
+                    .map_err(|reason| PropertyError::InvalidEffectiveState {
                         node: node_key,
-                        properties: vec![PropertyKey::CornerSmoothing, PropertyKey::Strokes],
+                        properties: vec![
+                            PropertyKey::CornerSmoothing,
+                            PropertyKey::Strokes,
+                            PropertyKey::PathGeometry,
+                        ],
                         reason,
-                    }
-                })?;
+                    })?;
             }
         }
         Ok(())
@@ -1129,6 +1187,43 @@ impl<'a> ValueView<'a> {
             _ => unreachable!(),
         }
     }
+
+    /// The complete effective transform program of a lens. Operations retain
+    /// their authored order; this accessor does not expose member targets.
+    #[inline]
+    pub fn lens_ops(&self, id: NodeId) -> &[LensOp] {
+        self.assert_applicable(id, PropertyKey::LensOps);
+        if self.values.is_none() {
+            return match &self.document.get(id).payload {
+                Payload::Lens { ops } => ops,
+                _ => unreachable!("registry applicability rejects non-lens ops reads"),
+            };
+        }
+        match self.effective_value_for_id(id, PropertyKey::LensOps) {
+            PropertyValueRef::LensOps(value) => value,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Complete effective unit-reference geometry of a path node. Resolution
+    /// maps this artifact through the final box exactly once, just as it does
+    /// for authored path geometry.
+    #[inline]
+    pub fn path_geometry(&self, id: NodeId) -> &Arc<PathGeometry> {
+        self.assert_applicable(id, PropertyKey::PathGeometry);
+        if self.values.is_none() {
+            return match &self.document.get(id).payload {
+                Payload::Shape {
+                    desc: ShapeDesc::Path(path),
+                } => path.geometry(),
+                _ => unreachable!("registry applicability rejects non-path geometry reads"),
+            };
+        }
+        match self.effective_value_for_id(id, PropertyKey::PathGeometry) {
+            PropertyValueRef::PathGeometry(value) => value,
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[inline]
@@ -1163,6 +1258,16 @@ fn base_value_ref(node: &Node, key: PropertyKey) -> PropertyValueRef<'_> {
         PropertyKey::CornerSmoothing => PropertyValueRef::Number(node.corner_smoothing.value()),
         PropertyKey::Fills => PropertyValueRef::Paints(&node.fills),
         PropertyKey::Strokes => PropertyValueRef::Strokes(&node.strokes),
+        PropertyKey::LensOps => match &node.payload {
+            Payload::Lens { ops } => PropertyValueRef::LensOps(ops),
+            _ => unreachable!("registry applicability rejects non-lens ops reads"),
+        },
+        PropertyKey::PathGeometry => match &node.payload {
+            Payload::Shape {
+                desc: ShapeDesc::Path(path),
+            } => PropertyValueRef::PathGeometry(path.geometry()),
+            _ => unreachable!("registry applicability rejects non-path geometry reads"),
+        },
     }
 }
 
@@ -1188,7 +1293,7 @@ fn validate_entry(
             applicability: spec.applicability,
         });
     }
-    validate_value(target, node, value)
+    validate_value(target, value)
 }
 
 fn invalid(target: PropertyTarget, reason: impl Into<String>) -> PropertyError {
@@ -1198,11 +1303,7 @@ fn invalid(target: PropertyTarget, reason: impl Into<String>) -> PropertyError {
     }
 }
 
-fn validate_value(
-    target: PropertyTarget,
-    node: &Node,
-    value: &PropertyValue,
-) -> Result<(), PropertyError> {
+fn validate_value(target: PropertyTarget, value: &PropertyValue) -> Result<(), PropertyError> {
     match (target.property, value) {
         (PropertyKey::X | PropertyKey::Y, PropertyValue::AxisBinding(binding)) => {
             let finite = match binding {
@@ -1269,10 +1370,16 @@ fn validate_value(
             renderability::validate_paints(paints)
                 .map_err(|reason| invalid(target, reason.to_string()))
         }
-        (PropertyKey::Strokes, PropertyValue::Strokes(strokes)) => {
-            validate_strokes(&node.payload, strokes, CornerSmoothing::default())
-                .map_err(|reason| invalid(target, reason))
+        (PropertyKey::Strokes, PropertyValue::Strokes(strokes)) => strokes
+            .iter()
+            .try_for_each(renderability::validate_stroke_value)
+            .map_err(|error| invalid(target, error.to_string())),
+        (PropertyKey::LensOps, PropertyValue::LensOps(ops)) => {
+            validate_lens_ops(ops).map_err(|reason| invalid(target, reason))
         }
+        (PropertyKey::PathGeometry, PropertyValue::PathGeometry(path)) => path
+            .validate()
+            .map_err(|error| invalid(target, error.to_string())),
         (
             PropertyKey::Active
             | PropertyKey::FlipX
@@ -1330,10 +1437,36 @@ fn validate_strokes(
     payload: &Payload,
     strokes: &[Stroke],
     corner_smoothing: CornerSmoothing,
+    path_geometry: Option<&PathGeometry>,
 ) -> Result<(), String> {
     for stroke in strokes {
-        renderability::validate_stroke(stroke, payload, corner_smoothing)
-            .map_err(|error| error.to_string())?;
+        let result = match path_geometry {
+            Some(path_geometry) => renderability::validate_stroke_with_path_geometry(
+                stroke,
+                payload,
+                corner_smoothing,
+                path_geometry,
+            ),
+            None => renderability::validate_stroke(stroke, payload, corner_smoothing),
+        };
+        result.map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn validate_lens_ops(ops: &[LensOp]) -> Result<(), String> {
+    for (index, op) in ops.iter().enumerate() {
+        let finite = match op {
+            LensOp::Translate { x, y } | LensOp::Scale { x, y } => x.is_finite() && y.is_finite(),
+            LensOp::Rotate { deg } => deg.is_finite(),
+            LensOp::Skew { x_deg, y_deg } => x_deg.is_finite() && y_deg.is_finite(),
+            LensOp::Matrix { m } => m.iter().all(|value| value.is_finite()),
+        };
+        if !finite {
+            return Err(format!(
+                "lens operation {index} must contain only finite numbers"
+            ));
+        }
     }
     Ok(())
 }

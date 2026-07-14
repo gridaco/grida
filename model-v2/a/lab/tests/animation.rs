@@ -1,13 +1,17 @@
 use anchor_lab::animation::{
-    AnimationProgram, CubicBezier, CubicBezierError, CubicControl, Easing, Endpoint, EndpointError,
-    FillMode, KeyframeOffset, KeyframeOffsetError, ProgramError, SampleError, SampleTime,
-    ScalarCurve, ScalarCurveError, ScalarKeyframe, ScalarSegment, Timing, TimingError, Track,
-    TrackError, TrackKind,
+    AnimationProgram, AnimationValueError, AnimationValueOperation, CompositeOperation,
+    CubicBezier, CubicBezierError, CubicControl, Easing, Endpoint, FillMode,
+    IterationCompositeOperation, KeyframeOffset, KeyframeOffsetError, ProgramError, SampleError,
+    SampleTime, ScalarCurve, ScalarCurveError, ScalarDomainError, ScalarKeyframe, ScalarSegment,
+    Timing, TimingError, Track, TrackEffectKind, TrackError, TrackKind, TransformCurve,
+    TransformCurveError, TransformKeyframe, TransformSegment, TransformValue, UnderlyingValueShape,
 };
 use anchor_lab::model::{
-    AxisBinding, DocBuilder, Document, Header, Payload, ShapeDesc, SizeIntent,
+    AxisBinding, DocBuilder, Document, Header, LensOp, Payload, ShapeDesc, SizeIntent,
 };
-use anchor_lab::properties::{PropertyKey, PropertyTarget, PropertyValue, PropertyValues};
+use anchor_lab::properties::{
+    PropertyError, PropertyKey, PropertyTarget, PropertyValue, PropertyValues,
+};
 
 fn scene() -> (Document, u32, u32) {
     let mut builder = DocBuilder::new();
@@ -26,6 +30,23 @@ fn scene() -> (Document, u32, u32) {
         },
     );
     (builder.build(), first, second)
+}
+
+fn lens_scene(ops: Vec<LensOp>) -> (Document, u32) {
+    let mut builder = DocBuilder::new();
+    let lens = builder.add(
+        0,
+        Header::new(SizeIntent::Auto, SizeIntent::Auto),
+        Payload::Lens { ops },
+    );
+    builder.add(
+        lens,
+        Header::new(SizeIntent::Fixed(20.0), SizeIntent::Fixed(20.0)),
+        Payload::Shape {
+            desc: ShapeDesc::Rect,
+        },
+    );
+    (builder.build(), lens)
 }
 
 fn target(document: &Document, node: u32, property: PropertyKey) -> PropertyTarget {
@@ -179,7 +200,7 @@ fn track_constructors_close_property_and_endpoint_domains() {
         Track::fixed_size("negative", width, -1.0, 1.0, timing, FillMode::Remove),
         Err(TrackError::InvalidEndpoint {
             endpoint: Endpoint::From,
-            reason: EndpointError::Negative,
+            reason: ScalarDomainError::Negative,
             ..
         })
     ));
@@ -187,7 +208,7 @@ fn track_constructors_close_property_and_endpoint_domains() {
         Track::opacity("outside", opacity, 0.0, 1.1, timing, FillMode::Remove),
         Err(TrackError::InvalidEndpoint {
             endpoint: Endpoint::To,
-            reason: EndpointError::OutsideUnitInterval,
+            reason: ScalarDomainError::OutsideUnitInterval,
             ..
         })
     ));
@@ -195,7 +216,7 @@ fn track_constructors_close_property_and_endpoint_domains() {
         Track::opacity("nan", opacity, f32::NAN, 1.0, timing, FillMode::Remove),
         Err(TrackError::InvalidEndpoint {
             endpoint: Endpoint::From,
-            reason: EndpointError::NotFinite,
+            reason: ScalarDomainError::NotFinite,
             ..
         })
     ));
@@ -203,6 +224,174 @@ fn track_constructors_close_property_and_endpoint_domains() {
         Track::opacity("", opacity, 0.0, 1.0, timing, FillMode::Remove),
         Err(TrackError::EmptySource)
     );
+}
+
+#[test]
+fn effect_accessors_and_composition_are_total_and_explicit() {
+    let (document, rect, _) = scene();
+    let x = target(&document, rect, PropertyKey::X);
+    let timing = Timing::new(0, 10, 1).unwrap();
+
+    let scalar = Track::axis_start("scalar", x, 0.0, 10.0, timing, FillMode::Remove).unwrap();
+    assert_eq!(scalar.effect_kind(), TrackEffectKind::ScalarCurve);
+    assert!(scalar.scalar_curve().is_some());
+    assert!(scalar.transform_curve().is_none());
+    assert_eq!(scalar.composite(), CompositeOperation::Replace);
+    assert!(matches!(
+        scalar.clone().with_composition(
+            CompositeOperation::InterpolateLiveUnderlying,
+            IterationCompositeOperation::Replace,
+        ),
+        Err(TrackError::InvalidComposition {
+            effect: TrackEffectKind::ScalarCurve,
+            composite: CompositeOperation::InterpolateLiveUnderlying,
+            iteration_composite: IterationCompositeOperation::Replace,
+            ..
+        })
+    ));
+
+    let live = Track::axis_start_from_live_underlying(
+        "live",
+        x,
+        10.0,
+        Easing::Linear,
+        timing,
+        FillMode::Remove,
+    )
+    .unwrap();
+    assert_eq!(
+        live.effect_kind(),
+        TrackEffectKind::ScalarFromLiveUnderlying
+    );
+    assert!(live.scalar_curve().is_none());
+    assert!(live.transform_curve().is_none());
+    assert_eq!(
+        live.composite(),
+        CompositeOperation::InterpolateLiveUnderlying
+    );
+    assert_eq!(
+        live.iteration_composite(),
+        IterationCompositeOperation::Replace
+    );
+    live.clone()
+        .with_composition(
+            CompositeOperation::InterpolateLiveUnderlying,
+            IterationCompositeOperation::Replace,
+        )
+        .unwrap();
+    for (composite, iteration_composite) in [
+        (
+            CompositeOperation::Replace,
+            IterationCompositeOperation::Replace,
+        ),
+        (
+            CompositeOperation::Add,
+            IterationCompositeOperation::Replace,
+        ),
+        (
+            CompositeOperation::InterpolateLiveUnderlying,
+            IterationCompositeOperation::Accumulate,
+        ),
+    ] {
+        assert!(matches!(
+            live.clone()
+                .with_composition(composite, iteration_composite),
+            Err(TrackError::InvalidComposition {
+                effect: TrackEffectKind::ScalarFromLiveUnderlying,
+                ..
+            })
+        ));
+    }
+
+    let (lens_document, lens) = lens_scene(vec![]);
+    let lens_ops = target(&lens_document, lens, PropertyKey::LensOps);
+    let transform = Track::lens_transform_curve(
+        "transform",
+        lens_ops,
+        TransformCurve::linear(
+            TransformValue::Translate { x: 0.0, y: 0.0 },
+            TransformValue::Translate { x: 10.0, y: 0.0 },
+        )
+        .unwrap(),
+        timing,
+        FillMode::Remove,
+    )
+    .unwrap();
+    assert_eq!(transform.effect_kind(), TrackEffectKind::TransformCurve);
+    assert!(transform.scalar_curve().is_none());
+    assert!(transform.transform_curve().is_some());
+    assert!(matches!(
+        transform.with_composition(
+            CompositeOperation::InterpolateLiveUnderlying,
+            IterationCompositeOperation::Replace,
+        ),
+        Err(TrackError::InvalidComposition {
+            effect: TrackEffectKind::TransformCurve,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn transform_constant_constructor_preserves_curve_validation() {
+    assert_eq!(
+        TransformCurve::constant(TransformValue::Translate {
+            x: f32::NAN,
+            y: 0.0,
+        }),
+        Err(TransformCurveError::NonFiniteValue { keyframe_index: 0 })
+    );
+
+    let constant = TransformCurve::constant(TransformValue::Scale { x: 2.0, y: 3.0 }).unwrap();
+    assert_eq!(constant.first().offset(), KeyframeOffset::ZERO);
+    assert_eq!(constant.keyframe_count(), 1);
+    assert_eq!(
+        constant.first_value(),
+        TransformValue::Scale { x: 2.0, y: 3.0 }
+    );
+
+    assert!(matches!(
+        TransformCurve::new(
+            TransformKeyframe::new(
+                KeyframeOffset::ZERO,
+                TransformValue::Translate { x: 0.0, y: 0.0 },
+            ),
+            vec![TransformSegment::new(
+                Easing::Linear,
+                TransformKeyframe::new(
+                    KeyframeOffset::ONE,
+                    TransformValue::Scale { x: 1.0, y: 1.0 },
+                ),
+            )],
+        ),
+        Err(TransformCurveError::MixedKinds {
+            expected: anchor_lab::animation::TransformKind::Translate,
+            keyframe_index: 1,
+            actual: anchor_lab::animation::TransformKind::Scale,
+        })
+    ));
+
+    let (document, lens) = lens_scene(vec![]);
+    let target = target(&document, lens, PropertyKey::LensOps);
+    let overflowing_pivot = TransformValue::Rotate {
+        degrees: 90.0,
+        center_x: f32::MAX,
+        center_y: f32::MAX,
+    };
+    let curve = TransformCurve::linear(overflowing_pivot, overflowing_pivot).unwrap();
+    assert!(matches!(
+        Track::lens_transform_curve(
+            "overflowing-pivot",
+            target,
+            curve,
+            Timing::new(0, 1, 1).unwrap(),
+            FillMode::Remove,
+        ),
+        Err(TrackError::InvalidTransformProjection {
+            keyframe_index: 0,
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -572,7 +761,7 @@ fn cubic_controls_and_property_space_hulls_are_validated() {
         Err(TrackError::UnsafeCubicControl {
             segment_index: 0,
             control: CubicControl::Y1,
-            reason: EndpointError::OutsideUnitInterval,
+            reason: ScalarDomainError::OutsideUnitInterval,
             ..
         })
     ));
@@ -598,7 +787,7 @@ fn cubic_controls_and_property_space_hulls_are_validated() {
         ),
         Err(TrackError::UnsafeCubicControl {
             control: CubicControl::Y1,
-            reason: EndpointError::Negative,
+            reason: ScalarDomainError::Negative,
             ..
         })
     ));
@@ -624,7 +813,7 @@ fn cubic_controls_and_property_space_hulls_are_validated() {
         ),
         Err(TrackError::UnsafeCubicControl {
             control: CubicControl::Y1,
-            reason: EndpointError::OutsideFiniteBinary32,
+            reason: ScalarDomainError::OutsideFiniteBinary32,
             ..
         })
     ));
@@ -652,7 +841,7 @@ fn every_curve_keyframe_is_validated_for_its_track_kind() {
         ),
         Err(TrackError::InvalidKeyframe {
             keyframe_index: 1,
-            reason: EndpointError::OutsideUnitInterval,
+            reason: ScalarDomainError::OutsideUnitInterval,
             ..
         })
     ));
@@ -670,8 +859,9 @@ fn one_value_curves_are_constant_through_repeats_and_freeze() {
         FillMode::Freeze,
     )
     .unwrap();
-    assert_eq!(track.from().to_bits(), (-0.0_f32).to_bits());
-    assert_eq!(track.to().to_bits(), (-0.0_f32).to_bits());
+    let curve = track.scalar_curve().expect("the track owns a scalar curve");
+    assert_eq!(curve.first_value().to_bits(), (-0.0_f32).to_bits());
+    assert_eq!(curve.last_value().to_bits(), (-0.0_f32).to_bits());
     let program = AnimationProgram::new(&document, "constant@0", vec![track]).unwrap();
 
     assert_eq!(
@@ -696,7 +886,7 @@ fn one_value_curves_are_constant_through_repeats_and_freeze() {
 }
 
 #[test]
-fn program_is_document_bound_sorted_and_unique() {
+fn program_is_document_bound_target_major_and_preserves_stack_priority() {
     let (document, rect, _) = scene();
     let timing = Timing::new(0, 10, 1).unwrap();
     let x = target(&document, rect, PropertyKey::X);
@@ -705,39 +895,812 @@ fn program_is_document_bound_sorted_and_unique() {
         &document,
         "test-profile@0",
         vec![
-            Track::opacity("second", opacity, 1.0, 0.0, timing, FillMode::Freeze).unwrap(),
-            Track::axis_start("first", x, 0.0, 10.0, timing, FillMode::Freeze).unwrap(),
+            Track::axis_start(
+                "x-lower-later-begin",
+                x,
+                0.0,
+                10.0,
+                Timing::new(20, 20, 1).unwrap(),
+                FillMode::Freeze,
+            )
+            .unwrap(),
+            Track::opacity("opacity", opacity, 1.0, 0.0, timing, FillMode::Freeze).unwrap(),
+            Track::axis_start(
+                "x-higher-earlier-begin",
+                x,
+                20.0,
+                30.0,
+                Timing::new(10, 40, 1).unwrap(),
+                FillMode::Freeze,
+            )
+            .unwrap(),
         ],
     )
     .unwrap();
     assert_eq!(program.compiler_id(), "test-profile@0");
     assert_eq!(program.tracks()[0].target(), x);
-    assert_eq!(program.tracks()[1].target(), opacity);
+    assert_eq!(program.tracks()[0].source(), "x-lower-later-begin");
+    assert_eq!(program.tracks()[1].target(), x);
+    assert_eq!(program.tracks()[1].source(), "x-higher-earlier-begin");
+    assert_eq!(program.tracks()[2].target(), opacity);
+    let stacks = program.effect_stacks().collect::<Vec<_>>();
+    assert_eq!(stacks.len(), 2);
+    assert_eq!(stacks[0].len(), 2);
+    assert_eq!(stacks[1].len(), 1);
+    assert_eq!(
+        sampled_axis(
+            &program
+                .sample(&document, SampleTime::from_nanoseconds(25))
+                .unwrap(),
+            x,
+        ),
+        Some(23.75),
+        "the kernel preserves frontend priority instead of deriving it from begin time"
+    );
     assert_eq!(
         program.document_root(),
         document.key_of(document.root).unwrap()
     );
-
-    let duplicate = AnimationProgram::new(
-        &document,
-        "test-profile@0",
-        vec![
-            Track::axis_start("a", x, 0.0, 1.0, timing, FillMode::Remove).unwrap(),
-            Track::axis_start("b", x, 2.0, 3.0, timing, FillMode::Remove).unwrap(),
-        ],
-    )
-    .unwrap_err();
-    assert!(matches!(
-        duplicate,
-        ProgramError::DuplicateTarget {
-            first_source,
-            second_source,
-            ..
-        } if first_source == "a" && second_source == "b"
-    ));
     assert!(matches!(
         AnimationProgram::empty(&document, ""),
         Err(ProgramError::EmptyCompilerId)
+    ));
+}
+
+#[test]
+fn replacement_stack_selects_the_highest_contributor_and_falls_through() {
+    let (document, rect, _) = scene();
+    let x = target(&document, rect, PropertyKey::X);
+    let lower = Track::axis_start(
+        "lower",
+        x,
+        10.0,
+        50.0,
+        Timing::new(10, 40, 1).unwrap(),
+        FillMode::Freeze,
+    )
+    .unwrap();
+    let middle = Track::axis_start(
+        "middle",
+        x,
+        70.0,
+        110.0,
+        Timing::new(20, 20, 1).unwrap(),
+        FillMode::Remove,
+    )
+    .unwrap();
+    let higher = Track::axis_start(
+        "higher",
+        x,
+        200.0,
+        210.0,
+        Timing::new(25, 5, 1).unwrap(),
+        FillMode::Remove,
+    )
+    .unwrap();
+    let program = AnimationProgram::new(
+        &document,
+        "replacement-stack@0",
+        vec![lower, middle, higher],
+    )
+    .unwrap();
+
+    let expected = [
+        (9, None),
+        (10, Some(10.0)),
+        (19, Some(19.0)),
+        (20, Some(70.0)),
+        (25, Some(200.0)),
+        (29, Some(208.0)),
+        (30, Some(90.0)),
+        (40, Some(40.0)),
+        (50, Some(50.0)),
+        (i64::MAX, Some(50.0)),
+    ];
+    for (time, expected) in expected {
+        let values = program
+            .sample(&document, SampleTime::from_nanoseconds(time))
+            .unwrap();
+        assert_eq!(sampled_axis(&values, x), expected, "sample at {time}ns");
+        assert!(values.len() <= 1, "one stack emits at most one value");
+    }
+
+    let frozen_higher = AnimationProgram::new(
+        &document,
+        "replacement-freeze@0",
+        vec![
+            Track::axis_start(
+                "lower",
+                x,
+                10.0,
+                50.0,
+                Timing::new(10, 40, 1).unwrap(),
+                FillMode::Freeze,
+            )
+            .unwrap(),
+            Track::axis_start(
+                "higher",
+                x,
+                200.0,
+                210.0,
+                Timing::new(25, 5, 1).unwrap(),
+                FillMode::Freeze,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+    for time in [30, 50, i64::MAX] {
+        assert_eq!(
+            sampled_axis(
+                &frozen_higher
+                    .sample(&document, SampleTime::from_nanoseconds(time))
+                    .unwrap(),
+                x,
+            ),
+            Some(210.0)
+        );
+    }
+}
+
+#[test]
+fn scalar_composition_supports_all_effect_and_iteration_combinations() {
+    let (mut document, rect, _) = scene();
+    document.get_mut(rect).header.x = AxisBinding::start(10.0);
+    let x = target(&document, rect, PropertyKey::X);
+    let timing = Timing::new(0, 10, 3).unwrap();
+
+    let cases = [
+        (
+            CompositeOperation::Replace,
+            IterationCompositeOperation::Replace,
+            [20.0, 25.0, 20.0, 25.0, 20.0, 25.0, 30.0],
+        ),
+        (
+            CompositeOperation::Add,
+            IterationCompositeOperation::Replace,
+            [30.0, 35.0, 30.0, 35.0, 30.0, 35.0, 40.0],
+        ),
+        (
+            CompositeOperation::Replace,
+            IterationCompositeOperation::Accumulate,
+            [20.0, 25.0, 50.0, 55.0, 80.0, 85.0, 90.0],
+        ),
+        (
+            CompositeOperation::Add,
+            IterationCompositeOperation::Accumulate,
+            [30.0, 35.0, 60.0, 65.0, 90.0, 95.0, 100.0],
+        ),
+    ];
+
+    for (composite, iteration, expected) in cases {
+        let track = Track::axis_start(
+            format!("{composite:?}-{iteration:?}"),
+            x,
+            20.0,
+            30.0,
+            timing,
+            FillMode::Freeze,
+        )
+        .unwrap()
+        .with_composition(composite, iteration)
+        .unwrap();
+        let program =
+            AnimationProgram::new(&document, "composition-matrix@0", vec![track]).unwrap();
+        for (time, expected) in [0, 5, 10, 15, 20, 25, 30].into_iter().zip(expected) {
+            let values = program
+                .sample(&document, SampleTime::from_nanoseconds(time))
+                .unwrap();
+            assert_eq!(sampled_axis(&values, x), Some(expected), "at {time}ns");
+        }
+    }
+}
+
+#[test]
+fn cumulative_fixed_size_uses_the_last_keyframe_not_the_curve_delta() {
+    let (mut document, rect, _) = scene();
+    document.get_mut(rect).header.width = SizeIntent::Fixed(20.0);
+    let width = target(&document, rect, PropertyKey::Width);
+    let curve = ScalarCurve::new(
+        keyframe(0, 1, 0.0),
+        vec![
+            segment(Easing::Linear, 1, 2, 15.0),
+            segment(Easing::Linear, 1, 1, 10.0),
+        ],
+    )
+    .unwrap();
+    let track = Track::fixed_size_curve(
+        "cumulative-width",
+        width,
+        curve,
+        Timing::new(0, 20, 3).unwrap(),
+        FillMode::Freeze,
+    )
+    .unwrap()
+    .with_composition(
+        CompositeOperation::Add,
+        IterationCompositeOperation::Accumulate,
+    )
+    .unwrap();
+    let program = AnimationProgram::new(&document, "cumulative-width@0", vec![track]).unwrap();
+
+    for (time, expected) in [
+        (0, 20.0),
+        (10, 35.0),
+        (20, 30.0),
+        (30, 45.0),
+        (40, 40.0),
+        (50, 55.0),
+        (60, 50.0),
+    ] {
+        assert_eq!(
+            sampled_size(
+                &program
+                    .sample(&document, SampleTime::from_nanoseconds(time))
+                    .unwrap(),
+                width,
+            ),
+            Some(expected),
+            "at {time}ns"
+        );
+    }
+}
+
+#[test]
+fn additive_sandwich_accumulates_then_composes_and_replacement_cuts_lower_layers() {
+    let (mut document, rect, _) = scene();
+    document.get_mut(rect).header.x = AxisBinding::start(8.0);
+    let x = target(&document, rect, PropertyKey::X);
+    let composed = |track: Result<Track, TrackError>, composite, iteration| {
+        track
+            .unwrap()
+            .with_composition(composite, iteration)
+            .unwrap()
+    };
+    let foundation = composed(
+        Track::axis_start(
+            "foundation",
+            x,
+            2.0,
+            6.0,
+            Timing::new(0, 10, 3).unwrap(),
+            FillMode::Freeze,
+        ),
+        CompositeOperation::Add,
+        IterationCompositeOperation::Accumulate,
+    );
+    let replacement = composed(
+        Track::axis_start(
+            "replacement",
+            x,
+            20.0,
+            60.0,
+            Timing::new(25, 40, 1).unwrap(),
+            FillMode::Freeze,
+        ),
+        CompositeOperation::Replace,
+        IterationCompositeOperation::Replace,
+    );
+    let persistent = composed(
+        Track::axis_start(
+            "persistent",
+            x,
+            0.0,
+            8.0,
+            Timing::new(30, 10, 2).unwrap(),
+            FillMode::Freeze,
+        ),
+        CompositeOperation::Add,
+        IterationCompositeOperation::Accumulate,
+    );
+    let temporary = composed(
+        Track::axis_start(
+            "temporary",
+            x,
+            4.0,
+            12.0,
+            Timing::new(35, 10, 1).unwrap(),
+            FillMode::Remove,
+        ),
+        CompositeOperation::Add,
+        IterationCompositeOperation::Replace,
+    );
+    let program = AnimationProgram::new(
+        &document,
+        "additive-sandwich@0",
+        vec![foundation, replacement, persistent, temporary],
+    )
+    .unwrap();
+
+    for (time, expected) in [
+        (0, 10.0),
+        (5, 12.0),
+        (10, 16.0),
+        (15, 18.0),
+        (20, 22.0),
+        (25, 20.0),
+        (30, 25.0),
+        (35, 38.0),
+        (40, 51.0),
+        (45, 52.0),
+        (50, 61.0),
+        (55, 66.0),
+        (60, 71.0),
+        (65, 76.0),
+        (70, 76.0),
+    ] {
+        let values = program
+            .sample(&document, SampleTime::from_nanoseconds(time))
+            .unwrap();
+        assert_eq!(sampled_axis(&values, x), Some(expected), "at {time}ns");
+    }
+}
+
+#[test]
+fn typed_composition_rounds_per_layer_clamps_opacity_once_and_skips_masked_overflow() {
+    let (mut document, rect, _) = scene();
+    document.get_mut(rect).header.x = AxisBinding::start(1.0);
+    document.get_mut(rect).header.opacity = 0.2;
+    let x = target(&document, rect, PropertyKey::X);
+    let opacity = target(&document, rect, PropertyKey::Opacity);
+    let active = Timing::new(0, 10, 1).unwrap();
+    let half_ulp = 2.0_f32.powi(-24);
+    let add = |source, target, value| {
+        Track::axis_start(source, target, value, value, active, FillMode::Freeze)
+            .unwrap()
+            .with_composition(
+                CompositeOperation::Add,
+                IterationCompositeOperation::Replace,
+            )
+            .unwrap()
+    };
+    let rounded = AnimationProgram::new(
+        &document,
+        "ordered-rounding@0",
+        vec![add("first", x, half_ulp), add("second", x, half_ulp)],
+    )
+    .unwrap();
+    assert_eq!(
+        sampled_axis(&rounded.sample(&document, SampleTime::ZERO).unwrap(), x),
+        Some(1.0),
+        "two additions are rounded in sandwich order, not regrouped"
+    );
+
+    let opacity_add = |source, value| {
+        Track::opacity(source, opacity, value, value, active, FillMode::Freeze)
+            .unwrap()
+            .with_composition(
+                CompositeOperation::Add,
+                IterationCompositeOperation::Replace,
+            )
+            .unwrap()
+    };
+    let opacity_program = AnimationProgram::new(
+        &document,
+        "late-opacity-clamp@0",
+        vec![opacity_add("a", 0.4), opacity_add("b", 0.5)],
+    )
+    .unwrap();
+    assert_eq!(
+        sampled_number(
+            &opacity_program.sample(&document, SampleTime::ZERO).unwrap(),
+            opacity
+        ),
+        Some(1.0)
+    );
+
+    document.get_mut(rect).header.x = AxisBinding::start(f32::MAX);
+    let overflow = add("overflow", x, f32::MAX);
+    let failing = AnimationProgram::new(&document, "overflow@0", vec![overflow.clone()]).unwrap();
+    assert!(matches!(
+        failing.sample(&document, SampleTime::ZERO),
+        Err(SampleError::InvalidComposition {
+            error: AnimationValueError::NonFiniteResult { .. },
+            ..
+        })
+    ));
+    let masked = Track::axis_start("mask", x, 7.0, 7.0, active, FillMode::Freeze).unwrap();
+    let program =
+        AnimationProgram::new(&document, "masked-overflow@0", vec![overflow, masked]).unwrap();
+    assert_eq!(
+        sampled_axis(&program.sample(&document, SampleTime::ZERO).unwrap(), x),
+        Some(7.0)
+    );
+}
+
+#[test]
+fn composition_arithmetic_errors_report_only_applied_sources() {
+    let (mut document, rect, _) = scene();
+    document.get_mut(rect).header.x = AxisBinding::start(f32::MAX);
+    let x = target(&document, rect, PropertyKey::X);
+    let timing = Timing::new(0, 10, 1).unwrap();
+    let additive = |source, value| {
+        Track::axis_start(source, x, value, value, timing, FillMode::Freeze)
+            .unwrap()
+            .with_composition(
+                CompositeOperation::Add,
+                IterationCompositeOperation::Replace,
+            )
+            .unwrap()
+    };
+    let program = AnimationProgram::new(
+        &document,
+        "causal-add-error@0",
+        vec![
+            additive("overflowing-add", f32::MAX),
+            additive("not-yet-applied", 0.0),
+        ],
+    )
+    .unwrap();
+    assert!(matches!(
+        program.sample(&document, SampleTime::ZERO),
+        Err(SampleError::InvalidComposition {
+            sources,
+            error: AnimationValueError::NonFiniteResult {
+                operation: AnimationValueOperation::Add,
+                ..
+            },
+            ..
+        }) if sources == ["overflowing-add"]
+    ));
+
+    let (document, rect, _) = scene();
+    let x = target(&document, rect, PropertyKey::X);
+    let overflowing_accumulation = Track::axis_start(
+        "overflowing-accumulation",
+        x,
+        f32::MAX,
+        f32::MAX,
+        Timing::new(0, 1, 2).unwrap(),
+        FillMode::Freeze,
+    )
+    .unwrap()
+    .with_composition(
+        CompositeOperation::Replace,
+        IterationCompositeOperation::Accumulate,
+    )
+    .unwrap();
+    let later_add = Track::axis_start(
+        "not-yet-applied",
+        x,
+        0.0,
+        0.0,
+        Timing::new(0, 2, 1).unwrap(),
+        FillMode::Freeze,
+    )
+    .unwrap()
+    .with_composition(
+        CompositeOperation::Add,
+        IterationCompositeOperation::Replace,
+    )
+    .unwrap();
+    let program = AnimationProgram::new(
+        &document,
+        "causal-accumulation-error@0",
+        vec![overflowing_accumulation, later_add],
+    )
+    .unwrap();
+    assert!(matches!(
+        program.sample(&document, SampleTime::from_nanoseconds(1)),
+        Err(SampleError::InvalidComposition {
+            sources,
+            error: AnimationValueError::NonFiniteResult {
+                operation: AnimationValueOperation::Accumulate,
+                ..
+            },
+            ..
+        }) if sources == ["overflowing-accumulation"]
+    ));
+}
+
+#[test]
+fn additive_tracks_require_authored_numeric_underlying_values() {
+    let (mut document, rect, _) = scene();
+    document.get_mut(rect).header.x = AxisBinding::center(12.0);
+    let x = target(&document, rect, PropertyKey::X);
+    let additive = Track::axis_start(
+        "add",
+        x,
+        1.0,
+        2.0,
+        Timing::new(0, 10, 1).unwrap(),
+        FillMode::Freeze,
+    )
+    .unwrap()
+    .with_composition(
+        CompositeOperation::Add,
+        IterationCompositeOperation::Replace,
+    )
+    .unwrap();
+    assert!(matches!(
+        AnimationProgram::new(&document, "bad-underlying@0", vec![additive.clone()]),
+        Err(ProgramError::InvalidComposition {
+            error: AnimationValueError::UnsupportedUnderlying {
+                actual: UnderlyingValueShape::CenterPin,
+                ..
+            },
+            ..
+        })
+    ));
+
+    document.get_mut(rect).header.width = SizeIntent::Auto;
+    let width = target(&document, rect, PropertyKey::Width);
+    let additive_width = Track::fixed_size(
+        "add-width",
+        width,
+        1.0,
+        2.0,
+        Timing::new(0, 10, 1).unwrap(),
+        FillMode::Freeze,
+    )
+    .unwrap()
+    .with_composition(
+        CompositeOperation::Add,
+        IterationCompositeOperation::Replace,
+    )
+    .unwrap();
+    assert!(matches!(
+        AnimationProgram::new(&document, "auto-underlying@0", vec![additive_width]),
+        Err(ProgramError::InvalidComposition {
+            error: AnimationValueError::UnsupportedUnderlying {
+                actual: UnderlyingValueShape::AutoSize,
+                ..
+            },
+            ..
+        })
+    ));
+    document.get_mut(rect).header.width = SizeIntent::Fixed(80.0);
+
+    let replacement = Track::axis_start(
+        "replace",
+        x,
+        1.0,
+        2.0,
+        Timing::new(0, 10, 1).unwrap(),
+        FillMode::Freeze,
+    )
+    .unwrap();
+    AnimationProgram::new(
+        &document,
+        "structural-base-replacement@0",
+        vec![replacement],
+    )
+    .unwrap();
+
+    document.get_mut(rect).header.x = AxisBinding::start(12.0);
+    let program = AnimationProgram::new(&document, "mutated-underlying@0", vec![additive]).unwrap();
+    document.get_mut(rect).header.x = AxisBinding::end(12.0);
+    assert!(matches!(
+        program.sample(&document, SampleTime::ZERO),
+        Err(SampleError::InvalidComposition {
+            error: AnimationValueError::UnsupportedUnderlying {
+                actual: UnderlyingValueShape::EndPin,
+                ..
+            },
+            ..
+        })
+    ));
+}
+
+#[test]
+fn additive_underlying_scalars_are_domain_checked_at_construction_and_sample() {
+    let timing = Timing::new(0, 10, 1).unwrap();
+    let make_track = |source, target, kind| {
+        let track = match kind {
+            TrackKind::AxisStart => {
+                Track::axis_start(source, target, 1.0, 2.0, timing, FillMode::Freeze)
+            }
+            TrackKind::FixedSize => {
+                Track::fixed_size(source, target, 1.0, 2.0, timing, FillMode::Freeze)
+            }
+            TrackKind::Opacity => {
+                Track::opacity(source, target, 0.1, 0.2, timing, FillMode::Freeze)
+            }
+            TrackKind::SolidFill | TrackKind::LensTransform | TrackKind::PathGeometry => {
+                unreachable!("this table covers scalar track kinds")
+            }
+        };
+        track
+            .unwrap()
+            .with_composition(
+                CompositeOperation::Add,
+                IterationCompositeOperation::Replace,
+            )
+            .unwrap()
+    };
+    let set_underlying = |document: &mut Document, node, kind, value| match kind {
+        TrackKind::AxisStart => document.get_mut(node).header.x = AxisBinding::start(value),
+        TrackKind::FixedSize => document.get_mut(node).header.width = SizeIntent::Fixed(value),
+        TrackKind::Opacity => document.get_mut(node).header.opacity = value,
+        TrackKind::SolidFill | TrackKind::LensTransform | TrackKind::PathGeometry => {
+            unreachable!("this table covers scalar track kinds")
+        }
+    };
+
+    for (kind, property, invalid, expected) in [
+        (
+            TrackKind::AxisStart,
+            PropertyKey::X,
+            f32::INFINITY,
+            ScalarDomainError::NotFinite,
+        ),
+        (
+            TrackKind::FixedSize,
+            PropertyKey::Width,
+            -1.0,
+            ScalarDomainError::Negative,
+        ),
+        (
+            TrackKind::Opacity,
+            PropertyKey::Opacity,
+            1.25,
+            ScalarDomainError::OutsideUnitInterval,
+        ),
+    ] {
+        let (mut document, rect, _) = scene();
+        set_underlying(&mut document, rect, kind, invalid);
+        let authored_target = target(&document, rect, property);
+        match AnimationProgram::new(
+            &document,
+            "invalid-authored-underlying@0",
+            vec![make_track("compile-add", authored_target, kind)],
+        )
+        .unwrap_err()
+        {
+            ProgramError::InvalidComposition {
+                sources,
+                error:
+                    AnimationValueError::InvalidUnderlying {
+                        target: actual,
+                        kind: actual_kind,
+                        reason,
+                    },
+            } => {
+                assert_eq!(sources, ["compile-add"]);
+                assert_eq!(actual, authored_target);
+                assert_eq!(actual_kind, kind);
+                assert_eq!(reason, expected);
+            }
+            error => panic!("expected invalid authored underlying scalar, found {error:?}"),
+        }
+
+        let (mut document, rect, _) = scene();
+        let mutated_target = target(&document, rect, property);
+        let program = AnimationProgram::new(
+            &document,
+            "invalid-mutated-underlying@0",
+            vec![make_track("sample-add", mutated_target, kind)],
+        )
+        .unwrap();
+        set_underlying(&mut document, rect, kind, invalid);
+        match program.sample(&document, SampleTime::ZERO).unwrap_err() {
+            SampleError::InvalidComposition {
+                sources,
+                error:
+                    AnimationValueError::InvalidUnderlying {
+                        target: actual,
+                        kind: actual_kind,
+                        reason,
+                    },
+                ..
+            } => {
+                assert_eq!(sources, ["sample-add"]);
+                assert_eq!(actual, mutated_target);
+                assert_eq!(actual_kind, kind);
+                assert_eq!(reason, expected);
+            }
+            error => panic!("expected invalid mutated underlying scalar, found {error:?}"),
+        }
+    }
+}
+
+#[test]
+fn additive_transform_underlying_is_checked_at_construction_even_when_masked() {
+    let (document, lens) = lens_scene(vec![LensOp::Translate {
+        x: f32::NAN,
+        y: 0.0,
+    }]);
+    let lens_ops = target(&document, lens, PropertyKey::LensOps);
+    let timing = Timing::new(0, 10, 1).unwrap();
+    let curve = TransformCurve::linear(
+        TransformValue::Translate { x: 0.0, y: 0.0 },
+        TransformValue::Translate { x: 10.0, y: 0.0 },
+    )
+    .unwrap();
+    let additive = Track::lens_transform_curve(
+        "add-transform",
+        lens_ops,
+        curve.clone(),
+        timing,
+        FillMode::Freeze,
+    )
+    .unwrap()
+    .with_composition(
+        CompositeOperation::Add,
+        IterationCompositeOperation::Replace,
+    )
+    .unwrap();
+    let replacement = Track::lens_transform_curve(
+        "replace-transform",
+        lens_ops,
+        curve,
+        timing,
+        FillMode::Freeze,
+    )
+    .unwrap();
+
+    for tracks in [
+        vec![additive.clone()],
+        vec![additive.clone(), replacement.clone()],
+    ] {
+        assert!(matches!(
+            AnimationProgram::new(&document, "invalid-lens-underlying@0", tracks),
+            Err(ProgramError::InvalidValues {
+                sources,
+                error: PropertyError::InvalidValue { target, .. },
+            }) if sources == ["add-transform"] && target == lens_ops
+        ));
+    }
+
+    // Replacement never consumes the authored list, matching the existing
+    // scalar replacement cutoff contract.
+    AnimationProgram::new(
+        &document,
+        "replacement-quarantines-underlying@0",
+        vec![replacement],
+    )
+    .unwrap();
+}
+
+#[test]
+fn mutated_additive_transform_underlying_is_checked_while_inactive_and_masked() {
+    let (mut document, lens) = lens_scene(vec![]);
+    let lens_ops = target(&document, lens, PropertyKey::LensOps);
+    let curve = TransformCurve::linear(
+        TransformValue::Translate { x: 0.0, y: 0.0 },
+        TransformValue::Translate { x: 10.0, y: 0.0 },
+    )
+    .unwrap();
+    let additive = Track::lens_transform_curve(
+        "inactive-add-transform",
+        lens_ops,
+        curve.clone(),
+        Timing::new(100, 10, 1).unwrap(),
+        FillMode::Remove,
+    )
+    .unwrap()
+    .with_composition(
+        CompositeOperation::Add,
+        IterationCompositeOperation::Replace,
+    )
+    .unwrap();
+    let replacement = Track::lens_transform_curve(
+        "higher-replacement",
+        lens_ops,
+        curve,
+        Timing::new(0, 10, 1).unwrap(),
+        FillMode::Freeze,
+    )
+    .unwrap();
+    let program = AnimationProgram::new(
+        &document,
+        "mutated-lens-underlying@0",
+        vec![additive, replacement],
+    )
+    .unwrap();
+
+    match &mut document.get_mut(lens).payload {
+        Payload::Lens { ops } => ops.push(LensOp::Rotate { deg: f32::INFINITY }),
+        _ => unreachable!("test node is a lens"),
+    }
+
+    assert!(matches!(
+        program.sample(&document, SampleTime::from_nanoseconds(50)),
+        Err(SampleError::InvalidValues {
+            sources,
+            error: PropertyError::InvalidValue { target, .. },
+            ..
+        }) if sources == ["inactive-add-transform"] && target == lens_ops
     ));
 }
 
@@ -840,6 +1803,9 @@ fn midpoint_value(kind: TrackKind, from: f32, to: f32) -> f32 {
                 Track::opacity("tie", target, from, to, timing, FillMode::Freeze).unwrap(),
             )
         }
+        TrackKind::SolidFill | TrackKind::LensTransform | TrackKind::PathGeometry => {
+            unreachable!("midpoint_value covers scalar track kinds")
+        }
     };
     let program = AnimationProgram::new(&document, "rounding@0", vec![track]).unwrap();
     let values = program
@@ -849,6 +1815,9 @@ fn midpoint_value(kind: TrackKind, from: f32, to: f32) -> f32 {
         TrackKind::AxisStart => sampled_axis(&values, target).unwrap(),
         TrackKind::FixedSize => sampled_size(&values, target).unwrap(),
         TrackKind::Opacity => sampled_number(&values, target).unwrap(),
+        TrackKind::SolidFill | TrackKind::LensTransform | TrackKind::PathGeometry => {
+            unreachable!("midpoint_value covers scalar track kinds")
+        }
     }
 }
 
@@ -930,6 +1899,47 @@ fn a_stale_track_rejects_the_whole_sample_with_source_identity() {
     assert!(matches!(
         error,
         SampleError::InvalidValues { sources, .. } if sources == ["removed"]
+    ));
+}
+
+#[test]
+fn a_masked_stale_stack_reports_every_source() {
+    let (mut document, first, _) = scene();
+    let x = target(&document, first, PropertyKey::X);
+    let program = AnimationProgram::new(
+        &document,
+        "stale-stack@0",
+        vec![
+            Track::axis_start(
+                "lower-inactive",
+                x,
+                0.0,
+                10.0,
+                Timing::new(100, 10, 1).unwrap(),
+                FillMode::Remove,
+            )
+            .unwrap(),
+            Track::axis_start(
+                "higher-frozen",
+                x,
+                20.0,
+                30.0,
+                Timing::new(0, 10, 1).unwrap(),
+                FillMode::Freeze,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+    document.remove_subtree(first);
+
+    let error = program
+        .sample(&document, SampleTime::from_nanoseconds(50))
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        SampleError::InvalidValues { sources, .. }
+            if sources == ["lower-inactive", "higher-frozen"]
     ));
 }
 
