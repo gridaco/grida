@@ -27,8 +27,9 @@ timing model. No native animation tag, attribute, namespace, or structural
 position is reserved by this decision.
 
 Actual SVG source is the first authored animation frontend. Its cumulative
-contracts are [SVG Animation Profile 0](../feat-svg/animation) and [Profile
-1](../feat-svg/animation-keyframes). SVG source is not Grida XML, and this
+contracts run from the [SVG Animation Profile
+0](../feat-svg/animation) baseline through the current cumulative [Profile
+6](../feat-svg/animation-path-geometry). SVG source is not Grida XML, and this
 decision does not make `<animate>` or any other SVG animation element valid
 inside `.grida.xml`.
 
@@ -77,9 +78,11 @@ are known.
 SVG is a useful first producer because it brings established concepts—base and
 animated values, explicit timing, interpolation, repeat, post-interval fill,
 and multiple effects—without requiring a new Grida syntax. Profile 0 narrows
-that vocabulary to a tractable linear slice. Profile 1 then proves that exact
-keyframe offsets and per-segment easing remain source-neutral without making
-the rest of SMIL part of the shared contract.
+that vocabulary to a tractable linear slice. Profiles 1–6 then prove that
+keyframes, easing, ordered composition, live underlying values, typed
+transforms, solid paints, typed path geometry, and discrete complete-value
+selection remain source-neutral without making the rest of SMIL part of the
+shared contract.
 
 ## Current static behavior
 
@@ -129,9 +132,9 @@ second canonical form.
 ## Related contracts
 
 - [SVG Animation Profile 0](../feat-svg/animation) — accepted first authored
-  frontend.
-- [SVG Animation Profile 1](../feat-svg/animation-keyframes) — cumulative
-  keyframe and easing contract.
+  frontend baseline.
+- [SVG Animation Profile 6](../feat-svg/animation-path-geometry) — current
+  cumulative source contract.
 - [Grida XML durable addressing](./grida-xml-addressing) — source identities,
   typed property targets, and effective values.
 - [Grida XML](./grida-xml) — static authored-language contract.

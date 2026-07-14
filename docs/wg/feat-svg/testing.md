@@ -75,7 +75,14 @@ The Oxygen icon set provides real-world SVG icon testing with:
 The static corpora above continue to evaluate animation-bearing files as base
 scenes. That is separate from conformance to [SVG Animation Profile
 0](./animation) and its cumulative [Profile 1 keyframe/easing
-extension](./animation-keyframes), which sample an explicit document time.
+extension](./animation-keyframes) and [Profile 2 replacement-sandwich
+extension](./animation-sandwiches), plus [Profile 3 additive and cumulative
+composition](./animation-composition) and [Profile 4 live-underlying and typed
+transform effects](./animation-effects-and-transforms), followed by [Profile 5
+solid-fill paints](./animation-solid-fills), which sample an explicit document
+time. [Profile 6 path geometry](./animation-path-geometry) adds smooth
+same-family topology, explicit discrete replacement, and bounded automatic
+fallback vectors.
 
 Animated-profile conformance runs must use value assertions first, then
 scene/query assertions, then pixel comparison against an explicitly sought
@@ -85,6 +92,33 @@ revision, fixture/corpus revision, browser build, exact sample time, and static
 materializer revision. The profile defines the required boundary, failure,
 source-preservation, and seek-independence test laws; this page does not
 duplicate that matrix.
+
+Profile 5 color fixtures additionally assert the typed ordered-paint result
+before raster comparison. They cover all four admitted hexadecimal forms,
+straight-alpha interpolation, singleton-solid replacement topology,
+underlying-topology rejection, additive and cumulative channel arithmetic,
+lone-`to` composition, half-channel rounding, and the one final channel clamp.
+Browser-oracle cases use only the browser/profile source overlap; CSS color
+syntax outside the profile is not admitted merely because the oracle parses it.
+
+The characterized Profile 5 additive/cumulative reference sandwich is sampled
+at exact whole-second times from `0s` through `4s` against explicitly sought
+Chromium 145 frames. Its decoded RGBA pixels compare exactly at those probes.
+That evidence exercises the shared browser/profile surface; it supplements but
+does not replace the profile's value-level exact oracle.
+
+Profile 6 browser vectors retain authored command-family topology separately
+from renderer-normalized geometry. Uppercase and lowercase forms inside one
+family interpolate, while `H`/`V` versus `L`, `S` versus `C`, and `T` versus
+`Q` exercise the discrete fallback. Explicit discrete vectors include arcs and
+probe immediately before, exactly at, and after every key time. One local
+Chromium 145 comparison of the accepted boundary vector reported an
+antialias-tolerant match for all eleven exact-time frames. Its comparator
+configuration and report are not checked in, so that tolerant result is not
+reproducible evidence. Under a threshold-zero comparison, nine frames matched
+exactly and the remaining two differed at four edge pixels each. Neither result
+is a durable gate until the explicitly sought browser producer and report are
+checked in.
 
 ## Measuring Method: Pixel Diffing
 

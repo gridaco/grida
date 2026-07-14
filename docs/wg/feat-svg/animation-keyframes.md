@@ -41,6 +41,9 @@ turn use the [SMIL animation-function
 model](https://www.w3.org/TR/2001/REC-smil-animation-20010904/#AnimFuncValues).
 Profile 1 deliberately narrows that model where this document says so.
 
+[SVG Animation Profile 2](./animation-sandwiches) is the cumulative extension
+for several ordered replacement effects on one target/property pair.
+
 ## Scope of the extension
 
 Profile 1 adds `values`, `keyTimes`, and `keySplines` to Profile 0's admitted
@@ -305,8 +308,12 @@ profile conformance results therefore remain separate, as required by Profile 0.
 ## Deferred families
 
 Profile 1 resolves only Profile 0's keyframe-list and easing deferral.
+Profile 2 separately resolves replacement sandwiches.
+Profile 3 separately resolves addition and accumulation.
+Profile 4 separately resolves live-underlying scalar effects and a bounded
+typed transform family.
+Profile 5 separately resolves straight-sRGB solid-fill paints.
 `calcMode="discrete"`, `calcMode="paced"`, `by`, lone-`to` animation,
-addition, accumulation, animation sandwiches, transforms, motion paths,
-colors and paints, additional SVG targets and properties, indefinite timing,
-event timing, CSS animation, and optimized execution remain outside this
-profile.
+transforms, motion paths, colors and paints,
+additional SVG targets and properties, indefinite timing, event timing, CSS
+animation, and optimized execution remain outside this profile.

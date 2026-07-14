@@ -16,8 +16,17 @@ How Blink animates SVG. Blink has a dedicated SVG/SMIL timing and composition
 engine alongside the standard CSS/Web Animations engine. They share the
 document lifecycle but do not collapse into one animation implementation.
 
-Source observations in this note were verified against Chromium
-`7385b4cc05a381629080a2435ce519f673758bf2` (2026-04-27).
+Source observations in this note were reverified against Chromium
+`aa4c950f52e67f6875cd655c4518b55f06cc2ce6` (2026-07-13).
+
+Empirical observations labeled “Chromium 145” below used Chrome for Testing
+145.0.7632.6, driven by Playwright 1.58.2. Each SVG was loaded as a top-level
+document; page-evaluated calls first invoked `pauseAnimations()` on the root
+and then `setCurrentTime(seconds)` before each observation. Observation
+surfaces were animated-value serialization, `getBBox()` where stated, and
+decoded RGBA screenshots; transparent pixel comparisons composited both
+outputs over the same white background. The probe sources and reports were
+local and are not a durable conformance corpus.
 
 ## Specification status
 
@@ -102,7 +111,7 @@ ElementSMILAnimations                 attached to a target
   └── map<QualifiedName, SMILAnimationSandwich>
 
 SMILAnimationSandwich                one target/attribute pair
-  └── priority-sorted active SVGSMILElements
+  └── priority-sorted contributing SVGSMILElements (active or frozen)
 ```
 
 Every `SVGSVGElement` constructs an `SMILTimeContainer`, and every connected
@@ -122,14 +131,209 @@ instance times change.
 ## Sandwich composition
 
 Several SVG animation elements targeting the same `(element, attribute)` form
-a sandwich. The active sandwich is priority-sorted. Later interval begin time
-has higher priority; equal begin time is broken by later document order.
+a sandwich. The contributing sandwich includes active and frozen effects and
+is priority-sorted. Later interval begin time has higher priority; equal begin
+time is broken by later document order.
+
+SMIL's normative equal-time rule first places a timing-dependent animation
+above its syncbase, then uses document order when neither depends on the other.
+Blink's `IsHigherPriorityThan` currently compares interval begin and document
+order only; its source carries a FIXME for the missing timing-dependency rule.
+Repeating does not create a new interval priority, while restarting does.
 
 `ApplyAnimationValues` scans downward from the highest-priority effect until it
 finds an effect that overwrites its underlying value, discards effects below
 that point, initializes a typed underlying value, then applies the remaining
 effects from lower to higher priority. This supports replacement, addition,
 and per-repeat accumulation.
+
+### Underlying-dependent lone-`to` effects
+
+SMIL's lone-`to` form is neither an ordinary replacement nor an ordinary
+additive effect. The [SMIL from/to/by
+rules](https://www.w3.org/TR/2001/REC-smil-animation-20010904/#FromToByAndAdditive)
+define it as interpolation from the current underlying value to the authored
+`to` value, and require it to behave as non-additive and non-cumulative.
+
+Blink preserves that distinction through sampling:
+
+- `SVGAnimationElement::UpdateAnimationValues` classifies the source as a
+  `to` animation and stores the authored destination without manufacturing a
+  static `from` value;
+- `ComputeEffectParameters` does not enable additive or cumulative behavior
+  for that animation mode;
+- `OverwritesUnderlyingAnimationValue` returns false, so sandwich scanning
+  cannot use a lone-`to` effect as the lower-layer cutoff; and
+- `SVGAnimateElement::CalculateAnimationValue` uses the typed value already
+  carried by the sandwich as the interpolation start.
+
+Consequently each sample depends on the lower effects applied earlier in the
+same low-to-high sandwich pass. The start is not captured at interval begin.
+Two lone-`to` effects fold sequentially because the higher one sees the result
+left by the lower one.
+
+The SVG specification gives `calcMode="discrete"` lone-`to` a special
+underlying/target switch rule. Linear and spline modes interpolate over the
+single virtual segment. The [spline lone-`to`
+web-platform-test](https://github.com/web-platform-tests/wpt/blob/master/svg/animations/animate-calcMode-spline-to.html)
+exercises the latter form.
+
+### Additive and cumulative numeric effects
+
+Blink represents effect composition and iteration composition as independent
+booleans in `SMILAnimationEffectParameters`. `additive="sum"` sets
+`is_additive`; `accumulate="sum"` sets `is_cumulative`. For an ordinary
+numeric `from`/`to` animation, `ComputeAnimatedNumber` evaluates:
+
+```text
+simple       = (to - from) * percentage + from
+accumulated  = simple + terminal * repeat_index   when cumulative
+result       = underlying + accumulated           when additive
+```
+
+For a `values` animation, `SVGAnimateElement::CalculateAnimationValue` passes
+the final `values` entry as `terminal`, even when the current keyframe segment
+ends elsewhere. Typed property classes perform the last step: `SVGNumber` and
+`SVGLength`, for example, add the value already carried by the sandwich only
+when the additive flag is set. The four additive/cumulative combinations are
+therefore distinct without four separate animation modes.
+
+All operands in this numeric path are `float`. Interpolation, accumulation,
+and addition appear as separate float expressions in source; Blink does not
+define an exact-rational or one-rounding numeric profile around them.
+
+`SVGAnimationElement::OverwritesUnderlyingAnimationValue` currently returns
+false for every cumulative effect, including a cumulative effect that is not
+additive. Its source marks that cumulative exception for removal: accumulation
+depends on repeat count, not on the underlying value. The consequence is extra
+work below such a layer, not additive semantics. The non-additive cumulative
+layer's typed calculation still replaces the carried value before any higher
+layer consumes it.
+
+### Solid paint-color animation
+
+Blink's SVG/SMIL CSS-property table classifies `fill`, `stroke`, `color`,
+`flood-color`, `lighting-color`, and `stop-color` as `kAnimatedColor`. This is
+a typed color path, not structural interpolation of the complete SVG paint
+grammar.
+
+`SVGColorProperty::SetValueAsString` parses CSS colors and separately admits
+`currentColor`. Before arithmetic, `currentColor` is resolved against the
+target's unvisited computed `color`, and every resolved endpoint is converted
+to sRGB. The source explicitly describes this sRGB conversion as legacy
+behavior.
+
+Interpolation then uses a straight `RGBATuple` of four float channels.
+`SVGColorProperty::CalculateAnimatedValue` calls the same
+`ComputeAnimatedNumber` operation independently for red, green, blue, and
+alpha, including terminal-value repeat accumulation. When the effect is
+additive, it adds the current typed sandwich color componentwise. It does not
+premultiply RGB by alpha before either operation.
+
+Each effect result is converted back through `Color::FromRGBAFloat`, but this
+conversion does not clamp. The `Color(SkColor4f)` constructor stores RGB as
+float channel values scaled by `255` and stores alpha as a float directly.
+Out-of-range components can therefore remain typed color values for a higher
+SMIL effect and are clamped only when the completed color is presented.
+
+The CSS/Web Animations path has a separate `CSSPaintInterpolationType`. Its
+underlying-value conversion succeeds only when the computed `SVGPaint` is a
+color, and applying an interpolated value constructs a color paint. A URL
+paint server is not decomposed into gradient stops or another resource graph
+by this interpolation type.
+
+An explicit-seek Chromium 145 probe from `#000000` to `#fd0000` over two
+seconds produced serialized red channels `63`, `127`, and `190` at `0.5`,
+`1`, and `1.5` seconds, then `253` at the endpoint. The midpoint starts from
+the mathematical value `126.5` and serializes as `127`. An equivalent
+`#00000000` to `#fd0000fd` probe changed alpha independently alongside red,
+confirming the straight four-channel path.
+
+An additive/cumulative color probe used base `#100000`, a lower
+`#100000`-to-`#120000` effect with two repeats, addition, and accumulation,
+plus a higher additive `#00000000`-to-`#01000000` effect. Explicit seeks at
+whole seconds `0` through `4` produced serialized red channels
+`32, 34, 51, 52, 53`. The `34` sample includes the higher effect's half-channel
+contribution rather than quantizing that contribution away before the
+completed color is serialized. Decoded pixels from the explicitly sought
+frames matched the same sequence exactly.
+
+### Transform-list animation
+
+`SVGAnimateTransformElement` is a typed specialization rather than a generic
+string-list animation. Blink accepts the SVG DOM transform-list target, rejects
+the CSS-property path for this element, and defaults an absent `type` to
+`translate`. Its parser accepts `translate`, `scale`, `rotate`, `skewX`, and
+`skewY`; `matrix` is not an admitted animated type. Each authored `from`, `to`,
+or `values` item must parse to exactly one operation of the selected type.
+
+`SVGTransformList::CalculateAnimatedValue` keeps composition at transform-list
+topology. A non-additive effect clears the carried lower list before adding its
+sampled operation. An additive effect retains the lower list and appends the
+new operation. It does not decompose or merge the lower operations. This is
+why additive animations of different transform types can coexist while each
+individual animation still has one fixed `type`.
+
+Interpolation and accumulation occur before list composition.
+`SVGTransformDistance` stores parameters for the selected operation and
+computes raw component differences and sums:
+
+- translation interpolates and accumulates both offsets;
+- scale interpolates and accumulates both factors; and
+- rotation interpolates and accumulates the angle and both center coordinates.
+
+Angles are treated as numeric degrees without shortest-path normalization.
+The rotate center is part of the animated value rather than immutable metadata.
+Repeat accumulation is parameter addition, not repeated application of the
+sampled geometric operation. The [transform animation
+web-platform-test](https://github.com/web-platform-tests/wpt/blob/master/svg/animations/svgtransform-animation-1.html)
+covers representative typed interpolation and addition behavior.
+
+The current SVG Animations Editor's Draft contains two apparent editorial
+defects in this area. Its cumulative scale example omits
+`accumulate="sum"` even though the accompanying graph and table apply
+accumulation. Its optional-component paragraph says an omitted scale `sy` is
+`1` and refers to an omitted translate `tx`; ordinary transform parsing and
+Blink instead copy `sx` into omitted `sy` and default omitted `ty` to zero.
+Those two lines are not reliable implementation instructions in isolation.
+
+SVG declares lone-`to` `<animateTransform>` behavior undefined. Blink still
+has a code path for it: when the first lower transform has the same type it is
+used as the start; otherwise a type-specific zero operation is used. That is
+implemented browser behavior, not a portable SVG contract.
+
+### Observed Chromium 145 matrices
+
+An explicit-seek probe with authored `x="10"`, `from="20"`, `to="30"`,
+`dur="1s"`, `repeatCount="3"`, and `fill="freeze"` produced these values at
+`0`, `0.5`, `1`, `1.5`, `2`, `2.5`, and `3` seconds:
+
+| `additive` | `accumulate` | Observed sequence             |
+| ---------- | ------------ | ----------------------------- |
+| `replace`  | `none`       | `20, 25, 20, 25, 20, 25, 30`  |
+| `sum`      | `none`       | `30, 35, 30, 35, 30, 35, 40`  |
+| `replace`  | `sum`        | `20, 25, 50, 55, 80, 85, 90`  |
+| `sum`      | `sum`        | `30, 35, 60, 65, 90, 95, 100` |
+
+The exact repeat boundary starts the next iteration at its first simple value
+and adds `repeat_index * terminal`. At the final end, freeze uses the final
+iteration's terminal value, yielding `repeatCount * terminal` for cumulative
+replacement. The `replace`/`sum` row also confirms that cumulative replacement
+does not semantically include the authored base despite the conservative
+sandwich cutoff noted above.
+
+A non-monotonic `values="0;15;10"` additive, cumulative animation over base
+`10`, with `dur="2s"`, `repeatCount="3"`, and freeze, produced
+`10, 25, 20, 35, 30, 45, 40` at whole seconds `0` through `6`. The increments
+are ten, proving that accumulation uses the terminal list item rather than the
+largest item or the preceding iteration's last sampled interior value.
+
+Opacity composition remains unclamped while the sandwich is being folded. A
+base opacity of `0.8` plus a constant additive `0.4` presented as `1`. A base
+of `0.8` plus `0.5` and then `-0.4` presented as `0.9`; clamping after the first
+addition would instead have produced `0.6`. The CSS result path eventually
+calls `ComputedStyle::SetOpacity`, which clamps the completed value to
+`[0, 1]`.
 
 ```xml
 <svg xmlns="http://www.w3.org/2000/svg">
@@ -260,26 +464,35 @@ do not execute script and do not have composited animations.
 
 ## Source locations
 
-| Path under `third_party/blink/renderer/`        | Role                                                                     |
-| ----------------------------------------------- | ------------------------------------------------------------------------ |
-| `core/svg/animation/svg_smil_element.{h,cc}`    | Instance times, interval state, conditions, priority, contribution state |
-| `core/svg/animation/element_smil_animations.h`  | Per-target sandwich registry                                             |
-| `core/svg/animation/smil_animation_sandwich.cc` | Priority stack and typed composition                                     |
-| `core/svg/animation/smil_time_container.{h,cc}` | Timeline synchronization, service, and scheduling                        |
-| `core/svg/animation/smil_animation_value.h`     | Typed sandwich value carrier                                             |
-| `core/svg/svg_animation_element.{h,cc}`         | Keyframes, calc modes, interpolation parameters                          |
-| `core/svg/svg_animate_element.{h,cc}`           | Target resolution, typed parsing, CSS/DOM result application             |
-| `core/svg/svg_animate_transform_element.{h,cc}` | Transform-list animation                                                 |
-| `core/svg/svg_animate_motion_element.{h,cc}`    | Motion-path animation and result application                             |
-| `core/svg/svg_element.cc`                       | Animated DOM value and motion-transform application/invalidation         |
-| `core/svg/svg_document_extensions.{h,cc}`       | Document-level SMIL registration and service entry                       |
-| `core/svg/svg_svg_element.cc`                   | Per-`<svg>` time-container ownership                                     |
-| `core/frame/local_frame_view.cc`                | Frame-level SMIL service call                                            |
-| `core/page/page_animator.cc`                    | Top-level scripted-animation ordering                                    |
-| `core/css/resolver/style_resolver.cc`           | SMIL declarations and CSS animation/transition cascade integration       |
-| `core/css/resolver/cascade_origin.h`            | Author, animation, and transition origin ordering                        |
-| `core/animation/compositor_animations.cc`       | SVG compositor eligibility                                               |
-| `core/svg/graphics/svg_image.cc`                | Isolated SVG image animation lifecycle                                   |
+| Path under `third_party/blink/renderer/`                | Role                                                                      |
+| ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `core/svg/animation/svg_smil_element.{h,cc}`            | Instance times, interval state, conditions, priority, contribution state  |
+| `core/svg/animation/element_smil_animations.h`          | Per-target sandwich registry                                              |
+| `core/svg/animation/smil_animation_sandwich.cc`         | Priority stack and typed composition                                      |
+| `core/svg/animation/smil_animation_effect_parameters.h` | Numeric interpolation and cumulative repeat arithmetic                    |
+| `core/svg/animation/smil_time_container.{h,cc}`         | Timeline synchronization, service, and scheduling                         |
+| `core/svg/animation/smil_animation_value.h`             | Typed sandwich value carrier                                              |
+| `core/svg/svg_animation_element.{h,cc}`                 | Keyframes, calc modes, interpolation parameters                           |
+| `core/svg/svg_animate_element.{h,cc}`                   | Target resolution, typed parsing, CSS/DOM result application              |
+| `core/svg/svg_animated_color.cc`                        | Straight-sRGB SMIL color parsing, interpolation, addition, and projection |
+| `core/svg/svg_number.cc`                                | Numeric additive application                                              |
+| `core/svg/svg_length.cc`                                | Length interpolation, accumulation, and additive application              |
+| `core/svg/svg_animate_transform_element.{h,cc}`         | Transform-list animation                                                  |
+| `core/svg/svg_transform_list.{h,cc}`                    | Typed transform interpolation and ordered list composition                |
+| `core/svg/svg_transform_distance.{h,cc}`                | Transform parameter distance, addition, and accumulation                  |
+| `core/svg/svg_animate_motion_element.{h,cc}`            | Motion-path animation and result application                              |
+| `core/svg/svg_element.cc`                               | Animated DOM value and motion-transform application/invalidation          |
+| `core/svg/svg_document_extensions.{h,cc}`               | Document-level SMIL registration and service entry                        |
+| `core/svg/svg_svg_element.cc`                           | Per-`<svg>` time-container ownership                                      |
+| `core/frame/local_frame_view.cc`                        | Frame-level SMIL service call                                             |
+| `core/page/page_animator.cc`                            | Top-level scripted-animation ordering                                     |
+| `core/css/resolver/style_resolver.cc`                   | SMIL declarations and CSS animation/transition cascade integration        |
+| `core/css/resolver/cascade_origin.h`                    | Author, animation, and transition origin ordering                         |
+| `core/animation/css_paint_interpolation_type.cc`        | CSS/Web Animations color-only conversion for SVG paint properties         |
+| `core/style/computed_style.h`                           | Final computed opacity clamp                                              |
+| `platform/graphics/color.h`                             | Float-channel color construction and clamp contract                       |
+| `core/animation/compositor_animations.cc`               | SVG compositor eligibility                                                |
+| `core/svg/graphics/svg_image.cc`                        | Isolated SVG image animation lifecycle                                    |
 
 ## See also
 
