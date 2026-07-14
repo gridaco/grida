@@ -2,7 +2,6 @@ import type {
   ComposerAttachmentInput,
   ComposerAttachmentFilter,
   ComposerCatalog,
-  ComposerFileAttachment,
   ComposerFileReference,
 } from "@/kits/composer";
 
@@ -20,6 +19,7 @@ export type MockFile = {
 export type MockFolder = {
   kind: "folder";
   id: string;
+  scopeId: string;
   name: string;
   path: string;
   mime: "inode/directory";
@@ -37,6 +37,7 @@ export const folders: MockFolder[] = [
   {
     kind: "folder",
     id: "folder-public-images",
+    scopeId: "dir_11111111-1111-4111-8111-111111111111",
     name: "images",
     path: "editor/public/images",
     mime: "inode/directory",
@@ -46,6 +47,7 @@ export const folders: MockFolder[] = [
   {
     kind: "folder",
     id: "folder-public-objects",
+    scopeId: "dir_22222222-2222-4222-8222-222222222222",
     name: "template-grida-customer-upload-csv-example",
     path: "editor/public/objects/template-grida-customer-upload-csv-example",
     mime: "inode/directory",
@@ -55,6 +57,7 @@ export const folders: MockFolder[] = [
   {
     kind: "folder",
     id: "folder-public-examples-canvas",
+    scopeId: "dir_33333333-3333-4333-8333-333333333333",
     name: "canvas",
     path: "editor/public/examples/canvas",
     mime: "inode/directory",
@@ -206,15 +209,27 @@ function attachmentReferenceKey(attachment: ComposerAttachmentInput): string {
     : (attachment.path ?? attachment.url ?? attachment.name);
 }
 
-export function toAttachment(
-  file: MockItem
-): Omit<ComposerFileAttachment, "id"> {
+export function toAttachment(file: MockItem): ComposerAttachmentInput {
+  if (file.kind === "folder") {
+    return {
+      kind: "directory",
+      name: file.name,
+      ref: {
+        kind: "scope",
+        id: file.scopeId,
+        name: file.name,
+        path: `/__references__/${file.scopeId}`,
+        access: "read",
+      },
+    };
+  }
+
   return {
     name: file.name,
     path: file.path,
     mime: file.mime,
     size: file.size,
-    url: file.kind === "file" ? file.publicPath : undefined,
+    url: file.publicPath,
   };
 }
 
@@ -234,7 +249,7 @@ export function resolveDropMode(
   mode: DropMode
 ): ResolvedDropMode {
   if (mode !== "auto") return mode === "card" ? "card" : "inline";
-  return isImageFile(file) ? "card" : "inline";
+  return file.kind === "folder" || isImageFile(file) ? "card" : "inline";
 }
 
 export const mockFileDragType = "application/x-grida-composer-file";
@@ -249,7 +264,8 @@ export function readMockItem(payload: string): MockItem | null {
       typeof value.path === "string" &&
       typeof value.mime === "string" &&
       typeof value.size === "number" &&
-      typeof value.folder === "string"
+      typeof value.folder === "string" &&
+      (value.kind !== "folder" || typeof value.scopeId === "string")
     ) {
       return value as MockItem;
     }

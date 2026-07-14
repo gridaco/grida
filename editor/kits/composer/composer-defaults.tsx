@@ -7,7 +7,7 @@ import {
   CommandItem,
   CommandList,
 } from "@app/ui/components/command";
-import { FolderIcon, ImageIcon, XIcon } from "lucide-react";
+import { FileIcon, FolderIcon, XIcon } from "lucide-react";
 import Image from "next/image";
 import { type ReactNode, useEffect, useRef } from "react";
 import {
@@ -32,7 +32,7 @@ function isImageAttachment(
 }
 
 function getAttachmentTypeLabel(attachment: ComposerAttachment): string {
-  if (attachment.kind === "directory") return "FOLDER · READ ONLY";
+  if (attachment.kind === "directory") return "Folder · read only";
   const mimeSubtype = attachment.mime?.split("/")[1]?.split("+")[0];
   const extension = attachment.name.includes(".")
     ? attachment.name.split(".").pop()
@@ -164,7 +164,7 @@ export function ComposerAttachmentCards({
   if (!snapshot.attachments.length) return null;
 
   return (
-    <div className={cn("flex flex-wrap items-end gap-2", className)}>
+    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
       {snapshot.attachments.map((attachment) => {
         const controls = {
           remove() {
@@ -173,7 +173,11 @@ export function ComposerAttachmentCards({
           },
         };
         return (
-          <div data-composer-attachment={attachment.id} key={attachment.id}>
+          <div
+            className="min-w-0 max-w-full"
+            data-composer-attachment={attachment.id}
+            key={attachment.id}
+          >
             {renderAttachment ? (
               renderAttachment(attachment, controls)
             ) : (
@@ -199,8 +203,8 @@ function ComposerAttachmentCard({
   if (attachment.kind === "directory") {
     return (
       <AttachmentCardShell
-        icon={<FolderIcon className="size-4" />}
-        iconClassName="text-blue-600"
+        icon={<FolderIcon className="size-3.5" />}
+        iconClassName="text-sky-500"
         label={getAttachmentTypeLabel(attachment)}
         name={attachment.name}
         onRemove={onRemove}
@@ -210,31 +214,28 @@ function ComposerAttachmentCard({
 
   if (isImageAttachment(attachment)) {
     return (
-      <div className="group relative size-20 overflow-hidden rounded-md border border-border bg-muted">
-        <Image
-          alt=""
-          className="object-cover"
-          fill
-          sizes="80px"
-          src={attachment.url}
-          unoptimized
-        />
-        <button
-          aria-label={`Remove ${attachment.name}`}
-          className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-background/90 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover:opacity-100 group-focus-within:opacity-100"
-          onClick={onRemove}
-          type="button"
-        >
-          <XIcon className="size-3" />
-        </button>
-      </div>
+      <AttachmentCardShell
+        icon={
+          <Image
+            alt=""
+            className="object-cover"
+            fill
+            sizes="32px"
+            src={attachment.url}
+            unoptimized
+          />
+        }
+        label={getAttachmentTypeLabel(attachment)}
+        name={attachment.name}
+        onRemove={onRemove}
+      />
     );
   }
 
   return (
     <AttachmentCardShell
-      icon={<ImageIcon className="size-4" />}
-      iconClassName="text-orange-600"
+      icon={<FileIcon className="size-3.5" />}
+      iconClassName="text-muted-foreground"
       label={getAttachmentTypeLabel(attachment)}
       name={attachment.name}
       onRemove={onRemove}
@@ -250,37 +251,39 @@ function AttachmentCardShell({
   onRemove,
 }: {
   icon: ReactNode;
-  iconClassName: string;
+  iconClassName?: string;
   label: string;
   name: string;
   onRemove: () => void;
 }) {
   return (
-    <div className="flex h-12 max-w-52 min-w-40 items-center gap-2 rounded-md border border-border bg-background px-2 py-1 shadow-xs">
-      <div
-        className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-md bg-muted",
-          iconClassName
-        )}
-      >
-        {icon}
+    <div className="group/attachment flex h-11 w-48 max-w-full min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-1.5">
+      <div className="relative size-8 shrink-0">
+        <div
+          className={cn(
+            "absolute inset-0 flex items-center justify-center overflow-hidden rounded-md bg-muted transition-opacity group-hover/attachment:opacity-0 group-focus-within/attachment:opacity-0 [@media(hover:none)]:opacity-0",
+            iconClassName
+          )}
+        >
+          {icon}
+        </div>
+        <button
+          aria-label={`Remove ${name}`}
+          className="absolute inset-0 flex items-center justify-center rounded-md bg-muted text-muted-foreground opacity-0 transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover/attachment:opacity-100 group-focus-within/attachment:opacity-100 [@media(hover:none)]:opacity-100"
+          onClick={onRemove}
+          type="button"
+        >
+          <XIcon className="size-3" />
+        </button>
       </div>
-      <span className="min-w-0 flex-1">
-        <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-tight">
+      <span className="min-w-0 flex-1" title={name}>
+        <span className="block truncate font-medium text-xs leading-4">
           {name}
         </span>
-        <span className="mt-0.5 block text-muted-foreground text-xs leading-tight">
+        <span className="block truncate text-[10px] text-muted-foreground leading-3">
           {label}
         </span>
       </span>
-      <button
-        aria-label={`Remove ${name}`}
-        className="self-start -mt-0.5 -mr-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:opacity-80"
-        onClick={onRemove}
-        type="button"
-      >
-        <XIcon className="size-2.5" />
-      </button>
     </div>
   );
 }

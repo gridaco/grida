@@ -47,7 +47,8 @@ export function FileSidebar({
           />
         </div>
         <p className="mt-2 px-1 text-muted-foreground text-xs">
-          Auto drops images as cards and other files as inline references.
+          Auto drops folders and images as cards; other files as inline
+          references.
         </p>
       </div>
 
