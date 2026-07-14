@@ -1,7 +1,13 @@
 permissions:
-  contents: write
+  contents: read
 
 name: Publish Desktop App
+
+concurrency:
+  # One release workflow may assemble drafts at a time. Platform builds remain
+  # parallel within the run; release mutation has one owner in the final job.
+  group: desktop-release
+  cancel-in-progress: false
 
 on:
   workflow_dispatch:
@@ -13,7 +19,20 @@ on:
         default: false
 
 jobs:
+  guard:
+    name: Require main branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main releases
+        if: ${{ github.ref != 'refs/heads/main' }}
+        shell: bash
+        run: |
+          echo "::error::Desktop releases must be dispatched from main"
+          exit 1
+
   build:
+    name: Build (${{ matrix.os.name }})
+    needs: guard
     environment: release
     strategy:
       fail-fast: false
@@ -21,8 +40,10 @@ jobs:
         os:
           - name: linux
             image: ubuntu-latest
+            arch: x64,arm64
           - name: windows
             image: windows-latest
+            arch: x64
           # macOS builds one arch per runner ON PURPOSE (issue #947): a single
           # parallel --arch="x64,arm64" invocation hits the maker-dmg race
           # (electron/forge#3517 — hdiutil EAGAIN + appdmg "Target already
@@ -31,12 +52,14 @@ jobs:
           # native prebuilds (e.g. @parcel/watcher-darwin-<arch>) correctly.
           - name: macos-apple-silicon
             image: macos-26
+            arch: arm64
             mac_arch: arm64
           - name: macos-intel
             # GitHub's LAST x86_64 macOS image — retired Aug 2027
             # (actions/runner-images#13045). When it dies, either Forge 8 GA
             # has fixed the parallel-arch DMG race or we re-drop Intel.
             image: macos-15-intel
+            arch: x64
             mac_arch: x64
     runs-on: ${{ matrix.os.image }}
     env:
@@ -50,12 +73,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Snapcraft (Ubuntu only)
-        if: ${{ matrix.os.name == 'linux' }}
+      - name: Require Apple release credentials
+        if: ${{ matrix.os.mac_arch && (env.HAS_SIGNING != 'true' || env.HAS_NOTARIZE != 'true') }}
+        shell: bash
         run: |
-          sudo apt update
-          sudo apt install snapd
-          sudo snap install snapcraft --classic
+          echo "::error::macOS release builds require signing and notarization credentials"
+          exit 1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -114,42 +137,56 @@ jobs:
           printf '%s' "$APPLE_API_KEY_P8" > "$KEY_PATH"
           echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Publish App (Windows)
-        if: ${{ matrix.os.name == 'windows' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PRERELEASE: ${{ inputs.prerelease }}
-        run: pnpm run publish:prerelease --arch="x64"
+      - name: Make App
+        if: ${{ !matrix.os.mac_arch }}
+        run: pnpm run make --arch="${{ matrix.os.arch }}"
 
-      - name: Publish App (Linux)
-        if: ${{ matrix.os.name == 'linux' }}
+      - name: Make App (MacOS)
+        if: ${{ matrix.os.mac_arch }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PRERELEASE: ${{ inputs.prerelease }}
-        run: pnpm run publish:prerelease --arch="x64,arm64"
-
-      - name: Publish App (MacOS)
-        if: ${{ matrix.os.mac_arch && env.HAS_SIGNING == 'true' && env.HAS_NOTARIZE == 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PRERELEASE: ${{ inputs.prerelease }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         # One arch per runner (matrix.os.mac_arch) — see the matrix comment.
-        run: pnpm run publish:prerelease --arch="${{ matrix.os.mac_arch }}"
+        run: pnpm run make --arch="${{ matrix.os.arch }}"
 
-      - name: Update release notes from template
-        # Runs once (gated to the linux row, which has no signing-secret
-        # dependency and therefore always runs). The release tag will exist
-        # by this point since linux's publish step ran just above.
-        # Template at .github/release-notes/desktop.md.
-        if: ${{ matrix.os.name == 'linux' }}
-        working-directory: ${{ github.workspace }}
+      - name: Upload distributables
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-release-${{ matrix.os.name }}
+          path: desktop/out/make
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  release:
+    name: Assemble draft release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download distributables
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-release-*
+          path: ${{ runner.temp }}/desktop-release
+          merge-multiple: false
+
+      - name: Test release assembler
+        run: node --test .github/scripts/assemble-desktop-release.test.mjs
+
+      - name: Assemble verified draft release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION=$(node -p "require('./desktop/package.json').version")
-          TAG="v${VERSION}"
-          BODY=$(sed "s|{{version}}|${VERSION}|g" .github/release-notes/desktop.md)
-          gh release edit "$TAG" --notes "$BODY" --repo gridaco/grida
+          DESKTOP_RELEASE_ASSETS_DIR: ${{ runner.temp }}/desktop-release
+          DESKTOP_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .github/scripts/assemble-desktop-release.mjs
