@@ -64,8 +64,19 @@ export type DesktopNativeCapabilities = {
   workspace_watch: boolean;
 };
 
+export type DesktopAgentCapabilities = {
+  /**
+   * The host accepts base64 scratch seeds (`{ path, base64 }`) on agent runs.
+   * Added after protocol 1 shipped; renderers must treat a missing/falsy value
+   * as an old host that accepts text-only scratch seeds.
+   */
+  scratch_seed_base64?: boolean;
+};
+
 export type DesktopCapabilities = {
   native: DesktopNativeCapabilities;
+  /** Optional because protocol-1 hosts shipped before agent capabilities. */
+  agent?: DesktopAgentCapabilities;
 };
 
 export type HandshakeResponse = DaemonHandshakeResponse;

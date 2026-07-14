@@ -136,6 +136,10 @@ export function createWebDaemonBridge(
     protocol: DESKTOP_BRIDGE_PROTOCOL,
     app: { version: "web-daemon-dev", platform: "web" },
     caps: {
+      // Intentionally omit `agent.scratch_seed_base64`: this adapter may
+      // connect to any protocol-1 daemon, whose broad `agent@1` handshake
+      // cannot prove support for base64 scratch seeds. Fail closed until the
+      // daemon handshake negotiates this feature explicitly.
       native: {
         host_apps: false,
         window: false,

@@ -154,6 +154,29 @@ describe("InputResourceRouter.prepare", () => {
     expect(encodeOperableFile).not.toHaveBeenCalled();
   });
 
+  it("does not read file bytes when the host omits base64 scratch support", async () => {
+    const encodeOperableFile =
+      vi.fn<InputResourceRouter.Effects["encodeOperableFile"]>();
+    const result = await InputResourceRouter.prepare(
+      {
+        kind: "browser-file",
+        id: "old-host-1",
+        source: "picker",
+        file: file({ name: "brief.pdf", type: "application/pdf" }),
+      },
+      environment({
+        attachment: { scratch: undefined },
+        effects: { encodeOperableFile },
+      })
+    );
+
+    expect(result).toMatchObject({
+      status: "reject",
+      reason: "scratch-unavailable",
+    });
+    expect(encodeOperableFile).not.toHaveBeenCalled();
+  });
+
   it("rejects scratch output whose declared size differs from its bytes", async () => {
     const encodeOperableFile = vi.fn<
       InputResourceRouter.Effects["encodeOperableFile"]
@@ -568,6 +591,34 @@ describe("InputResourceRouter.lower", () => {
       {
         attachmentId: "image-1",
         reason: "provider-capability-unavailable",
+      },
+    ]);
+  });
+
+  it("rejects an already-prepared scratch file when the host capability is absent", () => {
+    const lowered = InputResourceRouter.lower(
+      [
+        {
+          attachmentId: "file-1",
+          resource: {
+            kind: "scratch-file",
+            source: "drop",
+            sourceId: "drop-1",
+            name: "brief.pdf",
+            mimeType: "application/pdf",
+            size: 3,
+            base64: "AAAA",
+          },
+        },
+      ],
+      { provider: provider() }
+    );
+
+    expect(lowered.extras).toBeUndefined();
+    expect(lowered.rejected).toEqual([
+      {
+        attachmentId: "file-1",
+        reason: "scratch-unavailable",
       },
     ]);
   });

@@ -18,6 +18,7 @@ describe("Desktop preload agent seam", () => {
   it("exposes a versioned Electron-specific bridge protocol", () => {
     expect(preloadSource).toContain("protocol: DESKTOP_BRIDGE_PROTOCOL");
     expect(preloadSource).toContain("native:");
+    expect(preloadSource).toContain("scratch_seed_base64: true");
     expect(preloadSource).not.toContain("agentServer:");
   });
 });

@@ -59,7 +59,7 @@ import {
   ScratchSeedBudget,
   type SendExtras,
 } from "@/lib/agent-chat";
-import { useDesktopBridge } from "@/lib/desktop/bridge";
+import { ai as desktopAi, useDesktopBridge } from "@/lib/desktop/bridge";
 import { AgentLibraryAttachmentPicker } from "./agent-library-attachment-picker";
 import type { DesignLibraryPin } from "./design-search";
 
@@ -243,6 +243,8 @@ function AgentComposerInner({
   const attachDirectory = operableFiles
     ? desktopBridge?.agent.attach_directory
     : undefined;
+  const scratchSeedBase64Supported =
+    desktopAi.supportsScratchSeedBase64(desktopBridge);
   const resourceEnvironment = useMemo<InputResourceRouter.Environment>(
     () => ({
       // The runtime has path-aware filesystem tools but no general URL reader.
@@ -252,7 +254,7 @@ function AgentComposerInner({
           inlineMimes: providerFileMimes,
           remoteUrlMimes: providerUrlFileMimes,
         },
-        ...(operableFiles
+        ...(operableFiles && scratchSeedBase64Supported
           ? {
               scratch: {
                 maxFileBytes: OPERABLE_FILE_POLICY.maxBytes,
@@ -266,6 +268,7 @@ function AgentComposerInner({
     }),
     [
       attachDirectory,
+      scratchSeedBase64Supported,
       operableFiles,
       providerFileMimes,
       providerUrlFileMimes,

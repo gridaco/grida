@@ -106,6 +106,7 @@ export {
 } from "@grida/agent";
 
 export type {
+  DesktopAgentCapabilities,
   DesktopBridge,
   DesktopCapabilities,
   DesktopNativeCapabilities,
@@ -561,6 +562,16 @@ export namespace app {
  */
 export namespace ai {
   /**
+   * Whether the current host explicitly accepts base64 scratch seeds.
+   * Protocol 1 predates this capability, so omission must fail closed.
+   */
+  export function supportsScratchSeedBase64(
+    bridge: DesktopBridge | null
+  ): boolean {
+    return bridge?.caps.agent?.scratch_seed_base64 === true;
+  }
+
+  /**
    * Start an agent run. Resolves with `{streamId, done}` as
    * soon as the SSE connection is established; `onChunk` is invoked
    * once per `AgentUIMessageChunk` until the stream ends. `done` settles when
@@ -573,7 +584,16 @@ export namespace ai {
     opts: AgentRunOptions,
     onChunk: (chunk: AgentUIMessageChunk) => void
   ): Promise<{ streamId: string; sessionId: string; done: Promise<void> }> {
-    const handle = await bridgeOrThrow().agent.run(opts, onChunk);
+    const bridge = bridgeOrThrow();
+    if (
+      opts.scratch_seed?.some((entry) => "base64" in entry) &&
+      !supportsScratchSeedBase64(bridge)
+    ) {
+      throw new Error(
+        "agent.run: base64 scratch seeds are not supported by this desktop binary"
+      );
+    }
+    const handle = await bridge.agent.run(opts, onChunk);
     return {
       streamId: handle.stream_id,
       sessionId: handle.session_id,

@@ -9,6 +9,7 @@
 import fs from "node:fs/promises";
 import {
   constants as fsConstants,
+  type Dirent,
   type ReadStream as NodeReadStream,
 } from "node:fs";
 import path from "node:path";
@@ -149,28 +150,68 @@ export namespace workspaceFs {
       }
       throw err;
     }
-    const entries: Entry[] = [];
-    for (const dirent of dirents) {
-      let kind: Entry["kind"];
-      if (dirent.isDirectory()) kind = "directory";
-      else if (dirent.isFile()) kind = "file";
-      else if (dirent.isSymbolicLink()) kind = "symlink";
-      else kind = "other";
-      // Build a posix-style relPath even on Windows for client
-      // consistency. The daemon-side resolveInside uses path.resolve
-      // (platform-aware) on write so this isn't a portability issue.
-      const child =
-        relPath === "" || relPath === "."
-          ? dirent.name
-          : `${relPath.replace(/\\/g, "/").replace(/\/+$/, "")}/${dirent.name}`;
-      entries.push({ name: dirent.name, rel_path: child, kind });
-    }
+    const entries = dirents.map((dirent) => directoryEntry(relPath, dirent));
     entries.sort((a, b) => {
       if (a.kind === "directory" && b.kind !== "directory") return -1;
       if (b.kind === "directory" && a.kind !== "directory") return 1;
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     });
     return entries;
+  }
+
+  /**
+   * Lazily iterate immediate children of `relPath` without materializing the
+   * entire directory. This is the bounded-traversal sibling of {@link readDir}:
+   * callers that may stop after a work budget should use `for await`, whose
+   * early exit runs this generator's `finally` and closes the OS directory
+   * handle. Ordering is the filesystem's native enumeration order; callers
+   * that require the sorted UI shape should continue to use {@link readDir}.
+   *
+   * The same GRIDA-SEC-004 containment and ENOTDIR translation apply before
+   * any entry is yielded. Raw ENOENT/EACCES errors retain the existing
+   * workspaceFs contract and propagate to the owning caller.
+   */
+  export async function* iterateDir(
+    workspace: workspaceFs.Scope,
+    relPath: string
+  ): AsyncGenerator<Entry, void, void> {
+    const abs = await resolveInside(workspace, relPath, { must_exist: true });
+    const dir = await (async () => {
+      try {
+        return await fs.opendir(abs);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException | undefined)?.code === "ENOTDIR") {
+          throw new Exception({
+            code: "not-a-directory",
+            workspace_id: workspace.id,
+            rel_path: relPath,
+          });
+        }
+        throw err;
+      }
+    })();
+
+    try {
+      while (true) {
+        const dirent = await dir.read();
+        if (dirent === null) return;
+        yield directoryEntry(relPath, dirent);
+      }
+    } finally {
+      try {
+        await dir.close();
+      } catch (err) {
+        // A consumer can explicitly close a handle it obtained through
+        // instrumentation; otherwise this generator is its sole owner.
+        if (
+          (err as NodeJS.ErrnoException | undefined)?.code !== "ERR_DIR_CLOSED"
+        ) {
+          // Do not let a close failure replace the traversal error/return that
+          // led here, and never log the raw error (it may name the host path).
+          console.warn("[workspace-fs] directory iterator close failed");
+        }
+      }
+    }
   }
 
   /**
@@ -453,6 +494,21 @@ export namespace workspaceFs {
 }
 
 // ──────────────────────────── private helpers ────────────────────────────
+
+function directoryEntry(relPath: string, dirent: Dirent): workspaceFs.Entry {
+  let kind: workspaceFs.Entry["kind"];
+  if (dirent.isDirectory()) kind = "directory";
+  else if (dirent.isFile()) kind = "file";
+  else if (dirent.isSymbolicLink()) kind = "symlink";
+  else kind = "other";
+  // Build a posix-style relPath even on Windows for client consistency. The
+  // daemon-side resolveInside uses path.resolve (platform-aware) on write.
+  const child =
+    relPath === "" || relPath === "."
+      ? dirent.name
+      : `${relPath.replace(/\\/g, "/").replace(/\/+$/, "")}/${dirent.name}`;
+  return { name: dirent.name, rel_path: child, kind };
+}
 
 /**
  * Resolve `relPath` against `workspace.root` and verify containment.

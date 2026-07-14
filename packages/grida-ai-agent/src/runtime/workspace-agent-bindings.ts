@@ -539,15 +539,22 @@ function decodeDataUrl(url: string): Uint8Array | null {
 
 class DirectoryReferencePathError extends Error {
   constructor(
-    readonly reason: "unknown_scope" | "read_only" | "unbound_path",
-    pathname: string
+    readonly reason:
+      | "unknown_scope"
+      | "read_only"
+      | "unbound_path"
+      | "unreadable",
+    readonly pathname: string,
+    readonly code?: string
   ) {
-    super(`directory reference ${reason}: ${pathname}`);
+    super(
+      `directory reference ${reason}: ${pathname}${code ? ` (${code})` : ""}`
+    );
     this.name = "DirectoryReferencePathError";
   }
 }
 
-const REFERENCE_GREP_MAX_FILES = Math.min(SCAN_MAX_FILES, 1_000);
+const REFERENCE_GREP_MAX_TRAVERSAL_STEPS = Math.min(SCAN_MAX_FILES, 1_000);
 const REFERENCE_GREP_MAX_MATCHES = 1_000;
 
 type ResolvedAgentScope =
@@ -690,6 +697,9 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       ) {
         return { folders: [], files: [] };
       }
+      if (isDirectoryReferencePath(pathname)) {
+        throw this.referenceAccessError(pathname, err);
+      }
       throw err;
     }
   }
@@ -736,6 +746,18 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
 
     const matches: AgentFs.GrepMatch[] = [];
     const pathsScanned: string[] = [];
+    // A step is either one directory-open attempt or one entry considered.
+    // Text reads are covered by the entry that led to them. Counting the work
+    // before filtering/reading is what keeps binary-heavy and unreadable trees
+    // bounded too; successful text reads alone are not a traversal bound.
+    let traversalSteps = 0;
+    const atTraversalLimit = () =>
+      traversalSteps >= REFERENCE_GREP_MAX_TRAVERSAL_STEPS;
+    const reserveTraversalStep = (): boolean => {
+      if (atTraversalLimit()) return false;
+      traversalSteps += 1;
+      return true;
+    };
     const needle =
       args.case_sensitive === false
         ? args.pattern.toLocaleLowerCase()
@@ -745,10 +767,7 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       binding: DirectoryScopeBinding,
       relPath: string
     ): Promise<boolean> => {
-      if (
-        pathsScanned.length >= REFERENCE_GREP_MAX_FILES ||
-        matches.length >= REFERENCE_GREP_MAX_MATCHES
-      ) {
+      if (matches.length >= REFERENCE_GREP_MAX_MATCHES) {
         return true;
       }
       try {
@@ -773,13 +792,10 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
           !isAbsentForRead(err) &&
           !isWorkspaceFsCode(err, "path-escapes-workspace")
         ) {
-          console.warn(
-            `[agent-fs] reference grep skipped ${binding.id}:${relPath}:`,
-            err
-          );
+          this.warnReferenceFailure("grep", binding, relPath, err);
         }
       }
-      return false;
+      return atTraversalLimit();
     };
 
     const walk = async (
@@ -789,15 +805,32 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     ): Promise<boolean> => {
       if (
         depth > SCAN_MAX_DEPTH ||
-        pathsScanned.length >= REFERENCE_GREP_MAX_FILES ||
-        matches.length >= REFERENCE_GREP_MAX_MATCHES
+        matches.length >= REFERENCE_GREP_MAX_MATCHES ||
+        !reserveTraversalStep()
       ) {
         return true;
       }
 
-      let entries: workspaceFs.Entry[];
       try {
-        entries = await workspaceFs.readDir(binding, relPath);
+        for await (const entry of workspaceFs.iterateDir(binding, relPath)) {
+          if (!reserveTraversalStep()) return true;
+          if (entry.kind === "directory") {
+            if (isIgnoredScanDir(entry.name)) {
+              if (atTraversalLimit()) return true;
+              continue;
+            }
+            if (await walk(binding, entry.rel_path, depth + 1)) return true;
+            continue;
+          }
+          if (entry.kind === "file" || entry.kind === "symlink") {
+            if (isIgnoredScanFile(entry.name)) {
+              if (atTraversalLimit()) return true;
+              continue;
+            }
+            if (await inspectFile(binding, entry.rel_path)) return true;
+          }
+          if (atTraversalLimit()) return true;
+        }
       } catch (err) {
         if (
           isWorkspaceFsCode(err, "not-a-directory") ||
@@ -809,26 +842,11 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
           !isNotFound(err) &&
           !isWorkspaceFsCode(err, "path-escapes-workspace")
         ) {
-          console.warn(
-            `[agent-fs] reference grep skipped ${binding.id}:${relPath || "/"}:`,
-            err
-          );
+          this.warnReferenceFailure("grep", binding, relPath, err);
         }
-        return false;
+        return atTraversalLimit();
       }
-
-      for (const entry of entries) {
-        if (entry.kind === "directory") {
-          if (isIgnoredScanDir(entry.name)) continue;
-          if (await walk(binding, entry.rel_path, depth + 1)) return true;
-          continue;
-        }
-        if (entry.kind === "file" || entry.kind === "symlink") {
-          if (isIgnoredScanFile(entry.name)) continue;
-          if (await inspectFile(binding, entry.rel_path)) return true;
-        }
-      }
-      return false;
+      return atTraversalLimit();
     };
 
     for (const target of targets) {
@@ -852,6 +870,9 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       // (path escapes, etc.) still throw.
       if (isAbsentForRead(err) || err instanceof DirectoryReferencePathError) {
         return null;
+      }
+      if (isDirectoryReferencePath(path)) {
+        throw this.referenceAccessError(path, err);
       }
       throw err;
     }
@@ -883,6 +904,9 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       }
       if (isAbsentForRead(err) || err instanceof DirectoryReferencePathError) {
         return null;
+      }
+      if (isDirectoryReferencePath(path)) {
+        throw this.referenceAccessError(path, err);
       }
       throw err;
     }
@@ -999,6 +1023,39 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
     return rel.length > 0 ? `${binding.path}/${rel}` : binding.path;
   }
 
+  /**
+   * GRIDA-SEC-004 — raw Node errors name the canonical path they failed on.
+   * Directory-reference roots are host-only authority, so replace those errors
+   * at this seam with a typed failure that contains only the model-visible
+   * virtual path and a bounded filesystem code. Never retain the raw error as
+   * `cause`: console formatting may recursively print it. AgentFs's existing
+   * Backend contract catches read/list failures and returns null/empty to those
+   * tools; readBytes has no such fallback, so view_image receives this same
+   * safe typed failure instead of the raw OS error.
+   */
+  private referenceAccessError(
+    virtualPath: string,
+    err: unknown
+  ): DirectoryReferencePathError {
+    return new DirectoryReferencePathError(
+      "unreadable",
+      virtualPath,
+      safeReferenceErrorCode(err)
+    );
+  }
+
+  private warnReferenceFailure(
+    operation: "grep",
+    binding: DirectoryScopeBinding,
+    relPath: string,
+    err: unknown
+  ): void {
+    const virtualPath = this.referenceAgentPath(binding, relPath);
+    console.warn(
+      `[agent-fs] directory reference ${operation} skipped ${JSON.stringify(virtualPath)} (${safeReferenceErrorCode(err)})`
+    );
+  }
+
   private referenceGrepTargets(
     pathPrefix: string | undefined
   ): Array<{ binding: DirectoryScopeBinding; rel: string }> {
@@ -1089,6 +1146,19 @@ function isNotFound(err: unknown): boolean {
 
 function isWorkspaceFsCode(err: unknown, code: workspaceFs.ErrorCode): boolean {
   return err instanceof workspaceFs.Exception && err.detail.code === code;
+}
+
+/** Return only a small diagnostic token; raw error messages/paths are secret. */
+function safeReferenceErrorCode(err: unknown): string {
+  const candidate =
+    err instanceof workspaceFs.Exception
+      ? err.detail.code
+      : typeof err === "object" && err !== null
+        ? (err as { code?: unknown }).code
+        : undefined;
+  return typeof candidate === "string" && /^[a-z0-9_-]{1,64}$/i.test(candidate)
+    ? candidate
+    : "filesystem-error";
 }
 
 /** Raw ENOENT or a workspaceFs code that means "no readable text here". */

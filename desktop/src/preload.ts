@@ -299,6 +299,10 @@ const bridge: DesktopBridge = {
   protocol: DESKTOP_BRIDGE_PROTOCOL,
   app: { version: appVersion, platform: appPlatform },
   caps: {
+    agent: {
+      // This host accepts `{ path, base64 }` scratch seeds on agent runs.
+      scratch_seed_base64: true,
+    },
     native: {
       host_apps: true,
       // Native-OS surfaces — always present in a desktop build.
