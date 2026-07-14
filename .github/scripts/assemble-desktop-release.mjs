@@ -138,7 +138,6 @@ export class GitHubReleaseClient {
       `GitHub API ${method} ${url} timed out after ${timeoutMs}ms`
     );
     const timeout = setTimeout(() => controller.abort(timeoutError), timeoutMs);
-    timeout.unref?.();
 
     const forwardCallerAbort = () => controller.abort(callerSignal.reason);
     if (callerSignal?.aborted) {
