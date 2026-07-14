@@ -217,7 +217,7 @@ const config: ForgeConfig = {
     new MakerSquirrel((arch) => {
       const version = process.env.npm_package_version;
       return {
-        setupExe: `${productName} Setup ${version} ${arch}.exe`,
+        setupExe: `${productName}.Setup.${version}.${arch}.exe`,
         name: appBundleId + `.${arch}`,
         title: productName,
         iconUrl: "https://grida.co/favicon.ico",
@@ -314,21 +314,6 @@ const config: ForgeConfig = {
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
-  ],
-  publishers: [
-    {
-      // https://js.electronforge.io/interfaces/_electron_forge_publisher_github.PublisherGitHubConfig.html
-      name: "@electron-forge/publisher-github",
-      platforms: ["darwin", "win32", "linux"],
-      config: {
-        force: true,
-        repository: {
-          owner: "gridaco",
-          name: "grida",
-        },
-        prerelease: process.env.PRERELEASE === "true",
-      },
-    },
   ],
 };
 

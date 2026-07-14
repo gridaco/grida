@@ -142,31 +142,27 @@ convert icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
 
 ```bash
 pnpm make --arch="x64,arm64,universal"
-# or (for publishing)
-pnpm forge:publish --arch="x64,arm64,universal"
 ```
 
 **Windows** (recommeded to run windows device)
 
 ```bash
 pnpm make --arch="x64,arm64"
-# or (for publishing)
-pnpm forge:publish --platform=win32 --arch="x64,arm64"
 ```
 
 **Linux**
 
 ```bash
 pnpm make --platform=linux --arch="x64,arm64"
-# or (for publishing)
-pnpm forge:publish --platform=linux --arch="x64,arm64"
 ```
 
 ## Releasing
 
-We use Githib Actions for windows and linux releases. for macOS, we are locally building and uploading the release.
+Desktop releases are assembled by the `Publish Desktop App` GitHub Actions
+workflow. Each native runner builds and signs its platform artifacts, then one
+final job validates the complete cross-platform manifest and uploads it to one
+draft release. Do not publish platform artifacts directly from a local build;
+that bypasses the single-release completeness check.
 
-```sh
-pnpm publish:prerelease --arch="universal,arm64,x64"
-pnpm publish:prerelease --arch="universal,arm64,x64" --insiders
-```
+Dispatch the workflow from `main`, approve its `release` environment, and
+publish the resulting draft only after the final assembler job is green.
