@@ -272,7 +272,14 @@ function wait(delayMs) {
 
 async function confirmDraftIdentity(
   client,
-  { expectedId, retryDelaysMs, tag, target, waitForRetry = wait }
+  {
+    expectedId,
+    phase = "while assembling",
+    retryDelaysMs,
+    tag,
+    target,
+    waitForRetry = wait,
+  }
 ) {
   for (let attempt = 0; ; attempt += 1) {
     const selected = DesktopRelease.selectDraft(
@@ -283,7 +290,7 @@ async function confirmDraftIdentity(
     if (selected) {
       if (selected.id !== expectedId) {
         throw new Error(
-          `Release identity changed while assembling ${tag}: expected ${expectedId}, found ${selected.id}`
+          `Release identity changed ${phase} ${tag}: expected ${expectedId}, found ${selected.id}`
         );
       }
       return selected;
@@ -292,7 +299,7 @@ async function confirmDraftIdentity(
     const delayMs = retryDelaysMs[attempt];
     if (delayMs === undefined) {
       throw new Error(
-        `Release ${expectedId} did not become visible while assembling ${tag} after ${attempt + 1} checks`
+        `Release ${expectedId} did not become visible ${phase} ${tag} after ${attempt + 1} checks`
       );
     }
     if (!Number.isFinite(delayMs) || delayMs < 0) {
@@ -354,7 +361,6 @@ export async function assembleDesktopRelease(options, client) {
     tag,
     target
   );
-  const created = !release;
   if (!release) {
     release = await client.createDraft({
       tag,
@@ -364,28 +370,17 @@ export async function assembleDesktopRelease(options, client) {
     });
   }
 
-  if (created) {
-    // GitHub's list endpoint can briefly lag behind createDraft(). Retry only
-    // that absent state; conflicting, duplicate, published, immutable, and
-    // wrong-target releases still fail immediately through selectDraft().
-    await confirmDraftIdentity(client, {
-      expectedId: release.id,
-      retryDelaysMs:
-        draftVisibility.retryDelaysMs ?? githubReleaseVisibilityRetryDelaysMs,
-      tag,
-      target,
-      waitForRetry: draftVisibility.wait,
-    });
-  } else {
-    const selected = DesktopRelease.selectDraft(
-      await client.listReleases(),
-      tag,
-      target
-    );
-    if (!selected || selected.id !== release.id) {
-      throw new Error(`Release identity changed while assembling ${tag}`);
-    }
-  }
+  // GitHub's list endpoint can briefly omit a release around mutations.
+  // Retry only that absent state; conflicting, duplicate, published,
+  // immutable, and wrong-target releases still fail immediately.
+  await confirmDraftIdentity(client, {
+    expectedId: release.id,
+    retryDelaysMs:
+      draftVisibility.retryDelaysMs ?? githubReleaseVisibilityRetryDelaysMs,
+    tag,
+    target,
+    waitForRetry: draftVisibility.wait,
+  });
 
   release = await client.updateDraft(release.id, {
     tag,
@@ -453,14 +448,15 @@ export async function assembleDesktopRelease(options, client) {
     throw new Error(`Remote release metadata verification failed for ${tag}`);
   }
 
-  const finalSelection = DesktopRelease.selectDraft(
-    await client.listReleases(),
+  await confirmDraftIdentity(client, {
+    expectedId: release.id,
+    phase: "after assembling",
+    retryDelaysMs:
+      draftVisibility.retryDelaysMs ?? githubReleaseVisibilityRetryDelaysMs,
     tag,
-    target
-  );
-  if (!finalSelection || finalSelection.id !== release.id) {
-    throw new Error(`Release identity changed after assembling ${tag}`);
-  }
+    target,
+    waitForRetry: draftVisibility.wait,
+  });
   return finalRelease;
 }
 

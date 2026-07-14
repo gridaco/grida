@@ -168,16 +168,14 @@ test("assembles one complete draft after delayed list visibility", async () => {
     await writeReleaseAssets(directory);
 
     const uploads = [];
-    let visibilityMisses = 1;
+    const waits = [];
+    let listCount = 0;
+    let visible = false;
     const client = {
       release: undefined,
       async listReleases() {
-        if (!this.release) return [];
-        if (visibilityMisses > 0) {
-          visibilityMisses -= 1;
-          return [];
-        }
-        return [this.release];
+        listCount += 1;
+        return this.release && visible ? [this.release] : [];
       },
       async createDraft({ tag, target, notes, prerelease }) {
         this.release = {
@@ -233,14 +231,18 @@ test("assembles one complete draft after delayed list visibility", async () => {
         ...assemblyOptions,
         assetsDirectory: directory,
         draftVisibility: {
-          retryDelaysMs: [0],
-          wait: async () => {},
+          retryDelaysMs: [25],
+          wait: async (delayMs) => {
+            waits.push(delayMs);
+            visible = true;
+          },
         },
       },
       client
     );
     assert.equal(release.id, 42);
-    assert.equal(visibilityMisses, 0);
+    assert.equal(listCount, 4);
+    assert.deepEqual(waits, [25]);
     assert.deepEqual(uploads, Array(11).fill(42));
   } finally {
     await rm(directory, { force: true, recursive: true });
@@ -388,6 +390,7 @@ test("fails when a created draft never becomes list-visible", async () => {
     await writeReleaseAssets(directory);
     const created = createRelease({ id: 42 });
     let listCount = 0;
+    const waits = [];
     const client = {
       async listReleases() {
         listCount += 1;
@@ -405,7 +408,7 @@ test("fails when a created draft never becomes list-visible", async () => {
           assetsDirectory: directory,
           draftVisibility: {
             retryDelaysMs: [0, 0],
-            wait: async () => {},
+            wait: async (delayMs) => waits.push(delayMs),
           },
         },
         client
@@ -413,6 +416,71 @@ test("fails when a created draft never becomes list-visible", async () => {
       /Release 42 did not become visible while assembling v0\.0\.8 after 3 checks/
     );
     assert.equal(listCount, 4);
+    assert.deepEqual(waits, [0, 0]);
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
+test("rejects duplicate drafts discovered after asset uploads", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "desktop-release-"));
+  try {
+    await writeReleaseAssets(directory);
+    const release = createRelease({ id: 42 });
+    const competitor = createRelease({ id: 43 });
+    let listCount = 0;
+    let uploadCount = 0;
+    const client = {
+      async listReleases() {
+        listCount += 1;
+        if (listCount === 1) return [];
+        if (listCount === 2) return [release];
+        return [release, competitor];
+      },
+      async createDraft() {
+        return release;
+      },
+      async updateDraft(releaseId) {
+        assert.equal(releaseId, release.id);
+        return release;
+      },
+      async deleteAsset() {
+        assert.fail("a new release must not delete assets");
+      },
+      async uploadAsset(existingRelease, asset) {
+        uploadCount += 1;
+        const uploaded = {
+          digest: asset.digest,
+          id: uploadCount,
+          name: asset.name,
+          size: asset.size,
+          state: "uploaded",
+        };
+        existingRelease.assets.push(uploaded);
+        return uploaded;
+      },
+      async getRelease(releaseId) {
+        assert.equal(releaseId, release.id);
+        return release;
+      },
+    };
+
+    await assert.rejects(
+      assembleDesktopRelease(
+        {
+          ...assemblyOptions,
+          assetsDirectory: directory,
+          draftVisibility: {
+            retryDelaysMs: [0],
+            wait: async () => assert.fail("duplicates must not retry"),
+          },
+        },
+        client
+      ),
+      /Refusing ambiguous v0\.0\.8: found 2 releases \(42, 43\)/
+    );
+    assert.equal(uploadCount, 11);
+    assert.equal(listCount, 3);
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
