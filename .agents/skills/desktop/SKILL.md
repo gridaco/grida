@@ -255,58 +255,25 @@ from `https://grida.co/desktop/*`, and the native app containing Electron plus
 the bundled daemon/agent sidecar. A change can require a Desktop release
 without touching `desktop/src/**`.
 
-At the start and before handoff, compare the branch with the latest published
-stable Desktop release:
+At the start and before handoff, run the bundled audit from the repository
+root. It reports the release-scoped diff, uncommitted paths, and whether the
+current Desktop version already has a GitHub release:
 
-```bash
-LATEST_DESKTOP_TAG="$(
-  gh release list \
-    --repo gridaco/grida \
-    --exclude-drafts \
-    --exclude-pre-releases \
-    --limit 1 \
-    --json tagName \
-    --jq '.[0].tagName'
-)"
-if [ -z "$LATEST_DESKTOP_TAG" ]; then
-  echo "No published stable Desktop release found" >&2
-  exit 1
-fi
-git fetch origin "refs/tags/${LATEST_DESKTOP_TAG}:refs/tags/${LATEST_DESKTOP_TAG}"
-DESKTOP_RELEASE_PATHS=(
-  desktop
-  skills
-  packages/grida-ai-agent
-  packages/grida-daemon
-  packages/grida-ai-models
-  packages/grida-desktop-bridge
-  packages/grida-home
-  editor/app/desktop
-  editor/scaffolds/desktop
-  editor/lib/agent-chat
-  editor/lib/desktop
-  editor/proxy.ts
-)
-git diff --name-status "$LATEST_DESKTOP_TAG" -- "${DESKTOP_RELEASE_PATHS[@]}"
-git status --short -- "${DESKTOP_RELEASE_PATHS[@]}"
-
-CURRENT_DESKTOP_VERSION="$(node -p 'require("./desktop/package.json").version')"
-# Only `release not found` confirms this version is unused. Any other error
-# blocks the audit; do not reinterpret auth, network, or API failures.
-gh release view "v${CURRENT_DESKTOP_VERSION}" \
-  --repo gridaco/grida \
-  --json tagName,isDraft,isPrerelease,targetCommitish,url
+```sh
+.agents/skills/desktop/scripts/audit-release-impact.sh
 ```
 
 Decide from the shipped boundary, not the directory name:
 
-- A change to `desktop/**`, `skills/**`, or a linked package in the command
-  changes the native payload. Bump `desktop/package.json` before publishing a
-  new native build when its current `v<version>` is already published, including
-  as a prerelease. The release assembler deliberately refuses to modify any
-  published release.
+- A change to `desktop/**`, `skills/**`, or a linked package reported by the
+  audit changes the native payload. Bump `desktop/package.json` before
+  publishing a new native build when its current `v<version>` is already
+  published, including as a prerelease. The release assembler deliberately
+  refuses to modify any published release.
 - A renderer-only change needs no native version bump when it remains
   compatible with the latest published sidecar.
+- A release workflow or assembler change is release-impacting but does not by
+  itself change the native payload; review its version/tag semantics directly.
 - A renderer change that sends a new model id, provider id, protocol field,
   route, or bridge call that the published sidecar rejects is release-coupled.
   Compare the validation code at the published tag and bump the Desktop
