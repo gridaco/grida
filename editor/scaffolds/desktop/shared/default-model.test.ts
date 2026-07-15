@@ -14,8 +14,8 @@ const knows =
     typeof id === "string" && ids.includes(id);
 
 describe("resolveDefaultModelId — the initial default for a new chat", () => {
-  it("defaults the picker to Claude Sonnet 5", () => {
-    expect(DEFAULT_MODEL_ID).toBe("anthropic/claude-sonnet-5");
+  it("defaults the picker to GPT-5.6 Terra", () => {
+    expect(DEFAULT_MODEL_ID).toBe("openai/gpt-5.6-terra");
   });
 
   it("upgrades the keyless default to the included tier when a GG session is live", () => {

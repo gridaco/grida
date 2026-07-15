@@ -413,7 +413,17 @@ function CatalogRow({ spec }: { spec: ModelSpec }) {
         <div className="flex items-center gap-2">
           {Logo && <Logo className="size-4 shrink-0" />}
           <div>
-            <div className="font-medium">{spec.label}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium">{spec.label}</span>
+              {spec.deprecated && (
+                <Badge
+                  variant="outline"
+                  className="h-4 px-1.5 text-[10px] font-normal"
+                >
+                  Deprecated
+                </Badge>
+              )}
+            </div>
             <code className="text-xs text-muted-foreground">{spec.id}</code>
           </div>
         </div>
