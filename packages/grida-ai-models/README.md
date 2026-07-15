@@ -78,7 +78,8 @@ Each `ModelSpec` contains:
   (explicit on every entry; the agent loop is tool-heavy)
 - `contextWindow`
 - `outputLimit`
-- `cost`
+- `cost` — base token rates plus any provider-published request-wide
+  long-context multiplier
 - `deprecated` — optional Grida catalogue lifecycle marker; this does not
   imply that the upstream provider has retired the model
 

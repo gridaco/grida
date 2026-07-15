@@ -62,7 +62,8 @@ export function DesktopContextMeter({
   messages: UIMessage[];
   /** Active model id — its resolved spec supplies the context window. */
   modelId: string;
-  /** Session cumulative model cost, already computed from per-turn model usage. */
+  /** Session cumulative base-rate estimate from aggregate per-turn usage.
+   * Request-level pricing bands are not reconstructible from this rollup. */
   costUsd?: number;
   /** Configured endpoint providers (issue #806) — registered local models
    *  resolve their real (often small) windows through these. */
@@ -163,7 +164,7 @@ export function DesktopContextMeter({
         </div>
         {typeof costUsd === "number" && costUsd > 0 ? (
           <div className="flex items-center justify-between border-t px-3 py-2 text-xs">
-            <span className="text-muted-foreground">Cost</span>
+            <span className="text-muted-foreground">Estimated base cost</span>
             <span className="font-mono tabular-nums">
               {formatCostUsd(costUsd)}
             </span>

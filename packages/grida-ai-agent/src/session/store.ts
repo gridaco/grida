@@ -52,7 +52,7 @@ import type {
   SessionListFilter,
   SessionListPage,
 } from "./rows";
-import { costUsdFromMessageUsage, usageTokenTotal } from "./cost";
+import { baseCostUsdFromMessageUsage, usageTokenTotal } from "./cost";
 
 export type AppendMessageInput = {
   id?: string;
@@ -852,9 +852,10 @@ export class SessionsStore {
     return {
       ...session,
       // `chat_sessions.cost_usd` is a legacy persisted column. Public session
-      // rows expose cumulative cost as derived data from every assistant turn's
-      // model+usage. Unlike context rollups, spend does not disappear after a
-      // rewind or compaction.
+      // rows expose a cumulative base-rate estimate from every assistant
+      // turn's model+usage. Unlike context rollups, the estimate does not
+      // disappear after a rewind or compaction. Request-level bands cannot be
+      // reconstructed because one assistant turn may aggregate model steps.
       cost_usd: await this.sessionCostUsd(row.id),
     };
   }
@@ -888,7 +889,7 @@ export class SessionsStore {
       costs.set(
         row.session_id,
         (costs.get(row.session_id) ?? 0) +
-          (costUsdFromMessageUsage(meta.model, meta.usage) ?? 0)
+          (baseCostUsdFromMessageUsage(meta.model, meta.usage) ?? 0)
       );
     }
     return costs;

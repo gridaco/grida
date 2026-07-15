@@ -73,8 +73,8 @@ Per 1M tokens.
 | Gemini 3.5 Flash (`google/gemini-3.5-flash`)                 | $1.50  | —           | $0.15      | $9.00   |
 | Gemini 3.1 Pro Preview (`google/gemini-3.1-pro-preview`)     | $2.00  | —           | $0.20      | $12.00  |
 
-GPT-5.6 prices above are base rates. Requests with more than 272K input
-tokens are billed at 2x input and 1.5x output for the full request.
+GPT-5.6 and GPT-5.5 prices above are base rates. Requests with more than 272K
+input tokens are billed at 2x input and 1.5x output for the full request.
 
 `GPT-5.5` is deprecated in Grida's catalogue in favor of `GPT-5.6 Sol`;
 this is not an upstream OpenAI retirement. `GPT-5.5 Pro` remains active.

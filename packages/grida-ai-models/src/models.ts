@@ -75,6 +75,15 @@ export namespace models {
       cacheRead?: number;
       /** USD per 1M cached input tokens (write). `undefined` if not supported. */
       cacheWrite?: number;
+      /** Optional request-wide long-context pricing rule. */
+      longContext?: {
+        /** Apply when total input tokens are strictly greater than this value. */
+        inputTokensAbove: number;
+        /** Multiplier for every input bucket, including cache reads and writes. */
+        inputMultiplier: number;
+        /** Multiplier for every output bucket, including reasoning tokens. */
+        outputMultiplier: number;
+      };
     }
 
     /** An exact image media type accepted as model input. */
@@ -146,6 +155,17 @@ export namespace models {
       "image/heif",
     ] as const satisfies readonly ImageInputMime[];
 
+    // OpenAI bills the full request at these multipliers once its total input
+    // exceeds 272K tokens. The same rule is published for GPT-5.5 and every
+    // GPT-5.6 family member.
+    // https://developers.openai.com/api/docs/models/gpt-5.5
+    // https://developers.openai.com/api/docs/models/gpt-5.6-sol
+    const OPENAI_LONG_CONTEXT_PRICING = {
+      inputTokensAbove: 272_000,
+      inputMultiplier: 2,
+      outputMultiplier: 1.5,
+    } as const satisfies NonNullable<ModelCostPerMillion["longContext"]>;
+
     const catalogSpecs = {
       "openai/gpt-5.4-nano": {
         id: "openai/gpt-5.4-nano",
@@ -175,7 +195,12 @@ export namespace models {
         tool_call: true,
         contextWindow: 1_050_000,
         outputLimit: 128_000,
-        cost: { input: 5, output: 30, cacheRead: 0.5 },
+        cost: {
+          input: 5,
+          output: 30,
+          cacheRead: 0.5,
+          longContext: OPENAI_LONG_CONTEXT_PRICING,
+        },
         deprecated: true,
       },
       "openai/gpt-5.5-pro": {
@@ -188,9 +213,8 @@ export namespace models {
         outputLimit: 128_000,
         cost: { input: 30, output: 180 },
       },
-      // Base rates. Requests with more than 272K input tokens are billed at
-      // 2x input and 1.5x output for the full request; the catalogue's flat
-      // ModelCostPerMillion shape does not yet represent conditional bands.
+      // Base rates; OPENAI_LONG_CONTEXT_PRICING represents the request-wide
+      // band that applies above 272K total input tokens.
       "openai/gpt-5.6-sol": {
         id: "openai/gpt-5.6-sol",
         label: "GPT-5.6 Sol",
@@ -204,6 +228,7 @@ export namespace models {
           output: 30,
           cacheRead: 0.5,
           cacheWrite: 6.25,
+          longContext: OPENAI_LONG_CONTEXT_PRICING,
         },
       },
       "openai/gpt-5.6-terra": {
@@ -219,6 +244,7 @@ export namespace models {
           output: 15,
           cacheRead: 0.25,
           cacheWrite: 3.125,
+          longContext: OPENAI_LONG_CONTEXT_PRICING,
         },
       },
       "openai/gpt-5.6-luna": {
@@ -234,6 +260,7 @@ export namespace models {
           output: 6,
           cacheRead: 0.1,
           cacheWrite: 1.25,
+          longContext: OPENAI_LONG_CONTEXT_PRICING,
         },
       },
       // Standard rates stored as canonical (identical to Sonnet 4.6).

@@ -278,6 +278,7 @@ function resolveModelSpec(modelId: string): ModelSpec {
  * - cached input tokens charge at `cacheRead` rate (falls back to `input`)
  * - cache writes charge at `cacheWrite` rate (falls back to `input`)
  * - reasoning tokens are priced at the standard output rate
+ * - request-wide long-context multipliers use total input, including caches
  */
 export function costUsdFromTokenUsage(
   modelId: string,
@@ -286,19 +287,28 @@ export function costUsdFromTokenUsage(
   const spec = resolveModelSpec(modelId);
   const input = usage.inputTokens ?? {};
   const output = usage.outputTokens ?? {};
-  const inTotal = input.total ?? 0;
   const inCacheRead = input.cacheRead ?? 0;
   const inCacheWrite = input.cacheWrite ?? 0;
   const inNoCache =
-    input.noCache ?? Math.max(0, inTotal - inCacheRead - inCacheWrite);
+    input.noCache ??
+    Math.max(0, (input.total ?? 0) - inCacheRead - inCacheWrite);
+  const inTotal = input.total ?? inNoCache + inCacheRead + inCacheWrite;
   const outTotal = output.total ?? 0;
 
   const rates = spec.cost;
+  const longContext = rates.longContext;
+  const appliesLongContext =
+    longContext !== undefined && inTotal > longContext.inputTokensAbove;
+  const inputMultiplier = appliesLongContext ? longContext.inputMultiplier : 1;
+  const outputMultiplier = appliesLongContext
+    ? longContext.outputMultiplier
+    : 1;
   return (
-    (inNoCache * rates.input +
+    ((inNoCache * rates.input +
       inCacheRead * (rates.cacheRead ?? rates.input) +
-      inCacheWrite * (rates.cacheWrite ?? rates.input) +
-      outTotal * rates.output) /
+      inCacheWrite * (rates.cacheWrite ?? rates.input)) *
+      inputMultiplier +
+      outTotal * rates.output * outputMultiplier) /
     1_000_000
   );
 }

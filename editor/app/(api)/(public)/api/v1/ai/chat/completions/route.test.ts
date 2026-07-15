@@ -121,6 +121,16 @@ const USAGE: LanguageModelV3Usage = {
   outputTokens: { total: 20, text: 15, reasoning: 5 },
 };
 
+const LONG_CONTEXT_USAGE: LanguageModelV3Usage = {
+  inputTokens: {
+    total: 272_001,
+    noCache: 200_001,
+    cacheRead: 70_000,
+    cacheWrite: 2_000,
+  },
+  outputTokens: { total: 1_000, text: 800, reasoning: 200 },
+};
+
 function clientModel(token: string, modelId = MODEL): LanguageModelV3 {
   const provider = createOpenAICompatible({
     name: "gg",
@@ -212,6 +222,23 @@ describe("POST /api/v1/ai/chat/completions (contract)", () => {
     const [orgArg, millsArg] = mockedIngest.mock.calls[0]!;
     expect(orgArg).toBe(ORG);
     expect(millsArg).toBeCloseTo(costMillsFromTokenUsage(MODEL, USAGE), 10);
+  });
+
+  it("bills GPT-5.6 long-context usage at the literal request-wide rate", async () => {
+    h.generate = {
+      content: [{ type: "text", text: "Done." }],
+      finishReason: { unified: "stop", raw: "stop" },
+      usage: LONG_CONTEXT_USAGE,
+      warnings: [],
+    };
+    const model = clientModel(await mintedToken(), "openai/gpt-5.6-terra");
+
+    await model.doGenerate({ prompt: PROMPT });
+
+    expect(mockedIngest).toHaveBeenCalledTimes(1);
+    expect(mockedIngest.mock.calls[0]![0]).toBe(ORG);
+    // Terra above 272K: all input buckets ×2, all output ×1.5.
+    expect(mockedIngest.mock.calls[0]![1]).toBeCloseTo(1070.005, 10);
   });
 
   it("stream: tool-call arguments reassemble byte-for-byte; usage arrives; ingest fires", async () => {

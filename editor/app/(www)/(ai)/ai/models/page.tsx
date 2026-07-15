@@ -47,6 +47,9 @@ const Logos: Partial<Record<string, FC<{ className?: string }>>> = {
   google: GoogleLogo,
 };
 
+const LONG_CONTEXT_PRICING_NOTE =
+  "For GPT-5.5 and GPT-5.6 Sol, Terra, and Luna, requests above 272K total input tokens use 2× input/cache rates and 1.5× output rates for the full request.";
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function groupByVendor(
@@ -453,7 +456,9 @@ function CatalogSection() {
         <h3 className="text-lg font-semibold tracking-tight mb-1">
           All Models
         </h3>
-        <p className="text-xs text-muted-foreground">Per 1M tokens.</p>
+        <p className="text-xs text-muted-foreground">
+          Base rates per 1M tokens. {LONG_CONTEXT_PRICING_NOTE}
+        </p>
       </div>
       <div className="rounded-lg border overflow-hidden">
         <Table>
@@ -494,7 +499,8 @@ function TextModelsSection() {
       {/* Tier table */}
       <div className="container mx-auto px-4 pb-12">
         <p className="text-xs text-muted-foreground mb-2">
-          Cost columns are USD per 1M tokens.
+          Cost columns are base rates in USD per 1M tokens.{" "}
+          {LONG_CONTEXT_PRICING_NOTE}
         </p>
         <div className="rounded-lg border overflow-hidden">
           <Table>
