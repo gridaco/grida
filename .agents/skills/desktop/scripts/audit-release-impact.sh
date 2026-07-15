@@ -22,7 +22,7 @@ latest_desktop_tag="$(
     --exclude-pre-releases \
     --limit 1 \
     --json tagName \
-    --jq '.[0].tagName'
+    --jq '.[0].tagName // empty'
 )"
 if [[ -z "$latest_desktop_tag" ]]; then
   echo "No published stable Desktop release found" >&2
