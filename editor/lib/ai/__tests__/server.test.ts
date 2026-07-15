@@ -110,6 +110,62 @@ describe("costMillsFromTokenUsage", () => {
     expect(mills).toBeCloseTo(8.4);
   });
 
+  // GRIDA-GG: gateway — pin request pricing used by hosted chat metering.
+  it("keeps GPT-5.6 base rates at the 272K input boundary", () => {
+    const mills = costMillsFromTokenUsage("openai/gpt-5.6-terra", {
+      inputTokens: {
+        total: 272_000,
+        noCache: 180_000,
+        cacheRead: 72_000,
+        cacheWrite: 20_000,
+      },
+      outputTokens: { total: 10_000 },
+    });
+
+    expect(mills).toBeCloseTo(
+      ((180_000 * 2.5 + 72_000 * 0.25 + 20_000 * 3.125 + 10_000 * 15) /
+        1_000_000) *
+        1000
+    );
+  });
+
+  it("applies GPT-5.6 request-wide rates above 272K input", () => {
+    const mills = costMillsFromTokenUsage("openai/gpt-5.6-terra", {
+      inputTokens: {
+        total: 272_001,
+        noCache: 180_001,
+        cacheRead: 72_000,
+        cacheWrite: 20_000,
+      },
+      outputTokens: { total: 10_000, reasoning: 2_000 },
+    });
+
+    expect(mills).toBeCloseTo(
+      (((180_001 * 2.5 + 72_000 * 0.25 + 20_000 * 3.125) * 2 +
+        10_000 * 15 * 1.5) /
+        1_000_000) *
+        1000
+    );
+  });
+
+  it("derives total input from normalized buckets before applying the band", () => {
+    const mills = costMillsFromTokenUsage("openai/gpt-5.6-terra", {
+      inputTokens: {
+        noCache: 180_001,
+        cacheRead: 72_000,
+        cacheWrite: 20_000,
+      },
+      outputTokens: { total: 10_000 },
+    });
+
+    expect(mills).toBeCloseTo(
+      (((180_001 * 2.5 + 72_000 * 0.25 + 20_000 * 3.125) * 2 +
+        10_000 * 15 * 1.5) /
+        1_000_000) *
+        1000
+    );
+  });
+
   it("throws on unknown model id", () => {
     expect(() =>
       costMillsFromTokenUsage("acme/totally-fake-model", {

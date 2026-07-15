@@ -50,10 +50,24 @@ describe("GET /api/v1/ai/models", () => {
 
     const byId = new Map(body.data.map((entry) => [entry.id, entry]));
     // Tier annotation via the reverse TIER_MODEL_IDS map.
-    expect(byId.get("anthropic/claude-sonnet-5")?.grida).toMatchObject({
-      modality: "text",
-      tier: "pro",
-    });
+    for (const [tier, id] of [
+      ["nano", "openai/gpt-5.4-nano"],
+      ["mini", "openai/gpt-5.6-luna"],
+      ["pro", "openai/gpt-5.6-terra"],
+      ["max", "openai/gpt-5.6-sol"],
+    ] as const) {
+      expect(byId.get(id)?.grida).toMatchObject({ modality: "text", tier });
+    }
+    for (const id of [
+      "anthropic/claude-fable-5",
+      "anthropic/claude-opus-4.8",
+    ]) {
+      expect(byId.get(id)?.grida).toMatchObject({
+        modality: "text",
+        tier: null,
+        deprecated: false,
+      });
+    }
     // Every modality is represented.
     const modalities = new Set(body.data.map((e) => e.grida.modality));
     expect(modalities).toEqual(new Set(["text", "image", "video"]));

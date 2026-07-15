@@ -11,7 +11,14 @@ export function usageTokenTotal(usage: MessageUsage): number {
   );
 }
 
-export function costUsdFromMessageUsage(
+/**
+ * Estimate an assistant message at base catalogue rates.
+ *
+ * A message can aggregate several provider requests, so request-level pricing
+ * bands cannot be reconstructed from this rollup. Authoritative hosted billing
+ * is computed per request by the Grida Gateway billing seam.
+ */
+export function baseCostUsdFromMessageUsage(
   model: ChatModel | undefined,
   usage: MessageUsage
 ): number | undefined {

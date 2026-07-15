@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { costUsdFromMessageUsage, usageTokenTotal } from "./cost";
+import { baseCostUsdFromMessageUsage, usageTokenTotal } from "./cost";
 
 describe("session cost accounting", () => {
   it("sums all persisted usage buckets into the rollup token total", () => {
@@ -14,8 +14,8 @@ describe("session cost accounting", () => {
     ).toBe(28);
   });
 
-  it("uses the catalog card, including cache and reasoning rates", () => {
-    const cost = costUsdFromMessageUsage(
+  it("uses the base catalog card, including cache and reasoning rates", () => {
+    const cost = baseCostUsdFromMessageUsage(
       {
         provider_id: "openrouter",
         model_id: "anthropic/claude-sonnet-5",
@@ -35,9 +35,30 @@ describe("session cost accounting", () => {
     );
   });
 
+  it("does not apply request-level bands to an aggregate message rollup", () => {
+    const cost = baseCostUsdFromMessageUsage(
+      {
+        provider_id: "openrouter",
+        model_id: "openai/gpt-5.6-terra",
+      },
+      {
+        input: 200_001,
+        cache_read: 70_000,
+        cache_write: 2_000,
+        output: 800,
+        reasoning: 200,
+      }
+    );
+
+    expect(cost).toBeCloseTo(
+      (200_001 * 2.5 + 70_000 * 0.25 + 2_000 * 3.125 + 800 * 15 + 200 * 15) /
+        1_000_000
+    );
+  });
+
   it("returns undefined when no catalog price card is available", () => {
     expect(
-      costUsdFromMessageUsage(
+      baseCostUsdFromMessageUsage(
         { provider_id: "ollama", model_id: "acme/local-model" },
         { input: 1, output: 1 }
       )

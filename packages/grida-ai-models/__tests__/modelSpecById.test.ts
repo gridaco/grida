@@ -1,10 +1,27 @@
 import models, { TIER_MODEL_IDS } from "..";
 
 describe("models.text.modelSpecById", () => {
-  it("resolves an exact gateway id", () => {
-    const spec = models.text.modelSpecById("anthropic/claude-sonnet-4.6");
-    expect(spec?.id).toBe("anthropic/claude-sonnet-4.6");
-    expect(spec?.label).toBe("Claude Sonnet 4.6");
+  it.each([
+    {
+      id: "openai/gpt-5.6-sol",
+      label: "GPT-5.6 Sol",
+    },
+    {
+      id: "openai/gpt-5.6-terra",
+      label: "GPT-5.6 Terra",
+    },
+    {
+      id: "openai/gpt-5.6-luna",
+      label: "GPT-5.6 Luna",
+    },
+    {
+      id: "anthropic/claude-fable-5",
+      label: "Claude Fable 5",
+    },
+  ])("resolves the exact $id gateway id", ({ id, label }) => {
+    const spec = models.text.modelSpecById(id);
+    expect(spec?.id).toBe(id);
+    expect(spec?.label).toBe(label);
   });
 
   it("resolves a bare provider id", () => {

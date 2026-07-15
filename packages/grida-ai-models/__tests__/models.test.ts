@@ -185,6 +185,15 @@ describe("models.video catalogue invariants", () => {
 });
 
 describe("models.text.byTier", () => {
+  it("pins the accepted capability and cost topology", () => {
+    expect(TIER_MODEL_IDS).toEqual({
+      nano: "openai/gpt-5.4-nano",
+      mini: "openai/gpt-5.6-luna",
+      pro: "openai/gpt-5.6-terra",
+      max: "openai/gpt-5.6-sol",
+    });
+  });
+
   it("exposes a spec for every tier", () => {
     expect(models.text.byTier.nano).toBeDefined();
     expect(models.text.byTier.mini).toBeDefined();
@@ -196,6 +205,93 @@ describe("models.text.byTier", () => {
     for (const tier of ["nano", "mini", "pro", "max"] as const) {
       expect(models.text.byTier[tier].id).toBe(TIER_MODEL_IDS[tier]);
     }
+  });
+});
+
+describe("models.text current catalogue", () => {
+  const longContext = {
+    inputTokensAbove: 272_000,
+    inputMultiplier: 2,
+    outputMultiplier: 1.5,
+  } as const;
+
+  const newModels = [
+    {
+      id: "openai/gpt-5.6-sol",
+      contextWindow: 1_050_000,
+      outputLimit: 128_000,
+      cost: {
+        input: 5,
+        output: 30,
+        cacheRead: 0.5,
+        cacheWrite: 6.25,
+        longContext,
+      },
+    },
+    {
+      id: "openai/gpt-5.6-terra",
+      contextWindow: 1_050_000,
+      outputLimit: 128_000,
+      cost: {
+        input: 2.5,
+        output: 15,
+        cacheRead: 0.25,
+        cacheWrite: 3.125,
+        longContext,
+      },
+    },
+    {
+      id: "openai/gpt-5.6-luna",
+      contextWindow: 1_050_000,
+      outputLimit: 128_000,
+      cost: {
+        input: 1,
+        output: 6,
+        cacheRead: 0.1,
+        cacheWrite: 1.25,
+        longContext,
+      },
+    },
+    {
+      id: "anthropic/claude-fable-5",
+      contextWindow: 1_000_000,
+      outputLimit: 128_000,
+      cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+    },
+  ] as const;
+
+  it.each(newModels)("stores the published $id rate card", (expected) => {
+    const spec = models.text.catalog[expected.id];
+    expect(spec.contextWindow).toBe(expected.contextWindow);
+    expect(spec.outputLimit).toBe(expected.outputLimit);
+    expect(spec.cost).toEqual(expected.cost);
+  });
+
+  it("keeps the published long-context rule on every affected OpenAI card", () => {
+    for (const id of [
+      "openai/gpt-5.5",
+      "openai/gpt-5.6-sol",
+      "openai/gpt-5.6-terra",
+      "openai/gpt-5.6-luna",
+    ] as const) {
+      expect(models.text.catalog[id].cost.longContext).toEqual(longContext);
+    }
+    expect(
+      models.text.catalog["openai/gpt-5.5-pro"].cost.longContext
+    ).toBeUndefined();
+  });
+
+  it("keeps catalogue lifecycle markers scoped to the requested models", () => {
+    expect(models.text.catalog["openai/gpt-5.5"].deprecated).toBe(true);
+    expect(
+      models.text.catalog["openai/gpt-5.5-pro"].deprecated
+    ).toBeUndefined();
+    expect(
+      models.text.catalog["anthropic/claude-fable-5"].deprecated
+    ).toBeUndefined();
+    expect(
+      models.text.catalog["anthropic/claude-opus-4.8"].deprecated
+    ).toBeUndefined();
   });
 });
 

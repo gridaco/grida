@@ -43,7 +43,7 @@ import models, { TIER_MODEL_IDS } from "@grida/ai-models";
 
 const proModelId = TIER_MODEL_IDS.pro;
 const proModel = models.text.byTier.pro;
-const spec = models.text.modelSpecById("claude-sonnet-4.6");
+const spec = models.text.modelSpecById("claude-fable-5");
 
 const imageModel = models.image.models["openai/gpt-image-2"];
 const compactImageModel = imageModel && models.image.toCompact(imageModel);
@@ -78,7 +78,10 @@ Each `ModelSpec` contains:
   (explicit on every entry; the agent loop is tool-heavy)
 - `contextWindow`
 - `outputLimit`
-- `cost`
+- `cost` — base token rates plus any provider-published request-wide
+  long-context multiplier
+- `deprecated` — optional Grida catalogue lifecycle marker; this does not
+  imply that the upstream provider has retired the model
 
 Token costs are stored as USD per 1 million tokens.
 

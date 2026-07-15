@@ -57,8 +57,10 @@ export type ChatSessionRow = {
   cache_read: number;
   cache_write: number;
   total_tokens: number;
-  /** Derived from assistant-message `{ model, usage }`, including turns hidden
-   * by rewind or compaction; not authoritative billing state. */
+  /** Base-rate estimate derived from assistant-message `{ model, usage }`,
+   * including turns hidden by rewind or compaction. A message can aggregate
+   * multiple provider requests, so request-level bands are not reconstructible;
+   * this is not authoritative billing state. */
   cost_usd: number;
   created_at: number;
   updated_at: number;
