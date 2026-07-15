@@ -1,13 +1,14 @@
 ---
 name: desktop
 description: >-
-  Pure Electron work for Grida Desktop: BrowserWindow, preload,
+  Grida Desktop Electron shell and release-impact work: BrowserWindow, preload,
   `window.grida`, menus, protocol/deep links, file associations, Forge,
   path-scoped bridge security, Electron-only UI bugs, and CDP / Playwright
   verification. Use for `desktop/`, `editor/app/desktop/**`,
   `editor/scaffolds/desktop/**`, `editor/lib/desktop/**`, `/desktop/*` CSP,
-  and GRIDA-SEC-004. For the daemon/agent-tenant packages, sessions, tools, providers, or
-  `packages/grida-daemon/**` / `packages/grida-ai-agent/**`, use `agent-system`.
+  GRIDA-SEC-004, and deciding whether linked-package or hosted-renderer changes
+  require a native Desktop version bump or coordinated release. For implementing
+  daemon/agent-tenant core behavior, use `agent-system` as well.
 ---
 
 # Grida Desktop - Electron Shell
@@ -39,11 +40,14 @@ sessions, workspaces, providers, tool execution, HTTP routes, and tests in
   Electron" issues.
 - Verifying the desktop app through CDP / Playwright.
 - Touching CSP or proxy behavior for `/desktop/*`.
+- Auditing whether linked-package or hosted Desktop renderer changes require a
+  native version bump or coordinated release.
 
-Skip this skill when the change is core agent behavior that can be tested
-without Electron. Use `agent-system` for `packages/grida-daemon/**` / `packages/grida-ai-agent/**`,
-daemon HTTP routes, sessions, files/workspaces, providers, tools, runtime,
-skills, and BYOK/secrets.
+Use `agent-system` to implement core agent behavior that can be tested without
+Electron: `packages/grida-daemon/**`, `packages/grida-ai-agent/**`, daemon HTTP
+routes, sessions, files/workspaces, providers, tools, runtime, skills, and
+BYOK/secrets. Also use this skill when auditing whether that work changes the
+packaged Desktop payload or its compatibility with the hosted renderer.
 
 ---
 
@@ -241,6 +245,78 @@ When changing the bridge or navigation rules, review `SECURITY.md` and the
 4. Per-launch bridge credentials held in the preload closure, never exposed on
    `window.grida`.
 5. No bridge method may exfiltrate secrets or run arbitrary local code.
+
+---
+
+## Release impact and versioning
+
+Production Desktop has two independently shipped halves: the renderer loaded
+from `https://grida.co/desktop/*`, and the native app containing Electron plus
+the bundled daemon/agent sidecar. A change can require a Desktop release
+without touching `desktop/src/**`.
+
+At the start and before handoff, compare the branch with the latest published
+stable Desktop release:
+
+```bash
+LATEST_DESKTOP_TAG="$(
+  gh release list \
+    --repo gridaco/grida \
+    --exclude-drafts \
+    --exclude-pre-releases \
+    --limit 1 \
+    --json tagName \
+    --jq '.[0].tagName'
+)"
+if [ -z "$LATEST_DESKTOP_TAG" ]; then
+  echo "No published stable Desktop release found" >&2
+  exit 1
+fi
+git fetch origin "refs/tags/${LATEST_DESKTOP_TAG}:refs/tags/${LATEST_DESKTOP_TAG}"
+DESKTOP_RELEASE_PATHS=(
+  desktop
+  skills
+  packages/grida-ai-agent
+  packages/grida-daemon
+  packages/grida-ai-models
+  packages/grida-desktop-bridge
+  packages/grida-home
+  editor/app/desktop
+  editor/scaffolds/desktop
+  editor/lib/agent-chat
+  editor/lib/desktop
+  editor/proxy.ts
+)
+git diff --name-status "$LATEST_DESKTOP_TAG" -- "${DESKTOP_RELEASE_PATHS[@]}"
+git status --short -- "${DESKTOP_RELEASE_PATHS[@]}"
+
+CURRENT_DESKTOP_VERSION="$(node -p 'require("./desktop/package.json").version')"
+# Only `release not found` confirms this version is unused. Any other error
+# blocks the audit; do not reinterpret auth, network, or API failures.
+gh release view "v${CURRENT_DESKTOP_VERSION}" \
+  --repo gridaco/grida \
+  --json tagName,isDraft,isPrerelease,targetCommitish,url
+```
+
+Decide from the shipped boundary, not the directory name:
+
+- A change to `desktop/**`, `skills/**`, or a linked package in the command
+  changes the native payload. Bump `desktop/package.json` before publishing a
+  new native build when its current `v<version>` is already published, including
+  as a prerelease. The release assembler deliberately refuses to modify any
+  published release.
+- A renderer-only change needs no native version bump when it remains
+  compatible with the latest published sidecar.
+- A renderer change that sends a new model id, provider id, protocol field,
+  route, or bridge call that the published sidecar rejects is release-coupled.
+  Compare the validation code at the published tag and bump the Desktop
+  version, but block the incompatible hosted behavior until affected clients
+  are required to run that compatible version. Publishing or auto-update
+  notification alone does not update installed clients.
+
+When the scoped diff is non-empty, record one line in the PR description or
+handoff: `Desktop release impact: none`, `Desktop release impact: version bump
+included`, or `Desktop release impact: follow-up release required`.
 
 ---
 
