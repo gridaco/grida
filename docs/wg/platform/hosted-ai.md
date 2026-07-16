@@ -335,5 +335,5 @@ later, and the honest risks:
 - [Metronome integration](./billing/metronome.md) — the metering substrate.
 - [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md) —
   `GRIDA-SEC-003`/`004`/`005`/`006`, the enforced boundaries.
-- [Deferred Grida Cloud Agent Provider](https://github.com/gridaco/grida/blob/main/docs/wg/platform/_history/hosted-ai-deferred-provider-2026-06.md)
+- [Deferred Grida Cloud Agent Provider](./_history/hosted-ai-deferred-provider-2026-06.md)
   — the superseded pre-build design, kept for lineage.
