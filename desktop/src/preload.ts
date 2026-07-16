@@ -518,13 +518,14 @@ const bridge: DesktopBridge = {
   providers: {
     list_endpoints: () => agentClient.providers.list_endpoints(),
     set_endpoint: async (config) => {
-      await agentClient.providers.set_endpoint(config);
+      await ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_SET, config);
     },
     delete_endpoint: async (id) => {
-      await agentClient.providers.delete_endpoint(id);
+      await ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_DELETE, id);
     },
     info: () => agentClient.providers.info(),
-    probe_endpoint: (baseUrl) => agentClient.providers.probe_endpoint(baseUrl),
+    probe_endpoint: (baseUrl) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PROVIDER_ENDPOINT_PROBE, baseUrl),
     detect_claude: () => agentClient.providers.detect_claude(),
   },
 

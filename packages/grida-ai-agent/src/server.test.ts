@@ -21,7 +21,11 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
   // Every host-supplied tenant field must ride from the composed daemon into
   // the tenant. `skills_root` shipped disabled precisely because it was omitted
   // here → the agent discovered ZERO built-in skills on the desktop.
-  it("forwards skills_root, gg_base_url, scratch_base, and the capability flags", () => {
+  it("forwards skills_root, gg_base_url, scratch_base, provider_http, and the capability flags", () => {
+    const provider_http = {
+      request: globalThis.fetch,
+      download: globalThis.fetch,
+    };
     const out = agentTenantOptionsFromDaemon(
       {
         password: "p",
@@ -32,9 +36,11 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
         scratch_base: "/tmp/scratch",
         image_model_id: "img/model",
         sandbox_enforced: true,
+        external_agent_execution: "disabled",
         allow_unsandboxed_shell: false,
         interactive: true,
         library: true,
+        provider_http,
       },
       AGENT_DAEMON_DEFAULT_CAPABILITIES
     );
@@ -43,8 +49,10 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
     expect(out.scratch_base).toBe("/tmp/scratch");
     expect(out.image_model_id).toBe("img/model");
     expect(out.sandbox_enforced).toBe(true);
+    expect(out.external_agent_execution).toBe("disabled");
     expect(out.interactive).toBe(true);
     expect(out.library).toBe(true);
+    expect(out.provider_http).toBe(provider_http);
   });
 });
 

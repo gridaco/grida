@@ -23,7 +23,7 @@
     "verify:package": "node scripts/verify-packaged-bundle.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sandbox-runtime": "^0.0.52",
+    "@anthropic-ai/sandbox-runtime": "^0.0.65",
     "@hono/node-server": "^1.13.7",
     "@parcel/watcher": "^2.5.6",
     "hono": "^4.6.14",

@@ -17,28 +17,34 @@
  *
  * Electron-as-node means the runtime is Node, not the renderer
  * sandbox; no Electron APIs are available here, by design — the
- * sidecar surface is HTTP, not IPC.
+ * product surface is authenticated daemon HTTP. Its two private host
+ * channels are deliberately narrower: framed provider/control messages on
+ * stdin/stdout, and already-connected daemon sockets on Node IPC.
  *
  * Argv contract:
  *   process.argv[0]    runtime (electron in --as-node mode)
  *   process.argv[1]    this script
- *   stdin line         Basic-Auth password (per-launch, 256-bit base64url)
+ *   stdin              framed host→sidecar control and provider responses
+ *   Node IPC           main-accepted connected daemon sockets only
  *   process.argv[2+]   optional `--key=value` flags. Currently:
  *                        --user-data=<absolute path>
  *                          the agent home dir (`~/.grida/agent`, resolved
  *                          via `@grida/home`). We can't import that (or
  *                          `electron`) here, so the supervisor forwards it.
  *
- * Stdout contract:
- *   `PORT=<n>\n` once listening — supervisor parses this exact prefix.
+ * Stdout contract: framed sidecar→host control and provider requests only.
+ * Human-readable logs always use stderr.
  *
- * Trust boundary: `GRIDA-SEC-004`. Defense in depth at four levels:
- * preload path-scoping; CSP on the renderer; per-spawn Basic Auth
- * + Origin/Referer guards on the HTTP server; OS-level srt scope
- * on the process tree. The server binds 127.0.0.1 only.
+ * Trust boundary: `GRIDA-SEC-004`. The composed Desktop boundary is recorded
+ * in `SECURITY.md`: renderer scoping/CSP, the authenticated HTTP perimeter,
+ * the OS-level srt scope, secrets discipline, the main-owned loopback
+ * listener/socket capability channel, and the main-owned provider transport.
+ * This process creates no listener; it serves only sockets main already
+ * accepted on exact loopback.
  */
 import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
-import { createAgentDaemon } from "@grida/agent/server";
+import { AgentSidecarNetwork } from "./agent-sidecar-network";
+import { AgentSidecarDaemonSockets } from "./agent-sidecar-daemon-sockets";
 
 // Route Node's built-in `fetch` (undici) through whatever proxy is in
 // `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`. Without this, undici v6+
@@ -49,12 +55,23 @@ import { createAgentDaemon } from "@grida/agent/server";
 // allowlist in `@grida/agent/server` lives at that proxy. Bypass
 // the proxy and Seatbelt's outbound-DNS deny surfaces as a
 // misleading `getaddrinfo ENOTFOUND <host>` from inside the AI SDK's
-// retry loop, with no obvious connection to the sandbox.
+// retry loop, with no obvious connection to the sandbox. Trusted in-process
+// provider operations now use the explicit host transport below. This ambient
+// dispatcher remains for separately-authorized non-provider sidecar traffic;
+// Desktop supplies no direct external destinations to that policy.
 //
 // `EnvHttpProxyAgent` reads the env at construction time, so this
 // must run before any top-level fetch — i.e. before any other
 // import that might do work. Keep it directly under the imports.
 setGlobalDispatcher(new EnvHttpProxyAgent());
+
+// Stdout is the private framed channel. Package/runtime diagnostics use
+// console.log in several places, so redirect every stdout-backed console method
+// before dynamically importing the agent server. stderr remains observable by
+// the supervisor and cannot corrupt protocol framing.
+console.log = (...args: unknown[]) => console.error(...args);
+console.info = (...args: unknown[]) => console.error(...args);
+console.debug = (...args: unknown[]) => console.error(...args);
 
 /**
  * Parse `--name=value` from argv[2..]. Returns undefined if not present.
@@ -102,11 +119,38 @@ if (!skillsRoot) {
 }
 
 async function main() {
-  const password = await readPasswordFromStdin();
+  const network = new AgentSidecarNetwork(process.stdin, process.stdout);
+  let daemonSockets: AgentSidecarDaemonSockets | null = null;
+  network.onFatal((error) => {
+    console.error(`[agent-sidecar] provider channel failed: ${error.message}`);
+    process.exit(1);
+  });
+  process.on("message", (message, handle) => {
+    if (!daemonSockets) {
+      if (handle && "destroy" in handle) {
+        (handle as { destroy: () => void }).destroy();
+      }
+      console.error(
+        "[agent-sidecar] daemon socket arrived before capability setup"
+      );
+      process.exit(1);
+      return;
+    }
+    daemonSockets.accept(message, handle);
+  });
+  process.once("disconnect", () => {
+    console.error("[agent-sidecar] capability channel disconnected");
+    process.exit(1);
+  });
+  const { password, daemonPort } = await network.waitForBootstrap();
   if (!password || password.length < 16) {
-    console.error("[agent-sidecar] fatal: missing or short password on stdin");
+    console.error("[agent-sidecar] fatal: missing or short bootstrap password");
     process.exit(1);
   }
+
+  // Dynamic by design: no package top-level console output may run before
+  // stdout is reserved for the framed channel above.
+  const { createAgentDaemon } = await import("@grida/agent/server");
 
   const editorOrigin = new URL(runtimeEditorBaseUrl).origin;
   const host = createAgentDaemon({
@@ -122,6 +166,10 @@ async function main() {
     // srt actually confines this process tree. On platforms srt can't wrap
     // (Windows), this is false and the agent gets fs/todos/skills but no shell.
     sandbox_enforced: sandboxEnforced,
+    // External ACP owns a subprocess and network stack that cannot consume the
+    // host-routed provider transport. Keep it unavailable in Desktop until it
+    // has a separately confined, route-compatible authority domain.
+    external_agent_execution: "disabled",
     // A human is at the keyboard — the locked `question` tool pauses for their
     // answer (RFC `tools` §question) instead of returning the headless refusal.
     interactive: true,
@@ -132,12 +180,31 @@ async function main() {
     // origin (same editor base the perimeter already trusts); the renderer
     // pushes the short-lived session token over /auth/gg/set.
     gg_base_url: runtimeEditorBaseUrl,
+    // issue #974 — provider traffic follows Electron/Chromium's system network
+    // route while the sidecar and its raw children remain under the SRT wrap.
+    provider_http: network.providerHttp,
   });
 
   try {
-    await host.start();
-    process.stdout.write(`PORT=${host.port}\n`);
-    console.log(`[agent-sidecar] listening on 127.0.0.1:${host.port}`);
+    // Main owns the loopback listener and transfers only accepted sockets over
+    // the inherited IPC descriptor. The sidecar creates no network listener;
+    // this keeps Linux's private netns reachable and lets macOS deny all raw
+    // bind/connect operations.
+    await host.start({ listen: false });
+    daemonSockets = new AgentSidecarDaemonSockets(
+      (request) => host.fetch(request),
+      (error) => {
+        console.error(
+          `[agent-sidecar] daemon capability failed: ${error.message}`
+        );
+        process.exit(1);
+      }
+    );
+    await announceDaemonCapabilityReady();
+    await network.ready(daemonPort);
+    console.log(
+      `[agent-sidecar] serving transferred loopback sockets on host port ${daemonPort}`
+    );
   } catch (err) {
     console.error("[agent-sidecar] server error:", err);
     process.exit(1);
@@ -145,6 +212,7 @@ async function main() {
 
   const shutdown = (signal: string) => {
     console.log(`[agent-sidecar] shutdown (${signal})`);
+    daemonSockets?.close();
     void host
       .stop()
       .catch((err) => {
@@ -155,46 +223,24 @@ async function main() {
       });
     setTimeout(() => process.exit(0), 1_000).unref();
   };
+  network.onShutdown(() => shutdown("host-shutdown"));
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
-}
-
-function readPasswordFromStdin(): Promise<string> {
-  process.stdin.setEncoding("utf8");
-  return new Promise((resolve, reject) => {
-    let buffer = "";
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error("agent sidecar password read timed out"));
-    }, 5_000);
-    const cleanup = () => {
-      clearTimeout(timeout);
-      process.stdin.off("data", onData);
-      process.stdin.off("end", onEnd);
-      process.stdin.off("error", onError);
-    };
-    const finish = (value: string) => {
-      cleanup();
-      resolve(value.trim());
-    };
-    const onData = (chunk: string) => {
-      buffer += chunk;
-      const newline = buffer.indexOf("\n");
-      if (newline >= 0) finish(buffer.slice(0, newline));
-    };
-    const onEnd = () => finish(buffer);
-    const onError = (err: Error) => {
-      cleanup();
-      reject(err);
-    };
-    process.stdin.on("data", onData);
-    process.stdin.on("end", onEnd);
-    process.stdin.on("error", onError);
-    process.stdin.resume();
-  });
 }
 
 void main().catch((err) => {
   console.error("[agent-sidecar] fatal:", err);
   process.exit(1);
 });
+
+async function announceDaemonCapabilityReady(): Promise<void> {
+  if (!process.send || !process.connected) {
+    throw new Error("daemon capability IPC was not inherited");
+  }
+  await new Promise<void>((resolve, reject) => {
+    process.send!({ v: 1, type: "daemon.capability.ready" }, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}

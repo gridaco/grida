@@ -118,21 +118,39 @@ export function buildDaemonSandboxPolicy(opts: {
   user_data: string;
   home: string;
   /**
+   * Permit the sandboxed process to bind a local socket.
+   *
+   * Defaults to `true` for backward compatibility. Set to `false` when the
+   * host provides a listener-independent request transport and the sandboxed
+   * process must have no socket-listen authority.
+   */
+  allow_local_binding?: boolean;
+  /**
+   * Include the daemon-owned development-network baseline.
+   *
+   * Defaults to `true` for backward compatibility. Set to `false` when the
+   * host must construct a tenant-only network policy; tenant-contributed
+   * `allowed_network_hosts` are still accepted and preserved.
+   */
+  include_dev_network_hosts?: boolean;
+  /**
    * Tenant-contributed upstream hosts (e.g. the agent tenant's BYOK
    * provider + external-agent vendor endpoints), merged with the baseline
-   * dev-network allowlist. srt `*.host` matches subdomains only — callers
-   * must list apexes explicitly.
+   * dev-network allowlist when that baseline is enabled. srt `*.host`
+   * matches subdomains only — callers must list apexes explicitly.
    */
   allowed_network_hosts?: readonly string[];
 }): DaemonSandboxPolicy {
+  const baseline =
+    opts.include_dev_network_hosts === false ? [] : DEV_NETWORK_HOSTS;
   const allowedDomains = Array.from(
-    new Set([...DEV_NETWORK_HOSTS, ...(opts.allowed_network_hosts ?? [])])
+    new Set([...baseline, ...(opts.allowed_network_hosts ?? [])])
   );
   return {
     network: {
       allowed_domains: allowedDomains,
       denied_domains: [],
-      allow_local_binding: true,
+      allow_local_binding: opts.allow_local_binding ?? true,
     },
     filesystem: {
       deny_read: homeProtectedPaths(opts.home),

@@ -31,7 +31,8 @@ below.
 ## Why not Electron main
 
 Electron main is the right home for windows, menus, dialogs, protocol
-handlers, and OS integration. It is not the right home for:
+handlers, OS integration, and the destination-bound Chromium transport that
+must follow the host's trusted network route. It is not the right home for:
 
 - A provider registry resolving "which language model do I call right
   now?"
@@ -47,27 +48,35 @@ to audit, and leaves room for a future CLI to share the same backend.
 ## Where it sits
 
 ```
-┌─ Electron main ────────────────────────────────────────────────┐
-│  windows, menus, dialogs, file-open, deep links, single-instance│
-│        │  spawn + supervise (AgentSidecarSupervisor)                  │
-│        ▼                                                         │
-│  ┌─ AgentSidecar — DaemonServer + agent tenant (createAgentDaemon) ─┐  │
-│  │  HTTP 127.0.0.1:<random>  Basic Auth + Referer guard      │  │
-│  │  sessions/  providers/  workspaces/  secrets/             │  │
-│  │  files/  shell/  runtime/  http/                          │  │
-│  └────────────────────────────────────────────────────────────┘ │
-│  ┌─ Renderer (one per doc) ────────────────────────────────┐   │
-│  │  loadURL("https://grida.co/desktop/...")                │   │
-│  │  window.grida → preload → HTTP to AgentSidecar                │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+┌─ Electron main ───────────────────────────────────────────────────┐
+│  windows, dialogs, file-open, deep links, single-instance         │
+│        │ spawn + supervise                                        │
+│  ┌─ exact 127.0.0.1:<random> listener ─────────────────────────┐  │
+│  │ accept paused; transfer connected socket on Node IPC fd 3   │  │
+│  └──────────────────────────────┬──────────────────────────────┘  │
+│                                 ▼                                 │
+│  ┌─ socketless AgentSidecar — DaemonServer + agent tenant ─────┐  │
+│  │ authenticated HTTP on only the transferred connection       │  │
+│  │ sessions / providers / workspaces / secrets / agent runtime │  │
+│  └───────────────┬──────────────────────────────────────────────┘  │
+│                  │ bounded framed stdin/stdout                     │
+│                  ▼                                                 │
+│  ┌─ dedicated non-persistent Chromium Session ─────────────────┐  │
+│  │ destination-bound provider HTTP through the system route    │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│  ┌─ Renderer (one per document) ───────────────────────────────┐  │
+│  │ loadURL("https://grida.co/desktop/...")                     │  │
+│  │ window.grida → preload → authenticated AgentSidecar HTTP    │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 The renderer never sees the sidecar's port or password as page data.
 Electron main generates a per-spawn password, passes it to the sidecar
-over stdin, and preload fetches the connection tuple through guarded IPC
-into closure scope. See [security](./agent-security.md) for the five-layer
-breakdown.
+in the versioned private-channel bootstrap frame, and preload fetches the
+connection tuple through guarded IPC
+into closure scope. See [security](./agent-security.md) for the composed
+defense-in-depth controls.
 
 ## What the daemon owns
 
@@ -109,8 +118,8 @@ const host = createAgentDaemon({
   userDataPath,
   httpAccess,
 });
-await host.start(); // spawn HTTP, open SQLite, restore registries
-const port = host.port;
+await host.start({ listen: false }); // build routes, open state, no socket bind
+// Electron main accepts loopback sockets and delivers each connected request.
 await host.stop();
 ```
 
@@ -124,7 +133,9 @@ the route is a thin wrapper.
 
 ## Division of responsibility
 
-**`AgentSidecar`'s job.** Hold every secret at runtime. Enforce its own HTTP
+**`AgentSidecar`'s job.** Hold steady-state provider credentials at runtime.
+Start the daemon without a listener and serve only main-transferred connected
+sockets. Enforce its own HTTP
 perimeter — Basic Auth, `Referer` check against `/desktop/*`, `Origin`
 allowlist — as defense-in-depth under
 [`GRIDA-SEC-004`](https://github.com/gridaco/grida/blob/main/SECURITY.md).
@@ -132,12 +143,16 @@ Stream long-running work under a `sessionId` the renderer can abort.
 Refuse to start if the host cannot supply its HTTP perimeter config —
 failing loud beats silently degrading.
 
-**The shell's job.** Run one supervisor (`AgentSidecarSupervisor`). Forward
-Electron's `userData` path so `auth.json` lands in the right place. Keep
-daemon credentials inside preload closure. Validate IPC sender frames
-against `EDITOR_BASE_URL + /desktop/*` on every native handler — the
-preload's path-scoping should make this redundant; doing it anyway is
-the right kind of paranoid. See [security](./agent-security.md).
+**Electron main's job.** Run one supervisor (`AgentSidecarSupervisor`). Forward
+Electron's `userData` path so `auth.json` lands in the right place. Keep daemon
+credentials inside preload closure. Own the exact loopback listener and
+transfer only accepted connected sockets to the sidecar. Own the destination
+grants and execute the two bounded provider-network operation classes through a
+dedicated Chromium session. Validate IPC sender frames against
+`EDITOR_BASE_URL + /desktop/*` on
+every native handler — the preload's path-scoping should make this redundant;
+doing it anyway is the right kind of paranoid. See
+[security](./agent-security.md).
 
 **The renderer's job.** Use `window.grida` as the _only_ path to the
 daemon. Start and abort agent streams through `window.grida.agent`.
@@ -146,22 +161,24 @@ come from the daemon. See [renderer-bridge](./renderer-bridge.md).
 
 ## What can change
 
-- **srt wrap (V1.x).** AgentSidecar runs inside [`srt`](./agent-sandbox-wrap.md) at
-  the OS boundary. The supervisor flips the `RunAsNode` Electron fuse
-  and switches from `utilityProcess.fork` to
-  `child_process.spawn(process.execPath, …)`. See
-  [sandbox-wrap](./agent-sandbox-wrap.md).
-- **Transport.** Loopback HTTP is fine for V1. A Unix domain socket
-  (macOS/Linux) for OS-level access control is on the table; Windows
-  stays on loopback.
+- **Authority split (V1.x).** On macOS and Linux, AgentSidecar runs inside one
+  `srt` outer boundary; Windows is currently unwrapped. The landed
+  [Desktop authority model](./agent-sandbox-wrap.md) separates native provider
+  networking while retaining that coarse host containment. Separating each raw
+  runtime into a supervisor-owned authority path remains work to do.
+- **Transport.** The client protocol remains loopback HTTP, while ownership is
+  capability-shaped: main owns the exact listener and the sidecar receives only
+  accepted connected sockets. Provider control/data remains on separately
+  bounded framed stdin/stdout.
 - **CLI consumer.** `grida-agent serve`, `run`, and `sessions` exercise
   the same daemon/client path without Electron.
 
 ## See also
 
 - [Renderer bridge](./renderer-bridge.md) — the other end of the bridge.
-- [Security](./agent-security.md) — five-layer GRIDA-SEC-004 breakdown.
-- [Sandbox wrap](./agent-sandbox-wrap.md) — AgentSidecar's outer-wrap policy.
+- [Security](./agent-security.md) — GRIDA-SEC-004 defense-in-depth controls.
+- [Desktop agent authority](./agent-sandbox-wrap.md) — host containment,
+  native networking, and confined raw runtimes.
 - [Storage layout](./agent-storage-layout.md) — `${userData}` file map.
 - [Agent system RFC / environments / computer](../ai/agent/environments.md#computer)
   — the abstract model this implements.

@@ -25,6 +25,7 @@ import { makeImageModelFor } from "./image-byok";
 import { GridaGatewayImageModel } from "./gg-media";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import { DEFAULT_IMAGE_MODEL_ID } from "./preferences";
+import type { ProviderHttp } from "./http";
 
 type ImageProvider = models.image.ImageProvider;
 
@@ -100,6 +101,8 @@ function referenceCapableProviders(
 
 export type ResolveImageDeps = {
   secrets: SecretsStore;
+  /** Host-fed provider HTTP, resolved at the server construction edge. */
+  provider_http?: ProviderHttp;
   /** Grida Cloud session (GRIDA-SEC-006) — optional; absent or token-less
    *  ⇒ the hosted provider never resolves. */
   gg?: GridaGatewaySessionStore;
@@ -162,13 +165,19 @@ export async function hasUsableImageProvider(
 function resolvedGgImage(
   modelId: string,
   card: models.image.ImageModelCard,
-  hosted: { session: GridaGatewaySessionStore; base_url: string }
+  hosted: { session: GridaGatewaySessionStore; base_url: string },
+  providerHttp?: ProviderHttp
 ): ResolvedImageModel {
   return {
     provider_id: GG_PROVIDER_ID,
     model_id: modelId,
     binding_id: card.id,
-    model: new GridaGatewayImageModel(hosted.session, hosted.base_url, card.id),
+    model: new GridaGatewayImageModel(
+      hosted.session,
+      hosted.base_url,
+      card.id,
+      providerHttp
+    ),
   };
 }
 
@@ -192,7 +201,7 @@ export async function resolveImageModel(
     if (!hosted || !models.image.binding(card, "vercel")) {
       throw new ImageModelUnavailableError(modelId, GG_PROVIDER_ID);
     }
-    return resolvedGgImage(modelId, card, hosted);
+    return resolvedGgImage(modelId, card, hosted, deps.provider_http);
   }
 
   const order: ImageProvider[] = options.explicit
@@ -214,7 +223,12 @@ export async function resolveImageModel(
       provider_id: provider,
       model_id: modelId,
       binding_id,
-      model: makeImageModelFor(provider, key.trim(), binding_id),
+      model: makeImageModelFor(
+        provider,
+        key.trim(),
+        binding_id,
+        deps.provider_http
+      ),
       ...(options.references
         ? { references_max: binding.references!.max }
         : {}),
@@ -226,7 +240,7 @@ export async function resolveImageModel(
   if (!options.explicit && !options.references) {
     const hosted = liveGgMediaDeps(deps);
     if (hosted && models.image.binding(card, "vercel")) {
-      return resolvedGgImage(modelId, card, hosted);
+      return resolvedGgImage(modelId, card, hosted, deps.provider_http);
     }
   }
 

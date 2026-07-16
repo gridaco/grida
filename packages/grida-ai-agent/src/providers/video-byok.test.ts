@@ -5,6 +5,7 @@ import {
   OpenRouterVideoModel,
   makeVideoModelFor,
 } from "./video-byok";
+import { ProviderHttp } from "./http";
 
 function callOptions(
   over: Partial<VideoModelV3CallOptions> = {}
@@ -159,46 +160,93 @@ describe("FalVideoModel.doGenerate", () => {
     const model = new FalVideoModel("sk", "fal-ai/x");
     await expect(model.doGenerate(callOptions())).rejects.toThrow(/ERROR/);
   });
-});
 
-describe("OpenRouterVideoModel.doGenerate", () => {
-  it("submits, polls, downloads the unsigned clip WITHOUT the key, returns base64", async () => {
-    const MP4 = new Uint8Array([0, 0, 0, 24]);
-    let submit: Record<string, unknown> = {};
-    let downloadAuth: string | undefined;
-    let polls = 0;
+  it("rejects a provider-selected video URL outside fal origins", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init: MockInit = {}) => {
-        if (url === "https://openrouter.ai/api/v1/videos") {
-          submit = JSON.parse(init.body ?? "{}");
+        if (init.method === "POST") {
           return new Response(
             JSON.stringify({
-              id: "job_1",
-              polling_url: "https://openrouter.ai/api/v1/videos/job_1",
+              request_id: "r",
+              status_url: "https://queue.fal.run/r/status",
+              response_url: "https://queue.fal.run/r",
             }),
             { status: 200 }
           );
         }
-        if (url === "https://or.cdn/v.mp4") {
-          downloadAuth = init.headers?.authorization;
-          return new Response(MP4, {
+        if (url.endsWith("/status")) {
+          return new Response(JSON.stringify({ status: "COMPLETED" }), {
             status: 200,
-            headers: { "content-type": "video/mp4" },
           });
         }
-        polls++;
         return new Response(
-          JSON.stringify(
-            polls < 2
-              ? { status: "in_progress" }
-              : { status: "completed", unsigned_urls: ["https://or.cdn/v.mp4"] }
-          ),
+          JSON.stringify({
+            video: { url: "https://attacker.example/result.mp4" },
+          }),
           { status: 200 }
         );
       })
     );
-    const model = new OpenRouterVideoModel("sk", "google/veo-3.1");
+    const model = new FalVideoModel("sk", "fal-ai/x");
+
+    await expect(model.doGenerate(callOptions())).rejects.toThrow(
+      /video url.*disallowed host/
+    );
+  });
+});
+
+describe("OpenRouterVideoModel.doGenerate", () => {
+  it("ignores unsigned CDN URLs and downloads the authenticated same-origin content route", async () => {
+    const MP4 = new Uint8Array([0, 0, 0, 24]);
+    let submit: Record<string, unknown> = {};
+    let contentAuth: string | undefined;
+    let polls = 0;
+    const requestUrls: string[] = [];
+    const request = vi.fn<
+      (input: string | URL | Request, init?: MockInit) => Promise<Response>
+    >(async (input: string | URL | Request, init: MockInit = {}) => {
+      const url = String(input);
+      requestUrls.push(url);
+      if (url === "https://openrouter.ai/api/v1/videos") {
+        submit = JSON.parse(init.body ?? "{}");
+        return new Response(
+          JSON.stringify({
+            id: "job_1",
+            polling_url: "https://openrouter.ai/api/v1/videos/job_1",
+          }),
+          { status: 200 }
+        );
+      }
+      if (url === "https://openrouter.ai/api/v1/videos/job_1/content?index=0") {
+        contentAuth = init.headers?.authorization;
+        return new Response(MP4, {
+          status: 200,
+          headers: { "content-type": "video/mp4" },
+        });
+      }
+      polls++;
+      return new Response(
+        JSON.stringify(
+          polls < 2
+            ? { status: "in_progress" }
+            : {
+                status: "completed",
+                unsigned_urls: ["https://or.cdn/v.mp4"],
+              }
+        ),
+        { status: 200 }
+      );
+    });
+    const download = vi.fn<typeof globalThis.fetch>();
+    const model = new OpenRouterVideoModel(
+      "sk",
+      "google/veo-3.1",
+      new ProviderHttp({
+        request: request as unknown as typeof globalThis.fetch,
+        download: download as unknown as typeof globalThis.fetch,
+      })
+    );
     const result = await model.doGenerate(
       callOptions({ duration: 8, aspectRatio: "16:9" })
     );
@@ -209,8 +257,16 @@ describe("OpenRouterVideoModel.doGenerate", () => {
       duration: 8,
     });
     expect(polls).toBe(2);
-    // GRIDA-SEC-004: unsigned (public) URL is fetched WITHOUT the key.
-    expect(downloadAuth).toBeUndefined();
+    expect(requestUrls).toEqual([
+      "https://openrouter.ai/api/v1/videos",
+      "https://openrouter.ai/api/v1/videos/job_1",
+      "https://openrouter.ai/api/v1/videos/job_1",
+      "https://openrouter.ai/api/v1/videos/job_1/content?index=0",
+    ]);
+    // GRIDA-SEC-004: the third-party unsigned URL never crosses the host's
+    // closed download lane. Content stays on the authenticated provider path.
+    expect(download).not.toHaveBeenCalled();
+    expect(contentAuth).toBe("Bearer sk");
     expect(result.videos).toEqual([
       {
         type: "base64",
@@ -220,7 +276,7 @@ describe("OpenRouterVideoModel.doGenerate", () => {
     ]);
   });
 
-  it("falls back to the authed /content endpoint WITH the key when no unsigned url", async () => {
+  it("uses the authenticated content endpoint when no unsigned url is present", async () => {
     let contentAuth: string | undefined;
     let polls = 0;
     vi.stubGlobal(
@@ -242,7 +298,7 @@ describe("OpenRouterVideoModel.doGenerate", () => {
           });
         }
         polls++;
-        // completed, but NO unsigned_urls → must use the authed /content path
+        // completed, with no unsigned_urls — same fixed content path
         return new Response(JSON.stringify({ status: "completed" }), {
           status: 200,
         });

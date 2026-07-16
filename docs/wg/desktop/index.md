@@ -33,14 +33,14 @@ For the user-facing app and the security boundary:
 
 ## Pages
 
-| Page                                              | Covers                                                                                                                                                                   |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [Process model](./process-model.md)               | Electron main / `AgentSidecar` / renderer — the three-process boundary, the supervisor, the HTTP perimeter, the god class.                                               |
-| [Renderer bridge](./renderer-bridge.md)           | URL-loaded renderer doctrine — `loadURL("grida.co/desktop/*")`, path-scoped `window.grida`, `DesktopBridgeGate`.                                                         |
-| [Resource loading](./resource-loading.md)         | How the renderer gets host-owned resource bytes — buffered (`data:`) vs streamed (privileged `grida-workspace:` scheme), Range/seeking, proxy-not-new-authority.         |
-| [Agent security](./agent-security.md)             | Desktop binding of `GRIDA-SEC-004`: bridge path scope, HTTP perimeter, sandbox, and secrets discipline.                                                                  |
-| [Agent sandbox wrap](./agent-sandbox-wrap.md)     | How desktop adapts package sandbox intent to `srt`, the shell permission model (`accept-edits`/`auto`) and per-call sub-policy, and supervises the wrapped AgentSidecar. |
-| [Agent storage layout](./agent-storage-layout.md) | Desktop `${userData}` files and SQLite session storage.                                                                                                                  |
+| Page                                               | Covers                                                                                                                                                           |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Process model](./process-model.md)                | Electron main / socketless `AgentSidecar` / renderer — main-owned loopback, connected-socket capability transfer, provider frames, and the composed server.      |
+| [Renderer bridge](./renderer-bridge.md)            | URL-loaded renderer doctrine — `loadURL("grida.co/desktop/*")`, path-scoped `window.grida`, `DesktopBridgeGate`.                                                 |
+| [Resource loading](./resource-loading.md)          | How the renderer gets host-owned resource bytes — buffered (`data:`) vs streamed (privileged `grida-workspace:` scheme), Range/seeking, proxy-not-new-authority. |
+| [Agent security](./agent-security.md)              | Desktop binding of `GRIDA-SEC-004`: bridge path scope, HTTP perimeter, sandbox, and secrets discipline.                                                          |
+| [Desktop agent authority](./agent-sandbox-wrap.md) | The Desktop delta for contained host services, native host networking, per-principal raw execution, and permission modes above confinement.                      |
+| [Agent storage layout](./agent-storage-layout.md)  | Desktop `${userData}` files and SQLite session storage.                                                                                                          |
 
 ## God class
 
@@ -49,8 +49,8 @@ The desktop's agent system is wired by **one composed server** — `createAgentD
 It owns the lifetime of every
 long-lived service: sessions store, stream registry, provider registry,
 workspace registry, secrets, files, shell, runtime. Public API:
-`constructor(opts) / start() / stop()`. HTTP routes (`http/routes/*`) are thin
-wrappers — business logic lives behind the class. The Electron-side
+`constructor(opts) / start({ listen? }) / fetch(Request) / stop()`. HTTP routes
+are thin wrappers — business logic lives behind the class. The Electron-side
 [`agent-sidecar-supervisor.ts`](https://github.com/gridaco/grida/blob/main/desktop/src/main/agent-sidecar-supervisor.ts)
 spawns it; the renderer-side chat seam in `editor/lib/agent-chat`
 coordinates today's `use-chat-session`, bridge transport, and

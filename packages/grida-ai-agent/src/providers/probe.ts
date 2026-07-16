@@ -39,12 +39,17 @@ import {
 const PROBE_TIMEOUT_MS = 4_000;
 const MAX_BODY_BYTES = 1_048_576;
 const MAX_MODELS = 64;
+// Keep enrichment comfortably below host-transport admission limits. A model
+// listing is untrusted in size (up to MAX_MODELS); opening one request per row
+// at once can otherwise turn a harmless probe into a sidecar-fatal burst.
+const MAX_CONCURRENT_OLLAMA_SHOW_REQUESTS = 8;
 
 export type EndpointProbeResult =
   | { ok: true; source: "ollama" | "openai"; models: ProbedEndpointModel[] }
   | { ok: false; error: string };
 
-/** The `fetch` seam — tests inject a fake; production uses the global. */
+/** The fetch seam — the server injects provider `request`; direct callers
+ *  retain the ambient-global default and tests inject a fake. */
 export type ProbeFetch = (
   url: string,
   init: {
@@ -115,7 +120,10 @@ async function requestJson(
           }
         : {}),
     });
-    if (!res.ok) return { ok: false };
+    if (!res.ok) {
+      await cancelResponseBody(res);
+      return { ok: false };
+    }
     const text = await readBodyBounded(res);
     if (text === null) return { ok: false };
     return { ok: true, data: JSON.parse(text) };
@@ -132,7 +140,10 @@ async function requestJson(
  */
 async function readBodyBounded(res: Response): Promise<string | null> {
   const declared = Number(res.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    await cancelResponseBody(res);
+    return null;
+  }
   if (!res.body) {
     const text = await res.text();
     return text.length > MAX_BODY_BYTES ? null : text;
@@ -140,15 +151,17 @@ async function readBodyBounded(res: Response): Promise<string | null> {
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_BODY_BYTES) {
-      void reader.cancel().catch(() => {});
-      return null;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) return null;
+      chunks.push(value);
     }
-    chunks.push(value);
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
   const buf = new Uint8Array(total);
   let offset = 0;
@@ -157,6 +170,11 @@ async function readBodyBounded(res: Response): Promise<string | null> {
     offset += chunk.byteLength;
   }
   return new TextDecoder().decode(buf);
+}
+
+/** Release an ignored probe response without letting cancellation escape. */
+async function cancelResponseBody(res: Response): Promise<void> {
+  await res.body?.cancel().catch(() => undefined);
 }
 
 /**
@@ -185,26 +203,41 @@ async function enrichContextWindows(
       }
     }
   }
-  await Promise.all(
-    models.map(async (model) => {
-      const allocated = loaded.get(model.id);
-      if (allocated !== undefined) {
-        model.contextWindow = allocated;
-        return;
-      }
+
+  const unloaded: ProbedEndpointModel[] = [];
+  for (const model of models) {
+    const allocated = loaded.get(model.id);
+    if (allocated !== undefined) model.contextWindow = allocated;
+    else unloaded.push(model);
+  }
+
+  let cursor = 0;
+  const enrichNext = async () => {
+    for (;;) {
+      const index = cursor++;
+      if (index >= unloaded.length) return;
+      const model = unloaded[index]!;
       const show = await requestJson(fetchImpl, `${origin}/api/show`, {
         model: model.id,
       });
-      if (!show.ok) return;
+      if (!show.ok) continue;
       const info = (show.data as { model_info?: unknown } | null)?.model_info;
-      if (!info || typeof info !== "object") return;
+      if (!info || typeof info !== "object") continue;
       for (const [key, value] of Object.entries(info)) {
         if (key.endsWith(".context_length") && isPositiveInt(value)) {
           model.contextWindow = value;
-          return;
+          break;
         }
       }
-    })
+    }
+  };
+  await Promise.all(
+    Array.from(
+      {
+        length: Math.min(MAX_CONCURRENT_OLLAMA_SHOW_REQUESTS, unloaded.length),
+      },
+      () => enrichNext()
+    )
   );
 }
 

@@ -43,6 +43,64 @@ bundle.
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
 public subpath; workspace bindings use it in-process.
 
+## Provider HTTP
+
+Node hosts may pass `provider_http` to `createAgentTenant` or
+`createAgentDaemon` when provider traffic cannot use the process-global
+`fetch`. The value has two required operations:
+
+- `request` executes provider-owned traffic, including authenticated text and
+  media calls, hosted-provider calls, configured-endpoint inference and health
+  checks, and media job submit/poll/result requests.
+- `download` executes credential-free provider result/asset downloads,
+  including URL inputs that the AI SDK must lower to bytes before a model
+  call. The host authorizes each concrete origin; the contract does not grant
+  arbitrary public-web access.
+
+Omitting `provider_http` preserves ambient `globalThis.fetch` only for provider
+`request` operations needed by standalone/CLI hosts. Remote `download`
+operations fail closed because the package cannot bind DNS and redirect checks
+to an ambient fetch connection; inline `data:` assets are still decoded
+locally. When a transport is supplied, both functions are required together so
+a host cannot unknowingly leave one class of traffic on ambient networking.
+The callback is an authority boundary, not a pre-authorized execution hook.
+Before I/O, the host must inspect and authorize the concrete URL, method, and
+headers; enforce its credential-forwarding policy; authorize every redirect
+hop; and validate the resolved address/route (including DNS rebinding posture).
+Configured endpoints may intentionally be local, so this decision belongs to
+the host environment. The package owns provider-specific request shaping,
+credential injection, basic URL syntax checks, response parsing, and download
+byte bounds—not the host's destination or routing policy. Each automatic asset
+lowering batch is refused above private, non-configurable count and aggregate
+decoded-byte caps, and its host downloads are consumed sequentially. A callback
+rejection is terminal; there is no ambient-download fallback.
+
+Provider result URLs are narrower than the callback's general authorization
+surface. OpenRouter video ignores third-party `unsigned_urls` and fetches only
+its authenticated, same-origin content endpoint. Vercel Gateway video accepts
+only inline `data:` results or its exact configured Gateway origin; an
+arbitrary result origin fails with `unsupported_untrusted_result_origin`, and
+an exact remote origin still requires the host download transport. Vercel
+Gateway image responses are base64 strings on the provider request lane and
+never open the download lane.
+
+The callbacks are never exposed to tools, shell commands, or external-agent
+processes. There is deliberately no public fixed-destination manifest: hosted
+and BYOK endpoints are selected dynamically, and the host authorizes the
+concrete request it receives while the package's sandbox policy remains the
+coarse declarative allowlist. A host that routes these callbacks outside the
+sidecar sandbox should build that policy with
+`host_routed_provider_http: true`; direct BYOK/GG egress is then removed,
+making missed ambient provider calls fail closed.
+
+Hosts that require the sandboxed process tree—including raw shell and ACP
+children—to have no direct outbound destinations can additionally select
+`direct_network_access: "none"`. This empties `allowed_domains` across daemon
+development hosts and all agent-contributed hosts. Local socket binding is
+orthogonal: it remains enabled by default for compatibility, and a host with a
+listener-independent request transport can pass `allow_local_binding: false`.
+The outbound default is `"allowlisted"`, preserving CLI behavior.
+
 ## Anti-goals
 
 The perimeter that keeps this package small. A feature request that
@@ -90,7 +148,13 @@ this kind _before_ provider resolution and streams from the external agent, so
 no `ModelFactory` is ever called — it does **not** make the package a
 model-provider router (the anti-goal above stands). Synthetic `claude-acp/*`
 model ids (`agent-provider/types.ts`) select it; continuity rides ACP
-`session/resume`.
+`session/resume`. Because that subprocess owns its own tools and network stack,
+the construction-time `external_agent_execution` disposition is explicit:
+`"enabled"` is host-authorized execution with no containment claim (the
+CLI's explicit choice), `"sandboxed"` requires `sandbox_enforced: true`, and
+`"disabled"` withholds the capability and is the omission default.
+`allow_unsandboxed_shell` governs only Grida's locked shell and does not affect
+this independent process authority.
 
 This is a spike, and the class **forks every host feature** (each one needs an
 agent-provider branch alongside the model-provider one). Whether it earns that

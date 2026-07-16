@@ -17,6 +17,8 @@ import {
   startAgentSidecar,
   getAgentSidecarInfo,
   stopAgentSidecar,
+  approveAgentProviderEndpoint,
+  describeAgentProviderEndpoint,
   type AgentSidecarInfo,
 } from "./main/agent-sidecar-supervisor";
 import { registerIpcHandlers } from "./main/ipc-handlers";
@@ -389,6 +391,7 @@ app.on("ready", async () => {
 
   try {
     agentSidecarInfo = await startAgentSidecar();
+    await approveConfiguredProviderEndpoints();
     console.log(
       `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
     );
@@ -427,6 +430,57 @@ app.on("ready", async () => {
   }
   void drainDeepLinks();
 });
+
+async function approveConfiguredProviderEndpoints(): Promise<void> {
+  const endpoints = await agentSidecarClient.listProviderEndpoints();
+  if (endpoints.length === 0) return;
+  const rows: Array<{
+    id: string;
+    baseUrl: string;
+    origin: string;
+    route: string;
+  }> = [];
+  const withheld: string[] = [];
+  for (const endpoint of endpoints) {
+    try {
+      rows.push({
+        id: endpoint.id,
+        baseUrl: endpoint.base_url,
+        ...(await describeAgentProviderEndpoint(endpoint.base_url)),
+      });
+    } catch (error) {
+      withheld.push(
+        `${endpoint.id}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  if (withheld.length > 0) {
+    await dialog.showMessageBox({
+      type: "warning",
+      message: "Some AI provider endpoints are unavailable",
+      detail: withheld.join("\n"),
+      buttons: ["Continue"],
+      defaultId: 0,
+      noLink: true,
+    });
+  }
+  if (rows.length === 0) return;
+  const result = await dialog.showMessageBox({
+    type: "warning",
+    message: "Allow configured AI provider endpoints?",
+    detail:
+      rows.map((row) => `${row.id}: ${row.origin}\n  ${row.route}`).join("\n") +
+      "\n\nThese exact origins will be available to provider requests until Grida closes.",
+    buttons: ["Allow", "Not Now"],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (result.response !== 0) return;
+  for (const row of rows) {
+    await approveAgentProviderEndpoint(row.id, row.baseUrl);
+  }
+}
 
 app.on("window-all-closed", () => {
   // macOS keeps the app alive (`activate` re-opens a window); Win/Linux quit.

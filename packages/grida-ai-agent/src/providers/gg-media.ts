@@ -26,6 +26,7 @@ import type { GridaGatewaySessionStore } from "./gg-session";
 import { readGgToken, throwOnGgHttpError } from "./gg";
 import type { ImageGenerateResult } from "../protocol/images";
 import type { VideoGenerateResult } from "../protocol/video";
+import { ProviderHttp } from "./http";
 
 function joinApi(baseUrl: string, path: string): string {
   return new URL(path, baseUrl).toString();
@@ -37,8 +38,9 @@ async function postHosted<T>(args: {
   body: unknown;
   scope: string;
   abortSignal?: AbortSignal;
+  provider_http: ProviderHttp;
 }): Promise<T> {
-  const res = await fetch(args.url, {
+  const res = await args.provider_http.request(args.url, {
     method: "POST",
     signal: args.abortSignal,
     headers: {
@@ -65,7 +67,8 @@ export class GridaGatewayImageModel implements ImageModelV3 {
   constructor(
     private readonly session: GridaGatewaySessionStore,
     private readonly baseUrl: string,
-    readonly modelId: string
+    readonly modelId: string,
+    private readonly providerHttp: ProviderHttp = new ProviderHttp()
   ) {}
 
   async doGenerate(
@@ -92,6 +95,7 @@ export class GridaGatewayImageModel implements ImageModelV3 {
       url: joinApi(this.baseUrl, "/api/v1/ai/images/generations"),
       scope: "grida-images",
       abortSignal,
+      provider_http: this.providerHttp,
       body: {
         model_id: this.modelId,
         prompt,
@@ -123,7 +127,8 @@ export class GridaGatewayVideoModel implements VideoModelV3 {
   constructor(
     private readonly session: GridaGatewaySessionStore,
     private readonly baseUrl: string,
-    readonly modelId: string
+    readonly modelId: string,
+    private readonly providerHttp: ProviderHttp = new ProviderHttp()
   ) {}
 
   async doGenerate(
@@ -143,6 +148,7 @@ export class GridaGatewayVideoModel implements VideoModelV3 {
       url: joinApi(this.baseUrl, "/api/v1/ai/videos/generations"),
       scope: "grida-video",
       abortSignal,
+      provider_http: this.providerHttp,
       body: {
         model_id: this.modelId,
         prompt,

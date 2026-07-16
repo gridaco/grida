@@ -58,8 +58,10 @@ Two routing rules make the boundary visible:
    when the renderer is under `/desktop/*`, with preload history guards and
    main-process navigation guards covering same-document navigation.
    XSS on any other grida.co page cannot reach the agent server. This is
-   layer 1 of [`GRIDA-SEC-004`](https://github.com/gridaco/grida/blob/main/SECURITY.md);
-   see [security](./agent-security.md) for the full five-layer breakdown.
+   the path-scoped bridge control in
+   [`GRIDA-SEC-004`](https://github.com/gridaco/grida/blob/main/SECURITY.md);
+   see [security](./agent-security.md) for the complete defense-in-depth
+   boundary.
 
 ```
 grida.co  (one Next.js app)
@@ -117,13 +119,19 @@ renderer is under `/desktop/*`, never leaking agent server credentials onto
 **`AgentSidecar`.** See [process-model](./process-model.md). Short version:
 secrets, state, agent loop. Desktop preload delegates daemon HTTP calls to
 `AgentTransport.Client`; it does not duplicate daemon route strings, SSE
-parsing, or stream resume headers. The renderer holds no tokens; the shell
-holds no business logic.
+parsing, or stream resume headers. The shell holds no business logic. The
+renderer holds no _durable_ credential: for
+hosted AI it may transiently receive a short-lived, purpose-scoped `gg:ai`
+token from the same-origin mint and immediately push it across the
+authenticated bridge to the daemon. It never persists, logs, or returns
+that token. See [Hosted AI](../platform/hosted-ai.md).
 
 ## Anti-patterns
 
-- **Renderer holding tokens.** No OAuth access/refresh tokens, no BYOK
-  API keys. `secrets.get` is not in the bridge for a reason.
+- **Renderer retaining credentials.** No OAuth access/refresh tokens, no
+  BYOK API keys, and no persisted hosted-AI token. The transient `gg:ai`
+  mint-and-push handoff is the narrow exception; `secrets.get` is not in
+  the bridge for a reason.
 - **`useHost` / `HostProvider` in `(desktop)`.** That's the web-side
   "am I in the wrapper" hook. The desktop bridge is a typed client, not
   a React context.
@@ -157,5 +165,5 @@ holds no business logic.
 - [Security](./agent-security.md) — the five GRIDA-SEC-004 layers.
 - [`GRIDA-SEC-004`](https://github.com/gridaco/grida/blob/main/SECURITY.md)
   — the trust boundary the bridge enforces.
-- [Sandbox wrap](./agent-sandbox-wrap.md) — defense in depth for
-  agent host-spawned children.
+- [Desktop agent authority](./agent-sandbox-wrap.md) — defense in depth for the
+  contained host and raw runtime workers.

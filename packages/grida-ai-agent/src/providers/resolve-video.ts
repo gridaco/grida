@@ -21,6 +21,7 @@ import { byokProvidersFor, GG_PROVIDER_ID } from "../protocol/provider-ids";
 import { makeVideoModelFor } from "./video-byok";
 import { GridaGatewayVideoModel } from "./gg-media";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
+import type { ProviderHttp } from "./http";
 
 type VideoProvider = models.video.VideoProvider;
 
@@ -59,6 +60,8 @@ export class VideoModelUnavailableError extends Error {
 
 export type ResolveVideoDeps = {
   secrets: SecretsStore;
+  /** Host-fed provider HTTP, resolved at the server construction edge. */
+  provider_http?: ProviderHttp;
   /** Grida Cloud session (GRIDA-SEC-006) — optional; absent or token-less
    *  ⇒ the hosted provider never resolves. */
   gg?: GridaGatewaySessionStore;
@@ -85,13 +88,19 @@ export type ResolveVideoOptions = {
 function resolvedGgVideo(
   modelId: string,
   card: models.video.VideoModelCard,
-  hosted: { session: GridaGatewaySessionStore; base_url: string }
+  hosted: { session: GridaGatewaySessionStore; base_url: string },
+  providerHttp?: ProviderHttp
 ): ResolvedVideoModel {
   return {
     provider_id: GG_PROVIDER_ID,
     model_id: modelId,
     binding_id: card.id,
-    model: new GridaGatewayVideoModel(hosted.session, hosted.base_url, card.id),
+    model: new GridaGatewayVideoModel(
+      hosted.session,
+      hosted.base_url,
+      card.id,
+      providerHttp
+    ),
   };
 }
 
@@ -113,7 +122,7 @@ export async function resolveVideoModel(
     if (!hosted || !models.video.binding(card, "vercel")) {
       throw new VideoModelUnavailableError(modelId, GG_PROVIDER_ID);
     }
-    return resolvedGgVideo(modelId, card, hosted);
+    return resolvedGgVideo(modelId, card, hosted, deps.provider_http);
   }
 
   const order: VideoProvider[] = options.explicit
@@ -131,7 +140,12 @@ export async function resolveVideoModel(
       provider_id: provider,
       model_id: modelId,
       binding_id: binding.id,
-      model: makeVideoModelFor(provider, key.trim(), binding.id),
+      model: makeVideoModelFor(
+        provider,
+        key.trim(),
+        binding.id,
+        deps.provider_http
+      ),
     };
   }
 
@@ -140,7 +154,7 @@ export async function resolveVideoModel(
   if (!options.explicit && !options.image) {
     const hosted = liveGgMediaDeps(deps);
     if (hosted && models.video.binding(card, "vercel")) {
-      return resolvedGgVideo(modelId, card, hosted);
+      return resolvedGgVideo(modelId, card, hosted, deps.provider_http);
     }
   }
 

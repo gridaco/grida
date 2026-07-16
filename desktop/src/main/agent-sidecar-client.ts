@@ -38,7 +38,12 @@ import {
 } from "./agent-sidecar-supervisor";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentTransport } from "@grida/agent/transport";
-import type { AgentLifecycleEvent, ChatSessionRow } from "@grida/agent";
+import type {
+  AgentLifecycleEvent,
+  ChatSessionRow,
+  EndpointProviderConfig,
+  ProbedEndpointModel,
+} from "@grida/agent";
 
 const EDITOR_ORIGIN = new URL(EDITOR_BASE_URL).origin;
 const REFERER = `${EDITOR_ORIGIN}/desktop`;
@@ -100,6 +105,31 @@ export namespace agentSidecarClient {
     }>
   > {
     return await client().workspaces.list();
+  }
+
+  /** Main-owned endpoint operations keep native grant approval and the
+   * sidecar's persisted config on the same side of the renderer boundary. */
+  export async function listProviderEndpoints(): Promise<
+    EndpointProviderConfig[]
+  > {
+    return await client().providers.list_endpoints();
+  }
+
+  export async function setProviderEndpoint(
+    config: EndpointProviderConfig
+  ): Promise<void> {
+    await client().providers.set_endpoint(config);
+  }
+
+  export async function deleteProviderEndpoint(id: string): Promise<void> {
+    await client().providers.delete_endpoint(id);
+  }
+
+  export async function probeProviderEndpoint(baseUrl: string): Promise<{
+    source: "ollama" | "openai";
+    models: ProbedEndpointModel[];
+  }> {
+    return await client().providers.probe_endpoint(baseUrl);
   }
 
   /**

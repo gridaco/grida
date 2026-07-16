@@ -39,10 +39,22 @@ A tool MUST publish:
 | `requires`    | RequirementSet             | yes      | The capability surface this tool needs. See [Capability requirements](#capability-requirements). |
 | `execute`     | `(args, runtime) → Result` | yes      | The runtime hands a typed capability surface; the tool calls into it.                            |
 
-The runtime computes the **effective capability set** for the agent
-as the union of the agent manifest's `requires` and every tool's
-`requires`. Adding a tool to an agent MUST automatically extend the
-sandbox; the manifest does not need a parallel update.
+The runtime computes the agent's **declared requirement set** as the union of
+the agent manifest's `requires` and every tool's `requires`. It then derives the
+effective grant as:
+
+```text
+effective = host_user_ceiling
+          ∩ parent_delegable_authority
+          ∩ declared_requirements
+```
+
+Adding a tool extends requirements, never authority. A tool whose requirements
+are outside the host-issued grant is unavailable or fails closed; a manifest
+does not widen the sandbox by declaration. See
+[Execution authority](./execution-authority.md).
+For a top-level agent, `parent_delegable_authority` is the top-level delegable
+grant the host issued for that session; it is not ambient host authority.
 
 ## Locked fundamental tools
 
@@ -185,7 +197,8 @@ defaults are 25 calls/session and 15s per call.
 
 ## Capability requirements
 
-A tool's `requires` declares the runtime surface it depends on:
+A tool's `requires` declares the runtime surface it depends on. It is a request
+used to derive a grant, not authorization:
 
 ```ts
 RequirementSet = {

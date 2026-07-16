@@ -12,4 +12,6 @@ declare function clearTimeout(handle: unknown): void;
 declare class URL {
   constructor(url: string, base?: string | URL);
   protocol: string;
+  username: string;
+  password: string;
 }

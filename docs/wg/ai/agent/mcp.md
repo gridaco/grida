@@ -53,8 +53,16 @@ MCP servers are declared in host config, not in the agent manifest:
 }
 ```
 
-The host writes the config (per project, per user, per workspace —
-host's choice). The agent system reads it at session start.
+The host stores the config (per project, per user, per workspace — host's
+choice), but a stored entry is not authority. Installation, enablement, process
+egress, and tool invocation are separate grants under
+[Execution authority](./execution-authority.md#a7--extension-grants-are-independent).
+An `enabled` transition and every egress change MUST originate from the host's
+user-control path; model output cannot write or activate either grant.
+
+Installing a local MCP server means acquiring an inert artifact. A package
+resolver, lifecycle script, verification executable, or first launch is raw
+execution and receives a separate confined grant before it runs.
 
 ## Lazy materialization
 
@@ -67,8 +75,9 @@ server. The cost shape:
   confusion).
 - Skipping them makes them invisible.
 
-The runtime SHOULD connect to MCP servers lazily, materializing each
-server's tool list only when the agent might need it.
+The runtime SHOULD connect to already-enabled MCP servers lazily, materializing
+each server's tool list only when the agent might need it. Lazy connection does
+not bypass enablement or create an egress grant.
 
 **Tool name namespacing.** Each MCP tool's id MUST be namespaced
 with its client id — `<client>_<tool>` — unconditionally, not only
@@ -131,20 +140,24 @@ it needs to call the matched tool.
 
 A connection to an MCP server progresses through:
 
-1. **Resolution.** The runtime reads the config entry, resolves
-   local commands or remote URLs.
-2. **Authentication.** Remote servers MAY require OAuth, static
+1. **Grant resolution.** The host resolves the enabled principal and its
+   host-issued lifecycle and egress grants. A config entry alone is
+   insufficient.
+2. **Runtime start.** A local server starts in its extension-confinement domain;
+   its executable, environment, roots, destinations, and lifetime are
+   supervisor-validated. A remote server is bound to its exact approved origin.
+3. **Authentication.** Remote servers MAY require OAuth, static
    bearer tokens, or mTLS. The runtime delegates to the host's
    credential store.
-3. **Handshake.** The runtime calls MCP's `initialize` and receives
+4. **Handshake.** The runtime calls MCP's `initialize` and receives
    the server's capability declaration.
-4. **Tool list fetch.** The runtime calls `tools/list` and stores
+5. **Tool list fetch.** The runtime calls `tools/list` and stores
    the result in the session's tool index.
-5. **Steady state.** Tool calls flow through `tools/call`; the
+6. **Steady state.** Tool calls flow through `tools/call`; the
    runtime translates the result into the standard
    [tool result envelope](./tools.md#tool-result-envelope).
-6. **Teardown.** On session close or server disconnect, the runtime
-   releases the connection.
+7. **Teardown.** On session close, grant revocation, or server disconnect, the
+   runtime releases the connection.
 
 ## Authentication
 
@@ -196,18 +209,26 @@ Constraints:
 
 ## Trust policy
 
-MCP servers MUST be treated as **untrusted by default**. A user who
-installs an unknown MCP server has not vouched for its quality or
-safety.
+MCP servers MUST be treated as **untrusted by default**. A user who installs an
+unknown MCP server has not granted execution, startup egress, or tool side
+effects.
+
+A local MCP process is an extension principal before any tool call occurs. Its
+filesystem, process, credential, and network authority is enforced by its own
+confinement domain. Tool permission rules cannot contain hidden startup work,
+background tasks, or private network calls inside that process.
 
 The default policy:
 
-| Surface                            | Policy for unknown MCP servers                                                                            |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Filesystem writes via MCP tool     | `ask`                                                                                                     |
-| Outbound network via MCP tool      | `ask` (unless the tool's declared host matches an allowlist)                                              |
-| Shell execution via MCP tool       | `ask` (most MCP servers should not expose `shell.run`-equivalent surface; if they do, treat as untrusted) |
-| Tool descriptions in system prompt | Truncated to `max_description_length` (default 200 chars); the full description loads via `tool_search`   |
+| Surface                                      | Policy for unknown MCP servers                                                                                  |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Installation                                 | Inert acquisition only; no lifecycle execution.                                                                 |
+| Enablement / local process start             | Explicit user grant; one confined extension principal.                                                          |
+| Local process egress                         | Denied by default; exact destinations or a visible, revocable unmanaged-network posture for that process alone. |
+| Filesystem writes via MCP tool               | `ask`.                                                                                                          |
+| Outbound side effect declared by an MCP tool | `ask` unless a narrower invocation rule allows it. This is separate from the process egress grant.              |
+| Shell execution via MCP tool                 | `ask`; arbitrary shell is raw execution for that surface.                                                       |
+| Tool descriptions in system prompt           | Truncated to `max_description_length` (default 200 chars); the full description loads via `tool_search`.        |
 
 The host MAY whitelist specific MCP servers as trusted; trusted servers
 follow the same rule layering as built-in tools.

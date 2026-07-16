@@ -5,6 +5,7 @@ import {
   OpenRouterImageModel,
   makeImageModelFor,
 } from "./image-byok";
+import { ProviderHttp } from "./http";
 
 /** Minimal full ImageModelV3CallOptions with overridable fields. */
 function callOptions(
@@ -41,56 +42,65 @@ describe("FalImageModel.doGenerate", () => {
   it("submits, polls until COMPLETED, and returns image bytes", async () => {
     const calls: Array<{ url: string; method: string; body?: unknown }> = [];
     let statusPolls = 0;
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string, init: MockInit = {}) => {
-        calls.push({
-          url,
-          method: init.method ?? "GET",
-          body: init.body ? JSON.parse(init.body) : undefined,
-        });
-        if (init.method === "POST") {
-          return new Response(
-            JSON.stringify({
-              request_id: "req_1",
-              status_url: "https://queue.fal.run/req_1/status",
-              response_url: "https://queue.fal.run/req_1",
-            }),
-            { status: 200 }
-          );
-        }
-        if (url.endsWith("/status")) {
-          statusPolls++;
-          // first poll in-progress, second completed → exercises the loop
-          return new Response(
-            JSON.stringify({
-              status: statusPolls < 2 ? "IN_PROGRESS" : "COMPLETED",
-            }),
-            { status: 200 }
-          );
-        }
-        if (url === "https://queue.fal.run/req_1") {
-          return new Response(
-            JSON.stringify({
-              images: [
-                {
-                  url: "https://v3.fal.media/i.png",
-                  content_type: "image/png",
-                },
-              ],
-            }),
-            { status: 200 }
-          );
-        }
-        if (url === "https://v3.fal.media/i.png") {
-          return new Response(PNG, { status: 200 });
-        }
-        return new Response("not found", { status: 404 });
+    const request = vi.fn<
+      (input: string | URL | Request, init?: MockInit) => Promise<Response>
+    >(async (input: string | URL | Request, init: MockInit = {}) => {
+      const url = String(input);
+      calls.push({
+        url,
+        method: init.method ?? "GET",
+        body: init.body ? JSON.parse(init.body) : undefined,
+      });
+      if (init.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            request_id: "req_1",
+            status_url: "https://queue.fal.run/req_1/status",
+            response_url: "https://queue.fal.run/req_1",
+          }),
+          { status: 200 }
+        );
+      }
+      if (url.endsWith("/status")) {
+        statusPolls++;
+        // first poll in-progress, second completed → exercises the loop
+        return new Response(
+          JSON.stringify({
+            status: statusPolls < 2 ? "IN_PROGRESS" : "COMPLETED",
+          }),
+          { status: 200 }
+        );
+      }
+      if (url === "https://queue.fal.run/req_1") {
+        return new Response(
+          JSON.stringify({
+            images: [
+              {
+                url: "https://v3.fal.media/i.png",
+                content_type: "image/png",
+              },
+            ],
+          }),
+          { status: 200 }
+        );
+      }
+      throw new Error(`unexpected provider request: ${url}`);
+    });
+    const download = vi.fn<
+      (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+    >(async (input: string | URL | Request, init?: RequestInit) => {
+      expect(String(input)).toBe("https://v3.fal.media/i.png");
+      expect(new Headers(init?.headers).has("authorization")).toBe(false);
+      return new Response(PNG, { status: 200 });
+    });
+    const model = new FalImageModel(
+      "sk-test",
+      "fal-ai/flux-2-pro",
+      new ProviderHttp({
+        request: request as unknown as typeof globalThis.fetch,
+        download: download as unknown as typeof globalThis.fetch,
       })
     );
-
-    const model = new FalImageModel("sk-test", "fal-ai/flux-2-pro");
     const result = await model.doGenerate(
       callOptions({ seed: 42, providerOptions: { fal: { guidance: 3 } } })
     );
@@ -107,6 +117,13 @@ describe("FalImageModel.doGenerate", () => {
     });
     // polled more than once (loop ran)
     expect(statusPolls).toBe(2);
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://queue.fal.run/fal-ai/flux-2-pro",
+      "https://queue.fal.run/req_1/status",
+      "https://queue.fal.run/req_1/status",
+      "https://queue.fal.run/req_1",
+    ]);
+    expect(download).toHaveBeenCalledOnce();
     // bytes returned, not the url
     expect(result.images).toEqual([PNG]);
     expect(result.response.modelId).toBe("fal-ai/flux-2-pro");
@@ -276,5 +293,41 @@ describe("makeImageModelFor", () => {
 
   it("builds a vercel image model without throwing", () => {
     expect(makeImageModelFor("vercel", "sk", "bfl/flux-2-pro")).toBeTruthy();
+  });
+
+  it("keeps Vercel Gateway image results on the provider request lane", async () => {
+    const request = vi.fn<
+      (input: string | URL | Request, init?: MockInit) => Promise<Response>
+    >(async (input: string | URL | Request, init: MockInit = {}) => {
+      expect(String(input)).toBe(
+        "https://ai-gateway.vercel.sh/v3/ai/image-model"
+      );
+      expect(init.method).toBe("POST");
+      return new Response(
+        JSON.stringify({ images: ["iVBORw=="], warnings: [] }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }
+      );
+    });
+    const download = vi.fn<typeof globalThis.fetch>(async () => {
+      throw new Error("Vercel image results must never open a download lane");
+    });
+    const model = makeImageModelFor(
+      "vercel",
+      "sk",
+      "bfl/flux-2-pro",
+      new ProviderHttp({
+        request: request as unknown as typeof globalThis.fetch,
+        download: download as unknown as typeof globalThis.fetch,
+      })
+    );
+
+    const result = await model.doGenerate(callOptions());
+
+    expect(result.images).toEqual(["iVBORw=="]);
+    expect(request).toHaveBeenCalledOnce();
+    expect(download).not.toHaveBeenCalled();
   });
 });

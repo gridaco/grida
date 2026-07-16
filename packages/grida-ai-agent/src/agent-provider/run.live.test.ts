@@ -10,6 +10,10 @@
  *
  *   GRIDA_LIVE_CLAUDE=1 \
  *     pnpm --filter @grida/agent vitest run src/agent-provider/run.live.test.ts
+ *
+ * This direct Vitest command is not wrapped by an OS sandbox. The harness
+ * therefore makes the honest explicit `enabled` authorization and no
+ * containment claim; a genuinely wrapped host exercises `sandboxed` mode.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -48,6 +52,8 @@ function buildHost(baseDir: string): Host {
     sessions_store: store,
     streams: new StreamRegistry(),
     drain_cooldown_ms: 20,
+    sandbox_enforced: false,
+    external_agent_execution: "enabled",
   });
   registerAgentRoutes(app, runtime);
   return { app, runtime, store };

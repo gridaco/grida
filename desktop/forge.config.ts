@@ -305,8 +305,7 @@ const config: ForgeConfig = {
       // inside an srt wrap. Residual risk: a local attacker who
       // already controls the binary can pass the same env var to
       // run arbitrary JS — but they already own the binary, so this
-      // is not a new vector. See
-      // `docs/wg/desktop/agent-sandbox-wrap.md` for the full rationale.
+      // is not a new vector.
       [FuseV1Options.RunAsNode]: true,
       [FuseV1Options.EnableCookieEncryption]: true,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,

@@ -17,6 +17,7 @@ import {
   makeGridaGatewayFactory,
 } from "./gg";
 import { GridaGatewaySessionStore } from "./gg-session";
+import { ProviderHttp } from "./http";
 
 const realFetch = globalThis.fetch;
 const fetchMock =
@@ -46,9 +47,14 @@ function okJson(body: unknown): Response {
 /** Minimal V3 generate roundtrip through the model's real request path. */
 async function callModel(
   store: GridaGatewaySessionStore,
-  modelId?: string
+  modelId?: string,
+  providerHttp?: ProviderHttp
 ): Promise<void> {
-  const factory = makeGridaGatewayFactory(store, "https://grida.test");
+  const factory = makeGridaGatewayFactory(
+    store,
+    "https://grida.test",
+    providerHttp
+  );
   const model = factory("pro", modelId) as unknown as {
     doGenerate: (o: unknown) => Promise<unknown>;
   };
@@ -78,7 +84,12 @@ describe("makeGridaGatewayFactory", () => {
       "https://grida.co/api/v1/ai"
     );
     const store = liveStore("tok-first");
-    await callModel(store);
+    const download = vi.fn<typeof globalThis.fetch>();
+    const providerHttp = new ProviderHttp({
+      request: fetchMock as unknown as typeof globalThis.fetch,
+      download,
+    });
+    await callModel(store, undefined, providerHttp);
     const [url1, init1] = fetchMock.mock.calls[0]! as [string, RequestInit];
     expect(String(url1)).toBe("https://grida.test/api/v1/ai/chat/completions");
     expect(new Headers(init1.headers).get("authorization")).toBe(
@@ -87,11 +98,12 @@ describe("makeGridaGatewayFactory", () => {
 
     // A fresh push between calls is honored — token read at request time.
     store.set({ access_token: "tok-second", expires_at: Date.now() + 900_000 });
-    await callModel(store);
+    await callModel(store, undefined, providerHttp);
     const [, init2] = fetchMock.mock.calls[1]! as [string, RequestInit];
     expect(new Headers(init2.headers).get("authorization")).toBe(
       "Bearer tok-second"
     );
+    expect(download).not.toHaveBeenCalled();
   });
 
   it("tiers map through TIER_MODEL_IDS; explicit ids pass through", async () => {

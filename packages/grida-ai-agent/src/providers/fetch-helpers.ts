@@ -95,6 +95,8 @@ export function falQueueOutcome(body: { status: string }): PollOutcome {
 export async function pollQueue<T>(
   url: string,
   opts: {
+    /** Provider request operation. Polls may carry provider credentials. */
+    fetch: typeof globalThis.fetch;
     headers: Record<string, string>;
     timeoutMs: number;
     intervalMs: number;
@@ -117,7 +119,7 @@ export async function pollQueue<T>(
       ...(abortSignal ? [abortSignal] : []),
       AbortSignal.timeout(remaining),
     ]);
-    const res = await fetch(url, { headers: opts.headers, signal });
+    const res = await opts.fetch(url, { headers: opts.headers, signal });
     if (!res.ok) {
       throw new Error(
         `${opts.label} poll failed (${res.status}): ${await safeText(res)}`

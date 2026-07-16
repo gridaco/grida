@@ -54,6 +54,19 @@ describe("validateEndpointProviderConfig", () => {
     }
   });
 
+  it("rejects URL userinfo because endpoint credentials belong in SecretsStore", () => {
+    for (const base_url of [
+      "https://user@example.com/v1",
+      "https://user:password@example.com/v1",
+    ]) {
+      const result = validateEndpointProviderConfig({ ...OLLAMA, base_url });
+      expect(result).toEqual({
+        ok: false,
+        error: "base_url must not contain credentials",
+      });
+    }
+  });
+
   it("trims whitespace padding off base_url before persisting", () => {
     const result = validateEndpointProviderConfig({
       ...OLLAMA,

@@ -1,10 +1,13 @@
 /**
- * `@grida/daemon/server` — the Node surface for hosts and tenants.
+ * `@grida/daemon/server` — the GRIDA-SEC-004 Node surface for hosts and
+ * tenants.
  *
  * Two audiences, one entry:
  *   - HOSTS (desktop sidecar, CLI) construct `DaemonServer` (usually via a
  *     composed factory like `@grida/agent/server`'s `createAgentDaemon`)
- *     and drive `start()` / `stop()`.
+ *     and drive `start()` / `stop()`. A host-owned transport can select
+ *     `start({ listen: false })` and deliver standard Requests through
+ *     `DaemonServer.fetch` without binding a socket.
  *   - TENANTS (`@grida/agent`) implement `DaemonTenant` against
  *     `DaemonServices` and use the toolkit below (stores, shell runner,
  *     request validation) — the daemon depends on nothing tenant-specific;

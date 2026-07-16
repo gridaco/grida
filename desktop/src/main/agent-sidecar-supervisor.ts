@@ -30,21 +30,23 @@
  * `forge.config.ts` MUST be `true` for this to work in packaged
  * builds; dev electron honours the env var regardless.
  *
- * The password is held in this module's closure and crosses to the
- * agent sidecar over stdin (NOT argv, NOT env, NOT disk).
+ * The password is held in this module's closure and crosses in the private
+ * framed stdin bootstrap (NOT argv, NOT env, NOT disk). The same inherited
+ * stdio pair carries the host-routed provider transport for issue #974.
  *
- * Windows behaviour: `srt` doesn't support Windows. On Windows we
- * fall back to the unwrapped path (still using
+ * Windows behaviour: srt 0.0.65 includes an alpha Windows backend, but Desktop
+ * deliberately withholds it until it owns the required provisioning, argv
+ * spawn, packaging, and lifecycle. On Windows we fall back to the unwrapped
+ * path (still using
  * `child_process.spawn` + Electron-as-node so the spawn model is
- * uniform) but log a loud warning. A real Windows backend is
- * tracked in `docs/wg/desktop/agent-sandbox-wrap.md`.
+ * uniform) but log a loud warning. Desktop's Windows adoption is
+ * tracked in `desktop/docs/agent-authority.md`.
  */
 import { app } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { buildAgentDaemonSandboxPolicy } from "@grida/agent/sandbox";
 import { home } from "@grida/home";
 import {
   ensureInitialized,
@@ -55,26 +57,37 @@ import {
 } from "./sandbox/manager";
 import { SidecarLogWriter } from "./sidecar-log";
 import { EDITOR_BASE_URL } from "../env";
+import { AgentNetworkAuthority } from "./agent-network-authority";
+import { AgentNetworkHost } from "./agent-network-host";
+import { AgentDaemonSocketHost } from "./agent-daemon-socket-host";
+import { DesktopAgentSandboxPolicy } from "./agent-sandbox-policy";
 
 export type AgentSidecarInfo = {
-  /** TCP port the agent sidecar is listening on (127.0.0.1 only). */
+  /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
   port: number;
   /** Per-spawn Basic-Auth password. Main process only; preload requests it over guarded IPC. */
   password: string;
 };
 
-const PORT_LINE_PREFIX = "PORT=";
 const STARTUP_TIMEOUT_MS = 15_000; // bumped from 8s — srt init adds proxy startup time
 const BACKOFF_INITIAL_MS = 250;
 const BACKOFF_MAX_MS = 10_000;
 
-class AgentSidecarSupervisor {
+export class AgentSidecarSupervisor {
   private child: ChildProcess | null = null;
+  private activeGeneration = 0;
+  private nextGeneration = 0;
+  private spawning: Promise<AgentSidecarInfo> | null = null;
+  private networkHost: AgentNetworkHost | null = null;
+  private daemonSocketHost: AgentDaemonSocketHost | null = null;
   private info: AgentSidecarInfo | null = null;
   private restartBackoffMs = BACKOFF_INITIAL_MS;
   private isShuttingDown = false;
   private restartTimer: NodeJS.Timeout | null = null;
   private sandboxReady = false;
+  private readonly networkAuthority = new AgentNetworkAuthority(
+    new URL(EDITOR_BASE_URL).origin
+  );
 
   // The agent's data dir: the canonical Grida home + the "agent" component
   // (~/.grida/agent). Resolved ONCE so the sandbox write-allowlist and the
@@ -122,6 +135,10 @@ class AgentSidecarSupervisor {
 
   async start(): Promise<AgentSidecarInfo> {
     if (this.info) return this.info;
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
     if (!this.sandboxReady) {
       await this.initSandbox();
     }
@@ -133,15 +150,83 @@ class AgentSidecarSupervisor {
   }
 
   stop() {
-    if (this.child) {
-      try {
-        this.child.kill("SIGTERM");
-      } catch {
-        // already dead
-      }
-      this.child = null;
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
     }
+    const child = this.child;
+    const generation = this.activeGeneration;
+    if (child) this.retireGeneration(child, generation, false);
+    else this.closeCurrentHosts();
+    // Invalidate a spawn still awaiting sandbox wrapping before it has a child.
+    this.nextGeneration += 1;
     this.info = null;
+  }
+
+  async approveProviderEndpoint(id: string, baseUrl: string): Promise<void> {
+    const revision = this.networkAuthority.revision;
+    this.networkAuthority.approveCustomEndpoint(id, baseUrl);
+    if (this.networkAuthority.revision !== revision) await this.publishGrants();
+  }
+
+  async revokeProviderEndpoint(id: string): Promise<void> {
+    const revision = this.networkAuthority.revision;
+    this.networkAuthority.revokeCustomEndpoint(id);
+    if (this.networkAuthority.revision !== revision) await this.publishGrants();
+  }
+
+  async withTemporaryProviderEndpoint<T>(
+    baseUrl: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const endpointId = `probe_${crypto.randomUUID().replaceAll("-", "")}`;
+    let approved = false;
+    let published = false;
+    try {
+      this.networkAuthority.approveCustomEndpoint(endpointId, baseUrl);
+      approved = true;
+      await this.publishGrants();
+      published = true;
+      return await operation();
+    } finally {
+      if (approved) {
+        this.networkAuthority.revokeCustomEndpoint(endpointId);
+        // If initial publication or the operation retired the generation, its
+        // replacement bootstraps the already-rolled-back snapshot. When the
+        // same generation is alive, explicitly revoke and await its ACK.
+        if (published && this.networkHost) await this.publishGrants();
+      }
+    }
+  }
+
+  async describeProviderEndpoint(baseUrl: string): Promise<{
+    origin: string;
+    route: string;
+  }> {
+    const host = this.networkHost;
+    if (!host) throw new Error("agent provider network is not ready");
+    return await host.describeCustomEndpoint(baseUrl);
+  }
+
+  private async publishGrants(): Promise<void> {
+    const host = this.networkHost;
+    const child = this.child;
+    const generation = this.activeGeneration;
+    if (!host || !child) {
+      throw new Error("agent provider network is not ready");
+    }
+    try {
+      await host.updateGrants();
+    } catch (error) {
+      // A failed revocation must not leave the sidecar running with the stale
+      // grant snapshot. Retire only the generation/host that owned this
+      // publication: a delayed rejection from an old host must never kill the
+      // replacement that already bootstrapped the latest authority snapshot.
+      if (this.networkHost === host) {
+        this.retireGeneration(child, generation, true);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -161,7 +246,7 @@ class AgentSidecarSupervisor {
       console.warn(
         "[agent-sidecar:srt] platform not supported by sandbox-runtime — " +
           "starting agent sidecar WITHOUT srt wrap. Tracked in " +
-          "docs/wg/desktop/agent-sandbox-wrap.md"
+          "desktop/docs/agent-authority.md"
       );
       this.sandboxReady = true;
       return;
@@ -179,12 +264,10 @@ class AgentSidecarSupervisor {
       // (e.g. "bwrap not found in PATH"). Letting it throw means
       // one error path, not two.
     }
-    const policy = buildAgentDaemonSandboxPolicy({
-      user_data: this.user_data_path,
+    const policy = DesktopAgentSandboxPolicy.build({
+      userData: this.user_data_path,
       home: app.getPath("home"),
-      // GRIDA-SEC-006 — without this, the srt egress allowlist 403s the
-      // grida hosted provider's calls to the editor origin.
-      gg_host: new URL(EDITOR_BASE_URL).hostname,
+      ggHost: new URL(EDITOR_BASE_URL).hostname,
     });
     await ensureInitialized({
       network: {
@@ -228,7 +311,20 @@ class AgentSidecarSupervisor {
     return undefined;
   }
 
-  private async spawn(): Promise<AgentSidecarInfo> {
+  private spawn(): Promise<AgentSidecarInfo> {
+    if (this.info) return Promise.resolve(this.info);
+    if (this.spawning) return this.spawning;
+    const pending = this.spawnOne();
+    this.spawning = pending;
+    const clear = () => {
+      if (this.spawning === pending) this.spawning = null;
+    };
+    void pending.then(clear, clear);
+    return pending;
+  }
+
+  private async spawnOne(): Promise<AgentSidecarInfo> {
+    const generation = ++this.nextGeneration;
     const scriptPath = this.sidecarScriptPath();
     const password = crypto.randomBytes(32).toString("base64url");
 
@@ -268,14 +364,22 @@ class AgentSidecarSupervisor {
       );
       wrappedCmd = await wrap(cmd);
     }
+    if (generation !== this.nextGeneration || this.isShuttingDown) {
+      throw new Error("agent sidecar startup was cancelled");
+    }
 
     return await new Promise<AgentSidecarInfo>((resolve, reject) => {
       let resolved = false;
+      let child: ChildProcess;
+      // Per-spawn ownership: an old child's delayed `exit` must never close or
+      // clear the network host belonging to a newer generation.
+      let spawnNetworkHost: AgentNetworkHost | null = null;
+      let spawnDaemonSocketHost: AgentDaemonSocketHost | null = null;
       const timeout = setTimeout(() => {
         if (resolved) return;
         resolved = true;
         this.note("sup", "startup timed out; stopping child", "warn");
-        this.stop();
+        this.retireGeneration(child, generation, true);
         reject(new Error("agent sidecar startup timed out"));
       }, STARTUP_TIMEOUT_MS);
 
@@ -287,15 +391,15 @@ class AgentSidecarSupervisor {
       //    `main/sandbox/policy.ts`'s allowlist actually lives). If
       //    we let the launching shell's proxy env leak through, it
       //    races with srt's values — and on some macOS shells the
-      //    inherited value wins, which routes the sidecar's BYOK
-      //    calls through a localhost proxy that has no idea about
-      //    `openrouter.ai`. Concrete failure mode: launching Grida
+      //    inherited value wins. Trusted provider calls now use the private
+      //    host transport, but non-provider sidecar traffic still relies on
+      //    srt's proxy and must not inherit a competing outer proxy. Launching Grida
       //    from a sandbox shell (Claude Code, mitmproxy session,
       //    corporate VPN client) ends up with the sidecar talking to
       //    that outer sandbox's proxy instead of Grida's own.
       //
       // 2. With the strip in place, srt is the only source of truth
-      //    for the sidecar's proxy env. `agent-sidecar.ts` then sets an
+      //    for the remaining sidecar proxy env. `agent-sidecar.ts` then sets an
       //    `EnvHttpProxyAgent` as undici's global dispatcher so
       //    Node's fetch actually routes through that proxy — without
       //    the dispatcher, the env vars do nothing because undici v6+
@@ -325,45 +429,82 @@ class AgentSidecarSupervisor {
         ...cleanedEnv,
         ELECTRON_RUN_AS_NODE: "1",
       };
-      const child = supportedSandbox
+      child = supportedSandbox
         ? spawn(wrappedCmd!, {
             shell: true,
             env: childEnv,
-            stdio: ["pipe", "pipe", "pipe"],
+            stdio: ["pipe", "pipe", "pipe", "ipc"],
           })
         : spawn(process.execPath, args, {
             shell: false,
             env: childEnv,
-            stdio: ["pipe", "pipe", "pipe"],
+            stdio: ["pipe", "pipe", "pipe", "ipc"],
           });
       this.child = child;
+      this.activeGeneration = generation;
       this.note(
         "sup",
         `spawned pid=${child.pid ?? "?"} sandbox=${supportedSandbox ? "srt" : "none"}`
       );
-      child.stdin?.end(`${password}\n`);
+      if (!child.stdin || !child.stdout || !child.send || !child.connected) {
+        resolved = true;
+        clearTimeout(timeout);
+        this.retireGeneration(child, generation, true);
+        reject(new Error("agent sidecar stdio channel unavailable"));
+        return;
+      }
 
-      child.stdout?.on("data", (chunk: Buffer) => {
-        const text = chunk.toString("utf8");
-        for (const line of text.split("\n")) {
-          const trimmed = line.trim();
-          if (trimmed.length === 0) continue;
-          if (trimmed.startsWith(PORT_LINE_PREFIX)) {
-            const port = Number(trimmed.slice(PORT_LINE_PREFIX.length));
-            if (Number.isFinite(port) && port > 0 && port < 65536) {
-              this.info = { port, password };
-              this.restartBackoffMs = BACKOFF_INITIAL_MS;
-              this.note("sup", `listening port=${port}`);
-              if (!resolved) {
-                resolved = true;
-                clearTimeout(timeout);
-                resolve(this.info);
-              }
-            }
-          } else {
-            this.note("out", trimmed);
-          }
+      // Stdout is protocol-only; stderr below is the sole log channel.
+      // Set the ready waiter before bootstrap so a very fast sidecar cannot
+      // race its structured ready frame past the listener.
+      const failSpawnChannel = (label: string, error: Error) => {
+        if (!this.isCurrentGeneration(child, generation)) return;
+        this.note("sup", `${label} failed: ${error.message}`, "error");
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          reject(new Error(`agent sidecar ${label} failed`));
         }
+        this.retireGeneration(child, generation, true);
+      };
+      void (async () => {
+        const daemonSocketHost = new AgentDaemonSocketHost(child, (error) =>
+          failSpawnChannel("daemon capability channel", error)
+        );
+        spawnDaemonSocketHost = daemonSocketHost;
+        const daemonPort = await daemonSocketHost.listen();
+        const capabilityReady = daemonSocketHost.waitForCapabilityReady();
+        const host = await AgentNetworkHost.create({
+          input: child.stdout!,
+          output: child.stdin!,
+          authority: this.networkAuthority,
+          onFatal: (error) => failSpawnChannel("provider channel", error),
+        });
+        spawnNetworkHost = host;
+        if (!this.isCurrentGeneration(child, generation) || resolved) {
+          daemonSocketHost.close();
+          host.close();
+          return;
+        }
+        this.daemonSocketHost = daemonSocketHost;
+        this.networkHost = host;
+        const ready = host.waitForReady();
+        await host.bootstrap(password, daemonPort);
+        const readyPort = await ready;
+        await capabilityReady;
+        if (!this.isCurrentGeneration(child, generation) || resolved) return;
+        daemonSocketHost.markReady(readyPort);
+        this.info = { port: daemonPort, password };
+        this.restartBackoffMs = BACKOFF_INITIAL_MS;
+        this.note("sup", `ready main-owned port=${daemonPort}`);
+        resolved = true;
+        clearTimeout(timeout);
+        resolve(this.info);
+      })().catch((error) => {
+        failSpawnChannel(
+          "provider channel startup",
+          error instanceof Error ? error : new Error(String(error))
+        );
       });
 
       child.stderr?.on("data", (chunk: Buffer) => {
@@ -380,16 +521,28 @@ class AgentSidecarSupervisor {
           `exited code=${code}${signal ? ` signal=${signal}` : ""}`,
           "warn"
         );
+        spawnDaemonSocketHost?.close();
+        if (this.daemonSocketHost === spawnDaemonSocketHost) {
+          this.daemonSocketHost = null;
+        }
+        spawnNetworkHost?.close();
+        if (this.networkHost === spawnNetworkHost) this.networkHost = null;
+        // `stop()` may already have started a replacement while this child was
+        // taking its graceful-shutdown second. The old generation owns no
+        // current supervisor state and must not clear or restart the new one.
+        if (!this.isCurrentGeneration(child, generation)) return;
         this.info = null;
         this.child = null;
+        this.activeGeneration = 0;
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
           reject(
             new Error(
-              `agent sidecar exited before listening (code=${code} signal=${signal ?? "none"})`
+              `agent sidecar exited before readiness (code=${code} signal=${signal ?? "none"})`
             )
           );
+          this.scheduleRestart();
           return;
         }
         if (this.isShuttingDown) return;
@@ -404,12 +557,47 @@ class AgentSidecarSupervisor {
           resolved = true;
           clearTimeout(timeout);
           this.note("sup", `spawn failed: ${err.message}`, "error");
+          this.retireGeneration(child, generation, true);
           reject(new Error(`agent sidecar spawn failed: ${err.message}`));
         } else {
           this.note("sup", `spawn error: ${err.message}`, "error");
         }
       });
     });
+  }
+
+  private isCurrentGeneration(
+    child: ChildProcess,
+    generation: number
+  ): boolean {
+    return this.child === child && this.activeGeneration === generation;
+  }
+
+  private closeCurrentHosts(): void {
+    this.networkHost?.close();
+    this.networkHost = null;
+    this.daemonSocketHost?.close();
+    this.daemonSocketHost = null;
+  }
+
+  private retireGeneration(
+    child: ChildProcess,
+    generation: number,
+    restart: boolean
+  ): void {
+    if (!this.isCurrentGeneration(child, generation)) return;
+    this.closeCurrentHosts();
+    this.info = null;
+    // Clear ownership before kill: a synchronous/mock exit and a delayed real
+    // exit are both stale and cannot clear or restart a replacement.
+    this.child = null;
+    this.activeGeneration = 0;
+    try {
+      child.kill("SIGTERM");
+    } catch {
+      // already dead
+    }
+    if (restart && !this.isShuttingDown) this.scheduleRestart();
   }
 
   private handleRestartFailure(err: unknown): void {
@@ -424,10 +612,8 @@ class AgentSidecarSupervisor {
   /**
    * Schedule a single backoff restart. Idempotent: if a restart timer is
    * already pending (or we're shutting down) this is a no-op. That dedup is
-   * load-bearing — the startup-timeout path triggers BOTH a rejected respawn
-   * promise (→ handleRestartFailure) AND the SIGTERM'd child's `exit` event,
-   * and without it both would schedule a timer and spawn two concurrent
-   * sidecars (one leaked, since only the second is tracked in `this.child`).
+   * load-bearing: startup rejection, transport retirement, and a real child
+   * exit can converge on the same recovery edge.
    */
   private scheduleRestart(): void {
     if (this.isShuttingDown || this.restartTimer) return;
@@ -437,6 +623,7 @@ class AgentSidecarSupervisor {
     this.restartTimer = setTimeout(() => {
       this.restartTimer = null;
       if (this.isShuttingDown) return;
+      if (this.child || this.info || this.spawning) return;
       this.spawn().catch((err) => this.handleRestartFailure(err));
     }, wait);
   }
@@ -468,4 +655,28 @@ export function getAgentSidecarInfo(): AgentSidecarInfo | null {
 
 export function stopAgentSidecar() {
   supervisor.stop();
+}
+
+export async function approveAgentProviderEndpoint(
+  id: string,
+  baseUrl: string
+): Promise<void> {
+  await supervisor.approveProviderEndpoint(id, baseUrl);
+}
+
+export async function revokeAgentProviderEndpoint(id: string): Promise<void> {
+  await supervisor.revokeProviderEndpoint(id);
+}
+
+export async function withTemporaryAgentProviderEndpoint<T>(
+  baseUrl: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  return await supervisor.withTemporaryProviderEndpoint(baseUrl, operation);
+}
+
+export async function describeAgentProviderEndpoint(
+  baseUrl: string
+): Promise<{ origin: string; route: string }> {
+  return await supervisor.describeProviderEndpoint(baseUrl);
 }

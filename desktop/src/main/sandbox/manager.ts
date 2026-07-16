@@ -18,8 +18,7 @@
  *      forwards events to `console.error` with an `[agent-sidecar:srt]`
  *      prefix. On Linux the store is empty (no system-log tap);
  *      violations only surface via the child's `EPERM`-induced
- *      crash + restart-loop stderr, as documented in
- *      `docs/wg/desktop/agent-sandbox-wrap.md`.
+ *      crash + restart-loop stderr.
  *
  * Why a wrapper and not direct calls in the supervisor: tests can
  * stub this surface while the policy intent lives in `@grida/daemon` (+ the AI hosts in `@grida/agent/sandbox`).
@@ -101,13 +100,14 @@ export async function dispose(): Promise<void> {
 }
 
 /**
- * Whether the host platform is supported by srt. On Windows this
- * returns false; callers should fall back to running the agent sidecar
- * unwrapped (with a documented warning) until the Windows backend
- * lands upstream.
+ * Whether the Desktop integration supports the host platform. srt 0.0.65 has
+ * an alpha Windows backend, but it requires a different argv-based spawn and
+ * one-time machine provisioning. Keep it deliberately withheld until Desktop
+ * owns that lifecycle; dependency support alone must not silently widen the
+ * shipping platform contract.
  */
 export function isSupportedPlatform(): boolean {
-  return SandboxManager.isSupportedPlatform();
+  return process.platform !== "win32" && SandboxManager.isSupportedPlatform();
 }
 
 /**

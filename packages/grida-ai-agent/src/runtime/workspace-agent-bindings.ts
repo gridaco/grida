@@ -37,6 +37,7 @@ import {
   SCAN_MAX_FILES,
 } from "@grida/daemon/server";
 import type { Workspace, WorkspaceRegistry } from "@grida/daemon/server";
+import type { ProviderHttp } from "../providers/http";
 
 export type WorkspaceAgentBindingRequest = {
   workspace_root?: string;
@@ -135,6 +136,8 @@ export async function createWorkspaceAgentBindings(
      *  signed-in keyless user through the hosted provider. */
     gg?: import("../providers/gg-session").GridaGatewaySessionStore;
     gg_base_url?: string;
+    /** Provider HTTP used only inside the image-generator closure. */
+    provider_http?: ProviderHttp;
     /**
      * Whether the host enables image generation (its `images` server
      * capability). With it off, no `generate_image` binding is built — the host
@@ -258,6 +261,7 @@ export async function createWorkspaceAgentBindings(
       secrets,
       gg: deps.gg,
       gg_base_url: deps.gg_base_url,
+      provider_http: deps.provider_http,
     };
     if (await hasUsableImageProvider(imageDeps)) {
       image_gen = createImageGenerator(

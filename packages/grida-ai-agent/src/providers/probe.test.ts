@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { probeEndpointModels, type ProbeFetch } from "./probe";
 
 /** Fake fetch keyed by URL; POSTs may key on `url body.model`. */
@@ -102,8 +102,70 @@ describe("probeEndpointModels", () => {
     expect(result.error).toMatch(/is the server running/);
   });
 
+  it("cancels every non-success response before treating it as no answer", async () => {
+    const cancellations: Array<ReturnType<typeof vi.fn>> = [];
+    const result = await probeEndpointModels(BASE, async () => {
+      const cancel = vi.fn<(reason?: unknown) => void>();
+      cancellations.push(cancel);
+      return new Response(
+        new ReadableStream<Uint8Array>({ pull() {}, cancel }),
+        { status: 503 }
+      );
+    });
+
+    expect(result.ok).toBe(false);
+    expect(cancellations).toHaveLength(2);
+    expect(
+      cancellations.every((cancel) => cancel.mock.calls.length === 1)
+    ).toBe(true);
+  });
+
+  it("cancels a declared-oversize response before reading it", async () => {
+    const cancel = vi.fn<(reason?: unknown) => void>();
+    const result = await probeEndpointModels(BASE, async (url) => {
+      if (url.endsWith("/api/tags")) {
+        return new Response(
+          new ReadableStream<Uint8Array>({ pull() {}, cancel }),
+          {
+            status: 200,
+            headers: { "content-length": "1048577" },
+          }
+        );
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    expect(result.ok).toBe(false);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("cancels a streamed response as soon as it crosses the byte bound", async () => {
+    const cancel = vi.fn<(reason?: unknown) => void>();
+    const result = await probeEndpointModels(BASE, async (url) => {
+      if (url.endsWith("/api/tags")) {
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new Uint8Array(1_048_577));
+            },
+            cancel,
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    expect(result.ok).toBe(false);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it("rejects non-http(s) and malformed base URLs", async () => {
-    for (const url of ["file:///etc/passwd", "not a url"]) {
+    for (const url of [
+      "file:///etc/passwd",
+      "not a url",
+      "https://user:password@example.com/v1",
+    ]) {
       const result = await probeEndpointModels(url, fakeFetch({}));
       expect(result.ok).toBe(false);
     }

@@ -17,6 +17,7 @@ import { TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models";
 import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
 import type { GridaGatewaySessionStore } from "./gg-session";
+import { ProviderHttp } from "./http";
 
 const MODEL_BY_TIER: Record<ModelTier, TierModelId> = TIER_MODEL_IDS;
 
@@ -75,7 +76,8 @@ export async function throwOnGgHttpError(res: Response): Promise<void> {
 
 export function makeGridaGatewayFactory(
   session: GridaGatewaySessionStore,
-  baseUrl: string
+  baseUrl: string,
+  providerHttp: ProviderHttp = new ProviderHttp()
 ): ModelFactory {
   const provider = createOpenAICompatible({
     name: "gg",
@@ -86,7 +88,7 @@ export function makeGridaGatewayFactory(
     fetch: (async (input: string | URL | Request, init?: RequestInit) => {
       const headers = new Headers(init?.headers);
       headers.set("authorization", `Bearer ${readGgToken(session)}`);
-      const response = await fetch(input, { ...init, headers });
+      const response = await providerHttp.request(input, { ...init, headers });
       // 401/402 → typed errors; everything else passes through to the SDK's
       // own handling (already downgraded before reaching the renderer).
       await throwOnGgHttpError(response);
