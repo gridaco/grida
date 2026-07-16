@@ -14,6 +14,7 @@ import {
   createWorkspaceAgentBindings,
   WorkspaceAgentFsBackend,
 } from "./workspace-agent-bindings";
+import { ProviderHttp } from "../providers/http";
 
 const symlinkIt = process.platform === "win32" ? it.skip : it;
 
@@ -217,6 +218,98 @@ describe("agent workspace bindings", () => {
 
     expect(response.status).toBe(200);
     expect(modelFactory).toHaveBeenCalled();
+  });
+
+  it("routes AI SDK URL-part downloads through public download only", async () => {
+    // A model with no supported URL patterns makes the AI SDK lower the file
+    // URL to bytes before inference. That hidden download must use the public
+    // operation and must never enter the credential-bearing request operation.
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const request = vi.fn<typeof globalThis.fetch>(async () => {
+      throw new Error("URL-part download used provider request");
+    });
+    const download = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(png, {
+          status: 200,
+          headers: { "content-type": "image/png" },
+        })
+    );
+    const providerHttp = new ProviderHttp({ request, download });
+    const model = new MockLanguageModelV3({
+      provider: "openrouter",
+      modelId: "openai/gpt-5.4-nano",
+      supportedUrls: {},
+      doStream: {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "stream-start", warnings: [] },
+            { type: "text-start", id: "t" },
+            { type: "text-delta", id: "t", delta: "ok" },
+            { type: "text-end", id: "t" },
+            {
+              type: "finish",
+              finishReason: { unified: "stop", raw: "stop" },
+              usage: {
+                inputTokens: {
+                  total: 1,
+                  noCache: 1,
+                  cacheRead: undefined,
+                  cacheWrite: undefined,
+                },
+                outputTokens: {
+                  total: 1,
+                  text: 1,
+                  reasoning: undefined,
+                },
+              },
+            },
+          ],
+        }),
+      },
+    });
+
+    const response = await runAgent(
+      {
+        provider_id: "openrouter",
+        kind: "byok",
+        model_factory: () => model,
+      },
+      {
+        messages: [
+          {
+            id: "m-url-part",
+            role: "user",
+            parts: [
+              { type: "text", text: "inspect" },
+              {
+                type: "file",
+                mediaType: "image/png",
+                url: "https://cdn.example/reference.png",
+              },
+            ],
+          },
+        ] as never,
+        tier: AGENT_DEFAULT_TIER,
+        signal: new AbortController().signal,
+      },
+      { workspace_registry: fixture.registry, provider_http: providerHttp }
+    );
+    await response.text();
+
+    expect(download).toHaveBeenCalledOnce();
+    expect(String(download.mock.calls[0]?.[0])).toBe(
+      "https://cdn.example/reference.png"
+    );
+    expect(request).not.toHaveBeenCalled();
+    const user = model.doStreamCalls[0]?.prompt.find(
+      (message) => message.role === "user"
+    );
+    expect(user?.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "file", data: png }),
+      ])
+    );
   });
 
   it("forwards camelCase SDK step usage to on_step_usage as snake_case (regression: usage was silently zeroed)", async () => {

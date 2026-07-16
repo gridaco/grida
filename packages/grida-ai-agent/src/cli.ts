@@ -541,6 +541,11 @@ async function createHost(
     // deliberately opts into the shell rather than fail-closed. The desktop
     // host, by contrast, only enables shell when srt actually wraps it.
     allow_unsandboxed_shell: true,
+    // The CLI is itself the user's local power tool. Preserve its existing ACP
+    // process behavior explicitly; `enabled` is host authorization and makes
+    // no sandbox/containment claim. Sandboxed hosts can choose `sandboxed`, and
+    // Desktop withholds ACP through `disabled`.
+    external_agent_execution: "enabled",
     // The locked `question` tool pauses for a human only when this host serves
     // a UI (the `serve` daemon driven by the desktop-from-web bridge). A
     // throwaway embedded host (one-shot `run`) is headless → fixed refusal.

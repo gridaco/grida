@@ -287,15 +287,21 @@ become public the moment they're shipped. Always go through
 **What it protects.** The Grida Desktop V1 ships a local daemon
 sidecar (Node subprocess of the Electron app) that owns the user's BYOK
 keys (OpenRouter, Vercel AI Gateway), local file paths, chat sessions,
-and AI agent loops. The daemon listens
-on `127.0.0.1:<random-port>` and is the canonical local capability
-surface for the renderer. If anything other than the legitimate
+and AI agent loops. Electron main listens on an ephemeral
+`127.0.0.1` port and transfers only accepted connected sockets to the
+socketless sidecar, whose authenticated daemon protocol is the canonical local
+capability surface for the renderer. If anything other than the legitimate
 Electron renderer reaches it — another browser tab on grida.co, a
 local malware process, a same-origin XSS payload — that party can
 exfiltrate secrets, read/write the user's files, and bill AI calls.
 The boundary is the rule that **only requests originating from the
 desktop's privileged renderer at a `/desktop/*` path, signed with
-the per-spawn Basic Auth token, may reach the daemon.**
+the per-spawn Basic Auth token, may reach the daemon, and only the
+main-owned provider transport may carry the daemon's provider HTTP outside
+its sandbox. Electron main owns the exact loopback listener; AgentSidecar
+receives no listener, and the macOS/Linux sandbox grants it no generic
+bind/connect authority. Windows does not yet satisfy that containment
+clause; its current nonconformance is recorded below.**
 
 **Package shape (#927).** The perimeter and the host capability routes
 (files, recents, workspaces, the secrets store) are owned by
@@ -333,8 +339,8 @@ embed → context-isolation-disabled → RCE chain). Industry precedent
 Access permission) confirms the threat is real and the mitigation
 shape is standard.
 
-**How the code prevents it.** Composed of five layers; any single
-layer is insufficient.
+**How the code prevents it.** Composed of mutually reinforcing controls; any
+single control is insufficient.
 
 1. **Path-scoped preload** — the bridge in
    [desktop/src/preload.ts](desktop/src/preload.ts) installs
@@ -362,7 +368,7 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    keys. We chose nonce + `'strict-dynamic'` over `'unsafe-inline'`
    because `/desktop/*` was already dynamic-rendered (bridge gate is
    client-only) — the dynamic-rendering cost most Next.js teams pay
-   for nonce CSP is a cost we already pay, so layer 5 stays
+   for nonce CSP is a cost we already pay, so this control stays
    load-bearing at zero additional maintenance.
 
    **For maintainers:** if you add inline scripts to a `/desktop/*`
@@ -376,9 +382,21 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
 
 3. **Per-request Basic Auth** — the daemon rejects any request without
    `Authorization: Basic <base64("agent:<password>")>`. Password is a
-   random 256-bit value generated per sidecar spawn. Electron main sends it
-   to the sidecar over stdin and serves it to preload only through guarded IPC;
-   it is never placed on argv, env, disk, or `window.grida`.
+   random 256-bit value generated per sidecar spawn. Electron main sends it in
+   the private, versioned stdin bootstrap frame and serves it to preload only
+   through guarded IPC; it is never placed on argv, env, disk, or
+   `window.grida`.
+
+   Electron main owns the exact `127.0.0.1:<ephemeral>` listener. Each
+   loopback connection is accepted paused and transferred as an
+   already-connected socket over the per-spawn Node IPC descriptor.
+   AgentSidecar starts `DaemonServer` without a listener and can serve only
+   that transferred connection: it receives no listener, destination field,
+   bind operation, or connect operation. The descriptor is therefore a socket
+   capability channel, not a second daemon protocol. This keeps
+   `allow_local_binding: false` in the sidecar's `srt` profile and preserves
+   the main-owned loopback port across Bubblewrap's private Linux network
+   namespace.
 
    **Daemon mode (#798).** When the daemon runs as a registered local
    daemon (`grida-agent serve --register`; WG spec
@@ -414,47 +432,83 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    [desktop/src/preload.ts](desktop/src/preload.ts) exposes only
    `secrets.has/set/delete`. Agent server code reads keys internally when calling
    the BYOK provider; key material never returns to renderer. Closes
-   the exfil path even if all four layers above were bypassed.
+   the exfil path even if all preceding controls were bypassed.
+
+6. **Host-routed provider HTTP (#974)** — `@grida/agent` accepts two explicit,
+   construction-time HTTP operations: authenticated provider requests and
+   credential-free provider-asset downloads. Desktop implements them over the
+   sidecar's inherited stdin/stdout using a strict length-prefixed protocol;
+   stdout is protocol-only and stderr is logs. Electron main executes requests
+   through a dedicated, non-persistent Chromium `Session` in system-proxy mode.
+   It revalidates the host-issued grant, method, exact/suffix origin, headers,
+   body bounds, and every redirect; response bytes move only against explicit
+   credit and aborts propagate both ways. The download lane contains only
+   enumerated provider-owned namespaces — there is no arbitrary public-URL
+   grant.
+   There is no renderer broker method, loopback proxy, socket path, or
+   environment credential. When this transport is enabled, the outer `srt`
+   policy omits BYOK/GG destinations, so missing provider wiring cannot fall
+   back to direct sidecar egress. Electron main transiently observes provider
+   request headers and bodies while transporting them, but never persists,
+   returns, or logs credentials or bodies; credential ownership and injection
+   remain in the sidecar's provider layer.
+
+   Chromium supplies the operating system's effective proxy/PAC, VPN, DNS, and
+   platform-trust behavior. Cached or integrated proxy authentication remains
+   eligible; Desktop does not collect proxy usernames/passwords, so an
+   interactive proxy challenge fails closed with a specific diagnostic. This
+   is route compatibility, not a censorship-circumvention tunnel: no route is
+   created when Chromium and the operating system have none.
 
 **Endpoint providers (local LLMs, #806).** The agent tenant additionally
 serves `/providers/endpoints/*` — CRUD over user-configured
 OpenAI-compatible endpoints (Ollama preset, self-hosted gateways),
-persisted at `${userData}/endpoints.json`. The split that keeps layer 5
-intact: an endpoint **config** (base URL + registered model list) is
+persisted at `${userData}/endpoints.json`. The split that keeps the secrets
+discipline intact: an endpoint **config** (base URL + registered model list) is
 plain readable config the renderer may list back, while an endpoint's
 optional **API key** rides the `/secrets/*` surface under the endpoint's
 id (the secrets-route allowlist admits configured endpoint ids) and is
 never readable. The config validator
 (`packages/grida-ai-agent/src/protocol/endpoints.ts`) pins the shape —
-http(s) URL, bounded sizes, unknown fields dropped — so a config write
-cannot smuggle credentials or blobs into the readable store. The
-`base_url` is user-owned egress by design (the desktop user points their
-own agent at their own endpoint — same trust model as BYOK), and the
-routes sit behind the same CORS/Referer/Basic-Auth stack as everything
-else. The `/providers/endpoints/probe` route makes the host GET a
+http(s) URL with no URL userinfo, bounded sizes, unknown fields dropped — so a
+config write cannot smuggle credentials or blobs into the readable store.
+`base_url` is user-owned egress by design, but renderer configuration is not
+network authority: Desktop routes set/delete/probe through guarded main IPC,
+shows the canonical exact origin and route posture in a native confirmation,
+and mints a memory-only grant only after approval. Only `localhost`, subdomains
+of `.localhost`, and IP literals are currently eligible, always as exact
+origins. Remote hostnames — including `.local` names — remain withheld because
+the current Chromium connector cannot atomically bind proxy/PAC selection and
+DNS resolution to one authorization decision. Existing configured endpoints
+require the same approval on each
+launch; changing or deleting an endpoint revokes its old grant. The routes sit
+behind the same CORS/Referer/Basic-Auth stack as everything else. The
+`/providers/endpoints/probe` route makes the host GET a
 user-supplied URL's model listing (the renderer's grida.co origin cannot
 reach a local Ollama itself) — the same egress a configured run already
 performs; responses are parsed and reduced to
 `{id, tool_call, contextWindow}` rows with bounded reads (timeout + size
-cap), never proxied raw. On sandboxed
-platforms the srt network policy additionally bounds all of this
-structurally: outbound to **localhost** is permitted via the
-`allowLocalBinding` local-ip rule (how the user's own `ollama serve` is
-reached), while a config pointing at an arbitrary **remote** host is
-blocked unless that host is in the enumerated `allowed_domains` — a
-hostile config cannot turn the sidecar into an open exfil channel.
+cap), never proxied raw. The host transport permits an eligible local endpoint
+only through that explicit exact-origin grant; it does not turn endpoint
+config into a generic proxy.
 
-**Agent providers (external agents, #813).** When the host drives an
+**Agent providers (external agents, #813).** The reusable agent package can
+drive an
 EXTERNAL agent that owns its own loop (Claude Code via
 `@anthropic-ai/claude-agent-sdk`), that agent makes its own outbound auth +
 inference calls to its vendor. Those vendor hosts (Anthropic:
 `api.anthropic.com` incl. `/api/oauth/claude_cli/*`, `*.anthropic.com`,
 `claude.ai`) are added to the same enumerated `allowed_domains` allowlist as
 the BYOK provider hosts (`sandbox/policy.ts` `AGENT_PROVIDER_NETWORK_HOSTS`) —
-NOT a `*` opening. The external agent still runs tools/shell in the workspace
-under the same srt confinement, so its egress stays bounded to its legitimate
-vendor endpoints; this is the same trust model as a BYOK provider host (the
-provider sees the conversation by design), not a new exfil class.
+NOT a `*` opening. Desktop explicitly sets `external_agent_execution:
+"disabled"`: the ACP subprocess cannot consume the host-routed provider
+transport or prove system-route compatibility, so it is unavailable even on a
+sandboxed macOS/Linux launch. Reusable-package hosts choose an explicit
+`external_agent_execution` posture: `"sandboxed"` requires
+`sandbox_enforced === true` at HTTP preflight and immediately before spawn;
+`"disabled"` withholds ACP; and the compatibility default `"enabled"` makes no
+containment claim. A host that relies on the default is deliberately accepting
+unsandboxed external-agent execution; Desktop does not.
 
 **Electron-side hardening (mandatory; see the
 [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security)).**
@@ -517,13 +571,17 @@ the secret-dir guard below) does not exist yet and is the deferred hardening.
 - **Network (allow-only, enumerated).** `srt` denies all outbound except a
   host-set domain allowlist and **forbids `*` / broad patterns by design** —
   its structural sandbox is also its network sandbox, so there is no "open
-  network." The allowlist is composed along the #927 seam: the daemon frame
-  contributes the curated dev-network set (package registries, git hosts —
-  `packages/grida-daemon/src/sandbox/policy.ts`) and the agent tenant
-  contributes the AI upstream hosts (BYOK providers + external-agent
-  vendors — `packages/grida-ai-agent/src/sandbox/policy.ts`,
-  `buildAgentDaemonSandboxPolicy`), so the agent can install deps, fetch
-  code, and reach its providers.
+  network." Desktop passes `direct_network_access: "none"` plus
+  `host_routed_provider_http: true`. The first omits the daemon development
+  baseline and agent/external-vendor destinations; the second documents that
+  in-process provider/GG traffic uses the host transport. In the enforced
+  macOS/Linux profile, pinned srt 0.0.65 receives an empty direct external
+  allowlist and `allow_local_binding` is false. The daemon remains reachable because Electron
+  main owns the loopback listener and transfers only accepted connected
+  sockets; the wrapped sidecar receives no generic local-connect authority.
+  Windows currently lacks that kernel egress fence. CLI and other hosts retain
+  the package's allowlisted defaults unless they explicitly choose the same
+  strict construction mode.
 
 - **Fail-closed exposure (no sandbox ⇒ no shell).** The shell tool is not
   registered at all unless the host affirms containment. The decision is
@@ -532,8 +590,9 @@ the secret-dir guard below) does not exist yet and is the deferred hardening.
   `sandbox_enforced || allow_unsandboxed_shell` and threaded to the tool
   registry; the default is off. The desktop supervisor sets `sandbox_enforced`
   true only when it actually wrapped the sidecar spawn with `srt`, so on
-  platforms `srt` cannot wrap (Windows today) the agent gets fs/todos/skills
-  but **no** `run_command`. The `grida-agent` CLI — a local, user-invoked tool
+  platforms where Desktop does not enable the wrapper (Windows today) the agent
+  gets fs/todos/skills but **no** `run_command` and no external ACP agent. The
+  `grida-agent` CLI — a local, user-invoked tool
   with no OS sandbox — sets the explicit `allow_unsandboxed_shell` opt-in
   instead, which logs a warning. New privileged tools added later inherit the
   same gate: a capability that needs containment is born behind this switch,
@@ -555,13 +614,14 @@ the secret-dir guard below) does not exist yet and is the deferred hardening.
   top-level argv, so an interpreter or shell (`bash -c`, `python3 -c`) reachable
   in `auto` can read `userData` by a computed path. Closing that for the shell
   _child_ needs the kernel-level per-call `deny_read` (the deferred per-command
-  sub-policy); until then the network allowlist + the key being the user's own
-  provider credential bound the exfil. The fs-edit tools (`read_file`) remain
-  workspace-scoped and never serve `userData`.
+  sub-policy). Desktop's empty direct external allowlist blocks network
+  exfiltration from that child, but does not make the in-process read itself
+  acceptable. The fs-edit tools (`read_file`) remain workspace-scoped and never
+  serve `userData`.
 
 - **`auto` is informed-consent.** `auto` removes command-identity gating; the
-  sandbox still bounds the blast radius (writes confined to writable roots, the
-  enumerated network), but it does not judge _intent_ — an injected or confused
+  sandbox still bounds the blast radius (writes confined to writable roots,
+  direct external network denied), but it does not judge _intent_ — an injected or confused
   agent can read broadly and run anything within those bounds. Restoring intent
   judgment is the classifier/watchdog layer, named and deferred. `auto` is
   opt-in; the default `accept-edits` keeps a read-only-only shell.
@@ -601,10 +661,11 @@ webview cookie jar. Files registered under this record for that work
 `packages/grida-ai-agent/src/providers/{gg-session,gg,gg-media}.ts`,
 `src/http/routes/gg-auth.ts`, the `gg` arms in
 `src/providers/{index,resolve-image,resolve-video}.ts`, and the
-`gg_host` egress option in `src/sandbox/policy.ts` (the daemon
-may reach the configured editor origin — and nothing else new). The
-main process still holds no cloud credentials, and entitlement
-enforcement stays server-side (the hosted endpoints gate + meter).
+`gg_host` egress option in `src/sandbox/policy.ts` (used only by hosts without
+host-routed provider HTTP). Electron main transports GG requests and can
+transiently observe the scoped bearer header, but does not retain, persist,
+return, or log it; steady-state token custody remains in the sidecar.
+Entitlement enforcement stays server-side (the hosted endpoints gate + meter).
 
 **Update channel.** Release builds must be signed/notarized by platform
 policy. Security-sensitive runtime deps are reviewed as part of the
@@ -664,10 +725,11 @@ registry writes nothing but the directory, so the earlier manifest-injection
 surface is removed outright rather than field-constrained — whatever document
 the workspace eventually holds is created by the AGENT through its own
 already-bound (and separately-gated) fs write capability, not by this route.
-The sidecar's own `fs` writes are not srt-confined (srt wraps only the
-`run_command` shell child), and a created project registers as a workspace root
-the shell fs-policy already unions — so this adds no new reachable root for the
-sandboxed shell. `workspaces.create.test.ts` pins traversal-name containment,
+The sidecar's own `fs` writes and every child process are inside the same coarse
+whole-sidecar `srt` profile; no narrower per-command filesystem profile exists
+yet. A created project becomes an in-process workspace root for structured
+tools, while shell cwd authorization is checked separately by the runner.
+`workspaces.create.test.ts` pins traversal-name containment,
 that the created project is empty (an unexpected `seed` body is inert), and the
 no-managed-root refusal.
 
@@ -723,18 +785,24 @@ Today:
 - [packages/grida-desktop-bridge/src/index.ts](packages/grida-desktop-bridge/src/index.ts) — renderer-safe bridge protocol and DTO vocabulary.
 - `desktop/src/bridge/contract.ts` — Desktop-local IPC channel vocabulary plus re-export of the renderer-safe bridge contract.
 - `desktop/src/window.ts` — blocks exposed desktop windows from navigating outside `/desktop/*`; injects non-secret preload arguments.
-- `desktop/src/agent-sidecar.ts` — sidecar entrypoint; constructs the composed agent daemon (`createAgentDaemon`).
-- `desktop/src/main/agent-sidecar-supervisor.ts` — generates per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported (`srt` is not available on Windows yet).
+- `desktop/src/agent-sidecar.ts` — sidecar entrypoint; constructs the composed agent daemon (`createAgentDaemon`) in socketless mode and accepts only main-transferred daemon sockets.
+- `desktop/src/agent-sidecar-daemon-sockets.ts` — injects only validated, already-connected socket capabilities into the unbound HTTP server; it exposes no listen, bind, connect, or target-selection operation.
+- `desktop/src/agent-sidecar-channel.ts`, `agent-network-policy.ts`, and `agent-sidecar-network.ts` — strict private stdio framing, destination/header policy, and the sidecar's explicit provider/provider-asset transport client.
+- `desktop/src/main/agent-daemon-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
+- `desktop/src/main/agent-network-host.ts` and `agent-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization, and per-spawn built-in/custom grant state.
+- `desktop/src/main/agent-sandbox-policy.ts` — binds Desktop's strict sandbox posture: empty direct external egress, host-routed provider HTTP, and no generic local bind/connect authority.
+- `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported; owns both private channels and removes direct provider hosts from the sidecar policy (Desktop deliberately withholds srt's alpha Windows backend pending a supported lifecycle).
 - `desktop/src/main/protocol-router.ts` — deep-link protocol guard; the auth callback arm is bound by GRIDA-SEC-005.
-- `desktop/src/main/ipc-handlers.ts` — validates every native IPC sender frame before executing OS capabilities.
-- `packages/grida-daemon/src/http/server.ts` — loopback HTTP app, daemon route registration, and the `DaemonTenant` seam behind shared guards; `packages/grida-ai-agent/src/server.ts` — the agent tenant that mounts the AI route groups through it.
+- `desktop/src/main/ipc-handlers.ts` — validates every native IPC sender frame before executing OS capabilities; custom endpoint set/probe/delete additionally owns the native exact-origin grant ceremony.
+- `packages/grida-daemon/src/daemon-server.ts` — lifecycle owner for the same guarded Hono app in either loopback-listening or socketless host-delivered `fetch(Request)` mode; shutdown cancels and joins active response streams.
+- `packages/grida-daemon/src/http/server.ts` — daemon route registration and the `DaemonTenant` seam behind shared guards; `packages/grida-ai-agent/src/server.ts` — the agent tenant that mounts the AI route groups through it.
 - `packages/grida-ai-agent/src/http/routes/secrets.ts` — BYOK key presence/set/delete route group; no key-read route.
 - `packages/grida-daemon/src/transport.ts` — Basic Auth signing, fetch/SSE plumbing, typed HTTP errors, and the daemon route methods; `packages/grida-ai-agent/src/transport.ts` — the agent tenant client extending it (run/stream/sessions/events, stream resume headers).
 - `packages/grida-daemon/src/http/auth.ts` — Basic Auth middleware.
 - `packages/grida-daemon/src/http/origin.ts` — Origin allowlist and host-declared Referer-path guard.
 - `packages/grida-daemon/src/auth/file.ts` — `auth.json` chmod 0o600 read/write.
 - `packages/grida-daemon/src/secrets.ts` — `auth.json`-backed BYOK key store; exposes only `has`, `set`, and `delete` to routes.
-- `packages/grida-daemon/src/sandbox/policy.ts` — daemon sandbox policy frame (secret-path denies, dev-network baseline); `packages/grida-ai-agent/src/sandbox/policy.ts` — the agent tenant's AI upstream hosts composed on top.
+- `packages/grida-daemon/src/sandbox/policy.ts` — daemon sandbox policy frame (secret-path denies and an optional development-network baseline); `packages/grida-ai-agent/src/sandbox/policy.ts` — the agent tenant's external-agent/provider policy and the Desktop construction switches that remove direct external networking.
 - [editor/proxy.ts](editor/proxy.ts) — Next.js 16 proxy that sets the CSP + `X-Robots-Tag` + `Referrer-Policy` + `X-Content-Type-Options` headers on every `/desktop/*` response.
 - [editor/lib/desktop/csp.ts](editor/lib/desktop/csp.ts) — the desktop CSP template (`buildDesktopCsp`), kept out of `proxy.ts` per Next.js 16 route-export rules. Owns the directive set, the `grida-workspace:` img/media scope (#924), and the first-party library `img-src` carve-out. Pinned by `proxy.test.ts`.
 - [editor/app/desktop/layout.tsx](editor/app/desktop/layout.tsx) — root layout for the desktop route group; gates all children through `DesktopBridgeGate`.
@@ -863,11 +931,13 @@ paths, and params are public, so the design must not rely on obscurity.
    either scheme with byte-identical fixed-target behavior; the OS only
    ever delivers a build its own declared scheme.
 
-The Electron main process remains credential-free, and the sidecar
-holds at most the purpose-scoped, short-lived hosted-AI token
-(GRIDA-SEC-006 — memory-only, renderer-pushed, never a refresh token):
-the durable session lives in the webview's cookie jar and is refreshed
-by the same `@supabase/ssr` middleware machinery as the web app. The `/desktop/*`
+Electron main holds no durable desktop account or provider credential. Its
+provider broker does transiently route BYOK/GG request headers and bodies; the
+sidecar owns persisted BYOK material and may hold the purpose-scoped,
+short-lived hosted-AI token (GRIDA-SEC-006 — memory-only, renderer-pushed,
+never a refresh token). The durable Grida account session lives in the
+webview's cookie jar and is refreshed by the same `@supabase/ssr` middleware
+machinery as the web app. The `/desktop/*`
 CSP keeps `connect-src` closed, so session reads go through the
 same-origin `/desktop/auth/me` route rather than direct supabase-js
 calls.
@@ -968,8 +1038,10 @@ levels into one.
 6. **Custody doctrine (client half)** — the daemon holds the token in
    memory only: never `auth.json`, never disk, never a refresh token.
    The webview session remains the only durable credential
-   (GRIDA-SEC-005); the renderer re-mints and re-pushes. The sidecar
-   files implementing this register here when they land.
+   (GRIDA-SEC-005); the renderer re-mints and re-pushes. Provider requests use
+   the GRIDA-SEC-004 host transport: Electron main necessarily observes the
+   scoped bearer header and request body in transit, but does not retain,
+   persist, return, or log them and never receives the durable webview session.
 7. **Mint rate limit** — `rl:v1-ai:mint` per-user sliding window
    (fail-open when Upstash is unconfigured; the billing gate on the AI
    endpoints is the actual spend control).
@@ -978,7 +1050,9 @@ levels into one.
 not re-checked within a token's ≤15-minute lifetime. The mint rate
 limit fails open without Upstash. In-flight AI requests at sign-out
 complete on their token rather than being aborted — expiry is the
-revocation mechanism.
+revocation mechanism. Electron main and any OS-trusted TLS-inspection proxy can
+observe the short-lived bearer while transporting a request; neither is a
+durable account-credential holder.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-006 .` to enumerate.
 Today:
@@ -995,7 +1069,8 @@ governs the surface, this record governs its security half.
 - [packages/grida-ai-agent/src/http/routes/gg-auth.ts](packages/grida-ai-agent/src/http/routes/gg-auth.ts) — `/auth/gg/set|clear|status` behind the daemon perimeter; token never logged (pinned by its test).
 - [packages/grida-ai-agent/src/providers/gg.ts](packages/grida-ai-agent/src/providers/gg.ts) + [gg-media.ts](packages/grida-ai-agent/src/providers/gg-media.ts) — hosted text/image/video adapters: per-request token reads, editor-origin-only egress, code-led typed errors (401→`gg_token_expired`, 402→`insufficient_credits`), no upstream body text in thrown messages.
 - The `gg` resolver arms ([providers/index.ts](packages/grida-ai-agent/src/providers/index.ts), resolve-image, resolve-video) — precedence: explicit wins; implicit BYOK → `gg` → endpoints. The `/secrets/*` allowlist keeps REJECTING the `gg` id (no key may be stored under it; pinned by `gg-auth.test.ts`).
-- [packages/grida-ai-agent/src/sandbox/policy.ts](packages/grida-ai-agent/src/sandbox/policy.ts) — `gg_host` egress option (the ONLY new host a hosted-AI daemon may reach).
+- [packages/grida-ai-agent/src/sandbox/policy.ts](packages/grida-ai-agent/src/sandbox/policy.ts) — `gg_host` egress for ambient-fetch hosts and its omission when provider HTTP is host-routed.
+- [desktop/src/main/agent-network-host.ts](desktop/src/main/agent-network-host.ts) — destination-bound Chromium transport; transiently carries the scoped Authorization header without persistence or renderer exposure.
 
 **What does NOT belong here.** An AI endpoint that accepts Supabase
 access tokens or cookies. A mint path without a live session or without

@@ -1,5 +1,8 @@
 # HTTP Access
 
+> **GRIDA-SEC-004:** Listener and private-transport requests cross the same
+> authenticated perimeter.
+
 The daemon protects every HTTP route with three host-configured layers:
 
 - CORS allows only `httpAccess.allowedOrigins`.
@@ -10,6 +13,14 @@ The daemon protects every HTTP route with three host-configured layers:
 The package defines the contract; the host supplies policy. For example,
 a GUI host may allow its app route root, while the CLI harness may allow
 `/cli`. The daemon package must not hardcode either host.
+
+A host-owned private transport may use `start({ listen: false })` and deliver
+standard Requests through `DaemonServer.fetch`. That path runs this same
+middleware stack; it does not synthesize credentials or relax a guard. The
+transport is responsible for preserving the complete method, URL, headers,
+and body when it reconstructs the Request. The daemon retains lifecycle
+ownership after headers are returned: a streaming body stays active until it
+ends or is canceled, and shutdown joins it before tenant cleanup.
 
 Node host adapters and CLI clients should use `DaemonTransport.Client` from
 `@grida/daemon/transport` — or `AgentTransport.Client` from

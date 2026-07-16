@@ -10,6 +10,7 @@ import { createGateway } from "@ai-sdk/gateway";
 import { TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models";
 import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
+import { ProviderHttp } from "./http";
 
 const MODEL_BY_TIER: Record<ModelTier, TierModelId> = TIER_MODEL_IDS;
 
@@ -19,7 +20,10 @@ const OPENROUTER_HEADERS = {
   // "X-Title": "Grida",
 } as const;
 
-export function makeOpenRouterFactory(apiKey: string): ModelFactory {
+export function makeOpenRouterFactory(
+  apiKey: string,
+  providerHttp: ProviderHttp = new ProviderHttp()
+): ModelFactory {
   const provider = createOpenAICompatible({
     name: "openrouter",
     baseURL: "https://openrouter.ai/api/v1",
@@ -29,6 +33,7 @@ export function makeOpenRouterFactory(apiKey: string): ModelFactory {
     // `stream_options.include_usage` is requested — without it every
     // streamed run records zero tokens (no rollups, no context meter).
     includeUsage: true,
+    fetch: providerHttp.request,
   });
   // Both OpenRouter and the catalog use Vercel-style `creator/model`
   // ids, so an explicit pick hands straight through; otherwise fall
@@ -36,8 +41,11 @@ export function makeOpenRouterFactory(apiKey: string): ModelFactory {
   return (tier, modelId) => provider(modelId ?? MODEL_BY_TIER[tier]);
 }
 
-export function makeVercelFactory(apiKey: string): ModelFactory {
-  const provider = createGateway({ apiKey });
+export function makeVercelFactory(
+  apiKey: string,
+  providerHttp: ProviderHttp = new ProviderHttp()
+): ModelFactory {
+  const provider = createGateway({ apiKey, fetch: providerHttp.request });
   return (tier, modelId) => provider(modelId ?? MODEL_BY_TIER[tier]);
 }
 
@@ -52,12 +60,15 @@ export function makeVercelFactory(apiKey: string): ModelFactory {
  * local endpoint, and background subagents (titler, compactor) resolve
  * tiers too — they must land on a model this endpoint actually serves.
  */
-export function makeEndpointFactory(config: {
-  id: string;
-  base_url: string;
-  api_key?: string;
-  default_model_id: string;
-}): ModelFactory {
+export function makeEndpointFactory(
+  config: {
+    id: string;
+    base_url: string;
+    api_key?: string;
+    default_model_id: string;
+  },
+  providerHttp: ProviderHttp = new ProviderHttp()
+): ModelFactory {
   const provider = createOpenAICompatible({
     name: config.id,
     baseURL: config.base_url,
@@ -65,6 +76,7 @@ export function makeEndpointFactory(config: {
     // Same as the OpenRouter factory: opt in to the streaming usage
     // chunk, or streamed runs record zero tokens.
     includeUsage: true,
+    fetch: providerHttp.request,
   });
   return (_tier, modelId) => provider(modelId ?? config.default_model_id);
 }

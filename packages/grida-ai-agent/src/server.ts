@@ -41,6 +41,7 @@ import { AgentRuntime } from "./runtime";
 import { StreamRegistry } from "./runtime/stream-registry";
 import { defaultScratchBase, sweepScratch } from "./session/scratch";
 import { DirectoryScopeRegistry } from "./session/directory-scopes";
+import { ProviderHttp, type ProviderHttpTransport } from "./providers/http";
 
 export {
   DirectoryScopeRegistry,
@@ -49,6 +50,7 @@ export {
   type DirectoryScopeGrant,
   type DirectoryScopeRegistryOptions,
 } from "./session/directory-scopes";
+export type { ProviderHttpTransport } from "./providers/http";
 
 // Re-exported for hosts that compose or probe the daemon through this
 // package (the CLI, tests). The daemon package is the owner.
@@ -95,6 +97,22 @@ export type AgentTenantOptions = {
     >
   >;
   /**
+   * Host-owned execution of the agent tenant's in-process provider HTTP.
+   * `request` carries provider operations (including credential-bearing
+   * inference and media submit/poll/result calls); `download` is used only for
+   * credential-free provider result/assets that the host authorizes. Both are
+   * required when supplied so
+   * the two authorization classes cannot silently collapse. Omit the whole
+   * transport to retain ambient `globalThis.fetch` behavior.
+   *
+   * This grants no network operation to tools, shell commands, or external
+   * agent processes. The package shapes provider requests, performs basic URL
+   * syntax checks, and injects GG authorization at request time. The callback
+   * is the final network authority: before I/O the host must authorize each
+   * concrete URL/method/header set, redirect hop, and resolved address/route.
+   */
+  provider_http?: ProviderHttpTransport;
+  /**
    * Base directory for per-session scratch areas (WG `scratch.md`). Defaults
    * to {@link defaultScratchBase} (`<os.tmpdir()>/grida-agent-<host-tag>`,
    * namespaced per host by the daemon's `user_data_path`) when omitted —
@@ -113,18 +131,34 @@ export type AgentTenantOptions = {
   image_model_id?: string;
   /**
    * GRIDA-SEC-004 — whether this host's process tree is confined by an OS
-   * sandbox (srt Seatbelt/bubblewrap). Default `false` (FAIL-CLOSED): with no
-   * sandbox and no explicit opt-in, the `run_command` shell tool is NOT
-   * exposed to the model. The desktop supervisor sets this true only when it
-   * actually wrapped the sidecar spawn.
+   * sandbox (srt Seatbelt/bubblewrap). Default `false`: with no explicit
+   * shell-only opt-in the `run_command` tool is withheld, and an external ACP
+   * mode of `"sandboxed"` is unavailable. The desktop supervisor sets this
+   * true only when it actually wrapped the sidecar spawn.
    */
   sandbox_enforced?: boolean;
+  /**
+   * GRIDA-SEC-004 — host disposition for external ACP process execution.
+   * `"enabled"` (default for backward compatibility) is an explicit host
+   * authorization to spawn the process and makes NO containment claim.
+   * `"sandboxed"` additionally requires `sandbox_enforced` to be exactly true.
+   * `"disabled"` withholds the process capability entirely.
+   *
+   * This switch is independent of `allow_unsandboxed_shell`, which authorizes
+   * only Grida's locked shell tool. Security-sensitive hosts should explicitly
+   * choose `"sandboxed"` or `"disabled"` rather than rely on the compatibility
+   * default.
+   */
+  external_agent_execution?: "enabled" | "sandboxed" | "disabled";
   /**
    * GRIDA-SEC-004 — deliberate escape hatch for hosts that run WITHOUT an OS
    * sandbox (the `grida-agent` CLI, local dev). When true, `run_command` is
    * exposed even though `sandbox_enforced` is false. Off by default; enabling
    * it is an explicit, logged decision by the host author who accepts that the
    * shell child has no kernel-level fs/network containment.
+   *
+   * This does not affect external ACP agents; their independent disposition is
+   * controlled by `external_agent_execution`.
    */
   allow_unsandboxed_shell?: boolean;
   /**
@@ -185,6 +219,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
   return {
     sse_query_token_paths: sseQueryTokenPaths,
     register: (app: Hono, services: DaemonServices) => {
+      const providerHttp = new ProviderHttp(opts.provider_http);
       // Endpoint provider configs (issue #806): plain config beside the
       // secrets store, persisted at ${userData}/endpoints.json.
       const endpointsStore = new EndpointProvidersStore(
@@ -236,6 +271,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         registerProvidersRoutes(app, {
           endpoints: endpointsStore,
           secrets: services.secrets,
+          provider_http: providerHttp,
         });
       }
       if (caps.images) {
@@ -243,6 +279,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           secrets: services.secrets,
           gg: gridaSession,
           gg_base_url: gridaGatewayBaseUrl,
+          provider_http: providerHttp,
         });
       }
       if (caps.video) {
@@ -250,6 +287,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           secrets: services.secrets,
           gg: gridaSession,
           gg_base_url: gridaGatewayBaseUrl,
+          provider_http: providerHttp,
         });
       }
       // GRIDA-SEC-004 — the single fail-closed shell decision. Shell execution
@@ -285,6 +323,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         // URL is absent (resolver never picks grida).
         gg: gridaSession,
         gg_base_url: gridaGatewayBaseUrl,
+        provider_http: providerHttp,
         workspace_registry: services.workspaces,
         sessions_store: sessionsStore,
         directory_scopes: directoryScopes,
@@ -296,6 +335,13 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         secrets_root: services.user_data_path,
         scratch_base: scratchBase,
         shell_execution_allowed: shellExecutionAllowed,
+        // GRIDA-SEC-004 — the sandboxed ACP disposition consumes this host
+        // attestation; the compatibility `enabled` disposition does not.
+        sandbox_enforced: opts.sandbox_enforced === true,
+        // A host may authorize execution without a containment claim, require
+        // containment, or withhold the whole ACP process capability. Omission
+        // preserves the pre-option execution path.
+        external_agent_execution: opts.external_agent_execution ?? "enabled",
         // Image generation rides the same capability flag as the
         // `/images/generate` route. The bindings still require a scratch sink +
         // a provider key.

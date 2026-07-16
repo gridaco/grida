@@ -8,7 +8,7 @@
  *
  * Gated + excluded from CI (needs a logged-in `claude` and no API key). Run:
  *
- *   GRIDA_LIVE_CLAUDE=1 \
+ *   GRIDA_LIVE_CLAUDE=1 GRIDA_AGENT_SANDBOX_ENFORCED=1 \
  *     pnpm --filter @grida/agent vitest run src/agent-provider/run.live.test.ts
  */
 import fs from "node:fs/promises";
@@ -27,7 +27,8 @@ import { registerAgentRoutes } from "../http/routes/agent";
 import { EndpointProvidersStore } from "../providers/endpoints";
 import { assistantTextFromSse, sessionIdFromSse } from "../testing/sse";
 
-const LIVE = process.env.GRIDA_LIVE_CLAUDE === "1";
+const SANDBOX_ENFORCED = process.env.GRIDA_AGENT_SANDBOX_ENFORCED === "1";
+const LIVE = process.env.GRIDA_LIVE_CLAUDE === "1" && SANDBOX_ENFORCED;
 const TIMEOUT_MS = 300_000;
 const liveDescribe = LIVE ? describe : describe.skip;
 
@@ -48,6 +49,7 @@ function buildHost(baseDir: string): Host {
     sessions_store: store,
     streams: new StreamRegistry(),
     drain_cooldown_ms: 20,
+    sandbox_enforced: SANDBOX_ENFORCED,
   });
   registerAgentRoutes(app, runtime);
   return { app, runtime, store };

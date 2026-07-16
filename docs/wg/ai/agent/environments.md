@@ -159,36 +159,48 @@ process, an IDE plugin, a CLI invocation, or any local process.
 
 **Capabilities offered.**
 
-| Capability    | Available?                                                                        |
-| ------------- | --------------------------------------------------------------------------------- |
-| `fs.read`     | **Yes**, scoped by the runtime's capability declaration AND the OS-level sandbox. |
-| `fs.write`    | **Yes**, same scoping.                                                            |
-| `shell.run`   | **Yes**, with a per-call sub-policy (see below).                                  |
-| `net.fetch`   | **Yes**, with a host-allowlist.                                                   |
-| `secrets.has` | **Yes** via the OS keychain or a local secrets file.                              |
-| `stream.send` | **Yes**.                                                                          |
+| Capability    | Available?                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| `fs.read`     | **Yes**, scoped by the effective host-issued grant and host containment.                    |
+| `fs.write`    | **Yes**, same scoping.                                                                      |
+| `shell.run`   | **Yes**, through one execution-confinement authority.                                       |
+| `net.fetch`   | **Yes**, only as a structured capability or within an explicit execution destination grant. |
+| `secrets.has` | **Yes** via the OS keychain or a local secrets file.                                        |
+| `stream.send` | **Yes**.                                                                                    |
 
-**Locked tool availability.** All locked tools are available.
+**Locked tool availability.** The complete locked profile is available only
+where the host can enforce its authority. On an unsupported host, local
+filesystem, shell, external-runtime, and extension capabilities are withheld
+unless the user enters an explicit unsandboxed posture.
 
-**Sandbox.** The OS provides the outer wrap. Recommended primitives:
+**Sandbox.** The OS provides two distinct boundaries: host containment for
+structured in-process capabilities, and execution confinement for raw commands,
+external agents, and extension runtimes. Any permitted connection uses a
+compatible host network route without turning that route into agent authority;
+an incompatible opaque client fails closed. See
+[Execution authority](./execution-authority.md). Recommended primitives:
 
-| OS      | Outer sandbox primitive                                    |
+| OS      | Sandbox primitive                                          |
 | ------- | ---------------------------------------------------------- |
 | macOS   | Seatbelt (`sandbox_init`, `sandbox-exec`).                 |
 | Linux   | Landlock + namespace isolation (or bubblewrap / firejail). |
 | Windows | AppContainer + Job objects.                                |
 
-The only mature ready-to-go implementation matching this capability
-surface today is [`anthropic-experimental/sandbox-runtime`](https://github.com/anthropic-experimental/sandbox-runtime)
-("srt"); the guide names it as the reference. See
+The guide names
+[`anthropic-experimental/sandbox-runtime`](https://github.com/anthropic-experimental/sandbox-runtime)
+("srt") as the reference macOS/Linux confinement primitive. It does not, by
+itself, provide host-native routing or independent concurrent network
+authorities. See
 [Sandbox Runtime (`srt`)](./srt.md) for what srt provides, what the
 protocol locks and does not lock to, and how to substitute equivalent
 primitives.
 
-The runtime layers a per-tool-call sub-policy on top — for
-`shell.run`, the sub-policy is built from the agent's declared
-allowlist + the watchdog's run-time evaluation
-([`foundations / watchdog`](./foundations.md#watchdog)).
+For `shell.run`, the host creates a confined process tree from the effective
+grant: the host/user ceiling ∩ declared requirements ∩ parent-delegable
+authority. The watchdog may narrow that result; it cannot mint authority
+([`foundations / watchdog`](./foundations.md#watchdog)). The trusted agent host
+keeps filesystem and process defense in depth, but its provider calls do not run
+through a raw execution's destination set.
 
 **Defense in depth.** Three layers:
 
@@ -218,8 +230,13 @@ filesystem-resident database
 - Generate a per-launch credential for the host's IPC perimeter (HTTP
   loopback / Unix socket / named pipe); do not expose the agent host to
   the network.
-- Apply the OS sandbox to the daemon process itself, not only to the
-  shell calls it spawns.
+- Keep host services, structured capabilities, extensions, and raw execution on
+  separate authority paths. Retain host containment for in-process file tools,
+  and apply execution confinement to every raw process tree the agent controls,
+  including external agents that own their own tool loop.
+- Resolve an already-authorized destination through the effective host network
+  route. Merely removing a network sandbox does not provide system proxy, PAC,
+  proxy-authentication, or transport-trust compatibility.
 
 ## How a host picks
 

@@ -29,6 +29,7 @@ import { probeEndpointModels } from "../../providers/probe";
 import { detectClaude } from "../../agent-provider/detect";
 import type { SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
+import { ProviderHttp } from "../../providers/http";
 
 export type ProvidersRoutesDeps = {
   endpoints: EndpointProvidersStore;
@@ -40,6 +41,8 @@ export type ProvidersRoutesDeps = {
    * later would silently reuse the stale credential.
    */
   secrets?: SecretsStore;
+  /** Host-fed provider HTTP. Omit only in direct tests/standalone callers. */
+  provider_http?: ProviderHttp;
   /** Probe override for tests. Defaults to {@link probeEndpointModels}. */
   probe?: typeof probeEndpointModels;
   /** Claude-detect override for tests. Defaults to {@link detectClaude}. */
@@ -50,6 +53,7 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
   const { endpoints, secrets } = deps;
   const probe = deps.probe ?? probeEndpointModels;
   const detect = deps.detect ?? detectClaude;
+  const providerHttp = deps.provider_http ?? new ProviderHttp();
 
   app.post("/providers/endpoints/list", async (c) => {
     const list: EndpointProviderConfig[] = await endpoints.list();
@@ -118,7 +122,7 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
     if (!parsed.ok) {
       return c.json({ error: parsed.error }, 400);
     }
-    const result = await probe(parsed.base_url);
+    const result = await probe(parsed.base_url, providerHttp.request);
     if (!result.ok) {
       return c.json({ error: result.error }, 502);
     }

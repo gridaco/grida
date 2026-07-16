@@ -1,8 +1,8 @@
 # `@grida/daemon`
 
-Grida's local daemon: the loopback HTTP server and GRIDA-SEC-004
-perimeter that hosts capability tenants. Private, `workspace:*`, in
-active development.
+Grida's local daemon: the GRIDA-SEC-004 request perimeter and default loopback
+HTTP adapter that host capability tenants. Private, `workspace:*`, in active
+development.
 
 Promoted out of `@grida/agent` (issue #927): the host layer existed
 inside the AI package, named as if the agent owned it, while the code
@@ -12,10 +12,11 @@ the boundary match the role — the daemon is the host; the agent
 
 It owns:
 
-- **`DaemonServer`.** The lifecycle owner (`start()` / `stop()` /
-  `port`): binds the loopback socket, installs the perimeter (CORS →
-  Referer guard → Basic Auth), mounts the daemon route groups and the
-  supplied tenants. Node-only.
+- **`DaemonServer`.** The lifecycle owner (`start()` / `fetch()` / `stop()` /
+  `port`): installs the perimeter (CORS → Referer guard → Basic Auth), mounts
+  the daemon route groups and supplied tenants, and binds the default loopback
+  adapter. Hosts with a private transport may start without a listener and
+  deliver standard Requests directly. Node-only.
 - **Host capability routes.** `files` (path registry + read/write),
   `recent` (recents list), `workspaces` (registry, guarded fs, the
   streamed Range-aware `GET /workspaces/file`), and the handshake.
@@ -44,6 +45,17 @@ belongs in a tenant.
 | `./server`    | `DaemonServer`, `buildServer`, the tenant seam, `Daemon` discovery, the tenant toolkit | Node     |
 | `./transport` | `DaemonTransport` — Basic-Auth signing, fetch/SSE helpers, the daemon route client     | neutral  |
 | `./sandbox`   | sandbox policy frame (`buildDaemonSandboxPolicy`, `hostFromUrl`) — AI-free             | Node     |
+
+### Sandbox network baseline
+
+`buildDaemonSandboxPolicy` includes the daemon-owned development-network
+baseline by default, preserving the existing package-manager and VCS access
+contract. A host that requires a tenant-only network policy can set
+`include_dev_network_hosts: false`. That option omits only the built-in
+development hosts; `allowed_network_hosts` remains additive and is still
+deduplicated. A listener-independent host can separately set
+`allow_local_binding: false`; it defaults to `true` for existing hosts and does
+not alter the external-domain allowlist.
 
 ## Docs
 

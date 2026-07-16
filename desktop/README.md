@@ -11,20 +11,35 @@ lives in `@grida/agent`; desktop should stay thin: windows, menus,
 protocol routing, app lifecycle, IPC sender validation, and sidecar
 supervision.
 
+The accepted security architecture for host-native networking and confined
+agent execution is [Desktop agent authority](./docs/agent-authority.md).
+
 ## Architecture
 
 ```text
 Electron main/preload (desktop)
-  -> starts and authenticates loopback agent sidecar
+  -> owns the exact 127.0.0.1 ephemeral listener and per-spawn auth
+  -> transfers only accepted connected sockets to the socketless sidecar
+  -> owns provider destination grants and a dedicated Chromium network session
   -> loads editor /desktop/*
 
 @grida/agent
-  -> owns BYOK secrets, providers, files, workspaces, sessions,
-     and desktop agent execution
+  -> owns BYOK secrets, provider selection/credential injection, files,
+     workspaces, sessions, and desktop agent execution
+  -> serves authenticated daemon HTTP only on main-transferred sockets
+  -> sends only provider requests and credential-free provider-asset downloads
+     over bounded framed stdin/stdout
 
 editor /desktop/*
   -> owns UX only, through typed bridge clients
 ```
+
+On macOS and Linux, the sidecar runs under `srt` with no direct external
+destinations and `allow_local_binding: false`; Electron main supplies the two
+explicit capabilities above. Windows currently runs the sidecar without that
+outer wrapper: shell and external ACP are withheld, while structured local file
+tools remain available and no kernel egress fence exists. That is a documented
+nonconformance rather than a sandbox claim.
 
 If a bug reproduces in files, workspaces, BYOK providers, sessions,
 or agent execution, add the first test in

@@ -94,6 +94,12 @@ describe("@grida/daemon public API", () => {
         http_access: httpAccess,
       };
       expectTypeOf(DaemonServer).toBeConstructibleWith(opts);
+      const start: (options?: { listen?: boolean }) => Promise<void> =
+        DaemonServer.prototype.start;
+      const fetch: (request: Request) => Promise<Response> =
+        DaemonServer.prototype.fetch;
+      expect(typeof start).toBe("function");
+      expect(typeof fetch).toBe("function");
       expect(typeof buildServer).toBe("function");
 
       // The seam contract: a tenant registers routes against the daemon's
@@ -163,6 +169,20 @@ describe("@grida/daemon public API", () => {
       // are the agent tenant's contribution (`@grida/agent/sandbox`).
       expect(policy.network.allowed_domains).not.toContain("openrouter.ai");
       expect(policy.network.allowed_domains).not.toContain("api.anthropic.com");
+    });
+
+    // GRIDA-SEC-004 — the public policy can remove both direct external and
+    // local-bind authority without reaching into producer internals.
+    it("exposes a tenant-only network policy without changing the default", () => {
+      const policy: DaemonSandboxPolicy = buildDaemonSandboxPolicy({
+        user_data: "/tmp/grida",
+        home: "/Users/example",
+        allow_local_binding: false,
+        include_dev_network_hosts: false,
+        allowed_network_hosts: ["tenant.example"],
+      });
+      expect(policy.network.allowed_domains).toEqual(["tenant.example"]);
+      expect(policy.network.allow_local_binding).toBe(false);
     });
   });
 

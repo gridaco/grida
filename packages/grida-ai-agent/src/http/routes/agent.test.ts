@@ -45,6 +45,7 @@ const fakeRunAgent = async (): Promise<Response> =>
 describe("HTTP wire — agent routes (run/stream/abort)", () => {
   let baseDir: string;
   let sessionsStore: SessionsStore;
+  let secrets: SecretsStore;
   let workspaceRegistry: WorkspaceRegistry;
   let streamRegistry: StreamRegistry;
   let runtime: AgentRuntime;
@@ -53,7 +54,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
   beforeEach(async () => {
     baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-agent-route-"));
     const auth = new AuthStore(baseDir);
-    const secrets = new SecretsStore(auth);
+    secrets = new SecretsStore(auth);
     await secrets.set("openrouter", "sk-test");
     const db = openSessionsDb({ user_data_path: baseDir });
     sessionsStore = new SessionsStore(db);
@@ -68,6 +69,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       streams: streamRegistry,
       run_agent: fakeRunAgent,
       scratch_base: path.join(baseDir, "scratch-base"),
+      external_agent_execution: "sandboxed",
       // Shrink the inter-drain cooldown so the core-drain test runs fast.
       drain_cooldown_ms: 20,
     });
@@ -93,6 +95,58 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       body: JSON.stringify({ messages: "nope" }),
     });
     expect(invalid.status).toBe(400);
+  });
+
+  it("GRIDA-SEC-004: reports an external agent unavailable without an enforced sandbox", async () => {
+    const response = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model_id: "claude-acp",
+        messages: [{ id: "u-acp", role: "user", content: "hello" }],
+      }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error:
+        "[agent-host-providers] external agent claude requires an enforced OS sandbox",
+      code: "provider_down",
+      provider_id: "claude",
+    });
+  });
+
+  it("GRIDA-SEC-004: withholds external agents when the host disables ACP execution", async () => {
+    runtime.dispose();
+    streamRegistry = new StreamRegistry();
+    runtime = new AgentRuntime({
+      secrets,
+      workspace_registry: workspaceRegistry,
+      sessions_store: sessionsStore,
+      streams: streamRegistry,
+      run_agent: fakeRunAgent,
+      sandbox_enforced: true,
+      external_agent_execution: "disabled",
+    });
+    app = new Hono();
+    registerAgentRoutes(app, runtime);
+
+    const response = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model_id: "claude-acp",
+        messages: [{ id: "u-acp-disabled", role: "user", content: "hello" }],
+      }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error:
+        "[agent-host-providers] external agent claude is disabled by the host",
+      code: "provider_down",
+      provider_id: "claude",
+    });
   });
 
   it("stages byte-identical attachment bodies before persisting their descriptors", async () => {

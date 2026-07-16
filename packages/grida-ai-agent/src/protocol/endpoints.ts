@@ -216,7 +216,7 @@ export function isValidEndpointProviderId(id: string): boolean {
   return ENDPOINT_PROVIDER_ID_PATTERN.test(id) && !isByokProviderId(id);
 }
 
-/** Narrow + pin an endpoint base URL: http(s) only. Shared by the config
+/** Narrow + pin an endpoint base URL: http(s), with no URL userinfo. Shared by the config
  *  validator and the probe so the two boundaries can't drift. `base_url`
  *  is the TRIMMED input string (whitespace padding would survive `new
  *  URL` parsing yet break the string-concatenated request base later) —
@@ -239,6 +239,12 @@ export function parseEndpointBaseUrl(
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     return { ok: false, error: "base_url must be http(s)" };
+  }
+  // Endpoint config is readable + persisted plain text. Credentials belong in
+  // SecretsStore; accepting URL userinfo would smuggle them across both
+  // boundaries and hand them to a host transport as part of the URL.
+  if (url.username || url.password) {
+    return { ok: false, error: "base_url must not contain credentials" };
   }
   return { ok: true, base_url: trimmed, url };
 }

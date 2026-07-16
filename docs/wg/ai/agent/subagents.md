@@ -75,9 +75,9 @@ Calling `task` MUST:
 
 1. Resolve `subagent_type` against the host's agent registry. Unknown
    → tool error.
-2. Compute the child's effective permissions as
-   `parent_permissions ∩ child_manifest_permissions` (see
-   [Permission inheritance](#permission-inheritance)).
+2. Compute the child's effective permissions from the host/user ceiling, the
+   parent's effective delegable permissions, and the child's declared
+   requirements (see [Permission inheritance](#permission-inheritance)).
 3. Create a child session row whose `parent_id` points to the parent
    session and whose `parent_message_id` points to the user message
    the parent was processing.
@@ -146,9 +146,23 @@ even after the parent's turn returns.
 
 ## Permission inheritance
 
-A subagent's effective permissions are the **intersection** of the
-parent's permissions and the subagent's declared permissions. The
-load-bearing rule:
+A subagent's effective permissions are the **intersection** of the host/user
+ceiling, the parent's effective **delegable** permissions, and the subagent's
+declared requirements:
+
+```text
+child_effective = host_user_ceiling
+                ∩ parent_effective_delegable
+                ∩ child_declared_requirements
+```
+
+The manifest declares requirements; it does not mint authority. Credentials,
+provider endpoint grants, and permissions requiring fresh user presence are
+non-delegable by default. A host MAY mark a narrower, purpose-scoped credential
+or endpoint grant as delegable, but that decision is part of the parent grant,
+not a value the parent or child model can invent.
+
+The load-bearing rule:
 
 > **A deny in the parent CANNOT be turned into an allow by the
 > child.** A child can only be stricter than its parent, never
@@ -160,10 +174,17 @@ Consequences:
 - A parent without `shell.run` CANNOT spawn a child that has it.
 - A parent restricted to `{workspace}/docs/**` CANNOT spawn a child
   with broader file scope.
+- A parent that can use a provider endpoint CANNOT hand that endpoint or its
+  credential to a child unless the host grant explicitly marks it delegable.
 
 The opposite direction does not propagate — a child's _narrower_
 permissions are local to the child. The grand-child inherits from
 the child, not from the grand-parent.
+
+An in-process subagent receives this derived logical grant; it does not acquire
+a new operating-system isolation claim merely by being a subagent. Any raw
+process the child launches receives a separate confinement domain under
+[Execution authority](./execution-authority.md#host-owned-execution-boundary).
 
 This is the safety property that makes recursion safe. If a future
 optimization were to relax it ("trusted parent can hand a child a

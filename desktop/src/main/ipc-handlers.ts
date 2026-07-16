@@ -18,7 +18,18 @@ import {
 import { EDITOR_BASE_URL } from "../env";
 import { isSafeExternalUrl } from "../window";
 import { agentSidecarClient } from "./agent-sidecar-client";
-import { getAgentSidecarInfo } from "./agent-sidecar-supervisor";
+import {
+  approveAgentProviderEndpoint,
+  describeAgentProviderEndpoint,
+  getAgentSidecarInfo,
+  revokeAgentProviderEndpoint,
+  withTemporaryAgentProviderEndpoint,
+} from "./agent-sidecar-supervisor";
+import { AgentProviderEndpointMutation } from "./agent-provider-endpoint-mutation";
+import {
+  validateEndpointProviderConfig,
+  type EndpointProviderConfig,
+} from "@grida/agent";
 import { dirtyState } from "./dirty-state";
 import {
   allHostAppIds,
@@ -98,6 +109,44 @@ export function registerIpcHandlers() {
     if (!info) throw new Error("agent sidecar not ready");
     return info;
   });
+
+  // issue #974 — custom endpoints are network authority, not just config.
+  // Renderer writes/probes therefore cross a guarded native confirmation
+  // before main mints an exact-origin grant for the sidecar transport.
+  guarded(
+    IPC_CHANNELS.PROVIDER_ENDPOINT_SET,
+    async (event, input: EndpointProviderConfig) => {
+      const validated = validateEndpointProviderConfig(input);
+      if (!validated.ok) throw new Error(validated.error);
+      const config = validated.config;
+      const endpoint = await describeAgentProviderEndpoint(config.base_url);
+      await confirmProviderOrigin(event, endpoint.origin, endpoint.route);
+      // Persist first: config writes perform no provider egress. Only after the
+      // authenticated sidecar accepts the config does main publish its grant.
+      await agentSidecarClient.setProviderEndpoint(config);
+      await approveAgentProviderEndpoint(config.id, config.base_url);
+    }
+  );
+
+  guarded(IPC_CHANNELS.PROVIDER_ENDPOINT_DELETE, async (_event, id: string) => {
+    await AgentProviderEndpointMutation.remove({
+      revokeAuthority: async () => await revokeAgentProviderEndpoint(id),
+      deleteConfiguration: async () =>
+        await agentSidecarClient.deleteProviderEndpoint(id),
+    });
+  });
+
+  guarded(
+    IPC_CHANNELS.PROVIDER_ENDPOINT_PROBE,
+    async (event, baseUrl: string) => {
+      const endpoint = await describeAgentProviderEndpoint(baseUrl);
+      await confirmProviderOrigin(event, endpoint.origin, endpoint.route);
+      return await withTemporaryAgentProviderEndpoint(
+        baseUrl,
+        async () => await agentSidecarClient.probeProviderEndpoint(baseUrl)
+      );
+    }
+  );
 
   guarded(IPC_CHANNELS.WINDOW_SET_DOCUMENT_EDITED, (event, edited: boolean) => {
     // setDocumentEdited is macOS-only. On other platforms the
@@ -313,6 +362,30 @@ export function registerIpcHandlers() {
   guarded(IPC_CHANNELS.WORKSPACE_UNSUBSCRIBE_CHANGES, (_event, id: string) => {
     unsubscribeWorkspaceChanges(id);
   });
+}
+
+async function confirmProviderOrigin(
+  event: IpcMainInvokeEvent,
+  origin: string,
+  route: string
+): Promise<void> {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const options = {
+    type: "warning" as const,
+    message: "Allow this AI provider endpoint?",
+    detail:
+      `${origin}\n${route}\n\nGrida will let the agent sidecar contact only this origin ` +
+      "for provider requests until the app closes.",
+    buttons: ["Allow", "Cancel"],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  };
+  const result = window
+    ? await dialog.showMessageBox(window, options)
+    : await dialog.showMessageBox(options);
+  if (result.response !== 0)
+    throw new Error("provider endpoint was not approved");
 }
 
 async function findWorkspaceOrThrow(workspaceId: string) {

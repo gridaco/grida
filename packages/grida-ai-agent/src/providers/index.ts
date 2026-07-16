@@ -45,6 +45,7 @@ import {
   makeOpenRouterFactory,
   makeVercelFactory,
 } from "./byok";
+import type { ProviderHttp } from "./http";
 
 export { EndpointProvidersStore } from "./endpoints";
 
@@ -106,6 +107,8 @@ export class ProviderUnavailableError extends Error {
 
 export type ResolveDeps = {
   secrets: SecretsStore;
+  /** Host-fed provider HTTP, resolved at the server construction edge. */
+  provider_http?: ProviderHttp;
   /** Endpoint provider configs. Optional so key-only hosts/tests need not
    *  wire a store; absent ⇒ no endpoint providers resolve. */
   endpoints?: EndpointProvidersStore;
@@ -142,7 +145,7 @@ export async function resolveProvider(
   for (const provider of byokProvidersFor("text")) {
     const key = await deps.secrets._getKey(provider.id);
     if (key) {
-      return makeResolvedByok(provider.id, key);
+      return makeResolvedByok(provider.id, key, deps.provider_http);
     }
   }
 
@@ -178,7 +181,7 @@ async function resolveExplicit(
   if (isByokProviderId(providerId)) {
     const key = await deps.secrets._getKey(providerId);
     if (!key) throw new ProviderUnavailableError(providerId);
-    return makeResolvedByok(providerId, key);
+    return makeResolvedByok(providerId, key, deps.provider_http);
   }
   const endpoint = await deps.endpoints?.get(providerId);
   const resolved = endpoint && (await maybeResolveEndpoint(endpoint, deps));
@@ -198,26 +201,31 @@ function maybeResolveGg(deps: ResolveDeps): ResolvedProvider | null {
   return {
     provider_id: GG_PROVIDER_ID,
     kind: "gg",
-    model_factory: makeGridaGatewayFactory(hosted.session, hosted.base_url),
+    model_factory: makeGridaGatewayFactory(
+      hosted.session,
+      hosted.base_url,
+      deps.provider_http
+    ),
   };
 }
 
 function makeResolvedByok(
   providerId: ByokProviderId,
-  key: string
+  key: string,
+  providerHttp?: ProviderHttp
 ): ResolvedProvider {
   switch (providerId) {
     case "openrouter":
       return {
         provider_id: providerId,
         kind: "byok",
-        model_factory: makeOpenRouterFactory(key.trim()),
+        model_factory: makeOpenRouterFactory(key.trim(), providerHttp),
       };
     case "vercel":
       return {
         provider_id: providerId,
         kind: "byok",
-        model_factory: makeVercelFactory(key.trim()),
+        model_factory: makeVercelFactory(key.trim(), providerHttp),
       };
     case "fal":
       // fal is an image-only BYOK provider — it has no text/chat factory.
@@ -245,11 +253,14 @@ async function maybeResolveEndpoint(
   return {
     provider_id: endpoint.id,
     kind: "endpoint",
-    model_factory: makeEndpointFactory({
-      id: endpoint.id,
-      base_url: endpoint.base_url,
-      api_key: key?.trim() || undefined,
-      default_model_id: defaultModelId,
-    }),
+    model_factory: makeEndpointFactory(
+      {
+        id: endpoint.id,
+        base_url: endpoint.base_url,
+        api_key: key?.trim() || undefined,
+        default_model_id: defaultModelId,
+      },
+      deps.provider_http
+    ),
   };
 }

@@ -2,7 +2,7 @@
   "name": "@grida/daemon",
   "version": "0.0.0",
   "private": true,
-  "description": "Grida local daemon: the loopback HTTP server and GRIDA-SEC-004 perimeter that hosts capability tenants (files, recents, workspaces, secrets store) — the Grida AI agent is one tenant, not the owner. AI-free by contract.",
+  "description": "Grida local daemon: the GRIDA-SEC-004 request perimeter and default loopback HTTP adapter that host capability tenants (files, recents, workspaces, secrets store) — the Grida AI agent is one tenant, not the owner. AI-free by contract.",
   "license": "MIT",
   "author": "Grida",
   "repository": "https://github.com/gridaco/grida",

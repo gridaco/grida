@@ -28,7 +28,7 @@
  */
 
 import { createAgentUIStreamResponse } from "ai";
-import { createAgent, type AgentMessage } from "../agent";
+import { createAgentWithUrlPartDownload, type AgentMessage } from "../agent";
 import { newMessageId } from "../session/ids";
 import type { MessageUsage } from "../session/rows";
 import type { AgentModelId } from "../protocol/run";
@@ -42,6 +42,7 @@ import {
   createWorkspaceAgentBindings,
   type DirectoryScopeBinding,
 } from "./workspace-agent-bindings";
+import { ProviderHttp } from "../providers/http";
 
 export type AgentRunRequest = {
   /**
@@ -188,6 +189,8 @@ export async function runAgent(
     /** Host-level default for the `design_search` (library) capability;
      * overridden by the per-run `req.library`. */
     library?: boolean;
+    /** In-process provider HTTP. Used here only for AI SDK URL-part downloads. */
+    provider_http?: ProviderHttp;
   }
 ): Promise<Response> {
   // Wire bindings when the request carries workspace context OR host-authorized
@@ -198,42 +201,46 @@ export async function runAgent(
   // locally — server-side bindings there would double-execute.
   const bindings = await createWorkspaceAgentBindings(req, deps);
 
-  const agent = createAgent({
-    model_factory: provider.model_factory,
-    // No eager skill blocks on the workspace path — built-ins advertise-then-load
-    // from the bundled discovery layer via `skill_index` + the `skill` tool.
-    fs: bindings?.fs,
-    todos: bindings?.todos,
-    // AgentFs satisfies AgentVision.ByteReader, so the workspace agent can SEE
-    // images by path (server-resolved against the same read scope as read_file).
-    // Only wire it when the backend can actually read bytes — otherwise
-    // view_image would be advertised but degrade every call to not_found.
-    vision: bindings?.fs.bytesReadable ? bindings.fs : undefined,
-    // Image generation (`generate_image`) — built by the bindings only when the
-    // host enabled it, a scratch sink exists, and a provider key is present.
-    image_gen: bindings?.image_gen,
-    command: bindings?.command,
-    // RFC skills + project instructions are session-static context the
-    // runtime discovered once and threads through every turn. When scratch is
-    // wired (workspace path), the loader MATERIALIZES a loaded skill's tree into
-    // scratch so its files are reachable; otherwise it just reads the body.
-    skill_index: req.skill_index,
-    skill_cache: req.skill_cache,
-    skill_load_body: req.skill_index
-      ? (bindings?.skill_load_body ?? nodeSkillBodyLoader)
-      : undefined,
-    project_instructions: req.project_instructions,
-    // Whether the `question` tool pauses for a human or refuses headless. The
-    // per-run client capability (`req.interactive`) WINS over the host default
-    // (`deps.interactive`) — one daemon serves both an interactive web client
-    // and a headless `cli run`. Independent of workspace bindings (a person can
-    // answer a standalone-doc session too).
-    interactive: req.interactive ?? deps.interactive,
-    // design_search (library gather) — advertised only when the client declared
-    // it can resolve the search (renderer-owned, like fs). Per-run wins over the
-    // host default, mirroring `interactive`.
-    library: req.library ?? deps.library,
-  });
+  const providerHttp = deps.provider_http ?? new ProviderHttp();
+  const agent = createAgentWithUrlPartDownload(
+    {
+      model_factory: provider.model_factory,
+      // No eager skill blocks on the workspace path — built-ins advertise-then-load
+      // from the bundled discovery layer via `skill_index` + the `skill` tool.
+      fs: bindings?.fs,
+      todos: bindings?.todos,
+      // AgentFs satisfies AgentVision.ByteReader, so the workspace agent can SEE
+      // images by path (server-resolved against the same read scope as read_file).
+      // Only wire it when the backend can actually read bytes — otherwise
+      // view_image would be advertised but degrade every call to not_found.
+      vision: bindings?.fs.bytesReadable ? bindings.fs : undefined,
+      // Image generation (`generate_image`) — built by the bindings only when the
+      // host enabled it, a scratch sink exists, and a provider key is present.
+      image_gen: bindings?.image_gen,
+      command: bindings?.command,
+      // RFC skills + project instructions are session-static context the
+      // runtime discovered once and threads through every turn. When scratch is
+      // wired (workspace path), the loader MATERIALIZES a loaded skill's tree into
+      // scratch so its files are reachable; otherwise it just reads the body.
+      skill_index: req.skill_index,
+      skill_cache: req.skill_cache,
+      skill_load_body: req.skill_index
+        ? (bindings?.skill_load_body ?? nodeSkillBodyLoader)
+        : undefined,
+      project_instructions: req.project_instructions,
+      // Whether the `question` tool pauses for a human or refuses headless. The
+      // per-run client capability (`req.interactive`) WINS over the host default
+      // (`deps.interactive`) — one daemon serves both an interactive web client
+      // and a headless `cli run`. Independent of workspace bindings (a person can
+      // answer a standalone-doc session too).
+      interactive: req.interactive ?? deps.interactive,
+      // design_search (library gather) — advertised only when the client declared
+      // it can resolve the search (renderer-owned, like fs). Per-run wins over the
+      // host default, mirroring `interactive`.
+      library: req.library ?? deps.library,
+    },
+    providerHttp.downloadParts
+  );
 
   return await createAgentUIStreamResponse({
     agent,

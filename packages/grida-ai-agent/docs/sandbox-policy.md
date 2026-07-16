@@ -16,3 +16,20 @@ This keeps each package responsible for what its layer needs — the daemon
 for the host frame, the agent tenant for its providers — while each host
 remains responsible for how that intent is enforced on the operating
 system.
+
+When a host supplies `provider_http`, it should also build the policy with
+`host_routed_provider_http: true`. That strict mode omits direct BYOK and GG
+destinations so an ambient or missed provider call is denied by the outer
+sandbox. It retains the daemon's baseline development hosts and external-agent
+vendor hosts: ACP subprocesses own their network stack and remain confined by
+the same policy. The option defaults to false for CLI and standalone hosts that
+still intentionally use ambient `fetch`.
+
+For a process tree that must have no direct outbound destinations at all, pass
+`direct_network_access: "none"`. This removes the daemon development baseline,
+in-process provider/GG hosts, and external-agent vendor hosts, yielding an empty
+`allowed_domains` list. Local socket binding is an independent authority:
+`allow_local_binding` defaults to `true` for CLI/standalone compatibility, but
+a host with a listener-independent request transport can set it to `false`.
+The default `"allowlisted"` outbound mode preserves the existing
+CLI/standalone policy.

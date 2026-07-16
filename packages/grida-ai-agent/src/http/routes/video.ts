@@ -5,11 +5,11 @@
  * Desktop-only, user-BYOK video generation — the video sibling of
  * {@link ./images.ts}. Resolves the user's connected provider for a curated
  * model id, builds the `VideoModelV3` with the key (read internally — never
- * exposed), and returns the generated video (a provider CDN URL, or base64 for
- * inline data).
+ * exposed), normalizes the generated video to base64 bytes, and returns no
+ * provider URL to the renderer.
  *
  * Security contract (reviewed): reads `_getKey` internally (sidecar only); the
- * response carries a URL / base64 + provider id only — never the key, never raw
+ * response carries base64 + provider id only — never the key, never raw
  * upstream JSON. `model_id` is a closed catalog lookup and `provider` is
  * `oneOf` the fixed video providers — no user-supplied base URL, so no new
  * egress beyond the fixed provider hosts.
@@ -31,21 +31,80 @@ import {
   VideoModelUnavailableError,
   resolveVideoModel,
 } from "../../providers/resolve-video";
-import { assertHttpsUrl } from "../../providers/fetch-helpers";
+import { VERCEL_VIDEO_GATEWAY_BASE_URL } from "../../providers/video-byok";
 import { hostedGenerationError } from "./gg-media-errors";
 import { body, v } from "@grida/daemon/server";
+import { ProviderHttp } from "../../providers/http";
 
 const VIDEO_PROVIDERS = ["vercel", "fal", "openrouter", "gg"] as const;
+const VERCEL_VIDEO_GATEWAY_ORIGIN = new URL(VERCEL_VIDEO_GATEWAY_BASE_URL)
+  .origin;
+
+class UntrustedVideoResultOriginError extends Error {
+  readonly code = "unsupported_untrusted_result_origin" as const;
+
+  constructor(providerId: string, resultUrl: string) {
+    let origin = "<invalid-url>";
+    try {
+      origin = new URL(resultUrl).origin;
+    } catch {
+      // The fixed marker avoids echoing an untrusted opaque value to clients.
+    }
+    super(
+      `[agent-host-video] ${providerId} unsupported/untrusted-result-origin: ${origin}`
+    );
+    this.name = "UntrustedVideoResultOriginError";
+  }
+}
+
+function videoResultUrl(
+  value: string,
+  providerId: string,
+  hostRouted: boolean
+): URL {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    if (hostRouted && providerId === "vercel") {
+      throw new UntrustedVideoResultOriginError(providerId, value);
+    }
+    throw new Error(`[agent-host-video] ${providerId} returned an invalid url`);
+  }
+
+  // Vercel Gateway's VideoModel contract permits arbitrary provider-returned
+  // URLs. A closed host transport has granted only its configured provider
+  // origin, not every origin a downstream model might name. Inline data never
+  // crosses host I/O; an exact Gateway origin is the only network-shaped URL
+  // the package can prove belongs to the configured provider.
+  if (
+    hostRouted &&
+    providerId === "vercel" &&
+    url.protocol !== "data:" &&
+    url.origin !== VERCEL_VIDEO_GATEWAY_ORIGIN
+  ) {
+    throw new UntrustedVideoResultOriginError(providerId, value);
+  }
+
+  if (url.protocol !== "data:" && url.protocol !== "https:") {
+    throw new Error(
+      `[agent-host-video] ${providerId} returned a non-https url`
+    );
+  }
+  return url;
+}
 
 export type VideoRoutesDeps = {
   secrets: SecretsStore;
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
   gg?: import("../../providers/gg-session").GridaGatewaySessionStore;
   gg_base_url?: string;
+  provider_http?: ProviderHttp;
 };
 
 export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
   const { secrets, gg, gg_base_url } = deps;
+  const providerHttp = deps.provider_http ?? new ProviderHttp();
 
   app.post("/video/generate", async (c) => {
     const r = await body(c, {
@@ -69,7 +128,7 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     let resolved;
     try {
       resolved = await resolveVideoModel(
-        { secrets, gg, gg_base_url },
+        { secrets, gg, gg_base_url, provider_http: providerHttp },
         d.model_id,
         // `image` skips the t2v-only hosted `gg` arm for i2v requests so the
         // start frame isn't silently dropped — falls back to a BYOK route.
@@ -114,11 +173,10 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
       });
     }
 
-    // Normalize every result to base64 bytes. Providers return large clips as
-    // CDN URLs, but the desktop renderer can't load cross-origin media under
-    // the CSP — so the sidecar downloads them and hands back base64 the
-    // renderer plays as a `data:` URL. (The OpenRouter adapter already
-    // pre-downloads its authed content endpoint.)
+    // Normalize every result to base64 bytes. The renderer receives no provider
+    // URL. OpenRouter already uses its fixed authenticated content endpoint;
+    // URL-shaped outputs from other adapters are lowered through the bounded
+    // ProviderHttp download path after provider-specific trust checks.
     let videos;
     try {
       videos = await Promise.all(
@@ -130,18 +188,18 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
               base64: Buffer.from(vid.data).toString("base64"),
               media_type: vid.mediaType,
             };
-          // type === "url": public CDN (fal/vercel) — download in the sidecar.
-          // Require HTTPS here; host-level egress control is enforced by the
-          // OS sandbox allowlist (sandbox/policy.ts), the primary SSRF defense.
-          assertHttpsUrl(
+          const url = videoResultUrl(
             vid.url,
-            `[agent-host-video] ${resolved.provider_id} url`
+            resolved.provider_id,
+            providerHttp.isHostRouted
           );
-          const dl = await fetch(vid.url);
-          if (!dl.ok) throw new Error(`download failed (${dl.status})`);
+          const [downloaded] = await providerHttp.downloadParts([
+            { url, isUrlSupportedByModel: false },
+          ]);
+          if (!downloaded) throw new Error("video result was not downloaded");
           return {
-            base64: Buffer.from(await dl.arrayBuffer()).toString("base64"),
-            media_type: dl.headers.get("content-type") ?? vid.mediaType,
+            base64: Buffer.from(downloaded.data).toString("base64"),
+            media_type: downloaded.mediaType ?? vid.mediaType,
           };
         })
       );
@@ -149,6 +207,9 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
       return c.json(
         {
           error: `video fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+          ...(e instanceof UntrustedVideoResultOriginError
+            ? { code: e.code }
+            : {}),
           model_id: d.model_id,
           provider_id: resolved.provider_id,
         },

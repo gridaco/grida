@@ -23,20 +23,33 @@ import {
   pollQueue,
   safeText,
 } from "./fetch-helpers";
+import { ProviderHttp } from "./http";
 
 type ImageProvider = models.image.ImageProvider;
 
 // Internal per-provider builders — the public entry is makeImageModelFor.
-function makeOpenRouterImageModel(apiKey: string, id: string): ImageModelV3 {
-  return new OpenRouterImageModel(apiKey, id);
+function makeOpenRouterImageModel(
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp
+): ImageModelV3 {
+  return new OpenRouterImageModel(apiKey, id, providerHttp);
 }
 
-function makeVercelImageModel(apiKey: string, id: string): ImageModelV3 {
-  return createGateway({ apiKey }).imageModel(id);
+function makeVercelImageModel(
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp
+): ImageModelV3 {
+  return createGateway({ apiKey, fetch: providerHttp.request }).imageModel(id);
 }
 
-function makeFalImageModel(apiKey: string, id: string): ImageModelV3 {
-  return new FalImageModel(apiKey, id);
+function makeFalImageModel(
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp
+): ImageModelV3 {
+  return new FalImageModel(apiKey, id, providerHttp);
 }
 
 /**
@@ -46,15 +59,16 @@ function makeFalImageModel(apiKey: string, id: string): ImageModelV3 {
 export function makeImageModelFor(
   provider: ImageProvider,
   apiKey: string,
-  id: string
+  id: string,
+  providerHttp: ProviderHttp = new ProviderHttp()
 ): ImageModelV3 {
   switch (provider) {
     case "openrouter":
-      return makeOpenRouterImageModel(apiKey, id);
+      return makeOpenRouterImageModel(apiKey, id, providerHttp);
     case "vercel":
-      return makeVercelImageModel(apiKey, id);
+      return makeVercelImageModel(apiKey, id, providerHttp);
     case "fal":
-      return makeFalImageModel(apiKey, id);
+      return makeFalImageModel(apiKey, id, providerHttp);
   }
 }
 
@@ -82,7 +96,8 @@ export class OpenRouterImageModel implements ImageModelV3 {
 
   constructor(
     private readonly apiKey: string,
-    readonly modelId: string
+    readonly modelId: string,
+    private readonly providerHttp: ProviderHttp = new ProviderHttp()
   ) {}
 
   async doGenerate(
@@ -107,7 +122,7 @@ export class OpenRouterImageModel implements ImageModelV3 {
       image_url: { url },
     }));
 
-    const res = await fetch(OPENROUTER_IMAGE_URL, {
+    const res = await this.providerHttp.request(OPENROUTER_IMAGE_URL, {
       method: "POST",
       headers: {
         authorization: `Bearer ${this.apiKey}`,
@@ -188,7 +203,8 @@ export class FalImageModel implements ImageModelV3 {
 
   constructor(
     private readonly apiKey: string,
-    readonly modelId: string
+    readonly modelId: string,
+    private readonly providerHttp: ProviderHttp = new ProviderHttp()
   ) {}
 
   private headers(): Record<string, string> {
@@ -221,19 +237,22 @@ export class FalImageModel implements ImageModelV3 {
     }
 
     // 1. submit
-    const submitRes = await fetch(`${FAL_QUEUE_BASE}/${this.modelId}`, {
-      method: "POST",
-      headers: this.headers(),
-      signal: abortSignal,
-      body: JSON.stringify({
-        prompt,
-        num_images: n,
-        ...(image_size ? { image_size } : {}),
-        ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
-        ...(seed !== undefined ? { seed } : {}),
-        ...falExtra,
-      }),
-    });
+    const submitRes = await this.providerHttp.request(
+      `${FAL_QUEUE_BASE}/${this.modelId}`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        signal: abortSignal,
+        body: JSON.stringify({
+          prompt,
+          num_images: n,
+          ...(image_size ? { image_size } : {}),
+          ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
+          ...(seed !== undefined ? { seed } : {}),
+          ...falExtra,
+        }),
+      }
+    );
     if (!submitRes.ok) {
       throw new Error(
         `[fal] submit failed (${submitRes.status}): ${await safeText(submitRes)}`
@@ -256,12 +275,13 @@ export class FalImageModel implements ImageModelV3 {
         intervalMs: FAL_POLL_INTERVAL_MS,
         label: "[fal]",
         classify: falQueueOutcome,
+        fetch: this.providerHttp.request,
       },
       abortSignal
     );
 
     // 3. fetch the result, download each image to bytes
-    const resultRes = await fetch(submit.response_url, {
+    const resultRes = await this.providerHttp.request(submit.response_url, {
       headers: this.headers(),
       signal: abortSignal,
     });
@@ -280,7 +300,11 @@ export class FalImageModel implements ImageModelV3 {
     const images = await Promise.all(
       entries.map((img) => {
         assertAllowedUrl(img.url ?? "", FAL_HOSTS, "[fal] image url");
-        return downloadToBytes(img.url, abortSignal);
+        return downloadToBytes(
+          img.url,
+          this.providerHttp.download,
+          abortSignal
+        );
       })
     );
 
@@ -334,10 +358,11 @@ function whFromSize(
 
 async function downloadToBytes(
   url: string | undefined,
+  download: typeof globalThis.fetch,
   abortSignal?: AbortSignal
 ): Promise<Uint8Array> {
   if (!url) throw new Error("[fal] result image has no url");
-  const res = await fetch(url, { signal: abortSignal });
+  const res = await download(url, { signal: abortSignal });
   if (!res.ok) {
     throw new Error(`[fal] image download failed (${res.status})`);
   }

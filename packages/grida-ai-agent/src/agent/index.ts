@@ -28,6 +28,7 @@
 import {
   ToolLoopAgent,
   stepCountIs,
+  type Experimental_DownloadFunction as DownloadFunction,
   type InferAgentUIMessage,
   type LanguageModel,
 } from "ai";
@@ -145,6 +146,22 @@ export type CreateAgentOptions = {
  *   - Local AgentHost processes (BYOK model access).
  */
 export function createAgent(opts: CreateAgentOptions) {
+  return buildAgent(opts);
+}
+
+/**
+ * Node-host-only variant used by the agent runtime to replace the AI SDK's
+ * ambient URL-part downloader. Deliberately not re-exported from the package's
+ * neutral root: hosts supply provider HTTP only at `@grida/agent/server`.
+ */
+export function createAgentWithUrlPartDownload(
+  opts: CreateAgentOptions,
+  download: DownloadFunction
+) {
+  return buildAgent(opts, download);
+}
+
+function buildAgent(opts: CreateAgentOptions, download?: DownloadFunction) {
   const instructions = composeSystemPrompt({
     skill_blocks: opts.skill_blocks,
     project_instructions: opts.project_instructions,
@@ -177,6 +194,7 @@ export function createAgent(opts: CreateAgentOptions) {
     model: opts.model_factory(AGENT_DEFAULT_TIER),
     instructions,
     tools,
+    experimental_download: download,
     prepareCall: ({ options, ...settings }) => {
       const tier = options.tier ?? AGENT_DEFAULT_TIER;
       return {

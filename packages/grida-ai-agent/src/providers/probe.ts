@@ -39,12 +39,17 @@ import {
 const PROBE_TIMEOUT_MS = 4_000;
 const MAX_BODY_BYTES = 1_048_576;
 const MAX_MODELS = 64;
+// Keep enrichment comfortably below host-transport admission limits. A model
+// listing is untrusted in size (up to MAX_MODELS); opening one request per row
+// at once can otherwise turn a harmless probe into a sidecar-fatal burst.
+const MAX_CONCURRENT_OLLAMA_SHOW_REQUESTS = 8;
 
 export type EndpointProbeResult =
   | { ok: true; source: "ollama" | "openai"; models: ProbedEndpointModel[] }
   | { ok: false; error: string };
 
-/** The `fetch` seam — tests inject a fake; production uses the global. */
+/** The fetch seam — the server injects provider `request`; direct callers
+ *  retain the ambient-global default and tests inject a fake. */
 export type ProbeFetch = (
   url: string,
   init: {
@@ -185,26 +190,41 @@ async function enrichContextWindows(
       }
     }
   }
-  await Promise.all(
-    models.map(async (model) => {
-      const allocated = loaded.get(model.id);
-      if (allocated !== undefined) {
-        model.contextWindow = allocated;
-        return;
-      }
+
+  const unloaded: ProbedEndpointModel[] = [];
+  for (const model of models) {
+    const allocated = loaded.get(model.id);
+    if (allocated !== undefined) model.contextWindow = allocated;
+    else unloaded.push(model);
+  }
+
+  let cursor = 0;
+  const enrichNext = async () => {
+    for (;;) {
+      const index = cursor++;
+      if (index >= unloaded.length) return;
+      const model = unloaded[index]!;
       const show = await requestJson(fetchImpl, `${origin}/api/show`, {
         model: model.id,
       });
-      if (!show.ok) return;
+      if (!show.ok) continue;
       const info = (show.data as { model_info?: unknown } | null)?.model_info;
-      if (!info || typeof info !== "object") return;
+      if (!info || typeof info !== "object") continue;
       for (const [key, value] of Object.entries(info)) {
         if (key.endsWith(".context_length") && isPositiveInt(value)) {
           model.contextWindow = value;
-          return;
+          break;
         }
       }
-    })
+    }
+  };
+  await Promise.all(
+    Array.from(
+      {
+        length: Math.min(MAX_CONCURRENT_OLLAMA_SHOW_REQUESTS, unloaded.length),
+      },
+      () => enrichNext()
+    )
   );
 }
 

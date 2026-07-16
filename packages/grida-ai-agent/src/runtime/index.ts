@@ -195,6 +195,19 @@ export type AgentRuntimeDeps = ResolveDeps & {
    */
   shell_execution_allowed?: boolean;
   /**
+   * GRIDA-SEC-004 — whether the whole process tree is confined by an OS
+   * sandbox. This is an attestation consumed by the external-agent
+   * `"sandboxed"` mode; `"enabled"` makes no containment claim.
+   */
+  sandbox_enforced?: boolean;
+  /**
+   * GRIDA-SEC-004 — whether this constructed runtime may spawn external ACP
+   * agents. `"enabled"` (default for compatibility) is host-authorized process
+   * execution with no containment claim; `"sandboxed"` requires
+   * {@link sandbox_enforced}; `"disabled"` withholds the capability.
+   */
+  external_agent_execution?: "enabled" | "sandboxed" | "disabled";
+  /**
    * Base directory for per-session scratch areas (WG `scratch.md`). The host
    * injects it (filesystem location is host-owned I/O); the default is resolved
    * at the server boundary via `defaultScratchBase`. The runtime derives each
@@ -749,8 +762,36 @@ export class AgentRuntime {
     if (isAgentProviderModel(req.model_id)) {
       // Agent-provider class (issue #813): an external agent owns its own
       // loop. No BYOK/endpoint resolution, no model factory — the runtime
-      // streams from the agent-provider consumer in startTurn.
-      provider = makeAgentProvider(AGENT_PROVIDER_MODELS[req.model_id].id);
+      // streams from the agent-provider consumer in startTurn. GRIDA-SEC-004:
+      // external process authority is explicit and independent of the locked
+      // shell's disposition.
+      const providerId = AGENT_PROVIDER_MODELS[req.model_id].id;
+      const externalAgentExecution =
+        this.deps.external_agent_execution ?? "enabled";
+      if (externalAgentExecution === "disabled") {
+        return Response.json(
+          {
+            error: `[agent-host-providers] external agent ${providerId} is disabled by the host`,
+            code: "provider_down",
+            provider_id: providerId,
+          },
+          { status: 409 }
+        );
+      }
+      if (
+        externalAgentExecution === "sandboxed" &&
+        this.deps.sandbox_enforced !== true
+      ) {
+        return Response.json(
+          {
+            error: `[agent-host-providers] external agent ${providerId} requires an enforced OS sandbox`,
+            code: "provider_down",
+            provider_id: providerId,
+          },
+          { status: 409 }
+        );
+      }
+      provider = makeAgentProvider(providerId);
     } else {
       try {
         provider = await resolveProvider(this.deps, { explicit: req.explicit });
@@ -1116,6 +1157,7 @@ export class AgentRuntime {
       // GRIDA-SEC-006 — hosted-session deps for the generate_image gate.
       gg: this.deps.gg,
       gg_base_url: this.deps.gg_base_url,
+      provider_http: this.deps.provider_http,
       image_gen_enabled: this.deps.image_gen_enabled === true,
       image_model_id: this.deps.image_model_id,
       // Host-level: gates the `question` tool's execute-or-pause in createAgent.
@@ -1172,6 +1214,11 @@ export class AgentRuntime {
             : undefined;
           const result = await runAgentProviderTurn({
             provider_id: provider.provider_id as AgentProviderId,
+            // Defense in depth at the spawn seam. Direct runs are preflighted
+            // before session creation; this also protects non-HTTP turn paths.
+            sandbox_enforced: this.deps.sandbox_enforced === true,
+            external_agent_execution:
+              this.deps.external_agent_execution ?? "enabled",
             prompt: promptFromLatestUserModelMessage(
               preparedMessages,
               opts.agent_prompt ?? ""

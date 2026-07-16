@@ -33,6 +33,7 @@ import {
 } from "../../providers/resolve-image";
 import { hostedGenerationError } from "./gg-media-errors";
 import { body, v } from "@grida/daemon/server";
+import type { ProviderHttp } from "../../providers/http";
 
 const IMAGE_PROVIDERS = ["vercel", "fal", "openrouter", "gg"] as const;
 
@@ -41,10 +42,11 @@ export type ImagesRoutesDeps = {
   /** GRIDA-SEC-006 — hosted provider deps; absent ⇒ grida never resolves. */
   gg?: import("../../providers/gg-session").GridaGatewaySessionStore;
   gg_base_url?: string;
+  provider_http?: ProviderHttp;
 };
 
 export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
-  const { secrets, gg, gg_base_url } = deps;
+  const { secrets, gg, gg_base_url, provider_http } = deps;
 
   app.post("/images/generate", async (c) => {
     const r = await body(c, {
@@ -74,7 +76,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
     let resolved;
     try {
       resolved = await resolveImageModel(
-        { secrets, gg, gg_base_url },
+        { secrets, gg, gg_base_url, provider_http },
         model_id,
         provider ? { explicit: provider } : {}
       );

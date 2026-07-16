@@ -138,36 +138,48 @@ sequenceDiagram
     participant W as Webview session<br/>(durable login)
     participant M as Mint endpoint<br/>(first-party, same-origin)
     participant D as Native daemon<br/>(sidecar — memory only)
+    participant H as Native provider transport<br/>(Chromium system route)
     participant G as Grida Gateway (GG)<br/>(first-party)
     participant B as Entitlement + ledger<br/>(prepaid credit)
     participant P as Upstream model provider
 
     Note over W: signed in — the only durable credential (GRIDA-SEC-005)
-    D->>M: request scoped token (cookie session)
+    W->>M: request scoped token (cookie attached same-origin)
     M->>M: verify session + org membership
-    M-->>D: scoped token — aud "gg:ai", ~15 min, org-bound
+    M-->>W: scoped token — aud "gg:ai", ~15 min, org-bound
+    W->>D: immediately push across authenticated bridge
+    Note over W: transient handoff only<br/>never persisted, logged, or returned
     Note over D: held in memory only<br/>never on disk, never a refresh token
-    D->>G: AI request + Bearer scoped token
+    D->>H: AI request + Bearer scoped token
+    Note over H: transient routing only<br/>no persistence, logs, or cookie custody
+    H->>G: request through Chromium's system route
     G->>G: verify token (audience, signature, expiry)
     G->>B: entitlement gate (pre-flight)
     alt insufficient credit
         B-->>G: blocked
-        G-->>D: 402 insufficient_credits (before any upstream call)
+        G-->>H: 402 insufficient_credits (before any upstream call)
+        H-->>D: bounded response
     else allowed
         G->>P: model call (first-party upstream key)
         P-->>G: streamed tokens / media
-        G-->>D: streamed response
+        G-->>H: streamed response
+        H-->>D: credit-bounded stream
         G->>B: ingest usage (post-flight, at cost)
     end
 ```
 
-The flow reads top to bottom: the durable session mints a weak token; the
-native process holds that token in memory only; every AI call carries it to
-the first-party gateway; the gateway proves the token, gates the org's
-credit _before_ opening upstream, streams the model back, and meters what
-was actually used. **BYOK bypasses this entire diagram** — a user-supplied
-key resolves to a client-direct provider that never touches the gateway or
-the ledger.
+The flow reads top to bottom: the webview uses its durable, same-origin
+session to mint a weak token, immediately hands that token to the native
+process across the authenticated bridge, and retains no copy. The native
+process holds it in memory only; every AI call crosses the bounded native
+provider transport and Chromium's effective system route to the first-party
+gateway. Electron main can observe the scoped bearer transiently in that
+request, but does not persist, log, return, or place it in a cookie jar. The
+gateway proves the token, gates the org's credit _before_
+opening upstream, streams the model back, and meters what was actually used.
+The durable session cookie never leaves the webview. **BYOK bypasses this
+entire diagram** — a user-supplied key resolves to a client-direct provider
+that never touches the gateway or the ledger.
 
 ## The contract
 
@@ -187,10 +199,14 @@ short-lived, organization-bound token**:
 - **Minted only from the durable session, same-origin** — the sole place a
   token is created requires a live login and verified org membership. No
   other input can produce one.
-- **Custody: memory only** — the native daemon holds the token in memory
-  and nowhere else: never on disk, never persisted, never a refresh token.
-  The webview session remains the _only_ durable credential; the client
-  re-mints proactively before expiry and again on an expiry error.
+- **Custody: memory only** — the renderer handles the token only long enough
+  to push it across the authenticated bridge; it never persists, logs, or
+  returns it. The native daemon then holds the token in memory and nowhere
+  else: never on disk, never persisted, never a refresh token. Electron main
+  observes it only while routing an in-flight provider request and has no
+  durable credential custody. The webview session remains the _only_ durable
+  credential; the renderer re-mints and re-pushes proactively before expiry and
+  again on an expiry error.
 
 This is the "thin slice of A": a minted credential, but scoped to our own
 resource server, so its blast radius is "≤15 minutes of AI on one org's
@@ -274,10 +290,13 @@ off-device; it does not move the _agent_ off-device.
 
 **Implemented (local, end-to-end verified):** text, image, and video all
 run keyless for a signed-in desktop user; the scoped token mints from the
-session, lives only in the daemon's memory, and is re-minted on expiry; the
-gateway gates and meters through the live billing rail; BYOK continues to
-bypass everything; precedence resolves explicit → BYOK → hosted →
-fallbacks.
+session, crosses renderer memory only for the transient authenticated-bridge
+handoff, is then retained only in the daemon's memory, and is re-minted on
+expiry; each GG call uses the bounded native provider transport and Chromium
+system route without giving Electron main durable token custody; the gateway
+gates and meters through the live billing rail; BYOK
+continues to bypass everything; precedence resolves explicit → BYOK → hosted
+→ fallbacks.
 
 **Deferred / accepted limitations** — the parts deliberately left for
 later, and the honest risks:
@@ -316,5 +335,5 @@ later, and the honest risks:
 - [Metronome integration](./billing/metronome.md) — the metering substrate.
 - [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md) —
   `GRIDA-SEC-003`/`004`/`005`/`006`, the enforced boundaries.
-- [Deferred Grida Cloud Agent Provider](./_history/hosted-ai-deferred-provider-2026-06.md)
+- [Deferred Grida Cloud Agent Provider](https://github.com/gridaco/grida/blob/main/docs/wg/platform/_history/hosted-ai-deferred-provider-2026-06.md)
   — the superseded pre-build design, kept for lineage.

@@ -22,26 +22,46 @@ import type {
 import type { models } from "@grida/ai-models";
 import {
   assertAllowedUrl,
-  assertHttpsUrl,
   falQueueOutcome,
   pollQueue,
   safeText,
   type PollOutcome,
 } from "./fetch-helpers";
+import { ProviderHttp } from "./http";
 
 type VideoProvider = models.video.VideoProvider;
 
+/** Explicitly pin the SDK default so result-origin checks share its source. */
+export const VERCEL_VIDEO_GATEWAY_BASE_URL =
+  "https://ai-gateway.vercel.sh/v3/ai";
+
 // Internal per-provider builders — the public entry is makeVideoModelFor.
-function makeVercelVideoModel(apiKey: string, id: string): VideoModelV3 {
-  return createGateway({ apiKey }).videoModel(id);
+function makeVercelVideoModel(
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp
+): VideoModelV3 {
+  return createGateway({
+    apiKey,
+    baseURL: VERCEL_VIDEO_GATEWAY_BASE_URL,
+    fetch: providerHttp.request,
+  }).videoModel(id);
 }
 
-function makeFalVideoModel(apiKey: string, id: string): VideoModelV3 {
-  return new FalVideoModel(apiKey, id);
+function makeFalVideoModel(
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp
+): VideoModelV3 {
+  return new FalVideoModel(apiKey, id, providerHttp);
 }
 
-function makeOpenRouterVideoModel(apiKey: string, id: string): VideoModelV3 {
-  return new OpenRouterVideoModel(apiKey, id);
+function makeOpenRouterVideoModel(
+  apiKey: string,
+  id: string,
+  providerHttp: ProviderHttp
+): VideoModelV3 {
+  return new OpenRouterVideoModel(apiKey, id, providerHttp);
 }
 
 /**
@@ -51,15 +71,16 @@ function makeOpenRouterVideoModel(apiKey: string, id: string): VideoModelV3 {
 export function makeVideoModelFor(
   provider: VideoProvider,
   apiKey: string,
-  id: string
+  id: string,
+  providerHttp: ProviderHttp = new ProviderHttp()
 ): VideoModelV3 {
   switch (provider) {
     case "vercel":
-      return makeVercelVideoModel(apiKey, id);
+      return makeVercelVideoModel(apiKey, id, providerHttp);
     case "fal":
-      return makeFalVideoModel(apiKey, id);
+      return makeFalVideoModel(apiKey, id, providerHttp);
     case "openrouter":
-      return makeOpenRouterVideoModel(apiKey, id);
+      return makeOpenRouterVideoModel(apiKey, id, providerHttp);
   }
 }
 
@@ -94,7 +115,8 @@ export class FalVideoModel implements VideoModelV3 {
 
   constructor(
     private readonly apiKey: string,
-    readonly modelId: string
+    readonly modelId: string,
+    private readonly providerHttp: ProviderHttp = new ProviderHttp()
   ) {}
 
   private headers(): Record<string, string> {
@@ -121,22 +143,25 @@ export class FalVideoModel implements VideoModelV3 {
     const falExtra =
       (providerOptions?.fal as Record<string, unknown> | undefined) ?? {};
 
-    const submitRes = await fetch(`${FAL_QUEUE_BASE}/${this.modelId}`, {
-      method: "POST",
-      headers: this.headers(),
-      signal: abortSignal,
-      body: JSON.stringify({
-        prompt,
-        ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
-        ...(resolution ? { resolution } : {}),
-        ...(duration !== undefined ? { duration } : {}),
-        ...(fps !== undefined ? { fps } : {}),
-        ...(seed !== undefined ? { seed } : {}),
-        // image-to-video: fal takes the start frame as `image_url`.
-        ...(image ? { image_url: fileToUrl(image) } : {}),
-        ...falExtra,
-      }),
-    });
+    const submitRes = await this.providerHttp.request(
+      `${FAL_QUEUE_BASE}/${this.modelId}`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        signal: abortSignal,
+        body: JSON.stringify({
+          prompt,
+          ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
+          ...(resolution ? { resolution } : {}),
+          ...(duration !== undefined ? { duration } : {}),
+          ...(fps !== undefined ? { fps } : {}),
+          ...(seed !== undefined ? { seed } : {}),
+          // image-to-video: fal takes the start frame as `image_url`.
+          ...(image ? { image_url: fileToUrl(image) } : {}),
+          ...falExtra,
+        }),
+      }
+    );
     if (!submitRes.ok) {
       throw new Error(
         `[fal] video submit failed (${submitRes.status}): ${await safeText(submitRes)}`
@@ -160,11 +185,12 @@ export class FalVideoModel implements VideoModelV3 {
         intervalMs: FAL_POLL_INTERVAL_MS,
         label: "[fal] video",
         classify: falQueueOutcome,
+        fetch: this.providerHttp.request,
       },
       abortSignal
     );
 
-    const resultRes = await fetch(submit.response_url, {
+    const resultRes = await this.providerHttp.request(submit.response_url, {
       headers: this.headers(),
       signal: abortSignal,
     });
@@ -180,11 +206,15 @@ export class FalVideoModel implements VideoModelV3 {
     const entries = result.videos ?? (result.video ? [result.video] : []);
     const videos = entries
       .filter((v) => typeof v.url === "string")
-      .map((v) => ({
-        type: "url" as const,
-        url: v.url as string,
-        mediaType: v.content_type ?? "video/mp4",
-      }));
+      .map((v) => {
+        const url = v.url as string;
+        assertAllowedUrl(url, FAL_HOSTS, "[fal] video url");
+        return {
+          type: "url" as const,
+          url,
+          mediaType: v.content_type ?? "video/mp4",
+        };
+      });
     if (videos.length === 0) {
       throw new Error("[fal] response contained no video");
     }
@@ -213,15 +243,15 @@ const OR_POLL_INTERVAL_MS = 2_000;
 type OrSubmitResponse = { id: string; polling_url?: string };
 type OrPollResponse = {
   status?: string;
-  unsigned_urls?: string[];
   error?: string;
 };
 
 /**
  * `VideoModelV3` over OpenRouter's async Unified Video API (`POST
- * /api/v1/videos` → job id → poll `polling_url` → `unsigned_urls[0]`). The
- * `unsigned_urls` are public, so we hand the URL straight to the renderer (no
- * auth needed to play it). Verified live 2026-06-29.
+ * /api/v1/videos` → job id → poll `polling_url` → authenticated same-origin
+ * `/content`). Poll responses may advertise third-party `unsigned_urls`, but
+ * those origins are not part of the provider contract and are deliberately
+ * ignored. The adapter returns base64 bytes, never a URL to the renderer.
  */
 export class OpenRouterVideoModel implements VideoModelV3 {
   readonly specificationVersion = "v3" as const;
@@ -230,7 +260,8 @@ export class OpenRouterVideoModel implements VideoModelV3 {
 
   constructor(
     private readonly apiKey: string,
-    readonly modelId: string
+    readonly modelId: string,
+    private readonly providerHttp: ProviderHttp = new ProviderHttp()
   ) {}
 
   private headers(): Record<string, string> {
@@ -258,7 +289,7 @@ export class OpenRouterVideoModel implements VideoModelV3 {
       (providerOptions?.openrouter as Record<string, unknown> | undefined) ??
       {};
 
-    const submitRes = await fetch(OPENROUTER_VIDEO_URL, {
+    const submitRes = await this.providerHttp.request(OPENROUTER_VIDEO_URL, {
       method: "POST",
       headers: this.headers(),
       signal: abortSignal,
@@ -282,8 +313,12 @@ export class OpenRouterVideoModel implements VideoModelV3 {
       );
     }
     const submit = (await submitRes.json()) as OrSubmitResponse;
+    if (typeof submit.id !== "string" || submit.id.length === 0) {
+      throw new Error("[openrouter] video submit response contained no job id");
+    }
     const pollUrl =
-      submit.polling_url ?? `${OPENROUTER_VIDEO_URL}/${submit.id}`;
+      submit.polling_url ??
+      `${OPENROUTER_VIDEO_URL}/${encodeURIComponent(submit.id)}`;
     // GRIDA-SEC-004: the poll fetch carries the key — pin it to OpenRouter.
     assertAllowedUrl(
       pollUrl,
@@ -291,7 +326,7 @@ export class OpenRouterVideoModel implements VideoModelV3 {
       "[openrouter] video polling_url"
     );
 
-    const poll = await pollQueue<OrPollResponse>(
+    await pollQueue<OrPollResponse>(
       pollUrl,
       {
         headers: this.headers(),
@@ -299,28 +334,23 @@ export class OpenRouterVideoModel implements VideoModelV3 {
         intervalMs: OR_POLL_INTERVAL_MS,
         label: "[openrouter] video",
         classify: orVideoOutcome,
+        fetch: this.providerHttp.request,
       },
       abortSignal
     );
-    const unsignedUrl = poll.unsigned_urls?.[0];
-    const url =
-      unsignedUrl ?? `${OPENROUTER_VIDEO_URL}/${submit.id}/content?index=0`;
+    const url = `${OPENROUTER_VIDEO_URL}/${encodeURIComponent(submit.id)}/content?index=0`;
 
     // Download in the sidecar and return bytes — the renderer can't reach the
     // content endpoint under the desktop CSP; the route turns these bytes into
     // a `data:` URL the <video> plays.
     //
-    // GRIDA-SEC-004: `unsigned_urls` are pre-signed public CDN links — fetch
-    // them WITHOUT the key (or the secret leaks to a third-party host), and
-    // require HTTPS. The authed `/content` fallback is pinned to OpenRouter and
-    // gets the Authorization header.
-    if (unsignedUrl) {
-      assertHttpsUrl(unsignedUrl, "[openrouter] video url");
-    } else {
-      assertAllowedUrl(url, OPENROUTER_HOSTS, "[openrouter] video content");
-    }
-    const dl = await fetch(url, {
-      headers: unsignedUrl ? {} : { authorization: `Bearer ${this.apiKey}` },
+    // GRIDA-SEC-004: never follow provider-advertised unsigned/CDN URLs. The
+    // job id is encoded into the fixed OpenRouter origin's authenticated
+    // content route, so neither credentials nor host download authority can be
+    // redirected by an upstream response.
+    assertAllowedUrl(url, ["openrouter.ai"], "[openrouter] video content");
+    const dl = await this.providerHttp.request(url, {
+      headers: { authorization: `Bearer ${this.apiKey}` },
       signal: abortSignal,
     });
     if (!dl.ok) {

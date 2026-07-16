@@ -103,7 +103,11 @@ describe("probeEndpointModels", () => {
   });
 
   it("rejects non-http(s) and malformed base URLs", async () => {
-    for (const url of ["file:///etc/passwd", "not a url"]) {
+    for (const url of [
+      "file:///etc/passwd",
+      "not a url",
+      "https://user:password@example.com/v1",
+    ]) {
       const result = await probeEndpointModels(url, fakeFetch({}));
       expect(result.ok).toBe(false);
     }

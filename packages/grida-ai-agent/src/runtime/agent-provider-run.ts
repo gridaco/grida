@@ -43,6 +43,17 @@ function finishReasonFromStop(stopReason: string): string {
 export async function runAgentProviderTurn(opts: {
   provider_id: AgentProviderId;
   prompt: string;
+  /**
+   * GRIDA-SEC-004 — host attestation consumed only when
+   * `external_agent_execution` is `"sandboxed"`.
+   */
+  sandbox_enforced: boolean;
+  /**
+   * GRIDA-SEC-004 — explicit host disposition for the ACP process capability.
+   * The runtime resolves omission at its construction boundary; this final
+   * spawn seam requires the resolved value so non-HTTP paths cannot bypass it.
+   */
+  external_agent_execution: "enabled" | "sandboxed" | "disabled";
   cwd?: string;
   /** Resume the external agent's prior session (continuity). */
   resume_session_id?: string;
@@ -57,6 +68,16 @@ export async function runAgentProviderTurn(opts: {
   connect?: BridgeConnect;
   emit: Emit;
 }): Promise<TurnResult> {
+  if (opts.external_agent_execution === "disabled") {
+    throw new Error(
+      `[agent-host-providers] external agent ${opts.provider_id} is disabled by the host`
+    );
+  }
+  if (opts.external_agent_execution === "sandboxed" && !opts.sandbox_enforced) {
+    throw new Error(
+      `[agent-host-providers] external agent ${opts.provider_id} requires an enforced OS sandbox`
+    );
+  }
   const session = await openProvider(
     opts.provider_id,
     {

@@ -36,6 +36,8 @@ describe("agent-provider JTBD (issue #813)", () => {
     const chunks: AgentUIMessageChunk[] = [];
     const result = await runAgentProviderTurn({
       provider_id: "claude",
+      sandbox_enforced: true,
+      external_agent_execution: "sandboxed",
       prompt: "say hello",
       connect: bridge.connect,
       emit: (c) => chunks.push(c),
@@ -65,6 +67,8 @@ describe("agent-provider JTBD (issue #813)", () => {
     const bridge = createFakeBridge({ onPrompt: () => "end_turn" });
     await runAgentProviderTurn({
       provider_id: "claude",
+      sandbox_enforced: true,
+      external_agent_execution: "sandboxed",
       prompt: "hi",
       connect: bridge.connect,
       emit: () => {},
@@ -91,6 +95,8 @@ describe("agent-provider JTBD (issue #813)", () => {
     // Turn 1: no prior id → the consumer mints a fresh external session.
     const first = await runAgentProviderTurn({
       provider_id: "claude",
+      sandbox_enforced: true,
+      external_agent_execution: "sandboxed",
       prompt: "my code word is ZUMBRA",
       connect: bridge.connect,
       emit: () => {},
@@ -104,6 +110,8 @@ describe("agent-provider JTBD (issue #813)", () => {
     // turn 1; here we assert the consumer's half of that contract.)
     await runAgentProviderTurn({
       provider_id: "claude",
+      sandbox_enforced: true,
+      external_agent_execution: "sandboxed",
       prompt: "what was my code word?",
       resume_session_id: first.providerSessionId,
       connect: bridge.connect,
@@ -127,6 +135,8 @@ describe("agent-provider JTBD (issue #813)", () => {
 
     const turn = await runAgentProviderTurn({
       provider_id: "claude",
+      sandbox_enforced: true,
+      external_agent_execution: "sandboxed",
       prompt: "continue please",
       resume_session_id: "stale-sess-xyz",
       connect: bridge.connect,
@@ -161,6 +171,8 @@ describe("agent-provider JTBD (issue #813)", () => {
     const ac = new AbortController();
     const run = runAgentProviderTurn({
       provider_id: "claude",
+      sandbox_enforced: true,
+      external_agent_execution: "sandboxed",
       prompt: "do a long thing",
       signal: ac.signal,
       connect: bridge.connect,
@@ -187,6 +199,8 @@ describe("agent-provider JTBD (issue #813)", () => {
       const chunks: AgentUIMessageChunk[] = [];
       await runAgentProviderTurn({
         provider_id: "claude",
+        sandbox_enforced: true,
+        external_agent_execution: "sandboxed",
         prompt: "x",
         connect: bridge.connect,
         emit: (c) => chunks.push(c),
@@ -196,5 +210,56 @@ describe("agent-provider JTBD (issue #813)", () => {
         | undefined;
       expect(finish?.finishReason).toBe(expected);
     }
+  });
+
+  it("GRIDA-SEC-004: refuses before opening ACP without an enforced sandbox", async () => {
+    const bridge = createFakeBridge({ onPrompt: () => "end_turn" });
+
+    await expect(
+      runAgentProviderTurn({
+        provider_id: "claude",
+        sandbox_enforced: false,
+        external_agent_execution: "sandboxed",
+        prompt: "must not reach the process",
+        connect: bridge.connect,
+        emit: () => {},
+      })
+    ).rejects.toThrow(/requires an enforced OS sandbox/);
+    expect(bridge.calls.initialize).toBe(0);
+    expect(bridge.calls.newSession).toBe(0);
+  });
+
+  it("GRIDA-SEC-004: enabled mode preserves host-authorized unsandboxed execution", async () => {
+    const bridge = createFakeBridge({ onPrompt: () => "end_turn" });
+
+    const turn = await runAgentProviderTurn({
+      provider_id: "claude",
+      sandbox_enforced: false,
+      external_agent_execution: "enabled",
+      prompt: "host explicitly authorized this process",
+      connect: bridge.connect,
+      emit: () => {},
+    });
+
+    expect(bridge.calls.initialize).toBeGreaterThan(0);
+    expect(bridge.calls.newSession).toBe(1);
+    expect(turn.stopReason).toBe("end_turn");
+  });
+
+  it("GRIDA-SEC-004: refuses before opening ACP when the host disables it", async () => {
+    const bridge = createFakeBridge({ onPrompt: () => "end_turn" });
+
+    await expect(
+      runAgentProviderTurn({
+        provider_id: "claude",
+        sandbox_enforced: true,
+        external_agent_execution: "disabled",
+        prompt: "must not reach the process",
+        connect: bridge.connect,
+        emit: () => {},
+      })
+    ).rejects.toThrow(/disabled by the host/);
+    expect(bridge.calls.initialize).toBe(0);
+    expect(bridge.calls.newSession).toBe(0);
   });
 });

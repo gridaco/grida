@@ -49,7 +49,7 @@ should use the SQLite backup API rather than copying the trio.
 `sessions.db` deliberately uses the OS default mode, not `0o600` — the
 DB holds user data (chat content), not at-rest secrets. The
 `auth.json` permission guard protects the secret surface separately.
-This matches [agent security / layer 5](./agent-security.md#layer-5--secrets-discipline).
+This matches [agent security / secrets discipline](./agent-security.md#secrets-discipline).
 
 ## SQLite driver — `node:sqlite` + drizzle proxy
 
@@ -157,5 +157,5 @@ file copy during a WAL checkpoint risks tearing.
 - [Agent system RFC / Session lifecycle / streaming + resume](../ai/agent/session.md#streaming-and-layering)
   — the resume model the in-memory registry implements.
 - [Process model](./process-model.md) — who reads/writes which file.
-- [Agent security / layer 5](./agent-security.md#layer-5--secrets-discipline)
+- [Agent security / secrets discipline](./agent-security.md#secrets-discipline)
   — chmod and credential discipline.

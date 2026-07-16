@@ -53,6 +53,7 @@ import {
   DAEMON_PROTOCOL,
   type AgentDaemonOptions,
   type AgentTenantOptions,
+  type ProviderHttpTransport,
   type DaemonCapabilities,
   type DaemonHandshakeResponse,
   type DaemonHttpAccess,
@@ -242,11 +243,22 @@ describe("@grida/agent public API", () => {
       // Type-level: the factory returns the daemon's lifecycle class; the
       // tenant conforms to the daemon's seam contract.
       expectTypeOf(createAgentDaemon).returns.toEqualTypeOf<DaemonServer>();
-      const tenantOpts: AgentTenantOptions = { interactive: true };
+      const providerHttp: ProviderHttpTransport = {
+        request: globalThis.fetch,
+        download: globalThis.fetch,
+      };
+      const tenantOpts: AgentTenantOptions = {
+        interactive: true,
+        provider_http: providerHttp,
+      };
       const tenant: DaemonTenant = createAgentTenant(tenantOpts);
       expect(typeof tenant.register).toBe("function");
       expect(tenant.sse_query_token_paths?.length).toBe(2);
       expect(typeof createAgentDaemon).toBe("function");
+      // Host HTTP stays behind the Node-only server entry. Neither the raw
+      // operations nor the internal URL-part adapter join the neutral root.
+      expect("ProviderHttp" in root).toBe(false);
+      expect("createAgentWithUrlPartDownload" in root).toBe(false);
       void opts;
     });
 
@@ -256,8 +268,12 @@ describe("@grida/agent public API", () => {
       const policy: AgentDaemonSandboxPolicy = buildAgentDaemonSandboxPolicy({
         user_data: "/tmp/grida",
         home: "/Users/example",
+        gg_host: "grida.co",
       });
       expect(policy.network.allowed_domains).toContain("openrouter.ai");
+      expect(policy.network.allowed_domains).toEqual(
+        expect.arrayContaining(["grida.co", "*.grida.co"])
+      );
       // BYOK image provider fal (#908): queue API + media CDN must be reachable.
       expect(policy.network.allowed_domains).toEqual(
         expect.arrayContaining(["*.fal.run", "fal.media", "*.fal.media"])
@@ -277,6 +293,70 @@ describe("@grida/agent public API", () => {
       expect(policy.filesystem.deny_read.some((p) => p.includes(".ssh"))).toBe(
         true
       );
+    });
+
+    it("removes direct provider egress in host-routed HTTP mode", () => {
+      const policy = buildAgentDaemonSandboxPolicy({
+        user_data: "/tmp/grida",
+        home: "/Users/example",
+        gg_host: "grida.co",
+        host_routed_provider_http: true,
+      });
+
+      // BYOK + hosted GG must leave through the host callback. Pin every
+      // provider family, not only one representative host.
+      for (const host of [
+        "openrouter.ai",
+        "ai-gateway.vercel.sh",
+        "*.vercel-ai.com",
+        "fal.run",
+        "*.fal.run",
+        "fal.media",
+        "*.fal.media",
+        "grida.co",
+        "*.grida.co",
+      ]) {
+        expect(policy.network.allowed_domains).not.toContain(host);
+      }
+      // ACP owns a separate network stack inside the same outer sandbox; the
+      // daemon frame's baseline hosts also remain available to sandboxed work.
+      expect(policy.network.allowed_domains).toEqual(
+        expect.arrayContaining([
+          "api.anthropic.com",
+          "*.anthropic.com",
+          "registry.npmjs.org",
+          "github.com",
+        ])
+      );
+    });
+
+    it("can deny all direct outbound network to shell and child processes", () => {
+      const policy = buildAgentDaemonSandboxPolicy({
+        user_data: "/tmp/grida",
+        home: "/Users/example",
+        gg_host: "grida.co",
+        direct_network_access: "none",
+      });
+
+      // This suppresses all three sources: daemon development hosts,
+      // in-process provider/GG hosts, and external ACP vendor hosts.
+      expect(policy.network.allowed_domains).toEqual([]);
+      // The daemon still needs to listen on its loopback HTTP perimeter. This
+      // option governs outbound destinations, not local server binding.
+      expect(policy.network.allow_local_binding).toBe(true);
+    });
+
+    it("can independently deny local socket binding", () => {
+      const policy = buildAgentDaemonSandboxPolicy({
+        user_data: "/tmp/grida",
+        home: "/Users/example",
+        allow_local_binding: false,
+      });
+
+      // Binding authority is independent of outbound allowlisted domains. A
+      // socketless host can remove it without changing provider egress policy.
+      expect(policy.network.allow_local_binding).toBe(false);
+      expect(policy.network.allowed_domains).toContain("openrouter.ai");
     });
 
     it("exposes the Daemon discovery contract (WG daemon.md, #798)", () => {
