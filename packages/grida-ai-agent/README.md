@@ -57,8 +57,11 @@ Node hosts may pass `provider_http` to `createAgentTenant` or
   call. The host authorizes each concrete origin; the contract does not grant
   arbitrary public-web access.
 
-Omitting `provider_http` preserves the ambient `globalThis.fetch` behavior.
-Both functions are resolved at call time, and both must be supplied together so
+Omitting `provider_http` preserves ambient `globalThis.fetch` only for provider
+`request` operations needed by standalone/CLI hosts. Remote `download`
+operations fail closed because the package cannot bind DNS and redirect checks
+to an ambient fetch connection; inline `data:` assets are still decoded
+locally. When a transport is supplied, both functions are required together so
 a host cannot unknowingly leave one class of traffic on ambient networking.
 The callback is an authority boundary, not a pre-authorized execution hook.
 Before I/O, the host must inspect and authorize the concrete URL, method, and
@@ -67,18 +70,19 @@ hop; and validate the resolved address/route (including DNS rebinding posture).
 Configured endpoints may intentionally be local, so this decision belongs to
 the host environment. The package owns provider-specific request shaping,
 credential injection, basic URL syntax checks, response parsing, and download
-byte bounds—not the host's destination or routing policy. A callback rejection
-is terminal; there is no ambient-fetch fallback.
+byte bounds—not the host's destination or routing policy. Each automatic asset
+lowering batch is refused above private, non-configurable count and aggregate
+decoded-byte caps, and its host downloads are consumed sequentially. A callback
+rejection is terminal; there is no ambient-download fallback.
 
 Provider result URLs are narrower than the callback's general authorization
 surface. OpenRouter video ignores third-party `unsigned_urls` and fetches only
-its authenticated, same-origin content endpoint. With host-routed HTTP,
-Vercel Gateway video accepts only inline `data:` results or its exact configured
-Gateway origin; an arbitrary result origin fails with
-`unsupported_untrusted_result_origin`. Ambient standalone mode retains the
-legacy arbitrary-public-HTTPS result behavior. Vercel Gateway image responses
-are base64 strings on the provider request lane and never open the download
-lane.
+its authenticated, same-origin content endpoint. Vercel Gateway video accepts
+only inline `data:` results or its exact configured Gateway origin; an
+arbitrary result origin fails with `unsupported_untrusted_result_origin`, and
+an exact remote origin still requires the host download transport. Vercel
+Gateway image responses are base64 strings on the provider request lane and
+never open the download lane.
 
 The callbacks are never exposed to tools, shell commands, or external-agent
 processes. There is deliberately no public fixed-destination manifest: hosted
@@ -147,8 +151,8 @@ model ids (`agent-provider/types.ts`) select it; continuity rides ACP
 `session/resume`. Because that subprocess owns its own tools and network stack,
 the construction-time `external_agent_execution` disposition is explicit:
 `"enabled"` is host-authorized execution with no containment claim (the
-backward-compatible default and the CLI's explicit choice), `"sandboxed"`
-requires `sandbox_enforced: true`, and `"disabled"` withholds the capability.
+CLI's explicit choice), `"sandboxed"` requires `sandbox_enforced: true`, and
+`"disabled"` withholds the capability and is the omission default.
 `allow_unsandboxed_shell` governs only Grida's locked shell and does not affect
 this independent process authority.
 

@@ -303,7 +303,11 @@ export namespace AgentSidecarChannel {
 
   /** Stateful decoder for arbitrarily fragmented or coalesced pipe chunks. */
   export class Decoder {
-    private pending = Buffer.alloc(0);
+    private chunks: Buffer[] = [];
+    private chunkIndex = 0;
+    private chunkOffset = 0;
+    private bufferedBytes = 0;
+    private payloadBytes: number | null = null;
     private failed = false;
 
     push(chunk: Uint8Array): Frame[] {
@@ -313,26 +317,27 @@ export namespace AgentSidecarChannel {
       if (chunk.byteLength === 0) return [];
 
       try {
-        this.pending = Buffer.concat([
-          this.pending,
-          Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength),
-        ]);
+        this.append(chunk);
         const frames: Frame[] = [];
 
-        while (this.pending.length >= 4) {
-          const length = this.pending.readUInt32BE(0);
-          if (length === 0) {
-            throw protocolError("zero-length frame");
+        while (true) {
+          if (this.payloadBytes === null) {
+            if (this.bufferedBytes < 4) break;
+            const length = this.read(4).readUInt32BE(0);
+            if (length === 0) {
+              throw protocolError("zero-length frame");
+            }
+            if (length > MAX_FRAME_BYTES) {
+              throw protocolError(
+                `frame length ${length} exceeds ${MAX_FRAME_BYTES}`
+              );
+            }
+            this.payloadBytes = length;
           }
-          if (length > MAX_FRAME_BYTES) {
-            throw protocolError(
-              `frame length ${length} exceeds ${MAX_FRAME_BYTES}`
-            );
-          }
-          if (this.pending.length < 4 + length) break;
+          if (this.bufferedBytes < this.payloadBytes) break;
 
-          const payload = this.pending.subarray(4, 4 + length);
-          this.pending = this.pending.subarray(4 + length);
+          const payload = this.read(this.payloadBytes);
+          this.payloadBytes = null;
           let json: unknown;
           try {
             json = JSON.parse(UTF8_DECODER.decode(payload));
@@ -344,10 +349,68 @@ export namespace AgentSidecarChannel {
 
         return frames;
       } catch (error) {
-        this.pending = Buffer.alloc(0);
+        this.reset();
         this.failed = true;
         throw error;
       }
+    }
+
+    private append(chunk: Uint8Array): void {
+      // Take ownership once. Re-concatenating all prior bytes on every pipe
+      // fragment makes one-byte delivery quadratic in the frame size.
+      const owned = Buffer.from(chunk);
+      this.chunks.push(owned);
+      this.bufferedBytes += owned.length;
+    }
+
+    private read(length: number): Buffer {
+      const value = Buffer.allocUnsafe(length);
+      let valueOffset = 0;
+
+      while (valueOffset < length) {
+        const chunk = this.chunks[this.chunkIndex];
+        const available = chunk.length - this.chunkOffset;
+        const consumed = Math.min(available, length - valueOffset);
+        chunk.copy(
+          value,
+          valueOffset,
+          this.chunkOffset,
+          this.chunkOffset + consumed
+        );
+        valueOffset += consumed;
+        this.chunkOffset += consumed;
+        if (this.chunkOffset === chunk.length) {
+          this.chunkIndex += 1;
+          this.chunkOffset = 0;
+        }
+      }
+
+      this.bufferedBytes -= length;
+      this.compact();
+      return value;
+    }
+
+    private compact(): void {
+      if (this.chunkIndex === this.chunks.length) {
+        this.chunks = [];
+        this.chunkIndex = 0;
+        return;
+      }
+      if (
+        this.chunkIndex >= 1024 &&
+        this.chunkIndex * 2 >= this.chunks.length
+      ) {
+        this.chunks = this.chunks.slice(this.chunkIndex);
+        this.chunkIndex = 0;
+      }
+    }
+
+    private reset(): void {
+      this.chunks = [];
+      this.chunkIndex = 0;
+      this.chunkOffset = 0;
+      this.bufferedBytes = 0;
+      this.payloadBytes = null;
     }
   }
 

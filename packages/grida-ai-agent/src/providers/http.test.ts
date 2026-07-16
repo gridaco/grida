@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { DownloadError } from "ai";
 import { describe, expect, it, vi } from "vitest";
 import {
   makeEndpointFactory,
@@ -21,23 +22,29 @@ async function attemptModelRequest(model: unknown): Promise<void> {
 }
 
 describe("ProviderHttp", () => {
-  it("omission dereferences ambient globalThis.fetch at call time", async () => {
-    // CLI hosts and existing tests intentionally retain ambient fetch. Resolve
-    // it per call so a late test stub (or host polyfill) still takes effect.
+  it("omission keeps provider requests ambient but denies remote asset downloads", async () => {
+    // Standalone/CLI provider requests intentionally retain ambient fetch, but
+    // omission cannot silently authorize an unverified remote asset route.
     const original = globalThis.fetch;
     const ambient = vi.fn<typeof globalThis.fetch>(
       async () => new Response("ok")
     );
     const http = new ProviderHttp();
-    expect(http.isHostRouted).toBe(false);
     globalThis.fetch = ambient as unknown as typeof globalThis.fetch;
     try {
       await http.request("https://provider.example/request");
-      await http.download("https://cdn.example/result");
+      await expect(
+        http.downloadParts([
+          {
+            url: new URL("https://cdn.example/result"),
+            isUrlSupportedByModel: false,
+          },
+        ])
+      ).rejects.toThrow(/requires an authorized host transport/);
     } finally {
       globalThis.fetch = original;
     }
-    expect(ambient).toHaveBeenCalledTimes(2);
+    expect(ambient).toHaveBeenCalledOnce();
   });
 
   it("every in-process text provider uses request, never download", async () => {
@@ -53,7 +60,6 @@ describe("ProviderHttp", () => {
       throw new Error("text providers must not download public media");
     });
     const http = new ProviderHttp({ request, download });
-    expect(http.isHostRouted).toBe(true);
 
     await attemptModelRequest(makeOpenRouterFactory("sk-or", http)("pro"));
     await attemptModelRequest(makeVercelFactory("sk-v", http)("pro"));
@@ -301,14 +307,26 @@ describe("ProviderHttp", () => {
     );
     const http = new ProviderHttp({ request, download });
 
-    await expect(
-      http.downloadParts([
+    const resultUrl =
+      "https://cdn.example/failed.png?X-Amz-Signature=opaque-token";
+    let error: unknown;
+    try {
+      await http.downloadParts([
         {
-          url: new URL("https://cdn.example/failed.png"),
+          url: new URL(resultUrl),
           isUrlSupportedByModel: false,
         },
-      ])
-    ).rejects.toThrow(/502 Bad Gateway/);
+      ]);
+    } catch (cause) {
+      error = cause;
+    }
+
+    expect(DownloadError.isInstance(error)).toBe(true);
+    if (!DownloadError.isInstance(error)) throw error;
+    expect(error.url).toBe(resultUrl);
+    expect(error.statusCode).toBe(502);
+    expect(error.message).toBe("provider asset download failed (HTTP 502)");
+    expect(error.message).not.toContain("opaque-token");
     expect(cancel).toHaveBeenCalledTimes(1);
   });
 
@@ -353,7 +371,7 @@ describe("ProviderHttp", () => {
     );
     const http = new ProviderHttp(
       { request, download },
-      { max_download_bytes: 3 }
+      { max_download_batch_bytes: 3 }
     );
 
     await expect(
@@ -365,6 +383,161 @@ describe("ProviderHttp", () => {
       ])
     ).rejects.toThrow(/download is too large/);
     expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses a private 64 MiB aggregate production bound without allocating the declared body", async () => {
+    const cancel = vi.fn<(reason?: unknown) => void>();
+    const body = new ReadableStream<Uint8Array>({ pull() {}, cancel });
+    const request = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(body, {
+          status: 200,
+          headers: { "content-length": String(64 * 1024 * 1024 + 1) },
+        })
+    );
+    const http = new ProviderHttp({ request, download });
+
+    await expect(
+      http.downloadParts([
+        {
+          url: new URL("https://cdn.example/impractical.bin"),
+          isUrlSupportedByModel: false,
+        },
+      ])
+    ).rejects.toThrow(/download is too large/);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("refuses more than 16 automatic assets before any host I/O", async () => {
+    const request = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>();
+    const http = new ProviderHttp({ request, download });
+    const parts = Array.from({ length: 17 }, (_, index) => ({
+      url: new URL(`https://cdn.example/${index}.bin`),
+      isUrlSupportedByModel: false,
+    }));
+
+    await expect(http.downloadParts(parts)).rejects.toThrow(
+      /maximum asset count of 16/
+    );
+    expect(download).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("downloads sequentially and refuses cumulative bytes across the batch", async () => {
+    let resolveFirst!: (response: Response) => void;
+    const firstResponse = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondCancel = vi.fn<(reason?: unknown) => void>();
+    const request = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>(async (input) => {
+      if (String(input).endsWith("/first.bin")) return await firstResponse;
+      return new Response(
+        new ReadableStream<Uint8Array>({ pull() {}, cancel: secondCancel }),
+        { status: 200, headers: { "content-length": "2" } }
+      );
+    });
+    const http = new ProviderHttp(
+      { request, download },
+      { max_download_batch_bytes: 3 }
+    );
+
+    const run = http.downloadParts([
+      {
+        url: new URL("https://cdn.example/first.bin"),
+        isUrlSupportedByModel: false,
+      },
+      {
+        url: new URL("https://cdn.example/second.bin"),
+        isUrlSupportedByModel: false,
+      },
+    ]);
+
+    // The second transport request cannot open while the first is unresolved.
+    expect(download).toHaveBeenCalledOnce();
+    resolveFirst(
+      new Response(Uint8Array.from([1, 2]), {
+        status: 200,
+        headers: { "content-length": "2" },
+      })
+    );
+    await expect(run).rejects.toThrow(/download is too large/);
+
+    expect(download.mock.calls.map(([input]) => String(input))).toEqual([
+      "https://cdn.example/first.bin",
+      "https://cdn.example/second.bin",
+    ]);
+    expect(secondCancel).toHaveBeenCalledOnce();
+  });
+
+  it("preserves model-supported null positions in a bounded download batch", async () => {
+    const request = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>();
+    const http = new ProviderHttp(
+      { request, download },
+      { max_download_batch_bytes: 2 }
+    );
+
+    await expect(
+      http.downloadParts([
+        {
+          url: new URL("data:application/octet-stream;base64,AQ=="),
+          isUrlSupportedByModel: false,
+        },
+        {
+          url: new URL("https://model.example/native.png"),
+          isUrlSupportedByModel: true,
+        },
+        {
+          url: new URL("data:application/octet-stream;base64,Ag=="),
+          isUrlSupportedByModel: false,
+        },
+      ])
+    ).resolves.toEqual([
+      {
+        data: Uint8Array.from([1]),
+        mediaType: "application/octet-stream",
+      },
+      null,
+      {
+        data: Uint8Array.from([2]),
+        mediaType: "application/octet-stream",
+      },
+    ]);
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it("cancels a streamed download before constructing an oversize result", async () => {
+    const cancel = vi.fn<(reason?: unknown) => void>();
+    let pull = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(
+          pull++ === 0 ? Uint8Array.from([1, 2]) : Uint8Array.from([3, 4])
+        );
+      },
+      cancel,
+    });
+    const request = vi.fn<typeof globalThis.fetch>();
+    const download = vi.fn<typeof globalThis.fetch>(async () =>
+      Promise.resolve(new Response(body, { status: 200 }))
+    );
+    const http = new ProviderHttp(
+      { request, download },
+      { max_download_batch_bytes: 3 }
+    );
+
+    await expect(
+      http.downloadParts([
+        {
+          url: new URL("https://cdn.example/stream.bin"),
+          isUrlSupportedByModel: false,
+        },
+      ])
+    ).rejects.toThrow(/download is too large/);
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
   it("decodes base64 data URLs locally without crossing host HTTP", async () => {
@@ -418,7 +591,7 @@ describe("ProviderHttp", () => {
     const download = vi.fn<typeof globalThis.fetch>();
     const http = new ProviderHttp(
       { request, download },
-      { max_download_bytes: 3 }
+      { max_download_batch_bytes: 3 }
     );
 
     await expect(

@@ -113,48 +113,20 @@ describe("AgentSidecarNetwork", () => {
   });
 
   it("safely observes host denial while request.start is backpressured", async () => {
-    const hostOutput = new PassThrough();
-    const sidecarOutput = new FirstWriteBlockedTransform();
-    const network = new AgentSidecarNetwork(hostOutput, sidecarOutput);
-    const host = new AgentSidecarChannel.Writer(hostOutput);
-    const decoder = new AgentSidecarChannel.Decoder();
-    const frames: AgentSidecarChannel.SidecarToHostFrame[] = [];
-    sidecarOutput.on("data", (chunk: Buffer) => {
-      for (const frame of decoder.push(chunk)) {
-        frames.push(frame as AgentSidecarChannel.SidecarToHostFrame);
-      }
-    });
-    const bootstrap = network.waitForBootstrap();
-    await host.write({
-      v: 1,
-      type: "bootstrap",
-      password: "a-secure-spawn-password",
-      daemonPort: 43123,
-      revision: 1,
-      grants: [
-        {
-          id: "provider:built-in",
-          lane: "provider",
-          origins: ["https://openrouter.ai"],
-        },
-      ],
-    });
-    await bootstrap;
-    const result = network.providerHttp.request(
+    const sidecarOutput = new NthWriteBlockedTransform(1);
+    const harness = createHarness(sidecarOutput);
+    await harness.bootstrap();
+    const result = harness.network.providerHttp.request(
       "https://openrouter.ai/api/v1/chat/completions",
       { method: "POST", body: "{}" }
     );
     await sidecarOutput.untilBlocked();
-    const start = frames.find(
-      (frame): frame is AgentSidecarChannel.RequestStartFrame =>
-        frame.type === "request.start"
-    );
-    expect(start).toBeDefined();
+    const start = await harness.untilFrame("request.start");
 
-    await host.write({
+    await harness.host.write({
       v: 1,
       type: "response.error",
-      requestId: start!.requestId,
+      requestId: start.requestId,
       code: "denied",
       message: "provider network request denied",
     });
@@ -162,7 +134,46 @@ describe("AgentSidecarNetwork", () => {
     sidecarOutput.release();
 
     await expect(result).rejects.toThrow(/denied/);
-    network.close();
+    expect(
+      harness.frames
+        .filter(
+          (frame) => "requestId" in frame && frame.requestId === start.requestId
+        )
+        .map((frame) => frame.type)
+    ).toEqual(["request.start"]);
+    harness.network.close();
+  });
+
+  it("stops an upload denied while request.chunk is backpressured", async () => {
+    const sidecarOutput = new NthWriteBlockedTransform(2);
+    const harness = createHarness(sidecarOutput);
+    await harness.bootstrap();
+    const result = harness.network.providerHttp.request(
+      "https://openrouter.ai/api/v1/chat/completions",
+      { method: "POST", body: "x".repeat(100_000) }
+    );
+    await sidecarOutput.untilBlocked();
+    const start = await harness.untilFrame("request.start");
+
+    await harness.host.write({
+      v: 1,
+      type: "response.error",
+      requestId: start.requestId,
+      code: "denied",
+      message: "provider network request denied",
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    sidecarOutput.release();
+
+    await expect(result).rejects.toThrow(/denied/);
+    expect(
+      harness.frames
+        .filter(
+          (frame) => "requestId" in frame && frame.requestId === start.requestId
+        )
+        .map((frame) => frame.type)
+    ).toEqual(["request.start", "request.chunk"]);
+    harness.network.close();
   });
 
   it("does not open a host upload when abort fires during body buffering", async () => {
@@ -278,11 +289,26 @@ describe("AgentSidecarNetwork", () => {
     expect(applied.revision).toBe(2);
     harness.network.close();
   });
+
+  it("delivers shutdown received during startup after registration", async () => {
+    const harness = createHarness();
+    await harness.host.write({ v: 1, type: "shutdown" });
+    await harness.bootstrap();
+
+    let shutdowns = 0;
+    harness.network.onShutdown(() => {
+      shutdowns += 1;
+    });
+    expect(shutdowns).toBe(1);
+
+    await harness.host.write({ v: 1, type: "shutdown" });
+    expect(shutdowns).toBe(1);
+    harness.network.close();
+  });
 });
 
-function createHarness() {
+function createHarness(sidecarOutput: Transform = new PassThrough()) {
   const hostOutput = new PassThrough();
-  const sidecarOutput = new PassThrough();
   const network = new AgentSidecarNetwork(hostOutput, sidecarOutput);
   const host = new AgentSidecarChannel.Writer(hostOutput);
   const decoder = new AgentSidecarChannel.Decoder();
@@ -361,13 +387,17 @@ function createHarness() {
   };
 }
 
-class FirstWriteBlockedTransform extends Transform {
+class NthWriteBlockedTransform extends Transform {
   private blockedCallback: ((error?: Error | null) => void) | null = null;
   private blockedResolve: (() => void) | null = null;
   private readonly blocked = new Promise<void>((resolve) => {
     this.blockedResolve = resolve;
   });
   private writes = 0;
+
+  constructor(private readonly blockedWrite: number) {
+    super();
+  }
 
   override _transform(
     chunk: Buffer,
@@ -376,7 +406,7 @@ class FirstWriteBlockedTransform extends Transform {
   ): void {
     this.push(chunk);
     this.writes += 1;
-    if (this.writes === 1) {
+    if (this.writes === this.blockedWrite) {
       this.blockedCallback = callback;
       this.blockedResolve?.();
       this.blockedResolve = null;

@@ -1,8 +1,5 @@
 ---
 title: Execution authority
-description: The authority boundary between trusted agent-host services, structured capabilities, extensions, and raw agent-controlled execution.
-keywords:
-  [agent-system, authority, sandbox, network, proxy, extensions, mcp, subagents]
 format: md
 tags:
   - internal

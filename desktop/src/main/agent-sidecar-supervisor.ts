@@ -210,14 +210,21 @@ export class AgentSidecarSupervisor {
 
   private async publishGrants(): Promise<void> {
     const host = this.networkHost;
-    if (!host) throw new Error("agent provider network is not ready");
+    const child = this.child;
+    const generation = this.activeGeneration;
+    if (!host || !child) {
+      throw new Error("agent provider network is not ready");
+    }
     try {
       await host.updateGrants();
     } catch (error) {
       // A failed revocation must not leave the sidecar running with the stale
-      // grant snapshot. Retire this exact generation and bootstrap its
-      // replacement from the latest full authority snapshot.
-      this.restartCurrentGeneration();
+      // grant snapshot. Retire only the generation/host that owned this
+      // publication: a delayed rejection from an old host must never kill the
+      // replacement that already bootstrapped the latest authority snapshot.
+      if (this.networkHost === host) {
+        this.retireGeneration(child, generation, true);
+      }
       throw error;
     }
   }
@@ -591,15 +598,6 @@ export class AgentSidecarSupervisor {
       // already dead
     }
     if (restart && !this.isShuttingDown) this.scheduleRestart();
-  }
-
-  private restartCurrentGeneration(): void {
-    const child = this.child;
-    if (child) {
-      this.retireGeneration(child, this.activeGeneration, true);
-      return;
-    }
-    if (!this.isShuttingDown) this.scheduleRestart();
   }
 
   private handleRestartFailure(err: unknown): void {

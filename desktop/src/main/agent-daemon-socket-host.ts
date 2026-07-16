@@ -19,6 +19,8 @@ const MAX_PENDING_TRANSFERS = 64;
 export class AgentDaemonSocketHost {
   private server: Server | null = null;
   private portValue: number | null = null;
+  private listenPromise: Promise<number> | null = null;
+  private cancelListen: (() => void) | null = null;
   private ready = false;
   private capabilityAttested = false;
   private closed = false;
@@ -74,39 +76,91 @@ export class AgentDaemonSocketHost {
   }
 
   async listen(): Promise<number> {
-    if (this.server) return this.port;
-    if (!this.child.send || !this.child.connected) {
-      throw new Error("agent sidecar capability channel is unavailable");
+    if (this.closed) {
+      throw new Error("agent daemon socket host is closed");
     }
+    if (this.portValue !== null) return this.portValue;
+    let listening = this.listenPromise;
+    if (!listening) {
+      if (!this.child.send || !this.child.connected) {
+        throw new Error("agent sidecar capability channel is unavailable");
+      }
+      listening = this.listenOnce();
+      this.listenPromise = listening;
+    }
+    try {
+      const port = await listening;
+      if (this.closed || this.portValue !== port) {
+        throw new Error("agent daemon socket host closed while listening");
+      }
+      return port;
+    } finally {
+      if (this.listenPromise === listening) this.listenPromise = null;
+    }
+  }
+
+  private listenOnce(): Promise<number> {
     const server = net.createServer({ pauseOnConnect: true }, (socket) =>
       this.transfer(socket)
     );
     server.maxConnections = MAX_PENDING_TRANSFERS;
-    await new Promise<void>((resolve, reject) => {
+    // Publish ownership before the asynchronous bind. `close()` must be able to
+    // cancel and close this exact listener during the listen callback window.
+    this.server = server;
+    return new Promise<number>((resolve, reject) => {
       let listening = false;
+      let settled = false;
+      const failStartup = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        if (this.server === server) this.server = null;
+        if (this.cancelListen === cancel) this.cancelListen = null;
+        this.portValue = null;
+        closeServer(server);
+        reject(error);
+      };
+      const cancel = () =>
+        failStartup(
+          new Error("agent daemon socket host closed while listening")
+        );
+      this.cancelListen = cancel;
       const onError = (error: Error) => {
         if (listening) {
           if (!this.closed) this.onFatal(error);
           return;
         }
-        server.off("error", onError);
-        server.close();
-        reject(error);
+        failStartup(error);
       };
       server.on("error", onError);
-      server.listen(0, HOSTNAME, () => {
-        listening = true;
-        resolve();
-      });
+      try {
+        server.listen(0, HOSTNAME, () => {
+          if (settled) {
+            closeServer(server);
+            return;
+          }
+          if (this.closed || this.server !== server) {
+            failStartup(
+              new Error("agent daemon socket host closed while listening")
+            );
+            return;
+          }
+          const address = server.address();
+          if (!address || typeof address === "string") {
+            failStartup(
+              new Error("agent daemon socket host did not bind a TCP port")
+            );
+            return;
+          }
+          listening = true;
+          settled = true;
+          this.cancelListen = null;
+          this.portValue = address.port;
+          resolve(address.port);
+        });
+      } catch (error) {
+        failStartup(asError(error));
+      }
     });
-    const address = server.address();
-    if (!address || typeof address === "string") {
-      server.close();
-      throw new Error("agent daemon socket host did not bind a TCP port");
-    }
-    this.server = server;
-    this.portValue = address.port;
-    return address.port;
   }
 
   waitForCapabilityReady(): Promise<void> {
@@ -131,9 +185,11 @@ export class AgentDaemonSocketHost {
     );
     this.capabilityReadyResolve = null;
     this.capabilityReadyReject = null;
+    this.cancelListen?.();
+    this.cancelListen = null;
     for (const socket of this.pending) socket.destroy();
     this.pending.clear();
-    this.server?.close();
+    if (this.server) closeServer(this.server);
     this.server = null;
     this.portValue = null;
   }
@@ -171,6 +227,20 @@ export class AgentDaemonSocketHost {
       }
     }
   }
+}
+
+function closeServer(server: Server): void {
+  try {
+    server.close();
+  } catch {
+    // The listener may still be between createServer() and listen(). The
+    // startup promise owns the observable close result; there is nothing else
+    // to surface from an already-not-running Server.
+  }
+}
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 function isLoopbackPeer(address: string | undefined): boolean {

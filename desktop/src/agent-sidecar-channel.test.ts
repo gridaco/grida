@@ -237,6 +237,60 @@ describe("AgentSidecarChannel.Decoder", () => {
     expect(coalesced.push(packet)).toEqual(frames);
   });
 
+  it("decodes the largest legal binary chunk one byte at a time", () => {
+    const frame: AgentSidecarChannel.ResponseChunkFrame = {
+      v: 1,
+      type: "response.chunk",
+      requestId: "req_fragmented",
+      sequence: 0,
+      data: Buffer.alloc(
+        AgentSidecarChannel.MAX_BINARY_CHUNK_BYTES,
+        0xa5
+      ).toString("base64"),
+    };
+    const encoded = AgentSidecarChannel.encode(frame);
+    const decoder = new AgentSidecarChannel.Decoder();
+    const decoded: AgentSidecarChannel.Frame[] = [];
+
+    for (let index = 0; index < encoded.length; index += 1) {
+      decoded.push(...decoder.push(encoded.subarray(index, index + 1)));
+    }
+
+    expect(decoded).toEqual([frame]);
+  });
+
+  it("accepts a frame whose payload is exactly the 256 KiB limit", () => {
+    const headers: AgentSidecarChannel.Header[] = Array.from(
+      { length: 16 },
+      (_, index) => [`x-padding-${index}`, "x".repeat(16 * 1024)]
+    );
+    const candidate: AgentSidecarChannel.RequestStartFrame = {
+      v: 1,
+      type: "request.start",
+      requestId: "req_exact_limit",
+      grantId: "provider",
+      method: "POST",
+      url: "https://example.com",
+      headers,
+      hasBody: false,
+    };
+    const excess =
+      Buffer.byteLength(JSON.stringify(candidate), "utf8") -
+      AgentSidecarChannel.MAX_FRAME_BYTES;
+    expect(excess).toBeGreaterThan(0);
+    const [lastName, lastValue] = headers.at(-1)!;
+    headers[headers.length - 1] = [
+      lastName,
+      lastValue.slice(0, lastValue.length - excess),
+    ];
+
+    const encoded = AgentSidecarChannel.encode(candidate);
+    expect(encoded.readUInt32BE(0)).toBe(AgentSidecarChannel.MAX_FRAME_BYTES);
+    expect(new AgentSidecarChannel.Decoder().push(encoded)).toEqual([
+      candidate,
+    ]);
+  });
+
   it("uses an unsigned 4-byte big-endian payload length", () => {
     const packet = AgentSidecarChannel.encode({ v: 1, type: "shutdown" });
     expect(packet.readUInt32BE(0)).toBe(packet.length - 4);

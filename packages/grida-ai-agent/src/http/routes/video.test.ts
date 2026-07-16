@@ -202,19 +202,36 @@ describe("POST /video/generate", () => {
     expect(download).toHaveBeenCalledOnce();
   });
 
-  it("preserves ambient standalone download behavior for Vercel results", async () => {
-    const MP4 = new Uint8Array([0, 0, 0, 24]);
-    const resultUrl = "https://standalone-cdn.example/video.mp4";
+  it("does not reflect a signed result capability when host download fails", async () => {
+    const token = "opaque-signed-capability";
+    const resultUrl = `https://ai-gateway.vercel.sh/results/video.mp4?X-Amz-Signature=${token}`;
+    const request = vi.fn<typeof globalThis.fetch>(async () =>
+      vercelVideoResult(resultUrl)
+    );
+    const download = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(null, { status: 403, statusText: `Forbidden ${token}` })
+    );
+    const providerHttp = new ProviderHttp({ request, download });
+
+    const res = await post(appWith({ vercel: "sk-v" }, providerHttp), {
+      model_id: VEO,
+      prompt: "a cat surfing",
+      provider: "vercel",
+    });
+
+    expect(res.status).toBe(502);
+    const text = await res.text();
+    expect(text).toContain("provider asset download failed (HTTP 403)");
+    expect(text).not.toContain(token);
+    expect(text).not.toContain("X-Amz-Signature");
+    expect(download).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed on a remote Vercel result without host download authority", async () => {
+    const resultUrl = "https://ai-gateway.vercel.sh/v3/ai/video-result.mp4";
     const ambient = vi.fn<(input: string | URL | Request) => Promise<Response>>(
-      async (input: string | URL | Request) => {
-        const url = String(input);
-        return url === "https://ai-gateway.vercel.sh/v3/ai/video-model"
-          ? vercelVideoResult(resultUrl)
-          : new Response(MP4, {
-              status: 200,
-              headers: { "content-type": "video/mp4" },
-            });
-      }
+      async () => vercelVideoResult(resultUrl)
     );
     vi.stubGlobal("fetch", ambient);
 
@@ -224,10 +241,13 @@ describe("POST /video/generate", () => {
       provider: "vercel",
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({
+      error: "video fetch failed: provider asset download failed",
+      provider_id: "vercel",
+    });
     expect(ambient.mock.calls.map(([input]) => String(input))).toEqual([
       "https://ai-gateway.vercel.sh/v3/ai/video-model",
-      resultUrl,
     ]);
   });
 

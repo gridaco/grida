@@ -23,7 +23,8 @@ destinations so an ambient or missed provider call is denied by the outer
 sandbox. It retains the daemon's baseline development hosts and external-agent
 vendor hosts: ACP subprocesses own their network stack and remain confined by
 the same policy. The option defaults to false for CLI and standalone hosts that
-still intentionally use ambient `fetch`.
+still intentionally use ambient provider requests; remote asset downloads
+remain unavailable without a host transport.
 
 For a process tree that must have no direct outbound destinations at all, pass
 `direct_network_access: "none"`. This removes the daemon development baseline,

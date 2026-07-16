@@ -202,9 +202,9 @@ export type AgentRuntimeDeps = ResolveDeps & {
   sandbox_enforced?: boolean;
   /**
    * GRIDA-SEC-004 — whether this constructed runtime may spawn external ACP
-   * agents. `"enabled"` (default for compatibility) is host-authorized process
-   * execution with no containment claim; `"sandboxed"` requires
-   * {@link sandbox_enforced}; `"disabled"` withholds the capability.
+   * agents. `"enabled"` is host-authorized process execution with no
+   * containment claim; `"sandboxed"` requires {@link sandbox_enforced};
+   * `"disabled"` withholds the capability and is the omission default.
    */
   external_agent_execution?: "enabled" | "sandboxed" | "disabled";
   /**
@@ -418,6 +418,10 @@ export class AgentRuntime {
   private readonly compaction_enabled: boolean;
   private readonly compaction_config: CompactionConfig;
   private readonly compaction_summarize?: compactor.Summarize;
+  /** Resolved once: omission must never become process authority downstream. */
+  private readonly external_agent_execution: NonNullable<
+    AgentRuntimeDeps["external_agent_execution"]
+  >;
 
   constructor(private readonly deps: AgentRuntimeDeps) {
     this.streams = deps.streams ?? new StreamRegistry();
@@ -426,6 +430,7 @@ export class AgentRuntime {
     this.compaction_config =
       deps.compaction?.config ?? DEFAULT_COMPACTION_CONFIG;
     this.compaction_summarize = deps.compaction?.summarize;
+    this.external_agent_execution = deps.external_agent_execution ?? "disabled";
 
     // Run-state machine: owns SessionStatus + the serial drain. Its drain is a
     // one-way dependency back into this runtime (fires a turn via startTurn);
@@ -766,8 +771,7 @@ export class AgentRuntime {
       // external process authority is explicit and independent of the locked
       // shell's disposition.
       const providerId = AGENT_PROVIDER_MODELS[req.model_id].id;
-      const externalAgentExecution =
-        this.deps.external_agent_execution ?? "enabled";
+      const externalAgentExecution = this.external_agent_execution;
       if (externalAgentExecution === "disabled") {
         return Response.json(
           {
@@ -1217,8 +1221,7 @@ export class AgentRuntime {
             // Defense in depth at the spawn seam. Direct runs are preflighted
             // before session creation; this also protects non-HTTP turn paths.
             sandbox_enforced: this.deps.sandbox_enforced === true,
-            external_agent_execution:
-              this.deps.external_agent_execution ?? "enabled",
+            external_agent_execution: this.external_agent_execution,
             prompt: promptFromLatestUserModelMessage(
               preparedMessages,
               opts.agent_prompt ?? ""

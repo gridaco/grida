@@ -116,7 +116,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     });
   });
 
-  it("GRIDA-SEC-004: withholds external agents when the host disables ACP execution", async () => {
+  it("GRIDA-SEC-004: omission defaults external-agent execution to disabled", async () => {
     runtime.dispose();
     streamRegistry = new StreamRegistry();
     runtime = new AgentRuntime({
@@ -126,7 +126,6 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       streams: streamRegistry,
       run_agent: fakeRunAgent,
       sandbox_enforced: true,
-      external_agent_execution: "disabled",
     });
     app = new Hono();
     registerAgentRoutes(app, runtime);

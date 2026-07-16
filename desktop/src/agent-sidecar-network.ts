@@ -48,6 +48,8 @@ export class AgentSidecarNetwork {
   private bootstrapResolve: ((value: Bootstrap) => void) | null = null;
   private bootstrapReject: ((error: Error) => void) | null = null;
   private shutdownHandler: (() => void) | null = null;
+  private shutdownRequested = false;
+  private shutdownDelivered = false;
   private fatalHandler: ((error: Error) => void) | null = null;
   private fatalValue: Error | null = null;
 
@@ -98,6 +100,7 @@ export class AgentSidecarNetwork {
 
   onShutdown(handler: () => void): void {
     this.shutdownHandler = handler;
+    this.deliverShutdown();
   }
 
   onFatal(handler: (error: Error) => void): void {
@@ -194,6 +197,8 @@ export class AgentSidecarNetwork {
         headers: [...request.headers.entries()],
         hasBody: body.length > 0,
       });
+      if (!this.pending.has(requestId)) return await response;
+
       let sequence = 0;
       for (
         let offset = 0;
@@ -211,6 +216,7 @@ export class AgentSidecarNetwork {
             .toString("base64"),
         });
         sequence += 1;
+        if (!this.pending.has(requestId)) return await response;
       }
       if (request.signal.aborted) throw abortError(request.signal.reason);
       await this.send({
@@ -282,7 +288,8 @@ export class AgentSidecarNetwork {
         this.onResponseError(frame);
         return;
       case "shutdown":
-        this.shutdownHandler?.();
+        this.shutdownRequested = true;
+        this.deliverShutdown();
         return;
       default:
         throw new Error(`unexpected host frame: ${frame.type}`);
@@ -418,6 +425,18 @@ export class AgentSidecarNetwork {
 
   private requireBootstrap(): void {
     if (!this.bootstrapped) throw new Error("frame arrived before bootstrap");
+  }
+
+  private deliverShutdown(): void {
+    if (
+      !this.shutdownRequested ||
+      this.shutdownDelivered ||
+      !this.shutdownHandler
+    ) {
+      return;
+    }
+    this.shutdownDelivered = true;
+    this.shutdownHandler();
   }
 
   private async send(

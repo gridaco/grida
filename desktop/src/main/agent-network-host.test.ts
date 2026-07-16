@@ -251,6 +251,55 @@ describe("AgentNetworkHost", () => {
     harness.host.close();
   });
 
+  it("hard-bounds authorization-denied uploads in constant-time admission state", async () => {
+    const fetch = vi.fn<() => Promise<Response>>();
+    const harness = createHarness({ fetch });
+    const admissionState = harness.host as unknown as {
+      incoming: Map<string, unknown>;
+      discardedIncomingCount: number;
+    };
+    await harness.start();
+
+    for (let index = 0; index < 32; index += 1) {
+      await harness.sidecar.write({
+        v: 1,
+        type: "request.start",
+        requestId: `req_denied_flood_${index}`,
+        grantId: "provider:built-in",
+        method: "POST",
+        url: "https://attacker.example/upload",
+        headers: [],
+        hasBody: true,
+      });
+    }
+    expect(admissionState.incoming.size).toBe(32);
+    expect(admissionState.discardedIncomingCount).toBe(32);
+    expect(harness.fatal).not.toHaveBeenCalled();
+
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.start",
+      requestId: "req_denied_flood_overflow",
+      grantId: "provider:built-in",
+      method: "POST",
+      url: "https://attacker.example/upload",
+      headers: [],
+      hasBody: true,
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(harness.fatal).toHaveBeenCalledTimes(1);
+    expect(harness.fatal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "excessive discarded provider uploads",
+      })
+    );
+    expect(admissionState.incoming.size).toBe(0);
+    expect(admissionState.discardedIncomingCount).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    harness.host.close();
+  });
+
   it("rejects credential-bearing cross-origin redirects", async () => {
     const fetch = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(
       async () => Response.redirect("https://api.openrouter.ai/next", 307)
@@ -314,6 +363,103 @@ describe("AgentNetworkHost", () => {
     });
     expect((await harness.untilFrame("response.error")).code).toBe("denied");
     expect(fetch).toHaveBeenCalledTimes(1);
+    harness.host.close();
+  });
+
+  it("preserves HEAD across a same-origin 303 redirect", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const harness = createHarness({
+      fetch: async (url, init) => {
+        calls.push({ url, init });
+        return calls.length === 1
+          ? Response.redirect("https://openrouter.ai/next", 303)
+          : new Response(null, { status: 204 });
+      },
+    });
+    await harness.start();
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.start",
+      requestId: "req_head_303",
+      grantId: "provider:built-in",
+      method: "HEAD",
+      url: "https://openrouter.ai/start",
+      headers: [["accept", "application/json"]],
+      hasBody: false,
+    });
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.end",
+      requestId: "req_head_303",
+      sequence: 0,
+    });
+    await harness.untilFrame("response.end");
+
+    expect(calls.map(({ init }) => init.method)).toEqual(["HEAD", "HEAD"]);
+    expect(calls[1].init.body).toBeUndefined();
+    harness.host.close();
+  });
+
+  it("drops body metadata when a 303 rewrites POST to GET", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const harness = createHarness({
+      fetch: async (url, init) => {
+        calls.push({ url, init });
+        return calls.length === 1
+          ? Response.redirect("https://openrouter.ai/next", 303)
+          : new Response(null, { status: 204 });
+      },
+    });
+    await harness.start();
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.start",
+      requestId: "req_post_303",
+      grantId: "provider:built-in",
+      method: "POST",
+      url: "https://openrouter.ai/start",
+      headers: [
+        ["accept", "application/json"],
+        ["authorization", "Bearer secret"],
+        ["content-encoding", "gzip"],
+        ["content-language", "en"],
+        ["content-location", "/payload"],
+        ["content-type", "application/json"],
+      ],
+      hasBody: true,
+    });
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.chunk",
+      requestId: "req_post_303",
+      sequence: 0,
+      data: Buffer.from("payload").toString("base64"),
+    });
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.end",
+      requestId: "req_post_303",
+      sequence: 1,
+    });
+    await harness.untilFrame("response.end");
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].init.method).toBe("POST");
+    expect(await new Response(calls[0].init.body).text()).toBe("payload");
+    expect(calls[1].init.method).toBe("GET");
+    expect(calls[1].init.body).toBeUndefined();
+    const redirectedHeaders = new Headers(calls[1].init.headers);
+    expect(redirectedHeaders.get("accept")).toBe("application/json");
+    expect(redirectedHeaders.get("authorization")).toBe("Bearer secret");
+    for (const name of [
+      "content-encoding",
+      "content-language",
+      "content-length",
+      "content-location",
+      "content-type",
+    ]) {
+      expect(redirectedHeaders.has(name)).toBe(false);
+    }
     harness.host.close();
   });
 
@@ -532,6 +678,73 @@ describe("AgentNetworkHost", () => {
     resolveFirst(new Response(null, { status: 204 }));
     await harness.untilFrame("response.end");
     harness.host.close();
+  });
+
+  it("expires a discarded upload without a second terminal error", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    const harness = createHarness({
+      fetch: vi.fn<() => Promise<Response>>(),
+      maxBufferedRequestBodyBytes: 4,
+    });
+    const releaseRequestBody = vi.spyOn(
+      harness.host as unknown as {
+        releaseRequestBody(request: unknown): void;
+      },
+      "releaseRequestBody"
+    );
+    try {
+      await harness.start();
+      await harness.sidecar.write({
+        v: 1,
+        type: "request.start",
+        requestId: "req_discard_timeout",
+        grantId: "provider:built-in",
+        method: "POST",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        headers: [["content-type", "application/json"]],
+        hasBody: true,
+      });
+      await harness.sidecar.write({
+        v: 1,
+        type: "request.chunk",
+        requestId: "req_discard_timeout",
+        sequence: 0,
+        data: Buffer.from("1234").toString("base64"),
+      });
+      await harness.sidecar.write({
+        v: 1,
+        type: "request.chunk",
+        requestId: "req_discard_timeout",
+        sequence: 1,
+        data: Buffer.from("x").toString("base64"),
+      });
+      const firstError = await harness.untilFrame("response.error");
+      expect(firstError).toMatchObject({
+        requestId: "req_discard_timeout",
+        code: "overloaded",
+      });
+      expect(releaseRequestBody).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(releaseRequestBody).toHaveBeenCalledTimes(2);
+      expect(
+        harness.frames.filter(
+          (frame) =>
+            frame.type === "response.error" &&
+            frame.requestId === "req_discard_timeout"
+        )
+      ).toHaveLength(1);
+      expect(
+        (harness.host as unknown as { incoming: Map<string, unknown> }).incoming
+          .size
+      ).toBe(0);
+      expect(harness.fatal).not.toHaveBeenCalled();
+    } finally {
+      harness.host.close();
+      vi.useRealTimers();
+    }
   });
 
   it("ignores credit that races a response ending exactly at the window", async () => {

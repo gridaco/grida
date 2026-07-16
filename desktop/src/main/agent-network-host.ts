@@ -59,6 +59,10 @@ export class AgentNetworkHost {
   private readonly requestControllers = new Map<string, AbortController>();
   private readonly terminalResponses = new Set<string>();
   private bufferedRequestBodyBytes = 0;
+  // Together with `incoming.size`, this gives O(1) accepted/discarded
+  // admission accounting. Both classes are independently capped, so hostile
+  // denied starts cannot grow the map/timer set or make admission quadratic.
+  private discardedIncomingCount = 0;
   private readonly grantAcks = new Map<
     number,
     {
@@ -277,22 +281,19 @@ export class AgentNetworkHost {
     }
 
     let authorized: AgentNetworkPolicy.AuthorizedRequest | null = null;
-    const acceptedIncoming = [...this.incoming.values()].filter(
-      (request) => !request.discarded
-    ).length;
-    const discardedIncoming = this.incoming.size - acceptedIncoming;
+    const acceptedIncoming = this.incoming.size - this.discardedIncomingCount;
     let discarded =
       acceptedIncoming + this.requestControllers.size >=
       MAX_CONCURRENT_REQUESTS;
-    if (discarded && discardedIncoming >= MAX_DISCARDED_UPLOADS) {
-      throw new Error("excessive discarded provider uploads");
-    }
+    let terminalError: Readonly<{
+      code: AgentSidecarChannel.ResponseErrorCode;
+      message: string;
+    }> | null = null;
     if (discarded) {
-      void this.responseError(
-        frame.requestId,
-        "overloaded",
-        "provider network request capacity is temporarily exhausted"
-      ).catch((error) => this.fail(asError(error)));
+      terminalError = {
+        code: "overloaded",
+        message: "provider network request capacity is temporarily exhausted",
+      };
     } else {
       try {
         authorized = AgentNetworkPolicy.authorize(this.authority.grants(), {
@@ -303,17 +304,27 @@ export class AgentNetworkHost {
         });
       } catch {
         discarded = true;
-        void this.responseError(
-          frame.requestId,
-          "denied",
-          "provider network request denied"
-        ).catch((error) => this.fail(asError(error)));
+        terminalError = {
+          code: "denied",
+          message: "provider network request denied",
+        };
       }
     }
+    // Check after authorization as well as capacity classification: a denied
+    // start is also retained temporarily so any already-framed upload can be
+    // drained without desynchronizing the channel.
+    if (discarded && this.discardedIncomingCount >= MAX_DISCARDED_UPLOADS) {
+      throw new Error("excessive discarded provider uploads");
+    }
     const timeout = setTimeout(() => {
-      const request = this.incoming.get(frame.requestId);
-      if (!request || !this.incoming.delete(frame.requestId)) return;
+      const request = this.removeIncoming(frame.requestId);
+      if (!request) return;
       this.releaseRequestBody(request);
+      // A denied/overloaded upload already received its one terminal error at
+      // the point it became discarded. Keep draining it only to preserve frame
+      // synchronization; expiry releases its state without publishing a second
+      // terminal outcome for the same request id.
+      if (request.discarded) return;
       void this.responseError(
         frame.requestId,
         "invalid-request",
@@ -330,6 +341,14 @@ export class AgentNetworkHost {
       discarded,
       timeout,
     });
+    if (discarded) this.discardedIncomingCount += 1;
+    if (terminalError) {
+      void this.responseError(
+        frame.requestId,
+        terminalError.code,
+        terminalError.message
+      ).catch((error) => this.fail(asError(error)));
+    }
   }
 
   private onRequestChunk(frame: AgentSidecarChannel.RequestChunkFrame): void {
@@ -348,8 +367,8 @@ export class AgentNetworkHost {
         this.bufferedRequestBodyBytes + chunk.length >
         this.maxBufferedRequestBodyBytes
       ) {
+        this.markIncomingDiscarded(request);
         this.releaseRequestBody(request);
-        request.discarded = true;
         void this.responseError(
           frame.requestId,
           "overloaded",
@@ -369,7 +388,7 @@ export class AgentNetworkHost {
       throw new Error("provider request end sequence mismatch");
     }
     clearTimeout(request.timeout);
-    this.incoming.delete(frame.requestId);
+    this.removeIncoming(frame.requestId);
     if (request.discarded || !request.authorized) {
       this.releaseRequestBody(request);
       return;
@@ -408,12 +427,11 @@ export class AgentNetworkHost {
   }
 
   private onRequestAbort(requestId: string): void {
-    const incoming = this.incoming.get(requestId);
+    const incoming = this.removeIncoming(requestId);
     if (incoming) {
       clearTimeout(incoming.timeout);
       this.releaseRequestBody(incoming);
     }
-    this.incoming.delete(requestId);
     this.requestControllers.get(requestId)?.abort();
     const response = this.active.get(requestId);
     if (response) {
@@ -455,7 +473,6 @@ export class AgentNetworkHost {
         controller.signal
       );
       this.releaseRequestBody(request);
-      body = Buffer.alloc(0);
       reservationReleased = true;
       if (
         controller.signal.aborted ||
@@ -592,7 +609,7 @@ export class AgentNetworkHost {
 
       const target = new URL(location, current.url);
       const sameOrigin = target.origin === current.url.origin;
-      const headers = [...current.headers.entries()].filter(
+      let headers = [...current.headers.entries()].filter(
         ([name]) => sameOrigin || !isCredentialHeader(name)
       );
       // Provider requests can carry credentials in arbitrary headers, query
@@ -604,12 +621,16 @@ export class AgentNetworkHost {
       }
       let method = current.method;
       if (
-        response.status === 303 ||
+        (response.status === 303 && method !== "HEAD") ||
         ((response.status === 301 || response.status === 302) &&
           method === "POST")
       ) {
         method = "GET";
         currentBody = Buffer.alloc(0);
+        // Fetch's redirect rewrite removes request-body metadata along with the
+        // body. Re-authorize only the rewritten request so Chromium cannot send
+        // a bodyless GET carrying the POST representation's stale description.
+        headers = headers.filter(([name]) => !isRequestBodyHeader(name));
       }
       current = AgentNetworkPolicy.authorize(this.authority.grants(), {
         grant_id: current.grant.id,
@@ -709,6 +730,22 @@ export class AgentNetworkHost {
     return request;
   }
 
+  private removeIncoming(requestId: string): IncomingRequest | null {
+    const request = this.incoming.get(requestId);
+    if (!request || !this.incoming.delete(requestId)) return null;
+    if (request.discarded) this.discardedIncomingCount -= 1;
+    return request;
+  }
+
+  private markIncomingDiscarded(request: IncomingRequest): void {
+    if (request.discarded) return;
+    if (this.discardedIncomingCount >= MAX_DISCARDED_UPLOADS) {
+      throw new Error("excessive discarded provider uploads");
+    }
+    request.discarded = true;
+    this.discardedIncomingCount += 1;
+  }
+
   private releaseRequestBody(request: IncomingRequest): void {
     this.bufferedRequestBodyBytes = Math.max(
       0,
@@ -757,6 +794,7 @@ export class AgentNetworkHost {
     }
     for (const request of this.incoming.values()) clearTimeout(request.timeout);
     this.bufferedRequestBodyBytes = 0;
+    this.discardedIncomingCount = 0;
     this.incoming.clear();
     this.active.clear();
     this.requestControllers.clear();
@@ -975,6 +1013,17 @@ function isCredentialHeader(name: string): boolean {
     lower === "cookie" ||
     lower === "x-api-key" ||
     lower === "api-key"
+  );
+}
+
+function isRequestBodyHeader(name: string): boolean {
+  const lower = name.toLowerCase();
+  return (
+    lower === "content-encoding" ||
+    lower === "content-language" ||
+    lower === "content-length" ||
+    lower === "content-location" ||
+    lower === "content-type"
   );
 }
 

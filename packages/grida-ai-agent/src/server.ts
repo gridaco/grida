@@ -101,9 +101,9 @@ export type AgentTenantOptions = {
    * `request` carries provider operations (including credential-bearing
    * inference and media submit/poll/result calls); `download` is used only for
    * credential-free provider result/assets that the host authorizes. Both are
-   * required when supplied so
-   * the two authorization classes cannot silently collapse. Omit the whole
-   * transport to retain ambient `globalThis.fetch` behavior.
+   * required when supplied so the two authorization classes cannot silently
+   * collapse. Omission retains ambient provider requests for standalone/CLI
+   * compatibility but fails closed for remote asset downloads.
    *
    * This grants no network operation to tools, shell commands, or external
    * agent processes. The package shapes provider requests, performs basic URL
@@ -139,15 +139,14 @@ export type AgentTenantOptions = {
   sandbox_enforced?: boolean;
   /**
    * GRIDA-SEC-004 — host disposition for external ACP process execution.
-   * `"enabled"` (default for backward compatibility) is an explicit host
-   * authorization to spawn the process and makes NO containment claim.
+   * `"enabled"` is an explicit host authorization to spawn the process and
+   * makes NO containment claim.
    * `"sandboxed"` additionally requires `sandbox_enforced` to be exactly true.
-   * `"disabled"` withholds the process capability entirely.
+   * `"disabled"` withholds the process capability entirely and is the default
+   * when this field is omitted.
    *
    * This switch is independent of `allow_unsandboxed_shell`, which authorizes
-   * only Grida's locked shell tool. Security-sensitive hosts should explicitly
-   * choose `"sandboxed"` or `"disabled"` rather than rely on the compatibility
-   * default.
+   * only Grida's locked shell tool.
    */
   external_agent_execution?: "enabled" | "sandboxed" | "disabled";
   /**
@@ -336,12 +335,12 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         scratch_base: scratchBase,
         shell_execution_allowed: shellExecutionAllowed,
         // GRIDA-SEC-004 — the sandboxed ACP disposition consumes this host
-        // attestation; the compatibility `enabled` disposition does not.
+        // attestation; the explicit `enabled` disposition does not.
         sandbox_enforced: opts.sandbox_enforced === true,
         // A host may authorize execution without a containment claim, require
         // containment, or withhold the whole ACP process capability. Omission
-        // preserves the pre-option execution path.
-        external_agent_execution: opts.external_agent_execution ?? "enabled",
+        // cannot itself grant process authority.
+        external_agent_execution: opts.external_agent_execution ?? "disabled",
         // Image generation rides the same capability flag as the
         // `/images/generate` route. The bindings still require a scratch sink +
         // a provider key.

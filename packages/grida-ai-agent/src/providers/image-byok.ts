@@ -297,16 +297,17 @@ export class FalImageModel implements ImageModelV3 {
     if (entries.length === 0) {
       throw new Error("[fal] response contained no image");
     }
-    const images = await Promise.all(
-      entries.map((img) => {
-        assertAllowedUrl(img.url ?? "", FAL_HOSTS, "[fal] image url");
-        return downloadToBytes(
-          img.url,
-          this.providerHttp.download,
-          abortSignal
-        );
-      })
-    );
+    // Keep every provider-result URL in one credential-free bounded batch; the
+    // batch refuses excessive count/aggregate bytes and consumes sequentially.
+    const urls = entries.map((img) => {
+      const value = img.url ?? "";
+      assertAllowedUrl(value, FAL_HOSTS, "[fal] image url");
+      return new URL(value);
+    });
+    const downloaded = await this.providerHttp.downloadProviderAssets(urls, {
+      signal: abortSignal,
+    });
+    const images = downloaded.map((image) => image.data);
 
     return {
       images,
@@ -354,17 +355,4 @@ function whFromSize(
   // Omit `image_size` rather than post NaN dimensions to fal.
   if (!Number.isFinite(w) || !Number.isFinite(h)) return undefined;
   return { width: w, height: h };
-}
-
-async function downloadToBytes(
-  url: string | undefined,
-  download: typeof globalThis.fetch,
-  abortSignal?: AbortSignal
-): Promise<Uint8Array> {
-  if (!url) throw new Error("[fal] result image has no url");
-  const res = await download(url, { signal: abortSignal });
-  if (!res.ok) {
-    throw new Error(`[fal] image download failed (${res.status})`);
-  }
-  return new Uint8Array(await res.arrayBuffer());
 }

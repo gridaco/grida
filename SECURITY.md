@@ -506,9 +506,9 @@ transport or prove system-route compatibility, so it is unavailable even on a
 sandboxed macOS/Linux launch. Reusable-package hosts choose an explicit
 `external_agent_execution` posture: `"sandboxed"` requires
 `sandbox_enforced === true` at HTTP preflight and immediately before spawn;
-`"disabled"` withholds ACP; and the compatibility default `"enabled"` makes no
-containment claim. A host that relies on the default is deliberately accepting
-unsandboxed external-agent execution; Desktop does not.
+`"enabled"` makes no containment claim; and `"disabled"` withholds ACP.
+Omission resolves to `"disabled"`, so reusable hosts must explicitly select
+`"enabled"` or `"sandboxed"` to permit external-agent execution.
 
 **Electron-side hardening (mandatory; see the
 [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security)).**

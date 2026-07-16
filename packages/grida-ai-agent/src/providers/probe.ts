@@ -120,7 +120,10 @@ async function requestJson(
           }
         : {}),
     });
-    if (!res.ok) return { ok: false };
+    if (!res.ok) {
+      await cancelResponseBody(res);
+      return { ok: false };
+    }
     const text = await readBodyBounded(res);
     if (text === null) return { ok: false };
     return { ok: true, data: JSON.parse(text) };
@@ -137,7 +140,10 @@ async function requestJson(
  */
 async function readBodyBounded(res: Response): Promise<string | null> {
   const declared = Number(res.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    await cancelResponseBody(res);
+    return null;
+  }
   if (!res.body) {
     const text = await res.text();
     return text.length > MAX_BODY_BYTES ? null : text;
@@ -145,15 +151,17 @@ async function readBodyBounded(res: Response): Promise<string | null> {
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_BODY_BYTES) {
-      void reader.cancel().catch(() => {});
-      return null;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) return null;
+      chunks.push(value);
     }
-    chunks.push(value);
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
   const buf = new Uint8Array(total);
   let offset = 0;
@@ -162,6 +170,11 @@ async function readBodyBounded(res: Response): Promise<string | null> {
     offset += chunk.byteLength;
   }
   return new TextDecoder().decode(buf);
+}
+
+/** Release an ignored probe response without letting cancellation escape. */
+async function cancelResponseBody(res: Response): Promise<void> {
+  await res.body?.cancel().catch(() => undefined);
 }
 
 /**

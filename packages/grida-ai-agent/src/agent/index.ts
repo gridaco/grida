@@ -151,8 +151,9 @@ export function createAgent(opts: CreateAgentOptions) {
 
 /**
  * Node-host-only variant used by the agent runtime to replace the AI SDK's
- * ambient URL-part downloader. Deliberately not re-exported from the package's
- * neutral root: hosts supply provider HTTP only at `@grida/agent/server`.
+ * default URL-part downloader with the package's bounded, host-authorized
+ * lane. Deliberately not re-exported from the package's neutral root: hosts
+ * supply provider HTTP only at `@grida/agent/server`.
  */
 export function createAgentWithUrlPartDownload(
   opts: CreateAgentOptions,

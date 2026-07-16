@@ -27,6 +27,7 @@ import {
 } from "./agent-sidecar-supervisor";
 import { AgentProviderEndpointMutation } from "./agent-provider-endpoint-mutation";
 import {
+  isValidEndpointProviderId,
   validateEndpointProviderConfig,
   type EndpointProviderConfig,
 } from "@grida/agent";
@@ -59,6 +60,9 @@ const EDITOR_ORIGIN = (() => {
     return "";
   }
 })();
+
+const providerEndpointMutations =
+  new AgentProviderEndpointMutation.Coordinator();
 
 /**
  * GRIDA-SEC-004 — every native-OS IPC handler MUST validate the sender
@@ -119,20 +123,29 @@ export function registerIpcHandlers() {
       const validated = validateEndpointProviderConfig(input);
       if (!validated.ok) throw new Error(validated.error);
       const config = validated.config;
-      const endpoint = await describeAgentProviderEndpoint(config.base_url);
-      await confirmProviderOrigin(event, endpoint.origin, endpoint.route);
-      // Persist first: config writes perform no provider egress. Only after the
-      // authenticated sidecar accepts the config does main publish its grant.
-      await agentSidecarClient.setProviderEndpoint(config);
-      await approveAgentProviderEndpoint(config.id, config.base_url);
+      await providerEndpointMutations.run(config.id, async () => {
+        const endpoint = await describeAgentProviderEndpoint(config.base_url);
+        await confirmProviderOrigin(event, endpoint.origin, endpoint.route);
+        // Persist first: config writes perform no provider egress. Only after
+        // the authenticated sidecar accepts the config does main publish its
+        // grant. The per-id coordinator keeps this SET atomic with DELETE and
+        // replacement SET ceremonies for the same endpoint.
+        await agentSidecarClient.setProviderEndpoint(config);
+        await approveAgentProviderEndpoint(config.id, config.base_url);
+      });
     }
   );
 
   guarded(IPC_CHANNELS.PROVIDER_ENDPOINT_DELETE, async (_event, id: string) => {
-    await AgentProviderEndpointMutation.remove({
-      revokeAuthority: async () => await revokeAgentProviderEndpoint(id),
-      deleteConfiguration: async () =>
-        await agentSidecarClient.deleteProviderEndpoint(id),
+    if (!isValidEndpointProviderId(id)) {
+      throw new Error("provider endpoint id is invalid");
+    }
+    await providerEndpointMutations.run(id, async () => {
+      await AgentProviderEndpointMutation.remove({
+        revokeAuthority: async () => await revokeAgentProviderEndpoint(id),
+        deleteConfiguration: async () =>
+          await agentSidecarClient.deleteProviderEndpoint(id),
+      });
     });
   });
 

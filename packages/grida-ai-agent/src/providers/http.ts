@@ -4,9 +4,9 @@
  *
  * This is deliberately narrower than a networking abstraction: provider
  * adapters may use {@link ProviderHttp.request} for their named upstream
- * operations, and may use {@link ProviderHttp.download} only for
- * credential-free provider result/asset downloads. Tools, shell processes, and
- * external-agent processes never receive this object.
+ * operations, and may use {@link ProviderHttp.downloadProviderAssets} only for
+ * a bounded batch of credential-free provider result/asset downloads. Tools,
+ * shell processes, and external-agent processes never receive this object.
  */
 
 import {
@@ -14,12 +14,22 @@ import {
   type Experimental_DownloadFunction as DownloadFunction,
 } from "ai";
 
-const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
+// Keep one automatic lowering batch comfortably below the sidecar's practical
+// memory budget. Results remain live together while callers encode or hand
+// them to the model, so both count and aggregate decoded bytes are bounded.
+// Deliberately private: hosts authorize routes, not larger payloads.
+const MAX_DOWNLOAD_ASSET_COUNT = 16;
+const MAX_DOWNLOAD_BATCH_BYTES = 64 * 1024 * 1024;
 const DATA_URL_PREFIX = "data:";
 
 type ProviderHttpLimits = Readonly<{
-  /** Internal test seam; production retains the AI SDK's 2 GiB limit. */
-  max_download_bytes?: number;
+  /** Internal test seam; production uses the private package memory bound. */
+  max_download_batch_bytes?: number;
+}>;
+
+type ProviderAssetDownloadOptions = Readonly<{
+  /** Cancellation is the only per-call input; credentials cannot enter here. */
+  signal?: AbortSignal;
 }>;
 
 /**
@@ -32,7 +42,7 @@ type ProviderHttpLimits = Readonly<{
  * URL, method, headers, redirect behavior, and resolved address/route. It must
  * apply that decision to every redirect hop as well. The package owns
  * provider-specific request shaping, credential injection, basic URL syntax
- * checks, response parsing, and download byte bounds; it cannot enforce the
+ * checks, response parsing, and download batch bounds; it cannot enforce the
  * host's destination or routing policy from behind a fetch-shaped callback.
  */
 export type ProviderHttpTransport = Readonly<{
@@ -62,46 +72,93 @@ export type ProviderHttpTransport = Readonly<{
 /**
  * Resolved provider HTTP operations used inside the package.
  *
- * The ambient fallback dereferences `globalThis.fetch` per call rather than at
- * construction/import time. CLI hosts and tests that omit the transport retain
- * the existing process-global behavior, including late test stubs.
+ * Provider requests retain an ambient fallback, dereferenced per call for
+ * standalone/CLI compatibility. Remote asset downloads do not: only an
+ * injected host transport can bind destination authorization to the request it
+ * opens. Inline `data:` assets remain package-local.
  */
 export class ProviderHttp {
   readonly request: typeof globalThis.fetch;
-  readonly download: typeof globalThis.fetch;
-  /** Whether these operations cross an explicit host authority boundary. */
-  readonly isHostRouted: boolean;
   /** AI SDK URL-part lowering, bound only to the download operation. */
   readonly downloadParts: DownloadFunction;
-  private readonly maxDownloadBytes: number;
+  private readonly downloadTransport?: typeof globalThis.fetch;
+  private readonly maxDownloadBatchBytes: number;
 
   constructor(
     transport?: ProviderHttpTransport,
     limits: ProviderHttpLimits = {}
   ) {
-    this.isHostRouted = transport !== undefined;
-    this.maxDownloadBytes = limits.max_download_bytes ?? MAX_DOWNLOAD_BYTES;
+    this.maxDownloadBatchBytes =
+      limits.max_download_batch_bytes ?? MAX_DOWNLOAD_BATCH_BYTES;
     if (
-      !Number.isSafeInteger(this.maxDownloadBytes) ||
-      this.maxDownloadBytes < 0
+      !Number.isSafeInteger(this.maxDownloadBatchBytes) ||
+      this.maxDownloadBatchBytes < 0
     ) {
-      throw new RangeError("max_download_bytes must be a non-negative integer");
+      throw new RangeError(
+        "max_download_batch_bytes must be a non-negative integer"
+      );
     }
     this.request = transport
       ? (input, init) => transport.request(input, init)
       : (input, init) => globalThis.fetch(input, init);
-    this.download = transport
+    this.downloadTransport = transport
       ? (input, init) => transport.download(input, init)
-      : (input, init) => globalThis.fetch(input, init);
-    this.downloadParts = (parts) =>
-      Promise.all(
-        parts.map((part) =>
-          part.isUrlSupportedByModel ? null : this.downloadPart(part.url)
-        )
-      );
+      : undefined;
+    this.downloadParts = async (parts) => {
+      const indexes: number[] = [];
+      const urls: URL[] = [];
+      for (const [index, part] of parts.entries()) {
+        if (part.isUrlSupportedByModel) continue;
+        assertDownloadAssetCount(urls.length + 1);
+        indexes.push(index);
+        urls.push(part.url);
+      }
+      const downloaded = await this.downloadProviderAssets(urls);
+      const results: Array<{
+        data: Uint8Array;
+        mediaType: string | undefined;
+      } | null> = Array.from({ length: parts.length }, () => null);
+      for (const [offset, result] of downloaded.entries()) {
+        results[indexes[offset]!] = result;
+      }
+      return results;
+    };
   }
 
-  private async downloadPart(url: URL): Promise<{
+  /**
+   * Package-internal batch path for adapters that receive result URLs directly
+   * rather than through AI SDK URL parts. One batch is count-bounded,
+   * aggregate-byte-bounded, and consumed sequentially; callers cannot obtain a
+   * raw single-download operation and accidentally multiply retained results.
+   */
+  async downloadProviderAssets(
+    urls: readonly URL[],
+    options?: ProviderAssetDownloadOptions
+  ): Promise<Array<{ data: Uint8Array; mediaType: string | undefined }>> {
+    assertDownloadAssetCount(urls.length);
+
+    const downloaded: Array<{
+      data: Uint8Array;
+      mediaType: string | undefined;
+    }> = [];
+    let total = 0;
+    for (const url of urls) {
+      const result = await this.downloadPart(
+        url,
+        this.maxDownloadBatchBytes - total,
+        options
+      );
+      total += result.data.byteLength;
+      downloaded.push(result);
+    }
+    return downloaded;
+  }
+
+  private async downloadPart(
+    url: URL,
+    maxBytes: number,
+    options?: ProviderAssetDownloadOptions
+  ): Promise<{
     data: Uint8Array;
     mediaType: string | undefined;
   }> {
@@ -117,35 +174,84 @@ export class ProviderHttp {
           })()
         : url.toString();
     if (url.protocol === "data:") {
-      return decodeDataUrl(text, this.maxDownloadBytes);
+      return decodeDataUrl(text, maxBytes);
     }
     assertPublicDownloadUrl(url);
+    if (!this.downloadTransport) {
+      throw new DownloadError({
+        url: text,
+        message: "remote download requires an authorized host transport",
+      });
+    }
+    let response: Response;
     try {
-      const response = await this.download(text);
-      if (response.redirected) {
-        try {
-          assertPublicDownloadUrl(new URL(response.url));
-        } catch (error) {
-          await cancelResponseBody(response);
-          throw error;
-        }
-      }
-      if (!response.ok) {
+      response = await this.downloadTransport(
+        text,
+        options?.signal ? { signal: options.signal } : undefined
+      );
+    } catch (cause) {
+      // Fetch failures commonly embed the full signed URL in their message.
+      // Preserve that URL and cause on the internal error object, but keep the
+      // display message capability-free for any caller that surfaces it.
+      throw providerAssetDownloadError({ url: text, cause });
+    }
+    if (response.redirected) {
+      try {
+        assertPublicDownloadUrl(new URL(response.url));
+      } catch (error) {
         await cancelResponseBody(response);
-        throw new DownloadError({
-          url: text,
-          statusCode: response.status,
-          statusText: response.statusText,
-        });
+        throw error;
       }
+    }
+    if (!response.ok) {
+      await cancelResponseBody(response);
+      throw providerAssetDownloadError({
+        url: text,
+        statusCode: response.status,
+        statusText: response.statusText,
+      });
+    }
+    try {
       return {
-        data: await readBodyBounded(response, text, this.maxDownloadBytes),
+        data: await readBodyBounded(response, text, maxBytes),
         mediaType: response.headers.get("content-type") ?? undefined,
       };
     } catch (error) {
       if (DownloadError.isInstance(error)) throw error;
-      throw new DownloadError({ url: text, cause: error });
+      throw providerAssetDownloadError({ url: text, cause: error });
     }
+  }
+}
+
+function providerAssetDownloadError({
+  url,
+  statusCode,
+  statusText,
+  cause,
+}: {
+  url: string;
+  statusCode?: number;
+  statusText?: string;
+  cause?: unknown;
+}): DownloadError {
+  return new DownloadError({
+    url,
+    statusCode,
+    statusText,
+    cause,
+    message:
+      statusCode === undefined
+        ? "provider asset download failed"
+        : `provider asset download failed (HTTP ${statusCode})`,
+  });
+}
+
+function assertDownloadAssetCount(count: number): void {
+  if (count > MAX_DOWNLOAD_ASSET_COUNT) {
+    throw new DownloadError({
+      url: "provider-assets://batch",
+      message: `download batch exceeds maximum asset count of ${MAX_DOWNLOAD_ASSET_COUNT}`,
+    });
   }
 }
 
@@ -361,29 +467,41 @@ async function readBodyBounded(
   if (!response.body) return new Uint8Array();
 
   const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
+  // Grow one accumulator instead of retaining every stream chunk and then
+  // allocating a second full-size contiguous result. At a growth boundary the
+  // old and new arrays overlap briefly, but both are package-bounded and the
+  // returned subarray reuses the final backing store without another copy.
+  let data = new Uint8Array();
   let total = 0;
   try {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) {
+      const nextTotal = total + value.byteLength;
+      if (nextTotal > maxBytes) {
         throw new DownloadError({ url, message: "download is too large" });
       }
-      chunks.push(value);
+      if (nextTotal > data.byteLength) {
+        const minimumInitialCapacity = Math.min(64 * 1024, maxBytes);
+        const capacity = Math.min(
+          maxBytes,
+          Math.max(
+            nextTotal,
+            data.byteLength === 0 ? minimumInitialCapacity : data.byteLength * 2
+          )
+        );
+        const grown = new Uint8Array(capacity);
+        grown.set(data.subarray(0, total));
+        data = grown;
+      }
+      data.set(value, total);
+      total = nextTotal;
     }
   } finally {
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
-  const data = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    data.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return data;
+  return data.subarray(0, total);
 }
 
 /** Release a rejected response without letting cancellation mask its error. */

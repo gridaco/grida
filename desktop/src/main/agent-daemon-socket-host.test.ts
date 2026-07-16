@@ -13,6 +13,27 @@ afterEach(() => {
 });
 
 describe("AgentDaemonSocketHost", () => {
+  it("cancels the owned listener when close races asynchronous listen", async () => {
+    const child = fakeChild();
+    const fatal = vi.fn<(error: Error) => void>();
+    const host = new AgentDaemonSocketHost(child.value, fatal);
+    const listening = host.listen();
+    const rejection = listening.catch((error: unknown) => error);
+
+    host.close();
+
+    expect(await rejection).toEqual(
+      expect.objectContaining({
+        message: expect.stringMatching(/closed while listening/),
+      })
+    );
+    expect(() => host.port).toThrow(/before listen/);
+    expect(
+      (host as unknown as { server: net.Server | null }).server
+    ).toBeNull();
+    expect(fatal).not.toHaveBeenCalled();
+  });
+
   it("binds only loopback and drops connections before sidecar readiness", async () => {
     const child = fakeChild();
     const fatal = vi.fn<(error: Error) => void>();

@@ -25,6 +25,7 @@
  */
 
 import type { Hono } from "hono";
+import { DownloadError } from "ai";
 import type { Experimental_VideoModelV3CallOptions as VideoModelV3CallOptions } from "@ai-sdk/provider";
 import type { SecretsStore } from "@grida/daemon/server";
 import {
@@ -57,28 +58,23 @@ class UntrustedVideoResultOriginError extends Error {
   }
 }
 
-function videoResultUrl(
-  value: string,
-  providerId: string,
-  hostRouted: boolean
-): URL {
+function videoResultUrl(value: string, providerId: string): URL {
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    if (hostRouted && providerId === "vercel") {
+    if (providerId === "vercel") {
       throw new UntrustedVideoResultOriginError(providerId, value);
     }
     throw new Error(`[agent-host-video] ${providerId} returned an invalid url`);
   }
 
   // Vercel Gateway's VideoModel contract permits arbitrary provider-returned
-  // URLs. A closed host transport has granted only its configured provider
-  // origin, not every origin a downstream model might name. Inline data never
-  // crosses host I/O; an exact Gateway origin is the only network-shaped URL
-  // the package can prove belongs to the configured provider.
+  // URLs, but package download authority never does. Inline data stays local;
+  // the exact configured Gateway origin is the only network-shaped URL the
+  // package can prove belongs to that provider, and a host transport must still
+  // authorize the concrete request before I/O.
   if (
-    hostRouted &&
     providerId === "vercel" &&
     url.protocol !== "data:" &&
     url.origin !== VERCEL_VIDEO_GATEWAY_ORIGIN
@@ -92,6 +88,18 @@ function videoResultUrl(
     );
   }
   return url;
+}
+
+function videoFetchFailureMessage(error: unknown): string {
+  // DownloadError.url deliberately retains the opaque provider capability for
+  // internal diagnosis. Its message is not a client contract and may come from
+  // a foreign transport, so never reflect it across this renderer boundary.
+  if (DownloadError.isInstance(error)) {
+    return error.statusCode === undefined
+      ? "provider asset download failed"
+      : `provider asset download failed (HTTP ${error.statusCode})`;
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 export type VideoRoutesDeps = {
@@ -179,34 +187,45 @@ export function registerVideoRoutes(app: Hono, deps: VideoRoutesDeps) {
     // ProviderHttp download path after provider-specific trust checks.
     let videos;
     try {
-      videos = await Promise.all(
-        generation.videos.map(async (vid) => {
-          if (vid.type === "base64")
-            return { base64: vid.data, media_type: vid.mediaType };
-          if (vid.type === "binary")
-            return {
+      const urls: URL[] = [];
+      const pending = generation.videos.map((vid) => {
+        if (vid.type === "base64") {
+          return {
+            kind: "ready" as const,
+            video: { base64: vid.data, media_type: vid.mediaType },
+          };
+        }
+        if (vid.type === "binary") {
+          return {
+            kind: "ready" as const,
+            video: {
               base64: Buffer.from(vid.data).toString("base64"),
               media_type: vid.mediaType,
-            };
-          const url = videoResultUrl(
-            vid.url,
-            resolved.provider_id,
-            providerHttp.isHostRouted
-          );
-          const [downloaded] = await providerHttp.downloadParts([
-            { url, isUrlSupportedByModel: false },
-          ]);
-          if (!downloaded) throw new Error("video result was not downloaded");
-          return {
-            base64: Buffer.from(downloaded.data).toString("base64"),
-            media_type: downloaded.mediaType ?? vid.mediaType,
+            },
           };
-        })
-      );
+        }
+        const index = urls.length;
+        urls.push(videoResultUrl(vid.url, resolved.provider_id));
+        return {
+          kind: "download" as const,
+          index,
+          media_type: vid.mediaType,
+        };
+      });
+      const downloaded = await providerHttp.downloadProviderAssets(urls);
+      videos = pending.map((item) => {
+        if (item.kind === "ready") return item.video;
+        const result = downloaded[item.index];
+        if (!result) throw new Error("video result was not downloaded");
+        return {
+          base64: Buffer.from(result.data).toString("base64"),
+          media_type: result.mediaType ?? item.media_type,
+        };
+      });
     } catch (e) {
       return c.json(
         {
-          error: `video fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+          error: `video fetch failed: ${videoFetchFailureMessage(e)}`,
           ...(e instanceof UntrustedVideoResultOriginError
             ? { code: e.code }
             : {}),
