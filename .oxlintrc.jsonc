@@ -51,7 +51,6 @@
     "es2024": true,
   },
   "ignorePatterns": [
-    "third_party/externals/",
     ".ref/",
     "data/",
     "bin/",

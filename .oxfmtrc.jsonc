@@ -7,7 +7,6 @@
     "sortScripts": true,
   },
   "ignorePatterns": [
-    "third_party/externals/",
     ".ref/",
     ".json5",
     "data/",

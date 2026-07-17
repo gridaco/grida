@@ -4,7 +4,7 @@ Generated TypeScript bindings for the Grida FlatBuffers schema.
 
 ## Overview
 
-This package contains **generated-only** TypeScript code produced from [`format/grida.fbs`](../../format/grida.fbs) using the FlatBuffers compiler (`flatc`).
+This package contains **generated-only** TypeScript code produced from [`format/grida.fbs`](https://github.com/gridaco/nothing/blob/main/format/grida.fbs) using the FlatBuffers compiler (`flatc`).
 
 ## Generating Code
 

@@ -119,7 +119,7 @@ pages, the short version:
 
 - Links **within `/docs`** (relative paths between docs pages) are fine.
 - **Never link outside `/docs` with a relative path** — only `/docs/**`
-  is deployed, so `../../../crates/...` 404s on the site. Use an
+  is deployed, so `../../../editor/...` 404s on the site. Use an
   absolute GitHub URL:
   `https://github.com/gridaco/grida/blob/main/<path>`.
 - Links to **external URLs** (`https://...`) are fine.

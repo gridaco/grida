@@ -1,7 +1,7 @@
 /**
  * Render-policy bitflags used by the WASM renderer.
  *
- * **Source of truth**: `crates/grida/src/runtime/render_policy.rs`
+ * **Source of truth**: https://github.com/gridaco/nothing/blob/main/crates/grida/src/runtime/render_policy.rs
  *
  * These flags are an ABI boundary between the TypeScript editor runtime and the
  * Rust renderer (via `@grida/canvas-wasm`).

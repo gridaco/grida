@@ -41,6 +41,16 @@ contain Rust code and needs no Rust toolchain — the editor consumes the
 published `@grida/canvas-wasm` package from npm. To contribute to the engine
 itself, see that repository.
 
+### Where work gets filed
+
+- **[gridaco/nothing](https://github.com/gridaco/nothing)**: engine rendering,
+  the node/document model, `.grida` format/schema, engine text/SVG/HTML import,
+  reftests and engine perf, `@grida/canvas-wasm` publishing, engine WG specs.
+- **This repo**: the editor/product, desktop, forms/database, the SVG editor
+  (TS), platform/billing, and everything user-facing.
+- When unsure: file where the fix would land. Cross-repo references are always
+  full `gridaco/<repo>#N` form — never bare `#N`.
+
 Then, install the dependencies and run the development server:
 
 ```bash

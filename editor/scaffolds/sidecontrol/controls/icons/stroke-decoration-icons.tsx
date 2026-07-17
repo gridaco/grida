@@ -1,7 +1,8 @@
 /**
  * SVG icons for stroke decoration presets.
  *
- * Proportions match the Rust shape spec (crates/grida/src/shape/marker.rs):
+ * Proportions match the Rust shape spec
+ * (https://github.com/gridaco/nothing/blob/main/crates/grida/src/shape/marker.rs):
  * - Arrow lines: right-triangle, arms 45° (depth = size, half_h = size); scaled to fit.
  * - Triangle: depth = s*1.5, half_h = s*0.866, s = size*0.8.
  * - Circle: r = size*0.6, depth = 2r.

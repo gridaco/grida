@@ -22,7 +22,6 @@ short-published-name pattern — see the next table.
 | `packages/grida-canvas-io-figma` | `@grida/io-figma`    |
 | `packages/grida-canvas-tailwind` | `@grida/tailwindcss` |
 | `packages/grida-cmath`           | `@grida/cmath`       |
-| `packages/grida-reftest`         | `@grida/reftest`     |
 | `packages/react-p-queue`         | `react-p-queue`      |
 
 ## Route group charter (`editor/app/(*)/`)

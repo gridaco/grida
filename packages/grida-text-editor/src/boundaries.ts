@@ -124,7 +124,7 @@ export function prev_word(text: string, index: number): number {
  * containing `index`. Falls back to a zero-length range if `index` is
  * out of bounds. Used by word-granularity delete/backspace so the
  * operation matches the canonical UAX-29 segment-based behavior of
- * `crates/grida/src/text_edit/` and the shared-fixture suite:
+ * the engine's `text_edit` (github.com/gridaco/nothing) and the shared-fixture suite:
  * a word-delete at "hello |world" (caret = 6, right after the space)
  * removes only the space, yielding "helloworld", not "world".
  */

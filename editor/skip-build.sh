@@ -38,7 +38,6 @@ DEPS=(
   "editor/"
   "database/"             # @app/database
   "packages/"             # most @grida/* deps
-  "crates/grida-canvas-wasm/"  # @grida/canvas-wasm (lives under crates/)
 
   # build orchestration at the repo root
   "/package.json"

@@ -1,7 +1,7 @@
 /**
  * Command vocabulary + dispatcher.
  *
- * Mirrors `crates/grida/src/text_edit/`'s `EditingCommand` enum.
+ * Mirrors the engine `text_edit` `EditingCommand` enum (https://github.com/gridaco/nothing/tree/main/crates/grida/src/text_edit).
  * `apply_command` takes a session and a command, mutates the session,
  * and returns an `EditKind` (for history grouping) or `null` when the
  * command was non-mutating (caret/selection only).
@@ -106,7 +106,7 @@ export function apply_command(
     case "move_left": {
       // Selection + arrow WITHOUT extend = collapse to the boundary;
       // the caret does NOT move past it by an extra grapheme. Matches
-      // every native text editor (and `crates/grida/src/text_edit/`).
+      // every native text editor (and the engine's `text_edit`).
       const sel = session.selection;
       if (sel && !cmd.extend) {
         session.moveCaret(sel.start, false);
