@@ -10,7 +10,7 @@ This directory contains structured test case (TC) specifications for behaviors t
 
 ## What does NOT belong here
 
-Core math, algorithmic, or low-level features should be covered by formal unit/integration tests co-located with their source code (`__tests__/`, `*.test.ts`, `cargo test`). Only add entries here when automated testing is impractical or would bloat the test suite unnecessarily.
+Core math, algorithmic, or low-level features should be covered by formal unit/integration tests co-located with their source code (`__tests__/`, `*.test.ts`). Only add entries here when automated testing is impractical or would bloat the test suite unnecessarily.
 
 ## File naming
 

@@ -11,7 +11,7 @@ import { createCanvas, type Canvas, type types } from "@grida/canvas-wasm";
 /**
  * TODO: remove once @grida/canvas-wasm with Canvas.switchScene /
  * Canvas.loadedSceneIds is published and depended on. The passthroughs
- * already exist on HEAD at crates/grida-canvas-wasm/lib/index.ts but are
+ * already exist in the engine repo's grida-canvas-wasm lib (github.com/gridaco/nothing) but are
  * not in canary.19 or older — we reach into the inner `_scene` field
  * until a newer version ships.
  */

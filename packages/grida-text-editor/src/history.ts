@@ -1,7 +1,7 @@
 /**
  * Session-internal undo/redo stack with merge-by-EditKind grouping.
  *
- * Mirrors `crates/grida/src/text_edit/history.rs`. Same `EditKind`
+ * Mirrors the engine's `text_edit/history.rs` (https://github.com/gridaco/nothing/blob/main/crates/grida/src/text_edit/history.rs). Same `EditKind`
  * vocabulary, same 2-second merge timeout. Stores snapshots, not
  * diffs — fine at our text lengths.
  *

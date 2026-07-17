@@ -286,7 +286,7 @@ complexity in picker.
 ### (W) WASM SVG / CSS renderer
 
 We don't ship our own renderer for this package today. If we did
-(parity with the `crates/grida` canvas), hit-testing comes along
+(parity with the [engine canvas](https://github.com/gridaco/nothing/tree/main/crates/grida)), hit-testing comes along
 naturally because we own every paint decision. Not a v1 or v2 option —
 mentioned for completeness.
 
@@ -454,6 +454,6 @@ reproduced bad versions of them in user code. v2 should reuse them.
 
 - `packages/grida-svg-editor/docs/geometry.md` — how `bounds_of`
   composes CTM. Read before v2. (Lands with the implementation slice.)
-- `crates/grida` — the WASM-rendered canvas; if `@grida/svg-editor`
-  ever ports to a non-DOM backend, hit-testing follows the renderer
-  there too.
+- [the engine canvas](https://github.com/gridaco/nothing/tree/main/crates/grida) —
+  the WASM-rendered canvas; if `@grida/svg-editor` ever ports to a
+  non-DOM backend, hit-testing follows the renderer there too.

@@ -22,7 +22,7 @@ implementations.
   backend. SVG backend ships in V1; DOM and canvas backends are future
   work _outside_ the package's responsibility.
 - **Rust-code style** — file names and command vocabulary mirror
-  [`crates/grida/src/text_edit/`](../../crates/grida/src/text_edit/) so
+  [the engine's `text_edit`](https://github.com/gridaco/nothing/tree/main/crates/grida/src/text_edit) so
   cross-referencing the two is friction-free.
 - **Engine-grade testability** — pure layers (session, commands,
   history, boundaries) are unit-tested against a `MockLayoutEngine`
@@ -113,7 +113,7 @@ The package doesn't:
 
 V1 is plaintext only. Run-based attributed text (bold/italic/font-swap
 _within_ one editable text) is out of scope for V1; tracked for V2 by
-mirroring `crates/grida/src/text_edit/attributed_text/`.
+mirroring the engine's `text_edit/attributed_text/`.
 
 ### Block structure
 
@@ -164,7 +164,7 @@ refuses to define them.
 
 ## Naming conventions (Rust-style)
 
-The package mirrors `crates/grida/src/text_edit/` so cross-referencing
+The package mirrors the engine's `text_edit` module so cross-referencing
 is friction-free. Identifiers follow the Rust crate's casing; file
 names use kebab-case (TS norm) so the module tree is greppable across
 both languages while the on-disk filenames remain idiomatic for the
@@ -219,8 +219,8 @@ TS ecosystem.
 - WG manifesto: [`docs/wg/feat-text-editing/index.md`](../../docs/wg/feat-text-editing/index.md)
 - Attributed text spec: [`docs/wg/feat-text-editing/attributed-text.md`](../../docs/wg/feat-text-editing/attributed-text.md)
 - Performance roadmap: [`docs/wg/feat-text-editing/impl-performance.md`](../../docs/wg/feat-text-editing/impl-performance.md)
-- Reference Rust impl: [`crates/grida/src/text_edit/`](../../crates/grida/src/text_edit/) (~11.7k LoC; the bulk is `attributed_text/` for V2)
-- Reference Rust example: [`crates/grida_dev/examples/wd_text_editor.rs`](../../crates/grida_dev/examples/wd_text_editor.rs)
+- Reference Rust impl: [the engine's `text_edit`](https://github.com/gridaco/nothing/tree/main/crates/grida/src/text_edit) (~11.7k LoC; the bulk is `attributed_text/` for V2)
+- Reference Rust example: [`wd_text_editor.rs`](https://github.com/gridaco/nothing/blob/main/crates/grida_dev/examples/wd_text_editor.rs)
 - Main editor's current integration: [`editor/grida-canvas-react/viewport/ui/surface-text-editor.tsx`](../../editor/grida-canvas-react/viewport/ui/surface-text-editor.tsx)
 - Fixtures skill: [`.agents/skills/fixtures/SKILL.md`](../../.agents/skills/fixtures/SKILL.md)
 - Existing SVG text fixtures: `fixtures/test-svg/L0/text-*.svg`

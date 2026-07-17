@@ -5,7 +5,7 @@
 // content-edit. Both are composited ON the HUD canvas, above the content and
 // the selection box, so the caret is never occluded and the thickness stays
 // constant at any zoom. This mirrors the Skia text-edit overlay
-// (`crates/grida/src/overlay/widgets/text_edit_decoration.rs`).
+// (https://github.com/gridaco/nothing/blob/main/crates/grida/src/overlay/widgets/text_edit_decoration.rs).
 //
 // Anti-goals (what this class is NOT):
 //

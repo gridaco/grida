@@ -1,0 +1,20 @@
+# Engine-split sanitization probe (P1 forbidden-token + P4 allowlist-freshness).
+# The engine lives in gridaco/nothing; this repo must not accumulate references
+# that describe the departed tree as if it were local. See .github/scripts/split-probe.sh.
+name: split probe
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  probe:
+    name: departed-engine references
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run the probe
+        run: bash .github/scripts/split-probe.sh

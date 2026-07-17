@@ -1,0 +1,13 @@
+# Earned exceptions to the engine-split forbidden-token probe.
+# Format: <tracked path><TAB><reason>. P4 fails if a grant stops matching.
+.agents/skills/docs-wg/SKILL.md	doctrine: names `crates/` as the anti-pattern authors must search for
+.agents/skills/io-grida/SKILL.md	truthful negative: states these files are NOT in this repo (tombstone doc)
+.agents/skills/links/SKILL.md	link doctrine: cites the departed path as its worked anti-example
+.agents/skills/naming/SKILL.md	cross-repo naming rationale names the engine crate inline (pointer paragraph)
+.agents/skills/naming/cases.md	crate-alignment doctrine referencing engine crates (pointer paragraph)
+.agents/skills/sdk-design/SKILL.md	scope gate names engine crates as governed surfaces (with repo attribution)
+.agents/skills/sdk-seam/SKILL.md	boundary archetype example (a crate + the binary that links it)
+AGENTS.md	the engine pointer paragraph — repo URL sits on the adjacent line
+fixtures/test-grida/	frozen snapshot — mirrors engine canon; edits happen upstream (see fixtures/README.md)
+fixtures/text-editor/	frozen snapshot — byte-parity with engine canon; v1.json is test-consumed
+supabase/drafts/20251214_grida_canvas_document_model.sql	draft provenance comment citing the engine schema file as of authoring
