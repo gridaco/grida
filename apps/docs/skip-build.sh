@@ -9,6 +9,10 @@
 # runner can branch on an exit code (Vercel ignoreCommand, GitHub Actions).
 # The script itself knows nothing about the host.
 
+# KNOWN CAVEAT: on fresh PR branches VERCEL_GIT_PREVIOUS_SHA is unset and the
+# HEAD^ fallback sees only the tip commit — a docs-only tip commit wrongly
+# skips the build. Planned fix: diff against the merge base with the target
+# branch. (Vercel also runs its own "affected projects" check before this.)
 set -uo pipefail
 
 # ---------------------------------------------------------------------------

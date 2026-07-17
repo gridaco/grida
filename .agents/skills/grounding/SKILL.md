@@ -32,9 +32,10 @@ Authority is per-surface — the engine model and its TS mirror can each
 be right for their own surface and still disagree. Name the surface,
 then trust:
 
-- **Canvas render/node model** → Rust engine `crates/grida/src/`
-  (`node/schema.rs`). The TS mirror `editor/grida-canvas/` is
-  authoritative for _editor behavior_ and can lag the engine.
+- **Canvas render/node model** → the Rust engine, now in the engine repo:
+  https://github.com/gridaco/nothing/blob/main/crates/grida/src/node/schema.rs.
+  The TS mirror `editor/grida-canvas/` is authoritative for _editor
+  behavior_ and can lag the engine.
 - **DB schema** → `supabase/migrations/` (applied, immutable);
   `supabase/schemas/*.sql` is a readable projection that can lag — use
   the **database** skill.
@@ -47,21 +48,21 @@ the running entrypoint imports, what tests assert); don't average;
 surface a material conflict to the user. **Never authoritative even when
 they match:** `docs/_history/`,
 `docs/@designto-code/` (synced — truth is upstream), `docs/cli/`
-(deprecated), `.ref/`, vendored `third_party/`.
+(deprecated), `.ref/`.
 
 ## Dead-tree traps
 
 Some directories are git-tracked but dead — a bare `rg` from repo root
 returns obsolete hits that look like confirmation: `docs/_history/`,
-`.ref/`, vendored `third_party/`. (The legacy editor trees `.legacy/`
-and `packages/.legacy/` were retired May 2026 in #759; recover from the
+`.ref/`. (The legacy editor trees `.legacy/` and `packages/.legacy/` were
+retired May 2026 in #759; recover from the
 `snapshot/legacy-with-2023-grida-code-editor-at-202505` branch.) `rg` already skips gitignored build dirs
-(`node_modules/`, `target/`, `.next/`, …); don't waste flags there.
+(`node_modules/`, `.next/`, …); don't waste flags there.
 Scope positively, or exclude the dead trees:
 
 ```sh
-rg PATTERN editor/grida-canvas crates/grida/src packages
-rg PATTERN -g '!**/third_party/**' -g '!**/docs/_history/**'
+rg PATTERN editor/grida-canvas packages
+rg PATTERN -g '!**/docs/_history/**'
 ```
 
 ## Grounding the docs
@@ -75,8 +76,8 @@ frontmatter only, self-installs via `uv`, runs from any cwd:
 ```sh
 S=.agents/skills/grounding/scripts/docsearch.py
 uv run $S tags                          # vocabulary + usage counts + drift
-uv run $S find --tag canvas --tag svg   # AND (--any=OR); + --has K --field K=V
-uv run $S show wg/feat-svg/pattern.md   # one file's frontmatter only
+uv run $S find --tag figma --tag wg     # AND (--any=OR); + --has K --field K=V
+uv run $S show wg/feat-fig/glossary/fig.kiwi.md   # one file's frontmatter only
 ```
 
 Before trusting a doc over code: `draft: true` = proposal not built yet

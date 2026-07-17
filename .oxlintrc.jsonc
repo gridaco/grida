@@ -56,6 +56,9 @@
     "data/",
     "bin/",
     "library/",
+    // flatc-generated FBS bindings (tombstone) — byte-identical to generator output
+    "packages/grida-format/src/grida/",
+    "packages/grida-format/src/grida.ts",
     "worker-configuration.d.ts",
     "database-generated.types.ts",
   ],

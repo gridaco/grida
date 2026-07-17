@@ -2,10 +2,10 @@
  * Shared text-editor fixtures harness.
  *
  * Loads `fixtures/text-editor/v1.json` (relative to the repo root) and runs
- * each case against this package's `TextEditSession` + `apply_command`. The
- * same fixture file is consumed by the Rust crate at
- * `crates/grida/src/text_edit/`, so any drift between the two implementations
- * shows up here.
+ * each case against this package's `TextEditSession` + `apply_command`.
+ * The fixture is a FROZEN SNAPSHOT (see fixtures/README.md): the canonical
+ * copy lives in the engine repo (gridaco/nothing), consumed by its
+ * `text_edit` crate module. Re-snapshot deliberately if the canon evolves.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

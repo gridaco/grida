@@ -37,7 +37,7 @@ export namespace sitemap {
     npm_dotcanvas: "https://www.npmjs.com/package/dotcanvas",
     github_dotcanvas: "https://github.com/gridaco/grida/tree/main/packages/dotcanvas",
     dotcanvas_spec:
-      "https://github.com/gridaco/grida/blob/main/docs/wg/format/canvas.md",
+      "https://github.com/gridaco/nothing/blob/main/docs/wg/format/canvas.md",
     schema_dotcanvas_v1: "https://grida.co/schema/dotcanvas/v1.json",
     west: "/west",
     cookies: "/cookies-policy",

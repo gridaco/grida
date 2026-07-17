@@ -3,7 +3,6 @@ packages:
   - "database"
   - "public"
   - "apps/*"
-  - "crates/*"
   - "packages/*"
   - "packages/lib/*"
   - "services/*"

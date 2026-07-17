@@ -11,9 +11,10 @@ React subscription layer, and headless benchmarks.
 
 > **Scope boundary:** This skill covers the **JS/TS editor** pipeline
 > (`editor/grida-canvas/`). For the **Rust rendering engine** (the
-> `grida` crate), use the `render-perf` skill instead. The two pipelines are
-> connected — a dispatch in JS may trigger a WASM re-render — but they
-> are profiled with different tools.
+> `grida` crate), use the engine repo's render-perf skill:
+> https://github.com/gridaco/nothing/blob/main/.agents/skills/render-perf/SKILL.md.
+> The two pipelines are connected — a dispatch in JS may trigger a WASM
+> re-render — but they are profiled with different tools, in different repos.
 
 > **Maintaining this document:** If you notice a section that has gone
 > stale (e.g. a workflow step no longer matches the code, a discovery

@@ -9,8 +9,9 @@ description: >
   rejects the wrong contents and keeps the package testable in
   isolation. Default is "core, not customizable"; customization is
   the exception, defended by a deciding table. Use when authoring or
-  evolving any such surface — `@grida/*` published packages,
-  `crates/*` published or FFI-exported, intent/message vocabularies,
+  evolving any such surface — `@grida/*` published packages, engine
+  crates (gridaco/nothing `crates/*`) published or FFI-exported,
+  intent/message vocabularies,
   any contract a second author will compile against. Internal-only
   helper packages are welcome to follow, not forced. Companion skill
   for two-sided contract work: $sdk-seam. Critique partners:
@@ -53,7 +54,7 @@ What this excludes — where the doctrine is **welcome but not
 load-bearing**:
 
 - A package with exactly one internal caller, shipping on the same commit, where if the caller's needs changed the package would be rewritten freely. That's not an SDK; that's a refactored module that happens to live in `packages/`. Adopt the parts of this skill that pay; skip the rest without apology.
-- One-off helper crates pulled in by a single binary in `crates/`. Same logic.
+- One-off helper crates pulled in by a single binary in the engine repo's `crates/`. Same logic.
 
 Don't extend the doctrine to internal-only utilities just because
 the file structure looks like an SDK. The discipline costs

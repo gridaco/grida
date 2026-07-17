@@ -54,13 +54,21 @@ answer table.
 The only first-party hosts. Build every absolute link from these — if a
 link should be first-party but isn't one of these, it is wrong.
 
-| URL                                | What                                                                                                                  |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `https://grida.co`                 | Main website (marketing / product root)                                                                               |
-| `https://grida.co/docs`            | Docs site (Docusaurus). `docs/<path>.md` → `https://grida.co/docs/<path>` (drop the `docs/` prefix and the extension) |
-| `https://grida.co/_/<path>`        | Universal route — resolves to the tenant path `/:org/:project/...` at runtime                                         |
-| `https://github.com/gridaco`       | The GitHub org                                                                                                        |
-| `https://github.com/gridaco/grida` | This repo. File → `…/gridaco/grida/blob/main/<path>`; dir → `…/gridaco/grida/tree/main/<path>`                        |
+| URL                                  | What                                                                                                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `https://grida.co`                   | Main website (marketing / product root)                                                                                                                |
+| `https://grida.co/docs`              | Docs site (Docusaurus). `docs/<path>.md` → `https://grida.co/docs/<path>` (drop the `docs/` prefix and the extension)                                  |
+| `https://grida.co/_/<path>`          | Universal route — resolves to the tenant path `/:org/:project/...` at runtime                                                                          |
+| `https://github.com/gridaco`         | The GitHub org                                                                                                                                         |
+| `https://github.com/gridaco/grida`   | This repo. File → `…/gridaco/grida/blob/main/<path>`; dir → `…/gridaco/grida/tree/main/<path>`                                                         |
+| `https://github.com/gridaco/nothing` | **The engine repo** (crates/, format/, engine docs/wg clusters, engine fixtures). File → `…/blob/main/<path>`; dir → `…/tree/main/<path>`; `main` only |
+
+Decision row for engine targets: **any grida surface → an engine-repo path →
+absolute** `https://github.com/gridaco/nothing/blob|tree/main/<path>`. Never
+relative (different repo), never `grida.co/docs/wg/<engine-cluster>/…` —
+**the docs site no longer publishes the engine wg clusters** (canvas, format,
+research, feat-2d/svg/css/paragraph/text-editing/…). A redirect shim keeps
+_old_ published URLs alive; do not author _new_ links through a redirect.
 
 ## The forms (exact)
 
@@ -94,9 +102,10 @@ resolves in that host.
 ## Hard rules
 
 - **Never link outside `/docs` from a docs page with a relative path.**
-  Only `/docs/**` is deployed; `../../crates/...` 404s on the site. Use
-  the absolute GitHub URL. (Supersedes any older "use inline code"
-  guidance.)
+  Only `/docs/**` is deployed; `../../crates/...` 404s on the site — and
+  `crates/` now lives in gridaco/nothing, so such a link is wrong twice. Use
+  the absolute GitHub URL of the owning repo. (Supersedes any older "use
+  inline code" guidance.)
 - **npm-published package READMEs** (`packages/*` with
   `"private": false`): every in-repo reference must be absolute —
   relative paths die on `npmjs.com`.

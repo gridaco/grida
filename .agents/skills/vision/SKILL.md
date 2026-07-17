@@ -145,8 +145,8 @@ uv run $SCRIPT --ping
 uv run $SCRIPT /tmp/preview.png \
   --prompt "Answer with YES or NO: does this screenshot show any visible UI content, shapes, or text?"
 
-# Describe a golden render for a PR description
-uv run $SCRIPT crates/grida/goldens/progressive_blur.png \
+# Describe a captured screenshot for a PR description
+uv run $SCRIPT /tmp/canvas-screenshot.png \
   --prompt "Describe what visual effect is shown. Be specific about blur, colors, and shapes."
 ```
 

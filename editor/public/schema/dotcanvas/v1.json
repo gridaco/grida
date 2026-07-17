@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://grida.co/schema/dotcanvas/v1.json",
   "title": ".canvas manifest (.canvas.json)",
-  "description": "The single manifest of a `.canvas` bundle — a portable directory of standalone documents plus order and optional 2D placement. The reader is tolerant by construction: every field is optional and the minimal valid manifest is `{}`. Spec: https://github.com/gridaco/grida/blob/main/docs/wg/format/canvas.md",
+  "description": "The single manifest of a `.canvas` bundle — a portable directory of standalone documents plus order and optional 2D placement. The reader is tolerant by construction: every field is optional and the minimal valid manifest is `{}`. Spec: https://github.com/gridaco/nothing/blob/main/docs/wg/format/canvas.md",
   "type": "object",
   "additionalProperties": true,
   "properties": {

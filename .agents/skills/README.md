@@ -37,9 +37,9 @@ Every `SKILL.md` starts with YAML frontmatter:
 ---
 name: example-skill
 description: >
-  Performance optimization for the Grida Canvas Rust engine (grida crate).
-  Covers benchmarking, profiling, compositing, caching, culling, and
-  frame budgeting. Relevant files: optimization.md, bench_camera.
+  Performance investigation for the Grida Canvas web editor (TS reducer, Immer, React).
+  Covers profiling reducer dispatch, diagnosing slow interactions, and
+  editor benchmarks. Relevant files: editor.ts, PerfObserver.
 ---
 ```
 
@@ -47,7 +47,7 @@ description: >
 
 | Field         | Required | Description                                                                                                     |
 | ------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
-| `name`        | Yes      | Short, hyphenated identifier used for referencing and invocation (e.g. `render-perf`, `canvas-wasm`)            |
+| `name`        | Yes      | Short, hyphenated identifier used for referencing and invocation (e.g. `editor-perf`, `ee-billing`)             |
 | `description` | Yes      | What the skill covers and when to activate it. **This is how agents decide whether to load the skill.** (below) |
 
 Your agent runtime may support additional fields (e.g. `allowed-tools`, `context`, `model`). Check its documentation for what's available.
@@ -67,9 +67,9 @@ description: Helps with performance.
 
 # Strong -- specific scope, named files, concrete trigger terms
 description: >
-  Performance optimization for the Grida Canvas Rust engine (grida crate).
-  Covers benchmarking, profiling, compositing, caching, culling, and
-  frame budgeting. Relevant files: optimization.md, bench_camera.
+  Performance investigation for the Grida Canvas web editor (TS reducer, Immer, React).
+  Covers profiling reducer dispatch, diagnosing slow interactions, and
+  editor benchmarks. Relevant files: editor.ts, PerfObserver.
 ```
 
 ## How to Write Good Skill Content
@@ -81,7 +81,7 @@ A skill should tell the agent what to **do**, not just what to **know**. Prefer:
 - Opening with "Use this when..." to set scope
 - Step-by-step procedures over prose explanations
 - Concrete commands and code snippets over abstract guidance
-- Verification steps at the end (e.g. `cargo test -p grida`, `turbo typecheck`)
+- Verification steps at the end (e.g. `turbo test`, `turbo typecheck`)
 - Links to related skills when they exist
 
 ### Complement, Don't Repeat
@@ -92,7 +92,7 @@ You can reference skills from `AGENTS.md` using `$skill-name` notation to create
 
 ### Naming Conventions
 
-- Short and descriptive: `render-perf`, `form-validation`, `tenant-routing`
+- Short and descriptive: `editor-perf`, `form-validation`, `tenant-routing`
 - Hyphenated, lowercase
 - No `grida-` prefix -- the skill is already scoped to this repo
 

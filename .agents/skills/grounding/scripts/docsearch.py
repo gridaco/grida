@@ -35,12 +35,12 @@ find FILTERS
 EXAMPLES
   docsearch tags
   docsearch tags --alpha
-  docsearch find --tag canvas --tag svg
-  docsearch find --any --tag figma --tag svg wg
+  docsearch find --tag figma --tag wg
+  docsearch find --any --tag figma --tag forms wg
   docsearch find --has doc_tasks
   docsearch find --field draft=true
   docsearch find --match 'unlisted:\\s*true'
-  docsearch show wg/feat-svg/pattern.md
+  docsearch show wg/feat-fig/glossary/fig.kiwi.md
 """
 
 from __future__ import annotations

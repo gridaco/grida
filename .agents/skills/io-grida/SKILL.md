@@ -1,13 +1,14 @@
 ---
 name: io-grida
 description: >
-  Guides work on the Grida file format (.grida), the I/O packages that read/write it,
-  and the Rust decoder that loads it into the canvas runtime.
-  Use when working with .grida files, the FlatBuffers schema, file loading/saving,
-  archive packing, clipboard encode/decode, or debugging format round-trip issues.
+  Guides work on the Grida file format (.grida) from the TS side: the I/O
+  packages that read/write it (loading, archive packing, clipboard) and the
+  frozen schema bindings. Use when working with .grida files in the editor or
+  packages, or debugging format round-trip issues. (The schema and the Rust
+  decoder live in the engine repo.)
 ---
 
-# Grida I/O — `.grida` Format & Loading
+# Grida I/O — `.grida` Format & Loading (TS side)
 
 ## Format Overview
 
@@ -24,15 +25,15 @@ Two on-disk variants:
 
 ## Key Locations
 
-| Path                                     | Role                                                        |
-| ---------------------------------------- | ----------------------------------------------------------- |
-| `format/grida.fbs`                       | **Source of truth** — FlatBuffers schema                    |
-| `format/AGENTS.md`                       | Schema evolution rules (append-only, never reuse field IDs) |
-| `packages/grida-canvas-schema/grida.ts`  | TS runtime types (`grida` namespace)                        |
-| `packages/grida-canvas-io/`              | TS file loading, archive pack/unpack, clipboard protocol    |
-| `crates/grida/src/io/`                   | Rust decoder (FBS/ZIP/JSON → `Scene`)                       |
-| `crates/grida/src/io/generated/grida.rs` | Auto-generated Rust FlatBuffers bindings                    |
-| `crates/grida/src/node/schema.rs`        | Rust runtime node schema (aligned with TS)                  |
+| Path                                    | Role                                                     |
+| --------------------------------------- | -------------------------------------------------------- |
+| `packages/grida-canvas-schema/grida.ts` | TS runtime types (`grida` namespace) + `SCHEMA_VERSION`  |
+| `packages/grida-canvas-io/`             | TS file loading, archive pack/unpack, clipboard protocol |
+| `packages/grida-format/src/`            | **FROZEN** flatc TS bindings (tombstone — see below)     |
+
+The **schema source of truth and the Rust decoder** live in the engine repo:
+[`format/grida.fbs`](https://github.com/gridaco/nothing/blob/main/format/grida.fbs) ·
+[`crates/grida/src/io/`](https://github.com/gridaco/nothing/tree/main/crates/grida/src/io).
 
 ## TS Side — `packages/grida-canvas-io/`
 
@@ -41,59 +42,37 @@ Two on-disk variants:
 - **`io.archive.pack/unpack`** — ZIP with `manifest.json`
 - **`io.clipboard.encode/decode`** — Grida clipboard protocol
 
-## Rust Side — `crates/grida/src/io/`
+## The tombstone — `packages/grida-format`
 
-| File               | Role                                                           |
-| ------------------ | -------------------------------------------------------------- |
-| `io_grida_file.rs` | Format detection + unified `decode_all(&bytes)` → `Vec<Scene>` |
-| `io_grida_fbs.rs`  | FlatBuffers → Rust runtime (`GridaFile` → `Scene`)             |
-
-## Code Generation
-
-Schema → generated code (both committed):
-
-```sh
-# TS (runs during pnpm build of @grida/format)
-python3 bin/activate-flatc -- --ts --ts-no-import-ext -o <out> format/grida.fbs
-
-# Rust
-python3 bin/activate-flatc -- --rust -o <out> format/grida.fbs
-```
-
-Uses pinned `flatc` v25.12.19 via `bin/activate-flatc`.
+The generated TS FlatBuffers bindings are **committed and frozen**: the flatc
+generator wiring was deleted at the engine split (this repo has no
+`format/grida.fbs` and no `bin/activate-flatc`). The bindings are
+byte-identical to pinned flatc v25.12.19 output and the formatter/linter
+ignore them to keep it that way. **Do not edit them.** If the schema evolves
+in the engine repo and this reader should follow, re-snapshot deliberately
+from a gridaco/nothing checkout.
 
 ## Verification
 
 ```sh
-# Rust round-trip
-cargo test -p grida --test fbs_roundtrip
-
-# TS I/O tests
 pnpm turbo test --filter='@grida/io'
-
-# Full typecheck
 pnpm turbo typecheck --filter='@grida/io' --filter='@grida/canvas-schema'
 ```
 
 ## Schema Changes
 
-### Evolution (non-breaking, default)
+Schema evolution happens **in the engine repo** (see its io-grida skill and
+[`format/AGENTS.md`](https://github.com/gridaco/nothing/blob/main/format/AGENTS.md)).
+What this repo owes on a breaking change — **a cross-REPO lockstep**:
 
-- Add new **optional** fields only; never change or reuse field IDs
-- Prefer `table` over `struct` (structs are immutable once defined)
-- Append-only enums; new union variants at the end only
-- PATCH bump only (e.g. `0.91.0` → `0.91.1`)
-- Round-trip tests required
-
-### Breaking changes
-
-When you need to invalidate old files (field renumbering, semantic changes, removed fields):
-
-1. **Bump MINOR** (while MAJOR=0) in both places:
-   - TS: `grida.program.document.SCHEMA_VERSION` in `packages/grida-canvas-schema/grida.ts`
-   - Rust: `SCHEMA_VERSION` in `crates/grida/src/io/io_grida_fbs.rs`
-2. Keep them **exactly in sync** — both writers must emit the same version string.
-3. Old files will be **rejected** by the TS reader (`format.ts` calls `isSchemaCompatible()` and throws on mismatch).
+1. TS: bump `grida.program.document.SCHEMA_VERSION` in
+   `packages/grida-canvas-schema/grida.ts` to match the engine's
+   `SCHEMA_VERSION` in
+   [`crates/grida/src/io/io_grida_fbs.rs`](https://github.com/gridaco/nothing/blob/main/crates/grida/src/io/io_grida_fbs.rs)
+   — **exactly in sync**; both writers must emit the same version string.
+2. Re-snapshot the frozen bindings from the new schema (deliberate act, see above).
+3. Old files are **rejected** by the TS reader (`format.ts` calls
+   `isSchemaCompatible()` and throws on mismatch).
 
 **Version compatibility logic** (`isSchemaCompatible` in `grida-canvas-schema/grida.ts`):
 
@@ -102,21 +81,6 @@ When you need to invalidate old files (field renumbering, semantic changes, remo
 
 Format: `MAJOR.MINOR.PATCH-prerelease+build` (e.g. `"0.91.0-beta+20260311"`).
 
-See `format/AGENTS.md` for the full review checklist.
-
-## Debugging FlatBuffers Issues
-
-### Verifying bytes
-
-Use `flatbuffers::root::<fbs::GridaFile>(&bytes)` (not `root_unchecked`) in a Rust test to run the FlatBuffers verifier. It reports the exact field chain with the bad offset.
-
-```rust
-use grida::io::generated::grida::grida as fbs;
-let result = flatbuffers::root::<fbs::GridaFile>(&bytes);
-```
-
-Note: the TS FlatBuffers decoder is more lenient than Rust — a TS-side round-trip may pass even when the bytes are structurally invalid. Always verify with the Rust verifier.
-
-### Cross-boundary tests
-
-`crates/grida-canvas-wasm/lib/__test__/bench-load-scene.test.ts` includes tests that TS-encode → WASM-decode `.grida` fixtures. These catch issues that only surface across the TS→Rust boundary.
+Note: the TS FlatBuffers decoder is more lenient than the Rust verifier — a
+TS-side round-trip may pass on structurally invalid bytes. For byte-level
+verification, use the engine repo's Rust verifier.
