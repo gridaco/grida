@@ -12,7 +12,6 @@
     "@grida/cmath": "workspace:*",
     "@grida/format": "workspace:*",
     "@grida/schema": "workspace:*",
-    "@grida/sequence": "workspace:*",
     "fast-png": "^6.3.0",
     "fast-xml-parser": "^5.8.0",
     "fflate": "^0.8.2",

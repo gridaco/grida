@@ -2,6 +2,7 @@
 name = "grida_editor"
 version = "0.0.0"
 edition = "2024"
+license = "Apache-2.0"
 publish = false
 description = "Grida editor core — document working copy, invertible mutations, history, commands. Reference implementation of docs/wg/canvas."
 
