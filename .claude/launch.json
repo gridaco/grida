@@ -13,18 +13,6 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "docs", "start"],
       "port": 3001
-    },
-    {
-      "name": "svg-reftest-viewer",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": [
-        "-m",
-        "http.server",
-        "8123",
-        "--directory",
-        "target/reftests/viewer"
-      ],
-      "port": 8123
     }
   ]
 }

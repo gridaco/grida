@@ -135,10 +135,13 @@ python .agents/skills/io-figma/scripts/figma_archive.py \
 
 For end-to-end correctness of the Figma import pipeline (does our Grida
 render of a Figma file match Figma's own render?), use the **refig**
-flow: oracle PNGs from Figma's Images API + `@grida/reftest` for the
-diff/score/report. Suites live at `fixtures/local/refig/<name>.<filekey>/`
-(gitignored). See `fixtures/local/refig/README.md` and the `render-reftest`
-skill's "Figma — the refig reftest pipeline" section for the full flow.
+flow: oracle PNGs from Figma's Images API + `@grida/reftest` (developed in
+the engine repo: https://github.com/gridaco/nothing/tree/main/packages/grida-reftest)
+for the diff/score/report. Suites live in the engine repo's gitignored local
+corpus (`fixtures/local/refig/<name>.<filekey>/` — local-only, machine-local
+by definition). See the engine repo's render-reftest skill, section
+"Figma — the refig reftest pipeline":
+https://github.com/gridaco/nothing/blob/main/.agents/skills/render-reftest/SKILL.md.
 
 When debugging a conversion bug with a visible visual symptom, run the
 refig suite to locate the diverging nodes, then drill into `lib.ts` for

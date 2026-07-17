@@ -173,19 +173,18 @@ This prevents all MDX-related parsing issues for the entire file.
 
 ## Structure
 
-| directory                                | name           | description                                                            | active |
-| ---------------------------------------- | -------------- | ---------------------------------------------------------------------- | ------ |
-| [/docs/wg](./wg)                         | working group  | working group documents, architecture documents, todo list, etc        | yes    |
-| [/docs/wg/format](./wg/format)           | format         | Grida IR spec and CSS/HTML/SVG import mapping trackers                 | yes    |
-| [/docs/reference](./reference)           | reference      | glossary and references (technical documents)                          | yes    |
-| [/docs/math](./math)                     | math           | Math reference, used for internal docs referencing                     | yes    |
-| [/docs/platform](./platform)             | platform       | Grida Platform (API/Spec) documents                                    | yes    |
-| [/docs/editor](./editor)                 | editor         | Grida Editor - User Documentation                                      | yes    |
-| [/docs/forms](./forms)                   | forms          | Grida Forms - User Documentation                                       | yes    |
-| [/docs/with-figma](./with-figma)         | with-figma     | Grida with Figma - Grida &lt;-&gt; Figma compatibility and user guides | yes    |
-| [/docs/design](./design)                 | design         | Design-oriented docs and visual behavior notes                         | yes    |
-| [/docs/canvas](./canvas)                 | canvas         | Grida Canvas SDK - User Documentation                                  | no     |
-| [/docs/cli](./cli)                       | cli            | Deprecated CLI docs kept for compatibility                             | no     |
-| [/docs/@designto-code](./@designto-code) | design-to-code | Externally synced reference docs                                       | no     |
-| [/docs/\_history](./_history)            | history        | Archived, code-facing record docs not meant for user navigation        | no     |
-| [/docs/together](./together)             | together       | Contributing, Support, Community, etc                                  | no     |
+| directory                                | name           | description                                                                                                                                 | active |
+| ---------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| [/docs/wg](./wg)                         | working group  | working group documents (service clusters; engine clusters live in [gridaco/nothing](https://github.com/gridaco/nothing/tree/main/docs/wg)) | yes    |
+| [/docs/reference](./reference)           | reference      | glossary and references (technical documents)                                                                                               | yes    |
+| [/docs/math](./math)                     | math           | Math reference, used for internal docs referencing                                                                                          | yes    |
+| [/docs/platform](./platform)             | platform       | Grida Platform (API/Spec) documents                                                                                                         | yes    |
+| [/docs/editor](./editor)                 | editor         | Grida Editor - User Documentation                                                                                                           | yes    |
+| [/docs/forms](./forms)                   | forms          | Grida Forms - User Documentation                                                                                                            | yes    |
+| [/docs/with-figma](./with-figma)         | with-figma     | Grida with Figma - Grida &lt;-&gt; Figma compatibility and user guides                                                                      | yes    |
+| [/docs/design](./design)                 | design         | Design-oriented docs and visual behavior notes                                                                                              | yes    |
+| [/docs/canvas](./canvas)                 | canvas         | Grida Canvas SDK - User Documentation                                                                                                       | no     |
+| [/docs/cli](./cli)                       | cli            | Deprecated CLI docs kept for compatibility                                                                                                  | no     |
+| [/docs/@designto-code](./@designto-code) | design-to-code | Externally synced reference docs                                                                                                            | no     |
+| [/docs/\_history](./_history)            | history        | Archived, code-facing record docs not meant for user navigation                                                                             | no     |
+| [/docs/together](./together)             | together       | Contributing, Support, Community, etc                                                                                                       | no     |

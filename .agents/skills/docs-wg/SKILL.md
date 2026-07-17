@@ -71,7 +71,7 @@ study established; research that surveys how the domain is understood.
 
 > **The dedicated upstream-survey subtree is `docs/wg/research/**`**, and
 it has its own stricter rules (pure survey, Grida absent from the body).
-When writing there, use [`research`](../research/SKILL.md) — it governs
+When writing there, use [`research`](https://github.com/gridaco/nothing/blob/main/.agents/skills/research/SKILL.md) — it governs
 > that subtree specifically. This skill governs the broader WG surface.
 
 **Name the genre — and don't let one wear another's costume.** A cluster
@@ -110,7 +110,7 @@ reader wrong:
     necessary — Chromium and the W3C/WHATWG specs for web rendering, for
     example, _are_ the domain. The test: are you citing the standard, or
     a project's opinion? Dedicated surveys of such sources belong in
-    `docs/wg/research/**` under [`research`](../research/SKILL.md).
+    `docs/wg/research/**` under [`research`](https://github.com/gridaco/nothing/blob/main/.agents/skills/research/SKILL.md).
 - **Dirty plans / TODO sprawl.** Scattered "TODO: fix this later" and
   half-formed task lists turn a reference into a scratchpad. Keep the doc
   a clean statement of what is true and intended.
@@ -171,11 +171,15 @@ stays honest as it grows if three rules hold.
 
 ## Placement and upkeep
 
-- WG docs live in topic clusters: `docs/wg/feat-*/`, `docs/wg/format/`,
-  `docs/wg/platform/`, `docs/wg/ai/`, and surveys in
-  `docs/wg/research/`. Put the doc in the cluster that owns its topic;
-  create a new `feat-<topic>/` cluster when none fits (consult
-  [`naming`](../naming/SKILL.md) for the cluster name).
+- WG docs in THIS repo live in the staying topic clusters: `docs/wg/platform/`,
+  `docs/wg/ai/`, `docs/wg/desktop/`, and the product-side `feat-*` clusters
+  (`feat-editor`, `feat-fig`, `feat-slides`, `feat-svg-editor`). Put the doc
+  in the cluster that owns its topic; create a new `feat-<topic>/` cluster
+  when none fits (consult [`naming`](../naming/SKILL.md) for the cluster name).
+- **Engine-domain WG docs are authored in the engine repo** —
+  `https://github.com/gridaco/nothing/tree/main/docs/wg` (canvas, format,
+  research, and the engine `feat-*` clusters). A doc about the engine domain
+  does not get a new grida-side cluster.
 - **Most clusters have an `index.md` hub.** When you add a doc, update the
   hub so the cluster stays navigable — an orphaned doc is an unfindable
   doc.
@@ -211,7 +215,7 @@ stays honest as it grows if three rules hold.
 ## Related skills
 
 [`docs`](../docs/SKILL.md) (the family router — start there if unsure this
-is even a WG doc), [`research`](../research/SKILL.md) (the `research/`
+is even a WG doc), [`research`](https://github.com/gridaco/nothing/blob/main/.agents/skills/research/SKILL.md) (the `research/`
 upstream-survey subtree), [`grounding`](../grounding/SKILL.md) (read and
 reconcile before editing), [`links`](../links/SKILL.md),
 [`naming`](../naming/SKILL.md) (cluster and concept names).

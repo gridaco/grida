@@ -7,7 +7,7 @@
 <div align="center">
   <h1>Grida</h1>
   <p>
-    <strong>Grida is an open-source canvas editor & rendering engine (Rust + Skia + WASM) — plus an SVG editor, Database/CMS and Forms.</strong>
+    <strong>Grida is an open-source canvas editor — powered by the <a href="https://github.com/gridaco/nothing">nothing</a> graphics engine (Rust + Skia + WASM) — plus an SVG editor, Database/CMS and Forms.</strong>
   </p>
   <p>
     <a href="https://grida.co/canvas">Canvas demo</a> •
@@ -28,11 +28,11 @@
 
 ## Why Grida
 
-Grida is an open-source **2D graphics engine and editor** built for performance and interoperability — with a stable on-disk document format.
+Grida is an open-source **canvas editor** built for performance and interoperability — with a stable on-disk document format. The 2D graphics engine that powers it lives in [gridaco/nothing](https://github.com/gridaco/nothing); this repo consumes it as the published `@grida/canvas-wasm` artifact.
 
 - **Renderer backends**: a **DOM** renderer for HTML/CSS workflows and a **Skia** renderer via **WASM** (WebGL2 + raster).
 - **Headless rendering**: render in **Node.js** (no browser) for CI/export pipelines.
-- **Document format**: `.grida` on **FlatBuffers** (`format/grida.fbs`) for large documents and schema evolution.
+- **Document format**: `.grida` on **FlatBuffers** ([`format/grida.fbs`](https://github.com/gridaco/nothing/blob/main/format/grida.fbs)) for large documents and schema evolution.
 - **Interop**: import from **Figma** (`.fig` / REST JSON) and work with **SVG**.
 - **Supabase integration**: Database/CMS and Forms are built to work seamlessly with Supabase (Tables, Views, Storage, Auth).
 
@@ -56,7 +56,7 @@ If Grida is useful, consider starring this repo — it helps a lot.
 ![Grida Canvas](./.readme/cover-grida-canvas.png)
 
 Grida Canvas is a node/property-based 2D graphics engine and editor surface.
-Core engine is written in Rust (Skia) and is exposed to web/Node via `@grida/canvas-wasm`.
+The core engine ([gridaco/nothing](https://github.com/gridaco/nothing)) is written in Rust (Skia) and is exposed to web/Node via `@grida/canvas-wasm`.
 
 - [x] Infinite canvas + fast pan/zoom
 - [x] `.grida` document format (FlatBuffers)
@@ -83,7 +83,7 @@ Core engine is written in Rust (Skia) and is exposed to web/Node via `@grida/can
 
 ### Document format: `.grida`
 
-Grida documents are stored as `.grida` files using **FlatBuffers** (`format/grida.fbs`).
+Grida documents are stored as `.grida` files using **FlatBuffers** ([`format/grida.fbs`](https://github.com/gridaco/nothing/blob/main/format/grida.fbs)).
 The schema is designed to be evolvable and efficient for large documents.
 
 Docs: [Canvas SDK](https://grida.co/docs/canvas/sdk) (alpha)
@@ -135,7 +135,7 @@ Docs: [@grida/refig](https://grida.co/docs/packages/@grida/refig)
 - **SDK**: [`@grida/svg-editor`](https://www.npmjs.com/package/@grida/svg-editor) — headless core + React bindings (alpha), backed by [`@grida/svg`](https://www.npmjs.com/package/@grida/svg) for path data and trivia-preserving parsing
 - **The file is the source of truth** — byte-equal round trip when nothing changed; the editor leaves no fingerprints of its own
 
-On the rendering side, Grida Canvas ships an in-house SVG renderer — **Rust + Skia → WASM**, a Chromium-shaped pipeline within the same in-tree engine that renders HTML/CSS (Stylo + Taffy + Skia), validated against Chromium-rendered oracles (resvg-test-suite corpus, WPT-style harness).
+On the rendering side, Grida Canvas ships an in-house SVG renderer — **Rust + Skia → WASM**, a Chromium-shaped pipeline within the same engine ([gridaco/nothing](https://github.com/gridaco/nothing)) that renders HTML/CSS (Stylo + Taffy + Skia), validated against Chromium-rendered oracles (resvg-test-suite corpus, WPT-style harness).
 
 ---
 
@@ -227,24 +227,24 @@ pnpm test
 
 Published packages you can use independently:
 
-| Package                                                                                | Description                                                                                             | Demo                                                                                                 |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| [`@grida/canvas-wasm`](https://www.npmjs.com/package/@grida/canvas-wasm)               | Grida Canvas rendering engine (Rust + Skia) as WASM — WebGL2 in the browser, headless raster in Node.js |                                                                                                      |
-| [`@grida/refig`](https://www.npmjs.com/package/@grida/refig)                           | Headless Figma renderer — render `.fig` / REST JSON to PNG/JPEG/WebP/PDF/SVG, with CLI                  | [demo](https://grida.co/packages/@grida/refig) · [docs](https://grida.co/docs/packages/@grida/refig) |
-| [`@grida/svg-editor`](https://www.npmjs.com/package/@grida/svg-editor)                 | Headless, round-trip-faithful SVG editor SDK with React bindings (alpha)                                | [demo](https://grida.co/packages/@grida/svg-editor)                                                  |
-| [`@grida/svg`](https://www.npmjs.com/package/@grida/svg)                               | SVG tooling — path data, attribute parsing, trivia-preserving round-trip parser                         |                                                                                                      |
-| [`@grida/hud`](https://www.npmjs.com/package/@grida/hud)                               | Canvas-based heads-up display (overlays, handles) for editor viewports                                  | [demo](https://grida.co/packages/@grida/hud)                                                         |
-| [`@grida/tree-view`](https://www.npmjs.com/package/@grida/tree-view)                   | Headless, agnostic tree-view controller (layer panels)                                                  | [demo](https://grida.co/packages/@grida/tree-view)                                                   |
-| [`@grida/text-editor`](https://www.npmjs.com/package/@grida/text-editor)               | Backend-agnostic text editor engine (experimental)                                                      |                                                                                                      |
-| [`@grida/history`](https://www.npmjs.com/package/@grida/history)                       | Dependency-free transaction & undo/redo engine                                                          |                                                                                                      |
-| [`@grida/keybinding`](https://www.npmjs.com/package/@grida/keybinding)                 | Declarative keybinding primitives — modifiers, platform resolution, event matching                      |                                                                                                      |
-| [`@grida/cmath`](https://www.npmjs.com/package/@grida/cmath)                           | Unopinionated canvas math — vectors, rects, transforms, snapping                                        |                                                                                                      |
-| [`@grida/vn`](https://www.npmjs.com/package/@grida/vn)                                 | Vector network model (paths, holes, compound shapes)                                                    |                                                                                                      |
-| [`@grida/color`](https://www.npmjs.com/package/@grida/color)                           | Core graphics color library                                                                             |                                                                                                      |
-| [`@grida/ruler`](https://www.npmjs.com/package/@grida/ruler)                           | Zero-dependency canvas ruler for infinite canvas                                                        | [demo](https://grida.co/packages/@grida/ruler)                                                       |
-| [`@grida/pixel-grid`](https://www.npmjs.com/package/@grida/pixel-grid)                 | Pixel-perfect grid component for infinite canvas                                                        | [demo](https://grida.co/packages/@grida/pixel-grid)                                                  |
-| [`@grida/transparency-grid`](https://www.npmjs.com/package/@grida/transparency-grid)   | Transparency (checkerboard) grid for infinite canvas                                                    | [demo](https://grida.co/packages/@grida/transparency-grid)                                           |
-| [`@grida/tailwindcss-colors`](https://www.npmjs.com/package/@grida/tailwindcss-colors) | Tailwind CSS color data (RGBA/HEX/OKLCH) for programmatic use                                           |                                                                                                      |
+| Package                                                                                | Description                                                                                                                                                            | Demo                                                                                                 |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [`@grida/canvas-wasm`](https://www.npmjs.com/package/@grida/canvas-wasm)               | Grida Canvas rendering engine (Rust + Skia) as WASM — WebGL2 in the browser, headless raster in Node.js. Source: [gridaco/nothing](https://github.com/gridaco/nothing) |                                                                                                      |
+| [`@grida/refig`](https://www.npmjs.com/package/@grida/refig)                           | Headless Figma renderer — render `.fig` / REST JSON to PNG/JPEG/WebP/PDF/SVG, with CLI                                                                                 | [demo](https://grida.co/packages/@grida/refig) · [docs](https://grida.co/docs/packages/@grida/refig) |
+| [`@grida/svg-editor`](https://www.npmjs.com/package/@grida/svg-editor)                 | Headless, round-trip-faithful SVG editor SDK with React bindings (alpha)                                                                                               | [demo](https://grida.co/packages/@grida/svg-editor)                                                  |
+| [`@grida/svg`](https://www.npmjs.com/package/@grida/svg)                               | SVG tooling — path data, attribute parsing, trivia-preserving round-trip parser                                                                                        |                                                                                                      |
+| [`@grida/hud`](https://www.npmjs.com/package/@grida/hud)                               | Canvas-based heads-up display (overlays, handles) for editor viewports                                                                                                 | [demo](https://grida.co/packages/@grida/hud)                                                         |
+| [`@grida/tree-view`](https://www.npmjs.com/package/@grida/tree-view)                   | Headless, agnostic tree-view controller (layer panels)                                                                                                                 | [demo](https://grida.co/packages/@grida/tree-view)                                                   |
+| [`@grida/text-editor`](https://www.npmjs.com/package/@grida/text-editor)               | Backend-agnostic text editor engine (experimental)                                                                                                                     |                                                                                                      |
+| [`@grida/history`](https://www.npmjs.com/package/@grida/history)                       | Dependency-free transaction & undo/redo engine                                                                                                                         |                                                                                                      |
+| [`@grida/keybinding`](https://www.npmjs.com/package/@grida/keybinding)                 | Declarative keybinding primitives — modifiers, platform resolution, event matching                                                                                     |                                                                                                      |
+| [`@grida/cmath`](https://www.npmjs.com/package/@grida/cmath)                           | Unopinionated canvas math — vectors, rects, transforms, snapping                                                                                                       |                                                                                                      |
+| [`@grida/vn`](https://www.npmjs.com/package/@grida/vn)                                 | Vector network model (paths, holes, compound shapes)                                                                                                                   |                                                                                                      |
+| [`@grida/color`](https://www.npmjs.com/package/@grida/color)                           | Core graphics color library                                                                                                                                            |                                                                                                      |
+| [`@grida/ruler`](https://www.npmjs.com/package/@grida/ruler)                           | Zero-dependency canvas ruler for infinite canvas                                                                                                                       | [demo](https://grida.co/packages/@grida/ruler)                                                       |
+| [`@grida/pixel-grid`](https://www.npmjs.com/package/@grida/pixel-grid)                 | Pixel-perfect grid component for infinite canvas                                                                                                                       | [demo](https://grida.co/packages/@grida/pixel-grid)                                                  |
+| [`@grida/transparency-grid`](https://www.npmjs.com/package/@grida/transparency-grid)   | Transparency (checkerboard) grid for infinite canvas                                                                                                                   | [demo](https://grida.co/packages/@grida/transparency-grid)                                           |
+| [`@grida/tailwindcss-colors`](https://www.npmjs.com/package/@grida/tailwindcss-colors) | Tailwind CSS color data (RGBA/HEX/OKLCH) for programmatic use                                                                                                          |                                                                                                      |
 
 Interactive demos: [grida.co/packages](https://grida.co/packages)
 
@@ -257,7 +257,7 @@ Interactive demos: [grida.co/packages](https://grida.co/packages)
 
 - **Google Forms / Typeform / …**: Yes — Grida aims to replace them with a more powerful, beautiful, and customizable builder.
 - **Notion**: No — we’re not building a document management system (but we do aim for the same simplicity).
-- **Figma**: 50/50 — long-term we’re building a design tool; today we ship the foundation (canvas engine, interop/import, headless rendering). See [Nothing Graphics Engine](https://github.com/gridaco/nothing) (not active atm).
+- **Figma**: 50/50 — long-term we’re building a design tool; today we ship the foundation (canvas engine, interop/import, headless rendering). The engine lives in [gridaco/nothing](https://github.com/gridaco/nothing).
 - **Framer**: 50/50 — Framer is website-interaction-first; we’re aiming for a data-first prototyping tool focused on query + state, with templates.
 
 ---

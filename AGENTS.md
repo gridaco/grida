@@ -35,7 +35,7 @@ Currently, we have below features / modules.
 - TypeScript 5 - main language for most apps
 - Python 3.12 - partially used for tasks / jobs that are independent (hosted out-of-tree, e.g. [gridaco/library](https://github.com/gridaco/library))
 - Deno - partially used for tasks / jobs, that shares the codebase, e.g. `/jobs`
-- Rust (2024 edition) - used for wasm builds, mostly for graphics core.
+- Rust - not in this repo; the graphics engine lives in [gridaco/nothing](https://github.com/gridaco/nothing) and is consumed as the published `@grida/canvas-wasm` artifact.
 
 **Database**
 
@@ -57,7 +57,7 @@ Grida heavily relies on Supabase (PostgreSQL).
 **Graphics Backend**
 
 - DOM - plain dom as canvas - for website builder canvas. (binded with react)
-- Skia - the graphics backend - for 2D graphics. (binded with skia-safe)
+- Skia - the graphics backend - for 2D graphics, via the prebuilt `@grida/canvas-wasm` artifact (engine source: [gridaco/nothing](https://github.com/gridaco/nothing))
 
 **Desktop**
 
@@ -85,8 +85,8 @@ When linking docs to editor pages, prefer **universal routing** (`https://grida.
 
 The Rust render engine (formerly `/crates/*`, `/format`, engine WG docs) lives in the sibling
 repo [gridaco/nothing](https://github.com/gridaco/nothing). This repo consumes it only as the
-**published** `@grida/canvas-wasm` artifact, pinned in `editor/package.json` and vendored under
-`editor/public/vendor/`. Do not add engine code here.
+**published** `@grida/canvas-wasm` artifact, pinned in `editor/package.json` and installed from
+the npm registry. Do not add engine code here.
 
 ## `/editor`
 

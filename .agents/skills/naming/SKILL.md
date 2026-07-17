@@ -106,10 +106,10 @@ This asymmetry is why the directory name and the published name
 `@grida/cg`: the long directory pays for browsability (the
 canvas family clusters in the file tree) where rename is cheap;
 the short scope pays for ergonomics where rename is expensive.
-The Rust side, by contrast, currently aligns — `crates/grida`
-publishes as `grida` because the core crate is also the
-project's public namespace, and keeping the two in lockstep
-removes a name to remember. Two different trade-offs; pick per
+The Rust side, by contrast, aligns — the engine repo's
+`crates/grida` (gridaco/nothing) publishes as `grida` because
+the core crate is also the project's public namespace, and
+keeping the two in lockstep removes a name to remember. Two different trade-offs; pick per
 surface. Invest heavily in a name **before** it escapes its
 file; once it's a public surface, the name is a commitment.
 
