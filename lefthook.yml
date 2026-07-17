@@ -13,11 +13,3 @@ pre-commit:
       # list (e.g. generated files under lib/bin/), oxlint would otherwise
       # exit 1 with "No files found to lint" and block the commit.
       run: pnpm oxlint --no-error-on-unmatched-pattern {staged_files}
-
-    - name: cargo-fmt
-      glob: "*.rs"
-      run: cargo fmt --all -- --check
-
-    - name: clippy
-      glob: "*.rs"
-      run: cargo clippy --no-deps -- -D warnings

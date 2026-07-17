@@ -414,7 +414,7 @@ export namespace editor.config {
      * there is no short way to map the language-font, this is good enough for embedding purposes.
      * e.g. `latn` also may or may not include Vietnamese, etc.
      *
-     * this is level 1 implementation of font-fallback, see {@link https://grida.co/docs/wg/feat-paragraph/impl-font-fallback | wg font-fallback}
+     * this is level 1 implementation of font-fallback, see {@link https://github.com/gridaco/nothing/blob/main/docs/wg/feat-paragraph/impl-font-fallback.md | wg font-fallback}
      */
     export const DEFAULT_FONT_SCRIPTS = [
       "latn",

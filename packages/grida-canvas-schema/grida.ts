@@ -52,7 +52,7 @@ export namespace grida {
      * the rest of the system can transition to the CRDT-friendly layout without
      * relying on random UUIDs.
      *
-     * @see https://grida.co/docs/wg/feat-crdt/id
+     * @see https://github.com/gridaco/nothing/blob/main/docs/wg/feat-crdt/id.md
      */
     export namespace u32 {
       //

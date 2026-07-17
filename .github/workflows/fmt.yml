@@ -1,6 +1,5 @@
 # JS/TS formatting check (oxfmt).
-# Rust formatting (cargo fmt) is handled in test-crates.yml,
-# which is path-scoped to crates/** changes.
+# Rust formatting lives with the engine repo (gridaco/nothing).
 name: fmt
 
 on:

@@ -72,4 +72,4 @@ N/A
 ## See also
 
 - [Italic](./italic.md) for more details.
-- [wg - impl-italic](../wg/feat-paragraph/impl-italic.md) for more details.
+- [wg - impl-italic](https://github.com/gridaco/nothing/blob/main/docs/wg/feat-paragraph/impl-italic.md) for more details.

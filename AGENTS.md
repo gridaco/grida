@@ -19,9 +19,7 @@ Currently, we have below features / modules.
 | directory              | README                                       | AGENTS                                       | notes                                 |
 | ---------------------- | -------------------------------------------- | -------------------------------------------- | ------------------------------------- |
 | [docs](./docs)         | -                                            | [`docs/AGENTS.md`](./docs/AGENTS.md)         | the docs directory                    |
-| [format](./format)     | [`format/README.md`](./format/README.md)     | [`format/AGENTS.md`](./format/AGENTS.md)     | grida file formats & schemas          |
 | [editor](./editor)     | -                                            | [`editor/AGENTS.md`](./editor/AGENTS.md)     | the editor directory                  |
-| [crates](./crates)     | -                                            | -                                            | the rust crates directory             |
 | [packages](./packages) | -                                            | -                                            | shared packages                       |
 | [desktop](./desktop)   | [`desktop/README.md`](./desktop/README.md)   | -                                            | the electron desktop app              |
 | [supabase](./supabase) | [`supabase/README.md`](./supabase/README.md) | [`supabase/AGENTS.md`](./supabase/AGENTS.md) | the supabase project                  |
@@ -71,7 +69,6 @@ Grida heavily relies on Supabase (PostgreSQL).
 - Turborepo - monorepo build orchestration
 - oxfmt (oxc) - code formatter (JS/TS)
 - oxlint (oxc) - linter (JS/TS), replaces ESLint
-- cargo fmt (rustfmt) - code formatter (Rust)
 - just - command runner (see `justfile` at repo root)
 - lefthook - git hooks (`lefthook.yml`)
 
@@ -84,13 +81,12 @@ This directory contains the docs as-is, the deployment of the docs are handled b
 See [`docs/AGENTS.md`](./docs/AGENTS.md) for the docs contribution scope (we only actively maintain `docs/wg/**` and `docs/reference/**`).
 When linking docs to editor pages, prefer **universal routing** (`https://grida.co/_/<path>`). See `docs/wg/platform/universal-docs-routing.md`.
 
-## `/crates/*`
+## The Rust engine — moved to `gridaco/nothing`
 
-Importance: **High**
-
-monorepo rust crates.
-
-The rust implementation of the Grida Canvas. this is rapidly under development. - it will serve as our new rendering backend once it is stable.
+The Rust render engine (formerly `/crates/*`, `/format`, engine WG docs) lives in the sibling
+repo [gridaco/nothing](https://github.com/gridaco/nothing). This repo consumes it only as the
+**published** `@grida/canvas-wasm` artifact, pinned in `editor/package.json` and vendored under
+`editor/public/vendor/`. Do not add engine code here.
 
 ## `/editor`
 
@@ -175,10 +171,10 @@ We use turborepo (except few isolated packages).
 To run test, build, and dev, use below commands.
 
 ```sh
-# format the entire repo (JS/TS + Rust) — run this regularly, especially before committing
+# format the entire repo (JS/TS via oxfmt) — run this regularly, especially before committing
 just fmt
 
-# run tests (all, not recommended. requires crates build)
+# run tests
 turbo test
 
 # run tests for packages
@@ -189,9 +185,6 @@ turbo build --filter='./packages/*'
 
 # build packages in watch mode
 pnpm dev:packages
-
-# run tests except for rust crates
-turbo test --filter='!./crates/*'
 
 # run lint (oxlint)
 pnpm lint
@@ -204,24 +197,9 @@ turbo dev
 
 # run typecheck (always run)
 turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
-
-# for crates specific tests
-cargo test
-
-# for crates specific check
-cargo check
-
-# for crates (with long build time deps, e.g. skia)
-cargo clippy --no-deps
-
-# for crates specific build
-cargo build
-
-# format crates only
-cargo fmt --all
 ```
 
-> **Important for agents:** Formatting and linting run automatically on commit via lefthook pre-commit hooks (`oxfmt`, `oxlint`, `cargo fmt`, `clippy`). You can also run `just fmt` manually. Both `oxfmt` (JS/TS) and `cargo fmt` (Rust) are enforced in CI — PRs will fail format checks if code is not formatted.
+> **Important for agents:** Formatting and linting run automatically on commit via lefthook pre-commit hooks (`oxfmt`, `oxlint`). You can also run `just fmt` manually. `oxfmt` is enforced in CI — PRs will fail format checks if code is not formatted. (Rust tooling lives with the engine repo.)
 
 Note: `typecheck` still rely on packages build artifacts, so it will fail if the build fails.
 To handle this, you can build the `/packages/*`, then run typecheck.
@@ -235,9 +213,8 @@ steps before executing `pnpm typecheck`:
 ```sh
 pnpm install
 
-# build shared packages and the wasm bundle
+# build shared packages (@grida/canvas-wasm now installs from the npm registry)
 pnpm build:packages
-pnpm turbo build --filter @grida/canvas-wasm
 
 # finally, run the repository-wide typecheck
 pnpm typecheck
@@ -251,12 +228,6 @@ pnpm turbo test --filter='./packages/*' --filter=editor
 This project supports git worktrees. When working in a fresh worktree, run the following setup:
 
 ```sh
-# 1. Initialize git submodules (e.g. emsdk for WASM builds)
-git submodule update --init
-
-# 2. Install node dependencies
+# Install node dependencies (no submodules remain in this repo)
 pnpm install
 ```
-
-- **Cargo / Rust** works out of the box — the `target/` directory is resolved via relative paths and shared across worktrees.
-- **Rustup targets** (e.g. `wasm32-unknown-emscripten`) are installed globally and do not need per-worktree setup.

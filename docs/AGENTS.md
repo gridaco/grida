@@ -14,7 +14,9 @@ This directory is the **source of truth** for documentation content.
 
 The most actively maintained docs areas are:
 
-- `docs/wg/**` — working group docs (design notes, architecture, proposals, WIP)
+- `docs/wg/**` — working group docs (design notes, architecture, proposals, WIP). **The engine
+  WG clusters (canvas, format, research, and most feat-\*) moved to the engine repo:
+  `https://github.com/gridaco/nothing/tree/main/docs/wg` — author engine specs there, not here.**
 - `docs/reference/**` — reference docs (glossary, specs, stable technical references)
 - `docs/editor/**` — editor user and feature docs
 - `docs/forms/**` — forms docs

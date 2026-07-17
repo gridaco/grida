@@ -454,8 +454,8 @@ commits when, and why DOM event order can't express it cleanly — is an
 **implementation-agnostic working-group spec**, alongside its UX-narrative
 sibling:
 
-- Formal classifier: https://grida.co/docs/wg/feat-editor/ux-surface/selection-intent
-- UX-narrative test cases: https://grida.co/docs/wg/feat-editor/ux-surface/selection
+- Formal classifier: https://github.com/gridaco/nothing/blob/main/docs/wg/canvas/ux-surface/selection-intent.md
+- UX-narrative test cases: https://github.com/gridaco/nothing/blob/main/docs/wg/canvas/ux-surface/selection.md
 
 This package's implementation:
 

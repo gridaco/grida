@@ -53,6 +53,38 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // Engine WG docs moved to the engine repo (gridaco/nothing) — the docs
+      // site no longer produces these pages. Path-shape contract: the tree
+      // stays docs/wg/<cluster>/<doc>.md over there; retarget these to the
+      // engine docs site when one exists. Redirects run before the /docs
+      // rewrite, so non-engine wg paths still reach docs.grida.co.
+      ...[
+        "canvas",
+        "format",
+        "research",
+        "feat-2d",
+        "feat-crdt",
+        "feat-css",
+        "feat-fontgen",
+        "feat-hash-nch",
+        "feat-history",
+        "feat-icu-uct",
+        "feat-image-filters",
+        "feat-layout",
+        "feat-masks",
+        "feat-painting",
+        "feat-paragraph",
+        "feat-resources",
+        "feat-schema",
+        "feat-svg",
+        "feat-text-editing",
+        "feat-tray",
+        "feat-vector-network",
+      ].map((cluster) => ({
+        source: `/docs/wg/${cluster}/:path*`,
+        destination: `https://github.com/gridaco/nothing/tree/main/docs/wg/${cluster}`,
+        permanent: true,
+      })),
       // /login => /sign-in
       {
         source: "/login",

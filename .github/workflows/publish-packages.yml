@@ -9,13 +9,14 @@ on:
       - __noop__
 
 jobs:
-  publish-grida-canvas-wasm:
+  # The wasm build steps left with the engine repo (it owns @grida/canvas-wasm
+  # publishing); this job now only publishes the JS workspace packages.
+  publish-packages:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -26,14 +27,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - name: Setup just
-        uses: extractions/setup-just@v3
-
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Build Grida Canvas WASM
-        run: just build canvas wasm
 
       - name: Configure Git for Changesets
         run: |
