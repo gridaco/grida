@@ -12,6 +12,9 @@
     ".json5",
     "data/",
     "bin/",
+    // flatc-generated FBS bindings (tombstone) — must stay byte-identical to generator output
+    "packages/grida-format/src/grida/",
+    "packages/grida-format/src/grida.ts",
     "*.clipboard.html",
     "worker-configuration.d.ts",
     "database-generated.types.ts",
