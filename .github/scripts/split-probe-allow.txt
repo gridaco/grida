@@ -11,3 +11,5 @@ AGENTS.md	the engine pointer paragraph — repo URL sits on the adjacent line
 fixtures/test-grida/	frozen snapshot — mirrors engine canon; edits happen upstream (see fixtures/README.md)
 fixtures/text-editor/	frozen snapshot — byte-parity with engine canon; v1.json is test-consumed
 supabase/drafts/20251214_grida_canvas_document_model.sql	draft provenance comment citing the engine schema file as of authoring
+packages/dotcanvas/CHANGELOG.md	changelog — historical record (decay, not a lie); cites the spec path as of each release
+packages/grida-format/src/grida/	flatc tombstone — generated output, byte-parity forbids edits; schema-comment refs fixed upstream in the engine repo

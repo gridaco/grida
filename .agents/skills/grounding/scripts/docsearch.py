@@ -19,7 +19,7 @@ COMMANDS
                              counts + drift (defined-unused / used-undefined).
   find  [filters] [SUBDIR…]  Docs whose frontmatter matches ALL filters.
                              Optional SUBDIR args scope the scan (relative
-                             to docs root, e.g. `wg/feat-svg reference`).
+                             to docs root, e.g. `wg/feat-fig reference`).
   show  PATH                 Parsed frontmatter for one file (path is
                              relative to cwd or docs root).
 

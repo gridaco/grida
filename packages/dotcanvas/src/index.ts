@@ -4,5 +4,5 @@
 //   import { dotcanvas } from "dotcanvas";
 //   const canvas = await dotcanvas.read(fs);
 //
-// Contract: docs/wg/format/canvas.md
+// Contract: https://github.com/gridaco/nothing/blob/main/docs/wg/format/canvas.md
 export * as dotcanvas from "./api";

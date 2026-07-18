@@ -216,9 +216,9 @@ TS ecosystem.
 
 ## References
 
-- WG manifesto: [`docs/wg/feat-text-editing/index.md`](../../docs/wg/feat-text-editing/index.md)
-- Attributed text spec: [`docs/wg/feat-text-editing/attributed-text.md`](../../docs/wg/feat-text-editing/attributed-text.md)
-- Performance roadmap: [`docs/wg/feat-text-editing/impl-performance.md`](../../docs/wg/feat-text-editing/impl-performance.md)
+- WG manifesto: [`docs/wg/feat-text-editing/index.md`](https://github.com/gridaco/nothing/blob/main/docs/wg/feat-text-editing/index.md)
+- Attributed text spec: [`docs/wg/feat-text-editing/attributed-text.md`](https://github.com/gridaco/nothing/blob/main/docs/wg/feat-text-editing/attributed-text.md)
+- Performance roadmap: [`docs/wg/feat-text-editing/impl-performance.md`](https://github.com/gridaco/nothing/blob/main/docs/wg/feat-text-editing/impl-performance.md)
 - Reference Rust impl: [the engine's `text_edit`](https://github.com/gridaco/nothing/tree/main/crates/grida/src/text_edit) (~11.7k LoC; the bulk is `attributed_text/` for V2)
 - Reference Rust example: [`wd_text_editor.rs`](https://github.com/gridaco/nothing/blob/main/crates/grida_dev/examples/wd_text_editor.rs)
 - Main editor's current integration: [`editor/grida-canvas-react/viewport/ui/surface-text-editor.tsx`](../../editor/grida-canvas-react/viewport/ui/surface-text-editor.tsx)

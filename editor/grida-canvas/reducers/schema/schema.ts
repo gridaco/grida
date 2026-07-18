@@ -17,7 +17,7 @@ export namespace schema {}
  * - scaling rectangles around an anchor point
  * - scaling geometry-contributing properties (stroke widths, radii, font sizes, effects, vector networks, etc.)
  *
- * Spec: https://grida.co/docs/wg/canvas/parametric-scaling
+ * Spec: https://github.com/gridaco/nothing/blob/main/docs/wg/canvas/parametric-scaling.md
  */
 // oxlint-disable-next-line eslint(no-unused-vars)
 export namespace schema.parametric_scale {

@@ -5,7 +5,7 @@
 // has no filesystem, no clock, no global state — plain functions over plain
 // inputs, so the vitest suite exercises it with zero mocks.
 //
-// Contract reference: docs/wg/format/canvas.md (the `.canvas` Draft-V1 RFD).
+// Contract reference: https://github.com/gridaco/nothing/blob/main/docs/wg/format/canvas.md (the `.canvas` Draft-V1 RFD).
 // The reconcile rule, in one line: the manifest is authoritative for ORDER and
 // PLACEMENT; disk is authoritative for EXISTENCE.
 
@@ -217,7 +217,7 @@ export function isBundlePath(path: string): boolean {
  * format: a URI `src` is a first-class placed reference used as-is — it skips
  * the disk-existence gate in {@link resolve} and is never the target of a local
  * file op. Tested on the RAW `src` (before any path normalization, which would
- * mangle `https://` → `https:/`). See docs/wg/format/canvas.md §9.
+ * mangle `https://` → `https:/`). See the .canvas spec §9 (github.com/gridaco/nothing, docs/wg/format/canvas.md).
  */
 export function isUriSrc(src: string): boolean {
   return /^[a-z][a-z0-9+.-]*:\/\//i.test(src);
