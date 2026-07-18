@@ -69,7 +69,7 @@ study established; research that surveys how the domain is understood.
   by being correct and findable, not long.
 - **Domain-first.** It studies the _problem_, not Grida's solution to it.
 
-> **The dedicated upstream-survey subtree is `docs/wg/research/**`**, and
+> **The dedicated upstream-survey subtree is the engine repo's `docs/wg/research/**`** (github.com/gridaco/nothing), and
 it has its own stricter rules (pure survey, Grida absent from the body).
 When writing there, use [`research`](https://github.com/gridaco/nothing/blob/main/.agents/skills/research/SKILL.md) — it governs
 > that subtree specifically. This skill governs the broader WG surface.

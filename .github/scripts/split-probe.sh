@@ -32,6 +32,10 @@ TOKENS=(
   'model-v2/'
   'grida_wpt'
   'cargo (build|test|check|clippy|fmt|run)'
+  # moved docs/wg clusters (feat-svg guarded against the staying feat-svg-editor)
+  'docs/wg/(canvas|format|research)'
+  'docs/wg/feat-(2d|crdt|css|fontgen|hash-nch|history|icu-uct|image-filters|layout|masks|painting|paragraph|resources|schema|text-editing|tray|vector-network)'
+  'docs/wg/feat-svg(/|[^-])'
 )
 
 # Trees that are historical/generated/deprecated by declaration — decay, not lies.

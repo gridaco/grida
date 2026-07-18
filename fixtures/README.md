@@ -6,7 +6,7 @@ Ownership map after the engine split (the Rust engine lives in
 ## Grida-owned (live, evolve here)
 
 - `test-fig/`, `test-figma/` — Figma import fixtures (LFS: `*.fig`, `*.deck`)
-- `test-canvas/`, `test-markdown/`, `text-editor/`… — see below for `text-editor`
+- `test-canvas/`, `test-markdown/` — dotcanvas / markdown fixtures
 
 ## FROZEN SNAPSHOTS — canon lives in the engine repo
 

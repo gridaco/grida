@@ -11,7 +11,7 @@ manifest. It is a _container_ format one layer above
 of documents with an order and an optional 2D placement.
 
 Reference page: [grida.co/dotcanvas](https://grida.co/dotcanvas) ·
-Spec: [`docs/wg/format/canvas.md`](https://github.com/gridaco/grida/blob/main/docs/wg/format/canvas.md).
+Spec: [`docs/wg/format/canvas.md`](https://github.com/gridaco/nothing/blob/main/docs/wg/format/canvas.md).
 
 ## Install
 

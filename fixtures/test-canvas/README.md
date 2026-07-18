@@ -1,6 +1,6 @@
 # `test-canvas` fixtures
 
-On-disk [`.canvas`](../../docs/wg/format/canvas.md) bundles — a portable
+On-disk [`.canvas`](https://github.com/gridaco/nothing/blob/main/docs/wg/format/canvas.md) bundles — a portable
 directory of standalone SVG documents plus a `.canvas.json` manifest. Consumed by
 `dotcanvas`. Two bundles cover the two editors: a `slides` deck and a `board`.
 

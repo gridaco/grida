@@ -186,7 +186,7 @@ export namespace cg {
    * stroke path. When a preset is present at an endpoint, the renderer
    * uses Butt cap at that endpoint and draws the marker geometry instead.
    *
-   * @see docs/wg/feat-2d/curve-decoration.md
+   * @see https://github.com/gridaco/nothing/blob/main/docs/wg/feat-2d/curve-decoration.md
    */
   export type StrokeMarkerPreset =
     | "none"

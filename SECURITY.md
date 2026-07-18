@@ -95,11 +95,13 @@ as public.
    when the signing secret is missing in production.
 4. **Replay protection** — receivers dedup on event id and reject
    events older than 5 minutes (where applicable).
-5. **Tunnel path filter at the edge** —
-   [editor/scripts/billing/tunnel.sh](editor/scripts/billing/tunnel.sh)
-   configures cloudflared to forward only `/webhooks/*` and reject
-   everything else with 404. Defense-in-depth at the network layer:
-   even if app code drifts, the tunnel cannot expose non-webhook paths.
+5. **Tunnel path filter at the edge** — cloudflared is configured to
+   forward only `/webhooks/*` and reject everything else with 404.
+   Defense-in-depth at the network layer: even if app code drifts, the
+   tunnel cannot expose non-webhook paths. The tunnel config is
+   **deliberately not git-tracked** (it lives in the operator's
+   `~/.cloudflared/`); setup is documented in
+   [docs/contributing/billing.md](docs/contributing/billing.md) §7.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-001 .` to enumerate.
 Today:
@@ -108,7 +110,7 @@ Today:
 - [editor/app/(ingest)/webhooks/stripe/route.ts](<editor/app/(ingest)/webhooks/stripe/route.ts>) — Stripe receiver.
 - [editor/app/(ingest)/webhooks/metronome/route.ts](<editor/app/(ingest)/webhooks/metronome/route.ts>) — Metronome receiver.
 - [editor/proxy.ts](editor/proxy.ts) — path bypass.
-- [editor/scripts/billing/tunnel.sh](editor/scripts/billing/tunnel.sh) — tunnel ingress filter.
+- [docs/contributing/billing.md](docs/contributing/billing.md) — tunnel ingress filter setup (the config itself is untracked by design).
 - [editor/scripts/billing/README.md](editor/scripts/billing/README.md) — dev docs.
 
 **What does NOT belong under `(ingest)/`.** Admin tools, internal RPC,
