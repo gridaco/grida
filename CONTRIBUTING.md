@@ -33,24 +33,6 @@ brew install just
 brew install typos-cli
 ```
 
-## The Rust engine
-
-The Rust rendering engine (canvas WASM) is developed in
-[gridaco/nothing](https://github.com/gridaco/nothing). This repo does not
-contain Rust code and needs no Rust toolchain — the editor consumes the
-published `@grida/canvas-wasm` package from npm. To contribute to the engine
-itself, see that repository.
-
-### Where work gets filed
-
-- **[gridaco/nothing](https://github.com/gridaco/nothing)**: engine rendering,
-  the node/document model, `.grida` format/schema, engine text/SVG/HTML import,
-  reftests and engine perf, `@grida/canvas-wasm` publishing, engine WG specs.
-- **This repo**: the editor/product, desktop, forms/database, the SVG editor
-  (TS), platform/billing, and everything user-facing.
-- When unsure: file where the fix would land. Cross-repo references are always
-  full `gridaco/<repo>#N` form — never bare `#N`.
-
 Then, install the dependencies and run the development server:
 
 ```bash
@@ -93,6 +75,24 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ### Signing in locally
 
 After `supabase db reset --local` runs, `supabase/seed.sql` creates three test users you can sign in as via the `/sign-in` route. The default for normal flows is **`insider@grida.co` / `password`** (owner of the `local` org). See [`supabase/seed.md`](./supabase/seed.md) for the other personas (`alice@acme.com` for multi-tenant testing, `random@example.com` for no-org access checks). All three share the password `password`.
+
+## The Rust engine
+
+The Rust rendering engine (canvas WASM) is developed in
+[gridaco/nothing](https://github.com/gridaco/nothing). This repo does not
+contain Rust code and needs no Rust toolchain — the editor consumes the
+published `@grida/canvas-wasm` package from npm. To contribute to the engine
+itself, see that repository.
+
+### Where work gets filed
+
+- **[gridaco/nothing](https://github.com/gridaco/nothing)**: engine rendering,
+  the node/document model, `.grida` format/schema, engine text/SVG/HTML import,
+  reftests and engine perf, `@grida/canvas-wasm` publishing, engine WG specs.
+- **This repo**: the editor/product, desktop, forms/database, the SVG editor
+  (TS), platform/billing, and everything user-facing.
+- When unsure: file where the fix would land. Cross-repo references are always
+  full `gridaco/<repo>#N` form — never bare `#N`.
 
 ## Support
 

@@ -134,7 +134,7 @@ We use supabase for database, auth, and storage.
 - /supabase
   - ~~/functions~~ - we are not using supabase edge functions.
   - /migrations - applied migration sqls.
-  - /schema - human friendly organized schema sqls.
+  - /schemas - human friendly organized schema sqls.
 
 - To run supabase locally, follow the instructions in the [supabase docs](https://supabase.com/docs/guides/local-development).
 - To suggest a new feature, use `supabase migration new <feature-name>`.
@@ -175,13 +175,13 @@ To run test, build, and dev, use below commands.
 just fmt
 
 # run tests
-turbo test
+pnpm turbo test
 
 # run tests for packages
-turbo test --filter='./packages/*'
+pnpm turbo test --filter='./packages/*'
 
 # build packages (required for typecheck for its dependants)
-turbo build --filter='./packages/*'
+pnpm turbo build --filter='./packages/*'
 
 # build packages in watch mode
 pnpm dev:packages
@@ -190,13 +190,13 @@ pnpm dev:packages
 pnpm lint
 
 # run build (all, not recommended)
-turbo build
+pnpm turbo build
 
 # run dev
-turbo dev
+pnpm turbo dev
 
 # run typecheck (always run)
-turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
+pnpm turbo typecheck # fallback when build fails due to network issues (nextjs package might fail due to font fetching issues)
 ```
 
 > **Important for agents:** Formatting and linting run automatically on commit via lefthook pre-commit hooks (`oxfmt`, `oxlint`). You can also run `just fmt` manually. `oxfmt` is enforced in CI — PRs will fail format checks if code is not formatted. (Rust tooling lives with the engine repo.)
