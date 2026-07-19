@@ -54,11 +54,13 @@ INSERT INTO storage.objects (id, bucket_id, name) VALUES
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'testgembucket', 'testgem/b.png'),
   ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'testgembucket', 'testgem/c.png');
 
+-- sha256: required for new rows since the #929 content-addressing guard
+-- (synthetic, distinct — dedup is not under test here).
 INSERT INTO grida_library.object
-  (id, path, category, mimetype, width, height, bytes, transparency) VALUES
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'testgem/a.png', 'testgem', 'image/png', 1, 1, 1, false),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'testgem/b.png', 'testgem', 'image/png', 1, 1, 1, false),
-  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'testgem/c.png', 'testgem', 'image/png', 1, 1, 1, false);
+  (id, path, category, mimetype, width, height, bytes, transparency, sha256) VALUES
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'testgem/a.png', 'testgem', 'image/png', 1, 1, 1, false, repeat('a1', 32)),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'testgem/b.png', 'testgem', 'image/png', 1, 1, 1, false, repeat('b2', 32)),
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'testgem/c.png', 'testgem', 'image/png', 1, 1, 1, false, repeat('c3', 32));
 
 -- Synthetic 1536-d unit vectors:
 --   e1     = [1,0,0,...]

@@ -28,6 +28,8 @@ export namespace Library {
     prompt: string | null;
     public_domain: boolean;
     score: number | null;
+    /** Content address: sha256 of the stored bytes, lowercase hex. NULL = legacy (pre-backfill) rows (#929). */
+    sha256: string | null;
     title: string | null;
     transparency: boolean;
     updated_at: string;

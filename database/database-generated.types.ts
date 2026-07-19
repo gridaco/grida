@@ -2446,6 +2446,7 @@ export type Database = {
           public_domain: boolean
           score: number | null
           search_tsv: unknown
+          sha256: string | null
           sys_annotations: string[]
           title: string | null
           transparency: boolean
@@ -2485,6 +2486,7 @@ export type Database = {
           public_domain?: boolean
           score?: number | null
           search_tsv?: unknown
+          sha256?: string | null
           sys_annotations?: string[]
           title?: string | null
           transparency: boolean
@@ -2524,6 +2526,7 @@ export type Database = {
           public_domain?: boolean
           score?: number | null
           search_tsv?: unknown
+          sha256?: string | null
           sys_annotations?: string[]
           title?: string | null
           transparency?: boolean
@@ -2616,6 +2619,7 @@ export type Database = {
           public_domain: boolean
           score: number | null
           search_tsv: unknown
+          sha256: string | null
           sys_annotations: string[]
           title: string | null
           transparency: boolean
@@ -2669,6 +2673,7 @@ export type Database = {
           public_domain: boolean
           score: number | null
           search_tsv: unknown
+          sha256: string | null
           sys_annotations: string[]
           title: string | null
           transparency: boolean
@@ -2717,6 +2722,7 @@ export type Database = {
           public_domain: boolean
           score: number | null
           search_tsv: unknown
+          sha256: string | null
           sys_annotations: string[]
           title: string | null
           transparency: boolean
