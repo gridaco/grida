@@ -31,6 +31,7 @@
 "use client";
 
 import {
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -53,6 +54,7 @@ import {
   workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
+import { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import {
   confirmAndTrashEntry,
   copyAbsolutePath,
@@ -73,12 +75,14 @@ import { TerminalPane } from "./terminal-pane";
 import { WorkspaceChangesProvider } from "./workspace-changes";
 import { EditorGroup } from "./editor-group";
 import { WorkspaceSurfaceHost } from "./workspace-surface-host";
+import { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import {
   DESIGN_SEARCH_TAB_ID,
   isVirtualTab,
   pickToolCallId,
   type DesignSearchSession,
 } from "./design-search-tab";
+import styles from "./workspace-workbench.module.css";
 
 /**
  * Pane sizing for the agent-first split:
@@ -103,12 +107,21 @@ const RESIZE_HANDLE_HIGHLIGHT_CLASS =
   "before:pointer-events-none before:absolute before:z-10 before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-linear-to-b before:from-transparent before:via-muted-foreground/55 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100 active:before:via-foreground/70 active:before:opacity-100 focus-visible:before:opacity-100 aria-[orientation=horizontal]:before:inset-x-0 aria-[orientation=horizontal]:before:inset-y-auto aria-[orientation=horizontal]:before:left-0 aria-[orientation=horizontal]:before:top-1/2 aria-[orientation=horizontal]:before:h-px aria-[orientation=horizontal]:before:w-full aria-[orientation=horizontal]:before:-translate-y-1/2 aria-[orientation=horizontal]:before:translate-x-0 aria-[orientation=horizontal]:before:bg-linear-to-r";
 const RESIZE_GUTTER_CLASS = `z-20 w-1.5 cursor-col-resize bg-transparent after:w-3 aria-[orientation=horizontal]:h-1.5 aria-[orientation=horizontal]:cursor-row-resize aria-[orientation=horizontal]:after:h-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 const DOCKED_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-1.5 w-3 cursor-col-resize bg-transparent after:w-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
-const WORKBENCH_OVERFLOW_CLASS = "overflow-visible!";
 // Bottom terminal panel (VSCode-style). Collapsible: dragging it under
 // its min snaps it closed, and ctrl+` collapse/expand keeps the shell
 // process alive (the panel content stays mounted at zero height).
 const TERMINAL_PANE_DEFAULT = "30%";
 const TERMINAL_PANE_MIN = "120px";
+
+/**
+ * Separators remain keyboard-focusable for arrow-key resizing, but pointer
+ * interaction should not leave their focus ring pinned on screen afterward.
+ */
+function releaseResizeHandlePointerFocus(
+  event: ReactPointerEvent<HTMLDivElement>
+) {
+  event.currentTarget.blur();
+}
 
 /**
  * Whether a keyboard event originated inside an editable surface (text
@@ -165,28 +178,45 @@ export function WorkspaceWorkbench({
   // key on — null when the active tab is virtual.
   const activeFileRelPath =
     activeRelPath && !isVirtualTab(activeRelPath) ? activeRelPath : null;
-  const [restoreSettled, setRestoreSettled] = useState(
-    initialActiveRelPath === undefined
-  );
+  const [restoreSettled, setRestoreSettled] = useState(false);
 
-  // Cold-start continuity is a one-shot host action. The same strict resolver
-  // used by `surface_open` checks that the saved artifact still exists; a
-  // missing target leaves the workbench open and empty.
+  // Workspace continuity is a one-shot host action. The persisted renderer
+  // state supplies order + focus; the surface host still checks every path
+  // against live bridge truth before restoring the editor group.
+  //
+  // `initialActiveRelPath` is the legacy v1 last-workspace handoff. It seeds a
+  // one-tab state only when this workspace has no newer view-state record.
   useEffect(() => {
-    if (initialActiveRelPath === undefined) return;
     let current = true;
-    void surfaceHost.openRelative(initialActiveRelPath).finally(() => {
+    const tabs = WorkspaceViewState.initialTabs(
+      window.localStorage,
+      workspace.id,
+      initialActiveRelPath
+    );
+    void surfaceHost.restoreRelative(tabs).finally(() => {
       if (current) setRestoreSettled(true);
     });
     return () => {
       current = false;
     };
-  }, [initialActiveRelPath, surfaceHost]);
+  }, [initialActiveRelPath, surfaceHost, workspace.id]);
 
   // Manual regression: test/desktop-startup-restore-last-workspace.md
-  const rememberedActivePath = !restoreSettled
-    ? undefined
-    : surfaceHost.rememberedRelativePath();
+  useEffect(() => {
+    if (!restoreSettled) return;
+    const remember = () => {
+      WorkspaceViewState.remember(window.localStorage, workspace.id, {
+        tabs: surfaceHost.rememberedTabs(),
+      });
+    };
+    remember();
+    return group.subscribe(remember);
+  }, [group, restoreSettled, surfaceHost, workspace.id]);
+
+  // Do not flash Start while a remembered artifact is still being validated.
+  // Once restoration settles, an actually-empty editor group owns the faux tab.
+  // (see test/desktop-workbench-start-tab.md)
+  const showStart = restoreSettled && openTabs.length === 0;
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   // The live `design_search` pick, lifted from the agent pane so the editor
   // pane can host the picker as a virtual tab (the agent pane owns the chat +
@@ -235,6 +265,10 @@ export function WorkspaceWorkbench({
 
   const toggleTree = useCallback(() => {
     setShowTree((v) => !v);
+  }, []);
+
+  const openTree = useCallback(() => {
+    setShowTree(true);
   }, []);
 
   // A trashed entry: drop the affected tab(s) — a file closes its own
@@ -362,6 +396,17 @@ export function WorkspaceWorkbench({
     (relPath: string) => group.open(relPath),
     [group]
   );
+  const createCanvas = useCallback(
+    async (editor: WorkspaceCanvasCreation.Editor) => {
+      const relPath = await WorkspaceCanvasCreation.create(
+        workspace.id,
+        editor
+      );
+      bumpTreeRefresh();
+      group.open(relPath);
+    },
+    [workspace.id, group, bumpTreeRefresh]
+  );
   const activateTab = useCallback(
     (relPath: string) => group.activate(relPath),
     [group]
@@ -391,16 +436,12 @@ export function WorkspaceWorkbench({
 
   return (
     <WorkspaceChangesProvider workspaceId={workspace.id}>
-      <LastWorkspaceMarker
-        workspaceId={workspace.id}
-        surface="workbench"
-        activePath={rememberedActivePath}
-      />
+      <LastWorkspaceMarker workspaceId={workspace.id} surface="workbench" />
       <div
         data-testid="workspace-workbench"
         className="h-screen w-screen overflow-hidden"
       >
-        <ResizablePanelGroup className={WORKBENCH_OVERFLOW_CLASS}>
+        <ResizablePanelGroup className={styles.decorativeOverflow}>
           {/* The title bar belongs to the agent column. This keeps the right
               region vertically uninterrupted while retaining the workspace
               identity, navigation, and utility controls exactly where the
@@ -437,26 +478,28 @@ export function WorkspaceWorkbench({
           <ResizableHandle
             aria-label="Resize chat and document"
             className={RESIZE_GUTTER_CLASS}
+            onPointerUp={releaseResizeHandlePointerFocus}
+            onPointerCancel={releaseResizeHandlePointerFocus}
           />
 
           <ResizablePanel
-            className={WORKBENCH_OVERFLOW_CLASS}
+            data-workbench-decorative-overflow
             minSize={EDITOR_PANE_MIN}
           >
             <div className="h-full">
               {/* Main and file tree are full-height siblings, so their resize
                   boundary includes both title bars. The terminal remains a
                   child of main and never extends beneath the docked tree. */}
-              <ResizablePanelGroup className={WORKBENCH_OVERFLOW_CLASS}>
+              <ResizablePanelGroup className={styles.decorativeOverflow}>
                 <ResizablePanel
-                  className={WORKBENCH_OVERFLOW_CLASS}
+                  data-workbench-decorative-overflow
                   minSize={EDITOR_PANE_MIN}
                 >
                   <ResizablePanelGroup
-                    className={WORKBENCH_OVERFLOW_CLASS}
+                    className={styles.decorativeOverflow}
                     orientation="vertical"
                   >
-                    <ResizablePanel className={WORKBENCH_OVERFLOW_CLASS}>
+                    <ResizablePanel data-workbench-decorative-overflow>
                       <EditorPane
                         workspace={workspace}
                         openTabs={openTabs}
@@ -464,6 +507,9 @@ export function WorkspaceWorkbench({
                         onSelectTab={activateTab}
                         onCloseTab={closeTab}
                         onReopenClosedTab={reopenClosedTab}
+                        showStart={showStart}
+                        onOpenFileExplorer={openTree}
+                        onCreateCanvas={createCanvas}
                         treeVisible={showTree}
                         onToggleTree={toggleTree}
                         hasBottomPane={terminalSpawned}
@@ -477,9 +523,11 @@ export function WorkspaceWorkbench({
                         <ResizableHandle
                           aria-label="Resize document and terminal"
                           className={RESIZE_GUTTER_CLASS}
+                          onPointerUp={releaseResizeHandlePointerFocus}
+                          onPointerCancel={releaseResizeHandlePointerFocus}
                         />
                         <ResizablePanel
-                          className={WORKBENCH_OVERFLOW_CLASS}
+                          data-workbench-decorative-overflow
                           panelRef={terminalPanelRef}
                           collapsible
                           defaultSize={TERMINAL_PANE_DEFAULT}
@@ -503,6 +551,8 @@ export function WorkspaceWorkbench({
                     <ResizableHandle
                       aria-label="Resize document and file tree"
                       className={DOCKED_PANE_RESIZE_HANDLE_CLASS}
+                      onPointerUp={releaseResizeHandlePointerFocus}
+                      onPointerCancel={releaseResizeHandlePointerFocus}
                     />
                     <ResizablePanel
                       defaultSize={FILE_TREE_PANE_DEFAULT}

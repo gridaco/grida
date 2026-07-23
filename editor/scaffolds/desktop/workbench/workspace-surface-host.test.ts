@@ -115,14 +115,86 @@ describe("WorkspaceSurfaceHost.listOpen", () => {
   });
 });
 
-describe("WorkspaceSurfaceHost.rememberedRelativePath", () => {
-  it("uses the active real artifact", () => {
+describe("WorkspaceSurfaceHost.restoreRelative", () => {
+  it("restores live tabs in saved order and activates the remembered tab once", async () => {
+    const { host, group } = createHost([
+      { name: "a.svg", rel_path: "a.svg", kind: "file" },
+      { name: "b.svg", rel_path: "b.svg", kind: "file" },
+      { name: "c.svg", rel_path: "c.svg", kind: "file" },
+    ]);
+    const listener = vi.fn<() => void>();
+    group.subscribe(listener);
+
+    await host.restoreRelative({
+      open: ["a.svg", "b.svg", "c.svg"],
+      active: "b.svg",
+    });
+
+    expect(group.getSnapshot()).toEqual({
+      tabs: ["a.svg", "b.svg", "c.svg"],
+      active: "b.svg",
+    });
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops missing tabs and falls back to the last live tab", async () => {
+    const { host, group } = createHost([
+      { name: "a.svg", rel_path: "a.svg", kind: "file" },
+      { name: "c.svg", rel_path: "c.svg", kind: "file" },
+    ]);
+
+    await host.restoreRelative({
+      open: ["a.svg", "missing.svg", "c.svg"],
+      active: "missing.svg",
+    });
+
+    expect(group.getSnapshot()).toEqual({
+      tabs: ["a.svg", "c.svg"],
+      active: "c.svg",
+    });
+  });
+
+  it("does not replace newer user navigation after async validation", async () => {
+    let resolveEntries!: (entries: WorkspaceFsEntry[]) => void;
+    const entries = new Promise<WorkspaceFsEntry[]>((resolve) => {
+      resolveEntries = resolve;
+    });
+    const readdir = vi.fn<WorkspaceArtifact.Readdir>(() => entries);
+    const group = new EditorGroup();
+    const host = new WorkspaceSurfaceHost(readdir, group);
+
+    const restoring = host.restoreRelative({
+      open: ["remembered.svg"],
+      active: "remembered.svg",
+    });
+    group.open("user.svg");
+    resolveEntries([
+      {
+        name: "remembered.svg",
+        rel_path: "remembered.svg",
+        kind: "file",
+      },
+    ]);
+    await restoring;
+
+    expect(group.getSnapshot()).toEqual({
+      tabs: ["user.svg"],
+      active: "user.svg",
+    });
+  });
+});
+
+describe("WorkspaceSurfaceHost.rememberedTabs", () => {
+  it("keeps ordered real tabs and the active real artifact", () => {
     const { host, group } = createHost([]);
     group.open("a.svg");
     group.open("b.svg");
     group.activate("a.svg");
 
-    expect(host.rememberedRelativePath()).toBe("a.svg");
+    expect(host.rememberedTabs()).toEqual({
+      open: ["a.svg", "b.svg"],
+      active: "a.svg",
+    });
   });
 
   it("uses the last still-open real tab while a virtual tab is active", () => {
@@ -131,18 +203,24 @@ describe("WorkspaceSurfaceHost.rememberedRelativePath", () => {
     group.open("b.svg");
     group.open("virtual://design-search");
 
-    expect(host.rememberedRelativePath()).toBe("b.svg");
+    expect(host.rememberedTabs()).toEqual({
+      open: ["a.svg", "b.svg"],
+      active: "b.svg",
+    });
 
     group.close("b.svg");
-    expect(host.rememberedRelativePath()).toBe("a.svg");
+    expect(host.rememberedTabs()).toEqual({
+      open: ["a.svg"],
+      active: "a.svg",
+    });
   });
 
-  it("clears the remembered artifact when only virtual tabs remain", () => {
+  it("persists an empty group when only virtual tabs remain", () => {
     const { host, group } = createHost([]);
     group.open("remembered.svg");
     group.open("virtual://design-search");
     group.close("remembered.svg");
 
-    expect(host.rememberedRelativePath()).toBeNull();
+    expect(host.rememberedTabs()).toEqual({ open: [], active: null });
   });
 });

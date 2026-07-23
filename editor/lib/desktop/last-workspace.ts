@@ -5,7 +5,8 @@
  * which workspaces exist; this module remembers only which registered id a
  * cold launch should try to resume. The welcome bootstrap validates the id
  * against the daemon before navigating, so stale localStorage never grants
- * authority or creates a workspace.
+ * authority or creates a workspace. Workbench-internal continuity belongs to
+ * `WorkspaceViewState`; this record should not grow into a layout snapshot.
  */
 
 import type { WorkspaceFsEntry } from "@grida/desktop-bridge";
@@ -32,7 +33,10 @@ export namespace last_workspace {
     | {
         surface: "workbench";
         workspace_id: string;
-        /** Last active artifact in the workbench's relative tab vocabulary. */
+        /**
+         * Legacy v1 handoff. New workbenches persist their complete tab group
+         * in `WorkspaceViewState`; this remains readable for one-way migration.
+         */
         active_path?: string;
       }
     | {

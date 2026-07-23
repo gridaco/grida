@@ -1,5 +1,6 @@
 import type { AgentSurface } from "@grida/agent/surface";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
+import type { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import type { EditorGroup } from "./editor-group";
 
 /**
@@ -14,7 +15,10 @@ import type { EditorGroup } from "./editor-group";
 export class WorkspaceSurfaceHost implements AgentSurface.Host {
   constructor(
     private readonly readdir: WorkspaceArtifact.Readdir,
-    private readonly group: Pick<EditorGroup, "getSnapshot" | "open">,
+    private readonly group: Pick<
+      EditorGroup,
+      "getSnapshot" | "open" | "restore"
+    >,
     private readonly isVirtual: (id: string) => boolean = (id) =>
       id.startsWith("virtual://")
   ) {}
@@ -27,32 +31,42 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
   }
 
   /**
-   * Restore a persisted Desktop-relative path through the same live validation
-   * used for model calls.
+   * Restore an ordered persisted tab set after validating every path against
+   * live workspace truth. The group is replaced once, so React never renders
+   * intermediate active tabs while the bridge checks the saved paths.
    */
-  async openRelative(path: string): Promise<void> {
-    await this.openValidated(path);
+  async restoreRelative(state: WorkspaceViewState.Tabs): Promise<void> {
+    const expectedSnapshot = this.group.getSnapshot();
+    const restored = await Promise.all(
+      state.open.map((path) => this.resolveOpenableRelative(path))
+    );
+    if (this.group.getSnapshot() !== expectedSnapshot) return;
+
+    const tabs = restored.filter((path): path is string => path !== null);
+    const requestedActive =
+      state.active === null
+        ? null
+        : WorkspaceArtifact.normalizeRelativePath(state.active);
+    this.group.restore({
+      tabs,
+      active:
+        requestedActive !== null && tabs.includes(requestedActive)
+          ? requestedActive
+          : null,
+    });
   }
 
   private async openValidated(
     path: string,
     expectedSnapshot?: ReturnType<EditorGroup["getSnapshot"]>
   ): Promise<void> {
-    const relPath = WorkspaceArtifact.normalizeRelativePath(path);
+    const relPath = await this.resolveOpenableRelative(path);
     if (relPath === null) return;
-
-    let entry;
-    try {
-      entry = await WorkspaceArtifact.find(this.readdir, relPath);
-    } catch {
-      return;
-    }
-    if (!entry || !WorkspaceArtifact.isOpenable(entry)) return;
 
     // Validation crosses the asynchronous Desktop bridge. Any tab mutation in
     // the meantime is newer navigation and supersedes this auxiliary agent
-    // presentation request. Explicit cold-start restoration uses
-    // `openRelative`, which deliberately has no preemption snapshot.
+    // presentation request. `restoreRelative` independently guards its whole
+    // batch against the same race.
     if (
       expectedSnapshot !== undefined &&
       this.group.getSnapshot() !== expectedSnapshot
@@ -60,6 +74,18 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
       return;
     }
     this.group.open(relPath);
+  }
+
+  private async resolveOpenableRelative(path: string): Promise<string | null> {
+    const relPath = WorkspaceArtifact.normalizeRelativePath(path);
+    if (relPath === null) return null;
+
+    try {
+      const entry = await WorkspaceArtifact.find(this.readdir, relPath);
+      return entry && WorkspaceArtifact.isOpenable(entry) ? relPath : null;
+    } catch {
+      return null;
+    }
   }
 
   listOpen(): AgentSurface.Snapshot {
@@ -77,24 +103,26 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
   }
 
   /**
-   * Pick the relative artifact path safe to restore on a later cold start.
+   * Pick the ordered real tabs safe to persist for a later workspace restore.
    *
    * A virtual tab can own focus while real tabs are independently closed.
    * Persisting the old active path in that state resurrects a closed artifact,
    * so fall back to the last still-open real tab, or clear the path when none
    * remain.
    */
-  rememberedRelativePath(): string | null {
+  rememberedTabs(): WorkspaceViewState.Tabs {
     const { tabs, active } = this.group.getSnapshot();
-    if (active !== null && !this.isVirtual(active)) {
-      return WorkspaceArtifact.normalizeRelativePath(active);
-    }
-    for (let index = tabs.length - 1; index >= 0; index--) {
-      const id = tabs[index];
-      if (this.isVirtual(id)) continue;
+    const open = tabs.flatMap((id) => {
+      if (this.isVirtual(id)) return [];
       const path = WorkspaceArtifact.normalizeRelativePath(id);
-      if (path !== null) return path;
+      return path === null ? [] : [path];
+    });
+    if (active !== null && !this.isVirtual(active)) {
+      const normalized = WorkspaceArtifact.normalizeRelativePath(active);
+      if (normalized !== null && open.includes(normalized)) {
+        return { open, active: normalized };
+      }
     }
-    return null;
+    return { open, active: open.at(-1) ?? null };
   }
 }

@@ -12,15 +12,18 @@ automatable: false
 covered_by:
   - desktop/src/main/startup-window-policy.test.ts
   - editor/lib/desktop/last-workspace.test.ts
+  - editor/lib/desktop/workspace-view-state.test.ts
+  - editor/scaffolds/desktop/workbench/editor-group.test.ts
+  - editor/scaffolds/desktop/workbench/workspace-surface-host.test.ts
 ---
 
 ## Behavior
 
 A normal cold launch should continue the last workspace-backed surface the
-user focused: either its workbench, the last real artifact still open in that
-workbench, or its `.canvas` editor. Restoration is a convenience, not new
-filesystem authority: the saved opaque workspace ID and relative artifact path
-must be revalidated through the desktop workspace bridge before navigation.
+user focused: either its workbench and ordered real tab group, or its `.canvas`
+editor. Restoration is a convenience, not new filesystem authority: the saved
+opaque workspace ID and every relative artifact path must be revalidated
+through the desktop workspace bridge before it is rendered.
 
 If no target was saved, it is no longer registered, or its directory is no
 longer available, startup stays on Welcome. An explicit launch target (for
@@ -38,12 +41,13 @@ implicit restoration.
    and relaunch it normally.
    - Expected: a brief **Opening last workspace…** state appears, then
      workspace A opens without a Welcome flash.
-3. In workspace A's workbench, open an SVG or `.canvas` artifact, quit, and
+3. In workspace A's workbench, open three artifacts, then activate the middle
+   tab. Quit and relaunch.
+   - Expected: workspace A opens with all three real tabs in the same order and
+     the middle tab active.
+4. Open a temporary virtual tab while those artifacts remain open, quit, and
    relaunch.
-   - Expected: workspace A opens with the same artifact active.
-4. Open a temporary virtual tab while that artifact remains open, quit, and
-   relaunch.
-   - Expected: the real artifact reopens; the virtual tab is not persisted.
+   - Expected: the real artifacts reopen; the virtual tab is not persisted.
 5. Repeat the virtual-tab case, but close every real artifact before quitting.
    - Expected: workspace A opens with an empty editor group. An artifact the
      user explicitly closed is not resurrected.

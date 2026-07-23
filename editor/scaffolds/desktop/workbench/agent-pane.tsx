@@ -789,7 +789,7 @@ function AgentPaneContent({
     <div className="flex min-h-0 flex-1 flex-col">
       <ChatSessionPicker
         session={chatSession}
-        defaultTitle="Agent"
+        defaultTitle="New Task"
         onSelect={(id) => chatSession.select(id)}
         conversationEmpty={messages.length === 0}
         className="border-b-0"

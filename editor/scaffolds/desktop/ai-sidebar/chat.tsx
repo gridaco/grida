@@ -567,7 +567,7 @@ export function AISidebarChat({
       <ChatSessionPicker
         session={chatSession}
         icon={<SparklesIcon className="size-3.5 text-primary" />}
-        defaultTitle="Agent"
+        defaultTitle="New Task"
         onSelect={(id) => chatSession.select(id)}
         conversationEmpty={isEmpty}
       />

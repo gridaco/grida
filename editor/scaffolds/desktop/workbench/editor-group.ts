@@ -79,6 +79,32 @@ export class EditorGroup {
     this.commit();
   }
 
+  /**
+   * Replace the group with a validated persisted snapshot in one mutation.
+   *
+   * Restoration is intentionally a first-class model operation rather than a
+   * loop of `open()` calls: the render layer never observes intermediate active
+   * tabs, and reopen-closed history remains a property of this live session.
+   */
+  restore(state: EditorGroupState): void {
+    const tabs = [...new Set(state.tabs)];
+    const active =
+      state.active !== null && tabs.includes(state.active)
+        ? state.active
+        : (tabs.at(-1) ?? null);
+    if (
+      active === this._active &&
+      tabs.length === this._tabs.length &&
+      tabs.every((id, index) => id === this._tabs[index])
+    ) {
+      return;
+    }
+    this._tabs = tabs;
+    this._active = active;
+    this.closed.length = 0;
+    this.commit();
+  }
+
   /** Focus an already-open tab. No-op if `id` isn't open or already active. */
   activate(id: string): void {
     if (this._active === id || !this._tabs.includes(id)) return;

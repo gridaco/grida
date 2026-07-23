@@ -63,7 +63,7 @@ export type ChatSessionPickerProps = {
   session: UseChatSessionResult;
   /** Optional left-edge icon (e.g. SparklesIcon for the standalone-doc sidebar). */
   icon?: React.ReactNode;
-  /** Label shown when no session is active (e.g. "Agent"). */
+  /** Label shown when no session is active (e.g. "New Task"). */
   defaultTitle: string;
   /**
    * Called when the user picks a different session. The panel uses
@@ -202,7 +202,7 @@ export function ChatSessionPicker({
                 setRenameTargetId(null);
               }
             }}
-            className="h-7 min-w-0 flex-1 px-1.5 text-xs font-medium"
+            className="h-7 min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 py-0 text-xs font-medium text-muted-foreground shadow-none transition-none focus-visible:border-transparent focus-visible:ring-0 md:text-xs dark:bg-transparent"
           />
         ) : (
           <span

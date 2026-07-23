@@ -10,12 +10,12 @@
  * discard in-progress edits, which is a much worse failure mode than
  * the extra memory.
  *
- * Modes (`detectFileMode`):
+ * Modes (`WorkspaceFileKind.of`):
  *
  *   - `.svg` → editable SVG editor
  *   - `.md` / `.markdown` → editable CodeMirror markdown editor + preview
- *   - image/* (.png/.jpg/.gif/.webp/…) → base64 image viewer
- *   - video/* (.mp4/.webm/.mov/…) → base64 video viewer
+ *   - image/* (.png/.jpg/.gif/.webp/…) → streamed image viewer
+ *   - video/* (.mp4/.webm/.mov/…) → streamed video viewer
  *   - everything else → editable CodeMirror text editor (the fallback for any
  *     text format); the agent sidecar's `readFile` rejects binary / >1MiB
  *     content, which surfaces as the editor's error state, not gibberish
@@ -28,13 +28,13 @@
 import { useCallback, useMemo } from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { AlertTriangleIcon } from "lucide-react";
-import { dotcanvas } from "dotcanvas";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { EditorPaneSvgEditor } from "./editor-pane-svg-editor";
 import { EditorPaneCodeEditor } from "./editor-pane-code-editor";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { ImageViewer, VideoViewer } from "./editor-pane-viewers";
+import { WorkspaceFileKind } from "./workspace-file-kind";
 
 export type EditorPaneTabProps = {
   workspaceId: string;
@@ -54,7 +54,7 @@ export function EditorPaneTab({
   onDirtyChange,
   onSaved,
 }: EditorPaneTabProps) {
-  const mode = useMemo(() => detectFileMode(relPath), [relPath]);
+  const mode = useMemo(() => WorkspaceFileKind.of(relPath), [relPath]);
 
   // Partial-application of relPath so children (which don't know
   // their own path) can call a plain `(dirty) => void` callback.
@@ -108,14 +108,6 @@ export function EditorPaneTab({
 
 /* ─────────────────────── mode dispatch ─────────────────────── */
 
-type FileMode =
-  | { kind: "svg-editor" }
-  | { kind: "canvas" }
-  | { kind: "markdown-editor" }
-  | { kind: "image" }
-  | { kind: "video" }
-  | { kind: "text" };
-
 function ModeBody({
   mode,
   workspaceId,
@@ -124,15 +116,15 @@ function ModeBody({
   onDirtyChange,
   onSaved,
 }: {
-  mode: FileMode;
+  mode: WorkspaceFileKind.Kind;
   workspaceId: string;
   relPath: string;
   active: boolean;
   onDirtyChange: (dirty: boolean) => void;
   onSaved?: () => void;
 }) {
-  switch (mode.kind) {
-    case "svg-editor":
+  switch (mode) {
+    case "svg":
       return (
         <EditorPaneSvgEditor
           workspaceId={workspaceId}
@@ -155,7 +147,7 @@ function ModeBody({
           active={active}
         />
       );
-    case "markdown-editor":
+    case "markdown":
       return (
         <EditorPaneCodeEditor
           workspaceId={workspaceId}
@@ -181,59 +173,6 @@ function ModeBody({
         />
       );
   }
-}
-
-/* ─────────────────────── mode detection ─────────────────────── */
-
-const MARKDOWN_EXTENSIONS = new Set([".md", ".markdown"]);
-
-const IMAGE_EXTENSIONS = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".webp",
-  ".avif",
-  ".bmp",
-  ".ico",
-  ".tiff",
-  ".tif",
-]);
-
-const VIDEO_EXTENSIONS = new Set([
-  ".mp4",
-  ".m4v",
-  ".webm",
-  ".mov",
-  ".ogv",
-  ".ogg",
-  ".mpg",
-  ".mpeg",
-  ".avi",
-  ".mkv",
-  ".3gp",
-  ".3g2",
-]);
-
-function detectFileMode(relPath: string): FileMode {
-  const ext = getExtension(relPath); // includes the leading dot, lowercased
-  if (ext === dotcanvas.BUNDLE_EXTENSION) return { kind: "canvas" }; // a `.canvas` directory
-  if (ext === ".svg") return { kind: "svg-editor" };
-  if (MARKDOWN_EXTENSIONS.has(ext)) return { kind: "markdown-editor" };
-  if (IMAGE_EXTENSIONS.has(ext)) return { kind: "image" };
-  if (VIDEO_EXTENSIONS.has(ext)) return { kind: "video" };
-  // Anything else → editable text. Unknown extensions / dotfiles open as
-  // plain text (CodeMirror resolves a language from the filename when it
-  // can, lazily). Truly binary or >1MiB content is rejected by the agent
-  // sidecar's `readFile` and surfaces as the editor's error state.
-  return { kind: "text" };
-}
-
-function getExtension(relPath: string): string {
-  const name = relPath.split("/").pop() ?? relPath;
-  const dot = name.lastIndexOf(".");
-  if (dot <= 0) return ""; // no extension, or dotfile-without-suffix
-  return name.slice(dot).toLowerCase();
 }
 
 /* ─────────────────────── crash fallback ─────────────────────── */

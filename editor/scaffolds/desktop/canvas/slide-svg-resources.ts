@@ -39,6 +39,11 @@ export type MaterializeSlideSvgResourcesOptions = {
   bundleBasePath: string;
   /** Workspace-relative path of the slide SVG being materialized. */
   slideRelPath: string;
+  /**
+   * Optional work budget for read-only projections such as small thumbnails.
+   * The live editor intentionally leaves this unlimited.
+   */
+  maxResourceAttributes?: number;
   readFileBytes?: ReadFileBytes;
   xml?: {
     parse(svg: string): SvgResourceDocument | null;
@@ -90,18 +95,30 @@ export async function materializeSlideSvgResources(
     if (relPath) resources.push({ attr, href, relPath, sequence });
   });
 
+  const resourceLimit =
+    options.maxResourceAttributes === undefined
+      ? resources.length
+      : Math.max(0, Math.floor(options.maxResourceAttributes));
+
   await Promise.all(
-    resources.map(async ({ attr, href, relPath, sequence }) => {
-      try {
-        const { base64 } = await readFileBytes(options.workspaceId, relPath);
-        const materialized = toDataUrl(relPath, base64, projectionId, sequence);
-        restores.set(materialized, escapeXmlAttribute(href));
-        attr.set(materialized);
-      } catch {
-        // Per #960 this is a render projection, not document validation. A
-        // missing/oversized/binary asset should leave only that image broken.
-      }
-    })
+    resources
+      .slice(0, resourceLimit)
+      .map(async ({ attr, href, relPath, sequence }) => {
+        try {
+          const { base64 } = await readFileBytes(options.workspaceId, relPath);
+          const materialized = toDataUrl(
+            relPath,
+            base64,
+            projectionId,
+            sequence
+          );
+          restores.set(materialized, escapeXmlAttribute(href));
+          attr.set(materialized);
+        } catch {
+          // Per #960 this is a render projection, not document validation. A
+          // missing/oversized/binary asset should leave only that image broken.
+        }
+      })
   );
 
   const materialized = doc.serialize();
