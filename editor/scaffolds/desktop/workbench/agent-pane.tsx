@@ -4,10 +4,10 @@
  *
  * The agent runs inside the agent sidecar (fs bound to a `NodeFsBackend` rooted
  * at `workspace.root`, plus agent-sidecar internal shell wired through the
- * existing allowlist + cwd-containment checks). The renderer is
- * observe-only for tool calls — no renderer `onToolCall` resolver is
- * supplied, so agent sidecar-owned tool chunks flow straight through the AI
- * SDK UI-message stream.
+ * existing allowlist + cwd-containment checks). Filesystem and command tools
+ * resolve in the sidecar. Surface tools are acknowledged there too; the
+ * renderer only observes `surface_open` as a fire-and-forget request to focus
+ * a visible workbench tab.
  *
  * Per /sdk-design — this file is a *view*. The headless brain lives
  * in `@/lib/agent-chat` (the bridge `ChatTransport` and display
@@ -33,6 +33,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Chat, useChat } from "@ai-sdk/react";
+import { AgentSurface } from "@grida/agent/surface";
 import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type UIMessage,
@@ -110,6 +111,8 @@ import { useWorkspaceComposerCatalog } from "../shared/use-workspace-composer-ca
 
 export type AgentPaneProps = {
   workspace: Workspace;
+  /** Host-owned artifact presentation for this workbench's editor group. */
+  surfaceHost: AgentSurface.Host;
   /** The file currently in focus in the editor pane. */
   activeRelPath?: string | null;
   className?: string;
@@ -130,6 +133,7 @@ export type AgentPaneProps = {
 
 export function AgentPane({
   workspace,
+  surfaceHost,
   activeRelPath = null,
   className,
   onMaybeMutated,
@@ -140,6 +144,7 @@ export function AgentPane({
     <div className={cn("flex h-full flex-col bg-background", className)}>
       <AgentPaneContent
         workspace={workspace}
+        surfaceHost={surfaceHost}
         activeRelPath={activeRelPath}
         onMaybeMutated={onMaybeMutated}
         onDesignSearchChange={onDesignSearchChange}
@@ -153,6 +158,7 @@ type AgentPaneContentProps = Omit<AgentPaneProps, "className">;
 
 function AgentPaneContent({
   workspace,
+  surfaceHost,
   onMaybeMutated,
   onDesignSearchChange,
   onOpenPicker,
@@ -250,10 +256,14 @@ function AgentPaneContent({
   // ("No tool invocation found"), the run never renders, and the approval bar
   // never clears until a hard refresh re-hydrates from the DB.
   const chatRef = useRef<Chat<UIMessage> | null>(null);
-  // Live run-context (current model/provider/mode) the transport backfills onto
-  // body-less sends — the question/tool auto-resubmit — so a resume keeps the
-  // session's model + posture instead of resetting them. Assigned below once the
-  // pickers resolve; read fresh per send via the getter.
+  // Keep the latest workbench adapter behind a ref so its identity can never
+  // rebuild the session-bound Chat instance.
+  const surfaceHostRef = useRef(surfaceHost);
+  surfaceHostRef.current = surfaceHost;
+  // Live run-context (current model/provider/mode and surface snapshot) the
+  // transport backfills onto body-less sends — the question/tool auto-resubmit
+  // — so a resume keeps the session's model, posture, and truthful turn-start
+  // presentation state. Read fresh per send via the getter.
   const runContextRef = useRef<Partial<Omit<AgentRunOptions, "messages">>>({});
   // The single authority over stream starts/attaches for this pane
   // (`stream-attach-owner.ts`): the approval resume, the mount/rebuild
@@ -293,14 +303,22 @@ function AgentPaneContent({
             }
           },
         }),
-        // Resume after a CLIENT-resolved tool result lands. fs/todos/command are
-        // server-resolved (the sidecar completes the loop in-stream, ending on
-        // text — never a dangling tool call), so this fires for the human-input
-        // tools answered via their pinned cards: `question` and `design_search`
-        // (the pick card). Once the result lands the message becomes
-        // complete-with-tool-calls and the paused run resumes. Approval pauses
-        // are NOT affected (an approval-requested call has no result).
+        // Resume after a CLIENT-resolved tool result lands. fs/todos/command and
+        // surface tools are server-resolved (the sidecar completes the loop
+        // in-stream, ending on text — never a dangling tool call), so this fires
+        // for the human-input tools answered via their pinned cards: `question`
+        // and `design_search` (the pick card). Once the result lands the message
+        // becomes complete-with-tool-calls and the paused run resumes. Approval
+        // pauses are NOT affected (an approval-requested call has no result).
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+        onToolCall: ({ toolCall }) => {
+          // Manual behavior contract: test/desktop-agent-surface-open.md
+          AgentSurface.observeToolCall(surfaceHostRef.current, {
+            tool_name: toolCall.toolName,
+            input: toolCall.input,
+            dynamic: toolCall.dynamic,
+          });
+        },
       }),
     // Rebuild ONLY on a real rebinding — `epoch` bumps on select/start-new/
     // restore/archive-of-current and deliberately NOT on hydration or the
@@ -481,6 +499,7 @@ function AgentPaneContent({
     model_id: modelId,
     mode,
     ...(providerId ? { provider_id: providerId } : {}),
+    surface: surfaceHostRef.current.listOpen(),
   };
 
   const {

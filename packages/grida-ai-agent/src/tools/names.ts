@@ -27,6 +27,12 @@ export const QUESTION_TOOL_NAME = "question" as const;
  */
 export const DESIGN_SEARCH_TOOL_NAME = "design_search" as const;
 
+/** Open an existing workspace artifact as the host's active surface. */
+export const SURFACE_OPEN_TOOL_NAME = "surface_open" as const;
+
+/** Report the host's currently open and active artifact surfaces. */
+export const SURFACE_LIST_OPEN_TOOL_NAME = "surface_list_open" as const;
+
 /**
  * Every tool the agent may emit, regardless of which capabilities a
  * given callsite happens to wire. The *maximal* union: the client must
@@ -42,6 +48,8 @@ export type AgentToolName =
   | typeof RUN_COMMAND_TOOL_NAME
   | typeof QUESTION_TOOL_NAME
   | typeof DESIGN_SEARCH_TOOL_NAME
+  | typeof SURFACE_OPEN_TOOL_NAME
+  | typeof SURFACE_LIST_OPEN_TOOL_NAME
   | typeof SKILL_TOOL_NAME;
 
 /**
@@ -52,9 +60,9 @@ export type AgentToolName =
  * is in this set as a pending human block, so the queue waits exactly as it
  * does for a supervised approval. A future richer human-block tool (e.g. a
  * "pick a generated idea" picker) joins the contract by being added here —
- * no change to the gate. Distinct from a *transient* client-resolved fs call
- * at `input-available` (which a renderer fills in milliseconds), which must
- * NOT pause the drain.
+ * no change to the gate. Distinct from a *transient* client-resolved fs or
+ * surface call at `input-available` (which a renderer fills in milliseconds),
+ * which must NOT pause the drain.
  */
 export const HUMAN_INPUT_TOOL_NAMES = [
   QUESTION_TOOL_NAME,

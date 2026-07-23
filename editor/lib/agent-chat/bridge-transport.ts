@@ -35,10 +35,11 @@ export type DesktopAgentTransportOptions = Partial<
    */
   onResumeStart?: () => void;
   /**
-   * Live renderer run-context (current `model_id` / `provider_id` / `mode`),
-   * read FRESH on every send — crucially the AI SDK's **body-less** tool/approval
-   * auto-resubmit (`addToolResult` → `sendAutomaticallyWhen`). Without it, answering
-   * a client-resolved tool (e.g. `question`) resumes with no model/mode and the
+   * Live renderer run-context (current `model_id` / `provider_id` / `mode` and
+   * the turn-start artifact-surface snapshot), read FRESH on every send —
+   * crucially the AI SDK's **body-less** tool/approval auto-resubmit
+   * (`addToolResult` → `sendAutomaticallyWhen`). Without it, answering a
+   * client-resolved tool (e.g. `question`) resumes with no model/mode and the
    * server clobbers the session's model + posture with defaults. The explicit
    * per-send `body` still wins; this only backfills what a body-less send omits.
    */
@@ -81,8 +82,8 @@ export namespace desktopAgentTransport {
         await gridaGateway.ensureFresh();
         const body = readBodyOptions(options.body);
         if (body.session_id) liveSessionId = body.session_id;
-        // Backfill the live renderer context (model/provider/mode) so a body-less
-        // auto-resubmit still carries them; the explicit `body` overrides it.
+        // Backfill the live renderer context (model/provider/mode/surface) so a
+        // body-less auto-resubmit still carries it; explicit `body` fields win.
         const { runContext, ...restDefaults } = defaults;
         const context = runContext?.() ?? {};
         return streamFromBridge({
@@ -184,6 +185,7 @@ function streamFromBridge(
             workspace_id: opts.workspace_id,
             session_id: opts.session_id,
             mode: opts.mode,
+            surface: opts.surface,
             approval_answer: opts.approval_answer,
             scratch_seed: opts.scratch_seed,
           },

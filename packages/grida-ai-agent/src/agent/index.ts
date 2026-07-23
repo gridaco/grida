@@ -40,6 +40,8 @@ import {
   createToolset,
   RUN_COMMAND_TOOL_NAME,
   DESIGN_SEARCH_TOOL_NAME,
+  SURFACE_OPEN_TOOL_NAME,
+  SURFACE_LIST_OPEN_TOOL_NAME,
   type RunCommandBackend,
   type ToolsetCapabilities,
 } from "../tools";
@@ -126,12 +128,16 @@ export type CreateAgentOptions = {
    */
   project_instructions?: string;
   /**
-   * Whether a human UI is bound (RFC `tools` §question). When true the locked
-   * `question` tool is client-resolved (pauses for the user's answer); when
-   * false/undefined it ships with a fixed-refusal `execute` for headless hosts.
-   * The tool is always registered either way (it is locked).
+   * Whether a human UI can answer the locked `question` tool. When true it is
+   * client-resolved; when false/undefined it returns a fixed refusal.
    */
   interactive?: boolean;
+  /**
+   * Presentation state captured by an attached host at the start of this turn.
+   * The surface tools always execute server-side from this snapshot; omission
+   * means headless/detached.
+   */
+  surface?: ToolsetCapabilities["surface"];
   /**
    * Whether the client can resolve a Grida Library search. When true the
    * `design_search` tool joins the registry (client-resolved by the renderer);
@@ -178,6 +184,7 @@ function buildAgent(opts: CreateAgentOptions, download?: DownloadFunction) {
     image_gen: opts.image_gen,
     command: opts.command,
     interactive: opts.interactive,
+    surface: opts.surface,
     library: opts.library,
     skill:
       opts.skill_index && opts.skill_load_body
@@ -274,7 +281,15 @@ export function gridaAttribution(
  * not at the package root) so the gating is unit-pinned without driving a model.
  */
 export function buildCapabilityHints(opts: CreateAgentOptions): string[] {
-  const hints: string[] = [];
+  // Surface presentation is locked into every toolset. The same generic hint
+  // applies in interactive and headless hosts because the latter resolve an
+  // honest no-op and the agent must continue the artifact work unchanged.
+  const hints: string[] = [
+    prompts.surface_capability(
+      SURFACE_OPEN_TOOL_NAME,
+      SURFACE_LIST_OPEN_TOOL_NAME
+    ),
+  ];
   if (opts.command) {
     hints.push(
       prompts.command_capability(

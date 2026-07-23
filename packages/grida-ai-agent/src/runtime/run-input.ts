@@ -39,6 +39,7 @@ import {
 } from "../protocol/context";
 // Neutral (no node/SDK) import — just the synthetic-model-id contract.
 import { isAgentProviderModel } from "../agent-provider/types";
+import { AgentSurface } from "../surface";
 
 const ALLOWED_TIERS = new Set<string>(AGENT_TIERS);
 const CATALOG_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
@@ -63,9 +64,11 @@ export type RunRequest = {
   workspace_root?: string;
   /** Permission/supervision posture; defaults to `accept-edits` when absent. */
   mode: AgentMode;
-  /** Whether the requesting client has a human UI for the `question` tool
-   *  (RFC `tools` §question). Absent ⇒ inherit the host's `interactive` default. */
+  /** Whether the requesting client can resolve `question`. Absent ⇒ inherit
+   *  the host's `interactive` default. */
   interactive?: boolean;
+  /** Turn-start artifact-surface snapshot. Absent ⇒ headless/detached. */
+  surface?: AgentSurface.Snapshot;
   /** Whether the client can resolve a Grida Library search (`design_search`).
    *  Absent ⇒ inherit the host's `library` default. */
   library?: boolean;
@@ -109,6 +112,7 @@ export async function parseRunBody(
     workspace_id?: unknown;
     mode?: unknown;
     interactive?: unknown;
+    surface?: unknown;
     library?: unknown;
     approval_answer?: unknown;
     scratch_seed?: unknown;
@@ -236,6 +240,10 @@ export async function parseRunBody(
     // Only an explicit boolean counts; anything else leaves it absent so the
     // host's `interactive` default applies (the client didn't declare a UI).
     interactive: typeof b.interactive === "boolean" ? b.interactive : undefined,
+    // A malformed snapshot cannot grant any authority and degrades to the
+    // detached/headless state. The parser also requires a non-null active path
+    // to appear in `open`.
+    surface: AgentSurface.parseSnapshot(b.surface),
     // Whether the client can resolve a Grida Library search (`design_search`).
     // Only a renderer that wired the resolver declares this true, so the tool is
     // advertised exactly where it can be answered (client-resolved, like fs).

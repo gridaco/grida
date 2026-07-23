@@ -32,7 +32,6 @@ import {
 } from "@/lib/desktop/bridge";
 import { Button } from "@app/ui/components/button";
 import { WorkspaceWorkbench } from "@/scaffolds/desktop/workbench/workspace-workbench";
-import { LastWorkspaceMarker } from "@/scaffolds/desktop/shared/last-workspace-marker";
 
 export default function DesktopWorkspacePage() {
   return (
@@ -45,6 +44,7 @@ export default function DesktopWorkspacePage() {
 function WorkspacePageInner() {
   const params = useSearchParams();
   const workspaceId = params.get("id");
+  const initialActiveRelPath = params.get("path") ?? undefined;
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "ready"; workspace: Workspace }
@@ -94,13 +94,11 @@ function WorkspacePageInner() {
     return <ErrorScreen message={state.message} onRetry={resolve} />;
   }
   return (
-    <>
-      <LastWorkspaceMarker
-        workspaceId={state.workspace.id}
-        surface="workbench"
-      />
-      <WorkspaceWorkbench workspace={state.workspace} />
-    </>
+    <WorkspaceWorkbench
+      key={`${state.workspace.id}:${initialActiveRelPath ?? ""}`}
+      workspace={state.workspace}
+      initialActiveRelPath={initialActiveRelPath}
+    />
   );
 }
 

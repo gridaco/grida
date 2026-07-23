@@ -52,8 +52,10 @@ import {
   TitleBar,
   TITLEBAR_NO_DRAG_STYLE,
 } from "@/scaffolds/desktop/chrome/title-bar";
+import { LastWorkspaceMarker } from "@/scaffolds/desktop/shared/last-workspace-marker";
 import {
   terminal as bridgeTerminal,
+  workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
 import {
@@ -71,6 +73,7 @@ import { AgentPane } from "./agent-pane";
 import { TerminalPane } from "./terminal-pane";
 import { WorkspaceChangesProvider } from "./workspace-changes";
 import { EditorGroup } from "./editor-group";
+import { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import {
   DESIGN_SEARCH_TAB_ID,
   isVirtualTab,
@@ -122,7 +125,13 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
-export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
+export function WorkspaceWorkbench({
+  workspace,
+  initialActiveRelPath,
+}: {
+  workspace: Workspace;
+  initialActiveRelPath?: string;
+}) {
   // The editor group (VSCode's tab model) owns all tab state + rules — open
   // order, the active-tab-on-close neighbor rule, reopen-closed history, and the
   // picker's preview-tab lifecycle — as a plain, unit-tested class. React is a
@@ -132,6 +141,15 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   // lives where it's testable, not smeared across effects + refs + nested
   // setState updaters.)
   const group = useMemo(() => new EditorGroup(isVirtualTab), []);
+  const surfaceHost = useMemo(
+    () =>
+      new WorkspaceSurfaceHost(
+        (relPath) => workspacesNs.readdir(workspace.id, relPath),
+        group,
+        isVirtualTab
+      ),
+    [group, workspace.id]
+  );
   const { tabs: openTabs, active: activeRelPath } = useSyncExternalStore(
     group.subscribe,
     group.getSnapshot,
@@ -143,6 +161,28 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   // key on — null when the active tab is virtual.
   const activeFileRelPath =
     activeRelPath && !isVirtualTab(activeRelPath) ? activeRelPath : null;
+  const [restoreSettled, setRestoreSettled] = useState(
+    initialActiveRelPath === undefined
+  );
+
+  // Cold-start continuity is a one-shot host action. The same strict resolver
+  // used by `surface_open` checks that the saved artifact still exists; a
+  // missing target leaves the workbench open and empty.
+  useEffect(() => {
+    if (initialActiveRelPath === undefined) return;
+    let current = true;
+    void surfaceHost.openRelative(initialActiveRelPath).finally(() => {
+      if (current) setRestoreSettled(true);
+    });
+    return () => {
+      current = false;
+    };
+  }, [initialActiveRelPath, surfaceHost]);
+
+  // Manual regression: test/desktop-startup-restore-last-workspace.md
+  const rememberedActivePath = !restoreSettled
+    ? undefined
+    : surfaceHost.rememberedRelativePath();
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   // The live `design_search` pick, lifted from the agent pane so the editor
   // pane can host the picker as a virtual tab (the agent pane owns the chat +
@@ -331,6 +371,11 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
 
   return (
     <WorkspaceChangesProvider workspaceId={workspace.id}>
+      <LastWorkspaceMarker
+        workspaceId={workspace.id}
+        surface="workbench"
+        activePath={rememberedActivePath}
+      />
       <div className="flex h-screen w-screen flex-col bg-background">
         {/* The TitleBar exposes back/forward (Chromium history) and
           carries the workspace workbench's own chrome. Workspace-level
@@ -413,6 +458,7 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
                   <AgentPane
                     workspace={workspace}
                     activeRelPath={activeRelPath}
+                    surfaceHost={surfaceHost}
                     onMaybeMutated={bumpTreeRefresh}
                     onDesignSearchChange={setDesignSearch}
                     onOpenPicker={focusDesignSearchTab}

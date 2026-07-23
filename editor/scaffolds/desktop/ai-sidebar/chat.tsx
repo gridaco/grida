@@ -19,6 +19,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat, useChat } from "@ai-sdk/react";
 import { AgentFs } from "@grida/agent/fs";
+import { AgentSurface } from "@grida/agent/surface";
 import { AgentTodos } from "@grida/agent/todos";
 import { resolveDesignSearch } from "@/scaffolds/desktop/shared/design-search";
 import {
@@ -95,6 +96,8 @@ const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
  */
 type AISidebarChatProps = {
   className?: string;
+  /** Optional host-owned presentation state for an embedding file shell. */
+  surfaceHost?: AgentSurface.Host;
 } & (
   | {
       /**
@@ -121,6 +124,7 @@ type AISidebarChatProps = {
 export function AISidebarChat({
   fs,
   workspaceId,
+  surfaceHost,
   className,
 }: AISidebarChatProps) {
   const isWorkspace = !!workspaceId;
@@ -137,11 +141,13 @@ export function AISidebarChat({
   // callback mutate the chat's messages once a resume is happening — it can't
   // close over `chat`, which doesn't exist yet at closure-construction time.
   const chatRef = useRef<Chat<UIMessage> | null>(null);
-  // Live run-context (current model/provider) the transport backfills onto
-  // body-less sends — the fs/todos/question auto-resubmit — so a resume keeps
-  // the session's model instead of resetting it. Assigned once the picker
-  // resolves; read fresh per send via the getter.
+  // Live run-context (current model/provider and surface snapshot) the
+  // transport backfills onto body-less sends — the fs/todos/question
+  // auto-resubmit — so a resume keeps the session's model and truthful
+  // turn-start presentation state. Read fresh per send via the getter.
   const runContextRef = useRef<Partial<Omit<AgentRunOptions, "messages">>>({});
+  const surfaceHostRef = useRef(surfaceHost);
+  surfaceHostRef.current = surfaceHost;
   // Single attach authority for this sidebar (`stream-attach-owner.ts`):
   // mount/rebuild resume, queue-drain attach, and the SDK's adopted
   // auto-resubmit serialize here — one live attach max, resume-once keyed
@@ -180,14 +186,23 @@ export function AISidebarChat({
       sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
       onToolCall: ({ toolCall }) => {
         // `design_search` is human-input (the user picks from the gallery via the
-        // pinned pick card → addToolResult), not auto-resolved here. fs/todos
-        // stay client-resolved below.
+        // pinned pick card → addToolResult), not auto-resolved here. Surface
+        // calls are already acknowledged by the server; the renderer observes
+        // them only for fire-and-forget presentation. fs/todos stay
+        // client-resolved below.
         const agentToolCall = {
           tool_name: toolCall.toolName,
           tool_call_id: toolCall.toolCallId,
           input: toolCall.input,
           dynamic: toolCall.dynamic,
         };
+        // Manual behavior contract: test/desktop-agent-surface-open.md
+        if (
+          surfaceHostRef.current &&
+          AgentSurface.observeToolCall(surfaceHostRef.current, agentToolCall)
+        ) {
+          return;
+        }
         // Single-file mode resolves fs tools here against the in-memory editor
         // fs; workspace mode has no client fs (the server resolves fs tools), so
         // the fs leg is skipped and only todos resolve client-side.
@@ -335,6 +350,9 @@ export function AISidebarChat({
     runContextRef.current = {
       model_id: modelId,
       ...(providerId ? { provider_id: providerId } : {}),
+      ...(surfaceHostRef.current
+        ? { surface: surfaceHostRef.current.listOpen() }
+        : {}),
     };
   }
 

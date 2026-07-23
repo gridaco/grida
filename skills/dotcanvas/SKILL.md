@@ -61,3 +61,18 @@ a linear **deck / presentation / pitch / slideshow**, use the `slides` skill.
 - To move / resize / reorder, edit the `layout` (and document order) in the
   manifest. The human can also drag pins directly — re-read `.canvas.json`
   before editing so you don't clobber their changes (last write per file wins).
+
+## Show the result
+
+- Once the primary board is renderable, call `surface_open` once with the
+  workspace-rooted `.canvas` bundle directory (for example,
+  `/poster.canvas`). Pass the bundle directory, never its `.canvas.json`
+  manifest.
+- If the `.canvas` bundle itself is mounted as `/` in a dedicated file
+  surface, it is already presented; do not call `surface_open` just to reopen
+  it.
+- Treat presentation as auxiliary: continue regardless of the result, never
+  retry based on presentation status, and do not call `surface_open` after
+  every write.
+- Use `surface_list_open` only when the current host surface state is materially
+  useful. It is not required before `surface_open`.

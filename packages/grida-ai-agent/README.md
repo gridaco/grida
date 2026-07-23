@@ -19,8 +19,8 @@ It owns three agent-system concerns:
   AI-SDK UI-message stream contract. No Node, no DOM.
 - **Tool primitives.** Storage-agnostic [`fs`](./src/fs/README.md)
   (virtual filesystem + AI-SDK file tools) and
-  [`todos`](./src/todos/README.md) (live plan + `todo_write`). Each has
-  its own README.
+  [`todos`](./src/todos/README.md) (live plan + `todo_write`), plus the
+  host-rendered artifact [`surface`](./src/surface/index.ts) contract.
 
 ## Exports
 
@@ -36,6 +36,7 @@ bundle.
 | `./fs`               | virtual fs + file tools ([README](./src/fs/README.md))                                                                                                         | neutral  |
 | `./fs/backends/opfs` | browser OPFS backend                                                                                                                                           | browser  |
 | `./todos`            | plan store + `todo_write` ([README](./src/todos/README.md))                                                                                                    | neutral  |
+| `./surface`          | server-executed artifact-surface tools, turn snapshot, and browser observer                                                                                    | neutral  |
 | `./server`           | `createAgentTenant` + `createAgentDaemon` (the composed daemon), daemon re-exports                                                                             | Node     |
 | `./sandbox`          | composed sandbox policy (`buildAgentDaemonSandboxPolicy` — daemon frame + AI upstream hosts)                                                                   | Node     |
 | `./transport`        | `AgentTransport` namespace — extends `DaemonTransport.Client` with the agent tenant's routes                                                                   | neutral  |

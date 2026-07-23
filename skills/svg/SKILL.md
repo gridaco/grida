@@ -12,6 +12,21 @@ When you operate on `.svg` files inside a Grida editor session:
 - On `edit_file` reason="parse_error", your output broke the SVG. Re-read and
   fix.
 
+## Show the result
+
+- Once the primary artifact is renderable, call `surface_open` once with its
+  workspace-rooted path (for example, `/poster.svg`). Open a standalone SVG by
+  its file path; when the SVG belongs to a `.canvas` board or deck, open the
+  `.canvas` bundle directory, never its `.canvas.json` manifest.
+- If the standalone SVG or `.canvas` bundle is already mounted at the dedicated
+  file surface's root, it is already presented; do not call `surface_open` just
+  to reopen it.
+- Treat presentation as auxiliary: continue regardless of the result, never
+  retry based on presentation status, and do not call `surface_open` after
+  every write.
+- Use `surface_list_open` only when the current host surface state is materially
+  useful. It is not required before `surface_open`.
+
 ## SVG style
 
 When you produce SVG:

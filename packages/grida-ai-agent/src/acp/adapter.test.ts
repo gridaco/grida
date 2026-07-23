@@ -223,6 +223,32 @@ describe("AcpAgentAdapter", () => {
     expect(updates.every((u) => u.sessionId === "ses_1")).toBe(true);
   });
 
+  it("declares ACP prompts non-interactive so question cannot hang", async () => {
+    let request: Parameters<AcpCoreClient["agent"]["run"]>[0] | null = null;
+    const { adapter } = makeAdapter({
+      agent: {
+        run: async (opts: Parameters<AcpCoreClient["agent"]["run"]>[0]) => {
+          request = opts;
+          return {
+            session_id: opts.session_id!,
+            done: Promise.resolve(),
+          };
+        },
+        abort: async () => {},
+      } as unknown as AcpCoreClient["agent"],
+    });
+
+    await adapter.prompt({
+      sessionId: "ses_1",
+      prompt: [{ type: "text", text: "go" }],
+    });
+
+    expect(request).toMatchObject({
+      session_id: "ses_1",
+      interactive: false,
+    });
+  });
+
   it("cancel aborts the core run and the prompt stops cancelled", async () => {
     let release!: () => void;
     const done = new Promise<void>((r) => (release = r));

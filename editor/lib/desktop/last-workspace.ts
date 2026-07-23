@@ -8,6 +8,9 @@
  * authority or creates a workspace.
  */
 
+import type { WorkspaceFsEntry } from "@grida/desktop-bridge";
+import { WorkspaceArtifact } from "./workspace-artifact";
+
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 type WorkspaceRecord = {
@@ -18,10 +21,7 @@ type WorkspaceRecord = {
 type WorkspaceResolver = {
   list(): Promise<WorkspaceRecord[]>;
   openFolder(rootPath: string): Promise<WorkspaceRecord>;
-  readdir(
-    workspaceId: string,
-    relPath?: string
-  ): Promise<Array<{ name: string; kind: string }>>;
+  readdir(workspaceId: string, relPath?: string): Promise<WorkspaceFsEntry[]>;
 };
 
 const STORAGE_KEY = "grida.lastWorkspace";
@@ -32,6 +32,8 @@ export namespace last_workspace {
     | {
         surface: "workbench";
         workspace_id: string;
+        /** Last active artifact in the workbench's relative tab vocabulary. */
+        active_path?: string;
       }
     | {
         surface: "canvas";
@@ -66,10 +68,22 @@ export namespace last_workspace {
         return null;
       }
       if (value.surface === "workbench") {
-        return {
+        const target: Target = {
           surface: "workbench",
           workspace_id: value.workspace_id,
         };
+        if (value.active_path === undefined) return target;
+        const activePath =
+          typeof value.active_path === "string"
+            ? WorkspaceArtifact.normalizeRelativePath(value.active_path)
+            : null;
+        if (activePath === null) {
+          // Optional surface state must never invalidate an otherwise valid
+          // workspace. Clean only the unusable artifact path.
+          remember(storage, target);
+          return target;
+        }
+        return { ...target, active_path: activePath };
       }
       if (value.surface === "canvas" && isSafeBasePath(value.base_path)) {
         return {
@@ -97,7 +111,10 @@ export namespace last_workspace {
   export function href(target: Target): string {
     const id = encodeURIComponent(target.workspace_id);
     if (target.surface === "workbench") {
-      return `/desktop/workspace?id=${id}`;
+      const activePath = target.active_path
+        ? `&path=${encodeURIComponent(target.active_path)}`
+        : "";
+      return `/desktop/workspace?id=${id}${activePath}`;
     }
     const basePath = target.base_path
       ? `&path=${encodeURIComponent(target.base_path)}`
@@ -129,7 +146,30 @@ export namespace last_workspace {
     }
 
     const reopened = await workspaces.openFolder(registered.root);
-    const relocated: Target = { ...target, workspace_id: reopened.id };
+    let relocated: Target = { ...target, workspace_id: reopened.id };
+    let changed = reopened.id !== target.workspace_id;
+    if (relocated.surface === "workbench" && relocated.active_path) {
+      try {
+        const entry = await WorkspaceArtifact.find(
+          (relPath) => workspaces.readdir(relocated.workspace_id, relPath),
+          relocated.active_path
+        );
+        if (!entry || !WorkspaceArtifact.isOpenable(entry)) {
+          relocated = {
+            surface: "workbench",
+            workspace_id: relocated.workspace_id,
+          };
+          changed = true;
+        }
+      } catch (error) {
+        if (!isMissingEntry(error)) throw error;
+        relocated = {
+          surface: "workbench",
+          workspace_id: relocated.workspace_id,
+        };
+        changed = true;
+      }
+    }
     if (relocated.surface === "canvas") {
       try {
         // An empty implicit bundle is valid; successful enumeration is the
@@ -143,9 +183,7 @@ export namespace last_workspace {
       }
     }
 
-    if (reopened.id === target.workspace_id) return relocated;
-
-    remember(storage, relocated);
+    if (changed) remember(storage, relocated);
     return relocated;
   }
 }

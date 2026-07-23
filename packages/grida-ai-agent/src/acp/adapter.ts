@@ -243,6 +243,11 @@ export class AcpAgentAdapter implements Agent {
       {
         messages: [{ role: "user", content: text }],
         session_id: sessionId,
+        // ACP has no question-answer UI, even when connected to an interactive
+        // `serve` daemon. Override the host default per run so `question`
+        // refuses instead of leaving input pending forever. Surface state is
+        // independently omitted, so its server-executed tools are headless.
+        interactive: false,
       },
       (chunk) => {
         const update = translateChunk(chunk);

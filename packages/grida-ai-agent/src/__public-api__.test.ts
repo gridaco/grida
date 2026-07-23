@@ -24,6 +24,8 @@ import {
   createAgent,
   createToolset,
   GRIDA_STATUS_SSE_EVENT,
+  SURFACE_LIST_OPEN_TOOL_NAME,
+  SURFACE_OPEN_TOOL_NAME,
   type AgentModelId,
   type AgentRunMessage,
   type AgentRunMessagePart,
@@ -76,6 +78,7 @@ import {
 import { AgentTransport } from "./transport";
 import { AgentFs } from "./fs";
 import { AgentTodos } from "./todos";
+import { AgentSurface } from "./surface";
 import { OpfsBackend } from "./fs/backends/opfs";
 
 describe("@grida/agent public API", () => {
@@ -84,8 +87,10 @@ describe("@grida/agent public API", () => {
       const run: AgentRunOptions = {
         messages: [],
         feature: AGENT_SESSION_AGENT,
+        surface: { active: "/canvas.canvas", open: ["/canvas.canvas"] },
       };
       expect(run.feature).toBe("grida");
+      expect(run.surface?.active).toBe("/canvas.canvas");
 
       // Session status back-channel (RFC `session` / `queue`).
       expect(GRIDA_STATUS_SSE_EVENT).toBe("grida-status");
@@ -97,6 +102,8 @@ describe("@grida/agent public API", () => {
     it("exposes the runtime-agnostic agent factory and toolset factory", () => {
       expect(typeof createAgent).toBe("function");
       expect(typeof createToolset).toBe("function");
+      expect(SURFACE_OPEN_TOOL_NAME).toBe("surface_open");
+      expect(SURFACE_LIST_OPEN_TOOL_NAME).toBe("surface_list_open");
     });
 
     it("exposes BYOK provider identity, wire vocab, tiers, and session-row types", () => {
@@ -568,6 +575,50 @@ describe("@grida/agent public API", () => {
       expectTypeOf<AgentTodos.ToolName>().toEqualTypeOf<"todo_write">();
       expectTypeOf<AgentTodos.Tools>().toEqualTypeOf<typeof AgentTodos.tools>();
       expectTypeOf(AgentTodos.resolveToolCall).toBeFunction();
+    });
+  });
+
+  describe("AgentSurface namespace", () => {
+    it("exposes the tool family and browser observer", () => {
+      expect(AgentSurface.TOOL_NAMES).toEqual({
+        surface_open: "surface_open",
+        surface_list_open: "surface_list_open",
+      });
+      expectTypeOf<AgentSurface.ToolName>().toEqualTypeOf<
+        "surface_open" | "surface_list_open"
+      >();
+      expectTypeOf(AgentSurface.createTools).toBeFunction();
+      expectTypeOf(AgentSurface.observeToolCall).toBeFunction();
+      expectTypeOf(AgentSurface.parseSnapshot).toBeFunction();
+      expectTypeOf<AgentSurface.Tools>().toEqualTypeOf<
+        ReturnType<typeof AgentSurface.createTools>
+      >();
+    });
+
+    it("exposes the snapshot and acknowledgement contracts", () => {
+      const host: AgentSurface.Host = {
+        open: () => undefined,
+        listOpen: () => ({
+          active: "/canvas.canvas",
+          open: ["/canvas.canvas"],
+        }),
+      };
+      const snapshot: AgentSurface.Snapshot = host.listOpen();
+      const opened: AgentSurface.OpenOutput = {
+        path: "/canvas.canvas",
+        requested: true,
+        reason: "requested",
+      };
+      const listed: AgentSurface.ListOpenOutput = {
+        interactive: true,
+        active: "/canvas.canvas",
+        open: ["/canvas.canvas"],
+      };
+
+      expect(typeof host.open).toBe("function");
+      expect(snapshot.active).toBe("/canvas.canvas");
+      expect(opened.reason).toBe("requested");
+      expect(listed.active).toBe("/canvas.canvas");
     });
   });
 });

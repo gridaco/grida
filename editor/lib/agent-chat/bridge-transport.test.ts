@@ -133,6 +133,48 @@ describe("desktopAgentTransport", () => {
     );
   });
 
+  it("captures and forwards the live surface snapshot on every send", async () => {
+    vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_test",
+      done: Promise.resolve(),
+    }));
+
+    let surface = { active: "/a.svg", open: ["/a.svg"] };
+    const transport = desktopAgentTransport.create({
+      runContext: () => ({ surface }),
+    });
+    const send = async () => {
+      const stream = await transport.sendMessages({
+        trigger: "submit-message",
+        chatId: "chat-1",
+        messageId: undefined,
+        messages: [
+          { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+        ],
+        abortSignal: undefined,
+      });
+      await stream.cancel();
+    };
+
+    await send();
+    expect(ai.startAgentRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        surface: { active: "/a.svg", open: ["/a.svg"] },
+      }),
+      expect.any(Function)
+    );
+
+    surface = { active: "/b.svg", open: ["/a.svg", "/b.svg"] };
+    await send();
+    expect(ai.startAgentRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        surface: { active: "/b.svg", open: ["/a.svg", "/b.svg"] },
+      }),
+      expect.any(Function)
+    );
+  });
+
   // Regression: the permission mode (RFC `permission modes`) chosen in the
   // composer rides each send as `body.mode`. It MUST reach `startAgentRun` —
   // a prior bug dropped it in both `readBodyOptions` and the `startAgentRun`

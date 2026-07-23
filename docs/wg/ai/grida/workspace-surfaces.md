@@ -52,8 +52,9 @@ tool's type system. The surface capability remains artifact-agnostic:
   artifact kinds.
 
 The tool does not accept an artifact kind, renderer, window, or workspace
-identifier. The artifact's workspace-relative path is the grounded
-reference.
+identifier. The artifact's workspace-rooted agent-filesystem path is the
+grounded reference. Its leading `/` denotes the current workspace root, not
+the host filesystem root.
 
 ## Surface tool family
 
@@ -62,18 +63,24 @@ flat. Together, they form the `surface` product capability.
 
 ### `surface_open`
 
-`surface_open` asks the current host to open an existing workspace
-artifact and make it the active surface.
+`surface_open` emits a best-effort request for the current host to open an
+existing workspace artifact and make it the active surface.
 
-The target:
+An interactive host acts on the request only when the target:
 
 - already exists;
 - is inside the current workspace;
 - is a file or a recognized bundle directory;
-- is identified by its workspace-relative `path`.
+- is identified by its workspace-rooted `path`, such as `/poster.canvas`.
 
 The operation is idempotent. Opening an artifact that is already open
 activates the existing surface instead of creating a duplicate.
+
+The daemon acknowledges the request without waiting for the renderer. The
+result says whether the request was emitted to an interactive run or handled
+as a non-interactive no-op; it does not claim that a particular window
+finished opening the artifact. Renderer detachment, version skew, or a
+rejected target therefore cannot pause model continuation.
 
 `surface_open` does not:
 
@@ -84,18 +91,16 @@ activates the existing surface instead of creating a duplicate.
 - create a branch;
 - enter slideshow or fullscreen presentation mode.
 
-The result reports what happened: the target was opened, its existing
-surface was activated, the host was non-interactive, or the target was
-unavailable.
-
 ### `surface_list_open`
 
-`surface_list_open` reports the artifact paths currently represented by
-the host and identifies the active path.
+`surface_list_open` reports the surface snapshot supplied by the host when
+the current turn started. The snapshot contains the artifact paths then
+represented by the host and identifies the active path.
 
 It reports presentation state only. It is not a workspace file listing
 and does not grant access to any artifact. The agent does not need to call
-it before `surface_open`, because opening is idempotent.
+it before `surface_open`, because opening is idempotent. The snapshot is not
+updated or reconciled after a `surface_open` request within the same turn.
 
 ## Interactive and non-interactive hosts
 
@@ -104,9 +109,10 @@ agent.
 
 In an interactive host:
 
-- `surface_open` resolves through the host's artifact-opening behavior;
-- `surface_list_open` reports the host's current surface state;
-- each result reports the real visible outcome.
+- the run carries the host's surface snapshot;
+- `surface_open` is acknowledged by the daemon and observed by the renderer
+  as a best-effort, idempotent UI action;
+- `surface_list_open` reports the turn-start snapshot.
 
 In a non-interactive host:
 
@@ -115,9 +121,11 @@ In a non-interactive host:
 - `surface_list_open` returns an empty open set and no active surface.
 
 Presentation is auxiliary. Artifact creation, editing, verification, and
-task completion never depend on an artifact being opened. A
-non-interactive result does not change the underlying work, trigger a
-retry, or turn successful artifact work into a failure.
+task completion never depend on an artifact being opened. The renderer
+never owns completion of either tool call, and no later success
+reconciliation is required. A missed request or non-interactive result does
+not change the underlying work, trigger a retry, or turn successful artifact
+work into a failure.
 
 The same guidance can therefore use the surface tools in interactive and
 non-interactive environments without changing the model's artifact

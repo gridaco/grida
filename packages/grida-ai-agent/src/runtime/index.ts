@@ -231,10 +231,9 @@ export type AgentRuntimeDeps = ResolveDeps & {
    */
   image_model_id?: string;
   /**
-   * Whether a human UI is bound — gates the locked `question` tool. When true
-   * the tool is client-resolved (pauses for the user's answer); when
-   * false/undefined (fail-closed headless) the tool refuses with a fixed tool
-   * error. Threaded from the HTTP-server boundary down to `createToolset`.
+   * Whether a human UI can answer the locked `question` tool. When false or
+   * undefined, question refuses. Threaded from the HTTP-server boundary down
+   * to `createToolset`.
    */
   interactive?: boolean;
   /**
@@ -312,6 +311,9 @@ type StartTurnOptions = {
   /** Whether the requesting client can answer the `question` tool (per-run;
    *  absent ⇒ the host `interactive` default). A core drain leaves it absent. */
   interactive?: RunRequest["interactive"];
+  /** Turn-start presentation snapshot. A core drain has no attached request
+   * and therefore leaves it absent (headless/detached). */
+  surface?: RunRequest["surface"];
   /** Whether the requesting client can resolve `design_search` (per-run; absent
    *  ⇒ the host `library` default). */
   library?: RunRequest["library"];
@@ -994,6 +996,9 @@ export class AgentRuntime {
         // Per-run client UI capability (the desktop-from-web bridge sets true; a
         // headless `cli run` sets false). Absent ⇒ host default downstream.
         interactive: req.interactive,
+        // Exact presentation state at request start. Omission means no surface
+        // observer is attached.
+        surface: req.surface,
         // Per-run library-search capability (renderer wires the resolver).
         library: req.library,
         // Direct-run seeds were staged before persistence. Pass the exact root
@@ -1048,6 +1053,7 @@ export class AgentRuntime {
       workspace_root: workspaceRoot,
       mode,
       interactive,
+      surface,
       library,
       scratch_dir: preparedScratchDir,
     } = opts;
@@ -1164,7 +1170,7 @@ export class AgentRuntime {
       provider_http: this.deps.provider_http,
       image_gen_enabled: this.deps.image_gen_enabled === true,
       image_model_id: this.deps.image_model_id,
-      // Host-level: gates the `question` tool's execute-or-pause in createAgent.
+      // Host-level default for question resolution.
       interactive: this.deps.interactive === true,
       // Host-level default for design_search; per-run `req.library` overrides.
       library: this.deps.library === true,
@@ -1299,6 +1305,7 @@ export class AgentRuntime {
             directory_scopes: directoryScopes,
             mode,
             interactive,
+            surface,
             library,
             skill_index: ctx.skill_index,
             skill_cache: ctx.skill_cache,

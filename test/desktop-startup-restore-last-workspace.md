@@ -17,10 +17,10 @@ covered_by:
 ## Behavior
 
 A normal cold launch should continue the last workspace-backed surface the
-user focused: either its workbench or its `.canvas` editor. Restoration is a
-convenience, not new filesystem authority: the saved opaque workspace ID and
-relative canvas path must be revalidated through the desktop workspace bridge
-before navigation.
+user focused: either its workbench, the last real artifact still open in that
+workbench, or its `.canvas` editor. Restoration is a convenience, not new
+filesystem authority: the saved opaque workspace ID and relative artifact path
+must be revalidated through the desktop workspace bridge before navigation.
 
 If no target was saved, it is no longer registered, or its directory is no
 longer available, startup stays on Welcome. An explicit launch target (for
@@ -38,24 +38,34 @@ implicit restoration.
    and relaunch it normally.
    - Expected: a brief **Opening last workspace…** state appears, then
      workspace A opens without a Welcome flash.
-3. Open a `.canvas` directory inside workspace A, focus that window, quit, and
+3. In workspace A's workbench, open an SVG or `.canvas` artifact, quit, and
    relaunch.
+   - Expected: workspace A opens with the same artifact active.
+4. Open a temporary virtual tab while that artifact remains open, quit, and
+   relaunch.
+   - Expected: the real artifact reopens; the virtual tab is not persisted.
+5. Repeat the virtual-tab case, but close every real artifact before quitting.
+   - Expected: workspace A opens with an empty editor group. An artifact the
+     user explicitly closed is not resurrected.
+6. Open a `.canvas` directory inside workspace A as its dedicated editor,
+   focus that window, quit, and relaunch.
    - Expected: the same canvas surface opens. Both explicit-manifest and
      implicit/manifest-less canvas directories are valid.
-4. With workspace A saved, use **File → New Window** and then close every other
+7. With workspace A saved, use **File → New Window** and then close every other
    window.
    - Expected: the new window stays on Welcome; it does not redirect to A.
-5. Quit, then launch Grida by opening a supported file or `.canvas` directory
+8. Quit, then launch Grida by opening a supported file or `.canvas` directory
    from Finder.
    - Expected: the requested target wins. Workspace A is not restored in a
      competing window.
-6. Quit, then rename or remove the saved workspace directory and relaunch.
+9. Quit, then rename or remove the saved workspace directory and relaunch.
    - Expected: startup falls back to Welcome and never recreates the missing
      directory.
-7. Restore the directory, open two workspace windows, focus B last, quit, and
-   relaunch.
-   - Expected: B opens. This experiment restores one last-focused surface, not
-     the complete multi-window session.
+10. Restore the directory, open two workspace windows, focus B last, quit, and
+    relaunch.
+
+- Expected: B opens. This experiment restores one last-focused surface, not
+  the complete multi-window session.
 
 ## Notes
 

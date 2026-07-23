@@ -107,6 +107,16 @@
         "default": "./dist/todos/index.js"
       }
     },
+    "./surface": {
+      "import": {
+        "types": "./dist/surface/index.d.mts",
+        "default": "./dist/surface/index.mjs"
+      },
+      "require": {
+        "types": "./dist/surface/index.d.ts",
+        "default": "./dist/surface/index.js"
+      }
+    },
     "./vision": {
       "import": {
         "types": "./dist/vision/index.d.mts",

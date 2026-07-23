@@ -33,6 +33,45 @@ describe("last_workspace", () => {
     );
   });
 
+  it("round-trips the workbench's last active artifact", () => {
+    const storage = new MemoryStorage();
+    const target = {
+      surface: "workbench",
+      workspace_id: "workspace-a",
+      active_path: "decks/Launch.canvas",
+    } as const;
+
+    last_workspace.remember(storage, target);
+
+    expect(last_workspace.read(storage)).toEqual(target);
+    expect(last_workspace.href(target)).toBe(
+      "/desktop/workspace?id=workspace-a&path=decks%2FLaunch.canvas"
+    );
+  });
+
+  it("drops an unsafe active artifact without losing its workspace", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      "grida.lastWorkspace",
+      JSON.stringify({
+        version: 1,
+        surface: "workbench",
+        workspace_id: "workspace-a",
+        active_path: "../outside.svg",
+      })
+    );
+
+    expect(last_workspace.read(storage)).toEqual({
+      surface: "workbench",
+      workspace_id: "workspace-a",
+    });
+    expect(JSON.parse(storage.getItem("grida.lastWorkspace")!)).toEqual({
+      version: 1,
+      surface: "workbench",
+      workspace_id: "workspace-a",
+    });
+  });
+
   it("round-trips a canvas target including its bundle path", () => {
     const storage = new MemoryStorage();
     const target = {
@@ -86,6 +125,58 @@ describe("last_workspace", () => {
       workspace_id: "workspace-a",
     });
     expect(openFolder).toHaveBeenCalledWith("/projects/a");
+  });
+
+  it("restores a live workbench artifact after validating its parent", async () => {
+    const storage = new MemoryStorage();
+    const target = {
+      surface: "workbench",
+      workspace_id: "workspace-a",
+      active_path: "decks/Launch.canvas",
+    } as const;
+    last_workspace.remember(storage, target);
+
+    await expect(
+      last_workspace.resolve(storage, {
+        list: async () => [{ id: "workspace-a", root: "/projects/a" }],
+        openFolder: async (root) => ({ id: "workspace-a", root }),
+        readdir: async (workspaceId, relPath) => {
+          expect(workspaceId).toBe("workspace-a");
+          expect(relPath).toBe("decks");
+          return [
+            {
+              name: "Launch.canvas",
+              rel_path: "decks/Launch.canvas",
+              kind: "directory",
+            },
+          ];
+        },
+      })
+    ).resolves.toEqual(target);
+  });
+
+  it("falls back to the workspace when its saved artifact is missing", async () => {
+    const storage = new MemoryStorage();
+    last_workspace.remember(storage, {
+      surface: "workbench",
+      workspace_id: "workspace-a",
+      active_path: "removed.svg",
+    });
+
+    await expect(
+      last_workspace.resolve(storage, {
+        list: async () => [{ id: "workspace-a", root: "/projects/a" }],
+        openFolder: async (root) => ({ id: "workspace-a", root }),
+        readdir: async () => [],
+      })
+    ).resolves.toEqual({
+      surface: "workbench",
+      workspace_id: "workspace-a",
+    });
+    expect(last_workspace.read(storage)).toEqual({
+      surface: "workbench",
+      workspace_id: "workspace-a",
+    });
   });
 
   it("forgets a workspace id that is no longer registered", async () => {

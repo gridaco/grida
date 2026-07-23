@@ -117,6 +117,36 @@ Rules:
 `.trim(),
 
   /**
+   * Host-rendered artifact-surface capability. Both tools are always present:
+   * an attached renderer supplies a turn-start snapshot while a headless host
+   * resolves an honest no-op. Kept format-agnostic; canvas-first behavior
+   * belongs in the relevant product skill.
+   */
+  surface_capability: (
+    surface_open_name: string,
+    surface_list_open_name: string
+  ): string =>
+    [
+      '<capability name="workspace-surfaces">',
+      `You can ask the current host to show an existing workspace artifact with`,
+      `\`${surface_open_name}\`. Pass the artifact's absolute agent-filesystem`,
+      "path (starting with `/`): a file, or a recognized bundle directory.",
+      "After the primary user-facing artifact is renderable, open it once so the",
+      "user can see the work. Opening is presentation only: it does not create,",
+      "edit, attach, branch, or grant access to the artifact.",
+      "A `requested` result acknowledges only that an attached host can observe",
+      "the request. It does not prove the renderer opened the artifact.",
+      `\`${surface_list_open_name}\` reports presentation state only; it is not a`,
+      `workspace listing; its result is the host snapshot from the start of this`,
+      `turn. You do not need to call it before`,
+      `\`${surface_open_name}\` because opening is idempotent.`,
+      "Presentation is auxiliary. If the host reports `not_interactive`, do not",
+      "retry or change the artifact work. Continue and judge task completion from",
+      "the artifact itself.",
+      "</capability>",
+    ].join("\n"),
+
+  /**
    * Model-provider command-execution capability hint. Built per-run (the
    * workdir is runtime state) and appended to the composed prompt by
    * `buildCapabilityHints` (`agent/index.ts`) only when command exec is wired.
