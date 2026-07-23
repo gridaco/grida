@@ -296,6 +296,26 @@ export function open_welcome_window({
 }
 
 /**
+ * Cold-start bootstrap. It still enters the sign-in-gated Welcome segment;
+ * the query only asks the signed-in renderer to validate and resume its last
+ * workspace-backed surface. Every explicit Welcome entry uses
+ * {@link open_welcome_window} without this flag.
+ */
+export function open_startup_window({
+  app,
+  base_url: baseUrl,
+}: {
+  app: App;
+  base_url: string;
+}) {
+  return create_main_window({
+    base_url: baseUrl,
+    urlPath: "/desktop/welcome?startup=restore-last-workspace",
+    additionalArguments: buildDesktopArguments({ app }),
+  });
+}
+
+/**
  * Opens a per-document window for the supplied `docId`. Recipe 4
  * mechanics: each open document is its own BrowserWindow with its
  * own renderer process, addressed by `docId` (not by absolute path —

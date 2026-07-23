@@ -34,8 +34,15 @@
  * auto-sends when there's a prompt.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { XIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -76,8 +83,68 @@ import {
 import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
 import { PresetChip } from "@/scaffolds/desktop/home/preset-chip";
 import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import { last_workspace } from "@/lib/desktop/last-workspace";
 
 const NOOP = () => {};
+
+/**
+ * The native host adds `?startup=restore-last-workspace` only to the cold-start
+ * welcome window. Explicit Home navigation, File → New Window, auth callback,
+ * and macOS re-activation all use plain `/desktop/welcome` and stay here.
+ */
+export default function DesktopWelcomePage() {
+  return (
+    <Suspense fallback={<StartupRestoreScreen />}>
+      <DesktopWelcomeRoute />
+    </Suspense>
+  );
+}
+
+function DesktopWelcomeRoute() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const shouldRestore = params.get("startup") === "restore-last-workspace";
+  const [checking, setChecking] = useState(shouldRestore);
+
+  useEffect(() => {
+    if (!shouldRestore) return;
+    let cancelled = false;
+    void last_workspace
+      .resolve(window.localStorage, {
+        list: workspacesNs.list,
+        openFolder: workspacesNs.openFolder,
+        readdir: workspacesNs.readdir,
+      })
+      .then((target) => {
+        if (cancelled) return;
+        if (target) {
+          router.replace(last_workspace.href(target));
+          return;
+        }
+        setChecking(false);
+      })
+      .catch((err) => {
+        console.warn("[welcome] couldn't restore last workspace:", err);
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router, shouldRestore]);
+
+  return checking ? <StartupRestoreScreen /> : <WelcomeSurface />;
+}
+
+function StartupRestoreScreen() {
+  return (
+    <div className="flex h-svh w-full flex-col bg-background">
+      <TitleBar />
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        Opening last workspace…
+      </div>
+    </div>
+  );
+}
 
 /** The home composer targets no existing workspace (a fresh project is created
  *  on submit), so there are no `@` file refs or `/` skills to offer. A constant
@@ -102,7 +169,7 @@ function composePromptWithRefs(
   return `${lead}\n\nReferences:\n${list}`;
 }
 
-export default function DesktopWelcomePage() {
+function WelcomeSurface() {
   const router = useRouter();
   // The home's single page-scroll container — everything (composer, gallery)
   // scrolls together inside it; the gallery virtualizes against it.

@@ -32,6 +32,7 @@ import {
 } from "@/lib/desktop/bridge";
 import { Button } from "@app/ui/components/button";
 import { WorkspaceWorkbench } from "@/scaffolds/desktop/workbench/workspace-workbench";
+import { LastWorkspaceMarker } from "@/scaffolds/desktop/shared/last-workspace-marker";
 
 export default function DesktopWorkspacePage() {
   return (
@@ -92,7 +93,15 @@ function WorkspacePageInner() {
   if (state.kind === "error") {
     return <ErrorScreen message={state.message} onRetry={resolve} />;
   }
-  return <WorkspaceWorkbench workspace={state.workspace} />;
+  return (
+    <>
+      <LastWorkspaceMarker
+        workspaceId={state.workspace.id}
+        surface="workbench"
+      />
+      <WorkspaceWorkbench workspace={state.workspace} />
+    </>
+  );
 }
 
 function LoadingScreen() {
