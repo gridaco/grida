@@ -9,7 +9,9 @@
  * project's agent as its first turn via {@link welcome_handoff}. No workspace
  * picker, no folder dialog to get started: the newcomer never has to choose a
  * folder. "Open folder…" and the recents list stay for opening work that
- * already exists (files stay visible — a named tree, not hidden).
+ * already exists (files stay visible — a named tree, not hidden). Submitting an
+ * otherwise empty composer simply enters the selected/default workspace without
+ * starting an agent turn.
  *
  * The home NEVER mints a per-session folder and NEVER dirties the user's
  * workspace. Starting a session roots the agent at the DEFAULT workspace — the
@@ -432,7 +434,9 @@ function WelcomeSurface() {
   // The one "start" path, shared by the composer's send and the reference
   // tray's Start button. Picked references (if any) fold into the first-turn
   // prompt as context and always start a FRESH project — they take precedence
-  // over the target picker, since they're only meaningful for a new start.
+  // over the target picker, since they're only meaningful for a new start. An
+  // otherwise empty submit simply enters the selected/default workspace without
+  // starting an agent turn (see test/desktop-welcome-empty-submit.md).
   const start = useCallback(
     (text: string) => {
       const t = text.trim();
@@ -460,8 +464,8 @@ function WelcomeSurface() {
         void startFresh({ prompt: composePromptWithRefs(t, pickedRefs) });
         return;
       }
-      if (!t) return;
-      // Send into an existing opened workspace, or the default workspace.
+      // Send into an existing opened workspace, or enter it without a turn when
+      // the composer is empty. The default-workspace path follows the same rule.
       if (target) handoffAndGo(target, t);
       else void startFresh({ prompt: t });
     },
@@ -669,7 +673,12 @@ function WelcomeSurface() {
                     // composer attachments — its `start` ignores files/uploads, so
                     // hide the "+" rather than offer a dead control.
                     attach={false}
-                    allowEmptySubmit={pickedTemplate != null}
+                    allowEmptySubmit
+                    emptySubmitLabel={
+                      pickedTemplate || pickedRefs.length > 0
+                        ? "Start"
+                        : "Open workspace"
+                    }
                     autofocus
                     placeholder={
                       pickedTemplate
