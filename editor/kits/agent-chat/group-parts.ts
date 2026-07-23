@@ -1,11 +1,12 @@
-import { isReasoningUIPart, isTextUIPart, isToolUIPart } from "ai";
+import { isTextUIPart, isToolUIPart } from "ai";
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
 
 /**
  * One contiguous render unit walked out of a message's `parts`.
- * Consecutive reasoning deltas merge into one block, and consecutive tool
- * calls collapse into one group; part kinds the renderer doesn't handle
- * (file / source / step markers) are dropped.
+ * Consecutive tool calls collapse into one group; reasoning and other part
+ * kinds the renderer doesn't handle (file / source / step markers) are
+ * dropped. Reasoning tokens remain transport/session data, but they are not
+ * user-facing transcript content.
  *
  * Note on `file` parts: user-message images render inline via a dedicated
  * branch in `message.tsx` (perceive-only attachments), NOT through this
@@ -16,7 +17,6 @@ import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
  */
 export type RenderGroup =
   | { type: "text"; key: string; text: string }
-  | { type: "reasoning"; key: string; text: string }
   | { type: "tools"; key: string; entries: ToolCallEntry[] };
 
 export function groupMessageParts(message: ChatMessage): RenderGroup[] {
@@ -25,20 +25,6 @@ export function groupMessageParts(message: ChatMessage): RenderGroup[] {
   for (const [index, part] of message.parts.entries()) {
     if (isTextUIPart(part)) {
       groups.push({ type: "text", key: `text-${index}`, text: part.text });
-      continue;
-    }
-
-    if (isReasoningUIPart(part)) {
-      const last = groups[groups.length - 1];
-      if (last?.type === "reasoning") {
-        last.text += part.text;
-      } else {
-        groups.push({
-          type: "reasoning",
-          key: `reasoning-${index}`,
-          text: part.text,
-        });
-      }
       continue;
     }
 

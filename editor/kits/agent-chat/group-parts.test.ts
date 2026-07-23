@@ -20,19 +20,16 @@ const msg = (...parts: Part[]) =>
   ({ id: "m", role: "assistant", parts }) as ChatMessage;
 
 describe("groupMessageParts", () => {
-  it("keeps text, reasoning, and tools as ordered groups", () => {
+  it("keeps text and tools while dropping reasoning", () => {
     const groups = groupMessageParts(
       msg(text("hi"), reasoning("thinking"), tool("1", "read_file"))
     );
-    expect(groups.map((g) => g.type)).toEqual(["text", "reasoning", "tools"]);
+    expect(groups.map((g) => g.type)).toEqual(["text", "tools"]);
   });
 
-  it("merges consecutive reasoning into one block", () => {
-    const groups = groupMessageParts(
-      msg(reasoning("Plan: "), reasoning("do X"))
-    );
-    expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({ type: "reasoning", text: "Plan: do X" });
+  it("drops reasoning-only content", () => {
+    const groups = groupMessageParts(msg(reasoning("Plan: do X")));
+    expect(groups).toEqual([]);
   });
 
   it("collapses a run of tool calls into one group", () => {

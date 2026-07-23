@@ -39,7 +39,6 @@ import {
   FolderIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
-  SquareTerminalIcon,
 } from "lucide-react";
 import { usePanelRef } from "react-resizable-panels";
 import { Button } from "@app/ui/components/button";
@@ -65,7 +64,11 @@ import {
   matchFileActionShortcut,
   revealInFinder,
 } from "./workbench-file-actions";
-import { isTerminalToggleEvent } from "./workspace-workbench-keybindings";
+import {
+  isTerminalToggleEvent,
+  WORKSPACE_TERMINAL_TOGGLE_COMMAND,
+  WORKSPACE_WORKBENCH_COMMAND_EVENT,
+} from "./workspace-workbench-keybindings";
 import { FileTreePane } from "./file-tree-pane";
 import { EditorPane } from "./editor-pane";
 import { WorkspaceOpenInMenu } from "./workspace-open-in-menu";
@@ -191,25 +194,22 @@ export function WorkspaceWorkbench({
   const [designSearch, setDesignSearch] = useState<DesignSearchSession | null>(
     null
   );
-  // File tree pane visibility. VSCode convention: ⌘B / Ctrl+B
-  // toggles, and the TitleBar carries the persistent toggle button.
+  // File tree pane visibility. It starts hidden so the primary agent + editor
+  // surfaces get the full workspace; ⌘B / Ctrl+B toggles it, and the TitleBar
+  // carries the persistent toggle button.
   // Conditional render (not `display: none`) so the resizable-panel
   // group redistributes space cleanly to the EditorPane when the file tree pane
   // is hidden.
-  const [showTree, setShowTree] = useState(true);
+  const [showTree, setShowTree] = useState(false);
 
-  // Terminal pane (ctrl+` / TitleBar toggle), VSCode-style. Two facts:
-  // `terminalSpawned` — the bottom panel (and its PTY) exists; flips on
-  // first open and back off when the shell exits. `terminalOpen` —
-  // panel is expanded; derived from the panel's onResize so dragging
-  // the handle and the imperative collapse/expand stay in sync without
-  // a second source of truth. Collapse keeps the pane mounted (and the
-  // shell alive); only unmount kills the PTY.
+  // Terminal pane (ctrl+` / native View menu), VSCode-style.
+  // `terminalSpawned` tracks whether the bottom panel (and its PTY) exists;
+  // it flips on first open and back off when the shell exits. Collapse keeps
+  // the pane mounted (and the shell alive); only unmount kills the PTY.
   // Hidden entirely against older desktop binaries whose bridge
   // predates `terminal` (additive capability on protocol 1).
   const supportsTerminal = bridgeTerminal.isSupported();
   const [terminalSpawned, setTerminalSpawned] = useState(false);
-  const [terminalOpen, setTerminalOpen] = useState(false);
   const terminalPanelRef = usePanelRef();
 
   const toggleTerminal = useCallback(() => {
@@ -225,7 +225,6 @@ export function WorkspaceWorkbench({
 
   const handleTerminalSessionEnded = useCallback(() => {
     setTerminalSpawned(false);
-    setTerminalOpen(false);
   }, []);
 
   const bumpTreeRefresh = useCallback(() => {
@@ -327,8 +326,27 @@ export function WorkspaceWorkbench({
           return;
       }
     }
+
+    function onWorkspaceCommand(event: Event) {
+      const command = (event as CustomEvent<unknown>).detail;
+      if (command !== WORKSPACE_TERMINAL_TOGGLE_COMMAND || !supportsTerminal) {
+        return;
+      }
+      toggleTerminal();
+    }
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(
+      WORKSPACE_WORKBENCH_COMMAND_EVENT,
+      onWorkspaceCommand
+    );
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(
+        WORKSPACE_WORKBENCH_COMMAND_EVENT,
+        onWorkspaceCommand
+      );
+    };
   }, [
     toggleTree,
     activeFileRelPath,
@@ -395,26 +413,6 @@ export function WorkspaceWorkbench({
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
             <WorkspaceOpenInMenu workspace={workspace} />
-            {supportsTerminal && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                style={TITLEBAR_NO_DRAG_STYLE}
-                onClick={toggleTerminal}
-                aria-label={
-                  terminalOpen ? "Hide terminal pane" : "Show terminal pane"
-                }
-                aria-pressed={terminalOpen}
-                title={
-                  terminalOpen
-                    ? "Hide terminal pane (⌃`)"
-                    : "Show terminal pane (⌃`)"
-                }
-              >
-                <SquareTerminalIcon />
-              </Button>
-            )}
             <Button
               type="button"
               variant="ghost"
@@ -509,7 +507,6 @@ export function WorkspaceWorkbench({
                   collapsible
                   defaultSize={TERMINAL_PANE_DEFAULT}
                   minSize={TERMINAL_PANE_MIN}
-                  onResize={(size) => setTerminalOpen(size.inPixels > 0)}
                 >
                   <TerminalPane
                     workspace={workspace}

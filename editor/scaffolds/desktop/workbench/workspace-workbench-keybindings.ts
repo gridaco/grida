@@ -2,6 +2,9 @@ import { KeyCode, M, kb, match, type Keybinding } from "@grida/keybinding";
 
 export const WORKSPACE_WORKBENCH_COMMAND_EVENT = "grida:workspace:command";
 
+/** Native View menu command forwarded by Electron main through preload. */
+export const WORKSPACE_TERMINAL_TOGGLE_COMMAND = "workspace.terminal.toggle";
+
 export const WORKSPACE_WORKBENCH_COMMANDS = [
   "workspace.tabs.close-active",
   "workspace.tabs.reopen-closed",
