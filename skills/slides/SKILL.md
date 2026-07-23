@@ -62,10 +62,18 @@ deck stays uniform. Start each from this shape:
 
 ## Show the result
 
-- Once the primary deck is renderable, call `surface_open` once with the
-  workspace-rooted `.canvas` bundle directory (for example,
-  `/Q3 Report.canvas`). Pass the bundle directory, never its `.canvas.json`
+- Treat presentation as the first production milestone, not the final
+  "validate and open" step. For a new deck, create a meaningful valid first
+  slide and a manifest that references it, then call `surface_open` immediately
+  with the workspace-rooted `.canvas` bundle directory (for example,
+  `/Q3 Report.canvas`). Continue adding and refining slides while the user can
+  watch. Do not wait for the full deck, all assets, polish, preview generation,
+  exhaustive validation, or task completion.
+- Never open an empty bundle, a broken manifest, or a manifest whose first
+  slide is missing. Pass the bundle directory, never its `.canvas.json`
   manifest.
+- For an existing primary deck, open it after reading its manifest and before
+  substantial edits.
 - If the `.canvas` bundle itself is mounted as `/` in a dedicated file
   surface, it is already presented; do not call `surface_open` just to reopen
   it.

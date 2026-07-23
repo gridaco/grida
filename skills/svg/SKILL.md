@@ -14,10 +14,21 @@ When you operate on `.svg` files inside a Grida editor session:
 
 ## Show the result
 
-- Once the primary artifact is renderable, call `surface_open` once with its
-  workspace-rooted path (for example, `/poster.svg`). Open a standalone SVG by
-  its file path; when the SVG belongs to a `.canvas` board or deck, open the
-  `.canvas` bundle directory, never its `.canvas.json` manifest.
+- Treat presentation as the first production milestone, not the final
+  "validate and open" step. For a new standalone SVG, write a meaningful valid
+  first frame with the intended dimensions and basic visible composition, call
+  `surface_open` immediately with its workspace-rooted path (for example,
+  `/poster.svg`), then continue adding and refining details while the user can
+  watch. Do not wait for complete content, polish, preview generation,
+  exhaustive validation, or task completion. For nontrivial work,
+  intentionally start with the basic frame instead of authoring the finished
+  SVG before opening it.
+- Never open an empty or invalid SVG. For an existing primary SVG, open it
+  before substantial edits.
+- Open a standalone SVG by its file path. When the SVG belongs to a `.canvas`
+  board or deck, the board/deck skill owns presentation: open the `.canvas`
+  bundle directory once its manifest references a valid document, never the
+  internal SVG or `.canvas.json` manifest.
 - If the standalone SVG or `.canvas` bundle is already mounted at the dedicated
   file surface's root, it is already presented; do not call `surface_open` just
   to reopen it.

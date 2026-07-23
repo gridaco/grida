@@ -36,6 +36,18 @@ describe("workspace surface capability hint", () => {
     expect(hint).toMatch(/opened/i);
   });
 
+  it("presents the first meaningful checkpoint before finishing the work", () => {
+    const hint = surfaceHint(true);
+    expect(hint).toMatch(/early progress\s+milestone/i);
+    expect(hint).toMatch(/smallest meaningful valid version/i);
+    expect(hint).toMatch(/open it\s+immediately/i);
+    expect(hint).toMatch(/keep refining/i);
+    expect(hint).toMatch(/do not author the finished artifact/i);
+    expect(hint).toMatch(/do not wait for complete content, polish/i);
+    expect(hint).toMatch(/final `validate and open` step/i);
+    expect(hint).toMatch(/never open an empty, broken/i);
+  });
+
   it("uses the same workspace-rooted path vocabulary as filesystem tools", () => {
     const hint = surfaceHint(true);
     expect(hint).toMatch(/absolute agent-filesystem/i);

@@ -133,15 +133,35 @@ behavior.
 
 ## Agent presentation policy
 
-The agent opens the primary user-facing artifact when it is ready to be
-viewed.
+The agent opens the primary user-facing artifact at its first meaningful
+renderable checkpoint so the user can watch the remaining work develop.
+
+A meaningful renderable checkpoint is the earliest non-empty state the host
+can show without a structural or parse error. It communicates the intended
+frame or direction, but it does not need complete content, final assets,
+polish, exhaustive validation, or final verification. A bundle reaches this
+checkpoint when its valid manifest references at least one existing,
+renderable document.
 
 For canvas work:
 
-1. create or update the `.canvas` bundle;
-2. reach a renderable state;
+1. choose the basic direction;
+2. create a minimal but meaningful valid document and bundle manifest;
 3. call `surface_open` with the bundle path;
-4. continue the task regardless of the presentation result.
+4. continue production, refinement, and validation while the surface remains
+   visible;
+5. finish without reopening the same surface.
+
+Presentation is an early progress milestone, not a final "validate and open"
+step. The agent does not delay it for complete content, preview generation,
+polish, or task completion. For nontrivial creation, the agent intentionally
+establishes a lightweight first checkpoint instead of authoring the finished
+artifact before opening it. It also does not open an empty document, an invalid
+artifact, or a bundle whose referenced document is missing.
+
+When the primary artifact already exists, the agent opens it before substantial
+edits so the user can observe the change. A dedicated artifact editor already
+satisfies this policy because its artifact is visible from the start.
 
 The agent opens an artifact again only when intentionally switching the
 primary view or when the user asks to see it. It does not call

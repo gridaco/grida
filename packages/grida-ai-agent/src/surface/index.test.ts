@@ -50,6 +50,17 @@ describe("AgentSurface.createTools", () => {
     ).toBe(false);
   });
 
+  it("describes presentation as an early renderable milestone", () => {
+    const description = AgentSurface.createTools().surface_open.description;
+
+    expect(description).toMatch(/first meaningful renderable checkpoint/i);
+    expect(description).toMatch(
+      /before authoring final content, polishing, validating/i
+    );
+    expect(description).toMatch(/then continue working/i);
+    expect(description).toMatch(/do not request an empty, broken/i);
+  });
+
   it("acknowledges a request without claiming the renderer opened it", async () => {
     const tools = AgentSurface.createTools({
       snapshot: {

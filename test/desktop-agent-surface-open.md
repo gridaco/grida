@@ -16,9 +16,14 @@ covered_by:
 
 ## Behavior
 
-When the agent produces a primary visual artifact, Grida should present that
-artifact in the current Desktop workspace as soon as it is renderable. The
-request is idempotent and auxiliary: it may open a new tab or activate an
+When the agent produces a primary visual artifact, Grida should present its
+first meaningful renderable checkpoint in the current Desktop workspace, then
+continue working while the user watches it develop. Presentation is an early
+production milestone rather than the last action after polish and validation.
+The checkpoint must contain meaningful visible content and be structurally
+valid; an empty or broken scaffold is not progress.
+
+The request is idempotent and auxiliary: it may open a new tab or activate an
 existing one, but it never creates authority, duplicates a tab, repeatedly
 steals focus, or owns continuation of the agent's underlying work.
 
@@ -28,10 +33,11 @@ must not reveal a permanently pending presentation call.
 
 ## Steps
 
-1. Open a workspace in Grida Desktop and ask the agent to create one SVG
-   artifact.
-   - Expected: once the file is renderable, it opens as the active workbench
-     tab without requiring another user action.
+1. Open a workspace in Grida Desktop and ask the agent to create a moderately
+   detailed SVG artifact.
+   - Expected: once a valid first frame with meaningful visible content exists,
+     it opens as the active workbench tab while the agent is still working.
+     Later edits become visible before the final assistant response.
 2. Ask the agent to continue editing the same SVG.
    - Expected: the existing tab is activated if needed; no duplicate tab is
      created and normal writes do not repeatedly flash or steal focus.
@@ -39,8 +45,10 @@ must not reveal a permanently pending presentation call.
    - Expected: the user's navigation wins. The agent does not pull focus back
      unless it makes a new intentional presentation request.
 4. Ask the agent to create a `.canvas` bundle.
-   - Expected: the bundle directory opens as one artifact. Its internal
-     `.canvas.json` file is not opened as a separate surface.
+   - Expected: after the valid manifest references its first meaningful
+     document, the bundle directory opens as one artifact and the agent
+     continues refining it. Its internal `.canvas.json` file is not opened as a
+     separate surface.
 5. Start another artifact-creation request and close the window while the agent
    is still working. Wait for the run to finish, then reopen the workspace and
    conversation.

@@ -167,8 +167,13 @@ export namespace AgentSurface {
           "workspace-rooted absolute vocabulary as the filesystem tools. It " +
           "may name a file or a recognized bundle directory. This is " +
           "presentation only: it does not create, edit, attach, branch, or " +
-          "grant access to the artifact. A successful result acknowledges " +
-          "only the request, not the renderer's final state.",
+          "grant access to the artifact. For nontrivial creation, " +
+          "intentionally establish and request the first meaningful " +
+          "renderable checkpoint before authoring final content, polishing, " +
+          "validating, or completing the task, then continue working. Do not " +
+          "request an empty, broken, or structurally incomplete target. A " +
+          "successful result acknowledges only the request, not the " +
+          "renderer's final state.",
         inputSchema: OPEN_INPUT,
         outputSchema: OPEN_OUTPUT,
         execute: async ({ path }): Promise<OpenOutput> =>

@@ -64,10 +64,21 @@ a linear **deck / presentation / pitch / slideshow**, use the `slides` skill.
 
 ## Show the result
 
-- Once the primary board is renderable, call `surface_open` once with the
-  workspace-rooted `.canvas` bundle directory (for example,
-  `/poster.canvas`). Pass the bundle directory, never its `.canvas.json`
+- Treat presentation as the first production milestone, not the final
+  "validate and open" step. For a new board, establish a meaningful renderable
+  checkpoint early: the manifest references at least one existing, valid
+  document with a basic visible composition. Call `surface_open` immediately
+  with the workspace-rooted `.canvas` bundle directory (for example,
+  `/poster.canvas`), then continue building and polishing it while the user can
+  watch. Intentionally use a lightweight initial composition instead of
+  authoring the finished board before opening it. Do not wait for all content,
+  assets, polish, preview generation, exhaustive validation, or task
+  completion.
+- Never open an empty bundle, a broken manifest, or a manifest whose first
+  document is missing. Pass the bundle directory, never its `.canvas.json`
   manifest.
+- For an existing primary board, open it after reading its manifest and before
+  substantial edits.
 - If the `.canvas` bundle itself is mounted as `/` in a dedicated file
   surface, it is already presented; do not call `surface_open` just to reopen
   it.
