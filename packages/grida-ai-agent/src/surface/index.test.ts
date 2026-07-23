@@ -149,6 +149,11 @@ describe("AgentSurface.parseSnapshot", () => {
     open.push("/later.md");
     expect(snapshot.open).toEqual(["/brief.md"]);
   });
+
+  it("rejects snapshots large enough to inflate model context", () => {
+    const open = Array.from({ length: 51 }, (_, index) => `/doc-${index}.md`);
+    expect(AgentSurface.parseSnapshot({ active: null, open })).toBeUndefined();
+  });
 });
 
 describe("AgentSurface.observeToolCall", () => {

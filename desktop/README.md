@@ -80,11 +80,15 @@ pnpm --dir desktop dev
 Desktop commands build their linked packages first. Turbo reuses cached
 outputs when their sources have not changed.
 
-In development, `pnpm --dir desktop dev` launches Electron only.
-Run the editor dev server separately:
+In one terminal, start the editor dev server:
 
 ```bash
 pnpm --filter editor dev
+```
+
+In a second terminal, start Electron:
+
+```bash
 pnpm --dir desktop dev
 ```
 

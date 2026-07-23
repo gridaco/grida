@@ -107,9 +107,11 @@ export namespace AgentSurface {
 
   const LIST_OPEN_INPUT = z.object({}).strict();
 
+  const SNAPSHOT_OPEN_LIMIT = 50;
+
   const SNAPSHOT_FIELDS = {
     active: PATH.nullable(),
-    open: z.array(PATH),
+    open: z.array(PATH).max(SNAPSHOT_OPEN_LIMIT),
   } as const;
 
   const SNAPSHOT = z

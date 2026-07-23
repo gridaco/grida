@@ -74,9 +74,9 @@ a linear **deck / presentation / pitch / slideshow**, use the `slides` skill.
   authoring the finished board before opening it. Do not wait for all content,
   assets, polish, preview generation, exhaustive validation, or task
   completion.
-- Never open an empty bundle, a broken manifest, or a manifest whose first
-  document is missing. Pass the bundle directory, never its `.canvas.json`
-  manifest.
+- Never open an empty bundle or a broken manifest. Open only when the manifest
+  references at least one existing, renderable document. Pass the bundle
+  directory, never its `.canvas.json` manifest.
 - For an existing primary board, open it after reading its manifest and before
   substantial edits.
 - If the `.canvas` bundle itself is mounted as `/` in a dedicated file

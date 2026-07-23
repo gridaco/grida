@@ -172,6 +172,9 @@ function ModeBody({
           onSaved={onSaved}
         />
       );
+    default:
+      mode satisfies never;
+      return null;
   }
 }
 
