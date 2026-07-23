@@ -35,23 +35,27 @@ Before you start, ensure you have the following installed on your Mac:
 
 ```bash
 git clone https://github.com/gridaco/grida.git
-cd grida/desktop
+cd grida
 ```
 
 2. Install Dependencies
 
 ```bash
 pnpm install
+pnpm --dir desktop install
 ```
+
+The Desktop commands build their linked root-workspace packages before they
+run, using Turbo's cache when those packages are already current.
 
 3. Configure Environment Variables
 
-Create a .env file in the project root (if required) using the provided .env.example as a guide.
+Create `desktop/.env` if required, using `desktop/.env.example` as a guide.
 
 ## Development Workflow
 
 ```bash
-pnpm run dev
+pnpm --dir desktop dev
 ```
 
 ## Troubleshooting Mono and Wine Installation

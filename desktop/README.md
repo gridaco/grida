@@ -67,19 +67,29 @@ See the [CONTRIBUTING.md](CONTRIBUTING.md) file for instructions on how to build
 
 **Quick Start**
 
-Note: the `/desktop` directory has its own `pnpm-workspace.yaml` file, so you need to run `pnpm install` in the `/desktop` directory.
+The `/desktop` directory is a separate pnpm workspace, while the Grida
+packages it links are built by the root workspace. Install both from the
+repository root:
 
 ```bash
 pnpm install
-pnpm dev
+pnpm --dir desktop install
+pnpm --dir desktop dev
 ```
 
-In development, `pnpm dev` in this directory launches Electron only.
-Run the editor dev server separately:
+Desktop commands build their linked packages first. Turbo reuses cached
+outputs when their sources have not changed.
+
+In one terminal, start the editor dev server:
 
 ```bash
 pnpm --filter editor dev
-cd desktop && pnpm dev
+```
+
+In a second terminal, start Electron:
+
+```bash
+pnpm --dir desktop dev
 ```
 
 ## Testing

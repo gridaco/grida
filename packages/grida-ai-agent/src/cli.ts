@@ -164,7 +164,7 @@ async function serveCommand(args: string[]): Promise<void> {
     );
   }
   // A `serve` daemon is the host the desktop-from-web bridge drives — a human
-  // is present, so the `question` tool pauses for their answer (interactive).
+  // is present, so `question` may resolve through the attached client.
   const host = await createHost(config, flags, true);
   await host.start();
   process.stdout.write(`PORT=${host.port}\n`);
@@ -359,10 +359,10 @@ export async function runCommand(
       // `--mode accept-edits` is honored for callers that drive approvals.
       mode: workspaceId ? (mode ?? "auto") : mode,
       ...(modelId ? { model_id: modelId } : {}),
-      // A one-shot `run` has no UI to answer the `question` tool — and it may
-      // target a daemon that IS interactive for a web client. Declare headless
-      // per-run so `question` returns its fixed refusal instead of pausing this
-      // run forever (and leaving the session stuck on `human-input-pending`).
+      // A one-shot `run` has no UI to answer `question`, and it may target a
+      // daemon that IS interactive for a web client. Declare headless per-run
+      // so question refuses instead of leaving input pending forever. It also
+      // omits a surface snapshot, independently making presentation headless.
       interactive: false,
     },
     (chunk) => {

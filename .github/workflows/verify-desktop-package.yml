@@ -48,6 +48,9 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify linked package command coverage
+        run: pnpm exec vitest run scripts/linked-packages.test.ts
+
       - name: Build linked workspace packages
         # The desktop bundles several @grida/* workspace packages whose dist/ is
         # gitignored; build their closure from the repo root so the Vite build

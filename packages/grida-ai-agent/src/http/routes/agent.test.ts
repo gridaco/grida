@@ -671,6 +671,7 @@ describe("HTTP wire — session-scoped directory references", () => {
   let capturedRuns: Array<{
     messages: Array<{ parts?: Array<{ text?: string }> }>;
     directory_scopes?: Array<{ id: string; root: string; path: string }>;
+    surface?: { active: string | null; open: string[] };
   }>;
 
   beforeEach(async () => {
@@ -742,7 +743,13 @@ describe("HTTP wire — session-scoped directory references", () => {
     const response = await app.request("/agent/run", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: [messageWith(descriptor, "u-dir")] }),
+      body: JSON.stringify({
+        messages: [messageWith(descriptor, "u-dir")],
+        surface: {
+          active: "/poster.canvas",
+          open: ["/poster.canvas", "/brief.md"],
+        },
+      }),
     });
     expect(response.status).toBe(200);
     const sessionId = sessionIdFromSse(await response.text());
@@ -750,6 +757,10 @@ describe("HTTP wire — session-scoped directory references", () => {
 
     expect(directoryScopes.forSession(sessionId)).toHaveLength(1);
     expect(capturedRuns).toHaveLength(1);
+    expect(capturedRuns[0].surface).toEqual({
+      active: "/poster.canvas",
+      open: ["/poster.canvas", "/brief.md"],
+    });
     expect(capturedRuns[0].directory_scopes).toEqual([
       expect.objectContaining({
         id: descriptor.id,

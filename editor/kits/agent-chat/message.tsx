@@ -6,7 +6,6 @@
  *
  *   - `Message` / `MessageContent` / `MessageResponse` — role-aware
  *     bubble framing with Streamdown-backed Markdown rendering.
- *   - `Reasoning` — collapsible "thinking" block for reasoning parts.
  *   - `Task` — stock ai-elements collapsible. Every tool call renders as
  *     a compact `Task` row; a run of consecutive calls nests those rows
  *     inside one summary `Task` (title from `toolDisplay.summarize`).
@@ -67,11 +66,6 @@ import {
   MessageContent,
   MessageResponse,
 } from "@app/ui/ai-elements/message";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from "@app/ui/ai-elements/reasoning";
 import { Shimmer } from "@app/ui/ai-elements/shimmer";
 import { ToolOutput } from "@app/ui/ai-elements/tool";
 import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
@@ -308,10 +302,10 @@ export function ChatMessageView({
   // is reserved for user messages, the assistant's response flows like
   // a document. Matches the web panel's `w-full max-w-none` on
   // `<Message from="assistant">`.
-  const hasContent = message.parts.length > 0;
   const groups = groupMessageParts(message);
-  // Copyable response = the assistant's visible text only (reasoning and
-  // tool calls are excluded). Multiple text parts can be split by tool
+  const hasVisibleContent = groups.length > 0;
+  // Copyable response = the assistant's visible text only (non-text parts are
+  // excluded). Multiple text parts can be split by tool
   // calls, so rejoin them with blank lines to preserve paragraph breaks.
   const responseText = message.parts
     .filter(isTextUIPart)
@@ -320,7 +314,7 @@ export function ChatMessageView({
   return (
     <Message from="assistant" className="w-full max-w-none">
       <MessageContent className="w-full max-w-full text-[13px]">
-        {groups.map((group, groupIndex) => {
+        {groups.map((group) => {
           if (group.type === "text") {
             return (
               <MessageResponse
@@ -333,22 +327,9 @@ export function ChatMessageView({
               </MessageResponse>
             );
           }
-          if (group.type === "reasoning") {
-            return (
-              <Reasoning
-                key={group.key}
-                isStreaming={
-                  Boolean(isStreaming) && groupIndex === groups.length - 1
-                }
-              >
-                <ReasoningTrigger />
-                <ReasoningContent>{group.text}</ReasoningContent>
-              </Reasoning>
-            );
-          }
           return <ToolCallGroupView key={group.key} entries={group.entries} />;
         })}
-        {isStreaming && !hasContent && (
+        {isStreaming && !hasVisibleContent && (
           <Shimmer className="text-xs">Thinking</Shimmer>
         )}
       </MessageContent>

@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { DesktopFileShell } from "@/scaffolds/desktop/file/file-shell";
+import { LastWorkspaceMarker } from "@/scaffolds/desktop/shared/last-workspace-marker";
 
 /**
  * Desktop **file window** — the single dedicated editor route for one thing:
@@ -38,6 +39,13 @@ function DesktopFilePageInner() {
   // shell cleanly (fresh editor + AgentFs).
   return (
     <div className="h-dvh">
+      {workspaceId && !docId && (
+        <LastWorkspaceMarker
+          workspaceId={workspaceId}
+          surface="canvas"
+          basePath={basePath}
+        />
+      )}
       <DesktopFileShell
         key={docId ?? `${workspaceId}:${basePath}`}
         docId={docId}

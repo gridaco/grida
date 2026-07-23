@@ -1,11 +1,11 @@
 /**
- * Shared header strip used by the desktop chat panels — session picker
- * + "New chat" + a per-chat actions menu (rename, copy session id,
- * delete). The same `SessionActionsMenu` ("…") is used both on the
- * current chat in the header and on every row of the hover session
- * list, so the action set stays identical. Rename happens in a small
- * dialog so it works for any session (current or not) without switching
- * the active chat.
+ * Shared header strip used by the desktop chat panels — chat-list button,
+ * inline-editable current title, "New chat", and a per-chat actions menu
+ * (rename, copy session id, delete). The same `SessionActionsMenu` ("…") is
+ * used both on the current chat in the header and on every row of the session
+ * list, so the action set stays identical. Rename always switches to that chat
+ * and activates the one inline title editor.
+ * (see test/desktop-chat-session-header.md)
  *
  * Both `ai-sidebar/chat.tsx` and `workbench/agent-pane.tsx` consume
  * this. The picker reads its data from a `useChatSession()` result; the
@@ -15,13 +15,14 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
-  ChevronDownIcon,
   CopyIcon,
   EllipsisVerticalIcon,
+  ListIcon,
   MessageSquarePlusIcon,
   PencilIcon,
+  PlusIcon,
   Trash2Icon,
 } from "lucide-react";
 import {
@@ -34,14 +35,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@app/ui/components/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@app/ui/components/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,7 +63,7 @@ export type ChatSessionPickerProps = {
   session: UseChatSessionResult;
   /** Optional left-edge icon (e.g. SparklesIcon for the standalone-doc sidebar). */
   icon?: React.ReactNode;
-  /** Label shown when no session is active (e.g. "Agent"). */
+  /** Label shown when no session is active (e.g. "New Task"). */
   defaultTitle: string;
   /**
    * Called when the user picks a different session. The panel uses
@@ -99,39 +92,13 @@ export function ChatSessionPicker({
   className,
 }: ChatSessionPickerProps) {
   const [draft, setDraft] = useState("");
-  // The session being renamed (in the rename dialog), or null when closed.
+  // The session being renamed in the header title, or null when not editing.
   const [renameTargetId, setRenameTargetId] = useState<string | null>(null);
+  // Prevent Enter/Escape from being reinterpreted by the input's subsequent
+  // blur as a second commit. Reset for every new inline-edit session.
+  const renameExitRef = useRef<"commit" | "cancel" | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-
-  // The session-list dropdown opens on hover, not just click. Radix's
-  // DropdownMenu has no hover trigger, so we control `open` and drive it
-  // from pointer enter/leave on both the trigger and the content. A short
-  // close delay bridges the gap between the two (the content is portaled a
-  // few px below the trigger) so the menu doesn't flicker shut while the
-  // pointer crosses it. Click still toggles it via `onOpenChange`.
-  const [menuOpen, setMenuOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Set while a row's "…" actions menu is open. The actions menu portals
-  // outside the list content, so moving the pointer onto it fires the
-  // list's mouseleave — without this guard the list would close out from
-  // under the open menu.
-  const actionsOpenRef = useRef(false);
-  const cancelClose = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
-  const openMenu = () => {
-    cancelClose();
-    setMenuOpen(true);
-  };
-  const scheduleClose = () => {
-    if (actionsOpenRef.current) return;
-    cancelClose();
-    closeTimer.current = setTimeout(() => setMenuOpen(false), 150);
-  };
-  useEffect(() => cancelClose, []);
+  const [listOpen, setListOpen] = useState(false);
 
   const current = session.sessions.find((s) => s.id === session.current_id);
   const currentTitle = current?.title ?? defaultTitle;
@@ -145,10 +112,15 @@ export function ChatSessionPicker({
   const hideNewChat = session.current_id === null && conversationEmpty;
 
   const openRename = (s: SessionRow) => {
+    setListOpen(false);
+    if (s.id !== session.current_id) onSelect(s.id);
+    renameExitRef.current = null;
     setDraft(s.title);
     setRenameTargetId(s.id);
   };
   const commitRename = async () => {
+    if (renameExitRef.current !== null) return;
+    renameExitRef.current = "commit";
     const id = renameTargetId;
     const next = draft.trim();
     setRenameTargetId(null);
@@ -162,14 +134,6 @@ export function ChatSessionPicker({
     }
   };
 
-  // Keep the hover list open while a row's actions menu is open; resume
-  // the normal close-on-leave behaviour once it closes.
-  const onRowActionsOpenChange = (open: boolean) => {
-    actionsOpenRef.current = open;
-    if (open) cancelClose();
-    else scheduleClose();
-  };
-
   return (
     <>
       <header
@@ -179,27 +143,20 @@ export function ChatSessionPicker({
         )}
       >
         {icon}
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
+        <DropdownMenu open={listOpen} onOpenChange={setListOpen} modal={false}>
           <DropdownMenuTrigger asChild>
-            <button
+            <Button
               type="button"
-              onMouseEnter={openMenu}
-              onMouseLeave={scheduleClose}
-              // Fit-to-content, not flex-1: a grown trigger turns the empty
-              // space beside a short title into a hover target that opens the
-              // menu. `min-w-0` keeps it shrinkable so long titles truncate.
-              className="flex min-w-0 items-center gap-1 truncate text-left text-muted-foreground hover:text-foreground"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Open chat list"
+              title="Open chat list"
+              className="shrink-0"
             >
-              <span className="truncate">{currentTitle}</span>
-              <ChevronDownIcon className="size-3 shrink-0" />
-            </button>
+              <ListIcon className="size-3.5" />
+            </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="w-64"
-            onMouseEnter={openMenu}
-            onMouseLeave={scheduleClose}
-          >
+          <DropdownMenuContent align="start" className="w-64">
             <DropdownMenuItem onSelect={() => onSelect(null)}>
               <MessageSquarePlusIcon className="size-3.5" />
               New chat
@@ -219,12 +176,48 @@ export function ChatSessionPicker({
                   session={s}
                   onRename={openRename}
                   onDelete={setDeleteTargetId}
-                  onOpenChange={onRowActionsOpenChange}
                 />
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        {renameTargetId !== null ? (
+          <Input
+            value={draft}
+            autoFocus
+            aria-label="Chat title"
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => {
+              if (renameExitRef.current === null) void commitRename();
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void commitRename();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                renameExitRef.current = "cancel";
+                setRenameTargetId(null);
+              }
+            }}
+            className="h-7 min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 py-0 text-xs font-medium text-muted-foreground shadow-none transition-none focus-visible:border-transparent focus-visible:ring-0 md:text-xs dark:bg-transparent"
+          />
+        ) : (
+          <span
+            className={cn(
+              "min-w-0 truncate text-muted-foreground",
+              current && "cursor-text"
+            )}
+            title={current ? "Double-click to rename" : currentTitle}
+            onDoubleClick={() => {
+              if (current) openRename(current);
+            }}
+          >
+            {currentTitle}
+          </span>
+        )}
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {!hideNewChat && (
             <Button
@@ -235,7 +228,7 @@ export function ChatSessionPicker({
               aria-label="New chat"
               title="New chat"
             >
-              <MessageSquarePlusIcon className="size-3.5" />
+              <PlusIcon className="size-3.5" />
             </Button>
           )}
           {current && (
@@ -247,39 +240,6 @@ export function ChatSessionPicker({
           )}
         </div>
       </header>
-
-      <Dialog
-        open={renameTargetId !== null}
-        onOpenChange={(open) => {
-          if (!open) setRenameTargetId(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Rename chat</DialogTitle>
-            <DialogDescription>Give this chat a new name.</DialogDescription>
-          </DialogHeader>
-          <Input
-            value={draft}
-            autoFocus
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void commitRename();
-              }
-            }}
-            placeholder="Chat name"
-            className="text-sm"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameTargetId(null)}>
-              Cancel
-            </Button>
-            <Button onClick={() => void commitRename()}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog
         open={deleteTargetId !== null}
@@ -318,23 +278,19 @@ export function ChatSessionPicker({
 /**
  * The "…" actions menu for a single chat — Rename, Copy session ID,
  * Delete. Used both on the current chat in the header and on each row of
- * the hover session list, so the two stay in lock-step. Pass
- * `onOpenChange` from a row so the hover list can stay open while this
- * menu is.
+ * the session list, so the two stay in lock-step.
  */
 function SessionActionsMenu({
   session: s,
   onRename,
   onDelete,
-  onOpenChange,
 }: {
   session: SessionRow;
   onRename: (s: SessionRow) => void;
   onDelete: (id: string) => void;
-  onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <DropdownMenu modal={false} onOpenChange={onOpenChange}>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"

@@ -4,10 +4,10 @@
  *
  * The agent runs inside the agent sidecar (fs bound to a `NodeFsBackend` rooted
  * at `workspace.root`, plus agent-sidecar internal shell wired through the
- * existing allowlist + cwd-containment checks). The renderer is
- * observe-only for tool calls — no renderer `onToolCall` resolver is
- * supplied, so agent sidecar-owned tool chunks flow straight through the AI
- * SDK UI-message stream.
+ * existing allowlist + cwd-containment checks). Filesystem and command tools
+ * resolve in the sidecar. Surface tools are acknowledged there too; the
+ * renderer only observes `surface_open` as a fire-and-forget request to focus
+ * a visible workbench tab.
  *
  * Per /sdk-design — this file is a *view*. The headless brain lives
  * in `@/lib/agent-chat` (the bridge `ChatTransport` and display
@@ -33,6 +33,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Chat, useChat } from "@ai-sdk/react";
+import type { AgentSurface } from "@grida/agent/surface";
 import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type UIMessage,
@@ -67,6 +68,7 @@ import {
   isSessionBusy,
   ScratchSeedBudget,
   StreamAttachOwner,
+  SurfaceToolCallObserver,
   useChatSession,
   useCoreTurnSync,
   useRefreshOnStreamEnd,
@@ -107,9 +109,12 @@ import {
   type ComposerCommandAction,
 } from "../shared/agent-composer-input";
 import { useWorkspaceComposerCatalog } from "../shared/use-workspace-composer-catalog";
+import styles from "./agent-pane.module.css";
 
 export type AgentPaneProps = {
   workspace: Workspace;
+  /** Host-owned artifact presentation for this workbench's editor group. */
+  surfaceHost: AgentSurface.Host;
   /** The file currently in focus in the editor pane. */
   activeRelPath?: string | null;
   className?: string;
@@ -130,6 +135,7 @@ export type AgentPaneProps = {
 
 export function AgentPane({
   workspace,
+  surfaceHost,
   activeRelPath = null,
   className,
   onMaybeMutated,
@@ -140,6 +146,7 @@ export function AgentPane({
     <div className={cn("flex h-full flex-col bg-background", className)}>
       <AgentPaneContent
         workspace={workspace}
+        surfaceHost={surfaceHost}
         activeRelPath={activeRelPath}
         onMaybeMutated={onMaybeMutated}
         onDesignSearchChange={onDesignSearchChange}
@@ -153,6 +160,7 @@ type AgentPaneContentProps = Omit<AgentPaneProps, "className">;
 
 function AgentPaneContent({
   workspace,
+  surfaceHost,
   onMaybeMutated,
   onDesignSearchChange,
   onOpenPicker,
@@ -250,10 +258,14 @@ function AgentPaneContent({
   // ("No tool invocation found"), the run never renders, and the approval bar
   // never clears until a hard refresh re-hydrates from the DB.
   const chatRef = useRef<Chat<UIMessage> | null>(null);
-  // Live run-context (current model/provider/mode) the transport backfills onto
-  // body-less sends — the question/tool auto-resubmit — so a resume keeps the
-  // session's model + posture instead of resetting them. Assigned below once the
-  // pickers resolve; read fresh per send via the getter.
+  // Keep the latest workbench adapter behind a ref so its identity can never
+  // rebuild the session-bound Chat instance.
+  const surfaceHostRef = useRef(surfaceHost);
+  surfaceHostRef.current = surfaceHost;
+  // Live run-context (current model/provider/mode and surface snapshot) the
+  // transport backfills onto body-less sends — the question/tool auto-resubmit
+  // — so a resume keeps the session's model, posture, and truthful turn-start
+  // presentation state. Read fresh per send via the getter.
   const runContextRef = useRef<Partial<Omit<AgentRunOptions, "messages">>>({});
   // The single authority over stream starts/attaches for this pane
   // (`stream-attach-owner.ts`): the approval resume, the mount/rebuild
@@ -262,8 +274,9 @@ function AgentPaneContent({
   // (session, epoch), never on Chat identity.
   const attachOwner = useMemo(() => new StreamAttachOwner(), []);
   const chat = useMemo(
-    () =>
-      new Chat<UIMessage>({
+    () => {
+      const surfaceToolCallObserver = new SurfaceToolCallObserver();
+      return new Chat<UIMessage>({
         id: chatSession.current_id ?? undefined,
         messages: chatSession.initial_messages,
         transport: desktopAgentTransport.create({
@@ -293,15 +306,25 @@ function AgentPaneContent({
             }
           },
         }),
-        // Resume after a CLIENT-resolved tool result lands. fs/todos/command are
-        // server-resolved (the sidecar completes the loop in-stream, ending on
-        // text — never a dangling tool call), so this fires for the human-input
-        // tools answered via their pinned cards: `question` and `design_search`
-        // (the pick card). Once the result lands the message becomes
-        // complete-with-tool-calls and the paused run resumes. Approval pauses
-        // are NOT affected (an approval-requested call has no result).
+        // Resume after a CLIENT-resolved tool result lands. fs/todos/command and
+        // surface tools are server-resolved (the sidecar completes the loop
+        // in-stream, ending on text — never a dangling tool call), so this fires
+        // for the human-input tools answered via their pinned cards: `question`
+        // and `design_search` (the pick card). Once the result lands the message
+        // becomes complete-with-tool-calls and the paused run resumes. Approval
+        // pauses are NOT affected (an approval-requested call has no result).
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
-      }),
+        onToolCall: ({ toolCall }) => {
+          // Manual behavior contract: test/desktop-agent-surface-open.md
+          surfaceToolCallObserver.observe(surfaceHostRef.current, {
+            tool_name: toolCall.toolName,
+            tool_call_id: toolCall.toolCallId,
+            input: toolCall.input,
+            dynamic: toolCall.dynamic,
+          });
+        },
+      });
+    },
     // Rebuild ONLY on a real rebinding — `epoch` bumps on select/start-new/
     // restore/archive-of-current and deliberately NOT on hydration or the
     // mid-stream id adoption (`apply_resolved_session_id`). Keying on
@@ -481,6 +504,7 @@ function AgentPaneContent({
     model_id: modelId,
     mode,
     ...(providerId ? { provider_id: providerId } : {}),
+    surface: surfaceHostRef.current.listOpen(),
   };
 
   const {
@@ -765,31 +789,40 @@ function AgentPaneContent({
     <div className="flex min-h-0 flex-1 flex-col">
       <ChatSessionPicker
         session={chatSession}
-        defaultTitle="Agent"
+        defaultTitle="New Task"
         onSelect={(id) => chatSession.select(id)}
         conversationEmpty={messages.length === 0}
+        className="border-b-0"
       />
-      <Conversation
-        className="flex-1 min-h-0"
-        initial="instant"
-        resize={conversationResize}
-      >
-        <ConversationContent className="gap-4 px-3 py-4">
-          {/* Empty state intentionally omitted — the chat starts blank
-              and the prompt input below is the only affordance the
-              user needs to begin. No "Ask the workspace agent" hero,
-              no example prompts; the surface stays quiet until used. */}
-          {settledList}
-          {pendingTurn && <PendingTurnIndicator />}
-          {compacting && <CompactingIndicator />}
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
+      <div className="relative min-h-0 flex-1">
+        <Conversation
+          className="h-full min-h-0"
+          initial="instant"
+          resize={conversationResize}
+        >
+          <ConversationContent
+            className="gap-4 px-3 py-4"
+            scrollClassName={cn(
+              styles.chatScroll,
+              "scroll-fade-y scroll-fade-4"
+            )}
+          >
+            {/* Empty state intentionally omitted — the chat starts blank
+                and the prompt input below is the only affordance the
+                user needs to begin. No "Ask the workspace agent" hero,
+                no example prompts; the surface stays quiet until used. */}
+            {settledList}
+            {pendingTurn && <PendingTurnIndicator />}
+            {compacting && <CompactingIndicator />}
+          </ConversationContent>
+          <ConversationScrollButton className="z-20" />
+        </Conversation>
+      </div>
 
       {justForked && <ForkedNotice />}
 
       {error && (
-        <div className="flex items-start gap-2 border-t bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div className="flex items-start gap-2 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {/* GRIDA-SEC-006 — the two hosted-AI codes cross the bridge as
               bare code-led messages; translate to actionable copy. A
               token-expired error also fires a background re-mint so the
@@ -844,7 +877,7 @@ function AgentPaneContent({
           a dedicated tab. This note keeps the request visible here and reopens
           the tab if the user closed it. */}
       {pendingPick && (
-        <div className="shrink-0 border-t p-3">
+        <div className="shrink-0 p-3">
           <button
             type="button"
             onClick={() => onOpenPicker?.()}
@@ -862,7 +895,7 @@ function AgentPaneContent({
         </div>
       )}
 
-      <div className="shrink-0 border-t p-3">
+      <div className="shrink-0 p-3">
         <AgentComposerInput
           catalog={catalog}
           commandActions={commandActions}
@@ -964,7 +997,7 @@ function AgentApprovalBar({
   ) => void | Promise<void>;
 }) {
   return (
-    <div className="shrink-0 border-t bg-muted/30 px-3 py-2.5">
+    <div className="shrink-0 bg-muted/30 px-3 py-2.5">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-muted-foreground">

@@ -1,0 +1,14 @@
+.decorativeOverflow {
+  overflow: visible !important;
+}
+
+/*
+ * react-resizable-panels renders each Panel as two wrappers. `className`
+ * belongs to the inner wrapper, while the generated outer wrapper owns an
+ * inline `overflow: hidden`. Floating workbench surfaces need to paint their
+ * shadows through that outer boundary, so opt in only the panels that host
+ * those surfaces.
+ */
+.decorativeOverflow > [data-workbench-decorative-overflow] {
+  overflow: visible !important;
+}

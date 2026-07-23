@@ -6,7 +6,11 @@ import create_menu, {
   focus_or_open_canvas_window,
   rebuild_application_menu,
 } from "./menu";
-import { open_welcome_window, open_document_window } from "./window";
+import {
+  open_welcome_window,
+  open_startup_window,
+  open_document_window,
+} from "./window";
 import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
 import {
   RUNTIME_APP_NAME,
@@ -33,6 +37,7 @@ import { startAgentNotifications } from "./main/agent-notifications";
 import { routeDeepLink } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
 import { open_handoff } from "./main/open-handoff";
+import { startup_window } from "./main/startup-window-policy";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -138,6 +143,7 @@ app.on("browser-window-focus", refresh_recent_menu);
 const pendingFiles: string[] = [];
 const pendingDeepLinks: string[] = [];
 let deepLinkDrainTimer: NodeJS.Timeout | null = null;
+let startupBootstrapComplete = false;
 
 // Live document windows, keyed by agent-server-assigned docId. Used so that
 // re-opening an already-open file focuses the existing window instead
@@ -272,8 +278,13 @@ function handleFilePath(filePath: string) {
     console.warn("[grida] unsupported file type:", filePath);
     return;
   }
-  if (!app.isReady()) {
-    pendingFiles.push(filePath);
+  if (
+    !startup_window.canDispatchLaunchIntent({
+      app_ready: app.isReady(),
+      bootstrap_complete: startupBootstrapComplete,
+    })
+  ) {
+    if (!pendingFiles.includes(filePath)) pendingFiles.push(filePath);
     return;
   }
   if (isCanvas) void openCanvasBundleForPath(filePath);
@@ -281,7 +292,13 @@ function handleFilePath(filePath: string) {
 }
 
 function handleDeepLink(url: string) {
-  if (!app.isReady() || !getAgentSidecarInfo()) {
+  if (
+    !startup_window.canDispatchLaunchIntent({
+      app_ready: app.isReady(),
+      bootstrap_complete: startupBootstrapComplete,
+    }) ||
+    !getAgentSidecarInfo()
+  ) {
     queueDeepLink(url);
     return;
   }
@@ -304,7 +321,13 @@ function scheduleDeepLinkDrain() {
 }
 
 async function drainDeepLinks() {
-  if (!app.isReady() || !getAgentSidecarInfo()) {
+  if (
+    !startup_window.canDispatchLaunchIntent({
+      app_ready: app.isReady(),
+      bootstrap_complete: startupBootstrapComplete,
+    }) ||
+    !getAgentSidecarInfo()
+  ) {
     if (pendingDeepLinks.length > 0) scheduleDeepLinkDrain();
     return;
   }
@@ -412,10 +435,18 @@ app.on("ready", async () => {
     return;
   }
 
-  open_welcome_window({
-    app,
-    base_url: EDITOR_BASE_URL,
+  const startupBootstrap = startup_window.bootstrap({
+    pending_files: pendingFiles.length,
+    pending_deep_links: pendingDeepLinks.length,
   });
+  if (startupBootstrap === "restore-last-workspace") {
+    open_startup_window({ app, base_url: EDITOR_BASE_URL });
+  } else {
+    // An explicit file/deep-link launch retains the existing plain Welcome
+    // bootstrap. It must not race an unrelated workspace restoration.
+    open_welcome_window({ app, base_url: EDITOR_BASE_URL });
+  }
+  startupBootstrapComplete = true;
 
   // Populate File ▸ Open Recent now that the sidecar can answer `workspaces.list`
   // (the module-top menu was built before it was up).

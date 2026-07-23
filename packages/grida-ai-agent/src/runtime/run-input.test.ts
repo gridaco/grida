@@ -412,6 +412,34 @@ describe("parseRunBody", () => {
     expect((await asReq("yes")).interactive).toBeUndefined();
   });
 
+  it("parses a strict, internally consistent surface snapshot", async () => {
+    const messages = [{ role: "user", parts: [{ type: "text", text: "hi" }] }];
+    const asReq = async (surface: unknown) => {
+      const parsed = await parseRunBody({ messages, surface }, deps as never);
+      if (parsed instanceof Response) throw new Error("unexpected 400");
+      return parsed;
+    };
+
+    await expect(
+      asReq({
+        active: "/poster.canvas",
+        open: ["/poster.canvas", "/brief.md"],
+      })
+    ).resolves.toMatchObject({
+      surface: {
+        active: "/poster.canvas",
+        open: ["/poster.canvas", "/brief.md"],
+      },
+    });
+    expect((await asReq(undefined)).surface).toBeUndefined();
+    expect(
+      (await asReq({ active: "/poster.canvas", open: ["/brief.md"] })).surface
+    ).toBeUndefined();
+    expect(
+      (await asReq({ active: null, open: [], extra: true })).surface
+    ).toBeUndefined();
+  });
+
   it("rejects untyped message parts at the HTTP boundary", async () => {
     const parsed = await parseRunBody(
       {

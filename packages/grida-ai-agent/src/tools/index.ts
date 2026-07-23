@@ -19,6 +19,10 @@
  *     The agent loop handles them in-process — the client just
  *     observes chunks.
  *
+ * The locked surface family is also always present and always server-resolved.
+ * A per-turn host snapshot grounds its acknowledgement/list output; a renderer
+ * may observe the streamed call for the auxiliary UI effect.
+ *
  * Command execution is always server-resolved (the client has no
  * process-spawn capability). The command tool ships with `execute()`
  * baked in pointing at the injected backend; without an injected
@@ -46,6 +50,8 @@ import {
   RUN_COMMAND_TOOL_NAME,
   QUESTION_TOOL_NAME,
   DESIGN_SEARCH_TOOL_NAME,
+  SURFACE_OPEN_TOOL_NAME,
+  SURFACE_LIST_OPEN_TOOL_NAME,
   type AgentToolName,
 } from "./names";
 import {
@@ -55,11 +61,14 @@ import {
 } from "./run-command";
 import { createQuestionTool } from "./question";
 import { AgentDesignSearch } from "./design-search";
+import { AgentSurface } from "../surface";
 
 export {
   RUN_COMMAND_TOOL_NAME,
   QUESTION_TOOL_NAME,
   DESIGN_SEARCH_TOOL_NAME,
+  SURFACE_OPEN_TOOL_NAME,
+  SURFACE_LIST_OPEN_TOOL_NAME,
   SKILL_TOOL_NAME,
 };
 export type { AgentToolName, RunCommandBackend, RunCommandOutcome };
@@ -115,14 +124,19 @@ export type ToolsetCapabilities = {
     load_body: SkillBodyLoader;
   };
   /**
-   * Whether a human UI is bound (RFC `tools` §question). The locked `question`
-   * tool is ALWAYS registered — when `interactive` is true it is client-resolved
-   * (no `execute`, pauses for the user's answer); when false/undefined it ships
-   * with a fixed-refusal `execute` so a headless host returns a tool error
-   * instead of hanging forever. Unlike the other capabilities, absence does not
-   * drop the tool — the lock guarantees every host advertises it.
+   * Whether a human UI can answer the locked `question` tool. Interactive
+   * question calls are client-resolved (no `execute`); headless calls return a
+   * fixed refusal. The tool remains registered either way.
    */
   interactive?: boolean;
+  /**
+   * Presentation state captured by an attached host at the start of this turn.
+   * Presence makes `surface_open` acknowledge `requested` and gives
+   * `surface_list_open` its exact turn-start answer. Absence means
+   * headless/detached; the always-server-executed tools return noninteractive
+   * no-ops.
+   */
+  surface?: AgentSurface.Snapshot;
   /**
    * Whether the host can resolve a Grida Library search (the artwork-station
    * gather step). When true the `design_search` tool joins the registry; like
@@ -204,6 +218,9 @@ export function createToolset(caps: ToolsetCapabilities = {}) {
     [QUESTION_TOOL_NAME]: createQuestionTool({
       interactive: caps.interactive === true,
     }),
+    // Presentation is an auxiliary locked capability. Both tools execute here;
+    // a renderer observes surface_open but never resolves it for the model.
+    ...AgentSurface.createTools({ snapshot: caps.surface }),
   };
   // Conditional spreads keep each capability's precise tool type in the
   // inferred return (used by `createAgent`'s `ToolLoopAgent<…, typeof

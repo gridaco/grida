@@ -239,7 +239,7 @@ export function TerminalPane({ workspace, onSessionEnded }: TerminalPaneProps) {
       data-testid="terminal-pane"
       className="flex h-full w-full flex-col overflow-hidden bg-background"
     >
-      <div className="flex shrink-0 items-center border-b px-2">
+      <div className="flex shrink-0 items-center px-2">
         <span className="text-xs text-muted-foreground">Terminal</span>
         <Button
           type="button"

@@ -136,6 +136,25 @@ describe("materializeSlideSvgResources", () => {
     expect(out.svg).toBe('<svg><image href="assets/missing.png"/></svg>');
   });
 
+  it("can bound resource work for a read-only thumbnail projection", async () => {
+    const calls: string[] = [];
+    const out = await materializeSlideSvgResources(
+      '<svg><image href="assets/a.png"/><image href="assets/b.png"/></svg>',
+      {
+        ...BASE_OPTIONS,
+        maxResourceAttributes: 1,
+        readFileBytes: async (_workspaceId, relPath) => {
+          calls.push(relPath);
+          return { base64: "AAAA" };
+        },
+      }
+    );
+
+    expect(calls).toEqual(["assets/a.png"]);
+    expect(out.svg).toContain("data:image/png;grida-svg-resource=");
+    expect(out.svg).toContain('href="assets/b.png"');
+  });
+
   it("restores only generated data urls", async () => {
     const out = await materializeSlideSvgResources(
       '<svg><image href="assets/a.png"/></svg>',

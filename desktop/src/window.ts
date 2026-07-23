@@ -10,17 +10,31 @@ import { RUNTIME_APP_ICON } from "./branding";
 import { IS_DEV } from "./env";
 
 /**
- * Title-bar row height in CSS pixels. Must match
- * {@link editor/scaffolds/desktop/chrome/title-bar.tsx::TITLEBAR_HEIGHT_PX} —
- * the renderer's `<TitleBar>` reserves the same row so the OS-rendered
- * Min/Max/Close controls (Windows / Linux) sit flush with the
- * renderer's chrome. Tailwind `h-10` = 40px on both ends.
+ * Title-bar row height in CSS pixels. Its controls center at 22px. The
+ * workspace's right-side tab triggers occupy their own 44px row, so those
+ * controls share the same `44 / 2 = 22px` axis. Must match
+ * `.desktop-title-bar-height` in `editor/app/editor.css` — the renderer's
+ * `<TitleBar>` reserves the same row so the OS-rendered
+ * Min/Max/Close controls (Windows / Linux) sit flush with its chrome.
  */
-const TITLE_BAR_HEIGHT = 40;
+const TITLE_BAR_HEIGHT = 44;
+
+/**
+ * The workspace shell's narrowest fully-operable layout:
+ *
+ *   320px chat + 360px document + 200px file tree + resize gutters.
+ *
+ * A cold-start Welcome window can client-navigate into that shell while
+ * retaining the same BrowserWindow, so the native floor belongs to every main
+ * window rather than only windows constructed directly on `/desktop/workspace`.
+ */
+const MIN_WINDOW_WIDTH = 900;
 
 const trafficLightPosition = {
   x: 14,
-  y: 14,
+  // macOS traffic lights are 12px tall. A 16px top position centers them at
+  // `16 + 12 / 2 = 22px`, aligned with both title controls and document tabs.
+  y: 16,
 } as const;
 
 /**
@@ -57,7 +71,7 @@ function get_window_constructor_options(): BaseWindowConstructorOptions {
   const size = {
     width: 1440,
     height: 960,
-    minWidth: 384,
+    minWidth: MIN_WINDOW_WIDTH,
     minHeight: 384,
   };
   switch (process.platform) {
@@ -291,6 +305,26 @@ export function open_welcome_window({
   return create_main_window({
     base_url: baseUrl,
     urlPath: "/desktop/welcome",
+    additionalArguments: buildDesktopArguments({ app }),
+  });
+}
+
+/**
+ * Cold-start bootstrap. It still enters the sign-in-gated Welcome segment;
+ * the query only asks the signed-in renderer to validate and resume its last
+ * workspace-backed surface. Every explicit Welcome entry uses
+ * {@link open_welcome_window} without this flag.
+ */
+export function open_startup_window({
+  app,
+  base_url: baseUrl,
+}: {
+  app: App;
+  base_url: string;
+}) {
+  return create_main_window({
+    base_url: baseUrl,
+    urlPath: "/desktop/welcome?startup=restore-last-workspace",
     additionalArguments: buildDesktopArguments({ app }),
   });
 }

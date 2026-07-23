@@ -140,9 +140,14 @@ export type AgentComposerInputProps = {
   scratchReservation?: ScratchSeedBudget.Reservation;
   /**
    * Allows a submit with empty text/files when the host has out-of-band context
-   * to attach to the turn.
+   * to attach or gives an empty submission its own host action.
    */
   allowEmptySubmit?: boolean;
+  /**
+   * Accessible name for the submit control while the composer is empty.
+   * Hosts that give an empty submission its own action should describe it here.
+   */
+  emptySubmitLabel?: string;
   /** Left-aligned footer content (e.g. the model picker). */
   toolbar?: ReactNode;
   className?: string;
@@ -189,6 +194,7 @@ function AgentComposerInner({
   resourcePolicy = InputResourcePolicy.CURRENT,
   scratchReservation = ScratchSeedBudget.NONE,
   allowEmptySubmit = false,
+  emptySubmitLabel,
   toolbar,
   className,
 }: Omit<AgentComposerInputProps, "catalog">) {
@@ -433,8 +439,8 @@ function AgentComposerInner({
     // the turn queue persists text only, so image sends need an idle session.
     // `allow_empty` mirrors the later `allowEmptySubmit` guard: without it the
     // composer core returns null for a blank editor and we'd bail here, before
-    // that guard — so a picked-template start (payload on the handoff, not the
-    // text) would be lost. Let the empty message through and gate below.
+    // that guard — so a picked-template start or host-owned empty action would
+    // be lost. Let the empty message through and gate below.
     const message = composer.submit({
       submitted_at: Date.now(),
       allow_empty: allowEmptySubmit,
@@ -604,7 +610,14 @@ function AgentComposerInner({
               className="rounded-full"
               onClick={submit}
               disabled={isEncodingFiles}
-              aria-label="Send"
+              aria-label={
+                allowEmptySubmit &&
+                emptySubmitLabel &&
+                !composer.snapshot.text.trim() &&
+                composer.snapshot.attachments.length === 0
+                  ? emptySubmitLabel
+                  : "Send"
+              }
             >
               <ArrowUpIcon className="size-4" />
             </Button>

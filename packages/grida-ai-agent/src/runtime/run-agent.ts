@@ -85,12 +85,14 @@ export type AgentRunRequest = {
    */
   mode?: AgentMode;
   /**
-   * Per-run client UI capability for the `question` tool (RFC `tools`
-   * §question). When set it WINS over the host-level `interactive` deps below
-   * (a `cli run` against an interactive daemon declares `false` to stay
-   * headless). Absent ⇒ the host default applies.
+   * Per-run client UI capability for `question`. When set it WINS over the
+   * host-level `interactive` deps below (a `cli run` or ACP client against an
+   * interactive daemon declares `false` to stay headless). Absent ⇒ the host
+   * default applies.
    */
   interactive?: boolean;
+  /** Turn-start artifact-surface snapshot. Absent means headless/detached. */
+  surface?: import("../surface").AgentSurface.Snapshot;
   /**
    * Per-run client capability to resolve a Grida Library search
    * (`design_search`). Like {@link interactive} it WINS over the host-level
@@ -182,9 +184,8 @@ export async function runAgent(
   req: AgentRunRequest,
   deps: {
     workspace_registry: WorkspaceRegistry;
-    /** Host-level: gates the `question` tool (pause vs fixed-refusal). The
-     * runtime threads it down via `runDeps`; `createWorkspaceAgentBindings`
-     * ignores it (it reads only workspace/secret/shell fields). */
+    /** Host-level default for `question` pause/refusal. The runtime threads it
+     * down via `runDeps`; `createWorkspaceAgentBindings` ignores it. */
     interactive?: boolean;
     /** Host-level default for the `design_search` (library) capability;
      * overridden by the per-run `req.library`. */
@@ -234,6 +235,9 @@ export async function runAgent(
       // and a headless `cli run`. Independent of workspace bindings (a person can
       // answer a standalone-doc session too).
       interactive: req.interactive ?? deps.interactive,
+      // Surface tools always execute server-side. The immutable turn-start
+      // snapshot acknowledges an attached observer without claiming UI success.
+      surface: req.surface,
       // design_search (library gather) — advertised only when the client declared
       // it can resolve the search (renderer-owned, like fs). Per-run wins over the
       // host default, mirroring `interactive`.

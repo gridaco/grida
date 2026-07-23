@@ -9,7 +9,9 @@
  * project's agent as its first turn via {@link welcome_handoff}. No workspace
  * picker, no folder dialog to get started: the newcomer never has to choose a
  * folder. "Open folder…" and the recents list stay for opening work that
- * already exists (files stay visible — a named tree, not hidden).
+ * already exists (files stay visible — a named tree, not hidden). Submitting an
+ * otherwise empty composer simply enters the selected/default workspace without
+ * starting an agent turn.
  *
  * The home NEVER mints a per-session folder and NEVER dirties the user's
  * workspace. Starting a session roots the agent at the DEFAULT workspace — the
@@ -34,8 +36,15 @@
  * auto-sends when there's a prompt.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { XIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 import {
@@ -76,8 +85,68 @@ import {
 import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
 import { PresetChip } from "@/scaffolds/desktop/home/preset-chip";
 import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import { last_workspace } from "@/lib/desktop/last-workspace";
 
 const NOOP = () => {};
+
+/**
+ * The native host adds `?startup=restore-last-workspace` only to the cold-start
+ * welcome window. Explicit Home navigation, File → New Window, auth callback,
+ * and macOS re-activation all use plain `/desktop/welcome` and stay here.
+ */
+export default function DesktopWelcomePage() {
+  return (
+    <Suspense fallback={<StartupRestoreScreen />}>
+      <DesktopWelcomeRoute />
+    </Suspense>
+  );
+}
+
+function DesktopWelcomeRoute() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const shouldRestore = params.get("startup") === "restore-last-workspace";
+  const [checking, setChecking] = useState(shouldRestore);
+
+  useEffect(() => {
+    if (!shouldRestore) return;
+    let cancelled = false;
+    void last_workspace
+      .resolve(window.localStorage, {
+        list: workspacesNs.list,
+        openFolder: workspacesNs.openFolder,
+        readdir: workspacesNs.readdir,
+      })
+      .then((target) => {
+        if (cancelled) return;
+        if (target) {
+          router.replace(last_workspace.href(target));
+          return;
+        }
+        setChecking(false);
+      })
+      .catch((err) => {
+        console.warn("[welcome] couldn't restore last workspace:", err);
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router, shouldRestore]);
+
+  return checking ? <StartupRestoreScreen /> : <WelcomeSurface />;
+}
+
+function StartupRestoreScreen() {
+  return (
+    <div className="flex h-svh w-full flex-col bg-background">
+      <TitleBar />
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        Opening last workspace…
+      </div>
+    </div>
+  );
+}
 
 /** The home composer targets no existing workspace (a fresh project is created
  *  on submit), so there are no `@` file refs or `/` skills to offer. A constant
@@ -102,7 +171,7 @@ function composePromptWithRefs(
   return `${lead}\n\nReferences:\n${list}`;
 }
 
-export default function DesktopWelcomePage() {
+function WelcomeSurface() {
   const router = useRouter();
   // The home's single page-scroll container — everything (composer, gallery)
   // scrolls together inside it; the gallery virtualizes against it.
@@ -365,7 +434,9 @@ export default function DesktopWelcomePage() {
   // The one "start" path, shared by the composer's send and the reference
   // tray's Start button. Picked references (if any) fold into the first-turn
   // prompt as context and always start a FRESH project — they take precedence
-  // over the target picker, since they're only meaningful for a new start.
+  // over the target picker, since they're only meaningful for a new start. An
+  // otherwise empty submit simply enters the selected/default workspace without
+  // starting an agent turn (see test/desktop-welcome-empty-submit.md).
   const start = useCallback(
     (text: string) => {
       const t = text.trim();
@@ -393,8 +464,8 @@ export default function DesktopWelcomePage() {
         void startFresh({ prompt: composePromptWithRefs(t, pickedRefs) });
         return;
       }
-      if (!t) return;
-      // Send into an existing opened workspace, or the default workspace.
+      // Send into an existing opened workspace, or enter it without a turn when
+      // the composer is empty. The default-workspace path follows the same rule.
       if (target) handoffAndGo(target, t);
       else void startFresh({ prompt: t });
     },
@@ -602,7 +673,12 @@ export default function DesktopWelcomePage() {
                     // composer attachments — its `start` ignores files/uploads, so
                     // hide the "+" rather than offer a dead control.
                     attach={false}
-                    allowEmptySubmit={pickedTemplate != null}
+                    allowEmptySubmit
+                    emptySubmitLabel={
+                      pickedTemplate || pickedRefs.length > 0
+                        ? "Start"
+                        : "Open workspace"
+                    }
                     autofocus
                     placeholder={
                       pickedTemplate

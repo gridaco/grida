@@ -45,6 +45,7 @@ export function FileContextMenu({
   relPath,
   isDirectory = false,
   onTrashed,
+  onOpenChange,
   children,
 }: {
   workspace: Workspace;
@@ -61,13 +62,15 @@ export function FileContextMenu({
    * Omitted on surfaces that don't own that state.
    */
   onTrashed?: () => void;
+  /** Optional surface-level reaction, such as dismissing a tab preview. */
+  onOpenChange?: (open: boolean) => void;
   /** The right-click target — usually a tree row button or a tab. */
   children: ReactNode;
 }) {
   // `.canvas` bundles open on click (the tree renders them as opaque leaves),
   // so there's no longer a dedicated "Open as Canvas" item here.
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={onOpenChange}>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-[200px]">
         <ContextMenuItem

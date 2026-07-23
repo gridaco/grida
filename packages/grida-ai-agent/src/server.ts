@@ -161,11 +161,10 @@ export type AgentTenantOptions = {
    */
   allow_unsandboxed_shell?: boolean;
   /**
-   * Whether a human UI is bound to this host — i.e. the locked `question`
-   * tool can pause and be answered by a person. Default (undefined/false) is
-   * FAIL-CLOSED headless: the `question` tool refuses with a fixed tool error
-   * instead of pausing forever (RFC `tools` §question). The desktop sidecar
-   * sets this true; the CLI and hosted/batch paths leave it false.
+   * Whether a human UI can answer the locked `question` tool. Default
+   * (undefined/false) is FAIL-CLOSED headless: `question` refuses instead of
+   * pausing forever. The desktop sidecar sets this true; CLI/batch runs
+   * override false.
    */
   interactive?: boolean;
   /**
@@ -347,8 +346,8 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         image_gen_enabled: caps.images,
         // The user's selected image model (host config); the tool is prompt-only.
         image_model_id: opts.image_model_id,
-        // Whether the locked `question` tool pauses for a human (interactive) or
-        // refuses with a fixed tool error (headless). Fail-closed headless.
+        // Whether the client-owned question tool pauses for a human. Surface
+        // presentation is instead grounded by each run's optional snapshot.
         interactive: opts.interactive === true,
         // Host default for the `design_search` (library) capability.
         library: opts.library === true,

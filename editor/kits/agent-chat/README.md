@@ -2,8 +2,7 @@
 
 Render-only chat transcript renderer for Grida's agent surfaces. Given a single
 AI SDK `UIMessage` (settled or mid-stream) it renders one turn — user bubble or
-assistant response — including text (Markdown via Streamdown), reasoning
-("thinking") blocks, and tool calls.
+assistant response — including text (Markdown via Streamdown) and tool calls.
 
 ```tsx
 import { ChatMessageView } from "@/kits/agent-chat";
@@ -20,8 +19,9 @@ messages.map((m, i) => (
 ## What it renders
 
 - **Text** parts → `MessageResponse` (Streamdown Markdown).
-- **Reasoning** parts → a collapsible `Reasoning` block (auto-open while streaming,
-  auto-collapses to "Thought for Ns" once the turn moves on).
+- **Reasoning** parts → not rendered. Chain-of-thought tokens are internal
+  transport/session data, not transcript content. While reasoning is the only
+  streamed content, the existing compact `Thinking` indicator remains visible.
 - **Tool** parts → a compact `Task` row each; a run of consecutive tool calls
   collapses into one summary `Task` (label from `toolDisplay.summarize`). Known
   Grida tools expand to dedicated bodies (files, grep results, todos, commands,
@@ -78,8 +78,7 @@ Promoted out of the desktop scaffolds (was render-mis-filed there):
 - `message.tsx` ← `scaffolds/desktop/ai-sidebar/chat-message.tsx`
 - `tool-display.ts` / `tool-display.test.ts` ← `lib/agent-chat/`
 
-Reasoning rendering was added during the move (the scaffold version dropped
-reasoning parts). Consumers (each also pins `QuestionCard` above its composer):
-the desktop AI sidebar (`scaffolds/desktop/ai-sidebar/`), the workbench agent
-pane (`scaffolds/desktop/workbench/agent-pane.tsx`), and the
+Consumers (each also pins `QuestionCard` above its composer): the desktop AI
+sidebar (`scaffolds/desktop/ai-sidebar/`), the workbench agent pane
+(`scaffolds/desktop/workbench/agent-pane.tsx`), and the
 `/ui/components/ai-chat` demo.

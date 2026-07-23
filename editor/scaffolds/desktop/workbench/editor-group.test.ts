@@ -53,6 +53,41 @@ describe("EditorGroup — open / activate", () => {
   });
 });
 
+describe("EditorGroup — restore", () => {
+  it("restores ordered tabs and their active tab in one mutation", () => {
+    const g = new EditorGroup();
+    const listener = vi.fn<() => void>();
+    g.subscribe(listener);
+
+    g.restore({ tabs: ["a", "b", "c"], active: "b" });
+
+    expect(snap(g)).toEqual({ tabs: ["a", "b", "c"], active: "b" });
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("deduplicates tabs and falls back to the last tab for an invalid active id", () => {
+    const g = new EditorGroup();
+
+    g.restore({ tabs: ["a", "b", "a"], active: "missing" });
+
+    expect(snap(g)).toEqual({ tabs: ["a", "b"], active: "b" });
+  });
+
+  it("clears the live-session reopen history", () => {
+    const g = new EditorGroup();
+    g.open("old");
+    g.close("old");
+
+    g.restore({ tabs: ["restored"], active: "restored" });
+    g.reopenClosed();
+
+    expect(snap(g)).toEqual({
+      tabs: ["restored"],
+      active: "restored",
+    });
+  });
+});
+
 describe("EditorGroup — close (VSCode neighbor rule)", () => {
   it("closing the active tab focuses the LEFT neighbor", () => {
     const g = new EditorGroup();

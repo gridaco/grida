@@ -1,19 +1,21 @@
 /**
- * Workspace workbench — VSCode-like three-pane layout for a single
- * opened workspace.
+ * Workspace workbench — agent-first split layout for a single opened
+ * workspace.
  *
  * Layout:
  *
- *   ┌─ TitleBar ────────────────────────────────────────────────┐
- *   ├─ Agent Pane ────────┬─ Editor Pane ───────────┬─ File Tree Pane ┐
- *   │ agent + workspace-  │  tab strip + per-file   │ files     │
- *   │ scoped commands     │  viewers/editors        │ folders   │
- *   └─────────────────────┴─────────────────────────┴───────────┘
+ *   ┌─ Left ──────────────┬─ Main ───────────────────┬─ Right? ────┐
+ *   │ TitleBar            │ TitleBar: tabs ···       │ toggle      │
+ *   │ Agent Pane          │ focused content          │ file tree   │
+ *   │                     ├───────────────────────────┤             │
+ *   │                     │ terminal?                 │             │
+ *   └─────────────────────┴───────────────────────────┴─────────────┘
  *
- * No secondary header strip — the TitleBar above carries the only
- * cross-pane chrome (back/forward via Chromium history). The
- * workspace name lives in the file tree pane's root row, which is already
- * the right place for it.
+ * Each column owns its title bar. The file tree starts closed; while closed,
+ * its toggle lives at the end of the main title bar, and while open it moves
+ * into the file tree's own title bar. Documents and the optional terminal use
+ * floating surfaces. The file tree is a docked utility column with a hard left
+ * divider, and its resize boundary spans the full main/right height.
  *
  * The workbench owns the small amount of cross-pane state: which tabs
  * are open, which is active, and a refresh counter that the file tree pane
@@ -29,33 +31,30 @@
 "use client";
 
 import {
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
 } from "react";
-import {
-  FolderIcon,
-  PanelRightCloseIcon,
-  PanelRightOpenIcon,
-  SquareTerminalIcon,
-} from "lucide-react";
 import { usePanelRef } from "react-resizable-panels";
-import { Button } from "@app/ui/components/button";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@app/ui/components/resizable";
 import {
+  DESKTOP_WINDOW_CONTROLS_RIGHT_INSET,
   TitleBar,
-  TITLEBAR_NO_DRAG_STYLE,
 } from "@/scaffolds/desktop/chrome/title-bar";
+import { LastWorkspaceMarker } from "@/scaffolds/desktop/shared/last-workspace-marker";
 import {
   terminal as bridgeTerminal,
+  workspaces as workspacesNs,
   type Workspace,
 } from "@/lib/desktop/bridge";
+import { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import {
   confirmAndTrashEntry,
   copyAbsolutePath,
@@ -63,45 +62,66 @@ import {
   matchFileActionShortcut,
   revealInFinder,
 } from "./workbench-file-actions";
-import { isTerminalToggleEvent } from "./workspace-workbench-keybindings";
+import {
+  isTerminalToggleEvent,
+  WORKSPACE_TERMINAL_TOGGLE_COMMAND,
+  WORKSPACE_WORKBENCH_COMMAND_EVENT,
+} from "./workspace-workbench-keybindings";
 import { FileTreePane } from "./file-tree-pane";
-import { EditorPane } from "./editor-pane";
-import { WorkspaceOpenInMenu } from "./workspace-open-in-menu";
+import { EditorPane, WorkspaceExplorerToggleButton } from "./editor-pane";
+import { WorkspaceTitleMenu } from "./workspace-title-menu";
 import { AgentPane } from "./agent-pane";
 import { TerminalPane } from "./terminal-pane";
 import { WorkspaceChangesProvider } from "./workspace-changes";
 import { EditorGroup } from "./editor-group";
+import { WorkspaceSurfaceHost } from "./workspace-surface-host";
+import { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import {
   DESIGN_SEARCH_TAB_ID,
   isVirtualTab,
   pickToolCallId,
   type DesignSearchSession,
 } from "./design-search-tab";
+import styles from "./workspace-workbench.module.css";
 
 /**
- * Pane sizing, matching the file window's shell conventions:
+ * Pane sizing for the agent-first split:
  *   - Default size as a percentage (scales with window width).
  *   - Min (and optional max) as pixels (pane readability is a pixel concern).
  *
- * Side panes stay compact (15–25%); the editor pane fills the
- * rest. The agent pane sits at ~25% because that's what the SVG
- * workstation already established as a "comfortable chat width."
+ * The chat gets a stable conversational width while the document region takes
+ * the majority of the window. The optional file tree is a third visual column
+ * nested inside the non-chat region, so opening it never changes chat width.
  */
-const FILE_TREE_PANE_DEFAULT = "18%";
-const FILE_TREE_PANE_MIN = "180px";
+const FILE_TREE_PANE_DEFAULT = "24%";
+const FILE_TREE_PANE_MIN = "200px";
 const FILE_TREE_PANE_MAX = "360px";
-const AGENT_PANE_DEFAULT = "25%";
-const AGENT_PANE_MIN = "280px";
-// No max: the agent pane grows as far as the user drags it (bounded only by
-// the other panes' mins). Only a min is enforced, for readability.
-// The editor pane fills the slack (defaultSize below), but needs its own min
-// so widening the now-uncapped chat can't crush it to zero width.
+const AGENT_PANE_DEFAULT = "30%";
+const AGENT_PANE_MIN = "320px";
 const EDITOR_PANE_MIN = "360px";
+const FLOATING_BOTTOM_SURFACE_GUTTER_CLASS =
+  "h-full min-h-0 pb-3 pl-1.5 pr-3 pt-1.5";
+const FLOATING_UTILITY_SURFACE_CLASS =
+  "relative h-full min-h-0 overflow-hidden rounded-lg border border-border/60 bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]";
+const RESIZE_HANDLE_HIGHLIGHT_CLASS =
+  "before:pointer-events-none before:absolute before:z-10 before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-linear-to-b before:from-transparent before:via-muted-foreground/55 before:to-transparent before:opacity-0 before:transition-opacity hover:before:opacity-100 active:before:via-foreground/70 active:before:opacity-100 focus-visible:before:opacity-100 aria-[orientation=horizontal]:before:inset-x-0 aria-[orientation=horizontal]:before:inset-y-auto aria-[orientation=horizontal]:before:left-0 aria-[orientation=horizontal]:before:top-1/2 aria-[orientation=horizontal]:before:h-px aria-[orientation=horizontal]:before:w-full aria-[orientation=horizontal]:before:-translate-y-1/2 aria-[orientation=horizontal]:before:translate-x-0 aria-[orientation=horizontal]:before:bg-linear-to-r";
+const RESIZE_GUTTER_CLASS = `z-20 w-1.5 cursor-col-resize bg-transparent after:w-3 aria-[orientation=horizontal]:h-1.5 aria-[orientation=horizontal]:cursor-row-resize aria-[orientation=horizontal]:after:h-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
+const DOCKED_PANE_RESIZE_HANDLE_CLASS = `desktop-no-drag z-20 -mx-1.5 w-3 cursor-col-resize bg-transparent after:w-3 ${RESIZE_HANDLE_HIGHLIGHT_CLASS}`;
 // Bottom terminal panel (VSCode-style). Collapsible: dragging it under
 // its min snaps it closed, and ctrl+` collapse/expand keeps the shell
 // process alive (the panel content stays mounted at zero height).
 const TERMINAL_PANE_DEFAULT = "30%";
 const TERMINAL_PANE_MIN = "120px";
+
+/**
+ * Separators remain keyboard-focusable for arrow-key resizing, but pointer
+ * interaction should not leave their focus ring pinned on screen afterward.
+ */
+function releaseResizeHandlePointerFocus(
+  event: ReactPointerEvent<HTMLDivElement>
+) {
+  event.currentTarget.blur();
+}
 
 /**
  * Whether a keyboard event originated inside an editable surface (text
@@ -122,7 +142,13 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
-export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
+export function WorkspaceWorkbench({
+  workspace,
+  initialActiveRelPath,
+}: {
+  workspace: Workspace;
+  initialActiveRelPath?: string;
+}) {
   // The editor group (VSCode's tab model) owns all tab state + rules — open
   // order, the active-tab-on-close neighbor rule, reopen-closed history, and the
   // picker's preview-tab lifecycle — as a plain, unit-tested class. React is a
@@ -132,6 +158,15 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   // lives where it's testable, not smeared across effects + refs + nested
   // setState updaters.)
   const group = useMemo(() => new EditorGroup(isVirtualTab), []);
+  const surfaceHost = useMemo(
+    () =>
+      new WorkspaceSurfaceHost(
+        (relPath) => workspacesNs.readdir(workspace.id, relPath),
+        group,
+        isVirtualTab
+      ),
+    [group, workspace.id]
+  );
   const { tabs: openTabs, active: activeRelPath } = useSyncExternalStore(
     group.subscribe,
     group.getSnapshot,
@@ -143,6 +178,45 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   // key on — null when the active tab is virtual.
   const activeFileRelPath =
     activeRelPath && !isVirtualTab(activeRelPath) ? activeRelPath : null;
+  const [restoreSettled, setRestoreSettled] = useState(false);
+
+  // Workspace continuity is a one-shot host action. The persisted renderer
+  // state supplies order + focus; the surface host still checks every path
+  // against live bridge truth before restoring the editor group.
+  //
+  // `initialActiveRelPath` is the legacy v1 last-workspace handoff. It seeds a
+  // one-tab state only when this workspace has no newer view-state record.
+  useEffect(() => {
+    let current = true;
+    const tabs = WorkspaceViewState.initialTabs(
+      window.localStorage,
+      workspace.id,
+      initialActiveRelPath
+    );
+    void surfaceHost.restoreRelative(tabs).finally(() => {
+      if (current) setRestoreSettled(true);
+    });
+    return () => {
+      current = false;
+    };
+  }, [initialActiveRelPath, surfaceHost, workspace.id]);
+
+  // Manual regression: test/desktop-startup-restore-last-workspace.md
+  useEffect(() => {
+    if (!restoreSettled) return;
+    const remember = () => {
+      WorkspaceViewState.remember(window.localStorage, workspace.id, {
+        tabs: surfaceHost.rememberedTabs(),
+      });
+    };
+    remember();
+    return group.subscribe(remember);
+  }, [group, restoreSettled, surfaceHost, workspace.id]);
+
+  // Do not flash Start while a remembered artifact is still being validated.
+  // Once restoration settles, an actually-empty editor group owns the faux tab.
+  // (see test/desktop-workbench-start-tab.md)
+  const showStart = restoreSettled && openTabs.length === 0;
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
   // The live `design_search` pick, lifted from the agent pane so the editor
   // pane can host the picker as a virtual tab (the agent pane owns the chat +
@@ -151,25 +225,23 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   const [designSearch, setDesignSearch] = useState<DesignSearchSession | null>(
     null
   );
-  // File tree pane visibility. VSCode convention: ⌘B / Ctrl+B
-  // toggles, and the TitleBar carries the persistent toggle button.
+  // File tree pane visibility. It starts hidden so the primary agent + editor
+  // surfaces get the full workspace; ⌘B / Ctrl+B toggles it. The main title
+  // bar carries the toggle while closed; the tree's own title bar carries it
+  // while open.
   // Conditional render (not `display: none`) so the resizable-panel
   // group redistributes space cleanly to the EditorPane when the file tree pane
   // is hidden.
-  const [showTree, setShowTree] = useState(true);
+  const [showTree, setShowTree] = useState(false);
 
-  // Terminal pane (ctrl+` / TitleBar toggle), VSCode-style. Two facts:
-  // `terminalSpawned` — the bottom panel (and its PTY) exists; flips on
-  // first open and back off when the shell exits. `terminalOpen` —
-  // panel is expanded; derived from the panel's onResize so dragging
-  // the handle and the imperative collapse/expand stay in sync without
-  // a second source of truth. Collapse keeps the pane mounted (and the
-  // shell alive); only unmount kills the PTY.
+  // Terminal pane (ctrl+` / native View menu), VSCode-style.
+  // `terminalSpawned` tracks whether the bottom panel (and its PTY) exists;
+  // it flips on first open and back off when the shell exits. Collapse keeps
+  // the pane mounted (and the shell alive); only unmount kills the PTY.
   // Hidden entirely against older desktop binaries whose bridge
   // predates `terminal` (additive capability on protocol 1).
   const supportsTerminal = bridgeTerminal.isSupported();
   const [terminalSpawned, setTerminalSpawned] = useState(false);
-  const [terminalOpen, setTerminalOpen] = useState(false);
   const terminalPanelRef = usePanelRef();
 
   const toggleTerminal = useCallback(() => {
@@ -185,7 +257,6 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
 
   const handleTerminalSessionEnded = useCallback(() => {
     setTerminalSpawned(false);
-    setTerminalOpen(false);
   }, []);
 
   const bumpTreeRefresh = useCallback(() => {
@@ -194,6 +265,10 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
 
   const toggleTree = useCallback(() => {
     setShowTree((v) => !v);
+  }, []);
+
+  const openTree = useCallback(() => {
+    setShowTree(true);
   }, []);
 
   // A trashed entry: drop the affected tab(s) — a file closes its own
@@ -287,8 +362,27 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
           return;
       }
     }
+
+    function onWorkspaceCommand(event: Event) {
+      const command = (event as CustomEvent<unknown>).detail;
+      if (command !== WORKSPACE_TERMINAL_TOGGLE_COMMAND || !supportsTerminal) {
+        return;
+      }
+      toggleTerminal();
+    }
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(
+      WORKSPACE_WORKBENCH_COMMAND_EVENT,
+      onWorkspaceCommand
+    );
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(
+        WORKSPACE_WORKBENCH_COMMAND_EVENT,
+        onWorkspaceCommand
+      );
+    };
   }, [
     toggleTree,
     activeFileRelPath,
@@ -301,6 +395,17 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
   const openFile = useCallback(
     (relPath: string) => group.open(relPath),
     [group]
+  );
+  const createCanvas = useCallback(
+    async (editor: WorkspaceCanvasCreation.Editor) => {
+      const relPath = await WorkspaceCanvasCreation.create(
+        workspace.id,
+        editor
+      );
+      bumpTreeRefresh();
+      group.open(relPath);
+    },
+    [workspace.id, group, bumpTreeRefresh]
   );
   const activateTab = useCallback(
     (relPath: string) => group.activate(relPath),
@@ -331,149 +436,161 @@ export function WorkspaceWorkbench({ workspace }: { workspace: Workspace }) {
 
   return (
     <WorkspaceChangesProvider workspaceId={workspace.id}>
-      <div className="flex h-screen w-screen flex-col bg-background">
-        {/* The TitleBar exposes back/forward (Chromium history) and
-          carries the workspace workbench's own chrome. Workspace-level
-          actions sit flush right so they don't compete with the
-          back/forward pair that NavButtons pins to the left. */}
-        <TitleBar>
-          <div className="flex min-w-0 flex-1 items-center overflow-hidden">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <FolderIcon className="size-3.5 shrink-0 text-sky-500" />
-              <span className="truncate font-medium text-foreground">
-                {workspace.name}
-              </span>
-              <span className="truncate font-mono text-muted-foreground">
-                {workspace.root}
-              </span>
-            </div>
-          </div>
-          <div className="ml-auto flex shrink-0 items-center gap-1">
-            <WorkspaceOpenInMenu workspace={workspace} />
-            {supportsTerminal && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                style={TITLEBAR_NO_DRAG_STYLE}
-                onClick={toggleTerminal}
-                aria-label={
-                  terminalOpen ? "Hide terminal pane" : "Show terminal pane"
-                }
-                aria-pressed={terminalOpen}
-                title={
-                  terminalOpen
-                    ? "Hide terminal pane (⌃`)"
-                    : "Show terminal pane (⌃`)"
-                }
+      <LastWorkspaceMarker workspaceId={workspace.id} surface="workbench" />
+      <div
+        data-testid="workspace-workbench"
+        className="h-screen w-screen overflow-hidden"
+      >
+        <ResizablePanelGroup className={styles.decorativeOverflow}>
+          {/* The title bar belongs to the agent column. This keeps the right
+              region vertically uninterrupted while retaining the workspace
+              identity, navigation, and utility controls exactly where the
+              conversation begins. */}
+          <ResizablePanel
+            defaultSize={AGENT_PANE_DEFAULT}
+            minSize={AGENT_PANE_MIN}
+            className="bg-background"
+          >
+            <div className="flex h-full min-h-0 flex-col">
+              <TitleBar
+                className="border-b-0"
+                reserveRightWindowControls={false}
               >
-                <SquareTerminalIcon />
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              style={TITLEBAR_NO_DRAG_STYLE}
-              onClick={toggleTree}
-              aria-label={
-                showTree ? "Hide file tree pane" : "Show file tree pane"
-              }
-              aria-pressed={showTree}
-              title={
-                showTree
-                  ? "Hide file tree pane (⌘B)"
-                  : "Show file tree pane (⌘B)"
-              }
-            >
-              {showTree ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
-            </Button>
-          </div>
-        </TitleBar>
+                <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+                  <WorkspaceTitleMenu workspace={workspace} />
+                </div>
+              </TitleBar>
+              <div className="min-h-0 flex-1">
+                <AgentPane
+                  workspace={workspace}
+                  activeRelPath={activeRelPath}
+                  surfaceHost={surfaceHost}
+                  onMaybeMutated={bumpTreeRefresh}
+                  onDesignSearchChange={setDesignSearch}
+                  onOpenPicker={focusDesignSearchTab}
+                />
+              </div>
+            </div>
+          </ResizablePanel>
 
-        <div className="min-h-0 flex-1">
-          {/* Vertical split: the three workbench panes on top, the
-            terminal panel at the bottom (VSCode-style). The bottom pair
-            mounts on first ctrl+` and stays mounted while collapsed so
-            the shell survives toggling; shell exit unmounts it. */}
-          <ResizablePanelGroup orientation="vertical">
-            <ResizablePanel>
-              {/* Horizontal is the default orientation in
-                react-resizable-panels v4 — omit the prop.
-                Order: AgentPane | EditorPane | FileTreePane. Agent-first puts the
-                agent pane in the dominant left position; the file tree pane
-                sits on the right as a secondary navigator and is
-                conditionally rendered so the EditorPane absorbs its
-                space when hidden. */}
-              <ResizablePanelGroup>
+          {/* A generous, invisible gutter preserves resizing without putting
+              a divider back into the visual hierarchy. */}
+          <ResizableHandle
+            aria-label="Resize chat and document"
+            className={RESIZE_GUTTER_CLASS}
+            onPointerUp={releaseResizeHandlePointerFocus}
+            onPointerCancel={releaseResizeHandlePointerFocus}
+          />
+
+          <ResizablePanel
+            data-workbench-decorative-overflow
+            minSize={EDITOR_PANE_MIN}
+          >
+            <div className="h-full">
+              {/* Main and file tree are full-height siblings, so their resize
+                  boundary includes both title bars. The terminal remains a
+                  child of main and never extends beneath the docked tree. */}
+              <ResizablePanelGroup className={styles.decorativeOverflow}>
                 <ResizablePanel
-                  defaultSize={AGENT_PANE_DEFAULT}
-                  minSize={AGENT_PANE_MIN}
+                  data-workbench-decorative-overflow
+                  minSize={EDITOR_PANE_MIN}
                 >
-                  <AgentPane
-                    workspace={workspace}
-                    activeRelPath={activeRelPath}
-                    onMaybeMutated={bumpTreeRefresh}
-                    onDesignSearchChange={setDesignSearch}
-                    onOpenPicker={focusDesignSearchTab}
-                  />
-                </ResizablePanel>
-                <ResizableHandle />
-                <ResizablePanel defaultSize="57%" minSize={EDITOR_PANE_MIN}>
-                  <EditorPane
-                    workspace={workspace}
-                    openTabs={openTabs}
-                    activeRelPath={activeRelPath}
-                    onSelectTab={activateTab}
-                    onCloseTab={closeTab}
-                    onReopenClosedTab={reopenClosedTab}
-                    onSaved={bumpTreeRefresh}
-                    onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
-                    designSearch={designSearch}
-                  />
+                  <ResizablePanelGroup
+                    className={styles.decorativeOverflow}
+                    orientation="vertical"
+                  >
+                    <ResizablePanel data-workbench-decorative-overflow>
+                      <EditorPane
+                        workspace={workspace}
+                        openTabs={openTabs}
+                        activeRelPath={activeRelPath}
+                        onSelectTab={activateTab}
+                        onCloseTab={closeTab}
+                        onReopenClosedTab={reopenClosedTab}
+                        showStart={showStart}
+                        onOpenFileExplorer={openTree}
+                        onCreateCanvas={createCanvas}
+                        treeVisible={showTree}
+                        onToggleTree={toggleTree}
+                        hasBottomPane={terminalSpawned}
+                        onSaved={bumpTreeRefresh}
+                        onFileTrashed={(rp) => handleEntryTrashed(rp, false)}
+                        designSearch={designSearch}
+                      />
+                    </ResizablePanel>
+                    {terminalSpawned && (
+                      <>
+                        <ResizableHandle
+                          aria-label="Resize document and terminal"
+                          className={RESIZE_GUTTER_CLASS}
+                          onPointerUp={releaseResizeHandlePointerFocus}
+                          onPointerCancel={releaseResizeHandlePointerFocus}
+                        />
+                        <ResizablePanel
+                          data-workbench-decorative-overflow
+                          panelRef={terminalPanelRef}
+                          collapsible
+                          defaultSize={TERMINAL_PANE_DEFAULT}
+                          minSize={TERMINAL_PANE_MIN}
+                        >
+                          <div className={FLOATING_BOTTOM_SURFACE_GUTTER_CLASS}>
+                            <div className={FLOATING_UTILITY_SURFACE_CLASS}>
+                              <TerminalPane
+                                workspace={workspace}
+                                onSessionEnded={handleTerminalSessionEnded}
+                              />
+                            </div>
+                          </div>
+                        </ResizablePanel>
+                      </>
+                    )}
+                  </ResizablePanelGroup>
                 </ResizablePanel>
                 {showTree && (
                   <>
-                    <ResizableHandle />
+                    <ResizableHandle
+                      aria-label="Resize document and file tree"
+                      className={DOCKED_PANE_RESIZE_HANDLE_CLASS}
+                      onPointerUp={releaseResizeHandlePointerFocus}
+                      onPointerCancel={releaseResizeHandlePointerFocus}
+                    />
                     <ResizablePanel
                       defaultSize={FILE_TREE_PANE_DEFAULT}
                       minSize={FILE_TREE_PANE_MIN}
                       maxSize={FILE_TREE_PANE_MAX}
-                      className="bg-muted/20"
                     >
-                      <FileTreePane
-                        workspace={workspace}
-                        activeRelPath={activeRelPath}
-                        onOpenFile={(rp) => {
-                          if (rp) openFile(rp);
-                        }}
-                        refreshKey={treeRefreshKey}
-                        onEntryTrashed={handleEntryTrashed}
-                      />
+                      <div className="flex h-full min-h-0 flex-col border-l border-border bg-background">
+                        <div
+                          className="desktop-drag-area flex h-11 shrink-0 items-center justify-end"
+                          style={{
+                            paddingRight: DESKTOP_WINDOW_CONTROLS_RIGHT_INSET,
+                          }}
+                        >
+                          <WorkspaceExplorerToggleButton
+                            open
+                            onToggle={toggleTree}
+                            className="mr-3"
+                          />
+                        </div>
+                        <div className="min-h-0 flex-1">
+                          <FileTreePane
+                            workspace={workspace}
+                            activeRelPath={activeRelPath}
+                            onOpenFile={(rp) => {
+                              if (rp) openFile(rp);
+                            }}
+                            refreshKey={treeRefreshKey}
+                            onEntryTrashed={handleEntryTrashed}
+                          />
+                        </div>
+                      </div>
                     </ResizablePanel>
                   </>
                 )}
               </ResizablePanelGroup>
-            </ResizablePanel>
-            {terminalSpawned && (
-              <>
-                <ResizableHandle />
-                <ResizablePanel
-                  panelRef={terminalPanelRef}
-                  collapsible
-                  defaultSize={TERMINAL_PANE_DEFAULT}
-                  minSize={TERMINAL_PANE_MIN}
-                  onResize={(size) => setTerminalOpen(size.inPixels > 0)}
-                >
-                  <TerminalPane
-                    workspace={workspace}
-                    onSessionEnded={handleTerminalSessionEnded}
-                  />
-                </ResizablePanel>
-              </>
-            )}
-          </ResizablePanelGroup>
-        </div>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     </WorkspaceChangesProvider>
   );

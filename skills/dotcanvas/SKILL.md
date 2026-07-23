@@ -61,3 +61,29 @@ a linear **deck / presentation / pitch / slideshow**, use the `slides` skill.
 - To move / resize / reorder, edit the `layout` (and document order) in the
   manifest. The human can also drag pins directly — re-read `.canvas.json`
   before editing so you don't clobber their changes (last write per file wins).
+
+## Show the result
+
+- Treat presentation as the first production milestone, not the final
+  "validate and open" step. For a new board, establish a meaningful renderable
+  checkpoint early: the manifest references at least one existing, valid
+  document with a basic visible composition. Call `surface_open` immediately
+  with the workspace-rooted `.canvas` bundle directory (for example,
+  `/poster.canvas`), then continue building and polishing it while the user can
+  watch. Intentionally use a lightweight initial composition instead of
+  authoring the finished board before opening it. Do not wait for all content,
+  assets, polish, preview generation, exhaustive validation, or task
+  completion.
+- Never open an empty bundle or a broken manifest. Open only when the manifest
+  references at least one existing, renderable document. Pass the bundle
+  directory, never its `.canvas.json` manifest.
+- For an existing primary board, open it after reading its manifest and before
+  substantial edits.
+- If the `.canvas` bundle itself is mounted as `/` in a dedicated file
+  surface, it is already presented; do not call `surface_open` just to reopen
+  it.
+- Treat presentation as auxiliary: continue regardless of the result, never
+  retry based on presentation status, and do not call `surface_open` after
+  every write.
+- Use `surface_list_open` only when the current host surface state is materially
+  useful. It is not required before `surface_open`.

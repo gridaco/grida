@@ -300,6 +300,18 @@ function close_tab_or_window(baseWindow?: BaseWindow): void {
   focusedWindow.close();
 }
 
+function toggle_workspace_terminal(baseWindow?: BaseWindow): void {
+  const focusedWindow =
+    baseWindow instanceof BrowserWindow
+      ? baseWindow
+      : BrowserWindow.getFocusedWindow();
+  if (!focusedWindow || !is_workspace_window(focusedWindow)) return;
+  focusedWindow.webContents.send(
+    IPC_CHANNELS.WORKSPACE_COMMAND,
+    "workspace.terminal.toggle"
+  );
+}
+
 /**
  * Recursively merge `extras` into `base`. Items are matched by `label`;
  * properties on `extras` override `base`. If both sides of a match carry
@@ -353,6 +365,13 @@ export function create_default_menu(
     {
       label: "View",
       submenu: [
+        {
+          label: "Toggle Terminal",
+          accelerator: "Ctrl+`",
+          click: (_menuItem, baseWindow) =>
+            toggle_workspace_terminal(baseWindow),
+        },
+        { type: "separator" },
         {
           label: "Reload",
           accelerator: "CmdOrCtrl+Shift+Alt+R",

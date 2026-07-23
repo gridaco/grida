@@ -1,0 +1,44 @@
+.chatScroll {
+  --chat-scrollbar-rail: 10px;
+  --scroll-fade-mask: var(--scroll-fade-block), linear-gradient(#000 0 0);
+
+  -webkit-mask-position:
+    left top,
+    right top;
+  mask-position:
+    left top,
+    right top;
+  -webkit-mask-size:
+    calc(100% - var(--chat-scrollbar-rail)) 100%,
+    var(--chat-scrollbar-rail) 100%;
+  mask-size:
+    calc(100% - var(--chat-scrollbar-rail)) 100%,
+    var(--chat-scrollbar-rail) 100%;
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}
+
+.chatScroll::-webkit-scrollbar {
+  width: var(--chat-scrollbar-rail);
+  background: transparent;
+}
+
+.chatScroll::-webkit-scrollbar-button {
+  display: none;
+}
+
+.chatScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chatScroll::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--muted-foreground) 42%, transparent);
+  background-clip: padding-box;
+}
+
+.chatScroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--muted-foreground) 62%, transparent);
+  background-clip: padding-box;
+}

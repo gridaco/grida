@@ -44,6 +44,7 @@ export default function DesktopWorkspacePage() {
 function WorkspacePageInner() {
   const params = useSearchParams();
   const workspaceId = params.get("id");
+  const initialActiveRelPath = params.get("path") ?? undefined;
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "ready"; workspace: Workspace }
@@ -92,7 +93,13 @@ function WorkspacePageInner() {
   if (state.kind === "error") {
     return <ErrorScreen message={state.message} onRetry={resolve} />;
   }
-  return <WorkspaceWorkbench workspace={state.workspace} />;
+  return (
+    <WorkspaceWorkbench
+      key={`${state.workspace.id}:${initialActiveRelPath ?? ""}`}
+      workspace={state.workspace}
+      initialActiveRelPath={initialActiveRelPath}
+    />
+  );
 }
 
 function LoadingScreen() {

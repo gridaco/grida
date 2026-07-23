@@ -109,14 +109,20 @@ export type AgentRunOptions = {
    */
   mode?: AgentMode;
   /**
-   * Whether the CLIENT making this run has a human UI that can answer the
-   * locked `question` tool (RFC `tools` §question). Declared per run because one
-   * daemon serves both — the desktop-from-web bridge (a human, `true`) and a
-   * one-shot `cli run` (no UI, `false`). Omitted ⇒ falls back to the host's
-   * `interactive` default. When false, `question` returns the fixed headless
-   * refusal instead of pausing the run forever on a client that can't answer.
+   * Whether the CLIENT making this run can answer the `question` tool.
+   * Declared per run because one daemon serves both the Desktop bridge (`true`)
+   * and headless CLI/ACP clients (`false`). Omitted ⇒ the host's `interactive`
+   * default. When false, question refuses instead of pausing forever.
    */
   interactive?: boolean;
+  /**
+   * Artifact-surface state captured by the client at the start of this turn.
+   * Presence means a surface observer is attached; omission means
+   * headless/detached. The server uses this immutable snapshot to answer the
+   * always-server-executed surface tools, so model continuation never depends
+   * on a renderer result.
+   */
+  surface?: import("../surface").AgentSurface.Snapshot;
   /**
    * Resume answer for a paused supervised approval (RFC `permission modes`,
    * Phase 2). Present ONLY on the turn that answers an Allow/Deny; the host

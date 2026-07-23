@@ -126,6 +126,8 @@ export {
   createToolset,
   RUN_COMMAND_TOOL_NAME,
   QUESTION_TOOL_NAME,
+  SURFACE_OPEN_TOOL_NAME,
+  SURFACE_LIST_OPEN_TOOL_NAME,
   type AgentToolName,
   type RunCommandOutcome,
   type ToolsetCapabilities,

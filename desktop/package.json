@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "private": true,
   "description": "Grida Desktop App",
   "keywords": [],
@@ -13,13 +13,14 @@
   "repository": "https://github.com/gridaco/grida",
   "main": ".vite/build/main.js",
   "scripts": {
-    "dev": "node scripts/prepare-dev-electron-branding.mjs && electron-forge start",
-    "dev:insiders": "node scripts/prepare-dev-electron-branding.mjs --insiders && electron-forge start -- --insiders",
-    "make": "node scripts/prepare-dev-electron-branding.mjs && electron-forge make",
-    "package": "node scripts/prepare-dev-electron-branding.mjs && electron-forge package",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "build:linked-packages": "pnpm --dir .. exec turbo run build --no-update-notifier --output-logs=errors-only --filter=@grida/agent --filter=@grida/ai-models --filter=@grida/daemon --filter=@grida/desktop-bridge --filter=@grida/home",
+    "dev": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs && electron-forge start",
+    "dev:insiders": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs --insiders && electron-forge start -- --insiders",
+    "make": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs && electron-forge make",
+    "package": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs && electron-forge package",
+    "test": "pnpm run build:linked-packages && vitest run",
+    "test:watch": "pnpm run build:linked-packages && vitest",
+    "typecheck": "pnpm run build:linked-packages && tsc --noEmit",
     "verify:package": "node scripts/verify-packaged-bundle.mjs"
   },
   "dependencies": {

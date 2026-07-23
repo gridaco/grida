@@ -60,6 +60,29 @@ deck stays uniform. Start each from this shape:
 - Reorder = reorder `documents`. Add a slide = `write_file` a new `NNN.svg` and
   insert it into `documents`. Remove = drop it from `documents`.
 
+## Show the result
+
+- Treat presentation as the first production milestone, not the final
+  "validate and open" step. For a new deck, create a meaningful valid first
+  slide and a manifest that references it, then call `surface_open` immediately
+  with the workspace-rooted `.canvas` bundle directory (for example,
+  `/Q3 Report.canvas`). Continue adding and refining slides while the user can
+  watch. Do not wait for the full deck, all assets, polish, preview generation,
+  exhaustive validation, or task completion.
+- Never open an empty bundle, a broken manifest, or a manifest whose first
+  slide is missing. Pass the bundle directory, never its `.canvas.json`
+  manifest.
+- For an existing primary deck, open it after reading its manifest and before
+  substantial edits.
+- If the `.canvas` bundle itself is mounted as `/` in a dedicated file
+  surface, it is already presented; do not call `surface_open` just to reopen
+  it.
+- Treat presentation as auxiliary: continue regardless of the result, never
+  retry based on presentation status, and do not call `surface_open` after
+  every write.
+- Use `surface_list_open` only when the current host surface state is materially
+  useful. It is not required before `surface_open`.
+
 ## Starting from a template
 
 When the user picks a template from the gallery, a `<user_template_selection>`

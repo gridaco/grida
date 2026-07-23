@@ -19,17 +19,20 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@app/ui/lib/utils";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@app/ui/components/resizable";
+import { CurrentArtifactSurfaceHost } from "@/lib/desktop/current-artifact-surface-host";
+import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import { AISidebarChat } from "../ai-sidebar/chat";
 import { TitleBar } from "../chrome/title-bar";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
+import { CANVAS_PATH } from "../ai-sidebar/agent-fs-binding";
 import { useActiveEditorAgentFs } from "./active-editor-agent-fs";
 import { SingleFileSvgSurface, type FileMeta } from "./single-file-svg-surface";
 
@@ -63,6 +66,21 @@ export function DesktopFileShell({
       : "empty";
 
   const { fs, setActiveEditor } = useActiveEditorAgentFs();
+  const currentSurfacePath =
+    mode === "doc"
+      ? CANVAS_PATH
+      : mode === "deck"
+        ? basePath
+          ? WorkspaceArtifact.toAgentPath(basePath)
+          : "/"
+        : null;
+  const surfaceHost = useMemo(
+    () =>
+      currentSurfacePath
+        ? new CurrentArtifactSurfaceHost(currentSurfacePath)
+        : undefined,
+    [currentSurfacePath]
+  );
   // The deck auto-persists (no dirty) and has no filename — its title is the
   // bundle dir's basename, falling back to a generic label for a directly-opened
   // `.canvas` (whose workspace name we'd need a bridge call to resolve; the
@@ -111,9 +129,12 @@ export function DesktopFileShell({
                 workspace `.claude/skills`) and advertises them itself — a
                 `.canvas` bundle loads the dotcanvas/slides skill on demand. */}
             {mode === "deck" ? (
-              <AISidebarChat workspaceId={workspaceId} />
+              <AISidebarChat
+                workspaceId={workspaceId}
+                surfaceHost={surfaceHost}
+              />
             ) : (
-              <AISidebarChat fs={fs} />
+              <AISidebarChat fs={fs} surfaceHost={surfaceHost} />
             )}
           </aside>
         </ResizablePanel>

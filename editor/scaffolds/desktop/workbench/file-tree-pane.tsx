@@ -11,10 +11,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronRightIcon,
-  FileIcon,
   FolderIcon,
   FolderOpenIcon,
-  GalleryVerticalEndIcon,
   RefreshCwIcon,
 } from "lucide-react";
 import {
@@ -41,10 +39,13 @@ import {
 import { FileContextMenu } from "./workbench-file-context-menu";
 import { confirmAndTrashEntry } from "./workbench-file-actions";
 import { WorkspaceFileTree } from "./file-tree-source";
+import { WorkspaceFileIcon } from "./workspace-file-icon";
 import { useWorkspaceChanges } from "./workspace-changes";
 
 const INDENT_STEP = 12;
 const INDENT_BASE = 4;
+const FILE_TREE_SCROLL_AREA_CLASS =
+  "[&_[data-slot=scroll-area-scrollbar]]:hidden [&_[data-slot=scroll-area-viewport]]:scroll-fade-y [&_[data-slot=scroll-area-viewport]]:scroll-fade-4";
 
 const FILE_TREE_KEYMAP: Keymap = {
   ...defaultKeymap,
@@ -110,7 +111,9 @@ export function FileTreePane({
 
   if (!runtime) {
     return (
-      <ScrollArea className={cn("h-full w-full", className)}>
+      <ScrollArea
+        className={cn("h-full w-full", FILE_TREE_SCROLL_AREA_CLASS, className)}
+      >
         <LoadingRow depth={0} />
       </ScrollArea>
     );
@@ -267,7 +270,9 @@ function FileTreePaneInner({
   const selectedSet = useMemo(() => new Set(selection), [selection]);
 
   return (
-    <ScrollArea className={cn("h-full w-full", className)}>
+    <ScrollArea
+      className={cn("h-full w-full", FILE_TREE_SCROLL_AREA_CLASS, className)}
+    >
       <div
         role="tree"
         tabIndex={0}
@@ -384,7 +389,10 @@ function FileTreeRow({
         )}
       />
       {isBundle ? (
-        <GalleryVerticalEndIcon className="size-3.5 shrink-0 text-violet-500" />
+        <WorkspaceFileIcon
+          relPath={row.id}
+          className="size-3.5 shrink-0 text-violet-500"
+        />
       ) : isDirectory ? (
         row.isExpanded ? (
           <FolderOpenIcon className="size-3.5 shrink-0 text-sky-500" />
@@ -392,7 +400,10 @@ function FileTreeRow({
           <FolderIcon className="size-3.5 shrink-0 text-sky-500" />
         )
       ) : (
-        <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        <WorkspaceFileIcon
+          relPath={row.id}
+          className="size-3.5 shrink-0 text-muted-foreground"
+        />
       )}
       <span className="truncate">{meta.name}</span>
       {meta.kind === "symlink" && (
