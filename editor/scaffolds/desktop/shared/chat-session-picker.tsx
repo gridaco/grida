@@ -22,6 +22,7 @@ import {
   ListIcon,
   MessageSquarePlusIcon,
   PencilIcon,
+  PlusIcon,
   Trash2Icon,
 } from "lucide-react";
 import {
@@ -227,7 +228,7 @@ export function ChatSessionPicker({
               aria-label="New chat"
               title="New chat"
             >
-              <MessageSquarePlusIcon className="size-3.5" />
+              <PlusIcon className="size-3.5" />
             </Button>
           )}
           {current && (
