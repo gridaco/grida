@@ -97,6 +97,10 @@ export { AgentDirectoryReference } from "./directory-reference";
 export { InputResourcePolicy } from "./input-resource-policy";
 export { InputResourceRouter } from "./input-resource-router";
 export {
+  SurfaceToolCallObserver,
+  type SurfaceToolCall,
+} from "./surface-tool-call-observer";
+export {
   PreparedResourceLedger,
   type PreparedResourceSelection,
 } from "./prepared-resource-ledger";

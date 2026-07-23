@@ -33,7 +33,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Chat, useChat } from "@ai-sdk/react";
-import { AgentSurface } from "@grida/agent/surface";
+import type { AgentSurface } from "@grida/agent/surface";
 import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type UIMessage,
@@ -68,6 +68,7 @@ import {
   isSessionBusy,
   ScratchSeedBudget,
   StreamAttachOwner,
+  SurfaceToolCallObserver,
   useChatSession,
   useCoreTurnSync,
   useRefreshOnStreamEnd,
@@ -108,6 +109,7 @@ import {
   type ComposerCommandAction,
 } from "../shared/agent-composer-input";
 import { useWorkspaceComposerCatalog } from "../shared/use-workspace-composer-catalog";
+import styles from "./agent-pane.module.css";
 
 export type AgentPaneProps = {
   workspace: Workspace;
@@ -272,8 +274,9 @@ function AgentPaneContent({
   // (session, epoch), never on Chat identity.
   const attachOwner = useMemo(() => new StreamAttachOwner(), []);
   const chat = useMemo(
-    () =>
-      new Chat<UIMessage>({
+    () => {
+      const surfaceToolCallObserver = new SurfaceToolCallObserver();
+      return new Chat<UIMessage>({
         id: chatSession.current_id ?? undefined,
         messages: chatSession.initial_messages,
         transport: desktopAgentTransport.create({
@@ -313,13 +316,15 @@ function AgentPaneContent({
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
         onToolCall: ({ toolCall }) => {
           // Manual behavior contract: test/desktop-agent-surface-open.md
-          AgentSurface.observeToolCall(surfaceHostRef.current, {
+          surfaceToolCallObserver.observe(surfaceHostRef.current, {
             tool_name: toolCall.toolName,
+            tool_call_id: toolCall.toolCallId,
             input: toolCall.input,
             dynamic: toolCall.dynamic,
           });
         },
-      }),
+      });
+    },
     // Rebuild ONLY on a real rebinding — `epoch` bumps on select/start-new/
     // restore/archive-of-current and deliberately NOT on hydration or the
     // mid-stream id adoption (`apply_resolved_session_id`). Keying on
@@ -787,28 +792,37 @@ function AgentPaneContent({
         defaultTitle="Agent"
         onSelect={(id) => chatSession.select(id)}
         conversationEmpty={messages.length === 0}
+        className="border-b-0"
       />
-      <Conversation
-        className="flex-1 min-h-0"
-        initial="instant"
-        resize={conversationResize}
-      >
-        <ConversationContent className="gap-4 px-3 py-4">
-          {/* Empty state intentionally omitted — the chat starts blank
-              and the prompt input below is the only affordance the
-              user needs to begin. No "Ask the workspace agent" hero,
-              no example prompts; the surface stays quiet until used. */}
-          {settledList}
-          {pendingTurn && <PendingTurnIndicator />}
-          {compacting && <CompactingIndicator />}
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
+      <div className="relative min-h-0 flex-1">
+        <Conversation
+          className="h-full min-h-0"
+          initial="instant"
+          resize={conversationResize}
+        >
+          <ConversationContent
+            className="gap-4 px-3 py-4"
+            scrollClassName={cn(
+              styles.chatScroll,
+              "scroll-fade-y scroll-fade-4"
+            )}
+          >
+            {/* Empty state intentionally omitted — the chat starts blank
+                and the prompt input below is the only affordance the
+                user needs to begin. No "Ask the workspace agent" hero,
+                no example prompts; the surface stays quiet until used. */}
+            {settledList}
+            {pendingTurn && <PendingTurnIndicator />}
+            {compacting && <CompactingIndicator />}
+          </ConversationContent>
+          <ConversationScrollButton className="z-20" />
+        </Conversation>
+      </div>
 
       {justForked && <ForkedNotice />}
 
       {error && (
-        <div className="flex items-start gap-2 border-t bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div className="flex items-start gap-2 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {/* GRIDA-SEC-006 — the two hosted-AI codes cross the bridge as
               bare code-led messages; translate to actionable copy. A
               token-expired error also fires a background re-mint so the
@@ -863,7 +877,7 @@ function AgentPaneContent({
           a dedicated tab. This note keeps the request visible here and reopens
           the tab if the user closed it. */}
       {pendingPick && (
-        <div className="shrink-0 border-t p-3">
+        <div className="shrink-0 p-3">
           <button
             type="button"
             onClick={() => onOpenPicker?.()}
@@ -881,7 +895,7 @@ function AgentPaneContent({
         </div>
       )}
 
-      <div className="shrink-0 border-t p-3">
+      <div className="shrink-0 p-3">
         <AgentComposerInput
           catalog={catalog}
           commandActions={commandActions}
@@ -983,7 +997,7 @@ function AgentApprovalBar({
   ) => void | Promise<void>;
 }) {
   return (
-    <div className="shrink-0 border-t bg-muted/30 px-3 py-2.5">
+    <div className="shrink-0 bg-muted/30 px-3 py-2.5">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-muted-foreground">

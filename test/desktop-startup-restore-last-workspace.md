@@ -63,9 +63,8 @@ implicit restoration.
      directory.
 10. Restore the directory, open two workspace windows, focus B last, quit, and
     relaunch.
-
-- Expected: B opens. This experiment restores one last-focused surface, not
-  the complete multi-window session.
+    - Expected: B opens. This experiment restores one last-focused surface, not
+      the complete multi-window session.
 
 ## Notes
 

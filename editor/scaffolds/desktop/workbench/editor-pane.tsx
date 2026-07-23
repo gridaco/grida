@@ -1,8 +1,8 @@
 /**
- * Workspace editor pane: a VSCode-style tab strip over mounted file tabs.
+ * Workspace editor region: a persistent title bar over the focused document.
  *
  * Open, active, and close state lives in `workspace-workbench.tsx`; this
- * component owns only transient per-tab dirty state for the tab strip.
+ * component owns only transient per-tab dirty state for the title bar.
  */
 "use client";
 
@@ -13,9 +13,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { FileIcon, ImagesIcon, XIcon } from "lucide-react";
+import {
+  FileIcon,
+  ImagesIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
+  XIcon,
+} from "lucide-react";
+import { Button } from "@app/ui/components/button";
 import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
+import { DESKTOP_WINDOW_CONTROLS_RIGHT_INSET } from "@/scaffolds/desktop/chrome/title-bar";
 import { EditorPaneTab } from "./editor-pane-tab";
 import { EditorPaneDesignSearch } from "./editor-pane-design-search";
 import { isVirtualTab, type DesignSearchSession } from "./design-search-tab";
@@ -34,6 +42,9 @@ export type EditorPaneProps = {
   onSelectTab: (relPath: string) => void;
   onCloseTab: (relPath: string) => void;
   onReopenClosedTab: () => void;
+  treeVisible: boolean;
+  onToggleTree: () => void;
+  hasBottomPane?: boolean;
   className?: string;
   onSaved?: () => void;
   /** Called after a tab's "Move to Trash" succeeds (drops the tab +
@@ -52,6 +63,9 @@ export function EditorPane({
   onSelectTab,
   onCloseTab,
   onReopenClosedTab,
+  treeVisible,
+  onToggleTree,
+  hasBottomPane = false,
   className,
   onSaved,
   onFileTrashed,
@@ -151,79 +165,85 @@ export function EditorPane({
     };
   }, [dispatchWorkspaceCommand]);
 
-  if (openTabs.length === 0) {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full items-center justify-center bg-background px-6 text-center text-sm text-muted-foreground",
-          className
-        )}
-      >
-        Pick a file from the file tree pane to open it as a tab.
-      </div>
-    );
-  }
-
   return (
-    <div className={cn("flex h-full w-full flex-col bg-background", className)}>
-      <TabStrip
+    <div className={cn("flex h-full w-full flex-col", className)}>
+      <EditorTitleBar
         workspace={workspace}
         tabs={openTabs}
         activeRelPath={activeRelPath}
         dirtyPaths={dirtyPaths}
         onSelect={onSelectTab}
         onClose={handleClose}
+        treeVisible={treeVisible}
+        onToggleTree={onToggleTree}
         onFileTrashed={onFileTrashed}
       />
-      <div className="relative min-h-0 flex-1">
-        {openTabs.map((relPath) => {
-          // A virtual tab has no file body — render its bespoke surface (the
-          // design-search picker), kept mounted-but-hidden when inactive like a
-          // file tab so its fetched results survive a tab switch.
-          if (isVirtualTab(relPath)) {
-            const active = relPath === activeRelPath;
-            return (
-              <div
-                key={`${workspace.id}:${relPath}`}
-                className={cn(
-                  "absolute inset-0",
-                  !active && "invisible pointer-events-none"
-                )}
-                aria-hidden={!active}
-              >
-                {designSearch ? (
-                  <EditorPaneDesignSearch session={designSearch} />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-                    No references to pick.
-                  </div>
-                )}
-              </div>
-            );
-          }
-          return (
-            <EditorPaneTab
-              key={`${workspace.id}:${relPath}`}
-              workspaceId={workspace.id}
-              relPath={relPath}
-              active={relPath === activeRelPath}
-              onDirtyChange={onTabDirtyChange}
-              onSaved={onSaved}
-            />
-          );
-        })}
+      <div className="min-h-0 flex-1">
+        {/* An empty workspace is intentionally quiet: the persistent title
+            bar remains available, but no blank document surface is drawn. */}
+        {openTabs.length > 0 && (
+          /* The resizable ancestors allow decorative overflow, while this
+             surface remains clipped so only its shadow escapes. */
+          <div
+            className={cn(
+              "h-full min-h-0 pl-1.5 pr-3",
+              hasBottomPane ? "pb-1.5" : "pb-3"
+            )}
+          >
+            <div className="relative h-full overflow-hidden rounded-lg border border-border bg-background shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_24px_-8px_rgb(0_0_0/0.12)]">
+              {openTabs.map((relPath) => {
+                // A virtual tab has no file body — render its bespoke
+                // surface, kept mounted-but-hidden when inactive like a file
+                // tab so its fetched results survive a tab switch.
+                if (isVirtualTab(relPath)) {
+                  const active = relPath === activeRelPath;
+                  return (
+                    <div
+                      key={`${workspace.id}:${relPath}`}
+                      className={cn(
+                        "absolute inset-0",
+                        !active && "invisible pointer-events-none"
+                      )}
+                      aria-hidden={!active}
+                    >
+                      {designSearch ? (
+                        <EditorPaneDesignSearch session={designSearch} />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+                          No references to pick.
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <EditorPaneTab
+                    key={`${workspace.id}:${relPath}`}
+                    workspaceId={workspace.id}
+                    relPath={relPath}
+                    active={relPath === activeRelPath}
+                    onDirtyChange={onTabDirtyChange}
+                    onSaved={onSaved}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function TabStrip({
+function EditorTitleBar({
   workspace,
   tabs,
   activeRelPath,
   dirtyPaths,
   onSelect,
   onClose,
+  treeVisible,
+  onToggleTree,
   onFileTrashed,
 }: {
   workspace: Workspace;
@@ -232,43 +252,89 @@ function TabStrip({
   dirtyPaths: Set<string>;
   onSelect: (relPath: string) => void;
   onClose: (relPath: string) => void;
+  treeVisible: boolean;
+  onToggleTree: () => void;
   onFileTrashed?: (relPath: string) => void;
 }) {
   return (
     <div
-      role="tablist"
-      aria-label="Open files"
-      className="no-scrollbar flex h-9 shrink-0 items-stretch overflow-x-auto overscroll-x-contain border-b bg-muted/30"
+      className="desktop-drag-area relative flex h-11 shrink-0 items-center"
+      style={{
+        // While the file tree is closed, this is the rightmost title bar and
+        // must keep its toggle/tabs out from under Windows/Linux controls. When
+        // the tree opens, its own title bar becomes the rightmost owner.
+        paddingRight: treeVisible
+          ? undefined
+          : DESKTOP_WINDOW_CONTROLS_RIGHT_INSET,
+      }}
     >
-      {tabs.map((relPath) => {
-        const virtual = isVirtualTab(relPath);
-        return (
-          <TabItem
-            key={relPath}
-            workspace={workspace}
-            relPath={relPath}
-            virtual={virtual}
-            label={virtual ? "Pick references" : undefined}
-            active={relPath === activeRelPath}
-            dirty={dirtyPaths.has(relPath)}
-            icon={
-              virtual ? (
-                <ImagesIcon className="size-3.5 shrink-0" />
-              ) : (
-                <FileIcon className="size-3.5 shrink-0" />
-              )
-            }
-            onSelect={() => onSelect(relPath)}
-            onClose={() => onClose(relPath)}
-            onTrashed={
-              onFileTrashed && !virtual
-                ? () => onFileTrashed(relPath)
-                : undefined
-            }
-          />
-        );
-      })}
+      <div
+        role="tablist"
+        aria-label="Open files"
+        className="scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain pl-1.5 pr-2"
+      >
+        {tabs.map((relPath) => {
+          const virtual = isVirtualTab(relPath);
+          return (
+            <TabItem
+              key={relPath}
+              workspace={workspace}
+              relPath={relPath}
+              virtual={virtual}
+              label={virtual ? "Pick references" : undefined}
+              active={relPath === activeRelPath}
+              dirty={dirtyPaths.has(relPath)}
+              icon={
+                virtual ? (
+                  <ImagesIcon className="size-3.5 shrink-0" />
+                ) : (
+                  <FileIcon className="size-3.5 shrink-0" />
+                )
+              }
+              onSelect={() => onSelect(relPath)}
+              onClose={() => onClose(relPath)}
+              onTrashed={
+                onFileTrashed && !virtual
+                  ? () => onFileTrashed(relPath)
+                  : undefined
+              }
+            />
+          );
+        })}
+      </div>
+      {!treeVisible && (
+        <WorkspaceExplorerToggleButton
+          open={false}
+          onToggle={onToggleTree}
+          className="mr-3"
+        />
+      )}
     </div>
+  );
+}
+
+export function WorkspaceExplorerToggleButton({
+  open,
+  onToggle,
+  className,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className={cn("desktop-no-drag shrink-0", className)}
+      onClick={onToggle}
+      aria-label={open ? "Hide file tree pane" : "Show file tree pane"}
+      aria-pressed={open}
+      title={open ? "Hide file tree pane (⌘B)" : "Show file tree pane (⌘B)"}
+    >
+      {open ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
+    </Button>
   );
 }
 
@@ -330,11 +396,11 @@ function TabItem({
         }
       }}
       className={cn(
-        "group flex shrink-0 cursor-pointer select-none items-center gap-1.5 border-r px-2 text-xs outline-none",
+        "desktop-no-drag group flex h-6 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-2 text-xs outline-none transition-colors",
         active
-          ? "bg-background text-foreground"
+          ? "bg-muted text-foreground shadow-xs"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-        "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
+        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       )}
     >
       {icon}
@@ -346,7 +412,7 @@ function TabItem({
           onClose();
         }}
         className={cn(
-          "ml-1 grid size-4 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
+          "desktop-no-drag ml-1 grid size-4 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
           active || dirty ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         )}
         aria-label={dirty ? `Close ${name} (unsaved)` : `Close ${name}`}

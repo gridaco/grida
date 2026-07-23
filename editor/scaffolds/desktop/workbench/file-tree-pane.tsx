@@ -45,6 +45,8 @@ import { useWorkspaceChanges } from "./workspace-changes";
 
 const INDENT_STEP = 12;
 const INDENT_BASE = 4;
+const FILE_TREE_SCROLL_AREA_CLASS =
+  "[&_[data-slot=scroll-area-scrollbar]]:hidden [&_[data-slot=scroll-area-viewport]]:scroll-fade-y [&_[data-slot=scroll-area-viewport]]:scroll-fade-4";
 
 const FILE_TREE_KEYMAP: Keymap = {
   ...defaultKeymap,
@@ -110,7 +112,9 @@ export function FileTreePane({
 
   if (!runtime) {
     return (
-      <ScrollArea className={cn("h-full w-full", className)}>
+      <ScrollArea
+        className={cn("h-full w-full", FILE_TREE_SCROLL_AREA_CLASS, className)}
+      >
         <LoadingRow depth={0} />
       </ScrollArea>
     );
@@ -267,7 +271,9 @@ function FileTreePaneInner({
   const selectedSet = useMemo(() => new Set(selection), [selection]);
 
   return (
-    <ScrollArea className={cn("h-full w-full", className)}>
+    <ScrollArea
+      className={cn("h-full w-full", FILE_TREE_SCROLL_AREA_CLASS, className)}
+    >
       <div
         role="tree"
         tabIndex={0}

@@ -71,6 +71,29 @@ describe("WorkspaceSurfaceHost.open", () => {
     expect(readdir).toHaveBeenCalledTimes(1);
     expect(group.getSnapshot()).toEqual({ tabs: [], active: null });
   });
+
+  it("does not override newer user navigation after async validation", async () => {
+    let resolveEntries!: (entries: WorkspaceFsEntry[]) => void;
+    const entries = new Promise<WorkspaceFsEntry[]>((resolve) => {
+      resolveEntries = resolve;
+    });
+    const readdir = vi.fn<WorkspaceArtifact.Readdir>(() => entries);
+    const group = new EditorGroup();
+    const host = new WorkspaceSurfaceHost(readdir, group);
+    group.open("before.svg");
+
+    const opening = host.open("/agent.svg");
+    group.open("user.svg");
+    resolveEntries([
+      { name: "agent.svg", rel_path: "agent.svg", kind: "file" },
+    ]);
+    await opening;
+
+    expect(group.getSnapshot()).toEqual({
+      tabs: ["before.svg", "user.svg"],
+      active: "user.svg",
+    });
+  });
 });
 
 describe("WorkspaceSurfaceHost.listOpen", () => {

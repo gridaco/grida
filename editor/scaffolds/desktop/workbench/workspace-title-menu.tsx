@@ -6,16 +6,17 @@ import {
   ChevronDownIcon,
   ClipboardIcon,
   Code2Icon,
+  FolderIcon,
   FolderOpenIcon,
   HammerIcon,
   TerminalIcon,
 } from "lucide-react";
 import { Button } from "@app/ui/components/button";
-import { ButtonGroup } from "@app/ui/components/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@app/ui/components/dropdown-menu";
@@ -26,11 +27,7 @@ import {
   type Workspace,
 } from "@/lib/desktop/bridge";
 import { Resources } from "@/resources";
-import { TITLEBAR_NO_DRAG_STYLE } from "@/scaffolds/desktop/chrome/title-bar";
 import { copyWorkspacePath } from "./workbench-file-actions";
-
-const STORAGE_KEY = "grida.desktop.workspace.openIn.preferredApp";
-const DEFAULT_WORKSPACE_APP: HostAppId = "finder";
 
 const PREFERRED_WORKSPACE_APPS: HostAppId[] = [
   "finder",
@@ -42,17 +39,11 @@ const PREFERRED_WORKSPACE_APPS: HostAppId[] = [
   "xcode",
 ];
 
-export function WorkspaceOpenInMenu({ workspace }: { workspace: Workspace }) {
+export function WorkspaceTitleMenu({ workspace }: { workspace: Workspace }) {
   const [apps, setApps] = useState<HostAppInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState<HostAppId | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [preferredAppId, setPreferredAppId] = useState<HostAppId | null>(null);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (isHostAppId(stored)) setPreferredAppId(stored);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,12 +77,6 @@ export function WorkspaceOpenInMenu({ workspace }: { workspace: Workspace }) {
     [apps]
   );
 
-  const selectedApp =
-    installedApps.find((app) => app.id === preferredAppId) ??
-    installedApps.find((app) => app.id === DEFAULT_WORKSPACE_APP) ??
-    installedApps[0] ??
-    null;
-
   async function openIn(appId: HostAppId) {
     setOpening(appId);
     setError(null);
@@ -104,85 +89,50 @@ export function WorkspaceOpenInMenu({ workspace }: { workspace: Workspace }) {
     }
   }
 
-  function preferAndOpen(appId: HostAppId) {
-    setPreferredAppId(appId);
-    window.localStorage.setItem(STORAGE_KEY, appId);
-    void openIn(appId);
-  }
-
   return (
-    <ButtonGroup
-      className="rounded-md border bg-background shadow-xs"
-      style={TITLEBAR_NO_DRAG_STYLE}
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        disabled={!selectedApp || opening !== null}
-        onClick={() => selectedApp && void openIn(selectedApp.id)}
-        aria-label={
-          selectedApp
-            ? `Open workspace in ${selectedApp.label}`
-            : "Open workspace in app"
-        }
-        title={
-          selectedApp
-            ? `Open workspace in ${selectedApp.label}`
-            : (error ?? "Open workspace in app")
-        }
-      >
-        {selectedApp ? <HostAppIcon app={selectedApp} /> : <Code2Icon />}
-      </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="w-5 px-0"
-            aria-label="Choose app"
-            title="Choose app"
-          >
-            <ChevronDownIcon className="size-2.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[220px]">
-          {loading ? (
-            <DropdownMenuItem disabled>Checking apps…</DropdownMenuItem>
-          ) : installedApps.length === 0 ? (
-            <DropdownMenuItem disabled>
-              {error ?? "No preferred apps found"}
-            </DropdownMenuItem>
-          ) : (
-            installedApps.map((app) => {
-              return (
-                <DropdownMenuItem
-                  key={app.id}
-                  disabled={opening !== null}
-                  onSelect={() => preferAndOpen(app.id)}
-                >
-                  <HostAppIcon app={app} />
-                  <span>{app.label}</span>
-                </DropdownMenuItem>
-              );
-            })
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => void copyWorkspacePath(workspace)}>
-            <ClipboardIcon />
-            <span>Copy path</span>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="desktop-no-drag -ml-2 min-w-0 max-w-full gap-1.5 px-2 font-medium"
+          aria-label={`${workspace.name} workspace menu`}
+        >
+          <FolderIcon className="size-3.5 shrink-0" />
+          <span className="truncate">{workspace.name}</span>
+          <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[220px]">
+        <DropdownMenuLabel>Open in</DropdownMenuLabel>
+        {loading ? (
+          <DropdownMenuItem disabled>Checking apps…</DropdownMenuItem>
+        ) : installedApps.length === 0 ? (
+          <DropdownMenuItem disabled>
+            {error ?? "No preferred apps found"}
           </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </ButtonGroup>
-  );
-}
-
-function isHostAppId(id: string | null): id is HostAppId {
-  return (
-    typeof id === "string" &&
-    (PREFERRED_WORKSPACE_APPS as readonly string[]).includes(id)
+        ) : (
+          installedApps.map((app) => {
+            return (
+              <DropdownMenuItem
+                key={app.id}
+                disabled={opening !== null}
+                onSelect={() => void openIn(app.id)}
+              >
+                <HostAppIcon app={app} />
+                <span>{app.label}</span>
+              </DropdownMenuItem>
+            );
+          })
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void copyWorkspacePath(workspace)}>
+          <ClipboardIcon />
+          <span>Copy path</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

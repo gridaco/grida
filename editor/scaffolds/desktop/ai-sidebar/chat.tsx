@@ -19,7 +19,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat, useChat } from "@ai-sdk/react";
 import { AgentFs } from "@grida/agent/fs";
-import { AgentSurface } from "@grida/agent/surface";
+import type { AgentSurface } from "@grida/agent/surface";
 import { AgentTodos } from "@grida/agent/todos";
 import { resolveDesignSearch } from "@/scaffolds/desktop/shared/design-search";
 import {
@@ -46,6 +46,7 @@ import {
   desktopAgentTransport,
   isSessionBusy,
   StreamAttachOwner,
+  SurfaceToolCallObserver,
   useChatSession,
   useCoreTurnSync,
   useRefreshOnStreamEnd,
@@ -155,6 +156,7 @@ export function AISidebarChat({
   const attachOwner = useMemo(() => new StreamAttachOwner(), []);
   const chat = useMemo(() => {
     const todos = new AgentTodos();
+    const surfaceToolCallObserver = new SurfaceToolCallObserver();
     const chat = new Chat<UIMessage>({
       id: chatSession.current_id ?? undefined,
       messages: chatSession.initial_messages,
@@ -199,7 +201,7 @@ export function AISidebarChat({
         // Manual behavior contract: test/desktop-agent-surface-open.md
         if (
           surfaceHostRef.current &&
-          AgentSurface.observeToolCall(surfaceHostRef.current, agentToolCall)
+          surfaceToolCallObserver.observe(surfaceHostRef.current, agentToolCall)
         ) {
           return;
         }

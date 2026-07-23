@@ -22,7 +22,8 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
   async open(path: string): Promise<void> {
     const relPath = WorkspaceArtifact.fromAgentPath(path);
     if (relPath === null) return;
-    await this.openRelative(relPath);
+    const expectedSnapshot = this.group.getSnapshot();
+    await this.openValidated(relPath, expectedSnapshot);
   }
 
   /**
@@ -30,6 +31,13 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
    * used for model calls.
    */
   async openRelative(path: string): Promise<void> {
+    await this.openValidated(path);
+  }
+
+  private async openValidated(
+    path: string,
+    expectedSnapshot?: ReturnType<EditorGroup["getSnapshot"]>
+  ): Promise<void> {
     const relPath = WorkspaceArtifact.normalizeRelativePath(path);
     if (relPath === null) return;
 
@@ -41,6 +49,16 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
     }
     if (!entry || !WorkspaceArtifact.isOpenable(entry)) return;
 
+    // Validation crosses the asynchronous Desktop bridge. Any tab mutation in
+    // the meantime is newer navigation and supersedes this auxiliary agent
+    // presentation request. Explicit cold-start restoration uses
+    // `openRelative`, which deliberately has no preemption snapshot.
+    if (
+      expectedSnapshot !== undefined &&
+      this.group.getSnapshot() !== expectedSnapshot
+    ) {
+      return;
+    }
     this.group.open(relPath);
   }
 

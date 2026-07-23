@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
@@ -9,19 +9,12 @@ import { app, nav } from "@/lib/desktop/bridge";
 import { useNavigationState } from "@/lib/desktop/bridge-react";
 
 /**
- * Standard title-bar row height. Matches Tailwind `h-10` and the
- * `titleBarOverlay.height` value the Electron main process passes to
- * `BrowserWindow` on Windows / Linux (`desktop/src/window.ts`) so the
- * OS-rendered window-control buttons sit flush with the renderer's
- * title bar instead of clipping a few pixels off.
- */
-export const TITLEBAR_HEIGHT_PX = 40;
-
-/**
  * Left inset on macOS to clear the native traffic-light buttons.
  *
  * `BrowserWindow` is constructed with `titleBarStyle: "hidden"` +
- * `trafficLightPosition: { x: 14, y: 14 }`. The three native buttons
+ * `trafficLightPosition: { x: 14, y: 16 }`. The 12px native buttons
+ * therefore center at `16 + 12 / 2 = 22px`, matching the title controls
+ * and workspace tabs. The three native buttons
  * are 12px circles laid out with ~20px gaps, so the rightmost edge
  * lands around x = 14 + (12 + 8) × 3 ≈ 74. We pad 78 for visual
  * margin and so the leftmost interactive control doesn't appear
@@ -34,26 +27,13 @@ export const TITLEBAR_HEIGHT_PX = 40;
 const MAC_TRAFFIC_LIGHT_INSET_PX = 78;
 
 /**
- * Spread onto any child element that needs to receive pointer events
- * inside a `<TitleBar>` (buttons, links, inputs). The bar's
- * background is `-webkit-app-region: drag`; without this opt-out a
- * click on a control would be intercepted by the OS as a window-move
- * gesture and the `onClick` handler would never fire.
- *
- * Plain text is intentionally left as part of the drag region — the
- * macOS convention is that grabbing the document title moves the
- * window, and it's nice on every platform.
+ * Width occupied by native right-edge window controls in Window Controls
+ * Overlay mode. `100vw` keeps the calculation correct for title bars that own
+ * only one column of the window; the CSS env fallbacks reduce it to zero on
+ * macOS hidden-titlebar mode and in ordinary browsers.
  */
-export const TITLEBAR_NO_DRAG_STYLE: CSSProperties = {
-  // `WebkitAppRegion` is an Electron / Chromium extension that
-  // TypeScript's `CSSProperties` doesn't know about. The cast keeps
-  // it inline-styleable without polluting the global types.
-  WebkitAppRegion: "no-drag",
-} as CSSProperties;
-
-const TITLEBAR_DRAG_STYLE: CSSProperties = {
-  WebkitAppRegion: "drag",
-} as CSSProperties;
+export const DESKTOP_WINDOW_CONTROLS_RIGHT_INSET =
+  "calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw))";
 
 /**
  * Detect the host platform via the desktop bridge.
@@ -80,14 +60,16 @@ function usePlatform(): NodeJS.Platform | string | null {
 /**
  * Frameless-window title bar for `/desktop/*` pages.
  *
- * Renders a 40px-tall row pinned at the top of the page. The bar's
+ * Renders a 44px-tall row pinned at the top of the page. The bar's
  * background is a drag region: anywhere not covered by an
  * interactive child can be grabbed to move the window.
+ * Interactive children opt out with the shared `.desktop-no-drag` class
+ * from `editor/app/editor.css`; plain text remains draggable.
  *
  * Reserves the OS-controls strip so page content never overlaps it:
  *
  *   - **macOS** — 78px of left padding for the traffic-light buttons
- *     (hidden-titlebar mode draws them natively at `{x:14, y:14}`).
+ *     (hidden-titlebar mode draws them natively at `{x:14, y:16}`).
  *   - **Windows / Linux** — uses the WCO `env(titlebar-area-x)` and
  *     `env(titlebar-area-width)` env vars from `titleBarOverlay` to
  *     keep content inside the OS-supplied safe zone. When the env
@@ -100,14 +82,14 @@ function usePlatform(): NodeJS.Platform | string | null {
  * ```tsx
  * <TitleBar>
  *   <span className="font-medium">{docName}</span>
- *   <Button style={TITLEBAR_NO_DRAG_STYLE} onClick={toggle}>…</Button>
+ *   <Button className="desktop-no-drag" onClick={toggle}>…</Button>
  * </TitleBar>
  * ```
  *
  * Children render directly in the bar's content row. Buttons and
- * other interactive elements must spread {@link TITLEBAR_NO_DRAG_STYLE}
- * so clicks land on the handler instead of being eaten by the drag
- * region. Plain text inherits the drag region.
+ * other interactive elements must use `.desktop-no-drag` so clicks land on
+ * the handler instead of being eaten by the drag region. Plain text remains
+ * part of the drag region.
  *
  * Pages that don't need any controls in the bar can render
  * `<TitleBar />` bare — the drag region still works.
@@ -115,9 +97,16 @@ function usePlatform(): NodeJS.Platform | string | null {
 export function TitleBar({
   children,
   className,
+  reserveRightWindowControls = true,
 }: {
   children?: ReactNode;
   className?: string;
+  /**
+   * Keep the Windows/Linux window-controls overlay out of this bar's content.
+   * Disable only when the bar occupies a left-side region that cannot contain
+   * those right-edge controls; that layout must reserve their space itself.
+   */
+  reserveRightWindowControls?: boolean;
 }) {
   const platform = usePlatform();
   const isMac = platform === "darwin";
@@ -129,12 +118,10 @@ export function TitleBar({
       className={cn(
         // `select-none` so dragging the bar doesn't accidentally
         // start a text selection on the title.
-        "grida-titlebar relative flex shrink-0 select-none items-stretch border-b bg-background",
+        "desktop-drag-area desktop-title-bar-height grida-titlebar relative flex shrink-0 select-none items-stretch border-b bg-background",
         className
       )}
       style={{
-        ...TITLEBAR_DRAG_STYLE,
-        height: TITLEBAR_HEIGHT_PX,
         // OS-controls inset. The mac branch hardcodes the
         // traffic-light width since hidden-titlebar mode doesn't
         // publish env vars. Win/Linux read the WCO env vars; the
@@ -143,14 +130,14 @@ export function TitleBar({
         paddingLeft: isMac
           ? `${MAC_TRAFFIC_LIGHT_INSET_PX}px`
           : "env(titlebar-area-x, 0px)",
-        // `100%` here refers to the bar's own width — which equals
-        // the window width because the bar is a top-level row. The
-        // formula reduces to `window_width - safe_zone_width -
-        // safe_zone_x`, i.e. exactly the width of the right-side
-        // OS-controls strip on LTR Windows / Linux.
-        paddingRight: isMac
-          ? "0px"
-          : "calc(100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%))",
+        // The viewport-based formula reduces to `window_width -
+        // safe_zone_width - safe_zone_x`, i.e. the right-side OS-controls
+        // strip on LTR Windows/Linux. A partial-width title bar disables this
+        // inset and leaves that platform-safe space to its surrounding layout.
+        paddingRight:
+          isMac || !reserveRightWindowControls
+            ? "0px"
+            : DESKTOP_WINDOW_CONTROLS_RIGHT_INSET,
       }}
     >
       <div className="flex h-full w-full items-center gap-2 px-3 text-xs text-muted-foreground">
@@ -176,19 +163,15 @@ export function TitleBar({
  * routes are flat and the buttons would be noise on every page that
  * happened to be at the entry point.
  *
- * Each button opts out of the drag region via
- * {@link TITLEBAR_NO_DRAG_STYLE} — without it the OS would consume
- * the click as a window-move gesture.
+ * Each button opts out of the drag region via `.desktop-no-drag` — without it
+ * the OS would consume the click as a window-move gesture.
  */
 function NavButtons() {
   const state = useNavigationState();
   if (!state) return null;
   if (!state.can_go_back && !state.can_go_forward) return null;
   return (
-    <div
-      className="-ml-1 flex items-center gap-0.5"
-      style={TITLEBAR_NO_DRAG_STYLE}
-    >
+    <div className="desktop-no-drag -ml-1 flex items-center gap-0.5">
       <Button
         type="button"
         variant="ghost"
