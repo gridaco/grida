@@ -96,7 +96,7 @@ export function WorkspaceTitleMenu({ workspace }: { workspace: Workspace }) {
           type="button"
           variant="ghost"
           size="sm"
-          className="desktop-no-drag -ml-2 min-w-0 max-w-full gap-1.5 px-2 font-medium"
+          className="desktop-no-drag min-w-0 max-w-full gap-1.5 px-2 font-medium"
           aria-label={`${workspace.name} workspace menu`}
         >
           <FolderIcon className="size-3.5 shrink-0" />
