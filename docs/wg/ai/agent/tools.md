@@ -106,6 +106,37 @@ profile that intentionally relies on shell/search commands for
 discovery should document that product choice in its binding instead
 of shipping a misleading whole-index list tool.
 
+### Filesystem mutation invariant
+
+`edit` is a conditional mutation over the file's **current content**. During
+each invocation, the tool reads the current text and applies the replacement
+only when the supplied old text identifies the requested location. A missing
+match or an ambiguous match is a conflict result; the tool MUST leave the file
+unchanged.
+
+A prior `read` is often how an agent obtains exact edit context, but it is
+guidance, not authorization. Conformance MUST NOT depend on a session-local
+ledger recording that the agent read the path earlier. Such a ledger loses its
+meaning when a run pauses, resumes, or moves between workers. In particular, an
+agent MAY edit a file it just successfully wrote without reading the same bytes
+back first.
+
+An implementation SHOULD close the gap between validation and publication with
+an atomic or conditional backend write when its storage layer supports one. If
+it cannot, it MUST still read current content during the invocation and
+serialize its own same-path mutations; it must not claim cross-process
+atomicity.
+
+`write` remains the locked full-file operation: it creates or overwrites the
+path. It is intentionally different from `edit` and SHOULD be used only when
+replacing the complete content is the caller's intent.
+
+An implementation MAY impose a bounded text-file size. If it does, the same
+bound MUST govern successful reads, writes, and edits, and an oversized
+operation MUST return an explicit typed size failure rather than masquerading
+as a missing file. This preserves the guarantee that a successful write remains
+eligible for a later edit, including after the runtime is reconstructed.
+
 **Common extensions seen on top of the lock.** A code-shaped agent
 typically ships additional tools beyond the lock. Names are not
 standardized, but a recurring catalog includes:

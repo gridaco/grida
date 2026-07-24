@@ -108,6 +108,77 @@ describe("estimateContextBreakdown", () => {
       other: 3,
     });
   });
+
+  it("does not count persisted inline image bytes as prompt text", () => {
+    const image = {
+      ok: true,
+      path: "/scratch/image.png",
+      mime: "image/png",
+      width: 1024,
+      height: 1024,
+      bytes: 3_000_000,
+    };
+    const withoutUiBytes = estimateContextBreakdown([
+      {
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-generate_image",
+            input: { prompt: "A poster" },
+            output: image,
+          },
+          {
+            type: "tool-view_image",
+            input: { path: image.path },
+            output: image,
+          },
+        ],
+      },
+    ]);
+    const withUiBytes = estimateContextBreakdown([
+      {
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-generate_image",
+            input: { prompt: "A poster" },
+            output: { ...image, data: "A".repeat(4_000_000) },
+          },
+          {
+            type: "tool-view_image",
+            input: { path: image.path },
+            output: { ...image, data: "A".repeat(4_000_000) },
+          },
+        ],
+      },
+    ]);
+
+    expect(withUiBytes).toEqual(withoutUiBytes);
+    expect(withUiBytes.tools).toBeLessThan(100);
+  });
+
+  it("still counts ordinary text stored in a data field", () => {
+    const withoutData = estimateContextBreakdown([
+      {
+        role: "assistant",
+        parts: [{ type: "tool-example", input: {}, output: {} }],
+      },
+    ]);
+    const withData = estimateContextBreakdown([
+      {
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-example",
+            input: {},
+            output: { data: "x".repeat(40) },
+          },
+        ],
+      },
+    ]);
+
+    expect(withData.tools).toBeGreaterThan(withoutData.tools);
+  });
 });
 
 describe("computeContextUsage", () => {

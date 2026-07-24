@@ -154,6 +154,25 @@ describe("MemoryBackend", () => {
 // ---------------------------------------------------------------------------
 
 describe("AgentFs — basics", () => {
+  it("requires backend revision reads and writes to be implemented together", () => {
+    const backend: AgentFs.Backend = {
+      async list() {
+        return [];
+      },
+      async read() {
+        return null;
+      },
+      async readWithRevision() {
+        return null;
+      },
+      async write() {},
+      async delete() {},
+    };
+    expect(() => new AgentFs(backend)).toThrow(
+      /readWithRevision and writeIfRevision together/
+    );
+  });
+
   it("starts empty and lists nothing", () => {
     const fs = new AgentFs(new AgentFs.MemoryBackend());
     expect(fs.list()).toEqual([]);
@@ -331,9 +350,7 @@ describe("AgentFs — mounted (live binding)", () => {
 });
 
 describe("AgentFs.edit", () => {
-  it("requires a prior read on the path (not_read)", async () => {
-    // Seed the backend so hydrate brings in a file without any agent read.
-    // A direct `fs.write()` would count as a read, so we use hydrate here.
+  it("edits a hydrated file without a prior read when context matches", async () => {
     const backend = new AgentFs.MemoryBackend();
     await backend.write("/notes.md", "alpha beta");
     const fs = new AgentFs(backend);
@@ -341,21 +358,17 @@ describe("AgentFs.edit", () => {
     const r = fs.edit("/notes.md", {
       old_string: "alpha",
       new_string: "ALPHA",
-      expected_version: 0,
     });
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.reason).toBe("not_read");
+    expect(r.ok).toBe(true);
+    expect(fs.read("/notes.md")?.content).toBe("ALPHA beta");
   });
 
   it("applies a unique match and advances the version", () => {
     const fs = new AgentFs(new AgentFs.MemoryBackend());
     fs.write("/notes.md", { content: "alpha beta", expected_version: null });
-    const { version } = fs.read("/notes.md")!;
     const r = fs.edit("/notes.md", {
       old_string: "alpha",
       new_string: "ALPHA",
-      expected_version: version,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -366,11 +379,9 @@ describe("AgentFs.edit", () => {
   it("refuses an ambiguous match without replace_all", () => {
     const fs = new AgentFs(new AgentFs.MemoryBackend());
     fs.write("/notes.md", { content: "x x x", expected_version: null });
-    const { version } = fs.read("/notes.md")!;
     const r = fs.edit("/notes.md", {
       old_string: "x",
       new_string: "Y",
-      expected_version: version,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -381,12 +392,10 @@ describe("AgentFs.edit", () => {
   it("applies all matches when replace_all is true", () => {
     const fs = new AgentFs(new AgentFs.MemoryBackend());
     fs.write("/notes.md", { content: "x x x", expected_version: null });
-    const { version } = fs.read("/notes.md")!;
     const r = fs.edit("/notes.md", {
       old_string: "x",
       new_string: "Y",
       replace_all: true,
-      expected_version: version,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -397,11 +406,9 @@ describe("AgentFs.edit", () => {
   it("rejects no-op edits", () => {
     const fs = new AgentFs(new AgentFs.MemoryBackend());
     fs.write("/notes.md", { content: "alpha", expected_version: null });
-    const { version } = fs.read("/notes.md")!;
     const r = fs.edit("/notes.md", {
       old_string: "alpha",
       new_string: "alpha",
-      expected_version: version,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -411,11 +418,9 @@ describe("AgentFs.edit", () => {
   it("returns not_found when snippet is absent", () => {
     const fs = new AgentFs(new AgentFs.MemoryBackend());
     fs.write("/notes.md", { content: "alpha", expected_version: null });
-    const { version } = fs.read("/notes.md")!;
     const r = fs.edit("/notes.md", {
       old_string: "gamma",
       new_string: "GAMMA",
-      expected_version: version,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -426,15 +431,489 @@ describe("AgentFs.edit", () => {
     const fs = new AgentFs(new AgentFs.MemoryBackend());
     const b = makeBinding('<svg><rect fill="red"/></svg>');
     fs.mount("/canvas.svg", b);
-    const { version } = fs.read("/canvas.svg")!;
     const r = fs.edit("/canvas.svg", {
       old_string: 'fill="red"',
       new_string: 'fill="blue"',
-      expected_version: version,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(b.current()).toContain('fill="blue"');
+  });
+});
+
+describe("AgentFs — server-bound current-content edits", () => {
+  it("writes, reconstructs the fs, then edits without an authorization read", async () => {
+    const backend = new AgentFs.MemoryBackend();
+    const first = new AgentFs(backend);
+    expect(
+      await AgentFs.resolveToolCallAsync(first, {
+        tool_name: "write_file",
+        input: { path: "/new.md", content: "alpha beta" },
+      })
+    ).toEqual({ ok: true });
+    expect(await backend.read("/new.md")).toBe("alpha beta");
+
+    const resumed = new AgentFs(backend);
+    await resumed.hydrate();
+    expect(
+      await AgentFs.resolveToolCallAsync(resumed, {
+        tool_name: "edit_file",
+        input: {
+          path: "/new.md",
+          old_string: "alpha",
+          new_string: "ALPHA",
+        },
+      })
+    ).toEqual({ ok: true, occurrences: 1 });
+    expect(await backend.read("/new.md")).toBe("ALPHA beta");
+  });
+
+  it("validates against backend content changed after hydration", async () => {
+    const backend = new AgentFs.MemoryBackend();
+    await backend.write("/notes.md", "alpha beta");
+    const fs = new AgentFs(backend);
+    await fs.hydrate();
+
+    await backend.write("/notes.md", "human alpha beta");
+    expect(
+      await AgentFs.resolveToolCallAsync(fs, {
+        tool_name: "read_file",
+        input: { path: "/notes.md" },
+      })
+    ).toEqual({ content: "human alpha beta" });
+    const staleContext = await fs.edit_fresh("/notes.md", {
+      old_string: "alpha beta",
+      new_string: "agent",
+    });
+    expect(staleContext.ok).toBe(true);
+    expect(await backend.read("/notes.md")).toBe("human agent");
+
+    await backend.write("/notes.md", "human changed");
+    const missingContext = await fs.edit_fresh("/notes.md", {
+      old_string: "agent",
+      new_string: "AGENT",
+    });
+    expect(missingContext).toMatchObject({
+      ok: false,
+      reason: "not_found",
+    });
+    expect(await backend.read("/notes.md")).toBe("human changed");
+  });
+
+  it("reports backend read failures without treating the file as missing", async () => {
+    let failRead = false;
+    const backend: AgentFs.Backend = {
+      async list() {
+        return ["/notes.md"];
+      },
+      async read() {
+        return "persisted";
+      },
+      async readWithRevision() {
+        if (failRead) throw new Error("temporary read failure");
+        return { content: "persisted", revision: "1" };
+      },
+      async write() {},
+      async writeIfRevision(_path, _content, revision) {
+        return { ok: true, revision };
+      },
+      async delete() {},
+    };
+    const fs = new AgentFs(backend);
+    await fs.hydrate();
+    failRead = true;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await AgentFs.resolveToolCallAsync(fs, {
+      tool_name: "read_file",
+      input: { path: "/notes.md" },
+    });
+
+    warn.mockRestore();
+    expect(result).toMatchObject({ ok: false, reason: "io_error" });
+    expect(fs.read("/notes.md")).toMatchObject({ content: "persisted" });
+    const readSchema = AgentFs.tools.read_file.outputSchema as {
+      safeParse(value: unknown): { success: boolean };
+    };
+    expect(readSchema.safeParse(result).success).toBe(true);
+  });
+
+  it("serializes concurrent compatible edits on one path", async () => {
+    const backend = new AgentFs.MemoryBackend();
+    await backend.write("/notes.md", "alpha beta");
+    const fs = new AgentFs(backend);
+    await fs.hydrate();
+
+    const [first, second] = await Promise.all([
+      fs.edit_fresh("/notes.md", {
+        old_string: "alpha",
+        new_string: "ALPHA",
+      }),
+      fs.edit_fresh("/notes.md", {
+        old_string: "beta",
+        new_string: "BETA",
+      }),
+    ]);
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(await backend.read("/notes.md")).toBe("ALPHA BETA");
+  });
+
+  it("does not let an older in-flight flush overwrite a fresh write", async () => {
+    let disk: string | null = null;
+    let writes = 0;
+    let startFirst!: () => void;
+    let releaseFirst!: () => void;
+    let finishFirst!: () => void;
+    const firstStarted = new Promise<void>((resolve) => {
+      startFirst = resolve;
+    });
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const firstFinished = new Promise<void>((resolve) => {
+      finishFirst = resolve;
+    });
+    const backend: AgentFs.Backend = {
+      async list() {
+        return [];
+      },
+      async read() {
+        return disk;
+      },
+      async write(_path, content) {
+        writes += 1;
+        if (writes === 1) {
+          startFirst();
+          await firstGate;
+          disk = content;
+          finishFirst();
+          return;
+        }
+        disk = content;
+      },
+      async delete() {},
+    };
+    const fs = new AgentFs(backend, { flush_debounce_ms: 0 });
+    fs.write("/notes.md", { content: "old", expected_version: null });
+    await firstStarted;
+
+    const fresh = fs.write_fresh("/notes.md", {
+      content: "new",
+      expected_version: null,
+    });
+    setTimeout(releaseFirst, 0);
+
+    expect(await fresh).toMatchObject({ ok: true });
+    await firstFinished;
+    expect(disk).toBe("new");
+    expect(fs.read("/notes.md")?.content).toBe("new");
+    fs.dispose();
+  });
+
+  it("does not replace dirty cache with old disk bytes after a failed flush", async () => {
+    let disk = "base";
+    let failNextWrite = true;
+    const backend: AgentFs.Backend = {
+      async list() {
+        return ["/notes.md"];
+      },
+      async read() {
+        return disk;
+      },
+      async write(_path, content) {
+        if (failNextWrite) {
+          failNextWrite = false;
+          throw new Error("temporary storage failure");
+        }
+        disk = content;
+      },
+      async delete() {},
+    };
+    const fs = new AgentFs(backend, { flush_debounce_ms: 10_000 });
+    await fs.hydrate();
+    fs.write("/notes.md", { content: "new", expected_version: null });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(await fs.read_fresh("/notes.md")).toMatchObject({ content: "new" });
+    expect(disk).toBe("base");
+
+    await fs.flush();
+    warn.mockRestore();
+    expect(disk).toBe("new");
+    expect(fs.read("/notes.md")?.content).toBe("new");
+    fs.dispose();
+  });
+
+  it("does not edit old disk bytes after a pending local flush fails", async () => {
+    let disk = "base alpha";
+    let failNextWrite = true;
+    const backend: AgentFs.Backend = {
+      async list() {
+        return ["/notes.md"];
+      },
+      async read() {
+        return disk;
+      },
+      async write(_path, content) {
+        if (failNextWrite) {
+          failNextWrite = false;
+          throw new Error("temporary storage failure");
+        }
+        disk = content;
+      },
+      async delete() {},
+    };
+    const fs = new AgentFs(backend, { flush_debounce_ms: 10_000 });
+    await fs.hydrate();
+    fs.write("/notes.md", {
+      content: "local alpha",
+      expected_version: null,
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(
+      await fs.edit_fresh("/notes.md", {
+        old_string: "base",
+        new_string: "edited",
+      })
+    ).toMatchObject({ ok: false, reason: "io_error" });
+    warn.mockRestore();
+    expect(disk).toBe("base alpha");
+    expect(fs.read("/notes.md")?.content).toBe("local alpha");
+    fs.dispose();
+  });
+
+  it("does not publish when the backend revision changes during the edit", async () => {
+    let content = "alpha beta";
+    let revision = "1";
+    const backend: AgentFs.Backend = {
+      async list() {
+        return ["/notes.md"];
+      },
+      async read() {
+        return content;
+      },
+      async readWithRevision() {
+        return { content, revision };
+      },
+      async write(_path, next) {
+        content = next;
+      },
+      async writeIfRevision(_path, _next, expected) {
+        content = "human alpha beta";
+        revision = "2";
+        expect(expected).toBe("1");
+        return { ok: false, reason: "stale" };
+      },
+      async delete() {},
+    };
+    const fs = new AgentFs(backend);
+    await fs.hydrate();
+
+    expect(
+      await fs.edit_fresh("/notes.md", {
+        old_string: "alpha",
+        new_string: "ALPHA",
+      })
+    ).toMatchObject({ ok: false, reason: "stale" });
+    expect(content).toBe("human alpha beta");
+    expect(fs.read("/notes.md")?.content).toBe("alpha beta");
+  });
+
+  it("reports persistence failures instead of returning success", async () => {
+    const backend: AgentFs.Backend = {
+      async list() {
+        return [];
+      },
+      async read() {
+        return null;
+      },
+      async write() {
+        throw new Error("disk full");
+      },
+      async delete() {},
+    };
+    const fs = new AgentFs(backend);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await fs.write_fresh("/notes.md", {
+      content: "hello",
+      expected_version: null,
+    });
+    warn.mockRestore();
+    expect(result).toMatchObject({ ok: false, reason: "io_error" });
+    expect(fs.read("/notes.md")).toBeNull();
+  });
+});
+
+describe("AgentFs — model tool contract", () => {
+  it("does not expose ephemeral versions in schemas or results", async () => {
+    const readSchema = AgentFs.tools.read_file.outputSchema as {
+      safeParse(value: unknown): {
+        success: boolean;
+        data?: Record<string, unknown>;
+      };
+    };
+    const editSchema = AgentFs.tools.edit_file.inputSchema as {
+      safeParse(value: unknown): {
+        success: boolean;
+        data?: Record<string, unknown>;
+      };
+    };
+    const writeSchema = AgentFs.tools.write_file.inputSchema as {
+      safeParse(value: unknown): {
+        success: boolean;
+        data?: Record<string, unknown>;
+      };
+    };
+
+    expect(readSchema.safeParse({ content: "x" }).success).toBe(true);
+    const parsedRead = readSchema.safeParse({ content: "x", version: 7 });
+    expect(parsedRead.success).toBe(true);
+    expect(parsedRead.data).not.toHaveProperty("version");
+    expect(
+      editSchema.safeParse({
+        path: "/x",
+        old_string: "a",
+        new_string: "b",
+        version: 7,
+      }).data
+    ).not.toHaveProperty("version");
+    expect(
+      writeSchema.safeParse({
+        path: "/x",
+        content: "b",
+        version: 7,
+      }).data
+    ).not.toHaveProperty("version");
+
+    const fs = new AgentFs(new AgentFs.MemoryBackend());
+    expect(
+      AgentFs.resolveToolCall(fs, {
+        tool_name: "write_file",
+        input: { path: "/x", content: "a" },
+      })
+    ).toEqual({ ok: true });
+    expect(
+      AgentFs.resolveToolCall(fs, {
+        tool_name: "read_file",
+        input: { path: "/x" },
+      })
+    ).toEqual({ content: "a" });
+    expect(
+      AgentFs.resolveToolCall(fs, {
+        tool_name: "edit_file",
+        input: {
+          path: "/x",
+          old_string: "a",
+          new_string: "b",
+        },
+      })
+    ).toEqual({ ok: true, occurrences: 1 });
+    const editFailure = AgentFs.resolveToolCall(fs, {
+      tool_name: "edit_file",
+      input: {
+        path: "/x",
+        old_string: "missing",
+        new_string: "c",
+      },
+    });
+    expect(editFailure).toMatchObject({ ok: false, reason: "not_found" });
+    expect(editFailure).not.toHaveProperty("version");
+    expect(editFailure).not.toHaveProperty("current_version");
+
+    const asyncFs = new AgentFs(new AgentFs.MemoryBackend());
+    const asyncWrite = await AgentFs.resolveToolCallAsync(asyncFs, {
+      tool_name: "write_file",
+      input: { path: "/async", content: "a" },
+    });
+    expect(asyncWrite).toEqual({ ok: true });
+    expect(asyncWrite).not.toHaveProperty("version");
+    const asyncEdit = await AgentFs.resolveToolCallAsync(asyncFs, {
+      tool_name: "edit_file",
+      input: {
+        path: "/async",
+        old_string: "a",
+        new_string: "b",
+      },
+    });
+    expect(asyncEdit).toEqual({ ok: true, occurrences: 1 });
+    expect(asyncEdit).not.toHaveProperty("version");
+  });
+
+  it("returns too_large consistently for model text beyond the shared bound", async () => {
+    const oversized = "x".repeat(AgentFs.MAX_TEXT_FILE_BYTES + 1);
+    const backend = new AgentFs.MemoryBackend();
+    const fs = new AgentFs(backend);
+
+    expect(
+      AgentFs.resolveToolCall(fs, {
+        tool_name: "write_file",
+        input: { path: "/large.txt", content: oversized },
+      })
+    ).toMatchObject({ ok: false, reason: "too_large" });
+    expect(
+      AgentFs.resolveToolCall(fs, {
+        tool_name: "write_file",
+        input: {
+          path: "/large-unicode.txt",
+          content: "😀".repeat(AgentFs.MAX_TEXT_FILE_BYTES / 4 + 1),
+        },
+      })
+    ).toMatchObject({ ok: false, reason: "too_large" });
+    expect(await backend.read("/large.txt")).toBeNull();
+
+    const directLarge = "x".repeat(AgentFs.MAX_TEXT_FILE_BYTES) + "a";
+    expect(
+      fs.write("/direct-large.txt", {
+        content: directLarge,
+        expected_version: null,
+      })
+    ).toMatchObject({ ok: true });
+    expect(
+      fs.edit("/direct-large.txt", {
+        old_string: "a",
+        new_string: "b",
+      })
+    ).toMatchObject({ ok: true });
+    await fs.flush();
+    expect((await backend.read("/direct-large.txt"))?.endsWith("b")).toBe(true);
+
+    await backend.write("/large.txt", oversized);
+    const resumed = new AgentFs(backend);
+    await resumed.hydrate();
+    expect(
+      await AgentFs.resolveToolCallAsync(resumed, {
+        tool_name: "read_file",
+        input: { path: "/large.txt" },
+      })
+    ).toMatchObject({ ok: false, reason: "too_large" });
+    expect(
+      await AgentFs.resolveToolCallAsync(resumed, {
+        tool_name: "edit_file",
+        input: {
+          path: "/large.txt",
+          old_string: "x",
+          new_string: "y",
+        },
+      })
+    ).toMatchObject({ ok: false, reason: "too_large" });
+
+    const bounded = "x".repeat(AgentFs.MAX_TEXT_FILE_BYTES - 1) + "a";
+    await backend.write("/bounded.txt", bounded);
+    const boundedFs = new AgentFs(backend);
+    await boundedFs.hydrate();
+    expect(
+      await AgentFs.resolveToolCallAsync(boundedFs, {
+        tool_name: "edit_file",
+        input: {
+          path: "/bounded.txt",
+          old_string: "a",
+          new_string: "aa",
+        },
+      })
+    ).toMatchObject({ ok: false, reason: "too_large" });
+    expect(await backend.read("/bounded.txt")).toBe(bounded);
   });
 });
 
@@ -505,13 +984,7 @@ describe("AgentFs.grep", () => {
     expect(r.matches[0].line).toBe(2);
   });
 
-  it("does NOT count as a read — subsequent edit still requires read_file", () => {
-    const fs = new AgentFs(new AgentFs.MemoryBackend());
-    const backend = new AgentFs.MemoryBackend();
-    void backend; // unused
-    fs.write("/notes.md", { content: "hello", expected_version: null });
-    // simulate fresh session by hand: a write counts as a read, so use a fresh fs hydrated from backend.
-    // Easier: assert via a second fs that loaded without a read.
+  it("finds edit context without creating a separate authorization state", () => {
     const b2Backend = new AgentFs.MemoryBackend();
     return (async () => {
       await b2Backend.write("/notes.md", "hello");
@@ -519,15 +992,12 @@ describe("AgentFs.grep", () => {
       await fs2.hydrate();
       const r = fs2.grep({ pattern: "hello" });
       expect(r.matches.length).toBe(1);
-      // Now editing should still fail with not_read because grep didn't set last_read.
       const e = fs2.edit("/notes.md", {
         old_string: "hello",
         new_string: "hi",
-        expected_version: 0,
       });
-      expect(e.ok).toBe(false);
-      if (e.ok) return;
-      expect(e.reason).toBe("not_read");
+      expect(e.ok).toBe(true);
+      expect(fs2.read("/notes.md")?.content).toBe("hi");
     })();
   });
 });
@@ -753,7 +1223,6 @@ describe("AgentFs.watch", () => {
     const r = fs.edit("/notes.md", {
       old_string: "world",
       new_string: "there",
-      expected_version: start!.version,
     });
     expect(r.ok).toBe(true);
     expect(listener).toHaveBeenCalledTimes(1);

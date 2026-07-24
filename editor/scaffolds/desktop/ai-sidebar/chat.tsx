@@ -658,17 +658,17 @@ export function AISidebarChat({
           }
           providerFileMimes={providerFileMimes}
           operableFiles={isWorkspace}
-          toolbar={
+          toolbarEnd={
             <>
-              <DesktopModelPicker
-                value={modelId}
-                onValueChange={setModelId}
-                endpoints={endpoints}
-              />
               <DesktopContextMeter
                 messages={messages}
                 modelId={modelId}
                 costUsd={activeSession?.cost_usd}
+                endpoints={endpoints}
+              />
+              <DesktopModelPicker
+                value={modelId}
+                onValueChange={setModelId}
                 endpoints={endpoints}
               />
             </>

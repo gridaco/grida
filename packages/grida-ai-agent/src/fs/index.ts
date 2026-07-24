@@ -66,6 +66,47 @@ const PATH_DESCRIPTION =
 const HYDRATE_READ_CONCURRENCY = 24;
 const LIST_DIRECTORY_DEFAULT_LIMIT = 200;
 const LIST_DIRECTORY_MAX_LIMIT = 1000;
+const MODEL_TEXT_FILE_MAX_BYTES = 1_048_576;
+
+function utf8ByteLength(content: string): number {
+  let bytes = 0;
+  for (let i = 0; i < content.length; i++) {
+    const code = content.charCodeAt(i);
+    if (code <= 0x7f) {
+      bytes += 1;
+    } else if (code <= 0x7ff) {
+      bytes += 2;
+    } else if (
+      code >= 0xd800 &&
+      code <= 0xdbff &&
+      i + 1 < content.length &&
+      content.charCodeAt(i + 1) >= 0xdc00 &&
+      content.charCodeAt(i + 1) <= 0xdfff
+    ) {
+      bytes += 4;
+      i += 1;
+    } else {
+      // Three bytes covers BMP code points and TextEncoder's U+FFFD
+      // replacement for an unpaired surrogate.
+      bytes += 3;
+    }
+  }
+  return bytes;
+}
+
+function textSizeFailure(
+  path: string,
+  content: string,
+  maxBytes: number
+): { ok: false; reason: "too_large"; message: string } | null {
+  const bytes = utf8ByteLength(content);
+  if (bytes <= maxBytes) return null;
+  return {
+    ok: false,
+    reason: "too_large",
+    message: `File at ${path} is ${bytes} UTF-8 bytes; the text file limit is ${maxBytes} bytes.`,
+  };
+}
 
 function normalizeDirectoryPath(path: string | undefined): string {
   const raw = path?.trim();
@@ -201,16 +242,17 @@ async function mapSettledBounded<T, R>(
  *  - **Mirrors real fs ops.** `read` / `write` / `edit` / `delete` /
  *    `list` / `exists`, with a `mount` hook for paths backed by live
  *    state.
- *  - **Safety contract.** Read-before-write + version freshness checks
- *    on every mutating op, so the agent can't silently overwrite human
- *    edits or its own stale view.
+ *  - **Safety contract.** Match-and-replace edits validate their context
+ *    against the file's current content when the operation executes. A
+ *    session-local "read" record is never treated as write authority.
  *
  * Two file shapes share the API:
  *
  *  - **Bound files.** `mount(path, binding)` ties a path to an
  *    `AgentFs.LiveBinding`. `read` and `write` go through the binding;
- *    `getVersion()` is the freshness token. The backend persists a
- *    serialized snapshot; on `hydrate()` we load it via `binding.load()`.
+ *    `getVersion()` is an internal host freshness token, not a model-facing
+ *    credential. The backend persists a serialized snapshot; on `hydrate()`
+ *    we load it via `binding.load()`.
  *
  *  - **Pure files.** Anything not mounted. Stored in memory as
  *    `{content, version}` (version starts at 0, bumps per write). Useful
@@ -226,15 +268,25 @@ export class AgentFs {
   private readonly bindings = new Map<string, AgentFs.LiveBinding>();
   private readonly binding_unsubs = new Map<string, () => void>();
   private readonly files = new Map<string, FileEntry>();
-  /** Paths the agent has called `read()` on this session. */
-  private readonly last_read = new Map<string, number>();
   /** Last content sent to the backend per path. Avoids redundant writes. */
   private readonly last_flushed = new Map<string, string>();
   private readonly flush_queue = new Set<string>();
   private flush_timer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Debounced flushes may already be awaiting backend I/O when another
+   * operation asks to flush. Join them instead of starting a second writer:
+   * otherwise an older write can finish after a newer server-bound mutation.
+   */
+  private flush_tail: Promise<boolean> = Promise.resolve(true);
   private disposed = false;
   private hydrate_promise: Promise<void> | null = null;
   private readonly watchers = new Set<AgentFs.Listener>();
+  /**
+   * Server-bound filesystem operations and commands share this FIFO. AI SDK
+   * tool calls may execute concurrently; registration order must still
+   * preserve a write → edit → command sequence against one workspace.
+   */
+  private operation_tail: Promise<void> = Promise.resolve();
 
   private readonly write_guard?: AgentFs.Options["write_guard"];
 
@@ -242,6 +294,13 @@ export class AgentFs {
     private readonly backend: AgentFs.Backend,
     opts: AgentFs.Options = {}
   ) {
+    const readsRevisions = typeof backend.readWithRevision === "function";
+    const writesRevisions = typeof backend.writeIfRevision === "function";
+    if (readsRevisions !== writesRevisions) {
+      throw new Error(
+        "AgentFs backend revision support must provide readWithRevision and writeIfRevision together."
+      );
+    }
     this.flush_debounce_ms = opts.flush_debounce_ms ?? 500;
     this.write_guard = opts.write_guard;
   }
@@ -291,7 +350,6 @@ export class AgentFs {
     this.bindings.delete(path);
     // Clear per-path bookkeeping so repeated mount/unmount cycles don't
     // grow the maps unboundedly.
-    this.last_read.delete(path);
     this.last_flushed.delete(path);
   }
 
@@ -483,6 +541,21 @@ export class AgentFs {
   }
 
   /**
+   * Serialize a server-bound filesystem or command operation with the other
+   * operations registered on this fs. The action is enqueued synchronously,
+   * before its first await, so concurrent AI-SDK tool executions retain call
+   * order. Rejections never poison later operations.
+   */
+  runExclusive<T>(action: () => Promise<T>): Promise<T> {
+    const result = this.operation_tail.then(action, action);
+    this.operation_tail = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+
+  /**
    * Read the content + current version. Returns `null` for unknown paths
    * (call `hydrate()` first if the file might only exist in the backend).
    */
@@ -490,39 +563,62 @@ export class AgentFs {
     const binding = this.bindings.get(path);
     if (binding) {
       const version = binding.getVersion();
-      this.last_read.set(path, version);
       return { content: binding.serialize(), version };
     }
     const entry = this.files.get(path);
     if (!entry) return null;
-    this.last_read.set(path, entry.version);
     return { content: entry.content, version: entry.version };
   }
 
   /**
-   * Read through to the backend when a path was deliberately left out of the
-   * hydrate index. This is the server-bound path for lazy resources such as a
-   * dropped directory reference: the tree is not walked at session start, but
-   * an explicit `read_file` still resolves the requested descendant.
-   *
-   * A successful backend read is cached with version `0` for the rest of this
-   * fs instance and counts as the required read-before-edit observation. The
-   * host's mutation guard still decides whether that path is editable.
+   * Read the backend's current content rather than trusting the hydrate cache.
+   * This is the server-bound path for both ordinary workspace files and lazy
+   * resources such as a dropped directory reference. A pending local flush
+   * completes first, then the returned bytes refresh the local cache.
    */
   async read_fresh(path: string): Promise<AgentFs.ReadResult | null> {
-    const cached = this.read(path);
-    if (cached !== null) return cached;
+    return this.runExclusive(() => this.readFreshUnlocked(path));
+  }
+
+  private async readFreshUnlocked(
+    path: string
+  ): Promise<AgentFs.ReadResult | null> {
+    if (this.bindings.has(path)) return this.read(path);
+    // A failed forced flush leaves the newer local snapshot dirty. Do not
+    // replace it with older backend bytes; the queued retry still owns
+    // persistence of that mutation.
+    if (!(await this.flushPending())) return this.read(path);
+
     let content: string | null;
     try {
-      content = await this.backend.read(path);
+      if (this.backend.readWithRevision) {
+        const versioned = await this.backend.readWithRevision(path);
+        content = versioned?.content ?? null;
+      } else {
+        content = await this.backend.read(path);
+      }
     } catch (err) {
+      if (err instanceof AgentFs.TextFileTooLargeError) throw err;
       console.warn(`[agent-fs] backend.read(${path}) failed:`, err);
+      throw err;
+    }
+    if (content === null) {
+      this.files.delete(path);
+      this.last_flushed.delete(path);
       return null;
     }
-    if (content === null) return null;
-    const entry = { content, version: 0 };
+
+    const previous = this.files.get(path);
+    const entry = {
+      content,
+      version:
+        previous === undefined
+          ? 0
+          : previous.content === content
+            ? previous.version
+            : previous.version + 1,
+    };
     this.files.set(path, entry);
-    this.last_read.set(path, entry.version);
     this.last_flushed.set(path, content);
     return entry;
   }
@@ -535,8 +631,9 @@ export class AgentFs {
    * (see `../vision`) resolves against; `AgentFs` satisfies
    * `AgentVision.ByteReader` by exposing exactly this method.
    *
-   * NOT counted as a `read()` for the freshness/edit contract — perceiving
-   * pixels is not the same as reading text you intend to edit.
+   * Perception grants no write authority and provides no textual context for
+   * an edit. `edit_file` independently validates its supplied text against the
+   * current file content.
    */
   async readBytes(path: string): Promise<Uint8Array | null> {
     return (await this.backend.readBytes?.(path)) ?? null;
@@ -584,17 +681,112 @@ export class AgentFs {
   }
 
   /**
-   * Match-and-replace edit. Requires the file to exist and the agent to
-   * have read it this session (`not_read` otherwise). Standard staleness
-   * check via `expected_version`.
+   * Persist a server-bound full-file write before reporting success. The
+   * model-facing `write_file` is an explicit upsert, so it passes
+   * `expected_version: null`; the internal numeric-version path remains for
+   * live/client hosts that call {@link write} directly.
+   */
+  async write_fresh(
+    path: string,
+    args: AgentFs.WriteArgs
+  ): Promise<AgentFs.WriteResult> {
+    return this.runExclusive(async () => {
+      const guarded = this.mutationFailure(path, "write");
+      if (guarded) return guarded;
+
+      // Drain any older debounced snapshot before publishing the newer full
+      // write. `flushPending` also joins a flush whose backend write is already
+      // in flight.
+      if (!(await this.flushPending())) {
+        return {
+          ok: false,
+          reason: "io_error",
+          message: `The backing store rejected a pending write before writing ${path}.`,
+        };
+      }
+
+      if (this.bindings.has(path)) {
+        const result = this.write(path, args);
+        if (result.ok && !(await this.flushPending())) {
+          return {
+            ok: false,
+            reason: "io_error",
+            message: `The backing store rejected the write to ${path}.`,
+          };
+        }
+        return result;
+      }
+
+      if (args.expected_version !== null) {
+        try {
+          await this.readFreshUnlocked(path);
+        } catch (err) {
+          if (err instanceof AgentFs.TextFileTooLargeError) {
+            return {
+              ok: false,
+              reason: "too_large",
+              message: err.message,
+            };
+          }
+          return {
+            ok: false,
+            reason: "io_error",
+            message: `The backing store rejected the read of ${path}.`,
+          };
+        }
+        const current = this.lookup(path);
+        if (current === null) {
+          return {
+            ok: false,
+            reason: "not_found",
+            message: `No file at ${path}. Pass expected_version=null to create it.`,
+          };
+        }
+        if (current.version !== args.expected_version) {
+          return {
+            ok: false,
+            reason: "stale",
+            message: `File at ${path} changed since you last read it. Re-read and retry.`,
+            current_version: current.version,
+          };
+        }
+      }
+
+      try {
+        await this.backend.write(path, args.content);
+      } catch (err) {
+        if (err instanceof AgentFs.TextFileTooLargeError) {
+          return {
+            ok: false,
+            reason: "too_large",
+            message: err.message,
+          };
+        }
+        console.warn(`[agent-fs] backend.write(${path}) failed:`, err);
+        return {
+          ok: false,
+          reason: "io_error",
+          message: `The backing store rejected the write to ${path}.`,
+        };
+      }
+      return this.acceptPersisted(path, args.content);
+    });
+  }
+
+  /**
+   * Match-and-replace edit against the content that is current when this
+   * method executes. No prior-read ledger or model-supplied version is
+   * consulted: the supplied `old_string` is the edit's precondition.
    *
    * Matching: literal first, then whitespace-normalized — see
    * `findMatches`. Ambiguous matches reject with `reason: "ambiguous"`
    * unless `replace_all` is set.
    */
-  edit(path: string, args: AgentFs.EditArgs): AgentFs.EditResult {
-    const { old_string, new_string, replace_all, expected_version } = args;
-
+  edit(
+    path: string,
+    args: AgentFs.EditArgs,
+    options: AgentFs.EditOptions = {}
+  ): AgentFs.EditResult {
     const guarded = this.mutationFailure(path, "edit");
     if (guarded) return guarded;
     const entry = this.lookup(path);
@@ -605,21 +797,146 @@ export class AgentFs {
         message: `No file at ${path}.`,
       };
     }
-    if (!this.last_read.has(path)) {
-      return {
-        ok: false,
-        reason: "not_read",
-        message: `Call read_file(${path}) before editing.`,
-      };
+
+    const derived = this.deriveEdit(
+      path,
+      entry.content,
+      args,
+      options.max_bytes
+    );
+    if (!derived.ok) return derived;
+
+    const committed = this.commit(path, derived.content);
+    if (!committed.ok) return committed;
+    return { ...committed, occurrences: derived.occurrences };
+  }
+
+  /**
+   * Server-bound edit: read current bytes and an opaque backend revision,
+   * derive the replacement from those bytes, then conditionally publish. A
+   * backend without revision support still reads immediately before an
+   * awaited write; the shared operation FIFO prevents in-process tool races.
+   */
+  async edit_fresh(
+    path: string,
+    args: AgentFs.EditArgs,
+    options: AgentFs.EditOptions = {}
+  ): Promise<AgentFs.EditResult> {
+    return this.runExclusive(async () => {
+      const guarded = this.mutationFailure(path, "edit");
+      if (guarded) return guarded;
+
+      if (this.bindings.has(path)) {
+        const result = this.edit(path, args, options);
+        if (result.ok && !(await this.flushPending())) {
+          return {
+            ok: false,
+            reason: "io_error",
+            message: `The backing store rejected the edit to ${path}.`,
+          };
+        }
+        return result;
+      }
+
+      if (!(await this.flushPending())) {
+        return {
+          ok: false,
+          reason: "io_error",
+          message: `The backing store rejected a pending write before editing ${path}.`,
+        };
+      }
+      let current: { content: string; revision?: string } | null;
+      try {
+        current = this.backend.readWithRevision
+          ? await this.backend.readWithRevision(path)
+          : null;
+        if (current === null && !this.backend.readWithRevision) {
+          const content = await this.backend.read(path);
+          current = content === null ? null : { content, revision: undefined };
+        }
+      } catch (err) {
+        if (err instanceof AgentFs.TextFileTooLargeError) {
+          return {
+            ok: false,
+            reason: "too_large",
+            message: err.message,
+          };
+        }
+        console.warn(`[agent-fs] backend.read(${path}) failed:`, err);
+        return {
+          ok: false,
+          reason: "io_error",
+          message: `The backing store rejected the read of ${path}.`,
+        };
+      }
+      if (current === null) {
+        this.files.delete(path);
+        this.last_flushed.delete(path);
+        return {
+          ok: false,
+          reason: "not_found",
+          message: `No file at ${path}.`,
+        };
+      }
+
+      const derived = this.deriveEdit(
+        path,
+        current.content,
+        args,
+        options.max_bytes
+      );
+      if (!derived.ok) return derived;
+
+      try {
+        if (current.revision !== undefined && this.backend.writeIfRevision) {
+          const published = await this.backend.writeIfRevision(
+            path,
+            derived.content,
+            current.revision
+          );
+          if (!published.ok) {
+            return {
+              ok: false,
+              reason: "stale",
+              message: `File at ${path} changed while the edit was being applied. Retry against its current content.`,
+            };
+          }
+        } else {
+          await this.backend.write(path, derived.content);
+        }
+      } catch (err) {
+        if (err instanceof AgentFs.TextFileTooLargeError) {
+          return {
+            ok: false,
+            reason: "too_large",
+            message: err.message,
+          };
+        }
+        console.warn(`[agent-fs] backend.write(${path}) failed:`, err);
+        return {
+          ok: false,
+          reason: "io_error",
+          message: `The backing store rejected the edit to ${path}.`,
+        };
+      }
+
+      const committed = this.acceptPersisted(path, derived.content);
+      return { ...committed, occurrences: derived.occurrences };
+    });
+  }
+
+  private deriveEdit(
+    path: string,
+    content: string,
+    args: AgentFs.EditArgs,
+    maxBytes?: number
+  ): { ok: true; content: string; occurrences: number } | AgentFs.EditFailure {
+    if (maxBytes !== undefined) {
+      const oversizedCurrent = textSizeFailure(path, content, maxBytes);
+      if (oversizedCurrent) return oversizedCurrent;
     }
-    if (entry.version !== expected_version) {
-      return {
-        ok: false,
-        reason: "stale",
-        message: `File at ${path} changed since you last read it.`,
-        current_version: entry.version,
-      };
-    }
+
+    const { old_string, new_string, replace_all } = args;
     if (old_string.length === 0) {
       return {
         ok: false,
@@ -635,12 +952,12 @@ export class AgentFs {
       };
     }
 
-    const ranges = findMatches(entry.content, old_string);
+    const ranges = findMatches(content, old_string);
     if (ranges.length === 0) {
       return {
         ok: false,
         reason: "not_found",
-        message: `\`old_string\` not found in ${path}. Re-read with read_file and copy the snippet verbatim.`,
+        message: `\`old_string\` not found in the current content of ${path}. Read the file for updated context and retry.`,
       };
     }
     if (ranges.length > 1 && !replace_all) {
@@ -651,11 +968,16 @@ export class AgentFs {
         occurrences: ranges.length,
       };
     }
-    const next = applyReplacements(entry.content, ranges, new_string);
-
-    const committed = this.commit(path, next);
-    if (!committed.ok) return committed;
-    return { ...committed, occurrences: ranges.length };
+    const nextContent = applyReplacements(content, ranges, new_string);
+    if (maxBytes !== undefined) {
+      const oversizedNext = textSizeFailure(path, nextContent, maxBytes);
+      if (oversizedNext) return oversizedNext;
+    }
+    return {
+      ok: true,
+      content: nextContent,
+      occurrences: ranges.length,
+    };
   }
 
   /**
@@ -667,9 +989,8 @@ export class AgentFs {
    * the same formatted bytes `read()` would return). Empty pattern → empty
    * result. Scope can be narrowed with `path_prefix`.
    *
-   * Side-effect-free: does NOT mark `last_read`, so a subsequent `edit_file`
-   * still has to read the file first. Search is for finding things, not
-   * for claiming you've read them.
+   * Side-effect-free. Search results identify locations but may not contain
+   * enough context to author a unique match-and-replace edit.
    */
   grep(args: AgentFs.GrepArgs): AgentFs.GrepResult {
     const matches: AgentFs.GrepMatch[] = [];
@@ -762,7 +1083,6 @@ export class AgentFs {
       };
     }
     this.files.delete(path);
-    this.last_read.delete(path);
     this.last_flushed.delete(path);
     void this.backend.delete(path).catch((err) => {
       console.warn(`[agent-fs] backend.delete(${path}) failed:`, err);
@@ -822,19 +1142,35 @@ export class AgentFs {
         return parseError(err);
       }
       const v = binding.getVersion();
-      this.last_read.set(path, v);
       this.queueFlush(path);
       this.emit({ type: "write", path, version: v });
       return { ok: true, version: v };
     }
+    const result = this.acceptContent(path, content, false);
+    this.queueFlush(path);
+    return result;
+  }
+
+  /**
+   * Accept content already persisted by a server-bound operation into the
+   * local cache and event stream without scheduling a redundant backend write.
+   */
+  private acceptPersisted(path: string, content: string): AgentFs.WriteSuccess {
+    return this.acceptContent(path, content, true);
+  }
+
+  private acceptContent(
+    path: string,
+    content: string,
+    persisted: boolean
+  ): AgentFs.WriteSuccess {
     const existing = this.files.get(path);
     const next: FileEntry = {
       content,
       version: (existing?.version ?? 0) + 1,
     };
     this.files.set(path, next);
-    this.last_read.set(path, next.version);
-    this.queueFlush(path);
+    if (persisted) this.last_flushed.set(path, content);
     this.emit({ type: "write", path, version: next.version });
     return { ok: true, version: next.version };
   }
@@ -850,7 +1186,13 @@ export class AgentFs {
     if (this.flush_timer) clearTimeout(this.flush_timer);
     this.flush_timer = setTimeout(() => {
       this.flush_timer = null;
-      void this.runFlush();
+      // Background persistence participates in the same FIFO as server-bound
+      // tools and commands. It must not overtake, or be overtaken by, a fresh
+      // operation against the same workspace.
+      void this.runExclusive(() => this.flush()).catch(() => {
+        // `runFlush` already logged and re-queued the failed path. The timer is
+        // best-effort; explicit readers/commands receive the rejection.
+      });
     }, this.flush_debounce_ms);
   }
 
@@ -863,18 +1205,35 @@ export class AgentFs {
    * Idempotent and a no-op when nothing is dirty.
    */
   async flush(): Promise<void> {
+    if (!(await this.flushPending())) {
+      throw new Error("One or more agent filesystem writes failed to persist.");
+    }
+  }
+
+  /**
+   * Cancel the debounce timer, join any backend write already in flight, then
+   * drain the paths queued after it. The boolean is false only when this batch
+   * still could not be persisted (the path is re-queued for a later retry).
+   */
+  private async flushPending(): Promise<boolean> {
     if (this.flush_timer) {
       clearTimeout(this.flush_timer);
       this.flush_timer = null;
     }
-    await this.runFlush();
+    const result = this.flush_tail.then(
+      () => this.runFlush(),
+      () => this.runFlush()
+    );
+    this.flush_tail = result;
+    return result;
   }
 
-  private async runFlush(): Promise<void> {
+  private async runFlush(): Promise<boolean> {
+    let persisted = true;
     const targets = [...this.flush_queue];
     this.flush_queue.clear();
     for (const path of targets) {
-      if (this.disposed) return;
+      if (this.disposed) return persisted;
       const entry = this.lookup(path);
       if (entry === null) continue;
       if (this.last_flushed.get(path) === entry.content) continue;
@@ -882,6 +1241,7 @@ export class AgentFs {
         await this.backend.write(path, entry.content);
         if (!this.disposed) this.last_flushed.set(path, entry.content);
       } catch (err) {
+        persisted = false;
         console.warn(`[agent-fs] backend.write(${path}) failed:`, err);
         // Re-queue on transient failure so eventual persistence still
         // holds; otherwise a single failed flush would silently drop
@@ -889,6 +1249,7 @@ export class AgentFs {
         if (!this.disposed) this.queueFlush(path);
       }
     }
+    return persisted;
   }
 }
 
@@ -912,6 +1273,23 @@ function parseError(err: unknown): AgentFs.WriteFailure {
 // ---------------------------------------------------------------------------
 
 export namespace AgentFs {
+  /** Shared UTF-8 bound for model-readable and model-mutable text files. */
+  export const MAX_TEXT_FILE_BYTES = MODEL_TEXT_FILE_MAX_BYTES;
+
+  /** Backend signal for an existing text file outside the shared bound. */
+  export class TextFileTooLargeError extends Error {
+    readonly name = "TextFileTooLargeError";
+
+    constructor(
+      readonly path: string,
+      readonly byte_length: number
+    ) {
+      super(
+        `File at ${path} is ${byte_length} UTF-8 bytes; the text file limit is ${MAX_TEXT_FILE_BYTES} bytes.`
+      );
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Bindings & backend contracts
   // -------------------------------------------------------------------------
@@ -925,8 +1303,9 @@ export namespace AgentFs {
    *
    * **Version is monotonic and host-owned.** `getVersion()` must change
    * (typically increment) on every host-visible mutation — AI write, human
-   * gesture, undo, external sync. The fs uses it as a freshness token
-   * (`expected_version` matches → safe to write; mismatch → stale).
+   * gesture, undo, external sync. Direct host callers may use it as the
+   * `expected_version` for a whole-file write. Model-facing tools do not see
+   * or return it.
    *
    * **`subscribe` is optional** but recommended for live-bound paths. Without
    * it, the fs only knows about its own writes — it can't auto-flush changes
@@ -943,9 +1322,9 @@ export namespace AgentFs {
     load(content: string): void;
 
     /**
-     * Monotonic freshness token. Must reflect every host-visible change
-     * (not just writes through the fs). The fs uses it to detect
-     * concurrent edits between the agent's read and write.
+     * Monotonic host revision. Must reflect every host-visible change
+     * (not just writes through the fs). Direct callers use it for conditional
+     * full-file writes; model-facing edits use current-content matching.
      */
     getVersion(): number;
 
@@ -964,8 +1343,9 @@ export namespace AgentFs {
    * `/` as separator regardless of host OS — backends translate to their
    * native layout (subdirectories on disk, directory handles on OPFS, …).
    *
-   * Backends are pure I/O — no caching, no debouncing, no version
-   * tracking. The fs layer owns those.
+   * Backends are pure I/O — no caching or debouncing. A real filesystem MAY
+   * expose the paired opaque-revision methods so an edit can detect competing
+   * writes near publication time.
    *
    * Errors should be **thrown**, not swallowed. The fs handles them
    * (typically by logging + falling back to in-memory state).
@@ -993,6 +1373,15 @@ export namespace AgentFs {
     read(path: string): Promise<string | null>;
 
     /**
+     * Read current text plus an opaque backend revision. Paired with
+     * {@link writeIfRevision}; implementations MUST provide both methods or
+     * neither.
+     */
+    readWithRevision?(
+      path: string
+    ): Promise<BackendReadWithRevisionResult | null>;
+
+    /**
      * Read the RAW bytes at `path` (no text decode), or `null` if no such
      * file. Optional: a backend that has no byte view (or stores only text)
      * MAY omit it, in which case byte-level consumers (e.g. `view_image`,
@@ -1007,9 +1396,30 @@ export namespace AgentFs {
      */
     write(path: string, content: string): Promise<void>;
 
+    /**
+     * Attempt an optimistic publish against `revision`. A stale result means a
+     * competing change was detected and the backend MUST leave the file
+     * unchanged. Success does not imply a cross-process lock unless the backend
+     * itself provides one.
+     */
+    writeIfRevision?(
+      path: string,
+      content: string,
+      revision: string
+    ): Promise<BackendWriteIfRevisionResult>;
+
     /** Remove the file at `path`. No-op when the file doesn't exist. */
     delete(path: string): Promise<void>;
   }
+
+  export type BackendReadWithRevisionResult = {
+    content: string;
+    revision: string;
+  };
+
+  export type BackendWriteIfRevisionResult =
+    | { ok: true; revision: string }
+    | { ok: false; reason: "stale" };
 
   // -------------------------------------------------------------------------
   // Mutation events
@@ -1065,10 +1475,19 @@ export namespace AgentFs {
   // derived from these tuples, so they can't drift.
   // -------------------------------------------------------------------------
 
+  export const READ_FAILURE_REASONS = [
+    "not_found",
+    "too_large",
+    "io_error",
+  ] as const;
+  export type ReadFailureReason = (typeof READ_FAILURE_REASONS)[number];
+
   export const WRITE_FAILURE_REASONS = [
     "stale",
     "parse_error",
     "not_found",
+    "too_large",
+    "io_error",
     // GRIDA-SEC-004 — no-clobber path (see `fs/scope.ts`); only emitted when a
     // host injects a `write_guard` (the workspace-bound agent path).
     "protected",
@@ -1079,12 +1498,13 @@ export namespace AgentFs {
   export type WriteFailureReason = (typeof WRITE_FAILURE_REASONS)[number];
 
   export const EDIT_FAILURE_REASONS = [
-    "not_read",
     "stale",
     "not_found",
     "ambiguous",
     "parse_error",
     "no_op",
+    "too_large",
+    "io_error",
     // GRIDA-SEC-004 — no-clobber path (see `fs/scope.ts`).
     "protected",
     "read_only",
@@ -1127,7 +1547,14 @@ export namespace AgentFs {
     old_string: string;
     new_string: string;
     replace_all?: boolean;
-    expected_version: number;
+  };
+
+  export type EditOptions = {
+    /**
+     * Optional host/model-surface text bound. The generic filesystem leaves
+     * this unset so document stores can persist larger files.
+     */
+    max_bytes?: number;
   };
 
   export type EditSuccess = {
@@ -1230,20 +1657,20 @@ export namespace AgentFs {
   export const tools = {
     [TOOL_NAMES.read_file]: tool({
       description:
-        "Read a file's content and version (a freshness token).\n\n" +
-        "Always call this before your first edit_file on a given path, and " +
-        "re-read whenever an edit / write returns reason='stale'.",
+        "Read a file's current text content. Use this to understand an " +
+        "existing file or obtain exact context for edit_file. You do not " +
+        "need to re-read content you just successfully wrote. Text files are " +
+        `limited to ${MAX_TEXT_FILE_BYTES} UTF-8 bytes.`,
       inputSchema: z.object({
         path: z.string().describe(PATH_DESCRIPTION),
       }),
       outputSchema: z.union([
         z.object({
           content: z.string(),
-          version: z.number().int(),
         }),
         z.object({
           ok: z.literal(false),
-          reason: z.literal("not_found"),
+          reason: z.enum(READ_FAILURE_REASONS),
           message: z.string(),
         }),
       ]),
@@ -1258,16 +1685,19 @@ export namespace AgentFs {
         "fallback (forgives doubled spaces / minor newline drift; not a " +
         "semantic fuzzy match). Must be unique unless `replace_all` is " +
         "true.\n\n" +
-        "Requires a prior read_file on this path. On reason='stale', the " +
-        "human edited in the meantime — read_file again and retry.",
+        "The tool reads the file's current content during this invocation " +
+        "and applies the edit only when `old_string` matches that content. " +
+        "A prior read_file is useful for obtaining context, but is not " +
+        "authorization. Content you just wrote is valid context. Text files " +
+        `are limited to ${MAX_TEXT_FILE_BYTES} UTF-8 bytes.`,
       inputSchema: z.object({
         path: z.string().describe(PATH_DESCRIPTION),
         old_string: z
           .string()
           .min(1)
           .describe(
-            "Exact snippet from the read_file output. Include enough " +
-              "surrounding context to be unique."
+            "Exact snippet expected in the file's current content. It may " +
+              "come from read_file or content you just wrote. Include enough surrounding context to be unique."
           ),
         new_string: z
           .string()
@@ -1281,22 +1711,16 @@ export namespace AgentFs {
             "Default false. When false, ambiguous matches reject with " +
               "reason='ambiguous' so you can disambiguate."
           ),
-        version: z
-          .number()
-          .int()
-          .describe("Version from the most recent read_file."),
       }),
       outputSchema: z.discriminatedUnion("ok", [
         z.object({
           ok: z.literal(true),
-          version: z.number().int(),
           occurrences: z.number().int(),
         }),
         z.object({
           ok: z.literal(false),
           reason: z.enum(EDIT_FAILURE_REASONS),
           message: z.string(),
-          current_version: z.number().int().optional(),
           occurrences: z.number().int().optional(),
         }),
       ]),
@@ -1356,8 +1780,8 @@ export namespace AgentFs {
         "returns one entry per matching line with a 1-indexed line number and " +
         "the full line text.\n\n" +
         "Use this to find references / occurrences before deciding what to " +
-        "edit. Does NOT count as a `read_file` — you still have to read a " +
-        "file before editing it.",
+        "edit. A matching line may not contain enough surrounding context " +
+        "for a unique edit_file call; read the file when you need more.",
       inputSchema: z.object({
         pattern: z
           .string()
@@ -1394,35 +1818,22 @@ export namespace AgentFs {
       description:
         "Full-file upsert. Replace the entire content of `path` with " +
         "`content`. For surgical changes, prefer edit_file — it's safer " +
-        "(must locate the change) and cheaper (smaller payload).\n\n" +
-        "`version` is optional:\n" +
-        "  • include it (from the most recent read_file) for an explicit " +
-        "wholesale rewrite — same staleness safety as edit_file.\n" +
-        "  • omit it for a permissive write (creates the file if missing; " +
-        "overwrites without a freshness check). Only use when you don't " +
-        "care what's currently there.",
+        "(must locate the change) and cheaper (smaller payload). This is an " +
+        "intentional last-writer-wins operation: it creates a missing file " +
+        "and overwrites an existing one. Content is limited to " +
+        `${MAX_TEXT_FILE_BYTES} UTF-8 bytes so every successful write remains readable and editable.`,
       inputSchema: z.object({
         path: z.string().describe(PATH_DESCRIPTION),
         content: z.string().describe("Complete new content for the file."),
-        version: z
-          .number()
-          .int()
-          .optional()
-          .describe(
-            "Optional. When provided, the write fails with reason='stale' " +
-              "unless the current version matches. Omit for permissive write."
-          ),
       }),
       outputSchema: z.discriminatedUnion("ok", [
         z.object({
           ok: z.literal(true),
-          version: z.number().int(),
         }),
         z.object({
           ok: z.literal(false),
           reason: z.enum(WRITE_FAILURE_REASONS),
           message: z.string(),
-          current_version: z.number().int().optional(),
         }),
       ]),
     }),
@@ -1459,9 +1870,8 @@ export namespace AgentFs {
     old_string: string;
     new_string: string;
     replace_all?: boolean;
-    version: number;
   };
-  type WriteFileInput = { path: string; content: string; version?: number };
+  type WriteFileInput = { path: string; content: string };
   type ListFilesInput = {
     path?: string;
     offset?: number;
@@ -1472,6 +1882,53 @@ export namespace AgentFs {
     path_prefix?: string;
     case_sensitive?: boolean;
   };
+
+  function modelReadResult(
+    result: ReadResult,
+    path: string
+  ): { content: string } | { ok: false; reason: "too_large"; message: string } {
+    const bytes = utf8ByteLength(result.content);
+    if (bytes > MAX_TEXT_FILE_BYTES) {
+      return {
+        ok: false,
+        reason: "too_large",
+        message: new TextFileTooLargeError(path, bytes).message,
+      };
+    }
+    return { content: result.content };
+  }
+
+  function modelEditResult(result: EditResult):
+    | { ok: true; occurrences: number }
+    | {
+        ok: false;
+        reason: EditFailureReason;
+        message: string;
+        occurrences?: number;
+      } {
+    if (result.ok) {
+      return { ok: true, occurrences: result.occurrences };
+    }
+    return {
+      ok: false,
+      reason: result.reason,
+      message: result.message,
+      ...(result.occurrences === undefined
+        ? {}
+        : { occurrences: result.occurrences }),
+    };
+  }
+
+  function modelWriteResult(
+    result: WriteResult
+  ): { ok: true } | { ok: false; reason: WriteFailureReason; message: string } {
+    if (result.ok) return { ok: true };
+    return {
+      ok: false,
+      reason: result.reason,
+      message: result.message,
+    };
+  }
 
   export function resolveToolCall(
     fs: AgentFs,
@@ -1489,7 +1946,7 @@ export namespace AgentFs {
             message: `No file at ${path}.`,
           };
         }
-        return r;
+        return modelReadResult(r, path);
       }
       case TOOL_NAMES.list_files: {
         const { path, offset, limit } = (toolCall.input ??
@@ -1502,18 +1959,29 @@ export namespace AgentFs {
         return fs.grep({ pattern, path_prefix, case_sensitive });
       }
       case TOOL_NAMES.edit_file: {
-        const { path, old_string, new_string, replace_all, version } =
+        const { path, old_string, new_string, replace_all } =
           toolCall.input as EditFileInput;
-        return fs.edit(path, {
-          old_string,
-          new_string,
-          replace_all,
-          expected_version: version,
-        });
+        return modelEditResult(
+          fs.edit(
+            path,
+            {
+              old_string,
+              new_string,
+              replace_all,
+            },
+            {
+              max_bytes: MAX_TEXT_FILE_BYTES,
+            }
+          )
+        );
       }
       case TOOL_NAMES.write_file: {
-        const { path, content, version } = toolCall.input as WriteFileInput;
-        return fs.write(path, { content, expected_version: version ?? null });
+        const { path, content } = toolCall.input as WriteFileInput;
+        const oversized = textSizeFailure(path, content, MAX_TEXT_FILE_BYTES);
+        if (oversized) return oversized;
+        return modelWriteResult(
+          fs.write(path, { content, expected_version: null })
+        );
       }
       default:
         return undefined;
@@ -1528,14 +1996,29 @@ export namespace AgentFs {
     switch (toolCall.tool_name) {
       case TOOL_NAMES.read_file: {
         const { path } = toolCall.input as ReadFileInput;
-        const result = await fs.read_fresh(path);
-        return (
-          result ?? {
-            ok: false,
-            reason: "not_found",
-            message: `No file at ${path}.`,
+        try {
+          const result = await fs.read_fresh(path);
+          return (
+            (result ? modelReadResult(result, path) : null) ?? {
+              ok: false,
+              reason: "not_found",
+              message: `No file at ${path}.`,
+            }
+          );
+        } catch (err) {
+          if (err instanceof TextFileTooLargeError) {
+            return {
+              ok: false,
+              reason: "too_large",
+              message: err.message,
+            };
           }
-        );
+          return {
+            ok: false,
+            reason: "io_error",
+            message: `The backing store rejected the read of ${path}; this does not mean the file is missing.`,
+          };
+        }
       }
       case TOOL_NAMES.list_files: {
         const { path, offset, limit } = (toolCall.input ??
@@ -1550,6 +2033,34 @@ export namespace AgentFs {
           path_prefix,
           case_sensitive,
         });
+      }
+      case TOOL_NAMES.edit_file: {
+        const { path, old_string, new_string, replace_all } =
+          toolCall.input as EditFileInput;
+        return modelEditResult(
+          await fs.edit_fresh(
+            path,
+            {
+              old_string,
+              new_string,
+              replace_all,
+            },
+            {
+              max_bytes: MAX_TEXT_FILE_BYTES,
+            }
+          )
+        );
+      }
+      case TOOL_NAMES.write_file: {
+        const { path, content } = toolCall.input as WriteFileInput;
+        const oversized = textSizeFailure(path, content, MAX_TEXT_FILE_BYTES);
+        if (oversized) return oversized;
+        return modelWriteResult(
+          await fs.write_fresh(path, {
+            content,
+            expected_version: null,
+          })
+        );
       }
       default:
         return resolveToolCall(fs, toolCall);

@@ -35,14 +35,23 @@ import {
  * @param beforeRun Optional hook awaited just before a command spawns — used to
  *   flush the agent fs's pending (debounced) writes to disk, so a command that
  *   reads the workspace sees files the agent just wrote via the fs tools.
+ * @param runExclusive Optional shared workspace-operation FIFO. When present,
+ *   the whole command (not only its pre-run flush) is serialized with
+ *   server-bound read/write/edit tool calls.
  */
 export function createAgentCommandBackend(
   registry: WorkspaceRegistry,
   protectedReadRoots: ProtectedReadRoots = [],
   additionalAllowedRoots: AdditionalAllowedRoots = [],
-  beforeRun?: () => Promise<void>
+  beforeRun?: () => Promise<void>,
+  runExclusive?: <T>(action: () => Promise<T>) => Promise<T>
 ): RunCommandBackend {
-  return async ({ command, args, workdir, timeout_ms: timeoutMs }) => {
+  const execute: RunCommandBackend = async ({
+    command,
+    args,
+    workdir,
+    timeout_ms: timeoutMs,
+  }) => {
     // Make the agent's just-written files visible on disk before the command
     // reads them (the fs tools flush on a debounce; a command bypasses the fs
     // and reads the backing store directly).
@@ -71,6 +80,8 @@ export function createAgentCommandBackend(
       duration_ms: r.duration_ms,
     };
   };
+  return (input) =>
+    runExclusive ? runExclusive(() => execute(input)) : execute(input);
 }
 
 function describeError(err: ShellRunError): string {

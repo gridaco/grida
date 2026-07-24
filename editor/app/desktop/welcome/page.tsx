@@ -689,15 +689,15 @@ function WelcomeSurface() {
                             ? `Ask Grida to design something in ${target.name}…`
                             : presetPlaceholder
                     }
-                    toolbar={
-                      <>
-                        <PresetChip value={preset} onChange={setPreset} />
-                        <DesktopModelPicker
-                          value={modelId}
-                          onValueChange={setModelId}
-                          endpoints={endpoints}
-                        />
-                      </>
+                    toolbarStart={
+                      <PresetChip value={preset} onChange={setPreset} />
+                    }
+                    toolbarEnd={
+                      <DesktopModelPicker
+                        value={modelId}
+                        onValueChange={setModelId}
+                        endpoints={endpoints}
+                      />
                     }
                   />
                   {/* Kept inside the composer so a submit error is visible even when

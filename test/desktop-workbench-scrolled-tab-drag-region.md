@@ -15,11 +15,12 @@ covered_by:
 
 ## Behavior
 
-Only the visible portions of interactive editor tabs exclude native window
-dragging. Tabs that are horizontally clipped or fully scrolled out of view must
-not leave ghost hit regions over the neighboring title bars. Visually empty
-title-bar space and the gaps between visible tabs remain draggable at every
-scroll position.
+Only the visible occupied tab run—interactive tabs and the gaps between
+them—excludes native window dragging. The gaps remain part of the horizontal
+scroll surface, so wheel input works continuously while crossing the tab rail.
+Tabs that are horizontally clipped or fully scrolled out of view must not leave
+ghost hit regions over neighboring title bars. Visually empty title-bar space
+after the final tab remains draggable at every scroll position.
 
 ## Steps
 
@@ -36,11 +37,15 @@ scroll position.
 6. Select a visible tab, open and dismiss its context menu, then close a
    disposable tab with its close button.
    - Expected: tab selection, context menus, and close actions still work.
-7. Scroll the rail in both directions with the trackpad or mouse, stopping with
-   a tab partially clipped at each edge.
-   - Expected: visible tab portions remain interactive while newly exposed
-     gaps and neighboring title bars remain draggable.
-8. Repeat with the file-tree pane both hidden and visible.
+7. Place the pointer directly over a gap between two tabs and scroll the rail
+   in both directions with the trackpad or mouse.
+   - Expected: the tabs scroll continuously; crossing a gap does not interrupt
+     wheel input.
+8. Close enough tabs to leave visibly unused rail space after the final tab,
+   then drag from that empty space.
+   - Expected: the OS window moves. The horizontal strips above and below the
+     tabs also remain draggable.
+9. Repeat with the file-tree pane both hidden and visible.
    - Expected: the left, editor, and right title-bar drag regions behave
      consistently.
 

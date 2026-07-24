@@ -36,8 +36,8 @@ tool](#adding-a-new-fundamental-tool)).
 | RFC id        | Grida id                   | Notes                                                                                                                                                           |
 | ------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `read`        | `read_file`                | Same shape; Grida's name is more specific.                                                                                                                      |
-| `write`       | `write_file`               | Same shape; Grida adds an optional `version` for stale-check.                                                                                                   |
-| `edit`        | `edit_file`                | Same shape; Grida adds a strict ambiguity rule on multi-match.                                                                                                  |
+| `write`       | `write_file`               | Same full-file upsert shape; creates or overwrites.                                                                                                             |
+| `edit`        | `edit_file`                | Same current-content replacement shape; Grida adds a strict ambiguity rule on multi-match.                                                                      |
 | `glob`        | `list_files`               | Grida binding uses a path-scoped directory-listing shape; VFS hosts should provide it, real-fs hosts may omit it when command/search tools are stronger.        |
 | `grep`        | `grep_files`               | Same shape; literal substring search (regex is not shipped).                                                                                                    |
 | `bash`        | `run_command`              | Honest name — Grida's host does not always launch a shell.                                                                                                      |
@@ -55,12 +55,12 @@ Grida's filesystem tools are storage-agnostic by signature. The same
 `read_file({ path })` call works against any backend; what differs is
 **the adapter under the fs, not the schema the model sees**.
 
-| Backend         | Where                   | Use case                                                                          |
-| --------------- | ----------------------- | --------------------------------------------------------------------------------- |
-| `MemoryBackend` | in-process map          | Tests, scratch documents, ad-hoc agent runs.                                      |
-| `OpfsBackend`   | OPFS in the browser     | Web environment (per [`agent/environments / web`](../agent/environments.md#web)). |
-| `NodeFsBackend` | real disk via `node:fs` | Desktop / computer environment, scoped by the workspace root and OS sandbox.      |
-| (future) remote | remote document store   | Multi-tenant cloud product surfaces.                                              |
+| Backend category    | Where                 | Use case                                                                          |
+| ------------------- | --------------------- | --------------------------------------------------------------------------------- |
+| In-process storage  | application memory    | Tests, scratch documents, ad-hoc agent runs.                                      |
+| Browser storage     | browser origin        | Web environment (per [`agent/environments / web`](../agent/environments.md#web)). |
+| Host-scoped storage | local host filesystem | Opened Desktop/agent workspaces under the host's containment policy.              |
+| Remote storage      | service boundary      | Multi-tenant cloud product surfaces.                                              |
 
 A path can be **bound** to live state (an editor, a doc model) or
 **pure** in-memory storage (notes, scratch). Both shapes share the API.
@@ -71,27 +71,42 @@ Items where Grida's binding deviates from or extends the RFC shape.
 
 ### `read_file`
 
-Returns content + a freshness token. The token is mandatory for
-subsequent edits — `edit_file` and `write_file` (with `version`)
-check it for staleness. Same shape as the RFC's `read` plus the
-explicit freshness token.
+Returns the file's current text content. Read is how the agent understands an
+existing file and obtains exact edit context; it is not an authorization event.
+The tool exposes no session-local freshness token to the model. Grida bounds
+model-readable and model-mutable text files at 1 MiB of UTF-8; larger files
+return `too_large`. A storage read failure returns `io_error`, never
+`not_found`, so the agent cannot mistake an inaccessible existing file for a
+safe path to recreate.
 
 ### `edit_file`
 
 Match-and-replace edit. The default write path — cheap, safe, must
 locate the change.
 
+Each invocation loads current content and finds `old_string`. Where the storage
+layer supports an optimistic publication precondition, a detected concurrent
+change produces `stale` without clobbering the newer bytes. This narrows the
+validation-to-publication gap; it is not a claim of cross-process atomicity. A
+prior `read_file` is useful but not required: content from a successful
+`write_file` is already valid edit context, including after a pause or resumed
+run.
+
 Matching: literal substring first, then a whitespace-normalized
 fallback. Ambiguous matches reject unless `replace_all: true`. The
-strategy is conservative on purpose — closer to Claude Code's `Edit`
-than to fuzzing diff matchers.
+strategy is conservative on purpose: it tolerates whitespace drift, not semantic
+or broadly fuzzy matches.
 
 ### `write_file`
 
-Full-file upsert. `version` optional: include it (from the last read)
-for an explicit wholesale rewrite with staleness safety; omit it for a
-permissive write that bypasses the freshness check (use for
-fresh-start writes).
+Full-file upsert. It creates a missing path or replaces all content at an
+existing path. The model-facing shape has no version argument: choosing this
+tool is the explicit intent to perform a last-writer-wins wholesale write.
+Targeted changes belong in `edit_file`.
+
+Success means the full write has completed before the result returns.
+Content above the shared 1 MiB text bound is rejected with `too_large`, so every
+successful write can still be read and edited after a resumed run.
 
 ### `list_files`
 
@@ -120,8 +135,8 @@ Contract:
 - The result lists only the direct children of `path`, grouped into
   folders and files.
 - The result is sorted, paginated, and explicit about truncation.
-- `list_files` discovers names only. It does not search file content,
-  and it does not count as `read_file`.
+- `list_files` discovers names only. It does not return file content or provide
+  textual edit context.
 - For filename-pattern search, use a separate glob / find-path tool
   rather than overloading this directory-listing result.
 
@@ -146,9 +161,9 @@ Implementation guidance:
 Literal substring search across every known file. Returns one entry
 per matching line with a 1-indexed line number and the full line
 text. Mirrors `grep -n -F` (case-sensitive, fixed-string by default;
-pass `case_sensitive: false` for `-i`). Does NOT count as a
-`read_file` — search is for finding things, not for claiming you've
-read them.
+pass `case_sensitive: false` for `-i`). A result may provide enough
+text for a unique edit, but the agent should read the file when it
+needs broader context.
 
 Roadmap:
 
@@ -303,11 +318,10 @@ next thing to ship.
 
 ## What lives where
 
-- `packages/grida-agent-tools/src/fs/` — filesystem fundamentals
-  ([README](https://github.com/gridaco/grida/blob/main/packages/grida-agent-tools/src/fs/README.md))
-- `packages/grida-agent-tools/src/todos/` — planning fundamentals
-  ([README](https://github.com/gridaco/grida/blob/main/packages/grida-agent-tools/src/todos/README.md))
-- `packages/grida-agent-tools/src/tool-search/` — _not yet created; see proposal above_
+- `packages/grida-ai-agent/src/fs/` — filesystem fundamentals
+  ([README](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/fs/README.md))
+- `packages/grida-ai-agent/src/todos/` — planning fundamentals
+- `packages/grida-ai-agent/src/tool-search/` — _not yet created; see proposal above_
 - `editor/grida-canvas-hosted/ai/tools/` — canvas tools; see
   [`tools-canvas.md`](./tools-canvas.md) for the catalog.
 
@@ -322,7 +336,7 @@ Process:
 
 1. Confirm the RFC carries the shape — if not, propose it to
    [`../agent/tools.md`](../agent/tools.md) first.
-2. Drop the implementation in `packages/grida-agent-tools/src/<name>/`
+2. Drop the implementation in `packages/grida-ai-agent/src/<name>/`
    with its own README, class, AI-SDK tool schema, and pure-logic tests.
 3. Add a row to the naming map above and a per-tool section below it.
 4. If it's vfs-only (only needed because we lack command execution),

@@ -905,18 +905,20 @@ function AgentPaneContent({
           onStop={stop}
           providerFileMimes={providerFileMimes}
           scratchReservation={scratchReservation}
-          toolbar={
+          toolbarStart={
+            <DesktopModePicker value={mode} onValueChange={setMode} />
+          }
+          toolbarEnd={
             <>
-              <DesktopModePicker value={mode} onValueChange={setMode} />
-              <DesktopModelPicker
-                value={modelId}
-                onValueChange={setModelId}
-                endpoints={endpoints}
-              />
               <DesktopContextMeter
                 messages={messages}
                 modelId={modelId}
                 costUsd={activeSession?.cost_usd}
+                endpoints={endpoints}
+              />
+              <DesktopModelPicker
+                value={modelId}
+                onValueChange={setModelId}
                 endpoints={endpoints}
               />
             </>

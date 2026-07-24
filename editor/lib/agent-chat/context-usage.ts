@@ -12,7 +12,9 @@
  * runtime will send next: hidden system prompt, skill blocks, tool schemas,
  * provider framing, and server-side compaction state all live outside this
  * UI message list. Until the runtime exposes a prompt-token preflight value,
- * the honest client-side value is chars/4 over the visible message parts.
+ * the honest client-side value is chars/4 over the visible message parts'
+ * model-facing text. Persisted inline media bytes are UI payloads, not prompt
+ * text, and MUST NOT be serialized into this estimate.
  *
  * Provider-reported `metadata.usage` is still surfaced separately as
  * last-turn usage. That number is useful for cost/debugging, but it is not
@@ -108,13 +110,42 @@ function estimatePartTokens(part: PartLike): number {
   return 0;
 }
 
+/**
+ * Serialize the model-facing textual portion of a structured part.
+ *
+ * Image tools persist base64 `data` so the transcript can render their result,
+ * but the runtime's tool `toModelOutput` either lowers that result to a short
+ * descriptor or sends it as provider-native media. Counting the durable base64
+ * as prompt text can turn one image into millions of fake tokens.
+ */
 function safeStringify(value: unknown): string {
   if (typeof value === "string") return value;
   try {
-    return JSON.stringify(value) ?? "";
+    return (
+      JSON.stringify(value, (_key, nested) => {
+        if (!isInlineMediaPayload(nested)) return nested;
+        const { data: _mediaBytes, ...modelFacingMetadata } = nested;
+        return modelFacingMetadata;
+      }) ?? ""
+    );
   } catch {
     return "";
   }
+}
+
+function isInlineMediaPayload(
+  value: unknown
+): value is Record<string, unknown> & { data: string } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  const mime = record.mime ?? record.mediaType;
+  return (
+    typeof record.data === "string" &&
+    typeof mime === "string" &&
+    /^(image|audio|video)\//.test(mime)
+  );
 }
 
 /** The latest assistant message's stamped usage, or `undefined` until the
