@@ -525,7 +525,7 @@ function AgentComposerInner({
   return (
     <div
       className={cn(
-        "relative rounded-lg border bg-accent transition-colors [&_button:focus-visible]:ring-0!",
+        "relative rounded-lg border bg-accent transition-colors [&_button:focus-visible]:ring-1! [&_button:focus-visible]:ring-inset",
         className
       )}
     >
