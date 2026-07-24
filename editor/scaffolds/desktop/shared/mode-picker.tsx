@@ -24,11 +24,29 @@ import {
   asAgentMode,
   type AgentMode,
 } from "@grida/agent";
+import { HandIcon, ShieldCheckIcon, type LucideIcon } from "lucide-react";
 import type { ChatSessionRow } from "@/lib/desktop/bridge";
 
-const MODE_LABELS: Record<AgentMode, string> = {
-  "accept-edits": "Accept Edits",
-  auto: "Auto",
+const MODE_OPTIONS: Record<
+  AgentMode,
+  {
+    label: string;
+    description: string;
+    icon: LucideIcon;
+  }
+> = {
+  "accept-edits": {
+    label: "Accept Edits",
+    description:
+      "Reads and edits files automatically; asks before commands that may make changes.",
+    icon: HandIcon,
+  },
+  auto: {
+    label: "Auto",
+    description:
+      "Runs all commands without asking; workspace access remains sandboxed.",
+    icon: ShieldCheckIcon,
+  },
 };
 
 export function DesktopModePicker({
@@ -48,14 +66,36 @@ export function DesktopModePicker({
         className="min-w-0 px-2 text-xs [&>svg]:hidden [&_[data-slot=select-value]]:block [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate"
         aria-label="Mode"
       >
-        <PromptInputSelectValue placeholder="Mode" />
+        <PromptInputSelectValue>
+          {MODE_OPTIONS[value].label}
+        </PromptInputSelectValue>
       </PromptInputSelectTrigger>
-      <PromptInputSelectContent>
-        {AGENT_MODES.map((m) => (
-          <PromptInputSelectItem key={m} value={m} className="text-xs">
-            {MODE_LABELS[m]}
-          </PromptInputSelectItem>
-        ))}
+      <PromptInputSelectContent className="w-80 max-w-[calc(100vw-1rem)]">
+        <div className="px-2 py-1.5 text-xs text-muted-foreground">
+          How should agent actions be approved?
+        </div>
+        {AGENT_MODES.map((mode) => {
+          const option = MODE_OPTIONS[mode];
+          const Icon = option.icon;
+          return (
+            <PromptInputSelectItem
+              key={mode}
+              value={mode}
+              textValue={option.label}
+              className="items-start py-2.5 [&>span:last-child]:items-start"
+            >
+              <Icon className="mt-0.5 size-4" />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-foreground">
+                  {option.label}
+                </span>
+                <span className="mt-0.5 block text-xs leading-snug whitespace-normal text-muted-foreground">
+                  {option.description}
+                </span>
+              </span>
+            </PromptInputSelectItem>
+          );
+        })}
       </PromptInputSelectContent>
     </PromptInputSelect>
   );
