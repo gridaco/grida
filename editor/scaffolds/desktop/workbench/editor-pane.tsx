@@ -14,13 +14,8 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ImagesIcon,
-  PanelRightCloseIcon,
-  PanelRightOpenIcon,
-  XIcon,
-} from "lucide-react";
-import { Button } from "@app/ui/components/button";
+import { ImagesIcon, PanelRightIcon, XIcon } from "lucide-react";
+import { Toggle } from "@app/ui/components/toggle";
 import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import { DESKTOP_WINDOW_CONTROLS_RIGHT_INSET } from "@/scaffolds/desktop/chrome/title-bar";
@@ -464,18 +459,22 @@ export function WorkspaceExplorerToggleButton({
   className?: string;
 }) {
   return (
-    <Button
+    <Toggle
       type="button"
-      variant="ghost"
-      size="icon-sm"
-      className={cn("desktop-no-drag shrink-0", className)}
-      onClick={onToggle}
+      size="sm"
+      pressed={open}
+      className={cn(
+        "desktop-no-drag size-7 min-w-7 shrink-0 p-0 [&_svg:not([class*='size-'])]:size-3.5",
+        className
+      )}
+      onPressedChange={onToggle}
       aria-label={open ? "Hide file tree pane" : "Show file tree pane"}
-      aria-pressed={open}
       title={open ? "Hide file tree pane (⌘B)" : "Show file tree pane (⌘B)"}
     >
-      {open ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
-    </Button>
+      <PanelRightIcon
+        className={cn(!open && "fill-muted text-muted-foreground")}
+      />
+    </Toggle>
   );
 }
 
