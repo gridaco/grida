@@ -44,6 +44,12 @@ import {
 } from "@app/ui/components/dropdown-menu";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@app/ui/components/popover";
+import { Separator } from "@app/ui/components/separator";
 import { cn } from "@app/ui/lib/utils";
 import type { UseChatSessionResult } from "@/lib/agent-chat";
 
@@ -143,8 +149,13 @@ export function ChatSessionPicker({
         )}
       >
         {icon}
-        <DropdownMenu open={listOpen} onOpenChange={setListOpen} modal={false}>
-          <DropdownMenuTrigger asChild>
+        {/* The history surface contains an independent actions menu in every
+            row. It must be a Popover rather than another Menu root: an outer
+            menuitem refocuses itself during pointer travel and dismisses the
+            row menu before the pointer reaches it.
+            (see test/desktop-chat-session-row-actions.md) */}
+        <Popover open={listOpen} onOpenChange={setListOpen}>
+          <PopoverTrigger asChild>
             <Button
               type="button"
               variant="ghost"
@@ -155,32 +166,67 @@ export function ChatSessionPicker({
             >
               <ListIcon className="size-3.5" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-64">
-            <DropdownMenuItem onSelect={() => onSelect(null)}>
-              <MessageSquarePlusIcon className="size-3.5" />
-              New chat
-            </DropdownMenuItem>
-            {session.sessions.length > 0 && <DropdownMenuSeparator />}
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="max-h-(--radix-popover-content-available-height) w-64 overflow-x-hidden overflow-y-auto p-1"
+          >
+            {!hideNewChat && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-full justify-start rounded-sm px-2 text-sm font-normal"
+                onClick={() => {
+                  setListOpen(false);
+                  onSelect(null);
+                }}
+              >
+                <MessageSquarePlusIcon className="size-3.5" />
+                New chat
+              </Button>
+            )}
+            {!hideNewChat && session.sessions.length > 0 && (
+              <Separator className="-mx-1 my-1 w-auto" />
+            )}
             {session.sessions.slice(0, 20).map((s) => (
-              <DropdownMenuItem
+              <div
                 key={s.id}
-                onSelect={() => onSelect(s.id)}
                 className={cn(
-                  "flex items-center gap-2",
+                  "flex items-center rounded-sm pr-1",
                   s.id === session.current_id && "bg-accent"
                 )}
               >
-                <span className="flex-1 truncate">{s.title}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-8 min-w-0 flex-1 justify-start rounded-sm px-2 text-sm font-normal",
+                    s.id === session.current_id &&
+                      "bg-accent hover:bg-accent focus-visible:bg-accent"
+                  )}
+                  onClick={() => {
+                    setListOpen(false);
+                    onSelect(s.id);
+                  }}
+                >
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {s.title}
+                  </span>
+                </Button>
                 <SessionActionsMenu
                   session={s}
                   onRename={openRename}
-                  onDelete={setDeleteTargetId}
+                  onDelete={(id) => {
+                    setListOpen(false);
+                    setDeleteTargetId(id);
+                  }}
                 />
-              </DropdownMenuItem>
+              </div>
             ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </PopoverContent>
+        </Popover>
         {renameTargetId !== null ? (
           <Input
             value={draft}
@@ -299,16 +345,6 @@ function SessionActionsMenu({
           aria-label="Chat actions"
           title="Chat actions"
           className="shrink-0"
-          // This trigger sits inside a selectable row (DropdownMenuItem).
-          // Radix's menu item synthesizes a click on the row at pointer-up
-          // when it never saw the matching pointer-down (`!isPointerDownRef`,
-          // see @radix-ui/react-menu MenuItem). Stopping only pointer-down +
-          // click leaves that pointer-up path open, so opening this menu also
-          // selects the row — switching sessions and closing the list out from
-          // under the just-opened menu. Stop all three.
-          onPointerDown={(e) => e.stopPropagation()}
-          onPointerUp={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
         >
           <EllipsisVerticalIcon className="size-3.5" />
         </Button>

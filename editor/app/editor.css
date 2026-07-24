@@ -21,3 +21,14 @@ textarea,
 select {
   -webkit-app-region: no-drag;
 }
+
+/*
+ * Chromium does not clip app-region boxes to a scrollport. Scrolling
+ * descendants must not publish native rectangles of their own. Controls in
+ * ordinary content remain covered by the body's no-drag region; title-bar
+ * controls mirror their visible intersections into stationary exclusions.
+ * Upstream: https://issues.chromium.org/issues/40857813
+ */
+.desktop-native-drag-scroll-viewport * {
+  -webkit-app-region: initial;
+}

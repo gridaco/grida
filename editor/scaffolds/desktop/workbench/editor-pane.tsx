@@ -10,16 +10,12 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import {
-  ImagesIcon,
-  PanelRightCloseIcon,
-  PanelRightOpenIcon,
-  XIcon,
-} from "lucide-react";
-import { Button } from "@app/ui/components/button";
+import { ImagesIcon, PanelRightIcon, XIcon } from "lucide-react";
+import { Toggle } from "@app/ui/components/toggle";
 import { cn } from "@app/ui/lib/utils";
 import { getDesktopBridge, type Workspace } from "@/lib/desktop/bridge";
 import { DESKTOP_WINDOW_CONTROLS_RIGHT_INSET } from "@/scaffolds/desktop/chrome/title-bar";
@@ -28,6 +24,7 @@ import { EditorPaneDesignSearch } from "./editor-pane-design-search";
 import { EditorPaneStart } from "./editor-pane-start";
 import { EditorTabPreview } from "./editor-tab-preview";
 import { isVirtualTab, type DesignSearchSession } from "./design-search-tab";
+import { TabNativeDragRegion } from "./tab-native-drag-region";
 import { TabPreviewController } from "./tab-preview-controller";
 import type { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import { useWorkspaceChanges } from "./workspace-changes";
@@ -278,6 +275,7 @@ function EditorTitleBar({
   onFileTrashed?: (relPath: string) => void;
 }) {
   const railRef = useRef<HTMLDivElement | null>(null);
+  const nativeDragExclusionLayerRef = useRef<HTMLDivElement | null>(null);
   const [previewController] = useState(() => new TabPreviewController());
   const [thumbnailCache] = useState(() => new WorkspaceTabThumbnail.Cache());
   const [previewRevision, setPreviewRevision] = useState(0);
@@ -325,6 +323,16 @@ function EditorTitleBar({
     }
   });
 
+  useLayoutEffect(() => {
+    const rail = railRef.current;
+    const exclusionLayer = nativeDragExclusionLayerRef.current;
+    if (!rail || !exclusionLayer) return;
+
+    const controller = new TabNativeDragRegion.Controller(rail, exclusionLayer);
+    controller.connect();
+    return () => controller.dispose();
+  }, [showStart, tabs]);
+
   return (
     <div
       className="desktop-drag-area relative flex h-11 shrink-0 items-center"
@@ -341,7 +349,7 @@ function EditorTitleBar({
         ref={railRef}
         role="tablist"
         aria-label="Open editors"
-        className="desktop-no-drag scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain pl-1.5 pr-2 scroll-pl-1.5 scroll-pr-2"
+        className="desktop-native-drag-scroll-viewport scroll-fade-x scroll-fade-3 no-scrollbar flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain pl-1.5 pr-2 scroll-pl-1.5 scroll-pr-2"
         onPointerLeave={(event) =>
           previewController.railLeave(event.pointerType)
         }
@@ -379,12 +387,34 @@ function EditorTitleBar({
             />
           );
         })}
-        {/* Keep unused title-bar space draggable without turning the gaps
-            between scrollable tabs back into Electron drag regions. */}
-        <div
-          role="presentation"
-          className="desktop-drag-area h-full min-w-0 flex-1"
-        />
+        {/* The parent title bar owns dragging; region-free tab descendants
+            leave this unused space and the inter-tab gaps draggable. */}
+        <div role="presentation" className="h-full min-w-0 flex-1" />
+      </div>
+      {/* Chromium does not clip native app-region boxes to scrollports. Keep
+          moving tab descendants region-free and mirror only their visible
+          rectangles here. This layer is stationary and pointer-transparent.
+          (see test/desktop-workbench-scrolled-tab-drag-region.md) */}
+      <div
+        ref={nativeDragExclusionLayerRef}
+        className="pointer-events-none absolute inset-0"
+        aria-hidden
+      >
+        {showStart && (
+          <div
+            data-tab-native-drag-region-exclusion="start"
+            className="desktop-no-drag absolute"
+            style={{ display: "none" }}
+          />
+        )}
+        {tabs.map((relPath) => (
+          <div
+            key={relPath}
+            data-tab-native-drag-region-exclusion={relPath}
+            className="desktop-no-drag absolute"
+            style={{ display: "none" }}
+          />
+        ))}
       </div>
       <EditorTabPreview
         controller={previewController}
@@ -411,7 +441,8 @@ function StartTabItem() {
       role="tab"
       tabIndex={0}
       aria-selected
-      className="desktop-no-drag flex h-6 shrink-0 select-none items-center rounded-md bg-muted px-2 text-xs text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      data-tab-native-drag-region-target="start"
+      className="flex h-6 shrink-0 select-none items-center rounded-md bg-muted px-2 text-xs text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
     >
       Quick Start
     </div>
@@ -428,18 +459,22 @@ export function WorkspaceExplorerToggleButton({
   className?: string;
 }) {
   return (
-    <Button
+    <Toggle
       type="button"
-      variant="ghost"
-      size="icon-sm"
-      className={cn("desktop-no-drag shrink-0", className)}
-      onClick={onToggle}
+      size="sm"
+      pressed={open}
+      className={cn(
+        "desktop-no-drag size-7 min-w-7 shrink-0 p-0 [&_svg:not([class*='size-'])]:size-3.5",
+        className
+      )}
+      onPressedChange={onToggle}
       aria-label={open ? "Hide file tree pane" : "Show file tree pane"}
-      aria-pressed={open}
       title={open ? "Hide file tree pane (⌘B)" : "Show file tree pane (⌘B)"}
     >
-      {open ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
-    </Button>
+      <PanelRightIcon
+        className={cn(!open && "fill-muted text-muted-foreground")}
+      />
+    </Toggle>
   );
 }
 
@@ -488,6 +523,7 @@ function TabItem({
       role="tab"
       tabIndex={0}
       aria-selected={active}
+      data-tab-native-drag-region-target={relPath}
       title={virtual ? name : undefined}
       onPointerEnter={(event) => {
         if (!virtual) {
@@ -521,7 +557,7 @@ function TabItem({
         }
       }}
       className={cn(
-        "desktop-no-drag group flex h-6 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-2 text-xs outline-none transition-colors",
+        "group flex h-6 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-2 text-xs outline-none transition-colors",
         active
           ? "bg-muted text-foreground shadow-xs"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
@@ -538,7 +574,7 @@ function TabItem({
           onClose();
         }}
         className={cn(
-          "desktop-no-drag ml-1 grid size-4 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
+          "ml-1 grid size-4 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground",
           active || dirty ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         )}
         aria-label={dirty ? `Close ${name} (unsaved)` : `Close ${name}`}

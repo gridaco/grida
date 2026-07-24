@@ -804,7 +804,7 @@ function AgentPaneContent({
             className="gap-4 px-3 py-4"
             scrollClassName={cn(
               styles.chatScroll,
-              "scroll-fade-y scroll-fade-4"
+              "desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
             )}
           >
             {/* Empty state intentionally omitted — the chat starts blank
