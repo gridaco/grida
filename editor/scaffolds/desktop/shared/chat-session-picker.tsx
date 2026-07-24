@@ -17,12 +17,13 @@
 
 import { useRef, useState } from "react";
 import {
+  CircleIcon,
   CopyIcon,
   EllipsisVerticalIcon,
   ListIcon,
-  MessageSquarePlusIcon,
   PencilIcon,
   PlusIcon,
+  SquarePenIcon,
   Trash2Icon,
 } from "lucide-react";
 import {
@@ -182,7 +183,7 @@ export function ChatSessionPicker({
                   onSelect(null);
                 }}
               >
-                <MessageSquarePlusIcon className="size-3.5" />
+                <SquarePenIcon className="size-3.5" />
                 New chat
               </Button>
             )}
@@ -193,7 +194,7 @@ export function ChatSessionPicker({
               <div
                 key={s.id}
                 className={cn(
-                  "flex items-center rounded-sm pr-1",
+                  "group relative flex items-center rounded-sm hover:bg-accent has-[:focus-visible]:bg-accent has-data-[state=open]:bg-accent",
                   s.id === session.current_id && "bg-accent"
                 )}
               >
@@ -202,7 +203,7 @@ export function ChatSessionPicker({
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-8 min-w-0 flex-1 justify-start rounded-sm px-2 text-sm font-normal",
+                    "h-8 min-w-0 flex-1 justify-start rounded-sm px-2 text-sm font-normal group-hover:pr-8 group-has-[:focus-visible]:pr-8 group-has-data-[state=open]:pr-8",
                     s.id === session.current_id &&
                       "bg-accent hover:bg-accent focus-visible:bg-accent"
                   )}
@@ -211,12 +212,16 @@ export function ChatSessionPicker({
                     onSelect(s.id);
                   }}
                 >
+                  <span className="flex size-2 shrink-0 items-center justify-center">
+                    <CircleIcon className="size-1.5 fill-current text-muted-foreground/50" />
+                  </span>
                   <span className="min-w-0 flex-1 truncate text-left">
                     {s.title}
                   </span>
                 </Button>
                 <SessionActionsMenu
                   session={s}
+                  triggerClassName="pointer-events-none absolute top-1/2 right-1 z-10 -translate-y-1/2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:opacity-100"
                   onRename={openRename}
                   onDelete={(id) => {
                     setListOpen(false);
@@ -328,10 +333,12 @@ export function ChatSessionPicker({
  */
 function SessionActionsMenu({
   session: s,
+  triggerClassName,
   onRename,
   onDelete,
 }: {
   session: SessionRow;
+  triggerClassName?: string;
   onRename: (s: SessionRow) => void;
   onDelete: (id: string) => void;
 }) {
@@ -344,7 +351,7 @@ function SessionActionsMenu({
           size="icon-xs"
           aria-label="Chat actions"
           title="Chat actions"
-          className="shrink-0"
+          className={cn("shrink-0", triggerClassName)}
         >
           <EllipsisVerticalIcon className="size-3.5" />
         </Button>

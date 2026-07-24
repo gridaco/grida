@@ -120,7 +120,14 @@ export function DesktopContextMeter({
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent>Context {pct}</TooltipContent>
+          <TooltipContent className="text-center text-nowrap">
+            <div className="text-background/70">Context window:</div>
+            <div className="text-background/70">{pct} full</div>
+            <div className="mt-0.5">
+              {compact.format(usedTokens)} / {compact.format(maxTokens)} tokens
+              used
+            </div>
+          </TooltipContent>
         </Tooltip>
       </TooltipProvider>
 

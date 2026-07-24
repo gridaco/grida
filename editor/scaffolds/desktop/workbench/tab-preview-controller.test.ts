@@ -25,7 +25,7 @@ describe("TabPreviewController", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("opens a cold pointer target after 500 ms with a stable external-store snapshot", () => {
+  it("opens a cold pointer target after 50 ms with a stable external-store snapshot", () => {
     const controller = new TabPreviewController();
     const tab = anchor("a");
     const closed = controller.getSnapshot();

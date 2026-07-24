@@ -12,7 +12,7 @@
  * flashing the shared viewport closed.
  */
 
-export const TAB_PREVIEW_OPEN_DELAY_MS = 500;
+export const TAB_PREVIEW_OPEN_DELAY_MS = 50;
 export const TAB_PREVIEW_CLOSE_DELAY_MS = 100;
 
 export type TabPreviewTarget = {

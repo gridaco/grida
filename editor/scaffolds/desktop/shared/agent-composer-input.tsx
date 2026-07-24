@@ -7,9 +7,9 @@
  * (workspace file references), plus light rich text.
  *
  * Headless-ish: the caller supplies the `catalog` (commands + mentions)
- * and a `toolbar` (e.g. the model picker), and receives the lowered
- * prompt text on submit. The composer owns trigger state + editing; this
- * component owns the surrounding frame + send/stop affordances.
+ * and optional start/end toolbar content, and receives the lowered prompt
+ * text on submit. The composer owns trigger state + editing; this component
+ * owns the surrounding frame + send/stop affordances.
  *
  * Lowering: the prompt is `message.meta.text` plus an explicit list of
  * any referenced file paths (from `@`-mentions / file-ref parts) so the
@@ -148,8 +148,10 @@ export type AgentComposerInputProps = {
    * Hosts that give an empty submission its own action should describe it here.
    */
   emptySubmitLabel?: string;
-  /** Left-aligned footer content (e.g. the model picker). */
-  toolbar?: ReactNode;
+  /** Footer content grouped with the attachment button. */
+  toolbarStart?: ReactNode;
+  /** Footer content right-aligned before the submit/stop button. */
+  toolbarEnd?: ReactNode;
   className?: string;
 };
 
@@ -195,7 +197,8 @@ function AgentComposerInner({
   scratchReservation = ScratchSeedBudget.NONE,
   allowEmptySubmit = false,
   emptySubmitLabel,
-  toolbar,
+  toolbarStart,
+  toolbarEnd,
   className,
 }: Omit<AgentComposerInputProps, "catalog">) {
   // The image-block gate must match the queue controller's enqueue decision,
@@ -585,19 +588,22 @@ function AgentComposerInner({
             </DropdownMenu>
           </div>
         )}
-        {/* The toolbar (pickers + context meter) rides a shrinkable,
-            clipping track; the submit button sits outside it as shrink-0,
-            so as the composer narrows the pickers truncate first and the
-            most-important submit control is never culled. */}
+        {/* Start/end tools share a shrinkable, clipping track. `ml-auto`
+            creates the space-between split while the submit button stays
+            outside as shrink-0, so pickers truncate before the terminal
+            action is ever culled. */}
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden">
-          {toolbar}
+          {toolbarStart}
+          <div className="ml-auto flex min-w-0 items-center gap-0.5 overflow-hidden">
+            {toolbarEnd}
+          </div>
         </div>
         <div className="shrink-0">
           {isStreaming ? (
             <Button
               type="button"
-              size="icon-sm"
-              className="rounded-full"
+              size="icon-xs"
+              className="size-7 rounded-full"
               onClick={onStop}
               aria-label="Stop"
             >
@@ -606,8 +612,8 @@ function AgentComposerInner({
           ) : (
             <Button
               type="button"
-              size="icon-sm"
-              className="rounded-full"
+              size="icon-xs"
+              className="size-7 rounded-full"
               onClick={submit}
               disabled={isEncodingFiles}
               aria-label={

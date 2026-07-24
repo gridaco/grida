@@ -442,7 +442,7 @@ function StartTabItem() {
       tabIndex={0}
       aria-selected
       data-tab-native-drag-region-target="start"
-      className="flex h-6 shrink-0 select-none items-center rounded-md bg-muted px-2 text-xs text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      className="flex h-7 shrink-0 select-none items-center rounded-md bg-muted px-2 text-xs text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
     >
       Quick Start
     </div>
@@ -557,7 +557,7 @@ function TabItem({
         }
       }}
       className={cn(
-        "group flex h-6 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-2 text-xs outline-none transition-colors",
+        "group flex h-7 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-md px-2 text-xs outline-none transition-colors",
         active
           ? "bg-muted text-foreground shadow-xs"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",

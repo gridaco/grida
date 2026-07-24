@@ -7,7 +7,7 @@ tags: [chat, history, title, rename, session]
 status: untested
 severity: medium
 date: 2026-07-23
-updated: 2026-07-23
+updated: 2026-07-24
 automatable: false
 covered_by: []
 ---
@@ -37,15 +37,22 @@ title; Escape cancels it.
 3. Move the pointer over the title without clicking.
    - Expected: the chat list does not open.
 4. Activate the list button.
-   - Expected: the recent chat list opens.
-5. Close the list, then double-click the active title.
+   - Expected: the recent chat list opens with every row's overflow button
+     hidden and each title using the row's full available width.
+5. Hover a chat row, then open its overflow menu.
+   - Expected: only the hovered row's overflow button appears. It remains
+     visible while keyboard-focused or while its menu is open, and the menu
+     remains interactive when the pointer leaves the row. After pointer-
+     dismissing the menu outside the row, the button hides even though focus
+     returns to its trigger.
+6. Close the list, then double-click the active title.
    - Expected: the title becomes an inline text field with its text selected;
      its size, weight, color, and position match the read-state title, with no
      generic input border or shadow. No dialog appears.
-6. Type a new title and press Enter.
+7. Type a new title and press Enter.
    - Expected: the inline field closes and the renamed title remains visible.
-7. Open the active chat's overflow menu and choose Rename.
+8. Open the active chat's overflow menu and choose Rename.
    - Expected: the same inline title field opens. Pressing Escape restores the
      existing title without renaming it.
-8. Open the chat list, use a different row's overflow menu, and choose Rename.
+9. Open the chat list, use a different row's overflow menu, and choose Rename.
    - Expected: that chat becomes active and its title opens in the header editor.

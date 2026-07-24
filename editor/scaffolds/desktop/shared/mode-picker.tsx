@@ -45,7 +45,7 @@ export function DesktopModePicker({
     >
       <PromptInputSelectTrigger
         size="sm"
-        className="min-w-0 gap-1 px-2 text-xs [&>svg]:transition-colors hover:[&>svg]:text-foreground aria-expanded:[&>svg]:text-foreground [&_[data-slot=select-value]]:block [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate"
+        className="min-w-0 px-2 text-xs [&>svg]:hidden [&_[data-slot=select-value]]:block [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:truncate"
         aria-label="Mode"
       >
         <PromptInputSelectValue placeholder="Mode" />
