@@ -171,20 +171,22 @@ export function ChatSessionPicker({
             align="start"
             className="max-h-(--radix-popover-content-available-height) w-64 overflow-x-hidden overflow-y-auto p-1"
           >
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-full justify-start rounded-sm px-2 text-sm font-normal"
-              onClick={() => {
-                setListOpen(false);
-                onSelect(null);
-              }}
-            >
-              <MessageSquarePlusIcon className="size-3.5" />
-              New chat
-            </Button>
-            {session.sessions.length > 0 && (
+            {!hideNewChat && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-full justify-start rounded-sm px-2 text-sm font-normal"
+                onClick={() => {
+                  setListOpen(false);
+                  onSelect(null);
+                }}
+              >
+                <MessageSquarePlusIcon className="size-3.5" />
+                New chat
+              </Button>
+            )}
+            {!hideNewChat && session.sessions.length > 0 && (
               <Separator className="-mx-1 my-1 w-auto" />
             )}
             {session.sessions.slice(0, 20).map((s) => (
