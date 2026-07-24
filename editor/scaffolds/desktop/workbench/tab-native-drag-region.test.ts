@@ -8,6 +8,25 @@ type TestRect = Readonly<{
   bottom: number;
 }>;
 
+function domRect(rect: TestRect): TestRect {
+  // DOMRect geometry fields are inherited accessors, not own enumerable fields.
+  // Keep the mock faithful so spreading one cannot silently drop coordinates.
+  return Object.create({
+    get left() {
+      return rect.left;
+    },
+    get top() {
+      return rect.top;
+    },
+    get right() {
+      return rect.right;
+    },
+    get bottom() {
+      return rect.bottom;
+    },
+  }) as TestRect;
+}
+
 function element({
   attribute,
   rect,
@@ -18,10 +37,11 @@ function element({
   display?: string;
 }): HTMLElement {
   const attributes = new Map(attribute ? [attribute] : []);
+  const bounds = domRect(rect);
   return {
     style: { display },
     getAttribute: (name: string) => attributes.get(name) ?? null,
-    getBoundingClientRect: () => rect,
+    getBoundingClientRect: () => bounds,
   } as unknown as HTMLElement;
 }
 
@@ -89,18 +109,27 @@ describe("TabNativeDragRegion.intersection", () => {
 });
 
 describe("TabNativeDragRegion.Controller", () => {
-  it("mirrors clipped targets in layer coordinates and clears stale overlays", () => {
+  it("mirrors clipped tabs and their following gaps while clearing stale overlays", () => {
+    const targetOffscreen = element({
+      attribute: [TabNativeDragRegion.TARGET_ATTRIBUTE, "offscreen"],
+      rect: { left: -100, top: 8, right: 36, bottom: 36 },
+    });
     const targetA = element({
       attribute: [TabNativeDragRegion.TARGET_ATTRIBUTE, "a"],
-      rect: { left: 40, top: 10, right: 180, bottom: 34 },
+      rect: { left: 40, top: 8, right: 180, bottom: 36 },
     });
     const targetB = element({
       attribute: [TabNativeDragRegion.TARGET_ATTRIBUTE, "b"],
-      rect: { left: -100, top: 10, right: 80, bottom: 34 },
+      rect: { left: 184, top: 8, right: 300, bottom: 36 },
     });
     const targetC = element({
       attribute: [TabNativeDragRegion.TARGET_ATTRIBUTE, "c"],
-      rect: { left: 460, top: 10, right: 560, bottom: 34 },
+      rect: { left: 304, top: 8, right: 560, bottom: 36 },
+    });
+    const exclusionOffscreen = element({
+      attribute: [TabNativeDragRegion.EXCLUSION_ATTRIBUTE, "offscreen"],
+      rect: { left: 0, top: 0, right: 0, bottom: 0 },
+      display: "block",
     });
     const exclusionA = element({
       attribute: [TabNativeDragRegion.EXCLUSION_ATTRIBUTE, "a"],
@@ -110,7 +139,7 @@ describe("TabNativeDragRegion.Controller", () => {
     const exclusionB = element({
       attribute: [TabNativeDragRegion.EXCLUSION_ATTRIBUTE, "b"],
       rect: { left: 0, top: 0, right: 0, bottom: 0 },
-      display: "block",
+      display: "none",
     });
     const exclusionC = element({
       attribute: [TabNativeDragRegion.EXCLUSION_ATTRIBUTE, "c"],
@@ -118,11 +147,13 @@ describe("TabNativeDragRegion.Controller", () => {
       display: "none",
     });
     const viewport = container({ left: 100, top: 0, right: 500, bottom: 44 }, [
+      targetOffscreen,
       targetA,
       targetB,
       targetC,
     ]);
     const layer = container({ left: 80, top: 0, right: 520, bottom: 44 }, [
+      exclusionOffscreen,
       exclusionA,
       exclusionB,
       exclusionC,
@@ -142,19 +173,63 @@ describe("TabNativeDragRegion.Controller", () => {
     }).toEqual({
       display: "block",
       left: "20px",
-      top: "10px",
-      width: "80px",
-      height: "24px",
+      top: "8px",
+      width: "84px",
+      height: "28px",
     });
-    expect(exclusionB.style.display).toBe("none");
+    expect({
+      display: exclusionB.style.display,
+      left: exclusionB.style.left,
+      width: exclusionB.style.width,
+    }).toEqual({
+      display: "block",
+      left: "104px",
+      width: "120px",
+    });
     expect({
       display: exclusionC.style.display,
       left: exclusionC.style.left,
       width: exclusionC.style.width,
     }).toEqual({
       display: "block",
-      left: "380px",
-      width: "40px",
+      left: "224px",
+      width: "196px",
+    });
+    expect(exclusionOffscreen.style.display).toBe("none");
+  });
+
+  it("leaves space after the final tab in the native drag region", () => {
+    const target = element({
+      attribute: [TabNativeDragRegion.TARGET_ATTRIBUTE, "final"],
+      rect: { left: 160, top: 8, right: 280, bottom: 36 },
+    });
+    const exclusion = element({
+      attribute: [TabNativeDragRegion.EXCLUSION_ATTRIBUTE, "final"],
+      rect: { left: 0, top: 0, right: 0, bottom: 0 },
+      display: "none",
+    });
+    const viewport = container({ left: 100, top: 0, right: 500, bottom: 44 }, [
+      target,
+    ]);
+    const layer = container({ left: 100, top: 0, right: 500, bottom: 44 }, [
+      exclusion,
+    ]);
+
+    new TabNativeDragRegion.Controller(
+      viewport.element,
+      layer.element
+    ).reconcile();
+
+    expect({
+      display: exclusion.style.display,
+      left: exclusion.style.left,
+      width: exclusion.style.width,
+      height: exclusion.style.height,
+    }).toEqual({
+      display: "block",
+      left: "60px",
+      width: "120px",
+      height: "28px",
     });
   });
 

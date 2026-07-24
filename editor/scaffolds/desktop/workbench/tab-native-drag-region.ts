@@ -17,8 +17,11 @@ type VisibleRect = Rect &
  *
  * Chromium does not clip `-webkit-app-region` boxes to an ancestor's
  * scrollport. The moving tab nodes therefore carry no app-region declaration.
- * This controller mirrors only their visible intersections onto stationary,
- * pointer-transparent exclusion rectangles outside the scroller.
+ * This controller mirrors their visible intersections onto stationary,
+ * pointer-transparent exclusion rectangles outside the scroller. Each
+ * exclusion extends through the gap before the next tab so wheel input reaches
+ * the scroll viewport there; the final exclusion stops at the final tab so
+ * genuinely unused title-bar space remains draggable.
  */
 export namespace TabNativeDragRegion {
   export const TARGET_ATTRIBUTE = "data-tab-native-drag-region-target";
@@ -76,19 +79,30 @@ export namespace TabNativeDragRegion {
       const visibleExclusions = new Map<HTMLElement, VisibleRect>();
       const viewportRect = this.viewport.getBoundingClientRect();
       const layerRect = this.exclusionLayer.getBoundingClientRect();
+      const targets = Array.from(this.targets(), (target) => ({
+        target,
+        rect: target.getBoundingClientRect(),
+      }));
 
       // Finish all layout reads before writing overlay styles. This runs on
       // every horizontal scroll event and must not force a layout per tab.
-      for (const target of this.targets()) {
+      for (const [index, { target, rect }] of targets.entries()) {
         const id = target.getAttribute(TARGET_ATTRIBUTE);
         if (id === null) continue;
         const exclusion = exclusions.get(id);
         if (!exclusion) continue;
 
-        const visible = intersection(
-          target.getBoundingClientRect(),
-          viewportRect
-        );
+        const next = targets[index + 1];
+        const exclusionRect =
+          next && next.rect.left > rect.right
+            ? {
+                left: rect.left,
+                top: rect.top,
+                right: next.rect.left,
+                bottom: rect.bottom,
+              }
+            : rect;
+        const visible = intersection(exclusionRect, viewportRect);
         if (visible) visibleExclusions.set(exclusion, visible);
       }
 

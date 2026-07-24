@@ -387,13 +387,15 @@ function EditorTitleBar({
             />
           );
         })}
-        {/* The parent title bar owns dragging; region-free tab descendants
-            leave this unused space and the inter-tab gaps draggable. */}
+        {/* The parent title bar owns dragging. The stationary exclusions below
+            cover the occupied tab run (including inter-tab gaps); this genuinely
+            unused trailing space remains draggable. */}
         <div role="presentation" className="h-full min-w-0 flex-1" />
       </div>
       {/* Chromium does not clip native app-region boxes to scrollports. Keep
-          moving tab descendants region-free and mirror only their visible
-          rectangles here. This layer is stationary and pointer-transparent.
+          moving tab descendants region-free and mirror their visible interaction
+          run (tabs plus following gaps) here. This layer is stationary and
+          pointer-transparent.
           (see test/desktop-workbench-scrolled-tab-drag-region.md) */}
       <div
         ref={nativeDragExclusionLayerRef}
