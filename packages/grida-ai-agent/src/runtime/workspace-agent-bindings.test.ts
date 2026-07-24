@@ -866,7 +866,7 @@ describe("createWorkspaceAgentBindings — read-only directory references", () =
       viewError = err;
     }
 
-    expect(readOutput).toMatchObject({ ok: false, reason: "not_found" });
+    expect(readOutput).toMatchObject({ ok: false, reason: "io_error" });
     expect(listOutput).toMatchObject({ folders: [], files: [] });
     expect(grepOutput).toMatchObject({ matches: [] });
     expect(viewError).toMatchObject({
@@ -983,7 +983,15 @@ describe("createWorkspaceAgentBindings — read-only directory references", () =
         path.join(outsideRoot, "secret.txt"),
         path.join(referenceRoot, "escape.txt")
       );
-      expect(await result!.fs.read_fresh(`${mount}/escape.txt`)).toBeNull();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const output = await AgentFs.resolveToolCallAsync(result!.fs, {
+        tool_name: "read_file",
+        input: { path: `${mount}/escape.txt` },
+      });
+      warn.mockRestore();
+
+      expect(output).toMatchObject({ ok: false, reason: "io_error" });
+      expect(JSON.stringify(output)).not.toContain(outsideRoot);
     }
   );
 });

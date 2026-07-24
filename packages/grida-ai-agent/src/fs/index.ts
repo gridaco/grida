@@ -600,7 +600,7 @@ export class AgentFs {
     } catch (err) {
       if (err instanceof AgentFs.TextFileTooLargeError) throw err;
       console.warn(`[agent-fs] backend.read(${path}) failed:`, err);
-      return null;
+      throw err;
     }
     if (content === null) {
       this.files.delete(path);
@@ -718,7 +718,22 @@ export class AgentFs {
       }
 
       if (args.expected_version !== null) {
-        await this.readFreshUnlocked(path);
+        try {
+          await this.readFreshUnlocked(path);
+        } catch (err) {
+          if (err instanceof AgentFs.TextFileTooLargeError) {
+            return {
+              ok: false,
+              reason: "too_large",
+              message: err.message,
+            };
+          }
+          return {
+            ok: false,
+            reason: "io_error",
+            message: `The backing store rejected the read of ${path}.`,
+          };
+        }
         const current = this.lookup(path);
         if (current === null) {
           return {
@@ -1460,7 +1475,11 @@ export namespace AgentFs {
   // derived from these tuples, so they can't drift.
   // -------------------------------------------------------------------------
 
-  export const READ_FAILURE_REASONS = ["not_found", "too_large"] as const;
+  export const READ_FAILURE_REASONS = [
+    "not_found",
+    "too_large",
+    "io_error",
+  ] as const;
   export type ReadFailureReason = (typeof READ_FAILURE_REASONS)[number];
 
   export const WRITE_FAILURE_REASONS = [
@@ -1994,7 +2013,11 @@ export namespace AgentFs {
               message: err.message,
             };
           }
-          throw err;
+          return {
+            ok: false,
+            reason: "io_error",
+            message: `The backing store rejected the read of ${path}; this does not mean the file is missing.`,
+          };
         }
       }
       case TOOL_NAMES.list_files: {

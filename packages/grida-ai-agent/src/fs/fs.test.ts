@@ -500,6 +500,44 @@ describe("AgentFs — server-bound current-content edits", () => {
     expect(await backend.read("/notes.md")).toBe("human changed");
   });
 
+  it("reports backend read failures without treating the file as missing", async () => {
+    let failRead = false;
+    const backend: AgentFs.Backend = {
+      async list() {
+        return ["/notes.md"];
+      },
+      async read() {
+        return "persisted";
+      },
+      async readWithRevision() {
+        if (failRead) throw new Error("temporary read failure");
+        return { content: "persisted", revision: "1" };
+      },
+      async write() {},
+      async writeIfRevision(_path, _content, revision) {
+        return { ok: true, revision };
+      },
+      async delete() {},
+    };
+    const fs = new AgentFs(backend);
+    await fs.hydrate();
+    failRead = true;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await AgentFs.resolveToolCallAsync(fs, {
+      tool_name: "read_file",
+      input: { path: "/notes.md" },
+    });
+
+    warn.mockRestore();
+    expect(result).toMatchObject({ ok: false, reason: "io_error" });
+    expect(fs.read("/notes.md")).toMatchObject({ content: "persisted" });
+    const readSchema = AgentFs.tools.read_file.outputSchema as {
+      safeParse(value: unknown): { success: boolean };
+    };
+    expect(readSchema.safeParse(result).success).toBe(true);
+  });
+
   it("serializes concurrent compatible edits on one path", async () => {
     const backend = new AgentFs.MemoryBackend();
     await backend.write("/notes.md", "alpha beta");

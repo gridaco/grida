@@ -75,7 +75,9 @@ Returns the file's current text content. Read is how the agent understands an
 existing file and obtains exact edit context; it is not an authorization event.
 The tool exposes no session-local freshness token to the model. Grida bounds
 model-readable and model-mutable text files at 1 MiB of UTF-8; larger files
-return `too_large`.
+return `too_large`. A storage read failure returns `io_error`, never
+`not_found`, so the agent cannot mistake an inaccessible existing file for a
+safe path to recreate.
 
 ### `edit_file`
 
