@@ -134,9 +134,11 @@ pre-authorized middle.
 ### S5 — Scratch is not the workspace
 
 Writing to scratch MUST NOT be treated as editing the user's project. The
-contracts that govern workspace edits — read-before-edit, the freshness token an
-edit requires — do not apply to scratch. Perceiving or producing a scratch file
-is not reading-to-edit a user file, and MUST NOT satisfy those obligations.
+authority, review, and preservation safeguards that govern workspace mutation
+do not apply to scratch. Perceiving or producing a scratch file grants no
+authority over a workspace file. The edit operation's own current-content match
+still applies wherever that operation is used; it is intrinsic conflict
+detection, not a workspace-authorization rule.
 
 ## Lifecycle
 
@@ -173,8 +175,8 @@ A conforming implementation MUST:
 - Make scratch the default destination for tools that produce files (S3).
 - Let the agent read, move, copy, and perceive within scratch without
   per-operation approval, while keeping scratch inside sandbox containment (S4).
-- Keep scratch writes outside the workspace-edit contracts (read-before-edit /
-  freshness) (S5).
+- Keep scratch writes outside workspace mutation authority and review
+  safeguards, while retaining each operation's intrinsic validation (S5).
 
 ## What this guide does not specify
 

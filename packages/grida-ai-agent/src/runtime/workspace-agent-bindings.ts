@@ -8,6 +8,7 @@
  */
 
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import { generateImage } from "ai";
 import { AgentFs } from "../fs";
@@ -232,7 +233,11 @@ export async function createWorkspaceAgentBindings(
             // Flush the agent fs's pending writes before a command runs, so a
             // script the agent just wrote via write_file is on disk when the
             // shell reads it (closes the debounced-write vs immediate-read race).
-            () => fs.flush()
+            () => fs.flush(),
+            // Tool calls in one model step may execute concurrently. Share the
+            // fs FIFO across the entire command so call order, persistence, and
+            // subsequent operation-time reads agree.
+            (action) => fs.runExclusive(action)
           ),
           default_workdir: req.workspace_root,
           scratch_dir: scratchDir,
@@ -558,6 +563,35 @@ class DirectoryReferencePathError extends Error {
   }
 }
 
+type WorkspaceFileRevision = {
+  mtime: number;
+  sha256: string;
+};
+
+function workspaceFileDigest(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+function encodeWorkspaceFileRevision(content: string, mtime: number): string {
+  return JSON.stringify({ mtime, sha256: workspaceFileDigest(content) });
+}
+
+function decodeWorkspaceFileRevision(revision: string): WorkspaceFileRevision {
+  const value: unknown = JSON.parse(revision);
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("mtime" in value) ||
+    typeof value.mtime !== "number" ||
+    !Number.isFinite(value.mtime) ||
+    !("sha256" in value) ||
+    typeof value.sha256 !== "string"
+  ) {
+    throw new Error("invalid workspace file revision");
+  }
+  return { mtime: value.mtime, sha256: value.sha256 };
+}
+
 const REFERENCE_GREP_MAX_TRAVERSAL_STEPS = Math.min(SCAN_MAX_FILES, 1_000);
 const REFERENCE_GREP_MAX_MATCHES = 1_000;
 
@@ -862,16 +896,33 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   }
 
   async read(path: string): Promise<string | null> {
+    return (await this.readWithRevision(path))?.content ?? null;
+  }
+
+  async readWithRevision(
+    path: string
+  ): Promise<AgentFs.BackendReadWithRevisionResult | null> {
     try {
       const { scope, rel } = this.scopeFor(path);
       const result = await workspaceFs.readFile(scope, rel);
-      return result.content;
+      return {
+        content: result.content,
+        revision: encodeWorkspaceFileRevision(result.content, result.mtime),
+      };
     } catch (err) {
+      if (isWorkspaceFsCode(err, "file-too-large")) {
+        const size =
+          err instanceof workspaceFs.Exception &&
+          typeof err.detail.size === "number"
+            ? err.detail.size
+            : AgentFs.MAX_TEXT_FILE_BYTES + 1;
+        throw new AgentFs.TextFileTooLargeError(path, size);
+      }
       // The AgentFs.Backend contract is "null when there's no readable text
       // here". That covers a raw ENOENT *and* the structured workspaceFs
-      // codes for content we deliberately don't serve as text (a directory,
-      // an oversized file, or a binary/non-utf8 file). Policy violations
-      // (path escapes, etc.) still throw.
+      // codes for content we deliberately don't serve as text (a directory or
+      // binary/non-utf8 file). Oversized text is the typed error above; policy
+      // violations (path escapes, etc.) still throw.
       if (isAbsentForRead(err) || err instanceof DirectoryReferencePathError) {
         return null;
       }
@@ -917,12 +968,53 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
   }
 
   async write(path: string, content: string): Promise<void> {
+    assertWorkspaceAgentTextSize(path, content);
     const resolved = this.scopeFor(path);
     if (resolved.kind === "reference") {
       throw new DirectoryReferencePathError("read_only", path);
     }
     const { scope, rel } = resolved;
     await workspaceFs.writeFile(scope, rel, content);
+  }
+
+  async writeIfRevision(
+    path: string,
+    content: string,
+    revision: string
+  ): Promise<AgentFs.BackendWriteIfRevisionResult> {
+    assertWorkspaceAgentTextSize(path, content);
+    const resolved = this.scopeFor(path);
+    if (resolved.kind === "reference") {
+      throw new DirectoryReferencePathError("read_only", path);
+    }
+    const expected = decodeWorkspaceFileRevision(revision);
+    try {
+      const { scope, rel } = resolved;
+      // mtime alone is not a content identity: an editor or sync client can
+      // replace bytes and restore the timestamp. Pair it with a digest of the
+      // text actually observed by the edit. The daemon still performs its late
+      // mtime check immediately before rename, narrowing the remaining
+      // cross-process check→publish window.
+      const current = await workspaceFs.readFile(scope, rel);
+      if (
+        current.mtime !== expected.mtime ||
+        workspaceFileDigest(current.content) !== expected.sha256
+      ) {
+        return { ok: false, reason: "stale" };
+      }
+      const result = await workspaceFs.writeFile(scope, rel, content, {
+        expected_mtime: expected.mtime,
+      });
+      return {
+        ok: true,
+        revision: encodeWorkspaceFileRevision(content, result.mtime),
+      };
+    } catch (err) {
+      if (isWorkspaceFsCode(err, "modified-since") || isAbsentForRead(err)) {
+        return { ok: false, reason: "stale" };
+      }
+      throw err;
+    }
   }
 
   async delete(path: string): Promise<void> {
@@ -1137,6 +1229,13 @@ export class WorkspaceAgentFsBackend implements AgentFs.Backend {
       }
     }
     return truncated;
+  }
+}
+
+function assertWorkspaceAgentTextSize(path: string, content: string): void {
+  const bytes = Buffer.byteLength(content, "utf8");
+  if (bytes > AgentFs.MAX_TEXT_FILE_BYTES) {
+    throw new AgentFs.TextFileTooLargeError(path, bytes);
   }
 }
 

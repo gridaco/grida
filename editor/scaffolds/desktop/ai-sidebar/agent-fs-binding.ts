@@ -9,9 +9,9 @@
  *               match-and-replace `edit_file`)
  *   load      → editor accepts any valid SVG; re-formatting is the
  *               editor's concern
- *   getVersion → `state.content_version` so UI-state emissions
- *               (selection, scope, mode, tool) don't strand the
- *               agent's writes as stale between read and edit
+ *   getVersion → `state.content_version` for host-side change events
+ *               and direct conditional writes; model-facing edits
+ *               validate their text against current content
  *   subscribe  → wires editor emissions into the fs's auto-flush
  *
  * The owning `AgentFs` (built once per file window in

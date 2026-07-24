@@ -81,9 +81,10 @@ the read tool needs — perceiving a source is a read, not a new privilege. It
 adds no write or network surface. (A future rendering path, below, adds a
 render capability; bitmap perception does not.)
 
-Perception is **not** a `read` for the read-before-edit contract. Seeing an
-image is not reading text you intend to change; it must not satisfy the
-freshness token an edit requires.
+Perception grants no write authority and supplies no textual edit context.
+Seeing an image is not observing the exact text a match-and-replace edit needs.
+The edit operation independently validates its supplied context against current
+text; perception neither satisfies nor bypasses that check.
 
 ## The input matrix
 

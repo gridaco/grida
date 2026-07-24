@@ -58,30 +58,34 @@ Filesystem tools:
   truncated, next_offset? }. List direct children of a directory only.
   Defaults to \`/\`; this is not recursive and not a whole-workspace
   inventory.
-- ${fs.read_file}: { path } → { content, version }.
-- ${fs.edit_file}: { path, old_string, new_string, replace_all?, version }.
+- ${fs.read_file}: { path } → { content }.
+- ${fs.edit_file}: { path, old_string, new_string, replace_all? }.
   Match-and-replace. The default write path.
-- ${fs.write_file}: { path, content, version? }. Full-file upsert;
-  \`version\` optional for permissive writes.
+- ${fs.write_file}: { path, content }. Full-file upsert; creates a
+  missing file or intentionally replaces the whole existing file.
 - ${fs.grep_files}: { pattern, path_prefix?, case_sensitive? }.
   Literal substring search across files (mirrors \`grep -n -F\`).
   Returns one entry per matching line with a 1-indexed line number.
-  Use it to find references before editing — does NOT count as a
-  \`read_file\`.
+  Use it to find references before editing; read the file when a
+  matching line does not provide enough unique context.
 
 Rules:
-1. Call ${fs.read_file} on a path before your first edit. Re-read on
-   any reason="stale".
-2. Pass the most recent \`version\` you received back to every
-   version-checked write on that path.
-3. Prefer ${fs.edit_file} for targeted changes. Reach for ${fs.write_file}
+1. Read an existing file when you need to understand it or obtain
+   exact edit context. Do not re-read content you just successfully
+   wrote merely to authorize an edit.
+2. ${fs.edit_file} checks \`old_string\` against the file's current
+   content during that invocation. Follow the failure message. When the
+   current content no longer matches, read it, reconcile, and retry.
+3. On reason="too_large" from any text-file tool, use a shell/streaming
+   workflow or split the artifact.
+4. Prefer ${fs.edit_file} for targeted changes. Reach for ${fs.write_file}
    only for wholesale rewrites where edit_file would mean pasting most
    of the document as \`old_string\`.
-4. For ${fs.edit_file}, copy \`old_string\` verbatim from the read
-   output. Include enough surrounding context to be unique; on
+5. For ${fs.edit_file}, use exact text from the current file or from
+   content you just wrote. Include enough surrounding context to be unique; on
    reason="ambiguous" you'll get the count — add more context and retry.
-5. Multiple unrelated edits → multiple ${fs.edit_file} calls.
-6. Treat ${fs.list_files} results as one directory page. If \`truncated\`
+6. Multiple unrelated edits → multiple ${fs.edit_file} calls.
+7. Treat ${fs.list_files} results as one directory page. If \`truncated\`
    is true, call it again with \`next_offset\`; use ${fs.grep_files} or
    command/search tools for broad searches.
 </filesystem>

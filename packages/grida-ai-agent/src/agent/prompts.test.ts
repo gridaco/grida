@@ -10,6 +10,20 @@ describe("composeSystemPrompt", () => {
     expect(prompt).toContain("<filesystem>");
   });
 
+  it("teaches current-content edits without a prior-read authorization rule", () => {
+    const prompt = composeSystemPrompt({});
+
+    expect(prompt).toMatch(
+      /checks `old_string` against the file's current\s+content/
+    );
+    expect(prompt).toMatch(
+      /Do not re-read content you just successfully\s+wrote/
+    );
+    expect(prompt).not.toContain("before your first edit");
+    expect(prompt).not.toContain("most recent `version`");
+    expect(prompt).toContain('reason="too_large"');
+  });
+
   it("injects raw eager skill blocks only when provided", () => {
     const base = composeSystemPrompt({});
     const withBlock = composeSystemPrompt({

@@ -180,8 +180,6 @@ function rejectionLabel(rej: EditOrWriteFailure): {
       return { label: "Canvas changed — will retry", tone: "warn" };
     case "parse_error":
       return { label: "Invalid SVG — will retry", tone: "warn" };
-    case "not_read":
-      return { label: "Read first — will retry", tone: "warn" };
     case "not_found":
       return { label: "Snippet not found — will retry", tone: "warn" };
     case "ambiguous":
@@ -193,6 +191,8 @@ function rejectionLabel(rej: EditOrWriteFailure): {
       };
     case "no_op":
       return { label: "No change", tone: "warn" };
+    case "too_large":
+      return { label: "Canvas too large for text tools", tone: "warn" };
     default:
       return { label: "Edit rejected", tone: "warn" };
   }

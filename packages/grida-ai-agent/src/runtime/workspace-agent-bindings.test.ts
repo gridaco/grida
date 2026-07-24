@@ -41,6 +41,10 @@ describe("WorkspaceAgentFsBackend — path mapping", () => {
     await fs.rm(baseDir, { recursive: true, force: true });
   });
 
+  it("shares the workspace text-reader bound", () => {
+    expect(AgentFs.MAX_TEXT_FILE_BYTES).toBe(workspaceFs.MAX_FILE_BYTES);
+  });
+
   it("maps a logical '/'-rooted path to the workspace root", async () => {
     await backend.write("/a.txt", "hello");
     expect(await fs.readFile(path.join(workspaceRoot, "a.txt"), "utf8")).toBe(
@@ -67,6 +71,96 @@ describe("WorkspaceAgentFsBackend — path mapping", () => {
 
   it("still rejects a path that escapes the workspace", async () => {
     await expect(backend.write("/../escape.txt", "x")).rejects.toBeDefined();
+  });
+
+  it("conditionally publishes only while the read revision is current", async () => {
+    await backend.write("/a.txt", "alpha");
+    const current = await backend.readWithRevision("/a.txt");
+    expect(current).not.toBeNull();
+    const published = await backend.writeIfRevision(
+      "/a.txt",
+      "ALPHA",
+      current!.revision
+    );
+    expect(published.ok).toBe(true);
+    expect(await backend.read("/a.txt")).toBe("ALPHA");
+  });
+
+  it("rejects a conditional write after an external change", async () => {
+    await backend.write("/a.txt", "alpha");
+    const current = await backend.readWithRevision("/a.txt");
+    expect(current).not.toBeNull();
+
+    const abs = path.join(workspaceRoot, "a.txt");
+    await fs.writeFile(abs, "human");
+    const future = new Date(Date.now() + 2_000);
+    await fs.utimes(abs, future, future);
+    expect(
+      await backend.writeIfRevision("/a.txt", "agent", current!.revision)
+    ).toEqual({ ok: false, reason: "stale" });
+    expect(await backend.read("/a.txt")).toBe("human");
+  });
+
+  it("rejects replaced content even when its mtime is restored", async () => {
+    await backend.write("/a.txt", "alpha");
+    const abs = path.join(workspaceRoot, "a.txt");
+    const stableSeconds = Math.floor(Date.now() / 1_000) - 10;
+    await fs.utimes(abs, stableSeconds, stableSeconds);
+    const current = await backend.readWithRevision("/a.txt");
+    expect(current).not.toBeNull();
+    const { mtime } = JSON.parse(current!.revision) as { mtime: number };
+
+    await fs.writeFile(abs, "human");
+    await fs.utimes(abs, stableSeconds, stableSeconds);
+    expect((await fs.stat(abs)).mtimeMs).toBe(mtime);
+
+    expect(
+      await backend.writeIfRevision("/a.txt", "agent", current!.revision)
+    ).toEqual({ ok: false, reason: "stale" });
+    expect(await backend.read("/a.txt")).toBe("human");
+  });
+
+  it("keeps every successful model write editable after reconstruction", async () => {
+    const suffix = " alpha";
+    const content =
+      "x".repeat(AgentFs.MAX_TEXT_FILE_BYTES - suffix.length) + suffix;
+    const first = new AgentFs(backend);
+    expect(
+      await AgentFs.resolveToolCallAsync(first, {
+        tool_name: "write_file",
+        input: { path: "/large.txt", content },
+      })
+    ).toEqual({ ok: true });
+
+    const resumed = new AgentFs(backend);
+    await resumed.hydrate();
+    expect(
+      await AgentFs.resolveToolCallAsync(resumed, {
+        tool_name: "edit_file",
+        input: {
+          path: "/large.txt",
+          old_string: " alpha",
+          new_string: " ALPHA",
+        },
+      })
+    ).toEqual({ ok: true, occurrences: 1 });
+    expect((await backend.read("/large.txt"))?.endsWith(" ALPHA")).toBe(true);
+  });
+
+  it("rejects a model write above the editable text bound", async () => {
+    const agentFs = new AgentFs(backend);
+    expect(
+      await AgentFs.resolveToolCallAsync(agentFs, {
+        tool_name: "write_file",
+        input: {
+          path: "/too-large.txt",
+          content: "x".repeat(AgentFs.MAX_TEXT_FILE_BYTES + 1),
+        },
+      })
+    ).toMatchObject({ ok: false, reason: "too_large" });
+    await expect(
+      fs.access(path.join(workspaceRoot, "too-large.txt"))
+    ).rejects.toBeDefined();
   });
 });
 
@@ -285,6 +379,35 @@ describe("createWorkspaceAgentBindings — supervised approval wiring", () => {
       { workspace_registry: registry, shell_execution_allowed: false }
     );
     expect(bindings?.command).toBeUndefined();
+  });
+
+  it("serializes a concurrent write before a later command reads it", async () => {
+    const bindings = await createWorkspaceAgentBindings(
+      { workspace_root: workspaceRoot, mode: "auto" },
+      { workspace_registry: registry, shell_execution_allowed: true }
+    );
+    expect(bindings?.command).toBeDefined();
+
+    const write = AgentFs.resolveToolCallAsync(bindings!.fs, {
+      tool_name: "write_file",
+      input: { path: "/ordered.txt", content: "persisted first" },
+    });
+    const command = bindings!.command!.backend({
+      command: process.execPath,
+      args: [
+        "-e",
+        "process.stdout.write(require('node:fs').readFileSync('ordered.txt','utf8'))",
+      ],
+      workdir: workspaceRoot,
+      description: "read the ordered write",
+    });
+
+    const [writeResult, commandResult] = await Promise.all([write, command]);
+    expect(writeResult).toEqual({ ok: true });
+    expect(commandResult).toMatchObject({
+      exit_code: 0,
+      stdout: "persisted first",
+    });
   });
 });
 
