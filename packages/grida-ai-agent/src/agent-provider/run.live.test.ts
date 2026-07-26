@@ -35,6 +35,15 @@ const LIVE = process.env.GRIDA_LIVE_CLAUDE === "1";
 const TIMEOUT_MS = 300_000;
 const liveDescribe = LIVE ? describe : describe.skip;
 
+/**
+ * Which `AGENT_PROVIDER_MODELS` entry the picker case runs. Defaults to the
+ * cheapest one; override to verify a newly catalogued vendor id actually runs
+ * on a subscription through the bridge — the precondition that map documents:
+ *
+ *   GRIDA_LIVE_CLAUDE=1 GRIDA_LIVE_ACP_MODEL=claude-acp/opus-5 …
+ */
+const ACP_MODEL_ID = process.env.GRIDA_LIVE_ACP_MODEL ?? "claude-acp/haiku-4.5";
+
 type Host = { app: Hono; runtime: AgentRuntime; store: SessionsStore };
 
 function buildHost(baseDir: string): Host {
@@ -165,13 +174,13 @@ liveDescribe("LIVE — agent-provider class, no key (issue #813)", () => {
   );
 
   it(
-    "runs a picker-selected model (issue #813 model picker)",
+    `runs a picker-selected model (issue #813 model picker): ${ACP_MODEL_ID}`,
     async () => {
-      // The synthetic id carries the vendor model (claude-haiku-4-5) → run-input
-      // gate → runtime → _meta.claudeCode.options.model → bridge. A 200 + answer
-      // proves the whole chain accepts the picked model id and runs it.
+      // The synthetic id carries a vendor model → run-input gate → runtime →
+      // _meta.claudeCode.options.model → bridge. A 200 + answer proves the
+      // whole chain accepts the picked model id and runs it.
       const turn = await runTurn(host, {
-        model_id: "claude-acp/haiku-4.5",
+        model_id: ACP_MODEL_ID,
         messages: [
           {
             role: "user",

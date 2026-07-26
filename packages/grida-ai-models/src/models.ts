@@ -301,6 +301,18 @@ export namespace models {
         outputLimit: 128_000,
         cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
       },
+      // Drop-in successor to Opus 4.8 at the same rate card.
+      "anthropic/claude-opus-5": {
+        id: "anthropic/claude-opus-5",
+        label: "Claude Opus 5",
+        short_label: "Opus 5",
+        multimodal: true,
+        imageInputMimes: ANTHROPIC_IMAGE_INPUT_MIMES,
+        tool_call: true,
+        contextWindow: 1_000_000,
+        outputLimit: 128_000,
+        cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+      },
       "anthropic/claude-opus-4.8": {
         id: "anthropic/claude-opus-4.8",
         label: "Claude Opus 4.8",
@@ -311,6 +323,7 @@ export namespace models {
         contextWindow: 1_000_000,
         outputLimit: 128_000,
         cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+        deprecated: true,
       },
       "anthropic/claude-opus-4.7": {
         id: "anthropic/claude-opus-4.7",

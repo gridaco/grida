@@ -39,7 +39,7 @@ Models are organized into **tiers** based on capability and cost:
 | `max`  | GPT-5.6 Sol (`openai/gpt-5.6-sol`)     | 1.05M   | 128K       | $5.00          | $30.00          |
 
 All tier models support **multimodal** inputs (text + images).
-Claude Fable 5 and Claude Opus 4.8 remain active, non-tiered catalogue models.
+Claude Fable 5 and Claude Opus 5 remain active, non-tiered catalogue models.
 
 ### Cache Pricing
 
@@ -63,7 +63,8 @@ Per 1M tokens.
 | Claude Sonnet 5 (`anthropic/claude-sonnet-5`)                | $3.00  | $3.75       | $0.30      | $15.00  |
 | Claude Sonnet 4.6 (`anthropic/claude-sonnet-4.6`) _(legacy)_ | $3.00  | $3.75       | $0.30      | $15.00  |
 | Claude Fable 5 (`anthropic/claude-fable-5`)                  | $10.00 | $12.50      | $1.00      | $50.00  |
-| Claude Opus 4.8 (`anthropic/claude-opus-4.8`)                | $5.00  | $6.25       | $0.50      | $25.00  |
+| Claude Opus 5 (`anthropic/claude-opus-5`)                    | $5.00  | $6.25       | $0.50      | $25.00  |
+| Claude Opus 4.8 (`anthropic/claude-opus-4.8`) _(legacy)_     | $5.00  | $6.25       | $0.50      | $25.00  |
 | Claude Opus 4.7 (`anthropic/claude-opus-4.7`) _(legacy)_     | $5.00  | $6.25       | $0.50      | $25.00  |
 | GPT-5.6 Sol (`openai/gpt-5.6-sol`)                           | $5.00  | $6.25       | $0.50      | $30.00  |
 | GPT-5.6 Terra (`openai/gpt-5.6-terra`)                       | $2.50  | $3.125      | $0.25      | $15.00  |
@@ -78,6 +79,10 @@ input tokens are billed at 2x input and 1.5x output for the full request.
 
 `GPT-5.5` is deprecated in Grida's catalogue in favor of `GPT-5.6 Sol`;
 this is not an upstream OpenAI retirement. `GPT-5.5 Pro` remains active.
+
+`Claude Opus 4.8` is deprecated in Grida's catalogue in favor of
+`Claude Opus 5`, its drop-in successor at the same rate card; this is not an
+upstream Anthropic retirement.
 
 ## Image Generation Models
 
