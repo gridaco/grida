@@ -258,6 +258,12 @@ describe("models.text current catalogue", () => {
       outputLimit: 128_000,
       cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
     },
+    {
+      id: "anthropic/claude-opus-5",
+      contextWindow: 1_000_000,
+      outputLimit: 128_000,
+      cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+    },
   ] as const;
 
   it.each(newModels)("stores the published $id rate card", (expected) => {
@@ -290,8 +296,11 @@ describe("models.text current catalogue", () => {
       models.text.catalog["anthropic/claude-fable-5"].deprecated
     ).toBeUndefined();
     expect(
-      models.text.catalog["anthropic/claude-opus-4.8"].deprecated
+      models.text.catalog["anthropic/claude-opus-5"].deprecated
     ).toBeUndefined();
+    expect(models.text.catalog["anthropic/claude-opus-4.8"].deprecated).toBe(
+      true
+    );
   });
 });
 

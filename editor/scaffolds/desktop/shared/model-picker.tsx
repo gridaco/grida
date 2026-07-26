@@ -60,7 +60,7 @@ function isCatalogId(id: string | undefined | null): id is CatalogId {
 }
 
 // Group the flat catalog by provider for the picker. Vendor is the `vendor/`
-// id prefix (e.g. `anthropic/claude-opus-4.8`); Anthropic is surfaced first.
+// id prefix (e.g. `anthropic/claude-opus-5`); Anthropic is surfaced first.
 type CatalogSpec = (typeof MODEL_OPTIONS)[number];
 const VENDOR_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
