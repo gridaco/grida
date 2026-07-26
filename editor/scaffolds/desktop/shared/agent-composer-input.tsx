@@ -61,6 +61,11 @@ import {
 } from "@/lib/agent-chat";
 import { ai as desktopAi, useDesktopBridge } from "@/lib/desktop/bridge";
 import { AgentLibraryAttachmentPicker } from "./agent-library-attachment-picker";
+import {
+  AgentComposerQueueSubmitGuard,
+  isSameComposerDraft,
+  type AgentComposerQueueSubmitLease,
+} from "./agent-composer-queue-submit";
 import type { DesignLibraryPin } from "./design-search";
 
 const NO_PROVIDER_FILE_MIMES: readonly string[] = [];
@@ -102,6 +107,12 @@ export type AgentComposerInputProps = {
    * THIS client streams. Defaults to `isStreaming` when omitted.
    */
   busy?: boolean;
+  /**
+   * Stable identity for the currently bound chat session. A late queue
+   * acknowledgement from an older scope must never clear an identical draft
+   * in the newly selected session.
+   */
+  submissionScope?: string | number;
   onStop: () => void;
   placeholder?: string;
   autofocus?: boolean;
@@ -186,6 +197,7 @@ function AgentComposerInner({
   onSubmit,
   isStreaming,
   busy,
+  submissionScope,
   onStop,
   placeholder = "Ask anything…",
   autofocus,
@@ -221,6 +233,24 @@ function AgentComposerInner({
   // A counter, not a boolean, so queued picks don't clear it too early.
   const encodingCountRef = useRef(0);
   const [isEncodingFiles, setIsEncodingFiles] = useState(false);
+  const queueSubmitGuardRef = useRef<AgentComposerQueueSubmitGuard | null>(
+    null
+  );
+  if (!queueSubmitGuardRef.current) {
+    queueSubmitGuardRef.current = new AgentComposerQueueSubmitGuard();
+  }
+  const queueSubmitGuard = queueSubmitGuardRef.current;
+  const submissionScopeRef = useRef(submissionScope);
+  submissionScopeRef.current = submissionScope;
+  const [queueingLease, setQueueingLease] =
+    useState<AgentComposerQueueSubmitLease | null>(null);
+  const isQueueing =
+    queueingLease !== null &&
+    queueSubmitGuard.owns(queueingLease, submissionScope);
+  useEffect(() => {
+    queueSubmitGuard.mount();
+    return () => queueSubmitGuard.unmount();
+  }, [queueSubmitGuard]);
 
   // Minimal, neutral inline feedback for the two cases that would otherwise do
   // nothing visible: a non-vision model, or attempting to queue images.
@@ -429,7 +459,8 @@ function AgentComposerInner({
     [prepareResources]
   );
 
-  const submit = () => {
+  const submit = async () => {
+    if (queueSubmitGuard.inFlightFor(submissionScope)) return;
     // Hold a submit while resource preparation is still in flight — otherwise a
     // pick-then-Enter races the async router and sends without the
     // attachment. Keep the editor content so the user can retry.
@@ -506,6 +537,52 @@ function AgentComposerInner({
       );
       return;
     }
+    const submitArgs = [
+      text,
+      lowered.files.length > 0 ? lowered.files : undefined,
+      lowered.extras,
+    ] as const;
+    if (isBusy) {
+      // Busy/admission-blocked submits take the durable text queue path. Keep
+      // the draft and its resource ledger intact until enqueue is confirmed;
+      // otherwise a transient bridge failure would clear the only copy of the
+      // user's text. The guard also prevents Enter/button double-enqueues while
+      // that acknowledgement is in flight.
+      const lease = queueSubmitGuard.begin(submissionScope);
+      if (!lease) return;
+      setQueueingLease(lease);
+      try {
+        await onSubmit(...submitArgs);
+        if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
+          // The editor remains usable while the bridge acknowledges enqueue.
+          // Re-read it now: a user edit or session switch may have produced a
+          // newer draft that this older acknowledgement must never clear.
+          const currentMessage = composer.submit({
+            submitted_at: message.meta.submitted_at,
+            allow_empty: true,
+          });
+          if (currentMessage && isSameComposerDraft(message, currentMessage)) {
+            preparedResources.current.clear();
+            composer.clear();
+          }
+          notify(
+            droppedImages
+              ? "Images weren't sent — direct attachment isn't available for the selected model/provider."
+              : null
+          );
+        }
+      } catch {
+        if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
+          notify("Couldn't queue the message — your draft is still here.");
+        }
+      } finally {
+        if (queueSubmitGuard.finish(lease)) {
+          setQueueingLease((current) => (current === lease ? null : current));
+        }
+      }
+      return;
+    }
+
     preparedResources.current.clear();
     composer.clear();
     // Text still sends; if undeclared provider attachments were stripped, say
@@ -515,11 +592,7 @@ function AgentComposerInner({
         ? "Images weren't sent — direct attachment isn't available for the selected model/provider."
         : null
     );
-    void onSubmit(
-      text,
-      lowered.files.length > 0 ? lowered.files : undefined,
-      lowered.extras
-    );
+    void onSubmit(...submitArgs);
   };
 
   return (
@@ -615,7 +688,7 @@ function AgentComposerInner({
               size="icon-xs"
               className="size-7 rounded-full"
               onClick={submit}
-              disabled={isEncodingFiles}
+              disabled={isEncodingFiles || isQueueing}
               aria-label={
                 allowEmptySubmit &&
                 emptySubmitLabel &&

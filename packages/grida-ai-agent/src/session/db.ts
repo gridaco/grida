@@ -22,6 +22,7 @@
  */
 
 import { DatabaseSync } from "node:sqlite";
+import { AsyncLocalStorage } from "node:async_hooks";
 import fs from "node:fs";
 import path from "node:path";
 import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
@@ -30,6 +31,10 @@ import { BOOTSTRAP_SQL, SCHEMA_VERSION } from "./schema";
 
 export type SessionsSchema = typeof schema;
 export type SessionsDb = SqliteRemoteDatabase<SessionsSchema>;
+
+export type ConnectionAttempt<T> =
+  | { acquired: true; value: T }
+  | { acquired: false };
 
 export type OpenSessionsDbOptions = {
   /** Agent host `userDataPath`. The DB lives at `${userDataPath}/sessions.db`. */
@@ -43,10 +48,26 @@ export type OpenSessionsDbOptions = {
 
 export type OpenedSessionsDb = {
   db: SessionsDb;
-  /** Raw `node:sqlite` handle. Smoke / tests reach in for direct SELECTs. */
+  /**
+   * Raw `node:sqlite` handle. Smoke / tests reach in for direct SELECTs.
+   * Production store operations must use `withConnection` /
+   * `tryWithConnectionSync` so they cannot enter another async transaction.
+   */
   sqlite: DatabaseSync;
   /** Schema bag for chainable drizzle queries (`db.select().from(schema.chatSessions)`). */
   schema: SessionsSchema;
+  /**
+   * Run raw connection work exclusively. Re-entrant for the owner of
+   * {@link withTx}; every Drizzle proxy operation uses the same gate.
+   */
+  withConnection: <T>(fn: () => T | Promise<T>) => Promise<T>;
+  /**
+   * Try to run a synchronous raw operation without yielding. Used by the queue
+   * claim → stream-reserve handoff, whose two calls must stay on one JavaScript
+   * stack. A busy connection returns `{ acquired: false }`; callers retry from
+   * their normal scheduling edge rather than joining the foreign transaction.
+   */
+  tryWithConnectionSync: <T>(fn: () => T) => ConnectionAttempt<T>;
   /**
    * Run a compound mutation in a single transaction. The drizzle
    * sqlite-proxy adapter does NOT forward `db.transaction()`, so we drive
@@ -111,8 +132,10 @@ export function openSessionsDb(opts: OpenSessionsDbOptions): OpenedSessionsDb {
     sqlite.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   }
 
+  const connection = new ConnectionGate();
   const db = drizzle(
-    async (sql, params, method) => execProxy(sqlite, sql, params, method),
+    async (sql, params, method) =>
+      connection.run(() => execProxy(sqlite, sql, params, method)),
     { schema }
   );
 
@@ -120,21 +143,24 @@ export function openSessionsDb(opts: OpenSessionsDbOptions): OpenedSessionsDb {
     db,
     sqlite,
     schema,
-    withTx: async (fn) => {
-      sqlite.exec("BEGIN");
-      try {
-        const result = await fn();
-        sqlite.exec("COMMIT");
-        return result;
-      } catch (err) {
+    withConnection: (fn) => connection.run(fn),
+    tryWithConnectionSync: (fn) => connection.tryRunSync(fn),
+    withTx: (fn) =>
+      connection.run(async () => {
+        sqlite.exec("BEGIN");
         try {
-          sqlite.exec("ROLLBACK");
-        } catch {
-          // transaction may already be aborted/rolled back
+          const result = await fn();
+          sqlite.exec("COMMIT");
+          return result;
+        } catch (err) {
+          try {
+            sqlite.exec("ROLLBACK");
+          } catch {
+            // transaction may already be aborted/rolled back
+          }
+          throw err;
         }
-        throw err;
-      }
-    },
+      }),
     close: () => {
       try {
         sqlite.close();
@@ -143,6 +169,84 @@ export function openSessionsDb(opts: OpenSessionsDbOptions): OpenedSessionsDb {
       }
     },
   };
+}
+
+/**
+ * One owner at a time for the process-local `DatabaseSync` connection.
+ *
+ * `withTx` must await Drizzle's proxy-shaped promises while its raw SQLite
+ * transaction stays open. Without an ownership gate, an unrelated request can
+ * execute on the same connection during those awaits and silently become part
+ * of that transaction. `AsyncLocalStorage` identifies the transaction owner so
+ * its own nested proxy calls remain re-entrant while every unrelated operation
+ * waits. The synchronous try path supports queue claim + stream reservation:
+ * JavaScript cannot wait synchronously, so a busy connection is a benign lost
+ * claim that the scheduler retries.
+ */
+class ConnectionGate {
+  private readonly ownership = new AsyncLocalStorage<object>();
+  private owner: object | null = null;
+  private readonly waiters: Array<{
+    owner: object;
+    resolve: () => void;
+  }> = [];
+
+  async run<T>(fn: () => T | Promise<T>): Promise<T> {
+    const current = this.ownership.getStore();
+    if (current && this.owner === current) {
+      return await fn();
+    }
+
+    const owner = {};
+    await this.acquire(owner);
+    try {
+      return await this.ownership.run(owner, fn);
+    } finally {
+      this.release(owner);
+    }
+  }
+
+  tryRunSync<T>(fn: () => T): ConnectionAttempt<T> {
+    const current = this.ownership.getStore();
+    if (current && this.owner === current) {
+      return { acquired: true, value: fn() };
+    }
+    if (this.owner !== null) return { acquired: false };
+
+    const owner = {};
+    this.owner = owner;
+    try {
+      return {
+        acquired: true,
+        value: this.ownership.run(owner, fn),
+      };
+    } finally {
+      this.release(owner);
+    }
+  }
+
+  private acquire(owner: object): Promise<void> {
+    if (this.owner === null) {
+      this.owner = owner;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      this.waiters.push({ owner, resolve });
+    });
+  }
+
+  private release(owner: object): void {
+    if (this.owner !== owner) {
+      throw new Error("sessions DB connection released by a non-owner");
+    }
+    const next = this.waiters.shift();
+    if (!next) {
+      this.owner = null;
+      return;
+    }
+    this.owner = next.owner;
+    next.resolve();
+  }
 }
 
 /** Read `PRAGMA user_version` off the raw handle (0 on a fresh/unstamped DB). */

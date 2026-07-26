@@ -64,7 +64,7 @@ export namespace AgentDesignSearch {
     width: z.number().int().optional(),
     height: z.number().int().optional(),
   });
-  const OUTPUT = z.object({
+  export const outputSchema = z.object({
     picked: z.array(RESULT),
     skipped: z.boolean().optional(),
   });
@@ -88,7 +88,7 @@ export namespace AgentDesignSearch {
         "inputs when you generate — they condition the result. Call again with a " +
         "new description to gather a different direction.",
       inputSchema: INPUT,
-      outputSchema: OUTPUT,
+      outputSchema,
       toModelOutput: ({ output }: { output: unknown }) =>
         toModelOutput(output as DesignSearchOutput),
     } as const;

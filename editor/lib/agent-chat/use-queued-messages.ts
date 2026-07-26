@@ -28,8 +28,16 @@ import {
 export type UseQueuedMessagesResult = {
   /** Pending messages, FIFO by `queued_at`. */
   queued: ChatMessageWithParts[];
-  /** Enqueue a message while a turn is in flight. Returns the persisted row. */
-  enqueue: (sessionId: string, text: string) => Promise<ChatMessageWithParts>;
+  /**
+   * Enqueue a message while a turn is occupied. `messageId` is normally
+   * omitted; recovery supplies the rejected optimistic user id so the move
+   * from transcript to queue remains one durable identity.
+   */
+  enqueue: (
+    sessionId: string,
+    text: string,
+    messageId?: string
+  ) => Promise<ChatMessageWithParts>;
   /** Remove a queued message before it fires (the X affordance). */
   cancel: (messageId: string) => Promise<void>;
   /**
@@ -46,6 +54,12 @@ export type UseQueuedMessagesResult = {
    * optimistic enqueue.
    */
   refetch: () => Promise<void>;
+  /**
+   * Legacy-sidecar drain confirmation. Returns true only when the named local
+   * queue row is authoritatively absent from the server queue, reconciling the
+   * mirror with the same read.
+   */
+  confirmDequeued: (messageId: string) => Promise<boolean>;
 };
 
 /** Mint the row's id client-side; the same id promotes the core-fired row
@@ -86,6 +100,16 @@ export function mergeQueuedMirror(
   return [...serverItems, ...pendingKept].sort(byQueuedAt);
 }
 
+/** Upsert one optimistic/server row by durable message identity. */
+export function upsertQueuedMirrorRow(
+  rows: ChatMessageWithParts[],
+  row: ChatMessageWithParts
+): ChatMessageWithParts[] {
+  return [...rows.filter((message) => message.id !== row.id), row].sort(
+    byQueuedAt
+  );
+}
+
 /** A type-correct placeholder shown until the core confirms the enqueue. */
 function optimisticRow(
   sessionId: string,
@@ -118,16 +142,94 @@ function optimisticRow(
   };
 }
 
+/** Only ambiguous transport/server failures are safe for an automatic retry. */
+export function shouldRetryQueuedEnqueue(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const candidate = err as {
+    name?: unknown;
+    status?: unknown;
+    message?: unknown;
+  };
+  if (candidate.name === "AbortError") return false;
+  if (typeof candidate.status === "number") {
+    return candidate.status >= 500 && candidate.status < 600;
+  }
+  if (err instanceof TypeError) return true;
+  return (
+    typeof candidate.message === "string" &&
+    /(?:failed to fetch|fetch failed|network error|connection (?:closed|reset)|socket hang up|ECONNRESET|EPIPE|response lost|sidecar not ready)/i.test(
+      candidate.message
+    )
+  );
+}
+
+/**
+ * Retry one enqueue with the exact same client-minted id. The queue endpoint
+ * treats `(session, id, text)` as an idempotency key, so this closes the
+ * commit-then-response-loss window without creating a second message.
+ */
+export async function enqueueQueuedMessageWithRetry(
+  enqueue: (
+    sessionId: string,
+    message: { id: string; text: string }
+  ) => Promise<ChatMessageWithParts>,
+  sessionId: string,
+  message: { id: string; text: string },
+  options: {
+    /** New sidecars make `(session, id, text)` a durable idempotency key. */
+    retrySupported: boolean;
+    /**
+     * Rolling-upgrade reconciliation for released sidecars that reject id
+     * reuse. Returns the already-committed queued/fired row when the first
+     * response was lost.
+     */
+    findCommitted?: () => Promise<ChatMessageWithParts | null>;
+  }
+): Promise<ChatMessageWithParts> {
+  try {
+    return await enqueue(sessionId, message);
+  } catch (err) {
+    if (!shouldRetryQueuedEnqueue(err)) throw err;
+    try {
+      const committed = await options.findCommitted?.();
+      if (committed) return committed;
+    } catch {
+      // Inspection is best-effort. Only a capability-confirmed core may fall
+      // through to same-id retry; a legacy core preserves the draft instead.
+    }
+    if (!options.retrySupported) throw err;
+    return await enqueue(sessionId, message);
+  }
+}
+
 export function useQueuedMessages(
-  sessionId: string | null
+  sessionId: string | null,
+  options: { idempotentEnqueue?: boolean } = {}
 ): UseQueuedMessagesResult {
   const [queued, setQueued] = useState<ChatMessageWithParts[]>([]);
+  // Render-fresh identity guard for every async queue result. The hook instance
+  // survives session switches; a request issued for session A must never
+  // reconcile, append, or remove rows in session B's tray.
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
   // Generation counter so an out-of-order list response can't clobber a
   // fresher one (mirrors the swr-by-hand pattern in use-chat-session).
   const genRef = useRef(0);
   // Rows added locally but not yet confirmed by a server fetch — kept on
   // refetch so an in-flight enqueue isn't wiped by a concurrent list response.
   const optimisticIdsRef = useRef<Set<string>>(new Set());
+  // A recovery edge can fire twice (status + stream error). Coalesce the same
+  // id/payload into one POST/retry sequence; mismatched reuse fails locally.
+  const inflightEnqueuesRef = useRef<
+    Map<
+      string,
+      {
+        sessionId: string;
+        text: string;
+        promise: Promise<ChatMessageWithParts>;
+      }
+    >
+  >(new Map());
 
   const reconcile = useCallback((serverItems: ChatMessageWithParts[]) => {
     const serverIds = new Set(serverItems.map((m) => m.id));
@@ -142,15 +244,22 @@ export function useQueuedMessages(
   }, []);
 
   const refetch = useCallback(async () => {
-    if (!sessionId) {
+    const requestedSessionId = sessionId;
+    if (sessionIdRef.current !== requestedSessionId) return;
+    const gen = ++genRef.current;
+    if (!requestedSessionId) {
       optimisticIdsRef.current.clear();
       setQueued([]);
       return;
     }
-    const gen = ++genRef.current;
     try {
-      const items = await bridgeSessions.listQueued(sessionId);
-      if (gen !== genRef.current) return;
+      const items = await bridgeSessions.listQueued(requestedSessionId);
+      if (
+        gen !== genRef.current ||
+        sessionIdRef.current !== requestedSessionId
+      ) {
+        return;
+      }
       reconcile(items);
     } catch {
       // Keep the last-known queue on a transient failure; the next refetch
@@ -167,32 +276,123 @@ export function useQueuedMessages(
   }, [refetch]);
 
   const enqueue = useCallback(
-    async (sid: string, text: string): Promise<ChatMessageWithParts> => {
-      const id = newQueuedId();
-      optimisticIdsRef.current.add(id);
-      setQueued((prev) =>
-        [...prev, optimisticRow(sid, id, text)].sort(byQueuedAt)
-      );
-      try {
-        const row = await bridgeSessions.enqueue(sid, { id, text });
-        // The server now owns this row: drop its optimistic protection so a
-        // later refetch reflects server truth — INCLUDING the core draining it.
-        // Without this, a row drained BEFORE its first refetch-confirmation
-        // would linger forever as a phantom "optimistic" entry (it left the
-        // server queue but is still in `optimisticIds`, so `reconcile` keeps
-        // re-adding it).
-        optimisticIdsRef.current.delete(id);
+    (
+      sid: string,
+      text: string,
+      messageId?: string
+    ): Promise<ChatMessageWithParts> => {
+      const id = messageId ?? newQueuedId();
+      const inflight = inflightEnqueuesRef.current.get(id);
+      if (inflight) {
+        if (inflight.sessionId !== sid || inflight.text !== text) {
+          return Promise.reject(
+            new Error(
+              `queued message id already in flight with a different payload: ${id}`
+            )
+          );
+        }
+        return inflight.promise;
+      }
+
+      if (sessionIdRef.current === sid) {
+        optimisticIdsRef.current.add(id);
         setQueued((prev) =>
-          prev.map((m) => (m.id === id ? row : m)).sort(byQueuedAt)
+          upsertQueuedMirrorRow(prev, optimisticRow(sid, id, text))
         );
-        return row;
-      } catch (err) {
-        optimisticIdsRef.current.delete(id);
-        setQueued((prev) => prev.filter((m) => m.id !== id));
-        throw err;
+      }
+      let operation!: Promise<ChatMessageWithParts>;
+      operation = (async () => {
+        try {
+          const row = await enqueueQueuedMessageWithRetry(
+            bridgeSessions.enqueue,
+            sid,
+            { id, text },
+            {
+              retrySupported: options.idempotentEnqueue === true,
+              findCommitted: async () => {
+                const matches = (row: ChatMessageWithParts) =>
+                  row.id === id &&
+                  row.session_id === sid &&
+                  queuedMessageText(row) === text;
+                try {
+                  const queued = await bridgeSessions.listQueued(sid);
+                  const found = queued.find(matches);
+                  if (found) return found;
+                } catch {
+                  // The transcript read below may still recover a fired row.
+                }
+                try {
+                  const transcript = await bridgeSessions.listMessages(sid);
+                  return transcript.find(matches) ?? null;
+                } catch {
+                  return null;
+                }
+              },
+            }
+          );
+          // The server now owns this row: drop its optimistic protection so a
+          // later refetch reflects server truth — INCLUDING the core draining it.
+          // Without this, a row drained BEFORE its first refetch-confirmation
+          // would linger forever as a phantom "optimistic" entry (it left the
+          // server queue but is still in `optimisticIds`, so `reconcile` keeps
+          // re-adding it).
+          if (sessionIdRef.current === sid) {
+            optimisticIdsRef.current.delete(id);
+            setQueued((prev) => {
+              // A lost-response retry can arrive after the scheduler fired or
+              // another window canceled the exact row. Both durable outcomes
+              // lack queued_at; neither belongs back in the queue tray.
+              if (typeof row.metadata.queued_at !== "number") {
+                return prev.filter((m) => m.id !== id);
+              }
+              return upsertQueuedMirrorRow(prev, row);
+            });
+          }
+          return row;
+        } catch (err) {
+          if (sessionIdRef.current === sid) {
+            optimisticIdsRef.current.delete(id);
+            setQueued((prev) => prev.filter((m) => m.id !== id));
+          }
+          throw err;
+        } finally {
+          if (inflightEnqueuesRef.current.get(id)?.promise === operation) {
+            inflightEnqueuesRef.current.delete(id);
+          }
+        }
+      })();
+      inflightEnqueuesRef.current.set(id, {
+        sessionId: sid,
+        text,
+        promise: operation,
+      });
+      return operation;
+    },
+    [options.idempotentEnqueue]
+  );
+
+  const confirmDequeued = useCallback(
+    async (messageId: string): Promise<boolean> => {
+      const requestedSessionId = sessionId;
+      if (!requestedSessionId || sessionIdRef.current !== requestedSessionId) {
+        return false;
+      }
+      const gen = ++genRef.current;
+      try {
+        const items = await bridgeSessions.listQueued(requestedSessionId);
+        if (
+          gen !== genRef.current ||
+          sessionIdRef.current !== requestedSessionId
+        ) {
+          return false;
+        }
+        reconcile(items);
+        return !items.some((item) => item.id === messageId);
+      } catch {
+        return false;
       }
     },
-    []
+    [sessionId, reconcile]
   );
 
   // Local-only removal from the mirror (the promote/atomic-move primitive).
@@ -201,7 +401,8 @@ export function useQueuedMessages(
     setQueued((prev) => prev.filter((m) => m.id !== messageId));
   }, []);
 
-  // Cancel = drop locally, then hard-delete on the server (revert on failure).
+  // Cancel = drop locally, then remove it from the server queue (the core
+  // retains a hidden idempotency tombstone); revert the mirror on failure.
   const cancel = useCallback(
     async (messageId: string): Promise<void> => {
       drop(messageId);
@@ -215,7 +416,7 @@ export function useQueuedMessages(
     [sessionId, refetch, drop]
   );
 
-  return { queued, enqueue, cancel, drop, refetch };
+  return { queued, enqueue, cancel, drop, refetch, confirmDequeued };
 }
 
 /** The plain text of a queued message (joins its text parts). */

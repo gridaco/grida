@@ -571,13 +571,19 @@ falls back to hydrating from the DB. **Cross-restart resume is out
 of scope** — the upstream provider has no notion of "your previous
 request."
 
-**Orphaned in-flight tool calls on restart.** A `tool-input-available`
-part with no matching `tool-output-*` companion MUST be finalized as
-a tool-error envelope (`"aborted by host restart"` or equivalent)
-before the next run on that session is allowed. Without finalization
-the assembled prompt would contain an unresolved tool call and the
-loop could not proceed. The rule applies to every tool — `bash`,
-`web_fetch`, MCP calls, `task` — uniformly.
+**Orphaned in-flight tool calls on restart.** An ordinary non-human
+tool frozen at `input-streaming` or `input-available`, or an
+`approval-responded` call that never reached a terminal output, MUST be
+finalized as a tool-error envelope (`"aborted by host restart"` or
+equivalent) before the next run on that session is allowed. The host
+cannot know whether an approved side effect completed before the crash,
+so it MUST NOT replay that call automatically. Without finalization the
+assembled prompt would contain an unresolved tool call and the loop
+could not proceed. This applies uniformly to executable tools such as
+`bash`, `web_fetch`, MCP calls, and `task`. Intentional durable human
+waits are not orphans: `question`/`design_search` remain at
+`input-available`, and unanswered supervised approvals remain at
+`approval-requested`, until the user answers them.
 
 **Multi-replica deployments.** The in-memory registry assumes one
 process owns the session. A horizontally-scaled deployment (multiple
@@ -651,10 +657,19 @@ Shape:
 
 ```ts
 SessionStatus = {
-  state: "idle" | "busy" | "retrying" | "error",
+  state:
+    | "idle"
+    | "busy"
+    | "retrying"
+    | "waiting_on_approval"
+    | "waiting_on_user_input"
+    | "error",
   attempt?: int,         // current retry attempt, when state="retrying"
   message?: string,      // human-readable status, when state="retrying" | "error"
   started_at?: int,      // epoch ms; present when state="busy" | "retrying"
+  message_id?: string,   // fired user row; present only for a new-user-turn busy state
+  human_input_state_authoritative?: true,
+  queue_enqueue_idempotent?: true,
 }
 ```
 
@@ -663,28 +678,82 @@ SessionStatus = {
 - **Authoritative source:** an in-memory map keyed by session id,
   owned by the core, mutated by the run-state machine (the machine
   itself — states, single-flight, and the drain — is specified in
-  [Turn Queue](./queue.md)).
+  [Turn Queue](./queue.md)). The two waiting states are reconciled
+  from the persisted open interaction before a late joiner's first
+  status read.
 - **Subscription transport:** an event stream on the host's bus.
   The event payload is the `SessionStatus` shape.
 - **Read API:** `get_status(session_id) → SessionStatus` for
   consumers that join late.
 
-**Not persisted.** Status is volatile. On host restart, every
-session reads as `idle` — correct, because no run is in flight after
-a restart.
+**Run status is volatile; open interactions are durable.** A host
+restart does not restore a model call, so `busy` and `retrying` do
+not survive. An unanswered approval or human-input request is part
+of the persisted transcript, however, so the corresponding waiting
+state is reconstructed on restart. A session with neither a live run
+nor an open interaction reads as `idle`.
+
+**Waiting is an active turn without an active run.**
+`waiting_on_approval` means a supervised operation needs an explicit
+Allow/Deny result. `waiting_on_user_input` means a human-input tool
+needs its correlated answer. In both states the current turn is
+incomplete: ordinary text is not an answer, does not cancel the
+interaction, and MUST be queued behind it. Only the correlated
+interaction result resumes the current turn. If malformed persisted
+history contains both kinds of open interaction, the scalar status
+projects `waiting_on_approval`; either classification keeps the queue
+paused, and approval takes precedence because it has the stricter
+explicit-decision contract.
+
+`message_id` identifies the user row whose new turn produced a `busy`
+state. It is present when an ordinary submit or queue drain fires a
+user message, and absent when an approval or human-input result resumes
+the already-open turn. Clients MUST use this identity, rather than
+guessing from a local FIFO mirror, when attaching to a remotely drained
+turn.
+
+The two optional literal-`true` fields are rolling-upgrade capability
+markers. `human_input_state_authoritative` means `idle` also rules out a
+persisted approval/question; when it is absent, a newer renderer MUST preserve
+any transcript-local human control instead of letting a legacy sidecar's
+volatile `idle` hide it. `queue_enqueue_idempotent` means the host supports
+same-id enqueue retries across fire and cancel. When it is absent, a renderer
+MUST reconcile queue/transcript state after an ambiguous response and MUST NOT
+blindly retry the mutation.
 
 **One run per session at a time.** The state machine never runs two
-turns on one session in parallel. A turn-triggering message that
-arrives while `state != "idle"` is **queued, not rejected** — the
-core persists it and fires it when the session next goes idle, per
-the [Turn Queue](./queue.md) contract. A host MAY read status to
-surface "you have a turn already running," but it does not have to
-gate submission on it; the queue handles the busy case. `error` is
-not terminal — it clears on the next fired turn (a user retry, an
-edit-and-resend, or an explicit resume), at which point the machine
-transitions to `busy` and follows the normal lifecycle. A hard error
-pauses the queue drain rather than firing queued turns into a broken
-session; see [Turn Queue](./queue.md).
+turns on one session in parallel. A turn-triggering message admitted
+while the session is `busy`, `retrying`, or waiting on a person is
+**queued, not rejected**. The core persists it and fires it only after
+the active turn reaches a true finish, per the [Turn Queue](./queue.md)
+contract. A host SHOULD give the pending interaction visual and input
+priority, but a raced or non-visual submission must still follow the
+same queue rule. `error` is paused rather than automatically drained;
+an explicit user retry, edit-and-resend, or resume may start the next
+turn and clear it.
+
+The ordinary-message admission path is distinct from the low-level
+run/continuation endpoint. That endpoint MAY fail closed if a stale
+client bypasses admission and races an open interaction. On that
+response the client MUST retain the same user-message identity, persist
+it through queue admission, and rehydrate the transcript; it MUST NOT
+treat ordinary text as an implicit Allow/Deny or tool answer. This
+defensive guard does not change the queue policy: conforming ordinary
+submissions enter through queue-aware admission.
+
+**Interaction resolution is a late commit.** A correlated approval or
+human-input result is first matched read-only against the visible persisted
+block. Scratch staging and incoming-message persistence complete before the
+block is changed; the conditional result write is then followed immediately
+by turn reservation within the same serialized admission. A rejected or failed
+resume therefore leaves the interaction actionable under the same identity and
+can be retried.
+Parallel tool calls are correlated independently: another pending approval or
+human-input call does not invalidate an exact answer, and generic client tool
+result ingestion never consumes sibling human-input results implicitly. One
+continuation request resolves one correlated block; a payload carrying answers
+for multiple pending blocks is rejected before mutation, after which the
+answers can be submitted independently.
 
 **Retry visibility.** When the model call fails transiently (rate
 limit, provider 5xx) and the loop backs off, status transitions to

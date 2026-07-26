@@ -7,7 +7,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import { AuthStore } from "@grida/daemon/server";
 import { SecretsStore } from "@grida/daemon/server";
@@ -18,6 +18,7 @@ import { AGENT_SESSION_AGENT } from "../../protocol/run";
 import type { SessionStatus } from "../../protocol/session-status";
 import { AgentRuntime } from "../../runtime";
 import { StreamRegistry } from "../../runtime/stream-registry";
+import { registerAgentRoutes } from "./agent";
 import { registerSessionsRoutes } from "./sessions";
 
 describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
@@ -40,8 +41,13 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
       workspace_registry: new WorkspaceRegistry(baseDir),
       sessions_store: store,
       streams,
+      run_agent: async () =>
+        new Response("data: [DONE]\n\n", {
+          headers: { "content-type": "text/event-stream" },
+        }),
       compaction: { summarize: async () => "## Goal\nFAKE SUMMARY" },
     });
+    registerAgentRoutes(app, runtime);
     registerSessionsRoutes(app, { store, runtime });
   });
 
@@ -74,6 +80,34 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
       await new Promise((r) => setTimeout(r, 2));
     }
     return { id: s.id, userIds };
+  }
+
+  async function seedPendingBlock(
+    kind: "approval" | "user-input"
+  ): Promise<string> {
+    const s = await store.create({
+      agent: AGENT_SESSION_AGENT,
+      model: { provider_id: "openrouter", tier: "pro" },
+    });
+    const a = await store.appendMessage(s.id, { role: "assistant" });
+    const approval = kind === "approval";
+    const name = approval ? "run_command" : "question";
+    const state = approval ? "approval-requested" : "input-available";
+    await store.upsertPart(a.id, {
+      index: 0,
+      type: `tool-${name}`,
+      data: {
+        type: `tool-${name}`,
+        tool_call_id: `tc_${kind}`,
+        tool_name: name,
+        state,
+        input: {},
+      },
+      session_id: s.id,
+      tool_call_id: `tc_${kind}`,
+      tool_state: state,
+    });
+    return s.id;
   }
 
   it("POST /sessions/:id/rewind soft-truncates after a message", async () => {
@@ -113,6 +147,63 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
     });
     expect(res.status).toBe(409);
     expect(((await res.json()) as { code: string }).code).toBe("run_in_flight");
+  });
+
+  it("rewind holds admission across its async transcript mutation", async () => {
+    const { id, userIds } = await seed(2);
+    const before = (await store.listVisibleMessages(id)).map(
+      (message) => message.id
+    );
+    const originalGet = store.get.bind(store);
+    let entered!: () => void;
+    const insideRewind = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = false;
+    const getSpy = vi.spyOn(store, "get").mockImplementation(async (sid) => {
+      if (sid === id && !held) {
+        held = true;
+        entered();
+        await gate;
+      }
+      return await originalGet(sid);
+    });
+
+    try {
+      const rewind = app.request(`/sessions/${id}/rewind`, {
+        method: "POST",
+        body: JSON.stringify({ from_message_id: userIds[0] }),
+      });
+      await insideRewind;
+
+      const loser = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          session_id: id,
+          messages: [
+            { id: "user-during-rewind", role: "user", content: "race" },
+          ],
+        }),
+      });
+      expect(loser.status).toBe(409);
+      expect(((await loser.json()) as { code?: string }).code).toBe(
+        "run_in_flight"
+      );
+      expect(await store.getMessage("user-during-rewind")).toBeNull();
+      expect(
+        (await store.listVisibleMessages(id)).map((message) => message.id)
+      ).toEqual(before);
+
+      release();
+      expect((await rewind).status).toBe(200);
+    } finally {
+      release();
+      getSpy.mockRestore();
+    }
   });
 
   it("rewind 400s without fromMessageId", async () => {
@@ -238,9 +329,40 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
       expect(items.map((m) => m.id)).toEqual(["qa", "qb"]);
     });
 
+    it("POST is idempotent for the same message id and rejects mismatched reuse", async () => {
+      const { id } = await seed(1);
+      streams.create(id); // keep the accepted row queued during both requests
+      const first = await app.request(`/sessions/${id}/queue`, {
+        method: "POST",
+        body: JSON.stringify({ id: "q-retry", text: "keep this once" }),
+      });
+      const retry = await app.request(`/sessions/${id}/queue`, {
+        method: "POST",
+        body: JSON.stringify({ id: "q-retry", text: "keep this once" }),
+      });
+      expect(first.status).toBe(200);
+      expect(retry.status).toBe(200);
+      expect(await retry.json()).toEqual(await first.json());
+      expect(
+        (await store.listQueuedMessages(id)).filter(
+          (message) => message.id === "q-retry"
+        )
+      ).toHaveLength(1);
+
+      const conflict = await app.request(`/sessions/${id}/queue`, {
+        method: "POST",
+        body: JSON.stringify({ id: "q-retry", text: "different" }),
+      });
+      expect(conflict.status).toBe(409);
+      expect(((await conflict.json()) as { code: string }).code).toBe(
+        "queue-message-conflict"
+      );
+    });
+
     it("DELETE cancels a queued item, and is scoped to the path session", async () => {
       const { id } = await seed(1);
       const other = await store.create({ agent: AGENT_SESSION_AGENT });
+      streams.create(id); // keep the row queued until the explicit cancel
       await app.request(`/sessions/${id}/queue`, {
         method: "POST",
         body: JSON.stringify({ id: "qx", text: "pending" }),
@@ -256,7 +378,25 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
         method: "DELETE",
       });
       expect(ok.status).toBe(200);
-      expect(await store.getMessage("qx")).toBeNull();
+      expect(await store.getMessage("qx")).toMatchObject({
+        metadata: { queue_canceled_at: expect.any(Number) },
+        hidden_at: expect.any(Number),
+      });
+      expect(await store.listQueuedMessages(id)).toEqual([]);
+
+      // Lost-response retry: same id/payload returns the hidden tombstone and
+      // never recreates the queue row the user canceled.
+      const retry = await app.request(`/sessions/${id}/queue`, {
+        method: "POST",
+        body: JSON.stringify({ id: "qx", text: "pending" }),
+      });
+      expect(retry.status).toBe(200);
+      expect(await retry.json()).toMatchObject({
+        id: "qx",
+        metadata: { queue_canceled_at: expect.any(Number) },
+        hidden_at: expect.any(Number),
+      });
+      expect(await store.listQueuedMessages(id)).toEqual([]);
     });
   });
 
@@ -278,15 +418,21 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
 
     async function readStatuses(
       res: Response,
-      count: number
+      count: number,
+      afterFirst?: () => void | Promise<void>
     ): Promise<SessionStatus[]> {
       const reader = res.body!.getReader();
       const dec = new TextDecoder();
       let buf = "";
+      let firstHandled = false;
       while (parseStatuses(buf).length < count) {
         const { done, value } = await reader.read();
         if (done) break;
         buf += dec.decode(value, { stream: true });
+        if (!firstHandled && parseStatuses(buf).length > 0) {
+          firstHandled = true;
+          await afterFirst?.();
+        }
       }
       reader.cancel().catch(() => undefined);
       return parseStatuses(buf);
@@ -301,14 +447,49 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toContain("text/event-stream");
 
-      // Drive a turn lifecycle through the registry — the observer projects it
-      // onto the scheduler, which broadcasts to this subscription.
-      streams.create(id);
-      streams.finish(id, "finish");
-
-      const statuses = await readStatuses(res, 3);
+      // Wait for the hydrated first frame before driving the lifecycle. The
+      // observer then projects the registry edges onto this subscription.
+      const statuses = await readStatuses(res, 3, () => {
+        streams.create(id, { fired_message_id: "msg_user_1" });
+        streams.finish(id, "finish");
+      });
       ac.abort();
       expect(statuses.map((s) => s.state)).toEqual(["idle", "busy", "idle"]);
+      expect(statuses[1]?.message_id).toBe("msg_user_1");
+    });
+
+    it("keeps query-token status hydration read-only after restart", async () => {
+      const { id } = await seed(1);
+      await store.appendQueuedMessage(id, {
+        id: "queued-before-status",
+        text: "must not run from a GET",
+      });
+      const ac = new AbortController();
+      vi.useFakeTimers();
+      try {
+        const res = await app.request(`/sessions/${id}/status`, {
+          signal: ac.signal,
+        });
+        const statuses = await readStatuses(res, 1);
+        expect(statuses).toEqual([
+          {
+            state: "idle",
+            human_input_state_authoritative: true,
+            queue_enqueue_idempotent: true,
+          },
+        ]);
+
+        // GRIDA-SEC-004: query-token carriage is observation-only. Advancing
+        // past the drain cooldown must not create a stream or claim the row.
+        await vi.advanceTimersByTimeAsync(1_100);
+        expect(streams.get(id)).toBeUndefined();
+        expect(
+          (await store.listQueuedMessages(id)).map((message) => message.id)
+        ).toEqual(["queued-before-status"]);
+      } finally {
+        ac.abort();
+        vi.useRealTimers();
+      }
     });
 
     it("projects a hard error as state=error", async () => {
@@ -317,12 +498,63 @@ describe("HTTP wire — session lifecycle (rewind/fork/compact)", () => {
       const res = await app.request(`/sessions/${id}/status`, {
         signal: ac.signal,
       });
-      streams.create(id);
-      streams.finish(id, "error");
-      const statuses = await readStatuses(res, 3);
+      const statuses = await readStatuses(res, 3, () => {
+        streams.create(id);
+        streams.finish(id, "error");
+      });
       ac.abort();
       expect(statuses.map((s) => s.state)).toEqual(["idle", "busy", "error"]);
     });
+
+    it("never emits idle between busy and a persisted approval wait", async () => {
+      const { id } = await seed(0);
+      const ac = new AbortController();
+      const res = await app.request(`/sessions/${id}/status`, {
+        signal: ac.signal,
+      });
+      const statuses = await readStatuses(res, 3, async () => {
+        streams.create(id);
+        const a = await store.appendMessage(id, { role: "assistant" });
+        await store.upsertPart(a.id, {
+          index: 0,
+          type: "tool-run_command",
+          data: {
+            type: "tool-run_command",
+            tool_call_id: "tc_wait",
+            tool_name: "run_command",
+            state: "approval-requested",
+            input: {},
+          },
+          session_id: id,
+          tool_call_id: "tc_wait",
+          tool_state: "approval-requested",
+        });
+        streams.finish(id, "finish");
+      });
+      ac.abort();
+      expect(statuses.map((s) => s.state)).toEqual([
+        "idle",
+        "busy",
+        "waiting_on_approval",
+      ]);
+    });
+
+    it.each([
+      ["approval", "waiting_on_approval"],
+      ["user-input", "waiting_on_user_input"],
+    ] as const)(
+      "hydrates a persisted %s block before the first post-restart frame",
+      async (kind, expectedState) => {
+        const id = await seedPendingBlock(kind);
+        const ac = new AbortController();
+        const res = await app.request(`/sessions/${id}/status`, {
+          signal: ac.signal,
+        });
+        const [first] = await readStatuses(res, 1);
+        ac.abort();
+        expect(first?.state).toBe(expectedState);
+      }
+    );
 
     it("a late subscriber's first frame is the CURRENT status", async () => {
       const { id } = await seed(1);

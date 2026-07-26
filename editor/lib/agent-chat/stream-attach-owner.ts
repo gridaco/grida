@@ -84,23 +84,46 @@ export type StreamAttachDecision =
  * rebindings (select/start-new/restore/archive) from same-session churn
  * (hydration, mid-stream id adoption) — see `useChatSession().epoch`. */
 export type StreamAttachBinding = {
-  readonly session_id: string;
+  /** `null` while a fresh chat has not adopted its server session id yet. */
+  readonly session_id: string | null;
   readonly epoch: number;
 };
 
 type Logger = (line: string) => void;
+type StreamAttachLease = {
+  readonly revision: number;
+};
+export type StreamAttachBindingLease = {
+  readonly revision: number;
+};
+type RecoveryKind =
+  | "disconnect"
+  | "stream-state"
+  | "human-input-pending"
+  | "run-in-flight";
+type RecoveryBudget = "stream-view" | "admission-conflict";
 
 export class StreamAttachOwner {
   private binding: StreamAttachBinding | null = null;
+  /**
+   * Real-binding generation. Executor/transport settlements carry the
+   * generation they opened under, so a zombie from session A cannot occupy or
+   * release session B's attach slot after a session switch.
+   */
+  private binding_revision = 0;
   /** `resume-mount` executed (or claimed) for the current binding. */
   private resume_claimed = false;
   /** Granted executors that have not settled yet. */
   private pending_exec = 0;
   /** Transport-reported live streams (opens minus settles, floored at 0). */
   private open_streams = 0;
-  /** Self-heal used for the current binding (one attempt max — a recovery
-   * that dies again must surface honestly, not ping-pong). */
-  private recovery_attempted = false;
+  /**
+   * One self-heal per failure class and binding. Disconnect/reducer-desync
+   * share a stream-view budget so they cannot ping-pong; the deterministic
+   * admission-conflict repair has its own budget, so an earlier network flap
+   * cannot leave a later rejected optimistic tail permanently poisoned.
+   */
+  private readonly recovery_attempted = new Set<RecoveryBudget>();
   private readonly log: Logger;
 
   constructor(opts?: { log?: Logger }) {
@@ -120,11 +143,16 @@ export class StreamAttachOwner {
   /**
    * Rebind to a session identity. A no-op for the same `(session_id, epoch)`
    * (StrictMode re-effects, unrelated re-renders). A REAL change resets the
-   * resume claim — re-selecting a busy session re-attaches by design. Any
-   * still-unsettled exec from the previous binding is a bounded zombie (it
-   * consumes its stream and dies); logged, never cancelled (I3).
+   * resume claim and current-binding occupancy — re-selecting a busy session
+   * re-attaches by design. Any still-unsettled exec/stream from the previous
+   * binding is a bounded zombie: its revision-tagged settlement cannot occupy
+   * or release the new binding's slot, and it is never cancelled (I3).
+   *
+   * `null → server id` under the SAME epoch is the one non-real change: a fresh
+   * chat adopted the session id minted by its already-live first send. Preserve
+   * that send's ownership and only enrich the binding identity.
    */
-  bind(binding: StreamAttachBinding | null): void {
+  bind(binding: StreamAttachBinding): void {
     const prev = this.binding;
     if (
       prev?.session_id === binding?.session_id &&
@@ -132,32 +160,63 @@ export class StreamAttachOwner {
     ) {
       return;
     }
+    const adoptedFreshSession =
+      prev !== null &&
+      prev.session_id === null &&
+      binding.session_id !== null &&
+      prev.epoch === binding.epoch;
     this.binding = binding;
+    if (adoptedFreshSession) {
+      this.note("adopt-session");
+      return;
+    }
+    this.binding_revision += 1;
     this.resume_claimed = false;
-    this.recovery_attempted = false;
+    this.recovery_attempted.clear();
     if (this.busy) {
       this.note("superseded", `pending=${this.pending_exec}`);
     }
+    this.pending_exec = 0;
+    this.open_streams = 0;
     this.note("bind");
   }
 
   /**
+   * Capture the current logical session binding for an async executor. A
+   * null→server-id adoption keeps the revision; a real session/epoch rebind
+   * invalidates it before any late continuation may touch renderer state.
+   */
+  captureBinding(): StreamAttachBindingLease {
+    return { revision: this.binding_revision };
+  }
+
+  isCurrentBinding(lease: StreamAttachBindingLease): boolean {
+    return lease.revision === this.binding_revision;
+  }
+
+  /**
    * The one-shot self-heal for a recoverable stream failure
-   * (`chat-error.ts`: `disconnect` / `stream-state` — the server state is
-   * intact; only this client's view died). Gates, marks, and runs in one
-   * synchronous step: exactly once per binding, only when a restore is
-   * sound (bound, nothing live). Returns whether the recovery started —
-   * `false` means the failure surfaces honestly instead of ping-ponging.
+   * (`chat-error.ts`: disconnect, stream-state, or a stale direct send that
+   * lost atomic admission — the server state is intact; only this client's
+   * view died). Gates, marks, and runs in one synchronous step: exactly once
+   * per failure class and binding, only when a restore is sound (bound, nothing
+   * live). Returns whether the recovery started — `false` means the failure
+   * surfaces honestly instead of ping-ponging.
    */
   requestRecovery(
-    kind: "disconnect" | "stream-state",
+    kind: RecoveryKind,
     exec: () => void | Promise<void>
   ): boolean {
-    if (!this.binding || this.busy || this.recovery_attempted) {
+    const budget = recoveryBudget(kind);
+    if (
+      !this.binding?.session_id ||
+      this.busy ||
+      this.recovery_attempted.has(budget)
+    ) {
       this.note("recovery-ignore", `kind=${kind}`);
       return false;
     }
-    this.recovery_attempted = true;
+    this.recovery_attempted.add(budget);
     this.note("recovery", `kind=${kind}`);
     // The gate above IS the resume-recovery decision (I5: no interleaving
     // between it and the request), so this grant cannot be denied.
@@ -173,7 +232,7 @@ export class StreamAttachOwner {
         if (this.busy) return deny("attach-in-flight");
         return grant("exec");
       case "resume-mount":
-        if (!this.binding) return deny("no-session");
+        if (!this.binding?.session_id) return deny("no-session");
         if (this.resume_claimed) return deny("already-claimed");
         // A live attach means THIS client already holds the turn (its own
         // send, or an adopted auto-resubmit). Take the claim so the binding
@@ -183,7 +242,7 @@ export class StreamAttachOwner {
         return grant("exec");
       case "resume-drain":
       case "resume-recovery":
-        if (!this.binding) return deny("no-session");
+        if (!this.binding?.session_id) return deny("no-session");
         if (this.busy) return deny("attach-in-flight");
         return grant("exec");
     }
@@ -210,8 +269,13 @@ export class StreamAttachOwner {
       return decision;
     }
     this.pending_exec += 1;
+    const revision = this.binding_revision;
     this.note("grant", `intent=${intent}`);
     const settle = () => {
+      if (revision !== this.binding_revision) {
+        this.note("settle-stale", `intent=${intent}`);
+        return;
+      }
       this.pending_exec = Math.max(0, this.pending_exec - 1);
       this.note("settle", `intent=${intent}`);
     };
@@ -235,16 +299,29 @@ export class StreamAttachOwner {
 
   /** Transport report: a stream opened (incl. the SDK's body-less
    * auto-resubmit, which is never `request`ed). Adopts it as a live attach
-   * so every other intent serializes behind it. */
-  noteTransportOpen(): void {
+   * so every other intent serializes behind it. The returned opaque lease MUST
+   * ride the matching settle callback; it prevents an old binding's late
+   * settle from releasing the current stream. */
+  noteTransportOpen(): StreamAttachLease {
+    const lease = { revision: this.binding_revision };
     this.open_streams += 1;
     this.note("adopt");
+    return lease;
   }
 
   /** Transport report: a stream settled (closed / failed / cancelled).
-   * Floored at zero — a settle for a stream this owner never saw open
-   * (pre-construction, double-fire) must not underflow into fake capacity. */
-  noteTransportSettle(): void {
+   * A revision-tagged stale settlement is ignored. The optional argument keeps
+   * defensive/test callers source-compatible; production reporters always
+   * return the lease from {@link noteTransportOpen}. Floored at zero — a
+   * settle for a stream this owner never saw open must not underflow. */
+  noteTransportSettle(lease?: unknown): void {
+    if (
+      isStreamAttachLease(lease) &&
+      lease.revision !== this.binding_revision
+    ) {
+      this.note("stream-settle-stale");
+      return;
+    }
     this.open_streams = Math.max(0, this.open_streams - 1);
     this.note("stream-settle");
   }
@@ -255,7 +332,9 @@ export class StreamAttachOwner {
         `[agent-chat:attach] ${event}${detail ? ` ${detail}` : ""} ` +
           `session=${this.binding?.session_id ?? "-"} epoch=${
             this.binding?.epoch ?? "-"
-          } pending=${this.pending_exec} open=${this.open_streams}`
+          } revision=${this.binding_revision} pending=${
+            this.pending_exec
+          } open=${this.open_streams}`
       );
     } catch {
       // logging must never break attach decisions
@@ -269,4 +348,18 @@ function grant(mode: "exec" | "claim-only"): StreamAttachDecision {
 
 function deny(reason: StreamAttachDenyReason): StreamAttachDecision {
   return { granted: false, reason };
+}
+
+function recoveryBudget(kind: RecoveryKind): RecoveryBudget {
+  return kind === "human-input-pending" || kind === "run-in-flight"
+    ? "admission-conflict"
+    : "stream-view";
+}
+
+function isStreamAttachLease(value: unknown): value is StreamAttachLease {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as { revision?: unknown }).revision === "number"
+  );
 }

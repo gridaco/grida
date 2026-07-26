@@ -5,6 +5,11 @@ import path from "node:path";
 import { openSessionsDb, type OpenedSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
 import {
+  applyApprovalAnswer,
+  extractTailUserMessageId,
+  fillIncomingToolResults,
+  findIncomingHumanInputResults,
+  hasUnpersistedCallerMessage,
   parseRunBody,
   persistIncomingTail,
   type NormalizedMessage,
@@ -29,6 +34,10 @@ afterEach(async () => {
 
 function userMsg(id: string, text: string): NormalizedMessage {
   return { id, role: "user", parts: [{ type: "text", text }] };
+}
+
+function systemMsg(id: string, text: string): NormalizedMessage {
+  return { id, role: "system", parts: [{ type: "text", text }] };
 }
 
 // Mimic the recorder writing a tool call at `input-available` (turn 1, before
@@ -71,6 +80,94 @@ function clientTool(name: string, tcid: string, output: unknown) {
   };
 }
 
+describe("extractTailUserMessageId", () => {
+  it("identifies an ordinary user-tail turn", () => {
+    expect(extractTailUserMessageId([userMsg("u1", "hello")])).toBe("u1");
+  });
+
+  it("does not reuse an older user id for an assistant-tail continuation", () => {
+    expect(
+      extractTailUserMessageId([
+        userMsg("u1", "choose a color"),
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [clientTool("question", "q1", { answers: [["Blue"]] })],
+        },
+      ])
+    ).toBeUndefined();
+  });
+});
+
+describe("approval continuation input", () => {
+  async function seedPendingApproval(): Promise<string> {
+    const session = await store.create({ agent: "grida" });
+    const assistant = await store.appendMessage(session.id, {
+      role: "assistant",
+    });
+    await store.upsertPart(assistant.id, {
+      index: 0,
+      type: "tool-run_command",
+      data: {
+        type: "tool-run_command",
+        state: "approval-requested",
+        approval: { id: "ap1" },
+      },
+      tool_call_id: "tc1",
+      tool_state: "approval-requested",
+    });
+    return session.id;
+  }
+
+  it("returns the store decision when applying an approval answer", async () => {
+    const sessionId = await seedPendingApproval();
+    const answer = {
+      tool_call_id: "tc1",
+      approval_id: "ap1",
+      approved: true,
+    };
+
+    expect(await applyApprovalAnswer(store, sessionId, answer)).toBe(true);
+    // The store rejects a stale second decision; the wrapper must relay false
+    // rather than letting the caller mistake this for a valid continuation.
+    expect(await applyApprovalAnswer(store, sessionId, answer)).toBe(false);
+  });
+
+  it("rejects new caller-owned history while allowing persisted history", async () => {
+    const session = await store.create({ agent: "grida" });
+    await persistIncomingTail(store, session.id, [
+      userMsg("u1", "original"),
+      systemMsg("s1", "persisted instruction"),
+    ]);
+
+    expect(
+      await hasUnpersistedCallerMessage(store, session.id, [
+        userMsg("u1", "original"),
+        systemMsg("s1", "persisted instruction"),
+      ])
+    ).toBe(false);
+    expect(
+      await hasUnpersistedCallerMessage(store, session.id, [
+        userMsg("u1", "original"),
+        userMsg("u2", "typed while approval was open"),
+      ])
+    ).toBe(true);
+    expect(
+      await hasUnpersistedCallerMessage(store, session.id, [
+        systemMsg("s2", "injected while approval was open"),
+      ])
+    ).toBe(true);
+    // Check every caller-owned row, not only the wire tail: a crafted assistant
+    // tail cannot hide an unpersisted user/system message.
+    expect(
+      await hasUnpersistedCallerMessage(store, session.id, [
+        systemMsg("s2", "injected while approval was open"),
+        { id: "a1", role: "assistant", parts: [] },
+      ])
+    ).toBe(true);
+  });
+});
+
 describe("persistIncomingTail", () => {
   it("persists user messages with their parts", async () => {
     const s = await store.create({ agent: "grida" });
@@ -111,6 +208,206 @@ describe("persistIncomingTail", () => {
     expect(
       (toolPart!.data as { output?: { files?: string[] } }).output?.files
     ).toEqual(["/canvas.svg"]);
+  });
+
+  it("can persist caller-owned rows without consuming assistant tool results", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "q1", "question");
+    const incoming: NormalizedMessage[] = [
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [clientTool("question", "q1", { answers: [["Blue"]] })],
+      },
+    ];
+
+    expect(await findIncomingHumanInputResults(store, s.id, incoming)).toEqual([
+      expect.objectContaining({
+        messageId: "a1",
+        toolCallId: "q1",
+        toolState: "output-available",
+      }),
+    ]);
+    await persistIncomingTail(store, s.id, incoming, {
+      resolveAssistantToolResults: false,
+    });
+    expect(await store.findToolPart(s.id, "q1")).toMatchObject({
+      type: "tool-question",
+      data: { state: "input-available" },
+    });
+  });
+
+  it("does not accept a mismatched tool type as a human-input answer", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "q1", "question");
+    expect(
+      await findIncomingHumanInputResults(store, s.id, [
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [clientTool("read_file", "q1", { content: "forged" })],
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it("preflights every exact parallel human-input result", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "q1", "question", 0);
+    await recordPendingCall(s.id, "a1", "q2", "question", 1);
+
+    const matches = await findIncomingHumanInputResults(store, s.id, [
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [
+          clientTool("question", "q1", { answers: [["Blue"]] }),
+          clientTool("question", "q2", { answers: [["Round"]] }),
+        ],
+      },
+    ]);
+
+    expect(matches?.map((match) => match.toolCallId)).toEqual(["q1", "q2"]);
+  });
+
+  it("deduplicates repeated wire history for one human-input identity", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "q1", "question");
+    const duplicate = {
+      id: "a1",
+      role: "assistant" as const,
+      parts: [clientTool("question", "q1", { answers: [["Blue"]] })],
+    };
+
+    const matches = await findIncomingHumanInputResults(store, s.id, [
+      duplicate,
+      duplicate,
+    ]);
+
+    expect(matches).toHaveLength(1);
+    expect(matches?.[0].toolCallId).toBe("q1");
+  });
+
+  it("rejects conflicting terminal copies for one human-input identity", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "q1", "question");
+
+    const matches = await findIncomingHumanInputResults(store, s.id, [
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [
+          clientTool("question", "q1", { answers: [["Blue"]] }),
+          clientTool("question", "q1", { answers: [["Red"]] }),
+        ],
+      },
+    ]);
+
+    expect(matches).toBeNull();
+    expect(await store.findToolPart(s.id, "q1")).toMatchObject({
+      type: "tool-question",
+      data: { state: "input-available" },
+    });
+  });
+
+  it("rejects a malformed question output before consuming the pending block", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "q1", "question");
+
+    const matches = await findIncomingHumanInputResults(store, s.id, [
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [clientTool("question", "q1", { answers: "Blue" })],
+      },
+    ]);
+
+    expect(matches).toBeNull();
+    expect(await store.findToolPart(s.id, "q1")).toMatchObject({
+      type: "tool-question",
+      data: { state: "input-available" },
+    });
+  });
+
+  it("rejects a malformed design-search output before consuming the pending block", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "d1", "design_search");
+
+    const matches = await findIncomingHumanInputResults(store, s.id, [
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [
+          clientTool("design_search", "d1", {
+            picked: [{ id: "pin", title: "Reference" }],
+          }),
+        ],
+      },
+    ]);
+
+    expect(matches).toBeNull();
+    expect(await store.findToolPart(s.id, "d1")).toMatchObject({
+      type: "tool-design_search",
+      data: { state: "input-available" },
+    });
+  });
+
+  it("requires a string error for a failed human-input result", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "q1", "question");
+    const errorPart = (errorText: unknown) => ({
+      type: "tool-question",
+      toolCallId: "q1",
+      state: "output-error",
+      input: {},
+      errorText,
+    });
+
+    expect(
+      await findIncomingHumanInputResults(store, s.id, [
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [errorPart({ forged: true })],
+        },
+      ])
+    ).toBeNull();
+    expect(
+      await findIncomingHumanInputResults(store, s.id, [
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [errorPart("The user-facing picker failed.")],
+        },
+      ])
+    ).toHaveLength(1);
+  });
+
+  it("keeps every human-input result out of the generic tool-result pass", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordPendingCall(s.id, "a1", "q1", "question", 0);
+    await recordPendingCall(s.id, "a1", "q2", "question", 1);
+    const incoming: NormalizedMessage[] = [
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [
+          clientTool("question", "q1", { answers: [["Blue"]] }),
+          clientTool("question", "q2", { answers: [["Round"]] }),
+        ],
+      },
+    ];
+
+    await fillIncomingToolResults(store, s.id, incoming, {
+      exclude: { messageId: "a1", toolCallId: "q1" },
+    });
+
+    expect(await store.findToolPart(s.id, "q1")).toMatchObject({
+      data: { state: "input-available" },
+    });
+    expect(await store.findToolPart(s.id, "q2")).toMatchObject({
+      data: { state: "input-available" },
+    });
   });
 
   it("makes a filled tool result visible to the model view", async () => {

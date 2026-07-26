@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UIMessageChunk } from "ai";
 import { desktopAgentTransport } from "./bridge-transport";
 import { ai } from "@/lib/desktop/bridge";
+import * as gridaGateway from "@/lib/desktop/gg-session";
 
 // Spread the real module so the runtime vocab constants the transport reads
 // (`AGENT_MODES`, `AGENT_TIERS`, …) stay defined — stub ONLY the bridge `ai`
@@ -16,8 +17,85 @@ vi.mock("@/lib/desktop/bridge", async (importOriginal) => ({
     reconnectAgentRun: vi.fn(),
   },
 }));
+vi.mock("@/lib/desktop/gg-session", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/desktop/gg-session")>()),
+  ensureFresh: vi.fn(async () => ({ kind: "unsupported" as const })),
+}));
 
 describe("desktopAgentTransport", () => {
+  it("does not start a send whose binding changed during gateway refresh", async () => {
+    let release!: () => void;
+    let entered!: () => void;
+    const insideRefresh = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    vi.mocked(gridaGateway.ensureFresh).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ kind: "unsupported" });
+          entered();
+        })
+    );
+    let current = true;
+    const onSessionId = vi.fn();
+    const send = desktopAgentTransport
+      .create({
+        isCurrentBinding: () => current,
+        onSessionId,
+      })
+      .sendMessages({
+        trigger: "submit-message",
+        chatId: "chat-a",
+        messageId: undefined,
+        messages: [
+          { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+        ],
+        abortSignal: undefined,
+      });
+
+    await insideRefresh;
+    current = false;
+    release();
+    const reader = (await send).getReader();
+    await expect(reader.read()).resolves.toEqual({
+      done: true,
+      value: undefined,
+    });
+    expect(ai.startAgentRun).not.toHaveBeenCalled();
+    expect(onSessionId).not.toHaveBeenCalled();
+  });
+
+  it("drops a reconnect handle that resolves after its binding was superseded", async () => {
+    let resolveHandle!: (
+      value: Awaited<ReturnType<typeof ai.reconnectAgentRun>>
+    ) => void;
+    vi.mocked(ai.reconnectAgentRun).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveHandle = resolve;
+        })
+    );
+    let current = true;
+    const onResumeStart = vi.fn();
+    const onStreamOpen = vi.fn();
+    const reconnect = desktopAgentTransport.create({
+      session_id: "ses_a",
+      isCurrentBinding: () => current,
+      onResumeStart,
+      onStreamOpen,
+    }).reconnectToStream!({ chatId: "chat-a" });
+
+    current = false;
+    resolveHandle({
+      streamId: "stream-a",
+      sessionId: "ses_a",
+      done: Promise.resolve(),
+    });
+    await expect(reconnect).resolves.toBeNull();
+    expect(onResumeStart).not.toHaveBeenCalled();
+    expect(onStreamOpen).not.toHaveBeenCalled();
+  });
+
   it("converts bridge callback chunks into a readable UIMessageChunk stream", async () => {
     const chunk: UIMessageChunk = {
       type: "tool-input-start",
@@ -617,6 +695,33 @@ describe("attach-owner reporting (onStreamOpen / onStreamSettle)", () => {
     run.finish();
     await reader.read(); // drains the close
     expect(onStreamSettle).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes the open hook's opaque ownership lease to the matching settle", async () => {
+    const run = mockRun("ses_live");
+    const lease = { bindingRevision: 7 };
+    const onStreamSettle = vi.fn();
+    const stream = await desktopAgentTransport
+      .create({
+        onStreamOpen: () => lease,
+        onStreamSettle,
+      })
+      .sendMessages({
+        trigger: "submit-message",
+        chatId: "chat-1",
+        messageId: undefined,
+        messages: [
+          { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+        ],
+        abortSignal: undefined,
+      });
+    const reader = stream.getReader();
+    run.emit({ type: "text-start", id: "t" });
+    await reader.read();
+    run.finish();
+    await reader.read();
+
+    expect(onStreamSettle).toHaveBeenCalledExactlyOnceWith(lease);
   });
 
   it("send: consumer cancel settles exactly once — and still never aborts", async () => {

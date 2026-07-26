@@ -3,39 +3,41 @@
  * `docs/wg/ai/agent/queue.md` + `session.md` §Session status).
  *
  * Owns the three things the CORE must own and the UI must not:
- *   1. the authoritative {@link SessionStatus} per session (idle/busy/error),
+ *   1. the authoritative {@link SessionStatus} per session
+ *      (idle/busy/waiting/error),
  *   2. a status-subscriber registry the SSE channel broadcasts from, and
  *   3. the SERIAL queue drain + a settle **cooldown** between turns.
  *
  * It **observes** the `StreamRegistry` lifecycle — {@link onCreate} (a turn
- * started → busy) and {@link onFinish} (a turn ended → idle/error, then maybe
- * drain) — so it learns of every busy/idle edge at the single chokepoints
+ * started → busy) and {@link onFinish} (a turn ended → waiting/idle/error,
+ * then maybe drain) — so it learns of every run edge at the single chokepoints
  * without importing the runtime. The drain is an injected one-way dependency
  * ({@link SessionSchedulerDeps.drain}) the runtime supplies (it calls
  * `startTurn`); the scheduler never imports the runtime, and the registry
  * never imports the scheduler.
  *
- * Drain discipline (serial): on a CLEAN idle edge (finish/abort, NOT error)
- * the machine broadcasts `idle` immediately, then waits {@link cooldown_ms}
- * and, at FIRE time, dequeues the earliest queued head (clears its
- * `queued_at`) and starts its turn. The row stays QUEUED for the whole
- * cooldown — visible in `list_queued`, so a UI keeps showing it as pending and
- * it "submits" (becomes a real turn) only when it fires, in step with the
- * response. The session is genuinely idle through the cooldown, so the
- * Stop/Send control reads Send and the UI paints Stop→Send→Stop. A hard error
- * PAUSES the drain (queued rows wait for the next fired turn). A turn BLOCKED
- * awaiting a user decision (a pending supervised approval, or an unanswered
- * `question`) pauses it the same way: the blocking request finishes the run
- * cleanly so the session reads idle, but it is not a completed turn — the
- * fire-gate consults {@link SessionSchedulerDeps.has_pending_human_input} and
- * holds the queue until the user answers and the turn continues to a true
- * finish.
+ * Drain discipline (serial): on a CLEAN end edge (finish/abort, NOT error) the
+ * machine first consults the persisted human-input state while retaining
+ * `busy`. It then broadcasts either an explicit waiting state (and pauses) or
+ * `idle`, waits {@link cooldown_ms}, selects the earliest queued head, and asks
+ * the runtime to fire it. The runtime keeps that row QUEUED through all async
+ * provider/workspace preparation while holding admission, then conditionally
+ * claims it and reserves the stream on one synchronous stack. Retaining `busy`
+ * during the persisted
+ * human-input read is deliberate: publishing a transient `idle` frame would
+ * tell the client that a normal submit is admissible while an approval or
+ * question is still pending. A hard error or either waiting state PAUSES the
+ * drain.
  *
  * Re-entrancy: `onFinish` runs inside the registry's `finish()`; the drain it
  * schedules runs on a fresh task (a timer), never inline inside `finish()`, so
  * a drained `startTurn` never reserves re-entrantly. Re-checks after each await
  * abandon if a new turn started; the single-flight reserve in `drain` is the
  * ultimate guard.
+ *
+ * GRIDA-SEC-004 — this state machine is part of the supervised human-input
+ * boundary: persisted approvals/questions pause queue drain, including after a
+ * host restart, until the exact interaction is resolved.
  */
 
 import type { StreamEndReason } from "./stream-registry";
@@ -44,31 +46,28 @@ import type { SessionStatus } from "../protocol/session-status";
 export type SessionSchedulerDeps = {
   /** Read the pending queue (FIFO) for a session. */
   list_queued: (sessionId: string) => Promise<ReadonlyArray<{ id: string }>>;
-  /** Clear a row's `queued_at` so it becomes a visible user message. */
-  dequeue: (messageId: string) => Promise<void>;
   /**
-   * Fire ONE turn for a session (the runtime's `startTurn`). MUST start the
-   * registry reserve synchronously (so `onCreate` lands before this resolves).
-   * Throws if a run is already in flight (single-flight) — the scheduler
-   * swallows that and waits for the next idle edge. The selected row is
-   * already dequeued (visible), so the turn's model view includes it as the
-   * latest user message; `messageId` names that fired row — the
-   * fired-message identity the turn-lifecycle wire must carry (RFC
-   * `turn-authority`), threaded so the core can EMIT it rather than discard
-   * it. It does not select what runs (the dequeue already did).
+   * Prepare and fire ONE queued turn. The row MUST remain queued during every
+   * await. The runtime holds admission throughout preparation, then
+   * conditionally claims this exact `(sessionId, messageId)` row and starts the
+   * registry synchronously. Returns true only when that busy edge landed.
+   * False means cancel, another claimant, or a late human block won; the
+   * scheduler reclassifies persisted state before deciding whether to retry.
+   * A preparation failure throws and pauses auto-drain with the row preserved
+   * for a later explicit edge.
    */
-  drain: (sessionId: string, messageId: string) => Promise<void>;
+  drain: (sessionId: string, messageId: string) => Promise<boolean>;
   /**
-   * Is this session's current turn BLOCKED awaiting a user decision — an
-   * unanswered supervised approval, OR a human-input tool (e.g. `question`)
-   * paused for the user's answer? A blocked turn is NOT a completed turn: the
-   * drain stays paused until the user resolves it — like a hard error pauses it
-   * (RFC `queue` § drain-pause). Consulted at the drain fire-gate against the
-   * AUTHORITATIVE persisted state (restart-durable, unlike an in-memory flag).
-   * Required so a scheduler cannot silently forget the block and fire a queued
-   * turn before the user answers.
+   * Classify whether the current turn is BLOCKED awaiting a user decision:
+   * an unanswered supervised approval, or a human-input tool (e.g.
+   * `question`) paused for the user's answer. Consulted against the
+   * AUTHORITATIVE persisted state both when a turn settles and at the drain
+   * fire-gate, so the projection survives host restarts and cannot fire a
+   * queued turn ahead of the pending decision.
    */
-  has_pending_human_input: (sessionId: string) => Promise<boolean>;
+  pending_human_input_kind: (
+    sessionId: string
+  ) => Promise<"approval" | "user-input" | null>;
   /** Inter-turn settle delay before a drained turn fires (ms). */
   drain_cooldown_ms?: number;
 };
@@ -82,22 +81,85 @@ type StatusListener = (status: SessionStatus) => void;
 export class SessionScheduler {
   private readonly statuses = new Map<string, SessionStatus>();
   private readonly listeners = new Map<string, Set<StatusListener>>();
+  /** Sessions whose StreamRegistry entry is currently running. */
+  private readonly active_sessions = new Set<string>();
   private readonly drain_timers = new Map<
     string,
     ReturnType<typeof setTimeout>
   >();
+  /** Async fire-gates already preparing one queued head for this session. */
+  private readonly draining_sessions = new Set<string>();
+  /**
+   * One coalesced trusted drain edge received while a fire-gate is in flight.
+   * If that attempt fails before claiming, its `finally` schedules one fresh
+   * pass so the concurrent enqueue/refresh is not forgotten.
+   */
+  private readonly pending_drain_kicks = new Set<string>();
+  /**
+   * Per-session lifecycle revision. Async persisted-state reads only publish
+   * when the revision they started under is still current, so a late settle or
+   * hydration read cannot overwrite a newer `onCreate` edge.
+   */
+  private readonly revisions = new Map<string, number>();
   private readonly cooldown_ms: number;
+  private disposed = false;
 
   constructor(private readonly deps: SessionSchedulerDeps) {
     this.cooldown_ms = deps.drain_cooldown_ms ?? DEFAULT_DRAIN_COOLDOWN_MS;
   }
 
   // ───────────────── status reads + subscription ─────────────────
-  // The Phase-3 status SSE consumes these; a session not in the map reads as
-  // idle (the volatile default — also every session after a host restart).
+  // The status SSE hydrates persisted human-input state before subscribing.
+  // Direct in-memory reads still default to idle when no lifecycle is known.
 
   getStatus(sessionId: string): SessionStatus {
     return this.statuses.get(sessionId) ?? { state: "idle" };
+  }
+
+  /**
+   * Resolve a cold session's first status from durable human-input state.
+   * Called before the status SSE subscribes, so a host restart cannot emit an
+   * incorrect initial `idle` frame for a persisted approval/question block.
+   *
+   * A lifecycle transition that races this read wins: the revision check
+   * returns the newer in-memory status instead of overwriting it.
+   */
+  async hydrateStatus(sessionId: string): Promise<SessionStatus> {
+    const known = this.statuses.get(sessionId);
+    if (known) return known;
+    const revision = this.revision(sessionId);
+    const status = await this.readSettledStatus(sessionId);
+    if (this.disposed) return this.getStatus(sessionId);
+    if (this.revision(sessionId) !== revision || this.statuses.has(sessionId)) {
+      return this.getStatus(sessionId);
+    }
+    this.setStatus(sessionId, status);
+    // GRIDA-SEC-004 — hydration is reached from the read-only status SSE.
+    // It may classify and project durable state, but MUST NOT schedule work:
+    // possession of a leaked query token cannot become run/billing/filesystem
+    // authority. Trusted lifecycle and mutation paths kick the drain.
+    return status;
+  }
+
+  /**
+   * Re-read a non-running session after an out-of-band transcript mutation
+   * such as rewind/un-rewind. Waiting status is derived from visible persisted
+   * parts, so hiding or restoring a block must update the projection too.
+   */
+  async refreshStatus(sessionId: string): Promise<SessionStatus> {
+    const current = this.getStatus(sessionId);
+    if (this.active_sessions.has(sessionId)) {
+      return current;
+    }
+    this.clearDrainTimer(sessionId);
+    const revision = this.bumpRevision(sessionId);
+    const status = await this.readSettledStatus(sessionId);
+    if (this.disposed || this.revision(sessionId) !== revision) {
+      return this.getStatus(sessionId);
+    }
+    this.setStatus(sessionId, status);
+    if (status.state === "idle") this.scheduleDrain(sessionId);
+    return status;
   }
 
   /**
@@ -128,12 +190,21 @@ export class SessionScheduler {
 
   // ───────────────── StreamRegistry lifecycle observer ─────────────────
 
-  /** A turn started (registry `create`) → busy. */
-  onCreate(sessionId: string): void {
+  /**
+   * A turn started (registry `create`) → busy. `firedMessageId` identifies the
+   * new user row for direct/queued turns; continuations intentionally omit it.
+   */
+  onCreate(sessionId: string, firedMessageId?: string): void {
     // A turn is starting: any pending drain timer is moot — this turn
     // re-triggers a drain check when it finishes.
     this.clearDrainTimer(sessionId);
-    this.setStatus(sessionId, { state: "busy", started_at: Date.now() });
+    this.active_sessions.add(sessionId);
+    this.bumpRevision(sessionId);
+    this.setStatus(sessionId, {
+      state: "busy",
+      started_at: Date.now(),
+      ...(firedMessageId ? { message_id: firedMessageId } : {}),
+    });
   }
 
   /**
@@ -141,78 +212,103 @@ export class SessionScheduler {
    * drain pending, kick one — otherwise this row would never fire (a client
    * enqueues believing it is busy, but the turn may have just ended). A no-op
    * while busy (the turn-end edge drains) or while a drain is already scheduled
-   * (it will pick up the new row).
+   * (it will pick up the new row). If async drain preparation is already in
+   * flight, remember one follow-up kick: a preparation failure must not swallow
+   * the only edge that can make the newly queued row run.
    */
   notifyEnqueued(sessionId: string): void {
     if (this.getStatus(sessionId).state !== "idle") return;
-    if (this.drain_timers.has(sessionId)) return;
     this.scheduleDrain(sessionId);
   }
 
-  /** A turn ended (registry `finish`) → idle/error, then maybe drain. */
+  /**
+   * A turn ended (registry `finish`) → waiting/idle/error, then maybe drain.
+   * A clean end retains `busy` while persisted state is consulted; this avoids
+   * an observable idle admission race before a pending block is classified.
+   */
   onFinish(sessionId: string, reason: StreamEndReason): void {
+    this.active_sessions.delete(sessionId);
     if (reason === "error") {
       // Hard failure PAUSES the drain (RFC `queue`): queued rows wait for the
       // next fired turn. Do NOT schedule a drain.
+      this.bumpRevision(sessionId);
       this.setStatus(sessionId, { state: "error" });
       return;
     }
-    // Clean settle (finish/abort) → idle NOW (the button flips to Send), then
-    // wait the cooldown and fire the next queued head.
-    this.setStatus(sessionId, { state: "idle" });
-    this.scheduleDrain(sessionId);
+    const revision = this.bumpRevision(sessionId);
+    void this.publishSettledStatus(sessionId, revision);
   }
 
-  // ───────────────── drain (cooldown → dequeue + fire) ─────────────────
+  // ───────────────── drain (cooldown → select + atomic runtime fire) ────────
 
   /**
-   * Wait the cooldown, then DEQUEUE the earliest queued head and fire it. The
-   * row stays queued (`queued_at` set, visible in `list_queued`) for the whole
-   * cooldown — so a UI keeps showing it as pending and it "submits" (becomes a
-   * real turn) only when it fires, matching the response delay. The session is
-   * genuinely idle throughout, so the Stop/Send control reads Send during the
-   * gap. Re-checks after each await abandon if a new turn started; the single-
-   * flight reserve in `drain` is the ultimate guard (a lost race throws and is
-   * swallowed). An empty queue at fire is a no-op (a normal turn-end).
+   * Wait the cooldown, select the earliest queued head, and ask the runtime to
+   * fire it. Selection is read-only: the row keeps `queued_at` during provider
+   * and workspace preparation while runtime admission serializes session
+   * mutation. Runtime claim + stream reservation is the atomic fire boundary.
+   * An empty queue at fire is a no-op.
    */
   private scheduleDrain(sessionId: string): void {
+    if (this.disposed || this.drain_timers.has(sessionId)) return;
+    if (this.draining_sessions.has(sessionId)) {
+      this.pending_drain_kicks.add(sessionId);
+      return;
+    }
     this.setDrainTimer(sessionId, this.cooldown_ms, async () => {
-      if (this.getStatus(sessionId).state !== "idle") return;
-      // A turn BLOCKED awaiting a user decision (an unanswered supervised
-      // approval, or a `question` paused for the user's answer) is not ready
-      // for the next turn: pause the drain until the user resolves it (RFC
-      // `queue` § drain-pause — the same class as a hard error pausing the
-      // drain). The session reads `idle` through the pause — the blocking
-      // request finishes the run cleanly — so idle alone is NOT a sufficient
-      // drainability predicate. Checked against the authoritative persisted
-      // state. Fail closed: never drain over an unconfirmed block.
-      try {
-        if (await this.deps.has_pending_human_input(sessionId)) return;
-      } catch {
+      if (
+        this.getStatus(sessionId).state !== "idle" ||
+        this.draining_sessions.has(sessionId)
+      ) {
         return;
       }
-      if (this.getStatus(sessionId).state !== "idle") return;
-      let items: ReadonlyArray<{ id: string }>;
+      this.draining_sessions.add(sessionId);
+      let retry = false;
       try {
-        items = await this.deps.list_queued(sessionId);
+        // Re-check authoritative persisted state at FIRE time. A block can land
+        // after the clean-end classification (or this timer can have been
+        // kicked from a cold/default-idle enqueue). Fail closed.
+        const pending = await this.deps.pending_human_input_kind(sessionId);
+        if (this.getStatus(sessionId).state !== "idle") return;
+        if (pending) {
+          this.bumpRevision(sessionId);
+          this.setStatus(sessionId, waitingStatus(pending));
+          return;
+        }
+        const items = await this.deps.list_queued(sessionId);
+        if (this.getStatus(sessionId).state !== "idle") return;
+        const head = items[0];
+        if (!head) return;
+        const fired = await this.deps.drain(sessionId, head.id);
+        if (!fired) {
+          if (this.getStatus(sessionId).state !== "idle") return;
+          // `drain` performs the decisive persisted-state check under
+          // admission. A false result can therefore mean a human block landed
+          // after the timer's earlier check. Reclassify instead of spinning a
+          // retry loop against a row that must remain paused.
+          const pendingAfterDrain =
+            await this.deps.pending_human_input_kind(sessionId);
+          if (this.getStatus(sessionId).state !== "idle") return;
+          if (pendingAfterDrain) {
+            this.bumpRevision(sessionId);
+            this.setStatus(sessionId, waitingStatus(pendingAfterDrain));
+            return;
+          }
+          retry = true;
+        }
       } catch {
-        return;
-      }
-      if (this.getStatus(sessionId).state !== "idle") return;
-      const head = items[0];
-      if (!head) return; // empty queue → stay idle (a plain turn-end)
-      try {
-        await this.deps.dequeue(head.id); // becomes a visible user message NOW
-      } catch {
-        return;
-      }
-      if (this.getStatus(sessionId).state !== "idle") return;
-      try {
-        await this.deps.drain(sessionId, head.id);
-      } catch {
-        // RunInFlightError (lost a single-flight race) or a provider-down at
-        // drain time: the next clean idle edge re-checks the queue. We do NOT
-        // surface this as `error` — the run that won the race owns the status.
+        // Persisted-state/provider/workspace failure: the row was not claimed,
+        // so leave it queued. Ordinarily this pauses until a later trusted idle
+        // edge; an edge already received during this attempt is replayed below.
+      } finally {
+        this.draining_sessions.delete(sessionId);
+        const kicked = this.pending_drain_kicks.delete(sessionId);
+        // A false claim is a benign cancel/admission race. If no winner made
+        // the session busy, select the current head again after a cooldown.
+        // Likewise, replay exactly one coalesced enqueue/refresh kick that
+        // arrived during async preparation, including when preparation threw.
+        if ((retry || kicked) && this.getStatus(sessionId).state === "idle") {
+          this.scheduleDrain(sessionId);
+        }
       }
     });
   }
@@ -240,6 +336,42 @@ export class SessionScheduler {
     }
   }
 
+  private async publishSettledStatus(
+    sessionId: string,
+    revision: number
+  ): Promise<void> {
+    const status = await this.readSettledStatus(sessionId);
+    if (this.disposed || this.revision(sessionId) !== revision) return;
+    this.setStatus(sessionId, status);
+    if (status.state === "idle") this.scheduleDrain(sessionId);
+  }
+
+  private async readSettledStatus(sessionId: string): Promise<SessionStatus> {
+    try {
+      const pending = await this.deps.pending_human_input_kind(sessionId);
+      return pending ? waitingStatus(pending) : { state: "idle" };
+    } catch (err) {
+      // The classification is an admission boundary. Fail closed rather than
+      // publishing idle when persisted state could not be confirmed.
+      return {
+        state: "error",
+        message: `failed to resolve pending human input: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      };
+    }
+  }
+
+  private revision(sessionId: string): number {
+    return this.revisions.get(sessionId) ?? 0;
+  }
+
+  private bumpRevision(sessionId: string): number {
+    const next = this.revision(sessionId) + 1;
+    this.revisions.set(sessionId, next);
+    return next;
+  }
+
   private setStatus(sessionId: string, status: SessionStatus): void {
     this.statuses.set(sessionId, status);
     const set = this.listeners.get(sessionId);
@@ -258,14 +390,31 @@ export class SessionScheduler {
   /** Drop a session's run-state (call when a session is deleted). */
   forget(sessionId: string): void {
     this.clearDrainTimer(sessionId);
+    this.active_sessions.delete(sessionId);
+    this.draining_sessions.delete(sessionId);
+    this.pending_drain_kicks.delete(sessionId);
+    // Invalidate any outstanding settle/hydration read before dropping state.
+    this.bumpRevision(sessionId);
     this.statuses.delete(sessionId);
   }
 
   /** Clear all timers + state (host shutdown). Listeners detach themselves. */
   dispose(): void {
+    this.disposed = true;
     for (const handle of this.drain_timers.values()) clearTimeout(handle);
     this.drain_timers.clear();
+    this.active_sessions.clear();
+    this.draining_sessions.clear();
+    this.pending_drain_kicks.clear();
     this.statuses.clear();
+    this.revisions.clear();
     this.listeners.clear();
   }
+}
+
+function waitingStatus(kind: "approval" | "user-input"): SessionStatus {
+  return {
+    state:
+      kind === "approval" ? "waiting_on_approval" : "waiting_on_user_input",
+  };
 }

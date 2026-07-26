@@ -4,7 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { newMessageId, newPartId, newSessionId } from "./ids";
 import { openSessionsDb, type OpenedSessionsDb } from "./db";
-import { SessionsStore, SessionNotFoundError } from "./store";
+import {
+  QueueMessageConflictError,
+  SessionsStore,
+  SessionNotFoundError,
+} from "./store";
 
 let tempDir: string;
 let opened: OpenedSessionsDb;
@@ -855,9 +859,67 @@ describe("SessionsStore fork", () => {
       store.fork({ parent_session_id: parent.id, from_message_id: m.id })
     ).rejects.toThrow(/message not found/);
   });
+
+  it("fork rejects a pending queue row without creating a child session", async () => {
+    const parent = await store.create({ agent: "grida" });
+    await store.appendMessage(parent.id, { role: "user" });
+    await store.appendQueuedMessage(parent.id, {
+      id: "queued-fork-point",
+      text: "not conversation history yet",
+    });
+
+    await expect(
+      store.fork({
+        parent_session_id: parent.id,
+        from_message_id: "queued-fork-point",
+      })
+    ).rejects.toThrow(/message not found/);
+    expect((await store.list({ include_archived: true })).items).toHaveLength(
+      1
+    );
+  });
+
+  it("fork rejects a canceled queue tombstone without creating a child session", async () => {
+    const parent = await store.create({ agent: "grida" });
+    await store.appendMessage(parent.id, { role: "user" });
+    await store.appendQueuedMessage(parent.id, {
+      id: "canceled-fork-point",
+      text: "never became conversation history",
+    });
+    await store.deleteMessage(parent.id, "canceled-fork-point");
+
+    await expect(
+      store.fork({
+        parent_session_id: parent.id,
+        from_message_id: "canceled-fork-point",
+      })
+    ).rejects.toThrow(/message not found/);
+    expect((await store.list({ include_archived: true })).items).toHaveLength(
+      1
+    );
+  });
 });
 
 describe("SessionsStore queue", () => {
+  async function seedLegacyQueuedMessage(
+    sessionId: string,
+    id: string,
+    text: string,
+    queuedAt = 100
+  ): Promise<void> {
+    await store.appendMessage(sessionId, {
+      id,
+      role: "user",
+      metadata: { queued_at: queuedAt },
+    });
+    await store.upsertPart(id, {
+      index: 0,
+      type: "text",
+      data: { type: "text", text },
+      session_id: sessionId,
+    });
+  }
+
   it("appendQueuedMessage persists a user row with queued_at + text part", async () => {
     const s = await store.create({ agent: "grida" });
     const row = await store.appendQueuedMessage(s.id, {
@@ -870,6 +932,180 @@ describe("SessionsStore queue", () => {
     expect(row.parts).toHaveLength(1);
     expect(row.parts[0].type).toBe("text");
     expect(row.parts[0].data).toEqual({ type: "text", text: "hello" });
+  });
+
+  it("keeps another session's enqueue and claim out of a rolling-back transaction", async () => {
+    const a = await store.create({ agent: "grida", title: "session a" });
+    const b = await store.create({ agent: "grida", title: "session b" });
+    await store.appendQueuedMessage(b.id, {
+      id: "q-before",
+      text: "already queued",
+      queued_at: 1,
+    });
+
+    let markEntered!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const foreignTransaction = opened.withTx(async () => {
+      // Exercise the Drizzle proxy re-entry path while this connection owner
+      // holds the transaction open across an await.
+      await store.rename(a.id, "must roll back");
+      markEntered();
+      await held;
+      throw new Error("roll back session a");
+    });
+    await entered;
+
+    // A synchronous queue claim cannot wait. It must decline while another
+    // async owner holds the connection, rather than silently joining A's tx.
+    expect(store.claimQueuedMessage(b.id, "q-before")).toBeNull();
+
+    // Enqueue can wait, so it queues behind A's transaction instead of trying
+    // a nested BEGIN on the same DatabaseSync connection.
+    let enqueueSettled = false;
+    const enqueue = store.appendQueuedMessage(b.id, {
+      id: "q-during",
+      text: "serialize me",
+      queued_at: 2,
+    });
+    void enqueue.then(
+      () => {
+        enqueueSettled = true;
+      },
+      () => {
+        enqueueSettled = true;
+      }
+    );
+    await Promise.resolve();
+    expect(enqueueSettled).toBe(false);
+
+    release();
+    await expect(foreignTransaction).rejects.toThrow("roll back session a");
+    await expect(enqueue).resolves.toMatchObject({ id: "q-during" });
+    expect((await store.get(a.id))?.title).toBe("session a");
+    expect(
+      (await store.listQueuedMessages(b.id)).map((message) => message.id)
+    ).toEqual(["q-before", "q-during"]);
+
+    // The claim runs only after A's rollback owns no connection state, so that
+    // rollback cannot resurrect this successfully fired row.
+    expect(store.claimQueuedMessage(b.id, "q-before")).not.toBeNull();
+    expect(
+      (await store.listQueuedMessages(b.id)).map((message) => message.id)
+    ).toEqual(["q-during"]);
+  });
+
+  it("treats the same session/id/text as an idempotent enqueue retry", async () => {
+    const s = await store.create({ agent: "grida" });
+    const first = await store.appendQueuedMessage(s.id, {
+      id: "q-retry",
+      text: "keep this once",
+    });
+    const retry = await store.appendQueuedMessage(s.id, {
+      id: "q-retry",
+      text: "keep this once",
+    });
+
+    expect(retry).toEqual(first);
+    const messageCount = opened.sqlite
+      .prepare("SELECT COUNT(*) AS n FROM chat_messages WHERE id = ?")
+      .get("q-retry") as { n: number };
+    const partCount = opened.sqlite
+      .prepare("SELECT COUNT(*) AS n FROM chat_parts WHERE message_id = ?")
+      .get("q-retry") as { n: number };
+    expect(messageCount.n).toBe(1);
+    expect(partCount.n).toBe(1);
+  });
+
+  it("rejects an idempotency key reused for different queue content or session", async () => {
+    const a = await store.create({ agent: "grida" });
+    const b = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(a.id, {
+      id: "q-conflict",
+      text: "original",
+    });
+
+    await expect(
+      store.appendQueuedMessage(a.id, {
+        id: "q-conflict",
+        text: "different",
+      })
+    ).rejects.toBeInstanceOf(QueueMessageConflictError);
+    await expect(
+      store.appendQueuedMessage(b.id, {
+        id: "q-conflict",
+        text: "original",
+      })
+    ).rejects.toBeInstanceOf(QueueMessageConflictError);
+  });
+
+  it("does not mistake an ordinary fired user row for an enqueue retry", async () => {
+    const s = await store.create({ agent: "grida" });
+    const direct = await store.appendMessage(s.id, {
+      id: "ordinary-user",
+      role: "user",
+    });
+    await store.upsertPart(direct.id, {
+      index: 0,
+      type: "text",
+      data: { type: "text", text: "same text" },
+      session_id: s.id,
+    });
+
+    await expect(
+      store.appendQueuedMessage(s.id, {
+        id: direct.id,
+        text: "same text",
+      })
+    ).rejects.toBeInstanceOf(QueueMessageConflictError);
+  });
+
+  it("recognizes the same durable message after it already fired", async () => {
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, {
+      id: "q-fired-retry",
+      text: "already accepted",
+    });
+    expect(store.claimQueuedMessage(s.id, "q-fired-retry")).not.toBeNull();
+
+    const retry = await store.appendQueuedMessage(s.id, {
+      id: "q-fired-retry",
+      text: "already accepted",
+    });
+    expect(retry.metadata.queued_at).toBeUndefined();
+    expect(retry.metadata.queue_enqueued_at).toEqual(expect.any(Number));
+    expect(retry.parts[0]?.data).toEqual({
+      type: "text",
+      text: "already accepted",
+    });
+    expect(
+      (await store.listMessageIds(s.id)).filter(
+        (messageId) => messageId === "q-fired-retry"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("upgrades legacy queue provenance when the row fires", async () => {
+    const s = await store.create({ agent: "grida" });
+    await seedLegacyQueuedMessage(
+      s.id,
+      "q-legacy-fired",
+      "accepted before the marker",
+      321
+    );
+
+    expect(store.claimQueuedMessage(s.id, "q-legacy-fired")).not.toBeNull();
+    const retry = await store.appendQueuedMessage(s.id, {
+      id: "q-legacy-fired",
+      text: "accepted before the marker",
+    });
+    expect(retry.metadata.queued_at).toBeUndefined();
+    expect(retry.metadata.queue_enqueued_at).toBe(321);
   });
 
   it("holds a queued row out of the model view AND the transcript", async () => {
@@ -908,10 +1144,51 @@ describe("SessionsStore queue", () => {
     expect(q.map((m) => m.id)).toEqual(["c", "a", "b"]);
   });
 
-  it("dequeueMessage clears queued_at — the row becomes visible", async () => {
+  it("lists distinct sessions with live queues for trusted startup recovery", async () => {
+    const a = await store.create({ agent: "grida" });
+    const b = await store.create({ agent: "grida" });
+    const canceled = await store.create({ agent: "grida" });
+    const fired = await store.create({ agent: "grida" });
+    const malformed = await store.create({ agent: "grida" });
+
+    await store.appendQueuedMessage(a.id, {
+      id: "a-1",
+      text: "first a row",
+    });
+    await store.appendQueuedMessage(a.id, {
+      id: "a-2",
+      text: "second a row",
+    });
+    await store.appendQueuedMessage(b.id, { id: "b-1", text: "b row" });
+    await store.appendQueuedMessage(canceled.id, {
+      id: "canceled-1",
+      text: "canceled row",
+    });
+    await store.deleteMessage(canceled.id, "canceled-1");
+    await store.appendQueuedMessage(fired.id, {
+      id: "fired-1",
+      text: "fired row",
+    });
+    expect(store.claimQueuedMessage(fired.id, "fired-1")).not.toBeNull();
+    await store.appendMessage(malformed.id, {
+      role: "user",
+      metadata: { queued_at: "not numeric" },
+    });
+
+    expect(await store.listQueuedSessionIds()).toEqual(
+      [a.id, b.id].sort((left, right) => left.localeCompare(right))
+    );
+  });
+
+  it("claimQueuedMessage conditionally clears queued_at for the same session", async () => {
     const s = await store.create({ agent: "grida" });
     await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
-    await store.dequeueMessage("q1");
+    expect(store.claimQueuedMessage("another-session", "q1")).toBeNull();
+    const claim = store.claimQueuedMessage(s.id, "q1");
+    expect(claim).toMatchObject({
+      session_id: s.id,
+      message_id: "q1",
+    });
     expect(
       (await store.listQueuedMessages(s.id)).map((m) => m.id)
     ).not.toContain("q1");
@@ -921,9 +1198,10 @@ describe("SessionsStore queue", () => {
     expect((await store.listMessages(s.id)).map((m) => m.id)).toContain("q1");
     const row = await store.getMessage("q1");
     expect(row?.metadata.queued_at).toBeUndefined();
+    expect(store.claimQueuedMessage(s.id, "q1")).toBeNull();
   });
 
-  it("dequeueMessage re-stamps created_at so a fired message ends the conversation", async () => {
+  it("claimQueuedMessage re-stamps created_at so a fired message ends the conversation", async () => {
     // Repro for the "must end with a user message" provider error: the
     // assistant message is created lazily (first chunk), so a message queued
     // during the model's thinking gap has an EARLIER created_at than the
@@ -939,11 +1217,52 @@ describe("SessionsStore queue", () => {
     await delay(2);
     await store.appendMessage(s.id, { id: "zzz", role: "assistant" }); // later
     await delay(2);
-    await store.dequeueMessage("aaa");
+    expect(store.claimQueuedMessage(s.id, "aaa")).not.toBeNull();
     const visible = await store.listVisibleMessages(s.id);
     // Fired message sorts last — the conversation ends on a user message.
     expect(visible.at(-1)?.id).toBe("aaa");
     expect(visible.at(-1)?.role).toBe("user");
+  });
+
+  it("restoreQueuedMessage puts a failed pre-stream claim back exactly once", async () => {
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, {
+      id: "q1",
+      text: "queued",
+      queued_at: 42,
+    });
+    const before = await store.getMessage("q1");
+    const claim = store.claimQueuedMessage(s.id, "q1");
+    expect(claim).not.toBeNull();
+    expect(store.restoreQueuedMessage(claim!)).toBe(true);
+    expect(store.restoreQueuedMessage(claim!)).toBe(false);
+
+    const restored = await store.getMessage("q1");
+    expect(restored?.metadata.queued_at).toBe(42);
+    expect(restored?.created_at).toBe(before?.created_at);
+    expect((await store.listQueuedMessages(s.id)).map((m) => m.id)).toEqual([
+      "q1",
+    ]);
+  });
+
+  it("cancel and claim serialize: whichever conditional mutation wins excludes the other", async () => {
+    const s = await store.create({ agent: "grida" });
+
+    await store.appendQueuedMessage(s.id, {
+      id: "cancel-first",
+      text: "cancel me",
+    });
+    await store.deleteMessage(s.id, "cancel-first");
+    expect(store.claimQueuedMessage(s.id, "cancel-first")).toBeNull();
+
+    await store.appendQueuedMessage(s.id, {
+      id: "claim-first",
+      text: "fire me",
+    });
+    expect(store.claimQueuedMessage(s.id, "claim-first")).not.toBeNull();
+    await store.deleteMessage(s.id, "claim-first");
+    // Cancel is guarded by queued metadata and cannot hide the fired row.
+    expect(await store.getMessage("claim-first")).not.toBeNull();
   });
 
   it("rewind does NOT hide queued rows (the pending queue survives a rewind)", async () => {
@@ -970,24 +1289,93 @@ describe("SessionsStore queue", () => {
     ]);
   });
 
-  it("deleteMessage hard-deletes a queued row and its parts", async () => {
+  it("deleteMessage removes a queued row but retains its idempotency tombstone", async () => {
     const s = await store.create({ agent: "grida" });
     await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
     await store.deleteMessage(s.id, "q1");
-    expect(await store.getMessage("q1")).toBeNull();
-    expect(await store.listMessageIds(s.id)).not.toContain("q1");
+    const tombstone = await store.getMessage("q1");
+    expect(tombstone).toMatchObject({
+      id: "q1",
+      metadata: { queue_canceled_at: expect.any(Number) },
+      hidden_at: expect.any(Number),
+    });
+    expect(tombstone?.metadata.queued_at).toBeUndefined();
+    expect(await store.listMessageIds(s.id)).toContain("q1");
+    expect(await store.listQueuedMessages(s.id)).toEqual([]);
+    expect(await store.listMessages(s.id)).toEqual([]);
+    expect(await store.listVisibleMessages(s.id)).toEqual([]);
     const parts = opened.sqlite
       .prepare("SELECT COUNT(*) AS n FROM chat_parts WHERE message_id = ?")
       .get("q1") as { n: number };
-    expect(parts.n).toBe(0);
+    expect(parts.n).toBe(1);
+
+    // A retry after the original enqueue response was lost recognizes the
+    // tombstone as the same completed operation; it cannot resurrect/fires it.
+    const retry = await store.appendQueuedMessage(s.id, {
+      id: "q1",
+      text: "queued",
+    });
+    expect(retry.hidden_at).toBe(tombstone?.hidden_at);
+    expect(retry.metadata.queue_canceled_at).toBe(
+      tombstone?.metadata.queue_canceled_at
+    );
+    expect(await store.listQueuedMessages(s.id)).toEqual([]);
+  });
+
+  it("upgrades legacy queue provenance when the row is canceled", async () => {
+    const s = await store.create({ agent: "grida" });
+    await seedLegacyQueuedMessage(
+      s.id,
+      "q-legacy-canceled",
+      "cancel the old row",
+      654
+    );
+
+    await store.deleteMessage(s.id, "q-legacy-canceled");
+    const retry = await store.appendQueuedMessage(s.id, {
+      id: "q-legacy-canceled",
+      text: "cancel the old row",
+    });
+    expect(retry.hidden_at).toEqual(expect.any(Number));
+    expect(retry.metadata.queued_at).toBeUndefined();
+    expect(retry.metadata.queue_enqueued_at).toBe(654);
+    expect(retry.metadata.queue_canceled_at).toEqual(expect.any(Number));
+    expect(await store.listQueuedMessages(s.id)).toEqual([]);
+  });
+
+  it("rewind/un-rewind never surfaces a canceled queue tombstone", async () => {
+    const s = await store.create({ agent: "grida" });
+    const anchor = await store.appendMessage(s.id, { role: "user" });
+    await delay(2);
+    await store.appendMessage(s.id, { role: "assistant" });
+    await delay(2);
+    await store.appendQueuedMessage(s.id, {
+      id: "q-canceled",
+      text: "never revive",
+    });
+    await store.deleteMessage(s.id, "q-canceled");
+
+    const rewind = await store.rewind(s.id, anchor.id);
+    expect(rewind.hidden_count).toBe(1); // assistant only; tombstone is not history
+    await store.unhideAfter(s.id, anchor.id);
+
+    const tombstone = await store.getMessage("q-canceled");
+    expect(tombstone?.hidden_at).not.toBeNull();
+    expect(tombstone?.metadata.queue_canceled_at).toEqual(expect.any(Number));
+    expect(
+      (await store.listMessages(s.id)).map((message) => message.id)
+    ).not.toContain("q-canceled");
+    expect(
+      (await store.listVisibleMessages(s.id)).map((message) => message.id)
+    ).not.toContain("q-canceled");
   });
 
   it("deleteMessage refuses a non-queued (fired) message — guarded", async () => {
     const s = await store.create({ agent: "grida" });
     const m = await store.appendMessage(s.id, { role: "user" });
     await store.deleteMessage(s.id, m.id);
-    // Guard: only rows still carrying `queued_at` can be hard-deleted, so a
-    // fired/recorded message is never removed by cancel.
+    // Guard: only rows still carrying `queued_at` can be canceled, so a
+    // fired/recorded message is never hidden by cancel.
     expect(await store.getMessage(m.id)).not.toBeNull();
   });
 
@@ -998,9 +1386,13 @@ describe("SessionsStore queue", () => {
     // Cancel scoped to session A must NOT delete B's queued row.
     await store.deleteMessage(a.id, "q-b");
     expect(await store.getMessage("q-b")).not.toBeNull();
-    // Scoped to its own session, it deletes.
+    // Scoped to its own session, it removes the row from the pending queue.
     await store.deleteMessage(b.id, "q-b");
-    expect(await store.getMessage("q-b")).toBeNull();
+    expect(await store.getMessage("q-b")).toMatchObject({
+      metadata: { queue_canceled_at: expect.any(Number) },
+      hidden_at: expect.any(Number),
+    });
+    expect(await store.listQueuedMessages(b.id)).toEqual([]);
   });
 });
 
@@ -1056,6 +1448,60 @@ describe("answerApproval — supervised approval boundary (GRIDA-SEC-004)", () =
     expect(data.input).toEqual({ command: "python3", args: ["x.py"] });
   });
 
+  it("preflights the exact pending approval without consuming it", async () => {
+    const sid = await seedPendingApproval();
+    expect(
+      await store.matchesPendingApproval(sid, {
+        tool_call_id: "tc_1",
+        approval_id: "ap_1",
+      })
+    ).toBe(true);
+    expect(readPart("tc_1").tool_state).toBe("approval-requested");
+    expect(
+      await store.matchesPendingApproval(sid, {
+        tool_call_id: "tc_1",
+        approval_id: "ap_FORGED",
+      })
+    ).toBe(false);
+  });
+
+  it("preflights and answers one exact approval while a sibling remains pending", async () => {
+    const sid = await seedPendingApproval();
+    const sibling = await store.appendMessage(sid, { role: "assistant" });
+    await store.upsertPart(sibling.id, {
+      index: 0,
+      type: "tool-run_command",
+      data: {
+        type: "tool-run_command",
+        tool_call_id: "tc_2",
+        tool_name: "run_command",
+        state: "approval-requested",
+        approval: { id: "ap_2" },
+        input: { command: "python3", args: ["y.py"] },
+      },
+      tool_call_id: "tc_2",
+      tool_state: "approval-requested",
+      session_id: sid,
+    });
+
+    expect(
+      await store.matchesPendingApproval(sid, {
+        tool_call_id: "tc_1",
+        approval_id: "ap_1",
+      })
+    ).toBe(true);
+    expect(
+      await store.answerApproval(sid, {
+        tool_call_id: "tc_1",
+        approval_id: "ap_1",
+        approved: true,
+      })
+    ).toBe(true);
+    expect(readPart("tc_1").tool_state).toBe("approval-responded");
+    expect(readPart("tc_2").tool_state).toBe("approval-requested");
+    expect(await store.hasPendingApproval(sid)).toBe(true);
+  });
+
   it("ignores an answer for an unknown tool call (no forged execution)", async () => {
     const sid = await seedPendingApproval();
     const ok = await store.answerApproval(sid, {
@@ -1108,6 +1554,155 @@ describe("answerApproval — supervised approval boundary (GRIDA-SEC-004)", () =
     expect(ok).toBe(false);
     expect(readPart("tc_1").tool_state).toBe("approval-requested");
   });
+
+  it("does not preflight or answer a hidden approval", async () => {
+    const sid = await seedPendingApproval();
+    const row = opened.sqlite
+      .prepare("SELECT message_id FROM chat_parts WHERE tool_call_id = ?")
+      .get("tc_1") as { message_id: string };
+    opened.sqlite
+      .prepare("UPDATE chat_messages SET hidden_at = ? WHERE id = ?")
+      .run(Date.now(), row.message_id);
+
+    expect(
+      await store.matchesPendingApproval(sid, {
+        tool_call_id: "tc_1",
+        approval_id: "ap_1",
+      })
+    ).toBe(false);
+    expect(
+      await store.answerApproval(sid, {
+        tool_call_id: "tc_1",
+        approval_id: "ap_1",
+        approved: true,
+      })
+    ).toBe(false);
+    expect(await store.hasPendingApproval(sid)).toBe(false);
+    expect(readPart("tc_1").tool_state).toBe("approval-requested");
+  });
+});
+
+describe("restart orphan repair", () => {
+  it("terminalizes ordinary in-flight tools but preserves durable human waits", async () => {
+    const s = await store.create({ agent: "grida" });
+    const visible = await store.appendMessage(s.id, { role: "assistant" });
+    const record = async (
+      index: number,
+      toolCallId: string,
+      type: string,
+      state: string,
+      data: Record<string, unknown>
+    ) => {
+      await store.upsertPart(visible.id, {
+        index,
+        type,
+        data: { type, toolCallId, state, ...data },
+        tool_call_id: toolCallId,
+        tool_state: state,
+        session_id: s.id,
+      });
+    };
+
+    await record(0, "tc_streaming", "tool-run_command", "input-streaming", {
+      inputTextDelta: '{"command":',
+    });
+    await record(1, "tc_client", "tool-read_file", "input-available", {
+      input: { path: "notes.txt" },
+    });
+    await record(2, "tc_question", "tool-question", "input-available", {
+      input: { questions: [] },
+    });
+    await record(3, "tc_approval", "tool-run_command", "approval-requested", {
+      input: { command: "echo ok" },
+      approval: { id: "ap_1" },
+    });
+    await record(4, "tc_done", "tool-read_file", "output-available", {
+      input: { path: "done.txt" },
+      output: "done",
+    });
+    await record(
+      5,
+      "tc_approval_answered",
+      "tool-run_command",
+      "approval-responded",
+      {
+        input: { command: "echo maybe-ran" },
+        approval: { id: "ap_2", approved: true },
+      }
+    );
+
+    const hidden = await store.appendMessage(s.id, { role: "assistant" });
+    await store.upsertPart(hidden.id, {
+      index: 0,
+      type: "tool-read_file",
+      data: {
+        type: "tool-read_file",
+        toolCallId: "tc_hidden",
+        state: "input-available",
+        input: { path: "hidden.txt" },
+      },
+      tool_call_id: "tc_hidden",
+      tool_state: "input-available",
+      session_id: s.id,
+    });
+    opened.sqlite
+      .prepare("UPDATE chat_messages SET hidden_at = ? WHERE id = ?")
+      .run(Date.now(), hidden.id);
+
+    expect(store.finalizeRestartOrphanedTools()).toBe(3);
+
+    expect(await store.findToolPart(s.id, "tc_streaming")).toMatchObject({
+      data: {
+        state: "output-error",
+        errorText: "aborted by host restart",
+        inputTextDelta: '{"command":',
+      },
+    });
+    expect(await store.findToolPart(s.id, "tc_client")).toMatchObject({
+      data: {
+        state: "output-error",
+        errorText: "aborted by host restart",
+        input: { path: "notes.txt" },
+      },
+    });
+    expect(await store.findToolPart(s.id, "tc_question")).toMatchObject({
+      data: { state: "input-available" },
+    });
+    expect(await store.findToolPart(s.id, "tc_approval")).toMatchObject({
+      data: { state: "approval-requested" },
+    });
+    expect(await store.findToolPart(s.id, "tc_done")).toMatchObject({
+      data: { state: "output-available" },
+    });
+    expect(
+      await store.findToolPart(s.id, "tc_approval_answered")
+    ).toMatchObject({
+      data: {
+        state: "output-error",
+        errorText: "aborted by host restart",
+        input: { command: "echo maybe-ran" },
+      },
+    });
+    expect(await store.findToolPart(s.id, "tc_hidden")).toMatchObject({
+      data: { state: "input-available" },
+    });
+    const repairedStates = opened.sqlite
+      .prepare(
+        `SELECT tool_call_id, tool_state
+         FROM chat_parts
+         WHERE tool_call_id IN (
+           'tc_streaming', 'tc_client', 'tc_approval_answered'
+         )
+         ORDER BY tool_call_id`
+      )
+      .all() as Array<{ tool_call_id: string; tool_state: string }>;
+    expect(repairedStates).toEqual([
+      { tool_call_id: "tc_approval_answered", tool_state: "output-error" },
+      { tool_call_id: "tc_client", tool_state: "output-error" },
+      { tool_call_id: "tc_streaming", tool_state: "output-error" },
+    ]);
+    expect(store.finalizeRestartOrphanedTools()).toBe(0);
+  });
 });
 
 describe("hasPendingHumanInput (drain-pause trait gate)", () => {
@@ -1145,28 +1740,142 @@ describe("hasPendingHumanInput (drain-pause trait gate)", () => {
 
   it("is false for a session with no pending block", async () => {
     const s = await store.create({ agent: "grida" });
+    expect(await store.pendingHumanInputKind(s.id)).toBeNull();
     expect(await store.hasPendingHumanInput(s.id)).toBe(false);
   });
 
   it("is true while a supervised approval is unanswered", async () => {
     const s = await store.create({ agent: "grida" });
     await recordToolPart(s.id, "tc_a", "run_command", "approval-requested");
+    expect(await store.pendingHumanInputKind(s.id)).toBe("approval");
     expect(await store.hasPendingHumanInput(s.id)).toBe(true);
   });
 
   it("is true while a `question` is paused at input-available", async () => {
     const s = await store.create({ agent: "grida" });
     await recordToolPart(s.id, "tc_q", "question", "input-available");
+    expect(await store.pendingHumanInputKind(s.id)).toBe("user-input");
     expect(await store.hasPendingHumanInput(s.id)).toBe(true);
+  });
+
+  it("preflights and fills only the exact human tool while preserving its input", async () => {
+    const s = await store.create({ agent: "grida" });
+    const msgId = await recordToolPart(
+      s.id,
+      "tc_q",
+      "question",
+      "input-available"
+    );
+    expect(
+      await store.canFillPendingHumanInputResult(
+        s.id,
+        msgId,
+        "tc_q",
+        "tool-question"
+      )
+    ).toBe(true);
+    expect(
+      await store.canFillPendingHumanInputResult(
+        s.id,
+        msgId,
+        "tc_q",
+        "tool-read_file"
+      )
+    ).toBe(false);
+    expect(
+      await store.fillToolResult(s.id, msgId, "tc_q", {
+        type: "tool-read_file",
+        tool_state: "output-available",
+        data: {
+          type: "tool-read_file",
+          state: "output-available",
+          input: { forged: true },
+          output: { answers: [["Blue"]] },
+        },
+      })
+    ).toBe(false);
+    expect(
+      await store.fillToolResult(s.id, msgId, "tc_q", {
+        type: "tool-question",
+        tool_state: "output-available",
+        data: {
+          type: "tool-question",
+          state: "output-available",
+          input: { forged: true },
+          output: { answers: [["Blue"]] },
+        },
+      })
+    ).toBe(true);
+
+    const filled = await store.findToolPart(s.id, "tc_q");
+    expect(filled?.data).toMatchObject({
+      type: "tool-question",
+      state: "output-available",
+      input: {},
+      output: { answers: [["Blue"]] },
+    });
+  });
+
+  it("classifies every current human-input trait as user input", async () => {
+    const s = await store.create({ agent: "grida" });
+    await recordToolPart(s.id, "tc_design", "design_search", "input-available");
+    expect(await store.pendingHumanInputKind(s.id)).toBe("user-input");
+  });
+
+  it("gives approval status precedence while exact sibling preflights remain correlated", async () => {
+    const s = await store.create({ agent: "grida" });
+    const questionMessageId = await recordToolPart(
+      s.id,
+      "tc_q",
+      "question",
+      "input-available"
+    );
+    await recordToolPart(s.id, "tc_a", "run_command", "approval-requested");
+    expect(await store.pendingHumanInputKind(s.id)).toBe("approval");
+    expect(
+      await store.matchesPendingApproval(s.id, {
+        tool_call_id: "tc_a",
+        approval_id: "unused",
+      })
+    ).toBe(false);
+    expect(
+      await store.canFillPendingHumanInputResult(
+        s.id,
+        questionMessageId,
+        "tc_q",
+        "tool-question"
+      )
+    ).toBe(true);
+  });
+
+  it("preflights one exact question while another question remains pending", async () => {
+    const s = await store.create({ agent: "grida" });
+    const firstMessageId = await recordToolPart(
+      s.id,
+      "tc_q1",
+      "question",
+      "input-available"
+    );
+    await recordToolPart(s.id, "tc_q2", "question", "input-available");
+
+    expect(
+      await store.canFillPendingHumanInputResult(
+        s.id,
+        firstMessageId,
+        "tc_q1",
+        "tool-question"
+      )
+    ).toBe(true);
   });
 
   it("is FALSE for a transient client-fs call at input-available (the trait discriminator)", async () => {
     // A client-resolved `read_file` sits at `input-available` for the moment
     // between stream-finish and the renderer filling its result. It is NOT a
     // human block — the drain must NOT pause on it. This is exactly why the
-    // gate keys on the HUMAN_INPUT_TOOL_NAMES trait, not bare `input-available`.
+    // gate keys on the HUMAN_INPUT_PART_TYPES trait, not bare `input-available`.
     const s = await store.create({ agent: "grida" });
     await recordToolPart(s.id, "tc_r", "read_file", "input-available");
+    expect(await store.pendingHumanInputKind(s.id)).toBeNull();
     expect(await store.hasPendingHumanInput(s.id)).toBe(false);
   });
 
@@ -1180,6 +1889,7 @@ describe("hasPendingHumanInput (drain-pause trait gate)", () => {
     );
     // Answer arrives → the SAME row advances to output-available (in place).
     await recordToolPart(s.id, "tc_q", "question", "output-available", msgId);
+    expect(await store.pendingHumanInputKind(s.id)).toBeNull();
     expect(await store.hasPendingHumanInput(s.id)).toBe(false);
   });
 
@@ -1190,13 +1900,28 @@ describe("hasPendingHumanInput (drain-pause trait gate)", () => {
     const s = await store.create({ agent: "grida" });
     // A user turn to rewind back to, then a later assistant turn that pauses.
     const anchor = await store.appendMessage(s.id, { role: "user" });
-    await recordToolPart(s.id, "tc_q", "question", "input-available");
+    const msgId = await recordToolPart(
+      s.id,
+      "tc_q",
+      "question",
+      "input-available"
+    );
+    expect(await store.pendingHumanInputKind(s.id)).toBe("user-input");
     expect(await store.hasPendingHumanInput(s.id)).toBe(true);
 
     // Rewinding to the anchor hides the assistant question message → no longer
     // pending, even though its `input-available` part still exists in the DB.
     await store.rewind(s.id, anchor.id);
+    expect(await store.pendingHumanInputKind(s.id)).toBeNull();
     expect(await store.hasPendingHumanInput(s.id)).toBe(false);
+    expect(
+      await store.canFillPendingHumanInputResult(
+        s.id,
+        msgId,
+        "tc_q",
+        "tool-question"
+      )
+    ).toBe(false);
   });
 });
 

@@ -103,7 +103,7 @@ describe("StreamAttachOwner / resume-mount claim (I2)", () => {
       granted: false,
       reason: "no-session",
     });
-    owner.bind(null);
+    owner.bind({ session_id: null, epoch: 0 });
     expect(owner.request("resume-mount", () => {})).toEqual({
       granted: false,
       reason: "no-session",
@@ -203,6 +203,60 @@ describe("StreamAttachOwner / settlement + robustness", () => {
     expect(slotFree(owner)).toBe(true);
   });
 
+  it("a real rebind is not occupied or later released by the previous session's stream", async () => {
+    const { owner } = makeOwner();
+    owner.bind({ session_id: "ses_a", epoch: 1 });
+    const staleLease = owner.noteTransportOpen();
+
+    // Session B owns a different Chat. A's still-live reader is a bounded
+    // zombie and must not turn B's one mount-resume into a permanent claim.
+    owner.bind({ session_id: "ses_b", epoch: 2 });
+    const resume = gatedExec();
+    expect(owner.request("resume-mount", resume.exec)).toEqual({
+      granted: true,
+      mode: "exec",
+    });
+    expect(resume.calls.count).toBe(1);
+
+    // Once B's transport adopts the resumed stream, A settling cannot free B.
+    const currentLease = owner.noteTransportOpen();
+    resume.release();
+    await flush();
+    owner.noteTransportSettle(staleLease);
+    expect(slotFree(owner)).toBe(false);
+
+    owner.noteTransportSettle(currentLease);
+    expect(slotFree(owner)).toBe(true);
+  });
+
+  it("preserves a fresh first send across same-epoch null→session adoption", () => {
+    const { owner } = makeOwner();
+    owner.bind({ session_id: null, epoch: 4 });
+    const lease = owner.noteTransportOpen();
+
+    owner.bind({ session_id: "ses_minted", epoch: 4 });
+    expect(owner.request("resume-mount", () => {})).toEqual({
+      granted: true,
+      mode: "claim-only",
+    });
+
+    owner.noteTransportSettle(lease);
+    expect(slotFree(owner)).toBe(true);
+  });
+
+  it("invalidates async binding leases only on a real rebind", () => {
+    const { owner } = makeOwner();
+    owner.bind({ session_id: null, epoch: 4 });
+    const fresh = owner.captureBinding();
+
+    owner.bind({ session_id: "ses_minted", epoch: 4 });
+    expect(owner.isCurrentBinding(fresh)).toBe(true);
+
+    owner.bind({ session_id: "ses_other", epoch: 5 });
+    expect(owner.isCurrentBinding(fresh)).toBe(false);
+    expect(owner.isCurrentBinding(owner.captureBinding())).toBe(true);
+  });
+
   it("logs every grant, deny, claim, and adopt with the stable prefix (I4)", () => {
     const { owner, lines } = makeOwner();
     owner.bind({ session_id: "ses_1", epoch: 1 });
@@ -247,7 +301,7 @@ describe("StreamAttachOwner / settlement + robustness", () => {
 });
 
 describe("StreamAttachOwner / self-heal recovery", () => {
-  it("runs exactly ONE recovery per binding; a rebind resets the budget", async () => {
+  it("runs one stream-view recovery per binding; a rebind resets the budget", async () => {
     const { owner } = makeOwner();
     owner.bind({ session_id: "ses_1", epoch: 1 });
 
@@ -256,13 +310,33 @@ describe("StreamAttachOwner / self-heal recovery", () => {
     expect(first.calls.count).toBe(1);
     first.release();
     await flush();
-    // The one attempt is spent — even for a different recoverable kind.
+    // Disconnect and reducer desync share one anti-ping-pong budget.
     expect(owner.requestRecovery("disconnect", () => {})).toBe(false);
     expect(owner.requestRecovery("stream-state", () => {})).toBe(false);
 
     // A real re-open restores the budget.
     owner.bind({ session_id: "ses_1", epoch: 2 });
     expect(owner.requestRecovery("stream-state", () => {})).toBe(true);
+  });
+
+  it("reserves a separate deterministic admission-conflict repair", async () => {
+    const { owner } = makeOwner();
+    owner.bind({ session_id: "ses_1", epoch: 1 });
+
+    expect(owner.requestRecovery("disconnect", () => {})).toBe(true);
+    await flush();
+    expect(owner.requestRecovery("human-input-pending", () => {})).toBe(true);
+    await flush();
+    expect(owner.requestRecovery("human-input-pending", () => {})).toBe(false);
+  });
+
+  it("shares the admission-conflict budget across pending-input and run races", async () => {
+    const { owner } = makeOwner();
+    owner.bind({ session_id: "ses_1", epoch: 1 });
+
+    expect(owner.requestRecovery("run-in-flight", () => {})).toBe(true);
+    await flush();
+    expect(owner.requestRecovery("human-input-pending", () => {})).toBe(false);
   });
 
   it("ignores stream errors while unbound or while an attach is live", () => {
@@ -274,6 +348,20 @@ describe("StreamAttachOwner / self-heal recovery", () => {
     expect(owner.requestRecovery("disconnect", () => {})).toBe(false);
     owner.noteTransportSettle();
     expect(owner.requestRecovery("disconnect", () => {})).toBe(true);
+  });
+
+  it("uses the admission-conflict recovery for a stale pending-input send", async () => {
+    const { owner } = makeOwner();
+    owner.bind({ session_id: "ses_1", epoch: 1 });
+    const restore = gatedExec();
+
+    expect(owner.requestRecovery("human-input-pending", restore.exec)).toBe(
+      true
+    );
+    expect(restore.calls.count).toBe(1);
+    restore.release();
+    await flush();
+    expect(slotFree(owner)).toBe(true);
   });
 
   it("other intents serialize behind a live recovery, and the budget stays spent after it settles", async () => {

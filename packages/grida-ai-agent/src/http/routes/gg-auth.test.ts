@@ -8,7 +8,7 @@
  * `/secrets/set` keeps REJECTING it (nobody may store a key under the
  * hosted provider's id).
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Hono } from "hono";
 import { registerGridaAuthRoutes } from "./gg-auth";
 import { registerSecretsRoutes } from "./secrets";
@@ -17,6 +17,7 @@ import type { SecretsStore } from "@grida/daemon/server";
 
 let app: Hono;
 let store: GridaGatewaySessionStore;
+let onProviderReady: () => void;
 
 function post(path: string, body?: unknown): Promise<Response> {
   return Promise.resolve(
@@ -31,7 +32,11 @@ function post(path: string, body?: unknown): Promise<Response> {
 beforeEach(() => {
   app = new Hono();
   store = new GridaGatewaySessionStore();
-  registerGridaAuthRoutes(app, { store });
+  onProviderReady = vi.fn<() => void>();
+  registerGridaAuthRoutes(app, {
+    store,
+    on_provider_ready: onProviderReady,
+  });
 });
 
 describe("/auth/gg/*", () => {
@@ -53,6 +58,7 @@ describe("/auth/gg/*", () => {
     });
     expect(JSON.stringify(body)).not.toContain("jwt-abc");
     expect(store.getAccessToken()).toBe("jwt-abc");
+    expect(onProviderReady).toHaveBeenCalledOnce();
 
     const clear = await post("/auth/gg/clear");
     expect(clear.status).toBe(200);
@@ -81,6 +87,7 @@ describe("/auth/gg/*", () => {
       ).status
     ).toBe(400);
     expect(store.getAccessToken()).toBeNull();
+    expect(onProviderReady).not.toHaveBeenCalled();
   });
 
   it("malformed organization is dropped, not fatal", async () => {

@@ -97,6 +97,8 @@ describe("@grida/agent public API", () => {
       const idle: SessionStatus = { state: "idle" };
       const state: SessionRunState = idle.state;
       expect(state).toBe("idle");
+      const waiting: SessionStatus = { state: "waiting_on_approval" };
+      expect(waiting.state).toBe("waiting_on_approval");
     });
 
     it("exposes the runtime-agnostic agent factory and toolset factory", () => {

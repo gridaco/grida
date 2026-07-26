@@ -85,6 +85,22 @@ export type UpdateUsageDelta = {
   total_tokens?: number;
 };
 
+/**
+ * Optimistic token returned by the queue's conditional fire transition.
+ * Runtime code may restore it only when the synchronous stream reservation
+ * fails before a turn starts.
+ */
+export type QueuedMessageClaim = Readonly<{
+  session_id: string;
+  message_id: string;
+  queued_at: number;
+  original_metadata_json: string;
+  claimed_metadata_json: string;
+  original_created_at: number;
+  original_updated_at: number;
+  claimed_created_at: number;
+}>;
+
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
@@ -501,8 +517,10 @@ export class SessionsStore {
         // pending — not part of the transcript until they fire. Excluded here
         // and from `listVisibleMessages` (the model view); surfaced only via
         // `listQueuedMessages`. `listMessageIds` deliberately does NOT filter
-        // (the persist-tail dedup must still see queued ids).
-        .filter((m) => !isQueued(m.metadata))
+        // (the persist-tail dedup must still see queued ids). Canceled queue
+        // tombstones are likewise durable for enqueue idempotency, but are not
+        // conversation history.
+        .filter((m) => !isQueued(m.metadata) && !isQueueCanceled(m.metadata))
     );
   }
 
@@ -547,8 +565,9 @@ export class SessionsStore {
         }))
         // Queued sends (RFC `queue`): a pending `metadata.queued_at` row must
         // not reach the model — it is excluded until it fires (its `queued_at`
-        // is cleared by {@link dequeueMessage}). See {@link listMessages}.
-        .filter((m) => !isQueued(m.metadata))
+        // is cleared by {@link claimQueuedMessage}). See {@link listMessages}.
+        // Canceled queue tombstones are also excluded permanently.
+        .filter((m) => !isQueued(m.metadata) && !isQueueCanceled(m.metadata))
     );
   }
 
@@ -556,33 +575,126 @@ export class SessionsStore {
   // Queued sends (RFC `queue`): a queued message is a normal `user` row
   // carrying `metadata.queued_at`. It is held out of the model view and the
   // transcript until it fires; `listQueuedMessages` surfaces it for the host's
-  // queued region. Firing clears `queued_at` ({@link dequeueMessage}); the X
-  // affordance hard-deletes it ({@link deleteMessage}).
+  // queued region. Firing conditionally clears `queued_at`
+  // ({@link claimQueuedMessage}); the X affordance conditionally removes it
+  // from the queue while retaining a hidden idempotency tombstone
+  // ({@link deleteMessage}).
 
   /**
    * Persist a queued user message: a `user` row stamped with
    * `metadata.queued_at` plus its single text part (written in the same
    * AI-SDK part shape a fired turn consumes, so the row can later be fired
-   * directly). Uses {@link appendMessage} (not the idempotent variant) — a
-   * queued id collision is a real bug, not a resend race.
+   * directly).
+   *
+   * A caller-provided id is an idempotency key. Repeating the same
+   * `(session, id, text)` returns the original row — including when the row
+   * already fired between the first response being lost and the retry. Reusing
+   * the id for a different payload is a conflict. The message + part insert is
+   * one synchronous SQLite transaction, so neither the scheduler nor another
+   * window can observe a half-written queued message.
    */
   async appendQueuedMessage(
     sessionId: string,
     input: { id?: string; text: string; queued_at?: number }
   ): Promise<ChatMessageRow & { parts: ChatPartRow[] }> {
+    const id = input.id ?? newMessageId();
     const queuedAt = input.queued_at ?? Date.now();
-    const msg = await this.appendMessage(sessionId, {
-      id: input.id,
-      role: "user",
-      metadata: { queued_at: queuedAt },
+    const now = Date.now();
+    const partId = newPartId();
+    const metadataJson = JSON.stringify({
+      queued_at: queuedAt,
+      // Durable provenance survives fire/cancel after `queued_at` is removed,
+      // so an ordinary direct user row can never impersonate an enqueue retry.
+      queue_enqueued_at: queuedAt,
     });
-    const part = await this.upsertPart(msg.id, {
-      index: 0,
-      type: "text",
-      data: { type: "text", text: input.text },
-      session_id: sessionId,
+    const dataJson = JSON.stringify({ type: "text", text: input.text });
+    const sqlite = this.opened.sqlite;
+
+    // The shared connection gate owns the transaction across this callback.
+    // No unrelated Drizzle or raw-store operation can enter the connection
+    // between the message and part inserts.
+    return this.opened.withTx(async () => {
+      const existing = sqlite
+        .prepare(
+          `SELECT id, session_id, role, metadata_json, hidden_at,
+                  created_at, updated_at
+           FROM chat_messages
+           WHERE id = ?`
+        )
+        .get(id) as ChatMessageDbRow | undefined;
+      if (existing) {
+        const parts = sqlite
+          .prepare(
+            `SELECT id, message_id, session_id, "index", type, data_json,
+                    tool_call_id, tool_state, created_at, updated_at
+             FROM chat_parts
+             WHERE message_id = ?
+             ORDER BY "index", id`
+          )
+          .all(id) as ChatPartDbRow[];
+        if (
+          !isSameQueuedMessageRequest(
+            existing,
+            parts,
+            sessionId,
+            input.text,
+            input.queued_at
+          )
+        ) {
+          throw new QueueMessageConflictError(id);
+        }
+        return {
+          ...rowToMessage(existing),
+          parts: parts.map(rowToPart),
+        };
+      }
+
+      sqlite
+        .prepare(
+          `INSERT INTO chat_messages
+             (id, session_id, role, metadata_json, hidden_at, created_at, updated_at)
+           VALUES (?, ?, 'user', ?, NULL, ?, ?)`
+        )
+        .run(id, sessionId, metadataJson, now, now);
+      sqlite
+        .prepare(
+          `INSERT INTO chat_parts
+             (id, message_id, session_id, "index", type, data_json,
+              tool_call_id, tool_state, created_at, updated_at)
+           VALUES (?, ?, ?, 0, 'text', ?, NULL, NULL, ?, ?)`
+        )
+        .run(partId, id, sessionId, dataJson, now, now);
+      sqlite
+        .prepare("UPDATE chat_sessions SET updated_at = ? WHERE id = ?")
+        .run(now, sessionId);
+
+      return {
+        id,
+        session_id: sessionId,
+        role: "user",
+        metadata: {
+          queued_at: queuedAt,
+          queue_enqueued_at: queuedAt,
+        },
+        hidden_at: null,
+        created_at: now,
+        updated_at: now,
+        parts: [
+          {
+            id: partId,
+            message_id: id,
+            session_id: sessionId,
+            index: 0,
+            type: "text",
+            data: { type: "text", text: input.text },
+            tool_call_id: null,
+            tool_state: null,
+            created_at: now,
+            updated_at: now,
+          },
+        ],
+      };
     });
-    return { ...msg, parts: [part] };
   }
 
   /**
@@ -627,55 +739,280 @@ export class SessionsStore {
   }
 
   /**
-   * Fire a queued message: clear `metadata.queued_at` so it becomes a normal
-   * visible user message (RFC `queue / the run-state machine`). No-op if the
-   * row is gone or was not queued. Merges metadata so sibling keys survive
-   * (mirrors {@link setMessageAccounting}).
+   * Discover sessions with at least one live queued user row. This is the
+   * trusted host-start recovery index: status hydration remains read-only,
+   * while the host may explicitly kick these durable queues after restart.
    */
-  async dequeueMessage(messageId: string): Promise<void> {
-    const existing = await this.getMessage(messageId);
-    if (!existing || !isQueued(existing.metadata)) return;
-    const metadata = { ...existing.metadata };
-    delete metadata.queued_at;
-    const now = Date.now();
-    await this.db
-      .update(chatMessages)
-      .set({
-        metadata_json: JSON.stringify(metadata),
-        // Re-stamp `created_at` to fire time. A queued message's original
-        // `created_at` is its ENQUEUE time, which can predate the in-flight
-        // assistant message (created lazily on its first chunk). Since the
-        // model view orders by `created_at`, leaving it would sort the fired
-        // user message BEFORE that assistant turn — the conversation would end
-        // on an assistant message and the provider rejects it ("must end with
-        // a user message"). Firing IS the message entering the conversation as
-        // the next turn, so its position is the end.
-        created_at: now,
-        updated_at: now,
-      })
-      .where(eq(chatMessages.id, messageId));
+  async listQueuedSessionIds(): Promise<string[]> {
+    const rows = await this.db
+      .select({ session_id: chatMessages.session_id })
+      .from(chatMessages)
+      .where(
+        and(
+          eq(chatMessages.role, "user"),
+          isNull(chatMessages.hidden_at),
+          sql`json_type(${chatMessages.metadata_json}, '$.queued_at') IN ('integer', 'real')`
+        )
+      )
+      .groupBy(chatMessages.session_id)
+      .orderBy(asc(chatMessages.session_id));
+    return rows.map((row) => row.session_id);
   }
 
   /**
-   * Cancel a queued message: hard-delete the row and its parts (RFC
-   * `queue / operating on queued messages`). Doubly guarded — the row must
-   * (a) belong to `sessionId` (the DELETE route is session-scoped; a
-   * messageId must not reach across sessions) and (b) STILL carry
-   * `metadata.queued_at`, so it can never remove a fired/recorded turn
-   * (defends a cancel/fire race). No-op otherwise. This is the store's only
-   * hard delete; every other removal is a soft `hidden_at` rewind.
+   * Close visible tool calls that a dead host could not finish.
+   *
+   * This is a STARTUP-ONLY repair edge. A normal run may legitimately have a
+   * non-human tool at `input-streaming`, `input-available`, or
+   * `approval-responded`, so calling this while live streams exist could race
+   * real execution. Human-input tools at `input-available` are intentional
+   * durable waits and unanswered supervised approvals use
+   * `approval-requested`; both remain untouched across restart.
+   *
+   * Returns the number of rows advanced to `output-error`.
+   */
+  finalizeRestartOrphanedTools(): number {
+    const attempt = this.opened.tryWithConnectionSync(() => {
+      const humanTypeParams = HUMAN_INPUT_PART_TYPES.map(() => "?").join(", ");
+      const rows = this.opened.sqlite
+        .prepare(
+          `SELECT chat_parts.id, chat_parts.session_id, chat_parts.type,
+                  chat_parts.tool_call_id, chat_parts.tool_state,
+                  chat_parts.data_json
+           FROM chat_parts
+           INNER JOIN chat_messages
+             ON chat_messages.id = chat_parts.message_id
+           WHERE chat_messages.hidden_at IS NULL
+             AND (
+               chat_parts.tool_state IN ('input-streaming', 'approval-responded')
+               OR (
+                 chat_parts.tool_state = 'input-available'
+                 AND chat_parts.type NOT IN (${humanTypeParams})
+               )
+             )
+           ORDER BY chat_parts.id`
+        )
+        .all(...HUMAN_INPUT_PART_TYPES) as Array<{
+        id: string;
+        session_id: string;
+        type: string;
+        tool_call_id: string | null;
+        tool_state:
+          | "input-streaming"
+          | "input-available"
+          | "approval-responded";
+        data_json: string;
+      }>;
+
+      const update = this.opened.sqlite.prepare(
+        `UPDATE chat_parts
+         SET data_json = ?, tool_state = 'output-error', updated_at = ?
+         WHERE id = ?
+           AND session_id = ?
+           AND tool_state = ?
+           AND data_json = ?`
+      );
+      const now = Date.now();
+      let finalized = 0;
+      for (const row of rows) {
+        const parsed = parseJsonOr(row.data_json, null);
+        const nextData: Record<string, unknown> =
+          parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? { ...(parsed as Record<string, unknown>) }
+            : {
+                type: row.type,
+                ...(row.tool_call_id ? { toolCallId: row.tool_call_id } : {}),
+              };
+        nextData.state = "output-error";
+        nextData.errorText = "aborted by host restart";
+        delete nextData.error_text;
+        delete nextData.output;
+        const result = update.run(
+          JSON.stringify(nextData),
+          now,
+          row.id,
+          row.session_id,
+          row.tool_state,
+          row.data_json
+        );
+        finalized += Number(result.changes);
+      }
+      return finalized;
+    });
+    if (!attempt.acquired) {
+      throw new Error(
+        "cannot repair restart-orphaned tools while the sessions DB is busy"
+      );
+    }
+    return attempt.value;
+  }
+
+  /**
+   * Atomically claim one queued row for firing. The conditional UPDATE is the
+   * cancel/fire serialization point: it succeeds only while this exact row
+   * still belongs to `sessionId`, is visible, and carries the queued metadata
+   * snapshot read immediately before it. Returns null when cancel or another
+   * claimant won; no busy edge should be emitted in that case.
+   *
+   * This method is deliberately synchronous even though most store methods use
+   * drizzle's async facade. Queue claim and the following stream reserve run on
+   * one JavaScript stack, with no await/interleaving between them.
+   */
+  claimQueuedMessage(
+    sessionId: string,
+    messageId: string
+  ): QueuedMessageClaim | null {
+    const attempt = this.opened.tryWithConnectionSync(() => {
+      const existing = this.opened.sqlite
+        .prepare(
+          `SELECT metadata_json, created_at, updated_at
+           FROM chat_messages
+           WHERE id = ? AND session_id = ? AND role = 'user' AND hidden_at IS NULL`
+        )
+        .get(messageId, sessionId) as
+        | {
+            metadata_json: string;
+            created_at: number;
+            updated_at: number;
+          }
+        | undefined;
+      if (!existing) return null;
+
+      const parsed = parseJsonOr(existing.metadata_json, null);
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        Array.isArray(parsed) ||
+        !isQueued(parsed as Record<string, unknown>)
+      ) {
+        return null;
+      }
+      const metadata = { ...(parsed as Record<string, unknown>) };
+      const queuedAt = metadata.queued_at as number;
+      // Upgrade a pre-provenance queued row at the fire boundary. Once
+      // `queued_at` is removed, this durable marker is the only fact that lets an
+      // exact lost-response retry distinguish the fired enqueue from an ordinary
+      // direct user row with the same id/text.
+      if (typeof metadata.queue_enqueued_at !== "number") {
+        metadata.queue_enqueued_at = queuedAt;
+      }
+      delete metadata.queued_at;
+      const claimedMetadataJson = JSON.stringify(metadata);
+      const now = Date.now();
+      const result = this.opened.sqlite
+        .prepare(
+          `UPDATE chat_messages
+           SET metadata_json = ?, created_at = ?, updated_at = ?
+           WHERE id = ? AND session_id = ? AND role = 'user'
+             AND hidden_at IS NULL AND metadata_json = ?`
+        )
+        .run(
+          claimedMetadataJson,
+          now,
+          now,
+          messageId,
+          sessionId,
+          existing.metadata_json
+        );
+      if (result.changes !== 1) return null;
+      return {
+        session_id: sessionId,
+        message_id: messageId,
+        queued_at: queuedAt,
+        original_metadata_json: existing.metadata_json,
+        claimed_metadata_json: claimedMetadataJson,
+        original_created_at: existing.created_at,
+        original_updated_at: existing.updated_at,
+        claimed_created_at: now,
+      };
+    });
+    return attempt.acquired ? attempt.value : null;
+  }
+
+  /**
+   * Restore a claim whose synchronous stream reserve failed. The claimed
+   * metadata + fire timestamp are re-asserted in the UPDATE, so stale cleanup
+   * cannot put a row back after any later mutation.
+   */
+  restoreQueuedMessage(claim: QueuedMessageClaim): boolean {
+    const attempt = this.opened.tryWithConnectionSync(() => {
+      const result = this.opened.sqlite
+        .prepare(
+          `UPDATE chat_messages
+           SET metadata_json = ?, created_at = ?, updated_at = ?
+           WHERE id = ? AND session_id = ? AND role = 'user'
+             AND hidden_at IS NULL AND metadata_json = ? AND created_at = ?`
+        )
+        .run(
+          claim.original_metadata_json,
+          claim.original_created_at,
+          claim.original_updated_at,
+          claim.message_id,
+          claim.session_id,
+          claim.claimed_metadata_json,
+          claim.claimed_created_at
+        );
+      return result.changes === 1;
+    });
+    return attempt.acquired ? attempt.value : false;
+  }
+
+  /**
+   * Cancel a queued message by replacing `queued_at` with a durable canceled
+   * tombstone and hiding the row (RFC `queue / operating on queued messages`).
+   * Retaining the id + payload is load-bearing idempotency: a retry whose
+   * first response was lost cannot resurrect a message another window already
+   * canceled. Doubly guarded — the row must (a) belong to `sessionId` and
+   * (b) STILL carry the exact queued metadata snapshot, so cancel and fire
+   * serialize and a fired/recorded turn can never be hidden.
    */
   async deleteMessage(sessionId: string, messageId: string): Promise<void> {
-    const existing = await this.getMessage(messageId);
-    if (
-      !existing ||
-      existing.session_id !== sessionId ||
-      !isQueued(existing.metadata)
-    ) {
-      return;
-    }
-    await this.db.delete(chatParts).where(eq(chatParts.message_id, messageId));
-    await this.db.delete(chatMessages).where(eq(chatMessages.id, messageId));
+    await this.opened.withConnection(() => {
+      const existing = this.opened.sqlite
+        .prepare(
+          `SELECT metadata_json
+           FROM chat_messages
+           WHERE id = ? AND session_id = ? AND role = 'user' AND hidden_at IS NULL`
+        )
+        .get(messageId, sessionId) as { metadata_json: string } | undefined;
+      if (!existing) return;
+      const parsed = parseJsonOr(existing.metadata_json, null);
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        Array.isArray(parsed) ||
+        !isQueued(parsed as Record<string, unknown>)
+      ) {
+        return;
+      }
+      const metadata = { ...(parsed as Record<string, unknown>) };
+      const queuedAt = metadata.queued_at as number;
+      // Same legacy upgrade as the fire path: cancel removes `queued_at`, so copy
+      // its provenance before leaving the durable tombstone.
+      if (typeof metadata.queue_enqueued_at !== "number") {
+        metadata.queue_enqueued_at = queuedAt;
+      }
+      delete metadata.queued_at;
+      const now = Date.now();
+      metadata.queue_canceled_at = now;
+      // The one conditional UPDATE is atomic. If claim changed metadata after
+      // the read, this matches zero rows and the fired turn remains untouched.
+      this.opened.sqlite
+        .prepare(
+          `UPDATE chat_messages
+           SET metadata_json = ?, hidden_at = ?, updated_at = ?
+           WHERE id = ? AND session_id = ? AND role = 'user'
+             AND hidden_at IS NULL AND metadata_json = ?`
+        )
+        .run(
+          JSON.stringify(metadata),
+          now,
+          now,
+          messageId,
+          sessionId,
+          existing.metadata_json
+        );
+    });
   }
 
   /**
@@ -761,17 +1098,17 @@ export class SessionsStore {
       .from(chatMessages)
       .where(eq(chatMessages.session_id, sessionId))
       .orderBy(asc(chatMessages.created_at), asc(chatMessages.id));
-    // Queued sends (RFC `queue`) are PENDING, not history — a rewind must not
-    // touch them. A queued row's `created_at` is its (recent) enqueue time, so
-    // it sorts after the rewind target and the old code stamped `hidden_at` on
-    // it, which dropped it from `listQueuedMessages` forever (it requires
-    // `hidden_at IS NULL`) while its `queued_at` lingered → an unreclaimable
-    // lost message. Excluding them here keeps the pending queue invariant
-    // across a rewind.
-    const rows = allRows.filter(
-      (r) =>
-        !isQueued(parseJsonOr(r.metadata_json, {}) as Record<string, unknown>)
-    );
+    // Queued sends are PENDING, not history; canceled queue tombstones exist
+    // only for idempotency. A rewind must touch neither. A queued row's
+    // `created_at` sorts after the target, so hiding it would drop it from
+    // `listQueuedMessages` forever while leaving `queued_at` stranded.
+    const rows = allRows.filter((r) => {
+      const metadata = parseJsonOr(r.metadata_json, {}) as Record<
+        string,
+        unknown
+      >;
+      return !isQueued(metadata) && !isQueueCanceled(metadata);
+    });
     const targetIdx = rows.findIndex((r) => r.id === fromMessageId);
     if (targetIdx < 0) throw new MessageNotFoundError(fromMessageId);
 
@@ -841,7 +1178,15 @@ export class SessionsStore {
     await this.db
       .update(chatMessages)
       .set({ hidden_at: null, updated_at: now })
-      .where(and(eq(chatMessages.session_id, sessionId), boundary!));
+      .where(
+        and(
+          eq(chatMessages.session_id, sessionId),
+          boundary!,
+          // A canceled queue row is a durable idempotency tombstone, not a
+          // rewound turn. Un-rewind must never surface it as conversation.
+          sql`json_extract(${chatMessages.metadata_json}, '$.queue_canceled_at') IS NULL`
+        )
+      );
     await this.recomputeRollups(sessionId);
   }
 
@@ -1015,6 +1360,16 @@ export class SessionsStore {
     // Read the source transcript before opening the tx (keeps the tx short —
     // no long read while holding the write lock; see withTx).
     const source = await this.listVisibleMessages(opts.parent_session_id);
+    const forkPointIndex = source.findIndex(
+      (message) => message.id === opts.from_message_id
+    );
+    if (forkPointIndex < 0) {
+      // Raw message lookup also sees pending queue rows and canceled
+      // tombstones. Neither is conversation history, so neither can anchor a
+      // fork or cause the whole visible transcript to be copied accidentally.
+      throw new MessageNotFoundError(opts.from_message_id);
+    }
+    const sourceThroughForkPoint = source.slice(0, forkPointIndex + 1);
 
     // Atomic: the new session row and its copied messages/parts are one unit.
     // A crash mid-copy must not leave a fork session with a partial transcript
@@ -1036,7 +1391,7 @@ export class SessionsStore {
       });
 
       // Copy visible messages up to and including the fork point, in order.
-      for (const msg of source) {
+      for (const msg of sourceThroughForkPoint) {
         const newMsgId = newMessageId();
         await this.db.insert(chatMessages).values({
           id: newMsgId,
@@ -1061,7 +1416,6 @@ export class SessionsStore {
             updated_at: part.updated_at,
           });
         }
-        if (msg.id === opts.from_message_id) break;
       }
       return created;
     });
@@ -1262,6 +1616,59 @@ export class SessionsStore {
   }
 
   /**
+   * GRIDA-SEC-004 — read-only preflight for an approval continuation.
+   *
+   * A resume request must be able to validate all later fallible work (scratch
+   * staging, incoming persistence) BEFORE it consumes the approval. This
+   * predicate verifies that the exact visible pending approval exists without
+   * changing it; {@link answerApproval} remains the atomic commit.
+   */
+  async matchesPendingApproval(
+    sessionId: string,
+    answer: {
+      tool_call_id: string;
+      approval_id: string;
+    }
+  ): Promise<boolean> {
+    const rows = await this.db
+      .select({
+        data_json: chatParts.data_json,
+        tool_call_id: chatParts.tool_call_id,
+        tool_state: chatParts.tool_state,
+      })
+      .from(chatParts)
+      .innerJoin(chatMessages, eq(chatMessages.id, chatParts.message_id))
+      .where(
+        and(
+          eq(chatParts.session_id, sessionId),
+          eq(chatParts.tool_call_id, answer.tool_call_id),
+          eq(chatParts.tool_state, "approval-requested"),
+          isNull(chatMessages.hidden_at)
+        )
+      )
+      .limit(2);
+    // Parallel tool calls may legitimately leave several approvals pending.
+    // Require one exact correlated block; unrelated pending calls do not make
+    // this answer impossible, while duplicate identities still fail closed.
+    if (rows.length !== 1) return false;
+    const existing = rows[0];
+    if (
+      existing.tool_state !== "approval-requested" ||
+      existing.tool_call_id !== answer.tool_call_id
+    ) {
+      return false;
+    }
+    let data: Record<string, unknown> | null;
+    try {
+      data = JSON.parse(existing.data_json) as Record<string, unknown>;
+    } catch {
+      return false;
+    }
+    const approval = data?.approval as { id?: unknown } | undefined;
+    return approval?.id === answer.approval_id;
+  }
+
+  /**
    * GRIDA-SEC-004 — answer a PENDING tool approval (RFC `permission modes`,
    * Phase 2). The renderer may only ANSWER an approval the server actually
    * asked. This flips a persisted tool part to `approval-responded` ONLY when
@@ -1283,13 +1690,18 @@ export class SessionsStore {
     }
   ): Promise<boolean> {
     const rows = await this.db
-      .select()
+      .select({
+        id: chatParts.id,
+        data_json: chatParts.data_json,
+      })
       .from(chatParts)
+      .innerJoin(chatMessages, eq(chatMessages.id, chatParts.message_id))
       .where(
         and(
           eq(chatParts.session_id, sessionId),
           eq(chatParts.tool_call_id, answer.tool_call_id),
-          eq(chatParts.tool_state, "approval-requested")
+          eq(chatParts.tool_state, "approval-requested"),
+          isNull(chatMessages.hidden_at)
         )
       )
       .limit(1);
@@ -1318,20 +1730,75 @@ export class SessionsStore {
     // if two answers race past the read, only the first flips the row — the
     // second matches 0 rows and cannot overwrite the first decision. (No
     // transaction needed: the conditional write IS the serialization point.)
-    await this.db
-      .update(chatParts)
-      .set({
-        data_json: JSON.stringify(nextData),
-        tool_state: "approval-responded",
-        updated_at: Date.now(),
+    return this.opened.withConnection(() => {
+      const result = this.opened.sqlite
+        .prepare(
+          `UPDATE chat_parts
+           SET data_json = ?, tool_state = 'approval-responded', updated_at = ?
+           WHERE id = ? AND session_id = ? AND tool_state = 'approval-requested'
+             AND EXISTS (
+               SELECT 1
+               FROM chat_messages
+               WHERE chat_messages.id = chat_parts.message_id
+                 AND chat_messages.session_id = ?
+                 AND chat_messages.hidden_at IS NULL
+             )`
+        )
+        .run(
+          JSON.stringify(nextData),
+          Date.now(),
+          existing.id,
+          sessionId,
+          sessionId
+        );
+      return result.changes === 1;
+    });
+  }
+
+  /**
+   * GRIDA-SEC-004 — read-only preflight for a client-carried human-input
+   * result. The exact visible assistant message + tool call must still be a
+   * pending human-input tool. This lets the runtime validate/stage the request
+   * before {@link fillToolResult} commits the answer.
+   */
+  async canFillPendingHumanInputResult(
+    sessionId: string,
+    messageId: string,
+    toolCallId: string,
+    resultType: string
+  ): Promise<boolean> {
+    const rows = await this.db
+      .select({
+        message_id: chatParts.message_id,
+        tool_call_id: chatParts.tool_call_id,
+        tool_state: chatParts.tool_state,
+        type: chatParts.type,
       })
+      .from(chatParts)
+      .innerJoin(chatMessages, eq(chatMessages.id, chatParts.message_id))
       .where(
         and(
-          eq(chatParts.id, existing.id),
-          eq(chatParts.tool_state, "approval-requested")
+          eq(chatParts.session_id, sessionId),
+          eq(chatParts.message_id, messageId),
+          eq(chatParts.tool_call_id, toolCallId),
+          eq(chatParts.type, resultType),
+          eq(chatParts.tool_state, "input-available"),
+          inArray(chatParts.type, HUMAN_INPUT_PART_TYPES),
+          isNull(chatMessages.hidden_at)
         )
-      );
-    return true;
+      )
+      .limit(2);
+    if (rows.length !== 1) return false;
+    const pending = rows[0];
+    return (
+      pending.message_id === messageId &&
+      pending.tool_call_id === toolCallId &&
+      pending.type === resultType &&
+      pending.tool_state === "input-available" &&
+      HUMAN_INPUT_PART_TYPES.includes(
+        pending.type as (typeof HUMAN_INPUT_PART_TYPES)[number]
+      )
+    );
   }
 
   /**
@@ -1348,6 +1815,9 @@ export class SessionsStore {
    * conditional `WHERE` matches 0 rows and is a no-op). A missing row is also a
    * no-op, which keeps the server authoritative: the renderer can only supply a
    * result for a call the server delegated to it and is still waiting on.
+   * The incoming type must match, and only the terminal output/error is merged;
+   * persisted tool identity and input remain server-owned. Returns true iff
+   * the conditional fill committed.
    *
    * GRIDA-SEC-004: scoped by `sessionId` so a client-authored resend can only
    * fill a pending row in its OWN session — `message_id` already pins the
@@ -1358,23 +1828,97 @@ export class SessionsStore {
     messageId: string,
     toolCallId: string,
     result: { type: string; data: unknown; tool_state: string }
-  ): Promise<void> {
-    await this.db
-      .update(chatParts)
-      .set({
-        type: result.type,
-        data_json: JSON.stringify(result.data ?? null),
-        tool_state: result.tool_state,
-        updated_at: Date.now(),
-      })
-      .where(
-        and(
-          eq(chatParts.session_id, sessionId),
-          eq(chatParts.message_id, messageId),
-          eq(chatParts.tool_call_id, toolCallId),
-          eq(chatParts.tool_state, "input-available")
+  ): Promise<boolean> {
+    if (
+      result.tool_state !== "output-available" &&
+      result.tool_state !== "output-error"
+    ) {
+      return false;
+    }
+    return this.opened.withConnection(() => {
+      const existing = this.opened.sqlite
+        .prepare(
+          `SELECT id, type, data_json
+           FROM chat_parts
+           WHERE session_id = ?
+             AND message_id = ?
+             AND tool_call_id = ?
+             AND tool_state = 'input-available'
+             AND EXISTS (
+               SELECT 1
+               FROM chat_messages
+               WHERE chat_messages.id = chat_parts.message_id
+                 AND chat_messages.session_id = ?
+                 AND chat_messages.hidden_at IS NULL
+             )`
         )
-      );
+        .get(sessionId, messageId, toolCallId, sessionId) as
+        | { id: string; type: string; data_json: string }
+        | undefined;
+      if (!existing || existing.type !== result.type) return false;
+
+      const persistedData = parseJsonOr(existing.data_json, null);
+      const suppliedData = result.data;
+      if (
+        !persistedData ||
+        typeof persistedData !== "object" ||
+        Array.isArray(persistedData) ||
+        !suppliedData ||
+        typeof suppliedData !== "object" ||
+        Array.isArray(suppliedData)
+      ) {
+        return false;
+      }
+      const supplied = suppliedData as Record<string, unknown>;
+      const nextData: Record<string, unknown> = {
+        ...(persistedData as Record<string, unknown>),
+        state: result.tool_state,
+      };
+      if (result.tool_state === "output-available") {
+        if (!Object.hasOwn(supplied, "output")) return false;
+        nextData.output = supplied.output;
+        delete nextData.errorText;
+        delete nextData.error_text;
+      } else {
+        const errorText = supplied.errorText ?? supplied.error_text;
+        if (typeof errorText !== "string") return false;
+        nextData.errorText = errorText;
+        delete nextData.output;
+      }
+      const nextDataJson = JSON.stringify(nextData);
+      const updated = this.opened.sqlite
+        .prepare(
+          `UPDATE chat_parts
+           SET data_json = ?, tool_state = ?, updated_at = ?
+           WHERE id = ?
+             AND session_id = ?
+             AND message_id = ?
+             AND tool_call_id = ?
+             AND type = ?
+             AND tool_state = 'input-available'
+             AND data_json = ?
+             AND EXISTS (
+               SELECT 1
+               FROM chat_messages
+               WHERE chat_messages.id = chat_parts.message_id
+                 AND chat_messages.session_id = ?
+                 AND chat_messages.hidden_at IS NULL
+             )`
+        )
+        .run(
+          nextDataJson,
+          result.tool_state,
+          Date.now(),
+          existing.id,
+          sessionId,
+          messageId,
+          toolCallId,
+          existing.type,
+          existing.data_json,
+          sessionId
+        );
+      return updated.changes === 1;
+    });
   }
 
   /**
@@ -1391,10 +1935,12 @@ export class SessionsStore {
     const rows = await this.db
       .select({ id: chatParts.id })
       .from(chatParts)
+      .innerJoin(chatMessages, eq(chatMessages.id, chatParts.message_id))
       .where(
         and(
           eq(chatParts.session_id, sessionId),
-          eq(chatParts.tool_state, "approval-requested")
+          eq(chatParts.tool_state, "approval-requested"),
+          isNull(chatMessages.hidden_at)
         )
       )
       .limit(1);
@@ -1402,14 +1948,18 @@ export class SessionsStore {
   }
 
   /**
-   * Does this session have an UNANSWERED human-in-the-loop block? True iff a
-   * persisted tool part is awaiting a person — either a supervised approval
-   * (`approval-requested`) OR a human-input tool (e.g. `question`) paused at
-   * `input-available`. This is the authoritative drain-pause predicate (RFC
-   * `queue` § drain-pause): the queue waits while ANY such block is open, so a
-   * later turn never fires ahead of the user's pending decision.
+   * Classify this session's UNANSWERED human-in-the-loop block. A persisted
+   * supervised approval (`approval-requested`) maps to `approval`; a
+   * human-input tool (e.g. `question`) paused at `input-available` maps to
+   * `user-input`. `null` means no visible human block is open.
    *
-   * The `input-available` leg is keyed on the {@link HUMAN_INPUT_TOOL_NAMES}
+   * This is the authoritative, restart-durable source for both the projected
+   * session status and the drain-pause predicate (RFC `queue` § drain-pause):
+   * the queue waits while either class is open, so a later turn never fires
+   * ahead of the user's pending decision. If malformed history contains both,
+   * approval wins; either result still keeps the session safely blocked.
+   *
+   * The `input-available` leg is keyed on the {@link HUMAN_INPUT_PART_TYPES}
    * *trait*, NOT a literal name — a future richer human-block tool joins by
    * being added to that set. The trait clause is REQUIRED to distinguish a real
    * human block from a *transient* client-resolved fs call (which also sits at
@@ -1423,9 +1973,14 @@ export class SessionsStore {
    * gate would keep returning `human-input-pending` for a prompt the user can no
    * longer see (the same visibility rule as `listVisibleMessages`).
    */
-  async hasPendingHumanInput(sessionId: string): Promise<boolean> {
+  async pendingHumanInputKind(
+    sessionId: string
+  ): Promise<"approval" | "user-input" | null> {
     const rows = await this.db
-      .select({ id: chatParts.id })
+      .select({
+        type: chatParts.type,
+        tool_state: chatParts.tool_state,
+      })
       .from(chatParts)
       .innerJoin(chatMessages, eq(chatMessages.id, chatParts.message_id))
       .where(
@@ -1440,9 +1995,20 @@ export class SessionsStore {
             )
           )
         )
-      )
-      .limit(1);
-    return rows.length > 0;
+      );
+    if (rows.some((row) => row.tool_state === "approval-requested")) {
+      return "approval";
+    }
+    return rows.length > 0 ? "user-input" : null;
+  }
+
+  /**
+   * Does this session have any unanswered human-in-the-loop block?
+   * Compatibility predicate for admission checks; classification lives in
+   * {@link pendingHumanInputKind} so status and admission cannot drift.
+   */
+  async hasPendingHumanInput(sessionId: string): Promise<boolean> {
+    return (await this.pendingHumanInputKind(sessionId)) !== null;
   }
 
   /**
@@ -1516,6 +2082,15 @@ export class MessageNotFoundError extends Error {
   constructor(public readonly id: string) {
     super(`message not found: ${id}`);
     this.name = "MessageNotFoundError";
+  }
+}
+
+/** A client-minted queue id already names a different durable payload. */
+export class QueueMessageConflictError extends Error {
+  readonly code = "queue_message_conflict" as const;
+  constructor(public readonly id: string) {
+    super(`queued message id already exists with a different payload: ${id}`);
+    this.name = "QueueMessageConflictError";
   }
 }
 
@@ -1623,6 +2198,73 @@ function rowToPart(row: ChatPartDbRow): ChatPartRow {
   };
 }
 
+/**
+ * Validate an enqueue retry against the durable row behind its idempotency
+ * key. `queued_at` may be absent because the scheduler can fire the row before
+ * a lost-response retry arrives; that is still the same completed operation.
+ */
+function isSameQueuedMessageRequest(
+  message: ChatMessageDbRow,
+  parts: ChatPartDbRow[],
+  sessionId: string,
+  text: string,
+  requestedQueuedAt: number | undefined
+): boolean {
+  if (message.session_id !== sessionId || message.role !== "user") return false;
+  if (parts.length !== 1) return false;
+
+  const metadata = parseJsonOr(message.metadata_json, null);
+  if (
+    metadata === null ||
+    typeof metadata !== "object" ||
+    Array.isArray(metadata)
+  ) {
+    return false;
+  }
+  const durableMetadata = metadata as Record<string, unknown>;
+  const durableQueuedAt = durableMetadata.queued_at;
+  const durableEnqueuedAt = durableMetadata.queue_enqueued_at;
+  if (
+    durableQueuedAt !== undefined &&
+    (typeof durableQueuedAt !== "number" || !Number.isFinite(durableQueuedAt))
+  ) {
+    return false;
+  }
+  if (
+    durableEnqueuedAt !== undefined &&
+    (typeof durableEnqueuedAt !== "number" ||
+      !Number.isFinite(durableEnqueuedAt))
+  ) {
+    return false;
+  }
+  // New rows retain queue_enqueued_at after fire/cancel. A still-queued legacy
+  // row proves provenance through queued_at; once fired, a legacy row cannot be
+  // distinguished from an ordinary direct user row and therefore fails closed.
+  const provenanceAt =
+    typeof durableEnqueuedAt === "number"
+      ? durableEnqueuedAt
+      : typeof durableQueuedAt === "number"
+        ? durableQueuedAt
+        : undefined;
+  if (
+    provenanceAt === undefined ||
+    (requestedQueuedAt !== undefined && provenanceAt !== requestedQueuedAt)
+  ) {
+    return false;
+  }
+
+  const part = parts[0];
+  return (
+    part.message_id === message.id &&
+    part.session_id === sessionId &&
+    part.index === 0 &&
+    part.type === "text" &&
+    part.data_json === JSON.stringify({ type: "text", text }) &&
+    part.tool_call_id === null &&
+    part.tool_state === null
+  );
+}
+
 function parseJsonOr<T>(raw: string | null, fallback: T): unknown | T {
   if (raw === null) return fallback;
   try {
@@ -1636,12 +2278,19 @@ function parseJsonOr<T>(raw: string | null, fallback: T): unknown | T {
  * A message is QUEUED — pending, held out of the transcript AND the model
  * view until it fires — iff its metadata carries a numeric `queued_at`
  * (RFC `queue`). This is the single source of the queue-visibility rule:
- * every list filter and the dequeue/cancel guards route through it so they
+ * every list filter and the claim/cancel guards route through it so they
  * can never disagree about what counts as queued (e.g. on the `queued_at: 0`
  * boundary).
  */
 function isQueued(metadata: Record<string, unknown> | undefined): boolean {
   return typeof metadata?.queued_at === "number";
+}
+
+/** Durable tombstone left by queue cancel so an enqueue retry cannot revive it. */
+function isQueueCanceled(
+  metadata: Record<string, unknown> | undefined
+): boolean {
+  return typeof metadata?.queue_canceled_at === "number";
 }
 
 function clampLimit(raw: number | undefined): number {

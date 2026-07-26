@@ -40,10 +40,12 @@ export type SecretsRoutesDeps = {
   /** When present, ids of configured endpoint providers are also allowed
    *  (a keyed self-hosted gateway stores its key under its endpoint id). */
   endpoints?: EndpointProvidersStore;
+  /** Trusted host edge after a provider credential is successfully stored. */
+  on_provider_ready?: () => void;
 };
 
 export function registerSecretsRoutes(app: Hono, deps: SecretsRoutesDeps) {
-  const { store, endpoints } = deps;
+  const { store, endpoints, on_provider_ready } = deps;
 
   const allowedProviderId = async (
     id: string
@@ -81,6 +83,7 @@ export function registerSecretsRoutes(app: Hono, deps: SecretsRoutesDeps) {
     }
     await store.set(r.data.provider_id, r.data.key);
     console.log(`[agent-host-secrets] set providerId=${r.data.provider_id}`);
+    on_provider_ready?.();
     return c.json({ ok: true });
   });
 

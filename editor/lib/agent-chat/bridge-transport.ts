@@ -52,8 +52,19 @@ export type DesktopAgentTransportOptions = Partial<
    * failure, or consumer cancel). Reporting ONLY: the transport never asks
    * permission and never vetoes — ownership decisions live in the owner.
    */
-  onStreamOpen?: () => void;
-  onStreamSettle?: () => void;
+  /**
+   * `onStreamOpen` may return an opaque ownership lease. The reporter passes it
+   * back to `onStreamSettle`, allowing an owner to ignore a late settlement
+   * from a superseded session binding.
+   */
+  onStreamOpen?: () => unknown;
+  onStreamSettle?: (lease?: unknown) => void;
+  /**
+   * Whether this transport still belongs to the selected chat binding. Checked
+   * after every pre-I/O await and before renderer callbacks, so a superseded
+   * Chat cannot act on the newly selected session.
+   */
+  isCurrentBinding?: () => boolean;
 };
 
 export namespace desktopAgentTransport {
@@ -80,11 +91,14 @@ export namespace desktopAgentTransport {
         // one compare when fresh, and it NEVER throws — hosted AI
         // degrading must never break a BYOK run.
         await gridaGateway.ensureFresh();
+        if (defaults.isCurrentBinding?.() === false) {
+          return closedMessageStream();
+        }
         const body = readBodyOptions(options.body);
         if (body.session_id) liveSessionId = body.session_id;
         // Backfill the live renderer context (model/provider/mode/surface) so a
         // body-less auto-resubmit still carries it; explicit `body` fields win.
-        const { runContext, ...restDefaults } = defaults;
+        const { runContext, isCurrentBinding, ...restDefaults } = defaults;
         const context = runContext?.() ?? {};
         return streamFromBridge({
           ...restDefaults,
@@ -99,6 +113,7 @@ export namespace desktopAgentTransport {
           // one. The explicit per-send `body.session_id` still wins.
           session_id: body.session_id ?? liveSessionId ?? defaults.session_id,
           onSessionId: trackSessionId,
+          isCurrentBinding,
           messages: options.messages,
           abortSignal: options.abortSignal,
         });
@@ -109,10 +124,12 @@ export namespace desktopAgentTransport {
         // send (no in-flight run to reconnect to anyway).
         const sessionId = liveSessionId ?? options?.chatId;
         if (!sessionId) return null;
+        if (defaults.isCurrentBinding?.() === false) return null;
         return await reconnectFromBridge(sessionId, {
           onResumeStart: defaults.onResumeStart,
           onStreamOpen: defaults.onStreamOpen,
           onStreamSettle: defaults.onStreamSettle,
+          isCurrentBinding: defaults.isCurrentBinding,
         });
       },
     };
@@ -124,8 +141,9 @@ function streamFromBridge(
     messages: UIMessage[];
     abortSignal?: AbortSignal;
     onSessionId?: (sessionId: string) => void;
-    onStreamOpen?: () => void;
-    onStreamSettle?: () => void;
+    onStreamOpen?: () => unknown;
+    onStreamSettle?: (lease?: unknown) => void;
+    isCurrentBinding?: () => boolean;
   }
 ): ReadableStream<UIMessageChunk> {
   let sessionId: string | null = opts.session_id ?? null;
@@ -137,6 +155,11 @@ function streamFromBridge(
 
   return new ReadableStream<UIMessageChunk>({
     async start(controller) {
+      if (opts.isCurrentBinding?.() === false) {
+        settled = true;
+        controller.close();
+        return;
+      }
       reporter.open();
       const close = () => {
         if (settled) return;
@@ -190,9 +213,17 @@ function streamFromBridge(
             scratch_seed: opts.scratch_seed,
           },
           (chunk: AgentUIMessageChunk) => {
-            if (!settled) controller.enqueue(chunk);
+            if (!settled && opts.isCurrentBinding?.() !== false) {
+              controller.enqueue(chunk);
+            }
           }
         );
+        if (opts.isCurrentBinding?.() === false) {
+          opts.abortSignal?.removeEventListener("abort", abort);
+          void handle.done.catch(() => undefined);
+          close();
+          return;
+        }
         sessionId = handle.sessionId || sessionId;
         if (handle.sessionId && opts.onSessionId) {
           try {
@@ -234,14 +265,15 @@ function streamFromBridge(
  * Reporting must never break the stream — both swallow throws.
  */
 function makeStreamReporter(hooks?: {
-  onStreamOpen?: () => void;
-  onStreamSettle?: () => void;
+  onStreamOpen?: () => unknown;
+  onStreamSettle?: (lease?: unknown) => void;
 }): { open: () => void; settle: () => void } {
   let settled = false;
+  let lease: unknown;
   return {
     open() {
       try {
-        hooks?.onStreamOpen?.();
+        lease = hooks?.onStreamOpen?.();
       } catch {
         /* reporting must never break the stream */
       }
@@ -250,7 +282,7 @@ function makeStreamReporter(hooks?: {
       if (settled) return;
       settled = true;
       try {
-        hooks?.onStreamSettle?.();
+        hooks?.onStreamSettle?.(lease);
       } catch {
         /* reporting must never break the stream */
       }
@@ -272,17 +304,25 @@ async function reconnectFromBridge(
   chatId: string,
   hooks?: {
     onResumeStart?: () => void;
-    onStreamOpen?: () => void;
-    onStreamSettle?: () => void;
+    onStreamOpen?: () => unknown;
+    onStreamSettle?: (lease?: unknown) => void;
+    isCurrentBinding?: () => boolean;
   }
 ): Promise<ReadableStream<UIMessageChunk> | null> {
+  if (hooks?.isCurrentBinding?.() === false) return null;
   const queue: AgentUIMessageChunk[] = [];
   let downstream: ReadableStreamDefaultController<UIMessageChunk> | null = null;
 
-  const handle = await ai.reconnectAgentRun(chatId, 0, (chunk) =>
-    downstream ? downstream.enqueue(chunk) : queue.push(chunk)
-  );
+  const handle = await ai.reconnectAgentRun(chatId, 0, (chunk) => {
+    if (hooks?.isCurrentBinding?.() === false) return;
+    if (downstream) downstream.enqueue(chunk);
+    else queue.push(chunk);
+  });
   if (!handle) return null;
+  if (hooks?.isCurrentBinding?.() === false) {
+    void handle.done.catch(() => undefined);
+    return null;
+  }
 
   // Attach-owner reporting: a non-null handle IS a live attach (a null one
   // never opened — no report). Settle exactly once on done/error/cancel.
@@ -323,6 +363,14 @@ async function reconnectFromBridge(
       // Consumer stopped reading (stream-replace / unmount): a detach, and
       // the owner must see the slot free again.
       reporter.settle();
+    },
+  });
+}
+
+function closedMessageStream(): ReadableStream<UIMessageChunk> {
+  return new ReadableStream<UIMessageChunk>({
+    start(controller) {
+      controller.close();
     },
   });
 }

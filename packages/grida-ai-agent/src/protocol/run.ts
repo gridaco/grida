@@ -75,8 +75,9 @@ export const SCRATCH_SEED_LIMITS = Object.freeze({
  * The server is the single source of truth for message state, so the answer
  * never needs to be SDK-part-shaped on the wire: the host validates it against
  * the persisted pending approval (`store.answerApproval`) before rebuilding the
- * model view. A forged answer (unknown call, wrong id, already-answered) is a
- * silent no-op.
+ * model view. The store mutation is a silent no-op for an unknown call, wrong
+ * id, or already-answered approval; the run endpoint turns that failed match
+ * into `409 approval-answer-invalid` and starts no turn.
  */
 export type ApprovalAnswer = {
   tool_call_id: string;

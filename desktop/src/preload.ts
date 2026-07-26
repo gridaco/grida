@@ -617,17 +617,28 @@ const bridge: DesktopBridge = {
       const subscriptionId = crypto.randomUUID();
       const controller = new AbortController();
       statusSubs.set(subscriptionId, controller);
-      const { done } = await agentClient.sessions.subscribe_status(
-        id,
-        onStatus,
-        { signal: controller.signal }
-      );
-      return {
-        subscription_id: subscriptionId,
-        done: done.finally(() => {
+      try {
+        const { done } = await agentClient.sessions.subscribe_status(
+          id,
+          onStatus,
+          { signal: controller.signal }
+        );
+        return {
+          subscription_id: subscriptionId,
+          done: done.finally(() => {
+            statusSubs.delete(subscriptionId);
+          }),
+        };
+      } catch (err) {
+        // `useSessionStatus` reconnects indefinitely. A failed handshake has
+        // no `done` promise whose finally can clean this registry entry, so
+        // release it here or every retry leaks one controller in preload.
+        if (statusSubs.get(subscriptionId) === controller) {
           statusSubs.delete(subscriptionId);
-        }),
-      };
+        }
+        controller.abort();
+        throw err;
+      }
     },
     unsubscribe_status: async (subscriptionId) => {
       const controller = statusSubs.get(subscriptionId);

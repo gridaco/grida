@@ -8,6 +8,7 @@
  */
 
 import crypto from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { models } from "@grida/ai-models";
 import {
   SCRATCH_SEED_LIMITS,
@@ -37,6 +38,8 @@ import {
   type UserDirectoryReferencesData,
   type UserFileAttachmentsData,
 } from "../protocol/context";
+import { HUMAN_INPUT_PART_TYPES } from "../tools/names";
+import { isValidHumanInputResultPart } from "../tools/human-input-result";
 // Neutral (no node/SDK) import — just the synthetic-model-id contract.
 import { isAgentProviderModel } from "../agent-provider/types";
 import { AgentSurface } from "../surface";
@@ -249,8 +252,9 @@ export async function parseRunBody(
     // advertised exactly where it can be answered (client-resolved, like fs).
     library: typeof b.library === "boolean" ? b.library : undefined,
     // A malformed approval answer is treated as absent (no resume), never a
-    // 400 — and `store.answerApproval` re-validates it against the persisted
-    // pending approval regardless, so a forged answer is a no-op.
+    // 400. A well-formed answer is still matched against the persisted pending
+    // approval; the runtime rejects the request when that authoritative match
+    // returns false.
     approval_answer: coerceApprovalAnswer(b.approval_answer),
     scratch_seed: scratchSeed.value,
     directory_scopes: directoryReferences.value,
@@ -492,19 +496,39 @@ async function isRegisteredModelId(
 }
 
 /**
- * The id of the user message a direct `/agent/run` fires — the LAST
- * user-role message of the incoming array (the AI SDK client resends the
- * full history each turn; the tail is the new message). This is the
- * fired-message identity the `turn-started` lifecycle event carries (RFC
- * `turn-authority`). `undefined` when the array holds no user message.
+ * The id of the user message a direct `/agent/run` fires — only when the
+ * incoming array's TAIL is a user message. The AI SDK client resends full
+ * history, so scanning backward for any user would mislabel an
+ * approval/question continuation (whose assistant tool result is the tail)
+ * with an older user row. This is the fired-message identity the
+ * `turn-started` lifecycle event and busy status carry (RFC `turn-authority`).
  */
-export function extractLastUserMessageId(
+export function extractTailUserMessageId(
   msgs: NormalizedMessage[]
 ): string | undefined {
-  for (let i = msgs.length - 1; i >= 0; i -= 1) {
-    if (msgs[i].role === "user") return msgs[i].id;
-  }
-  return undefined;
+  const tail = msgs.at(-1);
+  return tail?.role === "user" ? tail.id : undefined;
+}
+
+/**
+ * Whether a human-input continuation introduces caller-owned history that
+ * does not already belong to this session. Resumes may resend previously
+ * persisted history, but they must not smuggle a new user or system message
+ * into the blocked turn. Check every non-assistant row rather than trusting
+ * client ordering so a crafted assistant tail cannot hide one earlier in the
+ * array.
+ */
+export async function hasUnpersistedCallerMessage(
+  store: SessionsStore,
+  sessionId: string,
+  incoming: NormalizedMessage[]
+): Promise<boolean> {
+  const callerOwnedIds = incoming
+    .filter((message) => message.role !== "assistant")
+    .map((message) => message.id);
+  if (callerOwnedIds.length === 0) return false;
+  const persisted = new Set(await store.listMessageIds(sessionId));
+  return callerOwnedIds.some((id) => !persisted.has(id));
 }
 
 export function extractFirstUserText(msgs: NormalizedMessage[]): string {
@@ -542,7 +566,8 @@ export function extractLastUserText(msgs: NormalizedMessage[]): string {
 export async function persistIncomingTail(
   store: SessionsStore,
   sessionId: string,
-  incoming: NormalizedMessage[]
+  incoming: NormalizedMessage[],
+  options: { resolveAssistantToolResults?: boolean } = {}
 ): Promise<void> {
   // Ids already persisted for this session. The AI SDK client resends
   // the full history with stable ids every turn, so most incoming ids
@@ -559,7 +584,9 @@ export async function persistIncomingTail(
       // arrives only on the next request's assistant message. Fill just those
       // into the existing (recorder-written) tool row so the server-authoritative
       // model view (`buildModelMessages`) stops dropping the call as incomplete.
-      await persistResolvedToolResults(store, sessionId, m);
+      if (options.resolveAssistantToolResults !== false) {
+        await persistResolvedToolResults(store, sessionId, m);
+      }
       continue;
     }
     if (seen.has(m.id)) continue;
@@ -579,65 +606,139 @@ export async function persistIncomingTail(
 }
 
 /**
- * Fill the CLIENT-resolved tool results carried on an incoming assistant
- * message into their existing (recorder-written) rows — see
- * {@link SessionsStore.fillToolResult} for the in-place, never-overwrite,
- * never-reindex semantics. Only terminal tool parts
- * (`output-available` / `output-error`) are considered; non-tool parts (text,
- * reasoning) and already-resolved rows are left to the recorder.
- *
- * GRIDA-SEC-004: the loopback's trusted renderer supplies a result only for a
- * call the server delegated to it and is still waiting on (the `WHERE
- * tool_state = 'input-available'` guard); it cannot inject or rewrite anything
- * else.
- */
-/**
  * Fill any CLIENT-resolved tool results carried on the incoming tail's
  * assistant messages — the in-place fill from {@link persistResolvedToolResults}
  * applied across the whole batch.
  *
- * Called BEFORE the pending-human-input guard (`runtime/index.ts`): a
- * client-resolved answer rides the message tail (unlike a supervised approval,
- * which arrives as an explicit `approval_answer` body field applied even
- * earlier). The locked `question` tool is the case that needs this — its answer
- * is a terminal `output-available` part in the tail, and it must clear the
- * session's human-input block BEFORE the guard, or the very POST that carries
- * the answer would be refused by the guard it resolves. Idempotent: the later
- * {@link persistIncomingTail} re-runs the same fill (a no-op once the row is
- * already terminal) and still appends any new user message.
+ * Called only after the request's fallible validation, scratch staging, and
+ * non-assistant persistence have succeeded. Human-input results are never
+ * consumed by this generic pass: the runtime preflights one exact correlated
+ * result and commits only that result immediately before turn start. This
+ * remains retry-safe when a model emitted parallel human-input calls.
+ *
+ * GRIDA-SEC-004: the renderer can supply a result only for a call the server
+ * delegated to it and is still waiting on (the store's
+ * `tool_state = 'input-available'` guard); it cannot inject or rewrite any
+ * other assistant history.
  */
 export async function fillIncomingToolResults(
   store: SessionsStore,
   sessionId: string,
-  incoming: NormalizedMessage[]
+  incoming: NormalizedMessage[],
+  options: {
+    exclude?: { messageId: string; toolCallId: string };
+  } = {}
 ): Promise<void> {
   for (const m of incoming) {
     if (m.role === "assistant") {
-      await persistResolvedToolResults(store, sessionId, m);
+      await persistResolvedToolResults(store, sessionId, m, options.exclude, {
+        skipHumanInput: true,
+      });
     }
   }
+}
+
+export type IncomingHumanInputResult = {
+  messageId: string;
+  toolCallId: string;
+  toolState: "output-available" | "output-error";
+  part: AgentRunMessagePart;
+};
+
+/**
+ * Read-only preflight for client-carried human-input answers. Returns every
+ * distinct terminal assistant tool identity that names an exact visible
+ * `input-available` human block persisted by the server. Deeply equivalent
+ * wire history for the same `(message, tool call)` is one answer;
+ * conflicting terminal copies are malformed and return `null`. The runtime
+ * accepts exactly one distinct match per continuation request; malformed, zero,
+ * or multiple matches fail closed before any mutation. This prevents a batched
+ * or ambiguous answer from being half-consumed.
+ */
+export async function findIncomingHumanInputResults(
+  store: SessionsStore,
+  sessionId: string,
+  incoming: NormalizedMessage[]
+): Promise<IncomingHumanInputResult[] | null> {
+  const matches: IncomingHumanInputResult[] = [];
+  const seen = new Map<string, AgentRunMessagePart>();
+  for (const message of incoming) {
+    if (message.role !== "assistant") continue;
+    for (const part of message.parts) {
+      const toolCallId = toolCallIdOf(part);
+      if (toolCallId === null || !isResolvedToolPart(part)) continue;
+      if (
+        await store.canFillPendingHumanInputResult(
+          sessionId,
+          message.id,
+          toolCallId,
+          part.type
+        )
+      ) {
+        const humanInputPart = part as AgentRunMessagePart & {
+          type: (typeof HUMAN_INPUT_PART_TYPES)[number];
+          state: "output-available" | "output-error";
+        };
+        if (!isValidHumanInputResultPart(humanInputPart)) return null;
+
+        const identity = `${message.id}\u0000${toolCallId}`;
+        const prior = seen.get(identity);
+        if (prior) {
+          if (!isDeepStrictEqual(prior, part)) return null;
+          continue;
+        }
+        seen.set(identity, part);
+        matches.push({
+          messageId: message.id,
+          toolCallId,
+          toolState: part.state,
+          part,
+        });
+      }
+    }
+  }
+  return matches;
 }
 
 async function persistResolvedToolResults(
   store: SessionsStore,
   sessionId: string,
-  message: NormalizedMessage
+  message: NormalizedMessage,
+  exclude?: { messageId: string; toolCallId: string },
+  options: { skipHumanInput?: boolean } = {}
 ): Promise<void> {
   for (const part of message.parts) {
     const toolCallId = toolCallIdOf(part);
     if (toolCallId === null || !isResolvedToolPart(part)) continue;
+    if (
+      options.skipHumanInput &&
+      HUMAN_INPUT_PART_TYPES.includes(
+        part.type as (typeof HUMAN_INPUT_PART_TYPES)[number]
+      )
+    ) {
+      continue;
+    }
+    if (
+      exclude?.messageId === message.id &&
+      exclude.toolCallId === toolCallId
+    ) {
+      continue;
+    }
     await store.fillToolResult(sessionId, message.id, toolCallId, {
       type: part.type,
       data: part,
-      // `isResolvedToolPart` already verified this is a terminal-state string.
-      tool_state: (part as { state?: unknown }).state as string,
+      tool_state: part.state,
     });
   }
 }
 
 /** A terminal tool part — the only assistant part a client authors that the
  *  model stream never carried. */
-function isResolvedToolPart(part: AgentRunMessagePart): boolean {
+function isResolvedToolPart(
+  part: AgentRunMessagePart
+): part is AgentRunMessagePart & {
+  state: "output-available" | "output-error";
+} {
   if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") {
     return false;
   }
@@ -661,18 +762,19 @@ function toolCallIdOf(part: AgentRunMessagePart): string | null {
  * never has to be SDK-part-shaped on the wire. This routes it through
  * `store.answerApproval`, which flips the persisted part to `approval-responded`
  * ONLY if it was a real pending approval with a matching id + session. A forged
- * answer (unknown call, wrong id, already answered) is a silent no-op: the
- * client can only answer what the server already asked.
+ * answer (unknown call, wrong id, already answered) returns false: the runtime
+ * rejects that request before starting a turn. The client can only answer what
+ * the server already asked.
  */
 export async function applyApprovalAnswer(
   store: SessionsStore,
   sessionId: string,
   answer: ApprovalAnswer
-): Promise<void> {
+): Promise<boolean> {
   // Pass the answer straight through — `ApprovalAnswer` IS the `answerApproval`
   // param shape. A field-by-field rebuild here would silently drop any field
   // later added to `ApprovalAnswer`; relaying the object keeps the two in lock-step.
-  await store.answerApproval(sessionId, answer);
+  return store.answerApproval(sessionId, answer);
 }
 
 /** Narrow an untrusted body value to an {@link ApprovalAnswer}, or `undefined`
