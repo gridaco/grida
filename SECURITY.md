@@ -548,12 +548,13 @@ client-mutated assistant message — it travels as an explicit `approval_answer`
 field on the run-request body (`{tool_call_id, approval_id, approved}`), exactly
 like `mode`/`model_id`. `parseRunBody` shape-gates it (`coerceApprovalAnswer`;
 malformed ⇒ no resume, never a 400), then `applyApprovalAnswer`
-(`runtime/run-input.ts`) routes it through `store.answerApproval`, which flips a
-persisted part to `approval-responded` **only if** it is currently
-`approval-requested` with a matching approval id and session. A forged client
-request therefore cannot inject a tool call, approve something never asked, or
-rewrite assistant history — it can only supply the boolean the host is already
-waiting on. The recorder persists the `approval-requested` state and the
+(`runtime/run-input.ts`) routes it through
+`store.commitApprovalContinuation`, which atomically flips a persisted part to
+`approval-responded` and binds its exact consuming run **only if** it is
+currently `approval-requested` with a matching approval id and session. A
+forged client request therefore cannot inject a tool call, approve something
+never asked, or rewrite assistant history — it can only supply the boolean the
+host is already waiting on. The recorder persists the `approval-requested` state and the
 model-view rebuild (`message-view.ts`) lowers `approval-responded`/`output-denied`
 parts so the SDK resumes (runs) or skips (denies) the call. Symmetrically, a send
 that does **not** answer the pending approval cannot run _ahead_ of it: the run
@@ -569,22 +570,23 @@ human-input continuation resolves exactly one correlated block; a batch naming
 multiple pending blocks is rejected before mutation rather than partially
 consumed, conflicting duplicate copies fail closed, and a question or
 design-search result must satisfy that tool's canonical output schema before
-the pending block can be consumed. Approval/question resolution is a two-phase commit:
-the read-only match happens first, but the conditional persisted-state mutation
-waits until scratch staging and incoming persistence succeed. A rejected resume
-therefore leaves the human interaction actionable and safely retryable.
-For a question/design-search result, that conditional mutation atomically
-stamps a host-only `continuation_run_id` on the exact
+the pending block can be consumed. Approval/question resolution is a two-phase
+commit: the read-only match happens first, but the conditional persisted-state
+mutation waits until scratch staging and incoming persistence succeed. A
+rejected resume therefore leaves the human interaction actionable and safely
+retryable. For an approval or question/design-search result, that conditional
+mutation atomically stamps a host-only `continuation_run_id` on the exact
 session/message/tool-call row. The marker remains through the resumed turn and
 is cleared only after the recorder settles inside the stream's
 finish/error/abort barrier, before the scheduler can observe the terminal edge.
-A synchronous failure before stream reservation rolls that exact run's result
-back to `input-available`; a failed rollback or settlement leaves the marker
-fail-closed in the human-input classifier, so queued work cannot overtake it.
-On host restart, marked continuations are converted to `output-error` and
-cleared before queue recovery because replaying their model/tool side effects
-would be unsafe. Historical completed human-input outputs have a null marker
-and are never selected by that repair.
+A synchronous failure before stream reservation rolls that exact run's answer
+back to `approval-requested` or `input-available`; a failed rollback or
+settlement leaves the marker fail-closed in the human-input classifier, so
+queued work cannot overtake it. On host restart, marked continuations are
+converted to `output-error` and cleared before queue recovery because replaying
+their model/tool side effects would be unsafe. Historical completed
+human-interaction outputs have a null marker and are never selected by that
+repair.
 Ordinary desktop submissions use
 queue-aware admission while this state is open; if a stale client races the
 low-level run endpoint, it preserves the same user-message id through durable
@@ -808,11 +810,11 @@ Today:
 - [packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts](packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts) — opened workspace to agent fs/todos/command bindings; wires the `accept-edits` supervised-approval predicate. The session scratch dir is wired as an additional sanctioned root for BOTH surfaces from one source (`deps.scratch_dir`): the shell's allowed cwd roots AND the fs backend's reachable roots (so `view_image`/`read_file`/`write_file` reach scratch, not just the shell). Containment is preserved per root — a path under no reachable root falls back contained to the workspace, and the secrets root is never a reachable root. Also builds the `generate_image` binding: it reads BYOK keys via `SecretsStore` to call the image provider in-process and returns the saved scratch path + metadata + base64 `data` (the bytes are for the CLIENT to render; `AgentGen.toModelOutput` is text-only, so they are NEVER lowered to the model — no context bloat, no perception claim). The complementary `view_image` perception path DOES deliver bytes to the model, but only ones already read under the agent's existing fs read capability: `agent/hoist-tool-result-images.ts` (wired at `agent/index.ts` `prepareStep`, #923) relocates an image tool-result into a synthetic user-message image part so the model can actually see it on the openai-compatible wire — a model-view lowering that moves bytes already inside the prompt, never persisted, with no new read, no new egress, and no boundary change. The key never leaves the host, and the call omits `providerOptions.grida` so it is BYOK-paid, never Grida-billed (mirrors the `/images/generate` route).
 - [packages/grida-ai-agent/src/session/scratch.ts](packages/grida-ai-agent/src/session/scratch.ts) — per-session ephemeral scratch dir (WG `scratch.md`): asserts the shell-writable scratch tree sits OUTSIDE `userData` (the secret root), creates it owner-only (`0700`), and reclaims it (per-session delete + synchronous host-start sweep). `writeScratchFile` lands produced bytes (e.g. `generate_image`) owner-only (`0600`) within the session tree, rejecting any filename that is not a single safe path segment AND opening `O_NOFOLLOW` so a symlink planted at the basename (e.g. by an auto-approved scratch-cwd `run_command`) fails the write instead of redirecting it outside the tree — closing the lexical-check TOCTOU.
 - [packages/grida-daemon/src/path-contains.ts](packages/grida-daemon/src/path-contains.ts) — shared `path.sep`-prefix containment used by the shell runner's workspace/secret-root gates, the scratch containment assert, and `createProject`'s managed-root assert (one source so the discipline can't drift).
-- [packages/grida-ai-agent/src/runtime/run-input.ts](packages/grida-ai-agent/src/runtime/run-input.ts) and [tools/human-input-result.ts](packages/grida-ai-agent/src/tools/human-input-result.ts) — wire-message normalization + `coerceApprovalAnswer`/`applyApprovalAnswer` (shape-gates the explicit `approval_answer` body field and routes it to `store.answerApproval`), plus exact correlation and canonical output-schema validation before a renderer-authored question/design-search result can consume a pending interaction.
+- [packages/grida-ai-agent/src/runtime/run-input.ts](packages/grida-ai-agent/src/runtime/run-input.ts) and [tools/human-input-result.ts](packages/grida-ai-agent/src/tools/human-input-result.ts) — wire-message normalization + `coerceApprovalAnswer`/`applyApprovalAnswer` (shape-gates the explicit `approval_answer` body field and atomically binds a valid answer to its exact consuming run), plus exact correlation and canonical output-schema validation before a renderer-authored question/design-search result can consume a pending interaction.
 - [packages/grida-ai-agent/src/protocol/context.ts](packages/grida-ai-agent/src/protocol/context.ts) — renderer-safe, persistable directory-reference descriptor vocabulary; the virtual path and read-only access are fixed by the host contract, while the descriptor itself carries no authority.
 - [packages/grida-ai-agent/src/session/directory-scopes.ts](packages/grida-ai-agent/src/session/directory-scopes.ts) and [its contract tests](packages/grida-ai-agent/src/session/directory-scopes.test.ts) — in-memory pending/session grant registry: realpath canonicalization, protected-root overlap refusal, bounded one-shot acquisition, exact atomic claim, exclusive session ownership, and lifecycle revocation.
 - [packages/grida-ai-agent/src/http/routes/directory-scopes.ts](packages/grida-ai-agent/src/http/routes/directory-scopes.ts) and [its perimeter tests](packages/grida-ai-agent/src/http/routes/directory-scopes.test.ts) — sole raw-path ingress, mounted behind the composed daemon's Auth/Origin/Referer perimeter; returns only an opaque descriptor.
-- [packages/grida-ai-agent/src/session/store.ts](packages/grida-ai-agent/src/session/store.ts), [schema.ts](packages/grida-ai-agent/src/session/schema.ts), and [db.ts](packages/grida-ai-agent/src/session/db.ts) — sessions store and durable schema; `answerApproval` is the server-authoritative supervised-approval gate (answers only a real pending approval, never forges a call), client-resolved question/design-search results atomically receive an exact-run continuation marker, and the startup-only orphan repair terminalizes abandoned non-human/answered approval calls and marked human continuations before queue recovery while preserving unanswered waits and unmarked completed history.
+- [packages/grida-ai-agent/src/session/store.ts](packages/grida-ai-agent/src/session/store.ts), [schema.ts](packages/grida-ai-agent/src/session/schema.ts), and [db.ts](packages/grida-ai-agent/src/session/db.ts) — sessions store and durable schema; supervised approvals and client-resolved question/design-search results atomically receive an exact-run continuation marker only after exact server-authoritative correlation, and the startup-only orphan repair terminalizes abandoned non-human/answered approval calls and marked human interactions before queue recovery while preserving unanswered waits and unmarked completed history.
 - [packages/grida-daemon/src/workspaces.ts](packages/grida-daemon/src/workspaces.ts) — opened workspace registry and root canonicalization.
 - [packages/grida-daemon/src/workspaces/fs.ts](packages/grida-daemon/src/workspaces/fs.ts) — guarded file operations over a containment **scope** (a `{ id, root }`: the workspace, or the session scratch dir — NOT tied to the workspace registry). Every read/write realpath-checks containment to that scope's root, so a symlink escaping the scope is rejected regardless of which scope it is. The streamed-media export (`openFile`, #924) goes through the same `resolveInside` containment (resolved once per request) and then pins the read to a contained file descriptor: it opens the realpath'd target `O_NOFOLLOW` and fstat-streams from that handle, so a symlink swapped in after the check (the realpath→read TOCTOU) fails the open instead of escaping — the same defense as scratch writes. It is deliberately uncapped because streaming has constant memory (the 1 MiB cap exists only to bound the buffered text/base64 readers), which is also why the TOCTOU hardening matters more here.
 - [packages/grida-daemon/src/http/routes/workspaces.ts](packages/grida-daemon/src/http/routes/workspaces.ts) — `/workspaces/*` registry + fs routes, including the streamed, Range-aware `GET /workspaces/file` (#924) that the `grida-workspace://` scheme proxies to. Same Auth/Origin/Referer guards as the base64 readers; containment via `workspaceFs`.

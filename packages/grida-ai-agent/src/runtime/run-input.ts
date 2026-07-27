@@ -23,7 +23,7 @@ import {
   type AgentMode,
 } from "../protocol/mode";
 import { AGENT_DEFAULT_TIER, AGENT_TIERS, type ModelTier } from "../tiers";
-import type { SessionsStore } from "../session/store";
+import type { HumanInputContinuation, SessionsStore } from "../session/store";
 import type { WorkspaceRegistry } from "@grida/daemon/server";
 import {
   isKnownProviderId,
@@ -767,26 +767,29 @@ function toolCallIdOf(part: AgentRunMessagePart): string | null {
  * `approval_answer` body field (parsed by {@link coerceApprovalAnswer}), NOT as
  * a mutated assistant message — the server owns message state, so the answer
  * never has to be SDK-part-shaped on the wire. This routes it through
- * `store.answerApproval`, which flips the persisted part to `approval-responded`
- * ONLY if it was a real pending approval with a matching id + session. A forged
- * answer (unknown call, wrong id, already answered) returns false: the runtime
- * rejects that request before starting a turn. The client can only answer what
- * the server already asked.
+ * `store.commitApprovalContinuation`, which atomically flips the persisted part
+ * to `approval-responded` and stamps the exact consuming run ONLY if it was a
+ * real pending approval with a matching id + session. A forged answer (unknown
+ * call, wrong id, already answered) returns null: the runtime rejects that
+ * request before starting a turn. The client can only answer what the server
+ * already asked.
  */
 export async function applyApprovalAnswer(
   store: SessionsStore,
   sessionId: string,
-  answer: ApprovalAnswer
-): Promise<boolean> {
-  // Pass the answer straight through — `ApprovalAnswer` IS the `answerApproval`
-  // param shape. A field-by-field rebuild here would silently drop any field
-  // later added to `ApprovalAnswer`; relaying the object keeps the two in lock-step.
-  return store.answerApproval(sessionId, answer);
+  answer: ApprovalAnswer,
+  continuationRunId: string
+): Promise<HumanInputContinuation | null> {
+  // Pass the answer straight through — `ApprovalAnswer` IS the
+  // `commitApprovalContinuation` answer shape. A field-by-field rebuild here
+  // would silently drop any field later added to `ApprovalAnswer`; relaying the
+  // object keeps the two in lock-step.
+  return store.commitApprovalContinuation(sessionId, answer, continuationRunId);
 }
 
 /** Narrow an untrusted body value to an {@link ApprovalAnswer}, or `undefined`
- *  (malformed ⇒ no resume). Shape-only — `store.answerApproval` is the
- *  authority on whether the answer matches a real pending approval. */
+ *  (malformed ⇒ no resume). Shape-only — `store.commitApprovalContinuation`
+ *  is the authority on whether the answer matches a real pending approval. */
 function coerceApprovalAnswer(raw: unknown): ApprovalAnswer | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const a = raw as Record<string, unknown>;

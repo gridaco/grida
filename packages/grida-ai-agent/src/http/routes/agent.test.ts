@@ -739,6 +739,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     expect(streamRegistry.get(session.id)?.fired_message_id).toBeUndefined();
     await resumed.text();
     expect(await sessionsStore.hasPendingApproval(session.id)).toBe(false);
+    expect(continuationRunId("tc1")).toBeNull();
 
     // Settle the recorder's async write chain before teardown closes the DB:
     // wait for the resumed turn's streamed assistant text ("hi") to land.
@@ -936,9 +937,112 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     expect(await sessionsStore.hasPendingHumanInput(session.id)).toBe(false);
   });
 
+  it("rolls an approval answer back when synchronous stream reservation fails", async () => {
+    const { session, priorUser } = await seedPendingApproval();
+    const body = {
+      messages: [
+        {
+          id: priorUser.id,
+          role: "user",
+          content: "run the command",
+        },
+      ],
+      session_id: session.id,
+      approval_answer: {
+        tool_call_id: "tc1",
+        approval_id: "ap1",
+        approved: true,
+      },
+    };
+    const create = vi
+      .spyOn(streamRegistry, "create")
+      .mockImplementationOnce(() => {
+        throw new Error("synthetic reservation failure");
+      });
+
+    try {
+      const failed = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      expect(failed.status).toBe(500);
+    } finally {
+      create.mockRestore();
+    }
+
+    expect(continuationRunId("tc1")).toBeNull();
+    expect(await sessionsStore.findToolPart(session.id, "tc1")).toMatchObject({
+      data: {
+        state: "approval-requested",
+        approval: { id: "ap1" },
+      },
+    });
+    expect(await sessionsStore.pendingHumanInputKind(session.id)).toBe(
+      "approval"
+    );
+
+    const retried = await app.request("/agent/run", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    expect(retried.status).toBe(200);
+    await retried.text();
+    expect(continuationRunId("tc1")).toBeNull();
+    expect(await sessionsStore.hasPendingHumanInput(session.id)).toBe(false);
+  });
+
+  it("keeps a failed approval rollback marked and fail-closed", async () => {
+    const { session, priorUser } = await seedPendingApproval();
+    const create = vi
+      .spyOn(streamRegistry, "create")
+      .mockImplementationOnce(() => {
+        throw new Error("synthetic reservation failure");
+      });
+    const rollback = vi
+      .spyOn(sessionsStore, "rollbackApprovalContinuation")
+      .mockRejectedValueOnce(new Error("synthetic rollback failure"));
+
+    try {
+      const failed = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [
+            {
+              id: priorUser.id,
+              role: "user",
+              content: "run the command",
+            },
+          ],
+          session_id: session.id,
+          approval_answer: {
+            tool_call_id: "tc1",
+            approval_id: "ap1",
+            approved: false,
+          },
+        }),
+      });
+      expect(failed.status).toBe(500);
+    } finally {
+      create.mockRestore();
+      rollback.mockRestore();
+    }
+
+    expect(continuationRunId("tc1")).toEqual(expect.any(String));
+    expect(await sessionsStore.findToolPart(session.id, "tc1")).toMatchObject({
+      data: {
+        state: "approval-responded",
+        approval: { id: "ap1", approved: false },
+      },
+    });
+    expect(await sessionsStore.pendingHumanInputKind(session.id)).toBe(
+      "approval"
+    );
+  });
+
   it("an admitted approval continuation cannot be overtaken by ordinary direct text", async () => {
     const { session, priorUser } = await seedPendingApproval();
-    const originalAnswer = sessionsStore.answerApproval.bind(sessionsStore);
+    const originalCommit =
+      sessionsStore.commitApprovalContinuation.bind(sessionsStore);
     let entered!: () => void;
     const insideAnswer = new Promise<void>((resolve) => {
       entered = resolve;
@@ -947,12 +1051,12 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const answerSpy = vi
-      .spyOn(sessionsStore, "answerApproval")
-      .mockImplementation(async (sessionId, answer) => {
+    const commitSpy = vi
+      .spyOn(sessionsStore, "commitApprovalContinuation")
+      .mockImplementation(async (sessionId, answer, runId) => {
         entered();
         await gate;
-        return await originalAnswer(sessionId, answer);
+        return await originalCommit(sessionId, answer, runId);
       });
 
     try {
@@ -1004,7 +1108,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       expect(await sessionsStore.getMessage("must-wait")).toBeNull();
     } finally {
       release();
-      answerSpy.mockRestore();
+      commitSpy.mockRestore();
     }
   });
 
@@ -1509,6 +1613,96 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
           output: { answers: [["Cool"]] },
         },
       });
+    }
+  );
+
+  it.each(["finish", "error", "abort"] as const)(
+    "settles the exact approval marker before the scheduler observes %s",
+    async (reason) => {
+      runtime.dispose();
+      streamRegistry = new StreamRegistry();
+      let releaseModel!: () => void;
+      const modelGate = new Promise<void>((resolve) => {
+        releaseModel = resolve;
+      });
+      runtime = new AgentRuntime({
+        secrets,
+        workspace_registry: workspaceRegistry,
+        sessions_store: sessionsStore,
+        streams: streamRegistry,
+        run_agent: async () => {
+          await modelGate;
+          if (reason === "error")
+            throw new Error("synthetic approval continuation error");
+          return await fakeRunAgent();
+        },
+        scratch_base: path.join(baseDir, "scratch-base"),
+        external_agent_execution: "sandboxed",
+        drain_cooldown_ms: 20,
+      });
+      app = new Hono();
+      registerAgentRoutes(app, runtime);
+
+      const { session, priorUser } = await seedPendingApproval();
+      const resumed = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          session_id: session.id,
+          messages: [
+            {
+              id: priorUser.id,
+              role: "user",
+              content: "run the command",
+            },
+          ],
+          approval_answer: {
+            tool_call_id: "tc1",
+            approval_id: "ap1",
+            approved: reason !== "abort",
+          },
+        }),
+      });
+      expect(resumed.status).toBe(200);
+      await vi.waitFor(() =>
+        expect(continuationRunId("tc1")).toEqual(expect.any(String))
+      );
+
+      const classify = sessionsStore.pendingHumanInputKind.bind(sessionsStore);
+      const markersAtClassification: Array<string | null> = [];
+      vi.spyOn(sessionsStore, "pendingHumanInputKind").mockImplementation(
+        async (sessionId) => {
+          if (sessionId === session.id) {
+            markersAtClassification.push(continuationRunId("tc1"));
+          }
+          return await classify(sessionId);
+        }
+      );
+
+      if (reason === "abort") {
+        runtime.abort({ session_id: session.id });
+      }
+      releaseModel();
+      const streamResult = await resumed.text().then(
+        () => ({ status: "fulfilled" as const, error: "" }),
+        (err: unknown) => ({
+          status: "rejected" as const,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      );
+      expect(streamResult.status).toBe(
+        reason === "error" ? "rejected" : "fulfilled"
+      );
+      expect(streamResult.error.includes("agent stream failed")).toBe(
+        reason === "error"
+      );
+
+      await vi.waitFor(() =>
+        expect(markersAtClassification.length).toBeGreaterThan(0)
+      );
+      expect(markersAtClassification).toEqual(
+        markersAtClassification.map(() => null)
+      );
+      expect(continuationRunId("tc1")).toBeNull();
     }
   );
 

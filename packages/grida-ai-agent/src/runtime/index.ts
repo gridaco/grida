@@ -37,6 +37,7 @@ import { createRecorderConsumer } from "../session/recorder";
 import { titler } from "../session/titler";
 import {
   QueueMessageConflictError,
+  type HumanInputContinuation,
   type SessionsStore,
 } from "../session/store";
 import {
@@ -360,15 +361,12 @@ type StartTurnOptions = {
   /**
    * GRIDA-SEC-004.
    *
-   * Exact durable client-human-result continuation owned by this run. Its
-   * marker is cleared only from the recorder's terminal settlement barrier.
-   * Queue turns and approval continuations use different durability contracts.
+   * Exact durable human-interaction continuation owned by this run. Its marker
+   * is cleared only from the recorder's terminal settlement barrier. This
+   * covers both explicit approvals and client-resolved question/design-search
+   * results.
    */
-  human_input_continuation?: {
-    message_id: string;
-    tool_call_id: string;
-    run_id: string;
-  };
+  human_input_continuation?: HumanInputContinuation;
   /**
    * Set only when `provider.kind === "agent-provider"`: the single prompt
    * string handed to the external agent for this turn (issue #813).
@@ -1008,6 +1006,7 @@ export class AgentRuntime {
       // when scratch staging or incoming persistence rejects the request.
       const pendingHumanInputKind =
         await this.deps.sessions_store.pendingHumanInputKind(sessionId);
+      let approvalContinuation: HumanInputContinuation | undefined;
       let incomingHumanInputResult: IncomingHumanInputResult | undefined;
       if (approvalAnswer) {
         if (
@@ -1201,15 +1200,16 @@ export class AgentRuntime {
       // re-assert that authority atomically. The successful write is followed
       // immediately by synchronous StreamRegistry reservation. A synchronous
       // pre-reservation failure conditionally rolls this exact run id back to
-      // `input-available`; once a registry entry exists, only its terminal
-      // settlement may clear the marker.
+      // its pending approval/input state; once a registry entry exists, only
+      // its terminal settlement may clear the marker.
       if (approvalAnswer) {
-        const answered = await applyApprovalAnswer(
+        const committed = await applyApprovalAnswer(
           this.deps.sessions_store,
           sessionId,
-          approvalAnswer
+          approvalAnswer,
+          runId
         );
-        if (!answered) {
+        if (!committed) {
           return Response.json(
             {
               error:
@@ -1220,6 +1220,7 @@ export class AgentRuntime {
             { status: 409 }
           );
         }
+        approvalContinuation = committed;
       } else if (incomingHumanInputResult) {
         const filled =
           await this.deps.sessions_store.commitHumanInputContinuation(
@@ -1266,13 +1267,15 @@ export class AgentRuntime {
           fired_message_id: pendingHumanInputKind
             ? undefined
             : extractTailUserMessageId(messages),
-          human_input_continuation: incomingHumanInputResult
-            ? {
-                message_id: incomingHumanInputResult.messageId,
-                tool_call_id: incomingHumanInputResult.toolCallId,
-                run_id: runId,
-              }
-            : undefined,
+          human_input_continuation:
+            approvalContinuation ??
+            (incomingHumanInputResult
+              ? {
+                  message_id: incomingHumanInputResult.messageId,
+                  tool_call_id: incomingHumanInputResult.toolCallId,
+                  run_id: runId,
+                }
+              : undefined),
           // Agent-provider turns take a single prompt string (the external
           // agent owns history); the tail user message is this turn's prompt.
           agent_prompt:
@@ -1282,17 +1285,26 @@ export class AgentRuntime {
         });
       } catch (err) {
         if (
-          incomingHumanInputResult &&
+          (approvalContinuation || incomingHumanInputResult) &&
           this.streams.get(sessionId)?.status !== "running"
         ) {
           try {
-            const rolledBack =
-              await this.deps.sessions_store.rollbackHumanInputContinuation(
-                sessionId,
-                incomingHumanInputResult.messageId,
-                incomingHumanInputResult.toolCallId,
-                runId
-              );
+            let rolledBack: boolean;
+            if (approvalContinuation) {
+              rolledBack =
+                await this.deps.sessions_store.rollbackApprovalContinuation(
+                  sessionId,
+                  approvalContinuation
+                );
+            } else {
+              rolledBack =
+                await this.deps.sessions_store.rollbackHumanInputContinuation(
+                  sessionId,
+                  incomingHumanInputResult!.messageId,
+                  incomingHumanInputResult!.toolCallId,
+                  runId
+                );
+            }
             if (!rolledBack) {
               console.warn(
                 `[agent-host-agent] failed to roll back unstarted human-input continuation sessionId=${sessionId} runId=${runId}`

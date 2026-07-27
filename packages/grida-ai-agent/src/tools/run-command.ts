@@ -27,7 +27,8 @@
  * re-gate on mode. The mode→predicate wiring is at
  * `workspace-agent-bindings.ts`; the read-only classification is
  * `permissions.ts` `isReadOnlyCommand`; the server-authoritative answer is
- * `store.answerApproval`. See SECURITY.md.
+ * atomically bound to its consuming run by
+ * `store.commitApprovalContinuation`. See SECURITY.md.
  */
 
 import { tool } from "ai";

@@ -102,6 +102,27 @@ export type QueuedMessageClaim = Readonly<{
   claimed_created_at: number;
 }>;
 
+export type ApprovalAnswerInput = Readonly<{
+  tool_call_id: string;
+  approval_id: string;
+  approved: boolean;
+  reason?: string;
+}>;
+
+/**
+ * Exact persisted human-interaction continuation owned by one model run.
+ *
+ * This covers both explicit supervised approvals and client-resolved
+ * question/design-search results. The host-only run marker keeps a failed
+ * commit→reserve handoff retryable and prevents queued work from overtaking an
+ * answer whose continuation has not settled.
+ */
+export type HumanInputContinuation = Readonly<{
+  message_id: string;
+  tool_call_id: string;
+  run_id: string;
+}>;
+
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
@@ -769,21 +790,20 @@ export class SessionsStore {
   }
 
   /**
-   * Close visible tool calls and every human-input continuation that a dead
-   * host could not finish.
+   * Close visible tool calls and every marked human-interaction continuation
+   * that a dead host could not finish.
    *
    * This is a STARTUP-ONLY repair edge. A normal run may legitimately have a
    * non-human tool at `input-streaming`, `input-available`, or
    * `approval-responded`, so calling this while live streams exist could race
-   * real execution. A client-resolved human-input result whose
-   * `continuation_run_id` is still set is likewise an interrupted live turn,
-   * even when rewind has hidden its message: no continuation from the prior
-   * host can still own that marker. Terminalize and clear it rather than
-   * replaying model/tool side effects or letting a later unhide expose a
-   * permanently unsettled marker. Human-input tools at `input-available` are
-   * intentional durable waits and unanswered supervised approvals use
-   * `approval-requested`; both remain untouched. Historical completed
-   * human-input outputs have a null marker and are never selected.
+   * real execution. Any human interaction whose `continuation_run_id` is still
+   * set is likewise an interrupted live turn, even when rewind has hidden its
+   * message: no continuation from the prior host can still own that marker.
+   * Terminalize and clear it rather than replaying model/tool side effects or
+   * letting a later unhide expose a permanently unsettled marker. Human-input
+   * tools at `input-available` are intentional durable waits and unanswered
+   * supervised approvals use `approval-requested`; both remain untouched.
+   * Historical completed results have a null marker and are never selected.
    *
    * Returns the number of rows advanced to `output-error`.
    */
@@ -1644,7 +1664,7 @@ export class SessionsStore {
    * A resume request must be able to validate all later fallible work (scratch
    * staging, incoming persistence) BEFORE it consumes the approval. This
    * predicate verifies that the exact visible pending approval exists without
-   * changing it; {@link answerApproval} remains the atomic commit.
+   * changing it; {@link commitApprovalContinuation} remains the atomic commit.
    */
   async matchesPendingApproval(
     sessionId: string,
@@ -1705,60 +1725,167 @@ export class SessionsStore {
    */
   async answerApproval(
     sessionId: string,
-    answer: {
-      tool_call_id: string;
-      approval_id: string;
-      approved: boolean;
-      reason?: string;
-    }
+    answer: ApprovalAnswerInput
   ): Promise<boolean> {
-    const rows = await this.db
-      .select({
-        id: chatParts.id,
-        data_json: chatParts.data_json,
-      })
-      .from(chatParts)
-      .innerJoin(chatMessages, eq(chatMessages.id, chatParts.message_id))
-      .where(
-        and(
-          eq(chatParts.session_id, sessionId),
-          eq(chatParts.tool_call_id, answer.tool_call_id),
-          eq(chatParts.tool_state, "approval-requested"),
-          isNull(chatMessages.hidden_at)
-        )
-      )
-      .limit(1);
-    const existing = rows[0];
-    if (!existing) return false;
-    let data: Record<string, unknown> | null;
-    try {
-      data = JSON.parse(existing.data_json) as Record<string, unknown>;
-    } catch {
-      return false;
-    }
-    const approval = data?.approval as { id?: unknown } | undefined;
-    // The answer must carry the exact approval id the server issued.
-    if (!approval || approval.id !== answer.approval_id) return false;
-    const nextData = {
-      ...data,
-      state: "approval-responded",
-      approval: {
-        id: answer.approval_id,
-        approved: answer.approved,
-        ...(answer.reason ? { reason: answer.reason } : {}),
-      },
-    };
-    // Single-writer: re-assert `approval-requested` in the UPDATE itself, not
-    // only in the read above. A single conditional SQLite UPDATE is atomic, so
-    // if two answers race past the read, only the first flips the row — the
-    // second matches 0 rows and cannot overwrite the first decision. (No
-    // transaction needed: the conditional write IS the serialization point.)
+    return (await this.writeApprovalAnswer(sessionId, answer, null)) !== null;
+  }
+
+  /**
+   * Commit an approval answer together with the exact model run that must
+   * consume it. The marker is written in the same conditional UPDATE as
+   * `approval-responded`, so there is no durable state where the answer looks
+   * complete while its continuation ownership is missing.
+   */
+  async commitApprovalContinuation(
+    sessionId: string,
+    answer: ApprovalAnswerInput,
+    continuationRunId: string
+  ): Promise<HumanInputContinuation | null> {
+    if (continuationRunId.length === 0) return null;
+    const committed = await this.writeApprovalAnswer(
+      sessionId,
+      answer,
+      continuationRunId
+    );
+    return committed
+      ? {
+          message_id: committed.message_id,
+          tool_call_id: answer.tool_call_id,
+          run_id: continuationRunId,
+        }
+      : null;
+  }
+
+  /**
+   * Undo an exact approval commit when synchronous stream reservation fails.
+   * The run marker is the stale-callback fence: a failure from an older attempt
+   * cannot reopen a newer decision.
+   */
+  async rollbackApprovalContinuation(
+    sessionId: string,
+    continuation: HumanInputContinuation
+  ): Promise<boolean> {
+    if (continuation.run_id.length === 0) return false;
     return this.opened.withConnection(() => {
+      const existing = this.opened.sqlite
+        .prepare(
+          `SELECT id, data_json
+           FROM chat_parts
+           WHERE session_id = ?
+             AND message_id = ?
+             AND tool_call_id = ?
+             AND tool_state = 'approval-responded'
+             AND continuation_run_id = ?
+             AND EXISTS (
+               SELECT 1
+               FROM chat_messages
+               WHERE chat_messages.id = chat_parts.message_id
+                 AND chat_messages.session_id = ?
+                 AND chat_messages.hidden_at IS NULL
+             )`
+        )
+        .get(
+          sessionId,
+          continuation.message_id,
+          continuation.tool_call_id,
+          continuation.run_id,
+          sessionId
+        ) as { id: string; data_json: string } | undefined;
+      if (!existing) return false;
+      const parsed = parseJsonOr(existing.data_json, null);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return false;
+      }
+      const approval = (parsed as Record<string, unknown>).approval as
+        | { id?: unknown }
+        | undefined;
+      if (typeof approval?.id !== "string") return false;
+      const pendingData = {
+        ...(parsed as Record<string, unknown>),
+        state: "approval-requested",
+        approval: { id: approval.id },
+      };
+      const updated = this.opened.sqlite
+        .prepare(
+          `UPDATE chat_parts
+           SET data_json = ?, tool_state = 'approval-requested',
+               continuation_run_id = NULL, updated_at = ?
+           WHERE id = ?
+             AND session_id = ?
+             AND message_id = ?
+             AND tool_call_id = ?
+             AND tool_state = 'approval-responded'
+             AND data_json = ?
+             AND continuation_run_id = ?`
+        )
+        .run(
+          JSON.stringify(pendingData),
+          Date.now(),
+          existing.id,
+          sessionId,
+          continuation.message_id,
+          continuation.tool_call_id,
+          existing.data_json,
+          continuation.run_id
+        );
+      return updated.changes === 1;
+    });
+  }
+
+  private async writeApprovalAnswer(
+    sessionId: string,
+    answer: ApprovalAnswerInput,
+    continuationRunId: string | null
+  ): Promise<{ message_id: string } | null> {
+    return this.opened.withConnection(() => {
+      const existing = this.opened.sqlite
+        .prepare(
+          `SELECT chat_parts.id, chat_parts.message_id, chat_parts.data_json
+           FROM chat_parts
+           INNER JOIN chat_messages
+             ON chat_messages.id = chat_parts.message_id
+           WHERE chat_parts.session_id = ?
+             AND chat_parts.tool_call_id = ?
+             AND chat_parts.tool_state = 'approval-requested'
+             AND chat_messages.hidden_at IS NULL
+           ORDER BY chat_parts.id
+           LIMIT 1`
+        )
+        .get(sessionId, answer.tool_call_id) as
+        | { id: string; message_id: string; data_json: string }
+        | undefined;
+      if (!existing) return null;
+      const data = parseJsonOr(existing.data_json, null);
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        return null;
+      }
+      const approval = (data as Record<string, unknown>).approval as
+        | { id?: unknown }
+        | undefined;
+      // The answer must carry the exact approval id the server issued.
+      if (approval?.id !== answer.approval_id) return null;
+      const nextData = {
+        ...(data as Record<string, unknown>),
+        state: "approval-responded",
+        approval: {
+          id: answer.approval_id,
+          approved: answer.approved,
+          ...(answer.reason ? { reason: answer.reason } : {}),
+        },
+      };
+      // Single-writer: re-assert the exact pending JSON and state in the UPDATE.
+      // If two answers race past the read, only the first can flip the row.
       const result = this.opened.sqlite
         .prepare(
           `UPDATE chat_parts
-           SET data_json = ?, tool_state = 'approval-responded', updated_at = ?
-           WHERE id = ? AND session_id = ? AND tool_state = 'approval-requested'
+           SET data_json = ?, tool_state = 'approval-responded',
+               continuation_run_id = ?, updated_at = ?
+           WHERE id = ?
+             AND session_id = ?
+             AND message_id = ?
+             AND tool_call_id = ?
+             AND tool_state = 'approval-requested'
+             AND data_json = ?
              AND EXISTS (
                SELECT 1
                FROM chat_messages
@@ -1769,12 +1896,16 @@ export class SessionsStore {
         )
         .run(
           JSON.stringify(nextData),
+          continuationRunId,
           Date.now(),
           existing.id,
           sessionId,
+          existing.message_id,
+          answer.tool_call_id,
+          existing.data_json,
           sessionId
         );
-      return result.changes === 1;
+      return result.changes === 1 ? { message_id: existing.message_id } : null;
     });
   }
 
@@ -2088,8 +2219,9 @@ export class SessionsStore {
   }
 
   /**
-   * Clear the exact run's marker after its recorder has flushed at the terminal
-   * finish/error/abort barrier. The terminal human result remains unchanged.
+   * Clear the exact run's human-interaction marker after its recorder has
+   * flushed at the terminal finish/error/abort barrier. The approval/result
+   * transcript remains unchanged.
    */
   async settleHumanInputContinuation(
     sessionId: string,
@@ -2099,7 +2231,6 @@ export class SessionsStore {
   ): Promise<boolean> {
     if (continuationRunId.length === 0) return false;
     return this.opened.withConnection(() => {
-      const humanTypeParams = HUMAN_INPUT_PART_TYPES.map(() => "?").join(", ");
       const updated = this.opened.sqlite
         .prepare(
           `UPDATE chat_parts
@@ -2108,8 +2239,6 @@ export class SessionsStore {
              AND message_id = ?
              AND tool_call_id = ?
              AND continuation_run_id = ?
-             AND type IN (${humanTypeParams})
-             AND tool_state IN ('output-available', 'output-error')
              AND EXISTS (
                SELECT 1
                FROM chat_messages
@@ -2124,7 +2253,6 @@ export class SessionsStore {
           messageId,
           toolCallId,
           continuationRunId,
-          ...HUMAN_INPUT_PART_TYPES,
           sessionId
         );
       return updated.changes === 1;
@@ -2159,10 +2287,11 @@ export class SessionsStore {
 
   /**
    * Classify this session's UNSETTLED human-in-the-loop block. A persisted
-   * supervised approval (`approval-requested`) maps to `approval`; a
-   * human-input tool (e.g. `question`) paused at `input-available` maps to
-   * `user-input`. A committed human result whose exact continuation marker has
-   * not settled also maps to `user-input` as a fail-closed recovery posture.
+   * supervised approval (`approval-requested`, or a marked
+   * `approval-responded`) maps to `approval`; a human-input tool (e.g.
+   * `question`) paused at `input-available` maps to `user-input`. Any committed
+   * human interaction whose exact continuation marker has not settled remains
+   * classified as a fail-closed block.
    * In normal operation that marker is cleared inside the stream's terminal
    * settlement barrier before idle/error projection, so this extra leg is
    * observable only after a commit→reserve failure or failed marker clear.
@@ -2209,14 +2338,17 @@ export class SessionsStore {
               eq(chatParts.tool_state, "input-available"),
               inArray(chatParts.type, HUMAN_INPUT_PART_TYPES)
             ),
-            and(
-              isNotNull(chatParts.continuation_run_id),
-              inArray(chatParts.type, HUMAN_INPUT_PART_TYPES)
-            )
+            isNotNull(chatParts.continuation_run_id)
           )
         )
       );
-    if (rows.some((row) => row.tool_state === "approval-requested")) {
+    if (
+      rows.some(
+        (row) =>
+          row.tool_state === "approval-requested" ||
+          row.tool_state === "approval-responded"
+      )
+    ) {
       return "approval";
     }
     return rows.length > 0 ? "user-input" : null;

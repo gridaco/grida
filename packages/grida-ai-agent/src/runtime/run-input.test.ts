@@ -127,10 +127,17 @@ describe("approval continuation input", () => {
       approved: true,
     };
 
-    expect(await applyApprovalAnswer(store, sessionId, answer)).toBe(true);
-    // The store rejects a stale second decision; the wrapper must relay false
+    expect(
+      await applyApprovalAnswer(store, sessionId, answer, "run_1")
+    ).toMatchObject({
+      tool_call_id: "tc1",
+      run_id: "run_1",
+    });
+    // The store rejects a stale second decision; the wrapper must relay null
     // rather than letting the caller mistake this for a valid continuation.
-    expect(await applyApprovalAnswer(store, sessionId, answer)).toBe(false);
+    expect(
+      await applyApprovalAnswer(store, sessionId, answer, "run_2")
+    ).toBeNull();
   });
 
   it("rejects new caller-owned history while allowing persisted history", async () => {

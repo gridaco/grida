@@ -113,12 +113,12 @@ export const chatParts = sqliteTable(
     data_json: text("data_json").notNull(),
     tool_call_id: text("tool_call_id"),
     tool_state: text("tool_state"),
-    // GRIDA-SEC-004 — internal durability marker for a client-resolved
-    // human-input result whose correlated model continuation has started but
-    // has not settled yet. Kept out of `data_json`: chat part JSON is the
-    // renderer/model transcript contract, while this is host recovery state.
-    // The exact run id prevents a stale terminal callback from clearing a
-    // newer continuation.
+    // GRIDA-SEC-004 — internal durability marker for a human interaction
+    // (supervised approval or client-resolved question/design search) whose
+    // correlated model continuation has started but has not settled yet. Kept
+    // out of `data_json`: chat part JSON is the renderer/model transcript
+    // contract, while this is host recovery state. The exact run id prevents a
+    // stale terminal callback from clearing a newer continuation.
     continuation_run_id: text("continuation_run_id"),
     created_at: integer("created_at").notNull(),
     updated_at: integer("updated_at").notNull(),

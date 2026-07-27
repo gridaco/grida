@@ -271,9 +271,9 @@ function migrateSchema(sqlite: DatabaseSync, fromVersion: number): void {
   if (fromVersion < 2) {
     addColumnIfMissing(sqlite, "chat_sessions", "mode", "TEXT");
   }
-  // GRIDA-SEC-004 — v2 → v3: exact-run durability for client-resolved
-  // human-input continuations. Nullable by design: historical completed output
-  // rows have no marker and must never be mistaken for interrupted live work.
+  // GRIDA-SEC-004 — v2 → v3: exact-run durability for human-interaction
+  // continuations. Nullable by design: historical completed output rows have
+  // no marker and must never be mistaken for interrupted live work.
   if (fromVersion < 3) {
     addColumnIfMissing(sqlite, "chat_parts", "continuation_run_id", "TEXT");
   }

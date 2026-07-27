@@ -1472,12 +1472,17 @@ describe("answerApproval — supervised approval boundary (GRIDA-SEC-004)", () =
   function readPart(toolCallId: string): {
     tool_state: string;
     data_json: string;
+    continuation_run_id: string | null;
   } {
     return opened.sqlite
       .prepare(
-        "SELECT tool_state, data_json FROM chat_parts WHERE tool_call_id = ?"
+        "SELECT tool_state, data_json, continuation_run_id FROM chat_parts WHERE tool_call_id = ?"
       )
-      .get(toolCallId) as { tool_state: string; data_json: string };
+      .get(toolCallId) as {
+      tool_state: string;
+      data_json: string;
+      continuation_run_id: string | null;
+    };
   }
 
   it("answers a pending approval (state → approval-responded, approved stamped)", async () => {
@@ -1495,6 +1500,90 @@ describe("answerApproval — supervised approval boundary (GRIDA-SEC-004)", () =
     expect(data.approval).toMatchObject({ id: "ap_1", approved: true });
     // The original input is preserved — the answer never rewrites the call.
     expect(data.input).toEqual({ command: "python3", args: ["x.py"] });
+    // The compatibility mutation is not a model continuation and owns no
+    // durable run marker.
+    expect(part.continuation_run_id).toBeNull();
+  });
+
+  it("marks and rolls back only the exact approval continuation run", async () => {
+    const sid = await seedPendingApproval();
+    const committed = await store.commitApprovalContinuation(
+      sid,
+      {
+        tool_call_id: "tc_1",
+        approval_id: "ap_1",
+        approved: true,
+        reason: "allow once",
+      },
+      "run_approval_1"
+    );
+
+    expect(committed).toMatchObject({
+      tool_call_id: "tc_1",
+      run_id: "run_approval_1",
+    });
+    expect(readPart("tc_1")).toMatchObject({
+      tool_state: "approval-responded",
+      continuation_run_id: "run_approval_1",
+    });
+    expect(await store.pendingHumanInputKind(sid)).toBe("approval");
+
+    expect(
+      await store.rollbackApprovalContinuation(sid, {
+        ...committed!,
+        run_id: "stale_run",
+      })
+    ).toBe(false);
+    expect(await store.rollbackApprovalContinuation(sid, committed!)).toBe(
+      true
+    );
+
+    const restored = readPart("tc_1");
+    expect(restored.tool_state).toBe("approval-requested");
+    expect(restored.continuation_run_id).toBeNull();
+    expect(JSON.parse(restored.data_json)).toMatchObject({
+      state: "approval-requested",
+      approval: { id: "ap_1" },
+      input: { command: "python3", args: ["x.py"] },
+    });
+    expect(JSON.parse(restored.data_json).approval).toEqual({ id: "ap_1" });
+    expect(await store.pendingHumanInputKind(sid)).toBe("approval");
+  });
+
+  it("settles only the exact approval continuation run", async () => {
+    const sid = await seedPendingApproval();
+    const committed = await store.commitApprovalContinuation(
+      sid,
+      {
+        tool_call_id: "tc_1",
+        approval_id: "ap_1",
+        approved: false,
+      },
+      "run_approval_1"
+    );
+    expect(committed).not.toBeNull();
+
+    expect(
+      await store.settleHumanInputContinuation(
+        sid,
+        committed!.message_id,
+        committed!.tool_call_id,
+        "stale_run"
+      )
+    ).toBe(false);
+    expect(
+      await store.settleHumanInputContinuation(
+        sid,
+        committed!.message_id,
+        committed!.tool_call_id,
+        committed!.run_id
+      )
+    ).toBe(true);
+    expect(readPart("tc_1")).toMatchObject({
+      tool_state: "approval-responded",
+      continuation_run_id: null,
+    });
+    expect(await store.pendingHumanInputKind(sid)).toBeNull();
   });
 
   it("preflights the exact pending approval without consuming it", async () => {
@@ -1823,6 +1912,35 @@ describe("restart orphan repair", () => {
         answer
       )
     ).toBe(true);
+    await store.upsertPart(hidden.id, {
+      index: 1,
+      type: "tool-run_command",
+      data: {
+        type: "tool-run_command",
+        toolCallId: "tc_hidden_approval",
+        state: "approval-requested",
+        input: { command: "echo maybe" },
+        approval: { id: "ap_hidden" },
+      },
+      tool_call_id: "tc_hidden_approval",
+      tool_state: "approval-requested",
+      session_id: s.id,
+    });
+    expect(
+      await store.commitApprovalContinuation(
+        s.id,
+        {
+          tool_call_id: "tc_hidden_approval",
+          approval_id: "ap_hidden",
+          approved: true,
+        },
+        "run_hidden_approval"
+      )
+    ).toMatchObject({
+      message_id: hidden.id,
+      tool_call_id: "tc_hidden_approval",
+      run_id: "run_hidden_approval",
+    });
     opened.sqlite
       .prepare("UPDATE chat_messages SET hidden_at = ? WHERE id = ?")
       .run(Date.now(), hidden.id);
@@ -1831,7 +1949,7 @@ describe("restart orphan repair", () => {
     opened = openSessionsDb({ user_data_path: tempDir });
     store = new SessionsStore(opened);
 
-    expect(store.finalizeRestartOrphanedTools()).toBe(2);
+    expect(store.finalizeRestartOrphanedTools()).toBe(3);
     expect(await store.findToolPart(s.id, "tc_interrupted")).toMatchObject({
       data: {
         state: "output-error",
@@ -1854,17 +1972,26 @@ describe("restart orphan repair", () => {
         input: { questions: [{ question: "Color?" }] },
       },
     });
+    expect(await store.findToolPart(s.id, "tc_hidden_approval")).toMatchObject({
+      data: {
+        state: "output-error",
+        errorText: "aborted by host restart",
+        input: { command: "echo maybe" },
+      },
+    });
     const markers = opened.sqlite
       .prepare(
         `SELECT tool_call_id, continuation_run_id
          FROM chat_parts
          WHERE tool_call_id IN (
-           'tc_interrupted', 'tc_historical', 'tc_hidden_interrupted'
+           'tc_interrupted', 'tc_historical', 'tc_hidden_interrupted',
+           'tc_hidden_approval'
          )
          ORDER BY tool_call_id`
       )
       .all();
     expect(markers).toEqual([
+      { tool_call_id: "tc_hidden_approval", continuation_run_id: null },
       { tool_call_id: "tc_hidden_interrupted", continuation_run_id: null },
       { tool_call_id: "tc_historical", continuation_run_id: null },
       { tool_call_id: "tc_interrupted", continuation_run_id: null },
@@ -1882,6 +2009,12 @@ describe("restart orphan repair", () => {
     expect(
       await store.findToolPart(s.id, "tc_hidden_interrupted")
     ).toMatchObject({
+      data: {
+        state: "output-error",
+        errorText: "aborted by host restart",
+      },
+    });
+    expect(await store.findToolPart(s.id, "tc_hidden_approval")).toMatchObject({
       data: {
         state: "output-error",
         errorText: "aborted by host restart",
