@@ -1,3 +1,4 @@
+// GRIDA-SEC-008 — explicit native-provider input validation pins.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -1175,7 +1176,11 @@ describe("parseRunBody — model/provider gates over the open registry (#806)", 
     registeredModels: async () => [{ id: "llama3.1:8b" }],
     get: async (id: string) =>
       id === "ollama"
-        ? { id: "ollama", base_url: "http://localhost:11434/v1", models: [] }
+        ? {
+            id: "ollama",
+            base_url: "http://localhost:11434/v1",
+            models: [{ id: "llama3.1:8b" }],
+          }
         : null,
   };
   const deps = {
@@ -1184,6 +1189,14 @@ describe("parseRunBody — model/provider gates over the open registry (#806)", 
   };
   const depsWithoutEndpoints = {
     workspace_registry: { findById: async () => null },
+  };
+  const depsWithChatGpt = {
+    ...deps,
+    chatgpt: {
+      config: {
+        default_model_id: "openai/gpt-5.6-terra",
+      },
+    },
   };
 
   it("accepts a catalog model id", async () => {
@@ -1236,5 +1249,81 @@ describe("parseRunBody — model/provider gates over the open registry (#806)", 
     );
     expect(bad).toBeInstanceOf(Response);
     expect(bad instanceof Response ? bad.status : 0).toBe(400);
+  });
+
+  it("validates the exact provider/model tuple", async () => {
+    for (const body of [
+      {
+        ...msg,
+        provider_id: "openrouter",
+        model_id: "anthropic/claude-opus-4.8",
+      },
+      {
+        ...msg,
+        provider_id: "ollama",
+        model_id: "llama3.1:8b",
+      },
+    ]) {
+      expect(await parseRunBody(body, deps as never)).not.toBeInstanceOf(
+        Response
+      );
+    }
+
+    for (const body of [
+      {
+        ...msg,
+        provider_id: "openrouter",
+        model_id: "llama3.1:8b",
+      },
+      {
+        ...msg,
+        provider_id: "ollama",
+        model_id: "anthropic/claude-opus-4.8",
+      },
+      {
+        ...msg,
+        provider_id: "gg",
+        model_id: "openai/gpt-5.4",
+      },
+    ]) {
+      const parsed = await parseRunBody(body, depsWithChatGpt as never);
+      expect(parsed).toBeInstanceOf(Response);
+      expect(parsed instanceof Response ? parsed.status : 0).toBe(400);
+    }
+  });
+
+  it("admits the closed subscription model/id pair and rejects a provider mismatch", async () => {
+    const ok = await parseRunBody(
+      {
+        ...msg,
+        provider_id: "chatgpt",
+        model_id: "openai/gpt-5.4",
+      },
+      depsWithChatGpt as never
+    );
+    expect(ok).not.toBeInstanceOf(Response);
+    if (ok instanceof Response) return;
+    expect(ok.explicit).toBe("chatgpt");
+    expect(ok.model_id).toBe("openai/gpt-5.4");
+
+    const mismatch = await parseRunBody(
+      {
+        ...msg,
+        provider_id: "chatgpt",
+        model_id: "anthropic/claude-opus-4.8",
+      },
+      depsWithChatGpt as never
+    );
+    expect(mismatch).toBeInstanceOf(Response);
+    expect(mismatch instanceof Response ? mismatch.status : 0).toBe(400);
+  });
+
+  it("keeps subscription-only models closed when the host did not configure the provider", async () => {
+    const parsed = await parseRunBody(
+      { ...msg, model_id: "openai/gpt-5.4" },
+      depsWithoutEndpoints as never
+    );
+    expect(parsed).toBeInstanceOf(Response);
+    expect(parsed instanceof Response ? parsed.status : 0).toBe(400);
   });
 });

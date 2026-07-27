@@ -78,7 +78,7 @@ export namespace AgentNetworkPolicy {
    */
   export function builtInGrants(ggOrigin: string): Grant[] {
     const canonicalGgOrigin = canonicalOrigin(ggOrigin);
-    const providerOrigins = [
+    const providerAssetOrigins = [
       canonicalGgOrigin,
       "https://openrouter.ai",
       "https://*.openrouter.ai",
@@ -88,6 +88,13 @@ export namespace AgentNetworkPolicy {
       "https://*.fal.run",
       "https://fal.media",
       "https://*.fal.media",
+    ];
+    const providerOrigins = [
+      ...providerAssetOrigins,
+      // GRIDA-SEC-008 — exact OAuth and inference authorities for the native
+      // ChatGPT-subscription provider. Neither origin joins the download lane.
+      "https://auth.openai.com",
+      "https://chatgpt.com",
     ];
     return [
       {
@@ -102,7 +109,7 @@ export namespace AgentNetworkPolicy {
         // lane. Keep them inside namespaces already owned by the providers.
         // An output URL on another CDN is refused until that origin has its
         // own explicit host grant ceremony.
-        origins: providerOrigins.filter((origin) =>
+        origins: providerAssetOrigins.filter((origin) =>
           origin.startsWith("https:")
         ),
       },

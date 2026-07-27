@@ -1,3 +1,4 @@
+// GRIDA-SEC-008 — tenant startup shares one serialized credential store.
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -34,12 +35,14 @@ describe("agent tenant startup", () => {
       () => fs.rm(baseDir, { recursive: true, force: true }),
       () => fs.rm(scratchBase, { recursive: true, force: true })
     );
+    const auth = new AuthStore(baseDir);
     const services: DaemonServices = {
       user_data_path: baseDir,
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
-      secrets: new SecretsStore(new AuthStore(baseDir)),
+      auth,
+      secrets: new SecretsStore(auth),
     };
     const recover = vi
       .spyOn(AgentRuntime.prototype, "recoverQueuedSessions")
@@ -74,12 +77,14 @@ describe("agent tenant startup", () => {
       () => fs.rm(baseDir, { recursive: true, force: true }),
       () => fs.rm(scratchBase, { recursive: true, force: true })
     );
+    const auth = new AuthStore(baseDir);
     const services: DaemonServices = {
       user_data_path: baseDir,
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
-      secrets: new SecretsStore(new AuthStore(baseDir)),
+      auth,
+      secrets: new SecretsStore(auth),
     };
     let finishStartupRecovery!: () => void;
     const startupRecovery = new Promise<void>((resolve) => {
@@ -131,12 +136,14 @@ describe("agent tenant startup", () => {
       () => fs.rm(baseDir, { recursive: true, force: true }),
       () => fs.rm(scratchBase, { recursive: true, force: true })
     );
+    const auth = new AuthStore(baseDir);
     const services: DaemonServices = {
       user_data_path: baseDir,
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
-      secrets: new SecretsStore(new AuthStore(baseDir)),
+      auth,
+      secrets: new SecretsStore(auth),
     };
     const recover = vi
       .spyOn(AgentRuntime.prototype, "recoverQueuedSessions")

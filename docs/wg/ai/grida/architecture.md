@@ -22,6 +22,13 @@ The local daemon runs BYOK model providers and — for signed-in users —
 provider. GG fit this contract instead of shaping it: it supplies model
 capacity only (the `gg` provider kind), while the agent loop stays local.
 
+The experimental
+[ChatGPT Subscription native provider](../agent/chatgpt-subscription-provider.md)
+fits the same capacity seam: Grida still owns sessions, tools, approvals,
+sandboxing, and the loop. It is not Codex ACP. Its adapter and local
+`GRIDA-SEC-008` boundary are implemented, while the stable legal/support
+contract with OpenAI remains an external release gate.
+
 **Host/tenant split (#927).** The local privileged process is a general
 **daemon** (`@grida/daemon`): the loopback HTTP server, the GRIDA-SEC-004
 perimeter, and the host capability route groups (files, recents, workspaces,
@@ -49,6 +56,9 @@ Sibling docs:
 - [Desktop](../../desktop/index.md) — the desktop host landing.
 - [Grida Gateway (GG)](../../platform/hosted-ai.md)
   — the shipped hosted model-capacity provider; the agent loop stays local.
+- [ChatGPT Subscription native provider](../agent/chatgpt-subscription-provider.md)
+  — the golden contract for experimental subscription-backed native capacity;
+  implemented locally and externally gated for stable release.
 - [Phase 3 agent contract cleanup](./agent-contract-cleanup.md) — seam
   decisions and refused alternatives after the BYOK-only cleanup.
 
@@ -126,23 +136,35 @@ tenant routes mount behind the same guards.
 | POST   | `/workspaces/open`         | `{ rootPath }`                                                  | `Workspace`                                                                          |
 | GET    | `/workspaces`              | —                                                               | `Workspace[]`                                                                        |
 
-There is intentionally no `/secrets/get`, no `/auth/*`, and no
-`/entitlements/*` in V1.
+There is intentionally no `/secrets/get`, renderer-facing `/auth/*`, or
+`/entitlements/*` in V1. A configured native host may use the authenticated,
+sidecar-private `/auth/chatgpt/*` control routes for start, completion, cancel,
+safe status, and sign-out. Those routes are deliberately absent from
+`AgentTransport`; the renderer reaches only fixed, guarded host capabilities.
 
 ### 3. Provider Contract
 
-V1 provider resolution is BYOK-only:
+Native providers supply model capacity to the same Grida-owned loop. BYOK, GG,
+configured endpoint/local capacity, and the experimental ChatGPT Subscription
+provider remain distinct provider-qualified surfaces; ACP is an external-agent
+boundary, not a native provider.
 
-1. `openrouter`
-2. `vercel`
-3. unavailable (`provider_down`)
+Selection is durable session intent:
 
-`AgentRunOptions.providerId` accepts only `ByokProviderId`. The package root
-exports `BYOK_PROVIDER_METADATA`, `BYOK_PROVIDER_IDS`, and `ByokProviderId`;
-it does not export `grida-cloud` provider constants. The metadata array order
-drives resolver precedence and Desktop settings labels. Sandbox network hosts
-stay in the sandbox policy layer. A future hosted provider must return the same
-kind of model factory the runtime already consumes.
+1. an explicit request/session provider wins;
+2. an explicitly changed model is an intentional re-resolution request and
+   may choose another compatible provider;
+3. otherwise a persisted user or session provider remains sticky while the
+   model is omitted or unchanged;
+4. a fresh, unconfigured session uses a ready ChatGPT Subscription connection
+   first;
+5. otherwise text resolution preserves BYOK, then GG, then configured
+   endpoint/local capacity;
+6. provider failure never causes silent mid-turn failover.
+
+The [ChatGPT Subscription provider specification](../agent/chatgpt-subscription-provider.md#provider-selection)
+owns this ordering. Existing users keep their stored choice, and auxiliary
+work such as titling, recovery, and compaction follows the session provider.
 
 ### 4. Host Client Bridge
 
@@ -171,7 +193,7 @@ package export.
 | Package            | Path                        | Owns                                                                                                                                 |
 | ------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `@grida/daemon`    | `packages/grida-daemon/`    | `DaemonServer`, the GRIDA-SEC-004 perimeter, daemon discovery, files/recents/workspaces, secrets store, shell runner, sandbox frame. |
-| `@grida/agent`     | `packages/grida-ai-agent/`  | The agent tenant: runtime, sessions, BYOK providers, prompts, tools, the AI route groups, CLI, and the AI upstream sandbox hosts.    |
+| `@grida/agent`     | `packages/grida-ai-agent/`  | The agent tenant: runtime, sessions, native providers, prompts, tools, the AI route groups, CLI, and the AI upstream sandbox hosts.  |
 | `@grida/ai-models` | `packages/grida-ai-models/` | Model catalog + pricing table. Imported for tier/model metadata.                                                                     |
 
 Current layer shape:
@@ -187,7 +209,7 @@ packages/grida-daemon/src/
 ├── http/                    # perimeter guards, daemon routes, the DaemonTenant seam
 ├── workspaces/              # opened workspace registry + guarded fs
 ├── files/                   # file registry + recents
-├── auth/ + secrets.ts       # auth.json persistence + BYOK key store
+├── auth/ + secrets.ts       # auth.json persistence + provider secret store
 ├── shell/                   # command runner (structural gates)
 └── sandbox/                 # sandbox policy frame (AI-free)
 
@@ -198,7 +220,7 @@ packages/grida-ai-agent/src/
 ├── protocol/                # provider ids, run, wire vocabulary
 ├── agent/                   # createAgent + prompts
 ├── tools/                   # createToolset + run_command + tool names
-├── providers/               # BYOK resolver + upstream factories
+├── providers/               # native-provider resolver + upstream factories
 ├── runtime/                 # AgentRuntime, runAgent, SSE registry, message-view
 ├── session/                 # rows, SQLite store, recorder, titler, compaction, compactor
 ├── skills/                  # discovery, project instructions, the `skill` tool
@@ -245,7 +267,7 @@ as these stay green.
 
 ```ts
 describe("public API", () => {
-  it("exports BYOK provider ids but no hosted provider id");
+  it("keeps native-provider identities distinct from ACP");
   it("exports session row types and wire chunk vocabulary from the root");
   it("pins server, transport, sandbox, fs, todos, and tiers subpaths");
 });
@@ -255,10 +277,10 @@ describe("handshake", () => {
 });
 
 describe("provider resolution", () => {
-  it("prefers OpenRouter BYOK over Vercel BYOK");
-  it("falls back to Vercel BYOK");
-  it("throws provider_down when no BYOK key is present");
-  it("validates explicit BYOK provider ids");
+  it("honors an explicit provider");
+  it("preserves a persisted provider choice");
+  it("keeps provider identity attached to auxiliary work");
+  it("never silently changes provider during a failed turn");
 });
 
 describe("HTTP perimeter", () => {
@@ -279,10 +301,10 @@ describe("daemon/tenant seam (#927)", () => {
 
 ## Anti-goals
 
-- No hosted model gateway in V1.
-- No OAuth/auth client in V1.
+- No renderer-owned provider credentials or OAuth lifecycle.
+- No native-provider shortcut through ACP.
 - No billing or entitlement engine in V1.
-- No general provider router.
+- No model-name-only provider inference.
 - No window/UX framework — hosts render; the daemon stores and runs.
 - No plugin/extension registry — tools and capabilities are fixed by the RFC,
   and the daemon's tenant list is a static typed list, not dynamic discovery.

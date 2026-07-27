@@ -1,3 +1,4 @@
+// GRIDA-SEC-008 — ChatGPT operations are registered through guarded IPC only.
 import {
   BrowserWindow,
   dialog,
@@ -11,6 +12,7 @@ import { URL } from "node:url";
 import {
   IPC_CHANNELS,
   type ConfirmOptions,
+  type IpcChannel,
   type NavigationState,
   type OpenDialogOptions,
   type SaveDialogOptions,
@@ -50,6 +52,9 @@ import {
   unsubscribeWorkspaceChanges,
 } from "./workspace-watcher-host";
 import { trashWorkspaceEntry } from "./workspace-files";
+import { createChatGptOAuthCoordinator } from "./chatgpt-oauth";
+import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
+import { ipc_sender } from "./ipc-sender";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
 // build-time constant once at module init rather than per call.
@@ -63,56 +68,85 @@ const EDITOR_ORIGIN = (() => {
 
 const providerEndpointMutations =
   new AgentProviderEndpointMutation.Coordinator();
+const chatgptOAuth = createChatGptOAuthCoordinator({
+  sidecar_fetch: (path, init) => agentSidecarClient.fetch(path, init),
+  open_external: async (url) => {
+    await shell.openExternal(url);
+  },
+});
 
-/**
- * GRIDA-SEC-004 — every native-OS IPC handler MUST validate the sender
- * frame's URL is under our editor origin AND under the `/desktop/*`
- * path. The preload's path-scope check shouldn't let the bridge be
- * exposed otherwise, but a malicious renderer that bypassed sandboxing
- * could still ipcRenderer.invoke() arbitrary channels — this guard
- * makes that ineffective.
- *
- * Returns `true` to allow, `false` (and logs) to deny.
- */
-function isAllowedDesktopSender(event: IpcMainInvokeEvent): boolean {
-  const frame = event.senderFrame;
-  if (!frame || !EDITOR_ORIGIN) return false;
-  let url: URL;
-  try {
-    url = new URL(frame.url);
-  } catch {
-    return false;
+type RegisterIpcHandlersOptions = {
+  resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
+  on_onboarding_complete?: (input: {
+    window: BrowserWindow;
+    workspace_id?: string;
+  }) => Promise<void> | void;
+  on_account_sign_out?: (input: {
+    window: BrowserWindow;
+  }) => Promise<void> | void;
+};
+
+export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
+  /**
+   * GRIDA-SEC-004 / GRIDA-SEC-005 — every native IPC invoke must pass both
+   * structural URL admission and the controller-owned window/role capability
+   * policy. Path scope alone is insufficient: sign-in and onboarding are
+   * `/desktop/*` documents too, and a hidden Settings renderer remains alive
+   * just long enough to receive the successful sign-out reply.
+   */
+  function guarded<A extends unknown[], R>(
+    channel: IpcChannel,
+    handler: (event: IpcMainInvokeEvent, ...args: A) => R
+  ): void {
+    ipcMain.handle(channel, (event, ...args) => {
+      const senderUrl = event.senderFrame?.url;
+      const window = BrowserWindow.fromWebContents(event.sender);
+      const role = window ? options.resolve_ipc_role(window) : null;
+      const pathname = ipc_sender.pathname(senderUrl);
+      if (
+        !ipc_sender.isAllowed(senderUrl, EDITOR_ORIGIN) ||
+        !role ||
+        !pathname ||
+        !ipc_admission.allows({ role, channel, pathname })
+      ) {
+        console.warn(
+          `[grida] IPC ${channel} denied: sender=${ipc_sender.diagnostic(senderUrl)}`
+        );
+        throw new Error(`IPC ${channel} denied`);
+      }
+      return handler(event, ...(args as A));
+    });
   }
-  if (url.origin !== EDITOR_ORIGIN) return false;
-  return url.pathname === "/desktop" || url.pathname.startsWith("/desktop/");
-}
 
-/**
- * Registers an `ipcMain.handle` that rejects any sender frame outside
- * the editor origin + `/desktop/*` path. The guard is GRIDA-SEC-004
- * load-bearing; wrapping it at registration time means a new handler
- * can't ship without it.
- */
-function guarded<A extends unknown[], R>(
-  channel: string,
-  handler: (event: IpcMainInvokeEvent, ...args: A) => R
-): void {
-  ipcMain.handle(channel, (event, ...args) => {
-    if (!isAllowedDesktopSender(event)) {
-      const url = event.senderFrame?.url ?? "<no frame>";
-      console.warn(`[grida] IPC ${channel} denied: sender=${url}`);
-      throw new Error(`IPC ${channel} denied`);
-    }
-    return handler(event, ...(args as A));
-  });
-}
-
-export function registerIpcHandlers() {
   guarded(IPC_CHANNELS.AGENT_SERVER_INFO, () => {
     const info = getAgentSidecarInfo();
     if (!info) throw new Error("agent sidecar not ready");
     return info;
   });
+
+  // GRIDA-SEC-004 — onboarding never receives AGENT_SERVER_INFO. These
+  // handlers keep the daemon bearer and the chosen absolute path on the
+  // trusted side of the bridge, returning only the user-facing Workspace DTO.
+  guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_DEFAULT, async () => {
+    const workspaces = await agentSidecarClient.listWorkspaces();
+    return workspaces.find((workspace) => workspace.is_default) ?? null;
+  });
+  guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_CHOOSE, async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) throw new Error("onboarding window is unavailable");
+    const result = await dialog.showOpenDialog(window, {
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return await agentSidecarClient.openWorkspace(result.filePaths[0]);
+  });
+
+  guarded(IPC_CHANNELS.CHATGPT_CONNECT, () => chatgptOAuth.connect());
+  guarded(IPC_CHANNELS.CHATGPT_CANCEL, async () => {
+    await chatgptOAuth.cancel();
+  });
+  guarded(IPC_CHANNELS.CHATGPT_STATUS, () => chatgptOAuth.status());
+  guarded(IPC_CHANNELS.CHATGPT_SIGN_OUT, () => chatgptOAuth.signOut());
 
   // issue #974 — custom endpoints are network authority, not just config.
   // Renderer writes/probes therefore cross a guarded native confirmation
@@ -184,6 +218,50 @@ export function registerIpcHandlers() {
 
   guarded(IPC_CHANNELS.WINDOW_CLOSE, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
+  guarded(
+    IPC_CHANNELS.WINDOW_COMPLETE_ONBOARDING,
+    async (event, workspaceId?: string) => {
+      const senderUrl = event.senderFrame?.url;
+      if (ipc_sender.pathname(senderUrl) !== "/desktop/onboarding") {
+        throw new Error(
+          "onboarding completion is only available to onboarding"
+        );
+      }
+      if (
+        workspaceId !== undefined &&
+        (typeof workspaceId !== "string" ||
+          workspaceId.length === 0 ||
+          workspaceId.length > 1024)
+      ) {
+        throw new Error("invalid onboarding workspace id");
+      }
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (!window || !options.on_onboarding_complete) {
+        throw new Error("onboarding completion is unavailable");
+      }
+      await options.on_onboarding_complete({
+        window,
+        ...(workspaceId ? { workspace_id: workspaceId } : {}),
+      });
+    }
+  );
+
+  // GRIDA-SEC-005 — one global Grida-account sign-out transition. Only the
+  // Settings account surface may request it; the controller additionally
+  // validates current app role and resolves dirty auxiliary windows before
+  // the shared cookie session changes.
+  guarded(IPC_CHANNELS.ACCOUNT_SIGN_OUT, async (event) => {
+    const senderUrl = event.senderFrame?.url;
+    if (ipc_sender.pathname(senderUrl) !== "/desktop/settings") {
+      throw new Error("account sign-out is only available from Settings");
+    }
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window || !options.on_account_sign_out) {
+      throw new Error("account sign-out is unavailable");
+    }
+    await options.on_account_sign_out({ window });
   });
 
   guarded(IPC_CHANNELS.DIALOG_CONFIRM, async (event, opts: ConfirmOptions) => {
@@ -375,6 +453,11 @@ export function registerIpcHandlers() {
   guarded(IPC_CHANNELS.WORKSPACE_UNSUBSCRIBE_CHANGES, (_event, id: string) => {
     unsubscribeWorkspaceChanges(id);
   });
+}
+
+/** Close any active native-provider callback before Electron exits. */
+export function closeChatGptOAuth(): void {
+  chatgptOAuth.close();
 }
 
 async function confirmProviderOrigin(

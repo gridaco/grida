@@ -1,5 +1,6 @@
 "use client";
-// GRIDA-GG: desktop — GG sign-out + BYOK precedence copy (docs/wg/platform/hosted-ai.md)
+// GRIDA-GG: desktop — GG sign-out + provider configuration (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-008 — native-provider controls consume only secret-free status.
 
 import {
   useCallback,
@@ -48,6 +49,7 @@ import {
 import {
   DesktopBridgeMissingError,
   OLLAMA_ENDPOINT_PRESET,
+  account,
   app,
   images,
   video,
@@ -65,7 +67,8 @@ import {
   DesktopPageContent,
   DesktopPageShell,
 } from "@/scaffolds/desktop/chrome/page-shell";
-import * as gridaGateway from "@/lib/desktop/gg-session";
+import * as chatgptSubscription from "@/lib/desktop/chatgpt-subscription";
+import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
 import { CreditsSection } from "./_components/credits-section";
 
 /**
@@ -100,25 +103,25 @@ export default function DesktopSettingsPage() {
           title="LLM Providers"
           description="Text model providers for Grida's native agent."
         >
-          <ByokSection
+          <ProviderListCard
             title="Providers"
             description={
               <>
-                Connect provider API keys or local model endpoints.
-                Grida-included AI works when you&apos;re signed in; keys you add
-                here take precedence.
+                Connect ChatGPT, an API-key provider, or a local model endpoint.
+                Grida-included AI works when you&apos;re signed in.
               </>
             }
             modalities={["text"]}
+            leading={<ChatGptProviderRow />}
           >
             <OllamaProviderRow />
-          </ByokSection>
+          </ProviderListCard>
         </SettingsSection>
         <SettingsSection
           title="Image/Video/Audio Providers"
           description="Generation providers for media workflows."
         >
-          <ByokSection
+          <ProviderListCard
             title="Media Provider Keys"
             description="Provider keys for image, video, and audio workflows. Providers that also serve LLMs may appear in both sections."
             modalities={["image", "video"]}
@@ -129,6 +132,159 @@ export default function DesktopSettingsPage() {
         <AboutSection />
       </DesktopPageContent>
     </DesktopPageShell>
+  );
+}
+
+function ChatGptProviderRow() {
+  const state = useChatGptSubscription();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (state.kind === "unsupported") return null;
+
+  const status = state.kind === "ready" ? state.status : null;
+  const connected = status?.signed_in === true;
+  const ready = status?.ready === true;
+  const signingIn = busy || status?.signing_in === true;
+  const accountLabel =
+    status?.account?.email ??
+    (status?.account?.plan
+      ? `ChatGPT ${status.account.plan}`
+      : connected
+        ? "ChatGPT account"
+        : null);
+  const displayError = error ?? (state.kind === "error" ? state.message : null);
+
+  const handleConnect = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await chatgptSubscription.connect();
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setError(null);
+    try {
+      await chatgptSubscription.cancel();
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await chatgptSubscription.signOut();
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex size-5 shrink-0 items-center justify-center rounded border bg-background">
+              <OpenAILogo
+                aria-hidden="true"
+                className="size-4 text-foreground"
+              />
+            </span>
+            <span className="truncate text-base font-medium">
+              ChatGPT Subscription
+            </span>
+            {ready ? (
+              <CheckIcon
+                aria-hidden="true"
+                className="size-4 shrink-0 text-emerald-600"
+              />
+            ) : null}
+          </span>
+          <span className="flex shrink-0 items-center gap-3">
+            {state.kind === "loading" ? (
+              <Skeleton className="h-4 w-16" />
+            ) : null}
+            <ChevronDownIcon
+              aria-hidden="true"
+              className={`size-4 text-muted-foreground transition-transform ${
+                open ? "rotate-180" : ""
+              }`}
+            />
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="px-6 pb-5 text-sm text-muted-foreground">
+          <p className="text-foreground">
+            {ready
+              ? "ChatGPT is connected."
+              : connected
+                ? "Reconnect ChatGPT to use your subscription."
+                : "Sign in to use eligible coding models from your ChatGPT plan."}
+          </p>
+          {connected && accountLabel ? (
+            <p className="mt-2">{accountLabel}</p>
+          ) : null}
+          <div className="mt-3">
+            {state.kind === "loading" ? (
+              <Skeleton className="h-9 w-full" />
+            ) : connected ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => void handleSignOut()}
+              >
+                {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                Sign out
+              </Button>
+            ) : signingIn ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void handleCancel()}
+              >
+                Cancel
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => void handleConnect()}>
+                Sign in with your ChatGPT account
+              </Button>
+            )}
+          </div>
+
+          {status?.signed_in && !status.ready ? (
+            <p className="mt-2 text-xs text-destructive" role="status">
+              This ChatGPT session is missing required account details. Sign
+              out, then sign in again.
+            </p>
+          ) : null}
+          {displayError ? (
+            <p className="mt-2 text-xs text-destructive" role="alert">
+              {displayError}
+            </p>
+          ) : null}
+          <p className="mt-3 text-xs">
+            Model availability and usage limits depend on your ChatGPT plan.
+          </p>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -156,9 +312,9 @@ function SettingsSection({
 
 type AccountState =
   | { kind: "loading" }
-  | { kind: "signed-out" }
   | { kind: "signed-in"; email: string | null }
-  | { kind: "signing-out" };
+  | { kind: "signing-out" }
+  | { kind: "unavailable" };
 
 /**
  * The Grida account this app is signed in with. Session reads and sign-out
@@ -167,9 +323,9 @@ type AccountState =
  * would be handed to the OS browser by the navigation guard (see
  * GRIDA-SEC-005 in /SECURITY.md).
  *
- * The cookie jar is shared across all desktop windows, so signing out here
- * signs out the whole app; other open windows keep their rendered state
- * until their next navigation hits the welcome gate.
+ * The cookie jar is shared across all desktop windows. The native entry
+ * controller resolves dirty auxiliary windows, clears the session once, and
+ * repurposes the canonical BrowserWindow as the sign-in surface.
  */
 function AccountSection() {
   const [state, setState] = useState<AccountState>({ kind: "loading" });
@@ -183,11 +339,11 @@ function AccountSection() {
         setState(
           user
             ? { kind: "signed-in", email: user.email }
-            : { kind: "signed-out" }
+            : { kind: "unavailable" }
         );
       })
       .catch(() => {
-        if (!cancelled) setState({ kind: "signed-out" });
+        if (!cancelled) setState({ kind: "unavailable" });
       });
     return () => {
       cancelled = true;
@@ -195,14 +351,12 @@ function AccountSection() {
   }, []);
 
   const signOut = async () => {
+    const email = state.kind === "signed-in" ? state.email : null;
     setState({ kind: "signing-out" });
     try {
-      // GRIDA-SEC-006 — drop the sidecar's hosted-AI session first
-      // (best-effort; the token's 15-min expiry is the backstop).
-      await gridaGateway.clear();
-      await fetch("/desktop/auth/sign-out", { method: "POST" });
-    } finally {
-      window.location.assign("/desktop/auth/sign-in");
+      await account.signOut();
+    } catch {
+      setState({ kind: "signed-in", email });
     }
   };
 
@@ -217,16 +371,10 @@ function AccountSection() {
       <CardContent>
         {state.kind === "loading" ? (
           <Skeleton className="h-9 w-full" />
-        ) : state.kind === "signed-out" ? (
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm text-muted-foreground">Not signed in</span>
-            <Button
-              size="sm"
-              onClick={() => window.location.assign("/desktop/auth/sign-in")}
-            >
-              Sign in
-            </Button>
-          </div>
+        ) : state.kind === "unavailable" ? (
+          <span className="text-sm text-muted-foreground">
+            Account status unavailable
+          </span>
         ) : (
           <div className="flex items-center justify-between gap-4">
             <span className="text-sm">
@@ -313,17 +461,19 @@ function providerServesAny(
   );
 }
 
-function ByokSection({
+function ProviderListCard({
   title,
   description,
   modalities,
   excludeModalities = [],
+  leading,
   children,
 }: {
   title: string;
   description: ReactNode;
   modalities: readonly ProviderModality[];
   excludeModalities?: readonly ProviderModality[];
+  leading?: ReactNode;
   children?: ReactNode;
 }) {
   const byokProviders = secrets
@@ -333,20 +483,15 @@ function ByokSection({
         providerServesAny(provider, modalities) &&
         !providerServesAny(provider, excludeModalities)
     );
-  const precedence = byokProviders
-    .map((provider) => provider.label)
-    .join(" → ");
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          {description}
-          {precedence ? <> Precedence: {precedence}.</> : null}
-        </CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <div className="divide-y">
+          {leading}
           {byokProviders.map((provider) => (
             <ByokRow key={provider.id} provider={provider} />
           ))}
@@ -643,7 +788,7 @@ function AcpSection() {
 
   return (
     <SettingsSection
-      title="ACP (Experimental)"
+      title="External Agents"
       description="External agents connected through the Agent Client Protocol."
     >
       <Card>

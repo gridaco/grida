@@ -1,4 +1,6 @@
 /**
+ * GRIDA-SEC-008 — endpoint ids cannot collide with the ChatGPT provider.
+ *
  * Custom OpenAI-compatible endpoint providers (issue #806 — local LLMs).
  *
  * Client-safe identity + config contract for user-configured endpoints.
@@ -18,7 +20,11 @@
  */
 
 import type { models } from "@grida/ai-models";
-import { isByokProviderId } from "./provider-ids";
+import {
+  isByokProviderId,
+  isChatGptProviderId,
+  isGgProviderId,
+} from "./provider-ids";
 
 /** A model spec consumable by the open registry — `@grida/ai-models`'
  *  custom spec (cost optional, capability flags explicit). This is the
@@ -206,14 +212,19 @@ export function mergeProbedModels(
 }
 
 /**
- * Endpoint ids: short lowercase slugs. Must not collide with the BYOK
- * provider ids — both share the provider-id namespace on sessions,
- * run options, and the secrets store.
+ * Endpoint ids: short lowercase slugs. Must not collide with any built-in
+ * provider id — all provider classes share one namespace on sessions, run
+ * options, and credential/config stores.
  */
 const ENDPOINT_PROVIDER_ID_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 
 export function isValidEndpointProviderId(id: string): boolean {
-  return ENDPOINT_PROVIDER_ID_PATTERN.test(id) && !isByokProviderId(id);
+  return (
+    ENDPOINT_PROVIDER_ID_PATTERN.test(id) &&
+    !isByokProviderId(id) &&
+    !isGgProviderId(id) &&
+    !isChatGptProviderId(id)
+  );
 }
 
 /** Narrow + pin an endpoint base URL: http(s), with no URL userinfo. Shared by the config

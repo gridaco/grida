@@ -38,6 +38,7 @@ import {
 } from "./agent-sidecar-supervisor";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentTransport } from "@grida/agent/transport";
+import type { Workspace } from "@grida/daemon";
 import type {
   AgentLifecycleEvent,
   ChatSessionRow,
@@ -85,25 +86,11 @@ export namespace agentSidecarClient {
    * Returns the resolved `Workspace` — `root` may differ from `rootPath`
    * if the agent server expanded to a containing git repo.
    */
-  export async function openWorkspace(rootPath: string): Promise<{
-    id: string;
-    root: string;
-    name: string;
-    opened_at: number;
-    pinned: boolean;
-  }> {
+  export async function openWorkspace(rootPath: string): Promise<Workspace> {
     return await client().workspaces.open(rootPath);
   }
 
-  export async function listWorkspaces(): Promise<
-    Array<{
-      id: string;
-      root: string;
-      name: string;
-      opened_at: number;
-      pinned: boolean;
-    }>
-  > {
+  export async function listWorkspaces(): Promise<Workspace[]> {
     return await client().workspaces.list();
   }
 
@@ -130,6 +117,12 @@ export namespace agentSidecarClient {
     models: ProbedEndpointModel[];
   }> {
     return await client().providers.probe_endpoint(baseUrl);
+  }
+
+  /** Best-effort cleanup for the short-lived hosted-AI session when the
+   * controller signs the shared Grida account out. */
+  export async function clearGridaGatewaySession(): Promise<void> {
+    await client().gg.clear_session();
   }
 
   /**

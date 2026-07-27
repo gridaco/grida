@@ -7,7 +7,7 @@
  * `auth_error`.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 
 const exchangeCodeForSession =
   vi.fn<
@@ -23,8 +23,10 @@ import { GET } from "./route";
 
 const ORIGIN = "https://grida.test";
 
-function request(pathAndQuery: string): NextRequest {
-  return new Request(`${ORIGIN}${pathAndQuery}`) as unknown as NextRequest;
+function request(pathAndQuery: string, cookie?: string): NextRequest {
+  return new NextRequest(`${ORIGIN}${pathAndQuery}`, {
+    headers: cookie ? { cookie } : undefined,
+  });
 }
 
 function redirectTarget(response: Response): URL {
@@ -38,14 +40,27 @@ beforeEach(() => {
 });
 
 describe("GET /desktop/auth/callback", () => {
-  it("exchanges the code and redirects to the welcome surface", async () => {
+  it("exchanges the code and redirects to the fixed completion surface", async () => {
     exchangeCodeForSession.mockResolvedValue({ error: null });
     const target = redirectTarget(
       await GET(request("/desktop/auth/callback?code=abc"))
     );
     expect(exchangeCodeForSession).toHaveBeenCalledWith("abc");
     expect(target.origin).toBe(ORIGIN);
-    expect(target.pathname).toBe("/desktop/welcome");
+    expect(target.pathname).toBe("/desktop/auth/complete");
+  });
+
+  it("ignores legacy cookies and callback continuation input", async () => {
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+    const target = redirectTarget(
+      await GET(
+        request(
+          "/desktop/auth/callback?code=abc&flow=https%3A%2F%2Fevil.test",
+          "grida.desktop.auth.flow=onboarding"
+        )
+      )
+    );
+    expect(target.pathname).toBe("/desktop/auth/complete");
   });
 
   it("redirects to sign-in with auth_error when the exchange fails", async () => {

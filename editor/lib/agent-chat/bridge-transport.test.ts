@@ -1,4 +1,5 @@
 /* eslint-disable vitest/require-mock-type-parameters */
+// GRIDA-SEC-008 — native-provider pin carriage is bounded and explicit.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UIMessageChunk } from "ai";
 import { desktopAgentTransport } from "./bridge-transport";
@@ -207,6 +208,59 @@ describe("desktopAgentTransport", () => {
 
     expect(ai.startAgentRun).toHaveBeenLastCalledWith(
       expect.objectContaining({ workspace_id: "workspace-1" }),
+      expect.any(Function)
+    );
+  });
+
+  it.each(["chatgpt", "gg", "openrouter", "ollama"])(
+    "forwards the bounded provider id %s from the per-turn body",
+    async (providerId) => {
+      vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+        streamId: "local-1",
+        sessionId: "ses_test",
+        done: Promise.resolve(),
+      }));
+
+      const stream = await desktopAgentTransport.create().sendMessages({
+        trigger: "submit-message",
+        chatId: "chat-1",
+        messageId: undefined,
+        messages: [
+          { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+        ],
+        abortSignal: undefined,
+        body: { provider_id: providerId },
+      });
+      await stream.cancel();
+
+      expect(ai.startAgentRun).toHaveBeenLastCalledWith(
+        expect.objectContaining({ provider_id: providerId }),
+        expect.any(Function)
+      );
+    }
+  );
+
+  it("drops an invalid provider id from the per-turn body", async () => {
+    vi.mocked(ai.startAgentRun).mockImplementation(async () => ({
+      streamId: "local-1",
+      sessionId: "ses_test",
+      done: Promise.resolve(),
+    }));
+
+    const stream = await desktopAgentTransport.create().sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ],
+      abortSignal: undefined,
+      body: { provider_id: "not/a/provider" },
+    });
+    await stream.cancel();
+
+    expect(ai.startAgentRun).toHaveBeenLastCalledWith(
+      expect.objectContaining({ provider_id: undefined }),
       expect.any(Function)
     );
   });

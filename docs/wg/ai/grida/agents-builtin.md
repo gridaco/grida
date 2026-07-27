@@ -23,6 +23,11 @@ For the abstract `task` tool, the `subagent` agent mode, and permission
 inheritance, read the RFC. What follows is delta: which subagents Grida
 runs, on which tier, against which provider, with which sentinel.
 
+Every built-in subagent inherits the parent session's provider-qualified
+choice. Titling, compaction, planning, and recovery MUST NOT silently move a
+session to a different capacity source. If the chosen provider cannot serve
+the auxiliary tier, that operation defers or fails without changing provider.
+
 ## Catalog
 
 | Id          | Status  | Triggers when                                                                        | Output                                                    |
@@ -41,9 +46,11 @@ title is anything other than the sentinel `"New Chat"` (`session_title.DEFAULT`)
 Re-firing on every turn is safe because the sentinel changes after the
 first successful run.
 
-**Provider.** Same provider the chat itself is using. V1 is BYOK-only:
-OpenRouter or AI Gateway. The titler never silently swaps to a different
-provider. Any future hosted provider must preserve this rule.
+**Provider.** Same provider-qualified choice as the parent session. This rule
+applies equally to BYOK, GG, configured endpoint/local capacity, and the
+experimental ChatGPT subscription provider. Signing in or out of another
+provider does not silently move auxiliary work; an unavailable stored provider
+defers or fails until the user intentionally changes provider/model.
 
 **Tier.** Cheapest the provider exposes (`nano` tier in
 [`@grida/ai-models`](https://github.com/gridaco/grida/tree/main/packages/grida-ai-models)).

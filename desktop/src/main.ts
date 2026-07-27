@@ -1,4 +1,5 @@
-import { app, shell, BrowserWindow, Menu, dialog } from "electron";
+// GRIDA-SEC-008 — close the main-owned OAuth callback before sidecar shutdown.
+import { app, shell, BrowserWindow, Menu, dialog, session } from "electron";
 import path from "node:path";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
@@ -6,11 +7,7 @@ import create_menu, {
   focus_or_open_canvas_window,
   rebuild_application_menu,
 } from "./menu";
-import {
-  open_welcome_window,
-  open_startup_window,
-  open_document_window,
-} from "./window";
+import { open_document_window } from "./window";
 import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
 import {
   RUNTIME_APP_NAME,
@@ -25,7 +22,7 @@ import {
   describeAgentProviderEndpoint,
   type AgentSidecarInfo,
 } from "./main/agent-sidecar-supervisor";
-import { registerIpcHandlers } from "./main/ipc-handlers";
+import { closeChatGptOAuth, registerIpcHandlers } from "./main/ipc-handlers";
 import { disposeAllTerminals } from "./main/terminal-host";
 import { disposeAllWorkspaceWatches } from "./main/workspace-watcher-host";
 import { agentSidecarClient } from "./main/agent-sidecar-client";
@@ -34,10 +31,13 @@ import {
   handleWorkspaceMediaProtocol,
 } from "./main/workspace-media-protocol";
 import { startAgentNotifications } from "./main/agent-notifications";
-import { routeDeepLink } from "./main/protocol-router";
+import { protocol_router } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
 import { open_handoff } from "./main/open-handoff";
 import { startup_window } from "./main/startup-window-policy";
+import { onboarding_state } from "./main/onboarding-state";
+import { DesktopAccountSession } from "./main/account-session";
+import { DesktopEntryWindow } from "./main/desktop-entry-window";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -106,11 +106,86 @@ if (process.defaultApp && process.argv.length >= 2) {
 // sidecar is up. See `main/workspace-media-protocol.ts`.
 registerWorkspaceMediaScheme();
 
+// The one canonical BrowserWindow that owns boot → sign-in → onboarding →
+// main. Auxiliary document/settings/workspace windows are admitted and
+// registered through this controller only after it reaches `main`.
+let entryWindow: DesktopEntryWindow | null = null;
+const windowAdmission = {
+  can_open: () => entryWindow?.isMain ?? false,
+  register: (window: BrowserWindow) => {
+    if (entryWindow) return entryWindow.registerSecondary(window);
+    window.close();
+    return false;
+  },
+  focus_entry: () => {
+    if (!entryWindow) return;
+    if (entryWindow.window) {
+      entryWindow.focus();
+      return;
+    }
+    void entryWindow.reconcile({ focus: true }).catch((error) => {
+      console.warn("[grida] couldn't reopen entry window:", error);
+    });
+  },
+};
+
+/**
+ * Let Electron serialize the current invoke result before disposing its
+ * sender. Controller role admission has already been revoked synchronously,
+ * so the hidden renderer cannot spend another native capability in this gap.
+ */
+function destroyAfterIpcReply(window: BrowserWindow): void {
+  setTimeout(() => {
+    if (!window.isDestroyed()) window.destroy();
+  }, 0);
+}
+
+app.on("web-contents-created", (_event, contents) => {
+  const reconcileContainedAuthControl = (rawUrl: string) => {
+    const path = DesktopEntryWindow.authControlPathForUrl(
+      rawUrl,
+      EDITOR_BASE_URL
+    );
+    if (!path) return;
+
+    const controller = entryWindow;
+    const source = BrowserWindow.fromWebContents(contents);
+    if (!controller || !source) return;
+
+    // A contained auth navigation is only a signal to re-probe the cookie
+    // session; the URL itself never grants or selects a native role. Hide the
+    // source immediately so an auxiliary/main-sized sign-in page cannot become
+    // a competing entry surface while the serialized probe runs. Both full
+    // loads and Next.js same-document transitions reach this one path.
+    source.hide();
+    void controller.reconcileAuthControlNavigation(source, path).catch(() => {
+      console.warn("[grida] account-navigation revalidation unavailable");
+      // Unavailable is not signed-out authority. Restore the one canonical
+      // window instead of leaving the app hidden. Controller admission remains
+      // fail-closed until a later authoritative probe validates the role.
+      controller.focus();
+    });
+  };
+
+  contents.on("did-navigate", (_navigationEvent, rawUrl) => {
+    reconcileContainedAuthControl(rawUrl);
+  });
+  contents.on(
+    "did-navigate-in-page",
+    (_navigationEvent, rawUrl, isMainFrame) => {
+      if (isMainFrame) reconcileContainedAuthControl(rawUrl);
+    }
+  );
+});
+
 // `onOpenFile` lets the File ▸ Open… picker route a chosen single file
 // through the same handler the OS file-open path uses (dedup + dirty-close
 // shared). `handleFilePath` is a hoisted declaration, so it's referenceable
 // here even though it's defined further down.
-const menu = create_menu(app, shell, { onOpenFile: handleFilePath });
+const menu = create_menu(app, shell, {
+  onOpenFile: handleFilePath,
+  windowAdmission,
+});
 Menu.setApplicationMenu(menu);
 
 // Keep File ▸ Open Recent in sync with the workspace list (the same recents the
@@ -123,11 +198,31 @@ function refresh_recent_menu(): void {
   // not become an unhandled rejection in main; the menu just stays stale until
   // the next trigger. (A sidecar that isn't up yet already resolves to an
   // empty recents list inside `rebuild_application_menu`.)
-  rebuild_application_menu(app, shell, { onOpenFile: handleFilePath }).catch(
-    (err) => console.error("[grida] open-recent menu rebuild failed:", err)
+  rebuild_application_menu(app, shell, {
+    onOpenFile: handleFilePath,
+    windowAdmission,
+  }).catch((err) =>
+    console.error("[grida] open-recent menu rebuild failed:", err)
   );
 }
-app.on("browser-window-focus", refresh_recent_menu);
+let accountRevalidationTimer: NodeJS.Timeout | null = null;
+app.on("browser-window-focus", () => {
+  refresh_recent_menu();
+  if (
+    !entryWindow ||
+    entryWindow.role === "booting" ||
+    accountRevalidationTimer
+  ) {
+    return;
+  }
+  accountRevalidationTimer = setTimeout(() => {
+    accountRevalidationTimer = null;
+    void entryWindow?.reconcile().catch((error) => {
+      // A transient account-status outage must not be treated as sign-out.
+      console.warn("[grida] account revalidation unavailable:", error);
+    });
+  }, 250);
+});
 
 // `grida://` deep-link router lives in `main/protocol-router.ts`.
 // Fire-and-forget from the event handlers below: the deep-link IO is
@@ -141,9 +236,7 @@ app.on("browser-window-focus", refresh_recent_menu);
 // `second-instance` for subsequent ones. Queue everything and drain
 // on ready.
 const pendingFiles: string[] = [];
-const pendingDeepLinks: string[] = [];
-let deepLinkDrainTimer: NodeJS.Timeout | null = null;
-let startupBootstrapComplete = false;
+const pendingAuthCallbacks: string[] = [];
 
 // Live document windows, keyed by agent-server-assigned docId. Used so that
 // re-opening an already-open file focuses the existing window instead
@@ -219,11 +312,20 @@ async function openDocumentWindowForPath(filePath: string) {
     return;
   }
 
+  // Registration above is asynchronous. Authentication or onboarding may
+  // have changed while it was in flight; queue rather than letting a late
+  // document window escape the entry admission gate.
+  if (!entryWindow?.isMain) {
+    if (!pendingFiles.includes(filePath)) pendingFiles.push(filePath);
+    return;
+  }
+
   const window = open_document_window({
     app,
     base_url: EDITOR_BASE_URL,
     doc_id: docId,
   });
+  if (!entryWindow.registerSecondary(window)) return;
   documentWindows.set(docId, window);
   attach_dirty_close_handler(window);
   window.on("closed", () => {
@@ -268,7 +370,16 @@ async function openCanvasBundleForPath(dirPath: string) {
     );
     return;
   }
-  focus_or_open_canvas_window({ app, agentSidecar, workspace_id: workspaceId });
+  if (!entryWindow?.isMain) {
+    if (!pendingFiles.includes(dirPath)) pendingFiles.push(dirPath);
+    return;
+  }
+  focus_or_open_canvas_window({
+    app,
+    agentSidecar,
+    workspace_id: workspaceId,
+    admission: windowAdmission,
+  });
   app.addRecentDocument(dirPath);
 }
 
@@ -279,9 +390,10 @@ function handleFilePath(filePath: string) {
     return;
   }
   if (
+    !agentSidecarInfo ||
     !startup_window.canDispatchLaunchIntent({
       app_ready: app.isReady(),
-      bootstrap_complete: startupBootstrapComplete,
+      entry_main: entryWindow?.isMain ?? false,
     })
   ) {
     if (!pendingFiles.includes(filePath)) pendingFiles.push(filePath);
@@ -291,52 +403,19 @@ function handleFilePath(filePath: string) {
   else void openDocumentWindowForPath(filePath);
 }
 
-function handleDeepLink(url: string) {
-  if (
-    !startup_window.canDispatchLaunchIntent({
-      app_ready: app.isReady(),
-      bootstrap_complete: startupBootstrapComplete,
-    }) ||
-    !getAgentSidecarInfo()
-  ) {
-    queueDeepLink(url);
+async function handleDeepLink(url: string): Promise<void> {
+  const route = protocol_router.route(url);
+  if (route.kind === "ignored") return;
+  if (!app.isReady() || !entryWindow) {
+    if (!pendingAuthCallbacks.includes(url)) pendingAuthCallbacks.push(url);
     return;
   }
-  void routeDeepLink(url).then((handled) => {
-    if (!handled) queueDeepLink(url);
+  const completed = await runEntryOperationWithRetry(async () => {
+    await entryWindow?.handleAuthCallback(route.callback_url);
   });
-}
-
-function queueDeepLink(url: string) {
-  if (!pendingDeepLinks.includes(url)) pendingDeepLinks.push(url);
-  scheduleDeepLinkDrain();
-}
-
-function scheduleDeepLinkDrain() {
-  if (deepLinkDrainTimer) return;
-  deepLinkDrainTimer = setTimeout(() => {
-    deepLinkDrainTimer = null;
-    void drainDeepLinks();
-  }, 500);
-}
-
-async function drainDeepLinks() {
-  if (
-    !startup_window.canDispatchLaunchIntent({
-      app_ready: app.isReady(),
-      bootstrap_complete: startupBootstrapComplete,
-    }) ||
-    !getAgentSidecarInfo()
-  ) {
-    if (pendingDeepLinks.length > 0) scheduleDeepLinkDrain();
-    return;
+  if (!completed) {
+    app.quit();
   }
-  const batch = pendingDeepLinks.splice(0);
-  for (const url of batch) {
-    const handled = await routeDeepLink(url);
-    if (!handled) pendingDeepLinks.push(url);
-  }
-  if (pendingDeepLinks.length > 0) scheduleDeepLinkDrain();
 }
 
 app.on("open-file", (event, filePath) => {
@@ -347,17 +426,14 @@ app.on("open-file", (event, filePath) => {
 // Also pick up file args from the first-instance command line (Win/Linux).
 // macOS delivers the opened document via `open-file` (above), not argv.
 for (const open of open_handoff.fromArgv(process.argv)) {
-  if (open.kind === "url") pendingDeepLinks.push(open.url);
+  if (open.kind === "url") pendingAuthCallbacks.push(open.url);
   else pendingFiles.push(open.path);
 }
 
 app.on("second-instance", (_event, argv, _workingDirectory, additionalData) => {
-  // Focus an existing window so the user knows we routed the request.
-  const existing = BrowserWindow.getAllWindows()[0];
-  if (existing) {
-    if (existing.isMinimized()) existing.restore();
-    existing.focus();
-  }
+  // Focus the controller-owned entry window, never an arbitrary Settings or
+  // document window.
+  entryWindow?.focus();
   // Prefer the forwarded `additionalData` — the secondary's captured opens.
   // This is the ONLY reliable channel on macOS, where the opened document
   // never appears in the second instance's argv (it arrives as an `open-file`
@@ -366,7 +442,7 @@ app.on("second-instance", (_event, argv, _workingDirectory, additionalData) => {
   const forwarded = open_handoff.decode(additionalData);
   const opens = forwarded.length > 0 ? forwarded : open_handoff.fromArgv(argv);
   for (const open of opens) {
-    if (open.kind === "url") handleDeepLink(open.url);
+    if (open.kind === "url") void handleDeepLink(open.url);
     else handleFilePath(open.path);
   }
 });
@@ -374,13 +450,84 @@ app.on("second-instance", (_event, argv, _workingDirectory, additionalData) => {
 // macOS deep-link arrival.
 app.on("open-url", (event, url) => {
   event.preventDefault();
-  handleDeepLink(url);
+  void handleDeepLink(url);
 });
 
 // agent sidecar info is set once on ready; stays in scope for `activate`,
 // menu actions, and the file-handle path. The supervisor maintains
 // the live reference internally for restart-on-crash continuity.
 let agentSidecarInfo: AgentSidecarInfo | null = null;
+let providerApprovalStarted = false;
+
+function approveConfiguredProviderEndpointsWhenReady(): void {
+  if (providerApprovalStarted || !agentSidecarInfo || !entryWindow?.isMain) {
+    return;
+  }
+  providerApprovalStarted = true;
+  void approveConfiguredProviderEndpoints().catch((error) => {
+    console.error("[grida] configured provider approval failed:", error);
+  });
+}
+
+function dispatchPendingLaunchIntents(): void {
+  for (const filePath of pendingFiles.splice(0)) {
+    handleFilePath(filePath);
+  }
+}
+
+async function dispatchPendingAuthCallbacks(): Promise<void> {
+  for (const url of pendingAuthCallbacks.splice(0)) {
+    await handleDeepLink(url);
+  }
+}
+
+async function openEntryWindowWithRetry(
+  initialAuthUrl?: string
+): Promise<boolean> {
+  if (!entryWindow) return false;
+  let callbackUrl: string | undefined;
+  if (initialAuthUrl) {
+    const route = protocol_router.route(initialAuthUrl);
+    if (route.kind === "auth-callback") callbackUrl = route.callback_url;
+  }
+  return await runEntryOperationWithRetry(async () => {
+    if (callbackUrl) {
+      // Keep the same bounded callback intent until the controller succeeds.
+      // PKCE codes are single-use, so a processed replay still fails safe and
+      // the subsequent account probe remains authoritative.
+      await entryWindow?.handleAuthCallback(callbackUrl);
+      callbackUrl = undefined;
+    } else {
+      await entryWindow?.open();
+    }
+  });
+}
+
+async function runEntryOperationWithRetry(
+  operation: () => Promise<void>
+): Promise<boolean> {
+  for (;;) {
+    try {
+      await operation();
+      return true;
+    } catch {
+      // Never inspect/log account callback errors: Electron navigation errors
+      // may contain the single-use code in their URL.
+      console.error("[grida] account entry operation unavailable");
+      const result = await dialog.showMessageBox({
+        type: "warning",
+        message: "Grida couldn't connect",
+        detail:
+          "Check your internet connection, then try again. Your account has not been signed out.",
+        buttons: ["Try Again", "Quit"],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+      if (result.response !== 0) return false;
+    }
+  }
+}
 
 app.on("ready", async () => {
   // GRIDA-SEC-004 — single-instance enforcement (deferred from module top;
@@ -392,7 +539,7 @@ app.on("ready", async () => {
   const isPrimary = app.requestSingleInstanceLock(
     open_handoff.encode([
       ...pendingFiles.map((path) => ({ kind: "file", path }) as const),
-      ...pendingDeepLinks.map((url) => ({ kind: "url", url }) as const),
+      ...pendingAuthCallbacks.map((url) => ({ kind: "url", url }) as const),
     ])
   );
   if (!isPrimary) {
@@ -408,58 +555,142 @@ app.on("ready", async () => {
     app.dock?.setIcon(create_runtime_app_icon());
   }
 
+  const nativeOnboardingComplete = await onboarding_state.isComplete(
+    app.getPath("userData")
+  );
+  const startupBootstrap = startup_window.bootstrap({
+    pending_files: pendingFiles.length,
+  });
+  const accountSession = new DesktopAccountSession({
+    base_url: EDITOR_BASE_URL,
+    fetch: async (url, init) =>
+      (await session.defaultSession.fetch(url, init)) as Response,
+  });
+  let markAuthenticatedEntryReady!: () => void;
+  const authenticatedEntryReady = new Promise<void>((resolve) => {
+    markAuthenticatedEntryReady = resolve;
+  });
+  entryWindow = new DesktopEntryWindow({
+    app,
+    base_url: EDITOR_BASE_URL,
+    account: accountSession,
+    onboarding_complete: nativeOnboardingComplete,
+    mark_onboarding_complete: async () => {
+      await onboarding_state.markComplete(app.getPath("userData"));
+    },
+    startup_main_path:
+      startupBootstrap === "restore-last-workspace"
+        ? "/desktop/welcome?startup=restore-last-workspace"
+        : "/desktop/welcome",
+    before_authenticated_entry: async () => {
+      await authenticatedEntryReady;
+    },
+    clear_hosted_session: async () => {
+      await agentSidecarClient.clearGridaGatewaySession();
+    },
+    on_role_change: (role) => {
+      refresh_recent_menu();
+      if (role === "main") {
+        approveConfiguredProviderEndpointsWhenReady();
+        dispatchPendingLaunchIntents();
+      }
+    },
+  });
+
   // Native-OS IPC handlers are needed before any window opens —
   // otherwise the renderer's first bridge call races the registration.
-  registerIpcHandlers();
+  registerIpcHandlers({
+    resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
+    on_onboarding_complete: async ({ window, workspace_id: workspaceId }) => {
+      try {
+        await entryWindow?.completeOnboarding(window, workspaceId);
+      } catch {
+        const recovered = await runEntryOperationWithRetry(async () => {
+          await entryWindow?.reconcile({ focus: true });
+        });
+        if (!recovered) app.quit();
+        throw new Error("onboarding completion could not be finalized");
+      }
+    },
+    on_account_sign_out: async ({ window }) => {
+      if (!entryWindow) throw new Error("entry window is unavailable");
+      let result: { close_sender_after_reply: boolean };
+      try {
+        result = await entryWindow.signOut(window);
+      } catch (error) {
+        if (error instanceof DesktopEntryWindow.SignOutCancelledError) {
+          throw error;
+        }
+        const recovered = await runEntryOperationWithRetry(async () => {
+          await entryWindow?.reconcile({ focus: true });
+        });
+        if (!recovered) app.quit();
+        if (
+          recovered &&
+          entryWindow?.role === "sign-in" &&
+          window !== entryWindow.window
+        ) {
+          destroyAfterIpcReply(window);
+        }
+        throw new Error("account sign-out could not be finalized");
+      }
+      if (result.close_sender_after_reply) {
+        destroyAfterIpcReply(window);
+      }
+    },
+  });
 
-  try {
-    agentSidecarInfo = await startAgentSidecar();
-    await approveConfiguredProviderEndpoints();
-    console.log(
-      `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
-    );
-    // Desktop notifications on turn-finish / pending-approval (RFC
-    // `events.md` §the first consumer). Main-owned so a turn with no
-    // renderer attached (queue drain, closed window) still notifies.
-    startAgentNotifications();
-    // Now that the sidecar is up, serve `grida-workspace://` media requests by
-    // proxying to its streamed `/workspaces/file` route (#924).
-    handleWorkspaceMediaProtocol();
-  } catch (err) {
-    console.error("[grida] agent sidecar failed to start:", err);
-    dialog.showErrorBox(
-      "Grida couldn't start",
-      "The Grida agent sidecar failed to start. Please relaunch the app or report this issue."
-    );
+  // Start the local sidecar in parallel, but do not let it—or provider
+  // approval UI—sit in front of the required Grida account entry flow.
+  const sidecarStartup = (async (): Promise<boolean> => {
+    try {
+      agentSidecarInfo = await startAgentSidecar();
+      console.log(
+        `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
+      );
+      // Desktop notifications on turn-finish / pending-approval (RFC
+      // `events.md` §the first consumer). Main-owned so a turn with no
+      // renderer attached (queue drain, closed window) still notifies.
+      startAgentNotifications(windowAdmission);
+      // Now that the sidecar is up, serve `grida-workspace://` media requests
+      // by proxying to its streamed `/workspaces/file` route (#924).
+      handleWorkspaceMediaProtocol();
+      markAuthenticatedEntryReady();
+      return true;
+    } catch (err) {
+      console.error("[grida] agent sidecar failed to start:", err);
+      dialog.showErrorBox(
+        "Grida couldn't start",
+        "The Grida agent sidecar failed to start. Please relaunch the app or report this issue."
+      );
+      app.quit();
+      return false;
+    }
+  })();
+
+  // A cold-start callback enters through the hidden controller window before
+  // any ordinary role is shown, avoiding a sign-in flash between the system
+  // browser and the authenticated destination.
+  const initialAuthCallback = pendingAuthCallbacks.shift();
+  if (!(await openEntryWindowWithRetry(initialAuthCallback))) {
     app.quit();
     return;
   }
 
-  const startupBootstrap = startup_window.bootstrap({
-    pending_files: pendingFiles.length,
-    pending_deep_links: pendingDeepLinks.length,
-  });
-  if (startupBootstrap === "restore-last-workspace") {
-    open_startup_window({ app, base_url: EDITOR_BASE_URL });
-  } else {
-    // An explicit file/deep-link launch retains the existing plain Welcome
-    // bootstrap. It must not race an unrelated workspace restoration.
-    open_welcome_window({ app, base_url: EDITOR_BASE_URL });
-  }
-  startupBootstrapComplete = true;
+  if (!(await sidecarStartup)) return;
 
   // Populate File ▸ Open Recent now that the sidecar can answer `workspaces.list`
   // (the module-top menu was built before it was up).
   refresh_recent_menu();
+  approveConfiguredProviderEndpointsWhenReady();
 
-  // Drain anything that arrived before ready. `splice(0)` clears the
-  // queue atomically so any `open-file` event firing during the drain
-  // (the handler now sees `app.isReady() === true`) doesn't get
-  // re-handled, and we avoid the O(n²) of repeated `shift()`.
-  for (const f of pendingFiles.splice(0)) {
-    handleFilePath(f);
+  // Account callbacks are control-plane events: drain them independently of
+  // onboarding/work admission. Work files drain from the controller's `main`
+  // transition.
+  await dispatchPendingAuthCallbacks();
+  if (entryWindow.isMain) {
+    dispatchPendingLaunchIntents();
   }
-  void drainDeepLinks();
 });
 
 async function approveConfiguredProviderEndpoints(): Promise<void> {
@@ -521,18 +752,18 @@ app.on("window-all-closed", () => {
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0 && agentSidecarInfo) {
-    open_welcome_window({
-      app,
-      base_url: EDITOR_BASE_URL,
-    });
-  }
+  if (!agentSidecarInfo || !entryWindow) return;
+  void entryWindow.reconcile({ focus: true }).catch((error) => {
+    console.warn("[grida] account revalidation failed:", error);
+    entryWindow?.focus();
+  });
 });
 
 app.on("before-quit", () => {
   // Belt-and-suspenders — supervisor also listens for this event, and
   // terminal PTYs / workspace watches are also torn down per-window on
   // webContents teardown.
+  closeChatGptOAuth();
   stopAgentSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();

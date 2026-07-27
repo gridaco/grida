@@ -1,4 +1,5 @@
 // GRIDA-GG: provider — construct + wire the GG session store and routes (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-008 — construct the native provider with the shared AuthStore.
 /**
  * `@grida/agent/server` — the agent TENANT of `@grida/daemon` (#927).
  *
@@ -33,8 +34,15 @@ import { registerAgentRoutes } from "./http/routes/agent";
 import { registerDirectoryScopesRoutes } from "./http/routes/directory-scopes";
 import { registerSessionsRoutes } from "./http/routes/sessions";
 import { registerGridaAuthRoutes } from "./http/routes/gg-auth";
+import { registerChatGptAuthRoutes } from "./http/routes/chatgpt-auth";
 import { EndpointProvidersStore } from "./providers/endpoints";
 import { GridaGatewaySessionStore } from "./providers/gg-session";
+import { ChatGptCredentialManager } from "./providers/chatgpt-credentials";
+import {
+  ChatGptProvider,
+  type ChatGptProviderConfig,
+  type ChatGptProviderRuntime,
+} from "./providers/chatgpt";
 import { openSessionsDb } from "./session/db";
 import { SessionsStore } from "./session/store";
 import { AgentRuntime } from "./runtime";
@@ -51,6 +59,12 @@ export {
   type DirectoryScopeRegistryOptions,
 } from "./session/directory-scopes";
 export type { ProviderHttpTransport } from "./providers/http";
+export { CHATGPT_AUTH_ROUTE_PATHS } from "./http/routes/chatgpt-auth";
+export type {
+  ChatGptAuthStart,
+  ChatGptOAuthConfig,
+} from "./providers/chatgpt-credentials";
+export type { ChatGptProviderConfig } from "./providers/chatgpt";
 
 // Re-exported for hosts that compose or probe the daemon through this
 // package (the CLI, tests). The daemon package is the owner.
@@ -182,6 +196,15 @@ export type AgentTenantOptions = {
    */
   gg_base_url?: string;
   /**
+   * Native ChatGPT subscription provider. Every endpoint, callback, model,
+   * and client identity is host-injected; omission keeps the provider and its
+   * OAuth routes fully dormant.
+   *
+   * This is a model provider consumed by Grida's own runtime. It does not
+   * enable ACP or delegate the agent loop to Codex.
+   */
+  chatgpt?: ChatGptProviderConfig;
+  /**
    * The host-bundled skills directory (the repo-root `skills/` tree shipped
    * with the app) — the lowest-precedence discovery layer that carries the
    * built-in `svg`/`dotcanvas`/`slides` skills. The host resolves it (desktop
@@ -239,6 +262,20 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       if (gridaGatewayBaseUrl) {
         registerGridaAuthRoutes(app, {
           store: gridaSession,
+          on_provider_ready: signalProviderReady,
+        });
+      }
+      let chatgpt: ChatGptProviderRuntime | undefined;
+      if (caps.providers && opts.chatgpt) {
+        ChatGptProvider.validate(opts.chatgpt);
+        const credentials = new ChatGptCredentialManager(
+          services.auth,
+          providerHttp,
+          opts.chatgpt.oauth
+        );
+        chatgpt = { config: opts.chatgpt, credentials };
+        registerChatGptAuthRoutes(app, {
+          credentials,
           on_provider_ready: signalProviderReady,
         });
       }
@@ -331,6 +368,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         // URL is absent (resolver never picks grida).
         gg: gridaSession,
         gg_base_url: gridaGatewayBaseUrl,
+        chatgpt,
         provider_http: providerHttp,
         workspace_registry: services.workspaces,
         sessions_store: sessionsStore,

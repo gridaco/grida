@@ -43,7 +43,9 @@ export function SignInCard({ authError }: { authError: string | null }) {
     setError(null);
     setPhase("starting");
     try {
-      const res = await fetch("/desktop/auth/start", { method: "POST" });
+      const res = await fetch("/desktop/auth/start", {
+        method: "POST",
+      });
       if (!res.ok) throw new Error("start_failed");
       const { url } = (await res.json()) as { url: string };
       const bridge = getDesktopBridge();
@@ -57,7 +59,7 @@ export function SignInCard({ authError }: { authError: string | null }) {
   };
 
   return (
-    <DesktopPageShell>
+    <DesktopPageShell titleBarClassName="border-b-0">
       <DesktopPageContent className="flex items-center justify-center">
         <div className="flex w-full max-w-xs flex-col items-center gap-6 px-6 py-12">
           <GridaLogo size={32} />

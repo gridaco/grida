@@ -288,8 +288,9 @@ become public the moment they're shipped. Always go through
 
 **What it protects.** The Grida Desktop V1 ships a local daemon
 sidecar (Node subprocess of the Electron app) that owns the user's BYOK
-keys (OpenRouter, Vercel AI Gateway), local file paths, chat sessions,
-and AI agent loops. Electron main listens on an ephemeral
+keys (OpenRouter, Vercel AI Gateway), native-provider OAuth credentials
+(GRIDA-SEC-008), local file paths, chat sessions, and AI agent loops.
+Electron main listens on an ephemeral
 `127.0.0.1` port and transfers only accepted connected sockets to the
 socketless sidecar, whose authenticated daemon protocol is the canonical local
 capability surface for the renderer. If anything other than the legitimate
@@ -355,6 +356,18 @@ single control is insufficient.
    the `will-navigate` / `did-navigate-in-page` allowlist in
    `desktop/src/window.ts` — `contextBridge.exposeInMainWorld` has no
    revocation API, so the navigation guards defend the post-mount surface.
+   Path eligibility is not capability admission by itself:
+   `desktop/src/main/desktop-entry-window.ts` resolves an exact sender window
+   to its current native role only while that role is stable, and
+   `desktop/src/main/ipc-admission.ts` applies a closed role + pathname +
+   channel policy inside the common guarded-IPC wrapper. Main rejects auth and
+   onboarding paths even before a navigation observer runs; sign-in receives
+   only browser launch + read-only title-bar state. Onboarding receives only
+   ChatGPT controls, completion, and two purpose-scoped main-owned workspace
+   operations (read the default or choose/register one folder). It never
+   receives the daemon connection tuple or a generic filesystem dialog. A
+   transitioning, stale, foreign, or post-sign-out auxiliary renderer resolves
+   to no role and receives no IPC capability.
 
 2. **CSP-strict `/desktop/*` routes** — [`editor/proxy.ts`](editor/proxy.ts)
    sets a per-request nonce-based CSP on every `/desktop/*` response,
@@ -448,7 +461,10 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    enumerated provider-owned namespaces — there is no arbitrary public-URL
    grant.
    There is no renderer broker method, loopback proxy, socket path, or
-   environment credential. When this transport is enabled, the outer `srt`
+   environment credential. The ChatGPT-subscription lane registered by
+   GRIDA-SEC-008 adds only exact `auth.openai.com` token and `chatgpt.com`
+   Responses destinations; those grants are never eligible for the asset lane.
+   When this transport is enabled, the outer `srt`
    policy omits BYOK/GG destinations, so missing provider wiring cannot fall
    back to direct sidecar egress. Electron main transiently observes provider
    request headers and bodies while transporting them, but never persists,
@@ -800,7 +816,7 @@ Today:
 
 - [editor/lib/supabase/server.ts](editor/lib/supabase/server.ts) — `createClientFromBearer` (bearer-auth shim for existing private editor routes that allow Desktop-originated calls without browser cookies).
 - [editor/app/(api)/private/ai/design/chat/route.ts](<editor/app/(api)/private/ai/design/chat/route.ts>) — legacy SVG/web whole-agent route; accepts bearer auth for existing Desktop SVG callers during migration.
-- [packages/grida-ai-agent/src/providers/index.ts](packages/grida-ai-agent/src/providers/index.ts) — BYOK-only provider resolver; never exposes credentials to the renderer.
+- [packages/grida-ai-agent/src/providers/index.ts](packages/grida-ai-agent/src/providers/index.ts) — native/BYOK/hosted/endpoint provider resolver; never exposes credentials to the renderer. The ChatGPT arm is additionally bound by GRIDA-SEC-008.
 - [packages/grida-daemon/src/daemon.ts](packages/grida-daemon/src/daemon.ts) — daemon discovery contract: owner-only atomic registration + persistent credential, loopback-only records, authenticated probe.
 - [packages/grida-ai-agent/src/runtime/index.ts](packages/grida-ai-agent/src/runtime/index.ts) — agent run orchestration; owns run / stream / abort behavior and binds a consumed human-input result to the exact resumed run through terminal recorder settlement.
 - [packages/grida-ai-agent/src/runtime/stream-registry.ts](packages/grida-ai-agent/src/runtime/stream-registry.ts) — in-flight run replay/abort registry; async model producers append and finish only through their exact `StreamEntry` generation, so a late response or error from aborted turn A cannot mutate queued replacement B under the same session id. Explicit human abort remains session-keyed so it targets whichever turn is current.
@@ -830,8 +846,9 @@ Today:
 - `desktop/src/main/agent-network-host.ts` and `agent-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization, and per-spawn built-in/custom grant state.
 - `desktop/src/main/agent-sandbox-policy.ts` — binds Desktop's strict sandbox posture: empty direct external egress, host-routed provider HTTP, and no generic local bind/connect authority.
 - `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported; owns both private channels and removes direct provider hosts from the sidecar policy (Desktop deliberately withholds srt's alpha Windows backend pending a supported lifecycle).
+- `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active; the Grida-account transition is additionally bound by GRIDA-SEC-005.
 - `desktop/src/main/protocol-router.ts` — deep-link protocol guard; the auth callback arm is bound by GRIDA-SEC-005.
-- `desktop/src/main/ipc-handlers.ts` — validates every native IPC sender frame before executing OS capabilities; custom endpoint set/probe/delete additionally owns the native exact-origin grant ceremony.
+- `desktop/src/main/ipc-handlers.ts`, `desktop/src/main/ipc-sender.ts`, and `desktop/src/main/ipc-admission.ts` — validate every native IPC sender frame, exact controller-owned window role, pathname, and channel before executing OS capabilities; redact query/fragment/userinfo from denied-sender diagnostics; and give sign-in/onboarding only their closed entry-role allowlists. Custom endpoint set/probe/delete additionally owns the native exact-origin grant ceremony.
 - `packages/grida-daemon/src/daemon-server.ts` — lifecycle owner for the same guarded Hono app in either loopback-listening or socketless host-delivered `fetch(Request)` mode; shutdown cancels and joins active response streams.
 - `packages/grida-daemon/src/http/server.ts` — daemon route registration and the `DaemonTenant` seam behind shared guards; `packages/grida-ai-agent/src/server.ts` — the agent tenant that mounts the AI route groups through it.
 - `packages/grida-ai-agent/src/http/routes/secrets.ts` — BYOK key presence/set/delete route group; no key-read route.
@@ -862,7 +879,9 @@ bridge first. Any IPC handler in Electron main that acts without
 checking `event.senderFrame.url`. A `grida://` deep-link handler that
 exchanges OAuth codes itself — the exchange belongs to the same-origin
 `/desktop/auth/callback` route against the webview-held PKCE verifier
-cookie (GRIDA-SEC-005).
+cookie (GRIDA-SEC-005). The fixed `http://localhost` callback for the native
+ChatGPT model provider is a separate main-owned ceremony registered under
+GRIDA-SEC-008; it must not reuse or widen this Grida-account deep-link arm.
 
 ---
 
@@ -875,9 +894,10 @@ unchanged. The ceremony runs in the system browser (RFC 8252; embedded
 webviews are blocked by providers) and returns through the
 `grida://auth/callback` deep link. The boundary is the rule that **a
 `grida://` deep link is untrusted, world-invokable input: it must never
-be able to create, steal, or redirect a session. The only thing a deep
-link may cause is a navigation of a desktop window to the fixed
-same-origin `/desktop/auth/callback` route.**
+be able to create, steal, or redirect a session by itself. Its only
+deep-link-controlled navigation is the fixed same-origin
+`/desktop/auth/callback` handoff to the one controller-owned entry window;
+the cookie-held PKCE verifier remains the authority for exchange.**
 
 **Vulnerable scenario (prevented).** Custom-protocol URLs are invokable
 by any webpage and any local process (`open "grida://…"`). Without the
@@ -928,19 +948,40 @@ paths, and params are public, so the design must not rely on obscurity.
    inherent to any browser OAuth handoff and bounded by the 5-min,
    single-use code; the systematic third-party beacon is what is closed
    here.
-3. **Stateless, fixed-target router** —
+3. **Pure, stateless, fixed-target parser** —
    [desktop/src/main/protocol-router.ts](desktop/src/main/protocol-router.ts)
-   performs no code exchange and holds no auth state. It navigates a
-   desktop window to the constant `/desktop/auth/callback` path on the
-   configured editor origin, forwarding only the known
-   `code`/`error*` params; nothing else from the deep link crosses the
-   boundary, and every branch consumes the URL (no re-queue loop).
-4. **Exchange only at the same-origin callback route** —
+   has no Electron dependency, performs no code exchange, holds no auth state,
+   and never searches for or navigates a window. It reduces untrusted protocol
+   input to a closed native intent whose target is the constant
+   `/desktop/auth/callback` path on the configured editor origin, forwarding
+   only the known `code`/`error*` params. Nothing else from the deep link
+   crosses the boundary, and every branch consumes the URL (no re-queue loop).
+4. **Exact entry-window ownership** —
+   [desktop/src/main/desktop-entry-window.ts](desktop/src/main/desktop-entry-window.ts)
+   owns the one canonical sign-in → onboarding → main `BrowserWindow`.
+   [desktop/src/main.ts](desktop/src/main.ts) gives the parser's closed callback
+   intent only to that controller—never a focused-window, first-window, or
+   URL-matched fallback. The controller re-checks the exact configured origin
+   and `/desktop/auth/callback` path before it hides and navigates its own
+   window. Auth callbacks are control-plane events: while the entry role is
+   booting or sign-in they bypass onboarding and work-file admission. Once
+   onboarding or main is active, stale/world-invokable account callbacks are
+   ignored so they cannot navigate a live workstation away from user work.
+5. **Exchange only at the same-origin callback; fixed native handoff** —
    [editor/app/desktop/auth/callback/route.ts](editor/app/desktop/auth/callback/route.ts)
    runs `exchangeCodeForSession` with the cookie client (identical
-   mechanism to the web `(auth)/auth/callback`); success and failure
-   both redirect inside `/desktop/*`.
-5. **Redirect containment** — the `will-redirect` guard in
+   mechanism to the web `(auth)/auth/callback`). Success always redirects to
+   the inert [fixed completion route](editor/app/desktop/auth/complete/page.tsx);
+   failure always redirects to the fixed desktop sign-in route. Neither HTTP
+   route chooses onboarding, a workspace, or a caller-supplied destination.
+   After the contained exchange, the controller re-probes the cookie session
+   through [desktop/src/main/account-session.ts](desktop/src/main/account-session.ts)
+   and [the fixed `/desktop/auth/me` route](editor/app/desktop/auth/me/route.ts),
+   combines only the resulting `signed-in` / `signed-out` state with native
+   onboarding state, and chooses the next role. A transport, redirect,
+   upstream-availability, or schema failure is `unavailable`, never evidence
+   that the user is signed out.
+6. **Redirect containment; non-navigating sign-out** — the `will-redirect` guard in
    [desktop/src/window.ts](desktop/src/window.ts) holds server 302s to
    the same same-origin `/desktop/*` allowlist as user navigations
    (`will-navigate` does not fire for server redirects, so without the
@@ -949,8 +990,36 @@ paths, and params are public, so the design must not rely on obscurity.
    Sign-out is the same-origin
    [editor/app/desktop/auth/sign-out/route.ts](editor/app/desktop/auth/sign-out/route.ts):
    navigating the webview to the web `/sign-out` would be blocked and
-   `shell.openExternal`'d — logging the user out of their OS browser.
-6. **Ceremony in the system browser only** — the launch URL travels
+   `shell.openExternal`'d — logging the user out of their OS browser. The
+   desktop route accepts only Electron main's explicit
+   `Sec-Grida-Desktop-Account-Session: sign-out` intent accompanied by
+   browserless Fetch Metadata (`Sec-Fetch-Site: none`,
+   `Sec-Fetch-Mode: no-cors`, `Sec-Fetch-Dest: empty`, and no `Origin`).
+   Those `Sec-` headers cannot be authored by renderer fetch/XHR/form/service
+   worker code, so a renderer cannot mutate the shared cookie around the
+   controller. The route returns only a non-redirecting `204` on success; an
+   HTTP response never selects the next native role.
+7. **One serialized global sign-out** —
+   [desktop/src/main/ipc-handlers.ts](desktop/src/main/ipc-handlers.ts)
+   accepts the account sign-out capability only from the exact Settings path,
+   then delegates to the entry controller. The controller requires the main
+   role and closes every other registered auxiliary window before mutating the
+   shared cookie session. If an existing dirty-window close handler keeps any
+   auxiliary window alive, sign-out aborts while credentials are still intact.
+   Before the cookie mutation starts, the controller synchronously revokes IPC
+   admission from every sender. Only after that close phase succeeds does
+   [desktop/src/main/account-session.ts](desktop/src/main/account-session.ts)
+   POST to the fixed sign-out endpoint, reject redirects or non-success,
+   treat that success as the irreversible cookie-mutation authority, and
+   transition the same entry window to sign-in. An auxiliary Settings sender
+   may stay hidden only long enough for Electron to serialize its successful
+   invoke reply; it has no admitted IPC role in that interval and main then
+   destroys it. A later account probe cannot roll back cookie deletion or
+   leave the UI presenting a confirmed main role.
+   Reconciliation that independently discovers signed-out state also clears
+   the sidecar's short-lived hosted-account capacity before it hides auxiliary
+   surfaces and presents sign-in.
+8. **Ceremony in the system browser only** — the launch URL travels
    renderer → `shell.open_external` (http/https-validated IPC); the
    webview never loads a provider page, and the `…://auth/callback`
    redirect is allowlisted in Supabase
@@ -969,16 +1038,19 @@ paths, and params are public, so the design must not rely on obscurity.
    either scheme with byte-identical fixed-target behavior; the OS only
    ever delivers a build its own declared scheme.
 
-Electron main holds no durable desktop account or provider credential. Its
-provider broker does transiently route BYOK/GG request headers and bodies; the
-sidecar owns persisted BYOK material and may hold the purpose-scoped,
-short-lived hosted-AI token (GRIDA-SEC-006 — memory-only, renderer-pushed,
-never a refresh token). The durable Grida account session lives in the
-webview's cookie jar and is refreshed by the same `@supabase/ssr` middleware
-machinery as the web app. The `/desktop/*`
-CSP keeps `connect-src` closed, so session reads go through the
-same-origin `/desktop/auth/me` route rather than direct supabase-js
-calls.
+Electron main holds no durable desktop account or provider credential.
+Chromium's default session owns the HttpOnly cookie jar;
+the entry account client invokes `session.defaultSession.fetch` only for the
+two fixed same-origin account routes. Main never reads or exports cookie/token
+material, and `DesktopAccountSession` returns only the three-state projection
+needed by the entry controller—not the route's account payload. Its provider
+broker does transiently route BYOK/GG request headers and bodies; the sidecar
+owns persisted BYOK material and may hold the purpose-scoped, short-lived
+hosted-AI token (GRIDA-SEC-006 — memory-only, renderer-pushed, never a refresh
+token). The durable Grida account session is refreshed by the same
+`@supabase/ssr` middleware machinery as the web app. The `/desktop/*` CSP keeps
+`connect-src` closed, so renderer session reads go through the same-origin
+`/desktop/auth/me` route rather than direct supabase-js calls.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-005 .` to enumerate.
 Today:
@@ -990,8 +1062,17 @@ Today:
 - [editor/host/auth/desktop-auth-flow.ts](editor/host/auth/desktop-auth-flow.ts) — the flow vocabulary shared by the launch page and the insiders route: challenge validation, challenge-bound authorize/OTP builders, verify-link extraction pinned to the Supabase origin (pinned by `desktop-auth-flow.test.ts`).
 - [editor/app/(insiders)/insiders/auth/basic/sign-in/route.ts](<editor/app/(insiders)/insiders/auth/basic/sign-in/route.ts>) (+ the hidden `challenge` passthrough in [basic/page.tsx](<editor/app/(insiders)/insiders/auth/basic/page.tsx>)) — the insiders **email+password** desktop branch: verifies the password exactly like the web insiders flow, then mints the challenge-bound code by firing the GoTrue OTP and consuming the emailed verify link straight from the local Mailpit capture, so the developer keeps email+password and still traverses the production verify → `grida://` → exchange path. A password grant alone can never produce a challenge-bound code (GoTrue returns sessions directly for passwords), which is why the mint rides the OTP-link machinery. Local-only by GRIDA-SEC-002 (`/insiders/*` 404s outside development), which is what makes the Mailpit coupling acceptable (pinned by its `route.test.ts`).
 - [editor/app/desktop/auth/callback/route.ts](editor/app/desktop/auth/callback/route.ts) — the only code-exchange point; `/desktop/*`-contained redirects (pinned by its `route.test.ts`).
-- [editor/app/desktop/auth/sign-out/route.ts](editor/app/desktop/auth/sign-out/route.ts) — same-origin sign-out (never the web `/sign-out`).
+- [editor/app/desktop/auth/complete/page.tsx](editor/app/desktop/auth/complete/page.tsx) — inert, fixed success handoff; contains no routing choice.
+- [editor/app/desktop/auth/me/route.ts](editor/app/desktop/auth/me/route.ts) — no-store, same-origin account projection; distinguishes upstream unavailability from signed-out state (pinned by `route.test.ts`).
+- [editor/lib/desktop/account-session-state.ts](editor/lib/desktop/account-session-state.ts) — shared signed-in/signed-out/unavailable classification for the account projection and protected Desktop server routes; retryable or unclassified auth failures fail closed instead of rendering sign-in (pinned by `account-session-state.test.ts`).
+- [editor/app/desktop/\_components/account-required.tsx](editor/app/desktop/_components/account-required.tsx) — defense-in-depth projection of that classification onto authenticated Desktop routes; unavailable fails closed instead of rendering an extra sign-in surface (pinned by `account-required.test.tsx`).
+- [editor/app/desktop/auth/sign-out/route.ts](editor/app/desktop/auth/sign-out/route.ts) — native-Fetch-Metadata-gated, non-redirecting sign-out (never renderer-callable and never the web `/sign-out`; pinned by `route.test.ts`).
+- [desktop/src/deep-link.ts](desktop/src/deep-link.ts), [desktop/src/env.ts](desktop/src/env.ts), [desktop/forge.config.ts](desktop/forge.config.ts), and [desktop/scripts/prepare-dev-electron-branding.mjs](desktop/scripts/prepare-dev-electron-branding.mjs) — closed per-environment scheme vocabulary and registration; production and local/insiders never contend for one handler.
+- [desktop/src/main/open-handoff.ts](desktop/src/main/open-handoff.ts) + [desktop/src/main.ts](desktop/src/main.ts) — collect OS/secondary-instance callback URLs, re-validate them through the parser, and deliver the closed intent only to the canonical entry controller.
 - [desktop/src/main/protocol-router.ts](desktop/src/main/protocol-router.ts) — stateless fixed-target auth arm (pinned by `protocol-router.test.ts`).
+- [desktop/src/main/account-session.ts](desktop/src/main/account-session.ts) — fixed-route, redirect-refusing account projection and native-intent sign-out over Chromium's cookie-owning session (pinned by `account-session.test.ts`).
+- [desktop/src/main/desktop-entry-window.ts](desktop/src/main/desktop-entry-window.ts) — exact entry-window ownership, serialized role transitions, callback re-probe, auxiliary-window admission, and close-before-sign-out ordering (pinned by `desktop-entry-window.test.ts`).
+- [desktop/src/main/ipc-handlers.ts](desktop/src/main/ipc-handlers.ts) + [desktop/src/main/ipc-admission.ts](desktop/src/main/ipc-admission.ts) — exact sender/role/path/channel validation for the one native account-sign-out transition and narrow sign-in/onboarding IPC capability sets (pinned by `ipc-admission.test.ts`).
 - [desktop/src/window.ts](desktop/src/window.ts) — `will-redirect` guard; `isAllowedNavigation` predicate (pinned by `window.test.ts`).
 
 **What does NOT belong here.** A code exchange in the Electron main
@@ -1003,7 +1084,10 @@ tokens (the scoped hosted-AI token is the one sanctioned exception,
 registered under GRIDA-SEC-006 and the GRIDA-SEC-004 hosted-AI
 paragraph). The launch page in a route group that loads Google/Vercel
 analytics (or any URL-reporting script) — the challenge in its URL is
-confidentiality-sensitive, so it stays in `(untracked)`.
+confidentiality-sensitive, so it stays in `(untracked)`. Provider OAuth for
+the native ChatGPT model provider: its fixed localhost callback, sidecar-held
+credential, and model egress are the distinct GRIDA-SEC-008 boundary and never
+produce a Grida webview cookie session.
 
 ---
 
@@ -1189,9 +1273,156 @@ session scratch. Reading a `SKILL.md` whose realpath escapes its layer root.
 
 ---
 
+### `GRIDA-SEC-008` — ChatGPT subscription OAuth credential boundary
+
+**What it protects.** Grida Desktop can use an eligible ChatGPT subscription
+as a native text-model provider. Grida still owns the agent loop, prompts,
+tools, approvals, sessions, and persistence; this path does not launch Codex,
+Codex app-server, or an ACP agent. The boundary is the rule that **the
+world-invokable localhost OAuth callback can complete only the exact
+main/sidecar attempt that opened it, ChatGPT credentials never cross into the
+renderer, provider traffic can reach only its fixed auth/inference
+destinations, and a stored conversation never changes provider merely because
+ambient provider readiness changed.**
+
+**Vulnerable scenario (prevented).** A webpage or local process races a forged
+request into the fixed callback port and consumes the legitimate user's
+one-time attempt; a compromised renderer asks the bridge for access/refresh
+tokens; a late refresh for account A overwrites a newly connected account B;
+sign-out loses a race and a late exchange resurrects the deleted credential;
+an upstream error body containing provider details is serialized into the
+agent stream; or connecting ChatGPT silently moves an existing BYOK
+conversation onto a different cost/privacy boundary.
+
+**Why it is specifically risky here.** Native-app OAuth client ids and
+loopback redirect URLs are public, localhost HTTP endpoints are reachable by
+webpages and local processes, the refresh token is long-lived, and the
+privileged renderer is hosted at a web origin. Electron main must also
+transiently transport token and inference bytes because the sandboxed sidecar
+has no direct provider egress. None of those components may be treated as
+trusted merely because it is “local.”
+
+**How the code prevents it.**
+
+1. **Two-owner OAuth ceremony.** Electron main binds the callback before
+   browser navigation, on only the approved ports (`1455`, then `1457`) and
+   both available loopback families. The sidecar independently generates the
+   one-use attempt id, random state, and PKCE S256 verifier/challenge for that
+   exact redirect URI. Main accepts only bounded `GET` requests for the exact
+   `/auth/callback` path and `localhost:<bound-port>` Host, constant-time
+   compares state, leaves the attempt usable after a mismatched callback,
+   atomically claims one valid callback, and closes every listener/socket on
+   success, denial, timeout, cancellation, or failure. Browser success is not
+   rendered until token exchange and durable persistence complete.
+2. **Exact browser-open validation.** Before `shell.openExternal`, main
+   requires the exact `https://auth.openai.com/oauth/authorize` origin/path,
+   client, scope, response type, S256 challenge shape, configured product
+   parameters, and the state and redirect URI of the currently bound attempt.
+   Reserved parameters must occur exactly once; credentials, fragments, an
+   alternate approved port, unknown query keys, and lookalike origins fail
+   closed.
+3. **Secret custody and race-safe persistence.** The sidecar alone owns code
+   exchange, access/refresh lifecycle, account metadata, and request-time
+   credential injection. One daemon `AuthStore` instance serializes BYOK and
+   OAuth writes into owner-readable `auth.json` (`0600`, atomic replacement).
+   Refresh is single-flight and rotating refresh tokens are persisted before
+   use. Compare-and-replace/remove guards prevent a late refresh or cancelled
+   exchange from overwriting/removing a newer account. Exact attempt
+   cancellation and a generation invalidation make sign-out win over
+   in-flight exchange/refresh work.
+4. **Narrow renderer capability.** Guarded IPC and the optional
+   `window.grida.chatgpt` namespace expose only connect, cancel, status, and
+   sign-out. Electron main reconstructs the returned status DTO field by field;
+   authorization URLs, codes, PKCE material, access tokens, refresh tokens,
+   and raw token claims have no renderer type or route. Renderer status reads
+   are epoch-ordered so an old read cannot visually restore a signed-out or
+   previous account.
+5. **Pinned provider traffic.** Desktop grants only the exact OpenAI token
+   endpoint and ChatGPT Responses endpoint to the authenticated provider lane;
+   neither is a provider-asset/download grant. The model adapter rejects any
+   other URL, injects bearer/account/product headers only at request time,
+   forces stateless Responses posture, performs at most one refresh/replay
+   after `401`, consumes every non-success body, and maps it to a bounded
+   code-led error before the AI SDK or agent stream can observe it.
+6. **Session/provider identity is sticky.** A new provider-unqualified
+   compatible conversation may prefer a ready ChatGPT connection. Once
+   persisted, the provider/model pair is reused for continuations and queued
+   turns. Titling and compaction stay on that provider and credential/cost
+   boundary but may use its lower-cost auxiliary model tier; unavailability
+   returns `provider_down` rather than falling through. An explicit provider,
+   or a request-supplied different model, is the intentional switch seam.
+7. **No credential borrowing and no ACP fallback.** Grida never reads
+   `~/.codex/auth.json`, browser cookies, or another app's credential store.
+   ChatGPT auth failure never launches or selects Codex ACP.
+
+**Current experimental trust posture.** The implementation follows the public
+Codex/Zed-compatible native flow: unless
+`GRIDA_CHATGPT_OAUTH_CLIENT_ID` supplies a replacement, Desktop uses the
+public Codex native client id, with `originator=grida`, and exposes a closed
+static model allowlist. That client/backend identity and the allowlist are not
+a documented general third-party OpenAI contract; support, terms, model
+availability, and a stable Grida registration remain release gates outside
+this repository.
+
+Account metadata is accepted only from the successful response of the exact
+pinned HTTPS token endpoint (or from a token payload delivered in that
+response), after state, PKCE, and code exchange. Token payload parsing checks
+shape and expiry but does **not** independently perform JOSE signature,
+issuer, audience, or nonce validation. The security claim therefore rests on
+the authenticated token-endpoint response, not on generic OIDC JWT
+verification. A future claim source outside that response must add full
+cryptographic OIDC validation before use.
+
+Long-lived OAuth material currently uses the daemon's owner-only atomic file
+store, not an operating-system keychain. This prevents renderer/network
+exposure and cross-write races but does not protect against another process
+already running as the same OS user. Moving refresh-token at-rest custody to a
+platform credential store is a separate hardening step.
+
+**Files bound by this id.** Run `grep -rn GRIDA-SEC-008 .` to enumerate.
+The load-bearing groups are:
+
+- `desktop/src/chatgpt-configuration.ts`,
+  `desktop/src/main/{oauth-loopback-callback,chatgpt-oauth}.ts`,
+  `desktop/src/{agent-network-policy,agent-sidecar,preload}.ts`,
+  `desktop/src/bridge/contract.ts`, `desktop/src/main/ipc-handlers.ts`, and
+  `desktop/src/main.ts` — fixed configuration, callback/orchestration,
+  exact network grants, sidecar construction, guarded bridge, and shutdown.
+- `packages/grida-ai-agent/src/protocol/{chatgpt,provider-ids,endpoints}.ts`,
+  `providers/{chatgpt-credentials,chatgpt,index}.ts`,
+  `http/routes/chatgpt-auth.ts`, `server.ts`, `runtime/{index,run-input}.ts`,
+  and `src/index.ts` — safe vocabulary, OAuth lifecycle, model adapter,
+  private route, provider/session resolution, and public type projection.
+- `packages/grida-daemon/src/auth/file.ts` and
+  `packages/grida-daemon/src/http/server.ts` — shared race-safe credential
+  persistence.
+- `packages/grida-desktop-bridge/src/index.ts`,
+  `editor/lib/desktop/{bridge,chatgpt-subscription}.ts`, and
+  `editor/lib/agent-chat/bridge-transport.ts` — secret-free renderer contract,
+  ordered status cache, and explicit provider carriage.
+- The adjacent `*.test.ts` files tagged with this id pin callback replay and
+  bounds, authorization correlation, cancellation/sign-out races, credential
+  rotation/reauth races, safe error mapping, model wire shape and tool loops,
+  provider stickiness/compaction, bridge DTOs, and renderer ordering.
+- `docs/wg/ai/agent/chatgpt-subscription-provider.md`,
+  `docs/wg/desktop/{agent-security,process-model}.md`,
+  `desktop/docs/chatgpt-subscription-oauth.md`, and
+  `packages/grida-ai-agent/docs/chatgpt-subscription-provider.md` — normative
+  and implementation bindings.
+
+**What does NOT belong here.** A renderer method that accepts or returns token,
+code, verifier, raw claim, or authorization-URL material. A generic localhost
+listener, callback path, redirect, provider origin, download grant, or
+arbitrary fetch. Cookie scraping, importing Codex credentials, direct
+sidecar egress, silent provider fallback, unbounded/replayed callbacks,
+upstream response bodies in errors, or treating ChatGPT sign-in as Grida
+account sign-in, an OpenAI API key, Codex app-server, or ACP.
+
+---
+
 ## Adding a new GRIDA-SEC entry
 
-1. Allocate the next sequential id (`GRIDA-SEC-008` for the next one).
+1. Allocate the next sequential id (`GRIDA-SEC-009` for the next one).
 2. Add an "Active boundaries" subsection here with the same shape as
    GRIDA-SEC-001: what it protects, vulnerable scenario, why it's risky
    here, how the code prevents it, files bound.

@@ -40,6 +40,48 @@ describe("AgentNetworkPolicy", () => {
     ).toThrow(/not granted/);
   });
 
+  it("pins ChatGPT subscription auth and inference to exact provider origins", () => {
+    // GRIDA-SEC-008 — token exchange and Responses inference use the
+    // credential-bearing provider lane, never the provider-asset lane.
+    for (const url of [
+      "https://auth.openai.com/oauth/token",
+      "https://chatgpt.com/backend-api/codex/responses",
+    ]) {
+      expect(
+        AgentNetworkPolicy.authorize(grants, {
+          grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+          method: "POST",
+          url,
+          headers: [["authorization", "Bearer transient"]],
+        }).url.origin
+      ).toBe(new URL(url).origin);
+      expect(() =>
+        AgentNetworkPolicy.authorize(grants, {
+          grant_id: AgentNetworkPolicy.PROVIDER_ASSET_GRANT_ID,
+          method: "GET",
+          url,
+          headers: [],
+        })
+      ).toThrow(/not granted/);
+    }
+
+    for (const url of [
+      "https://evil.auth.openai.com/oauth/token",
+      "https://auth.openai.com.attacker.example/oauth/token",
+      "https://api.chatgpt.com/backend-api/codex/responses",
+      "https://chatgpt.com.attacker.example/backend-api/codex/responses",
+    ]) {
+      expect(() =>
+        AgentNetworkPolicy.authorize(grants, {
+          grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+          method: "POST",
+          url,
+          headers: [],
+        })
+      ).toThrow(/not granted/);
+    }
+  });
+
   it("pins custom grants to a canonical exact origin", () => {
     const custom: AgentNetworkPolicy.Grant = {
       id: "custom:ollama",

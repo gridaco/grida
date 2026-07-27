@@ -56,12 +56,15 @@ const CATEGORIES = [
 export function DesktopContextMeter({
   messages,
   modelId,
+  providerId,
   costUsd,
   endpoints = [],
 }: {
   messages: UIMessage[];
   /** Active model id — its resolved spec supplies the context window. */
   modelId: string;
+  /** Exact provider paired with `modelId`, when selected or persisted. */
+  providerId?: string;
   /** Session cumulative base-rate estimate from aggregate per-turn usage.
    * Request-level pricing bands are not reconstructible from this rollup. */
   costUsd?: number;
@@ -72,8 +75,9 @@ export function DesktopContextMeter({
   // Memoized: chat panels re-render per streamed token, and resolve()
   // rebuilds the flattened spec list each call.
   const contextWindow = useMemo(
-    () => registered_models.resolve(modelId, endpoints)?.contextWindow,
-    [modelId, endpoints]
+    () =>
+      registered_models.resolve(modelId, endpoints, providerId)?.contextWindow,
+    [modelId, providerId, endpoints]
   );
   const {
     usedTokens,

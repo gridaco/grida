@@ -1,8 +1,10 @@
 import {
   BrowserWindow,
+  screen,
   shell,
   type App,
   type BaseWindowConstructorOptions,
+  type Rectangle,
 } from "electron";
 import path from "node:path";
 import { attachNavigationEvents } from "./main/ipc-handlers";
@@ -29,6 +31,16 @@ const TITLE_BAR_HEIGHT = 44;
  * window rather than only windows constructed directly on `/desktop/workspace`.
  */
 const MIN_WINDOW_WIDTH = 900;
+const MIN_WINDOW_HEIGHT = 384;
+const MAIN_WINDOW_WIDTH = 1440;
+const MAIN_WINDOW_HEIGHT = 960;
+
+const ONBOARDING_WINDOW_WIDTH = 720;
+const ONBOARDING_WINDOW_HEIGHT = 720;
+const MIN_ONBOARDING_WINDOW_WIDTH = 560;
+const MIN_ONBOARDING_WINDOW_HEIGHT = 600;
+
+export type DesktopWindowPresentation = "main" | "compact";
 
 const trafficLightPosition = {
   x: 14,
@@ -66,14 +78,26 @@ const WINDOW_ICON: { [key: string]: string | undefined } = {
   netbsd: undefined,
 };
 
-function get_window_constructor_options(): BaseWindowConstructorOptions {
+function get_window_constructor_options(
+  presentation: DesktopWindowPresentation
+): BaseWindowConstructorOptions {
   const icon = WINDOW_ICON[process.platform];
-  const size = {
-    width: 1440,
-    height: 960,
-    minWidth: MIN_WINDOW_WIDTH,
-    minHeight: 384,
-  };
+  const size =
+    presentation === "compact"
+      ? {
+          width: ONBOARDING_WINDOW_WIDTH,
+          height: ONBOARDING_WINDOW_HEIGHT,
+          minWidth: MIN_ONBOARDING_WINDOW_WIDTH,
+          minHeight: MIN_ONBOARDING_WINDOW_HEIGHT,
+          maximizable: false,
+          fullscreenable: false,
+        }
+      : {
+          width: MAIN_WINDOW_WIDTH,
+          height: MAIN_WINDOW_HEIGHT,
+          minWidth: MIN_WINDOW_WIDTH,
+          minHeight: MIN_WINDOW_HEIGHT,
+        };
   switch (process.platform) {
     case "darwin": {
       return {
@@ -179,17 +203,28 @@ function register_window_hooks(
   window.webContents.on("will-redirect", (event, target) => {
     if (!isAllowedNavigation(baseUrl, target)) {
       event.preventDefault();
-      console.warn(`[grida] blocked redirect outside /desktop: ${target}`);
+      console.warn(
+        `[grida] blocked redirect outside /desktop: ${urlWithoutQuery(target)}`
+      );
     }
   });
 
   window.webContents.on("did-navigate-in-page", (_event, target) => {
     if (isAllowedNavigation(baseUrl, target)) return;
     console.warn(
-      `[grida] blocked in-page navigation outside /desktop: ${target}`
+      `[grida] blocked in-page navigation outside /desktop: ${urlWithoutQuery(target)}`
     );
     void window.loadURL(`${baseUrl}/desktop/welcome`);
   });
+}
+
+function urlWithoutQuery(raw: string): string {
+  try {
+    const url = new URL(raw);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return "<malformed>";
+  }
 }
 
 export function isAllowedNavigation(baseUrl: string, target: string): boolean {
@@ -212,20 +247,30 @@ export function isAllowedNavigation(baseUrl: string, target: string): boolean {
   return url.pathname === "/desktop" || url.pathname.startsWith("/desktop/");
 }
 
-export default function create_main_window({
+export function create_desktop_window({
+  app,
   base_url: baseUrl,
   urlPath = "/desktop/welcome",
   title = "Grida",
   additionalArguments = [],
+  presentation = "main",
+  show = true,
 }: {
+  app?: App;
   base_url: string;
-  urlPath?: string;
+  urlPath?: string | null;
   title?: string;
   additionalArguments?: string[];
+  presentation?: DesktopWindowPresentation;
+  show?: boolean;
 }) {
+  const desktopArguments = app
+    ? buildDesktopArguments({ app, extra: additionalArguments })
+    : additionalArguments;
   const window = new BrowserWindow({
-    ...get_window_constructor_options(),
+    ...get_window_constructor_options(presentation),
     title,
+    show,
     webPreferences: {
       // GRIDA-SEC-004 Electron hardening.
       nodeIntegration: false,
@@ -235,9 +280,11 @@ export default function create_main_window({
       webSecurity: true,
       allowRunningInsecureContent: false,
       preload: path.join(__dirname, "preload.js"),
-      additionalArguments,
+      additionalArguments: desktopArguments,
     },
   });
+
+  if (presentation === "compact") window.center();
 
   if (IS_DEV) {
     // Dev-only diagnostics. Production logs must not depend on every
@@ -253,17 +300,107 @@ export default function create_main_window({
     });
   }
 
-  window.loadURL(`${baseUrl}${urlPath}`);
-
+  // Register every navigation/security hook before the initial load.
+  // A fast same-origin server redirect (notably Welcome → signed-out sign-in)
+  // can complete before a listener attached after `loadURL`, skipping the
+  // redirect guard entirely.
   register_window_hooks(window, { base_url: baseUrl });
 
-  // Per-window nav-history push channel. `did-navigate*` are queued
-  // asynchronously, so attaching synchronously after `loadURL` still
-  // catches the initial-load event — matches how `register_window_hooks`
-  // installs `will-navigate` above.
+  // Per-window nav-history push channel must observe the initial load too.
   attachNavigationEvents(window);
 
+  if (urlPath !== null) void window.loadURL(`${baseUrl}${urlPath}`);
+
   return window;
+}
+
+export default create_desktop_window;
+
+/**
+ * Apply native geometry for an explicitly selected entry role.
+ *
+ * This function deliberately knows nothing about URLs. The entry-flow
+ * controller owns the role; this low-level window module only applies its
+ * presentation. Redirects and SPA history therefore cannot silently become
+ * window-lifecycle state.
+ */
+export function set_desktop_window_presentation(
+  window: BrowserWindow,
+  presentation: DesktopWindowPresentation,
+  options: {
+    animate?: boolean;
+    main_bounds?: Rectangle | null;
+  } = {}
+): void {
+  if (window.isDestroyed()) return;
+
+  const animate = options.animate ?? true;
+  if (window.isFullScreen()) window.setFullScreen(false);
+  if (presentation === "compact" && window.isMaximized()) window.unmaximize();
+
+  if (presentation === "compact") {
+    const workArea = screen.getDisplayMatching(window.getBounds()).workArea;
+    const width = Math.min(ONBOARDING_WINDOW_WIDTH, workArea.width);
+    const height = Math.min(ONBOARDING_WINDOW_HEIGHT, workArea.height);
+    const x = workArea.x + Math.round((workArea.width - width) / 2);
+    const y = workArea.y + Math.round((workArea.height - height) / 2);
+
+    window.setMinimumSize(
+      Math.min(MIN_ONBOARDING_WINDOW_WIDTH, width),
+      Math.min(MIN_ONBOARDING_WINDOW_HEIGHT, height)
+    );
+    window.setResizable(true);
+    window.setMaximizable(false);
+    window.setFullScreenable(false);
+    window.setBounds({ x, y, width, height }, animate);
+    return;
+  }
+
+  const preferredBounds = options.main_bounds ?? window.getBounds();
+  const workArea = screen.getDisplayMatching(preferredBounds).workArea;
+  const fallbackWidth = Math.min(MAIN_WINDOW_WIDTH, workArea.width);
+  const fallbackHeight = Math.min(MAIN_WINDOW_HEIGHT, workArea.height);
+  const fallback = {
+    x: workArea.x + Math.round((workArea.width - fallbackWidth) / 2),
+    y: workArea.y + Math.round((workArea.height - fallbackHeight) / 2),
+    width: fallbackWidth,
+    height: fallbackHeight,
+  };
+  const bounds = options.main_bounds
+    ? fitBoundsToWorkArea(options.main_bounds, workArea)
+    : fallback;
+
+  window.setMinimumSize(
+    Math.min(MIN_WINDOW_WIDTH, bounds.width),
+    Math.min(MIN_WINDOW_HEIGHT, bounds.height)
+  );
+  window.setResizable(true);
+  window.setMaximizable(true);
+  window.setFullScreenable(true);
+  window.setBounds(bounds, animate);
+}
+
+function fitBoundsToWorkArea(
+  bounds: Rectangle,
+  workArea: Rectangle
+): Rectangle {
+  const width = Math.min(
+    Math.max(bounds.width, MIN_WINDOW_WIDTH),
+    workArea.width
+  );
+  const height = Math.min(
+    Math.max(bounds.height, MIN_WINDOW_HEIGHT),
+    workArea.height
+  );
+  const x = Math.min(
+    Math.max(bounds.x, workArea.x),
+    workArea.x + workArea.width - width
+  );
+  const y = Math.min(
+    Math.max(bounds.y, workArea.y),
+    workArea.y + workArea.height - height
+  );
+  return { x, y, width, height };
 }
 
 /**
@@ -290,10 +427,10 @@ function buildDesktopArguments({
 }
 
 /**
- * The single canonical "open the welcome window" call. `main.ts` uses
- * it on `ready` and `activate`; `menu.ts` uses it for "File → New
- * Window". Centralising keeps desktop window arguments constrained to
- * non-secret host facts.
+ * Opens an authenticated auxiliary Welcome window for File → New Window.
+ * The canonical entry window is created and role-managed separately by
+ * `DesktopEntryWindow`; this helper never participates in sign-in/onboarding
+ * lifecycle decisions.
  */
 export function open_welcome_window({
   app,
@@ -302,29 +439,9 @@ export function open_welcome_window({
   app: App;
   base_url: string;
 }) {
-  return create_main_window({
+  return create_desktop_window({
     base_url: baseUrl,
     urlPath: "/desktop/welcome",
-    additionalArguments: buildDesktopArguments({ app }),
-  });
-}
-
-/**
- * Cold-start bootstrap. It still enters the sign-in-gated Welcome segment;
- * the query only asks the signed-in renderer to validate and resume its last
- * workspace-backed surface. Every explicit Welcome entry uses
- * {@link open_welcome_window} without this flag.
- */
-export function open_startup_window({
-  app,
-  base_url: baseUrl,
-}: {
-  app: App;
-  base_url: string;
-}) {
-  return create_main_window({
-    base_url: baseUrl,
-    urlPath: "/desktop/welcome?startup=restore-last-workspace",
     additionalArguments: buildDesktopArguments({ app }),
   });
 }
@@ -348,7 +465,7 @@ export function open_document_window({
   base_url: string;
   doc_id: string;
 }) {
-  return create_main_window({
+  return create_desktop_window({
     base_url: baseUrl,
     urlPath: `/desktop/file?docId=${encodeURIComponent(docId)}`,
     additionalArguments: buildDesktopArguments({ app }),
@@ -372,7 +489,7 @@ export function open_settings_window({
   app: App;
   base_url: string;
 }) {
-  return create_main_window({
+  return create_desktop_window({
     base_url: baseUrl,
     urlPath: "/desktop/settings",
     title: "Grida Settings",
@@ -409,7 +526,7 @@ export function open_workspace_window({
   session_id?: string;
 }) {
   const session = sessionId ? `&session=${encodeURIComponent(sessionId)}` : "";
-  return create_main_window({
+  return create_desktop_window({
     base_url: baseUrl,
     urlPath: `/desktop/workspace?id=${encodeURIComponent(workspaceId)}${session}`,
     additionalArguments: buildDesktopArguments({ app }),
@@ -436,7 +553,7 @@ export function open_canvas_window({
   base_url: string;
   workspace_id: string;
 }) {
-  return create_main_window({
+  return create_desktop_window({
     base_url: baseUrl,
     urlPath: `/desktop/file?id=${encodeURIComponent(workspaceId)}`,
     additionalArguments: buildDesktopArguments({ app }),

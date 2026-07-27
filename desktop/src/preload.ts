@@ -1,4 +1,5 @@
 // GRIDA-GG: desktop — install the `gg` bridge namespace (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-008 — expose only secret-free native-provider operations.
 /**
  * GRIDA-SEC-004 — Desktop agent-sidecar trust boundary (renderer side).
  *
@@ -322,6 +323,19 @@ const bridge: DesktopBridge = {
 
   handshake,
 
+  account: {
+    sign_out: () => ipcRenderer.invoke(IPC_CHANNELS.ACCOUNT_SIGN_OUT),
+  },
+
+  // GRIDA-SEC-004 — onboarding gets two purpose-scoped main-process
+  // operations, never the daemon connection tuple or a generic dialog.
+  onboarding: {
+    get_default_workspace: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_WORKSPACE_DEFAULT),
+    choose_workspace: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ONBOARDING_WORKSPACE_CHOOSE),
+  },
+
   window: {
     set_document_edited: (edited) =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_SET_DOCUMENT_EDITED, edited),
@@ -331,6 +345,8 @@ const bridge: DesktopBridge = {
         filePath
       ),
     close: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_CLOSE),
+    complete_onboarding: (workspaceId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WINDOW_COMPLETE_ONBOARDING, workspaceId),
     navigation: {
       state: () => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_NAVIGATION_STATE),
       subscribe: (cb) => {
@@ -538,6 +554,18 @@ const bridge: DesktopBridge = {
       await agentClient.gg.clear_session();
     },
     status: () => agentClient.gg.status(),
+  },
+
+  // Native provider OAuth is main-owned. The renderer can start/cancel the
+  // user gesture and read secret-free status, but never receives codes,
+  // verifier/state values, or provider credentials.
+  chatgpt: {
+    connect: () => ipcRenderer.invoke(IPC_CHANNELS.CHATGPT_CONNECT),
+    cancel: async () => {
+      await ipcRenderer.invoke(IPC_CHANNELS.CHATGPT_CANCEL);
+    },
+    status: () => ipcRenderer.invoke(IPC_CHANNELS.CHATGPT_STATUS),
+    sign_out: () => ipcRenderer.invoke(IPC_CHANNELS.CHATGPT_SIGN_OUT),
   },
 
   images: {

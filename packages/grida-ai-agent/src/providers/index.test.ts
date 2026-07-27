@@ -106,6 +106,30 @@ describe("resolveProvider — endpoint providers (issue #806)", () => {
     expect(provider.kind).toBe("endpoint");
   });
 
+  it("validates explicit and automatic provider/model compatibility", async () => {
+    await expect(
+      resolveProvider(deps({ openrouter: "sk-or" }, [OLLAMA]), {
+        explicit: "openrouter",
+        model_id: "llama3.1:8b",
+      })
+    ).rejects.toMatchObject({ provider_id: "openrouter" });
+    await expect(
+      resolveProvider(deps({}, [OLLAMA]), {
+        explicit: "ollama",
+        model_id: "anthropic/claude-opus-4.8",
+      })
+    ).rejects.toMatchObject({ provider_id: "ollama" });
+
+    const endpoint = await resolveProvider(
+      deps({ openrouter: "sk-or" }, [OLLAMA]),
+      { model_id: "qwen3:32b" }
+    );
+    expect(endpoint).toMatchObject({
+      provider_id: "ollama",
+      kind: "endpoint",
+    });
+  });
+
   it("an endpoint with no registered models is not resolvable", async () => {
     const empty = { ...OLLAMA, models: [] };
     await expect(resolveProvider(deps({}, [empty]))).rejects.toBeInstanceOf(

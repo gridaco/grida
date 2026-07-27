@@ -1,17 +1,15 @@
 "use client";
 
 /**
- * First-run onboarding completion flag (issue #813 zero-config onboarding).
+ * First-run ChatGPT onboarding completion flag.
  *
- * The desktop welcome page shows a one-time onboarding step that detects the
- * user's `claude` and gets them to a ready state. Once dismissed it should
- * never reappear — so the flag is in `localStorage` (survives restart), unlike
- * the per-navigation `welcome_handoff` (sessionStorage).
+ * The dedicated desktop onboarding route mirrors native completion in
+ * `localStorage`. The native host owns the launch-time first-run decision; this
+ * renderer flag lets a new host migrate users who completed the former Welcome
+ * dialog without replaying the flow.
  *
- * Pure renderer UI state — NOT a host/desktop setting: persisting it through
- * the agent host would add a bridge round-trip and a new persisted host field
- * for one boolean. Keep it here, single owner of the key (the welcome page
- * reads, the onboarding step writes).
+ * Keep the v1 key stable: it is the compatibility seam between the old dialog
+ * and the controller-owned onboarding surface.
  */
 
 const KEY = "grida.desktop.onboarding.completed.v1";

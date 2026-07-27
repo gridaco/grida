@@ -1,4 +1,5 @@
 // GRIDA-GG: desktop — the optional `gg` bridge namespace (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-008 — renderer-safe ChatGPT status/control DTOs only.
 /**
  * GRIDA-SEC-004 — renderer-visible Desktop bridge protocol.
  *
@@ -20,6 +21,7 @@ import type {
   VideoGenerateResult,
   ChatMessageWithParts,
   ChatSessionRow,
+  ChatGptSubscriptionStatus,
   CreateSessionOptions,
   PatchSessionOptions,
   RewindResult,
@@ -176,10 +178,35 @@ export type DesktopBridge = {
   app: { version: string; platform: string };
   caps: DesktopCapabilities;
   handshake: () => Promise<HandshakeResponse>;
+  /**
+   * Grida account lifecycle owned by the native entry controller. Optional
+   * because older protocol-1 hosts let individual renderer windows sign out
+   * independently.
+   */
+  account?: {
+    sign_out: () => Promise<void>;
+  };
+  /**
+   * Purpose-scoped first-run workspace setup owned by Electron main.
+   *
+   * This namespace intentionally does not expose the daemon connection tuple
+   * or a generic filesystem dialog. It is optional because protocol-1 hosts
+   * shipped before the native onboarding role.
+   */
+  onboarding?: {
+    get_default_workspace: () => Promise<Workspace | null>;
+    choose_workspace: () => Promise<Workspace | null>;
+  };
   window: {
     set_document_edited: (edited: boolean) => Promise<void>;
     set_represented_filename: (filePath: string) => Promise<void>;
     close: () => Promise<void>;
+    /**
+     * Finish the dedicated onboarding surface and promote the same entry
+     * BrowserWindow to the regular workstation. Optional because older
+     * protocol-1 hosts predate the native onboarding route.
+     */
+    complete_onboarding?: (workspaceId?: string) => Promise<void>;
     navigation: {
       state: () => Promise<NavigationState>;
       subscribe: (cb: (state: NavigationState) => void) => () => void;
@@ -360,6 +387,18 @@ export type DesktopBridge = {
     set_session: (session: GridaGatewaySession) => Promise<void>;
     clear_session: () => Promise<void>;
     status: () => Promise<GridaGatewaySessionStatus>;
+  };
+  /**
+   * Native ChatGPT-subscription provider control surface. OAuth credentials,
+   * authorization codes, PKCE material, and provider access tokens stay in
+   * Electron main + the agent sidecar; only secret-free status crosses into
+   * the renderer. Optional because protocol-1 Desktop builds predate it.
+   */
+  chatgpt?: {
+    connect: () => Promise<ChatGptSubscriptionStatus>;
+    cancel: () => Promise<void>;
+    status: () => Promise<ChatGptSubscriptionStatus>;
+    sign_out: () => Promise<ChatGptSubscriptionStatus>;
   };
   /**
    * BYOK image generation (#908). Desktop-only: the request resolves the

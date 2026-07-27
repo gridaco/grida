@@ -10,9 +10,10 @@ It owns three agent-system concerns:
 
 - **The agent tenant.** `createAgentTenant` registers the AI route
   groups (`/agent`, `/events`, `/sessions`, `/secrets`, `/providers`,
-  `/images`, `/video`) through the daemon's `DaemonTenant` seam, and
+  `/images`, `/video`, and optional native-provider auth) through the daemon's
+  `DaemonTenant` seam, and
   owns their state — the run loop, chat sessions (SQLite), BYOK
-  provider resolution, endpoint configs. `createAgentDaemon` is the
+  and native-provider resolution, endpoint configs. `createAgentDaemon` is the
   composed server hosts actually run. Node-only.
 - **The Grida agent.** Runtime-agnostic agent definition: system-prompt
   composition (`composeSystemPrompt` + skills), model tiers, and the
@@ -29,17 +30,17 @@ stays browser-safe, and the Node-only entry points are quarantined
 behind their own subpaths so they never pull `node:*` into a client
 bundle.
 
-| Subpath              | What                                                                                                                                                           | Platform |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `.`                  | protocol contracts (BYOK provider metadata, handshake, run, stream DTOs), `createAgent`, `composeSystemPrompt`, `createToolset`, tier types, session-row types | neutral  |
-| `./tiers`            | model tier constants (`AGENT_TIERS`, `AGENT_DEFAULT_TIER`)                                                                                                     | neutral  |
-| `./fs`               | virtual fs + file tools ([README](./src/fs/README.md))                                                                                                         | neutral  |
-| `./fs/backends/opfs` | browser OPFS backend                                                                                                                                           | browser  |
-| `./todos`            | plan store + `todo_write` ([README](./src/todos/README.md))                                                                                                    | neutral  |
-| `./surface`          | server-executed artifact-surface tools, turn snapshot, and browser observer                                                                                    | neutral  |
-| `./server`           | `createAgentTenant` + `createAgentDaemon` (the composed daemon), daemon re-exports                                                                             | Node     |
-| `./sandbox`          | composed sandbox policy (`buildAgentDaemonSandboxPolicy` — daemon frame + AI upstream hosts)                                                                   | Node     |
-| `./transport`        | `AgentTransport` namespace — extends `DaemonTransport.Client` with the agent tenant's routes                                                                   | neutral  |
+| Subpath              | What                                                                                                                                                                                  | Platform |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `.`                  | protocol contracts (native/BYOK provider metadata and safe status, handshake, run, stream DTOs), `createAgent`, `composeSystemPrompt`, `createToolset`, tier types, session-row types | neutral  |
+| `./tiers`            | model tier constants (`AGENT_TIERS`, `AGENT_DEFAULT_TIER`)                                                                                                                            | neutral  |
+| `./fs`               | virtual fs + file tools ([README](./src/fs/README.md))                                                                                                                                | neutral  |
+| `./fs/backends/opfs` | browser OPFS backend                                                                                                                                                                  | browser  |
+| `./todos`            | plan store + `todo_write` ([README](./src/todos/README.md))                                                                                                                           | neutral  |
+| `./surface`          | server-executed artifact-surface tools, turn snapshot, and browser observer                                                                                                           | neutral  |
+| `./server`           | `createAgentTenant` + `createAgentDaemon` (the composed daemon), daemon re-exports                                                                                                    | Node     |
+| `./sandbox`          | composed sandbox policy (`buildAgentDaemonSandboxPolicy` — daemon frame + AI upstream hosts)                                                                                          | Node     |
+| `./transport`        | `AgentTransport` namespace — extends `DaemonTransport.Client` with the agent tenant's routes                                                                                          | neutral  |
 
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
 public subpath; workspace bindings use it in-process.
@@ -51,8 +52,9 @@ Node hosts may pass `provider_http` to `createAgentTenant` or
 `fetch`. The value has two required operations:
 
 - `request` executes provider-owned traffic, including authenticated text and
-  media calls, hosted-provider calls, configured-endpoint inference and health
-  checks, and media job submit/poll/result requests.
+  media calls, OAuth exchange/refresh for configured native providers,
+  hosted-provider calls, configured-endpoint inference and health checks, and
+  media job submit/poll/result requests.
 - `download` executes credential-free provider result/asset downloads,
   including URL inputs that the AI SDK must lower to bytes before a model
   call. The host authorizes each concrete origin; the contract does not grant
@@ -111,12 +113,16 @@ crosses one of these is the wrong tool, not a missing feature.
   isolated to the node-only `providers/` layer: the BYOK key slots
   (OpenRouter → AI Gateway) plus ONE generalized OpenAI-compatible
   endpoint type (`{base_url, optional key, registered models}` — Ollama
-  is the preset; issue #806). The agent + runtime core never import
+  is the preset; issue #806), and the narrowly configured native ChatGPT
+  subscription provider. The agent + runtime core never import
   selection; they receive a resolved `ModelFactory`. There is no
   registry for arbitrary third-party providers — new hosted providers are
-  new BYOK slots, not config.
-- **Not a hosted model gateway.** The package does not proxy model calls
-  through grida.co, own OAuth sessions, or mint hosted provider tokens.
+  reviewed adapters, not renderer-defined config.
+- **Not a hosted model gateway or general OAuth broker.** The package does not
+  proxy ChatGPT subscription calls through grida.co or mint hosted provider
+  tokens. Its one refreshable OAuth session is the optional, host-configured
+  native ChatGPT provider described below; auth routes remain private to the
+  native host and expose only secret-free status.
 - **Not a billing or entitlement engine.** The package forwards per-step
   usage via a hook and propagates a transaction id; metering, pricing,
   plan gates, and invoicing live outside this package.
@@ -176,6 +182,10 @@ Package docs are host-agnostic and describe the contracts exported by
   Referer policy supplied by a host adapter (`@grida/daemon`).
 - [Sandbox policy](./docs/sandbox-policy.md) — the composed sandbox intent
   (daemon frame + this tenant's AI upstream hosts).
+- [ChatGPT subscription provider](./docs/chatgpt-subscription-provider.md) —
+  host configuration, private OAuth routes, credential lifecycle, model
+  mapping, provider-resolution behavior, and the active Desktop security
+  binding.
 
 The wider architecture lives in the working-group docs:
 

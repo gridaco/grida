@@ -12,6 +12,8 @@
  * response (same mechanism as the web `(auth)/auth/callback` route) and the
  * wrapped web app is signed in like any browser session. Every redirect out
  * of this route MUST stay under `/desktop/*` (desktop navigation guard).
+ * Success always lands on one fixed completion route; the native entry
+ * controller decides which authenticated surface comes next.
  */
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse, type NextRequest } from "next/server";
@@ -20,13 +22,11 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
 
-  const fail = (reason: string) =>
-    NextResponse.redirect(
-      new URL(
-        `/desktop/auth/sign-in?auth_error=${encodeURIComponent(reason)}`,
-        requestUrl.origin
-      )
-    );
+  const fail = (reason: string) => {
+    const target = new URL("/desktop/auth/sign-in", requestUrl.origin);
+    target.searchParams.set("auth_error", reason);
+    return NextResponse.redirect(target);
+  };
 
   if (!code) {
     // GoTrue reports provider errors (user denied, expired flow) as
@@ -46,5 +46,7 @@ export async function GET(request: NextRequest) {
     return fail(error.code ?? "exchange_failed");
   }
 
-  return NextResponse.redirect(new URL("/desktop/welcome", requestUrl.origin));
+  return NextResponse.redirect(
+    new URL("/desktop/auth/complete", requestUrl.origin)
+  );
 }

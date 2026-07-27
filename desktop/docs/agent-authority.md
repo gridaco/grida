@@ -100,6 +100,18 @@ MUST NOT attach the webview's Electron session or partition, inherit its cookie
 jar, or receive its durable login. Proxy authentication belongs to the host
 route; provider authorization comes only from the provider grant.
 
+The native ChatGPT-subscription provider is a narrow instance of this split:
+AgentSidecar owns OAuth persistence, refresh, account scoping, and request
+credential injection; Electron main owns the system-browser launch, temporary
+dual-stack loopback callback, and the exact `auth.openai.com` / `chatgpt.com`
+network route. The renderer receives only a reconstructed secret-free status
+DTO. The experimental binding defaults to the public Codex native OAuth client
+id with a host override; it never starts Codex or ACP. Account/display claims
+are parsed only from the exact TLS-authenticated token response, without an
+OIDC nonce or independent JWT/JWKS/issuer/audience verification. The complete
+ceremony and cancel/sign-out races are bound in
+[chatgpt-subscription-oauth.md](https://github.com/gridaco/grida/blob/main/desktop/docs/chatgpt-subscription-oauth.md).
+
 The package exposes two construction-time operations: provider requests and
 credential-free provider-asset downloads. The service accepts one of those
 classes plus an opaque host-issued grant, validates the
@@ -370,7 +382,11 @@ The implementation must prove at least:
 - Windows exposes no falsely labeled sandboxed capability; and
 - GG mint preserves the renderer-transient scoped-token handoff without
   transferring the durable cookie session, and sign-out clears the memory-only
-  token without main/disk persistence or logging.
+  token without main/disk persistence or logging; and
+- the ChatGPT callback admits only the fixed localhost
+  address/ports/Host/method/path, keeps code/tokens out of the renderer, and
+  prevents late callback, exchange, refresh, cancel, sign-out, or
+  reauthentication work from resurrecting stale credentials.
 
 Current platform evidence is intentionally narrower than this full contract.
 The main-accepted socket transfer has been exercised end to end under the
@@ -383,6 +399,6 @@ into one cross-platform verification claim.
 
 This is a Desktop security-boundary change. Implementation requires a normal
 Desktop release audit, signed/notarized macOS verification, packaged Linux
-verification, and an explicit `GRIDA-SEC-004` / `GRIDA-SEC-006` security review.
-The architecture does not justify a dependency-version bump by itself; the
-version decision belongs to the implementing change set.
+verification, and explicit daemon, hosted-AI, and ChatGPT OAuth security
+reviews. The architecture does not justify a dependency-version bump by
+itself; the version decision belongs to the implementing change set.

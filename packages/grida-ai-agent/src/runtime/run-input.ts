@@ -1,4 +1,5 @@
 // GRIDA-GG: provider — accept the `gg` provider id at the run gate (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-008 — validate explicit ChatGPT provider/model selections.
 /**
  * Agent run request boundary.
  *
@@ -29,7 +30,16 @@ import {
   isKnownProviderId,
   type EndpointProvidersStore,
 } from "../providers/endpoints";
-import { isGgProviderId } from "../protocol/provider-ids";
+import {
+  byokProvidersFor,
+  isByokProviderId,
+  isGgProviderId,
+} from "../protocol/provider-ids";
+import {
+  isChatGptProviderId,
+  isChatGptSubscriptionModelId,
+} from "../protocol/chatgpt";
+import type { ChatGptProviderRuntime } from "../providers/chatgpt";
 import {
   DIRECTORY_SCOPE_MOUNT_ROOT,
   USER_DIRECTORY_REFERENCES,
@@ -46,6 +56,9 @@ import { AgentSurface } from "../surface";
 
 const ALLOWED_TIERS = new Set<string>(AGENT_TIERS);
 const CATALOG_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
+const TEXT_BYOK_PROVIDER_IDS = new Set<string>(
+  byokProvidersFor("text").map((provider) => provider.id)
+);
 const ALLOWED_ROLES = new Set<string>(["user", "assistant", "system"]);
 
 export type NormalizedMessage = {
@@ -100,6 +113,8 @@ export type ParseRunBodyDeps = {
   /** Endpoint provider configs (issue #806). When present, registered
    *  model ids and endpoint provider ids join the allowed sets. */
   endpoints?: EndpointProvidersStore;
+  /** Closed model list of the optional native ChatGPT provider. */
+  chatgpt?: ChatGptProviderRuntime;
 };
 
 export async function parseRunBody(
@@ -168,6 +183,8 @@ export async function parseRunBody(
       typeof b.model_id === "string" &&
       (CATALOG_MODEL_IDS.has(b.model_id) ||
         isAgentProviderModel(b.model_id) || // issue #813 agent-provider class
+        (deps.chatgpt !== undefined &&
+          isChatGptSubscriptionModelId(b.model_id)) ||
         (await isRegisteredModelId(b.model_id, deps)));
     if (!allowed) {
       return Response.json(
@@ -188,6 +205,7 @@ export async function parseRunBody(
     const allowed =
       providerId.length > 0 &&
       (isGgProviderId(providerId) ||
+        isChatGptProviderId(providerId) ||
         (await isKnownProviderId(providerId, deps.endpoints)));
     if (!allowed) {
       return Response.json(
@@ -196,6 +214,18 @@ export async function parseRunBody(
       );
     }
     explicit = providerId;
+  }
+  if (
+    explicit &&
+    modelId !== undefined &&
+    !(await isModelAvailableFromProvider(explicit, modelId, deps))
+  ) {
+    return Response.json(
+      {
+        error: `modelId not available from provider ${explicit}: ${modelId}`,
+      },
+      { status: 400 }
+    );
   }
   let workspaceId: string | undefined;
   let workspaceRoot: string | undefined;
@@ -493,6 +523,31 @@ async function isRegisteredModelId(
   if (!deps.endpoints) return false;
   const registered = await deps.endpoints.registeredModels();
   return registered.some((m) => m.id === modelId);
+}
+
+/**
+ * Provider and model form one cost/privacy boundary. Validate the exact tuple
+ * at the untrusted HTTP edge instead of accepting two independently valid
+ * strings that the selected provider cannot serve.
+ */
+async function isModelAvailableFromProvider(
+  providerId: string,
+  modelId: string,
+  deps: ParseRunBodyDeps
+): Promise<boolean> {
+  if (isChatGptProviderId(providerId)) {
+    return deps.chatgpt !== undefined && isChatGptSubscriptionModelId(modelId);
+  }
+  if (isGgProviderId(providerId)) {
+    return CATALOG_MODEL_IDS.has(modelId);
+  }
+  if (isByokProviderId(providerId)) {
+    return (
+      TEXT_BYOK_PROVIDER_IDS.has(providerId) && CATALOG_MODEL_IDS.has(modelId)
+    );
+  }
+  const endpoint = await deps.endpoints?.get(providerId);
+  return endpoint?.models.some((model) => model.id === modelId) ?? false;
 }
 
 /**

@@ -1,4 +1,5 @@
 // GRIDA-GG: desktop — pass the GG base URL to the daemon (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-008 — construct the native provider inside Grida's agent tenant.
 /**
  * Agent sidecar entry point.
  *
@@ -45,6 +46,7 @@
 import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 import { AgentSidecarNetwork } from "./agent-sidecar-network";
 import { AgentSidecarDaemonSockets } from "./agent-sidecar-daemon-sockets";
+import { CHATGPT_SUBSCRIPTION_CONFIG } from "./chatgpt-configuration";
 
 // Route Node's built-in `fetch` (undici) through whatever proxy is in
 // `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`. Without this, undici v6+
@@ -180,6 +182,10 @@ async function main() {
     // origin (same editor base the perimeter already trusts); the renderer
     // pushes the short-lived session token over /auth/gg/set.
     gg_base_url: runtimeEditorBaseUrl,
+    // Native provider path: Grida owns the agent loop; the user's ChatGPT
+    // subscription supplies only model capacity. This is deliberately
+    // separate from the disabled external ACP execution path above.
+    chatgpt: CHATGPT_SUBSCRIPTION_CONFIG,
     // issue #974 — provider traffic follows Electron/Chromium's system network
     // route while the sidecar and its raw children remain under the SRT wrap.
     provider_http: network.providerHttp,

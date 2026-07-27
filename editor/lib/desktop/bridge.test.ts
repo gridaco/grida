@@ -3,6 +3,8 @@ import type { DesktopBridge } from "@grida/desktop-bridge";
 import {
   BYOK_PROVIDER_METADATA,
   DESKTOP_BRIDGE_PROTOCOL,
+  DesktopBridgeMissingError,
+  account,
   ai,
   getDesktopBridge,
   getDesktopBridgeStatus,
@@ -42,6 +44,34 @@ describe("desktop bridge client contract", () => {
 
     expect(getDesktopBridge()).toBe(bridge);
     expect(getDesktopBridgeStatus()).toEqual({ kind: "ready", bridge });
+  });
+
+  it("routes account sign-out only through the native entry controller", async () => {
+    const signOut = vi
+      .fn<NonNullable<DesktopBridge["account"]>["sign_out"]>()
+      .mockResolvedValue();
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+        account: { sign_out: signOut },
+      } as unknown as DesktopBridge,
+    });
+
+    await account.signOut();
+
+    expect(signOut).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed when the native account controller is absent", async () => {
+    installBridge({
+      grida: {
+        protocol: DESKTOP_BRIDGE_PROTOCOL,
+      } as unknown as DesktopBridge,
+    });
+
+    await expect(account.signOut()).rejects.toBeInstanceOf(
+      DesktopBridgeMissingError
+    );
   });
 
   it("fails closed when an old host omits base64 scratch capability", () => {

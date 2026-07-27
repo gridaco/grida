@@ -1,4 +1,6 @@
 /**
+ * GRIDA-SEC-008 — host config must reach the native provider unchanged.
+ *
  * Contract pins for the composed agent-daemon (#927): `createAgentDaemon`
  * = `@grida/daemon`'s server frame + this package's agent tenant. Wire
  * behavior must be identical to the pre-split `AgentHost` — same routes,
@@ -26,6 +28,18 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
       request: globalThis.fetch,
       download: globalThis.fetch,
     };
+    const chatgpt = {
+      oauth: {
+        authorize_url: "https://auth.example.test/oauth/authorize",
+        token_url: "https://auth.example.test/oauth/token",
+        client_id: "grida-test-client",
+        redirect_uris: ["http://localhost:1455/auth/callback"],
+        scopes: ["openid", "offline_access"],
+      },
+      responses_url: "https://chatgpt.example.test/backend-api/agent/responses",
+      originator: "grida-test",
+      default_model_id: "openai/gpt-5.6-terra" as const,
+    };
     const out = agentTenantOptionsFromDaemon(
       {
         password: "p",
@@ -41,6 +55,7 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
         interactive: true,
         library: true,
         provider_http,
+        chatgpt,
       },
       AGENT_DAEMON_DEFAULT_CAPABILITIES
     );
@@ -53,6 +68,7 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
     expect(out.interactive).toBe(true);
     expect(out.library).toBe(true);
     expect(out.provider_http).toBe(provider_http);
+    expect(out.chatgpt).toBe(chatgpt);
   });
 });
 

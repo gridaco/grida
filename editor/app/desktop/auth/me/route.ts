@@ -1,4 +1,6 @@
 /**
+ * GRIDA-SEC-005 — fixed same-origin account-state projection.
+ *
  * Desktop session read, same-origin.
  *
  * The `/desktop/*` CSP keeps `connect-src` closed to `'self'` (+ loopback),
@@ -11,6 +13,7 @@
  * `{ user: null }`.
  */
 import { createClient } from "@/lib/supabase/server";
+import { desktop_account_session } from "@/lib/desktop/account-session-state";
 import { NextResponse } from "next/server";
 
 const NO_STORE = { "cache-control": "no-store" } as const;
@@ -19,9 +22,21 @@ export async function GET() {
   const client = await createClient();
   const {
     data: { user },
+    error,
   } = await client.auth.getUser();
 
-  if (!user) {
+  const state = desktop_account_session.classify({
+    has_user: user !== null,
+    error,
+  });
+  if (state === "unavailable") {
+    return NextResponse.json(
+      { error: "account_unavailable" },
+      { status: 503, headers: NO_STORE }
+    );
+  }
+
+  if (state === "signed-out" || !user) {
     return NextResponse.json({ user: null }, { headers: NO_STORE });
   }
 

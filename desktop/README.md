@@ -13,6 +13,13 @@ supervision.
 
 The accepted security architecture for host-native networking and confined
 agent execution is [Desktop agent authority](./docs/agent-authority.md).
+The native system-browser and loopback flow for using an eligible ChatGPT
+subscription is documented in
+[ChatGPT subscription OAuth](./docs/chatgpt-subscription-oauth.md).
+That flow has an active local credential boundary and remains an experimental
+integration: it defaults to the public native Codex OAuth client identity,
+never starts Codex/ACP, and is still gated for stable release on a
+legal/support contract with OpenAI.
 
 ## Architecture
 
@@ -24,8 +31,8 @@ Electron main/preload (desktop)
   -> loads editor /desktop/*
 
 @grida/agent
-  -> owns BYOK secrets, provider selection/credential injection, files,
-     workspaces, sessions, and desktop agent execution
+  -> owns BYOK/native-provider secrets, provider selection/credential
+     injection, files, workspaces, sessions, and desktop agent execution
   -> serves authenticated daemon HTTP only on main-transferred sockets
   -> sends only provider requests and credential-free provider-asset downloads
      over bounded framed stdin/stdout

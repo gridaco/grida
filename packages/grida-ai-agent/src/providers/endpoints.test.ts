@@ -1,4 +1,6 @@
 /**
+ * GRIDA-SEC-008 — custom endpoint ids cannot shadow the native provider.
+ *
  * Endpoint provider layer (issue #806): config validation, the file-
  * backed store, and the `/providers/endpoints/*` + extended `/secrets/*`
  * routes. Runs against a tmp-dir store and a bare Hono app — no model,
@@ -38,9 +40,11 @@ describe("validateEndpointProviderConfig", () => {
     expect(result.config.models.length).toBe(2);
   });
 
-  it("rejects BYOK-colliding and malformed ids", () => {
+  it("rejects built-in-provider collisions and malformed ids", () => {
     expect(isValidEndpointProviderId("openrouter")).toBe(false);
     expect(isValidEndpointProviderId("vercel")).toBe(false);
+    expect(isValidEndpointProviderId("gg")).toBe(false);
+    expect(isValidEndpointProviderId("chatgpt")).toBe(false);
     expect(isValidEndpointProviderId("Ollama")).toBe(false);
     expect(isValidEndpointProviderId("")).toBe(false);
     expect(isValidEndpointProviderId("ollama")).toBe(true);

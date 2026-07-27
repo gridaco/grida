@@ -14,13 +14,15 @@ import { TitleBar } from "./title-bar";
 export function DesktopPageShell({
   children,
   className,
+  titleBarClassName,
 }: {
   children: ReactNode;
   className?: string;
+  titleBarClassName?: string;
 }) {
   return (
     <div className={cn("flex h-svh w-full flex-col bg-background", className)}>
-      <TitleBar />
+      <TitleBar className={titleBarClassName} />
       {children}
     </div>
   );

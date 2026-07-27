@@ -49,6 +49,10 @@ export type WelcomeHandoff = {
    * turn so the picker's choice survives the navigation; omitted when
    * the workspace chat should fall back to its own default. */
   model_id?: string;
+  /** The provider explicitly paired with `model_id`. Kept separate because
+   * the same model may run through ChatGPT Subscription, BYOK, Grida, or an
+   * endpoint. */
+  provider_id?: string;
   /**
    * Files to land in the session's SCRATCH dir before the first turn — agent-only
    * reference material (a picked slides template's unzipped bundle), NOT written

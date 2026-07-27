@@ -1,3 +1,4 @@
+// GRIDA-SEC-008 — one shared AuthStore serializes OAuth and BYOK mutations.
 import { Hono } from "hono";
 import {
   makeCorsMiddleware,
@@ -36,6 +37,15 @@ export type DaemonServices = {
   workspaces: WorkspaceRegistry;
   files: FileRegistry;
   recent: RecentStore;
+  /**
+   * Shared credential persistence for tenant-owned OAuth sessions.
+   *
+   * This is an in-process host service, not an HTTP capability: tenants may
+   * read their own named records, while renderer routes must continue to
+   * expose only purpose-built, secret-free status/mutation DTOs. Keeping one
+   * instance also keeps every auth.json mutation on one write chain.
+   */
+  auth: AuthStore;
   /**
    * BYOK credential store (presence/set/delete semantics; raw reads stay
    * server-side). The STORE is daemon-owned host persistence; the `/secrets`
@@ -168,12 +178,14 @@ export function buildServer(opts: ServerOptions): BuiltServer {
 
   // Per-launch daemon state (registry is in-memory and resets on restart;
   // recent.json / auth.json / workspaces.json are on disk and persist).
+  const auth = new AuthStore(opts.user_data_path);
   const services: DaemonServices = {
     user_data_path: opts.user_data_path,
     files: new FileRegistry(),
     recent: new RecentStore(opts.user_data_path),
     workspaces: new WorkspaceRegistry(opts.user_data_path, opts.projects_root),
-    secrets: new SecretsStore(new AuthStore(opts.user_data_path)),
+    auth,
+    secrets: new SecretsStore(auth),
   };
 
   // Daemon-owned routes. Capabilities describe the route groups mounted.

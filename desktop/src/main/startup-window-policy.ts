@@ -5,17 +5,12 @@ export namespace startup_window {
 
   export function canDispatchLaunchIntent(input: {
     app_ready: boolean;
-    bootstrap_complete: boolean;
+    entry_main: boolean;
   }): boolean {
-    return input.app_ready && input.bootstrap_complete;
+    return input.app_ready && input.entry_main;
   }
 
-  export function bootstrap(input: {
-    pending_files: number;
-    pending_deep_links: number;
-  }): Bootstrap {
-    return input.pending_files === 0 && input.pending_deep_links === 0
-      ? "restore-last-workspace"
-      : "welcome";
+  export function bootstrap(input: { pending_files: number }): Bootstrap {
+    return input.pending_files === 0 ? "restore-last-workspace" : "welcome";
   }
 }

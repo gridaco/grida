@@ -1072,6 +1072,9 @@ importers:
       '@ai-sdk/gateway':
         specifier: 3.0.125
         version: 3.0.125(zod@4.3.6)
+      '@ai-sdk/openai':
+        specifier: 3.0.0
+        version: 3.0.0(zod@4.3.6)
       '@ai-sdk/openai-compatible':
         specifier: 2.0.48
         version: 2.0.48(zod@4.3.6)

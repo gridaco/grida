@@ -12,9 +12,14 @@
 
 import { useEffect, useState } from "react";
 import _models from "@grida/ai-models";
-import { resolveEndpointModels } from "@grida/agent";
+import {
+  byokProvidersFor,
+  resolveEndpointModels,
+  type ByokProviderId,
+} from "@grida/agent";
 import {
   providers,
+  secrets,
   type EndpointModelSpec,
   type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
@@ -31,12 +36,20 @@ export namespace registered_models {
   /** Resolve a model id over catalog ∪ registered (normalized defaults). */
   export function resolve(
     modelId: string,
-    endpoints: readonly EndpointProviderConfig[]
+    endpoints: readonly EndpointProviderConfig[],
+    providerId?: string
   ): _models.text.registry.ResolvedModelSpec | undefined {
-    // A registered endpoint wins the same id collision because sends pin that
-    // endpoint through `providerIdForModel` below. Resolving the static catalog
-    // first would pair endpoint execution with unrelated catalog capabilities.
-    const custom = specs(endpoints).find((spec) => spec.id === modelId);
+    // An explicit endpoint provider owns only its own registered metadata.
+    // An explicit native/BYOK/Grida provider must never inherit capabilities
+    // from an unrelated endpoint whose model id happens to collide.
+    const endpoint = providerId
+      ? endpoints.find((candidate) => candidate.id === providerId)
+      : undefined;
+    const custom = endpoint
+      ? resolveEndpointModels(endpoint).find((spec) => spec.id === modelId)
+      : providerId
+        ? undefined
+        : specs(endpoints).find((spec) => spec.id === modelId);
     return custom
       ? _models.text.registry.normalize(custom)
       : _models.text.registry.resolve(modelId, []);
@@ -59,27 +72,86 @@ export namespace registered_models {
 }
 
 /**
- * The configured endpoint providers, fetched once per mount. `[]` while
- * loading, outside the desktop renderer, or on an old binary without the
- * bridge surface — every consumer degrades to catalog-only behavior.
+ * The configured endpoint providers. `[]` while loading, outside the desktop
+ * renderer, or on an old binary without the bridge surface — every consumer
+ * degrades to catalog-only behavior. Settings has a separate BrowserWindow,
+ * so the list is refreshed when this window becomes active again.
  */
 export function useEndpointProviders(): EndpointProviderConfig[] {
   const [endpoints, setEndpoints] = useState<EndpointProviderConfig[]>([]);
   useEffect(() => {
     let cancelled = false;
+    let generation = 0;
     if (!providers.isSupported()) return;
-    providers
-      .listEndpoints()
-      .then((list) => {
-        if (!cancelled) setEndpoints(list);
-      })
-      .catch(() => {
-        // Endpoint config is additive — a failed fetch degrades to
-        // catalog-only models, never blocks the chat.
-      });
+    const load = () => {
+      const requestGeneration = ++generation;
+      providers
+        .listEndpoints()
+        .then((list) => {
+          if (!cancelled && requestGeneration === generation) {
+            setEndpoints(list);
+          }
+        })
+        .catch(() => {
+          // Endpoint config is additive — a failed fetch keeps the last-known
+          // list and never blocks the chat.
+        });
+    };
+    const loadWhenVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+
+    load();
+    window.addEventListener("focus", load);
+    document.addEventListener("visibilitychange", loadWhenVisible);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", load);
+      document.removeEventListener("visibilitychange", loadWhenVisible);
     };
   }, []);
   return endpoints;
+}
+
+/**
+ * GRIDA-SEC-004 — renderer-safe BYOK availability for the text picker.
+ * The bridge exposes only key presence, never key material. Upstream
+ * reachability is intentionally not guessed here.
+ */
+export function useConfiguredTextByokProviderIds(): ByokProviderId[] {
+  const [configured, setConfigured] = useState<ByokProviderId[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    let generation = 0;
+    const textProviders = byokProvidersFor("text");
+    const load = () => {
+      const requestGeneration = ++generation;
+      void Promise.all(
+        textProviders.map(async (provider) => ({
+          id: provider.id,
+          configured: await secrets.hasKey(provider.id).catch(() => false),
+        }))
+      ).then((statuses) => {
+        if (cancelled || requestGeneration !== generation) return;
+        setConfigured(
+          statuses
+            .filter((status) => status.configured)
+            .map((status) => status.id)
+        );
+      });
+    };
+    const loadWhenVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+
+    load();
+    window.addEventListener("focus", load);
+    document.addEventListener("visibilitychange", loadWhenVisible);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", load);
+      document.removeEventListener("visibilitychange", loadWhenVisible);
+    };
+  }, []);
+  return configured;
 }
