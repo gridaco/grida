@@ -123,7 +123,8 @@ export function registerSessionsRoutes(
     );
 
     // Queued sends (RFC `queue`). enqueue persists a pending user message;
-    // list returns the queue FIFO; cancel hard-deletes a pending item. The
+    // list returns the queue FIFO; cancel hides a pending item while retaining
+    // its idempotency tombstone. The
     // drain itself is CORE-owned (the SessionScheduler fires queued turns on a
     // clean idle edge) — clients enqueue/cancel and watch status; they do not
     // drive the drain.

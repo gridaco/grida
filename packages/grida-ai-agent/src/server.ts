@@ -231,8 +231,16 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           ? opts.gg_base_url
           : undefined;
       const gridaSession = new GridaGatewaySessionStore();
+      // Provider configuration routes are registered before the runtime is
+      // constructed. Their callback closes over this late-bound trusted edge;
+      // requests cannot arrive until tenant registration returns.
+      let onProviderReady: (() => void) | undefined;
+      const signalProviderReady = () => onProviderReady?.();
       if (gridaGatewayBaseUrl) {
-        registerGridaAuthRoutes(app, { store: gridaSession });
+        registerGridaAuthRoutes(app, {
+          store: gridaSession,
+          on_provider_ready: signalProviderReady,
+        });
       }
       // Chat sessions: SQLite at ${userData}/sessions.db — agent-tenant
       // domain data (#927). Opened once per launch and closed via the
@@ -263,6 +271,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         registerSecretsRoutes(app, {
           store: services.secrets,
           endpoints: endpointsStore,
+          on_provider_ready: signalProviderReady,
         });
       }
       if (caps.providers) {
@@ -270,6 +279,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
           endpoints: endpointsStore,
           secrets: services.secrets,
           provider_http: providerHttp,
+          on_provider_ready: signalProviderReady,
         });
       }
       if (caps.images) {
@@ -365,6 +375,34 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         },
       });
       if (caps.agent) {
+        // Repair restart-orphaned tool state before ANY recovery edge may kick
+        // a durable successor. Provider setup can arrive immediately after the
+        // daemon starts; chaining it to this promise keeps a repair failure
+        // fail-closed rather than allowing that later mutation to bypass it.
+        const startupRecovery = runtime.recoverQueuedSessions();
+        void startupRecovery.catch((err) => {
+          console.warn(
+            `[grida-agent] queued-session startup recovery failed: ${
+              err instanceof Error ? err.message : String(err)
+            }`
+          );
+        });
+        onProviderReady = () => {
+          void startupRecovery
+            .then(() => runtime.retryQueuedSessions())
+            .catch((err) => {
+              console.warn(
+                `[grida-agent] queued-session provider-ready retry failed: ${
+                  err instanceof Error ? err.message : String(err)
+                }`
+              );
+            });
+        };
+        // GRIDA-SEC-004 — queued turns survive process death, but recovery is
+        // host-start execution authority, never a side effect of the read-only
+        // status SSE. The scheduler re-checks persisted human-input state at
+        // its fire gate, so queued successors remain paused behind approvals
+        // and questions after restart.
         registerDirectoryScopesRoutes(app, directoryScopes);
         registerAgentRoutes(app, runtime);
       }

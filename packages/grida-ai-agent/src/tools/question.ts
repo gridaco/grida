@@ -92,7 +92,7 @@ const questionInputSchema = z.object({
     .describe("One or more questions to ask in a single survey."),
 });
 
-const questionOutputSchema = z.object({
+export const questionOutputSchema = z.object({
   answers: z
     .array(z.array(z.string()))
     .describe(

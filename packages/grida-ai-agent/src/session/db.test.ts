@@ -42,6 +42,22 @@ const V1_CHAT_SESSIONS_DDL = `
   );
 `;
 
+/** A v2 `chat_parts` table, before the continuation-run marker was added. */
+const V2_CHAT_PARTS_DDL = `
+  CREATE TABLE chat_parts (
+    id TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    "index" INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    data_json TEXT NOT NULL,
+    tool_call_id TEXT,
+    tool_state TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+`;
+
 function userVersion(db: OpenedSessionsDb): number {
   const row = db.sqlite.prepare("PRAGMA user_version").get() as {
     user_version?: number;
@@ -109,6 +125,42 @@ describe("openSessionsDb — user_version gate", () => {
         .prepare("SELECT mode FROM chat_sessions WHERE id = 's1'")
         .get();
       expect(updated).toEqual({ mode: "auto" });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("GRIDA-SEC-004: migrates the continuation marker without marking history", () => {
+    const filePath = path.join(dir, "sessions.db");
+    const raw = new DatabaseSync(filePath);
+    raw.exec(V2_CHAT_PARTS_DDL);
+    raw.exec(
+      `INSERT INTO chat_parts
+         (id, message_id, session_id, "index", type, data_json,
+          tool_call_id, tool_state, created_at, updated_at)
+       VALUES
+         ('p1', 'm1', 's1', 0, 'tool-question',
+          '{"type":"tool-question","state":"output-available","output":{"answers":[["Blue"]]}}',
+          'q1', 'output-available', 0, 0)`
+    );
+    raw.exec("PRAGMA user_version = 2");
+    raw.close();
+
+    const db = openSessionsDb({ user_data_path: dir });
+    try {
+      expect(userVersion(db)).toBe(SCHEMA_VERSION);
+      const row = db.sqlite
+        .prepare("SELECT continuation_run_id FROM chat_parts WHERE id = 'p1'")
+        .get();
+      expect(row).toEqual({ continuation_run_id: null });
+      db.sqlite.exec(
+        "UPDATE chat_parts SET continuation_run_id = 'run_1' WHERE id = 'p1'"
+      );
+      expect(
+        db.sqlite
+          .prepare("SELECT continuation_run_id FROM chat_parts WHERE id = 'p1'")
+          .get()
+      ).toEqual({ continuation_run_id: "run_1" });
     } finally {
       db.close();
     }

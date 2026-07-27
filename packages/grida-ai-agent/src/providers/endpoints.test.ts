@@ -7,7 +7,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import {
   OLLAMA_ENDPOINT_PRESET,
@@ -403,14 +403,26 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
   let app: Hono;
   let endpoints: EndpointProvidersStore;
   let secrets: SecretsStore;
+  let onEndpointReady: () => void;
+  let onSecretReady: () => void;
 
   beforeEach(async () => {
     baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-providers-rt-"));
     endpoints = new EndpointProvidersStore(baseDir);
     secrets = new SecretsStore(new AuthStore(baseDir));
+    onEndpointReady = vi.fn<() => void>();
+    onSecretReady = vi.fn<() => void>();
     app = new Hono();
-    registerProvidersRoutes(app, { endpoints, secrets });
-    registerSecretsRoutes(app, { store: secrets, endpoints });
+    registerProvidersRoutes(app, {
+      endpoints,
+      secrets,
+      on_provider_ready: onEndpointReady,
+    });
+    registerSecretsRoutes(app, {
+      store: secrets,
+      endpoints,
+      on_provider_ready: onSecretReady,
+    });
   });
 
   afterEach(async () => {
@@ -434,6 +446,7 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
   it("set → list → delete round-trips", async () => {
     const set = await post("/providers/endpoints/set", { config: OLLAMA });
     expect(set.status).toBe(200);
+    expect(onEndpointReady).toHaveBeenCalledOnce();
 
     const list = await post("/providers/endpoints/list");
     expect(list.status).toBe(200);
@@ -443,6 +456,93 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
     const del = await post("/providers/endpoints/delete", { id: "ollama" });
     expect(del.status).toBe(200);
     expect(await (await post("/providers/endpoints/list")).json()).toEqual([]);
+  });
+
+  it("signals readiness only after successful provider mutations", async () => {
+    expect(
+      (
+        await post("/providers/endpoints/set", {
+          config: { ...OLLAMA, id: "openrouter" },
+        })
+      ).status
+    ).toBe(400);
+    expect(onEndpointReady).not.toHaveBeenCalled();
+
+    expect(
+      (await post("/providers/endpoints/set", { config: OLLAMA })).status
+    ).toBe(200);
+    expect(onEndpointReady).toHaveBeenCalledOnce();
+
+    expect(
+      (
+        await post("/secrets/set", {
+          provider_id: "ollama",
+          key: "   ",
+        })
+      ).status
+    ).toBe(400);
+    expect(onSecretReady).not.toHaveBeenCalled();
+
+    expect(
+      (
+        await post("/secrets/set", {
+          provider_id: "ollama",
+          key: "gateway-key",
+        })
+      ).status
+    ).toBe(200);
+    expect(onSecretReady).toHaveBeenCalledOnce();
+  });
+
+  it("keeps successful provider mutations successful when queue recovery rejects", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const failureApp = new Hono();
+    registerProvidersRoutes(failureApp, {
+      endpoints,
+      secrets,
+      on_provider_ready: async () => {
+        throw new Error("endpoint recovery failed");
+      },
+    });
+    registerSecretsRoutes(failureApp, {
+      store: secrets,
+      endpoints,
+      on_provider_ready: async () => {
+        throw new Error("secret recovery failed");
+      },
+    });
+    const failurePost = (route: string, body: unknown) =>
+      failureApp.request(route, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const endpoint = await failurePost("/providers/endpoints/set", {
+      config: OLLAMA,
+    });
+    const secret = await failurePost("/secrets/set", {
+      provider_id: "ollama",
+      key: "stored-despite-recovery-failure",
+    });
+
+    expect(endpoint.status).toBe(200);
+    expect(secret.status).toBe(200);
+    expect(await endpoints.get("ollama")).toMatchObject({ id: "ollama" });
+    expect(await secrets.has("ollama")).toBe(true);
+    await vi.waitFor(() => {
+      expect(warning).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "provider-ready hook failed: endpoint recovery failed"
+        )
+      );
+      expect(warning).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "provider-ready hook failed: secret recovery failed"
+        )
+      );
+    });
+    warning.mockRestore();
   });
 
   it("probe route returns parsed models, 502s an unreachable endpoint", async () => {

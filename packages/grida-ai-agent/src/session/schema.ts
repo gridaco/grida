@@ -28,7 +28,7 @@ import {
  * alongside an entry in the ALTER-ladder in `db.ts` whenever the schema
  * changes in a way an in-place migration must handle.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const chatSessions = sqliteTable(
   "chat_sessions",
@@ -113,6 +113,13 @@ export const chatParts = sqliteTable(
     data_json: text("data_json").notNull(),
     tool_call_id: text("tool_call_id"),
     tool_state: text("tool_state"),
+    // GRIDA-SEC-004 — internal durability marker for a human interaction
+    // (supervised approval or client-resolved question/design search) whose
+    // correlated model continuation has started but has not settled yet. Kept
+    // out of `data_json`: chat part JSON is the renderer/model transcript
+    // contract, while this is host recovery state. The exact run id prevents a
+    // stale terminal callback from clearing a newer continuation.
+    continuation_run_id: text("continuation_run_id"),
     created_at: integer("created_at").notNull(),
     updated_at: integer("updated_at").notNull(),
   },
@@ -180,6 +187,7 @@ const BOOTSTRAP_TABLES_SQL = `
     data_json TEXT NOT NULL,
     tool_call_id TEXT,
     tool_state TEXT,
+    continuation_run_id TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );

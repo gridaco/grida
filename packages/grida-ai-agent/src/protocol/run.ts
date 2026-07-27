@@ -74,9 +74,10 @@ export const SCRATCH_SEED_LIMITS = Object.freeze({
  * smuggled inside a mutated assistant message — exactly like `mode`/`model_id`.
  * The server is the single source of truth for message state, so the answer
  * never needs to be SDK-part-shaped on the wire: the host validates it against
- * the persisted pending approval (`store.answerApproval`) before rebuilding the
- * model view. A forged answer (unknown call, wrong id, already-answered) is a
- * silent no-op.
+ * the persisted pending approval before rebuilding the model view. The store
+ * atomically binds a valid answer to its exact consuming run; an unknown call,
+ * wrong id, or already-answered approval is a silent no-op that the run
+ * endpoint turns into `409 approval-answer-invalid`.
  */
 export type ApprovalAnswer = {
   tool_call_id: string;
@@ -126,8 +127,10 @@ export type AgentRunOptions = {
   /**
    * Resume answer for a paused supervised approval (RFC `permission modes`,
    * Phase 2). Present ONLY on the turn that answers an Allow/Deny; the host
-   * applies it (`store.answerApproval`) before rebuilding the model view, then
-   * the SDK resumes (Allow) or skips (Deny) the call. See {@link ApprovalAnswer}.
+   * atomically binds it to the exact consuming run
+   * (`store.commitApprovalContinuation`) before rebuilding the model view, then
+   * the SDK resumes (Allow) or skips (Deny) the call. See
+   * {@link ApprovalAnswer}.
    */
   approval_answer?: ApprovalAnswer;
   /**

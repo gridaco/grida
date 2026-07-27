@@ -35,7 +35,11 @@ import {
 import { runAgentProviderTurn } from "./agent-provider-run";
 import { createRecorderConsumer } from "../session/recorder";
 import { titler } from "../session/titler";
-import type { SessionsStore } from "../session/store";
+import {
+  QueueMessageConflictError,
+  type HumanInputContinuation,
+  type SessionsStore,
+} from "../session/store";
 import {
   DirectoryScopeError,
   type DirectoryScopeRegistry,
@@ -63,6 +67,8 @@ import type { WorkspaceRegistry } from "@grida/daemon/server";
 import {
   RunInFlightError,
   StreamRegistry,
+  type StreamAdmission,
+  type StreamConsumer,
   type StreamEntry,
   type StreamEndReason,
 } from "./stream-registry";
@@ -74,10 +80,13 @@ import {
   applyApprovalAnswer,
   extractFirstUserText,
   extractLastUserText,
-  extractLastUserMessageId,
+  extractTailUserMessageId,
+  findIncomingHumanInputResults,
   fillIncomingToolResults,
+  hasUnpersistedCallerMessage,
   parseRunBody,
   persistIncomingTail,
+  type IncomingHumanInputResult,
   type RunRequest,
 } from "./run-input";
 import { runAgent, type AgentStepUsage } from "./run-agent";
@@ -101,16 +110,36 @@ type SessionContext = {
   skill_cache: SkillBodyCache;
 };
 
+function humanInputPendingResponse(sessionId: string): Response {
+  return Response.json(
+    {
+      error:
+        "a human-input block (approval or question) is pending; resolve it before starting a new turn",
+      code: "human-input-pending",
+      session_id: sessionId,
+    },
+    { status: 409 }
+  );
+}
+
 /**
- * Resolve an existing chat session (validating agent bucket + model
- * freshness) or create a new one. Returns the session id or a 4xx
- * `Response`.
+ * Resolve an existing chat session (validating its agent bucket) or create a
+ * new one. Existing-session model/mode updates are described, not applied:
+ * continuation preflight must be able to reject without changing the posture
+ * a later queued drain will inherit.
  */
 async function resolveOrCreateSession(
   store: SessionsStore,
   req: RunRequest,
   provider: { provider_id: string }
-): Promise<string | Response> {
+): Promise<
+  | {
+      session_id: string;
+      model_update_required: boolean;
+      mode_update_required: boolean;
+    }
+  | Response
+> {
   if (req.session_id) {
     const existing = await store.get(req.session_id);
     if (!existing) {
@@ -131,23 +160,14 @@ async function resolveOrCreateSession(
         { status: 409 }
       );
     }
-    if (
-      existing.model?.provider_id !== provider.provider_id ||
-      existing.model?.tier !== req.tier ||
-      existing.model?.model_id !== req.model_id
-    ) {
-      await store.updateModel(existing.id, {
-        provider_id: provider.provider_id,
-        tier: req.tier,
-        model_id: req.model_id,
-      });
-    }
-    // Persist a mode change so a later queued-turn drain (no client request)
-    // reuses the user's last-chosen posture.
-    if (existing.mode !== req.mode) {
-      await store.updateMode(existing.id, req.mode);
-    }
-    return existing.id;
+    return {
+      session_id: existing.id,
+      model_update_required:
+        existing.model?.provider_id !== provider.provider_id ||
+        existing.model?.tier !== req.tier ||
+        existing.model?.model_id !== req.model_id,
+      mode_update_required: existing.mode !== req.mode,
+    };
   }
   const created = await store.create({
     agent: AGENT_SESSION_AGENT,
@@ -160,7 +180,11 @@ async function resolveOrCreateSession(
     },
     mode: req.mode,
   });
-  return created.id;
+  return {
+    session_id: created.id,
+    model_update_required: false,
+    mode_update_required: false,
+  };
 }
 
 /** Collaborators the agent run pipeline needs. */
@@ -302,6 +326,11 @@ type LimitsResolution = {
  */
 type StartTurnOptions = {
   provider: ResolvedProvider;
+  /**
+   * Synchronous pre-stream lease held by direct persistence or queue claim.
+   * `startTurn` hands it to `StreamRegistry.create`, which consumes it.
+   */
+  admission: StreamAdmission;
   run_id: string;
   tier: RunRequest["tier"];
   model_id?: RunRequest["model_id"];
@@ -324,11 +353,20 @@ type StartTurnOptions = {
   /**
    * The user message this turn fires — the fired-message identity the
    * turn-lifecycle wire carries (RFC `turn-authority`; emitted on the
-   * `turn-started` event). A queue drain names the dequeued row; an HTTP
+   * `turn-started` event). A queue drain names the atomically claimed row; an HTTP
    * run names the incoming tail's user message; an approval-answer resume
    * fires no new user message and leaves this absent.
    */
   fired_message_id?: string;
+  /**
+   * GRIDA-SEC-004.
+   *
+   * Exact durable human-interaction continuation owned by this run. Its marker
+   * is cleared only from the recorder's terminal settlement barrier. This
+   * covers both explicit approvals and client-resolved question/design-search
+   * results.
+   */
+  human_input_continuation?: HumanInputContinuation;
   /**
    * Set only when `provider.kind === "agent-provider"`: the single prompt
    * string handed to the external agent for this turn (issue #813).
@@ -436,16 +474,15 @@ export class AgentRuntime {
 
     // Run-state machine: owns SessionStatus + the serial drain. Its drain is a
     // one-way dependency back into this runtime (fires a turn via startTurn);
-    // it reads/clears the queue through the store. Wire it to the registry's
-    // busy/idle edges (works for an injected registry too).
+    // it selects the queue through the store; runtime claim + registry reserve
+    // form the atomic fire boundary. Wire it to the registry's busy/idle edges
+    // (works for an injected registry too).
     this.scheduler = new SessionScheduler({
       list_queued: (sessionId) =>
         this.deps.sessions_store.listQueuedMessages(sessionId),
-      dequeue: (messageId) =>
-        this.deps.sessions_store.dequeueMessage(messageId),
       drain: (sessionId, messageId) => this.drainTurn(sessionId, messageId),
-      has_pending_human_input: (sessionId) =>
-        this.deps.sessions_store.hasPendingHumanInput(sessionId),
+      pending_human_input_kind: (sessionId) =>
+        this.deps.sessions_store.pendingHumanInputKind(sessionId),
       drain_cooldown_ms: deps.drain_cooldown_ms,
     });
     // Both observers are detached in dispose(): the registry can be
@@ -453,7 +490,8 @@ export class AgentRuntime {
     // detach, a disposed runtime's scheduler would keep receiving edges.
     this.detach_observers.push(
       this.streams.observe({
-        on_create: (sessionId) => this.scheduler.onCreate(sessionId),
+        on_create: (sessionId, firedMessageId) =>
+          this.scheduler.onCreate(sessionId, firedMessageId),
         on_finish: (sessionId, reason) =>
           this.scheduler.onFinish(sessionId, reason),
       })
@@ -473,6 +511,35 @@ export class AgentRuntime {
         },
       })
     );
+  }
+
+  /**
+   * Trusted host-start recovery for the durable turn queue.
+   *
+   * Status hydration is deliberately projection-only (GRIDA-SEC-004): a GET
+   * carrying an SSE query credential must never gain execution authority.
+   * The host invokes this method exactly once during tenant startup instead.
+   * It first terminalizes ordinary in-flight tool calls abandoned by the dead
+   * process, while preserving intentional approval/question waits, and only
+   * then kicks durable queues.
+   */
+  async recoverQueuedSessions(): Promise<void> {
+    this.deps.sessions_store.finalizeRestartOrphanedTools();
+    await this.retryQueuedSessions();
+  }
+
+  /**
+   * Re-kick durable queues after provider configuration becomes usable.
+   *
+   * Unlike {@link recoverQueuedSessions}, this is safe during normal runtime:
+   * it does not rewrite tool state. Provider preparation remains ahead of the
+   * durable queue claim, so a still-unavailable provider leaves the row queued.
+   */
+  async retryQueuedSessions(): Promise<void> {
+    const sessionIds = await this.deps.sessions_store.listQueuedSessionIds();
+    for (const sessionId of sessionIds) {
+      this.scheduler.notifyEnqueued(sessionId);
+    }
   }
 
   /**
@@ -545,43 +612,94 @@ export class AgentRuntime {
 
   /**
    * Fire the next queued turn for a session — the scheduler's injected drain
-   * (RFC `queue / the run-state machine`). The scheduler already dequeued the
-   * fired row (cleared its `queued_at`) just before calling this, so it is
-   * already in the model view; this just rebuilds the turn context from the
-   * PERSISTED session — provider/model from `session.model`, workspace root
-   * from the row — and starts the turn. No client request, no per-send skills
-   * (a renderer concern with no analogue here). `messageId` is the dequeued
-   * row the scheduler fired — carried through to the `turn-started` event
-   * (RFC `turn-authority`), never used to select what runs. Throws
-   * {@link RunInFlightError} if a run is already in flight (the scheduler
-   * swallows it and retries on the next idle edge).
+   * (RFC `queue / the run-state machine`). The selected row remains queued
+   * throughout provider/workspace preparation, while a session admission lease
+   * prevents a direct run from mutating the mode/model snapshot underneath the
+   * drain. After a final persisted human-input check, this conditionally claims
+   * the exact same-session row and hands both to `startTurn` on one synchronous
+   * stack. Returns false when cancel or a human block won.
+   * Provider/preparation errors throw with the row untouched.
    */
-  private async drainTurn(sessionId: string, messageId: string): Promise<void> {
-    const session = await this.deps.sessions_store.get(sessionId);
-    if (!session) return;
-    // Resolve the provider from the persisted model. A provider-down here
-    // throws to the scheduler (swallowed); the committed row waits for a
-    // user retry. The win path owns status.
-    const provider = await resolveProvider(this.deps, {
-      explicit: session.model?.provider_id,
-    });
-    const workspaceRoot =
-      (await this.deps.sessions_store.getWorkspaceRoot(sessionId)) ?? undefined;
-    const runId = crypto.randomUUID();
-    console.log(
-      `[agent-host-agent] drain firing sessionId=${sessionId} runId=${runId} providerId=${provider.provider_id}`
-    );
-    this.startTurn(sessionId, {
-      provider,
-      run_id: runId,
-      tier: session.model?.tier ?? AGENT_DEFAULT_TIER,
-      model_id: session.model?.model_id,
-      workspace_root: workspaceRoot,
-      // Queued-turn posture comes from the persisted session, not a client
-      // request (there is none here). Legacy rows (null mode) fall to default.
-      mode: session.mode ?? AGENT_DEFAULT_MODE,
-      fired_message_id: messageId,
-    });
+  private async drainTurn(
+    sessionId: string,
+    messageId: string
+  ): Promise<boolean> {
+    let admission: StreamAdmission;
+    try {
+      admission = this.streams.acquireAdmission(sessionId);
+    } catch (err) {
+      if (err instanceof RunInFlightError) return false;
+      throw err;
+    }
+    try {
+      const session = await this.deps.sessions_store.get(sessionId);
+      if (!session) return false;
+      // Provider-down throws before claim, so the durable row remains queued.
+      let provider: ResolvedProvider;
+      if (isAgentProviderModel(session.model?.model_id)) {
+        const providerId = AGENT_PROVIDER_MODELS[session.model.model_id].id;
+        if (
+          this.external_agent_execution === "disabled" ||
+          (this.external_agent_execution === "sandboxed" &&
+            this.deps.sandbox_enforced !== true)
+        ) {
+          throw new ProviderUnavailableError(providerId);
+        }
+        provider = makeAgentProvider(providerId);
+      } else {
+        provider = await resolveProvider(this.deps, {
+          explicit: session.model?.provider_id,
+        });
+      }
+      const workspaceRoot =
+        (await this.deps.sessions_store.getWorkspaceRoot(sessionId)) ??
+        undefined;
+
+      // This is the final await before the synchronous claim → stream handoff.
+      // A recorder flush or restored transcript block that landed during
+      // preparation therefore wins without consuming the queued row.
+      if (
+        (await this.deps.sessions_store.pendingHumanInputKind(sessionId)) !==
+        null
+      ) {
+        return false;
+      }
+
+      const claim = this.deps.sessions_store.claimQueuedMessage(
+        sessionId,
+        messageId
+      );
+      if (!claim) return false;
+      const runId = crypto.randomUUID();
+      console.log(
+        `[agent-host-agent] drain firing sessionId=${sessionId} runId=${runId} providerId=${provider.provider_id}`
+      );
+      try {
+        this.startTurn(sessionId, {
+          provider,
+          admission,
+          run_id: runId,
+          tier: session.model?.tier ?? AGENT_DEFAULT_TIER,
+          model_id: session.model?.model_id,
+          workspace_root: workspaceRoot,
+          // Queued-turn posture comes from the persisted session, not a client
+          // request (there is none here). Legacy rows (null mode) fall to default.
+          mode: session.mode ?? AGENT_DEFAULT_MODE,
+          fired_message_id: messageId,
+        });
+        return true;
+      } catch (err) {
+        // `create` consumes admission only after installing the running entry.
+        // Any synchronous failure before that point must put the same row back.
+        if (this.streams.get(sessionId)?.status !== "running") {
+          this.deps.sessions_store.restoreQueuedMessage(claim);
+        }
+        throw err;
+      }
+    } finally {
+      // Identity-guarded no-op after a successful create/handoff.
+      this.streams.releaseAdmission(admission);
+    }
   }
 
   /**
@@ -818,217 +936,460 @@ export class AgentRuntime {
       }
     }
 
-    const runId = crypto.randomUUID();
-    console.log(
-      `[agent-host-agent] run started providerId=${provider.provider_id} runId=${runId} tier=${req.tier} modelId=${req.model_id ?? "(tier)"} kind=${provider.kind}`
-    );
-
-    const sessionResolution = await resolveOrCreateSession(
-      this.deps.sessions_store,
-      req,
-      provider
-    );
-    if (sessionResolution instanceof Response) return sessionResolution;
-    const sessionId = sessionResolution;
-    const {
-      messages,
-      tier,
-      model_id: modelId,
-      feature,
-      workspace_root: workspaceRoot,
-      mode,
-      approval_answer: approvalAnswer,
-    } = req;
-
-    // GRIDA-SEC-004 — a persisted `directory-ref` is NOT authority. Claim the
-    // matching one-shot host grant for this exact session before mutating the
-    // prior transcript, staging scratch, or persisting the incoming tail. The
-    // registry compares every descriptor to its canonical host facts and
-    // commits the set atomically; replay/fork/stale ids therefore fail closed.
-    if (req.directory_scopes && req.directory_scopes.length > 0) {
-      const registry = this.deps.directory_scopes;
-      if (!registry) {
-        return Response.json(
-          {
-            error: "directory references are unavailable on this host",
-            code: "directory-scopes-unavailable",
-            session_id: sessionId,
-          },
-          { status: 409 }
-        );
-      }
+    // Existing-session admission is acquired BEFORE session resolution. New
+    // sessions have a fresh id and acquire immediately after creation. The
+    // same lease remains held through continuation preflight/config mutation,
+    // incoming persistence, and the synchronous StreamRegistry handoff.
+    let admission: StreamAdmission | undefined;
+    if (req.session_id) {
       try {
-        registry.claim(sessionId, req.directory_scopes);
+        admission = this.streams.acquireAdmission(req.session_id);
       } catch (err) {
-        if (!(err instanceof DirectoryScopeError)) throw err;
-        return Response.json(
-          { error: err.message, code: err.code, session_id: sessionId },
-          { status: 409 }
-        );
-      }
-    }
-
-    // Supervised-approval resume (RFC `permission modes`, Phase 2): if this
-    // re-submit carries an Allow/Deny (the explicit `approval_answer` body
-    // field), apply it to the persisted part BEFORE anything else — the
-    // pending-approval guard below must see the cleared state, and the model
-    // view rebuilt in `startTurn` must no longer see `approval-requested` or the
-    // run would not resume. `applyApprovalAnswer` flips a part persisted by the
-    // PRIOR turn, so it does not depend on the incoming tail being persisted yet.
-    if (approvalAnswer) {
-      await applyApprovalAnswer(
-        this.deps.sessions_store,
-        sessionId,
-        approvalAnswer
-      );
-    }
-
-    // Clear a CLIENT-resolved answer that rides the incoming tail BEFORE the
-    // pending-block guard below. A `question` answer is a terminal tool result
-    // on the assistant tail (not a body field like an approval), so without
-    // this the very POST carrying the answer would trip the guard it resolves
-    // (the live-daemon resume 409). Idempotent vs. the later persistIncomingTail.
-    await fillIncomingToolResults(
-      this.deps.sessions_store,
-      sessionId,
-      messages
-    );
-
-    // Fail closed on an unanswered human-in-the-loop block (a supervised
-    // approval, or a `question` paused for the user) — the SAME invariant the
-    // scheduler's drain enforces (`session-scheduler.ts` `has_pending_human_input`):
-    // never start a NEW turn while one is pending. `buildModelMessages` drops the
-    // unanswered blocking part, so a turn started here would orphan the block and
-    // run the next message ahead of it. A valid `approval_answer` above clears an
-    // approval; a question clears when its answer is filled. The client normally
-    // queues sends while a block is pending (it never POSTs here), so this is the
-    // server-authoritative guard for a direct or forged send. We bail BEFORE
-    // persisting the incoming tail so a typed-ahead follow-up isn't recorded
-    // against a refused turn.
-    if (await this.deps.sessions_store.hasPendingHumanInput(sessionId)) {
-      return Response.json(
-        {
-          error:
-            "a human-input block (approval or question) is pending; resolve it before starting a new turn",
-          code: "human-input-pending",
-          session_id: sessionId,
-        },
-        { status: 409 }
-      );
-    }
-
-    // The durable multipart row may describe scratch-backed attachments, so
-    // the transient bodies MUST exist first. Failure is an HTTP error before
-    // `persistIncomingTail`: a descriptor can never outlive a failed seed.
-    const scratchDir =
-      this.deps.scratch_base &&
-      workspaceRoot &&
-      req.scratch_seed &&
-      req.scratch_seed.length > 0
-        ? scratchRootFor(this.deps.scratch_base, sessionId)
-        : undefined;
-    if (req.scratch_seed && req.scratch_seed.length > 0) {
-      if (!scratchDir) {
-        return Response.json(
-          {
-            error:
-              "scratch-backed files require a workspace-bound session and an enabled scratch base",
-            code: "scratch-unavailable",
-            session_id: sessionId,
-          },
-          { status: 409 }
-        );
-      }
-      try {
-        await prepareScratchForTurn(
-          scratchDir,
-          this.deps.secrets_root,
-          req.scratch_seed
-        );
-      } catch (err) {
-        return Response.json(
-          {
-            error: `failed to stage scratch files: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-            code: "scratch-seed-failed",
-            session_id: sessionId,
-          },
-          { status: 500 }
-        );
-      }
-    }
-
-    await persistIncomingTail(this.deps.sessions_store, sessionId, messages);
-
-    // Fire-and-forget title generation; writes title only if still the
-    // default sentinel, so a user rename always wins. Failures swallowed.
-    const firstUserText = extractFirstUserText(messages);
-    // Titling runs a model-provider; skip it for agent-providers (no factory).
-    if (provider.kind !== "agent-provider" && firstUserText.length > 0) {
-      void titler
-        .maybeGenerate({
-          store: this.deps.sessions_store,
-          session_id: sessionId,
-          model_factory: provider.model_factory,
-          user_text: firstUserText,
-        })
-        .catch((err) => {
-          console.warn(
-            `[agent-host-titler] failed sessionId=${sessionId} err=${
-              err instanceof Error ? err.message : String(err)
-            }`
+        if (err instanceof RunInFlightError) {
+          return Response.json(
+            {
+              error: err.message,
+              code: err.code,
+              session_id: req.session_id,
+            },
+            { status: 409 }
           );
-        });
+        }
+        throw err;
+      }
     }
 
-    // Reserve + pump for this turn (single-flight owned by startTurn). A 409
-    // surfaces as RunInFlightError; everything else streams.
     try {
-      this.startTurn(sessionId, {
-        provider,
-        run_id: runId,
+      const runId = crypto.randomUUID();
+      console.log(
+        `[agent-host-agent] run started providerId=${provider.provider_id} runId=${runId} tier=${req.tier} modelId=${req.model_id ?? "(tier)"} kind=${provider.kind}`
+      );
+
+      const sessionResolution = await resolveOrCreateSession(
+        this.deps.sessions_store,
+        req,
+        provider
+      );
+      if (sessionResolution instanceof Response) return sessionResolution;
+      const sessionId = sessionResolution.session_id;
+      if (!admission) {
+        try {
+          admission = this.streams.acquireAdmission(sessionId);
+        } catch (err) {
+          if (err instanceof RunInFlightError) {
+            return Response.json(
+              { error: err.message, code: err.code, session_id: sessionId },
+              { status: 409 }
+            );
+          }
+          throw err;
+        }
+      }
+      const {
+        messages,
         tier,
         model_id: modelId,
         feature,
         workspace_root: workspaceRoot,
         mode,
-        // Per-run client UI capability (the desktop-from-web bridge sets true; a
-        // headless `cli run` sets false). Absent ⇒ host default downstream.
-        interactive: req.interactive,
-        // Exact presentation state at request start. Omission means no surface
-        // observer is attached.
-        surface: req.surface,
-        // Per-run library-search capability (renderer wires the resolver).
-        library: req.library,
-        // Direct-run seeds were staged before persistence. Pass the exact root
-        // onward so bindings expose the same files to tools and shell.
-        scratch_dir: scratchDir,
-        // The fired message of a direct run is the incoming tail's user
-        // message (the client resends history; the tail is the new one). An
-        // approval-answer resume continues the PRIOR turn's tool call — it
-        // fires no new user message (RFC `turn-authority`).
-        fired_message_id: approvalAnswer
-          ? undefined
-          : extractLastUserMessageId(messages),
-        // Agent-provider turns take a single prompt string (the external
-        // agent owns history); the tail user message is this turn's prompt.
-        agent_prompt:
-          provider.kind === "agent-provider"
-            ? extractLastUserText(messages)
-            : undefined,
-      });
-    } catch (err) {
-      if (err instanceof RunInFlightError) {
-        return Response.json(
-          { error: err.message, code: err.code, session_id: sessionId },
-          { status: 409 }
-        );
-      }
-      throw err;
-    }
+        approval_answer: approvalAnswer,
+      } = req;
 
-    return buildConsumerResponse(this.streams, sessionId, requestSignal);
+      // GRIDA-SEC-004 — validate a human-input continuation without consuming
+      // it. Approval answers are explicit body fields; question/design-search
+      // answers are terminal assistant tool parts. In either form:
+      //   1. the exact visible persisted block must match;
+      //   2. no new caller-owned user/system row may ride the continuation;
+      //   3. the store mutation waits until every later fallible preparation
+      //      step succeeds.
+      // This two-phase boundary keeps Allow/Deny or a question answer retryable
+      // when scratch staging or incoming persistence rejects the request.
+      const pendingHumanInputKind =
+        await this.deps.sessions_store.pendingHumanInputKind(sessionId);
+      let approvalContinuation: HumanInputContinuation | undefined;
+      let incomingHumanInputResult: IncomingHumanInputResult | undefined;
+      if (approvalAnswer) {
+        if (
+          await hasUnpersistedCallerMessage(
+            this.deps.sessions_store,
+            sessionId,
+            messages
+          )
+        ) {
+          return Response.json(
+            {
+              error:
+                "an approval continuation cannot add a new user or system message; resume the approval before starting the queued turn",
+              code: "approval-resume-with-new-message",
+              session_id: sessionId,
+            },
+            { status: 409 }
+          );
+        }
+        if (
+          pendingHumanInputKind !== "approval" ||
+          !(await this.deps.sessions_store.matchesPendingApproval(
+            sessionId,
+            approvalAnswer
+          ))
+        ) {
+          return Response.json(
+            {
+              error:
+                "approval answer does not match a pending approval for this session",
+              code: "approval-answer-invalid",
+              session_id: sessionId,
+            },
+            { status: 409 }
+          );
+        }
+      } else if (pendingHumanInputKind !== null) {
+        if (
+          await hasUnpersistedCallerMessage(
+            this.deps.sessions_store,
+            sessionId,
+            messages
+          )
+        ) {
+          return humanInputPendingResponse(sessionId);
+        }
+        const matches = await findIncomingHumanInputResults(
+          this.deps.sessions_store,
+          sessionId,
+          messages
+        );
+        // The scalar status gives approval presentation precedence, but exact
+        // sibling continuations remain independently correlated. A question or
+        // design-search result may therefore match even while an approval is
+        // also pending; ordinary caller text already failed closed above.
+        // A continuation resolves one exact visible interaction. Accepting a
+        // batch without an atomic multi-result commit could otherwise consume
+        // only its first answer and silently discard parallel siblings.
+        // Conflicting duplicate copies return null and fail closed as well.
+        if (!matches || matches.length !== 1) {
+          return humanInputPendingResponse(sessionId);
+        }
+        incomingHumanInputResult = matches[0];
+      }
+
+      // GRIDA-SEC-004 — a persisted `directory-ref` is NOT authority. Claim the
+      // matching one-shot host grant for this exact session before mutating the
+      // prior transcript, staging scratch, or persisting the incoming tail. The
+      // registry compares every descriptor to its canonical host facts and
+      // commits the set atomically; replay/fork/stale ids therefore fail closed.
+      // Re-claim by the SAME session is idempotent, so a later scratch or
+      // persistence failure remains safely retryable.
+      if (req.directory_scopes && req.directory_scopes.length > 0) {
+        const registry = this.deps.directory_scopes;
+        if (!registry) {
+          return Response.json(
+            {
+              error: "directory references are unavailable on this host",
+              code: "directory-scopes-unavailable",
+              session_id: sessionId,
+            },
+            { status: 409 }
+          );
+        }
+        try {
+          registry.claim(sessionId, req.directory_scopes);
+        } catch (err) {
+          if (!(err instanceof DirectoryScopeError)) throw err;
+          return Response.json(
+            { error: err.message, code: err.code, session_id: sessionId },
+            { status: 409 }
+          );
+        }
+      }
+
+      // The durable multipart row may describe scratch-backed attachments, so
+      // the transient bodies MUST exist first. Failure is an HTTP error before
+      // `persistIncomingTail`: a descriptor can never outlive a failed seed.
+      const scratchDir =
+        this.deps.scratch_base &&
+        workspaceRoot &&
+        req.scratch_seed &&
+        req.scratch_seed.length > 0
+          ? scratchRootFor(this.deps.scratch_base, sessionId)
+          : undefined;
+      if (req.scratch_seed && req.scratch_seed.length > 0) {
+        if (!scratchDir) {
+          return Response.json(
+            {
+              error:
+                "scratch-backed files require a workspace-bound session and an enabled scratch base",
+              code: "scratch-unavailable",
+              session_id: sessionId,
+            },
+            { status: 409 }
+          );
+        }
+        try {
+          await prepareScratchForTurn(
+            scratchDir,
+            this.deps.secrets_root,
+            req.scratch_seed
+          );
+        } catch (err) {
+          return Response.json(
+            {
+              error: `failed to stage scratch files: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+              code: "scratch-seed-failed",
+              session_id: sessionId,
+            },
+            { status: 500 }
+          );
+        }
+      }
+
+      // Re-check an ordinary direct request after every fallible preparation
+      // step but BEFORE persisting its user row. Stream admission includes the
+      // recorder's async terminal flush, so once this read is clear no previous
+      // turn can publish a late human block underneath the commit. A 409 from
+      // this boundary is therefore mutation-free and safe for the renderer to
+      // retry as a durable queued message.
+      if (
+        pendingHumanInputKind === null &&
+        (await this.deps.sessions_store.hasPendingHumanInput(sessionId))
+      ) {
+        return humanInputPendingResponse(sessionId);
+      }
+
+      // Persist only caller-owned non-assistant rows first. Assistant tool
+      // results are the continuation commit and deliberately remain untouched
+      // until every fallible preparation step above has succeeded.
+      await persistIncomingTail(this.deps.sessions_store, sessionId, messages, {
+        resolveAssistantToolResults: false,
+      });
+
+      // Fill every non-blocking client tool result first. Human-input results
+      // are excluded as a class; for a question/design-search continuation,
+      // the one exact preflight match is the final mutation below.
+      await fillIncomingToolResults(
+        this.deps.sessions_store,
+        sessionId,
+        messages,
+        incomingHumanInputResult
+          ? {
+              exclude: {
+                messageId: incomingHumanInputResult.messageId,
+                toolCallId: incomingHumanInputResult.toolCallId,
+              },
+            }
+          : undefined
+      );
+
+      // Persist the accepted request's provider/model/mode only after every
+      // branch that can reject a malformed or batched human continuation. A
+      // rejected 409 must not change the posture inherited by a queued drain.
+      if (sessionResolution.model_update_required) {
+        await this.deps.sessions_store.updateModel(sessionId, {
+          provider_id: provider.provider_id,
+          tier,
+          model_id: modelId,
+        });
+      }
+      if (sessionResolution.mode_update_required) {
+        await this.deps.sessions_store.updateMode(sessionId, mode);
+      }
+
+      // Late continuation commit. The read-only preflight above already proved
+      // that the exact visible block matches; these conditional store writes
+      // re-assert that authority atomically. The successful write is followed
+      // immediately by synchronous StreamRegistry reservation. A synchronous
+      // pre-reservation failure conditionally rolls this exact run id back to
+      // its pending approval/input state; once a registry entry exists, only
+      // its terminal settlement may clear the marker.
+      if (approvalAnswer) {
+        const committed = await applyApprovalAnswer(
+          this.deps.sessions_store,
+          sessionId,
+          approvalAnswer,
+          runId
+        );
+        if (!committed) {
+          return Response.json(
+            {
+              error:
+                "approval answer does not match a pending approval for this session",
+              code: "approval-answer-invalid",
+              session_id: sessionId,
+            },
+            { status: 409 }
+          );
+        }
+        approvalContinuation = committed;
+      } else if (incomingHumanInputResult) {
+        const filled =
+          await this.deps.sessions_store.commitHumanInputContinuation(
+            sessionId,
+            incomingHumanInputResult.messageId,
+            incomingHumanInputResult.toolCallId,
+            runId,
+            {
+              type: incomingHumanInputResult.part.type,
+              data: incomingHumanInputResult.part,
+              tool_state: incomingHumanInputResult.toolState,
+            }
+          );
+        if (!filled) return humanInputPendingResponse(sessionId);
+      }
+
+      // Reserve + pump for this turn. `create` atomically consumes admission;
+      // the finally release is then an identity-guarded no-op.
+      try {
+        this.startTurn(sessionId, {
+          provider,
+          admission,
+          run_id: runId,
+          tier,
+          model_id: modelId,
+          feature,
+          workspace_root: workspaceRoot,
+          mode,
+          // Per-run client UI capability (the desktop-from-web bridge sets true; a
+          // headless `cli run` sets false). Absent ⇒ host default downstream.
+          interactive: req.interactive,
+          // Exact presentation state at request start. Omission means no surface
+          // observer is attached.
+          surface: req.surface,
+          // Per-run library-search capability (renderer wires the resolver).
+          library: req.library,
+          // Direct-run seeds were staged before persistence. Pass the exact root
+          // onward so bindings expose the same files to tools and shell.
+          scratch_dir: scratchDir,
+          // The fired message of a direct run is the incoming tail's user
+          // message (the client resends history; the tail is the new one). An
+          // approval/question/design-search resumes end in an assistant tool
+          // result and fire no new user message (RFC `turn-authority`).
+          fired_message_id: pendingHumanInputKind
+            ? undefined
+            : extractTailUserMessageId(messages),
+          human_input_continuation:
+            approvalContinuation ??
+            (incomingHumanInputResult
+              ? {
+                  message_id: incomingHumanInputResult.messageId,
+                  tool_call_id: incomingHumanInputResult.toolCallId,
+                  run_id: runId,
+                }
+              : undefined),
+          // Agent-provider turns take a single prompt string (the external
+          // agent owns history); the tail user message is this turn's prompt.
+          agent_prompt:
+            provider.kind === "agent-provider"
+              ? extractLastUserText(messages)
+              : undefined,
+        });
+      } catch (err) {
+        if (
+          (approvalContinuation || incomingHumanInputResult) &&
+          this.streams.get(sessionId)?.status !== "running"
+        ) {
+          try {
+            let rolledBack: boolean;
+            if (approvalContinuation) {
+              rolledBack =
+                await this.deps.sessions_store.rollbackApprovalContinuation(
+                  sessionId,
+                  approvalContinuation
+                );
+            } else {
+              rolledBack =
+                await this.deps.sessions_store.rollbackHumanInputContinuation(
+                  sessionId,
+                  incomingHumanInputResult!.messageId,
+                  incomingHumanInputResult!.toolCallId,
+                  runId
+                );
+            }
+            if (!rolledBack) {
+              console.warn(
+                `[agent-host-agent] failed to roll back unstarted human-input continuation sessionId=${sessionId} runId=${runId}`
+              );
+            }
+          } catch (rollbackError) {
+            // Keep the exact marker durable and fail closed. Admission/drain
+            // sees it as unsettled, and host-start repair can terminalize it.
+            console.warn(
+              `[agent-host-agent] human-input continuation rollback errored sessionId=${sessionId} runId=${runId} err=${
+                rollbackError instanceof Error
+                  ? rollbackError.message
+                  : String(rollbackError)
+              }`
+            );
+          }
+        }
+        if (err instanceof RunInFlightError) {
+          return Response.json(
+            { error: err.message, code: err.code, session_id: sessionId },
+            { status: 409 }
+          );
+        }
+        throw err;
+      }
+
+      // Fire-and-forget title generation starts only after the turn reservation
+      // succeeds. It writes only while the default sentinel remains, so a user
+      // rename always wins; failures are intentionally swallowed.
+      const firstUserText = extractFirstUserText(messages);
+      // Titling runs a model-provider; skip it for agent-providers (no factory).
+      if (provider.kind !== "agent-provider" && firstUserText.length > 0) {
+        void titler
+          .maybeGenerate({
+            store: this.deps.sessions_store,
+            session_id: sessionId,
+            model_factory: provider.model_factory,
+            user_text: firstUserText,
+          })
+          .catch((err) => {
+            console.warn(
+              `[agent-host-titler] failed sessionId=${sessionId} err=${
+                err instanceof Error ? err.message : String(err)
+              }`
+            );
+          });
+      }
+
+      return buildConsumerResponse(this.streams, sessionId, requestSignal);
+    } finally {
+      // Covers resolve/update, every continuation mutation, persistence
+      // failure, and every early/throw path. Successful create already
+      // consumed the lease, making this identity-guarded release a no-op.
+      if (admission) this.streams.releaseAdmission(admission);
+    }
+  }
+
+  /**
+   * Complete a successful pump without opening a detached-recorder race.
+   *
+   * The recorder is detached so `finish()` cannot invoke `on_end` twice, but
+   * its manual flush (and any accounting that depends on it) remains part of
+   * the registry's terminal settlement. If abort already won, registration
+   * fails and the still-attached recorder is settled by the abort path.
+   */
+  private async finishSuccessfulTurn(
+    entry: StreamEntry,
+    recorder: StreamConsumer,
+    detachRecorder: () => void,
+    afterRecorder?: () => Promise<void>
+  ): Promise<void> {
+    let releaseSettlement!: () => void;
+    const settlementTask = new Promise<void>((resolve) => {
+      releaseSettlement = resolve;
+    });
+    if (!this.streams.trackSettlementTask(entry, settlementTask)) return;
+
+    detachRecorder();
+    try {
+      await recorder.on_end("finish");
+      await afterRecorder?.();
+    } finally {
+      releaseSettlement();
+    }
+    this.streams.finishEntry(entry, "finish");
   }
 
   /**
@@ -1036,12 +1397,11 @@ export class AgentRuntime {
    * the (fire-and-forget) model pump for ONE turn. Both the HTTP `run()` path
    * and the core queue drain go through here, so the reserve, recorder attach,
    * model view, and finish are owned in one place. Throws
-   * {@link RunInFlightError} if a run is already in flight — the caller maps
-   * it (HTTP → 409; a core drain swallows it and retries on the next idle
-   * edge). The model view is built from the server-authoritative
-   * `listVisibleMessages`; a drained row is already made visible by the
-   * scheduler (it clears `queued_at` right before firing), so this needs no
-   * client message array and no dequeue of its own.
+   * {@link RunInFlightError} if admission was lost or a run is already in
+   * flight. The model view is built from the server-authoritative
+   * `listVisibleMessages`; a drained row was conditionally claimed immediately
+   * before this synchronous call, so this needs no client message array or
+   * queue mutation of its own.
    */
   private startTurn(sessionId: string, opts: StartTurnOptions): StreamEntry {
     const {
@@ -1100,6 +1460,8 @@ export class AgentRuntime {
     // before it is decided.
     const entry = this.streams.create(sessionId, {
       replay_prefix: turnSnapshot.then((s) => s.prefix),
+      fired_message_id: opts.fired_message_id,
+      admission: opts.admission,
     });
 
     // Lifecycle event (RFC `events`): the turn is reserved — announce it,
@@ -1123,18 +1485,39 @@ export class AgentRuntime {
     // is committed before usage is stamped — see below) and detaches it so
     // `streams.finish` doesn't re-fire its `on_end`. The error/abort path
     // leaves it attached, flushed by `streams.finish` as usual.
-    const recorder = createRecorderConsumer({
+    const sessionsStore = this.deps.sessions_store;
+    const persistedRecorder = createRecorderConsumer({
       store: this.deps.sessions_store,
       session_id: sessionId,
       run_id: runId,
     });
+    const continuation = opts.human_input_continuation;
+    const recorder: StreamConsumer = continuation
+      ? {
+          on_frame: (data) => persistedRecorder.on_frame(data),
+          on_end: async (reason) => {
+            await persistedRecorder.on_end(reason);
+            const settled = await sessionsStore.settleHumanInputContinuation(
+              sessionId,
+              continuation.message_id,
+              continuation.tool_call_id,
+              continuation.run_id
+            );
+            if (!settled) {
+              console.warn(
+                `[agent-host-agent] stale human-input continuation settlement sessionId=${sessionId} runId=${continuation.run_id} reason=${reason}`
+              );
+            }
+          },
+          on_error: (err) => persistedRecorder.on_error?.(err),
+        }
+      : persistedRecorder;
     const detachRecorder = this.streams.attach(sessionId, recorder);
 
     const streams = this.streams;
     const runAgentFn = this.run_agent_fn;
     const {
       workspace_registry: workspaceRegistry,
-      sessions_store: sessionsStore,
       secrets_root: secretsRoot,
       shell_execution_allowed: shellExecutionAllowed,
       scratch_base: scratchBase,
@@ -1236,7 +1619,7 @@ export class AgentRuntime {
             resume_session_id: resumeSessionId,
             model: agentModel,
             signal: entry.model_abort.signal,
-            emit: (chunk) => streams.push(sessionId, JSON.stringify(chunk)),
+            emit: (chunk) => streams.pushEntry(entry, JSON.stringify(chunk)),
           });
           if (
             result.providerSessionId &&
@@ -1246,13 +1629,10 @@ export class AgentRuntime {
               .setAgentProviderSessionId(sessionId, result.providerSessionId)
               .catch(() => undefined);
           }
-          // Deterministic recorder flush — mirror the normal success path:
-          // detach so `streams.finish` won't re-fire `on_end`, then AWAIT the
-          // terminal flush so the assistant row is committed before the
-          // response is consumed (otherwise a fast reader sees no history).
-          detachRecorder();
-          await recorder.on_end("finish");
-          streams.finish(sessionId, "finish");
+          // Deterministic recorder flush — mirror the normal success path.
+          // The helper keeps this detached phase inside terminal settlement,
+          // so an abort cannot publish idle while persistence is still open.
+          await this.finishSuccessfulTurn(entry, recorder, detachRecorder);
           return;
         }
 
@@ -1332,7 +1712,7 @@ export class AgentRuntime {
           runDeps
         );
         console.log(`[agent-host-agent] run response opened runId=${runId}`);
-        await pumpResponseIntoRegistry(response, streams, sessionId);
+        await pumpResponseIntoRegistry(response, streams, entry);
         // Drain the recorder BEFORE stamping usage. The recorder creates the
         // assistant row on a fire-and-forget write_chain fed by each pushed
         // frame; `pumpResponseIntoRegistry` returning only means the frames
@@ -1340,22 +1720,27 @@ export class AgentRuntime {
         // "the latest assistant row", so stamping before the write settles
         // races onto the wrong row (or none). The recorder's terminal flush
         // (its `on_end`) awaits its write_chain + finalizes, so awaiting it
-        // here makes the row exist deterministically. Detach so the later
-        // `streams.finish` won't re-fire `on_end` on it.
-        detachRecorder();
-        await recorder.on_end("finish");
-        if (hasUsage(runUsage)) {
-          await sessionsStore
-            .setLatestAssistantAccounting(sessionId, {
-              model: turnModel,
-              usage: runUsage,
-            })
-            .catch(() => undefined);
-          await sessionsStore
-            .recomputeRollups(sessionId)
-            .catch(() => undefined);
-        }
-        streams.finish(sessionId, "finish");
+        // here makes the row exist deterministically. The detached recorder
+        // flush + dependent accounting remain one terminal settlement task, so
+        // abort cannot admit a new turn between them.
+        await this.finishSuccessfulTurn(
+          entry,
+          recorder,
+          detachRecorder,
+          async () => {
+            if (hasUsage(runUsage)) {
+              await sessionsStore
+                .setLatestAssistantAccounting(sessionId, {
+                  model: turnModel,
+                  usage: runUsage,
+                })
+                .catch(() => undefined);
+              await sessionsStore
+                .recomputeRollups(sessionId)
+                .catch(() => undefined);
+            }
+          }
+        );
       } catch (err) {
         const reason = entry.model_abort.signal.aborted ? "abort" : "error";
         console.log(
@@ -1366,7 +1751,7 @@ export class AgentRuntime {
         // Forward the real reason: a genuine failure ("error") must reach
         // consumers as an error, not a clean/aborted close, so the client
         // can distinguish a crashed run from a user cancel.
-        streams.finish(sessionId, reason);
+        streams.finishEntry(entry, reason);
       }
     })();
 
@@ -1401,9 +1786,10 @@ export class AgentRuntime {
   /**
    * `GET /sessions/:id/status` — subscribe to the session's `SessionStatus`
    * (RFC `session.md` §Session status). Long-lived SSE: the current status is
-   * the first frame, then every idle⇄busy⇄error transition. Always available —
-   * an unknown/idle session reads as `{ state: "idle" }`. This is the
-   * authoritative fact the dumb UI renders Stop/Send from.
+   * the first frame, then every idle⇄busy⇄waiting⇄error transition. Always
+   * available — a cold session hydrates any persisted human-input wait before
+   * its first frame; otherwise it reads as `{ state: "idle" }`. This is the
+   * authoritative fact the dumb UI renders admission from.
    */
   statusStream(sessionId: string, requestSignal: AbortSignal): Response {
     if (!sessionId) {
@@ -1445,7 +1831,8 @@ export class AgentRuntime {
   /**
    * `POST /sessions/:id/rewind` — soft-truncate to a prior message (RFC
    * `session / rewinding`). `restore: true` un-rewinds (un-hides). Refuses
-   * while a run is in flight.
+   * while the session is occupied and holds admission through the mutation so
+   * a new run cannot race the transcript rewrite.
    */
   async rewind(sessionId: string, body: unknown): Promise<Response> {
     const { from_message_id: fromMessageId, restore } = (body ?? {}) as {
@@ -1458,15 +1845,16 @@ export class AgentRuntime {
         { status: 400 }
       );
     }
-    const guard = this.guardIdle(sessionId);
-    if (guard) return guard;
-    const session = await this.deps.sessions_store.get(sessionId);
-    if (!session) {
-      return Response.json({ error: "session not found" }, { status: 404 });
-    }
+    const admission = this.acquireIdleAdmission(sessionId);
+    if (admission instanceof Response) return admission;
     try {
+      const session = await this.deps.sessions_store.get(sessionId);
+      if (!session) {
+        return Response.json({ error: "session not found" }, { status: 404 });
+      }
       if (restore === true) {
         await this.deps.sessions_store.unhideAfter(sessionId, fromMessageId);
+        await this.scheduler.refreshStatus(sessionId);
         const refreshed = await this.deps.sessions_store.get(sessionId);
         return Response.json({ ok: true, restored: true, session: refreshed });
       }
@@ -1474,19 +1862,22 @@ export class AgentRuntime {
         sessionId,
         fromMessageId
       );
+      await this.scheduler.refreshStatus(sessionId);
       return Response.json(result);
     } catch (err) {
       return Response.json(
         { error: err instanceof Error ? err.message : String(err) },
         { status: 400 }
       );
+    } finally {
+      this.streams.releaseAdmission(admission);
     }
   }
 
   /**
    * `POST /sessions/:id/fork` — fork the session at a message into a new
-   * session (RFC `session / fork`). Refuses while the parent run is
-   * in flight.
+   * session (RFC `session / fork`). Holds parent admission so the copied
+   * transcript is a stable idle snapshot.
    */
   async fork(sessionId: string, body: unknown): Promise<Response> {
     const { from_message_id: fromMessageId, metadata } = (body ?? {}) as {
@@ -1499,13 +1890,13 @@ export class AgentRuntime {
         { status: 400 }
       );
     }
-    const guard = this.guardIdle(sessionId);
-    if (guard) return guard;
-    const parent = await this.deps.sessions_store.get(sessionId);
-    if (!parent) {
-      return Response.json({ error: "session not found" }, { status: 404 });
-    }
+    const admission = this.acquireIdleAdmission(sessionId);
+    if (admission instanceof Response) return admission;
     try {
+      const parent = await this.deps.sessions_store.get(sessionId);
+      if (!parent) {
+        return Response.json({ error: "session not found" }, { status: 404 });
+      }
       const forked = await this.deps.sessions_store.fork({
         parent_session_id: sessionId,
         from_message_id: fromMessageId,
@@ -1520,56 +1911,62 @@ export class AgentRuntime {
         { error: err instanceof Error ? err.message : String(err) },
         { status: 400 }
       );
+    } finally {
+      this.streams.releaseAdmission(admission);
     }
   }
 
   /**
    * `POST /sessions/:id/compact` — user-fired compaction (RFC
-   * `session / compaction / auto vs manual`). Resolves a provider for the
-   * summarizer model; refuses while a run is in flight.
+   * `session / compaction / auto vs manual`). Holds admission while resolving
+   * the summarizer and rewriting the transcript.
    */
   async compact(sessionId: string): Promise<Response> {
-    const guard = this.guardIdle(sessionId);
-    if (guard) return guard;
-    const session = await this.deps.sessions_store.get(sessionId);
-    if (!session) {
-      return Response.json({ error: "session not found" }, { status: 404 });
-    }
-    let provider;
+    const admission = this.acquireIdleAdmission(sessionId);
+    if (admission instanceof Response) return admission;
     try {
-      provider = await resolveProvider(this.deps, {});
-    } catch (err) {
-      if (err instanceof ProviderUnavailableError) {
-        return Response.json(
-          { error: err.message, code: err.code },
-          { status: 409 }
-        );
+      const session = await this.deps.sessions_store.get(sessionId);
+      if (!session) {
+        return Response.json({ error: "session not found" }, { status: 404 });
       }
-      throw err;
+      let provider;
+      try {
+        provider = await resolveProvider(this.deps, {});
+      } catch (err) {
+        if (err instanceof ProviderUnavailableError) {
+          return Response.json(
+            { error: err.message, code: err.code },
+            { status: 409 }
+          );
+        }
+        throw err;
+      }
+      const limits = await this.limitsResolver();
+      const result = await compactSession(
+        {
+          store: this.deps.sessions_store,
+          model_factory: provider.model_factory,
+          summarize: this.compaction_summarize,
+          resolve_limits: limits.resolve,
+        },
+        {
+          session_id: sessionId,
+          auto: false,
+          config: this.compaction_config,
+          summarizer_input_cap: this.summarizerInputCap(session.model, limits),
+        }
+      );
+      return Response.json(result);
+    } finally {
+      this.streams.releaseAdmission(admission);
     }
-    const limits = await this.limitsResolver();
-    const result = await compactSession(
-      {
-        store: this.deps.sessions_store,
-        model_factory: provider.model_factory,
-        summarize: this.compaction_summarize,
-        resolve_limits: limits.resolve,
-      },
-      {
-        session_id: sessionId,
-        auto: false,
-        config: this.compaction_config,
-        summarizer_input_cap: this.summarizerInputCap(session.model, limits),
-      }
-    );
-    return Response.json(result);
   }
 
   /**
    * `POST /sessions/:id/queue` — enqueue a user message (RFC `queue`). Persists
    * a pending `user` row with `metadata.queued_at`; it is held out of the model
-   * view and the transcript until it fires. Does NOT call {@link guardIdle} —
-   * enqueueing while a run is in flight is the entire point.
+   * view and the transcript until it fires. Does NOT acquire idle admission —
+   * enqueueing behind an occupied session is the entire point.
    */
   async enqueue(sessionId: string, body: unknown): Promise<Response> {
     const { id, text } = (body ?? {}) as { id?: unknown; text?: unknown };
@@ -1580,16 +1977,34 @@ export class AgentRuntime {
     if (!session) {
       return Response.json({ error: "session not found" }, { status: 404 });
     }
-    const row = await this.deps.sessions_store.appendQueuedMessage(sessionId, {
-      id: typeof id === "string" && id.length > 0 ? id : undefined,
-      text,
-    });
+    let row: ChatMessageWithParts;
+    try {
+      row = await this.deps.sessions_store.appendQueuedMessage(sessionId, {
+        id: typeof id === "string" && id.length > 0 ? id : undefined,
+        text,
+      });
+    } catch (err) {
+      if (err instanceof QueueMessageConflictError) {
+        return Response.json(
+          {
+            error: err.message,
+            code: "queue-message-conflict",
+            session_id: sessionId,
+            message_id: err.id,
+          },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
     // Close the stale-busy race: a client enqueues while it believes the
     // session is busy, but the turn may have just ended (the idle status frame
     // still in flight). If the session is already idle with no drain pending,
     // nothing else would ever fire this row — kick a drain now. A no-op while
     // busy (the turn-end edge drains) or while a drain is already scheduled.
-    this.scheduler.notifyEnqueued(sessionId);
+    if (typeof row.metadata.queued_at === "number") {
+      this.scheduler.notifyEnqueued(sessionId);
+    }
     return Response.json(row);
   }
 
@@ -1609,9 +2024,9 @@ export class AgentRuntime {
   /**
    * `DELETE /sessions/:id/queue/:messageId` — cancel (remove) a queued message
    * before it fires (RFC `queue / operating on queued messages`). Scoped to
-   * the path's session: the store only deletes a row that belongs to
+   * the path's session: the store only tombstones a row that belongs to
    * `sessionId` AND still carries `queued_at`, so a messageId can neither
-   * reach across sessions nor remove a fired turn; idempotent.
+   * reach across sessions nor cancel a fired turn; idempotent.
    */
   async cancelQueued(sessionId: string, messageId: string): Promise<Response> {
     if (!messageId) {
@@ -1621,11 +2036,17 @@ export class AgentRuntime {
     return Response.json({ ok: true });
   }
 
-  /** 409 if a run is actively in flight on this session; null when idle.
-   *  Mirrors {@link StreamRegistry.create}: an *ended* entry lingering in
-   *  its replay grace window is NOT in flight. */
-  private guardIdle(sessionId: string): Response | null {
-    if (this.streams.get(sessionId)?.status === "running") {
+  /**
+   * Acquire the same per-session slot used by direct runs and queue drains for
+   * an async idle-only lifecycle mutation. The lease closes the check/use gap:
+   * after this succeeds, no run can persist or snapshot the session until the
+   * caller releases it in `finally`.
+   */
+  private acquireIdleAdmission(sessionId: string): StreamAdmission | Response {
+    try {
+      return this.streams.acquireAdmission(sessionId);
+    } catch (err) {
+      if (!(err instanceof RunInFlightError)) throw err;
       return Response.json(
         {
           error: "a run is in flight on this session",
@@ -1635,7 +2056,6 @@ export class AgentRuntime {
         { status: 409 }
       );
     }
-    return null;
   }
 
   /** Drain in-flight runs (abort upstream) + clear the registry. */

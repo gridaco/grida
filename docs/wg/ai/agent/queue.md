@@ -96,10 +96,15 @@ shape it does not fit.
 ### Queued vs fired
 
 - A message is **queued** when it is persisted while a turn is
-  already running, with `metadata_json.queued_at` set to the epoch ms
-  at which it was queued.
-- A message **fires** when the run-state machine clears its
-  `queued_at` and starts its turn.
+  already running or the session is waiting on an unresolved human
+  interaction, with `metadata_json.queued_at` set to the epoch ms at
+  which it was queued.
+- A message **fires** when the run-state machine conditionally clears
+  its `queued_at` and reserves its turn as one atomic admission. It
+  remains queued during any provider or workspace preparation before
+  that boundary, while the drain holds the session's single-flight
+  admission lease so a direct request cannot change its mode or model
+  snapshot.
 - A message that arrives while the session is **idle** fires
   immediately and never carries `queued_at`. `queued_at` present means
   "this message waited."
@@ -107,8 +112,12 @@ shape it does not fit.
 ### Single-flight
 
 At most one turn per session is in the running state at any instant.
-The idle→busy transition MUST be atomic, so two near-simultaneous
-arrivals cannot both win the run; the loser is queued.
+The idle→busy transition MUST be atomic. A host may use a short-lived
+pre-stream admission lease while an accepted direct send persists its
+tail, but that lease and the running stream occupy the same
+single-flight slot. Two near-simultaneous arrivals therefore cannot
+both persist/model-view competing tails; the loser is rejected back
+to queue-aware admission.
 
 ### Order
 
@@ -133,18 +142,25 @@ submit. Explicit, observable, never the default.
 
 The queue is drained by the **run-state machine** — the core
 component that owns whether a session is running and what fires next.
-Its states are `idle` / `busy` / `retrying` / `error`. These project
-onto the client-facing `SessionStatus` back-channel; the wire shape
-and its transport live in
+Its states are `idle` / `busy` / `retrying` /
+`waiting_on_approval` / `waiting_on_user_input` / `error`. These
+project onto the client-facing `SessionStatus` back-channel; the wire
+shape and its transport live in
 [`session / session status`](./session.md#session-status). This page
 owns the _behavior_; that page owns the _shape clients read_.
 
 **Drain rule.** On entering `idle` — when the running turn finishes
 or is aborted — the machine selects the next batch of queued messages
 in `queued_at` order (one message, or all currently queued, per the
-[drain discipline](#drain-discipline)), clears their `queued_at`,
-transitions to `busy`, and fires the turn. If nothing is queued, it
-stays `idle`.
+[drain discipline](#drain-discipline)). Selection is read-only: the
+core first acquires session admission, then provider and workspace
+preparation leave `queued_at` intact. After a final persisted
+human-input check, the fire boundary conditionally claims the same
+still-queued row(s), transitions to `busy`, and reserves the turn
+without an observable interleaving gap. If cancel or a pending human
+interaction won, the claim is a no-op and no busy edge is emitted. If
+preparation fails, the row stays queued. If nothing is queued, the
+session stays `idle`.
 
 **Where it lives.** The core. The machine is authoritative; it is not
 the UI, and it is not any single client. Every client of the session
@@ -166,16 +182,16 @@ once the turn reaches a clean `idle`.
 **A blocked turn pauses the drain.** A turn that pauses **awaiting a
 user decision** — a supervised-approval Allow/Deny, or any other
 human-in-the-loop block on the current turn — is **not a completed
-turn**, even though it may end the run's stream and read as `idle`.
+turn**, even when it ends the run's stream. It transitions to
+`waiting_on_approval` or `waiting_on_user_input`, never to `idle`.
 Firing the next queued turn into that gap would run it _before_ the
 user resolves the block, reordering the user's own intent. So a
-pending block pauses the drain exactly like a hard error: queued
-messages keep their `queued_at` and wait. The drain resumes once the
-user resolves the block and the turn continues to a **true finish**.
-`idle` alone is therefore not a sufficient drainability test — the
-drain fires only when the session is genuinely ready for a _new_ turn,
-which a blocked turn is not. The block state is authoritative session
-state (a persisted pending approval, or an unanswered
+pending block pauses the drain exactly like a hard error: ordinary
+messages are accepted into the queue, keep their `queued_at`, and
+wait. They do not answer, cancel, or replace the open interaction.
+The drain resumes once the user supplies the correlated result and
+the resumed turn continues to a **true finish**. The block state is
+authoritative session state (a persisted pending approval, or an unanswered
 [`question`](./tools.md#the-question-tool) tool call still at
 `input-available`), so every consumer — a second window, a hosted
 runner, the CLI — honors the pause identically. The drainability
@@ -239,16 +255,45 @@ coalescing drain deterministic.
 
 The full path, from any source to a fired turn:
 
-1. A turn-triggering message arrives.
+1. A turn-triggering message arrives through queue-aware admission.
 2. The core persists it as a `user` message **immediately**, before
    deciding whether to run it. The persisted-message store _is_ the
    queue; there is no separate queue structure.
 3. If the session is **idle**, the machine fires the turn now (no
-   `queued_at`). If **busy** or **retrying**, the message is stamped
-   `queued_at` and the machine does **not** start a turn.
+   `queued_at`). If **busy**, **retrying**, or waiting on a human
+   interaction, the message is stamped `queued_at` and the machine
+   does **not** start a turn.
 4. When the running turn reaches **idle**, the drain rule fires the
    earliest queued message.
 5. Steps 3–4 repeat until the queue is empty.
+
+The low-level run/continuation endpoint is not an alternative
+ordinary-message ingestion path. It MAY reject a stale caller that
+bypasses admission while a human interaction is open. A client that
+loses that race re-submits the same user-message identity through
+queue admission and rehydrates; it never converts the text into a
+tool result or leaves an optimistic-only transcript tail.
+
+**Enqueue is idempotent by message identity.** A client-minted message
+id is the idempotency key for `(session, id, payload)`. Retrying that
+exact tuple MUST return the original durable message, even if it fired
+after the first request committed but before its response reached the
+caller. It MUST NOT append a duplicate or reset its `queued_at`.
+Reusing the id for a different session or payload is a conflict. The
+message row and its parts MUST become visible atomically; a scheduler
+cannot claim a half-written enqueue. A surface MAY make one bounded
+retry with the same id after an ambiguous transport failure only when
+the status protocol advertises `queue_enqueue_idempotent`. With a legacy
+host that omits the marker, the surface first reconciles the queue and visible
+transcript for that exact identity and does not blindly repeat the mutation.
+Cancel
+retains a hidden idempotency tombstone: an exact retry observes the
+already-canceled operation and MUST NOT recreate or fire it. A durable
+queue-provenance marker survives both fire and cancel so an unrelated
+ordinary user row with the same id/text cannot be mistaken for the
+completed enqueue. A queued row written before that marker existed is
+upgraded from its still-authoritative `queued_at` at the fire/cancel
+transition, before `queued_at` is removed.
 
 ## Operating on queued messages
 
@@ -298,12 +343,17 @@ not yet fired (the `queued_at` metadata key is defined in
 [`persistency / chat_messages`](./persistency.md#chat_messages)).
 
 This has a free consequence: the queue **survives a host restart**.
-`SessionStatus` is volatile, so after a restart every session reads
-as `idle` ([`session / session status`](./session.md#session-status));
-the run-state machine then resumes by draining any still-queued
-messages. A turn that was _running_ at restart is **not** resumed —
-cross-restart run-resume is out of scope, and its orphaned in-flight
-tool calls are finalized as errors
+Live run status is volatile, but an unanswered human interaction is
+persisted and its waiting state is reconstructed
+([`session / session status`](./session.md#session-status)). Queued
+messages remain paused behind that interaction. Otherwise the session
+returns to `idle`; read-only status hydration does not run work. The Grida
+host explicitly repairs orphaned non-human tool calls and kicks every durable
+queue at startup under host execution authority. A later trusted lifecycle,
+queue mutation, or provider-ready edge can retry a queue whose provider was
+not yet usable. A turn that was _running_ at restart is **not** resumed —
+cross-restart run-resume is out of scope, and its orphaned in-flight tool calls
+are finalized as errors
 ([`session / resume`](./session.md#resume-across-renderer-disconnect))
 — but that turn's queued successors still drain normally.
 
@@ -341,7 +391,14 @@ anything.
 A conforming implementation MUST hold all of these:
 
 - At most one turn runs per session at any instant.
-- The idle→busy transition is atomic.
+- Direct persistence admission and the idle→busy stream transition
+  share one per-session single-flight slot.
+- Queue preparation holds that same slot, preventing a concurrent
+  direct request from changing the queued turn's mode/model snapshot.
+- Queue claim and stream reservation have no asynchronous gap; a
+  failed reservation restores the same row to queued state.
+- Cancel and fire are conditional mutations of the same still-queued
+  row, so exactly one can win.
 - The drain fires the earliest unfired `queued_at` message; ties are
   broken deterministically (e.g. by message id).
 - Human- and trigger-originated messages share one FIFO clock; no

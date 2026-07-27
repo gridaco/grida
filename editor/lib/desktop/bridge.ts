@@ -756,7 +756,8 @@ export namespace sessions {
 
   /**
    * Subscribe to a session's run-state (RFC `session` §Session status). The
-   * current status arrives first, then every idle⇄busy⇄error transition.
+   * current status arrives first, then every idle⇄busy⇄waiting⇄error
+   * transition.
    * Returns a `subscriptionId` to pass to {@link unsubscribeStatus} on
    * cleanup, plus a `done` that settles when the subscription ends. This is
    * the authoritative busy/idle the UI renders from — not the AI-SDK client's

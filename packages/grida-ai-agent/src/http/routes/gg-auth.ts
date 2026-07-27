@@ -16,13 +16,20 @@
 import type { Hono } from "hono";
 import { body, v } from "@grida/daemon/server";
 import type { GridaGatewaySessionStore } from "../../providers/gg-session";
+import { ProviderReady } from "./provider-ready";
 
 export type GridaAuthRoutesDeps = {
   store: GridaGatewaySessionStore;
+  /**
+   * Trusted host edge after the in-memory credential becomes usable. The
+   * server uses it to retry durable queues that startup recovery left intact
+   * while GG was unavailable.
+   */
+  on_provider_ready?: ProviderReady.Hook;
 };
 
 export function registerGridaAuthRoutes(app: Hono, deps: GridaAuthRoutesDeps) {
-  const { store } = deps;
+  const { store, on_provider_ready } = deps;
 
   app.post("/auth/gg/set", async (c) => {
     const r = await body(c, {
@@ -64,6 +71,7 @@ export function registerGridaAuthRoutes(app: Hono, deps: GridaAuthRoutesDeps) {
         (organization ? ` org=${organization.id}` : "") +
         ` expires_in=${Math.round((r.data.expires_at - Date.now()) / 1000)}s`
     );
+    ProviderReady.notify(on_provider_ready);
     return c.json({ ok: true });
   });
 

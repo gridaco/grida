@@ -16,6 +16,8 @@ export type StreamConsumer = {
 
 export type StreamEntry = {
   readonly session_id: string;
+  /** User message fired by this turn; absent for approval/question resumes. */
+  readonly fired_message_id?: string;
   readonly model_abort: AbortController;
   status: "running" | "ended";
   end_reason?: StreamEndReason;
@@ -34,6 +36,16 @@ export type StreamEntry = {
   replay_prefix?: Promise<readonly string[]>;
 };
 
+/**
+ * A short-lived, synchronous admission lease for one session. The runtime
+ * acquires it before an async direct-run persistence phase, or immediately
+ * before a queued row is claimed. {@link StreamRegistry.create} consumes the
+ * exact object by identity when it installs the running entry.
+ */
+export type StreamAdmission = Readonly<{
+  session_id: string;
+}>;
+
 export class RunInFlightError extends Error {
   readonly code = "run_in_flight" as const;
   constructor(public readonly sessionId: string) {
@@ -47,6 +59,11 @@ export type StreamRegistryOptions = {
   finish_grace_ms?: number;
 };
 
+type StreamSettlement = {
+  readonly entry: StreamEntry;
+  readonly promise: Promise<void>;
+};
+
 /**
  * Lifecycle observer — the two clean edges the registry's lifecycle exposes:
  * a turn started (`create`) and a turn ended (`finish`, including the abort
@@ -57,12 +74,44 @@ export type StreamRegistryOptions = {
  * another.
  */
 export type StreamLifecycleObserver = {
-  on_create?: (sessionId: string) => void;
+  on_create?: (sessionId: string, firedMessageId?: string) => void;
   on_finish?: (sessionId: string, reason: StreamEndReason) => void;
 };
 
 export class StreamRegistry {
   private readonly entries = new Map<string, StreamEntry>();
+  /**
+   * Pre-stream admission slots. They close the gap before `create()` where a
+   * direct run may still be persisting its user tail. Queue drains and other
+   * direct runs must lose synchronously instead of both mutating the transcript
+   * and racing at the later stream reserve.
+   */
+  private readonly admissions = new Map<string, StreamAdmission>();
+  /**
+   * End-delivery barriers. An entry becomes `ended` immediately so late
+   * consumers can replay its terminal reason, but the session remains occupied
+   * until every consumer that was attached (or attaching) at `finish()` has
+   * completed `on_end`. The recorder uses that callback to flush its durable
+   * transcript, so publishing idle before this barrier settles lets a new turn
+   * race ahead of a just-persisted approval/question.
+   */
+  private readonly settlements = new Map<string, StreamSettlement>();
+  /** Attach/replay jobs not yet represented in `entry.consumers`. */
+  private readonly attach_tasks = new WeakMap<
+    StreamEntry,
+    Set<Promise<void>>
+  >();
+  /**
+   * Post-pump durability work that is not represented by an attached consumer.
+   * The success path detaches the recorder before driving its terminal flush
+   * itself (usage accounting depends on that flush). If abort lands during
+   * that detached phase, its finish edge must still wait for the work before
+   * publishing idle and admitting the next turn.
+   */
+  private readonly settlement_tasks = new WeakMap<
+    StreamEntry,
+    Set<Promise<unknown>>
+  >();
   private readonly grace_ms: number;
   private consumer_seq = 0;
   private readonly observers = new Set<StreamLifecycleObserver>();
@@ -107,19 +156,77 @@ export class StreamRegistry {
     }
   }
 
+  /**
+   * Synchronously reserve the right to start the next turn for a session.
+   * Throws the same error as {@link create} when either a stream or another
+   * pre-stream admission already owns the session.
+   */
+  acquireAdmission(sessionId: string): StreamAdmission {
+    if (
+      this.admissions.has(sessionId) ||
+      this.entries.get(sessionId)?.status === "running" ||
+      this.settlements.has(sessionId)
+    ) {
+      throw new RunInFlightError(sessionId);
+    }
+    const admission: StreamAdmission = Object.freeze({
+      session_id: sessionId,
+    });
+    this.admissions.set(sessionId, admission);
+    return admission;
+  }
+
+  /**
+   * Release an admission that did not reach {@link create}. Identity-guarded
+   * so stale cleanup can never release a newer request's lease.
+   */
+  releaseAdmission(admission: StreamAdmission): void {
+    if (this.admissions.get(admission.session_id) === admission) {
+      this.admissions.delete(admission.session_id);
+    }
+  }
+
+  /**
+   * True while pre-stream admission, a running stream, or terminal consumer
+   * settlement owns the session.
+   */
+  isOccupied(sessionId: string): boolean {
+    return (
+      this.admissions.has(sessionId) ||
+      this.entries.get(sessionId)?.status === "running" ||
+      this.settlements.has(sessionId)
+    );
+  }
+
   /** Reserve a new entry. Throws `RunInFlightError` if one is running.
-   *  A previously-ended entry in its grace window is replaced.
+   *  A previously-ended, fully-settled entry in its grace window is replaced.
    *  `replay_prefix` is assigned here — synchronously with the reserve — so
    *  no consumer can attach to an entry whose prefix isn't decided yet. */
   create(
     sessionId: string,
-    opts?: { replay_prefix?: Promise<readonly string[]> }
+    opts?: {
+      replay_prefix?: Promise<readonly string[]>;
+      fired_message_id?: string;
+      /** Exact pre-stream lease to consume during this reserve. */
+      admission?: StreamAdmission;
+    }
   ): StreamEntry {
+    const admission = opts?.admission;
+    const heldAdmission = this.admissions.get(sessionId);
+    if (
+      (admission && heldAdmission !== admission) ||
+      (!admission && heldAdmission)
+    ) {
+      throw new RunInFlightError(sessionId);
+    }
     const existing = this.entries.get(sessionId);
-    if (existing?.status === "running") throw new RunInFlightError(sessionId);
+    if (existing?.status === "running" || this.settlements.has(sessionId)) {
+      throw new RunInFlightError(sessionId);
+    }
     if (existing) this.drop(sessionId);
     const entry: StreamEntry = {
       session_id: sessionId,
+      fired_message_id: opts?.fired_message_id,
       model_abort: new AbortController(),
       status: "running",
       chunks: [],
@@ -127,8 +234,11 @@ export class StreamRegistry {
       replay_prefix: opts?.replay_prefix,
     };
     this.entries.set(sessionId, entry);
+    if (admission) this.admissions.delete(sessionId);
     // Busy edge — AFTER the entry is in the map (throws above never notify).
-    this.notifyObservers((o) => o.on_create?.(sessionId));
+    this.notifyObservers((o) =>
+      o.on_create?.(sessionId, entry.fired_message_id)
+    );
     return entry;
   }
 
@@ -136,35 +246,143 @@ export class StreamRegistry {
     return this.entries.get(sessionId);
   }
 
-  /** Append + broadcast. Silent no-op if entry is gone. */
+  /**
+   * Append + broadcast to the currently-owned generation. Silent no-op if the
+   * session has no running entry.
+   *
+   * Long-lived pump callbacks must use {@link pushEntry}; this session-keyed
+   * convenience is for synchronous host/test ingress that intentionally
+   * targets whichever generation is current.
+   */
   push(sessionId: string, data: string): void {
     const entry = this.entries.get(sessionId);
     if (!entry) return;
+    this.pushEntry(entry, data);
+  }
+
+  /**
+   * Append only while `entry` is the exact current running generation.
+   *
+   * A model promise can settle after its turn was aborted and a queued
+   * replacement started under the same session id. Identity, not session id,
+   * prevents that stale producer from injecting frames into the replacement.
+   */
+  pushEntry(entry: StreamEntry, data: string): boolean {
+    if (
+      this.entries.get(entry.session_id) !== entry ||
+      entry.status !== "running"
+    ) {
+      return false;
+    }
     entry.chunks.push(data);
     for (const c of entry.consumers.values()) {
       void this.deliver(entry, c, () => c.on_frame(data));
     }
+    return true;
   }
 
-  /** Mark entry done, broadcast onEnd, schedule GC. Idempotent. */
+  /**
+   * Add durability work to this running entry's terminal settlement barrier.
+   * Callers must register the task before detaching the consumer whose work it
+   * represents. Identity + status checks make a late registration fail closed:
+   * if abort already ended (or replacement invalidated) the entry, its attached
+   * consumer remains responsible for terminal delivery.
+   */
+  trackSettlementTask(entry: StreamEntry, task: Promise<unknown>): boolean {
+    if (
+      this.entries.get(entry.session_id) !== entry ||
+      entry.status !== "running"
+    ) {
+      return false;
+    }
+    let tasks = this.settlement_tasks.get(entry);
+    if (!tasks) {
+      tasks = new Set();
+      this.settlement_tasks.set(entry, tasks);
+    }
+    tasks.add(task);
+    const cleanup = () => {
+      tasks?.delete(task);
+    };
+    void task.then(cleanup, cleanup);
+    return true;
+  }
+
+  /**
+   * Mark entry done and begin terminal delivery. The lifecycle finish edge and
+   * grace timer wait for every current/pending consumer's `on_end` and every
+   * explicitly tracked durability task to settle; until then admission remains
+   * occupied. Idempotent.
+   */
   finish(sessionId: string, reason: StreamEndReason): void {
     const entry = this.entries.get(sessionId);
-    if (!entry || entry.status !== "running") return;
+    if (!entry) return;
+    this.finishEntry(entry, reason);
+  }
+
+  /**
+   * Finish only while `entry` is the exact current running generation.
+   *
+   * Explicit user abort remains session-keyed because it intentionally targets
+   * the current turn. Async pump success/error paths must carry their captured
+   * entry so a stale completion cannot finish a newer queued turn.
+   */
+  finishEntry(entry: StreamEntry, reason: StreamEndReason): boolean {
+    const sessionId = entry.session_id;
+    if (this.entries.get(sessionId) !== entry || entry.status !== "running") {
+      return false;
+    }
     entry.status = "ended";
     entry.end_reason = reason;
-    for (const c of entry.consumers.values()) {
-      void this.deliver(
-        entry,
-        c,
-        () => c.on_end(reason),
-        /* detachAfter */ true
+    // Occupy the session BEFORE invoking any consumer callback. `on_end` may
+    // execute synchronously up to its first await, and a re-entrant admission
+    // attempt from that stack must not observe an ended-but-unsettled gap.
+    const placeholder: StreamSettlement = {
+      entry,
+      promise: Promise.resolve(),
+    };
+    this.settlements.set(sessionId, placeholder);
+    const terminalDeliveries = Array.from(entry.consumers.values(), (c) =>
+      this.deliver(entry, c, () => c.on_end(reason), /* detachAfter */ true)
+    );
+    // An attach can still be replaying when finish lands and therefore not yet
+    // appear in `entry.consumers`. Its task observes `ended`, delivers on_end
+    // after replay, and belongs to the same durability barrier.
+    const pendingAttaches = Array.from(this.attach_tasks.get(entry) ?? []);
+    // A successful pump may have detached the recorder so it can flush before
+    // usage is stamped. Abort during that phase must still wait for the tracked
+    // flush/accounting task before the lifecycle publishes idle.
+    const pendingSettlementTasks = Array.from(
+      this.settlement_tasks.get(entry) ?? []
+    );
+    const promise = Promise.allSettled([
+      ...pendingAttaches,
+      ...terminalDeliveries,
+      ...pendingSettlementTasks,
+    ]).then(() => {
+      const settlement = this.settlements.get(sessionId);
+      // `drop`/`clear` may have invalidated this entry and a replacement may now
+      // own the same session id. A stale completion must neither publish that
+      // replacement idle nor install a timer that later deletes it.
+      if (
+        settlement?.entry !== entry ||
+        this.entries.get(sessionId) !== entry
+      ) {
+        return;
+      }
+      this.settlements.delete(sessionId);
+      this.notifyObservers((o) => o.on_finish?.(sessionId, reason));
+      entry.gc_timer = setTimeout(
+        () => this.dropEntry(sessionId, entry),
+        this.grace_ms
       );
+    });
+    // `allSettled().then` is always asynchronous, so replacing the placeholder
+    // here precedes completion even when there are no consumers.
+    if (this.settlements.get(sessionId) === placeholder) {
+      this.settlements.set(sessionId, { entry, promise });
     }
-    entry.gc_timer = setTimeout(() => this.drop(sessionId), this.grace_ms);
-    // Idle/error edge — AFTER the entry is marked ended + consumers notified,
-    // so an observer that triggers a drain sees a consistent ended entry. The
-    // drain it schedules runs on a fresh task, never re-entrantly here.
-    this.notifyObservers((o) => o.on_finish?.(sessionId, reason));
+    return true;
   }
 
   /** Explicit cancel: abort the upstream signal then `finish("abort")`. */
@@ -172,7 +390,7 @@ export class StreamRegistry {
     const entry = this.entries.get(sessionId);
     if (!entry || entry.status !== "running") return;
     entry.model_abort.abort();
-    this.finish(sessionId, "abort");
+    this.finishEntry(entry, "abort");
   }
 
   /**
@@ -199,7 +417,7 @@ export class StreamRegistry {
       detached = true;
       entry.consumers.delete(id);
     };
-    void (async () => {
+    const task = (async () => {
       try {
         if (opts?.replay_prefix && entry.replay_prefix) {
           // Never rejects by contract (the builder degrades to []); frames
@@ -238,6 +456,15 @@ export class StreamRegistry {
         consumer.on_error?.(err);
       }
     })();
+    let tasks = this.attach_tasks.get(entry);
+    if (!tasks) {
+      tasks = new Set();
+      this.attach_tasks.set(entry, tasks);
+    }
+    tasks.add(task);
+    void task.finally(() => {
+      tasks?.delete(task);
+    });
     return detach;
   }
 
@@ -245,15 +472,27 @@ export class StreamRegistry {
   drop(sessionId: string): void {
     const entry = this.entries.get(sessionId);
     if (!entry) return;
+    this.dropEntry(sessionId, entry);
+  }
+
+  private dropEntry(sessionId: string, entry: StreamEntry): void {
+    if (this.entries.get(sessionId) !== entry) return;
     if (entry.gc_timer) clearTimeout(entry.gc_timer);
     if (entry.status === "running") entry.model_abort.abort();
     entry.consumers.clear();
     this.entries.delete(sessionId);
+    if (this.settlements.get(sessionId)?.entry === entry) {
+      this.settlements.delete(sessionId);
+    }
   }
 
   /** Test teardown: drop all entries. */
   clear(): void {
-    for (const id of Array.from(this.entries.keys())) this.drop(id);
+    for (const [id, entry] of Array.from(this.entries)) {
+      this.dropEntry(id, entry);
+    }
+    this.admissions.clear();
+    this.settlements.clear();
   }
 
   private async deliver(

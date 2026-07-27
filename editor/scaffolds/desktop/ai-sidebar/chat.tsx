@@ -18,6 +18,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat, useChat } from "@ai-sdk/react";
+import { AGENT_DEFAULT_MODE } from "@grida/agent";
 import { AgentFs } from "@grida/agent/fs";
 import type { AgentSurface } from "@grida/agent/surface";
 import { AgentTodos } from "@grida/agent/todos";
@@ -41,10 +42,13 @@ import {
   type AgentRunOptions,
 } from "@/lib/desktop/bridge";
 import {
+  buildApprovalResumeBody,
   buildAgentSend,
   chatError,
   desktopAgentTransport,
+  isHumanInputPendingState,
   isSessionBusy,
+  shouldUseLocalHumanInput,
   StreamAttachOwner,
   SurfaceToolCallObserver,
   useChatSession,
@@ -85,6 +89,11 @@ import {
   AgentComposerInput,
   type ComposerCommandAction,
 } from "../shared/agent-composer-input";
+import {
+  AgentApprovalBar,
+  findPendingApproval,
+  type PendingApproval,
+} from "../shared/agent-approval";
 
 // Standalone-doc surface: no workspace, so no file mentions or skill
 // commands — the composer is still the input for its rich-text + paste UX.
@@ -154,7 +163,13 @@ export function AISidebarChat({
   // auto-resubmit serialize here — one live attach max, resume-once keyed
   // on (session, epoch), never on Chat identity.
   const attachOwner = useMemo(() => new StreamAttachOwner(), []);
+  // Render-current binding for async transport gates. A transport belongs to
+  // the epoch it was created under; a real session switch bumps the epoch,
+  // while null→server-id adoption deliberately does not.
+  const bindingEpochRef = useRef(chatSession.epoch);
+  bindingEpochRef.current = chatSession.epoch;
   const chat = useMemo(() => {
+    const bindingEpoch = chatSession.epoch;
     const todos = new AgentTodos();
     const surfaceToolCallObserver = new SurfaceToolCallObserver();
     const chat = new Chat<UIMessage>({
@@ -163,6 +178,7 @@ export function AISidebarChat({
       transport: desktopAgentTransport.create({
         workspace_id: workspaceId,
         session_id: chatSession.current_id ?? undefined,
+        isCurrentBinding: () => bindingEpochRef.current === bindingEpoch,
         runContext: () => runContextRef.current,
         onSessionId: (resolvedId) => {
           chatSession.apply_resolved_session_id(resolvedId);
@@ -170,7 +186,7 @@ export function AISidebarChat({
         // Attach-owner reporting (never vetoes): adopted streams serialize
         // every other intent behind them.
         onStreamOpen: () => attachOwner.noteTransportOpen(),
-        onStreamSettle: () => attachOwner.noteTransportSettle(),
+        onStreamSettle: (lease) => attachOwner.noteTransportSettle(lease),
         onResumeStart: () => {
           // AgentHost confirmed an in-flight run for this chat id; drop
           // the in-progress assistant message we hydrated from the DB
@@ -265,20 +281,6 @@ export function AISidebarChat({
   // state.
   const isStreaming = status === "submitted" || status === "streaming";
 
-  // Mount/rebuild resume (rehydrate-then-attach) + the owner-gated
-  // self-heal, in the ONE shared wire (`use-stream-attach.ts`) — the
-  // workspace agent pane runs the identical wiring.
-  const { recovering } = useStreamAttach({
-    owner: attachOwner,
-    sessionId: chatSession.current_id,
-    epoch: chatSession.epoch,
-    rehydrateAsync: chatSession.rehydrate_async,
-    setMessages,
-    resumeStream,
-    error,
-    clearError,
-  });
-
   // Manual compaction (RFC `session / compaction`) runs as a separate op that
   // does NOT move `useChat` status. Declared here so the single `busy` signal
   // below can fold it in; the `/compact` command is wired further down.
@@ -291,13 +293,52 @@ export function AISidebarChat({
   const coreStatus = useSessionStatus(chatSession.current_id);
   const coreBusy =
     coreStatus?.state === "busy" || coreStatus?.state === "retrying";
+  // Hydrated tool parts are a startup/status-channel fallback. Once a core
+  // frame arrives, only a control matching its waiting kind remains current;
+  // a non-waiting frame suppresses stale local parts immediately.
+  const localPendingHumanInput = useMemo(
+    () => ({
+      approval: findPendingApproval(messages),
+      question: findPendingQuestion(messages),
+      designSearch: findPendingDesignSearch(messages),
+    }),
+    [messages]
+  );
+  const pendingApproval = shouldUseLocalHumanInput(
+    coreStatus,
+    "waiting_on_approval"
+  )
+    ? localPendingHumanInput.approval
+    : null;
+  const useLocalUserInput = shouldUseLocalHumanInput(
+    coreStatus,
+    "waiting_on_user_input"
+  );
+  const pendingQuestion = useLocalUserInput
+    ? localPendingHumanInput.question
+    : null;
+  const pendingPick = useLocalUserInput
+    ? localPendingHumanInput.designSearch
+    : null;
+  const localHumanInputPending =
+    localPendingHumanInput.approval !== null ||
+    localPendingHumanInput.question !== null ||
+    localPendingHumanInput.designSearch !== null;
+  const humanInputPending =
+    isHumanInputPendingState(coreStatus?.state) ||
+    (coreStatus?.human_input_state_authoritative !== true &&
+      localHumanInputPending);
+  // Unknown status is an admission barrier, not an active-run claim. During a
+  // sidecar/status-SSE reconnect, durable enqueue is safe for both idle and
+  // occupied sessions; a direct run could race an unseen busy turn.
+  const statusUnavailable =
+    chatSession.current_id !== null && coreStatus === null;
+  const admissionBlocked = humanInputPending || statusUnavailable;
 
-  // The session-busy signal — the SINGLE source for "is this session occupied
-  // and may not start another op." Combines the client-local view (streaming or
-  // an in-flight compaction) with the authoritative core state, so every
-  // session-op gate (queue submit, rewind, fork, compact, per-message actions)
-  // agrees on "busy" and a core-started turn also gates submits to enqueue.
+  // Active-run busy stays separate from human-input waiting: the latter has no
+  // run to Stop and its question/pick controls must remain enabled.
   const busy = isSessionBusy(status, compacting) || coreBusy;
+  const sessionOccupied = busy || admissionBlocked;
   // Block the reconcile while a turn is live — streaming locally OR a core turn
   // this client is (about to be) attached to. NOT compacting: a compaction is
   // idle to both signals and its rehydrate MUST reconcile. Read via a ref so
@@ -345,24 +386,25 @@ export function AISidebarChat({
     () => registered_models.resolve(modelId, endpoints)?.imageInputMimes ?? [],
     [modelId, endpoints]
   );
-  // Keep the transport's body-less backfill (above) in step with the picker.
-  // The single-file/deck agent has no permission-mode picker, so no `mode`.
-  {
-    const providerId = registered_models.providerIdForModel(modelId, endpoints);
-    runContextRef.current = {
-      model_id: modelId,
-      ...(providerId ? { provider_id: providerId } : {}),
-      ...(surfaceHostRef.current
-        ? { surface: surfaceHostRef.current.listOpen() }
-        : {}),
-    };
-  }
-
   // The active session row carries the rolled-up cost the context meter
-  // surfaces alongside the (real) window %.
+  // surfaces alongside the (real) window %. This surface has no mode picker,
+  // so preserve the session's persisted supervision mode and use the
+  // conservative default only for a fresh/legacy row.
   const activeSession = chatSession.sessions.find(
     (s) => s.id === chatSession.current_id
   );
+  const sessionMode = activeSession?.mode ?? AGENT_DEFAULT_MODE;
+  const providerId = registered_models.providerIdForModel(modelId, endpoints);
+
+  // Keep body-less tool/approval resumes in step with the active session.
+  runContextRef.current = {
+    model_id: modelId,
+    mode: sessionMode,
+    ...(providerId ? { provider_id: providerId } : {}),
+    ...(surfaceHostRef.current
+      ? { surface: surfaceHostRef.current.listOpen() }
+      : {}),
+  };
 
   // Pull a fresh sessions list every time a turn finishes. The agent sidecar
   // writes the auto-generated title + final usage counters AFTER the
@@ -382,15 +424,36 @@ export function AISidebarChat({
     drop: dropQueued,
     submit: onSubmit,
     refetch: refetchQueue,
+    confirmDequeued,
+    recoverPendingHumanInputTail,
   } = useTurnQueueController({
     sessionId: chatSession.current_id,
     busy,
+    admissionBlocked,
+    idempotentEnqueue: coreStatus?.queue_enqueue_idempotent === true,
     send: buildAgentSend({
       sendMessage,
       sessionId: chatSession.current_id,
       modelId,
-      providerId: registered_models.providerIdForModel(modelId, endpoints),
+      providerId,
+      mode: sessionMode,
     }),
+  });
+
+  // Mount/rebuild resume + owner-gated self-heal. Kept after the queue
+  // controller so a rejected optimistic text tail can be durably queued before
+  // the authoritative transcript replaces it.
+  const { recovering } = useStreamAttach({
+    owner: attachOwner,
+    sessionId: chatSession.current_id,
+    epoch: chatSession.epoch,
+    rehydrateAsync: chatSession.rehydrate_async,
+    setMessages,
+    resumeStream,
+    error,
+    clearError,
+    messages,
+    recoverPendingHumanInputTail,
   });
 
   // React to the CORE drain (RFC `queue`): when the core fires a queued turn (a
@@ -399,9 +462,13 @@ export function AISidebarChat({
   // core dequeues the row at FIRE time (not during the cooldown), so it stays
   // in the tray as pending until then — "submitting" in step with its response.
   useCoreTurnSync({
+    sessionId: chatSession.current_id,
     coreState: coreStatus?.state ?? null,
+    coreMessageId: coreStatus?.message_id ?? null,
     isStreaming,
     queued,
+    messages,
+    rehydrate: chatSession.rehydrate_async,
     setMessages,
     dropQueued,
     // Drain attaches go through the owner: a second stream over a live
@@ -410,6 +477,7 @@ export function AISidebarChat({
       attachOwner.request("resume-drain", () => resumeStream());
     },
     refetchQueue,
+    confirmDequeued,
   });
 
   // Rewind (RFC `session / rewinding`): soft-truncate the session to the
@@ -418,7 +486,7 @@ export function AISidebarChat({
   const onRewind = useCallback(
     async (messageId: string) => {
       const sid = chatSession.current_id;
-      if (!sid || busy) return;
+      if (!sid || sessionOccupied) return;
       try {
         await bridgeSessions.rewind(sid, messageId);
         chatSession.rehydrate();
@@ -427,14 +495,17 @@ export function AISidebarChat({
         console.warn("[ai-sidebar] rewind failed", err);
       }
     },
-    [chatSession, busy, clearError]
+    [chatSession, sessionOccupied, clearError]
   );
 
   // Fork (RFC `session / fork`): the action + its "just forked" notice live
   // in one hook so every entry point (the per-message button and the `/fork`
   // command below) shares the same behavior and feedback. Blocked while busy
   // (a fork mid-compaction would copy a half-written summary).
-  const { fork, just_forked: justForked } = useSessionFork(chatSession, busy);
+  const { fork, just_forked: justForked } = useSessionFork(
+    chatSession,
+    sessionOccupied
+  );
 
   // Manual compaction (RFC `session / compaction`). `compacting` (declared
   // above, where the queue controller reads it) drives the in-flight
@@ -444,9 +515,7 @@ export function AISidebarChat({
   // would clobber the in-flight turn (RFC `queue`).
   const onCompact = useCallback(async () => {
     const sid = chatSession.current_id;
-    // `busy` already folds in `compacting`, so this also blocks re-entrant
-    // compaction.
-    if (!sid || busy) return;
+    if (!sid || sessionOccupied) return;
     setCompacting(true);
     try {
       await bridgeSessions.compact(sid);
@@ -457,7 +526,7 @@ export function AISidebarChat({
     } finally {
       setCompacting(false);
     }
-  }, [chatSession, busy, clearError]);
+  }, [chatSession, sessionOccupied, clearError]);
 
   // `/fork` command: the no-target sibling of the per-message fork. With no
   // chosen message it forks at the tail — the whole conversation.
@@ -467,12 +536,11 @@ export function AISidebarChat({
     return fork(fromMessageId);
   }, [fork, messages]);
 
-  // Stable per-turn affordances. `disabled` flips with `busy` (rewind/fork are
-  // session ops — disabled during a turn AND a compaction), so the object
-  // identity changes only on that edge; settled rows skip re-render otherwise.
+  // Rewind/fork stay disabled during a run, compaction, or unresolved
+  // human-input interaction.
   const messageActions = useMemo<ChatMessageActions>(
-    () => ({ onRewind, onFork: fork, disabled: busy }),
-    [onRewind, fork, busy]
+    () => ({ onRewind, onFork: fork, disabled: sessionOccupied }),
+    [onRewind, fork, sessionOccupied]
   );
 
   const commandActions = useMemo<ComposerCommandAction[]>(
@@ -491,6 +559,36 @@ export function AISidebarChat({
       },
     ],
     [onCompact, onForkCommand]
+  );
+
+  // Approval answers resume the paused turn through the same live Chat that
+  // owns the rendered transcript. The attach owner serializes double-clicks
+  // and concurrent resume intents; the persisted session mode is required so
+  // this body re-enters the sidecar with the turn's supervision posture.
+  const onApprove = useCallback(
+    (pending: PendingApproval, approved: boolean) => {
+      attachOwner.request("approval-resume", () =>
+        chat.sendMessage(undefined, {
+          body: buildApprovalResumeBody({
+            session_id: chatSession.current_id ?? undefined,
+            model_id: modelId,
+            provider_id: providerId,
+            mode: sessionMode,
+            tool_call_id: pending.toolCallId,
+            approval_id: pending.approvalId,
+            approved,
+          }),
+        })
+      );
+    },
+    [
+      attachOwner,
+      chat,
+      chatSession.current_id,
+      modelId,
+      providerId,
+      sessionMode,
+    ]
   );
 
   // Commit a `question` (ask-user) answer: the human's answer becomes the tool
@@ -521,22 +619,6 @@ export function AISidebarChat({
         />
       )),
     [messages, isStreaming, messageActions]
-  );
-
-  // The agent ASKS: a pending `question` is a session-global prompt pinned above
-  // the composer (the same model as the supervised-approval bar), not a card in
-  // the transcript. One open question per session. Memoized on `messages` like
-  // the approval bar's `findPendingApproval` — it only changes when they do.
-  const pendingQuestion = useMemo(
-    () => findPendingQuestion(messages),
-    [messages]
-  );
-
-  // A pending `design_search` — the same session-global pattern: pick references
-  // from the gathered results while the run is paused on the user.
-  const pendingPick = useMemo(
-    () => findPendingDesignSearch(messages),
-    [messages]
   );
 
   const onPickReferences = useCallback<PickReferencesHandler>(
@@ -620,6 +702,12 @@ export function AISidebarChat({
 
       <ModelToolCallNotice model_id={modelId} endpoints={endpoints} />
 
+      {/* Approval controls key only on active-run busy. Human-input waiting is
+          exactly why this bar is present and must not disable itself. */}
+      {pendingApproval && !busy && (
+        <AgentApprovalBar pending={pendingApproval} onApprove={onApprove} />
+      )}
+
       {/* The agent is asking — session-global prompt above the composer. */}
       {pendingQuestion && (
         <div className="shrink-0 px-3 py-2">
@@ -649,7 +737,8 @@ export function AISidebarChat({
           commandActions={commandActions}
           onSubmit={onSubmit}
           isStreaming={isStreaming}
-          busy={busy}
+          busy={sessionOccupied}
+          submissionScope={chatSession.epoch}
           onStop={stop}
           placeholder={
             isWorkspace

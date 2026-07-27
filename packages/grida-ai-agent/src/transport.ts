@@ -302,10 +302,10 @@ export namespace AgentTransport {
       /**
        * Subscribe to the session's `SessionStatus` back-channel (RFC
        * `session` §Session status). A long-lived SSE: the CURRENT status
-       * arrives first, then every idle⇄busy⇄error transition. The returned
-       * `done` settles when the subscription ends (the caller aborts via
-       * `init.signal`, or the socket drops). Unknown/idle sessions read
-       * `{ state: "idle" }`.
+       * arrives first, then every idle⇄busy⇄waiting⇄error transition. The
+       * returned `done` settles when the subscription ends (the caller aborts
+       * via `init.signal`, or the socket drops). Unknown/idle sessions read
+       * `{ state: "idle" }`; persisted human-input blocks read as waiting.
        */
       subscribe_status: async (
         id: string,

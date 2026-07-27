@@ -5,14 +5,14 @@
  * focused on run / stream / abort lifecycle.
  */
 
-import type { StreamRegistry } from "./stream-registry";
+import type { StreamEntry, StreamRegistry } from "./stream-registry";
 import { GRIDA_SESSION_SSE_EVENT } from "../protocol/run";
 
 /** Pump an AI-SDK SSE response body into the registry as opaque frames. */
 export async function pumpResponseIntoRegistry(
   response: Response,
   registry: StreamRegistry,
-  sessionId: string
+  entry: StreamEntry
 ): Promise<void> {
   if (!response.body) return;
   const reader = response.body.getReader();
@@ -30,7 +30,7 @@ export async function pumpResponseIntoRegistry(
         .filter((l) => l.startsWith("data:"))
         .map((l) => l.slice(5).trimStart())
         .join("\n");
-      if (data) registry.push(sessionId, data);
+      if (data) registry.pushEntry(entry, data);
     }
   };
   try {

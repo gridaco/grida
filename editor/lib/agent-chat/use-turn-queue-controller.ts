@@ -7,7 +7,7 @@
  * It composes the optimistic mirror ({@link useQueuedMessages}) with the pure
  * submit decision ({@link decideSubmit}) and turns it into the one side effect
  * the surface owns: `send` (start a turn now). A submit while the session is
- * busy enqueues instead.
+ * busy OR waiting on human input enqueues instead.
  *
  * The DRAIN is NOT here. Firing the next queued turn is CORE state now (the
  * `SessionScheduler` fires it on a clean idle edge); the surface only reacts to
@@ -23,6 +23,7 @@ import { decideSubmit } from "./turn-queue";
 import { useQueuedMessages } from "./use-queued-messages";
 import type { SendExtras } from "./build-agent-send";
 import type { ChatMessageWithParts } from "@/lib/desktop/bridge";
+import type { StreamRecovery } from "./stream-recovery";
 
 export type UseTurnQueueControllerArgs = {
   /** Active session id, or `null` for a fresh (unsent) chat. */
@@ -33,6 +34,15 @@ export type UseTurnQueueControllerArgs = {
    * `SessionStatus` being busy. While true, submits enqueue.
    */
   busy: boolean;
+  /**
+   * Is a new direct turn unsafe even though no active run is known? True while
+   * paused on approval/question and while the authoritative status channel is
+   * reconnecting. Deliberately separate from `busy`: there may be no run for
+   * the surface's Stop control to abort. Ordinary text queues safely.
+   */
+  admissionBlocked: boolean;
+  /** Whether the connected core supports same-id enqueue retry. */
+  idempotentEnqueue?: boolean;
   /**
    * Start a brand-new turn NOW (the session is idle). The surface owns the
    * request body (model, skills, session id). Called by {@link submit} when
@@ -60,10 +70,9 @@ export type UseTurnQueueControllerResult = {
   /** Local-only tray removal — used to PROMOTE a row the core just fired into
    *  the transcript (atomic move, no server delete). */
   drop: (messageId: string) => void;
-  /** The composer's submit handler: enqueue while busy, else send now.
+  /** The composer's submit handler: enqueue while busy/human-blocked, else send.
    *  `files` (inline images) and `extras` (operable uploads) only flow on the
-   *  send-now path — the queue is text-only, and the composer blocks
-   *  image/upload submits while busy. */
+   *  send-now path — the queue is text-only. */
   submit: (
     text: string,
     files?: FileUIPart[],
@@ -71,16 +80,86 @@ export type UseTurnQueueControllerResult = {
   ) => Promise<void>;
   /** Re-read the queue from the core (reconcile the mirror after a drain). */
   refetch: () => Promise<void>;
+  /** Confirm a legacy-sidecar drain by checking that the candidate left the
+   * authoritative queue. */
+  confirmDequeued: (messageId: string) => Promise<boolean>;
+  /**
+   * Move a text-only optimistic user tail rejected by the pending-human-input
+   * race into the durable queue under the same message id.
+   */
+  recoverPendingHumanInputTail: (
+    tail: StreamRecovery.PendingUserTail
+  ) => Promise<boolean>;
 };
+
+/** Pure controller action; the hook below only applies its side effect. */
+export type TurnQueueSubmitAction =
+  | { type: "ignore" }
+  | { type: "enqueue"; sessionId: string; text: string }
+  | {
+      type: "send";
+      text: string;
+      files?: FileUIPart[];
+      extras?: SendExtras;
+    };
+
+/**
+ * Lower one composer submit to the controller action it authorizes.
+ *
+ * The durable queue currently carries ordinary text only. A blocked/busy
+ * session therefore queues non-empty text and never direct-sends file/context
+ * payloads into the pending turn.
+ */
+export function turnQueueSubmitAction(input: {
+  text: string;
+  files?: FileUIPart[];
+  extras?: SendExtras;
+  sessionId: string | null;
+  busy: boolean;
+  admissionBlocked: boolean;
+  hasSendContext: boolean;
+}): TurnQueueSubmitAction {
+  const t = input.text.trim();
+  const hasFiles = !!input.files && input.files.length > 0;
+  const hasExtras =
+    !!input.extras &&
+    ((input.extras.scratchSeed?.length ?? 0) > 0 ||
+      (input.extras.contexts?.length ?? 0) > 0);
+  if (!t && !hasFiles && !input.hasSendContext && !hasExtras) {
+    return { type: "ignore" };
+  }
+
+  if (
+    decideSubmit({
+      busy: input.busy,
+      admissionBlocked: input.admissionBlocked,
+    }) === "enqueue"
+  ) {
+    return input.sessionId && t
+      ? { type: "enqueue", sessionId: input.sessionId, text: t }
+      : { type: "ignore" };
+  }
+
+  return {
+    type: "send",
+    text: t,
+    files: input.files,
+    extras: input.extras,
+  };
+}
 
 export function useTurnQueueController(
   args: UseTurnQueueControllerArgs
 ): UseTurnQueueControllerResult {
-  const queue = useQueuedMessages(args.sessionId);
+  const queue = useQueuedMessages(args.sessionId, {
+    idempotentEnqueue: args.idempotentEnqueue,
+  });
 
   // Read submit-time state through refs so `submit` stays a stable callback.
   const busyRef = useRef(args.busy);
   busyRef.current = args.busy;
+  const admissionBlockedRef = useRef(args.admissionBlocked);
+  admissionBlockedRef.current = args.admissionBlocked;
   const sessionIdRef = useRef(args.sessionId);
   sessionIdRef.current = args.sessionId;
   const enqueueRef = useRef(queue.enqueue);
@@ -92,29 +171,35 @@ export function useTurnQueueController(
 
   const submit = useCallback(
     async (text: string, files?: FileUIPart[], extras?: SendExtras) => {
-      const t = text.trim();
-      const hasFiles = !!files && files.length > 0;
-      const hasContext = hasSendContextRef.current;
-      // Operable uploads (scratch bytes + their marker) also make an empty-text
-      // submit real — and, like images, only ride the immediate-send path.
-      const hasExtras =
-        !!extras &&
-        ((extras.scratchSeed?.length ?? 0) > 0 ||
-          (extras.contexts?.length ?? 0) > 0);
-      if (!t && !hasFiles && !hasContext && !hasExtras) return;
-      const sid = sessionIdRef.current;
-      if (decideSubmit({ busy: busyRef.current }) === "enqueue") {
-        // Queue behind the busy session. A null session can't be mid-turn (the
-        // first turn is never in flight), so there is nothing to queue against —
-        // drop it rather than enqueue into the void. The queue is text-only;
-        // image AND upload submits are blocked at the composer while busy, so
-        // `files`/`extras` never reach this branch. Require non-empty `t` too: a
-        // files-only submit would otherwise queue an empty turn. Context-only
-        // sends are first-turn immediate sends; the queue has no durable payload.
-        if (sid && t) await enqueueRef.current(sid, t);
+      const action = turnQueueSubmitAction({
+        text,
+        files,
+        extras,
+        sessionId: sessionIdRef.current,
+        busy: busyRef.current,
+        admissionBlocked: admissionBlockedRef.current,
+        hasSendContext: hasSendContextRef.current,
+      });
+      if (action.type === "ignore") return;
+      if (action.type === "enqueue") {
+        // Queue behind the occupied/human-blocked session. A null session
+        // cannot be either, so the action gate drops it rather than enqueueing
+        // into the void. The queue is text-only; file/context-only submissions
+        // have no durable queue payload and are ignored by that gate.
+        await enqueueRef.current(action.sessionId, action.text);
         return;
       }
-      await sendRef.current(t, files, extras);
+      await sendRef.current(action.text, action.files, action.extras);
+    },
+    []
+  );
+
+  const recoverPendingHumanInputTail = useCallback(
+    async (tail: StreamRecovery.PendingUserTail): Promise<boolean> => {
+      const sid = sessionIdRef.current;
+      if (!sid || !tail.text.trim()) return false;
+      await enqueueRef.current(sid, tail.text, tail.id);
+      return true;
     },
     []
   );
@@ -125,5 +210,7 @@ export function useTurnQueueController(
     drop: queue.drop,
     submit,
     refetch: queue.refetch,
+    confirmDequeued: queue.confirmDequeued,
+    recoverPendingHumanInputTail,
   };
 }

@@ -57,16 +57,33 @@ describe("StreamRegistry / create + get + drop", () => {
     expect(() => registry.create("ses_a")).toThrow(RunInFlightError);
   });
 
-  it("replaces an entry in its finished grace window", () => {
+  it("replaces an entry in its finished grace window", async () => {
     const first = registry.create("ses_a");
     registry.push("ses_a", "frame-1");
     registry.finish("ses_a", "finish");
     expect(registry.get("ses_a")?.status).toBe("ended");
+    expect(() => registry.create("ses_a")).toThrow(RunInFlightError);
+    await flushMicrotasks();
 
     const second = registry.create("ses_a");
     expect(second).not.toBe(first);
     expect(second.status).toBe("running");
     expect(second.chunks).toEqual([]);
+  });
+
+  it("rejects stale entry writes after a replacement generation starts", async () => {
+    const first = registry.create("ses_a");
+    expect(registry.finishEntry(first, "abort")).toBe(true);
+    await flushMicrotasks();
+
+    const second = registry.create("ses_a");
+    expect(registry.pushEntry(first, "late-first-frame")).toBe(false);
+    expect(registry.finishEntry(first, "error")).toBe(false);
+    expect(second.status).toBe("running");
+    expect(second.chunks).toEqual([]);
+
+    expect(registry.pushEntry(second, "second-frame")).toBe(true);
+    expect(second.chunks).toEqual(["second-frame"]);
   });
 
   it("drop removes the entry and aborts the model if still running", () => {
@@ -76,6 +93,32 @@ describe("StreamRegistry / create + get + drop", () => {
     registry.drop("ses_a");
     expect(registry.get("ses_a")).toBeUndefined();
     expect(onAbort).toHaveBeenCalledOnce();
+  });
+
+  it("serializes pre-stream admission and atomically hands it to create", async () => {
+    const admission = registry.acquireAdmission("ses_a");
+    expect(registry.isOccupied("ses_a")).toBe(true);
+    expect(() => registry.acquireAdmission("ses_a")).toThrow(RunInFlightError);
+    expect(() => registry.create("ses_a")).toThrow(RunInFlightError);
+
+    const entry = registry.create("ses_a", { admission });
+    expect(entry.status).toBe("running");
+    // The lease was consumed, but the installed stream still owns the session.
+    expect(registry.isOccupied("ses_a")).toBe(true);
+    registry.finish("ses_a", "finish");
+    expect(registry.isOccupied("ses_a")).toBe(true);
+    await flushMicrotasks();
+    expect(registry.isOccupied("ses_a")).toBe(false);
+  });
+
+  it("release is identity-guarded and makes a failed admission reusable", () => {
+    const first = registry.acquireAdmission("ses_a");
+    registry.releaseAdmission(first);
+    const second = registry.acquireAdmission("ses_a");
+    registry.releaseAdmission(first); // stale cleanup cannot release second
+    expect(() => registry.acquireAdmission("ses_a")).toThrow(RunInFlightError);
+    registry.releaseAdmission(second);
+    expect(() => registry.acquireAdmission("ses_a")).not.toThrow();
   });
 });
 
@@ -232,14 +275,168 @@ describe("StreamRegistry / finish + abort + onEnd", () => {
     await flushMicrotasks();
     expect(c.ended).toEqual(["finish"]);
   });
+
+  it("keeps admission occupied and withholds finish until async onEnd settles", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ended: string[] = [];
+    const finished: Array<[string, string]> = [];
+    registry.observe({
+      on_finish: (sessionId, reason) => {
+        finished.push([sessionId, reason]);
+      },
+    });
+    registry.create("ses_a");
+    registry.attach("ses_a", {
+      on_frame: () => {},
+      on_end: async (reason) => {
+        ended.push(reason);
+        await gate;
+      },
+    });
+
+    registry.finish("ses_a", "finish");
+    await Promise.resolve();
+    expect(ended).toEqual(["finish"]);
+    expect(registry.get("ses_a")?.status).toBe("ended");
+    expect(registry.isOccupied("ses_a")).toBe(true);
+    expect(() => registry.acquireAdmission("ses_a")).toThrow(RunInFlightError);
+    expect(() => registry.create("ses_a")).toThrow(RunInFlightError);
+    expect(finished).toEqual([]);
+
+    release();
+    await flushMicrotasks();
+    expect(registry.isOccupied("ses_a")).toBe(false);
+    expect(finished).toEqual([["ses_a", "finish"]]);
+  });
+
+  it("waits for a tracked detached recorder flush when abort lands", async () => {
+    let release!: () => void;
+    const recorderFlush = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const finished: Array<[string, string]> = [];
+    registry.observe({
+      on_finish: (sessionId, reason) => {
+        finished.push([sessionId, reason]);
+      },
+    });
+    const entry = registry.create("ses_a");
+    const detachRecorder = registry.attach("ses_a", makeConsumer());
+    await flushMicrotasks();
+
+    expect(registry.trackSettlementTask(entry, recorderFlush)).toBe(true);
+    detachRecorder();
+    registry.abort("ses_a");
+    await flushMicrotasks();
+
+    expect(entry.model_abort.signal.aborted).toBe(true);
+    expect(entry.status).toBe("ended");
+    expect(registry.isOccupied("ses_a")).toBe(true);
+    expect(() => registry.acquireAdmission("ses_a")).toThrow(RunInFlightError);
+    expect(finished).toEqual([]);
+
+    release();
+    await flushMicrotasks();
+    expect(registry.isOccupied("ses_a")).toBe(false);
+    expect(finished).toEqual([["ses_a", "abort"]]);
+  });
+
+  it("installs the settlement barrier before invoking onEnd", () => {
+    let rejected = false;
+    registry.create("ses_a");
+    registry.attach("ses_a", {
+      on_frame: () => {},
+      on_end: () => {
+        try {
+          const admission = registry.acquireAdmission("ses_a");
+          registry.releaseAdmission(admission);
+        } catch (err) {
+          rejected = err instanceof RunInFlightError;
+        }
+      },
+    });
+
+    registry.finish("ses_a", "finish");
+    expect(rejected).toBe(true);
+  });
+
+  it("waits for an attaching consumer to replay and finish before releasing admission", async () => {
+    let releasePrefix!: (frames: readonly string[]) => void;
+    const prefix = new Promise<readonly string[]>((resolve) => {
+      releasePrefix = resolve;
+    });
+    const ended: string[] = [];
+    registry.create("ses_a", { replay_prefix: prefix });
+    registry.attach(
+      "ses_a",
+      {
+        on_frame: () => {},
+        on_end: (reason) => {
+          ended.push(reason);
+        },
+      },
+      { replay_prefix: true }
+    );
+
+    registry.finish("ses_a", "abort");
+    await flushMicrotasks();
+    expect(registry.isOccupied("ses_a")).toBe(true);
+    expect(ended).toEqual([]);
+
+    releasePrefix([]);
+    await flushMicrotasks();
+    expect(ended).toEqual(["abort"]);
+    expect(registry.isOccupied("ses_a")).toBe(false);
+  });
+
+  it.each(["drop", "clear"] as const)(
+    "%s invalidates an old settlement without finishing or GCing its replacement",
+    async (operation) => {
+      vi.useFakeTimers();
+      const r = new StreamRegistry({ finish_grace_ms: 10 });
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const finished: string[] = [];
+      r.observe({
+        on_finish: (sessionId) => {
+          finished.push(sessionId);
+        },
+      });
+      r.create("ses_a");
+      r.attach("ses_a", {
+        on_frame: () => {},
+        on_end: () => gate,
+      });
+      r.finish("ses_a", "finish");
+      await Promise.resolve();
+
+      if (operation === "drop") r.drop("ses_a");
+      else r.clear();
+      const replacement = r.create("ses_a");
+      release();
+      await flushMicrotasks();
+      vi.advanceTimersByTime(10);
+
+      expect(finished).toEqual([]);
+      expect(r.get("ses_a")).toBe(replacement);
+      r.clear();
+      vi.useRealTimers();
+    }
+  );
 });
 
 describe("StreamRegistry / GC", () => {
-  it("drops the entry after the grace period", () => {
+  it("drops the entry after the grace period", async () => {
     vi.useFakeTimers();
     const r = new StreamRegistry({ finish_grace_ms: 5_000 });
     r.create("ses_a");
     r.finish("ses_a", "finish");
+    await flushMicrotasks();
     expect(r.get("ses_a")).toBeDefined();
     vi.advanceTimersByTime(4_999);
     expect(r.get("ses_a")).toBeDefined();
@@ -250,7 +447,27 @@ describe("StreamRegistry / GC", () => {
 });
 
 describe("StreamRegistry / lifecycle observer", () => {
-  it("notifies on_create (busy edge) and on_finish (idle edge) at the chokepoints", () => {
+  it("carries the fired message identity on the busy edge", () => {
+    const r = new StreamRegistry();
+    const created: Array<[string, string | undefined]> = [];
+    r.observe({
+      on_create: (sid, messageId) => created.push([sid, messageId]),
+    });
+
+    const direct = r.create("ses_direct", {
+      fired_message_id: "msg_user_1",
+    });
+    expect(direct.fired_message_id).toBe("msg_user_1");
+    r.finish("ses_direct", "finish");
+    r.create("ses_resume");
+
+    expect(created).toEqual([
+      ["ses_direct", "msg_user_1"],
+      ["ses_resume", undefined],
+    ]);
+  });
+
+  it("notifies on_create (busy edge) and on_finish (idle edge) at the chokepoints", async () => {
     const r = new StreamRegistry();
     const created: string[] = [];
     const finished: Array<[string, string]> = [];
@@ -264,12 +481,14 @@ describe("StreamRegistry / lifecycle observer", () => {
     expect(finished).toEqual([]);
 
     r.finish("ses_a", "finish");
+    await flushMicrotasks();
     expect(finished).toEqual([["ses_a", "finish"]]);
 
     // The abort path funnels through finish — observer sees a single
     // on_finish("abort"), the same chokepoint.
     r.create("ses_b");
     r.abort("ses_b");
+    await flushMicrotasks();
     expect(created).toEqual(["ses_a", "ses_b"]);
     expect(finished).toEqual([
       ["ses_a", "finish"],
@@ -302,7 +521,7 @@ describe("StreamRegistry / lifecycle observer", () => {
     r.attach("ses_a", c);
     r.push("ses_a", "f1");
     expect(() => r.finish("ses_a", "finish")).not.toThrow();
-    await Promise.resolve();
+    await flushMicrotasks();
     expect(c.frames).toEqual(["f1"]);
     expect(c.ended).toEqual(["finish"]);
   });
@@ -311,7 +530,7 @@ describe("StreamRegistry / lifecycle observer", () => {
   // failure mode was a single-observer slot that silently overwrote: the
   // scheduler attached, and a second consumer (the lifecycle event bus)
   // could not attach without displacing it.
-  it("is multi-subscriber: a second observe() never displaces the first", () => {
+  it("is multi-subscriber: a second observe() never displaces the first", async () => {
     const r = new StreamRegistry();
     const first: string[] = [];
     const second: string[] = [];
@@ -325,11 +544,12 @@ describe("StreamRegistry / lifecycle observer", () => {
 
     r.create("ses_a");
     r.finish("ses_a", "finish");
+    await flushMicrotasks();
     expect(first).toEqual(["create:ses_a", "finish:ses_a:finish"]);
     expect(second).toEqual(["finish:ses_a:finish"]);
   });
 
-  it("a throwing observer never breaks delivery to its siblings", () => {
+  it("a throwing observer never breaks delivery to its siblings", async () => {
     const r = new StreamRegistry();
     const seen: string[] = [];
     r.observe({
@@ -346,6 +566,7 @@ describe("StreamRegistry / lifecycle observer", () => {
     });
     r.create("ses_a");
     r.finish("ses_a", "finish");
+    await flushMicrotasks();
     expect(seen).toEqual(["create:ses_a", "finish:ses_a:finish"]);
   });
 

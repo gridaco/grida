@@ -1,28 +1,31 @@
 /**
+ * GRIDA-SEC-004 — session scheduling and the read-only status-hydration
+ * boundary.
+ *
  * Contract tests for the core run-state machine (RFC
  * docs/wg/ai/agent/queue.md + session.md §Session status). These are the
  * executable spec for the behaviors the CORE now owns (moved off the UI):
  *
- *   1. status transitions: create → busy, finish/abort → idle, error → error.
+ *   1. status transitions: create → busy, finish/abort →
+ *      waiting-or-idle, error → error.
  *   2. SERIAL drain: a clean idle edge fires the earliest queued row, one
  *      turn at a time, FIFO.
- *   3. dequeue happens at SELECTION (before the cooldown) so the row is
- *      visible during the idle cooldown window.
+ *   3. selection is read-only; the runtime claims only after async preparation
+ *      and synchronously reserves the turn.
  *   4. a hard error PAUSES the drain; cancel halts the cascade.
- *   5. a single-flight race (drain throws RunInFlightError) is swallowed.
+ *   5. a preparation failure preserves the queued row.
  *   6. status subscription delivers current-then-changes.
  *
- * Uses a real in-memory store for list_queued/dequeue and a fake `drain`; a
+ * Uses a real in-memory store for list/claim and a fake `drain`; a
  * small real cooldown + `delay()` keeps it deterministic without fake timers.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { openSessionsDb, type OpenedSessionsDb } from "../session/db";
 import { SessionsStore } from "../session/store";
-import { RunInFlightError } from "./stream-registry";
 import {
   SessionScheduler,
   type SessionSchedulerDeps,
@@ -51,27 +54,43 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 /** A scheduler wired to the real store with an overridable `drain`. The
- *  `has_pending_human_input` gate defaults to "never blocked" so the existing
- *  drain tests are unaffected; the block-pause tests pass a real flag. */
+ *  `pending_human_input_kind` classifier defaults to "never blocked" so the
+ *  existing drain tests are unaffected; block-pause tests pass a real kind. */
 function makeScheduler(
   drain?: SessionSchedulerDeps["drain"],
-  hasPendingHumanInput?: SessionSchedulerDeps["has_pending_human_input"]
+  pendingHumanInputKind?: SessionSchedulerDeps["pending_human_input_kind"]
 ): {
   scheduler: SessionScheduler;
   calls: string[];
 } {
   const calls: string[] = [];
   let scheduler!: SessionScheduler;
-  const defaultDrain: SessionSchedulerDeps["drain"] = async (sid) => {
+  const defaultDrain: SessionSchedulerDeps["drain"] = async (
+    sid,
+    messageId
+  ) => {
+    const claim = store.claimQueuedMessage(sid, messageId);
+    if (!claim) return false;
     calls.push(sid);
     scheduler.onCreate(sid); // a real startTurn would reserve → onCreate
+    return true;
   };
   scheduler = new SessionScheduler({
     list_queued: (sid) => store.listQueuedMessages(sid),
-    dequeue: (id) => store.dequeueMessage(id),
     drain: drain ?? defaultDrain,
-    has_pending_human_input: hasPendingHumanInput ?? (async () => false),
+    pending_human_input_kind: pendingHumanInputKind ?? (async () => null),
     drain_cooldown_ms: COOLDOWN,
   });
   live.push(scheduler);
@@ -84,22 +103,28 @@ describe("SessionScheduler status", () => {
     const s = await store.create({ agent: "grida" });
     expect(scheduler.getStatus(s.id)).toEqual({ state: "idle" });
 
-    scheduler.onCreate(s.id);
+    scheduler.onCreate(s.id, "msg_user_1");
     expect(scheduler.getStatus(s.id).state).toBe("busy");
     expect(scheduler.getStatus(s.id).started_at).toEqual(expect.any(Number));
+    expect(scheduler.getStatus(s.id).message_id).toBe("msg_user_1");
 
-    // idle is broadcast synchronously on a clean turn-end (the button flips to
-    // Send immediately); the cooldown happens BEFORE the next fire, not before
-    // idle.
+    // A clean end retains busy while persisted pending-input state is read. It
+    // must never expose a transient idle admission window.
     scheduler.onFinish(s.id, "finish");
+    expect(scheduler.getStatus(s.id).state).toBe("busy");
+    await delay(0);
     expect(scheduler.getStatus(s.id).state).toBe("idle");
 
     scheduler.onCreate(s.id);
+    expect(scheduler.getStatus(s.id).message_id).toBeUndefined();
     scheduler.onFinish(s.id, "abort");
-    expect(scheduler.getStatus(s.id).state).toBe("idle");
+    expect(scheduler.getStatus(s.id).state).toBe("busy");
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(s.id).state).toBe("idle")
+    );
   });
 
-  it("subscribe delivers the current status immediately, then on change", () => {
+  it("subscribe delivers the current status immediately, then on change", async () => {
     const { scheduler } = makeScheduler();
     const sid = "ses_sub";
     const seen: string[] = [];
@@ -107,24 +132,267 @@ describe("SessionScheduler status", () => {
     expect(seen).toEqual(["idle"]); // current, immediately
 
     scheduler.onCreate(sid);
-    scheduler.onFinish(sid, "finish"); // both edges are synchronous
-    expect(seen).toEqual(["idle", "busy", "idle"]);
+    scheduler.onFinish(sid, "finish");
+    expect(seen).toEqual(["idle", "busy"]); // no transient idle
+    await vi.waitFor(() => expect(seen).toEqual(["idle", "busy", "idle"]));
 
     unsub();
     scheduler.onCreate(sid);
     expect(seen).toEqual(["idle", "busy", "idle"]); // silent after unsubscribe
   });
+
+  it("a refresh after clean end supersedes an older settle read", async () => {
+    let readCount = 0;
+    let resolveFirst!: (kind: "approval" | null) => void;
+    const { scheduler } = makeScheduler(undefined, () => {
+      readCount += 1;
+      if (readCount === 1) {
+        return new Promise<"approval" | "user-input" | null>((resolve) => {
+          resolveFirst = resolve;
+        });
+      }
+      return Promise.resolve(null);
+    });
+    const s = await store.create({ agent: "grida" });
+
+    scheduler.onCreate(s.id);
+    scheduler.onFinish(s.id, "finish");
+    expect(scheduler.getStatus(s.id).state).toBe("busy");
+
+    // Rewind/un-rewind calls refresh after the registry entry has ended. Its
+    // newer durable read must win even if the original settle read resolves
+    // later with stale pre-mutation data.
+    await expect(scheduler.refreshStatus(s.id)).resolves.toEqual({
+      state: "idle",
+    });
+    resolveFirst("approval");
+    await delay(0);
+    expect(scheduler.getStatus(s.id).state).toBe("idle");
+  });
+});
+
+describe("SessionScheduler hard-error projection", () => {
+  it("projects a durable approval wait instead of error and never drains", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const listQueued = vi.fn<SessionSchedulerDeps["list_queued"]>(async () => [
+      { id: "q1" },
+    ]);
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(async () => true);
+    const scheduler = new SessionScheduler({
+      list_queued: listQueued,
+      drain,
+      pending_human_input_kind: () => classification.promise,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+    const sid = "ses_error_approval";
+
+    scheduler.onCreate(sid);
+    scheduler.onFinish(sid, "error");
+    expect(scheduler.getStatus(sid).state).toBe("busy");
+    classification.resolve("approval");
+
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(sid).state).toBe("waiting_on_approval")
+    );
+    await delay(0);
+    expect(listQueued).not.toHaveBeenCalled();
+    expect(drain).not.toHaveBeenCalled();
+  });
+
+  it("projects a durable question wait instead of error", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [],
+      drain: async () => true,
+      pending_human_input_kind: () => classification.promise,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+    const sid = "ses_error_question";
+
+    scheduler.onCreate(sid);
+    scheduler.onFinish(sid, "error");
+    expect(scheduler.getStatus(sid).state).toBe("busy");
+    classification.resolve("user-input");
+
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(sid).state).toBe("waiting_on_user_input")
+    );
+  });
+
+  it("does not let a stale error classification overwrite a newer run", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [],
+      drain: async () => true,
+      pending_human_input_kind: () => classification.promise,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+    const sid = "ses_error_stale";
+
+    scheduler.onCreate(sid, "msg_old");
+    scheduler.onFinish(sid, "error");
+    scheduler.onCreate(sid, "msg_new");
+    classification.resolve("approval");
+    await delay(0);
+
+    expect(scheduler.getStatus(sid)).toMatchObject({
+      state: "busy",
+      message_id: "msg_new",
+    });
+  });
+});
+
+describe("SessionScheduler dispose races", () => {
+  it("drops an in-flight hard-error classification after disposal", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [],
+      drain: async () => true,
+      pending_human_input_kind: () => classification.promise,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+    const sid = "ses_dispose_error";
+
+    scheduler.onCreate(sid);
+    scheduler.onFinish(sid, "error");
+    scheduler.dispose();
+    classification.resolve("approval");
+    await delay(0);
+
+    expect(scheduler.getStatus(sid)).toEqual({ state: "idle" });
+  });
+
+  it("stops after an in-flight human-input classification resolves", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const listQueued = vi.fn<SessionSchedulerDeps["list_queued"]>(async () => [
+      { id: "q1" },
+    ]);
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(async () => true);
+    const pendingHumanInputKind = vi.fn<
+      SessionSchedulerDeps["pending_human_input_kind"]
+    >(() => classification.promise);
+    const scheduler = new SessionScheduler({
+      list_queued: listQueued,
+      drain,
+      pending_human_input_kind: pendingHumanInputKind,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+
+    scheduler.notifyEnqueued("ses_dispose_classification");
+    await vi.waitFor(() =>
+      expect(pendingHumanInputKind).toHaveBeenCalledTimes(1)
+    );
+    scheduler.dispose();
+    classification.resolve("approval");
+    await delay(0);
+
+    expect(scheduler.getStatus("ses_dispose_classification")).toEqual({
+      state: "idle",
+    });
+    expect(listQueued).not.toHaveBeenCalled();
+    expect(drain).not.toHaveBeenCalled();
+  });
+
+  it("stops after an in-flight queue read resolves", async () => {
+    const queued = deferred<ReadonlyArray<{ id: string }>>();
+    const listQueued = vi.fn<SessionSchedulerDeps["list_queued"]>(
+      () => queued.promise
+    );
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(async () => true);
+    const scheduler = new SessionScheduler({
+      list_queued: listQueued,
+      drain,
+      pending_human_input_kind: async () => null,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+
+    scheduler.notifyEnqueued("ses_dispose_list");
+    await vi.waitFor(() => expect(listQueued).toHaveBeenCalledTimes(1));
+    scheduler.dispose();
+    queued.resolve([{ id: "q1" }]);
+    await delay(0);
+
+    expect(drain).not.toHaveBeenCalled();
+    expect(scheduler.getStatus("ses_dispose_list")).toEqual({ state: "idle" });
+  });
+
+  it("stops after an in-flight drain declines the head", async () => {
+    const fired = deferred<boolean>();
+    const pendingHumanInputKind = vi.fn<
+      SessionSchedulerDeps["pending_human_input_kind"]
+    >(async () => null);
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(() => fired.promise);
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [{ id: "q1" }],
+      drain,
+      pending_human_input_kind: pendingHumanInputKind,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+
+    scheduler.notifyEnqueued("ses_dispose_drain");
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1));
+    scheduler.dispose();
+    fired.resolve(false);
+    await delay(0);
+
+    // A declined head normally triggers a second persisted-state read. The
+    // disposed scheduler must not cross that next authority boundary.
+    expect(pendingHumanInputKind).toHaveBeenCalledTimes(1);
+    expect(scheduler.getStatus("ses_dispose_drain")).toEqual({
+      state: "idle",
+    });
+  });
+
+  it("stops after the post-drain classification resolves", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    let checks = 0;
+    const pendingHumanInputKind = vi.fn<
+      SessionSchedulerDeps["pending_human_input_kind"]
+    >(() => {
+      checks += 1;
+      return checks === 1 ? Promise.resolve(null) : classification.promise;
+    });
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [{ id: "q1" }],
+      drain: async () => false,
+      pending_human_input_kind: pendingHumanInputKind,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+
+    scheduler.notifyEnqueued("ses_dispose_reclassification");
+    await vi.waitFor(() =>
+      expect(pendingHumanInputKind).toHaveBeenCalledTimes(2)
+    );
+    scheduler.dispose();
+    classification.resolve("approval");
+    await delay(0);
+
+    expect(scheduler.getStatus("ses_dispose_reclassification")).toEqual({
+      state: "idle",
+    });
+    expect(pendingHumanInputKind).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("SessionScheduler drain", () => {
-  it("keeps the row queued through the cooldown, then dequeues + fires at fire time", async () => {
+  it("keeps the row queued through the cooldown, then atomically claims + fires", async () => {
     const { scheduler, calls } = makeScheduler();
     const s = await store.create({ agent: "grida" });
     await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
 
     scheduler.onCreate(s.id);
     scheduler.onFinish(s.id, "finish");
-    expect(scheduler.getStatus(s.id).state).toBe("idle"); // idle immediately
+    expect(scheduler.getStatus(s.id).state).toBe("busy");
+    await delay(0);
+    expect(scheduler.getStatus(s.id).state).toBe("idle");
 
     // Right after the idle edge the cooldown timer has NOT fired (it is a fresh
     // task), so the row is STILL queued (visible to the UI as pending) and
@@ -135,20 +403,23 @@ describe("SessionScheduler drain", () => {
     ]);
     expect(calls).toEqual([]);
 
-    // At fire time (cooldown elapsed): dequeued AND fired together.
+    // At fire time (cooldown elapsed): claimed AND fired together.
     await delay(COOLDOWN + 20);
     expect(await store.listQueuedMessages(s.id)).toHaveLength(0);
     expect(calls).toEqual([s.id]);
   });
 
-  it("a hard error pauses the drain — queued rows wait", async () => {
+  it("a hard error with no pending input projects error and pauses the drain", async () => {
     const { scheduler, calls } = makeScheduler();
     const s = await store.create({ agent: "grida" });
     await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
 
     scheduler.onCreate(s.id);
     scheduler.onFinish(s.id, "error");
-    expect(scheduler.getStatus(s.id).state).toBe("error");
+    expect(scheduler.getStatus(s.id).state).toBe("busy");
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(s.id).state).toBe("error")
+    );
 
     await delay(COOLDOWN + 20);
     expect(calls).toEqual([]); // never drained
@@ -158,24 +429,21 @@ describe("SessionScheduler drain", () => {
   });
 
   it("a pending approval pauses the drain — the queued head waits until answered", async () => {
-    // A turn blocked awaiting the user's Allow/Deny is NOT a completed turn
-    // (RFC queue § drain-pause). An approval-request finishes the run cleanly,
-    // so the session reads idle through the pause — but the queued message must
-    // NOT fire until the approval resolves. Without the fire-gate's
-    // has_pending_human_input check, the cooldown drain would fire `q1` during
-    // the wait (the reported B1 bug): drop that check and this assertion fails.
-    let pendingApproval = true;
-    const { scheduler, calls } = makeScheduler(
-      undefined,
-      async () => pendingApproval
-    );
+    // A turn blocked awaiting the user's Allow/Deny is NOT a completed turn.
+    // The clean stream end must project an explicit wait and hold the queue.
+    let pending: "approval" | null = "approval";
+    const { scheduler, calls } = makeScheduler(undefined, async () => pending);
     const s = await store.create({ agent: "grida" });
     await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
 
-    // Turn 1 pauses for approval: clean finish → idle, but an approval pends.
+    // Turn 1 pauses for approval: retain busy until persisted classification,
+    // then publish waiting — never idle.
     scheduler.onCreate(s.id);
     scheduler.onFinish(s.id, "finish");
-    expect(scheduler.getStatus(s.id).state).toBe("idle");
+    expect(scheduler.getStatus(s.id).state).toBe("busy");
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(s.id).state).toBe("waiting_on_approval")
+    );
 
     await delay(COOLDOWN + 20);
     expect(calls).toEqual([]); // did NOT fire during the approval pause
@@ -184,30 +452,86 @@ describe("SessionScheduler drain", () => {
     ]); // still queued
 
     // User answers; the resume turn runs and reaches a true finish.
-    pendingApproval = false;
+    pending = null;
     scheduler.onCreate(s.id);
     scheduler.onFinish(s.id, "finish");
+    await delay(0);
+    expect(scheduler.getStatus(s.id).state).toBe("idle");
 
     await delay(COOLDOWN + 20);
     expect(calls).toEqual([s.id]); // now the queued head drains, exactly once
     expect(await store.listQueuedMessages(s.id)).toHaveLength(0);
   });
 
+  it("distinguishes a human-input tool wait from approval", async () => {
+    const { scheduler } = makeScheduler(undefined, async () => "user-input");
+    const s = await store.create({ agent: "grida" });
+
+    scheduler.onCreate(s.id);
+    scheduler.onFinish(s.id, "finish");
+
+    expect(scheduler.getStatus(s.id).state).toBe("busy");
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(s.id).state).toBe("waiting_on_user_input")
+    );
+  });
+
+  it("hydrates a persisted wait before a cold session reads idle", async () => {
+    const { scheduler } = makeScheduler(undefined, async () => "approval");
+    const s = await store.create({ agent: "grida" });
+
+    expect(scheduler.getStatus(s.id)).toEqual({ state: "idle" });
+    await expect(scheduler.hydrateStatus(s.id)).resolves.toEqual({
+      state: "waiting_on_approval",
+    });
+    expect(scheduler.getStatus(s.id)).toEqual({
+      state: "waiting_on_approval",
+    });
+  });
+
+  it("keeps status hydration read-only, then drains on a trusted enqueue edge", async () => {
+    const { scheduler, calls } = makeScheduler();
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, {
+      id: "q_restart",
+      text: "survived restart",
+    });
+
+    await expect(scheduler.hydrateStatus(s.id)).resolves.toEqual({
+      state: "idle",
+    });
+    await delay(COOLDOWN + 20);
+
+    // GET /status owns hydration. A leaked query token may observe state but
+    // must never acquire run, billing, or filesystem authority.
+    expect(calls).toEqual([]);
+    expect(await store.listQueuedMessages(s.id)).toHaveLength(1);
+
+    // An authenticated queue mutation is a trusted execution edge. Its stale-
+    // busy recovery kick also resumes any durable head that survived restart.
+    scheduler.notifyEnqueued(s.id);
+    await delay(COOLDOWN + 20);
+
+    expect(calls).toEqual([s.id]);
+    expect(await store.listQueuedMessages(s.id)).toHaveLength(0);
+  });
+
   it("drains a multi-item queue serially, one turn each, FIFO", async () => {
     const order: string[] = [];
     let scheduler!: SessionScheduler;
-    const drain: SessionSchedulerDeps["drain"] = async (sid) => {
-      // The just-dequeued head is the latest visible user row.
+    const drain: SessionSchedulerDeps["drain"] = async (sid, messageId) => {
+      if (!store.claimQueuedMessage(sid, messageId)) return false;
+      // The just-claimed head is the latest visible user row.
       const visible = await store.listVisibleMessages(sid);
       order.push(visible.at(-1)!.id);
       scheduler.onCreate(sid);
       setTimeout(() => scheduler.onFinish(sid, "finish"), 3); // settle the turn
+      return true;
     };
     scheduler = new SessionScheduler({
       list_queued: (sid) => store.listQueuedMessages(sid),
-      dequeue: (id) => store.dequeueMessage(id),
       drain,
-      has_pending_human_input: async () => false,
+      pending_human_input_kind: async () => null,
       drain_cooldown_ms: COOLDOWN,
     });
     live.push(scheduler);
@@ -227,25 +551,27 @@ describe("SessionScheduler drain", () => {
     scheduler.onCreate(s.id);
     scheduler.onFinish(s.id, "finish"); // ends the current turn → drain begins
 
-    await delay(2 * (COOLDOWN + 25));
-    expect(order).toEqual(["a", "b"]); // FIFO, one turn at a time
+    await vi.waitFor(() => expect(order).toEqual(["a", "b"]), {
+      timeout: 2_000,
+    }); // FIFO, one turn at a time
     expect(await store.listQueuedMessages(s.id)).toHaveLength(0);
   });
 
   it("a cancelled queued row never fires (cancel halts the cascade)", async () => {
     const order: string[] = [];
     let scheduler!: SessionScheduler;
-    const drain: SessionSchedulerDeps["drain"] = async (sid) => {
+    const drain: SessionSchedulerDeps["drain"] = async (sid, messageId) => {
+      if (!store.claimQueuedMessage(sid, messageId)) return false;
       const visible = await store.listVisibleMessages(sid);
       order.push(visible.at(-1)!.id);
       scheduler.onCreate(sid);
       setTimeout(() => scheduler.onFinish(sid, "finish"), 3);
+      return true;
     };
     scheduler = new SessionScheduler({
       list_queued: (sid) => store.listQueuedMessages(sid),
-      dequeue: (id) => store.dequeueMessage(id),
       drain,
-      has_pending_human_input: async () => false,
+      pending_human_input_kind: async () => null,
       drain_cooldown_ms: COOLDOWN,
     });
     live.push(scheduler);
@@ -274,9 +600,9 @@ describe("SessionScheduler drain", () => {
     expect(await store.listQueuedMessages(s.id)).toHaveLength(0);
   });
 
-  it("swallows a single-flight RunInFlightError from the drain", async () => {
+  it("preserves the row when async turn preparation fails", async () => {
     const { scheduler } = makeScheduler(async () => {
-      throw new RunInFlightError("ses_race");
+      throw new Error("provider down");
     });
     const s = await store.create({ agent: "grida" });
     await store.appendQueuedMessage(s.id, { id: "q1", text: "x" });
@@ -285,10 +611,124 @@ describe("SessionScheduler drain", () => {
     scheduler.onFinish(s.id, "finish");
 
     await delay(COOLDOWN + 20);
-    // The throw did not crash the scheduler or flip status to error (the run
-    // that won the race owns the status). The row was committed at selection.
+    // The scheduler does not convert preparation failure to a busy/error edge,
+    // and selection did not dequeue the durable row.
     expect(scheduler.getStatus(s.id).state).toBe("idle");
-    expect(await store.listQueuedMessages(s.id)).toHaveLength(0);
+    expect(await store.listQueuedMessages(s.id)).toHaveLength(1);
+  });
+
+  it("replays one enqueue kick received during failed async preparation", async () => {
+    let markEntered!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let attempts = 0;
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(
+      async (_sessionId, _messageId) => {
+        attempts += 1;
+        if (attempts === 1) {
+          markEntered();
+          await held;
+        }
+        throw new Error("provider preparation failed");
+      }
+    );
+    const { scheduler } = makeScheduler(drain);
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, { id: "q1", text: "first" });
+
+    scheduler.notifyEnqueued(s.id);
+    await entered;
+    await store.appendQueuedMessage(s.id, { id: "q2", text: "second" });
+    scheduler.notifyEnqueued(s.id);
+    release();
+
+    // The first failure replays the coalesced enqueue edge, even though the
+    // queue head remains q1. The second failure has no newer edge and pauses,
+    // proving this is a one-shot replay rather than an error retry loop.
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(2));
+    expect(drain.mock.calls).toEqual([
+      [s.id, "q1"],
+      [s.id, "q1"],
+    ]);
+    expect(
+      (await store.listQueuedMessages(s.id)).map((message) => message.id)
+    ).toEqual(["q1", "q2"]);
+    await delay(2 * COOLDOWN + 20);
+    expect(drain).toHaveBeenCalledTimes(2);
+  });
+
+  it("reclassifies a late human block when drain declines the queued head", async () => {
+    let pendingChecks = 0;
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(async () => false);
+    const { scheduler } = makeScheduler(drain, async () => {
+      pendingChecks += 1;
+      return pendingChecks === 1 ? null : "approval";
+    });
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, { id: "q1", text: "wait" });
+
+    scheduler.notifyEnqueued(s.id);
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(s.id).state).toBe("waiting_on_approval")
+    );
+    expect(drain).toHaveBeenCalledTimes(1);
+    expect(
+      (await store.listQueuedMessages(s.id)).map((message) => message.id)
+    ).toEqual(["q1"]);
+
+    // Waiting is a stable pause, not a false-claim retry loop.
+    await delay(COOLDOWN + 10);
+    expect(drain).toHaveBeenCalledTimes(1);
+  });
+
+  it("a cancel during async preparation wins the later conditional claim", async () => {
+    let entered!: () => void;
+    const preparing = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls: string[] = [];
+    let scheduler!: SessionScheduler;
+    scheduler = new SessionScheduler({
+      list_queued: (sid) => store.listQueuedMessages(sid),
+      drain: async (sid, messageId) => {
+        entered();
+        await gate;
+        if (!store.claimQueuedMessage(sid, messageId)) return false;
+        calls.push(messageId);
+        scheduler.onCreate(sid);
+        return true;
+      },
+      pending_human_input_kind: async () => null,
+      drain_cooldown_ms: COOLDOWN,
+    });
+    live.push(scheduler);
+    const s = await store.create({ agent: "grida" });
+    await store.appendQueuedMessage(s.id, { id: "q1", text: "x" });
+
+    scheduler.notifyEnqueued(s.id);
+    await preparing;
+    expect((await store.listQueuedMessages(s.id)).map((m) => m.id)).toEqual([
+      "q1",
+    ]);
+    await store.deleteMessage(s.id, "q1");
+    release();
+
+    await delay(COOLDOWN + 20);
+    expect(calls).toEqual([]);
+    expect(await store.getMessage("q1")).toMatchObject({
+      metadata: { queue_canceled_at: expect.any(Number) },
+      hidden_at: expect.any(Number),
+    });
+    expect(await store.listQueuedMessages(s.id)).toEqual([]);
   });
 
   it("does not drain when the queue is empty (stays idle, no fire)", async () => {
@@ -317,7 +757,7 @@ describe("SessionScheduler drain", () => {
     expect(calls).toEqual([]);
     await delay(COOLDOWN + 20);
     expect(await store.listQueuedMessages(s.id)).toHaveLength(0);
-    expect(calls).toEqual([s.id]); // dequeued + fired at fire time
+    expect(calls).toEqual([s.id]); // claimed + fired at fire time
   });
 
   it("notifyEnqueued is a no-op while busy — the turn-end edge drains", async () => {

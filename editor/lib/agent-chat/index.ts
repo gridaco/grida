@@ -39,7 +39,10 @@ export {
 } from "./use-queued-messages";
 export {
   isSessionBusy,
+  isHumanInputPendingState,
+  shouldUseLocalHumanInput,
   decideSubmit,
+  type HumanInputWaitingState,
   type TurnQueueStatus,
 } from "./turn-queue";
 export {

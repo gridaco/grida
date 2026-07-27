@@ -24,8 +24,8 @@
  *      replay lands on top.
  *
  *   3. **Self-heal.** A recoverable stream failure (`chat-error.ts`:
- *      `disconnect` / `stream-state` — the server state is durable; only
- *      this client's view died) triggers the owner's one-shot
+ *      disconnect / stream-state / admission race — the server state is
+ *      durable; only this client's view died) triggers the owner's one-shot
  *      `requestRecovery`: restore from the DB, re-attach if the run is
  *      still live, and clear the error silently on success. A second
  *      failure in the same binding surfaces honestly.
@@ -37,6 +37,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { UIMessage } from "ai";
 import type { StreamAttachOwner } from "./stream-attach-owner";
 import { chatError } from "./chat-error";
+import { StreamRecovery } from "./stream-recovery";
 
 export type UseStreamAttachArgs = {
   owner: StreamAttachOwner;
@@ -55,6 +56,13 @@ export type UseStreamAttachArgs = {
   /** `useChat`'s current error / clearError, for the self-heal. */
   error: Error | undefined;
   clearError: () => void;
+  /** Current optimistic client messages. Recovery inspects only the final
+   * text-only user tail after a pending-human-input rejection. */
+  messages: UIMessage[];
+  /** Move that rejected optimistic tail into the durable queue. */
+  recoverPendingHumanInputTail?: (
+    tail: StreamRecovery.PendingUserTail
+  ) => Promise<boolean>;
 };
 
 export type UseStreamAttachResult = {
@@ -74,6 +82,8 @@ export function useStreamAttach(
     resumeStream,
     error,
     clearError,
+    messages,
+    recoverPendingHumanInputTail,
   } = args;
 
   // useChat's actions get a fresh identity per render; the executors read
@@ -84,33 +94,70 @@ export function useStreamAttach(
   resumeStreamRef.current = resumeStream;
   const clearErrorRef = useRef(clearError);
   clearErrorRef.current = clearError;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const recoverPendingHumanInputTailRef = useRef(recoverPendingHumanInputTail);
+  recoverPendingHumanInputTailRef.current = recoverPendingHumanInputTail;
 
   const rehydrateThenAttach = useCallback(async () => {
+    const binding = owner.captureBinding();
     const msgs = await rehydrateAsync();
+    if (!owner.isCurrentBinding(binding)) return;
     if (msgs) setMessagesRef.current(msgs);
+    if (!owner.isCurrentBinding(binding)) return;
     await resumeStreamRef.current();
-  }, [rehydrateAsync]);
+  }, [owner, rehydrateAsync]);
 
   useEffect(() => {
-    owner.bind(sessionId ? { session_id: sessionId, epoch } : null);
+    // Keep the epoch even before a fresh chat adopts its server id. Transport
+    // ownership opened under that fresh binding then survives the null→id
+    // adoption, while a real epoch/session switch drops old occupancy.
+    owner.bind({ session_id: sessionId, epoch });
     if (sessionId) owner.request("resume-mount", rehydrateThenAttach);
   }, [owner, sessionId, epoch, rehydrateThenAttach]);
 
   const [recovering, setRecovering] = useState(false);
   useEffect(() => {
+    setRecovering(false);
+  }, [sessionId, epoch]);
+  useEffect(() => {
     if (!error) return;
     const kind = chatError.classify(error);
     if (!chatError.recoverable(kind)) return;
     const started = owner.requestRecovery(kind, async () => {
+      const binding = owner.captureBinding();
       try {
-        await rehydrateThenAttach();
-        clearErrorRef.current();
+        const recovered = await StreamRecovery.run({
+          kind,
+          messages: messagesRef.current,
+          enqueuePendingTail: async (tail) =>
+            owner.isCurrentBinding(binding)
+              ? ((await recoverPendingHumanInputTailRef.current?.(tail)) ??
+                false)
+              : false,
+          rehydrate: async () => {
+            const restored = await rehydrateAsync();
+            return owner.isCurrentBinding(binding) ? restored : null;
+          },
+          applyMessages: (restored) => {
+            if (owner.isCurrentBinding(binding)) {
+              setMessagesRef.current(restored);
+            }
+          },
+          resumeStream: () =>
+            owner.isCurrentBinding(binding)
+              ? resumeStreamRef.current()
+              : undefined,
+        });
+        if (recovered && owner.isCurrentBinding(binding)) {
+          clearErrorRef.current();
+        }
       } finally {
-        setRecovering(false);
+        if (owner.isCurrentBinding(binding)) setRecovering(false);
       }
     });
     if (started) setRecovering(true);
-  }, [error, owner, rehydrateThenAttach]);
+  }, [error, owner, rehydrateAsync]);
 
   return { recovering };
 }

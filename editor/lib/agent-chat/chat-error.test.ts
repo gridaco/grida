@@ -22,6 +22,42 @@ describe("chatError.classify", () => {
     expect(chatError.classify(streamStateError())).toBe("stream-state");
   });
 
+  it("detects the pending-human-input 409 before and after desktop error serialization", () => {
+    expect(
+      chatError.classify({
+        code: "human-input-pending",
+        message: "request refused",
+      })
+    ).toBe("human-input-pending");
+    expect(
+      chatError.classify(
+        new Error(
+          "[grida] /agent/run: a human-input block (approval or question) is pending"
+        )
+      )
+    ).toBe("human-input-pending");
+    expect(
+      chatError.classify({
+        code: "approval-resume-with-new-message",
+        message: "request refused",
+      })
+    ).toBe("human-input-pending");
+  });
+
+  it("detects a losing atomic-admission race before and after desktop serialization", () => {
+    expect(
+      chatError.classify({
+        code: "run_in_flight",
+        message: "request refused",
+      })
+    ).toBe("run-in-flight");
+    expect(
+      chatError.classify(
+        new Error("[grida] /agent/run: run already in flight for session ses_1")
+      )
+    ).toBe("run-in-flight");
+  });
+
   it("detects torn-connection TypeErrors across browser wordings", () => {
     // Chromium
     expect(chatError.classify(new TypeError("network error"))).toBe(
@@ -44,9 +80,11 @@ describe("chatError.classify", () => {
 });
 
 describe("chatError.recoverable", () => {
-  it("only the two view-only failures are recoverable", () => {
+  it("recovers failures where durable server state remains authoritative", () => {
     expect(chatError.recoverable("disconnect")).toBe(true);
     expect(chatError.recoverable("stream-state")).toBe(true);
+    expect(chatError.recoverable("human-input-pending")).toBe(true);
+    expect(chatError.recoverable("run-in-flight")).toBe(true);
     expect(chatError.recoverable("gg-token-expired")).toBe(false);
     expect(chatError.recoverable("gg-insufficient-credits")).toBe(false);
     expect(chatError.recoverable("unknown")).toBe(false);
@@ -69,6 +107,25 @@ describe("chatError.describe", () => {
     const desync = chatError.describe(streamStateError());
     expect(desync).toBe("The live view lost sync with the agent.");
     expect(desync).not.toContain("No tool invocation found");
+  });
+
+  it("explains a pending interaction instead of surfacing the HTTP text", () => {
+    expect(
+      chatError.describe(
+        new Error(
+          "[grida] /agent/run: a human-input block (approval or question) is pending"
+        )
+      )
+    ).toBe("The agent is waiting for your response before it can continue.");
+  });
+
+  it("explains that a losing concurrent send is being queued", () => {
+    expect(
+      chatError.describe({
+        code: "run_in_flight",
+        message: "request refused",
+      })
+    ).toBe("Another turn started first. Your message is waiting to be queued.");
   });
 
   it("unknown errors pass their message through (with a fallback)", () => {

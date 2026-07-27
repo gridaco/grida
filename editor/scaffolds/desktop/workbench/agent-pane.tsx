@@ -45,7 +45,6 @@ import {
 } from "@app/ui/ai-elements/conversation";
 import { ImagesIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
-import { Button } from "@app/ui/components/button";
 import {
   AGENT_SESSION_AGENT,
   getDesktopBridge,
@@ -65,7 +64,9 @@ import {
   buildApprovalResumeBody,
   chatError,
   desktopAgentTransport,
+  isHumanInputPendingState,
   isSessionBusy,
+  shouldUseLocalHumanInput,
   ScratchSeedBudget,
   StreamAttachOwner,
   SurfaceToolCallObserver,
@@ -109,6 +110,11 @@ import {
   type ComposerCommandAction,
 } from "../shared/agent-composer-input";
 import { useWorkspaceComposerCatalog } from "../shared/use-workspace-composer-catalog";
+import {
+  AgentApprovalBar,
+  findPendingApproval,
+  type PendingApproval,
+} from "../shared/agent-approval";
 import styles from "./agent-pane.module.css";
 
 export type AgentPaneProps = {
@@ -273,8 +279,14 @@ function AgentPaneContent({
   // serialize here — one live attach max, resume-once keyed on
   // (session, epoch), never on Chat identity.
   const attachOwner = useMemo(() => new StreamAttachOwner(), []);
+  // Render-current binding for async transport gates. Same-epoch session-id
+  // adoption stays valid; selecting/restoring a different chat invalidates the
+  // old transport before it can touch callbacks after an await.
+  const bindingEpochRef = useRef(chatSession.epoch);
+  bindingEpochRef.current = chatSession.epoch;
   const chat = useMemo(
     () => {
+      const bindingEpoch = chatSession.epoch;
       const surfaceToolCallObserver = new SurfaceToolCallObserver();
       return new Chat<UIMessage>({
         id: chatSession.current_id ?? undefined,
@@ -282,6 +294,7 @@ function AgentPaneContent({
         transport: desktopAgentTransport.create({
           workspace_id: workspace.id,
           session_id: chatSession.current_id ?? undefined,
+          isCurrentBinding: () => bindingEpochRef.current === bindingEpoch,
           runContext: () => runContextRef.current,
           onSessionId: (resolvedId) => {
             chatSession.apply_resolved_session_id(resolvedId);
@@ -290,7 +303,7 @@ function AgentPaneContent({
           // body-less auto-resubmit no scaffold requests) is adopted so
           // other intents serialize behind it. Reporting only — never vetoes.
           onStreamOpen: () => attachOwner.noteTransportOpen(),
-          onStreamSettle: () => attachOwner.noteTransportSettle(),
+          onStreamSettle: (lease) => attachOwner.noteTransportSettle(lease),
           onResumeStart: () => {
             // AgentHost confirmed an in-flight run — drop the unfinished
             // assistant we hydrated from the DB so the replay rebuilds it
@@ -376,19 +389,6 @@ function AgentPaneContent({
   // state.
   const isStreaming = status === "submitted" || status === "streaming";
 
-  // Mount/rebuild resume (rehydrate-then-attach) + the owner-gated
-  // self-heal, in the ONE shared wire (`use-stream-attach.ts`) — the sidebar
-  // runs the identical wiring.
-  const { recovering } = useStreamAttach({
-    owner: attachOwner,
-    sessionId: chatSession.current_id,
-    epoch: chatSession.epoch,
-    rehydrateAsync: chatSession.rehydrate_async,
-    setMessages,
-    resumeStream,
-    error,
-    clearError,
-  });
   // Classified once; the banner copy and the billing CTA branch on the same
   // fact (the predicates are shared with `gg-session.ts` via `gg-errors.ts`).
   const errorKind = error ? chatError.classify(error) : null;
@@ -405,13 +405,55 @@ function AgentPaneContent({
   const coreStatus = useSessionStatus(chatSession.current_id);
   const coreBusy =
     coreStatus?.state === "busy" || coreStatus?.state === "retrying";
+  // Hydrated tool parts are a startup/status-channel fallback. Once a core
+  // frame arrives, only a control matching its waiting kind remains current;
+  // a non-waiting frame suppresses stale local parts immediately.
+  const localPendingHumanInput = useMemo(
+    () => ({
+      approval: findPendingApproval(messages),
+      question: findPendingQuestion(messages),
+      designSearch: findPendingDesignSearch(messages),
+    }),
+    [messages]
+  );
+  const pendingApproval = shouldUseLocalHumanInput(
+    coreStatus,
+    "waiting_on_approval"
+  )
+    ? localPendingHumanInput.approval
+    : null;
+  const useLocalUserInput = shouldUseLocalHumanInput(
+    coreStatus,
+    "waiting_on_user_input"
+  );
+  const pendingQuestion = useLocalUserInput
+    ? localPendingHumanInput.question
+    : null;
+  const pendingPick = useLocalUserInput
+    ? localPendingHumanInput.designSearch
+    : null;
+  const localHumanInputPending =
+    localPendingHumanInput.approval !== null ||
+    localPendingHumanInput.question !== null ||
+    localPendingHumanInput.designSearch !== null;
+  const humanInputPending =
+    isHumanInputPendingState(coreStatus?.state) ||
+    (coreStatus?.human_input_state_authoritative !== true &&
+      localHumanInputPending);
+  // Unknown status is an admission barrier, not an active-run claim. During a
+  // sidecar/status-SSE reconnect, durable enqueue is safe for both idle and
+  // occupied sessions; a direct run could race an unseen busy turn.
+  const statusUnavailable =
+    chatSession.current_id !== null && coreStatus === null;
+  const admissionBlocked = humanInputPending || statusUnavailable;
 
   // The session-busy signal — the SINGLE source for "is this session occupied
-  // and may not start another op." Combines the client-local view (streaming or
-  // an in-flight compaction) with the authoritative core state, so every
-  // session-op gate (queue submit, rewind, fork, compact, per-message actions)
-  // agrees on "busy" and a core-started turn also gates submits to enqueue.
+  // by an active run." Human-input waiting is deliberately separate: there is
+  // no run to Stop, and the pending interaction controls must remain enabled.
   const busy = isSessionBusy(status, compacting) || coreBusy;
+  // Session mutations and non-text sends still require a truly idle session.
+  // Ordinary text uses the separate queue admission signal below.
+  const sessionOccupied = busy || admissionBlocked;
   // Block the reconcile while a turn is live — streaming locally OR a core turn
   // this client is (about to be) attached to. NOT compacting: a compaction is
   // idle to both signals and its rehydrate MUST reconcile. Read via a ref so
@@ -513,9 +555,13 @@ function AgentPaneContent({
     drop: dropQueued,
     submit: onSubmit,
     refetch: refetchQueue,
+    confirmDequeued,
+    recoverPendingHumanInputTail,
   } = useTurnQueueController({
     sessionId: chatSession.current_id,
     busy,
+    admissionBlocked,
+    idempotentEnqueue: coreStatus?.queue_enqueue_idempotent === true,
     send: buildAgentSend({
       sendMessage,
       sessionId: chatSession.current_id,
@@ -528,15 +574,35 @@ function AgentPaneContent({
     hasSendContext: (contexts?.length ?? 0) > 0,
   });
 
+  // Mount/rebuild resume + owner-gated self-heal. This sits after the queue
+  // controller so a stale direct send rejected by pending human input can move
+  // its optimistic text tail into the durable queue before rehydrating.
+  const { recovering } = useStreamAttach({
+    owner: attachOwner,
+    sessionId: chatSession.current_id,
+    epoch: chatSession.epoch,
+    rehydrateAsync: chatSession.rehydrate_async,
+    setMessages,
+    resumeStream,
+    error,
+    clearError,
+    messages,
+    recoverPendingHumanInputTail,
+  });
+
   // React to the CORE drain (RFC `queue`): when the core fires a queued turn (a
   // busy edge THIS client did not start), `useCoreTurnSync` promotes the fired
   // message from the tray into the transcript and attaches to its stream. The
   // core dequeues the row at FIRE time (not during the cooldown), so it stays
   // in the tray as pending until then — "submitting" in step with its response.
   useCoreTurnSync({
+    sessionId: chatSession.current_id,
     coreState: coreStatus?.state ?? null,
+    coreMessageId: coreStatus?.message_id ?? null,
     isStreaming,
     queued,
+    messages,
+    rehydrate: chatSession.rehydrate_async,
     setMessages,
     dropQueued,
     // Drain attaches go through the owner: if an attach is already live for
@@ -546,6 +612,7 @@ function AgentPaneContent({
       attachOwner.request("resume-drain", () => resumeStream());
     },
     refetchQueue,
+    confirmDequeued,
   });
 
   // Welcome-composer handoff: send the stashed prompt once as the first
@@ -580,7 +647,7 @@ function AgentPaneContent({
   const onRewind = useCallback(
     async (messageId: string) => {
       const sid = chatSession.current_id;
-      if (!sid || busy) return;
+      if (!sid || sessionOccupied) return;
       try {
         await bridgeSessions.rewind(sid, messageId);
         chatSession.rehydrate();
@@ -589,14 +656,17 @@ function AgentPaneContent({
         console.warn("[agent-pane] rewind failed", err);
       }
     },
-    [chatSession, busy, clearError]
+    [chatSession, sessionOccupied, clearError]
   );
 
   // Fork (RFC `session / fork`): the action + its "just forked" notice live
   // in one hook so every entry point (the per-message button and the `/fork`
   // command below) shares the same behavior and feedback. Blocked while busy
   // (a fork mid-compaction would copy a half-written summary).
-  const { fork, just_forked: justForked } = useSessionFork(chatSession, busy);
+  const { fork, just_forked: justForked } = useSessionFork(
+    chatSession,
+    sessionOccupied
+  );
 
   // Manual compaction (RFC `session / compaction`): summarize earlier turns to
   // free context, then re-hydrate so the summary + tail show. `compacting`
@@ -607,9 +677,9 @@ function AgentPaneContent({
   // would clobber the in-flight turn (RFC `queue`).
   const onCompact = useCallback(async () => {
     const sid = chatSession.current_id;
-    // `busy` already folds in `compacting`, so this also blocks re-entrant
-    // compaction.
-    if (!sid || busy) return;
+    // `sessionOccupied` also blocks re-entrant compaction and a mutation while
+    // the current turn is waiting on a person.
+    if (!sid || sessionOccupied) return;
     setCompacting(true);
     try {
       await bridgeSessions.compact(sid);
@@ -620,7 +690,7 @@ function AgentPaneContent({
     } finally {
       setCompacting(false);
     }
-  }, [chatSession, busy, clearError]);
+  }, [chatSession, sessionOccupied, clearError]);
 
   // `/fork` command: the no-target sibling of the per-message fork. With no
   // chosen message it forks at the tail — the whole conversation.
@@ -630,11 +700,11 @@ function AgentPaneContent({
     return fork(fromMessageId);
   }, [fork, messages]);
 
-  // `disabled` flips with `busy` (rewind/fork are session ops — disabled during
-  // a turn AND a compaction), so settled rows skip re-render off that edge.
+  // Rewind/fork are session ops, so they stay disabled during a run,
+  // compaction, or unresolved human-input interaction.
   const messageActions = useMemo<ChatMessageActions>(
-    () => ({ onRewind, onFork: fork, disabled: busy }),
-    [onRewind, fork, busy]
+    () => ({ onRewind, onFork: fork, disabled: sessionOccupied }),
+    [onRewind, fork, sessionOccupied]
   );
 
   const commandActions = useMemo<ComposerCommandAction[]>(
@@ -692,15 +762,6 @@ function AgentPaneContent({
     [attachOwner, chat, chatSession.current_id, modelId, providerId, mode]
   );
 
-  // A pending supervised approval (the model called a mutating command in
-  // Accept Edits and the sidecar paused it). Surfaced as a session-global bar
-  // above the composer so the Allow/Deny is instantly visible — not buried in a
-  // collapsed tool row. Read off the last assistant turn's tool parts.
-  const pendingApproval = useMemo(
-    () => findPendingApproval(messages),
-    [messages]
-  );
-
   // Commit a `question` (ask-user) answer: the human's answer becomes the tool
   // result and `sendAutomaticallyWhen` resumes the paused run. Unlike the
   // approval resume (which must use the live `chat` to merge into an in-flight
@@ -745,23 +806,10 @@ function AgentPaneContent({
     [messages, isStreaming, messageActions]
   );
 
-  // The agent ASKS: a pending `question` is a session-global prompt pinned above
-  // the composer (same model as the approval bar), not a transcript card.
-  // Memoized on `messages` to match `pendingApproval` above.
-  const pendingQuestion = useMemo(
-    () => findPendingQuestion(messages),
-    [messages]
-  );
-
   // A pending `design_search` pauses the run on the user's selection. The pick
   // surface itself is hosted by the editor pane (a dedicated virtual tab, room
   // to browse a large staggered gallery), so we lift the live session up to the
   // workbench rather than render the picker here.
-  const pendingPick = useMemo(
-    () => findPendingDesignSearch(messages),
-    [messages]
-  );
-
   useEffect(() => {
     onDesignSearchChange?.(
       pendingPick
@@ -901,7 +949,8 @@ function AgentPaneContent({
           commandActions={commandActions}
           onSubmit={onSubmit}
           isStreaming={isStreaming}
-          busy={busy}
+          busy={sessionOccupied}
+          submissionScope={chatSession.epoch}
           onStop={stop}
           providerFileMimes={providerFileMimes}
           scratchReservation={scratchReservation}
@@ -924,111 +973,6 @@ function AgentPaneContent({
             </>
           }
         />
-      </div>
-    </div>
-  );
-}
-
-/** A supervised command awaiting the user's Allow/Deny (RFC `permission
- *  modes`, Phase 2). `approvalId` is the tool part's `approval.id`;
- *  `toolCallId` identifies the paused call — both ride the answer back so the
- *  sidecar can match it to the persisted pending approval. */
-type PendingApproval = {
-  approvalId: string;
-  toolCallId: string;
-  /** Human label for the command, e.g. `python3 quadtree.py`. */
-  label: string;
-  description?: string;
-};
-
-/**
- * Find a pending supervised approval on the LAST assistant turn. The sidecar
- * pauses a mutating command in Accept Edits and emits an `approval-requested`
- * tool part; this surfaces it for the session-global bar. Tolerant of both the
- * live (camelCase `toolCallId`) and hydrated (snake `tool_call_id`) part shapes
- * — it only reads `state`/`approval`/`input`, which agree in both.
- */
-function findPendingApproval(messages: UIMessage[]): PendingApproval | null {
-  const last = messages[messages.length - 1];
-  if (!last || last.role !== "assistant") return null;
-  for (const part of last.parts) {
-    const p = part as {
-      type?: string;
-      state?: string;
-      toolCallId?: string;
-      tool_call_id?: string;
-      approval?: { id?: string };
-      input?: { command?: string; args?: string[]; description?: string };
-    };
-    const toolCallId = p.toolCallId ?? p.tool_call_id;
-    if (
-      typeof p.type !== "string" ||
-      (!p.type.startsWith("tool-") && p.type !== "dynamic-tool") ||
-      p.state !== "approval-requested" ||
-      !p.approval?.id ||
-      !toolCallId
-    ) {
-      continue;
-    }
-    const input = p.input ?? {};
-    const label = input.command
-      ? `${input.command} ${(input.args ?? []).join(" ")}`.trim()
-      : p.type.replace(/^tool-/, "");
-    return {
-      approvalId: p.approval.id,
-      toolCallId,
-      label,
-      description: input.description,
-    };
-  }
-  return null;
-}
-
-/**
- * Session-global supervised-approval prompt, rendered above the composer so the
- * Allow/Deny is instantly visible (not buried in a collapsed tool row).
- */
-function AgentApprovalBar({
-  pending,
-  onApprove,
-}: {
-  pending: PendingApproval;
-  onApprove: (
-    pending: PendingApproval,
-    approved: boolean
-  ) => void | Promise<void>;
-}) {
-  return (
-    <div className="shrink-0 bg-muted/30 px-3 py-2.5">
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-muted-foreground">
-            {pending.description
-              ? pending.description
-              : "This command mutates files or executes code."}{" "}
-            Allow it to run?
-          </p>
-          <code className="mt-1 block truncate font-mono text-xs text-foreground/80">
-            $ {pending.label}
-          </code>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void onApprove(pending, false)}
-          >
-            Deny
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => void onApprove(pending, true)}
-          >
-            Allow
-          </Button>
-        </div>
       </div>
     </div>
   );

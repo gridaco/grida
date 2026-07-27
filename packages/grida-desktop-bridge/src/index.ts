@@ -442,7 +442,7 @@ export type DesktopBridge = {
     cancel_queued: (id: string, messageId: string) => Promise<void>;
     /**
      * Subscribe to the session's run-state (RFC `session` §Session status):
-     * the current status arrives first, then every idle⇄busy⇄error
+     * the current status arrives first, then every idle⇄busy⇄waiting⇄error
      * transition. Returns a `subscription_id` to later
      * {@link unsubscribe_status}, and a `done` that settles when the
      * subscription ends.

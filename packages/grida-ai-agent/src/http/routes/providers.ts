@@ -30,6 +30,7 @@ import { detectClaude } from "../../agent-provider/detect";
 import type { SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
 import { ProviderHttp } from "../../providers/http";
+import { ProviderReady } from "./provider-ready";
 
 export type ProvidersRoutesDeps = {
   endpoints: EndpointProvidersStore;
@@ -47,6 +48,8 @@ export type ProvidersRoutesDeps = {
   probe?: typeof probeEndpointModels;
   /** Claude-detect override for tests. Defaults to {@link detectClaude}. */
   detect?: typeof detectClaude;
+  /** Trusted host edge after an endpoint config becomes resolvable. */
+  on_provider_ready?: ProviderReady.Hook;
 };
 
 export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
@@ -95,6 +98,7 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
     console.log(
       `[agent-host-providers] endpoint set id=${result.config.id} models=${result.config.models.length}`
     );
+    ProviderReady.notify(deps.on_provider_ready);
     return c.json({ ok: true });
   });
 
