@@ -668,6 +668,13 @@ export async function findIncomingHumanInputResults(
       const toolCallId = toolCallIdOf(part);
       if (toolCallId === null || !isResolvedToolPart(part)) continue;
       if (
+        !HUMAN_INPUT_PART_TYPES.includes(
+          part.type as (typeof HUMAN_INPUT_PART_TYPES)[number]
+        )
+      ) {
+        continue;
+      }
+      if (
         await store.canFillPendingHumanInputResult(
           sessionId,
           message.id,

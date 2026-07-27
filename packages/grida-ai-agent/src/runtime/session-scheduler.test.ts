@@ -54,6 +54,17 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 /** A scheduler wired to the real store with an overridable `drain`. The
  *  `pending_human_input_kind` classifier defaults to "never blocked" so the
  *  existing drain tests are unaffected; block-pause tests pass a real kind. */
@@ -160,6 +171,217 @@ describe("SessionScheduler status", () => {
   });
 });
 
+describe("SessionScheduler hard-error projection", () => {
+  it("projects a durable approval wait instead of error and never drains", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const listQueued = vi.fn<SessionSchedulerDeps["list_queued"]>(async () => [
+      { id: "q1" },
+    ]);
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(async () => true);
+    const scheduler = new SessionScheduler({
+      list_queued: listQueued,
+      drain,
+      pending_human_input_kind: () => classification.promise,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+    const sid = "ses_error_approval";
+
+    scheduler.onCreate(sid);
+    scheduler.onFinish(sid, "error");
+    expect(scheduler.getStatus(sid).state).toBe("busy");
+    classification.resolve("approval");
+
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(sid).state).toBe("waiting_on_approval")
+    );
+    await delay(0);
+    expect(listQueued).not.toHaveBeenCalled();
+    expect(drain).not.toHaveBeenCalled();
+  });
+
+  it("projects a durable question wait instead of error", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [],
+      drain: async () => true,
+      pending_human_input_kind: () => classification.promise,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+    const sid = "ses_error_question";
+
+    scheduler.onCreate(sid);
+    scheduler.onFinish(sid, "error");
+    expect(scheduler.getStatus(sid).state).toBe("busy");
+    classification.resolve("user-input");
+
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(sid).state).toBe("waiting_on_user_input")
+    );
+  });
+
+  it("does not let a stale error classification overwrite a newer run", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [],
+      drain: async () => true,
+      pending_human_input_kind: () => classification.promise,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+    const sid = "ses_error_stale";
+
+    scheduler.onCreate(sid, "msg_old");
+    scheduler.onFinish(sid, "error");
+    scheduler.onCreate(sid, "msg_new");
+    classification.resolve("approval");
+    await delay(0);
+
+    expect(scheduler.getStatus(sid)).toMatchObject({
+      state: "busy",
+      message_id: "msg_new",
+    });
+  });
+});
+
+describe("SessionScheduler dispose races", () => {
+  it("drops an in-flight hard-error classification after disposal", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [],
+      drain: async () => true,
+      pending_human_input_kind: () => classification.promise,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+    const sid = "ses_dispose_error";
+
+    scheduler.onCreate(sid);
+    scheduler.onFinish(sid, "error");
+    scheduler.dispose();
+    classification.resolve("approval");
+    await delay(0);
+
+    expect(scheduler.getStatus(sid)).toEqual({ state: "idle" });
+  });
+
+  it("stops after an in-flight human-input classification resolves", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    const listQueued = vi.fn<SessionSchedulerDeps["list_queued"]>(async () => [
+      { id: "q1" },
+    ]);
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(async () => true);
+    const pendingHumanInputKind = vi.fn<
+      SessionSchedulerDeps["pending_human_input_kind"]
+    >(() => classification.promise);
+    const scheduler = new SessionScheduler({
+      list_queued: listQueued,
+      drain,
+      pending_human_input_kind: pendingHumanInputKind,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+
+    scheduler.notifyEnqueued("ses_dispose_classification");
+    await vi.waitFor(() =>
+      expect(pendingHumanInputKind).toHaveBeenCalledTimes(1)
+    );
+    scheduler.dispose();
+    classification.resolve("approval");
+    await delay(0);
+
+    expect(scheduler.getStatus("ses_dispose_classification")).toEqual({
+      state: "idle",
+    });
+    expect(listQueued).not.toHaveBeenCalled();
+    expect(drain).not.toHaveBeenCalled();
+  });
+
+  it("stops after an in-flight queue read resolves", async () => {
+    const queued = deferred<ReadonlyArray<{ id: string }>>();
+    const listQueued = vi.fn<SessionSchedulerDeps["list_queued"]>(
+      () => queued.promise
+    );
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(async () => true);
+    const scheduler = new SessionScheduler({
+      list_queued: listQueued,
+      drain,
+      pending_human_input_kind: async () => null,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+
+    scheduler.notifyEnqueued("ses_dispose_list");
+    await vi.waitFor(() => expect(listQueued).toHaveBeenCalledTimes(1));
+    scheduler.dispose();
+    queued.resolve([{ id: "q1" }]);
+    await delay(0);
+
+    expect(drain).not.toHaveBeenCalled();
+    expect(scheduler.getStatus("ses_dispose_list")).toEqual({ state: "idle" });
+  });
+
+  it("stops after an in-flight drain declines the head", async () => {
+    const fired = deferred<boolean>();
+    const pendingHumanInputKind = vi.fn<
+      SessionSchedulerDeps["pending_human_input_kind"]
+    >(async () => null);
+    const drain = vi.fn<SessionSchedulerDeps["drain"]>(() => fired.promise);
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [{ id: "q1" }],
+      drain,
+      pending_human_input_kind: pendingHumanInputKind,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+
+    scheduler.notifyEnqueued("ses_dispose_drain");
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1));
+    scheduler.dispose();
+    fired.resolve(false);
+    await delay(0);
+
+    // A declined head normally triggers a second persisted-state read. The
+    // disposed scheduler must not cross that next authority boundary.
+    expect(pendingHumanInputKind).toHaveBeenCalledTimes(1);
+    expect(scheduler.getStatus("ses_dispose_drain")).toEqual({
+      state: "idle",
+    });
+  });
+
+  it("stops after the post-drain classification resolves", async () => {
+    const classification = deferred<"approval" | "user-input" | null>();
+    let checks = 0;
+    const pendingHumanInputKind = vi.fn<
+      SessionSchedulerDeps["pending_human_input_kind"]
+    >(() => {
+      checks += 1;
+      return checks === 1 ? Promise.resolve(null) : classification.promise;
+    });
+    const scheduler = new SessionScheduler({
+      list_queued: async () => [{ id: "q1" }],
+      drain: async () => false,
+      pending_human_input_kind: pendingHumanInputKind,
+      drain_cooldown_ms: 0,
+    });
+    live.push(scheduler);
+
+    scheduler.notifyEnqueued("ses_dispose_reclassification");
+    await vi.waitFor(() =>
+      expect(pendingHumanInputKind).toHaveBeenCalledTimes(2)
+    );
+    scheduler.dispose();
+    classification.resolve("approval");
+    await delay(0);
+
+    expect(scheduler.getStatus("ses_dispose_reclassification")).toEqual({
+      state: "idle",
+    });
+    expect(pendingHumanInputKind).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("SessionScheduler drain", () => {
   it("keeps the row queued through the cooldown, then atomically claims + fires", async () => {
     const { scheduler, calls } = makeScheduler();
@@ -187,14 +409,17 @@ describe("SessionScheduler drain", () => {
     expect(calls).toEqual([s.id]);
   });
 
-  it("a hard error pauses the drain — queued rows wait", async () => {
+  it("a hard error with no pending input projects error and pauses the drain", async () => {
     const { scheduler, calls } = makeScheduler();
     const s = await store.create({ agent: "grida" });
     await store.appendQueuedMessage(s.id, { id: "q1", text: "queued" });
 
     scheduler.onCreate(s.id);
     scheduler.onFinish(s.id, "error");
-    expect(scheduler.getStatus(s.id).state).toBe("error");
+    expect(scheduler.getStatus(s.id).state).toBe("busy");
+    await vi.waitFor(() =>
+      expect(scheduler.getStatus(s.id).state).toBe("error")
+    );
 
     await delay(COOLDOWN + 20);
     expect(calls).toEqual([]); // never drained

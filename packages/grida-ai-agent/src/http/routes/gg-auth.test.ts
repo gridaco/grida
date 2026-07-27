@@ -99,6 +99,32 @@ describe("/auth/gg/*", () => {
     expect(res.status).toBe(200);
     expect(store.status().organization).toBeUndefined();
   });
+
+  it("keeps a successful token mutation successful when queue recovery throws", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    app = new Hono();
+    store = new GridaGatewaySessionStore();
+    registerGridaAuthRoutes(app, {
+      store,
+      on_provider_ready: () => {
+        throw new Error("recovery failed");
+      },
+    });
+
+    const res = await post("/auth/gg/set", {
+      access_token: "jwt-stored",
+      expires_at: Date.now() + 900_000,
+    });
+
+    expect(res.status).toBe(200);
+    expect(store.getAccessToken()).toBe("jwt-stored");
+    await vi.waitFor(() =>
+      expect(warning).toHaveBeenCalledWith(
+        expect.stringContaining("provider-ready hook failed: recovery failed")
+      )
+    );
+    warning.mockRestore();
+  });
 });
 
 describe("secrets boundary split (GRIDA-SEC-006)", () => {

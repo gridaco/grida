@@ -770,6 +770,36 @@ describe("SessionsStore fork", () => {
       type: "text",
       data: { type: "text", text: "reply" },
     });
+    await store.upsertPart(a1.id, {
+      index: 1,
+      type: "tool-question",
+      data: {
+        type: "tool-question",
+        toolCallId: "forked-question",
+        state: "input-available",
+        input: { questions: [{ question: "Color?" }] },
+      },
+      tool_call_id: "forked-question",
+      tool_state: "input-available",
+      session_id: parent.id,
+    });
+    expect(
+      await store.commitHumanInputContinuation(
+        parent.id,
+        a1.id,
+        "forked-question",
+        "run_parent",
+        {
+          type: "tool-question",
+          tool_state: "output-available",
+          data: {
+            type: "tool-question",
+            state: "output-available",
+            output: { answers: [["Blue"]] },
+          },
+        }
+      )
+    ).toBe(true);
     await delay(2);
     const u2 = await store.appendMessage(parent.id, { role: "user" });
     await store.upsertPart(u2.id, {
@@ -798,6 +828,25 @@ describe("SessionsStore fork", () => {
     expect(copied[0].id).not.toBe(u1.id); // fresh ids
     expect((copied[0].parts[0].data as { text: string }).text).toBe("first");
     expect((copied[1].parts[0].data as { text: string }).text).toBe("reply");
+    const continuationMarkers = opened.sqlite
+      .prepare(
+        `SELECT session_id, continuation_run_id
+         FROM chat_parts
+         WHERE tool_call_id = 'forked-question'
+         ORDER BY session_id`
+      )
+      .all() as Array<{
+      session_id: string;
+      continuation_run_id: string | null;
+    }>;
+    expect(
+      continuationMarkers.find((row) => row.session_id === parent.id)
+        ?.continuation_run_id
+    ).toBe("run_parent");
+    expect(
+      continuationMarkers.find((row) => row.session_id === fork.id)
+        ?.continuation_run_id
+    ).toBeNull();
 
     // Rollups recomputed from copied turns (only a1's usage).
     expect(fork.total_tokens).toBe(14);
@@ -1703,6 +1752,143 @@ describe("restart orphan repair", () => {
     ]);
     expect(store.finalizeRestartOrphanedTools()).toBe(0);
   });
+
+  it("terminalizes visible and hidden marked continuations but preserves completed history", async () => {
+    const s = await store.create({ agent: "grida" });
+    const visible = await store.appendMessage(s.id, { role: "assistant" });
+    const historical = await store.appendMessage(s.id, { role: "assistant" });
+    const hidden = await store.appendMessage(s.id, { role: "assistant" });
+    const pendingQuestion = async (
+      messageId: string,
+      toolCallId: string
+    ): Promise<void> => {
+      await store.upsertPart(messageId, {
+        index: 0,
+        type: "tool-question",
+        data: {
+          type: "tool-question",
+          toolCallId,
+          state: "input-available",
+          input: { questions: [{ question: "Color?" }] },
+        },
+        tool_call_id: toolCallId,
+        tool_state: "input-available",
+        session_id: s.id,
+      });
+    };
+    const answer = {
+      type: "tool-question",
+      tool_state: "output-available",
+      data: {
+        type: "tool-question",
+        state: "output-available",
+        output: { answers: [["Blue"]] },
+      },
+    };
+
+    await pendingQuestion(visible.id, "tc_interrupted");
+    expect(
+      await store.commitHumanInputContinuation(
+        s.id,
+        visible.id,
+        "tc_interrupted",
+        "run_interrupted",
+        answer
+      )
+    ).toBe(true);
+
+    // Same terminal transcript shape, but no live marker: completed history.
+    await store.upsertPart(historical.id, {
+      index: 0,
+      type: "tool-question",
+      data: {
+        type: "tool-question",
+        toolCallId: "tc_historical",
+        state: "output-available",
+        input: { questions: [{ question: "Color?" }] },
+        output: { answers: [["Red"]] },
+      },
+      tool_call_id: "tc_historical",
+      tool_state: "output-available",
+      session_id: s.id,
+    });
+
+    await pendingQuestion(hidden.id, "tc_hidden_interrupted");
+    expect(
+      await store.commitHumanInputContinuation(
+        s.id,
+        hidden.id,
+        "tc_hidden_interrupted",
+        "run_hidden",
+        answer
+      )
+    ).toBe(true);
+    opened.sqlite
+      .prepare("UPDATE chat_messages SET hidden_at = ? WHERE id = ?")
+      .run(Date.now(), hidden.id);
+
+    store.close();
+    opened = openSessionsDb({ user_data_path: tempDir });
+    store = new SessionsStore(opened);
+
+    expect(store.finalizeRestartOrphanedTools()).toBe(2);
+    expect(await store.findToolPart(s.id, "tc_interrupted")).toMatchObject({
+      data: {
+        state: "output-error",
+        errorText: "aborted by host restart",
+        input: { questions: [{ question: "Color?" }] },
+      },
+    });
+    expect(await store.findToolPart(s.id, "tc_historical")).toMatchObject({
+      data: {
+        state: "output-available",
+        output: { answers: [["Red"]] },
+      },
+    });
+    expect(
+      await store.findToolPart(s.id, "tc_hidden_interrupted")
+    ).toMatchObject({
+      data: {
+        state: "output-error",
+        errorText: "aborted by host restart",
+        input: { questions: [{ question: "Color?" }] },
+      },
+    });
+    const markers = opened.sqlite
+      .prepare(
+        `SELECT tool_call_id, continuation_run_id
+         FROM chat_parts
+         WHERE tool_call_id IN (
+           'tc_interrupted', 'tc_historical', 'tc_hidden_interrupted'
+         )
+         ORDER BY tool_call_id`
+      )
+      .all();
+    expect(markers).toEqual([
+      { tool_call_id: "tc_hidden_interrupted", continuation_run_id: null },
+      { tool_call_id: "tc_historical", continuation_run_id: null },
+      { tool_call_id: "tc_interrupted", continuation_run_id: null },
+    ]);
+
+    // Re-exposing rewound history cannot resurrect a continuation run owned by
+    // the dead host or make the fail-closed human-input gate stick forever.
+    await store.unhideAfter(s.id, historical.id);
+    expect(
+      (await store.listVisibleMessages(s.id)).some(
+        (message) => message.id === hidden.id
+      )
+    ).toBe(true);
+    expect(await store.pendingHumanInputKind(s.id)).toBeNull();
+    expect(
+      await store.findToolPart(s.id, "tc_hidden_interrupted")
+    ).toMatchObject({
+      data: {
+        state: "output-error",
+        errorText: "aborted by host restart",
+      },
+    });
+    expect(store.finalizeRestartOrphanedTools()).toBe(0);
+  });
 });
 
 describe("hasPendingHumanInput (drain-pause trait gate)", () => {
@@ -1795,7 +1981,7 @@ describe("hasPendingHumanInput (drain-pause trait gate)", () => {
       })
     ).toBe(false);
     expect(
-      await store.fillToolResult(s.id, msgId, "tc_q", {
+      await store.commitHumanInputContinuation(s.id, msgId, "tc_q", "run_q1", {
         type: "tool-question",
         tool_state: "output-available",
         data: {
@@ -1814,6 +2000,67 @@ describe("hasPendingHumanInput (drain-pause trait gate)", () => {
       input: {},
       output: { answers: [["Blue"]] },
     });
+    expect(await store.pendingHumanInputKind(s.id)).toBe("user-input");
+    expect(
+      opened.sqlite
+        .prepare(
+          "SELECT continuation_run_id FROM chat_parts WHERE tool_call_id = 'tc_q'"
+        )
+        .get()
+    ).toEqual({ continuation_run_id: "run_q1" });
+    expect(
+      await store.settleHumanInputContinuation(s.id, msgId, "tc_q", "stale_run")
+    ).toBe(false);
+    expect(
+      await store.settleHumanInputContinuation(s.id, msgId, "tc_q", "run_q1")
+    ).toBe(true);
+    expect(await store.pendingHumanInputKind(s.id)).toBeNull();
+    expect(await store.findToolPart(s.id, "tc_q")).toMatchObject({
+      data: {
+        state: "output-available",
+        input: {},
+        output: { answers: [["Blue"]] },
+      },
+    });
+  });
+
+  it("rolls back only the exact unstarted human continuation", async () => {
+    const s = await store.create({ agent: "grida" });
+    const msgId = await recordToolPart(
+      s.id,
+      "tc_q",
+      "question",
+      "input-available"
+    );
+    expect(
+      await store.commitHumanInputContinuation(s.id, msgId, "tc_q", "run_q1", {
+        type: "tool-question",
+        tool_state: "output-error",
+        data: {
+          type: "tool-question",
+          state: "output-error",
+          errorText: "picker failed",
+        },
+      })
+    ).toBe(true);
+    expect(
+      await store.rollbackHumanInputContinuation(
+        s.id,
+        msgId,
+        "tc_q",
+        "stale_run"
+      )
+    ).toBe(false);
+    expect(
+      await store.rollbackHumanInputContinuation(s.id, msgId, "tc_q", "run_q1")
+    ).toBe(true);
+    expect(await store.findToolPart(s.id, "tc_q")).toMatchObject({
+      data: {
+        state: "input-available",
+        input: {},
+      },
+    });
+    expect(await store.pendingHumanInputKind(s.id)).toBe("user-input");
   });
 
   it("classifies every current human-input trait as user input", async () => {

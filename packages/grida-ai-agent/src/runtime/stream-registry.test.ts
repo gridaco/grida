@@ -71,6 +71,21 @@ describe("StreamRegistry / create + get + drop", () => {
     expect(second.chunks).toEqual([]);
   });
 
+  it("rejects stale entry writes after a replacement generation starts", async () => {
+    const first = registry.create("ses_a");
+    expect(registry.finishEntry(first, "abort")).toBe(true);
+    await flushMicrotasks();
+
+    const second = registry.create("ses_a");
+    expect(registry.pushEntry(first, "late-first-frame")).toBe(false);
+    expect(registry.finishEntry(first, "error")).toBe(false);
+    expect(second.status).toBe("running");
+    expect(second.chunks).toEqual([]);
+
+    expect(registry.pushEntry(second, "second-frame")).toBe(true);
+    expect(second.chunks).toEqual(["second-frame"]);
+  });
+
   it("drop removes the entry and aborts the model if still running", () => {
     const entry = registry.create("ses_a");
     const onAbort = vi.fn();

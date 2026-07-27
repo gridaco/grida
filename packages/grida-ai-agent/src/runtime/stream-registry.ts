@@ -246,14 +246,39 @@ export class StreamRegistry {
     return this.entries.get(sessionId);
   }
 
-  /** Append + broadcast. Silent no-op if entry is gone. */
+  /**
+   * Append + broadcast to the currently-owned generation. Silent no-op if the
+   * session has no running entry.
+   *
+   * Long-lived pump callbacks must use {@link pushEntry}; this session-keyed
+   * convenience is for synchronous host/test ingress that intentionally
+   * targets whichever generation is current.
+   */
   push(sessionId: string, data: string): void {
     const entry = this.entries.get(sessionId);
     if (!entry) return;
+    this.pushEntry(entry, data);
+  }
+
+  /**
+   * Append only while `entry` is the exact current running generation.
+   *
+   * A model promise can settle after its turn was aborted and a queued
+   * replacement started under the same session id. Identity, not session id,
+   * prevents that stale producer from injecting frames into the replacement.
+   */
+  pushEntry(entry: StreamEntry, data: string): boolean {
+    if (
+      this.entries.get(entry.session_id) !== entry ||
+      entry.status !== "running"
+    ) {
+      return false;
+    }
     entry.chunks.push(data);
     for (const c of entry.consumers.values()) {
       void this.deliver(entry, c, () => c.on_frame(data));
     }
+    return true;
   }
 
   /**
@@ -291,7 +316,22 @@ export class StreamRegistry {
    */
   finish(sessionId: string, reason: StreamEndReason): void {
     const entry = this.entries.get(sessionId);
-    if (!entry || entry.status !== "running") return;
+    if (!entry) return;
+    this.finishEntry(entry, reason);
+  }
+
+  /**
+   * Finish only while `entry` is the exact current running generation.
+   *
+   * Explicit user abort remains session-keyed because it intentionally targets
+   * the current turn. Async pump success/error paths must carry their captured
+   * entry so a stale completion cannot finish a newer queued turn.
+   */
+  finishEntry(entry: StreamEntry, reason: StreamEndReason): boolean {
+    const sessionId = entry.session_id;
+    if (this.entries.get(sessionId) !== entry || entry.status !== "running") {
+      return false;
+    }
     entry.status = "ended";
     entry.end_reason = reason;
     // Occupy the session BEFORE invoking any consumer callback. `on_end` may
@@ -342,6 +382,7 @@ export class StreamRegistry {
     if (this.settlements.get(sessionId) === placeholder) {
       this.settlements.set(sessionId, { entry, promise });
     }
+    return true;
   }
 
   /** Explicit cancel: abort the upstream signal then `finish("abort")`. */
@@ -349,7 +390,7 @@ export class StreamRegistry {
     const entry = this.entries.get(sessionId);
     if (!entry || entry.status !== "running") return;
     entry.model_abort.abort();
-    this.finish(sessionId, "abort");
+    this.finishEntry(entry, "abort");
   }
 
   /**

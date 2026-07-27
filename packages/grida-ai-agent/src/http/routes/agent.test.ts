@@ -19,7 +19,7 @@ import { Hono } from "hono";
 import { AuthStore } from "@grida/daemon/server";
 import { SecretsStore } from "@grida/daemon/server";
 import { WorkspaceRegistry } from "@grida/daemon/server";
-import { openSessionsDb } from "../../session/db";
+import { openSessionsDb, type OpenedSessionsDb } from "../../session/db";
 import { SessionsStore } from "../../session/store";
 import { createRecorderConsumer } from "../../session/recorder";
 import { DirectoryScopeRegistry } from "../../session/directory-scopes";
@@ -47,6 +47,7 @@ const fakeRunAgent = async (): Promise<Response> =>
 
 describe("HTTP wire — agent routes (run/stream/abort)", () => {
   let baseDir: string;
+  let sessionsDb: OpenedSessionsDb;
   let sessionsStore: SessionsStore;
   let secrets: SecretsStore;
   let workspaceRegistry: WorkspaceRegistry;
@@ -59,8 +60,8 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     const auth = new AuthStore(baseDir);
     secrets = new SecretsStore(auth);
     await secrets.set("openrouter", "sk-test");
-    const db = openSessionsDb({ user_data_path: baseDir });
-    sessionsStore = new SessionsStore(db);
+    sessionsDb = openSessionsDb({ user_data_path: baseDir });
+    sessionsStore = new SessionsStore(sessionsDb);
     workspaceRegistry = new WorkspaceRegistry(baseDir);
     // Inject the registry so tests can pre-populate in-flight runs.
     streamRegistry = new StreamRegistry();
@@ -144,6 +145,15 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       tool_state: "input-available",
     });
     return { session, priorUser, assistant };
+  }
+
+  function continuationRunId(toolCallId: string): string | null {
+    const row = sessionsDb.sqlite
+      .prepare(
+        "SELECT continuation_run_id FROM chat_parts WHERE tool_call_id = ?"
+      )
+      .get(toolCallId) as { continuation_run_id: string | null } | undefined;
+    return row?.continuation_run_id ?? null;
   }
 
   it("rejects invalid message payloads", async () => {
@@ -1395,6 +1405,165 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     expect(await sessionsStore.hasPendingHumanInput(created.id)).toBe(false);
   });
 
+  it.each(["finish", "error", "abort"] as const)(
+    "settles the exact question marker before the scheduler observes %s",
+    async (reason) => {
+      runtime.dispose();
+      streamRegistry = new StreamRegistry();
+      let releaseModel!: () => void;
+      const modelGate = new Promise<void>((resolve) => {
+        releaseModel = resolve;
+      });
+      runtime = new AgentRuntime({
+        secrets,
+        workspace_registry: workspaceRegistry,
+        sessions_store: sessionsStore,
+        streams: streamRegistry,
+        run_agent: async () => {
+          await modelGate;
+          if (reason === "error")
+            throw new Error("synthetic continuation error");
+          return await fakeRunAgent();
+        },
+        scratch_base: path.join(baseDir, "scratch-base"),
+        external_agent_execution: "sandboxed",
+        drain_cooldown_ms: 20,
+      });
+      app = new Hono();
+      registerAgentRoutes(app, runtime);
+
+      const { session, priorUser, assistant } = await seedPendingQuestion();
+      const resumed = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          session_id: session.id,
+          messages: [
+            {
+              id: priorUser.id,
+              role: "user",
+              parts: [{ type: "text", text: "Help me pick a color" }],
+            },
+            {
+              id: assistant.id,
+              role: "assistant",
+              parts: [
+                {
+                  type: "tool-question",
+                  toolCallId: "q1",
+                  state: "output-available",
+                  input: { questions: [{ question: "Which color?" }] },
+                  output: { answers: [["Cool"]] },
+                },
+              ],
+            },
+          ],
+        }),
+      });
+      expect(resumed.status).toBe(200);
+      await vi.waitFor(() =>
+        expect(continuationRunId("q1")).toEqual(expect.any(String))
+      );
+
+      // Install after the request preflight: every later classification is the
+      // scheduler's terminal projection. StreamRegistry must not publish that
+      // edge until the marker consumer has settled.
+      const classify = sessionsStore.pendingHumanInputKind.bind(sessionsStore);
+      const markersAtClassification: Array<string | null> = [];
+      vi.spyOn(sessionsStore, "pendingHumanInputKind").mockImplementation(
+        async (sessionId) => {
+          if (sessionId === session.id) {
+            markersAtClassification.push(continuationRunId("q1"));
+          }
+          return await classify(sessionId);
+        }
+      );
+
+      if (reason === "abort") {
+        runtime.abort({ session_id: session.id });
+      }
+      releaseModel();
+      const streamResult = await resumed.text().then(
+        () => ({ status: "fulfilled" as const, error: "" }),
+        (err: unknown) => ({
+          status: "rejected" as const,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      );
+      expect(streamResult.status).toBe(
+        reason === "error" ? "rejected" : "fulfilled"
+      );
+      expect(streamResult.error.includes("agent stream failed")).toBe(
+        reason === "error"
+      );
+
+      await vi.waitFor(() =>
+        expect(markersAtClassification.length).toBeGreaterThan(0)
+      );
+      expect(markersAtClassification).toEqual(
+        markersAtClassification.map(() => null)
+      );
+      expect(continuationRunId("q1")).toBeNull();
+      expect(await sessionsStore.findToolPart(session.id, "q1")).toMatchObject({
+        data: {
+          state: "output-available",
+          output: { answers: [["Cool"]] },
+        },
+      });
+    }
+  );
+
+  it("rolls a question answer back when synchronous stream reservation fails", async () => {
+    const { session, priorUser, assistant } = await seedPendingQuestion();
+    const create = vi
+      .spyOn(streamRegistry, "create")
+      .mockImplementationOnce(() => {
+        throw new Error("synthetic reservation failure");
+      });
+
+    try {
+      const failed = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          session_id: session.id,
+          messages: [
+            {
+              id: priorUser.id,
+              role: "user",
+              parts: [{ type: "text", text: "Help me pick a color" }],
+            },
+            {
+              id: assistant.id,
+              role: "assistant",
+              parts: [
+                {
+                  type: "tool-question",
+                  toolCallId: "q1",
+                  state: "output-available",
+                  input: { questions: [{ question: "Which color?" }] },
+                  output: { answers: [["Cool"]] },
+                },
+              ],
+            },
+          ],
+        }),
+      });
+      expect(failed.status).toBe(500);
+    } finally {
+      create.mockRestore();
+    }
+
+    expect(continuationRunId("q1")).toBeNull();
+    expect(await sessionsStore.findToolPart(session.id, "q1")).toMatchObject({
+      data: {
+        state: "input-available",
+        input: { questions: [{ question: "Which color?" }] },
+      },
+    });
+    expect(await sessionsStore.pendingHumanInputKind(session.id)).toBe(
+      "user-input"
+    );
+  });
+
   it("keeps a question retryable when later scratch validation rejects the resume", async () => {
     const { session, priorUser, assistant } = await seedPendingQuestion();
     const messages = [
@@ -1510,6 +1679,50 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       tool_state: "input-available",
       session_id: created.id,
     });
+    await sessionsStore.upsertPart(abandonedAssistant.id, {
+      index: 1,
+      type: "tool-question",
+      data: {
+        type: "tool-question",
+        toolCallId: "restart-question",
+        state: "input-available",
+        input: { questions: [{ question: "Which color?" }] },
+      },
+      tool_call_id: "restart-question",
+      tool_state: "input-available",
+      session_id: created.id,
+    });
+    expect(
+      await sessionsStore.commitHumanInputContinuation(
+        created.id,
+        abandonedAssistant.id,
+        "restart-question",
+        "run-crashed-after-answer",
+        {
+          type: "tool-question",
+          tool_state: "output-available",
+          data: {
+            type: "tool-question",
+            state: "output-available",
+            output: { answers: [["Cool"]] },
+          },
+        }
+      )
+    ).toBe(true);
+    await sessionsStore.upsertPart(abandonedAssistant.id, {
+      index: 2,
+      type: "tool-question",
+      data: {
+        type: "tool-question",
+        toolCallId: "historical-question",
+        state: "output-available",
+        input: { questions: [{ question: "Completed?" }] },
+        output: { answers: [["Yes"]] },
+      },
+      tool_call_id: "historical-question",
+      tool_state: "output-available",
+      session_id: created.id,
+    });
     await sessionsStore.appendQueuedMessage(created.id, {
       id: "restart-queued",
       text: "resume after restart",
@@ -1520,12 +1733,30 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     // edge and no GET /status occurs after this simulated host restart.
     runtime.dispose();
     streamRegistry = new StreamRegistry();
+    const projectionsWhenQueueFired: Array<{
+      interrupted: unknown;
+      historical: unknown;
+      marker: string | null;
+    }> = [];
     runtime = new AgentRuntime({
       secrets,
       workspace_registry: workspaceRegistry,
       sessions_store: sessionsStore,
       streams: streamRegistry,
-      run_agent: fakeRunAgent,
+      run_agent: async () => {
+        projectionsWhenQueueFired.push({
+          interrupted: await sessionsStore.findToolPart(
+            created.id,
+            "restart-question"
+          ),
+          historical: await sessionsStore.findToolPart(
+            created.id,
+            "historical-question"
+          ),
+          marker: continuationRunId("restart-question"),
+        });
+        return await fakeRunAgent();
+      },
       scratch_base: path.join(baseDir, "scratch-base"),
       external_agent_execution: "sandboxed",
       drain_cooldown_ms: 20,
@@ -1553,6 +1784,23 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
             state: "output-error",
             errorText: "aborted by host restart",
             input: { path: "notes.txt" },
+          },
+        });
+        expect(projectionsWhenQueueFired).toHaveLength(1);
+        expect(projectionsWhenQueueFired[0]).toMatchObject({
+          marker: null,
+          interrupted: {
+            data: {
+              state: "output-error",
+              errorText: "aborted by host restart",
+              input: { questions: [{ question: "Which color?" }] },
+            },
+          },
+          historical: {
+            data: {
+              state: "output-available",
+              output: { answers: [["Yes"]] },
+            },
           },
         });
       },
@@ -1673,13 +1921,15 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       queued_at: 7,
     });
     runtime.streams.create(created.id);
-    runtime.streams.finish(created.id, "finish");
     const createSpy = vi
       .spyOn(streamRegistry, "create")
       .mockImplementation(() => {
         throw new Error("synthetic create failure");
       });
     try {
+      // Install the failure before finish publishes idle and schedules the
+      // drain; otherwise a short cooldown can reserve the queued turn first.
+      runtime.streams.finish(created.id, "finish");
       await vi.waitFor(() => expect(createSpy).toHaveBeenCalled());
       expect(
         (await sessionsStore.listQueuedMessages(created.id)).map((m) => m.id)
@@ -1979,6 +2229,135 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       await body?.catch(() => undefined);
     }
   });
+
+  it.each(["late-response", "late-error"] as const)(
+    "does not let an aborted turn's %s contaminate its queued replacement",
+    async (lateOutcome) => {
+      runtime.dispose();
+      streamRegistry = new StreamRegistry();
+
+      let resolveFirst!: (response: Response) => void;
+      let rejectFirst!: (reason: unknown) => void;
+      const firstModel = new Promise<Response>((resolve, reject) => {
+        resolveFirst = resolve;
+        rejectFirst = reject;
+      });
+      let firstStarted!: () => void;
+      const firstStartedGate = new Promise<void>((resolve) => {
+        firstStarted = resolve;
+      });
+
+      let resolveSecond!: (response: Response) => void;
+      const secondModel = new Promise<Response>((resolve) => {
+        resolveSecond = resolve;
+      });
+      let secondStarted!: () => void;
+      const secondStartedGate = new Promise<void>((resolve) => {
+        secondStarted = resolve;
+      });
+
+      let runCount = 0;
+      runtime = new AgentRuntime({
+        secrets,
+        workspace_registry: workspaceRegistry,
+        sessions_store: sessionsStore,
+        streams: streamRegistry,
+        run_agent: async () => {
+          runCount += 1;
+          if (runCount === 1) {
+            firstStarted();
+            return await firstModel;
+          }
+          secondStarted();
+          return await secondModel;
+        },
+        scratch_base: path.join(baseDir, "scratch-base"),
+        external_agent_execution: "sandboxed",
+        drain_cooldown_ms: 20,
+      });
+      app = new Hono();
+      registerAgentRoutes(app, runtime);
+
+      const session = await sessionsStore.create({
+        agent: AGENT_SESSION_AGENT,
+      });
+      const firstResponse = await app.request("/agent/run", {
+        method: "POST",
+        body: JSON.stringify({
+          session_id: session.id,
+          messages: [{ id: "turn-a", role: "user", content: "first" }],
+        }),
+      });
+      expect(firstResponse.status).toBe(200);
+      const firstBody = firstResponse.text();
+      await firstStartedGate;
+      const firstEntry = streamRegistry.get(session.id)!;
+
+      await sessionsStore.appendQueuedMessage(session.id, {
+        id: "turn-b",
+        text: "second",
+        queued_at: 2,
+      });
+      expect(runtime.abort({ session_id: session.id }).status).toBe(200);
+      await firstBody;
+
+      // The abort edge settles A and lets the durable queue reserve B even
+      // though A's model promise ignores cancellation and remains pending.
+      await secondStartedGate;
+      const secondEntry = streamRegistry.get(session.id)!;
+      expect(secondEntry).not.toBe(firstEntry);
+      expect(secondEntry.status).toBe("running");
+      expect(secondEntry.fired_message_id).toBe("turn-b");
+
+      const pushEntry = vi.spyOn(streamRegistry, "pushEntry");
+      const finishEntry = vi.spyOn(streamRegistry, "finishEntry");
+      if (lateOutcome === "late-response") {
+        resolveFirst(
+          new Response(
+            'data: {"type":"text-start","id":"late-a"}\n\n' +
+              'data: {"type":"text-delta","id":"late-a","delta":"STALE"}\n\n' +
+              "data: [DONE]\n\n",
+            { headers: { "content-type": "text/event-stream" } }
+          )
+        );
+      } else {
+        rejectFirst(new Error("late failure from turn A"));
+      }
+      await vi.waitFor(() => {
+        const observed =
+          lateOutcome === "late-response"
+            ? pushEntry.mock.calls.some(
+                ([entry, data]) =>
+                  entry === firstEntry && data.includes("late-a")
+              )
+            : finishEntry.mock.calls.some(
+                ([entry, reason]) => entry === firstEntry && reason === "abort"
+              );
+        if (!observed) throw new Error(`did not observe ${lateOutcome}`);
+      });
+
+      const observedLateResponse = pushEntry.mock.calls.some(
+        ([entry, data]) => entry === firstEntry && data.includes("late-a")
+      );
+      const observedLateError = finishEntry.mock.calls.some(
+        ([entry, reason]) => entry === firstEntry && reason === "abort"
+      );
+      expect(observedLateResponse).toBe(lateOutcome === "late-response");
+      expect(observedLateError).toBe(lateOutcome === "late-error");
+
+      // A's late producer was correlated to A's entry token, so it neither
+      // appended to nor terminalized the same-session replacement B.
+      expect(streamRegistry.get(session.id)).toBe(secondEntry);
+      expect(secondEntry.status).toBe("running");
+      expect(secondEntry.chunks).toEqual([]);
+
+      resolveSecond(await fakeRunAgent());
+      await vi.waitFor(() => expect(secondEntry.status).toBe("ended"));
+      expect(secondEntry.chunks.some((frame) => frame.includes("late-a"))).toBe(
+        false
+      );
+    }
+  );
 });
 
 describe("HTTP wire — session-scoped directory references", () => {

@@ -381,6 +381,23 @@ describe("persistIncomingTail", () => {
         },
       ])
     ).toHaveLength(1);
+    expect(
+      await findIncomingHumanInputResults(store, s.id, [
+        {
+          id: "a1",
+          role: "assistant",
+          parts: [
+            {
+              type: "tool-question",
+              toolCallId: "q1",
+              state: "output-error",
+              input: {},
+              error_text: "The user-facing picker failed.",
+            },
+          ],
+        },
+      ])
+    ).toHaveLength(1);
   });
 
   it("keeps every human-input result out of the generic tool-result pass", async () => {

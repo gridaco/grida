@@ -152,6 +152,61 @@ describe("StreamRecovery.run", () => {
     expect(applyMessages).toHaveBeenCalledWith([prior]);
   });
 
+  it("uses the same admission fallback when hydration rejects", async () => {
+    const prior: UIMessage = {
+      id: "a1",
+      role: "assistant",
+      parts: [],
+    };
+    const applyMessages = vi.fn<(messages: UIMessage[]) => void>();
+    expect(
+      await StreamRecovery.run({
+        kind: "human-input-pending",
+        messages: [prior, user("u1", [{ type: "text", text: "follow up" }])],
+        enqueuePendingTail: async () => true,
+        rehydrate: async () => {
+          throw new Error("transient hydration failure");
+        },
+        applyMessages,
+        resumeStream: vi.fn<() => void>(),
+      })
+    ).toBe(true);
+    expect(applyMessages).toHaveBeenCalledWith([prior]);
+  });
+
+  it("does not propagate a failed stream reattachment", async () => {
+    const restored: UIMessage[] = [{ id: "a1", role: "assistant", parts: [] }];
+    const applyMessages = vi.fn<(messages: UIMessage[]) => void>();
+    expect(
+      await StreamRecovery.run({
+        kind: "disconnect",
+        messages: [],
+        rehydrate: async () => restored,
+        applyMessages,
+        resumeStream: async () => {
+          throw new Error("stream unavailable");
+        },
+      })
+    ).toBe(false);
+    expect(applyMessages).toHaveBeenCalledWith(restored);
+  });
+
+  it("keeps a durably queued tail recovered when reattachment fails", async () => {
+    const restored: UIMessage[] = [{ id: "a1", role: "assistant", parts: [] }];
+    expect(
+      await StreamRecovery.run({
+        kind: "run-in-flight",
+        messages: [user("u1", [{ type: "text", text: "follow up" }])],
+        enqueuePendingTail: async () => true,
+        rehydrate: async () => restored,
+        applyMessages: vi.fn<(messages: UIMessage[]) => void>(),
+        resumeStream: async () => {
+          throw new Error("stream unavailable");
+        },
+      })
+    ).toBe(true);
+  });
+
   it("does not claim a disconnect recovery when hydration fails", async () => {
     expect(
       await StreamRecovery.run({

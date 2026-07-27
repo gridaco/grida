@@ -56,6 +56,39 @@ describe("findPendingApproval", () => {
     });
   });
 
+  it("accepts a dynamic tool and falls back to its tool-type label", () => {
+    expect(
+      findPendingApproval([
+        assistant([
+          {
+            type: "dynamic-tool",
+            state: "approval-requested",
+            toolCallId: "call_3",
+            approval: { id: "approval_3" },
+          },
+        ]),
+      ])
+    ).toMatchObject({
+      approvalId: "approval_3",
+      toolCallId: "call_3",
+      label: "dynamic-tool",
+    });
+    expect(
+      findPendingApproval([
+        assistant([
+          {
+            type: "tool-run_command",
+            state: "approval-requested",
+            toolCallId: "call_4",
+            approval: { id: "approval_4" },
+          },
+        ]),
+      ])
+    ).toMatchObject({
+      label: "run_command",
+    });
+  });
+
   it("does not surface an answered or non-tail approval", () => {
     const pending = assistant([
       {

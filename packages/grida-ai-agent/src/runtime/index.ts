@@ -358,6 +358,18 @@ type StartTurnOptions = {
    */
   fired_message_id?: string;
   /**
+   * GRIDA-SEC-004.
+   *
+   * Exact durable client-human-result continuation owned by this run. Its
+   * marker is cleared only from the recorder's terminal settlement barrier.
+   * Queue turns and approval continuations use different durability contracts.
+   */
+  human_input_continuation?: {
+    message_id: string;
+    tool_call_id: string;
+    run_id: string;
+  };
+  /**
    * Set only when `provider.kind === "agent-provider"`: the single prompt
    * string handed to the external agent for this turn (issue #813).
    */
@@ -1187,9 +1199,10 @@ export class AgentRuntime {
       // Late continuation commit. The read-only preflight above already proved
       // that the exact visible block matches; these conditional store writes
       // re-assert that authority atomically. The successful write is followed
-      // immediately by synchronous StreamRegistry reservation — no further
-      // await or error-return branch can consume the interaction and strand its
-      // retry.
+      // immediately by synchronous StreamRegistry reservation. A synchronous
+      // pre-reservation failure conditionally rolls this exact run id back to
+      // `input-available`; once a registry entry exists, only its terminal
+      // settlement may clear the marker.
       if (approvalAnswer) {
         const answered = await applyApprovalAnswer(
           this.deps.sessions_store,
@@ -1208,16 +1221,18 @@ export class AgentRuntime {
           );
         }
       } else if (incomingHumanInputResult) {
-        const filled = await this.deps.sessions_store.fillToolResult(
-          sessionId,
-          incomingHumanInputResult.messageId,
-          incomingHumanInputResult.toolCallId,
-          {
-            type: incomingHumanInputResult.part.type,
-            data: incomingHumanInputResult.part,
-            tool_state: incomingHumanInputResult.toolState,
-          }
-        );
+        const filled =
+          await this.deps.sessions_store.commitHumanInputContinuation(
+            sessionId,
+            incomingHumanInputResult.messageId,
+            incomingHumanInputResult.toolCallId,
+            runId,
+            {
+              type: incomingHumanInputResult.part.type,
+              data: incomingHumanInputResult.part,
+              tool_state: incomingHumanInputResult.toolState,
+            }
+          );
         if (!filled) return humanInputPendingResponse(sessionId);
       }
 
@@ -1251,6 +1266,13 @@ export class AgentRuntime {
           fired_message_id: pendingHumanInputKind
             ? undefined
             : extractTailUserMessageId(messages),
+          human_input_continuation: incomingHumanInputResult
+            ? {
+                message_id: incomingHumanInputResult.messageId,
+                tool_call_id: incomingHumanInputResult.toolCallId,
+                run_id: runId,
+              }
+            : undefined,
           // Agent-provider turns take a single prompt string (the external
           // agent owns history); the tail user message is this turn's prompt.
           agent_prompt:
@@ -1259,6 +1281,35 @@ export class AgentRuntime {
               : undefined,
         });
       } catch (err) {
+        if (
+          incomingHumanInputResult &&
+          this.streams.get(sessionId)?.status !== "running"
+        ) {
+          try {
+            const rolledBack =
+              await this.deps.sessions_store.rollbackHumanInputContinuation(
+                sessionId,
+                incomingHumanInputResult.messageId,
+                incomingHumanInputResult.toolCallId,
+                runId
+              );
+            if (!rolledBack) {
+              console.warn(
+                `[agent-host-agent] failed to roll back unstarted human-input continuation sessionId=${sessionId} runId=${runId}`
+              );
+            }
+          } catch (rollbackError) {
+            // Keep the exact marker durable and fail closed. Admission/drain
+            // sees it as unsettled, and host-start repair can terminalize it.
+            console.warn(
+              `[agent-host-agent] human-input continuation rollback errored sessionId=${sessionId} runId=${runId} err=${
+                rollbackError instanceof Error
+                  ? rollbackError.message
+                  : String(rollbackError)
+              }`
+            );
+          }
+        }
         if (err instanceof RunInFlightError) {
           return Response.json(
             { error: err.message, code: err.code, session_id: sessionId },
@@ -1326,7 +1377,7 @@ export class AgentRuntime {
     } finally {
       releaseSettlement();
     }
-    this.streams.finish(entry.session_id, "finish");
+    this.streams.finishEntry(entry, "finish");
   }
 
   /**
@@ -1422,18 +1473,39 @@ export class AgentRuntime {
     // is committed before usage is stamped — see below) and detaches it so
     // `streams.finish` doesn't re-fire its `on_end`. The error/abort path
     // leaves it attached, flushed by `streams.finish` as usual.
-    const recorder = createRecorderConsumer({
+    const sessionsStore = this.deps.sessions_store;
+    const persistedRecorder = createRecorderConsumer({
       store: this.deps.sessions_store,
       session_id: sessionId,
       run_id: runId,
     });
+    const continuation = opts.human_input_continuation;
+    const recorder: StreamConsumer = continuation
+      ? {
+          on_frame: (data) => persistedRecorder.on_frame(data),
+          on_end: async (reason) => {
+            await persistedRecorder.on_end(reason);
+            const settled = await sessionsStore.settleHumanInputContinuation(
+              sessionId,
+              continuation.message_id,
+              continuation.tool_call_id,
+              continuation.run_id
+            );
+            if (!settled) {
+              console.warn(
+                `[agent-host-agent] stale human-input continuation settlement sessionId=${sessionId} runId=${continuation.run_id} reason=${reason}`
+              );
+            }
+          },
+          on_error: (err) => persistedRecorder.on_error?.(err),
+        }
+      : persistedRecorder;
     const detachRecorder = this.streams.attach(sessionId, recorder);
 
     const streams = this.streams;
     const runAgentFn = this.run_agent_fn;
     const {
       workspace_registry: workspaceRegistry,
-      sessions_store: sessionsStore,
       secrets_root: secretsRoot,
       shell_execution_allowed: shellExecutionAllowed,
       scratch_base: scratchBase,
@@ -1535,7 +1607,7 @@ export class AgentRuntime {
             resume_session_id: resumeSessionId,
             model: agentModel,
             signal: entry.model_abort.signal,
-            emit: (chunk) => streams.push(sessionId, JSON.stringify(chunk)),
+            emit: (chunk) => streams.pushEntry(entry, JSON.stringify(chunk)),
           });
           if (
             result.providerSessionId &&
@@ -1628,7 +1700,7 @@ export class AgentRuntime {
           runDeps
         );
         console.log(`[agent-host-agent] run response opened runId=${runId}`);
-        await pumpResponseIntoRegistry(response, streams, sessionId);
+        await pumpResponseIntoRegistry(response, streams, entry);
         // Drain the recorder BEFORE stamping usage. The recorder creates the
         // assistant row on a fire-and-forget write_chain fed by each pushed
         // frame; `pumpResponseIntoRegistry` returning only means the frames
@@ -1667,7 +1739,7 @@ export class AgentRuntime {
         // Forward the real reason: a genuine failure ("error") must reach
         // consumers as an error, not a clean/aborted close, so the client
         // can distinguish a crashed run from a user cancel.
-        streams.finish(sessionId, reason);
+        streams.finishEntry(entry, reason);
       }
     })();
 

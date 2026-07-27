@@ -21,6 +21,7 @@ import {
   eq,
   gt,
   inArray,
+  isNotNull,
   isNull,
   like,
   lt,
@@ -103,6 +104,14 @@ export type QueuedMessageClaim = Readonly<{
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+
+function isHumanInputPartType(
+  type: string
+): type is (typeof HUMAN_INPUT_PART_TYPES)[number] {
+  return HUMAN_INPUT_PART_TYPES.includes(
+    type as (typeof HUMAN_INPUT_PART_TYPES)[number]
+  );
+}
 
 export type CreateSessionInput = CreateSessionOptions & {
   /** Internal AgentHost metadata; never returned on the public session wire. */
@@ -760,14 +769,21 @@ export class SessionsStore {
   }
 
   /**
-   * Close visible tool calls that a dead host could not finish.
+   * Close visible tool calls and every human-input continuation that a dead
+   * host could not finish.
    *
    * This is a STARTUP-ONLY repair edge. A normal run may legitimately have a
    * non-human tool at `input-streaming`, `input-available`, or
    * `approval-responded`, so calling this while live streams exist could race
-   * real execution. Human-input tools at `input-available` are intentional
-   * durable waits and unanswered supervised approvals use
-   * `approval-requested`; both remain untouched across restart.
+   * real execution. A client-resolved human-input result whose
+   * `continuation_run_id` is still set is likewise an interrupted live turn,
+   * even when rewind has hidden its message: no continuation from the prior
+   * host can still own that marker. Terminalize and clear it rather than
+   * replaying model/tool side effects or letting a later unhide expose a
+   * permanently unsettled marker. Human-input tools at `input-available` are
+   * intentional durable waits and unanswered supervised approvals use
+   * `approval-requested`; both remain untouched. Historical completed
+   * human-input outputs have a null marker and are never selected.
    *
    * Returns the number of rows advanced to `output-error`.
    */
@@ -778,16 +794,19 @@ export class SessionsStore {
         .prepare(
           `SELECT chat_parts.id, chat_parts.session_id, chat_parts.type,
                   chat_parts.tool_call_id, chat_parts.tool_state,
-                  chat_parts.data_json
+                  chat_parts.data_json, chat_parts.continuation_run_id
            FROM chat_parts
            INNER JOIN chat_messages
              ON chat_messages.id = chat_parts.message_id
-           WHERE chat_messages.hidden_at IS NULL
-             AND (
-               chat_parts.tool_state IN ('input-streaming', 'approval-responded')
-               OR (
-                 chat_parts.tool_state = 'input-available'
-                 AND chat_parts.type NOT IN (${humanTypeParams})
+           WHERE chat_parts.continuation_run_id IS NOT NULL
+              OR (
+                chat_messages.hidden_at IS NULL
+                AND (
+                  chat_parts.tool_state IN ('input-streaming', 'approval-responded')
+                  OR (
+                    chat_parts.tool_state = 'input-available'
+                    AND chat_parts.type NOT IN (${humanTypeParams})
+                  )
                )
              )
            ORDER BY chat_parts.id`
@@ -797,20 +816,20 @@ export class SessionsStore {
         session_id: string;
         type: string;
         tool_call_id: string | null;
-        tool_state:
-          | "input-streaming"
-          | "input-available"
-          | "approval-responded";
+        tool_state: string;
         data_json: string;
+        continuation_run_id: string | null;
       }>;
 
       const update = this.opened.sqlite.prepare(
         `UPDATE chat_parts
-         SET data_json = ?, tool_state = 'output-error', updated_at = ?
+         SET data_json = ?, tool_state = 'output-error',
+             continuation_run_id = NULL, updated_at = ?
          WHERE id = ?
            AND session_id = ?
            AND tool_state = ?
-           AND data_json = ?`
+           AND data_json = ?
+           AND continuation_run_id IS ?`
       );
       const now = Date.now();
       let finalized = 0;
@@ -833,7 +852,8 @@ export class SessionsStore {
           row.id,
           row.session_id,
           row.tool_state,
-          row.data_json
+          row.data_json,
+          row.continuation_run_id
         );
         finalized += Number(result.changes);
       }
@@ -1412,6 +1432,9 @@ export class SessionsStore {
             data_json: JSON.stringify(part.data ?? null),
             tool_call_id: part.tool_call_id ?? null,
             tool_state: part.tool_state ?? null,
+            // A fork copies transcript history, never an in-flight host
+            // continuation lease from the parent process.
+            continuation_run_id: null,
             created_at: part.created_at,
             updated_at: part.updated_at,
           });
@@ -1829,6 +1852,56 @@ export class SessionsStore {
     toolCallId: string,
     result: { type: string; data: unknown; tool_state: string }
   ): Promise<boolean> {
+    // Human-input results carry a stronger contract: consuming the answer must
+    // atomically record which resumed run owes its continuation. Force those
+    // callers through `commitHumanInputContinuation` so a future generic fill
+    // cannot recreate the restart hole.
+    if (isHumanInputPartType(result.type)) return false;
+    return this.fillToolResultInternal(
+      sessionId,
+      messageId,
+      toolCallId,
+      result,
+      null
+    );
+  }
+
+  /**
+   * GRIDA-SEC-004 — atomically consume one exact client-resolved human-input
+   * result and bind it to the run that will continue the model turn.
+   *
+   * The marker shares the same conditional UPDATE as the terminal tool result:
+   * there is never a durable `output-available`/`output-error` answer with no
+   * record that its continuation is still owed. Only the exact visible
+   * question/design-search row can be consumed. The marker stays internal to
+   * the host DB rather than leaking into renderer/model-visible `data_json`.
+   */
+  async commitHumanInputContinuation(
+    sessionId: string,
+    messageId: string,
+    toolCallId: string,
+    continuationRunId: string,
+    result: { type: string; data: unknown; tool_state: string }
+  ): Promise<boolean> {
+    if (continuationRunId.length === 0 || !isHumanInputPartType(result.type)) {
+      return false;
+    }
+    return this.fillToolResultInternal(
+      sessionId,
+      messageId,
+      toolCallId,
+      result,
+      continuationRunId
+    );
+  }
+
+  private async fillToolResultInternal(
+    sessionId: string,
+    messageId: string,
+    toolCallId: string,
+    result: { type: string; data: unknown; tool_state: string },
+    continuationRunId: string | null
+  ): Promise<boolean> {
     if (
       result.tool_state !== "output-available" &&
       result.tool_state !== "output-error"
@@ -1889,7 +1962,8 @@ export class SessionsStore {
       const updated = this.opened.sqlite
         .prepare(
           `UPDATE chat_parts
-           SET data_json = ?, tool_state = ?, updated_at = ?
+           SET data_json = ?, tool_state = ?, continuation_run_id = ?,
+               updated_at = ?
            WHERE id = ?
              AND session_id = ?
              AND message_id = ?
@@ -1908,6 +1982,7 @@ export class SessionsStore {
         .run(
           nextDataJson,
           result.tool_state,
+          continuationRunId,
           Date.now(),
           existing.id,
           sessionId,
@@ -1915,6 +1990,141 @@ export class SessionsStore {
           toolCallId,
           existing.type,
           existing.data_json,
+          sessionId
+        );
+      return updated.changes === 1;
+    });
+  }
+
+  /**
+   * Undo a just-committed human-input result when synchronous stream
+   * reservation fails before the correlated run starts. Identity is guarded by
+   * session/message/tool/run id and the exact stored JSON snapshot, so a stale
+   * failure cannot reopen a newer answer.
+   */
+  async rollbackHumanInputContinuation(
+    sessionId: string,
+    messageId: string,
+    toolCallId: string,
+    continuationRunId: string
+  ): Promise<boolean> {
+    if (continuationRunId.length === 0) return false;
+    return this.opened.withConnection(() => {
+      const humanTypeParams = HUMAN_INPUT_PART_TYPES.map(() => "?").join(", ");
+      const existing = this.opened.sqlite
+        .prepare(
+          `SELECT id, type, tool_state, data_json
+           FROM chat_parts
+           WHERE session_id = ?
+             AND message_id = ?
+             AND tool_call_id = ?
+             AND continuation_run_id = ?
+             AND type IN (${humanTypeParams})
+             AND tool_state IN ('output-available', 'output-error')
+             AND EXISTS (
+               SELECT 1
+               FROM chat_messages
+               WHERE chat_messages.id = chat_parts.message_id
+                 AND chat_messages.session_id = ?
+                 AND chat_messages.hidden_at IS NULL
+             )`
+        )
+        .get(
+          sessionId,
+          messageId,
+          toolCallId,
+          continuationRunId,
+          ...HUMAN_INPUT_PART_TYPES,
+          sessionId
+        ) as
+        | {
+            id: string;
+            type: string;
+            tool_state: string;
+            data_json: string;
+          }
+        | undefined;
+      if (!existing) return false;
+      const parsed = parseJsonOr(existing.data_json, null);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return false;
+      }
+      const pendingData: Record<string, unknown> = {
+        ...(parsed as Record<string, unknown>),
+        state: "input-available",
+      };
+      delete pendingData.output;
+      delete pendingData.errorText;
+      delete pendingData.error_text;
+      const pendingDataJson = JSON.stringify(pendingData);
+      const updated = this.opened.sqlite
+        .prepare(
+          `UPDATE chat_parts
+           SET data_json = ?, tool_state = 'input-available',
+               continuation_run_id = NULL, updated_at = ?
+           WHERE id = ?
+             AND session_id = ?
+             AND message_id = ?
+             AND tool_call_id = ?
+             AND type = ?
+             AND tool_state = ?
+             AND data_json = ?
+             AND continuation_run_id = ?`
+        )
+        .run(
+          pendingDataJson,
+          Date.now(),
+          existing.id,
+          sessionId,
+          messageId,
+          toolCallId,
+          existing.type,
+          existing.tool_state,
+          existing.data_json,
+          continuationRunId
+        );
+      return updated.changes === 1;
+    });
+  }
+
+  /**
+   * Clear the exact run's marker after its recorder has flushed at the terminal
+   * finish/error/abort barrier. The terminal human result remains unchanged.
+   */
+  async settleHumanInputContinuation(
+    sessionId: string,
+    messageId: string,
+    toolCallId: string,
+    continuationRunId: string
+  ): Promise<boolean> {
+    if (continuationRunId.length === 0) return false;
+    return this.opened.withConnection(() => {
+      const humanTypeParams = HUMAN_INPUT_PART_TYPES.map(() => "?").join(", ");
+      const updated = this.opened.sqlite
+        .prepare(
+          `UPDATE chat_parts
+           SET continuation_run_id = NULL, updated_at = ?
+           WHERE session_id = ?
+             AND message_id = ?
+             AND tool_call_id = ?
+             AND continuation_run_id = ?
+             AND type IN (${humanTypeParams})
+             AND tool_state IN ('output-available', 'output-error')
+             AND EXISTS (
+               SELECT 1
+               FROM chat_messages
+               WHERE chat_messages.id = chat_parts.message_id
+                 AND chat_messages.session_id = ?
+                 AND chat_messages.hidden_at IS NULL
+             )`
+        )
+        .run(
+          Date.now(),
+          sessionId,
+          messageId,
+          toolCallId,
+          continuationRunId,
+          ...HUMAN_INPUT_PART_TYPES,
           sessionId
         );
       return updated.changes === 1;
@@ -1948,10 +2158,15 @@ export class SessionsStore {
   }
 
   /**
-   * Classify this session's UNANSWERED human-in-the-loop block. A persisted
+   * Classify this session's UNSETTLED human-in-the-loop block. A persisted
    * supervised approval (`approval-requested`) maps to `approval`; a
    * human-input tool (e.g. `question`) paused at `input-available` maps to
-   * `user-input`. `null` means no visible human block is open.
+   * `user-input`. A committed human result whose exact continuation marker has
+   * not settled also maps to `user-input` as a fail-closed recovery posture.
+   * In normal operation that marker is cleared inside the stream's terminal
+   * settlement barrier before idle/error projection, so this extra leg is
+   * observable only after a commit→reserve failure or failed marker clear.
+   * `null` means no visible human block is open or unsettled.
    *
    * This is the authoritative, restart-durable source for both the projected
    * session status and the drain-pause predicate (RFC `queue` § drain-pause):
@@ -1978,6 +2193,7 @@ export class SessionsStore {
   ): Promise<"approval" | "user-input" | null> {
     const rows = await this.db
       .select({
+        continuation_run_id: chatParts.continuation_run_id,
         type: chatParts.type,
         tool_state: chatParts.tool_state,
       })
@@ -1991,6 +2207,10 @@ export class SessionsStore {
             eq(chatParts.tool_state, "approval-requested"),
             and(
               eq(chatParts.tool_state, "input-available"),
+              inArray(chatParts.type, HUMAN_INPUT_PART_TYPES)
+            ),
+            and(
+              isNotNull(chatParts.continuation_run_id),
               inArray(chatParts.type, HUMAN_INPUT_PART_TYPES)
             )
           )

@@ -34,6 +34,7 @@ import {
 } from "../../providers/endpoints";
 import type { SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
+import { ProviderReady } from "./provider-ready";
 
 export type SecretsRoutesDeps = {
   store: SecretsStore;
@@ -41,7 +42,7 @@ export type SecretsRoutesDeps = {
    *  (a keyed self-hosted gateway stores its key under its endpoint id). */
   endpoints?: EndpointProvidersStore;
   /** Trusted host edge after a provider credential is successfully stored. */
-  on_provider_ready?: () => void;
+  on_provider_ready?: ProviderReady.Hook;
 };
 
 export function registerSecretsRoutes(app: Hono, deps: SecretsRoutesDeps) {
@@ -83,7 +84,7 @@ export function registerSecretsRoutes(app: Hono, deps: SecretsRoutesDeps) {
     }
     await store.set(r.data.provider_id, r.data.key);
     console.log(`[agent-host-secrets] set providerId=${r.data.provider_id}`);
-    on_provider_ready?.();
+    ProviderReady.notify(on_provider_ready);
     return c.json({ ok: true });
   });
 

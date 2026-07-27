@@ -223,19 +223,18 @@ export class SessionScheduler {
 
   /**
    * A turn ended (registry `finish`) → waiting/idle/error, then maybe drain.
-   * A clean end retains `busy` while persisted state is consulted; this avoids
-   * an observable idle admission race before a pending block is classified.
+   * Both clean and hard-error ends retain `busy` while persisted state is
+   * consulted; this avoids an observable admission race before a pending block
+   * is classified. A hard error projects the durable wait when one exists,
+   * otherwise `error`, and never drains.
    */
   onFinish(sessionId: string, reason: StreamEndReason): void {
     this.active_sessions.delete(sessionId);
+    const revision = this.bumpRevision(sessionId);
     if (reason === "error") {
-      // Hard failure PAUSES the drain (RFC `queue`): queued rows wait for the
-      // next fired turn. Do NOT schedule a drain.
-      this.bumpRevision(sessionId);
-      this.setStatus(sessionId, { state: "error" });
+      void this.publishErroredStatus(sessionId, revision);
       return;
     }
-    const revision = this.bumpRevision(sessionId);
     void this.publishSettledStatus(sessionId, revision);
   }
 
@@ -256,6 +255,7 @@ export class SessionScheduler {
     }
     this.setDrainTimer(sessionId, this.cooldown_ms, async () => {
       if (
+        this.disposed ||
         this.getStatus(sessionId).state !== "idle" ||
         this.draining_sessions.has(sessionId)
       ) {
@@ -268,17 +268,22 @@ export class SessionScheduler {
         // after the clean-end classification (or this timer can have been
         // kicked from a cold/default-idle enqueue). Fail closed.
         const pending = await this.deps.pending_human_input_kind(sessionId);
-        if (this.getStatus(sessionId).state !== "idle") return;
+        if (this.disposed || this.getStatus(sessionId).state !== "idle") {
+          return;
+        }
         if (pending) {
           this.bumpRevision(sessionId);
           this.setStatus(sessionId, waitingStatus(pending));
           return;
         }
         const items = await this.deps.list_queued(sessionId);
-        if (this.getStatus(sessionId).state !== "idle") return;
+        if (this.disposed || this.getStatus(sessionId).state !== "idle") {
+          return;
+        }
         const head = items[0];
         if (!head) return;
         const fired = await this.deps.drain(sessionId, head.id);
+        if (this.disposed) return;
         if (!fired) {
           if (this.getStatus(sessionId).state !== "idle") return;
           // `drain` performs the decisive persisted-state check under
@@ -287,7 +292,9 @@ export class SessionScheduler {
           // retry loop against a row that must remain paused.
           const pendingAfterDrain =
             await this.deps.pending_human_input_kind(sessionId);
-          if (this.getStatus(sessionId).state !== "idle") return;
+          if (this.disposed || this.getStatus(sessionId).state !== "idle") {
+            return;
+          }
           if (pendingAfterDrain) {
             this.bumpRevision(sessionId);
             this.setStatus(sessionId, waitingStatus(pendingAfterDrain));
@@ -306,7 +313,11 @@ export class SessionScheduler {
         // the session busy, select the current head again after a cooldown.
         // Likewise, replay exactly one coalesced enqueue/refresh kick that
         // arrived during async preparation, including when preparation threw.
-        if ((retry || kicked) && this.getStatus(sessionId).state === "idle") {
+        if (
+          !this.disposed &&
+          (retry || kicked) &&
+          this.getStatus(sessionId).state === "idle"
+        ) {
           this.scheduleDrain(sessionId);
         }
       }
@@ -344,6 +355,23 @@ export class SessionScheduler {
     if (this.disposed || this.revision(sessionId) !== revision) return;
     this.setStatus(sessionId, status);
     if (status.state === "idle") this.scheduleDrain(sessionId);
+  }
+
+  /**
+   * Project a hard stream failure without losing a durable human-input wait.
+   * The same persisted classifier as clean settlement is authoritative, but
+   * its no-block `idle` result maps to `error`. There is deliberately no drain
+   * edge here: both waiting and error pause queued work.
+   */
+  private async publishErroredStatus(
+    sessionId: string,
+    revision: number
+  ): Promise<void> {
+    const classified = await this.readSettledStatus(sessionId);
+    if (this.disposed || this.revision(sessionId) !== revision) return;
+    const status: SessionStatus =
+      classified.state === "idle" ? { state: "error" } : classified;
+    this.setStatus(sessionId, status);
   }
 
   private async readSettledStatus(sessionId: string): Promise<SessionStatus> {

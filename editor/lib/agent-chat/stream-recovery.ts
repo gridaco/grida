@@ -81,11 +81,23 @@ export namespace StreamRecovery {
       }
     }
 
-    const restored = await args.rehydrate();
+    let restored: UIMessage[] | null = null;
+    try {
+      restored = await args.rehydrate();
+    } catch {
+      restored = null;
+    }
     if (restored) {
       args.applyMessages(restored);
-      await args.resumeStream();
-      return queued;
+      try {
+        await args.resumeStream();
+        return queued;
+      } catch {
+        // The durable transcript is already authoritative. Admission conflicts
+        // are recovered once their rejected tail is queued; a plain stream
+        // failure remains visible so the user can retry the attachment.
+        return isAdmissionConflict(args.kind) ? queued : false;
+      }
     }
 
     // `/agent/run` rejects before persistence, so removing its final

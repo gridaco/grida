@@ -494,6 +494,57 @@ describe("HTTP wire — /providers/endpoints/* and endpoint-id secrets", () => {
     expect(onSecretReady).toHaveBeenCalledOnce();
   });
 
+  it("keeps successful provider mutations successful when queue recovery rejects", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const failureApp = new Hono();
+    registerProvidersRoutes(failureApp, {
+      endpoints,
+      secrets,
+      on_provider_ready: async () => {
+        throw new Error("endpoint recovery failed");
+      },
+    });
+    registerSecretsRoutes(failureApp, {
+      store: secrets,
+      endpoints,
+      on_provider_ready: async () => {
+        throw new Error("secret recovery failed");
+      },
+    });
+    const failurePost = (route: string, body: unknown) =>
+      failureApp.request(route, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const endpoint = await failurePost("/providers/endpoints/set", {
+      config: OLLAMA,
+    });
+    const secret = await failurePost("/secrets/set", {
+      provider_id: "ollama",
+      key: "stored-despite-recovery-failure",
+    });
+
+    expect(endpoint.status).toBe(200);
+    expect(secret.status).toBe(200);
+    expect(await endpoints.get("ollama")).toMatchObject({ id: "ollama" });
+    expect(await secrets.has("ollama")).toBe(true);
+    await vi.waitFor(() => {
+      expect(warning).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "provider-ready hook failed: endpoint recovery failed"
+        )
+      );
+      expect(warning).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "provider-ready hook failed: secret recovery failed"
+        )
+      );
+    });
+    warning.mockRestore();
+  });
+
   it("probe route returns parsed models, 502s an unreachable endpoint", async () => {
     const probeApp = new Hono();
     registerProvidersRoutes(probeApp, {

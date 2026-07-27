@@ -16,6 +16,7 @@
 import type { Hono } from "hono";
 import { body, v } from "@grida/daemon/server";
 import type { GridaGatewaySessionStore } from "../../providers/gg-session";
+import { ProviderReady } from "./provider-ready";
 
 export type GridaAuthRoutesDeps = {
   store: GridaGatewaySessionStore;
@@ -24,7 +25,7 @@ export type GridaAuthRoutesDeps = {
    * server uses it to retry durable queues that startup recovery left intact
    * while GG was unavailable.
    */
-  on_provider_ready?: () => void;
+  on_provider_ready?: ProviderReady.Hook;
 };
 
 export function registerGridaAuthRoutes(app: Hono, deps: GridaAuthRoutesDeps) {
@@ -70,7 +71,7 @@ export function registerGridaAuthRoutes(app: Hono, deps: GridaAuthRoutesDeps) {
         (organization ? ` org=${organization.id}` : "") +
         ` expires_in=${Math.round((r.data.expires_at - Date.now()) / 1000)}s`
     );
-    on_provider_ready?.();
+    ProviderReady.notify(on_provider_ready);
     return c.json({ ok: true });
   });
 
