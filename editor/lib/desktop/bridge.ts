@@ -950,11 +950,11 @@ export namespace workspaces {
     return await bridgeOrThrow().workspaces.read_file(workspaceId, relPath);
   }
   /**
-   * Read raw bytes (base64-encoded) for the image viewer. The agent host
-   * applies the same 1 MiB cap as {@link readFile} but skips the
-   * UTF-8 / null-byte gates so genuine binary content can come
-   * through. Callers should pair the result with a `data:<mime>;
-   * base64,` prefix derived from the file extension.
+   * Read raw bytes (base64-encoded) for buffered workspace resources. The
+   * agent host allows up to 8 MiB here, separately from {@link readFile}'s
+   * 1 MiB source-text cap, and skips the UTF-8 / null-byte gates so genuine
+   * binary content can come through. Callers should pair the result with a
+   * `data:<mime>;base64,` prefix derived from the file extension.
    */
   export async function readFileBytes(
     workspaceId: string,

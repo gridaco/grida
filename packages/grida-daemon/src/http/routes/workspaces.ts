@@ -26,6 +26,14 @@ import { workspaceFs } from "../../workspaces/fs";
 import { body, v } from "../validate";
 
 /**
+ * Buffered binary resources cross the loopback route as base64-in-JSON, so
+ * they still need a finite ceiling. Keep this separate from the 1 MiB
+ * source-text budget: 8 MiB covers ordinary generated images without making
+ * whole-file buffering the general media transport.
+ */
+export const MAX_BUFFERED_WORKSPACE_RESOURCE_BYTES = 8 * 1024 * 1024;
+
+/**
  * Resolve a workspace by id, or return a 404 JSON response. Caller
  * does `if (ws instanceof Response) return ws;` to short-circuit.
  */
@@ -139,8 +147,9 @@ export function registerWorkspacesRoutes(
 
   // POST /workspaces/readfilebytes { workspaceId, relPath }
   //   → {base64, size, mtime}
-  // Sister to /readfile for the read-only image viewer; same size cap,
-  // no UTF-8 check.
+  // Buffered resource fallback for consumers that cannot use the streamed
+  // /workspaces/file route. Its 8 MiB cap is intentionally distinct from the
+  // 1 MiB source-text policy; no UTF-8 check applies.
   app.post("/workspaces/readfilebytes", async (c) => {
     const r = await body(c, {
       workspace_id: v.string,
@@ -152,7 +161,8 @@ export function registerWorkspacesRoutes(
     try {
       const result = await workspaceFs.readFileBytes(
         workspace,
-        r.data.rel_path
+        r.data.rel_path,
+        { max_bytes: MAX_BUFFERED_WORKSPACE_RESOURCE_BYTES }
       );
       return c.json(result);
     } catch (err) {

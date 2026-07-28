@@ -116,7 +116,7 @@ function LoadingState({ relPath }: { relPath: string }) {
  * the base64 media fallback). The streamed media path (#924) has no cap, so it
  * passes no hint. */
 const SIDECAR_CAP_HINT =
-  "The viewer reads files up to 1 MiB. Larger or unreadable files are rejected by the agent sidecar.";
+  "The viewer reads text files up to 1 MiB and buffered media up to 8 MiB.";
 
 function ErrorState({ message, hint }: { message: string; hint?: string }) {
   return (

@@ -289,10 +289,11 @@ export namespace workspaceFs {
    * known-safe content types (PNG/JPG/WebP/etc.) a path to the
    * client.
    *
-   * The same size cap applies — large images aren't free to round-trip
-   * through a JSON+base64 payload (≈33% overhead), and the workspace
-   * pane is for *viewing*, not for handling 50 MB scan files. Callers
-   * pick a smaller in-pane affordance for oversized assets.
+   * The 1 MiB source-text cap remains the default. Callers that intentionally
+   * buffer binary resources must provide their own finite budget; for example,
+   * the Desktop `/workspaces/readfilebytes` route and agent image inspection
+   * allow ordinary multi-MiB images. Streamed viewers use {@link openFile}
+   * instead of raising this indefinitely.
    *
    * Mime detection lives on the client side: this function is
    * deliberately content-agnostic. The route fans out to whichever
@@ -303,9 +304,8 @@ export namespace workspaceFs {
     relPath: string,
     opts?: { max_bytes?: number }
   ): Promise<{ base64: string; size: number; mtime: number }> {
-    // The 1 MiB default suits the source-file viewer; callers that legitimately
-    // serve larger binaries (e.g. the agent's `view_image`, up to its own
-    // perception cap) raise it so a valid image isn't rejected as too-large.
+    // The 1 MiB default suits source-file reads. Callers that legitimately
+    // buffer larger binaries must opt into a bounded, caller-owned budget.
     const maxBytes = opts?.max_bytes ?? MAX_FILE_BYTES;
     const abs = await resolveInside(workspace, relPath, { must_exist: true });
     const stat = await fs.stat(abs);

@@ -22,8 +22,10 @@ import {
   createDaemonFixture,
   type DaemonFixture,
 } from "../../test/daemon-fixture";
-import { workspaceFs } from "../../workspaces/fs";
-import { registerWorkspacesRoutes } from "./workspaces";
+import {
+  MAX_BUFFERED_WORKSPACE_RESOURCE_BYTES,
+  registerWorkspacesRoutes,
+} from "./workspaces";
 
 const symlinkIt = process.platform === "win32" ? it.skip : it;
 
@@ -171,11 +173,14 @@ describe("GET /workspaces/file (#924)", () => {
     }
   );
 
-  it("is NOT subject to the 1 MiB base64 cap — streams a large file", async () => {
-    // A file well past MAX_FILE_BYTES (the buffered readers' cap) streams fine,
-    // because the streaming path has constant memory. This is the bug #924
-    // fixes: the base64 reader rejected this with file-too-large.
-    const big = Buffer.alloc(workspaceFs.MAX_FILE_BYTES + 4096, 0x61); // 'a'
+  it("is NOT subject to the buffered resource cap — streams a large file", async () => {
+    // A file past the base64 route's explicit ceiling streams fine because
+    // this path has constant memory. This is the transport distinction #924
+    // established: the buffered reader remains bounded; streaming does not.
+    const big = Buffer.alloc(
+      MAX_BUFFERED_WORKSPACE_RESOURCE_BYTES + 4096,
+      0x61
+    ); // 'a'
     await fixture.write_workspace_file("big.png", big.toString("binary"));
 
     const res = await app.request(url("big.png"));
