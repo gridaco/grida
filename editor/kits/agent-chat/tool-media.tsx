@@ -16,7 +16,6 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { getToolName } from "ai";
-import { Shimmer } from "@app/ui/ai-elements/shimmer";
 import { AgentVision } from "@grida/agent/vision";
 import { FullscreenImagePreview } from "@/kits/image-preview";
 import type { ToolCallEntry } from "@/lib/agent-chat";
@@ -238,15 +237,9 @@ function PendingPrompt({ prompt }: { prompt?: string }): ReactNode {
   const elapsed = useElapsedSeconds();
   return (
     <div className="max-w-prose space-y-0.5">
-      {prompt ? (
-        <Shimmer as="p" className="max-w-prose text-xs">
-          {prompt}
-        </Shimmer>
-      ) : (
-        <Shimmer as="p" className="text-xs">
-          Generating image
-        </Shimmer>
-      )}
+      <p className="shimmer max-w-prose text-xs text-muted-foreground">
+        {prompt ?? "Generating image"}
+      </p>
       {elapsed * 1000 >= ELAPSED_REVEAL_AFTER_MS && (
         <div className="tabular-nums text-[10px] text-muted-foreground">
           {formatElapsed(elapsed)}
