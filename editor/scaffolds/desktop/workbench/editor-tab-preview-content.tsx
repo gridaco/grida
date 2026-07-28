@@ -17,6 +17,7 @@ import {
 } from "react";
 import {
   Code2Icon,
+  FileArchiveIcon,
   FileTextIcon,
   GalleryVerticalEndIcon,
   ImageIcon,
@@ -112,6 +113,7 @@ function ThumbnailBody({
         <WorkspaceVideoThumbnail workspaceId={workspaceId} relPath={relPath} />
       );
     case "markdown":
+    case "zip":
     case "text":
       return null;
   }
@@ -492,6 +494,8 @@ function iconFor(kind: WorkspaceFileKind.Kind): ThumbnailIcon {
       return ImageIcon;
     case "video":
       return VideoIcon;
+    case "zip":
+      return FileArchiveIcon;
     case "markdown":
       return FileTextIcon;
     case "text":

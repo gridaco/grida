@@ -7,7 +7,14 @@ import { dotcanvas } from "dotcanvas";
  * surfaces cannot drift into disagreeing about the same path.
  */
 export namespace WorkspaceFileKind {
-  export type Kind = "canvas" | "svg" | "image" | "video" | "markdown" | "text";
+  export type Kind =
+    | "canvas"
+    | "svg"
+    | "image"
+    | "video"
+    | "zip"
+    | "markdown"
+    | "text";
 
   const MARKDOWN_EXTENSIONS = new Set([".md", ".markdown"]);
 
@@ -63,6 +70,7 @@ export namespace WorkspaceFileKind {
     ".mkv": "video/x-matroska",
     ".3gp": "video/3gpp",
     ".3g2": "video/3gpp2",
+    ".zip": "application/zip",
   };
 
   export function of(relPath: string): Kind {
@@ -72,6 +80,7 @@ export namespace WorkspaceFileKind {
     if (MARKDOWN_EXTENSIONS.has(ext)) return "markdown";
     if (IMAGE_EXTENSIONS.has(ext)) return "image";
     if (VIDEO_EXTENSIONS.has(ext)) return "video";
+    if (ext === ".zip") return "zip";
     return "text";
   }
 
@@ -101,6 +110,8 @@ export namespace WorkspaceFileKind {
         return "Image";
       case "video":
         return "Video";
+      case "zip":
+        return "ZIP archive";
       case "markdown":
         return "Markdown";
       case "text":

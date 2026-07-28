@@ -7,6 +7,7 @@ describe("WorkspaceFileKind", () => {
     expect(WorkspaceFileKind.of("art.svg")).toBe("svg");
     expect(WorkspaceFileKind.of("photo.avif")).toBe("image");
     expect(WorkspaceFileKind.of("clip.webm")).toBe("video");
+    expect(WorkspaceFileKind.of("export.ZIP")).toBe("zip");
     expect(WorkspaceFileKind.of("notes.markdown")).toBe("markdown");
     expect(WorkspaceFileKind.of(".env")).toBe("text");
     expect(WorkspaceFileKind.of("src/app.tsx")).toBe("text");
@@ -21,6 +22,7 @@ describe("WorkspaceFileKind", () => {
     );
     expect(WorkspaceFileKind.parentPath("README.md")).toBeNull();
     expect(WorkspaceFileKind.mimeType("A.JPEG")).toBe("image/jpeg");
+    expect(WorkspaceFileKind.mimeType("export.ZIP")).toBe("application/zip");
     expect(WorkspaceFileKind.mimeType("unknown.bin")).toBe(
       "application/octet-stream"
     );

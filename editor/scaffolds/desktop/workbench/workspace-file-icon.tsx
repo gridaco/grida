@@ -1,5 +1,6 @@
 import {
   FileIcon,
+  FileArchiveIcon,
   GalleryVerticalEndIcon,
   ImageIcon,
   SplineIcon,
@@ -37,6 +38,8 @@ export namespace WorkspaceFileIcon {
         return ImageIcon;
       case "video":
         return VideoIcon;
+      case "zip":
+        return FileArchiveIcon;
       case "markdown":
         return TextIcon;
       case "text":

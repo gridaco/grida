@@ -1,4 +1,5 @@
 import {
+  FileArchiveIcon,
   FileIcon,
   GalleryVerticalEndIcon,
   ImageIcon,
@@ -15,6 +16,7 @@ describe("WorkspaceFileIcon", () => {
     expect(WorkspaceFileIcon.forKind("svg")).toBe(SplineIcon);
     expect(WorkspaceFileIcon.forKind("image")).toBe(ImageIcon);
     expect(WorkspaceFileIcon.forKind("video")).toBe(VideoIcon);
+    expect(WorkspaceFileIcon.forKind("zip")).toBe(FileArchiveIcon);
     expect(WorkspaceFileIcon.forKind("markdown")).toBe(TextIcon);
     expect(WorkspaceFileIcon.forKind("text")).toBe(FileIcon);
   });
