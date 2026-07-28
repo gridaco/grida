@@ -524,6 +524,7 @@ export function open_settings_window({
     base_url: baseUrl,
     urlPath: "/desktop/settings",
     title: "Grida Settings",
+    presentation: "compact",
     additionalArguments: buildDesktopArguments({ app }),
   });
 }
