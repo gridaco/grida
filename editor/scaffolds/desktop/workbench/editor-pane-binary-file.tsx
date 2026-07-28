@@ -1,16 +1,17 @@
 "use client";
 
-import { FileArchiveIcon, FolderOpenIcon } from "lucide-react";
+import { FolderOpenIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
 import type { Workspace } from "@/lib/desktop/bridge";
+import { WorkspaceFileIcon } from "./workspace-file-icon";
 import { WorkspaceFileKind } from "./workspace-file-kind";
 import { revealInFinder } from "./workbench-file-actions";
 
 /**
- * ZIP files are useful workspace artifacts but not editable documents.
- * Keep them out of the UTF-8 reader and offer the one meaningful native action.
+ * Files without a dedicated Grida viewer stay out of the UTF-8 reader and
+ * expose the one universally useful native action.
  */
-export function EditorPaneZipFile({
+export function EditorPaneBinaryFile({
   workspace,
   relPath,
 }: {
@@ -19,18 +20,18 @@ export function EditorPaneZipFile({
 }) {
   return (
     <div
-      data-testid="viewer-workspace-zip"
+      data-testid="viewer-workspace-binary"
       className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center"
     >
       <div className="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        <FileArchiveIcon className="size-6" aria-hidden />
+        <WorkspaceFileIcon relPath={relPath} className="size-6" />
       </div>
       <div className="min-w-0 space-y-1">
         <p className="break-all text-sm font-medium">
           {WorkspaceFileKind.filename(relPath)}
         </p>
         <p className="text-xs text-muted-foreground">
-          {WorkspaceFileKind.typeLabel("zip")}
+          {WorkspaceFileKind.label(relPath)}
         </p>
       </div>
       <Button

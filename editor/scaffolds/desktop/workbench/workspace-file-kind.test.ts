@@ -7,10 +7,26 @@ describe("WorkspaceFileKind", () => {
     expect(WorkspaceFileKind.of("art.svg")).toBe("svg");
     expect(WorkspaceFileKind.of("photo.avif")).toBe("image");
     expect(WorkspaceFileKind.of("clip.webm")).toBe("video");
-    expect(WorkspaceFileKind.of("export.ZIP")).toBe("zip");
     expect(WorkspaceFileKind.of("notes.markdown")).toBe("markdown");
     expect(WorkspaceFileKind.of(".env")).toBe("text");
     expect(WorkspaceFileKind.of("src/app.tsx")).toBe("text");
+    expect(WorkspaceFileKind.of("schema.graphql")).toBe("text");
+    expect(WorkspaceFileKind.of("content.mdx")).toBe("text");
+    expect(WorkspaceFileKind.of("Dockerfile")).toBe("text");
+    expect(WorkspaceFileKind.of("README")).toBe("text");
+    expect(WorkspaceFileKind.of("export.ZIP")).toBe("binary");
+    expect(WorkspaceFileKind.of(".DS_Store")).toBe("binary");
+    expect(WorkspaceFileKind.of("unknown.custom")).toBe("binary");
+  });
+
+  it("classifies unsupported binaries only for labels and icons", () => {
+    expect(WorkspaceFileKind.binaryFamily("export.ZIP")).toBe("archive");
+    expect(WorkspaceFileKind.binaryFamily("brief.pdf")).toBe("document");
+    expect(WorkspaceFileKind.binaryFamily("deck.pptx")).toBe("presentation");
+    expect(WorkspaceFileKind.binaryFamily("design.psd")).toBe("design");
+    expect(WorkspaceFileKind.binaryFamily("unknown.bin")).toBe("binary");
+    expect(WorkspaceFileKind.label("export.ZIP")).toBe("Archive");
+    expect(WorkspaceFileKind.label("unknown.bin")).toBe("File");
   });
 
   it("provides stable display metadata and base64 fallback MIME types", () => {

@@ -17,7 +17,7 @@ import {
 } from "react";
 import {
   Code2Icon,
-  FileArchiveIcon,
+  FileIcon,
   FileTextIcon,
   GalleryVerticalEndIcon,
   ImageIcon,
@@ -71,8 +71,8 @@ export function EditorTabPreviewContent({
         </div>
         <p className="mt-0.5 break-all text-[10px] text-muted-foreground">
           {parent
-            ? `${parent} · ${WorkspaceFileKind.typeLabel(kind)}`
-            : WorkspaceFileKind.typeLabel(kind)}
+            ? `${parent} · ${WorkspaceFileKind.label(relPath)}`
+            : WorkspaceFileKind.label(relPath)}
         </p>
       </div>
     </div>
@@ -113,8 +113,8 @@ function ThumbnailBody({
         <WorkspaceVideoThumbnail workspaceId={workspaceId} relPath={relPath} />
       );
     case "markdown":
-    case "zip":
     case "text":
+    case "binary":
       return null;
   }
 }
@@ -494,11 +494,11 @@ function iconFor(kind: WorkspaceFileKind.Kind): ThumbnailIcon {
       return ImageIcon;
     case "video":
       return VideoIcon;
-    case "zip":
-      return FileArchiveIcon;
     case "markdown":
       return FileTextIcon;
     case "text":
       return Code2Icon;
+    case "binary":
+      return FileIcon;
   }
 }

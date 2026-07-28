@@ -1,4 +1,6 @@
 import { dotcanvas } from "dotcanvas";
+import { LanguageDescription } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
 
 /**
  * The workbench's path-derived file family.
@@ -12,11 +14,100 @@ export namespace WorkspaceFileKind {
     | "svg"
     | "image"
     | "video"
-    | "zip"
     | "markdown"
-    | "text";
+    | "text"
+    | "binary";
+
+  export type BinaryFamily =
+    | "archive"
+    | "audio"
+    | "document"
+    | "spreadsheet"
+    | "presentation"
+    | "font"
+    | "package"
+    | "database"
+    | "design"
+    | "binary";
 
   const MARKDOWN_EXTENSIONS = new Set([".md", ".markdown"]);
+
+  const PLAIN_TEXT_EXTENSIONS = new Set([
+    ".txt",
+    ".text",
+    ".log",
+    ".csv",
+    ".tsv",
+    ".env",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".config",
+    ".properties",
+    ".lock",
+    ".jsonc",
+    ".json5",
+    ".mdx",
+    ".svelte",
+    ".astro",
+    ".prisma",
+    ".graphql",
+    ".gql",
+    ".tf",
+    ".tfvars",
+    ".hcl",
+    ".nix",
+    ".gradle",
+    ".cmake",
+    ".rego",
+    ".sol",
+    ".mustache",
+    ".hbs",
+    ".liquid",
+    ".ejs",
+    ".njk",
+  ]);
+
+  const PLAIN_TEXT_FILENAMES = new Set([
+    "readme",
+    "license",
+    "notice",
+    "authors",
+    "contributors",
+    "changelog",
+    "changes",
+    "copying",
+    "codeowners",
+    "makefile",
+    "rakefile",
+    "gemfile",
+    "brewfile",
+    "procfile",
+    "justfile",
+    ".env",
+    ".gitignore",
+    ".gitattributes",
+    ".gitmodules",
+    ".gitconfig",
+    ".editorconfig",
+    ".npmrc",
+    ".yarnrc",
+    ".nvmrc",
+    ".node-version",
+    ".python-version",
+    ".ruby-version",
+    ".tool-versions",
+    ".dockerignore",
+    ".prettierignore",
+    ".eslintignore",
+    ".stylelintignore",
+    ".prettierrc",
+    ".eslintrc",
+    ".babelrc",
+    ".browserslistrc",
+    ".stylelintrc",
+    ".postcssrc",
+  ]);
 
   const IMAGE_EXTENSIONS = new Set([
     ".png",
@@ -45,6 +136,81 @@ export namespace WorkspaceFileKind {
     ".3gp",
     ".3g2",
   ]);
+
+  const BINARY_EXTENSIONS_BY_FAMILY: Record<
+    Exclude<BinaryFamily, "binary">,
+    ReadonlySet<string>
+  > = {
+    archive: new Set([
+      ".zip",
+      ".7z",
+      ".rar",
+      ".tar",
+      ".tgz",
+      ".gz",
+      ".bz2",
+      ".xz",
+      ".zst",
+    ]),
+    audio: new Set([
+      ".mp3",
+      ".wav",
+      ".flac",
+      ".aac",
+      ".m4a",
+      ".opus",
+      ".oga",
+      ".aiff",
+      ".wma",
+    ]),
+    document: new Set([
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".odt",
+      ".rtf",
+      ".pages",
+      ".epub",
+    ]),
+    spreadsheet: new Set([".xls", ".xlsx", ".ods", ".numbers"]),
+    presentation: new Set([".ppt", ".pptx", ".odp", ".key"]),
+    font: new Set([".ttf", ".otf", ".woff", ".woff2", ".eot"]),
+    package: new Set([
+      ".dmg",
+      ".pkg",
+      ".iso",
+      ".exe",
+      ".msi",
+      ".deb",
+      ".rpm",
+      ".apk",
+      ".ipa",
+      ".appimage",
+    ]),
+    database: new Set([
+      ".sqlite",
+      ".sqlite3",
+      ".db",
+      ".parquet",
+      ".arrow",
+      ".avro",
+    ]),
+    design: new Set([
+      ".psd",
+      ".ai",
+      ".indd",
+      ".sketch",
+      ".fig",
+      ".xd",
+      ".blend",
+      ".fbx",
+      ".obj",
+      ".gltf",
+      ".glb",
+      ".dwg",
+      ".dxf",
+    ]),
+  };
 
   const MIME_BY_EXTENSION: Record<string, string> = {
     ".png": "image/png",
@@ -80,8 +246,8 @@ export namespace WorkspaceFileKind {
     if (MARKDOWN_EXTENSIONS.has(ext)) return "markdown";
     if (IMAGE_EXTENSIONS.has(ext)) return "image";
     if (VIDEO_EXTENSIONS.has(ext)) return "video";
-    if (ext === ".zip") return "zip";
-    return "text";
+    if (isSupportedText(relPath)) return "text";
+    return "binary";
   }
 
   export function extension(relPath: string): string {
@@ -100,8 +266,18 @@ export namespace WorkspaceFileKind {
     return parts.length > 1 ? parts.slice(0, -1).join("/") : null;
   }
 
-  export function typeLabel(kind: Kind): string {
-    switch (kind) {
+  export function binaryFamily(relPath: string): BinaryFamily {
+    const ext = extension(relPath);
+    for (const family of Object.keys(BINARY_EXTENSIONS_BY_FAMILY) as Array<
+      Exclude<BinaryFamily, "binary">
+    >) {
+      if (BINARY_EXTENSIONS_BY_FAMILY[family].has(ext)) return family;
+    }
+    return "binary";
+  }
+
+  export function label(relPath: string): string {
+    switch (of(relPath)) {
       case "canvas":
         return "Canvas";
       case "svg":
@@ -110,16 +286,52 @@ export namespace WorkspaceFileKind {
         return "Image";
       case "video":
         return "Video";
-      case "zip":
-        return "ZIP archive";
       case "markdown":
         return "Markdown";
       case "text":
         return "Text";
+      case "binary":
+        return binaryFamilyLabel(binaryFamily(relPath));
     }
   }
 
   export function mimeType(relPath: string): string {
     return MIME_BY_EXTENSION[extension(relPath)] ?? "application/octet-stream";
+  }
+
+  function isSupportedText(relPath: string): boolean {
+    const filenameValue = filename(relPath);
+    const name = filenameValue.toLowerCase();
+    if (PLAIN_TEXT_FILENAMES.has(name) || name.startsWith(".env.")) return true;
+    if (PLAIN_TEXT_EXTENSIONS.has(extension(name))) return true;
+    return (
+      LanguageDescription.matchFilename(languages, filenameValue) !== null ||
+      LanguageDescription.matchFilename(languages, name) !== null
+    );
+  }
+
+  function binaryFamilyLabel(family: BinaryFamily): string {
+    switch (family) {
+      case "archive":
+        return "Archive";
+      case "audio":
+        return "Audio";
+      case "document":
+        return "Document";
+      case "spreadsheet":
+        return "Spreadsheet";
+      case "presentation":
+        return "Presentation";
+      case "font":
+        return "Font";
+      case "package":
+        return "Package";
+      case "database":
+        return "Database";
+      case "design":
+        return "Design file";
+      case "binary":
+        return "File";
+    }
   }
 }
