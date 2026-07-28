@@ -17,13 +17,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getToolName } from "ai";
 import { Shimmer } from "@app/ui/ai-elements/shimmer";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogTrigger,
-} from "@app/ui/components/dialog";
 import { AgentVision } from "@grida/agent/vision";
+import { FullscreenImagePreview } from "@/kits/image-preview";
 import type { ToolCallEntry } from "@/lib/agent-chat";
 
 // `@grida/agent/gen` is not a published entrypoint; the tool name is locked
@@ -112,47 +107,6 @@ export function mediaPath(entry: ToolCallEntry): string | undefined {
 const imageClass = "max-h-96 max-w-full rounded-md border object-contain";
 const ELAPSED_REVEAL_AFTER_MS = 3000;
 
-export function FullscreenImagePreview({
-  src,
-  alt,
-  title,
-  className,
-  children,
-}: {
-  src: string;
-  alt: string;
-  title?: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className={`inline-block max-w-full cursor-zoom-in rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${className ?? ""}`}
-          title={title}
-        >
-          {children}
-        </button>
-      </DialogTrigger>
-      <DialogContent
-        className="flex h-screen max-h-screen w-screen max-w-none items-center justify-center rounded-none border-0 bg-background/95 p-4 shadow-none backdrop-blur-sm sm:max-w-none"
-        showCloseButton
-      >
-        <DialogTitle className="sr-only">{title ?? alt}</DialogTitle>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={alt}
-          className="max-h-full max-w-full object-contain"
-          decoding="async"
-        />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /** `view_image`: the viewed path, then the image (or refusal message). */
 function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
   const path = mediaPath(entry);
@@ -169,10 +123,12 @@ function ViewImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
         </div>
       )}
       {src ? (
+        /* Interaction contract: test/desktop-agent-chat-media-preview.md */
         <FullscreenImagePreview
           src={src}
           alt={path ?? "viewed image"}
           title={path}
+          downloadName={path}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -219,6 +175,7 @@ function GenerateImageBody({ entry }: { entry: ToolCallEntry }): ReactNode {
           src={src}
           alt={prompt ?? "generated image"}
           title={prompt}
+          downloadName={path}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -311,6 +268,7 @@ function ReferenceStrip({ references }: { references: string[] }): ReactNode {
             src={src}
             alt={`Reference ${index + 1}`}
             title={reference}
+            downloadName={reference}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

@@ -9,8 +9,8 @@
 import { getToolName } from "ai";
 import { Loader2Icon } from "lucide-react";
 import { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import { FullscreenImagePreview } from "@/kits/image-preview";
 import type { ToolCallEntry } from "@/lib/agent-chat";
-import { FullscreenImagePreview } from "./tool-media";
 
 export function isDesignSearchEntry(entry: ToolCallEntry): boolean {
   return getToolName(entry) === AgentDesignSearch.TOOL_NAME;
