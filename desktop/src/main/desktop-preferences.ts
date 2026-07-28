@@ -85,9 +85,7 @@ export class DesktopPreferences {
 
   completeLegacyRendererOnboardingMigration(completed: boolean): Promise<void> {
     return this.#setOnboardingState({
-      completed_version: completed
-        ? ONBOARDING_VERSION
-        : this.#value.onboarding.completed_version,
+      completed_version: completed ? ONBOARDING_VERSION : undefined,
       renderer_migration_complete: true,
     });
   }
@@ -110,7 +108,7 @@ export class DesktopPreferences {
     completed_version: completedVersion,
     renderer_migration_complete: rendererMigrationComplete,
   }: {
-    completed_version: number;
+    completed_version?: number;
     renderer_migration_complete?: boolean;
   }): Promise<void> {
     const operation = this.#writeQueue.then(async () => {
@@ -124,7 +122,8 @@ export class DesktopPreferences {
         schema_version: SCHEMA_VERSION,
         onboarding: {
           ...this.#value.onboarding,
-          completed_version: completedVersion,
+          completed_version:
+            completedVersion ?? this.#value.onboarding.completed_version,
         },
         ...(rendererMigrationComplete === undefined
           ? {}

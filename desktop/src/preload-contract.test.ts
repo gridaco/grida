@@ -25,7 +25,7 @@ describe("Desktop preload agent seam", () => {
 
   it("forwards the native ChatGPT connect result without translating errors", () => {
     expect(preloadSource).toMatch(
-      /chatgpt:\s*{\s*connect:\s*\(\)\s*=>\s*ipcRenderer\.invoke\(IPC_CHANNELS\.CHATGPT_CONNECT\)/
+      /chatgpt:\s*{\s*connect:\s*\(\)\s*=>\s*ipcRenderer\.invoke\(IPC_CHANNELS\.CHATGPT_CONNECT\)\s*[,}]/
     );
   });
 });

@@ -104,6 +104,24 @@ describe("DesktopPreferences", () => {
     });
   });
 
+  it("does not let a queued absent renderer migration roll back completion", async () => {
+    const preferences = await createPreferences();
+
+    await Promise.all([
+      preferences.completeOnboarding(),
+      preferences.completeLegacyRendererOnboardingMigration(false),
+    ]);
+
+    expect(preferences.isOnboardingComplete()).toBe(true);
+    expect(preferences.needsLegacyRendererOnboardingMigration()).toBe(false);
+    await expect(readPersisted()).resolves.toMatchObject({
+      onboarding: {
+        completed_version: DesktopPreferences.onboarding_version,
+      },
+      migrations: { renderer_onboarding_v1: true },
+    });
+  });
+
   it("publishes memory only after a durable write and recovers its queue", async () => {
     const blockedPath = path.join(userDataPath, "blocked");
     const preferences = await DesktopPreferences.open({

@@ -29,8 +29,8 @@ Each onboarding step has dedicated generated artwork. The artwork carries no
 text badge; the official OpenAI logo appears on the ChatGPT sign-in action. The
 flow has no Back action.
 
-Grida account authentication keeps the same compact geometry after onboarding
-is complete. ChatGPT sign-in opens the system browser and returns to a connected
+Grida account authentication keeps the same compact geometry through
+onboarding. ChatGPT sign-in opens the system browser and returns to a connected
 state in the same step. The flow never exposes credentials to the renderer,
 never invokes ACP, and never blocks the user from continuing without ChatGPT. A
 folder opened during onboarding becomes the welcome composer's active
