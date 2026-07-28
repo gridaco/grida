@@ -35,9 +35,9 @@ import { protocol_router } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
 import { open_handoff } from "./main/open-handoff";
 import { startup_window } from "./main/startup-window-policy";
-import { onboarding_state } from "./main/onboarding-state";
 import { DesktopAccountSession } from "./main/account-session";
 import { DesktopEntryWindow } from "./main/desktop-entry-window";
+import { DesktopPreferences } from "./main/desktop-preferences";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -555,9 +555,6 @@ app.on("ready", async () => {
     app.dock?.setIcon(create_runtime_app_icon());
   }
 
-  const nativeOnboardingComplete = await onboarding_state.isComplete(
-    app.getPath("userData")
-  );
   const startupBootstrap = startup_window.bootstrap({
     pending_files: pendingFiles.length,
   });
@@ -566,6 +563,20 @@ app.on("ready", async () => {
     fetch: async (url, init) =>
       (await session.defaultSession.fetch(url, init)) as Response,
   });
+  let desktopPreferences: DesktopPreferences;
+  try {
+    desktopPreferences = await DesktopPreferences.open({
+      user_data_path: app.getPath("userData"),
+    });
+  } catch {
+    console.error("[grida] desktop preferences could not be read");
+    dialog.showErrorBox(
+      "Grida couldn't start",
+      "Desktop preferences could not be read. Check that Grida can access its application data, then relaunch the app."
+    );
+    app.quit();
+    return;
+  }
   let markAuthenticatedEntryReady!: () => void;
   const authenticatedEntryReady = new Promise<void>((resolve) => {
     markAuthenticatedEntryReady = resolve;
@@ -574,10 +585,7 @@ app.on("ready", async () => {
     app,
     base_url: EDITOR_BASE_URL,
     account: accountSession,
-    onboarding_complete: nativeOnboardingComplete,
-    mark_onboarding_complete: async () => {
-      await onboarding_state.markComplete(app.getPath("userData"));
-    },
+    preferences: desktopPreferences,
     startup_main_path:
       startupBootstrap === "restore-last-workspace"
         ? "/desktop/welcome?startup=restore-last-workspace"

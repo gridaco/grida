@@ -25,6 +25,8 @@ legal/support contract with OpenAI.
 
 ```text
 Electron main/preload (desktop)
+  -> owns the live Grida-account projection and versioned Desktop preferences
+  -> derives the one sign-in / onboarding / main entry-window role
   -> owns the exact 127.0.0.1 ephemeral listener and per-spawn auth
   -> transfers only accepted connected sockets to the socketless sidecar
   -> owns provider destination grants and a dedicated Chromium network session
@@ -40,6 +42,14 @@ Electron main/preload (desktop)
 editor /desktop/*
   -> owns UX only, through typed bridge clients
 ```
+
+Small, non-secret native preferences live in `preferences.json` under
+Electron's `userData` directory and are owned exclusively by main. The hosted
+renderer receives purpose-specific actions, never a generic preferences
+key/value bridge. `DesktopPreferences` uses a small versioned JSON document
+with owner-only atomic writes. Account cookies remain in Chromium's HttpOnly
+session, while provider credentials and API keys remain in the sidecar's secret
+store.
 
 On macOS and Linux, the sidecar runs under `srt` with no direct external
 destinations and `allow_local_binding: false`; Electron main supplies the two

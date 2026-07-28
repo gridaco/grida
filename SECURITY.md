@@ -978,7 +978,8 @@ paths, and params are public, so the design must not rely on obscurity.
    through [desktop/src/main/account-session.ts](desktop/src/main/account-session.ts)
    and [the fixed `/desktop/auth/me` route](editor/app/desktop/auth/me/route.ts),
    combines only the resulting `signed-in` / `signed-out` state with native
-   onboarding state, and chooses the next role. A transport, redirect,
+   non-secret Desktop preferences, and chooses the next role. Renderer storage
+   never participates in that decision. A transport, redirect,
    upstream-availability, or schema failure is `unavailable`, never evidence
    that the user is signed out.
 6. **Redirect containment; non-navigating sign-out** — the `will-redirect` guard in
@@ -1043,7 +1044,9 @@ Chromium's default session owns the HttpOnly cookie jar;
 the entry account client invokes `session.defaultSession.fetch` only for the
 two fixed same-origin account routes. Main never reads or exports cookie/token
 material, and `DesktopAccountSession` returns only the three-state projection
-needed by the entry controller—not the route's account payload. Its provider
+needed by the entry controller—not the route's account payload. Main persists
+only non-secret Desktop preferences separately from every credential store.
+Its provider
 broker does transiently route BYOK/GG request headers and bodies; the sidecar
 owns persisted BYOK material and may hold the purpose-scoped, short-lived
 hosted-AI token (GRIDA-SEC-006 — memory-only, renderer-pushed, never a refresh
@@ -1071,6 +1074,7 @@ Today:
 - [desktop/src/main/open-handoff.ts](desktop/src/main/open-handoff.ts) + [desktop/src/main.ts](desktop/src/main.ts) — collect OS/secondary-instance callback URLs, re-validate them through the parser, and deliver the closed intent only to the canonical entry controller.
 - [desktop/src/main/protocol-router.ts](desktop/src/main/protocol-router.ts) — stateless fixed-target auth arm (pinned by `protocol-router.test.ts`).
 - [desktop/src/main/account-session.ts](desktop/src/main/account-session.ts) — fixed-route, redirect-refusing account projection and native-intent sign-out over Chromium's cookie-owning session (pinned by `account-session.test.ts`).
+- [desktop/src/main/desktop-preferences.ts](desktop/src/main/desktop-preferences.ts) — non-secret, versioned native onboarding authority; writes are serialized and atomic, future schemas are read-only, and no generic renderer preferences capability exists (pinned by `desktop-preferences.test.ts`).
 - [desktop/src/main/desktop-entry-window.ts](desktop/src/main/desktop-entry-window.ts) — exact entry-window ownership, serialized role transitions, callback re-probe, auxiliary-window admission, and close-before-sign-out ordering (pinned by `desktop-entry-window.test.ts`).
 - [desktop/src/main/ipc-handlers.ts](desktop/src/main/ipc-handlers.ts) + [desktop/src/main/ipc-admission.ts](desktop/src/main/ipc-admission.ts) — exact sender/role/path/channel validation for the one native account-sign-out transition and narrow sign-in/onboarding IPC capability sets (pinned by `ipc-admission.test.ts`).
 - [desktop/src/window.ts](desktop/src/window.ts) — `will-redirect` guard; `isAllowedNavigation` predicate (pinned by `window.test.ts`).

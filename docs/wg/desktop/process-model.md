@@ -105,10 +105,10 @@ The entry window has exactly one user-facing role:
 | Signed in     | Incomplete | Onboarding |
 | Signed in     | Complete   | Main       |
 
-The account session and host-persisted onboarding state are the authorities for
-this decision. The loaded URL is an output of the selected role, not evidence
-that the role has been earned. An indeterminate account check must not be
-treated as a signed-out session.
+The live account session and versioned native Desktop preferences are the only
+authorities for this decision. The loaded URL is an output of the selected
+role, not evidence that the role has been earned. An indeterminate account
+check must not be treated as a signed-out session.
 
 Sign-in and onboarding use a compact presentation. Main uses workstation
 dimensions. A role transition reuses the canonical window, replaces its
@@ -133,13 +133,15 @@ rather than waiting behind that payload queue.
 Global sign-out first asks auxiliary work windows to close. If any window
 refuses because work would be lost, the account session remains unchanged. The
 Settings surface that initiated sign-out may remain only long enough to receive
-completion; it closes as the canonical entry window returns to Sign-in.
-Application activation and account-state changes likewise reconcile and focus
-this same entry window instead of creating a competing entry surface.
+completion; it closes as the canonical entry window returns to Sign-in. A
+confirmed explicit sign-out resets onboarding completion so the next signed-in
+account receives the entry flow. Application activation and account-state
+changes likewise reconcile and focus this same entry window instead of
+creating a competing entry surface.
 
-A renderer-side marker may migrate completion from an older embedded
-onboarding experience, but it is not launch-time authority. The normal Welcome
-surface neither renders onboarding nor decides whether it is needed.
+Renderer storage is neither onboarding authority nor a migration input. The
+normal Welcome surface neither renders onboarding nor decides whether it is
+needed.
 
 ## What the daemon owns
 
@@ -207,11 +209,12 @@ Refuse to start if the host cannot supply its HTTP perimeter config —
 failing loud beats silently degrading.
 
 **Electron main's job.** Run one supervisor (`AgentSidecarSupervisor`). Forward
-Electron's `userData` path so `auth.json` lands in the right place. Keep daemon
-credentials inside preload closure. Own the exact loopback listener and
-transfer only accepted connected sockets to the sidecar. Own the destination
-grants and execute the two bounded provider-network operation classes through a
-dedicated Chromium session. Validate IPC sender frames against
+the canonical Grida agent home so `auth.json` lands outside Electron's browser
+profile. Keep daemon credentials inside preload closure. Own versioned,
+non-secret Desktop preferences in the browser profile. Own the exact loopback
+listener and transfer only accepted connected sockets to the sidecar. Own the
+destination grants and execute the two bounded provider-network operation
+classes through a dedicated Chromium session. Validate IPC sender frames against
 `EDITOR_BASE_URL + /desktop/*` on
 every native handler — the preload's path-scoping should make this redundant;
 doing it anyway is the right kind of paranoid. See
@@ -276,7 +279,8 @@ response. See [Agent security](./agent-security.md).
 - [Security](./agent-security.md) — GRIDA-SEC-004 defense-in-depth controls.
 - [Desktop agent authority](./agent-sandbox-wrap.md) — host containment,
   native networking, and confined raw runtimes.
-- [Storage layout](./agent-storage-layout.md) — `${userData}` file map.
+- [Storage layout](./agent-storage-layout.md) — agent-home file map and the
+  separate native-preferences boundary.
 - [Agent system RFC / environments / computer](../ai/agent/environments.md#computer)
   — the abstract model this implements.
 - [Grida Gateway (GG)](../platform/hosted-ai.md)

@@ -8,6 +8,7 @@ import type {
   DesktopAccountSession,
   DesktopAccountState,
 } from "./account-session";
+import type { DesktopPreferences } from "./desktop-preferences";
 import type { DesktopIpcRole } from "./ipc-admission";
 
 export type DesktopEntryRole = "booting" | "sign-in" | "onboarding" | "main";
@@ -17,8 +18,10 @@ type DesktopEntryWindowOptions = {
   app: App;
   base_url: string;
   account: Pick<DesktopAccountSession, "status" | "signOut">;
-  onboarding_complete: boolean;
-  mark_onboarding_complete: () => Promise<void>;
+  preferences: Pick<
+    DesktopPreferences,
+    "isOnboardingComplete" | "completeOnboarding" | "resetOnboarding"
+  >;
   startup_main_path: string;
   before_authenticated_entry?: () => Promise<void>;
   clear_hosted_session?: () => Promise<void>;
@@ -31,8 +34,8 @@ type DesktopEntryWindowOptions = {
  * Authentication, onboarding completion, and native window role remain three
  * separate authorities:
  *
- * - {@link DesktopAccountSession} validates the HttpOnly cookie session.
- * - native onboarding state says whether setup has completed.
+ * - {@link DesktopAccountSession} projects the HttpOnly cookie session.
+ * - {@link DesktopPreferences} owns native onboarding completion.
  * - this controller owns the exact BrowserWindow and turns those facts into a
  *   mutually exclusive full-window role.
  *
@@ -69,7 +72,6 @@ export class DesktopEntryWindow {
   readonly #secondaryWindows = new Set<BrowserWindow>();
   #window: BrowserWindow | null = null;
   #role: DesktopEntryRole = "booting";
-  #onboardingComplete: boolean;
   #startupMainPath: string;
   #hasPresentedMain = false;
   #transitioning = false;
@@ -85,7 +87,6 @@ export class DesktopEntryWindow {
 
   constructor(options: DesktopEntryWindowOptions) {
     this.#options = options;
-    this.#onboardingComplete = options.onboarding_complete;
     this.#startupMainPath = options.startup_main_path;
   }
 
@@ -265,7 +266,7 @@ export class DesktopEntryWindow {
 
         const role = DesktopEntryWindow.roleFor(
           account,
-          this.#onboardingComplete
+          this.#options.preferences.isOnboardingComplete()
         );
         if (!role) throw new DesktopEntryWindow.AccountUnavailableError();
         if (this.#isAuthControlSuperseded(authControlRevision)) {
@@ -347,8 +348,7 @@ export class DesktopEntryWindow {
         return;
       }
 
-      await this.#options.mark_onboarding_complete();
-      this.#onboardingComplete = true;
+      await this.#options.preferences.completeOnboarding();
       const query = workspaceId
         ? `?onboardingWorkspace=${encodeURIComponent(workspaceId)}`
         : "";
@@ -411,6 +411,16 @@ export class DesktopEntryWindow {
       this.#admissionBlocked = true;
       await this.#options.account.signOut();
       await this.#clearHostedSession();
+      try {
+        await this.#options.preferences.resetOnboarding();
+      } catch (error) {
+        // The cookie deletion remains authoritative. Onboarding is non-security
+        // UX state and must not strand a successfully signed-out user.
+        console.warn(
+          "[grida] couldn't reset onboarding after sign-out:",
+          error
+        );
+      }
 
       const closeSender = sender !== this.#liveWindow();
       if (closeSender && !sender.isDestroyed()) sender.hide();
@@ -462,7 +472,10 @@ export class DesktopEntryWindow {
   }): Promise<void> {
     const account = await this.#options.account.status();
     if (this.#isAuthControlSuperseded(authControlRevision)) return;
-    const role = DesktopEntryWindow.roleFor(account, this.#onboardingComplete);
+    const role = DesktopEntryWindow.roleFor(
+      account,
+      this.#options.preferences.isOnboardingComplete()
+    );
     if (!role) throw new DesktopEntryWindow.AccountUnavailableError();
     if (role !== "sign-in") {
       await this.#options.before_authenticated_entry?.();

@@ -12,12 +12,11 @@ automatable: false
 covered_by:
   - desktop/src/main/desktop-entry-window.test.ts
   - desktop/src/main/ipc-admission.test.ts
-  - desktop/src/main/onboarding-state.test.ts
+  - desktop/src/main/desktop-preferences.test.ts
   - desktop/src/main/protocol-router.test.ts
   - desktop/src/main/startup-window-policy.test.ts
   - desktop/src/window.test.ts
   - editor/app/desktop/onboarding/page.test.tsx
-  - editor/lib/desktop/onboarding-flag.test.ts
   - editor/lib/desktop/chatgpt-subscription.test.ts
 ---
 
@@ -36,8 +35,10 @@ flow has no Back action.
 Grida account authentication keeps the same compact geometry after onboarding
 has been completed. Signing out or relaunching with an expired or missing Grida
 session must not leave the sign-in page inside normal workstation dimensions.
-Successful authentication returns the same entry window to normal workstation
-geometry and Welcome.
+After an explicit sign-out, successful authentication continues through compact
+onboarding because that action resets completion. A merely expired session
+preserves completed onboarding and returns the same entry window to normal
+workstation geometry and Welcome.
 
 ChatGPT sign-in opens the system browser and returns to a connected state in the
 same step. The flow never exposes credentials to the renderer, never invokes
@@ -45,8 +46,9 @@ ACP, and never blocks the user from continuing without ChatGPT. A folder opened
 during onboarding becomes the welcome composer's active workspace. Completing
 the Workspace step records host onboarding completion, changes the same entry
 window to normal workstation dimensions, and enters Welcome. The legacy
-renderer flag remains a one-launch migration seam for users who completed the
-former Welcome dialog.
+native onboarding file migrates once into versioned Desktop preferences.
+Renderer storage neither records completion nor decides whether onboarding is
+needed.
 
 Document, workspace, and file launches cannot create auxiliary windows until
 the entry window reaches the main role. Payload launches that arrive during
@@ -54,9 +56,8 @@ sign-in or onboarding wait until onboarding is complete.
 
 ## Steps
 
-1. Start an Insiders Desktop build with both host onboarding completion state
-   and the renderer key `grida.desktop.onboarding.completed.v1` absent, and
-   with no active Grida account session.
+1. Start an Insiders Desktop build with native onboarding completion reset and
+   no active Grida account session.
 2. Expected: the canonical entry window opens in its compact presentation on
    `/desktop/auth/sign-in`, with no continuation query. The normal Welcome
    composer is not present behind or beneath it, and the empty titlebar has no
@@ -88,14 +89,17 @@ sign-in or onboarding wait until onboarding is complete.
     progress indicator, **Skip**, or **Back** is visible.
 14. Open another folder, then select **Start creating**.
 15. Expected: the same entry window grows to the normal workstation size and
-    navigates to Welcome. No second Welcome window is created, and browser Back
-    cannot return to onboarding.
-16. Reload and relaunch Grida.
-17. Expected: onboarding stays absent and the opened folder is the Welcome
-    composer's active workspace.
-18. Repeat from cleared native and renderer completion state. Select **Skip** on
-    the ChatGPT step,
-    then select **Start creating** on the Workspace step.
+    navigates to Welcome with the opened folder as the active workspace. No
+    second Welcome window is created, and browser Back cannot return to
+    onboarding.
+16. Clear only renderer localStorage, leaving cookies and the Grida session
+    intact, then reload and relaunch Grida.
+17. Expected: onboarding stays absent because native preferences remain
+    authoritative. Unrelated renderer-only UX state may return to its default.
+18. Reset native onboarding completion. Even if the obsolete renderer key
+    `grida.desktop.onboarding.completed.v1` is manually set to `1`, relaunching
+    must still show onboarding. Select **Skip** on the ChatGPT step, then select
+    **Start creating** on the Workspace step.
 19. Expected: onboarding finishes and Grida stays usable with the default
     workspace and any configured text provider.
 20. While sign-in or onboarding is open, send a supported file-open, document,
@@ -111,9 +115,10 @@ sign-in or onboarding wait until onboarding is complete.
     compact sign-in surface, not a normal workstation-sized surface or a
     second window. Close and relaunch the app; the same sign-in role is chosen.
 26. Complete Grida sign-in.
-27. Expected: the same entry window grows to normal workstation dimensions and
-    enters Welcome. Completed onboarding is not replayed, and auxiliary windows
-    become available only after this transition.
+27. Expected: explicit sign-out has reset native onboarding completion, so the
+    same compact entry window enters onboarding rather than Welcome. Complete
+    the flow; the window then grows to normal workstation dimensions and
+    auxiliary windows become available.
 
 ## Notes
 

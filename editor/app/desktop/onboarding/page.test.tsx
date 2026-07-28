@@ -9,5 +9,7 @@ describe("Desktop onboarding navigation authority", () => {
     expect(source).toContain("complete_onboarding");
     expect(source).not.toContain('from "next/navigation"');
     expect(source).not.toMatch(/\brouter\.(?:push|replace)\b/);
+    expect(source).not.toContain("onboarding_flag");
+    expect(source).not.toContain("localStorage");
   });
 });

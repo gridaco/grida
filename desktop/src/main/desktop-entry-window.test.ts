@@ -195,6 +195,31 @@ describe("DesktopEntryWindow lifecycle", () => {
     expect(entry.role).toBe("onboarding");
   });
 
+  it("keeps onboarding authoritative when preference persistence fails", async () => {
+    const window = makeWindow();
+    const account = makeAccount(["signed-in", "signed-in"]);
+    const markComplete = vi.fn<() => Promise<void>>(async () => {
+      throw new Error("preferences unavailable");
+    });
+    windowFactory.mockReturnValue(window);
+    const entry = makeController(account, {
+      onboarding_complete: false,
+      mark_onboarding_complete: markComplete,
+    });
+    await entry.open();
+
+    await expect(entry.completeOnboarding(window as never)).rejects.toThrow(
+      "preferences unavailable"
+    );
+
+    expect(markComplete).toHaveBeenCalledOnce();
+    expect(entry.role).toBe("onboarding");
+    expect(entry.isMain).toBe(false);
+    expect(window.loadURL).not.toHaveBeenCalledWith(
+      "https://grida.test/desktop/welcome"
+    );
+  });
+
   it("recovers an onboarding-to-main load after completion is persisted", async () => {
     const window = makeWindow();
     const account = makeAccount(["signed-in", "signed-in", "signed-in"]);
@@ -667,6 +692,69 @@ describe("DesktopEntryWindow lifecycle", () => {
     expect(entryWindow.webContents.navigationHistory.clear).toHaveBeenCalled();
   });
 
+  it("revokes hosted account capacity before resetting onboarding", async () => {
+    const entryWindow = makeWindow();
+    const order: string[] = [];
+    const account = makeAccount(["signed-in"]);
+    account.signOut.mockImplementation(async () => {
+      order.push("account");
+    });
+    windowFactory.mockReturnValue(entryWindow);
+    const entry = makeController(account, {
+      onboarding_complete: true,
+      clear_hosted_session: async () => {
+        order.push("hosted-session");
+      },
+      reset_onboarding: () => {
+        order.push("onboarding");
+      },
+    });
+    await entry.open();
+    await entryWindow.loadURL("https://grida.test/desktop/settings");
+
+    await entry.signOut(entryWindow as never);
+
+    expect(order).toEqual(["account", "hosted-session", "onboarding"]);
+  });
+
+  it("replays onboarding after an explicit Grida account sign-out", async () => {
+    const entryWindow = makeWindow();
+    const account = makeAccount(["signed-in", "signed-in"]);
+    windowFactory.mockReturnValue(entryWindow);
+    const entry = makeController(account, { onboarding_complete: true });
+    await entry.open();
+    await entryWindow.loadURL("https://grida.test/desktop/settings");
+
+    await entry.signOut(entryWindow as never);
+    await entry.handleAuthCallback(
+      "https://grida.test/desktop/auth/callback?code=next-account"
+    );
+
+    expect(entry.role).toBe("onboarding");
+    expect(entryWindow.loadURL).toHaveBeenLastCalledWith(
+      "https://grida.test/desktop/onboarding"
+    );
+  });
+
+  it("does not strand a successful sign-out when onboarding reset fails", async () => {
+    const entryWindow = makeWindow();
+    const account = makeAccount(["signed-in"]);
+    windowFactory.mockReturnValue(entryWindow);
+    const entry = makeController(account, {
+      onboarding_complete: true,
+      reset_onboarding: () => {
+        throw new Error("preferences unavailable");
+      },
+    });
+    await entry.open();
+    await entryWindow.loadURL("https://grida.test/desktop/settings");
+
+    await entry.signOut(entryWindow as never);
+
+    expect(account.signOut).toHaveBeenCalledOnce();
+    expect(entry.role).toBe("sign-in");
+  });
+
   it("blocks late auxiliary admission for the full sign-out mutation", async () => {
     const entryWindow = makeWindow();
     const lateWindow = makeWindow();
@@ -782,7 +870,12 @@ describe("DesktopEntryWindow lifecycle", () => {
 
   it("preserves main bounds when a compact transition fails and retries", async () => {
     const entryWindow = makeWindow();
-    const account = makeAccount(["signed-in", "signed-out", "signed-in"]);
+    const account = makeAccount([
+      "signed-in",
+      "signed-out",
+      "signed-in",
+      "signed-in",
+    ]);
     windowFactory.mockReturnValue(entryWindow);
     const entry = makeController(account, { onboarding_complete: true });
     await entry.open();
@@ -803,6 +896,9 @@ describe("DesktopEntryWindow lifecycle", () => {
     expect(entryWindow.focus).toHaveBeenCalledTimes(3);
     await entry.reconcile();
     await entry.reconcile();
+    expect(entry.role).toBe("onboarding");
+
+    await entry.completeOnboarding(entryWindow as never);
 
     expect(applyPresentation).toHaveBeenLastCalledWith(entryWindow, "main", {
       main_bounds: { x: 10, y: 10, width: 1200, height: 800 },
@@ -844,6 +940,7 @@ function makeController(
   options: {
     onboarding_complete: boolean;
     mark_onboarding_complete?: () => Promise<void>;
+    reset_onboarding?: () => void | Promise<void>;
     startup_main_path?: string;
     clear_hosted_session?: () => Promise<void>;
     before_authenticated_entry?: () => Promise<void>;
@@ -853,13 +950,23 @@ function makeController(
     ) => void;
   }
 ) {
+  let onboardingComplete = options.onboarding_complete;
+  const preferences = {
+    isOnboardingComplete: () => onboardingComplete,
+    completeOnboarding: async () => {
+      await (options.mark_onboarding_complete ?? (async () => undefined))();
+      onboardingComplete = true;
+    },
+    resetOnboarding: async () => {
+      await options.reset_onboarding?.();
+      onboardingComplete = false;
+    },
+  };
   return new DesktopEntryWindow({
     app: { getVersion: () => "0.0.14" } as never,
     base_url: "https://grida.test",
     account,
-    onboarding_complete: options.onboarding_complete,
-    mark_onboarding_complete:
-      options.mark_onboarding_complete ?? (async () => undefined),
+    preferences,
     startup_main_path: options.startup_main_path ?? "/desktop/welcome",
     clear_hosted_session: options.clear_hosted_session,
     before_authenticated_entry: options.before_authenticated_entry,

@@ -1,6 +1,6 @@
 ---
 title: Agent storage layout
-description: Desktop userData files owned by AgentSidecar, including auth.json, recent files, workspaces, and SQLite session storage.
+description: Desktop files under the Grida agent home, including auth.json, recent files, workspaces, and SQLite session storage.
 keywords: [desktop, agent-sidecar, storage, sqlite, userData]
 format: md
 tags:
@@ -22,16 +22,21 @@ the JSON-column discipline are all locked in the RFC — read that first.
 
 What follows is delta:
 
-- `${userData}` file layout.
+- Agent-home layout and its separation from Electron's browser profile.
 - The `node:sqlite` + drizzle `sqlite-proxy` implementation choice.
 - Multi-process safety.
 - Why we don't ship `resumable-stream`.
 
-## `${userData}` layout
+## Agent-home layout
 
-The agent host owns four files. All sit side-by-side under Electron's
-`app.getPath('userData')` (or the XDG equivalent on Linux / the macOS
-default).
+The agent host owns four files. All sit side-by-side under the canonical Grida
+agent home (`~/.grida/agent`).
+
+Electron main separately owns `preferences.json` under Electron's
+platform-specific `userData` directory. It contains small, non-secret Desktop
+lifecycle preferences such as versioned onboarding completion. It is not agent
+data, never contains account or provider credentials, and is intentionally
+outside the AgentSidecar table below.
 
 | File              | Holds                                                                  | Mode    | Atomic write               |
 | ----------------- | ---------------------------------------------------------------------- | ------- | -------------------------- |
@@ -100,7 +105,7 @@ Desktop picks the RFC defaults.
 ## Multi-process safety
 
 WAL handles concurrent readers + one writer. Two daemon processes on
-the same `${userData}` is user error today (typically two Electron
+the same agent home is user error today (typically two Electron
 instances spawned by a packaging bug or a developer with a release +
 dev build open). The plan: take a process lock on `sessions.db` itself
 on agent host start; refuse to boot if held.

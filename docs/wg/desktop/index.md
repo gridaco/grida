@@ -40,7 +40,7 @@ For the user-facing app and the security boundary:
 | [Resource loading](./resource-loading.md)          | How the renderer gets host-owned resource bytes — buffered (`data:`) vs streamed (privileged `grida-workspace:` scheme), Range/seeking, proxy-not-new-authority. |
 | [Agent security](./agent-security.md)              | Desktop binding of `GRIDA-SEC-004`: bridge path scope, HTTP perimeter, sandbox, and secrets discipline.                                                          |
 | [Desktop agent authority](./agent-sandbox-wrap.md) | The Desktop delta for contained host services, native host networking, per-principal raw execution, and permission modes above confinement.                      |
-| [Agent storage layout](./agent-storage-layout.md)  | Desktop `${userData}` files and SQLite session storage.                                                                                                          |
+| [Agent storage layout](./agent-storage-layout.md)  | Agent-home files and SQLite session storage, separated from native Desktop preferences.                                                                          |
 
 ## God class
 
