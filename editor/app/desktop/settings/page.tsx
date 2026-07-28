@@ -89,9 +89,9 @@ import { CreditsSection } from "./_components/credits-section";
 export default function DesktopSettingsPage() {
   return (
     <DesktopPageShell>
-      <DesktopPageContent className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
+      <DesktopPageContent className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-8">
         <header>
-          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Account, credits, providers, external agents, and app info.
           </p>
@@ -299,12 +299,12 @@ function SettingsSection({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-3">
       <header>
-        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </header>
-      <div className="flex flex-col gap-4">{children}</div>
+      <div className="flex flex-col gap-3">{children}</div>
     </section>
   );
 }

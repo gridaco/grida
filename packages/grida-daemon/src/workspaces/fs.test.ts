@@ -5,10 +5,10 @@ import path from "node:path";
 import { workspaceFs } from "./fs";
 import type { Workspace } from "../workspaces";
 
-// `readFileBytes` is the byte read behind the workspace image viewer AND the
-// agent's `view_image` tool. The viewer wants a tight 1 MiB default; the agent
-// raises it via `max_bytes` so an ordinary multi-MiB screenshot is viewable
-// rather than rejected as too-large. These lock that parameterization.
+// `readFileBytes` keeps the 1 MiB source-read default. Buffered resource
+// callers (the workspace byte route and the agent's `view_image` tool) raise it
+// explicitly so ordinary multi-MiB images are viewable without weakening the
+// text-file policy. These lock that parameterization.
 describe("workspaceFs.readFileBytes — max_bytes", () => {
   let root: string;
   let ws: Workspace;

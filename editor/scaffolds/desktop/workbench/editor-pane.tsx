@@ -234,7 +234,7 @@ export function EditorPane({
                   return (
                     <EditorPaneTab
                       key={`${workspace.id}:${relPath}`}
-                      workspaceId={workspace.id}
+                      workspace={workspace}
                       relPath={relPath}
                       active={relPath === activeRelPath}
                       onDirtyChange={onTabDirtyChange}

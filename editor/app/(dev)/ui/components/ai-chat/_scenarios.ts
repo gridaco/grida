@@ -255,6 +255,31 @@ function toolMessage({
   } as UIMessage;
 }
 
+function pendingImageGroupMessage(): UIMessage {
+  return {
+    id: "tool-demo-generate-image-pair-pending",
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-generate_image",
+        toolCallId: "tool-demo-generate-image-pair-pending-1",
+        state: "input-available",
+        input: {
+          prompt: "A refined editorial still life on a warm neutral backdrop.",
+        },
+      },
+      {
+        type: "tool-generate_image",
+        toolCallId: "tool-demo-generate-image-pair-pending-2",
+        state: "input-available",
+        input: {
+          prompt: "A bold abstract poster with restrained cobalt accents.",
+        },
+      },
+    ],
+  } as UIMessage;
+}
+
 export const TOOL_CARD_DEMOS: ToolCardDemo[] = [
   {
     id: "read-file",
@@ -499,6 +524,43 @@ export const TOOL_CARD_DEMOS: ToolCardDemo[] = [
         references: GENERATE_IMAGE_REFERENCES,
       },
       state: "input-available",
+    }),
+  },
+  {
+    id: "generate-image-pair-pending",
+    label: "generate_image × 2 · pending",
+    message: pendingImageGroupMessage(),
+  },
+  {
+    id: "surface-open",
+    label: "surface_open",
+    message: toolMessage({
+      id: "surface-open",
+      toolName: "surface_open",
+      input: { path: "/launch-campaign.canvas" },
+      output: {
+        path: "/launch-campaign.canvas",
+        requested: true,
+        reason: "requested",
+      },
+    }),
+  },
+  {
+    id: "surface-list-open",
+    label: "surface_list_open",
+    message: toolMessage({
+      id: "surface-list-open",
+      toolName: "surface_list_open",
+      input: {},
+      output: {
+        interactive: true,
+        active: "/launch-campaign.canvas",
+        open: [
+          "/launch-campaign.canvas",
+          "/research/visual-directions.md",
+          "/assets/hero-reference.webp",
+        ],
+      },
     }),
   },
   {

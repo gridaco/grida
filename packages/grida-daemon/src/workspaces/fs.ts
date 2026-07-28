@@ -117,10 +117,10 @@ export namespace workspaceFs {
    * `relPath` lists the workspace root.
    *
    * Sort: directories first, then files, both alphabetical
-   * case-insensitive. Dotfiles ARE included — hiding them would be a
-   * surprise for users opening source repos (`.git`, `.gitignore`,
-   * `.env.example` etc. all matter at a glance). The client can fold
-   * them visually if it wants.
+   * case-insensitive. Useful dotfiles remain visible (`.gitignore`,
+   * `.env.example`, `.vscode`, etc.); narrow OS and VCS implementation
+   * metadata is omitted from every listing. Direct reads by an explicit
+   * relative path remain available.
    *
    * Symlinks are reported with `kind: 'symlink'` and a best-effort
    * target classification — clicking them in the tree is allowed but
@@ -150,7 +150,9 @@ export namespace workspaceFs {
       }
       throw err;
     }
-    const entries = dirents.map((dirent) => directoryEntry(relPath, dirent));
+    const entries = dirents
+      .filter((dirent) => isListableEntry(dirent.name))
+      .map((dirent) => directoryEntry(relPath, dirent));
     entries.sort((a, b) => {
       if (a.kind === "directory" && b.kind !== "directory") return -1;
       if (b.kind === "directory" && a.kind !== "directory") return 1;
@@ -195,6 +197,7 @@ export namespace workspaceFs {
       while (true) {
         const dirent = await dir.read();
         if (dirent === null) return;
+        if (!isListableEntry(dirent.name)) continue;
         yield directoryEntry(relPath, dirent);
       }
     } finally {
@@ -286,10 +289,11 @@ export namespace workspaceFs {
    * known-safe content types (PNG/JPG/WebP/etc.) a path to the
    * client.
    *
-   * The same size cap applies — large images aren't free to round-trip
-   * through a JSON+base64 payload (≈33% overhead), and the workspace
-   * pane is for *viewing*, not for handling 50 MB scan files. Callers
-   * pick a smaller in-pane affordance for oversized assets.
+   * The 1 MiB source-text cap remains the default. Callers that intentionally
+   * buffer binary resources must provide their own finite budget; for example,
+   * the Desktop `/workspaces/readfilebytes` route and agent image inspection
+   * allow ordinary multi-MiB images. Streamed viewers use {@link openFile}
+   * instead of raising this indefinitely.
    *
    * Mime detection lives on the client side: this function is
    * deliberately content-agnostic. The route fans out to whichever
@@ -300,9 +304,8 @@ export namespace workspaceFs {
     relPath: string,
     opts?: { max_bytes?: number }
   ): Promise<{ base64: string; size: number; mtime: number }> {
-    // The 1 MiB default suits the source-file viewer; callers that legitimately
-    // serve larger binaries (e.g. the agent's `view_image`, up to its own
-    // perception cap) raise it so a valid image isn't rejected as too-large.
+    // The 1 MiB default suits source-file reads. Callers that legitimately
+    // buffer larger binaries must opt into a bounded, caller-owned budget.
     const maxBytes = opts?.max_bytes ?? MAX_FILE_BYTES;
     const abs = await resolveInside(workspace, relPath, { must_exist: true });
     const stat = await fs.stat(abs);
@@ -494,6 +497,29 @@ export namespace workspaceFs {
 }
 
 // ──────────────────────────── private helpers ────────────────────────────
+
+/**
+ * Metadata owned by an operating system, archive tool, or VCS should not
+ * become product content. Keep this deliberately narrow: editor settings,
+ * environment examples, dependency folders, and build output are legitimate
+ * workspace entries and remain listable.
+ */
+const NON_LISTABLE_ENTRY_NAMES = new Set([
+  ".ds_store",
+  ".git",
+  ".hg",
+  ".svn",
+  "__macosx",
+  "cvs",
+  "desktop.ini",
+  "thumbs.db",
+]);
+
+function isListableEntry(name: string): boolean {
+  return (
+    !NON_LISTABLE_ENTRY_NAMES.has(name.toLowerCase()) && !name.startsWith("._")
+  );
+}
 
 function directoryEntry(relPath: string, dirent: Dirent): workspaceFs.Entry {
   let kind: workspaceFs.Entry["kind"];

@@ -37,10 +37,15 @@ import {
   PathToolbarPosition,
 } from "@/app/(canvas)/svg/_components/path-toolbar";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
-import { useWorkspaceChanges } from "../workbench/workspace-changes";
+import {
+  useWorkspaceChanges,
+  useWorkspaceFileRevision,
+} from "../workbench/workspace-changes";
+import { WorkspaceFileProjectionDependencies } from "../workbench/workspace-file-projection-dependencies";
 import { CanvasDeck, type Slide } from "./deck-store";
 import { SlideSurface } from "./slide-surface";
 import { materializeSlideSvgResources } from "./slide-svg-resources";
+import { SlideThumbnailProjectionController } from "./slide-thumbnail-projection-controller";
 
 export function DesktopCanvasShell({
   workspaceId,
@@ -214,45 +219,72 @@ export function DesktopCanvasShell({
   );
 }
 
-/** Slide thumbnails, read once per `src` and refreshable after a save. */
+/**
+ * Slide thumbnails are projections of the slide SVG plus every local resource
+ * it references. Track those dependencies per slide so external asset writes
+ * refresh the strip and presentation, not only the active editor.
+ */
 function useSlideThumbnails(
   workspaceId: string,
   slides: readonly Slide[],
   basePath: string
 ): { map: Record<string, string>; refresh: (src: string) => void } {
   const [map, setMap] = useState<Record<string, string>>({});
-  const requested = useRef<Set<string>>(new Set());
+  const [controller] = useState(
+    () => new SlideThumbnailProjectionController(basePath)
+  );
 
   // Keyed by bundle-relative `src` (what the UI looks up), read at the
   // workspace-relative path the bridge speaks.
   const read = useCallback(
     (src: string) => {
-      const rel = basePath ? `${basePath}/${src}` : src;
-      workspacesNs
-        .readFile(workspaceId, rel)
+      const request = controller.begin(src);
+      if (!request) return;
+      void workspacesNs
+        .readFile(workspaceId, request.relPath)
         .then(async (r) => {
           const materialized = await materializeSlideSvgResources(r.content, {
             workspaceId,
             bundleBasePath: basePath,
-            slideRelPath: rel,
+            slideRelPath: request.relPath,
           });
+          if (!controller.complete(request, materialized.dependencies)) return;
           setMap((m) => ({ ...m, [src]: svgToDataUri(materialized.svg) }));
         })
         .catch(() => {
-          /* a slide that can't be read just shows an empty thumbnail */
+          if (!controller.fail(request)) return;
+          // A slide that can no longer be read must not retain its old preview.
+          setMap((current) => {
+            if (!(src in current)) return current;
+            const next = { ...current };
+            delete next[src];
+            return next;
+          });
         });
     },
-    [workspaceId, basePath]
+    [workspaceId, basePath, controller]
   );
 
   useEffect(() => {
-    for (const s of slides) {
-      if (!requested.current.has(s.src)) {
-        requested.current.add(s.src);
-        read(s.src);
-      }
+    controller.reset(basePath);
+    setMap({});
+  }, [controller, workspaceId, basePath]);
+
+  useEffect(() => {
+    const change = controller.reconcile(slides.map((slide) => slide.src));
+    if (change.removed.length > 0) {
+      setMap((current) => {
+        const next = { ...current };
+        for (const src of change.removed) delete next[src];
+        return next;
+      });
     }
-  }, [slides, read]);
+    for (const src of change.load) read(src);
+  }, [controller, slides, read]);
+
+  useWorkspaceChanges((events) => {
+    for (const src of controller.changed(events)) read(src);
+  });
 
   return { map, refresh: read };
 }
@@ -434,21 +466,45 @@ function ActiveSlide({
   const [state, setState] = useState<ActiveState>(
     slide ? { kind: "loading" } : { kind: "empty" }
   );
+  const [projectionDependencies] = useState(
+    () => new WorkspaceFileProjectionDependencies(basePath)
+  );
+  const resourceRevision = useWorkspaceFileRevision(() =>
+    projectionDependencies.scope()
+  );
   const restoreRef = useRef<(serialized: string) => string>(
     (serialized) => serialized
   );
   const prepareContentForEditor = useCallback(
     async (diskContent: string) => {
-      if (!relPath) return diskContent;
-      const materialized = await materializeSlideSvgResources(diskContent, {
-        workspaceId,
-        bundleBasePath: basePath,
-        slideRelPath: relPath,
-      });
-      restoreRef.current = materialized.restore;
-      return materialized.svg;
+      if (!relPath) return { content: diskContent };
+      const request = projectionDependencies.begin();
+      try {
+        const materialized = await materializeSlideSvgResources(diskContent, {
+          workspaceId,
+          bundleBasePath: basePath,
+          slideRelPath: relPath,
+        });
+        return {
+          content: materialized.svg,
+          commit() {
+            if (
+              !projectionDependencies.commit(request, materialized.dependencies)
+            ) {
+              return;
+            }
+            restoreRef.current = materialized.restore;
+          },
+          discard() {
+            projectionDependencies.discard(request);
+          },
+        };
+      } catch (error) {
+        projectionDependencies.discard(request);
+        throw error;
+      }
     },
-    [workspaceId, basePath, relPath]
+    [workspaceId, basePath, relPath, projectionDependencies]
   );
   const prepareContentForWrite = useCallback((serialized: string) => {
     return restoreRef.current(serialized);
@@ -464,9 +520,16 @@ function ActiveSlide({
     workspacesNs
       .readFile(workspaceId, relPath)
       .then(async (r) => {
-        const content = await prepareContentForEditor(r.content);
+        const prepared = await prepareContentForEditor(r.content);
         if (!cancelled) {
-          setState({ kind: "ready", content, mtime: r.mtime });
+          prepared.commit?.();
+          setState({
+            kind: "ready",
+            content: prepared.content,
+            mtime: r.mtime,
+          });
+        } else {
+          prepared.discard?.();
         }
       })
       .catch((err: unknown) => {
@@ -522,6 +585,7 @@ function ActiveSlide({
         workspaceId={workspaceId}
         relPath={relPath!}
         initialMtime={state.mtime}
+        resourceRevision={resourceRevision}
         active={editable}
         onSaved={onSaved}
         prepareContentForEditor={prepareContentForEditor}

@@ -9,12 +9,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ChevronRightIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  RefreshCwIcon,
-} from "lucide-react";
+import { ChevronRightIcon, RefreshCwIcon } from "lucide-react";
 import {
   defaultKeymap,
   modeFromEvent,
@@ -42,10 +37,12 @@ import { WorkspaceFileTree } from "./file-tree-source";
 import { WorkspaceFileIcon } from "./workspace-file-icon";
 import { useWorkspaceChanges } from "./workspace-changes";
 
-const INDENT_STEP = 12;
-const INDENT_BASE = 4;
+const INDENT_STEP = 14;
+const INDENT_BASE = 8;
+// Keep Radix's content wrapper viewport-bound so the demo's flex-label
+// ellipsis pattern can engage. (see test/desktop-workbench-file-tree-ellipsis.md)
 const FILE_TREE_SCROLL_AREA_CLASS =
-  "[&_[data-slot=scroll-area-scrollbar]]:hidden [&_[data-slot=scroll-area-viewport]]:scroll-fade-y [&_[data-slot=scroll-area-viewport]]:scroll-fade-4";
+  "[&_[data-slot=scroll-area-scrollbar]]:hidden [&_[data-slot=scroll-area-viewport]]:scroll-fade-y [&_[data-slot=scroll-area-viewport]]:scroll-fade-4 [&_[data-slot=scroll-area-viewport]>div]:!block [&_[data-slot=scroll-area-viewport]>div]:h-full";
 
 const FILE_TREE_KEYMAP: Keymap = {
   ...defaultKeymap,
@@ -277,7 +274,7 @@ function FileTreePaneInner({
         role="tree"
         tabIndex={0}
         data-testid="desktop-workspace-file-tree"
-        className="px-1 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-full flex-col px-1 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onKeyDown={onKeyDown}
       >
         <RootStatus handle={handle} />
@@ -293,6 +290,12 @@ function FileTreePaneInner({
             onEntryTrashed={afterTrashed}
           />
         ))}
+        {/* The unoccupied pane belongs to the workspace root. Keep this as a
+            sibling trigger so row-level context menus remain independent.
+            (see test/desktop-workbench-file-tree-background-context-menu.md) */}
+        <FileContextMenu workspace={workspace} relPath="" isDirectory readOnly>
+          <div className="min-h-6 flex-1" aria-hidden="true" />
+        </FileContextMenu>
       </div>
     </ScrollArea>
   );
@@ -356,6 +359,7 @@ function FileTreeRow({
   const showEmpty =
     isContainer && row.isExpanded && loadState === "loaded" && childCount === 0;
 
+  // (see test/desktop-workbench-file-tree-row-states.md)
   const button = (
     <button
       type="button"
@@ -367,11 +371,11 @@ function FileTreeRow({
       data-row-depth={row.depth}
       data-source-version={sourceVersion}
       className={cn(
-        "group flex w-full items-center gap-1 rounded-sm px-1.5 py-0.5 text-left text-xs outline-none",
+        "group flex w-full items-center gap-1.5 rounded-sm px-2 py-1 text-left text-xs outline-none",
         selected
-          ? "bg-accent text-accent-foreground"
-          : "hover:bg-accent/60 hover:text-accent-foreground",
-        focused && !selected && "bg-accent/40 text-accent-foreground"
+          ? "bg-foreground/10 text-foreground"
+          : "hover:bg-foreground/5 hover:text-foreground",
+        focused && !selected && "bg-foreground/5 text-foreground"
       )}
       style={{ paddingLeft: `${row.depth * INDENT_STEP + INDENT_BASE}px` }}
       onClick={(e) => {
@@ -381,31 +385,30 @@ function FileTreeRow({
         else controller.dispatch("activate");
       }}
     >
-      <ChevronRightIcon
-        className={cn(
-          "size-3 shrink-0 text-muted-foreground transition-transform",
-          isContainer && row.isExpanded && "rotate-90",
-          !isContainer && "invisible"
-        )}
-      />
-      {isBundle ? (
-        <WorkspaceFileIcon
-          relPath={row.id}
-          className="size-3.5 shrink-0 text-violet-500"
-        />
-      ) : isDirectory ? (
-        row.isExpanded ? (
-          <FolderOpenIcon className="size-3.5 shrink-0 text-sky-500" />
-        ) : (
-          <FolderIcon className="size-3.5 shrink-0 text-sky-500" />
-        )
+      {/* One leading slot per row: folder toggle or file icon.
+          (see test/desktop-workbench-file-tree-leading-slot.md) */}
+      {isContainer ? (
+        <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
+          <ChevronRightIcon
+            className={cn(
+              "size-3.5 text-muted-foreground transition-transform",
+              row.isExpanded && "rotate-90"
+            )}
+          />
+        </span>
       ) : (
         <WorkspaceFileIcon
           relPath={row.id}
-          className="size-3.5 shrink-0 text-muted-foreground"
+          className={cn(
+            "size-3.5 shrink-0",
+            isBundle ? "text-violet-500" : "text-muted-foreground"
+          )}
         />
       )}
-      <span className="truncate">{meta.name}</span>
+      <FileTreeRowLabel
+        name={meta.name}
+        preserveExtension={!isDirectory || isBundle}
+      />
       {meta.kind === "symlink" && (
         <span className="ml-auto text-[9px] text-muted-foreground">↪</span>
       )}
@@ -435,6 +438,26 @@ function FileTreeRow({
       )}
       {showEmpty && <EmptyRow depth={row.depth + 1} />}
     </>
+  );
+}
+
+function FileTreeRowLabel({
+  name,
+  preserveExtension,
+}: {
+  name: string;
+  preserveExtension: boolean;
+}) {
+  const dot = preserveExtension ? name.lastIndexOf(".") : -1;
+  const hasExtension = dot > 0 && dot < name.length - 1;
+  const stem = hasExtension ? name.slice(0, dot) : name;
+  const extension = hasExtension ? name.slice(dot) : "";
+
+  return (
+    <span className="flex min-w-0 flex-1">
+      <span className="truncate">{stem}</span>
+      {extension && <span className="shrink-0">{extension}</span>}
+    </span>
   );
 }
 

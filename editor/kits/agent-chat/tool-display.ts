@@ -2,8 +2,10 @@ import { AgentFs } from "@grida/agent/fs";
 import { AgentTodos } from "@grida/agent/todos";
 import { AgentVision } from "@grida/agent/vision";
 import { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import { AgentSurface } from "@grida/agent/surface";
 import { getToolName } from "ai";
 import type { ToolCallEntry } from "@/lib/agent-chat";
+import { SurfaceToolCall } from "./surface-tool";
 
 const GENERATE_IMAGE = "generate_image";
 const SKILL = "skill";
@@ -20,6 +22,8 @@ export type ToolDisplayAction =
   | "command"
   | "question"
   | "skill"
+  | "open_tab"
+  | "list_tabs"
   | "tool";
 
 export type ToolDisplayTone = "running" | "ok" | "warn" | "error";
@@ -201,6 +205,52 @@ export namespace toolDisplay {
           tone,
         };
 
+      case AgentSurface.TOOL_NAMES.surface_open: {
+        const surface = SurfaceToolCall.from(entry);
+        const surfaceTone =
+          surface?.data.kind === "open" &&
+          surface.data.requested === false &&
+          tone === "ok"
+            ? "warn"
+            : tone;
+        return {
+          action: "open_tab",
+          title: describeTitle(
+            surfaceTone,
+            "Opening tab",
+            "Opened tab",
+            "Couldn’t open tab"
+          ),
+          detail:
+            surface?.data.kind === "open"
+              ? shortPath(surface.data.path)
+              : undefined,
+          target: surface?.data.kind === "open" ? surface.data.path : undefined,
+          tone: surfaceTone,
+        };
+      }
+
+      case AgentSurface.TOOL_NAMES.surface_list_open: {
+        const surface = SurfaceToolCall.from(entry);
+        const open = surface?.data.kind === "list" ? surface.data.open : null;
+        return {
+          action: "list_tabs",
+          title: describeTitle(
+            tone,
+            "Checking open tabs",
+            "Checked open tabs",
+            "Couldn’t check open tabs"
+          ),
+          detail:
+            open === null
+              ? undefined
+              : open.length === 0
+                ? "No tabs open"
+                : `${open.length} ${pluralize("tab", open.length)}`,
+          tone,
+        };
+      }
+
       default:
         return {
           action: "tool",
@@ -216,12 +266,15 @@ export namespace toolDisplay {
 
     const counts = new Map<ToolDisplayAction, number>();
     const files = new Map<ToolDisplayAction, Set<string>>();
-    let running = 0;
+    const runningCounts = new Map<ToolDisplayAction, number>();
     let failed = 0;
     for (const entry of entries) {
       const desc = describe(entry);
       if (desc.tone === "running") {
-        running += 1;
+        runningCounts.set(
+          desc.action,
+          (runningCounts.get(desc.action) ?? 0) + 1
+        );
         continue;
       }
       if (desc.tone === "warn" || desc.tone === "error") {
@@ -252,12 +305,39 @@ export namespace toolDisplay {
     pushClause(clauses, counts, "plan", "updated", "plan update");
     pushClause(clauses, counts, "question", "asked");
     pushClause(clauses, counts, "skill", "loaded", "skill");
+    pushClause(clauses, counts, "open_tab", "opened", "tab");
+    pushTabsCheckClause(clauses, counts, "checked");
     pushClause(clauses, counts, "tool", "used");
-    pushStatusClause(clauses, running, "running");
+    pushClause(clauses, runningCounts, "edit", "editing");
+    pushClause(clauses, runningCounts, "write", "writing");
+    pushClause(clauses, runningCounts, "read", "reading");
+    pushClause(clauses, runningCounts, "generate_image", "generating", "image");
+    pushClause(clauses, runningCounts, "view_image", "viewing", "image");
+    pushClause(clauses, runningCounts, "search", "searching");
+    pushClause(clauses, runningCounts, "list", "listing");
+    pushClause(clauses, runningCounts, "command", "running");
+    pushClause(clauses, runningCounts, "plan", "updating", "plan update");
+    pushClause(clauses, runningCounts, "question", "asking");
+    pushClause(clauses, runningCounts, "skill", "loading", "skill");
+    pushClause(clauses, runningCounts, "open_tab", "opening", "tab");
+    pushTabsCheckClause(clauses, runningCounts, "checking");
+    pushStatusClause(clauses, runningCounts.get("tool") ?? 0, "running");
     pushStatusClause(clauses, failed, "failed");
 
     return capitalize(clauses.join(", "));
   }
+}
+
+function pushTabsCheckClause(
+  clauses: string[],
+  counts: Map<ToolDisplayAction, number>,
+  verb: "checked" | "checking"
+) {
+  const count = counts.get("list_tabs");
+  if (!count) return;
+  clauses.push(
+    count === 1 ? `${verb} open tabs` : `${verb} open tabs ${count} times`
+  );
 }
 
 function describeTitle(
@@ -317,6 +397,10 @@ function nounForAction(action: ToolDisplayAction): string {
       return "question";
     case "skill":
       return "skill";
+    case "open_tab":
+      return "tab";
+    case "list_tabs":
+      return "tab check";
     case "tool":
       return "tool call";
   }

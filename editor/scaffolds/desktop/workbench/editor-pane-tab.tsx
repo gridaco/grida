@@ -16,9 +16,8 @@
  *   - `.md` / `.markdown` → editable CodeMirror markdown editor + preview
  *   - image/* (.png/.jpg/.gif/.webp/…) → streamed image viewer
  *   - video/* (.mp4/.webm/.mov/…) → streamed video viewer
- *   - everything else → editable CodeMirror text editor (the fallback for any
- *     text format); the agent sidecar's `readFile` rejects binary / >1MiB
- *     content, which surfaces as the editor's error state, not gibberish
+ *   - known text/code formats → editable CodeMirror text editor
+ *   - everything else → reveal-only binary viewer (never read as UTF-8)
  *
  * The per-tab error boundary keeps a crash inside one viewer from
  * taking down the whole workspace window — see `EditorCrashFallback`.
@@ -30,14 +29,16 @@ import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { AlertTriangleIcon } from "lucide-react";
 import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
+import type { Workspace } from "@/lib/desktop/bridge";
 import { EditorPaneSvgEditor } from "./editor-pane-svg-editor";
 import { EditorPaneCodeEditor } from "./editor-pane-code-editor";
+import { EditorPaneBinaryFile } from "./editor-pane-binary-file";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { ImageViewer, VideoViewer } from "./editor-pane-viewers";
 import { WorkspaceFileKind } from "./workspace-file-kind";
 
 export type EditorPaneTabProps = {
-  workspaceId: string;
+  workspace: Workspace;
   relPath: string;
   active: boolean;
   /** Parent collects dirty state across all open tabs for the tab
@@ -48,7 +49,7 @@ export type EditorPaneTabProps = {
 };
 
 export function EditorPaneTab({
-  workspaceId,
+  workspace,
   relPath,
   active,
   onDirtyChange,
@@ -81,7 +82,7 @@ export function EditorPaneTab({
           cleanly, and the in-fallback "Try again" button calls
           `resetErrorBoundary` for the soft path. */}
       <ErrorBoundary
-        resetKeys={[workspaceId, relPath]}
+        resetKeys={[workspace.id, relPath]}
         onError={(err, info) => {
           console.error(
             `[workspace] viewer crashed for ${relPath}:`,
@@ -95,7 +96,7 @@ export function EditorPaneTab({
       >
         <ModeBody
           mode={mode}
-          workspaceId={workspaceId}
+          workspace={workspace}
           relPath={relPath}
           active={active}
           onDirtyChange={reportDirty}
@@ -110,19 +111,20 @@ export function EditorPaneTab({
 
 function ModeBody({
   mode,
-  workspaceId,
+  workspace,
   relPath,
   active,
   onDirtyChange,
   onSaved,
 }: {
   mode: WorkspaceFileKind.Kind;
-  workspaceId: string;
+  workspace: Workspace;
   relPath: string;
   active: boolean;
   onDirtyChange: (dirty: boolean) => void;
   onSaved?: () => void;
 }) {
+  const workspaceId = workspace.id;
   switch (mode) {
     case "svg":
       return (
@@ -172,6 +174,8 @@ function ModeBody({
           onSaved={onSaved}
         />
       );
+    case "binary":
+      return <EditorPaneBinaryFile workspace={workspace} relPath={relPath} />;
     default:
       mode satisfies never;
       return null;

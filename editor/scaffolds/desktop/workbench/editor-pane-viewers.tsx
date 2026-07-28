@@ -24,8 +24,6 @@
 
 import {
   type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
   useRef,
@@ -35,7 +33,10 @@ import { AlertCircleIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { type BundledLanguage, codeToHtml } from "shiki";
 import { cn } from "@app/ui/lib/utils";
+import { ZoomableImage } from "@/components/zoomable-image";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
+import { useWorkspaceFileRevision } from "./workspace-changes";
+import { WorkspaceFileRevision } from "./workspace-file-revision";
 
 /* ─────────────────────── shared load helpers ──────────────────── */
 
@@ -74,7 +75,11 @@ type BytesState =
   | { kind: "ready"; base64: string }
   | { kind: "error"; message: string };
 
-function useFileBytes(workspaceId: string, relPath: string): BytesState {
+function useFileBytes(
+  workspaceId: string,
+  relPath: string,
+  revision: number
+): BytesState {
   const [state, setState] = useState<BytesState>({ kind: "loading" });
   useEffect(() => {
     let cancelled = false;
@@ -95,7 +100,7 @@ function useFileBytes(workspaceId: string, relPath: string): BytesState {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, relPath]);
+  }, [workspaceId, relPath, revision]);
   return state;
 }
 
@@ -111,7 +116,7 @@ function LoadingState({ relPath }: { relPath: string }) {
  * the base64 media fallback). The streamed media path (#924) has no cap, so it
  * passes no hint. */
 const SIDECAR_CAP_HINT =
-  "The viewer reads files up to 1 MiB. Larger or unreadable files are rejected by the agent sidecar.";
+  "The viewer reads text files up to 1 MiB and buffered media up to 8 MiB.";
 
 function ErrorState({ message, hint }: { message: string; hint?: string }) {
   return (
@@ -187,287 +192,6 @@ function inferMime(relPath: string): string {
   return IMAGE_MIME[ext] ?? VIDEO_MIME[ext] ?? "application/octet-stream";
 }
 
-/* ───────────────────────── zoomable image surface ──────────────────────── */
-
-// Per-wheel-unit zoom sensitivity for pinch / Cmd-wheel. Mirrors the
-// `@grida/svg-editor` WHEEL_PAN_ZOOM default (src/gestures/defaults.ts).
-const WHEEL_ZOOM_SENSITIVITY = 0.01;
-// Screen-px breathing room between the fitted image and the pane edge, AND the
-// overscroll slack past the edge when zoomed in — the keynote `padding` +
-// `pan_overshoot` pair (presets/keynote.ts). At rest the image sits centered
-// inside the pane minus this padding.
-const PADDING = 32;
-const PAN_OVERSHOOT = PADDING;
-// Max magnification, in natural image pixels (1 = 100%). The MIN zoom is the
-// padded fit, computed per-image.
-const MAX_SCALE = 16;
-const DOUBLE_CLICK_FACTOR = 2;
-
-/** Measured geometry: container (`c*`) and natural image (`n*`) sizes. */
-type Measured = { cw: number; ch: number; nw: number; nh: number };
-/** Camera over the natural-size image: screen = natural · scale + (x, y). */
-type Camera = { scale: number; x: number; y: number };
-
-/** The "fully zoomed-out" scale: the image fits inside the pane minus PADDING.
- * Capped at 1 so small images rest at ≤100% (no ugly upscaling) — the one
- * deliberate deviation from keynote, which upscales-to-fill. */
-function fitScaleOf(m: Measured): number {
-  const raw = Math.min(
-    (m.cw - 2 * PADDING) / m.nw,
-    (m.ch - 2 * PADDING) / m.nh
-  );
-  return Math.min(raw > 0 ? raw : 1, 1);
-}
-
-/** Clamp a camera to the legal range: scale ∈ [paddedFit, MAX_SCALE]; per axis,
- * center when the content is smaller than the pane (keynote: fitted axis locks
- * at center), else clamp to the edges with PAN_OVERSHOOT slack. */
-function clampCamera(cam: Camera, m: Measured): Camera {
-  const scale = Math.min(MAX_SCALE, Math.max(fitScaleOf(m), cam.scale));
-  const axis = (content: number, view: number, v: number): number => {
-    if (content <= view) return (view - content) / 2; // centered, locked
-    return Math.min(PAN_OVERSHOOT, Math.max(view - content - PAN_OVERSHOOT, v));
-  };
-  return {
-    scale,
-    x: axis(m.nw * scale, m.cw, cam.x),
-    y: axis(m.nh * scale, m.ch, cam.y),
-  };
-}
-
-/** Centered, padded-fit camera — the rest state. */
-function fitCamera(m: Measured): Camera {
-  const scale = fitScaleOf(m);
-  return { scale, x: (m.cw - m.nw * scale) / 2, y: (m.ch - m.nh * scale) / 2 };
-}
-
-/** Zoom to `rawScale` while keeping the point under (px, py) fixed. */
-function zoomAt(
-  cam: Camera,
-  rawScale: number,
-  px: number,
-  py: number,
-  m: Measured
-): Camera {
-  const scale = Math.min(MAX_SCALE, Math.max(fitScaleOf(m), rawScale));
-  if (scale === cam.scale) return cam;
-  const ratio = scale / cam.scale;
-  return clampCamera(
-    { scale, x: px - (px - cam.x) * ratio, y: py - (py - cam.y) * ratio },
-    m
-  );
-}
-
-/**
- * Read-only image surface, keynote-style: pinch / Cmd-wheel to zoom (anchored at
- * the cursor), two-finger scroll or pointer-drag to pan, double-click to toggle
- * fit ⇄ actual-ish size. The image rests centered with PADDING breathing room;
- * zoom-out bottoms out at that padded fit, and panning gets PAN_OVERSHOOT slack
- * past the edges. Dependency-free — a CSS transform over the natural-size
- * `<img>`, driven by a small camera over measured container + image geometry.
- * Re-fits whenever `src` changes (navigating files) or the pane resizes.
- *
- * TODO(https://github.com/gridaco/grida/issues/925): this is hand-rolled and
- * image-specific. When a SECOND pan/zoom use case appears, extract the camera
- * math + interaction wiring into a headless, content-agnostic `usePanZoom`
- * primitive and de-dup this — NOT before (YAGNI; see the issue's
- * promotion-on-2nd-consumer rationale).
- */
-function ZoomableImage({
-  src,
-  alt,
-  onError,
-}: {
-  src: string;
-  alt: string;
-  onError?: () => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  // Geometry lives in refs so the once-attached wheel listener and the pointer
-  // handlers always read current values (not a stale closure). `cam` is state
-  // because it drives render; it stays null until both sizes are known.
-  const sizeRef = useRef<{ cw: number; ch: number } | null>(null);
-  const natRef = useRef<{ nw: number; nh: number } | null>(null);
-  const [cam, setCam] = useState<Camera | null>(null);
-  const [panning, setPanning] = useState(false);
-  const drag = useRef<{ x: number; y: number; cx: number; cy: number } | null>(
-    null
-  );
-
-  const measured = (): Measured | null => {
-    const s = sizeRef.current;
-    const n = natRef.current;
-    return s && n ? { cw: s.cw, ch: s.ch, nw: n.nw, nh: n.nh } : null;
-  };
-
-  // New image → forget the old natural size and re-fit on the next load.
-  useEffect(() => {
-    natRef.current = null;
-    setCam(null);
-  }, [src]);
-
-  // Track container size; re-clamp (or initialise) the camera on resize.
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      const r = el.getBoundingClientRect();
-      sizeRef.current = { cw: r.width, ch: r.height };
-      const m = measured();
-      if (m) setCam((prev) => (prev ? clampCamera(prev, m) : fitCamera(m)));
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const onLoad = () => {
-    const img = imgRef.current;
-    if (!img) return;
-    natRef.current = { nw: img.naturalWidth, nh: img.naturalHeight };
-    if (!sizeRef.current && containerRef.current) {
-      const r = containerRef.current.getBoundingClientRect();
-      sizeRef.current = { cw: r.width, ch: r.height };
-    }
-    const m = measured();
-    if (m) setCam(fitCamera(m));
-  };
-
-  // Wheel must be a non-passive native listener — React's synthetic onWheel is
-  // passive, so it can't preventDefault the page scroll. Attached once; reads
-  // geometry from refs. Model mirrors `@grida/svg-editor`'s WHEEL_PAN_ZOOM:
-  // trackpad pinch (reports `ctrlKey`) and Cmd-wheel ZOOM at the cursor; plain
-  // two-finger scroll PANS.
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const m = measured();
-      if (!m) return;
-      const rect = el.getBoundingClientRect();
-      if (e.ctrlKey || e.metaKey) {
-        const px = e.clientX - rect.left;
-        const py = e.clientY - rect.top;
-        setCam((prev) =>
-          prev
-            ? zoomAt(
-                prev,
-                prev.scale * (1 - e.deltaY * WHEEL_ZOOM_SENSITIVITY),
-                px,
-                py,
-                m
-              )
-            : prev
-        );
-      } else {
-        setCam((prev) =>
-          prev
-            ? clampCamera(
-                { ...prev, x: prev.x - e.deltaX, y: prev.y - e.deltaY },
-                m
-              )
-            : prev
-        );
-      }
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
-
-  // Pannable iff the content overflows the pane on some axis (else it's locked
-  // centered and there's nothing to drag).
-  const m0 = measured();
-  const pannable =
-    !!m0 &&
-    !!cam &&
-    (m0.nw * cam.scale > m0.cw + 0.5 || m0.nh * cam.scale > m0.ch + 0.5);
-
-  const onPointerDown = (e: ReactPointerEvent) => {
-    if (!pannable || !cam) return;
-    containerRef.current?.setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y };
-    setPanning(true);
-  };
-  const onPointerMove = (e: ReactPointerEvent) => {
-    const d = drag.current;
-    const m = measured();
-    if (!d || !m) return;
-    const x = d.cx + (e.clientX - d.x);
-    const y = d.cy + (e.clientY - d.y);
-    setCam((prev) => (prev ? clampCamera({ ...prev, x, y }, m) : prev));
-  };
-  const endPan = (e: ReactPointerEvent) => {
-    drag.current = null;
-    setPanning(false);
-    containerRef.current?.releasePointerCapture(e.pointerId);
-  };
-
-  // Double-click toggles padded-fit ⇄ a magnified view at the cursor (2× the
-  // fit, but at least 100% so large images snap to pixel-accurate).
-  const onDoubleClick = (e: ReactMouseEvent) => {
-    const el = containerRef.current;
-    const m = measured();
-    if (!el || !m) return;
-    const rect = el.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-    setCam((prev) => {
-      if (!prev) return prev;
-      const fit = fitScaleOf(m);
-      if (prev.scale > fit + 1e-3) return fitCamera(m);
-      const target = Math.min(
-        MAX_SCALE,
-        Math.max(1, fit * DOUBLE_CLICK_FACTOR)
-      );
-      return zoomAt(prev, target, px, py, m);
-    });
-  };
-
-  const cursor = pannable ? (panning ? "grabbing" : "grab") : "default";
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative h-full w-full overflow-hidden bg-muted/30"
-      style={{ touchAction: "none", cursor }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endPan}
-      onPointerCancel={endPan}
-      onDoubleClick={onDoubleClick}
-    >
-      {/* Natural-size `<img>` (max-w-none defeats the global img reset),
-          absolutely positioned and driven entirely by the camera transform.
-          Faded in (opacity) until the first fit is computed, to avoid a flash
-          at full size. MUST gate via `opacity`, NOT `visibility` — the editor
-          pane stacks every open tab and hides the inactive ones with
-          `invisible` (`visibility: hidden`; see editor-pane-tab.tsx). An
-          explicit `visibility: visible` here would pierce that inherited hide
-          and paint an inactive image tab over the active one; `opacity` stays
-          subordinate to the parent's `visibility: hidden`. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        ref={imgRef}
-        src={src}
-        alt={alt}
-        className="absolute left-0 top-0 max-w-none select-none"
-        draggable={false}
-        onLoad={onLoad}
-        onError={onError}
-        style={{
-          transform: cam
-            ? `translate(${cam.x}px, ${cam.y}px) scale(${cam.scale})`
-            : undefined,
-          transformOrigin: "0 0",
-          opacity: cam ? 1 : 0,
-          willChange: "transform",
-        }}
-      />
-    </div>
-  );
-}
-
 /**
  * Image/video viewers (#924). On desktop the host exposes a streamable
  * `media_url` (`grida-workspace://`, proxied to the sidecar's Range-capable
@@ -485,11 +209,19 @@ export function ImageViewer({
   workspaceId: string;
   relPath: string;
 }) {
-  const src = workspacesNs.mediaUrl(workspaceId, relPath);
+  const revision = useWorkspaceFileRevision(
+    WorkspaceFileRevision.exact(relPath)
+  );
+  const direct = workspacesNs.mediaUrl(workspaceId, relPath);
+  const src = direct ? WorkspaceFileRevision.url(direct, revision) : undefined;
   return src ? (
     <StreamedImage src={src} relPath={relPath} />
   ) : (
-    <Base64ImageViewer workspaceId={workspaceId} relPath={relPath} />
+    <Base64ImageViewer
+      workspaceId={workspaceId}
+      relPath={relPath}
+      revision={revision}
+    />
   );
 }
 
@@ -522,11 +254,13 @@ function StreamedImage({ src, relPath }: { src: string; relPath: string }) {
 function Base64ImageViewer({
   workspaceId,
   relPath,
+  revision,
 }: {
   workspaceId: string;
   relPath: string;
+  revision: number;
 }) {
-  const state = useFileBytes(workspaceId, relPath);
+  const state = useFileBytes(workspaceId, relPath, revision);
   const src =
     state.kind === "ready"
       ? `data:${inferMime(relPath)};base64,${state.base64}`
@@ -551,11 +285,19 @@ export function VideoViewer({
   workspaceId: string;
   relPath: string;
 }) {
-  const src = workspacesNs.mediaUrl(workspaceId, relPath);
+  const revision = useWorkspaceFileRevision(
+    WorkspaceFileRevision.exact(relPath)
+  );
+  const direct = workspacesNs.mediaUrl(workspaceId, relPath);
+  const src = direct ? WorkspaceFileRevision.url(direct, revision) : undefined;
   return src ? (
     <StreamedVideo src={src} />
   ) : (
-    <Base64VideoViewer workspaceId={workspaceId} relPath={relPath} />
+    <Base64VideoViewer
+      workspaceId={workspaceId}
+      relPath={relPath}
+      revision={revision}
+    />
   );
 }
 
@@ -579,11 +321,13 @@ function StreamedVideo({ src }: { src: string }) {
 function Base64VideoViewer({
   workspaceId,
   relPath,
+  revision,
 }: {
   workspaceId: string;
   relPath: string;
+  revision: number;
 }) {
-  const state = useFileBytes(workspaceId, relPath);
+  const state = useFileBytes(workspaceId, relPath, revision);
   const src =
     state.kind === "ready"
       ? `data:${inferMime(relPath)};base64,${state.base64}`

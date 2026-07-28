@@ -25,12 +25,14 @@ import {
   useContext,
   useEffect,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 import {
   workspaces as workspacesNs,
   type WorkspaceChangeEvent,
 } from "@/lib/desktop/bridge";
+import { WorkspaceFileRevision } from "./workspace-file-revision";
 
 type ChangeListener = (events: WorkspaceChangeEvent[]) => void;
 type Subscribe = (listener: ChangeListener) => () => void;
@@ -108,4 +110,25 @@ export function useWorkspaceChanges(onChanges: ChangeListener): void {
     if (!subscribe) return;
     return subscribe((events) => ref.current(events));
   }, [subscribe]);
+}
+
+/**
+ * Monotonic render revision for one workspace-file dependency scope. The
+ * framework-agnostic matching/advance policy lives in
+ * {@link WorkspaceFileRevision}; this hook is only its React subscription wire.
+ */
+export function useWorkspaceFileRevision(
+  scope: WorkspaceFileRevision.Scope | (() => WorkspaceFileRevision.Scope)
+): number {
+  const [revision, setRevision] = useState(0);
+  useWorkspaceChanges((events) => {
+    setRevision((current) =>
+      WorkspaceFileRevision.next(
+        current,
+        typeof scope === "function" ? scope() : scope,
+        events
+      )
+    );
+  });
+  return revision;
 }

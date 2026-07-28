@@ -30,6 +30,8 @@ type SvgHrefAttributeSpec = {
 
 export type MaterializedSlideSvg = {
   svg: string;
+  /** Workspace paths consumed (or attempted) by this projection. */
+  dependencies: readonly string[];
   restore(serialized: string): string;
 };
 
@@ -99,31 +101,28 @@ export async function materializeSlideSvgResources(
     options.maxResourceAttributes === undefined
       ? resources.length
       : Math.max(0, Math.floor(options.maxResourceAttributes));
+  const selectedResources = resources.slice(0, resourceLimit);
+  const dependencies = [...new Set(selectedResources.map((r) => r.relPath))];
 
   await Promise.all(
-    resources
-      .slice(0, resourceLimit)
-      .map(async ({ attr, href, relPath, sequence }) => {
-        try {
-          const { base64 } = await readFileBytes(options.workspaceId, relPath);
-          const materialized = toDataUrl(
-            relPath,
-            base64,
-            projectionId,
-            sequence
-          );
-          restores.set(materialized, escapeXmlAttribute(href));
-          attr.set(materialized);
-        } catch {
-          // Per #960 this is a render projection, not document validation. A
-          // missing/oversized/binary asset should leave only that image broken.
-        }
-      })
+    selectedResources.map(async ({ attr, href, relPath, sequence }) => {
+      try {
+        const { base64 } = await readFileBytes(options.workspaceId, relPath);
+        const materialized = toDataUrl(relPath, base64, projectionId, sequence);
+        restores.set(materialized, escapeXmlAttribute(href));
+        attr.set(materialized);
+      } catch {
+        // Per #960 this is a render projection, not document validation. A
+        // missing/oversized/binary asset should leave only that image broken.
+        // Its path remains a dependency so a later `added` event can recover.
+      }
+    })
   );
 
   const materialized = doc.serialize();
   return {
     svg: materialized,
+    dependencies,
     restore(serialized) {
       let restored = serialized;
       for (const [materializedHref, originalHref] of restores) {
@@ -135,7 +134,7 @@ export async function materializeSlideSvgResources(
 }
 
 function identity(svg: string): MaterializedSlideSvg {
-  return { svg, restore: (serialized) => serialized };
+  return { svg, dependencies: [], restore: (serialized) => serialized };
 }
 
 const DOM_XML = {

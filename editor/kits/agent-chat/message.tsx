@@ -52,10 +52,12 @@ import {
   ListTodoIcon,
   MessageCircleQuestionIcon,
   PaperclipIcon,
+  PanelsTopLeftIcon,
   RotateCcwIcon,
   SearchIcon,
   SparklesIcon,
   SquareTerminalIcon,
+  AppWindowIcon,
   WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -89,6 +91,11 @@ import {
 } from "./design-search-widget";
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
+import {
+  hasOpenTabsResult,
+  isSurfaceToolEntry,
+  SurfaceToolContent,
+} from "./surface-tool-card";
 
 export type { ChatMessage, ToolCallEntry };
 
@@ -680,6 +687,7 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
     );
   }
   const mediaTool = isMediaToolEntry(entry);
+  const surfaceTool = isSurfaceToolEntry(entry);
   const humanReadableTool = isHumanReadableToolCardEntry(entry);
   // The Allow/Deny ACTION lives in the session-global approval bar above the
   // composer (instantly visible). Here we only echo the status passively so the
@@ -689,7 +697,10 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
     isGenerateImageEntry(entry) && isMediaPending(entry);
 
   return (
-    <Task defaultOpen={mediaTool || humanReadableTool} className="w-full">
+    <Task
+      defaultOpen={mediaTool || humanReadableTool || hasOpenTabsResult(entry)}
+      className="w-full"
+    >
       <TaskTrigger title={title}>
         {triggerRow(iconForAction(description.action), title, {
           busy: showTriggerSpinner,
@@ -698,6 +709,10 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
       {mediaTool ? (
         <TaskContent>
           <MediaToolContent entry={entry} />
+        </TaskContent>
+      ) : surfaceTool ? (
+        <TaskContent>
+          <SurfaceToolContent entry={entry} />
         </TaskContent>
       ) : (
         <TaskContent>
@@ -809,6 +824,10 @@ function iconForAction(action: ToolDisplayDescription["action"]): LucideIcon {
       return MessageCircleQuestionIcon;
     case "skill":
       return BookOpenIcon;
+    case "open_tab":
+      return AppWindowIcon;
+    case "list_tabs":
+      return PanelsTopLeftIcon;
     case "tool":
       return WrenchIcon;
   }
