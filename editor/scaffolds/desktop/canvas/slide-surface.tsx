@@ -14,6 +14,7 @@ import { useEffect, useRef } from "react";
 import { useSvgEditor } from "@grida/svg-editor/react";
 import { keynote } from "@grida/svg-editor/presets";
 import { useWorkspaceFileSave } from "../workbench/use-workspace-file-save";
+import type { WorkspaceFileReloadGuard } from "../workbench/workspace-file-reload-guard";
 import {
   DirtyBadge,
   SaveConflictDialog,
@@ -24,6 +25,7 @@ export function SlideSurface({
   workspaceId,
   relPath,
   initialMtime,
+  resourceRevision = 0,
   active = true,
   onSaved,
   prepareContentForEditor,
@@ -32,10 +34,17 @@ export function SlideSurface({
   workspaceId: string;
   relPath: string;
   initialMtime: number;
+  /** Monotonic revision of workspace resources embedded by this slide. */
+  resourceRevision?: number;
   /** Gates Cmd+S — false when this deck is a hidden workbench tab. */
   active?: boolean;
   onSaved?: () => void;
-  prepareContentForEditor?: (diskContent: string) => Promise<string> | string;
+  prepareContentForEditor?: (
+    diskContent: string
+  ) =>
+    | Promise<string | WorkspaceFileReloadGuard.Prepared<string>>
+    | string
+    | WorkspaceFileReloadGuard.Prepared<string>;
   prepareContentForWrite?: (editorSerializedContent: string) => string;
 }) {
   const editor = useSvgEditor();
@@ -59,6 +68,36 @@ export function SlideSurface({
     prepareContentForEditor,
     prepareContentForWrite,
   });
+  const appliedResourceRevisionRef = useRef(0);
+  const refreshingResourceRevisionRef = useRef<number | null>(null);
+
+  // A referenced image can change while the slide SVG itself (and therefore
+  // its mtime) stays unchanged. Re-run the host projection only while clean;
+  // dirty editor content is never discarded and catches up after save/revert.
+  useEffect(() => {
+    if (
+      resourceRevision === appliedResourceRevisionRef.current ||
+      save.dirty ||
+      save.saving ||
+      save.conflictOpen ||
+      refreshingResourceRevisionRef.current === resourceRevision
+    ) {
+      return;
+    }
+    const targetRevision = resourceRevision;
+    refreshingResourceRevisionRef.current = targetRevision;
+    void save.reloadProjectionFromDisk().then((applied) => {
+      if (refreshingResourceRevisionRef.current !== targetRevision) return;
+      refreshingResourceRevisionRef.current = null;
+      if (applied) appliedResourceRevisionRef.current = targetRevision;
+    });
+  }, [
+    resourceRevision,
+    save.dirty,
+    save.saving,
+    save.conflictOpen,
+    save.reloadProjectionFromDisk,
+  ]);
 
   return (
     <div className="relative h-full w-full bg-muted">

@@ -4,13 +4,13 @@ title: Open media tabs refresh after their workspace file changes
 module: desktop
 area: workbench
 tags: [workspace, tabs, image, video, file-watcher]
-status: untested
+status: verified
 severity: high
 date: 2026-07-29
 updated: 2026-07-29
 automatable: false
 covered_by:
-  - editor/scaffolds/desktop/workbench/workspace-media-revision.test.ts
+  - editor/scaffolds/desktop/workbench/workspace-file-revision.test.ts
 ---
 
 ## Behavior

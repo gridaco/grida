@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorState, useSvgEditor } from "@grida/svg-editor/react";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import { useWorkspaceChanges } from "./workspace-changes";
+import { WorkspaceFileReloadGuard } from "./workspace-file-reload-guard";
 
 export type WorkspaceFileSave = {
   dirty: boolean;
@@ -27,6 +28,12 @@ export type WorkspaceFileSave = {
   onSave: () => void;
   /** Take the current bytes on disk into the editor (clean-buffer reload). */
   reloadFromDisk: () => Promise<void>;
+  /**
+   * Re-read and re-project the current bytes even when this file's mtime did
+   * not change. Returns false when an edit/write raced the read and the caller
+   * should retry after the buffer becomes clean.
+   */
+  reloadProjectionFromDisk: () => Promise<boolean>;
   /** Force the editor's content over disk (last-writer-wins). */
   overwriteAnyway: () => void;
   dismissError: () => void;
@@ -51,7 +58,12 @@ export function useWorkspaceFileSave({
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   /** Optional host projection before bytes from disk enter the editor. */
-  prepareContentForEditor?: (diskContent: string) => Promise<string> | string;
+  prepareContentForEditor?: (
+    diskContent: string
+  ) =>
+    | Promise<string | WorkspaceFileReloadGuard.Prepared<string>>
+    | string
+    | WorkspaceFileReloadGuard.Prepared<string>;
   /** Optional inverse projection before serialized editor content hits disk. */
   prepareContentForWrite?: (editorSerializedContent: string) => string;
 }): WorkspaceFileSave {
@@ -73,6 +85,11 @@ export function useWorkspaceFileSave({
   // external edit. Drop the overlap; the buffer stays dirty and re-saves cleanly
   // once the in-flight write lands.
   const writeInFlightRef = useRef(false);
+  // Exact-file reloads and dependency-only reprojections have independent
+  // latest-request lanes. A same-mtime file-watch echo must not supersede an
+  // in-flight dependency refresh that intentionally bypasses that mtime check.
+  const fileReloadGuardRef = useRef(new WorkspaceFileReloadGuard());
+  const projectionReloadGuardRef = useRef(new WorkspaceFileReloadGuard());
   // Set when a save is rejected because disk advanced past our token. Holds the
   // content the user tried to write so "Overwrite anyway" can re-issue it
   // without re-serializing a since-changed editor.
@@ -147,28 +164,57 @@ export function useWorkspaceFileSave({
   // re-baseline `savedVersion` to the post-load content_version so the
   // freshly-reloaded file reads as clean (editor.load() bumps the version —
   // without re-baselining it would show as dirty).
+  const reload = useCallback(
+    async (forceProjection: boolean): Promise<boolean> => {
+      const guard = forceProjection
+        ? projectionReloadGuardRef.current
+        : fileReloadGuardRef.current;
+      const request = guard.begin(editor.state.content_version);
+      setConflict(null);
+      setSaveError(null);
+      try {
+        const r = await workspacesNs.readFile(workspaceId, relPath);
+        // Echo suppression (issue #805): our own save produces a watcher
+        // `changed` event for this same file, which lands here once the buffer
+        // is clean again. A dependency-only refresh deliberately bypasses this:
+        // the source file is unchanged, but its host projection is not.
+        if (!forceProjection && r.mtime === lastMtimeRef.current) return true;
+        const projected = prepareContentForEditor
+          ? await prepareContentForEditor(r.content)
+          : r.content;
+        const prepared =
+          typeof projected === "string" ? { content: projected } : projected;
+        const applied = guard.apply(
+          request,
+          {
+            contentVersion: editor.state.content_version,
+            writeInFlight: writeInFlightRef.current,
+          },
+          prepared,
+          (content) => editor.load(content)
+        );
+        if (!applied) return false;
+        lastMtimeRef.current = r.mtime;
+        setSavedVersion(editor.state.content_version);
+        return true;
+      } catch (err) {
+        if (
+          guard.accepts(request, {
+            contentVersion: editor.state.content_version,
+            writeInFlight: writeInFlightRef.current,
+          })
+        ) {
+          setSaveError(err instanceof Error ? err.message : "Reload failed.");
+        }
+        return false;
+      }
+    },
+    [workspaceId, relPath, editor, prepareContentForEditor]
+  );
   const reloadFromDisk = useCallback(async () => {
-    setConflict(null);
-    setSaveError(null);
-    try {
-      const r = await workspacesNs.readFile(workspaceId, relPath);
-      // Echo suppression (issue #805): our own save produces a watcher
-      // `changed` event for this same file, which lands here once the buffer is
-      // clean again. `lastMtimeRef` is the mtime we last wrote/loaded; if disk
-      // hasn't advanced past it there's nothing new to take, and calling
-      // editor.load() would needlessly reset selection / history / mode on
-      // every Cmd+S. Reload only when disk genuinely moved ahead of us.
-      if (r.mtime === lastMtimeRef.current) return;
-      const content = prepareContentForEditor
-        ? await prepareContentForEditor(r.content)
-        : r.content;
-      editor.load(content);
-      lastMtimeRef.current = r.mtime;
-      setSavedVersion(editor.state.content_version);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Reload failed.");
-    }
-  }, [workspaceId, relPath, editor, prepareContentForEditor]);
+    await reload(false);
+  }, [reload]);
+  const reloadProjectionFromDisk = useCallback(() => reload(true), [reload]);
 
   const overwriteAnyway = useCallback(() => {
     if (!conflict) return;
@@ -208,6 +254,7 @@ export function useWorkspaceFileSave({
     conflictOpen: conflict !== null,
     onSave,
     reloadFromDisk,
+    reloadProjectionFromDisk,
     overwriteAnyway,
     dismissError: () => setSaveError(null),
     keepEditing: () => setConflict(null),

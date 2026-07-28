@@ -35,8 +35,8 @@ import { type BundledLanguage, codeToHtml } from "shiki";
 import { cn } from "@app/ui/lib/utils";
 import { ZoomableImage } from "@/components/zoomable-image";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
-import { useWorkspaceChanges } from "./workspace-changes";
-import { WorkspaceMediaRevision } from "./workspace-media-revision";
+import { useWorkspaceFileRevision } from "./workspace-changes";
+import { WorkspaceFileRevision } from "./workspace-file-revision";
 
 /* ─────────────────────── shared load helpers ──────────────────── */
 
@@ -209,9 +209,11 @@ export function ImageViewer({
   workspaceId: string;
   relPath: string;
 }) {
-  const revision = useMediaRevision(relPath);
+  const revision = useWorkspaceFileRevision(
+    WorkspaceFileRevision.exact(relPath)
+  );
   const direct = workspacesNs.mediaUrl(workspaceId, relPath);
-  const src = direct ? WorkspaceMediaRevision.url(direct, revision) : undefined;
+  const src = direct ? WorkspaceFileRevision.url(direct, revision) : undefined;
   return src ? (
     <StreamedImage src={src} relPath={relPath} />
   ) : (
@@ -221,21 +223,6 @@ export function ImageViewer({
       revision={revision}
     />
   );
-}
-
-/**
- * Workspace tabs deliberately stay mounted while inactive. Translate an exact
- * file-watch match into the request revision that makes the media element load
- * the new bytes at the same path.
- */
-function useMediaRevision(relPath: string): number {
-  const [revision, setRevision] = useState(0);
-  useWorkspaceChanges((events) => {
-    if (WorkspaceMediaRevision.matches(events, relPath)) {
-      setRevision((current) => current + 1);
-    }
-  });
-  return revision;
 }
 
 /** View-local "did the media element fail to load" flag, reset whenever `src`
@@ -298,9 +285,11 @@ export function VideoViewer({
   workspaceId: string;
   relPath: string;
 }) {
-  const revision = useMediaRevision(relPath);
+  const revision = useWorkspaceFileRevision(
+    WorkspaceFileRevision.exact(relPath)
+  );
   const direct = workspacesNs.mediaUrl(workspaceId, relPath);
-  const src = direct ? WorkspaceMediaRevision.url(direct, revision) : undefined;
+  const src = direct ? WorkspaceFileRevision.url(direct, revision) : undefined;
   return src ? (
     <StreamedVideo src={src} />
   ) : (

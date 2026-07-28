@@ -28,7 +28,11 @@ import {
 } from "react";
 import { dotcanvas } from "dotcanvas";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
-import { useWorkspaceChanges } from "../workbench/workspace-changes";
+import {
+  useWorkspaceChanges,
+  useWorkspaceFileRevision,
+} from "../workbench/workspace-changes";
+import { WorkspaceFileRevision } from "../workbench/workspace-file-revision";
 import { CanvasBoard, isUriSrc, type Frame } from "./board-store";
 
 type Camera = { x: number; y: number; zoom: number };
@@ -63,10 +67,16 @@ function placedRect(frame: Frame, index: number) {
  *  hostile/garbled manifest) degrades to an empty URL — a broken `<img>`, not a
  *  render-phase throw that takes down the whole board (`bundlePath` stays the
  *  throwing chokepoint for actual file ops). */
-function pinSrc(board: CanvasBoard, workspaceId: string, src: string): string {
+function pinSrc(
+  board: CanvasBoard,
+  workspaceId: string,
+  src: string,
+  revision: number
+): string {
   if (isUriSrc(src)) return src;
   try {
-    return workspacesNs.mediaUrl(workspaceId, board.bundlePath(src)) ?? "";
+    const direct = workspacesNs.mediaUrl(workspaceId, board.bundlePath(src));
+    return direct ? WorkspaceFileRevision.url(direct, revision) : "";
   } catch {
     return "";
   }
@@ -86,18 +96,34 @@ export function DesktopBoardShell({
   const frames = useSyncExternalStore(board.subscribe, board.getFrames, () =>
     board.getFrames()
   );
+  const localPinPaths = useMemo(() => {
+    const paths = new Set<string>();
+    for (const frame of frames) {
+      if (isUriSrc(frame.src)) continue;
+      try {
+        paths.add(board.bundlePath(frame.src));
+      } catch {
+        // A hostile/garbled manifest stays an individual broken pin.
+      }
+    }
+    return [...paths];
+  }, [board, frames]);
+  const pinRevision = useWorkspaceFileRevision(
+    WorkspaceFileRevision.paths(localPinPaths)
+  );
 
-  // Resolve each pin's render URL once per frame-set, not once per camera tick:
-  // pan/zoom re-renders this component, but a pin's URL is stable for its `src`,
-  // so recomputing `bundlePath` + the `mediaUrl` bridge call on every scroll
-  // frame is pure waste. Keyed by `frames`, so it refreshes only on a real edit.
+  // Resolve each pin URL once per frame-set or dependent-file revision, not once
+  // per camera tick. The explicit path scope excludes `.canvas.json`, so moving
+  // a pin does not refetch every image; overwriting a pin's bytes does.
   const pinUrls = useMemo(() => {
     const urls = new Map<string, string>();
     for (const f of frames) {
-      if (!urls.has(f.src)) urls.set(f.src, pinSrc(board, workspaceId, f.src));
+      if (!urls.has(f.src)) {
+        urls.set(f.src, pinSrc(board, workspaceId, f.src, pinRevision));
+      }
     }
     return urls;
-  }, [frames, board, workspaceId]);
+  }, [frames, board, workspaceId, pinRevision]);
 
   useEffect(() => {
     void board.load();

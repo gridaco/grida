@@ -28,6 +28,7 @@ import { svgToDataUri } from "@/app/(canvas)/svg/_storage/thumbnails";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
 import { materializeSlideSvgResources } from "../canvas/slide-svg-resources";
 import { workspaceBundleFs } from "../canvas/workspace-bundle-fs";
+import { WorkspaceFileRevision } from "./workspace-file-revision";
 import { WorkspaceFileKind } from "./workspace-file-kind";
 import { WorkspaceTabThumbnail } from "./workspace-tab-thumbnail";
 
@@ -56,6 +57,7 @@ export function EditorTabPreviewContent({
           kind={kind}
           workspaceId={workspaceId}
           relPath={relPath}
+          revision={revision}
           thumbnailCache={thumbnailCache}
         />
       </div>
@@ -83,11 +85,13 @@ function ThumbnailBody({
   kind,
   workspaceId,
   relPath,
+  revision,
   thumbnailCache,
 }: {
   kind: WorkspaceFileKind.Kind;
   workspaceId: string;
   relPath: string;
+  revision: number;
   thumbnailCache: WorkspaceTabThumbnail.Cache;
 }) {
   switch (kind) {
@@ -96,6 +100,7 @@ function ThumbnailBody({
         <CanvasThumbnail
           workspaceId={workspaceId}
           basePath={relPath}
+          revision={revision}
           thumbnailCache={thumbnailCache}
         />
       );
@@ -105,12 +110,17 @@ function ThumbnailBody({
         <WorkspaceImageThumbnail
           workspaceId={workspaceId}
           relPath={relPath}
+          revision={revision}
           fallback={null}
         />
       );
     case "video":
       return (
-        <WorkspaceVideoThumbnail workspaceId={workspaceId} relPath={relPath} />
+        <WorkspaceVideoThumbnail
+          workspaceId={workspaceId}
+          relPath={relPath}
+          revision={revision}
+        />
       );
     case "markdown":
     case "text":
@@ -126,9 +136,13 @@ type MediaSource =
 
 function useWorkspaceMediaSource(
   workspaceId: string,
-  relPath: string
+  relPath: string,
+  revision: number
 ): MediaSource {
-  const direct = workspacesNs.mediaUrl(workspaceId, relPath);
+  const mediaUrl = workspacesNs.mediaUrl(workspaceId, relPath);
+  const direct = mediaUrl
+    ? WorkspaceFileRevision.url(mediaUrl, revision)
+    : undefined;
   const [fallback, setFallback] = useState<MediaSource>({ kind: "loading" });
 
   useEffect(() => {
@@ -150,7 +164,7 @@ function useWorkspaceMediaSource(
     return () => {
       cancelled = true;
     };
-  }, [direct, workspaceId, relPath]);
+  }, [direct, workspaceId, relPath, revision]);
 
   return direct ? { kind: "ready", src: direct } : fallback;
 }
@@ -158,13 +172,15 @@ function useWorkspaceMediaSource(
 function WorkspaceImageThumbnail({
   workspaceId,
   relPath,
+  revision,
   fallback,
 }: {
   workspaceId: string;
   relPath: string;
+  revision: number;
   fallback: ReactNode;
 }) {
-  const source = useWorkspaceMediaSource(workspaceId, relPath);
+  const source = useWorkspaceMediaSource(workspaceId, relPath, revision);
   const [decodeFailed, setDecodeFailed] = useState(false);
   const [inset, setInset] = useState(false);
   const src = source.kind === "ready" ? source.src : "";
@@ -209,11 +225,13 @@ function hasNaturalGutter(image: HTMLImageElement): boolean {
 function WorkspaceVideoThumbnail({
   workspaceId,
   relPath,
+  revision,
 }: {
   workspaceId: string;
   relPath: string;
+  revision: number;
 }) {
-  const source = useWorkspaceMediaSource(workspaceId, relPath);
+  const source = useWorkspaceMediaSource(workspaceId, relPath, revision);
   const [decodeFailed, setDecodeFailed] = useState(false);
   const [ready, setReady] = useState(false);
   const src = source.kind === "ready" ? source.src : "";
@@ -264,10 +282,12 @@ type CanvasState =
 function CanvasThumbnail({
   workspaceId,
   basePath,
+  revision,
   thumbnailCache,
 }: {
   workspaceId: string;
   basePath: string;
+  revision: number;
   thumbnailCache: WorkspaceTabThumbnail.Cache;
 }) {
   const [state, setState] = useState<CanvasState>({ kind: "loading" });
@@ -305,6 +325,7 @@ function CanvasThumbnail({
     <CanvasFallbackThumbnail
       workspaceId={workspaceId}
       basePath={basePath}
+      revision={revision}
       fallback={state.model.fallback}
       thumbnailCache={thumbnailCache}
     />
@@ -318,6 +339,7 @@ function CanvasThumbnail({
         workspaceId={workspaceId}
         basePath={basePath}
         src={state.model.cover ?? ""}
+        revision={revision}
         fallback={fallback}
         thumbnailCache={thumbnailCache}
       />
@@ -325,6 +347,7 @@ function CanvasThumbnail({
       <WorkspaceImageThumbnail
         workspaceId={workspaceId}
         relPath={coverPath}
+        revision={revision}
         fallback={fallback}
       />
     )
@@ -336,11 +359,13 @@ function CanvasThumbnail({
 function CanvasFallbackThumbnail({
   workspaceId,
   basePath,
+  revision,
   fallback,
   thumbnailCache,
 }: {
   workspaceId: string;
   basePath: string;
+  revision: number;
   fallback: WorkspaceTabThumbnail.CanvasFallback;
   thumbnailCache: WorkspaceTabThumbnail.Cache;
 }) {
@@ -351,6 +376,7 @@ function CanvasFallbackThumbnail({
           workspaceId={workspaceId}
           basePath={basePath}
           src={fallback.src}
+          revision={revision}
           fallback={null}
           thumbnailCache={thumbnailCache}
         />
@@ -366,12 +392,14 @@ function CanvasSvgThumbnail({
   workspaceId,
   basePath,
   src,
+  revision,
   fallback,
   thumbnailCache,
 }: {
   workspaceId: string;
   basePath: string;
   src: string;
+  revision: number;
   fallback: ReactNode;
   thumbnailCache: WorkspaceTabThumbnail.Cache;
 }) {
@@ -413,7 +441,7 @@ function CanvasSvgThumbnail({
       cancelled = true;
       projection.cancel();
     };
-  }, [workspaceId, basePath, relPath, thumbnailCache]);
+  }, [workspaceId, basePath, relPath, revision, thumbnailCache]);
 
   if (state.kind === "error" || decodeFailed) return fallback;
   if (state.kind === "loading") return <ThumbnailLoading />;

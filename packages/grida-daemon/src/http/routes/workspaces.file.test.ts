@@ -54,9 +54,23 @@ describe("GET /workspaces/file (#924)", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/png");
     expect(res.headers.get("accept-ranges")).toBe("bytes");
+    expect(res.headers.get("cache-control")).toBe("no-store");
     expect(res.headers.get("content-length")).toBe(String(bytes.length));
     const body = Buffer.from(await res.arrayBuffer());
     expect(body.equals(bytes)).toBe(true);
+  });
+
+  it("serves new bytes after the same workspace URL is overwritten", async () => {
+    const target = url("fill.png");
+    await fixture.write_workspace_file("fill.png", "BLACK");
+    const initial = await app.request(target);
+    expect(await initial.text()).toBe("BLACK");
+    expect(initial.headers.get("cache-control")).toBe("no-store");
+
+    await fixture.write_workspace_file("fill.png", "RED");
+    const refreshed = await app.request(target);
+    expect(await refreshed.text()).toBe("RED");
+    expect(refreshed.headers.get("cache-control")).toBe("no-store");
   });
 
   it("honors a byte Range with 206 + Content-Range (video seeking)", async () => {

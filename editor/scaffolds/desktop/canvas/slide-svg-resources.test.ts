@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { WorkspaceFileRevision } from "../workbench/workspace-file-revision";
 import { materializeSlideSvgResources } from "./slide-svg-resources";
 
 function testXml() {
@@ -56,6 +57,7 @@ describe("materializeSlideSvgResources", () => {
     );
 
     expect(calls).toEqual(["assets/a.png"]);
+    expect(out.dependencies).toEqual(["assets/a.png"]);
     expect(out.svg).toContain('href="data:image/png;grida-svg-resource=');
     expect(out.svg).toContain(';base64,AAAA"');
     expect(out.restore(out.svg)).toBe(
@@ -77,6 +79,7 @@ describe("materializeSlideSvgResources", () => {
     );
 
     expect(calls).toEqual(["assets/a.jpg", "assets/filter.webp"]);
+    expect(out.dependencies).toEqual(["assets/a.jpg", "assets/filter.webp"]);
     expect(out.svg).toContain(
       'xlink:href="data:image/jpeg;grida-svg-resource='
     );
@@ -99,6 +102,7 @@ describe("materializeSlideSvgResources", () => {
     });
 
     expect(out.svg).toBe(svg);
+    expect(out.dependencies).toEqual([]);
     expect(out.restore(svg)).toBe(svg);
   });
 
@@ -118,6 +122,7 @@ describe("materializeSlideSvgResources", () => {
     );
 
     expect(calls).toEqual(["deck.canvas/assets/a.png"]);
+    expect(out.dependencies).toEqual(["deck.canvas/assets/a.png"]);
     expect(out.svg).toContain("data:image/png;grida-svg-resource=");
     expect(out.svg).toContain('href="../../outside.png"');
   });
@@ -134,6 +139,7 @@ describe("materializeSlideSvgResources", () => {
     );
 
     expect(out.svg).toBe('<svg><image href="assets/missing.png"/></svg>');
+    expect(out.dependencies).toEqual(["assets/missing.png"]);
   });
 
   it("can bound resource work for a read-only thumbnail projection", async () => {
@@ -151,6 +157,7 @@ describe("materializeSlideSvgResources", () => {
     );
 
     expect(calls).toEqual(["assets/a.png"]);
+    expect(out.dependencies).toEqual(["assets/a.png"]);
     expect(out.svg).toContain("data:image/png;grida-svg-resource=");
     expect(out.svg).toContain('href="assets/b.png"');
   });
@@ -170,5 +177,46 @@ describe("materializeSlideSvgResources", () => {
     expect(out.restore(out.svg)).toBe(
       '<svg><image href="assets/a.png"/></svg>'
     );
+  });
+
+  it("deduplicates dependency paths while materializing every carrier", async () => {
+    const out = await materializeSlideSvgResources(
+      '<svg><image href="assets/a.png"/><feImage href="assets/a.png"/></svg>',
+      {
+        ...BASE_OPTIONS,
+        readFileBytes: async () => ({ base64: "AAAA" }),
+      }
+    );
+
+    expect(out.dependencies).toEqual(["assets/a.png"]);
+    expect(out.svg.match(/;base64,AAAA/g)).toHaveLength(2);
+  });
+
+  it("reprojects unchanged slide text when a declared asset changes", async () => {
+    let bytes = "BLACK";
+    const project = () =>
+      materializeSlideSvgResources(
+        '<svg><image href="assets/fill.png"/></svg>',
+        {
+          ...BASE_OPTIONS,
+          readFileBytes: async () => ({ base64: bytes }),
+        }
+      );
+
+    const initial = await project();
+    expect(initial.svg).toContain(";base64,BLACK");
+    expect(initial.dependencies).toEqual(["assets/fill.png"]);
+
+    const revision = WorkspaceFileRevision.next(
+      0,
+      WorkspaceFileRevision.paths(initial.dependencies),
+      [{ kind: "changed", rel_path: "assets/fill.png" }]
+    );
+    expect(revision).toBe(1);
+
+    bytes = "RED";
+    const refreshed = await project();
+    expect(refreshed.svg).toContain(";base64,RED");
+    expect(refreshed.svg).not.toContain(";base64,BLACK");
   });
 });
