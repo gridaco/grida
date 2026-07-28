@@ -42,7 +42,7 @@ const INDENT_BASE = 8;
 // Keep Radix's content wrapper viewport-bound so the demo's flex-label
 // ellipsis pattern can engage. (see test/desktop-workbench-file-tree-ellipsis.md)
 const FILE_TREE_SCROLL_AREA_CLASS =
-  "[&_[data-slot=scroll-area-scrollbar]]:hidden [&_[data-slot=scroll-area-viewport]]:scroll-fade-y [&_[data-slot=scroll-area-viewport]]:scroll-fade-4 [&_[data-slot=scroll-area-viewport]>div]:!block";
+  "[&_[data-slot=scroll-area-scrollbar]]:hidden [&_[data-slot=scroll-area-viewport]]:scroll-fade-y [&_[data-slot=scroll-area-viewport]]:scroll-fade-4 [&_[data-slot=scroll-area-viewport]>div]:!block [&_[data-slot=scroll-area-viewport]>div]:h-full";
 
 const FILE_TREE_KEYMAP: Keymap = {
   ...defaultKeymap,
@@ -274,7 +274,7 @@ function FileTreePaneInner({
         role="tree"
         tabIndex={0}
         data-testid="desktop-workspace-file-tree"
-        className="px-1 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-full flex-col px-1 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onKeyDown={onKeyDown}
       >
         <RootStatus handle={handle} />
@@ -290,6 +290,12 @@ function FileTreePaneInner({
             onEntryTrashed={afterTrashed}
           />
         ))}
+        {/* The unoccupied pane belongs to the workspace root. Keep this as a
+            sibling trigger so row-level context menus remain independent.
+            (see test/desktop-workbench-file-tree-background-context-menu.md) */}
+        <FileContextMenu workspace={workspace} relPath="" isDirectory readOnly>
+          <div className="min-h-6 flex-1" aria-hidden="true" />
+        </FileContextMenu>
       </div>
     </ScrollArea>
   );

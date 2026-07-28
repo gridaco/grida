@@ -1,10 +1,9 @@
 /**
- * Right-click context menu for a workspace entry — a file row or a
- * folder row in the file tree pane, or a tab in the tab strip. Same
- * actions, same shortcut hints, same backing helpers; the only
- * difference between the surfaces is which element receives the
- * right-click (and tabs are always files, so they pass `isDirectory`
- * false by default).
+ * Right-click context menu for a workspace location — a file/folder row,
+ * a tab in the tab strip, or the file-tree background representing the
+ * workspace root. Same actions, same shortcut hints, same backing helpers;
+ * callers may restrict the menu to read-only actions when the location must
+ * not be mutated.
  *
  * Built on shadcn's `ContextMenu` primitives, which wrap Radix. The
  * `<ContextMenuTrigger asChild>` pattern means the trigger element
@@ -44,6 +43,7 @@ export function FileContextMenu({
   workspace,
   relPath,
   isDirectory = false,
+  readOnly = false,
   onTrashed,
   onOpenChange,
   children,
@@ -56,6 +56,8 @@ export function FileContextMenu({
    * ("…and its contents"); the main process trashes either kind.
    */
   isDirectory?: boolean;
+  /** Omit every mutating action from this menu. */
+  readOnly?: boolean;
   /**
    * Called after the entry was successfully moved to the trash, so the
    * surrounding surface can refresh its tree / close affected tabs.
@@ -85,26 +87,32 @@ export function FileContextMenu({
           Copy path
           <ContextMenuShortcut>{COPY_PATH_SHORTCUT_HINT}</ContextMenuShortcut>
         </ContextMenuItem>
-        <ContextMenuItem onSelect={() => void copyRelativePath(relPath)}>
-          Copy relative path
-          <ContextMenuShortcut>
-            {COPY_RELATIVE_PATH_SHORTCUT_HINT}
-          </ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem
-          variant="destructive"
-          onSelect={() =>
-            void confirmAndTrashEntry(workspace, relPath, isDirectory).then(
-              (trashed) => {
-                if (trashed) onTrashed?.();
+        {relPath.length > 0 && (
+          <ContextMenuItem onSelect={() => void copyRelativePath(relPath)}>
+            Copy relative path
+            <ContextMenuShortcut>
+              {COPY_RELATIVE_PATH_SHORTCUT_HINT}
+            </ContextMenuShortcut>
+          </ContextMenuItem>
+        )}
+        {!readOnly && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              variant="destructive"
+              onSelect={() =>
+                void confirmAndTrashEntry(workspace, relPath, isDirectory).then(
+                  (trashed) => {
+                    if (trashed) onTrashed?.();
+                  }
+                )
               }
-            )
-          }
-        >
-          Move to Trash
-          <ContextMenuShortcut>{TRASH_SHORTCUT_HINT}</ContextMenuShortcut>
-        </ContextMenuItem>
+            >
+              Move to Trash
+              <ContextMenuShortcut>{TRASH_SHORTCUT_HINT}</ContextMenuShortcut>
+            </ContextMenuItem>
+          </>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );
