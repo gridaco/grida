@@ -66,7 +66,7 @@ describe("isAllowedNavigation", () => {
 });
 
 describe("set_desktop_window_presentation", () => {
-  it("applies compact and main geometry only when explicitly requested", () => {
+  it("applies entry-role and main geometry only when explicitly requested", () => {
     const window = {
       isDestroyed: vi.fn<() => boolean>(() => false),
       isFullScreen: vi.fn<() => boolean>(() => false),
@@ -94,6 +94,14 @@ describe("set_desktop_window_presentation", () => {
     expect(window.setMaximizable).toHaveBeenLastCalledWith(false);
     expect(window.setBounds).toHaveBeenLastCalledWith(
       { x: 504, y: 199, width: 720, height: 720 },
+      true
+    );
+
+    set_desktop_window_presentation(window as never, "onboarding");
+    expect(window.setMinimumSize).toHaveBeenLastCalledWith(560, 600);
+    expect(window.setMaximizable).toHaveBeenLastCalledWith(false);
+    expect(window.setBounds).toHaveBeenLastCalledWith(
+      { x: 504, y: 109, width: 720, height: 900 },
       true
     );
 

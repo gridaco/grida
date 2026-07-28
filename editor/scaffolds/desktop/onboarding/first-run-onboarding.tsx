@@ -86,16 +86,16 @@ export function FirstRunOnboarding({
         className="desktop-drag-area absolute inset-x-0 top-0 z-20 h-11"
       />
       <div className="relative flex min-h-full flex-col overflow-y-auto">
-        <div className="relative aspect-[8/3] w-full shrink-0 overflow-hidden bg-neutral-950">
+        <div className="relative aspect-[3/2] w-full shrink-0 overflow-hidden bg-neutral-950">
           {/* eslint-disable-next-line @next/next/no-img-element -- static same-origin asset; the Desktop CSP blocks the Next image optimizer */}
           <img
             src={step.artwork}
             alt=""
             aria-hidden
-            width={1024}
-            height={384}
+            width={1536}
+            height={1024}
             decoding="async"
-            className="size-full object-cover"
+            className="pointer-events-none size-full select-none object-cover [-webkit-user-drag:none]"
           />
         </div>
 

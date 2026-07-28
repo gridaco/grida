@@ -35,12 +35,14 @@ const MIN_WINDOW_HEIGHT = 384;
 const MAIN_WINDOW_WIDTH = 1440;
 const MAIN_WINDOW_HEIGHT = 960;
 
+const COMPACT_WINDOW_WIDTH = 720;
+const COMPACT_WINDOW_HEIGHT = 720;
 const ONBOARDING_WINDOW_WIDTH = 720;
-const ONBOARDING_WINDOW_HEIGHT = 720;
-const MIN_ONBOARDING_WINDOW_WIDTH = 560;
-const MIN_ONBOARDING_WINDOW_HEIGHT = 600;
+const ONBOARDING_WINDOW_HEIGHT = 900;
+const MIN_COMPACT_WINDOW_WIDTH = 560;
+const MIN_COMPACT_WINDOW_HEIGHT = 600;
 
-export type DesktopWindowPresentation = "main" | "compact";
+export type DesktopWindowPresentation = "main" | "compact" | "onboarding";
 
 const trafficLightPosition = {
   x: 14,
@@ -83,12 +85,18 @@ function get_window_constructor_options(
 ): BaseWindowConstructorOptions {
   const icon = WINDOW_ICON[process.platform];
   const size =
-    presentation === "compact"
+    presentation !== "main"
       ? {
-          width: ONBOARDING_WINDOW_WIDTH,
-          height: ONBOARDING_WINDOW_HEIGHT,
-          minWidth: MIN_ONBOARDING_WINDOW_WIDTH,
-          minHeight: MIN_ONBOARDING_WINDOW_HEIGHT,
+          width:
+            presentation === "onboarding"
+              ? ONBOARDING_WINDOW_WIDTH
+              : COMPACT_WINDOW_WIDTH,
+          height:
+            presentation === "onboarding"
+              ? ONBOARDING_WINDOW_HEIGHT
+              : COMPACT_WINDOW_HEIGHT,
+          minWidth: MIN_COMPACT_WINDOW_WIDTH,
+          minHeight: MIN_COMPACT_WINDOW_HEIGHT,
           maximizable: false,
           fullscreenable: false,
         }
@@ -284,7 +292,7 @@ export function create_desktop_window({
     },
   });
 
-  if (presentation === "compact") window.center();
+  if (presentation !== "main") window.center();
 
   if (IS_DEV) {
     // Dev-only diagnostics. Production logs must not depend on every
@@ -336,18 +344,26 @@ export function set_desktop_window_presentation(
 
   const animate = options.animate ?? true;
   if (window.isFullScreen()) window.setFullScreen(false);
-  if (presentation === "compact" && window.isMaximized()) window.unmaximize();
+  if (presentation !== "main" && window.isMaximized()) window.unmaximize();
 
-  if (presentation === "compact") {
+  if (presentation !== "main") {
     const workArea = screen.getDisplayMatching(window.getBounds()).workArea;
-    const width = Math.min(ONBOARDING_WINDOW_WIDTH, workArea.width);
-    const height = Math.min(ONBOARDING_WINDOW_HEIGHT, workArea.height);
+    const preferredWidth =
+      presentation === "onboarding"
+        ? ONBOARDING_WINDOW_WIDTH
+        : COMPACT_WINDOW_WIDTH;
+    const preferredHeight =
+      presentation === "onboarding"
+        ? ONBOARDING_WINDOW_HEIGHT
+        : COMPACT_WINDOW_HEIGHT;
+    const width = Math.min(preferredWidth, workArea.width);
+    const height = Math.min(preferredHeight, workArea.height);
     const x = workArea.x + Math.round((workArea.width - width) / 2);
     const y = workArea.y + Math.round((workArea.height - height) / 2);
 
     window.setMinimumSize(
-      Math.min(MIN_ONBOARDING_WINDOW_WIDTH, width),
-      Math.min(MIN_ONBOARDING_WINDOW_HEIGHT, height)
+      Math.min(MIN_COMPACT_WINDOW_WIDTH, width),
+      Math.min(MIN_COMPACT_WINDOW_HEIGHT, height)
     );
     window.setResizable(true);
     window.setMaximizable(false);

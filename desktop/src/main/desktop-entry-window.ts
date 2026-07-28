@@ -629,7 +629,11 @@ export class DesktopEntryWindow {
   ): void {
     set_desktop_window_presentation(
       window,
-      role === "main" ? "main" : "compact",
+      role === "main"
+        ? "main"
+        : role === "onboarding"
+          ? "onboarding"
+          : "compact",
       role === "main" ? { main_bounds: this.#mainBounds } : undefined
     );
     window.setTitle(

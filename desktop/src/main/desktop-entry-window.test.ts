@@ -140,6 +140,11 @@ describe("DesktopEntryWindow lifecycle", () => {
     expect(window.loadURL).toHaveBeenLastCalledWith(
       "https://grida.test/desktop/onboarding"
     );
+    expect(applyPresentation).toHaveBeenLastCalledWith(
+      window,
+      "onboarding",
+      undefined
+    );
 
     await entry.completeOnboarding(window as never, "workspace-1");
 
@@ -208,7 +213,7 @@ describe("DesktopEntryWindow lifecycle", () => {
     expect(entry.isMain).toBe(false);
     expect(applyPresentation).toHaveBeenLastCalledWith(
       window,
-      "compact",
+      "onboarding",
       undefined
     );
     expect(window.show).toHaveBeenCalledTimes(2);
