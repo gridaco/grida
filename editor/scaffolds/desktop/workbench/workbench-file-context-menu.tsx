@@ -76,19 +76,24 @@ export function FileContextMenu({
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-[200px]">
         <ContextMenuItem
+          className="text-xs"
           onSelect={() => void revealInFinder(workspace, relPath)}
         >
           Reveal in Finder
           <ContextMenuShortcut>{REVEAL_SHORTCUT_HINT}</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuItem
+          className="text-xs"
           onSelect={() => void copyAbsolutePath(workspace, relPath)}
         >
           Copy path
           <ContextMenuShortcut>{COPY_PATH_SHORTCUT_HINT}</ContextMenuShortcut>
         </ContextMenuItem>
         {relPath.length > 0 && (
-          <ContextMenuItem onSelect={() => void copyRelativePath(relPath)}>
+          <ContextMenuItem
+            className="text-xs"
+            onSelect={() => void copyRelativePath(relPath)}
+          >
             Copy relative path
             <ContextMenuShortcut>
               {COPY_RELATIVE_PATH_SHORTCUT_HINT}
@@ -99,6 +104,7 @@ export function FileContextMenu({
           <>
             <ContextMenuSeparator />
             <ContextMenuItem
+              className="text-xs"
               variant="destructive"
               onSelect={() =>
                 void confirmAndTrashEntry(workspace, relPath, isDirectory).then(
