@@ -65,16 +65,52 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 >
 > See [`AGENTS.md`](./AGENTS.md) ("Running `pnpm typecheck` from a clean checkout") for the full sequence.
 
-## Running backend (supabase) locally
+## Authenticated local development
 
-- follow this [guide](https://supabase.io/docs/guides/local-development) to run supabase locally
-  - supabase cli required (`brew install supabase/tap/supabase`)
-  - [docker desktop](https://docker.com) required
-- for Grida-specific Supabase setup (migrations, env, signing keys), see `supabase/README.md`.
+For feature development and UI verification that needs a signed-in user, use
+the local Supabase stack with insiders auth. Use the hosted/default sign-in
+path only when authentication itself is the feature under development or test.
 
-### Signing in locally
+Insiders auth is not a separate authentication backend. It selects the
+local-only email/password sign-in page while continuing to use the Supabase
+project configured in `editor/.env.local`. Both the local Supabase connection
+and the insiders-auth flag must therefore be configured.
 
-After `supabase db reset --local` runs, `supabase/seed.sql` creates three test users you can sign in as via the `/sign-in` route. The default for normal flows is **`insider@grida.co` / `password`** (owner of the `local` org). See [`supabase/seed.md`](./supabase/seed.md) for the other personas (`alice@acme.com` for multi-tenant testing, `random@example.com` for no-org access checks). All three share the password `password`.
+Install and run:
+
+- [Docker Desktop](https://docker.com)
+- Supabase CLI (`brew install supabase/tap/supabase`)
+
+```bash
+cd supabase
+supabase start
+supabase db reset --local
+supabase status -o env
+```
+
+Configure `editor/.env.local` with the local values reported by
+`supabase status -o env`:
+
+```bash
+# API_URL
+SUPABASE_URL="http://127.0.0.1:54321"
+NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321"
+
+# PUBLISHABLE_KEY and SECRET_KEY
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="<PUBLISHABLE_KEY>"
+SUPABASE_SECRET_KEY="<SECRET_KEY>"
+
+# Use the local email/password sign-in path.
+NEXT_PUBLIC_GRIDA_USE_INSIDERS_AUTH="1"
+```
+
+Restart the editor dev server after changing these variables. Sign in with
+**`insider@grida.co` / `password`**; this seeded user owns the `local`
+organization and is the default persona for normal feature work.
+
+[`supabase/README.md`](./supabase/README.md) is the local-backend runbook.
+[`supabase/seed.md`](./supabase/seed.md) documents the other seeded personas
+for multi-tenant and no-organization testing.
 
 ## The Rust engine
 

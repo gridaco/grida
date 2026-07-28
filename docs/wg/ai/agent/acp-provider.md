@@ -37,25 +37,31 @@ what it costs to do so forever.
 Tracking issue:
 [gridaco/grida#813](https://github.com/gridaco/grida/issues/813).
 
+> **Status correction (July 2026).** The
+> [ChatGPT Subscription native provider](./chatgpt-subscription-provider.md)
+> now supplies the zero-key ChatGPT on-ramp while **Grida keeps the loop**.
+> That path is never ACP. This RFD is therefore only about the different
+> outcome ACP uniquely provides: running Claude/Codex _as an external agent_
+> with its own loop, tools, sandbox, approvals, and session behavior.
+
 ## TL;DR
 
 - **The decision, in one sentence.** Building this introduces a **second
   provider class that Grida maintains forever** — one where the external
-  agent owns the loop and Grida is merely its client — in exchange for one
-  thing the current providers cannot offer: **"run on your existing Claude
-  or ChatGPT subscription, zero key, zero signup."**
+  agent owns the loop and Grida is merely its client — in exchange for
+  behavior a native model provider cannot offer: **"run Claude/Codex itself,
+  with that agent's tools, sandbox, approvals, and session semantics."**
 - **It is a positioning bet, not an economics one.** The "costs us nothing"
   benefit is **already shipped** via BYOK and the local `endpoint` provider
-  (both bypass Grida billing). The _only_ thing this class adds over those is
-  reaching the **subscription** population that has no API key.
-- **Recommendation.** Do not commit the class yet. Ship the multi-provider
-  BYOK config UX ([#807](https://github.com/gridaco/grida/issues/807)) first
-  — it captures most of the "bring your own" story with **no new
-  architecture class** — then build this **only if** the data below clears.
-- **The one number that should drive the call.** Does the zero-signup
-  subscription on-ramp **convert materially better than BYOK-with-a-key**?
-  If yes, the permanent layer is earning its keep and we should commit to it
-  as identity. If we cannot articulate why it would, this waits.
+  (both bypass Grida billing), and zero-key ChatGPT access now exists through
+  the native provider without surrendering the loop. ACP still opens a
+  Claude-subscription route and external-agent behavior, but subscription
+  access alone no longer justifies the class.
+- **Recommendation.** Keep the experimental class reversible until external
+  agent ownership produces outcomes the native Grida agent cannot.
+- **The question that should drive the call.** Do users materially benefit
+  from the external agent's own loop/tools/session behavior enough to justify
+  a permanent second ownership model? If not, use native providers.
 
 ## What is actually being decided
 
@@ -66,47 +72,49 @@ credentials and **bypass Grida's billing entirely** (no gate, no metering;
 the GRIDA-SEC-003 carve-out). So this decision is **not** about whether
 users can bring their own inference. They already can.
 
-What an ACP consumer _uniquely_ adds over BYOK is narrow:
+What an ACP consumer _uniquely_ adds over native model providers is narrow:
 
-> **Ride an existing Claude Pro/Max or ChatGPT subscription — with zero
-> key-paste and zero new signup.**
+> **Run an installed Claude/Codex agent as the owner of the loop, preserving
+> that external agent's tools, sandbox, approvals, and session semantics.**
 
-That delta is not nothing. BYOK serves the **API-key** population (small,
-technical, willing to create an account and paste a secret). A subscription
-on-ramp serves the **subscription** population (large, already paying
-Anthropic/OpenAI, with no API account at all). The question is whether
-reaching that second population is worth a **permanent second architecture
-class**, for the slice of users who are on **desktop** and already have
-**Claude Code or Codex installed and logged in**.
+That delta is not nothing, but it is no longer the ChatGPT onboarding story.
+The native ChatGPT provider serves eligible ChatGPT subscriptions while Grida
+retains its tuned tools and loop. ACP remains relevant when the user
+specifically wants Claude/Codex itself—or, today, the separate
+Claude-subscription route—and accepts the external agent's ownership model.
+The question is whether that behavior is worth a **permanent second
+architecture class** for users on **desktop** who already have the external
+agent installed and logged in.
 
-## Status — what exists today (June 2026)
+## Status — what exists today (July 2026)
 
 Grounded against the current code so the cost ledger below is concrete, not
 hand-waved.
 
-- **The provider layer has exactly two _model-provider_ kinds**, `byok`
-  (OpenRouter / Vercel) and `endpoint` (any OpenAI-compatible base URL,
-  optional key, Ollama preset — shipped as
-  [#806](https://github.com/gridaco/grida/issues/806)). In both, **Grida
-  owns the loop** and injects its own locked tools. Neither is an
-  agent-provider.
+- **The provider layer has four native _model-provider_ kinds**: `chatgpt`,
+  `byok`, `gg`, and `endpoint`. In every one, **Grida owns the loop** and
+  injects its own locked tools. The ChatGPT kind supplies subscription-backed
+  capacity without becoming an agent-provider.
 - **ACP code already exists — but in the opposite direction.** What shipped
   with the [local daemon](./daemon.md)
   ([#798](https://github.com/gridaco/grida/issues/798)) is Grida-as-**agent**:
   an external client like Zed drives _Grida_ over ACP. The
-  [ACP Integration](./acp.md) page specs that outward wire. The **consuming**
-  direction — Grida driving Claude/Codex — is a different seam and is **not
-  built**.
-- **So this is greenfield.** None of the consumer layer, none of the
-  agent-provider class, and none of the Grida-as-MCP-server work exists yet.
+  [ACP Integration](./acp.md) page specs that outward wire. The consuming
+  direction—Grida driving Claude/Codex—is a separate seam, not a production
+  or default Desktop surface.
+- **An experimental consumer spike now exists.** It proves the
+  agent-provider branch and a Claude ACP bridge, but it remains a reversible
+  package experiment; Desktop keeps external-agent execution disabled. It is
+  not the default ChatGPT onboarding architecture. The native ChatGPT provider
+  is the path when Grida should own the loop.
 
 ## The two provider classes
 
 The whole decision turns on **who owns the loop**.
 
 ```text
-MODEL-PROVIDER class (today: byok, endpoint)        AGENT-PROVIDER class (this decision)
-─────────────────────────────────────────          ─────────────────────────────────────────
+MODEL-PROVIDER class (chatgpt/byok/gg/endpoint)     AGENT-PROVIDER class (this decision)
+──────────────────────────────────────────────     ─────────────────────────────────────────
 Grida owns the loop.                                External agent owns the loop.
   · Grida calls the model directly.                   · Grida sends a task, receives an
   · Grida injects its locked tools                      event stream (messages, tool calls,
@@ -138,26 +146,27 @@ must then account for.
 
 ## The pros — stated fairly
 
-- **The lowest-friction on-ramp that exists.** A Claude/ChatGPT subscriber
-  runs Grida's agent with nothing to configure — no account, no key. BYOK
-  cannot match that for non-API-key users.
-- **Reaches a population BYOK cannot.** Subscription holders vastly outnumber
-  API-key holders, and they are a less technical audience.
+- **A Claude-subscription and external-agent on-ramp.** A user can run an
+  installed/logged-in external agent without pasting an API key. ChatGPT
+  subscription onboarding does not require ACP and belongs to the native
+  provider.
+- **Preserves foreign-agent behavior.** Users who want Claude/Codex itself get
+  that agent's own loop, tools, sandbox, approvals, and session semantics
+  rather than a model-only approximation.
 - **Try → convert at near-zero CAC.** A curious user is in immediately;
   conversion to a Grida subscription or hosted plan comes later.
 - **Ecosystem alignment, and we are half-built.** The local-server-plus-clients
   shape and ACP/MCP interop is where the ecosystem is heading, and Grida
   already built the [daemon](./daemon.md) and the ACP-_agent_ half — the
   muscle exists.
-- **Codex is blessed.** OpenAI explicitly endorses using a ChatGPT
-  subscription through Codex wherever the user likes — a safe primary pitch
-  with no ToS cloud. (Claude only works _de facto_, via a community bridge,
-  unblessed.)
+- **Codex remains a distinct user intent.** A user may choose ACP when they
+  want Codex itself to own the run. Merely wanting ChatGPT-funded model
+  capacity is not that intent and routes to the native provider.
 
 ## The narrow question, and the recommendation
 
-This is a **bet on identity, not on cost** — the cost play is already won by
-BYOK. Decide by answering what Grida is:
+This is a **bet on ownership, not on cost or onboarding** — those are already
+served by native providers. Decide by answering what Grida is:
 
 - **"A design tool that plugs into the agent ecosystem."** Then the
   agent-provider class is **core identity**, the forever layer is justified,
@@ -167,42 +176,44 @@ BYOK. Decide by answering what Grida is:
   is sufficient, and this class is **scope creep** dressed as a GTM win.
   Don't build it.
 
-**Recommendation: do not commit the class yet.** Sequence it:
+**Recommendation: do not commit the class as a permanent product surface
+yet.** Sequence it:
 
-1. Ship [#807](https://github.com/gridaco/grida/issues/807) (multi-provider
-   BYOK + a real config UX). It delivers most of the "bring your own" GTM
-   story with **zero new architecture class**.
-2. **Measure** whether the zero-signup subscription on-ramp would convert
-   better than BYOK. If we cannot make that case, the forever layer is not
-   earning its keep, and this remains a documented option, not a build.
+1. Keep native ChatGPT, BYOK, GG, and endpoint capacity in the one
+   Grida-owned loop.
+2. **Measure** whether foreign-agent ownership delivers better outcomes than
+   that native loop for users who intentionally choose Claude/Codex itself.
+   If it does not, the forever layer is not earning its keep.
 
 ## A reversible path — if the answer is yes
 
 If the data clears, keep "forever" reversible until the bet is proven:
 
-- **Codex-first; gate Claude.** Ship only the blessed path. Hold the
-  unblessed Claude bridge until Anthropic clarifies — this removes the
-  standing legal liability from v1.
+- **Gate every external agent independently.** Keep the existing Claude bridge
+  experimental until Anthropic clarifies its third-party posture. Evaluate a
+  Codex ACP adapter separately and never use it as a shortcut for native
+  ChatGPT model capacity.
 - **Desktop-only, behind a flag, labeled experimental.** The forever cost
   only locks in when the class is load-bearing for many users. Keep it
   kill-switchable.
 - **Contain the inversion.** Build the consumer as a bounded adapter on the
   [transport](./acp.md) and [daemon](./daemon.md) Grida already has. Do
   **not** let "external owns the loop" leak into the core session/tool model
-  until conversion data justifies hardening the class.
+  until outcome data justifies hardening the class.
 - **Modality split is mandatory.** ACP covers the agentic/text modality only;
-  it does not cover image/video generation. Image/video stays on BYOK or a
-  Grida subscription — make that cost boundary obvious in the config UX
-  before the user hits it (see the Codex profile's image-generation section).
+  it does not cover image/video generation. Image/video stays on BYOK, Grida
+  Gateway, or another explicit media provider—make that cost boundary obvious
+  in the config UX before the user hits it (see the Codex profile's
+  image-generation section).
 
 ## Decision checklist / open questions
 
 - [ ] Decide identity: plug-into-the-ecosystem vs. needs-an-LLM (the section
       above).
-- [ ] Ship [#807](https://github.com/gridaco/grida/issues/807) and instrument
-      the conversion comparison (subscription on-ramp vs. BYOK).
+- [ ] Measure external-agent outcomes against the native Grida loop; do not
+      count ChatGPT zero-key onboarding as ACP value.
 - [ ] If yes: provider registry models an **agent-provider class** alongside
-      the two model-provider kinds; how the picker presents them.
+      the four model-provider kinds; define how the picker presents them.
 - [ ] Grida-as-MCP-server: which design/canvas/workspace tools to expose, and
       the trust/scope boundary.
 - [ ] PATH auto-detection of an installed, logged-in Claude/Codex;
@@ -217,6 +228,7 @@ If the data clears, keep "forever" reversible until the bet is proven:
 
 - **Grida WG:** [ACP Integration](./acp.md),
   [ACP Provider: Codex](./acp-provider-codex.md),
+  [ChatGPT Subscription native provider](./chatgpt-subscription-provider.md),
   [MCP and Connectors](./mcp.md), [Local Daemon](./daemon.md),
   [Session Lifecycle](./session.md), [Turn Queue](./queue.md),
   [index](./index.md).

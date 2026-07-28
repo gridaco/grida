@@ -1,6 +1,6 @@
 // GRIDA-GG: provider — the `gg` provider resolution arm + precedence (docs/wg/platform/hosted-ai.md)
 /**
- * GRIDA-SEC-004 — provider resolver (in-package providers layer).
+ * GRIDA-SEC-004 / GRIDA-SEC-008 — provider resolver.
  *
  * Picks the active provider for an agent run and returns a runnable
  * `ModelFactory`. Resolution is a node-only, in-process concern: it reads
@@ -8,21 +8,25 @@
  * secrets threat model) and never calls the model itself — it only builds
  * the factory, so it's cheap on the hot path and easy to test.
  *
- * This is the providers layer, not a generic model-provider router. Two
- * provider kinds exist:
+ * This is the providers layer, not a generic model-provider router. The
+ * in-process model-provider kinds are:
  *
+ *   - `chatgpt` — a native ChatGPT subscription credential whose model
+ *     adapter still runs inside Grida's agent loop.
  *   - `byok` — the hardcoded third-party slots (OpenRouter, Vercel),
  *     keyed by a stored secret.
+ *   - `gg` — Grida's hosted, included provider.
  *   - `endpoint` — ONE generalized OpenAI-compatible endpoint type
  *     (issue #806): user-configured `{base_url, models[]}` with an
  *     OPTIONAL key. Ollama is the preset; a missing key is not an error.
  *
- * Precedence: BYOK keys first (in metadata order), then configured
- * endpoints that have at least one registered model. A configured-but-
- * empty endpoint is not resolvable. Explicit picks skip precedence.
+ * Automatic precedence starts with a connected, model-compatible ChatGPT
+ * subscription, then BYOK keys, Grida, and configured endpoints. A
+ * configured-but-empty endpoint is not resolvable. Explicit picks skip
+ * precedence.
  */
 
-import { TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models";
+import { models, TIER_MODEL_IDS, type TierModelId } from "@grida/ai-models";
 import type { ModelFactory } from "../agent";
 import type { ModelTier } from "../tiers";
 import type { SecretsStore } from "@grida/daemon/server";
@@ -33,6 +37,11 @@ import {
   GG_PROVIDER_ID,
   type ByokProviderId,
 } from "../protocol/provider-ids";
+import {
+  CHATGPT_PROVIDER_ID,
+  isChatGptProviderId,
+  isChatGptSubscriptionModelId,
+} from "../protocol/chatgpt";
 import { makeGridaGatewayFactory } from "./gg";
 import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
 import {
@@ -46,25 +55,27 @@ import {
   makeVercelFactory,
 } from "./byok";
 import type { ProviderHttp } from "./http";
+import { ChatGptProvider, type ChatGptProviderRuntime } from "./chatgpt";
 
 export { EndpointProvidersStore } from "./endpoints";
 
 /** Canonical tier->catalog-model map. One table, sourced from @grida/ai-models. */
 export const MODEL_BY_TIER: Record<ModelTier, TierModelId> = TIER_MODEL_IDS;
+const CATALOG_MODEL_IDS = new Set<string>(Object.keys(models.text.catalog));
 
 export type ResolvedProvider = {
-  /** A BYOK provider id, a configured endpoint id, or an agent-provider id. */
+  /** A native, BYOK, hosted, endpoint, or external-agent provider id. */
   provider_id: string;
   /**
-   * `byok`/`grida`/`endpoint` are MODEL providers (the host owns the
-   * loop, calls `model_factory`). `grida` is the hosted "included"
+   * `chatgpt`/`byok`/`gg`/`endpoint` are MODEL providers (the host owns the
+   * loop, calls `model_factory`). `gg` is the hosted "included"
    * provider (GRIDA-SEC-006) — credential is the pushed session token,
    * not a stored key. `agent-provider` is an EXTERNAL agent that owns
    * its own loop (issue #813); `model_factory` is never called — the
    * runtime branches on this kind and streams from the agent-provider
    * consumer instead.
    */
-  kind: "byok" | "gg" | "endpoint" | "agent-provider";
+  kind: "byok" | "gg" | "chatgpt" | "endpoint" | "agent-provider";
   model_factory: ModelFactory;
 };
 
@@ -121,6 +132,12 @@ export type ResolveDeps = {
   /** Origin the grida provider calls (e.g. `https://grida.co`). Host-
    *  injected; absent ⇒ the grida provider is disabled. */
   gg_base_url?: string;
+  /**
+   * Native ChatGPT subscription provider. Optional construction-time config
+   * keeps the provider dormant when a host has no approved OAuth/backend
+   * identity.
+   */
+  chatgpt?: ChatGptProviderRuntime;
 };
 
 export type ResolveOptions = {
@@ -129,6 +146,8 @@ export type ResolveOptions = {
    * named provider (BYOK or endpoint) is checked.
    */
   explicit?: string;
+  /** Selected model, used to prevent a provider/model mismatch. */
+  model_id?: string;
 };
 
 export async function resolveProvider(
@@ -136,29 +155,52 @@ export async function resolveProvider(
   options: ResolveOptions = {}
 ): Promise<ResolvedProvider> {
   if (options.explicit) {
-    return await resolveExplicit(options.explicit, deps);
+    return await resolveExplicit(options.explicit, deps, options.model_id);
+  }
+
+  // A connected ChatGPT subscription is the zero-dollar onboarding path.
+  // Model compatibility is checked before precedence: a catalog model not
+  // offered by the subscription falls through to BYOK/GG/endpoints.
+  const chatgptResolved = await maybeResolveChatGpt(deps, options.model_id);
+  if (chatgptResolved) return chatgptResolved;
+
+  // A subscription-only id has no honest automatic fallback. Even if another
+  // provider is configured, it must not receive a model id outside the shared
+  // catalog merely because ChatGPT is currently signed out.
+  if (
+    options.model_id &&
+    isChatGptSubscriptionModelId(options.model_id) &&
+    !CATALOG_MODEL_IDS.has(options.model_id)
+  ) {
+    throw new ProviderUnavailableError(CHATGPT_PROVIDER_ID);
   }
 
   // Text path: only text-capable BYOK providers. An image-only provider
   // (fal) may have a stored key, but it serves no chat models — skip it so a
   // fal-only user falls through to endpoints rather than erroring.
-  for (const provider of byokProvidersFor("text")) {
-    const key = await deps.secrets._getKey(provider.id);
-    if (key) {
-      return makeResolvedByok(provider.id, key, deps.provider_http);
+  if (isCatalogModel(options.model_id)) {
+    for (const provider of byokProvidersFor("text")) {
+      const key = await deps.secrets._getKey(provider.id);
+      if (key) {
+        return makeResolvedByok(provider.id, key, deps.provider_http);
+      }
     }
-  }
 
-  // Grida hosted (GRIDA-SEC-006) — after BYOK (existing BYOK users keep
-  // exact behavior; explicit choice always wins), before endpoints
-  // (fresh signed-in users get included AI without configuring
-  // anything). Resolves only with a LIVE session token.
-  const gridaResolved = maybeResolveGg(deps);
-  if (gridaResolved) return gridaResolved;
+    // Grida hosted (GRIDA-SEC-006) — after BYOK (existing BYOK users keep
+    // exact behavior; explicit choice always wins), before endpoints
+    // (fresh signed-in users get included AI without configuring
+    // anything). Resolves only with a LIVE session token.
+    const gridaResolved = maybeResolveGg(deps);
+    if (gridaResolved) return gridaResolved;
+  }
 
   if (deps.endpoints) {
     for (const endpoint of await deps.endpoints.list()) {
-      const resolved = await maybeResolveEndpoint(endpoint, deps);
+      const resolved = await maybeResolveEndpoint(
+        endpoint,
+        deps,
+        options.model_id
+      );
       if (resolved) return resolved;
     }
   }
@@ -168,25 +210,59 @@ export async function resolveProvider(
 
 async function resolveExplicit(
   providerId: string,
-  deps: ResolveDeps
+  deps: ResolveDeps,
+  modelId?: string
 ): Promise<ResolvedProvider> {
+  if (isChatGptProviderId(providerId)) {
+    const resolved = await maybeResolveChatGpt(deps, modelId);
+    if (!resolved) throw new ProviderUnavailableError(providerId);
+    return resolved;
+  }
   if (isGgProviderId(providerId)) {
     // Without a live token the pick surfaces as the existing 409
     // `provider_down` with `provider_id: "gg"` — the renderer maps
     // that to "Sign in to use included AI".
-    const resolved = maybeResolveGg(deps);
+    const resolved = isCatalogModel(modelId) ? maybeResolveGg(deps) : null;
     if (!resolved) throw new ProviderUnavailableError(providerId);
     return resolved;
   }
   if (isByokProviderId(providerId)) {
+    if (
+      !byokProvidersFor("text").some(
+        (provider) => provider.id === providerId
+      ) ||
+      !isCatalogModel(modelId)
+    ) {
+      throw new ProviderUnavailableError(providerId);
+    }
     const key = await deps.secrets._getKey(providerId);
     if (!key) throw new ProviderUnavailableError(providerId);
     return makeResolvedByok(providerId, key, deps.provider_http);
   }
   const endpoint = await deps.endpoints?.get(providerId);
-  const resolved = endpoint && (await maybeResolveEndpoint(endpoint, deps));
+  const resolved =
+    endpoint && (await maybeResolveEndpoint(endpoint, deps, modelId));
   if (!resolved) throw new ProviderUnavailableError(providerId);
   return resolved;
+}
+
+async function maybeResolveChatGpt(
+  deps: ResolveDeps,
+  modelId?: string
+): Promise<ResolvedProvider | null> {
+  const runtime = deps.chatgpt;
+  if (
+    !runtime ||
+    !ChatGptProvider.supportsModel(runtime.config, modelId) ||
+    !(await ChatGptProvider.isReady(runtime))
+  ) {
+    return null;
+  }
+  return {
+    provider_id: CHATGPT_PROVIDER_ID,
+    kind: "chatgpt",
+    model_factory: ChatGptProvider.makeFactory(runtime, deps.provider_http),
+  };
 }
 
 /**
@@ -245,10 +321,17 @@ function makeResolvedByok(
  */
 async function maybeResolveEndpoint(
   endpoint: EndpointProviderConfig,
-  deps: ResolveDeps
+  deps: ResolveDeps,
+  modelId?: string
 ): Promise<ResolvedProvider | null> {
   const defaultModelId = endpointDefaultModelId(endpoint);
-  if (!defaultModelId) return null;
+  if (
+    !defaultModelId ||
+    (modelId !== undefined &&
+      !endpoint.models.some((model) => model.id === modelId))
+  ) {
+    return null;
+  }
   const key = await deps.secrets._getKey(endpoint.id);
   return {
     provider_id: endpoint.id,
@@ -263,4 +346,8 @@ async function maybeResolveEndpoint(
       deps.provider_http
     ),
   };
+}
+
+function isCatalogModel(modelId: string | undefined): boolean {
+  return modelId === undefined || CATALOG_MODEL_IDS.has(modelId);
 }

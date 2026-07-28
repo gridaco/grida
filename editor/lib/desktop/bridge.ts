@@ -1,4 +1,6 @@
 /**
+ * GRIDA-SEC-008 — renderer adapter for the secret-free ChatGPT capability.
+ *
  * Typed client for the Grida Desktop bridge — `window.grida` exposed by
  * the Electron preload when the page is loaded inside the desktop app.
  *
@@ -30,6 +32,7 @@ import {
   type ByokProviderId,
   type ProviderId,
   type ChatMessageWithParts,
+  type ChatGptSubscriptionStatus,
   type ChatSessionRow,
   type CreateSessionOptions,
   type EndpointModelEntry,
@@ -49,6 +52,7 @@ import {
 } from "@grida/agent";
 import type {
   DesktopBridge,
+  ChatGptConnectResult,
   DesktopHostAppId,
   DesktopHostAppInfo,
   NavigationState,
@@ -95,6 +99,8 @@ export {
   type ProviderId,
   type ChatMessageRow,
   type ChatMessageWithParts,
+  type ChatGptSubscriptionAccount,
+  type ChatGptSubscriptionStatus,
   type ChatModel,
   type ChatPartRow,
   type ChatSessionRow,
@@ -106,6 +112,7 @@ export {
 } from "@grida/agent";
 
 export type {
+  ChatGptConnectResult,
   DesktopAgentCapabilities,
   DesktopBridge,
   DesktopCapabilities,
@@ -445,6 +452,76 @@ export namespace providers {
       cancel_id: 1,
     });
     return choice === 0;
+  }
+}
+
+/* ─────────────────────── account namespace ────────────────────── */
+
+/** Global Grida-account lifecycle owned by the native entry controller. */
+export namespace account {
+  export async function signOut(): Promise<void> {
+    const native = bridgeOrThrow().account;
+    if (!native) throw new DesktopBridgeMissingError();
+    await native.sign_out();
+  }
+}
+
+/* ───────────────────── onboarding namespace ───────────────────── */
+
+/**
+ * Purpose-scoped first-run workspace operations. Electron main owns both the
+ * daemon credential and the native picker; this renderer sees only Workspace
+ * DTOs and cannot turn onboarding access into a general daemon capability.
+ */
+export namespace onboarding {
+  export async function getDefaultWorkspace(): Promise<Workspace | null> {
+    const native = bridgeOrThrow().onboarding;
+    if (!native) throw new DesktopBridgeMissingError();
+    return await native.get_default_workspace();
+  }
+
+  export async function chooseWorkspace(): Promise<Workspace | null> {
+    const native = bridgeOrThrow().onboarding;
+    if (!native) throw new DesktopBridgeMissingError();
+    return await native.choose_workspace();
+  }
+}
+
+/* ─────────────────────── ChatGPT namespace ────────────────────── */
+
+/**
+ * Native ChatGPT-subscription provider controls. This is separate from ACP:
+ * Grida remains the agent and uses the signed-in account only as a model
+ * provider. Results are secret-free status objects, except for the explicit
+ * normal cancellation outcome returned by connect.
+ */
+export namespace chatgpt {
+  export function isSupported(): boolean {
+    return getDesktopBridge()?.chatgpt != null;
+  }
+
+  export async function connect(): Promise<ChatGptConnectResult> {
+    const bridge = bridgeOrThrow().chatgpt;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    return await bridge.connect();
+  }
+
+  export async function cancel(): Promise<void> {
+    const bridge = bridgeOrThrow().chatgpt;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    await bridge.cancel();
+  }
+
+  export async function status(): Promise<ChatGptSubscriptionStatus> {
+    const bridge = bridgeOrThrow().chatgpt;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    return await bridge.status();
+  }
+
+  export async function signOut(): Promise<ChatGptSubscriptionStatus> {
+    const bridge = bridgeOrThrow().chatgpt;
+    if (!bridge) throw new DesktopBridgeMissingError();
+    return await bridge.sign_out();
   }
 }
 

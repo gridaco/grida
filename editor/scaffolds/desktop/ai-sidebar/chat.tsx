@@ -374,17 +374,26 @@ export function AISidebarChat({
 
   // Flat model selection (ignores tiers). Seeds from the active
   // session's stored model and rides each send as `body.modelId`.
-  const { model_id: modelId, setModelId } = useModelPickerState({
+  const {
+    model_id: modelId,
+    provider_id: modelProviderId,
+    setSelection: setModelSelection,
+  } = useModelPickerState({
     current_id: chatSession.current_id,
+    binding_epoch: chatSession.epoch,
     sessions: chatSession.sessions,
     endpoints,
   });
+  const providerId =
+    modelProviderId ?? registered_models.providerIdForModel(modelId, endpoints);
 
   // Exact native image formats come from the catalogue or an explicit custom
   // endpoint declaration. The broad `multimodal` flag never widens this set.
   const providerFileMimes = useMemo(
-    () => registered_models.resolve(modelId, endpoints)?.imageInputMimes ?? [],
-    [modelId, endpoints]
+    () =>
+      registered_models.resolve(modelId, endpoints, providerId)
+        ?.imageInputMimes ?? [],
+    [modelId, providerId, endpoints]
   );
   // The active session row carries the rolled-up cost the context meter
   // surfaces alongside the (real) window %. This surface has no mode picker,
@@ -394,7 +403,6 @@ export function AISidebarChat({
     (s) => s.id === chatSession.current_id
   );
   const sessionMode = activeSession?.mode ?? AGENT_DEFAULT_MODE;
-  const providerId = registered_models.providerIdForModel(modelId, endpoints);
 
   // Keep body-less tool/approval resumes in step with the active session.
   runContextRef.current = {
@@ -700,7 +708,11 @@ export function AISidebarChat({
 
       <QueuedMessages queued={queued} onCancel={cancelQueued} />
 
-      <ModelToolCallNotice model_id={modelId} endpoints={endpoints} />
+      <ModelToolCallNotice
+        model_id={modelId}
+        provider_id={providerId}
+        endpoints={endpoints}
+      />
 
       {/* Approval controls key only on active-run busy. Human-input waiting is
           exactly why this bar is present and must not disable itself. */}
@@ -752,12 +764,16 @@ export function AISidebarChat({
               <DesktopContextMeter
                 messages={messages}
                 modelId={modelId}
+                providerId={providerId}
                 costUsd={activeSession?.cost_usd}
                 endpoints={endpoints}
               />
               <DesktopModelPicker
-                value={modelId}
-                onValueChange={setModelId}
+                value={{
+                  model_id: modelId,
+                  ...(modelProviderId ? { provider_id: modelProviderId } : {}),
+                }}
+                onValueChange={setModelSelection}
                 endpoints={endpoints}
               />
             </>

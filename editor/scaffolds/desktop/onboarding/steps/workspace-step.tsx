@@ -1,24 +1,14 @@
 "use client";
 
 /**
- * Step 3 — open a workspace. Reuses the same native-dialog + openFolder flow as
- * the welcome page; the opened workspace is stashed in onboarding state so the
- * finish step can name it and the welcome composer targets it afterwards.
- * Skippable — Next advances even without opening one.
+ * Lets a new user keep the managed default workspace or open a folder. An
+ * opened folder is carried back to the welcome page as its active target.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { CheckIcon, FolderIcon } from "lucide-react";
 import { Button } from "@app/ui/components/button";
-import {
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@app/ui/components/dialog";
-import {
-  getDesktopBridge,
-  workspaces as workspacesNs,
-} from "@/lib/desktop/bridge";
+import { onboarding as onboardingNs } from "@/lib/desktop/bridge";
 import type { Workspace } from "@/lib/desktop/bridge";
 import type { OnboardingStepProps } from "../types";
 
@@ -32,7 +22,7 @@ function displayWorkspaceRoot(root: string): string {
     );
 }
 
-export function WorkspaceStep({ state, update }: OnboardingStepProps) {
+export function WorkspaceStep({ state, update, next }: OnboardingStepProps) {
   const [busy, setBusy] = useState(false);
   const [defaultWorkspace, setDefaultWorkspace] = useState<Workspace | null>(
     null
@@ -41,10 +31,10 @@ export function WorkspaceStep({ state, update }: OnboardingStepProps) {
 
   useEffect(() => {
     let cancelled = false;
-    void workspacesNs
-      .getDefault()
-      .then((ws) => {
-        if (!cancelled) setDefaultWorkspace(ws);
+    void onboardingNs
+      .getDefaultWorkspace()
+      .then((workspace) => {
+        if (!cancelled) setDefaultWorkspace(workspace);
       })
       .catch(() => {
         if (!cancelled) setDefaultWorkspace(null);
@@ -55,21 +45,14 @@ export function WorkspaceStep({ state, update }: OnboardingStepProps) {
   }, []);
 
   const openFolder = useCallback(async () => {
-    const bridge = getDesktopBridge();
-    if (!bridge) return;
     try {
       setBusy(true);
       setError(null);
-      // `createDirectory` surfaces the macOS "New Folder" button; macOS-only,
-      // safely ignored elsewhere (mirrors the welcome page).
-      const paths = await bridge.dialog.open({
-        properties: ["openDirectory", "createDirectory"],
-      });
-      if (!paths || paths.length === 0) return;
-      const ws = await workspacesNs.openFolder(paths[0]);
-      update({ openedWorkspace: ws });
+      const workspace = await onboardingNs.chooseWorkspace();
+      if (!workspace) return;
+      update({ openedWorkspace: workspace });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't open folder.");
+      setError(err instanceof Error ? err.message : "Could not open folder.");
     } finally {
       setBusy(false);
     }
@@ -80,17 +63,19 @@ export function WorkspaceStep({ state, update }: OnboardingStepProps) {
   return (
     <div
       data-testid="onboarding-step-workspace"
-      className="flex flex-col gap-5"
+      className="flex min-h-full flex-1 flex-col gap-5"
     >
-      <DialogHeader>
-        <DialogTitle>Open a workspace</DialogTitle>
-        <DialogDescription>
-          Grida uses a default workspace, or you can open another folder.
-        </DialogDescription>
-      </DialogHeader>
+      <div className="space-y-1.5">
+        <h1 className="text-xl font-semibold tracking-tight">
+          Choose a workspace
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Use Grida&apos;s default workspace or open another folder.
+        </p>
+      </div>
 
       <div className="flex flex-col gap-2">
-        {defaultWorkspace && (
+        {defaultWorkspace ? (
           <div className="flex items-center gap-2 rounded-md border bg-muted/30 p-3 text-sm">
             <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
             <div className="flex min-w-0 flex-col">
@@ -99,11 +84,11 @@ export function WorkspaceStep({ state, update }: OnboardingStepProps) {
                 {displayWorkspaceRoot(defaultWorkspace.root)}
               </span>
             </div>
-            {!opened && <CheckIcon className="ml-auto size-4 shrink-0" />}
+            {!opened ? <CheckIcon className="ml-auto size-4 shrink-0" /> : null}
           </div>
-        )}
+        ) : null}
 
-        {opened && (
+        {opened ? (
           <div className="flex items-center gap-2 rounded-md border p-3 text-sm">
             <CheckIcon className="size-4 shrink-0" />
             <div className="flex min-w-0 flex-col">
@@ -113,7 +98,7 @@ export function WorkspaceStep({ state, update }: OnboardingStepProps) {
               </span>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       <Button
@@ -125,7 +110,17 @@ export function WorkspaceStep({ state, update }: OnboardingStepProps) {
       >
         {busy ? "Opening…" : opened ? "Change folder…" : "Open another folder…"}
       </Button>
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      {error ? (
+        <span className="text-xs text-destructive" role="alert">
+          {error}
+        </span>
+      ) : null}
+
+      <div className="mt-auto flex justify-center pt-8">
+        <Button className="w-full max-w-64" onClick={next}>
+          Start creating
+        </Button>
+      </div>
     </div>
   );
 }

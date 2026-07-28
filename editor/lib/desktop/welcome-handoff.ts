@@ -49,6 +49,10 @@ export type WelcomeHandoff = {
    * turn so the picker's choice survives the navigation; omitted when
    * the workspace chat should fall back to its own default. */
   model_id?: string;
+  /** The provider explicitly paired with `model_id`. Kept separate because
+   * the same model may run through ChatGPT Subscription, BYOK, Grida, or an
+   * endpoint. */
+  provider_id?: string;
   /**
    * Files to land in the session's SCRATCH dir before the first turn — agent-only
    * reference material (a picked slides template's unzipped bundle), NOT written
@@ -96,14 +100,16 @@ export namespace welcome_handoff {
       const raw = window.sessionStorage.getItem(storageKey(workspaceId));
       if (raw == null) return null;
       const parsed = JSON.parse(raw) as unknown;
+      if (typeof parsed !== "object" || parsed === null) return null;
+      const candidate = parsed as Record<string, unknown>;
+      if (typeof candidate.prompt !== "string") return null;
       if (
-        typeof parsed === "object" &&
-        parsed !== null &&
-        typeof (parsed as WelcomeHandoff).prompt === "string"
+        candidate.provider_id !== undefined &&
+        typeof candidate.provider_id !== "string"
       ) {
-        return parsed as WelcomeHandoff;
+        return null;
       }
-      return null;
+      return candidate as WelcomeHandoff;
     } catch {
       return null;
     }

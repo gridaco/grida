@@ -1,7 +1,8 @@
 ---
 title: Agent security
-description: Desktop binding of GRIDA-SEC-004 for AgentSidecar, the renderer bridge, HTTP perimeter, sandbox, and secrets discipline.
-keywords: [desktop, agent-sidecar, grida-sec-004, security]
+description: Desktop binding of GRIDA-SEC-004 and GRIDA-SEC-008 for AgentSidecar, the renderer bridge, HTTP perimeter, sandbox, native provider OAuth, and secrets discipline.
+keywords:
+  [desktop, agent-sidecar, grida-sec-004, grida-sec-008, chatgpt, security]
 format: md
 tags:
   - internal
@@ -19,6 +20,12 @@ tags:
 > extension workers must not be represented here as shipped. The current outer
 > sandbox applies on macOS/Linux; Windows is unwrapped, with shell and external
 > ACP withheld but structured local filesystem capabilities still exposed.
+
+> **GRIDA-SEC-008 is active.** The ChatGPT Subscription provider adds the
+> main-owned callback, sidecar-owned credential lifecycle, safe renderer
+> bridge, and exact provider destinations as one registered boundary. The
+> implementation is still an experimental interoperability profile; an active
+> local security boundary is not a claim of OpenAI support or approval.
 
 `GRIDA-SEC-004` is the trust boundary between the URL-loaded renderer and the
 long-lived agent server. On supported macOS/Linux hosts, the boundary uses
@@ -44,6 +51,7 @@ This page is the desktop-specific landing.
 | OS-level outer sandbox (macOS/Linux)      | [`agent-sandbox-wrap`](./agent-sandbox-wrap.md). Wraps the daemon process tree on supported platforms.                                                                                           | A compromised agent server reading SSH keys, writing shell rc files, calling arbitrary hosts.                    |
 | Secrets discipline                        | `auth.json` at chmod `0o600`; preload holds the agent server password in closure; never on `window`.                                                                                             | A non-Grida process on the same machine reading the token file; a renderer script enumerating credentials.       |
 | Host-routed provider transport            | Electron main, reached only through bounded framed stdin/stdout.                                                                                                                                 | Provider calls bypassing the system proxy/trust route; turning provider configuration into generic native fetch. |
+| ChatGPT OAuth credential boundary         | Electron main callback + AgentSidecar credential manager + guarded bridge (`GRIDA-SEC-008`).                                                                                                     | Renderer or local callback callers obtaining/replaying provider credentials; provider OAuth widening into ACP.   |
 
 ## Path-scoped `window.grida`
 
@@ -236,6 +244,11 @@ in the Chromium cookie jar. Main has transient routing authority, not durable
 credential custody. The host transport is an explicit trust boundary, not a
 claim that main cannot see in-flight authorization.
 
+The ChatGPT credential follows the same routing distinction under
+`GRIDA-SEC-008`: AgentSidecar owns credential lifecycle; main may route an
+in-flight authorized request but gains no durable custody; the renderer
+receives neither.
+
 **What this catches.** A provider call that would otherwise inherit the
 sidecar's static proxy/SRT route instead of the user's Chromium/system route;
 an attempt to turn endpoint configuration or a credential-free download into
@@ -248,6 +261,63 @@ credentials, but Desktop does not collect interactive proxy credentials; that
 challenge fails with a specific diagnostic. This control honors an effective
 system route; it is not a censorship-circumvention tunnel and cannot create a
 route where Chromium and the operating system have none.
+
+## ChatGPT Subscription OAuth boundary
+
+The experimental provider is a native Grida model provider, never ACP.
+**“Sign in with your ChatGPT account”** supplies eligible model capacity while
+Grida keeps the session, agent loop, tools, approvals, sandbox, transcript,
+and recovery. No part of the ceremony starts Codex or transfers credentials
+to an external agent.
+
+The active `GRIDA-SEC-008` invariant is:
+
+> A renderer may ask Grida to connect a ChatGPT account, but no renderer,
+> project, transcript, command, extension, or external agent can obtain or
+> replay the authorization result or credential.
+
+It is enforced by all of the following:
+
+- an experimental public native Codex OAuth client identity, replaceable by a
+  host-owned client-id override and never described as a Grida-owned or
+  OpenAI-approved identity;
+- exact authorization/token/Responses destinations and exact callback address,
+  ports, method, Host, and path;
+- fresh cryptographic state and PKCE S256 for each short-lived attempt;
+- listener-before-browser ordering, one-time callback consumption, timeout,
+  cancellation, and close-on-every-terminal-path;
+- state validation before atomic attempt claim, so an invalid callback does
+  not consume the legitimate attempt;
+- renderer operations limited to connect, cancel, safe status, and sign-out;
+- callback and token material transient in main, never persisted or logged;
+- bounded account/display claims parsed only from the response returned by the
+  exact TLS-authenticated token endpoint;
+- one durable credential owner, serialized refresh, and atomic refresh-token
+  rotation;
+- sign-out and account change winning over in-flight login, refresh, and
+  inference;
+- exact provider authorization/inference destinations through the native
+  provider transport, with no generic fetch or local-binding grant;
+- bounded, sanitized errors with no token, claim, authorization URL, account
+  identifier, or upstream secret;
+- no credential import from Codex or another application.
+
+The current profile does **not** send an OIDC nonce and does not independently
+verify JWT signature, JWKS, issuer, or audience. Its claim trust derives from
+the pinned token endpoint plus the platform TLS trust path; callback,
+renderer, project, and imported credential data are never claim sources. This
+accepted experimental limit and the use of the public Codex native client
+identity are why a stable legal/support contract with OpenAI remains an
+external release gate.
+
+The separate `grida://` Grida-account login boundary is not reused. A provider
+authorization, entitlement, rate, or quota failure remains on the selected
+provider; it cannot silently fail over to BYOK, GG, a local endpoint, or ACP.
+
+`SECURITY.md` remains authoritative for the registered security tag. The
+user-facing ChatGPT Subscription guide must preserve the availability and
+support caveat until the external OpenAI gate is resolved; “active boundary”
+describes local enforcement, not product support.
 
 ## Reviewer checklist
 
@@ -272,6 +342,11 @@ agent server's HTTP layer, `buildAgentDaemonSandboxPolicy()`, or any source file
    bodies, redirects, downloads, and response credit remain bounded; no
    credential or private channel reaches the renderer, argv, environment,
    disk, logs, shell, or ACP.
+7. **ChatGPT boundary intact?** `GRIDA-SEC-008` still binds the exact callback,
+   credential owner, safe renderer status, provider destinations,
+   cancellation/sign-out races, and negative tests. Documentation must not
+   invent nonce/JWT verification or call the experimental public-client
+   profile OpenAI-approved.
 
 Anything that weakens a control needs an explicit `GRIDA-SEC-004` review
 note in the PR, not a silent regression.
@@ -280,10 +355,14 @@ note in the PR, not a silent regression.
 
 - [`GRIDA-SEC-004` in `SECURITY.md`](https://github.com/gridaco/grida/blob/main/SECURITY.md)
   — the authoritative declaration.
+- [`GRIDA-SEC-008` in `SECURITY.md`](https://github.com/gridaco/grida/blob/main/SECURITY.md)
+  — the ChatGPT subscription OAuth credential boundary.
 - [Process model](./process-model.md) — what each process owns.
 - [Renderer bridge](./renderer-bridge.md) — path-scoped bridge detail.
-- [Desktop agent authority](./agent-sandbox-wrap.md) — the landed native
-  provider slice and the remaining raw-worker re-scope.
+- [Desktop agent authority](https://github.com/gridaco/grida/blob/main/desktop/docs/agent-authority.md)
+  — the landed native provider slice and the remaining raw-worker re-scope.
 - [Agent storage layout](./agent-storage-layout.md) — secrets and state file map.
 - [Agent system RFC / foundations / watchdog](../ai/agent/foundations.md#watchdog)
   — abstract defense-in-depth model.
+- [ChatGPT Subscription native provider](../ai/agent/chatgpt-subscription-provider.md)
+  — the golden provider contract and external activation gate.

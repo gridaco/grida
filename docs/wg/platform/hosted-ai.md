@@ -241,19 +241,23 @@ carries **no billing logic of its own**:
 - **Granularity** — one hosted request per model step, so per-request
   gating _is_ step-level gating for the agent.
 
-### 4. Provider precedence
+### 4. Relationship to provider selection
 
-When more than one way to reach a model is available, resolution is:
+GG is one native capacity source; it does not own the global provider order.
+The golden selection rules live in the
+[ChatGPT subscription provider specification](../ai/agent/chatgpt-subscription-provider.md#provider-selection):
 
-1. **An explicit user choice always wins** — if the user selected a
-   specific provider, honor it.
-2. Otherwise **BYOK**, if a user key is present (the $0-to-us path).
-3. Otherwise **hosted (Grida)**, if signed in with a live token.
-4. Otherwise the remaining fallbacks.
+- an explicit provider or explicitly changed model is an intentional switch;
+- otherwise a persisted provider remains sticky while the model is omitted or
+  unchanged;
+- a fresh, unconfigured session uses a ready ChatGPT subscription connection
+  first;
+- otherwise the existing text fallback remains BYOK, then GG, then configured
+  endpoint/local capacity;
+- a provider failure never silently changes provider in the middle of a turn.
 
-Hosted AI is thus _just another provider_ in an existing precedence order —
-adding it distorted neither BYOK nor the resolution model, and removing or
-reordering it is trivial.
+This preserves GG as the managed no-key route without overriding an existing
+user's chosen BYOK, endpoint, local, or GG route.
 
 ## Security boundary
 
@@ -295,8 +299,11 @@ handoff, is then retained only in the daemon's memory, and is re-minted on
 expiry; each GG call uses the bounded native provider transport and Chromium
 system route without giving Electron main durable token custody; the gateway
 gates and meters through the live billing rail; BYOK
-continues to bypass everything; precedence resolves explicit → BYOK → hosted
-→ fallbacks.
+continues to bypass everything. The experimental ChatGPT subscription
+provider now participates in the native resolver and provider-qualified
+session persistence described above. That local implementation does not make
+it a stable OpenAI-supported integration: its legal/support contract remains
+an external release gate.
 
 **Deferred / accepted limitations** — the parts deliberately left for
 later, and the honest risks:
@@ -319,9 +326,10 @@ later, and the honest risks:
   only explicit top-ups create balance, so the revenue path for bundled
   AI is a prerequisite tracked in [AI Credits](./billing/ai-credits.md), not
   here.
-- **Default-model UX** — a signed-in keyless user still defaults to a
-  BYOK-oriented default model; steering the default to a hosted tier when a
-  hosted session is active is a separate product decision.
+- **ChatGPT stable activation** — subscription-first onboarding and sticky
+  provider-qualified sessions are implemented experimentally. A stable
+  legal/support contract with OpenAI, including the native client and
+  subscription-backend posture, remains an external release gate.
 - **Packaged egress smoke** — the native sandbox must be proven to reach
   the hosted host from a _packaged_ build; the dev loop cannot prove the
   packaged allowlist.
@@ -335,5 +343,5 @@ later, and the honest risks:
 - [Metronome integration](./billing/metronome.md) — the metering substrate.
 - [SECURITY.md](https://github.com/gridaco/grida/blob/main/SECURITY.md) —
   `GRIDA-SEC-003`/`004`/`005`/`006`, the enforced boundaries.
-- [Deferred Grida Cloud Agent Provider](./_history/hosted-ai-deferred-provider-2026-06.md)
-  — the superseded pre-build design, kept for lineage.
+- [Deferred Grida Cloud Agent Provider](https://github.com/gridaco/grida/blob/main/docs/wg/platform/_history/hosted-ai-deferred-provider-2026-06.md)
+  — the unlisted superseded pre-build design, kept for lineage.

@@ -82,7 +82,7 @@ describe("buildAgentSend", () => {
   });
 });
 
-describe("buildAgentSend — endpoint provider pin (#806)", () => {
+describe("buildAgentSend — explicit provider/model selection", () => {
   it("rides provider_id when the picked model is a registered endpoint model", () => {
     const sendMessage = vi.fn<SendMessageFn>();
     const send = buildAgentSend({
@@ -106,7 +106,25 @@ describe("buildAgentSend — endpoint provider pin (#806)", () => {
     );
   });
 
-  it("omits provider_id for catalog models (BYOK cascade stays in charge)", () => {
+  it("rides the native ChatGPT provider with an eligible catalog model", () => {
+    const sendMessage = vi.fn<SendMessageFn>();
+    const send = buildAgentSend({
+      sendMessage,
+      sessionId: "s1",
+      modelId: "openai/gpt-5.6-terra",
+      providerId: "chatgpt",
+    });
+
+    send("hi");
+
+    expect(sendMessage.mock.calls[0][1]?.body).toMatchObject({
+      session_id: "s1",
+      model_id: "openai/gpt-5.6-terra",
+      provider_id: "chatgpt",
+    });
+  });
+
+  it("omits provider_id for automatic catalog resolution", () => {
     const sendMessage = vi.fn<SendMessageFn>();
     const send = buildAgentSend({
       sendMessage,

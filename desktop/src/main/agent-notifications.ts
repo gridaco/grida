@@ -31,7 +31,7 @@ import { agentSidecarClient } from "./agent-sidecar-client";
 import { agent_notifications } from "./agent-notifications-policy";
 import { findWindowByUrl } from "./window-focus";
 import { IPC_CHANNELS } from "../bridge/contract";
-import { open_welcome_window, open_workspace_window } from "../window";
+import { open_workspace_window } from "../window";
 import { EDITOR_BASE_URL } from "../env";
 
 const RETRY_INITIAL_MS = 1_000;
@@ -55,7 +55,21 @@ function resolveSessionWindow(
  * Re-resolves the window at click time — it may have opened or closed
  * since the notification was shown.
  */
-function attendSession(sessionId: string, session: ChatSessionRow | null) {
+type AgentNotificationNavigation = {
+  can_open: () => boolean;
+  register: (window: BrowserWindow) => boolean;
+  focus_entry: () => void;
+};
+
+function attendSession(
+  sessionId: string,
+  session: ChatSessionRow | null,
+  navigation: AgentNotificationNavigation
+) {
+  if (!navigation.can_open()) {
+    navigation.focus_entry();
+    return;
+  }
   // The app is in the background by construction (the focus gate suppressed
   // the focused case), and on macOS `BrowserWindow.focus()` alone does not
   // bring a background app forward. macOS usually activates the app on a
@@ -72,26 +86,25 @@ function attendSession(sessionId: string, session: ChatSessionRow | null) {
     return;
   }
   if (session?.workspace_id) {
-    open_workspace_window({
+    const window = open_workspace_window({
       app,
       base_url: EDITOR_BASE_URL,
       workspace_id: session.workspace_id,
       session_id: sessionId,
     });
+    navigation.register(window);
     return;
   }
-  // Unbound session: the host's default surface — frontmost window, or a
-  // fresh welcome window when none is open.
-  const existing = BrowserWindow.getAllWindows()[0];
-  if (existing && !existing.isDestroyed()) {
-    if (existing.isMinimized()) existing.restore();
-    existing.focus();
-    return;
-  }
-  open_welcome_window({ app, base_url: EDITOR_BASE_URL });
+  // Unbound session: return to the one controller-owned app entry instead of
+  // guessing which arbitrary window is the front door.
+  navigation.focus_entry();
 }
 
-async function handleEvent(event: AgentLifecycleEvent): Promise<void> {
+async function handleEvent(
+  event: AgentLifecycleEvent,
+  navigation: AgentNotificationNavigation
+): Promise<void> {
+  if (!navigation.can_open()) return;
   // Cheap pre-filter before the session read: only attention moments.
   if (event.type === "turn-started") return;
   if (
@@ -110,6 +123,9 @@ async function handleEvent(event: AgentLifecycleEvent): Promise<void> {
   } catch {
     session = null;
   }
+  // Session enrichment is asynchronous. Sign-out or onboarding may have
+  // changed admission while it was in flight; suppress the stale notification.
+  if (!navigation.can_open()) return;
   const facts = session
     ? { title: session.title, workspace_id: session.workspace_id }
     : null;
@@ -130,7 +146,9 @@ async function handleEvent(event: AgentLifecycleEvent): Promise<void> {
     title: decision.title,
     body: decision.body,
   });
-  notification.on("click", () => attendSession(event.session_id, session));
+  notification.on("click", () =>
+    attendSession(event.session_id, session, navigation)
+  );
   // macOS rejects notifications silently when the app's identity isn't
   // authorized (UNErrorDomain 1 — e.g. ad-hoc-signed dev builds, or the
   // user disabled the app in Notification Center). Without this listener
@@ -153,7 +171,9 @@ async function handleEvent(event: AgentLifecycleEvent): Promise<void> {
  * detached are lost by design — the channel is volatile (RFC `events`
  * §semantics); nothing of record rides it.
  */
-export function startAgentNotifications(): void {
+export function startAgentNotifications(
+  navigation: AgentNotificationNavigation
+): void {
   let stopped = false;
   const controller = new AbortController();
   app.on("before-quit", () => {
@@ -167,7 +187,7 @@ export function startAgentNotifications(): void {
       try {
         const { done } = await agentSidecarClient.subscribeEvents(
           (event) => {
-            void handleEvent(event).catch((err) => {
+            void handleEvent(event, navigation).catch((err) => {
               console.warn("[agent-notifications] handler error:", err);
             });
           },

@@ -490,18 +490,26 @@ function AgentPaneContent({
   // Flat model selection (ignores tiers). Seeds from the welcome
   // composer's pick on a handed-off fresh session, otherwise from the
   // active session's stored model, and rides each send as `body.modelId`.
-  const { model_id: modelId, setModelId } = useModelPickerState({
+  const {
+    model_id: modelId,
+    provider_id: modelProviderId,
+    setSelection: setModelSelection,
+  } = useModelPickerState({
     current_id: chatSession.current_id,
+    binding_epoch: chatSession.epoch,
     sessions: chatSession.sessions,
     initial: handoff?.model_id,
+    initial_provider_id: handoff?.provider_id,
     endpoints,
   });
 
   // Exact native image formats come from the catalogue or an explicit custom
   // endpoint declaration. The broad `multimodal` flag never widens this set.
   const providerFileMimes = useMemo(
-    () => registered_models.resolve(modelId, endpoints)?.imageInputMimes ?? [],
-    [modelId, endpoints]
+    () =>
+      registered_models.resolve(modelId, endpoints, modelProviderId)
+        ?.imageInputMimes ?? [],
+    [modelId, modelProviderId, endpoints]
   );
 
   // Permission/supervision posture (RFC `permission modes`). Seeds from the
@@ -536,9 +544,11 @@ function AgentPaneContent({
   // CORE fires queued items serially on a clean idle edge (the drain is core
   // state — not this client). `useTurnQueueController` owns the submit gate +
   // the optimistic mirror, shared with `ai-sidebar/chat.tsx`.
-  // Endpoint provider pin for the active model (issue #806) — rides every
-  // run-entering body: normal sends AND approval resumes below.
-  const providerId = registered_models.providerIdForModel(modelId, endpoints);
+  // An explicit provider/model selection (ChatGPT Subscription, Grida, BYOK,
+  // or an endpoint) rides every run-entering body: normal sends AND approval
+  // resumes below.
+  const providerId =
+    modelProviderId ?? registered_models.providerIdForModel(modelId, endpoints);
   // Keep the transport's body-less backfill (above) in step with the pickers.
   // (Skills are no longer per-tab: the agent discovers them from disk and
   // advertises them itself, loading on demand via the `skill` tool.)
@@ -901,7 +911,11 @@ function AgentPaneContent({
 
       <QueuedMessages queued={queued} onCancel={cancelQueued} />
 
-      <ModelToolCallNotice model_id={modelId} endpoints={endpoints} />
+      <ModelToolCallNotice
+        model_id={modelId}
+        provider_id={modelProviderId}
+        endpoints={endpoints}
+      />
 
       {/* Hidden while the session is busy: clicking Allow/Deny starts the
           resume turn (busy → true), so the bar vanishes on click — instant
@@ -962,12 +976,16 @@ function AgentPaneContent({
               <DesktopContextMeter
                 messages={messages}
                 modelId={modelId}
+                providerId={modelProviderId}
                 costUsd={activeSession?.cost_usd}
                 endpoints={endpoints}
               />
               <DesktopModelPicker
-                value={modelId}
-                onValueChange={setModelId}
+                value={{
+                  model_id: modelId,
+                  ...(modelProviderId ? { provider_id: modelProviderId } : {}),
+                }}
+                onValueChange={setModelSelection}
                 endpoints={endpoints}
               />
             </>

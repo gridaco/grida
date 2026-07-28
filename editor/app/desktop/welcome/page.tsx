@@ -57,8 +57,6 @@ import {
   type ScratchSeedFile,
   type WelcomeHandoff,
 } from "@/lib/desktop/welcome-handoff";
-import { onboarding_flag } from "@/lib/desktop/onboarding-flag";
-import { FirstRunOnboarding } from "@/scaffolds/desktop/onboarding/first-run-onboarding";
 import { dotcanvas } from "dotcanvas";
 import { TitleBar } from "@/scaffolds/desktop/chrome/title-bar";
 import { AgentComposerInput } from "@/scaffolds/desktop/shared/agent-composer-input";
@@ -106,6 +104,7 @@ function DesktopWelcomeRoute() {
   const router = useRouter();
   const params = useSearchParams();
   const shouldRestore = params.get("startup") === "restore-last-workspace";
+  const onboardingWorkspaceId = params.get("onboardingWorkspace");
   const [checking, setChecking] = useState(shouldRestore);
 
   useEffect(() => {
@@ -134,7 +133,11 @@ function DesktopWelcomeRoute() {
     };
   }, [router, shouldRestore]);
 
-  return checking ? <StartupRestoreScreen /> : <WelcomeSurface />;
+  return checking ? (
+    <StartupRestoreScreen />
+  ) : (
+    <WelcomeSurface initialWorkspaceId={onboardingWorkspaceId} />
+  );
 }
 
 function StartupRestoreScreen() {
@@ -171,7 +174,11 @@ function composePromptWithRefs(
   return `${lead}\n\nReferences:\n${list}`;
 }
 
-function WelcomeSurface() {
+function WelcomeSurface({
+  initialWorkspaceId,
+}: {
+  initialWorkspaceId: string | null;
+}) {
   const router = useRouter();
   // The home's single page-scroll container — everything (composer, gallery)
   // scrolls together inside it; the gallery virtualizes against it.
@@ -195,6 +202,7 @@ function WelcomeSurface() {
   // send the prompt into instead. Owned here; the top-left WorkspacePicker
   // mutates it and the composer's `start` reads it.
   const [target, setTarget] = useState<Workspace | null>(null);
+  const pendingInitialWorkspaceId = useRef(initialWorkspaceId);
   // References the user has gathered from the gallery (multi-select). They seed
   // ONE fresh board on submit; a click in the gallery toggles membership here.
   const [pickedRefs, setPickedRefs] = useState<
@@ -226,22 +234,22 @@ function WelcomeSurface() {
   const composerSlotRef = useRef<HTMLDivElement>(null);
   const [docked, setDocked] = useState(false);
   const [heroHeight, setHeroHeight] = useState<number>();
-  // First-run onboarding. Start hidden so the server render and first client
-  // render agree — `localStorage` is client-only, so seeding in the initializer
-  // would render the modal during SSR and tear it down on hydration for
-  // returning users. Decide after mount.
-  const [onboarding, setOnboarding] = useState(false);
-  useEffect(() => {
-    if (!onboarding_flag.isComplete()) setOnboarding(true);
-  }, []);
-
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
   const refreshWorkspaces = useCallback(async () => {
     const bridge = getDesktopBridge();
     if (!bridge) return;
     try {
-      setWorkspaces(await workspacesNs.list());
+      const nextWorkspaces = await workspacesNs.list();
+      setWorkspaces(nextWorkspaces);
+      const pendingId = pendingInitialWorkspaceId.current;
+      if (pendingId) {
+        const opened = nextWorkspaces.find(
+          (workspace) => workspace.id === pendingId
+        );
+        if (opened) setTarget((current) => current ?? opened);
+        pendingInitialWorkspaceId.current = null;
+      }
     } catch (err) {
       // Non-fatal — the welcome page can still create or open a folder.
       console.warn("[welcome] workspaces.list failed:", err);
@@ -352,10 +360,12 @@ function WelcomeSurface() {
   // the session's first turn runs on the chosen model.
   const {
     model_id: modelId,
-    setModelId,
+    provider_id: modelProviderId,
+    setSelection: setModelSelection,
     is_user_pick: isUserPick,
   } = useModelPickerState({
     current_id: null,
+    binding_epoch: 0,
     sessions: [],
     endpoints,
   });
@@ -378,9 +388,14 @@ function WelcomeSurface() {
         // untouched default — or a GG upgrade that hasn't resolved yet — is
         // left off so the workspace resolves its own (GG-aware) default;
         // otherwise a fast submit before the async session settles would
-        // seed the workspace with the Claude-Code default as a false
-        // explicit pick, and keyless users would hit `auth_required` (#942).
-        ...(isUserPick ? { model_id: modelId } : {}),
+        // seed the workspace with the hosted default as a false explicit
+        // pick, and keyless users would hit `auth_required` (#942).
+        ...(isUserPick
+          ? {
+              model_id: modelId,
+              ...(modelProviderId ? { provider_id: modelProviderId } : {}),
+            }
+          : {}),
         ...(scratchSeed && scratchSeed.length > 0
           ? { scratch_seed: scratchSeed }
           : {}),
@@ -388,7 +403,7 @@ function WelcomeSurface() {
       });
       router.push(workspaceWorkbenchHref(workspace));
     },
-    [modelId, isUserPick, router]
+    [modelId, modelProviderId, isUserPick, router]
   );
 
   // Start a session in the DEFAULT workspace (`~/Documents/Grida`). We NEVER mint
@@ -530,16 +545,6 @@ function WelcomeSurface() {
       // writing while browsing.
       className="flex h-svh w-full flex-col bg-background"
     >
-      {onboarding && (
-        <FirstRunOnboarding
-          onDone={(openedWorkspaceId) => {
-            setOnboarding(false);
-            // A folder opened during onboarding lives only in the wizard until
-            // now — pull it into this page's list so recents reflect it.
-            if (openedWorkspaceId) void refreshWorkspaces();
-          }}
-        />
-      )}
       {/* Bare drag region — Settings moved to the rail footer below. */}
       <TitleBar />
 
@@ -694,8 +699,13 @@ function WelcomeSurface() {
                     }
                     toolbarEnd={
                       <DesktopModelPicker
-                        value={modelId}
-                        onValueChange={setModelId}
+                        value={{
+                          model_id: modelId,
+                          ...(modelProviderId
+                            ? { provider_id: modelProviderId }
+                            : {}),
+                        }}
+                        onValueChange={setModelSelection}
                         endpoints={endpoints}
                       />
                     }

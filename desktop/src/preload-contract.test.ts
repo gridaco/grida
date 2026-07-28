@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
+// GRIDA-SEC-004 / GRIDA-SEC-008 — renderer bridge source contract pins.
 const preloadSource = fs.readFileSync(
   new URL("./preload.ts", import.meta.url),
   "utf8"
@@ -20,5 +21,11 @@ describe("Desktop preload agent seam", () => {
     expect(preloadSource).toContain("native:");
     expect(preloadSource).toContain("scratch_seed_base64: true");
     expect(preloadSource).not.toContain("agentServer:");
+  });
+
+  it("forwards the native ChatGPT connect result without translating errors", () => {
+    expect(preloadSource).toMatch(
+      /chatgpt:\s*{\s*connect:\s*\(\)\s*=>\s*ipcRenderer\.invoke\(IPC_CHANNELS\.CHATGPT_CONNECT\)\s*[,}]/
+    );
   });
 });

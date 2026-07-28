@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — `auth.json` reader/writer.
+ * GRIDA-SEC-004 / GRIDA-SEC-008 — serialized credential persistence.
  *
  * Lives at `${userDataPath}/auth.json`, chmod 0o600, owned exclusively
  * by the agent host. V1 stores BYOK API key records keyed by provider id.
@@ -47,6 +47,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { atomicWrite } from "../storage/atomic-write";
 
 export type OAuthEntry = {
@@ -60,6 +61,10 @@ export type OAuthEntry = {
   expires: number;
   account_id?: string;
   email?: string;
+  /** Provider-reported subscription plan, for display only. */
+  plan?: string;
+  /** Provider-owned bookkeeping; never exposed through credential routes. */
+  metadata?: Record<string, string>;
 };
 
 export type ApiKeyEntry = {
@@ -190,6 +195,47 @@ export class AuthStore {
       if (!(providerId in all)) return;
       delete all[providerId];
       await this.writeAll(all);
+    });
+  }
+
+  /**
+   * Compare-and-remove on the same mutation chain as set/remove.
+   *
+   * OAuth cancellation uses this after an in-flight exchange: a cancelled
+   * attempt may remove only the exact record it wrote, never a newer sign-in
+   * that won the provider slot meanwhile.
+   */
+  async removeIfUnchanged(
+    providerId: string,
+    expected: AuthInfo
+  ): Promise<boolean> {
+    return this.enqueueWrite(async () => {
+      const all = await this.readAll();
+      if (!isDeepStrictEqual(all[providerId], expected)) return false;
+      delete all[providerId];
+      await this.writeAll(all);
+      return true;
+    });
+  }
+
+  /**
+   * Compare-and-replace on the shared mutation chain.
+   *
+   * A slow token refresh may finish after a new OAuth ceremony has installed
+   * a different account. Replacing only the record the refresh actually read
+   * prevents that late response from rolling the provider slot back.
+   */
+  async replaceIfUnchanged(
+    providerId: string,
+    expected: AuthInfo,
+    next: AuthInfo
+  ): Promise<boolean> {
+    return this.enqueueWrite(async () => {
+      const all = await this.readAll();
+      if (!isDeepStrictEqual(all[providerId], expected)) return false;
+      all[providerId] = next;
+      await this.writeAll(all);
+      return true;
     });
   }
 }

@@ -21,17 +21,28 @@ import { agentSidecarClient } from "./main/agent-sidecar-client";
 import { focusWindowByUrl } from "./main/window-focus";
 import { IPC_CHANNELS } from "./bridge/contract";
 
+export type DesktopWindowAdmission = {
+  can_open: () => boolean;
+  register: (window: BrowserWindow) => boolean;
+  focus_entry: () => void;
+};
+
 /**
  * "Preferences…" menu click handler. Macros and a separate window
  * mirror native conventions (macOS Cmd+, opens app prefs in a window
  * distinct from any open doc). Dedup: if a `/desktop/settings` window
  * already exists, focus it instead of spawning a second one.
  */
-function open_or_focus_settings(app: App) {
+function open_or_focus_settings(app: App, admission?: DesktopWindowAdmission) {
+  if (admission && !admission.can_open()) {
+    admission.focus_entry();
+    return;
+  }
   if (focusWindowByUrl("/desktop/settings")) return;
   const agentSidecar = getAgentSidecarInfo();
   if (!agentSidecar) return; // pre-ready / between restarts
-  open_settings_window({ app, base_url: EDITOR_BASE_URL });
+  const window = open_settings_window({ app, base_url: EDITOR_BASE_URL });
+  admission?.register(window);
 }
 
 /**
@@ -57,8 +68,13 @@ type OpenKind = "any" | "file" | "directory";
 async function open_picker_and_register(
   app: App,
   kind: OpenKind,
-  onOpenFile?: (filePath: string) => void
+  onOpenFile?: (filePath: string) => void,
+  admission?: DesktopWindowAdmission
 ): Promise<void> {
+  if (admission && !admission.can_open()) {
+    admission.focus_entry();
+    return;
+  }
   const agentSidecar = getAgentSidecarInfo();
   if (!agentSidecar) return; // pre-ready / between restarts
   const focused = BrowserWindow.getFocusedWindow() ?? undefined;
@@ -117,7 +133,11 @@ async function open_picker_and_register(
     );
     return;
   }
-  route_workspace_window(app, workspace);
+  if (admission && !admission.can_open()) {
+    admission.focus_entry();
+    return;
+  }
+  route_workspace_window(app, workspace, admission);
   // Record the folder in Recents, matching the OS-open paths (`main.ts` adds
   // both files and directories). The file branch above already does this via
   // `onOpenFile`, so only the directory branch needs it here.
@@ -136,19 +156,26 @@ function focus_or_open_workspace_window({
   app,
   agentSidecar,
   workspace_id: workspaceId,
+  admission,
 }: {
   app: App;
   agentSidecar: ReturnType<typeof getAgentSidecarInfo>;
   workspace_id: string;
+  admission?: DesktopWindowAdmission;
 }) {
+  if (admission && !admission.can_open()) {
+    admission.focus_entry();
+    return;
+  }
   if (!agentSidecar) return;
   const needle = `/desktop/workspace?id=${encodeURIComponent(workspaceId)}`;
   if (focusWindowByUrl(needle)) return;
-  open_workspace_window({
+  const window = open_workspace_window({
     app,
     base_url: EDITOR_BASE_URL,
     workspace_id: workspaceId,
   });
+  admission?.register(window);
 }
 
 /**
@@ -160,19 +187,26 @@ function focus_or_open_canvas_window({
   app,
   agentSidecar,
   workspace_id: workspaceId,
+  admission,
 }: {
   app: App;
   agentSidecar: ReturnType<typeof getAgentSidecarInfo>;
   workspace_id: string;
+  admission?: DesktopWindowAdmission;
 }) {
+  if (admission && !admission.can_open()) {
+    admission.focus_entry();
+    return;
+  }
   if (!agentSidecar) return;
   const needle = `/desktop/file?id=${encodeURIComponent(workspaceId)}`;
   if (focusWindowByUrl(needle)) return;
-  open_canvas_window({
+  const window = open_canvas_window({
     app,
     base_url: EDITOR_BASE_URL,
     workspace_id: workspaceId,
   });
+  admission?.register(window);
 }
 
 export { focus_or_open_workspace_window, focus_or_open_canvas_window };
@@ -193,8 +227,13 @@ const MAX_RECENT_MENU_ITEMS = 12;
  */
 function route_workspace_window(
   app: App,
-  workspace: { id: string; root: string }
+  workspace: { id: string; root: string },
+  admission?: DesktopWindowAdmission
 ) {
+  if (admission && !admission.can_open()) {
+    admission.focus_entry();
+    return;
+  }
   const agentSidecar = getAgentSidecarInfo();
   if (!agentSidecar) return; // pre-ready / between restarts
   const isCanvas = existsSync(join(workspace.root, ".canvas.json"));
@@ -203,12 +242,14 @@ function route_workspace_window(
       app,
       agentSidecar,
       workspace_id: workspace.id,
+      admission,
     });
   } else {
     focus_or_open_workspace_window({
       app,
       agentSidecar,
       workspace_id: workspace.id,
+      admission,
     });
   }
 }
@@ -234,10 +275,18 @@ async function list_recent_workspaces() {
 // skips re-setting the native menu when the recents are unchanged, so frequent
 // triggers (window focus) don't thrash it.
 let last_recent_signature: string | null = null;
-// Coalesce overlapping triggers (rapid focus flips): one fetch at a time, and
-// no out-of-order `Menu.setApplicationMenu` from a slow earlier fetch landing
-// after a fast later one.
-let rebuild_in_flight = false;
+type MenuRebuildRequest = {
+  app: App;
+  shell: Shell;
+  opts?: {
+    onOpenFile?: (filePath: string) => void;
+    windowAdmission?: DesktopWindowAdmission;
+  };
+};
+// Coalesce overlapping triggers without dropping the latest role. A sign-out
+// arriving during a slow recents fetch always gets a trailing gated rebuild.
+let pending_rebuild: MenuRebuildRequest | null = null;
+let rebuild_task: Promise<void> | null = null;
 
 /**
  * Re-fetch recents and rebuild the whole application menu so File ▸ Open Recent
@@ -248,29 +297,56 @@ let rebuild_in_flight = false;
 export async function rebuild_application_menu(
   app: App,
   shell: Shell,
-  opts?: { onOpenFile?: (filePath: string) => void }
+  opts?: {
+    onOpenFile?: (filePath: string) => void;
+    windowAdmission?: DesktopWindowAdmission;
+  }
 ): Promise<void> {
-  if (rebuild_in_flight) return;
-  rebuild_in_flight = true;
+  pending_rebuild = { app, shell, opts };
+  rebuild_task ??= drain_menu_rebuilds();
+  await rebuild_task;
+}
+
+async function drain_menu_rebuilds(): Promise<void> {
   try {
-    await rebuild_application_menu_locked(app, shell, opts);
+    while (pending_rebuild) {
+      const request = pending_rebuild;
+      pending_rebuild = null;
+      await rebuild_application_menu_locked(
+        request.app,
+        request.shell,
+        request.opts
+      );
+    }
   } finally {
-    rebuild_in_flight = false;
+    rebuild_task = null;
   }
 }
 
 async function rebuild_application_menu_locked(
   app: App,
   shell: Shell,
-  opts?: { onOpenFile?: (filePath: string) => void }
+  opts?: {
+    onOpenFile?: (filePath: string) => void;
+    windowAdmission?: DesktopWindowAdmission;
+  }
 ): Promise<void> {
-  const recents = await list_recent_workspaces();
-  const signature = recents.map((w) => w.id).join(" ");
+  const readyAtStart = opts?.windowAdmission?.can_open() ?? true;
+  let recents = readyAtStart ? await list_recent_workspaces() : [];
+  // Authentication may change during the fetch. Never install prior-account
+  // workspace names or enabled commands after admission has closed.
+  const ready = opts?.windowAdmission?.can_open() ?? true;
+  if (!ready) recents = [];
+  const signature = [
+    ready ? "ready" : "gated",
+    ...recents.map((w) => w.id),
+  ].join("\u0000");
   if (signature === last_recent_signature && Menu.getApplicationMenu()) return;
   last_recent_signature = signature;
   const recent: MenuItemConstructorOptions[] = recents.map((w) => ({
     label: w.name || w.root,
-    click: () => route_workspace_window(app, w),
+    enabled: opts?.windowAdmission?.can_open() ?? true,
+    click: () => route_workspace_window(app, w, opts?.windowAdmission),
   }));
   Menu.setApplicationMenu(create_menu(app, shell, { ...opts, recent }));
 }
@@ -344,7 +420,8 @@ export function merge_templates(
 
 export function create_default_menu(
   app: App,
-  shell: Shell
+  shell: Shell,
+  admission?: DesktopWindowAdmission
 ): MenuItemConstructorOptions[] {
   const template: MenuItemConstructorOptions[] = [
     {
@@ -440,7 +517,8 @@ export function create_default_menu(
         {
           label: "Settings…",
           accelerator: "Command+,",
-          click: () => open_or_focus_settings(app),
+          enabled: admission?.can_open() ?? true,
+          click: () => open_or_focus_settings(app, admission),
         },
         { type: "separator" },
         { role: "services", label: "Services", submenu: [] },
@@ -484,13 +562,14 @@ export default function create_menu(
   shell: Shell,
   opts?: {
     onOpenFile?: (filePath: string) => void;
+    windowAdmission?: DesktopWindowAdmission;
     /** Pre-fetched File ▸ Open Recent items (built by {@link rebuild_application_menu}).
      *  Omitted on the initial synchronous build (sidecar not up yet) → the menu
      *  shows a disabled "No Recent Projects" placeholder until the first rebuild. */
     recent?: MenuItemConstructorOptions[];
   }
 ) {
-  const default_menu = create_default_menu(app, shell);
+  const default_menu = create_default_menu(app, shell, opts?.windowAdmission);
   // Minimal File menu. An extension-keyed registry (one entry per
   // openable file type) is the next iteration when modules other than
   // `.svg` / `.grida` land.
@@ -501,15 +580,21 @@ export default function create_menu(
         {
           label: "New Window",
           accelerator: "CmdOrCtrl+Shift+N",
+          enabled: opts?.windowAdmission?.can_open() ?? true,
           click: () => {
+            if (opts?.windowAdmission && !opts.windowAdmission.can_open()) {
+              opts.windowAdmission.focus_entry();
+              return;
+            }
             const agentSidecar = getAgentSidecarInfo();
             // Pre-ready or between supervisor restarts → no-op rather
             // than open a window that can't reach the agent sidecar.
             if (!agentSidecar) return;
-            open_welcome_window({
+            const window = open_welcome_window({
               app,
               base_url: EDITOR_BASE_URL,
             });
+            opts?.windowAdmission?.register(window);
           },
         },
         // macOS offers files + folders in one panel; Windows/Linux can't, so
@@ -520,8 +605,14 @@ export default function create_menu(
               {
                 label: "Open…",
                 accelerator: "CmdOrCtrl+O",
+                enabled: opts?.windowAdmission?.can_open() ?? true,
                 click: () => {
-                  void open_picker_and_register(app, "any", opts?.onOpenFile);
+                  void open_picker_and_register(
+                    app,
+                    "any",
+                    opts?.onOpenFile,
+                    opts?.windowAdmission
+                  );
                 },
               },
             ]
@@ -529,18 +620,26 @@ export default function create_menu(
               {
                 label: "Open File…",
                 accelerator: "CmdOrCtrl+O",
+                enabled: opts?.windowAdmission?.can_open() ?? true,
                 click: () => {
-                  void open_picker_and_register(app, "file", opts?.onOpenFile);
+                  void open_picker_and_register(
+                    app,
+                    "file",
+                    opts?.onOpenFile,
+                    opts?.windowAdmission
+                  );
                 },
               },
               {
                 label: "Open Folder…",
                 accelerator: "CmdOrCtrl+Shift+O",
+                enabled: opts?.windowAdmission?.can_open() ?? true,
                 click: () => {
                   void open_picker_and_register(
                     app,
                     "directory",
-                    opts?.onOpenFile
+                    opts?.onOpenFile,
+                    opts?.windowAdmission
                   );
                 },
               },
@@ -566,7 +665,8 @@ export default function create_menu(
               {
                 label: "Settings…",
                 accelerator: "Ctrl+,",
-                click: () => open_or_focus_settings(app),
+                enabled: opts?.windowAdmission?.can_open() ?? true,
+                click: () => open_or_focus_settings(app, opts?.windowAdmission),
               },
             ]),
       ],

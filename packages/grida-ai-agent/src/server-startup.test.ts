@@ -1,3 +1,4 @@
+// GRIDA-SEC-008 — tenant startup shares one serialized credential store.
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -34,12 +35,14 @@ describe("agent tenant startup", () => {
       () => fs.rm(baseDir, { recursive: true, force: true }),
       () => fs.rm(scratchBase, { recursive: true, force: true })
     );
+    const auth = new AuthStore(baseDir);
     const services: DaemonServices = {
       user_data_path: baseDir,
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
-      secrets: new SecretsStore(new AuthStore(baseDir)),
+      auth,
+      secrets: new SecretsStore(auth),
     };
     const recover = vi
       .spyOn(AgentRuntime.prototype, "recoverQueuedSessions")
@@ -65,6 +68,61 @@ describe("agent tenant startup", () => {
     expect(recover).toHaveBeenCalledOnce();
   });
 
+  it("warns when ChatGPT is configured while provider routes are disabled", async () => {
+    const baseDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "grida-agent-chatgpt-disabled-")
+    );
+    const scratchBase = `${baseDir}-scratch`;
+    cleanup.push(
+      () => fs.rm(baseDir, { recursive: true, force: true }),
+      () => fs.rm(scratchBase, { recursive: true, force: true })
+    );
+    const auth = new AuthStore(baseDir);
+    const services: DaemonServices = {
+      user_data_path: baseDir,
+      files: new FileRegistry(),
+      recent: new RecentStore(baseDir),
+      workspaces: new WorkspaceRegistry(baseDir),
+      auth,
+      secrets: new SecretsStore(auth),
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let handle: DaemonTenantHandle | undefined;
+    cleanup.push(() => {
+      handle?.drain?.();
+      handle?.cleanup?.();
+    });
+
+    handle = createAgentTenant({
+      capabilities: {
+        secrets: false,
+        agent: false,
+        sessions: false,
+        providers: false,
+        images: false,
+        video: false,
+      },
+      chatgpt: {
+        oauth: {
+          authorize_url: "https://auth.example.test/oauth/authorize",
+          token_url: "https://auth.example.test/oauth/token",
+          client_id: "grida-test-client",
+          redirect_uris: ["http://localhost:1455/auth/callback"],
+          scopes: ["openid", "offline_access"],
+        },
+        responses_url:
+          "https://chatgpt.example.test/backend-api/agent/responses",
+        originator: "grida-test",
+        default_model_id: "openai/gpt-5.6-terra",
+      },
+      scratch_base: scratchBase,
+    }).register(new Hono(), services);
+
+    expect(warn).toHaveBeenCalledWith(
+      "[grida-agent] chatgpt is configured but capabilities.providers is disabled; the provider is unavailable."
+    );
+  });
+
   it("retries durable queues when a provider credential becomes ready", async () => {
     const baseDir = await fs.mkdtemp(
       path.join(os.tmpdir(), "grida-agent-provider-ready-")
@@ -74,12 +132,14 @@ describe("agent tenant startup", () => {
       () => fs.rm(baseDir, { recursive: true, force: true }),
       () => fs.rm(scratchBase, { recursive: true, force: true })
     );
+    const auth = new AuthStore(baseDir);
     const services: DaemonServices = {
       user_data_path: baseDir,
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
-      secrets: new SecretsStore(new AuthStore(baseDir)),
+      auth,
+      secrets: new SecretsStore(auth),
     };
     let finishStartupRecovery!: () => void;
     const startupRecovery = new Promise<void>((resolve) => {
@@ -131,12 +191,14 @@ describe("agent tenant startup", () => {
       () => fs.rm(baseDir, { recursive: true, force: true }),
       () => fs.rm(scratchBase, { recursive: true, force: true })
     );
+    const auth = new AuthStore(baseDir);
     const services: DaemonServices = {
       user_data_path: baseDir,
       files: new FileRegistry(),
       recent: new RecentStore(baseDir),
       workspaces: new WorkspaceRegistry(baseDir),
-      secrets: new SecretsStore(new AuthStore(baseDir)),
+      auth,
+      secrets: new SecretsStore(auth),
     };
     const recover = vi
       .spyOn(AgentRuntime.prototype, "recoverQueuedSessions")

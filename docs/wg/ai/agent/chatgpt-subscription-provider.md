@@ -1,10 +1,10 @@
 ---
-title: ChatGPT Subscription Provider Implementation Guide
-description: Implementation guide for using a user's eligible ChatGPT plan as a native OpenAI/Codex-backed model provider. Covers auth flow, credential custody, capability resolution, user flow, first-party gateway, OpenAI API-key/BYOK, Codex ACP, and media-generation boundaries.
+title: ChatGPT Subscription Native Provider Specification
+description: Normative contract for using an eligible ChatGPT account as native Grida model capacity while Grida retains ownership of the agent loop, tools, and sessions.
 keywords:
   [
     agent-system,
-    implementation-guide,
+    native-provider,
     openai,
     chatgpt,
     chatgpt-subscription,
@@ -22,7 +22,7 @@ tags:
   - ai
 ---
 
-# ChatGPT Subscription Provider Implementation Guide
+# ChatGPT Subscription Native Provider Specification
 
 This guide defines how to implement a **ChatGPT Subscription native
 provider**: a native model provider that lets a user sign in with an
@@ -44,6 +44,10 @@ The important implementation rule is simple:
 > A ChatGPT subscription can authenticate a native model provider only
 > for the entitlement-bounded ChatGPT/Codex inference surface. It does
 > not become an OpenAI API key, and it does not become Codex ACP.
+
+In Grida this rule is stronger: the provider is **never ACP**. Grida owns
+the session, agent loop, prompts, tools, approvals, sandbox, transcript,
+compaction, and recovery. ChatGPT supplies model capacity only.
 
 The keywords **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and
 **MAY** are used as in
@@ -76,6 +80,24 @@ public OpenAI API. A native provider that uses ChatGPT sign-in therefore
 MUST treat its model endpoint, token audience, model list, quota, and
 media capabilities as a provider-specific integration contract.
 
+OpenAI's public documentation describes ChatGPT sign-in for its supported
+Codex clients. It does not publish a general third-party OAuth registration or
+subscription-backend contract.
+
+The current Grida implementation is therefore an **experimental
+interoperability profile**. It defaults to the publicly shipped Codex native
+OAuth client identity, pins the observed OpenAI authorization/token and
+ChatGPT Responses destinations, and allows a host-owned client-id override.
+That public client identity is not a secret, but using it is also not evidence
+that OpenAI has approved, supports, or contracts with Grida. Grida MUST NOT
+describe it as Grida-owned or provider-approved.
+
+The stable legal/support contract with OpenAI remains an external release
+gate. Until it is resolved, the provider MUST remain explicitly experimental.
+The implementation still MUST NOT import another application's stored
+credentials, read Codex auth files, scrape ChatGPT browser state, or present
+observed behavior as a durable public API.
+
 ## Ownership Model
 
 The provider is native only if the host owns the loop.
@@ -105,19 +127,27 @@ The expected user flow is:
    - does not require an OpenAI API key;
    - does not configure Codex ACP;
    - does not imply image generation unless listed as supported.
-3. User clicks **Sign in with ChatGPT**.
-4. App opens the provider-approved browser sign-in flow.
+3. User clicks **Sign in with your ChatGPT account**.
+4. App opens the exact configured browser sign-in flow.
 5. User completes ChatGPT/OpenAI account login and workspace selection.
-6. Browser returns to the app through the approved callback flow.
-7. App stores the resulting credential in the OS credential store.
-8. App resolves available models/capabilities for that signed-in account.
-9. App marks the provider connected and allows it in the model picker.
-10. User may sign out from the same provider settings panel.
+6. Browser returns to the app through the configured callback flow.
+7. App stores the resulting credential in an owner-readable local secret
+   store.
+8. App validates model selection against its closed compatibility catalog.
+9. App marks the provider connected and shows its compatible models first in
+   the native text-model picker.
+10. A model-picker choice records both the ChatGPT provider and the selected
+    model; the app never infers provider identity from an `openai/*` model id.
+11. User may sign out from the same provider settings panel.
 
-The onboarding flow SHOULD NOT promote this provider as the first default
-when a first-party gateway is available. It MAY offer ChatGPT
-Subscription as an optional account-linking path for users who already
-have an eligible ChatGPT plan and do not have an OpenAI API key.
+For a new Desktop user with no persisted provider choice, onboarding SHOULD
+offer this provider first. Skipping, cancelling, or failing sign-in MUST keep
+onboarding usable. A fresh unconfigured session uses a ready ChatGPT
+Subscription connection first; otherwise it preserves the existing native
+fallback order: text BYOK, then Grida Gateway, then a configured endpoint/local
+provider. A persisted provider remains sticky while its model is omitted or
+unchanged. An explicit provider or explicitly changed model is intentional
+user input and MAY select a different compatible provider.
 
 ## Auth Flow
 
@@ -129,7 +159,7 @@ App
   |-- create auth request
   |     - random state
   |     - PKCE verifier/challenge
-  |     - provider-approved redirect URI
+  |     - redirect URI fixed by the configured native profile
   |
   |-- open browser
   |
@@ -143,7 +173,7 @@ OpenAI / ChatGPT sign-in
 Redirect callback
   |
   |-- validate state
-  |-- exchange authorization result through approved token flow
+  |-- exchange authorization result through the pinned token flow
   |
   v
 Credential store
@@ -154,20 +184,34 @@ Credential store
 
 Implementation requirements:
 
-| Step              | Requirement                                                                                                                             |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Browser launch    | The app SHOULD use the system browser, not an embedded password form.                                                                   |
-| CSRF protection   | The app MUST bind the callback to a random state value.                                                                                 |
-| PKCE              | The app SHOULD use PKCE for an installed-app flow.                                                                                      |
-| Redirect handling | The redirect URI MUST be provider-approved; localhost and custom-scheme callbacks are both possible policy choices.                     |
-| Token exchange    | The app MUST use only an approved OAuth/token flow. It MUST NOT scrape ChatGPT cookies or ask the user to paste private browser tokens. |
-| Token custody     | Access/refresh material MUST live in an OS credential store or equivalent secret store, not in project settings.                        |
-| Display metadata  | The app MAY store non-secret metadata such as email, account id, or workspace label for UI.                                             |
-| Sign out          | Sign out MUST clear local credential material and provider connection state.                                                            |
+| Step              | Requirement                                                                                                                                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser launch    | The app SHOULD use the system browser, not an embedded password form.                                                                                                                                     |
+| CSRF protection   | The app MUST bind the callback to a random state value.                                                                                                                                                   |
+| PKCE              | The app MUST use PKCE S256 for the installed-app flow.                                                                                                                                                    |
+| Redirect handling | The redirect URI MUST be fixed by the configured public-client profile. A loopback installed-app callback may be used only when that profile accepts it; Grida MUST NOT reuse its separate custom scheme. |
+| Token exchange    | The app MUST use only the pinned HTTPS token flow. It MUST NOT scrape ChatGPT cookies or ask the user to paste private browser tokens.                                                                    |
+| Token custody     | Access/refresh material MUST live in an OS credential store or equivalent secret store, not in project settings.                                                                                          |
+| Display metadata  | The app MAY store non-secret metadata such as email, account id, or workspace label for UI.                                                                                                               |
+| Sign out          | Sign out MUST clear local credential material and provider connection state.                                                                                                                              |
 
-If the implementation cannot obtain an approved ChatGPT/Codex token flow,
-it MUST NOT expose this as a native provider. The fallback is a
-first-party gateway, OpenAI API-key/BYOK, or Codex ACP.
+The current experimental profile uses state and PKCE S256; it does not send an
+OIDC nonce and does not independently verify a JWT signature, JWKS, issuer, or
+audience. Account/display claims are parsed only from the bounded response
+returned by the exact configured HTTPS token endpoint. Trust therefore comes
+from the pinned endpoint and the platform TLS trust path, not from a second
+JWT-verification layer. No callback, renderer value, project data, or imported
+credential is treated as an account claim.
+
+This trust posture is an explicit experimental constraint, not a general OIDC
+recommendation. A supported OpenAI contract may add a verifiable ID-token or
+authenticated account endpoint; adopting it would strengthen the profile
+without changing the native-provider ownership model.
+
+If the experimental ChatGPT/Codex token flow is unavailable, the user may
+explicitly choose Grida Gateway, OpenAI API-key/BYOK, a configured
+endpoint/local provider, or an external agent. Codex ACP is never an automatic
+fallback.
 
 ## Credential Management
 
@@ -186,6 +230,12 @@ The host SHOULD refresh before starting a turn when the token is near
 expiry. Concurrent turns SHOULD share one refresh operation instead of
 starting multiple token refreshes. A fatal auth failure SHOULD clear the
 credential and require the user to sign in again.
+
+On an inference `401`, the provider SHOULD first reload newer persisted
+same-account state, then perform one serialized forced refresh if needed, and
+replay the request at most once. A rotated refresh credential MUST be
+persisted atomically before use continues. Sign-out or account change MUST win
+over in-flight refresh work.
 
 Auth error handling:
 
@@ -218,10 +268,18 @@ Capability resolution SHOULD answer:
 - what context and output limits apply on this surface;
 - whether priority/fast processing is available.
 
-Dynamic capability discovery is preferred. If the provider cannot fetch
-capabilities dynamically, it MAY ship a conservative static list, but it
-MUST treat upstream rejection as an entitlement/capability error rather
-than an API-key error.
+Dynamic, authenticated capability discovery remains the preferred stable
+contract. The current experimental implementation has no such surface. It
+uses a closed, fail-before-network model allowlist that mirrors the currently
+observed Zed/Codex-compatible subscription surface. That list is compatibility
+evidence, not entitlement discovery or an upstream guarantee: it may drift,
+and an account may reject a listed model. Any change to the list requires a
+grounded compatibility update rather than assuming parity with the public
+OpenAI API.
+
+The absence of an approved discovery/catalog contract is part of the external
+stable-release gate. Upstream rejection is an entitlement/capability error
+rather than an API-key error.
 
 Model ids that look similar to OpenAI API model ids MUST still be scoped
 to this provider. The same string can have different availability,
@@ -258,23 +316,36 @@ A conforming host:
   equivalent native model-provider surface;
 - MUST keep Codex ACP under **ACP** or the equivalent external
   agent-provider surface;
-- SHOULD make the first-party gateway the default first-run native option
-  when available;
-- SHOULD make ChatGPT Subscription an optional account-linking provider;
+- SHOULD make **Sign in with your ChatGPT account** the first provider action
+  for a new, unconfigured Desktop user;
+- MUST present a ready ChatGPT connection as a distinct, first native-provider
+  group in the text-model picker;
+- MUST present Grida-hosted models in an always-visible **Grida** group whose
+  choices explicitly select the credit-backed `gg` provider;
+- MUST show BYOK and compatible endpoint groups only after that provider is
+  configured with usable text models;
+- MUST bind a ChatGPT picker choice to both provider and model identity rather
+  than inferring the provider from an OpenAI-shaped model id;
+- MUST preserve a persisted provider choice while the model is omitted or
+  unchanged;
+- MUST treat an explicit provider or explicitly changed model as an
+  intentional switch request;
 - SHOULD show the signed-in ChatGPT account/workspace label;
 - SHOULD show the selected model as `provider/model`, not as a global OpenAI API
   model;
 - MUST give auth errors ChatGPT-specific copy;
 - MUST give entitlement errors model/capability-specific copy;
 - MUST provide an explicit sign-out control;
+- MUST NOT silently switch provider in the middle of a turn;
 - MUST keep secrets in the platform secret store;
 - MUST keep host-native turns inspectable in the normal agent transcript.
 
 Suggested settings copy:
 
 ```text
-Sign in with ChatGPT to use eligible OpenAI models through your ChatGPT
-subscription. This does not configure an OpenAI API key or Codex ACP.
+Sign in with your ChatGPT account to use eligible models through your
+ChatGPT subscription. Grida still owns the agent, tools, and session. This
+does not configure an OpenAI API key or Codex ACP.
 ```
 
 Suggested disconnected error:
@@ -298,7 +369,8 @@ User-facing routing should be narrow:
 
 | User wants...                                            | Send them to...                                   |
 | -------------------------------------------------------- | ------------------------------------------------- |
-| Default first-party AI without setup                     | First-party gateway                               |
+| Start a new unconfigured Desktop profile                 | ChatGPT Subscription, then explicit alternatives  |
+| Use managed Grida AI without ChatGPT sign-in             | First-party gateway                               |
 | Use an OpenAI API billing account                        | OpenAI API-key/BYOK provider                      |
 | Use an eligible ChatGPT plan without creating an API key | ChatGPT Subscription provider                     |
 | Run Codex itself, with Codex tools/sandbox/session       | Codex ACP provider                                |
@@ -383,12 +455,64 @@ Codex under ACP instead.
 That callout should be secondary. It should not make ACP the default path
 for users who only want a native model provider.
 
+## Provider Selection
+
+Provider selection is durable session intent, not a model-name side effect:
+
+1. An explicit request/session provider wins.
+2. An explicitly changed model is an intentional re-resolution request and
+   may select another compatible provider.
+3. Otherwise, a persisted user or session provider remains sticky when the
+   model is omitted or unchanged.
+4. A fresh, unconfigured session uses a ready ChatGPT Subscription connection
+   first.
+5. If ChatGPT is not ready, resolution preserves the existing native fallback:
+   text BYOK, then Grida Gateway, then configured endpoint/local capacity.
+6. The chosen provider carries through recovery, titling, and compaction.
+   Continuations and queued turns reuse the selected model; auxiliary titling
+   and compaction may use that provider's lower-cost model tier.
+
+The model picker MUST expose provider and model as one explicit selection. When
+the ChatGPT provider is ready, its closed compatible model set appears before
+other native model choices, and an untouched new Desktop conversation starts on
+the highest-capability compatible model (`GPT-5.6 Sol`). This default is derived
+from live readiness and MUST NOT be persisted as a global preference. The
+provider group order is ChatGPT Subscription when ready, Grida, configured text
+BYOK providers, then configured compatible endpoints. The Grida, OpenRouter,
+and Vercel groups may repeat catalog model ids because each tuple names a
+different cost and privacy boundary. OpenAI-shaped model ids outside the closed
+ChatGPT set never gain ChatGPT eligibility from their name alone.
+
+An auth, entitlement, rate, or quota failure MUST leave the failed turn on its
+selected provider. The app MAY offer another available provider before a new
+turn, but the user must explicitly accept any cost, privacy, and capability
+change. There is no silent mid-turn failover.
+
+## Desktop Security Boundary
+
+The Desktop authorization ceremony is registered as
+**`GRIDA-SEC-008: ChatGPT subscription OAuth credential boundary`**. The
+callback, bridge, credential manager, exact provider transport, cancellation,
+sign-out, and negative-test enforcement form one active boundary. See
+[Desktop agent security](../../desktop/agent-security.md) and the canonical
+[security registry](https://github.com/gridaco/grida/blob/main/SECURITY.md).
+
+SEC-008 records the implementation's actual trust posture: exact
+authorization/token/Responses destinations; a fixed public native client
+identity with a host override; one-time state and PKCE S256; renderer-safe
+status only; owner-readable credential persistence; and no credential import.
+It does not claim nonce binding or independent JWT signature/JWKS validation.
+Claims are trusted only because they come in the bounded response from the
+exact TLS-authenticated token endpoint. The active local boundary does not
+remove the external stable/legal/support release gate with OpenAI.
+
 ## Conformance
 
 A conforming implementation satisfies all of the following:
 
 - The provider id is distinct from `openai`, `gg`, and `codex-acp`.
-- Sign-in uses an approved OpenAI/ChatGPT auth flow.
+- Experimental sign-in uses the exact pinned OpenAI/ChatGPT native flow and is
+  not described as a supported Grida integration before the external gate.
 - Token material is stored only in a secret store.
 - Sign-out clears local credential material.
 - The model/capability list is ChatGPT/Codex-surface-specific.
@@ -396,8 +520,24 @@ A conforming implementation satisfies all of the following:
 - OpenAI API-key setup remains separate.
 - Codex ACP setup remains separate.
 - Image input and image generation are represented separately.
-- The provider is optional in onboarding; the first-party gateway remains
-  the first native default when available.
+- A persisted provider remains sticky while its model is omitted or unchanged;
+  an explicit provider or explicitly changed model is an intentional switch.
+- A new, unconfigured Desktop user sees ChatGPT sign-in first, and a ready
+  connection becomes the first session provider.
+- A ready ChatGPT connection appears first in the native text-model picker, and
+  each of its choices records the `chatgpt` provider with an eligible model.
+- An untouched new conversation defaults to `GPT-5.6 Sol` while ChatGPT is
+  ready, without storing a global preference.
+- The picker always exposes Grida-hosted models under **Grida** and identifies
+  configured BYOK and endpoint choices by provider.
+- The picker never infers ChatGPT provider ownership from an `openai/*` model
+  id.
+- Without a ready ChatGPT connection, text resolution remains BYOK, then GG,
+  then configured endpoints.
+- Provider failure never causes a silent mid-turn fallback.
+- The active SEC-008 boundary describes the implemented callback, credential,
+  bridge, and provider-transport controls without overstating claim
+  verification or OpenAI support.
 - Native turns remain in the host's normal session, stream, inspection,
   and tool-policy model.
 
@@ -421,6 +561,9 @@ A conforming implementation satisfies all of the following:
   and
   [image generation tool](https://developers.openai.com/api/docs/guides/tools-image-generation)
   — public API media-generation surfaces.
+- [Zed: ChatGPT subscription in Zed](https://zed.dev/blog/chatgpt-subscription-in-zed)
+  — behavioral interoperability evidence, not an authorization or source-code
+  dependency.
 - [ACP Provider: Codex](./acp-provider-codex.md) — separate provider
   profile for consuming Codex as an external agent.
 - [ACP Integration](./acp.md) — the outward ACP protocol boundary.

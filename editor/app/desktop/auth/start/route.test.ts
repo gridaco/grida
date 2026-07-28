@@ -24,8 +24,8 @@ import { POST } from "./route";
 
 const CHALLENGE = "NF4wmu64KqpZmRNAuYJrxnETLbuzRbtPSbXpoHggKaA";
 
-function request(): NextRequest {
-  return new Request("https://grida.test/desktop/auth/start", {
+function request(query = ""): NextRequest {
+  return new Request(`https://grida.test/desktop/auth/start${query}`, {
     method: "POST",
   }) as unknown as NextRequest;
 }
@@ -57,6 +57,24 @@ describe("POST /desktop/auth/start", () => {
           skipBrowserRedirect: true,
         }),
       })
+    );
+  });
+
+  it("does not accept or persist a caller-selected continuation", async () => {
+    signInWithOAuth.mockResolvedValue({
+      data: {
+        url: `https://supabase.test/auth/v1/authorize?provider=google&code_challenge=${CHALLENGE}&code_challenge_method=s256`,
+      },
+      error: null,
+    });
+
+    const response = await POST(
+      request("?flow=https%3A%2F%2Fevil.test&next=%2Fdesktop%2Fsettings")
+    );
+    const { url } = (await response.json()) as { url: string };
+    expect(new URL(url).pathname).toBe("/desktop-auth");
+    expect(response.headers.get("set-cookie") ?? "").not.toContain(
+      "grida.desktop.auth.flow"
     );
   });
 

@@ -1,7 +1,13 @@
 "use client";
 // GRIDA-GG: desktop — re-mint the GG token before each send (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-008 — carry the explicit native-provider pin without widening it.
 
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
+import {
+  CHATGPT_PROVIDER_ID,
+  GG_PROVIDER_ID,
+  isValidEndpointProviderId,
+} from "@grida/agent";
 import * as gridaGateway from "@/lib/desktop/gg-session";
 import {
   asAgentMode,
@@ -389,7 +395,12 @@ function readBodyOptions(body: unknown): DesktopAgentTransportOptions {
     out.model_id = obj.model_id as AgentRunOptions["model_id"];
   }
   if (typeof obj.provider_id === "string") {
-    if ((BYOK_PROVIDER_IDS as readonly string[]).includes(obj.provider_id)) {
+    if (
+      obj.provider_id === CHATGPT_PROVIDER_ID ||
+      obj.provider_id === GG_PROVIDER_ID ||
+      (BYOK_PROVIDER_IDS as readonly string[]).includes(obj.provider_id) ||
+      isValidEndpointProviderId(obj.provider_id)
+    ) {
       out.provider_id = obj.provider_id as AgentRunOptions["provider_id"];
     }
   }

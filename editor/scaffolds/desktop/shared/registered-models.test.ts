@@ -22,11 +22,25 @@ describe("registered_models", () => {
       registered_models.providerIdForModel("openai/gpt-5.4-mini", [endpoint])
     ).toBe("endpoint-local");
     expect(
-      registered_models.resolve("openai/gpt-5.4-mini", [endpoint])
+      registered_models.resolve(
+        "openai/gpt-5.4-mini",
+        [endpoint],
+        "endpoint-local"
+      )
     ).toMatchObject({
       label: "Local collision",
       imageInputMimes: ["image/png"],
     });
+  });
+
+  it("does not leak endpoint capabilities into another explicit provider", () => {
+    const resolved = registered_models.resolve(
+      "openai/gpt-5.4-mini",
+      [endpoint],
+      "gg"
+    );
+    expect(resolved?.label).toBe("GPT-5.4 Mini");
+    expect(resolved?.imageInputMimes).toContain("image/jpeg");
   });
 
   it("still resolves the static catalog when no endpoint owns the id", () => {

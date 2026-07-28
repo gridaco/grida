@@ -1,4 +1,5 @@
 // GRIDA-GG: provider — thread the `gg` session deps into resolution (docs/wg/platform/hosted-ai.md)
+// GRIDA-SEC-008 — persist and reuse the exact session provider/model identity.
 /**
  * AgentRuntime — the agent loop + the in-flight stream registry behind
  * one object. `AgentHost` owns an instance; the HTTP layer
@@ -44,7 +45,7 @@ import {
   DirectoryScopeError,
   type DirectoryScopeRegistry,
 } from "../session/directory-scopes";
-import type { ChatModel, MessageUsage } from "../session/rows";
+import type { ChatModel, ChatSessionRow, MessageUsage } from "../session/rows";
 import { usageTokenTotal } from "../session/cost";
 import {
   DEFAULT_COMPACTION_CONFIG,
@@ -131,7 +132,8 @@ function humanInputPendingResponse(sessionId: string): Response {
 async function resolveOrCreateSession(
   store: SessionsStore,
   req: RunRequest,
-  provider: { provider_id: string }
+  provider: { provider_id: string },
+  preloaded?: ChatSessionRow
 ): Promise<
   | {
       session_id: string;
@@ -141,7 +143,7 @@ async function resolveOrCreateSession(
   | Response
 > {
   if (req.session_id) {
-    const existing = await store.get(req.session_id);
+    const existing = preloaded ?? (await store.get(req.session_id));
     if (!existing) {
       return Response.json(
         {
@@ -649,6 +651,7 @@ export class AgentRuntime {
       } else {
         provider = await resolveProvider(this.deps, {
           explicit: session.model?.provider_id,
+          model_id: session.model?.model_id ?? undefined,
         });
       }
       const workspaceRoot =
@@ -774,8 +777,10 @@ export class AgentRuntime {
     const custom = configs.flatMap(resolveEndpointModels);
     const resolve: ResolveModelLimits = (model) => {
       let effective = model;
+      let applicableCustom = custom;
       if (model?.provider_id) {
         const endpoint = configs.find((e) => e.id === model.provider_id);
+        applicableCustom = endpoint ? resolveEndpointModels(endpoint) : [];
         const defaultId = endpoint && endpointDefaultModelId(endpoint);
         // Substitute the endpoint default when the session has no model
         // id — or a STALE one (saved against a model since removed from
@@ -790,7 +795,7 @@ export class AgentRuntime {
           effective = { ...model, model_id: defaultId };
         }
       }
-      return resolveModelLimits(effective, custom);
+      return resolveModelLimits(effective, applicableCustom);
     };
     return { resolve, configs };
   }
@@ -881,61 +886,6 @@ export class AgentRuntime {
     const req = await parseRunBody(body, this.deps);
     if (req instanceof Response) return req;
 
-    // Resolve provider BEFORE opening the stream so a 4xx stays a proper
-    // HTTP error instead of a half-opened SSE.
-    let provider;
-    if (isAgentProviderModel(req.model_id)) {
-      // Agent-provider class (issue #813): an external agent owns its own
-      // loop. No BYOK/endpoint resolution, no model factory — the runtime
-      // streams from the agent-provider consumer in startTurn. GRIDA-SEC-004:
-      // external process authority is explicit and independent of the locked
-      // shell's disposition.
-      const providerId = AGENT_PROVIDER_MODELS[req.model_id].id;
-      const externalAgentExecution = this.external_agent_execution;
-      if (externalAgentExecution === "disabled") {
-        return Response.json(
-          {
-            error: `[agent-host-providers] external agent ${providerId} is disabled by the host`,
-            code: "provider_down",
-            provider_id: providerId,
-          },
-          { status: 409 }
-        );
-      }
-      if (
-        externalAgentExecution === "sandboxed" &&
-        this.deps.sandbox_enforced !== true
-      ) {
-        return Response.json(
-          {
-            error: `[agent-host-providers] external agent ${providerId} requires an enforced OS sandbox`,
-            code: "provider_down",
-            provider_id: providerId,
-          },
-          { status: 409 }
-        );
-      }
-      provider = makeAgentProvider(providerId);
-    } else {
-      try {
-        provider = await resolveProvider(this.deps, { explicit: req.explicit });
-      } catch (err) {
-        if (err instanceof ProviderUnavailableError) {
-          return Response.json(
-            err.provider_id
-              ? {
-                  error: err.message,
-                  code: err.code,
-                  provider_id: err.provider_id,
-                }
-              : { error: err.message, code: err.code },
-            { status: 409 }
-          );
-        }
-        throw err;
-      }
-    }
-
     // Existing-session admission is acquired BEFORE session resolution. New
     // sessions have a fresh id and acquire immediately after creation. The
     // same lease remains held through continuation preflight/config mutation,
@@ -960,15 +910,115 @@ export class AgentRuntime {
     }
 
     try {
+      // The persisted provider/model is part of an existing session's
+      // execution identity. Load it under admission before resolving:
+      // ambient provider readiness may change between turns, but it must not
+      // silently migrate the conversation. An explicit request may still
+      // intentionally override either persisted choice.
+      let existingSession: ChatSessionRow | undefined;
+      if (req.session_id) {
+        existingSession =
+          (await this.deps.sessions_store.get(req.session_id)) ?? undefined;
+        if (!existingSession) {
+          return Response.json(
+            {
+              error: `session not found: ${req.session_id}`,
+              code: "session-not-found",
+            },
+            { status: 404 }
+          );
+        }
+        if (existingSession.agent !== AGENT_SESSION_AGENT) {
+          return Response.json(
+            {
+              error: `session agent mismatch: ${existingSession.agent} != ${AGENT_SESSION_AGENT}`,
+              code: "session-agent-mismatch",
+            },
+            { status: 409 }
+          );
+        }
+      }
+      const effectiveReq: RunRequest = {
+        ...req,
+        model_id: req.model_id ?? existingSession?.model?.model_id,
+      };
+      const explicitlyChangedModel =
+        req.model_id !== undefined &&
+        req.model_id !== existingSession?.model?.model_id;
+      const explicitProviderId =
+        req.explicit ??
+        (explicitlyChangedModel
+          ? undefined
+          : existingSession?.model?.provider_id);
+
+      // Resolve provider before opening the stream so a 4xx stays a proper
+      // HTTP error instead of a half-opened SSE.
+      let provider: ResolvedProvider;
+      if (isAgentProviderModel(effectiveReq.model_id)) {
+        // Agent-provider class (issue #813): an external agent owns its own
+        // loop. No BYOK/endpoint resolution, no model factory — the runtime
+        // streams from the agent-provider consumer in startTurn. GRIDA-SEC-004:
+        // external process authority is explicit and independent of the locked
+        // shell's disposition.
+        const providerId = AGENT_PROVIDER_MODELS[effectiveReq.model_id].id;
+        const externalAgentExecution = this.external_agent_execution;
+        if (externalAgentExecution === "disabled") {
+          return Response.json(
+            {
+              error: `[agent-host-providers] external agent ${providerId} is disabled by the host`,
+              code: "provider_down",
+              provider_id: providerId,
+            },
+            { status: 409 }
+          );
+        }
+        if (
+          externalAgentExecution === "sandboxed" &&
+          this.deps.sandbox_enforced !== true
+        ) {
+          return Response.json(
+            {
+              error: `[agent-host-providers] external agent ${providerId} requires an enforced OS sandbox`,
+              code: "provider_down",
+              provider_id: providerId,
+            },
+            { status: 409 }
+          );
+        }
+        provider = makeAgentProvider(providerId);
+      } else {
+        try {
+          provider = await resolveProvider(this.deps, {
+            explicit: explicitProviderId,
+            model_id: effectiveReq.model_id,
+          });
+        } catch (err) {
+          if (err instanceof ProviderUnavailableError) {
+            return Response.json(
+              err.provider_id
+                ? {
+                    error: err.message,
+                    code: err.code,
+                    provider_id: err.provider_id,
+                  }
+                : { error: err.message, code: err.code },
+              { status: 409 }
+            );
+          }
+          throw err;
+        }
+      }
+
       const runId = crypto.randomUUID();
       console.log(
-        `[agent-host-agent] run started providerId=${provider.provider_id} runId=${runId} tier=${req.tier} modelId=${req.model_id ?? "(tier)"} kind=${provider.kind}`
+        `[agent-host-agent] run started providerId=${provider.provider_id} runId=${runId} tier=${effectiveReq.tier} modelId=${effectiveReq.model_id ?? "(tier)"} kind=${provider.kind}`
       );
 
       const sessionResolution = await resolveOrCreateSession(
         this.deps.sessions_store,
-        req,
-        provider
+        effectiveReq,
+        provider,
+        existingSession
       );
       if (sessionResolution instanceof Response) return sessionResolution;
       const sessionId = sessionResolution.session_id;
@@ -993,7 +1043,7 @@ export class AgentRuntime {
         workspace_root: workspaceRoot,
         mode,
         approval_answer: approvalAnswer,
-      } = req;
+      } = effectiveReq;
 
       // GRIDA-SEC-004 — validate a human-input continuation without consuming
       // it. Approval answers are explicit body fields; question/design-search
@@ -1931,11 +1981,20 @@ export class AgentRuntime {
       }
       let provider;
       try {
-        provider = await resolveProvider(this.deps, {});
+        provider = await resolveProvider(this.deps, {
+          explicit: session.model?.provider_id,
+          model_id: session.model?.model_id,
+        });
       } catch (err) {
         if (err instanceof ProviderUnavailableError) {
           return Response.json(
-            { error: err.message, code: err.code },
+            err.provider_id
+              ? {
+                  error: err.message,
+                  code: err.code,
+                  provider_id: err.provider_id,
+                }
+              : { error: err.message, code: err.code },
             { status: 409 }
           );
         }

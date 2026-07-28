@@ -13,19 +13,28 @@ supervision.
 
 The accepted security architecture for host-native networking and confined
 agent execution is [Desktop agent authority](./docs/agent-authority.md).
+The native system-browser and loopback flow for using an eligible ChatGPT
+subscription is documented in
+[ChatGPT subscription OAuth](./docs/chatgpt-subscription-oauth.md).
+That flow has an active local credential boundary and remains an experimental
+integration: it defaults to the public native Codex OAuth client identity,
+never starts Codex/ACP, and is still gated for stable release on a
+legal/support contract with OpenAI.
 
 ## Architecture
 
 ```text
 Electron main/preload (desktop)
+  -> owns the live Grida-account projection and versioned Desktop preferences
+  -> derives the one sign-in / onboarding / main entry-window role
   -> owns the exact 127.0.0.1 ephemeral listener and per-spawn auth
   -> transfers only accepted connected sockets to the socketless sidecar
   -> owns provider destination grants and a dedicated Chromium network session
   -> loads editor /desktop/*
 
 @grida/agent
-  -> owns BYOK secrets, provider selection/credential injection, files,
-     workspaces, sessions, and desktop agent execution
+  -> owns BYOK/native-provider secrets, provider selection/credential
+     injection, files, workspaces, sessions, and desktop agent execution
   -> serves authenticated daemon HTTP only on main-transferred sockets
   -> sends only provider requests and credential-free provider-asset downloads
      over bounded framed stdin/stdout
@@ -33,6 +42,17 @@ Electron main/preload (desktop)
 editor /desktop/*
   -> owns UX only, through typed bridge clients
 ```
+
+Small, non-secret native preferences live in `preferences.json` under
+Electron's `userData` directory and are owned exclusively by main. The hosted
+renderer receives purpose-specific actions, never a generic preferences
+key/value bridge. `DesktopPreferences` uses a small versioned JSON document
+with owner-only atomic writes. Account cookies remain in Chromium's HttpOnly
+session, while provider credentials and API keys remain in the sidecar's secret
+store. On the first upgrade from Desktop 0.0.13, main consumes the former
+renderer onboarding-completion flag through one fixed hidden same-origin probe
+and records the migration before selecting an authenticated role. That legacy
+flag is never consulted again.
 
 On macOS and Linux, the sidecar runs under `srt` with no direct external
 destinations and `allow_local_binding: false`; Electron main supplies the two
